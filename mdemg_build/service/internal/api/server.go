@@ -34,6 +34,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext) *Server {
 			OpenAIEndpoint: cfg.OpenAIEndpoint,
 			OllamaEndpoint: cfg.OllamaEndpoint,
 			OllamaModel:    cfg.OllamaModel,
+			CacheEnabled:   cfg.EmbeddingCacheEnabled,
+			CacheSize:      cfg.EmbeddingCacheSize,
 		}
 		var err error
 		emb, err = embeddings.New(embCfg)
