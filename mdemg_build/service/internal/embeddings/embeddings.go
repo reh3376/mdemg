@@ -40,6 +40,10 @@ type Config struct {
 	// Ollama settings
 	OllamaEndpoint string // default: http://localhost:11434
 	OllamaModel    string // default: nomic-embed-text
+
+	// Cache settings
+	CacheEnabled bool // Enable LRU caching of embeddings
+	CacheSize    int  // Maximum number of cached embeddings (ignored if CacheEnabled=false)
 }
 
 // CachedEmbedder wraps an Embedder with an LRU cache.
@@ -145,18 +149,33 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 
 // New creates an Embedder based on the configuration.
 // Returns ErrNoProvider if no valid provider is configured.
+// If CacheEnabled=true, wraps the embedder with LRU caching.
 func New(cfg Config) (Embedder, error) {
+	var embedder Embedder
+	var err error
+
 	switch cfg.Provider {
 	case "openai":
 		if cfg.OpenAIAPIKey == "" {
 			return nil, errors.New("OPENAI_API_KEY is required for openai provider")
 		}
-		return NewOpenAI(cfg)
+		embedder, err = NewOpenAI(cfg)
 	case "ollama":
-		return NewOllama(cfg)
+		embedder, err = NewOllama(cfg)
 	case "", "none":
 		return nil, ErrNoProvider
 	default:
 		return nil, errors.New("unknown embedding provider: " + cfg.Provider)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap with cache if enabled
+	if cfg.CacheEnabled && cfg.CacheSize > 0 {
+		return NewCachedEmbedder(embedder, cfg.CacheSize), nil
+	}
+
+	return embedder, nil
 }
