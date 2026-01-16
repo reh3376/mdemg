@@ -5,6 +5,9 @@ package embeddings
 import (
 	"context"
 	"errors"
+	"log"
+	"os"
+	"strings"
 )
 
 // ErrNoProvider is returned when no embedding provider is configured.
@@ -51,14 +54,18 @@ type Config struct {
 type CachedEmbedder struct {
 	embedder Embedder
 	cache    *EmbeddingCache
+	debug    bool // Enable debug logging for cache hits/misses
 }
 
 // NewCachedEmbedder creates a new CachedEmbedder wrapping the given embedder.
 // cacheSize determines the maximum number of cached embeddings.
+// Debug logging is enabled if EMBEDDING_CACHE_DEBUG=true environment variable is set.
 func NewCachedEmbedder(embedder Embedder, cacheSize int) *CachedEmbedder {
+	debug := strings.ToLower(os.Getenv("EMBEDDING_CACHE_DEBUG")) == "true"
 	return &CachedEmbedder{
 		embedder: embedder,
 		cache:    NewEmbeddingCache(cacheSize),
+		debug:    debug,
 	}
 }
 
@@ -80,10 +87,25 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 
 	// Check cache first
 	if cached, found := c.cache.Get(cacheKey); found {
+		if c.debug {
+			truncated := text
+			if len(text) > 50 {
+				truncated = text[:50] + "..."
+			}
+			log.Printf("[EMBEDDING_CACHE] HIT: %q (size=%d)", truncated, c.cache.Len())
+		}
 		return cached, nil
 	}
 
 	// Cache miss - call underlying embedder
+	if c.debug {
+		truncated := text
+		if len(text) > 50 {
+			truncated = text[:50] + "..."
+		}
+		log.Printf("[EMBEDDING_CACHE] MISS: %q (size=%d)", truncated, c.cache.Len())
+	}
+
 	embedding, err := c.embedder.Embed(ctx, text)
 	if err != nil {
 		return nil, err
@@ -117,7 +139,14 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 
 	// If all were cached, return immediately
 	if len(misses) == 0 {
+		if c.debug {
+			log.Printf("[EMBEDDING_CACHE] BATCH: all %d texts cached (size=%d)", len(texts), c.cache.Len())
+		}
 		return results, nil
+	}
+
+	if c.debug {
+		log.Printf("[EMBEDDING_CACHE] BATCH: %d hits, %d misses out of %d texts (size=%d)", len(texts)-len(misses), len(misses), len(texts), c.cache.Len())
 	}
 
 	// Build list of texts to embed
