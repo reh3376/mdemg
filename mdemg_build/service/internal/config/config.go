@@ -39,6 +39,10 @@ type Config struct {
 	OllamaEndpoint      string // default: http://localhost:11434
 	OllamaModel         string // default: nomic-embed-text
 
+	// Embedding cache settings
+	EmbeddingCacheEnabled bool // Feature toggle (default: true)
+	EmbeddingCacheSize    int  // LRU cache capacity (default: 1000)
+
 	// Semantic edge creation on ingest settings
 	SemanticEdgeOnIngest      bool    // Feature toggle (default: true)
 	SemanticEdgeTopN          int     // Max similar nodes to query (default: 5)
@@ -227,6 +231,16 @@ func FromEnv() (Config, error) {
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "nomic-embed-text")
 
+	// Embedding cache settings
+	embCacheEnabled := getBool("EMBEDDING_CACHE_ENABLED", true)
+	embCacheSize, err := atoi("EMBEDDING_CACHE_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if embCacheEnabled && embCacheSize <= 0 {
+		return Config{}, errors.New("EMBEDDING_CACHE_SIZE must be > 0 when caching is enabled")
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -252,6 +266,8 @@ func FromEnv() (Config, error) {
 		OpenAIEndpoint: openaiEndpoint,
 		OllamaEndpoint: ollamaEndpoint,
 		OllamaModel: ollamaModel,
+		EmbeddingCacheEnabled:     embCacheEnabled,
+		EmbeddingCacheSize:        embCacheSize,
 		SemanticEdgeOnIngest:      semEdgeEnabled,
 		SemanticEdgeTopN:          semEdgeTopN,
 		SemanticEdgeMinSimilarity: semEdgeMinSim,
