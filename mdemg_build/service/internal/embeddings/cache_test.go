@@ -1,6 +1,7 @@
 package embeddings
 
 import (
+	"context"
 	"sync"
 	"testing"
 )
@@ -539,4 +540,321 @@ func TestEmbeddingCacheLen(t *testing.T) {
 	if cache.Len() != 0 {
 		t.Errorf("cache length after clear = %d, expected 0", cache.Len())
 	}
+}
+
+// mockEmbedder is a test embedder that tracks call counts and returns predictable embeddings.
+type mockEmbedder struct {
+	mu              sync.Mutex
+	callCount       int
+	batchCallCount  int
+	dimensions      int
+	name            string
+	embedFunc       func(text string) ([]float32, error)
+	embedBatchFunc  func(texts []string) ([][]float32, error)
+}
+
+func newMockEmbedder(name string, dims int) *mockEmbedder {
+	return &mockEmbedder{
+		dimensions: dims,
+		name:       name,
+	}
+}
+
+func (m *mockEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+	m.mu.Lock()
+	m.callCount++
+	m.mu.Unlock()
+
+	if m.embedFunc != nil {
+		return m.embedFunc(text)
+	}
+
+	// Default: return predictable embedding based on text length
+	result := make([]float32, m.dimensions)
+	for i := range result {
+		result[i] = float32(len(text)) * 0.01
+	}
+	return result, nil
+}
+
+func (m *mockEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+	m.mu.Lock()
+	m.batchCallCount++
+	m.mu.Unlock()
+
+	if m.embedBatchFunc != nil {
+		return m.embedBatchFunc(texts)
+	}
+
+	// Default: embed each text individually
+	results := make([][]float32, len(texts))
+	for i, text := range texts {
+		result := make([]float32, m.dimensions)
+		for j := range result {
+			result[j] = float32(len(text)) * 0.01
+		}
+		results[i] = result
+	}
+	return results, nil
+}
+
+func (m *mockEmbedder) Dimensions() int {
+	return m.dimensions
+}
+
+func (m *mockEmbedder) Name() string {
+	return m.name
+}
+
+func (m *mockEmbedder) getCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.callCount
+}
+
+func (m *mockEmbedder) getBatchCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.batchCallCount
+}
+
+// TestCachedEmbedder tests the CachedEmbedder integration with cache hits
+func TestCachedEmbedder(t *testing.T) {
+	t.Run("cache hit avoids underlying embedder call", func(t *testing.T) {
+		mock := newMockEmbedder("test-provider", 128)
+		cached := NewCachedEmbedder(mock, 10)
+
+		ctx := context.Background()
+		text := "test input text"
+
+		// First call - should hit the mock embedder
+		emb1, err := cached.Embed(ctx, text)
+		if err != nil {
+			t.Fatalf("first embed failed: %v", err)
+		}
+		if len(emb1) != 128 {
+			t.Errorf("embedding dimensions = %d, expected 128", len(emb1))
+		}
+		if mock.getCallCount() != 1 {
+			t.Errorf("mock call count after first call = %d, expected 1", mock.getCallCount())
+		}
+
+		// Second call with same text - should hit cache, not call mock
+		emb2, err := cached.Embed(ctx, text)
+		if err != nil {
+			t.Fatalf("second embed failed: %v", err)
+		}
+		if len(emb2) != 128 {
+			t.Errorf("embedding dimensions = %d, expected 128", len(emb2))
+		}
+		if mock.getCallCount() != 1 {
+			t.Errorf("mock call count after cache hit = %d, expected 1 (not 2)", mock.getCallCount())
+		}
+
+		// Verify embeddings are identical
+		for i := range emb1 {
+			if emb1[i] != emb2[i] {
+				t.Errorf("embedding mismatch at index %d: first=%f, second=%f", i, emb1[i], emb2[i])
+			}
+		}
+
+		// Third call with different text - should call mock again
+		emb3, err := cached.Embed(ctx, "different text")
+		if err != nil {
+			t.Fatalf("third embed failed: %v", err)
+		}
+		if len(emb3) != 128 {
+			t.Errorf("embedding dimensions = %d, expected 128", len(emb3))
+		}
+		if mock.getCallCount() != 2 {
+			t.Errorf("mock call count after different text = %d, expected 2", mock.getCallCount())
+		}
+	})
+
+	t.Run("cache respects provider name in key", func(t *testing.T) {
+		mock1 := newMockEmbedder("provider-A", 64)
+		mock2 := newMockEmbedder("provider-B", 64)
+
+		cached1 := NewCachedEmbedder(mock1, 10)
+		cached2 := NewCachedEmbedder(mock2, 10)
+
+		ctx := context.Background()
+		text := "same text"
+
+		// Call both embedders with same text
+		_, err := cached1.Embed(ctx, text)
+		if err != nil {
+			t.Fatalf("cached1 embed failed: %v", err)
+		}
+		_, err = cached2.Embed(ctx, text)
+		if err != nil {
+			t.Fatalf("cached2 embed failed: %v", err)
+		}
+
+		// Both should have called their underlying embedders (different cache keys)
+		if mock1.getCallCount() != 1 {
+			t.Errorf("mock1 call count = %d, expected 1", mock1.getCallCount())
+		}
+		if mock2.getCallCount() != 1 {
+			t.Errorf("mock2 call count = %d, expected 1", mock2.getCallCount())
+		}
+	})
+
+	t.Run("Name method includes cache indicator", func(t *testing.T) {
+		mock := newMockEmbedder("my-provider", 128)
+		cached := NewCachedEmbedder(mock, 10)
+
+		name := cached.Name()
+		expected := "my-provider+cache"
+		if name != expected {
+			t.Errorf("cached name = %q, expected %q", name, expected)
+		}
+	})
+
+	t.Run("Dimensions method returns underlying dimensions", func(t *testing.T) {
+		mock := newMockEmbedder("test-provider", 256)
+		cached := NewCachedEmbedder(mock, 10)
+
+		dims := cached.Dimensions()
+		if dims != 256 {
+			t.Errorf("dimensions = %d, expected 256", dims)
+		}
+	})
+
+	t.Run("batch operations use cache", func(t *testing.T) {
+		mock := newMockEmbedder("batch-provider", 128)
+		cached := NewCachedEmbedder(mock, 10)
+
+		ctx := context.Background()
+		texts := []string{"text1", "text2", "text3"}
+
+		// First batch call - all misses
+		embs1, err := cached.EmbedBatch(ctx, texts)
+		if err != nil {
+			t.Fatalf("first batch embed failed: %v", err)
+		}
+		if len(embs1) != 3 {
+			t.Fatalf("batch result length = %d, expected 3", len(embs1))
+		}
+		if mock.getBatchCallCount() != 1 {
+			t.Errorf("mock batch call count = %d, expected 1", mock.getBatchCallCount())
+		}
+
+		// Second batch call with same texts - all hits, no mock call
+		embs2, err := cached.EmbedBatch(ctx, texts)
+		if err != nil {
+			t.Fatalf("second batch embed failed: %v", err)
+		}
+		if len(embs2) != 3 {
+			t.Fatalf("batch result length = %d, expected 3", len(embs2))
+		}
+		if mock.getBatchCallCount() != 1 {
+			t.Errorf("mock batch call count after cache hits = %d, expected 1 (not 2)", mock.getBatchCallCount())
+		}
+
+		// Verify embeddings match
+		for i := range embs1 {
+			for j := range embs1[i] {
+				if embs1[i][j] != embs2[i][j] {
+					t.Errorf("embedding mismatch at [%d][%d]: first=%f, second=%f", i, j, embs1[i][j], embs2[i][j])
+				}
+			}
+		}
+	})
+
+	t.Run("batch with mixed hits and misses", func(t *testing.T) {
+		mock := newMockEmbedder("mixed-provider", 128)
+		cached := NewCachedEmbedder(mock, 10)
+
+		ctx := context.Background()
+
+		// Pre-populate cache with some texts
+		_, err := cached.Embed(ctx, "cached1")
+		if err != nil {
+			t.Fatalf("pre-populate failed: %v", err)
+		}
+		_, err = cached.Embed(ctx, "cached2")
+		if err != nil {
+			t.Fatalf("pre-populate failed: %v", err)
+		}
+
+		// Reset counters
+		mock.mu.Lock()
+		mock.callCount = 0
+		mock.batchCallCount = 0
+		mock.mu.Unlock()
+
+		// Batch with mix of cached and new texts
+		texts := []string{"cached1", "new1", "cached2", "new2"}
+		embs, err := cached.EmbedBatch(ctx, texts)
+		if err != nil {
+			t.Fatalf("mixed batch embed failed: %v", err)
+		}
+		if len(embs) != 4 {
+			t.Fatalf("batch result length = %d, expected 4", len(embs))
+		}
+
+		// Should only call batch embedder for the 2 new texts
+		if mock.getBatchCallCount() != 1 {
+			t.Errorf("mock batch call count = %d, expected 1 (for 2 misses)", mock.getBatchCallCount())
+		}
+
+		// All results should be valid
+		for i, emb := range embs {
+			if len(emb) != 128 {
+				t.Errorf("embedding[%d] dimensions = %d, expected 128", i, len(emb))
+			}
+		}
+	})
+
+	t.Run("cache eviction behavior with CachedEmbedder", func(t *testing.T) {
+		mock := newMockEmbedder("eviction-provider", 64)
+		cached := NewCachedEmbedder(mock, 2) // Small cache
+
+		ctx := context.Background()
+
+		// Fill cache
+		_, err := cached.Embed(ctx, "text1")
+		if err != nil {
+			t.Fatalf("embed text1 failed: %v", err)
+		}
+		_, err = cached.Embed(ctx, "text2")
+		if err != nil {
+			t.Fatalf("embed text2 failed: %v", err)
+		}
+
+		// At this point, callCount should be 2
+		if mock.getCallCount() != 2 {
+			t.Fatalf("call count after filling cache = %d, expected 2", mock.getCallCount())
+		}
+
+		// Add third item, should evict text1
+		_, err = cached.Embed(ctx, "text3")
+		if err != nil {
+			t.Fatalf("embed text3 failed: %v", err)
+		}
+
+		// callCount should be 3
+		if mock.getCallCount() != 3 {
+			t.Fatalf("call count after eviction = %d, expected 3", mock.getCallCount())
+		}
+
+		// Re-embed text1 - should be cache miss (was evicted)
+		_, err = cached.Embed(ctx, "text1")
+		if err != nil {
+			t.Fatalf("re-embed text1 failed: %v", err)
+		}
+		if mock.getCallCount() != 4 {
+			t.Errorf("call count after re-embedding evicted text = %d, expected 4", mock.getCallCount())
+		}
+
+		// Re-embed text2 - should be cache hit (still in cache)
+		_, err = cached.Embed(ctx, "text2")
+		if err != nil {
+			t.Fatalf("re-embed text2 failed: %v", err)
+		}
+		if mock.getCallCount() != 4 {
+			t.Errorf("call count after cache hit = %d, expected 4 (not 5)", mock.getCallCount())
+		}
+	})
 }
