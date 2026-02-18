@@ -21,10 +21,13 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "c801a807f671a0e09609e39aea85f21f6f2fb89f18a5f24a1fd308d40f9b6b8d"
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "eea844f53ab4d5d5b295cbfcc579b181a8e3f560d6b7e59a533984af5b48d4af"
   },
   "variables": {
-    "test_space": "uats-rsic-phase87",
+    "test_space": "uats-rsic-phase87-meta",
     "idempotency_key": {
       "generator": "uuid"
     }

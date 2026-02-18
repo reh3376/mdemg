@@ -364,6 +364,13 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Conflict resolution between agents (CRDT merge — Phase 35)
 - [ ] Collective learning aggregation
 
+### Phase 6: RSIC Self-Improvement Hardening ✅ COMPLETE
+- [x] Recursive Self-Improvement Cycle foundation (Phase 60b)
+- [x] Orchestration with trigger sources and cooldown policies (Phase 87)
+- [x] Safety enforcement with dry-run and rollback (Phase 88)
+- [x] Persistent state with multi-space correctness (Phase 89)
+- [x] Conformance testing and CI gating — 6 integration tests, CI split, UATS tag filtering (Phase 90)
+
 ---
 
 ## Design Principles

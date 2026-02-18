@@ -80,6 +80,12 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   # API validation (UATS - requires running server)
   make test-api
 
+  # RSIC-specific tests (requires running server + Neo4j)
+  make test-rsic              # All RSIC tests (unit + integration + UATS)
+  make test-rsic-unit         # RSIC unit tests only
+  make test-rsic-integration  # RSIC integration tests (full stack, 6 tests)
+  make test-rsic-uats         # RSIC contract tests (14 specs)
+
   # Smoke tests (health + readiness only)
   make test-smoke
 
@@ -123,6 +129,18 @@ When adding a new language parser or modifying an existing one:
 1. Create or edit `docs/api/api-spec/uats/specs/<endpoint>.uats.json`
 2. Run `make test-api-<endpoint>` to validate
 3. Install UATS dependencies: `make uats-setup`
+
+**UATS Tag Filtering** (Phase 90): Specs support optional tags in their `config.tags` array for selective execution:
+```bash
+# Run only RSIC specs
+python3 runners/uats_runner.py validate-all --spec-dir specs/ --base-url ... --include-tag rsic
+
+# Run all non-embedding specs (CI merge-gating)
+python3 runners/uats_runner.py validate-all --spec-dir specs/ --base-url ... --exclude-tag embedding_required
+```
+Tags: `rsic` (14 RSIC/self-improve specs), `embedding_required` (4 embedding-dependent specs). **CI splits UATS into merge-gating (core) and best-effort (embedding).**
+
+**UATS Sequential Mode**: Specs with `"sequential": true` in config run variants in order with previous response fields available as `prev_*` variables (used for idempotency testing).
 
 **UBTS (Universal Benchmark Test Specification)** defines performance benchmarks with latency thresholds and throughput requirements. Specs live in `docs/tests/ubts/specs/`. Profiles (smoke, load, stress) control test intensity.
 

@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-02-16 (All phases complete through Phase 80. Phase 11 LLM Plugin SDK complete. 102 UATS specs, 172 variants, 100% passing.)
+**Updated**: 2026-02-18 (All phases complete through Phase 90. RSIC hardening complete (Phases 87-90). 109 UATS specs, 180 variants, 100% passing. 6 RSIC integration tests. CI gated on non-embedding specs.)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved 0.733, Edge Attention achieved **0.898 avg score** (+58.4% from v4 baseline, 100% high-score rate)

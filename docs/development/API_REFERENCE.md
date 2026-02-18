@@ -23,6 +23,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Backup & Restore](#backup--restore-phase-70)
 - [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
 - [Meta-Cognition & Self-Improvement](#meta-cognition--self-improvement-phase-80)
+- [RSIC Orchestration & Safety](#rsic-orchestration--safety-phases-87-90)
 
 ---
 
@@ -2098,6 +2099,128 @@ Phase 80 adds `anomalies` and `memory_state` fields to existing resume and recal
 **Response Headers** (set on degraded state):
 - `X-MDEMG-Memory-State: degraded`
 - `X-MDEMG-Anomaly: empty-resume`
+
+---
+
+## RSIC Orchestration & Safety (Phases 87-90)
+
+### POST /v1/self-improve/cycle
+
+Triggers an RSIC cycle with orchestration policy enforcement.
+
+**Request Body**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "tier": "meso",
+  "trigger_source": "manual_api",
+  "idempotency_key": "optional-dedup-key",
+  "dry_run": false
+}
+```
+
+- `trigger_source`: `manual_api` (default), `micro_auto`, `session_periodic`, `macro_cron`, `watchdog_force`
+- `dry_run` (Phase 88): When `true`, runs full pipeline but applies zero mutations. Returns `deltas` array.
+- `idempotency_key` (Phase 87): If provided, duplicate requests within the dedupe window return the cached result.
+
+**Response (200)**:
+```json
+{
+  "cycle_id": "rsic-meso-abc12345",
+  "tier": "meso",
+  "space_id": "mdemg-dev",
+  "started_at": "2026-02-18T10:00:00Z",
+  "completed_at": "2026-02-18T10:00:01Z",
+  "actions_executed": 3,
+  "success_count": 3,
+  "failed_count": 0,
+  "trigger_source": "manual_api",
+  "trigger_id": "manual_api:mdemg-dev:2026-02-18T10:00",
+  "triggered_at": "2026-02-18T10:00:00Z",
+  "policy_version": "phase87-v1",
+  "idempotency_key": "optional-dedup-key",
+  "safety_version": "phase88-v1",
+  "dry_run": false
+}
+```
+
+**Response (409 — Cooldown/Overlap)**:
+```json
+{
+  "error": "trigger rejected",
+  "reason": "cooldown active for source=manual_api space=mdemg-dev (143s remaining)",
+  "policy_version": "phase87-v1"
+}
+```
+
+**Config**: `RSIC_TRIGGER_COOLDOWN_SEC` (default 300), `RSIC_TRIGGER_DEDUPE_SEC` (default 600).
+
+### GET /v1/self-improve/health
+
+Extended health endpoint with orchestration, safety, and persistence blocks.
+
+**Response (200)** includes Phase 87-90 blocks:
+```json
+{
+  "status": "idle",
+  "active_tasks": 0,
+  "watchdog": { "decay_score": 0.85, "cycles_seen": 12 },
+  "orchestration": {
+    "cooldown_sec": 300,
+    "dedupe_sec": 600,
+    "last_triggers": [],
+    "scheduler": { "enabled": true, "macro_next_run": "2026-02-25T03:00:00Z" }
+  },
+  "safety": {
+    "safety_version": "phase88-v1",
+    "rollback_window_sec": 3600,
+    "protected_spaces": ["mdemg-dev"]
+  },
+  "persistence": {
+    "enabled": true,
+    "last_flush": "2026-02-18T10:00:00Z",
+    "state_nodes": 4,
+    "dirty_keys": 0,
+    "flush_errors": 0
+  }
+}
+```
+
+### GET /v1/self-improve/history
+
+Supports Phase 87 filtering by `trigger_source`, `tier`, and `space_id` query params.
+
+**Query Parameters**: `limit` (default 50), `trigger_source`, `tier`, `space_id`.
+
+### GET /v1/self-improve/rollback
+
+Lists available rollback snapshots (Phase 88).
+
+**Response (200)**:
+```json
+{
+  "snapshots": [
+    {
+      "snapshot_id": "snap-abc123",
+      "cycle_id": "rsic-meso-abc12345",
+      "space_id": "mdemg-dev",
+      "action_type": "tombstone_stale",
+      "created_at": "2026-02-18T10:00:00Z",
+      "reversible": true
+    }
+  ],
+  "count": 1
+}
+```
+
+### POST /v1/self-improve/rollback
+
+Rolls back a specific snapshot (Phase 88).
+
+**Request Body**:
+```json
+{ "snapshot_id": "snap-abc123" }
+```
 
 ---
 

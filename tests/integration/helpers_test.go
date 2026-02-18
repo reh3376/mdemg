@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -279,4 +280,126 @@ func CreateControlledEmbedding(dims int, similarity float64, perpIndex int) []fl
 	}
 
 	return embedding
+}
+
+// ─── RSIC Helpers ───
+
+// ObserveTestNode creates a minimal CMS observation in the test space.
+// This is used to seed graph data for RSIC cycle tests.
+func ObserveTestNode(t *testing.T, endpoint, spaceID, content string) {
+	t.Helper()
+
+	body := map[string]any{
+		"space_id":   spaceID,
+		"session_id": "integration-test",
+		"content":    content,
+		"obs_type":   "learning",
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal observe request: %v", err)
+	}
+
+	client := NewTestHTTPClient()
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/conversation/observe", bytes.NewReader(bodyBytes))
+	if err != nil {
+		t.Fatalf("failed to create observe request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("observe request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errBody map[string]any
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		t.Fatalf("observe returned status %d: %v", resp.StatusCode, errBody)
+	}
+}
+
+// TriggerRSICCycle triggers an RSIC cycle and returns the parsed response body.
+func TriggerRSICCycle(t *testing.T, endpoint, spaceID string, opts map[string]any) map[string]any {
+	t.Helper()
+
+	body := map[string]any{"space_id": spaceID, "tier": "micro"}
+	for k, v := range opts {
+		body[k] = v
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal cycle request: %v", err)
+	}
+
+	client := NewTestHTTPClient()
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/self-improve/cycle", bytes.NewReader(bodyBytes))
+	if err != nil {
+		t.Fatalf("failed to create cycle request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("cycle request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errBody map[string]any
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		t.Fatalf("cycle returned status %d: %v", resp.StatusCode, errBody)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode cycle response: %v", err)
+	}
+	return result
+}
+
+// GetRSICHealth fetches the RSIC health endpoint and returns parsed response.
+func GetRSICHealth(t *testing.T, endpoint string) map[string]any {
+	t.Helper()
+
+	client := NewTestHTTPClient()
+	resp, err := client.Get(endpoint + "/v1/self-improve/health")
+	if err != nil {
+		t.Fatalf("health request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("health returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode health response: %v", err)
+	}
+	return result
+}
+
+// GetRSICHistory fetches RSIC cycle history and returns parsed response.
+func GetRSICHistory(t *testing.T, endpoint string, limit int) map[string]any {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/v1/self-improve/history?limit=%d", endpoint, limit)
+	client := NewTestHTTPClient()
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("history request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("history returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode history response: %v", err)
+	}
+	return result
 }

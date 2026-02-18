@@ -275,6 +275,7 @@ type CycleOutcome struct {
 	TriggerID      string        `json:"trigger_id,omitempty"`
 	TriggeredAt    time.Time     `json:"triggered_at,omitempty"`
 	PolicyVersion  string        `json:"policy_version,omitempty"`
+	IdempotencyKey string        `json:"idempotency_key,omitempty"`
 
 	// Phase 88: Safety enforcement
 	DryRun         bool            `json:"dry_run,omitempty"`

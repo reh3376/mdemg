@@ -30,7 +30,10 @@
       "$.stats.duration",
       "$.stats.rate"
     ],
-    "sha256": "3be1142c80172b68617a61fee713694b00662ebdc4eb93f05c716dc836ec1f66"
+    "tags": [
+      "embedding_required"
+    ],
+    "sha256": "f5e39c6d0e2fe031116604f3ccb65036bf2452721087fd31fd5a8a6473d2eadd"
   },
   "variables": {
     "test_space": "uats-ingest-test",

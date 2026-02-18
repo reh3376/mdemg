@@ -444,7 +444,10 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ Complete |
+| 90 | RSIC Conformance & CI Gating (integration tests, CI split, tag filtering) | ✅ Complete |
+| 89 | RSIC Persistence & Multi-Space Correctness (write-behind, RSICState nodes) | ✅ Complete |
+| 88 | RSIC Safety & Policy Enforcement (dry-run, rollback, blast-radius) | ✅ Complete |
+| 87 | RSIC Orchestration Activation (trigger sources, cooldown, dedupe) | ✅ Complete |
 | 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ Complete |
 | 76 | Neo4j State Monitor & Space Overview | ✅ Complete |
 | 75 | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
@@ -453,11 +456,6 @@ Exposes all MDEMG metrics in Prometheus format.
 | 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
 | 51 | Web Scraper Ingestion Module | ✅ Complete |
 | 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |
-| 48.3-48.4 | Data Transmission & Connection Pooling | ✅ Complete |
-| 48-SR | CMS Skill Registry API | ✅ Complete |
-| 47 | Optimistic Lock Retry + Edge Consistency | ✅ Complete |
-| 46-PR | Dynamic Pipeline Registry | ✅ Complete |
-| 45.5 | Constraint Detection & Consolidation | ✅ Complete |
 
 ### In Progress / Next Up
 

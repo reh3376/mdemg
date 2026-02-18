@@ -125,3 +125,26 @@ test-api-remote:
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--report /tmp/api-report.json
+
+# ============================================================
+# RSIC Testing Targets
+# ============================================================
+.PHONY: test-rsic test-rsic-unit test-rsic-integration test-rsic-uats
+
+test-rsic: test-rsic-unit test-rsic-integration test-rsic-uats
+	@echo "All RSIC tests complete"
+
+test-rsic-unit:
+	@echo "Running RSIC unit tests..."
+	go test -v ./internal/ape/...
+
+test-rsic-integration:
+	@echo "Running RSIC integration tests..."
+	go test -v -tags=integration ./tests/integration/... -run "TestRSIC_"
+
+test-rsic-uats:
+	@echo "Running RSIC UATS contract tests..."
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url $(BASE_URL) \
+		--include-tag rsic

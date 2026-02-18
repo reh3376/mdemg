@@ -21,7 +21,10 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "ac1118bc30a7bd4d64b4d4b21d797d109dbf4289b66aea2a3c6eaaa47ea482e5"
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "1011ee172d6137ec7bace53250995ba8af7d1b2b354a1a787c375a8a72f5c439"
   },
   "request": {
     "method": "GET",
