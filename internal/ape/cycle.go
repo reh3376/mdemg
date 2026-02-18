@@ -100,7 +100,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	// Bail early if confidence is too low
 	if report.Confidence < c.cfg.RSICMinConfidence {
-		return &CycleOutcome{
+		outcome := &CycleOutcome{
 			CycleID:        cycleID,
 			Tier:           tier,
 			SpaceID:        spaceID,
@@ -114,7 +114,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			IdempotencyKey: idempotencyKey,
 			DryRun:         isDryRun,
 			SafetyVersion:  SafetyVersion,
-		}, nil
+		}
+		c.calibrator.UpdateCalibration(outcome, nil, nil)
+		return outcome, nil
 	}
 
 	// Stage 2: Reflect
@@ -143,6 +145,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			SafetyVersion:  SafetyVersion,
 		}
 		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
+		c.calibrator.UpdateCalibration(outcome, nil, nil)
 		if c.watchdog != nil {
 			c.watchdog.RecordCycle()
 		}
@@ -211,6 +214,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			MetricsBefore:  baseline,
 		}
 		log.Printf("RSIC %s: dry-run complete (%d deltas)", cycleID, len(outcome.Deltas))
+		c.calibrator.UpdateCalibration(outcome, tasks, nil)
 		return outcome, nil
 	}
 

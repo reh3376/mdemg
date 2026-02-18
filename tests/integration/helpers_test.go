@@ -284,39 +284,42 @@ func CreateControlledEmbedding(dims int, similarity float64, perpIndex int) []fl
 
 // ─── RSIC Helpers ───
 
-// ObserveTestNode creates a minimal CMS observation in the test space.
-// This is used to seed graph data for RSIC cycle tests.
+// ObserveTestNode creates a minimal node in the test space via /v1/memory/ingest.
+// This uses the ingest endpoint (not conversation/observe) so it works without
+// an embedding provider — critical for CI where no embedder is available.
 func ObserveTestNode(t *testing.T, endpoint, spaceID, content string) {
 	t.Helper()
 
 	body := map[string]any{
-		"space_id":   spaceID,
-		"session_id": "integration-test",
-		"content":    content,
-		"obs_type":   "learning",
+		"space_id":  spaceID,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"source":    "integration-test",
+		"name":      content,
+		"content":   content,
+		"path":      fmt.Sprintf("/test/rsic/%d", time.Now().UnixNano()),
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		t.Fatalf("failed to marshal observe request: %v", err)
+		t.Fatalf("failed to marshal ingest request: %v", err)
 	}
 
 	client := NewTestHTTPClient()
-	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/conversation/observe", bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/memory/ingest", bytes.NewReader(bodyBytes))
 	if err != nil {
-		t.Fatalf("failed to create observe request: %v", err)
+		t.Fatalf("failed to create ingest request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Fatalf("observe request failed: %v", err)
+		t.Fatalf("ingest request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var errBody map[string]any
 		json.NewDecoder(resp.Body).Decode(&errBody)
-		t.Fatalf("observe returned status %d: %v", resp.StatusCode, errBody)
+		t.Fatalf("ingest returned status %d: %v", resp.StatusCode, errBody)
 	}
 }
 
