@@ -444,6 +444,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 91 | RSIC Observability & Operations (Prometheus metrics, Grafana dashboard, alert rules) | ✅ Complete |
 | 90 | RSIC Conformance & CI Gating (integration tests, CI split, tag filtering) | ✅ Complete |
 | 89 | RSIC Persistence & Multi-Space Correctness (write-behind, RSICState nodes) | ✅ Complete |
 | 88 | RSIC Safety & Policy Enforcement (dry-run, rollback, blast-radius) | ✅ Complete |

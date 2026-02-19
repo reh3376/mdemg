@@ -79,6 +79,31 @@ type StandardMetrics struct {
 	Neo4jContainerMemUsed   *Gauge
 	Neo4jContainerMemLimit  *Gauge
 	Neo4jContainerMemPercent *Gauge
+
+	// RSIC cycle metrics (Phase 91)
+	RSICCycleTotal    func(tier, source, outcome string) *Counter
+	RSICCycleDuration func(tier string) *Histogram
+
+	// RSIC trigger orchestration
+	RSICTriggerRejected func(source, reason string) *Counter
+
+	// RSIC action metrics
+	RSICActionTotal    func(action, status string) *Counter
+	RSICActionDuration func(action string) *Histogram
+
+	// RSIC safety metrics
+	RSICSafetyBlocked func(action, reason string) *Counter
+
+	// RSIC watchdog metrics
+	RSICWatchdogDecay      func(spaceID string) *Gauge
+	RSICWatchdogEscalation func(spaceID string) *Gauge
+	RSICWatchdogForce      *Counter
+
+	// RSIC calibration
+	RSICCalibrationConfidence func(action string) *Gauge
+
+	// RSIC snapshot
+	RSICSnapshotCreated func(action string) *Counter
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -185,6 +210,61 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.Neo4jContainerMemUsed = r.NewGauge("neo4j_container_mem_used_bytes", "Neo4j container memory used in bytes", nil)
 	m.Neo4jContainerMemLimit = r.NewGauge("neo4j_container_mem_limit_bytes", "Neo4j container memory limit in bytes", nil)
 	m.Neo4jContainerMemPercent = r.NewGauge("neo4j_container_mem_percent", "Neo4j container memory usage percent", nil)
+
+	// RSIC cycle metrics (Phase 91)
+	m.RSICCycleTotal = func(tier, source, outcome string) *Counter {
+		return r.NewCounter("rsic_cycle_total", "Total RSIC cycles",
+			map[string]string{"tier": tier, "source": source, "outcome": outcome})
+	}
+	m.RSICCycleDuration = func(tier string) *Histogram {
+		return r.NewHistogram("rsic_cycle_duration_seconds", "RSIC cycle duration",
+			map[string]string{"tier": tier})
+	}
+
+	// RSIC trigger orchestration
+	m.RSICTriggerRejected = func(source, reason string) *Counter {
+		return r.NewCounter("rsic_trigger_rejected_total", "RSIC trigger rejections",
+			map[string]string{"source": source, "reason": reason})
+	}
+
+	// RSIC action metrics
+	m.RSICActionTotal = func(action, status string) *Counter {
+		return r.NewCounter("rsic_action_total", "Total RSIC actions",
+			map[string]string{"action": action, "status": status})
+	}
+	m.RSICActionDuration = func(action string) *Histogram {
+		return r.NewHistogram("rsic_action_duration_seconds", "RSIC per-action duration",
+			map[string]string{"action": action})
+	}
+
+	// RSIC safety metrics
+	m.RSICSafetyBlocked = func(action, reason string) *Counter {
+		return r.NewCounter("rsic_safety_blocked_total", "RSIC safety blocks",
+			map[string]string{"action": action, "reason": reason})
+	}
+
+	// RSIC watchdog metrics
+	m.RSICWatchdogDecay = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_watchdog_decay_score", "RSIC watchdog decay score",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICWatchdogEscalation = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_watchdog_escalation_level", "RSIC watchdog escalation level (0=nominal..3=force)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICWatchdogForce = r.NewCounter("rsic_watchdog_force_total", "RSIC watchdog force triggers", nil)
+
+	// RSIC calibration
+	m.RSICCalibrationConfidence = func(action string) *Gauge {
+		return r.NewGauge("rsic_calibration_confidence", "RSIC per-action confidence (0-1)",
+			map[string]string{"action": action})
+	}
+
+	// RSIC snapshot
+	m.RSICSnapshotCreated = func(action string) *Counter {
+		return r.NewCounter("rsic_snapshot_created_total", "RSIC snapshots captured",
+			map[string]string{"action": action})
+	}
 
 	return m
 }

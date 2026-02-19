@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+
+	"mdemg/internal/metrics"
 )
 
 // Dispatcher launches and manages RSIC task goroutines.
@@ -108,6 +110,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 		d.reports[task.TaskID] = nil
 		d.mu.Unlock()
 
+		metrics.Metrics().RSICActionTotal(task.ActionType, "dispatched").Inc()
 		go d.executeTask(taskCtx, at)
 	}
 	return nil
@@ -118,6 +121,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 
 	taskID := at.Spec.TaskID
 	actionType := at.Spec.ActionType
+	taskStart := time.Now()
 
 	// Phase 88: Dry-run mode — build delta, skip execution
 	if d.dryRun && d.safetyValidator != nil {
@@ -188,6 +192,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		if err != nil {
 			log.Printf("RSIC snapshot: capture failed for %s: %v (continuing)", actionType, err)
 		} else {
+			metrics.Metrics().RSICSnapshotCreated(actionType).Inc()
 			log.Printf("RSIC snapshot: captured %s (%d items, expires %s)", snap.SnapshotID, snap.AffectedCount, snap.ExpiresAt.Format("15:04:05"))
 			d.safetyMu.Lock()
 			if d.safetySummary != nil {
@@ -219,6 +224,8 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	}
 
 	if execErr != nil {
+		metrics.Metrics().RSICActionTotal(actionType, "failed").Inc()
+		metrics.Metrics().RSICActionDuration(actionType).ObserveDuration(taskStart)
 		d.mu.Lock()
 		at.Status = "failed"
 		d.mu.Unlock()
@@ -232,6 +239,9 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 
 	// Milestone: validation_complete
 	d.postReport(taskID, "completed", 100, "validation_complete", "Task completed", deliverables, "")
+
+	metrics.Metrics().RSICActionTotal(actionType, "success").Inc()
+	metrics.Metrics().RSICActionDuration(actionType).ObserveDuration(taskStart)
 
 	d.mu.Lock()
 	at.Status = "completed"

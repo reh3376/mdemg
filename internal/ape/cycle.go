@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // RunCycleOpts carries optional parameters for RunCycle.
@@ -90,10 +91,13 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	}
 
 	log.Printf("RSIC cycle %s started (tier=%s, space=%s, source=%s)", cycleID, tier, spaceID, meta.TriggerSource)
+	metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "started").Inc()
 
 	// Stage 1: Assess
 	report, err := c.assessor.Assess(ctx, spaceID, tier)
 	if err != nil {
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		return nil, fmt.Errorf("assess failed: %w", err)
 	}
 	log.Printf("RSIC %s: assess complete (health=%.2f, confidence=%.2f)", cycleID, report.OverallHealth, report.Confidence)
@@ -115,6 +119,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			DryRun:         isDryRun,
 			SafetyVersion:  SafetyVersion,
 		}
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "low_confidence").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		c.calibrator.UpdateCalibration(outcome, nil, nil)
 		return outcome, nil
 	}
@@ -122,6 +128,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// Stage 2: Reflect
 	insights, err := c.reflector.Reflect(ctx, report)
 	if err != nil {
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		return nil, fmt.Errorf("reflect failed: %w", err)
 	}
 	log.Printf("RSIC %s: reflect complete (%d insights)", cycleID, len(insights))
@@ -145,6 +153,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			SafetyVersion:  SafetyVersion,
 		}
 		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "completed").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		c.calibrator.UpdateCalibration(outcome, nil, nil)
 		if c.watchdog != nil {
 			c.watchdog.RecordCycle()
@@ -214,6 +224,8 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			MetricsBefore:  baseline,
 		}
 		log.Printf("RSIC %s: dry-run complete (%d deltas)", cycleID, len(outcome.Deltas))
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "dry_run").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		c.calibrator.UpdateCalibration(outcome, tasks, nil)
 		return outcome, nil
 	}
@@ -237,6 +249,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	// Phase 89: Clean up stale dispatcher tasks
 	c.dispatcher.CleanupStaleTasks(10 * time.Minute)
+
+	metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "completed").Inc()
+	metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 
 	log.Printf("RSIC %s: cycle complete (executed=%d, success=%d, failed=%d)",
 		cycleID, outcome.ActionsExecuted, outcome.SuccessCount, outcome.FailedCount)

@@ -1,6 +1,6 @@
 # RSIC Gap Analysis and Hardening Plan
 
-Last updated: 2026-02-16
+Last updated: 2026-02-19
 
 ## Purpose
 
@@ -118,14 +118,14 @@ Tasks:
 - Add dedicated CI job(s) for RSIC conformance and remove permissive `continue-on-error` for RSIC-critical specs.
 - Add Make targets for reproducible local RSIC verification.
 
-### Phase 91: RSIC Observability and Operations
+### Phase 91: RSIC Observability and Operations — Complete
 
 Tasks:
 
-- Add RSIC metrics: cycle trigger source, action success/failure by type, confidence distribution, guardrail rejections.
-- Add dashboard panels and alerts for repeated forced cycles, repeated failed actions, and calibration drift.
-- Add operational runbook for RSIC incident triage, override, safe-mode, and replay.
-- Document RSIC SLOs/SLIs and non-regression acceptance thresholds.
+- ✅ Add RSIC metrics: cycle trigger source, action success/failure by type, confidence distribution, guardrail rejections. (12 Prometheus metrics in `internal/metrics/collectors.go`, instrumented across 6 files in `internal/ape/`)
+- ✅ Add dashboard panels and alerts for repeated forced cycles, repeated failed actions, and calibration drift. (16-panel Grafana dashboard in `deploy/docker/grafana/dashboards/mdemg-rsic.json`, 8 alert rules in `deploy/docker/prometheus/alerts/rsic.yaml`)
+- ✅ Add operational runbook for RSIC incident triage, override, safe-mode, and replay. (`docs/architecture/14_Operations_Runbook.md` §11 — 8 failure mode playbooks, safe mode instructions)
+- ✅ Document RSIC SLOs/SLIs and non-regression acceptance thresholds. (§11.4 in Operations Runbook — cycle success >95%, meso p95 <5min, action success >95%, rejection <10%, force triggers <1/day)
 
 ## Acceptance Criteria for RSIC Hardening
 
