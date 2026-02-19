@@ -1,0 +1,125 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Phase 91 - Prometheus RSIC Metrics",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "phase91",
+      "metrics",
+      "prometheus",
+      "observability"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-19",
+    "description": "Validates RSIC Prometheus metrics are emitted after a cycle runs. Sequential: triggers a cycle first, then checks /v1/prometheus for mdemg_rsic_* metric families.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "sequential": true,
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "be04782b99ab2faa60cdc1b046dd906e1241083521eac5639a895270f07ea8ce"
+  },
+  "variables": {
+    "test_space": "uats-rsic-phase91"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/cycle",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "meso",
+      "trigger_source": "manual_api"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cycle_id",
+        "type": "string"
+      },
+      {
+        "path": "$.trigger_source",
+        "equals": "manual_api"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "prometheus_contains_rsic_cycle_metrics",
+      "request": {
+        "method": "GET",
+        "path": "/v1/prometheus",
+        "headers": {
+          "Content-Type": ""
+        },
+        "body": ""
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$",
+            "contains": "mdemg_rsic_cycle_total"
+          },
+          {
+            "path": "$",
+            "contains": "mdemg_rsic_cycle_duration_seconds"
+          }
+        ]
+      }
+    },
+    {
+      "name": "prometheus_contains_rsic_action_metrics",
+      "request": {
+        "method": "GET",
+        "path": "/v1/prometheus",
+        "headers": {
+          "Content-Type": ""
+        },
+        "body": ""
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$",
+            "contains": "mdemg_rsic_action_total"
+          }
+        ]
+      }
+    },
+    {
+      "name": "prometheus_contains_rsic_calibration_metrics",
+      "request": {
+        "method": "GET",
+        "path": "/v1/prometheus",
+        "headers": {
+          "Content-Type": ""
+        },
+        "body": ""
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$",
+            "contains": "mdemg_rsic_calibration_confidence"
+          }
+        ]
+      }
+    }
+  ]
+}

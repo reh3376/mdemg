@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // ───────────── Trigger Decision ─────────────
@@ -127,6 +128,7 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 
 	// 1. Validate source-tier pairing
 	if !p.isAllowedTier(source, tier) {
+		metrics.Metrics().RSICTriggerRejected(string(source), "tier_mismatch").Inc()
 		return TriggerDecision{
 			Allowed: false,
 			Reason:  fmt.Sprintf("source %s cannot trigger tier %s", source, tier),
@@ -138,6 +140,7 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	if idempotencyKey != "" {
 		if rec, ok := p.dedupeWindow[idempotencyKey]; ok {
 			if now.Sub(rec.Timestamp).Seconds() < float64(p.dedupeSec) {
+				metrics.Metrics().RSICTriggerRejected(string(source), "dedupe").Inc()
 				return TriggerDecision{
 					Allowed: false,
 					Reason:  fmt.Sprintf("duplicate trigger (key=%s, original_cycle=%s)", idempotencyKey, rec.CycleID),
@@ -154,6 +157,7 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 		if now.Sub(rec.Timestamp) > 30*time.Minute {
 			delete(p.activeCycles, activeKey)
 		} else {
+			metrics.Metrics().RSICTriggerRejected(string(source), "overlap").Inc()
 			return TriggerDecision{
 				Allowed: false,
 				Reason:  fmt.Sprintf("active cycle exists for space=%s tier=%s (cycle=%s)", spaceID, tier, rec.CycleID),
@@ -166,6 +170,7 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 	cooldownKey := fmt.Sprintf("%s:%s", source, spaceID)
 	if rec, ok := p.lastTrigger[cooldownKey]; ok {
 		if now.Sub(rec.Timestamp).Seconds() < float64(p.cooldownSec) {
+			metrics.Metrics().RSICTriggerRejected(string(source), "cooldown").Inc()
 			return TriggerDecision{
 				Allowed: false,
 				Reason:  fmt.Sprintf("cooldown active for source=%s space=%s (%.0fs remaining)", source, spaceID, float64(p.cooldownSec)-now.Sub(rec.Timestamp).Seconds()),
@@ -179,6 +184,7 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 		// Check same space, any tier
 		if rec.SpaceID == spaceID && now.Sub(rec.Timestamp) < 30*time.Minute {
 			if rec.Source.Priority() < source.Priority() {
+				metrics.Metrics().RSICTriggerRejected(string(source), "priority").Inc()
 				return TriggerDecision{
 					Allowed: false,
 					Reason:  fmt.Sprintf("higher-priority source %s active (key=%s)", rec.Source, key),

@@ -379,7 +379,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 88**: `docs/specs/phase88-rsic-safety-policy-enforcement.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle_dry_run.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health_safety.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_rollback_list.phase88.uats.json`. Go: `internal/ape/safety_validator.go`, `internal/ape/action_snapshot.go`.
 - **Phase 89**: `docs/specs/phase89-rsic-persistence-multi-space.md` | Go: `internal/ape/rsic_store.go`. Config: `RSIC_PERSISTENCE_ENABLED`, `RSIC_WATCHDOG_SPACE_ID`.
 - **Phase 90**: `docs/specs/phase90-rsic-conformance-ci-gating.md` | Go: `tests/integration/rsic_test.go` (6 integration tests). CI: `.github/workflows/ci.yml` (pipeline split). Make: `test-rsic*` targets. Runner: `--include-tag`/`--exclude-tag`/sequential mode.
-- **Phase 91**: `docs/development/RSIC_GAP_ANALYSIS.md` (Gap #6: Observability & Alerting) | Planned.
+- **Phase 91**: `docs/specs/phase91-rsic-observability-operations.md` | Go: `internal/metrics/collectors.go` (12 RSIC metrics), `internal/ape/cycle.go`, `internal/ape/orchestration_policy.go`, `internal/ape/safety_validator.go`, `internal/ape/watchdog.go`, `internal/ape/calibration.go`, `internal/ape/task_dispatch.go`. Dashboard: `deploy/docker/grafana/dashboards/mdemg-rsic.json`. Alerts: `deploy/docker/prometheus/alerts/rsic.yaml`. Runbook: `docs/architecture/14_Operations_Runbook.md` §11. JSON: `docs/api/api-spec/uats/specs/prometheus_rsic_metrics.phase91.uats.json`.
 
 ---
 
@@ -1874,20 +1874,22 @@ Main RSIC gap sets identified:
 - `docs/api/api-spec/uats/drafts/self_improve_cycle_trigger_metadata.phase87.uats.json`
 - `docs/api/api-spec/uats/drafts/self_improve_health_orchestration.phase87.uats.json`
 
-#### Phase 91: RSIC Observability and Operations
+#### Phase 91: RSIC Observability and Operations (Complete)
 
-- Add RSIC metrics for trigger source, action success/failure, guardrail rejections, and calibration drift.
-- Add dashboard + alert coverage for repeated force cycles and persistent failed action types.
-- Publish RSIC runbook for safe-mode operation, incident triage, and controlled recovery.
+- ✅ Added 12 Prometheus metrics (`mdemg_rsic_*`) across cycle, trigger, action, safety, watchdog, and calibration domains.
+- ✅ Added Grafana dashboard with 16 panels across 4 rows (Overview, Cycles, Actions, Watchdog).
+- ✅ Added 8 Prometheus alert rules for RSIC degradation detection.
+- ✅ Added Operations Runbook §11 with failure mode playbooks, safe mode instructions, and SLO targets.
+- ✅ Added UATS spec for Prometheus RSIC metric validation.
 
 **Supporting artifacts (docs + JSON):**
 
+- `docs/specs/phase91-rsic-observability-operations.md`
+- `docs/architecture/14_Operations_Runbook.md` (§11)
+- `deploy/docker/grafana/dashboards/mdemg-rsic.json`
+- `deploy/docker/prometheus/alerts/rsic.yaml`
+- `docs/api/api-spec/uats/specs/prometheus_rsic_metrics.phase91.uats.json`
 - `docs/development/RSIC_GAP_ANALYSIS.md`
-- `docs/api/api-spec/uats/specs/self_improve_health.uats.json`
-- `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`
-- `docs/tests/uobs/specs/prometheus_metrics.uobs.json`
-- `docs/tests/uobs/specs/embedding_health.uobs.json`
-- `docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json`
 
 ### UDTS (Active)
 

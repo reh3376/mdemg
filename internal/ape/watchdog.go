@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // Watchdog monitors the time since the last RSIC cycle and escalates if overdue.
@@ -134,6 +135,8 @@ func (w *Watchdog) check() {
 	w.state.DecayScore = hoursSinceCycle * w.cfg.RSICWatchdogDecayRate
 	w.state.NextDue = w.state.LastCycleTime.Add(time.Duration(w.cfg.RSICMesoPeriodHours) * time.Hour)
 
+	metrics.Metrics().RSICWatchdogDecay(w.spaceID).Set(w.state.DecayScore)
+
 	prevLevel := w.state.EscalationLevel
 
 	switch {
@@ -146,6 +149,8 @@ func (w *Watchdog) check() {
 	default:
 		w.state.EscalationLevel = EscalationNominal
 	}
+
+	metrics.Metrics().RSICWatchdogEscalation(w.spaceID).Set(float64(w.state.EscalationLevel))
 
 	// Log on escalation level changes
 	if w.state.EscalationLevel != prevLevel {
@@ -161,6 +166,7 @@ func (w *Watchdog) check() {
 
 	// Auto-trigger at force level
 	if w.state.EscalationLevel == EscalationForce && w.cycleTrigger != nil {
+		metrics.Metrics().RSICWatchdogForce.Inc()
 		// Reset before triggering to avoid re-triggering
 		now := time.Now()
 		w.state.LastCycleTime = now

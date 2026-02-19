@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+
+	"mdemg/internal/metrics"
 )
 
 // SafetyDecision is the result of evaluating safety bounds for an action.
@@ -37,6 +39,7 @@ func (sv *SafetyValidator) ValidateAction(ctx context.Context, spec *RSICTaskSpe
 	// Check protected-space policy for destructive actions
 	for _, ps := range spec.Safety.ProtectedSpaces {
 		if ps == spec.TargetSpace {
+			metrics.Metrics().RSICSafetyBlocked(actionType, "protected_space").Inc()
 			return SafetyDecision{
 				Allowed: false,
 				Reason:  fmt.Sprintf("space %s is protected from destructive RSIC actions", spec.TargetSpace),
@@ -55,6 +58,7 @@ func (sv *SafetyValidator) ValidateAction(ctx context.Context, spec *RSICTaskSpe
 	// Determine applicable limit
 	limit := sv.limitForAction(actionType, spec)
 	if limit > 0 && estimated > limit {
+		metrics.Metrics().RSICSafetyBlocked(actionType, "blast_radius").Inc()
 		return SafetyDecision{
 			Allowed:           false,
 			Reason:            fmt.Sprintf("blast radius %d exceeds limit %d for %s", estimated, limit, actionType),

@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"mdemg/internal/metrics"
 )
 
 // ActionOutcome records whether a single action succeeded or failed.
@@ -109,6 +111,24 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 	}
 
 	c.cycleHistory = append(c.cycleHistory, *outcome)
+
+	// Emit calibration confidence gauges
+	m := metrics.Metrics()
+	if len(c.actionHistory) == 0 {
+		m.RSICCalibrationConfidence("overall").Set(0.5)
+	}
+	for actionType, outcomes := range c.actionHistory {
+		if len(outcomes) == 0 {
+			continue
+		}
+		successes := 0
+		for _, o := range outcomes {
+			if o.Success {
+				successes++
+			}
+		}
+		m.RSICCalibrationConfidence(actionType).Set(float64(successes) / float64(len(outcomes)))
+	}
 
 	// Trim history to last 100 entries per action type
 	for k, v := range c.actionHistory {

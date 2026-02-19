@@ -193,3 +193,186 @@ Track these time series:
 - Daily: decay + pruning
 - Weekly: consolidation + abstraction generation
 - Monthly: restore drill + capacity review
+
+---
+
+## 11) RSIC Observability & Operations (Phase 91)
+
+The Recursive Self-Improvement Cycle (RSIC) subsystem has dedicated Prometheus metrics, a Grafana dashboard, and alert rules.
+
+### 11.1 RSIC Health Indicators
+
+| Metric | Healthy Range | Description |
+|--------|---------------|-------------|
+| `mdemg_rsic_cycle_total` | Steady non-zero rate | Cycles starting and completing |
+| `mdemg_rsic_cycle_duration_seconds` | p95 < 300s | End-to-end cycle time |
+| `mdemg_rsic_trigger_rejected_total` | < 10% of total triggers | Trigger rejections (cooldown, dedupe, overlap) |
+| `mdemg_rsic_action_total` | > 95% success rate | Per-action success/failure |
+| `mdemg_rsic_safety_blocked_total` | Near zero | Safety validator blocks |
+| `mdemg_rsic_watchdog_decay_score` | < 4.0 | Time-weighted decay since last cycle |
+| `mdemg_rsic_watchdog_escalation_level` | 0 (nominal) | Watchdog state (0=nominal, 1=nudge, 2=warn, 3=force) |
+| `mdemg_rsic_watchdog_force_total` | < 1/day | Watchdog force triggers |
+| `mdemg_rsic_calibration_confidence` | > 0.7 per action | Per-action success rate (0-1) |
+| `mdemg_rsic_snapshot_created_total` | Matches destructive actions | Pre-mutation snapshots captured |
+
+### 11.2 Failure Mode Playbooks
+
+#### MDEMGRSICHighFailureRate (>25% cycles not completing)
+**Symptoms:** Cycle outcomes show `error` or `low_confidence` predominating.
+
+**Diagnosis:**
+```bash
+# Check recent cycle history
+curl -s http://localhost:9999/v1/self-improve/history?limit=10 | jq '.[] | {cycle_id, tier, error, trigger_source}'
+
+# Check assessment confidence
+curl -s -X POST http://localhost:9999/v1/self-improve/assess \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","tier":"meso"}' | jq '{confidence, overall_health}'
+
+# Check Neo4j health
+curl -s http://localhost:9999/v1/self-improve/health | jq '.safety'
+```
+
+**Root causes:** Neo4j connection issues, insufficient graph data for assessment, min_confidence threshold too high.
+
+**Remediation:** Check Neo4j pool metrics, lower `RSIC_MIN_CONFIDENCE` if data is sparse, verify space has sufficient nodes.
+
+#### MDEMGRSICRepeatedForceTriggers (>0.5 force/hr for 30m)
+**Symptoms:** Watchdog repeatedly escalating to force level, cycles completing but decay resetting too slowly.
+
+**Diagnosis:**
+```bash
+# Check watchdog state
+curl -s http://localhost:9999/v1/self-improve/health | jq '.watchdog'
+
+# Check cycle history for meso completions
+curl -s "http://localhost:9999/v1/self-improve/history?limit=20&tier=meso" | jq '.[] | {cycle_id, trigger_source, completed_at}'
+```
+
+**Root causes:** Meso period too long, watchdog decay rate too aggressive, cycles completing but not resetting watchdog.
+
+**Remediation:** Adjust `RSIC_MESO_PERIOD_HOURS`, lower `RSIC_WATCHDOG_DECAY_RATE`, or enable macro cron (`RSIC_MACRO_CRON`).
+
+#### MDEMGRSICActionFailureSpike (>50% per-action failure)
+**Symptoms:** A specific RSIC action type (e.g., `prune_decayed_edges`) is consistently failing.
+
+**Diagnosis:**
+```bash
+# Check calibration confidence per action
+curl -s http://localhost:9999/v1/self-improve/calibration | jq '.'
+
+# Run a dry-run cycle to isolate the issue
+curl -s -X POST http://localhost:9999/v1/self-improve/cycle \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","tier":"meso","dry_run":true}' | jq '.deltas'
+```
+
+**Root causes:** Neo4j pool exhaustion, Cypher query timeout, missing service provider (learning/hidden layer not available).
+
+**Remediation:** Check Neo4j pool metrics, verify service wiring, check specific action executor logs.
+
+#### MDEMGRSICSafetyRejectionSpike (>0.1/min safety blocks)
+**Symptoms:** Safety validator frequently blocking actions due to protected space or blast radius.
+
+**Diagnosis:**
+```bash
+# Check safety state
+curl -s http://localhost:9999/v1/self-improve/health | jq '.safety'
+
+# Check rollback history
+curl -s http://localhost:9999/v1/self-improve/rollback | jq '.'
+```
+
+**Root causes:** Blast radius limits too restrictive, unexpected data growth in target space, protected space misconfiguration.
+
+**Remediation:** Review `RSIC_MAX_EDGES_AFFECTED` / `RSIC_MAX_NODES_AFFECTED` limits, check space data volume, verify protected spaces list.
+
+#### MDEMGRSICHighRejectionRate (>50% triggers rejected)
+**Symptoms:** Most trigger attempts are being blocked by cooldown, dedupe, or overlap guards.
+
+**Diagnosis:**
+```bash
+# Check orchestration state
+curl -s http://localhost:9999/v1/self-improve/health | jq '.orchestration'
+```
+
+**Root causes:** Cooldown period too long, triggers firing too rapidly, active cycles not completing (overlap block).
+
+**Remediation:** Lower `RSIC_TRIGGER_COOLDOWN_SEC`, check for stuck active cycles, verify cycle completion is calling `CompleteCycle`.
+
+#### MDEMGRSICLowConfidence (confidence < 0.3 for 30m)
+**Symptoms:** Calibrator reporting persistently low success rate for one or more action types.
+
+**Diagnosis:**
+```bash
+curl -s http://localhost:9999/v1/self-improve/calibration | jq '.'
+```
+
+**Root causes:** Action type has structural issues (bad Cypher, missing service), action depends on data conditions that don't exist.
+
+**Remediation:** Run dry-run cycles to test the action, consider temporarily removing the action from the planner's repertoire.
+
+#### MDEMGRSICHighDecayScore (decay > 8.0 for 10m)
+**Symptoms:** Watchdog decay climbing, no recent cycles recorded.
+
+**Diagnosis:**
+```bash
+curl -s http://localhost:9999/v1/self-improve/health | jq '{watchdog, orchestration}'
+```
+
+**Root causes:** All trigger sources disabled, cycles failing before completion, meso period too long.
+
+**Remediation:** Enable at least one trigger source (`RSIC_MICRO_ENABLED=true`), check cycle error logs, trigger a manual cycle.
+
+#### MDEMGRSICCycleDurationSpike (p95 > 300s for 10m)
+**Symptoms:** Cycles taking longer than 5 minutes at the 95th percentile.
+
+**Diagnosis:**
+```bash
+# Check active tasks
+curl -s http://localhost:9999/v1/self-improve/health | jq '.active_tasks'
+
+# Check Neo4j performance
+curl -s http://localhost:9999/metrics | grep neo4j_pool
+```
+
+**Root causes:** Neo4j slow queries, large blast radius estimation, consolidation taking too long, network latency.
+
+**Remediation:** Check Neo4j query performance, reduce action scope, increase tier timeout if appropriate.
+
+### 11.3 RSIC Safe Mode
+
+To disable all automatic RSIC triggers and run only manual cycles:
+
+```bash
+# Disable all automatic triggers
+export RSIC_MICRO_ENABLED=false
+export RSIC_MESO_PERIOD_SESSIONS=0
+export RSIC_MACRO_CRON=""
+export RSIC_WATCHDOG_ENABLED=false
+```
+
+In safe mode, only `POST /v1/self-improve/cycle` with `trigger_source: manual_api` will execute cycles. Use this during incidents or when investigating RSIC-related issues.
+
+To re-enable, restore the previous values and restart the server.
+
+### 11.4 RSIC SLOs
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Cycle success rate | > 95% | `completed / (completed + error + low_confidence)` over 24h |
+| Meso cycle p95 duration | < 5 min | `histogram_quantile(0.95, rsic_cycle_duration_seconds{tier="meso"})` |
+| Action success rate | > 95% | `success / (success + failed)` over 24h |
+| Trigger rejection rate | < 10% | `rejected / (rejected + started)` over 24h |
+| Watchdog force triggers | < 1/day | `increase(rsic_watchdog_force_total[24h])` |
+| Safety blocks | < 5/day | `increase(rsic_safety_blocked_total[24h])` |
+
+### 11.5 Grafana Dashboard
+
+The RSIC Operations dashboard (`/d/mdemg-rsic`) provides 16 panels across 4 rows:
+
+- **Overview**: Cycle rate, success rate, rejection rate, watchdog escalation level
+- **Cycles**: Duration by tier, cycles by source, rejection reasons, outcome breakdown
+- **Actions**: Success/failure table, duration p95, safety blocks, calibration confidence
+- **Watchdog**: Decay score, escalation timeline, force triggers, snapshot creation
