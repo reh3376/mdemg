@@ -20,7 +20,10 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "109dbf98ec11124b94afb28073a9c2954487752b623a99488761d9f39d8beb5a"
+    "sha256": "d1ea46e5ee8d7382eb968318173c411bf30d85d4a215873cc5b06585353df089",
+    "tags": [
+      "embedding_required"
+    ]
   },
   "variables": {
     "test_space": "uats-skills-register-test"
