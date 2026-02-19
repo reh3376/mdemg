@@ -378,7 +378,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 87**: `docs/specs/phase87-rsic-orchestration-activation.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle_trigger_metadata.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health_orchestration.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_history_trigger_source_filter.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_cycle_idempotency.phase87.uats.json`. Go: `internal/ape/orchestration_policy.go`.
 - **Phase 88**: `docs/specs/phase88-rsic-safety-policy-enforcement.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle_dry_run.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health_safety.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_rollback_list.phase88.uats.json`. Go: `internal/ape/safety_validator.go`, `internal/ape/action_snapshot.go`.
 - **Phase 89**: `docs/specs/phase89-rsic-persistence-multi-space.md` | Go: `internal/ape/rsic_store.go`. Config: `RSIC_PERSISTENCE_ENABLED`, `RSIC_WATCHDOG_SPACE_ID`.
-- **Phase 90**: `docs/specs/phase90-rsic-conformance-ci-gating.md` | Go: `tests/integration/rsic_test.go` (6 integration tests), `tests/integration/rsic_systems_test.go` (10 systems tests). CI: `.github/workflows/ci.yml` (pipeline split). Make: `test-rsic*` targets. Runner: `--include-tag`/`--exclude-tag`/sequential mode.
+- **Phase 90**: `docs/specs/phase90-rsic-conformance-ci-gating.md` | Go: `tests/integration/rsic_test.go` (6 core tests), `tests/integration/rsic_systems_test.go` (10 systems tests), `tests/integration/rsic_holistic_test.go` (6 holistic tests — full pipeline with Neo4j mutations). CI: `.github/workflows/ci.yml` (pipeline split). Make: `test-rsic*` targets. Runner: `--include-tag`/`--exclude-tag`/sequential mode.
 - **Phase 91**: `docs/specs/phase91-rsic-observability-operations.md` | Go: `internal/metrics/collectors.go` (12 RSIC metrics), `internal/ape/cycle.go`, `internal/ape/orchestration_policy.go`, `internal/ape/safety_validator.go`, `internal/ape/watchdog.go`, `internal/ape/calibration.go`, `internal/ape/task_dispatch.go`. Dashboard: `deploy/docker/grafana/dashboards/mdemg-rsic.json`. Alerts: `deploy/docker/prometheus/alerts/rsic.yaml`. Runbook: `docs/architecture/14_Operations_Runbook.md` §11. JSON: `docs/api/api-spec/uats/specs/prometheus_rsic_metrics.phase91.uats.json`.
 
 ---
@@ -1861,7 +1861,8 @@ Main RSIC gap sets identified:
 
 - ✅ 6 core integration tests in `tests/integration/rsic_test.go` (CycleCreatesHistory, DryRunNoDelta, SafetyBlocksProtected, MultiSpaceIsolation, PersistenceFlush, HealthShape).
 - ✅ 10 systems-level integration tests in `tests/integration/rsic_systems_test.go` (CooldownRejectsRapidRetrigger, SourceTierMismatchRejected, IdempotencyDeduplication, CalibrationAccumulatesHistory, HistoryFiltersBySpaceAndTier, DryRunStructureAndSafetyMetadata, RollbackListAndInvalidAttempt, WatchdogStateInHealth, FullHealthCompositeValidation, PrometheusMetricsAfterCycle).
-- ✅ 6 new test helpers in `tests/integration/helpers_test.go` (TriggerRSICCycleRaw, GetRSICCalibration, GetRSICHistoryFiltered, GetRSICRollbackList, PostRSICRollback, GetRSICSignals).
+- ✅ 6 holistic integration tests in `tests/integration/rsic_holistic_test.go` (ConfidenceGatePassAndReflect, TombstoneStaleEndToEnd, DryRunPreservesState, RollbackReversesTombstone, HistoryAndCalibrationReflectExecution, MultiActionDispatchAndMetrics). These are the first tests to pass the confidence gate and verify the full reflect→plan→dispatch→execute pipeline with real Neo4j mutations.
+- ✅ 10 test helpers in `tests/integration/helpers_test.go` — RSIC API helpers (TriggerRSICCycleRaw, GetRSICCalibration, GetRSICHistoryFiltered, GetRSICRollbackList, PostRSICRollback, GetRSICSignals) + holistic helpers (SeedHiddenNode, SeedObservationNodes, CountNodesByProperty, RefreshDistributionCache).
 - ✅ CI pipeline split: core specs merge-gating, embedding specs best-effort.
 - ✅ UATS runner: `--include-tag`/`--exclude-tag` CLI args, sequential mode.
 - ✅ Makefile: `test-rsic`, `test-rsic-unit`, `test-rsic-integration`, `test-rsic-uats` targets.
@@ -1990,6 +1991,7 @@ Located at `docs/lang-parser/lang-parse-spec/upts/` — 27 language parser specs
 | `tests/integration/stats_test.go` | Stats endpoint, embedding coverage |
 | `tests/integration/rsic_test.go` | RSIC core: cycle→history, dry-run no delta, safety blocks protected space, multi-space isolation, persistence flush, health shape (6 tests) |
 | `tests/integration/rsic_systems_test.go` | RSIC systems: cooldown rejection, source-tier mismatch, idempotency dedupe, calibration accumulation, history filtering, dry-run structure+safety, rollback API, watchdog state, full health composite, Prometheus metrics (10 tests) |
+| `tests/integration/rsic_holistic_test.go` | RSIC holistic: confidence gate passage, tombstone end-to-end with Neo4j mutation, dry-run preserves state, rollback reverses tombstone, history/calibration reflect execution, multi-action dispatch + Prometheus (6 tests) |
 
 ### Documentation Map
 

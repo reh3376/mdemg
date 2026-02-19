@@ -306,8 +306,10 @@ Tags are additive — a spec can have multiple tags (e.g., `["rsic", "phase87"]`
 
 | File | Action | Changes |
 |------|--------|---------|
-| `tests/integration/rsic_test.go` | **Create** | 6 RSIC integration tests (~300 lines) |
-| `tests/integration/helpers_test.go` | Edit | Add 3 RSIC helper functions (~40 lines) |
+| `tests/integration/rsic_test.go` | **Create** | 6 RSIC core integration tests (~300 lines) |
+| `tests/integration/rsic_systems_test.go` | **Create** | 10 systems-level integration tests (~600 lines) |
+| `tests/integration/rsic_holistic_test.go` | **Create** | 6 holistic integration tests — full pipeline with Neo4j mutations (~350 lines) |
+| `tests/integration/helpers_test.go` | Edit | Add 10 RSIC test helpers: 6 API (TriggerRSICCycleRaw, GetRSICCalibration, GetRSICHistoryFiltered, GetRSICRollbackList, PostRSICRollback, GetRSICSignals) + 4 holistic (SeedHiddenNode, SeedObservationNodes, CountNodesByProperty, RefreshDistributionCache) (~210 lines) |
 | `.github/workflows/ci.yml` | Edit | Split UATS into 2 steps (~15 lines changed) |
 | `docs/api/api-spec/uats/runners/uats_runner.py` | Edit | Add tag filtering + sequential mode (~60 lines) |
 | `Makefile` | Edit | Add 4 RSIC test targets (~20 lines) |
@@ -316,4 +318,17 @@ Tags are additive — a spec can have multiple tags (e.g., `["rsic", "phase87"]`
 | ~6 draft files | Delete | Remove promoted stubs |
 | 1 draft spec | Promote | Move idempotency spec to specs/ |
 
-**Total:** 1 new file (~300 lines), ~30 modified files (~150 lines of changes), ~6 deletions
+**Total:** 3 new test files (~1250 lines), ~30 modified files (~150 lines of changes), ~6 deletions
+
+### Holistic Tests — Pipeline Verification
+
+The 6 holistic tests in `rsic_holistic_test.go` close the critical gap where no existing test exercised the full RSIC pipeline past the confidence gate. They seed data via direct Cypher to achieve 2/4 confidence data points (TotalNodes + ConsolidationAgeSec = 0.50 > 0.30 threshold), then verify:
+
+| Test | Pipeline Coverage |
+|------|-------------------|
+| `ConfidenceGatePassAndReflect` | Assess → Reflect (proves gate passage, insights produced) |
+| `TombstoneStaleEndToEnd` | Assess → Reflect → Plan → Dispatch → Execute → Neo4j mutation verified |
+| `DryRunPreservesState` | Full pipeline in dry-run mode → zero Neo4j mutations |
+| `RollbackReversesTombstone` | Execute → Snapshot → Rollback → mutations reversed |
+| `HistoryAndCalibrationReflectExecution` | History/calibration entries reflect real pipeline execution |
+| `MultiActionDispatchAndMetrics` | Multiple actions dispatched, Prometheus action-level metrics recorded |
