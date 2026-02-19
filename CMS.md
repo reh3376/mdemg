@@ -263,6 +263,17 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 - Max 10% of edges pruned per cycle
 - Protected spaces (`mdemg-dev`) never modified destructively
 - All actions bounded by configurable timeout per tier
+- Dry-run mode: full pipeline runs with zero mutations, returning structured deltas
+- Pre-mutation snapshots enable rollback for reversible actions (tombstone, graduate)
+
+**Test Coverage (22 integration tests):**
+
+RSIC is verified at three levels of integration testing:
+- **6 core tests** (`rsic_test.go`): Cycle→history, dry-run no delta, safety blocks protected space, multi-space isolation, persistence flush, health shape
+- **10 systems tests** (`rsic_systems_test.go`): Cooldown rejection, source-tier mismatch, idempotency dedupe, calibration accumulation, history filtering, dry-run structure, rollback API, watchdog state, health composite, Prometheus metrics
+- **6 holistic tests** (`rsic_holistic_test.go`): Full pipeline verification — confidence gate passage, tombstone_stale end-to-end with Neo4j mutation verification, dry-run preserves state, rollback reverses tombstone, history/calibration reflect real execution, multi-action dispatch with Prometheus metrics
+
+The holistic tests seed data via direct Cypher to pass the confidence gate (2/4 data points = 0.50 > 0.30 threshold), enabling the first end-to-end verification of the reflect → plan → dispatch → execute → calibrate pipeline with real Neo4j mutations.
 
 ### Meta-Cognition & Self-Improvement Enforcement (Phase 80)
 
@@ -404,8 +415,15 @@ Observations are stored as `MemoryNode` nodes in Neo4j with:
 | `internal/ape/calibration.go` | Validation and per-action confidence tracking |
 | `internal/ape/watchdog.go` | Decay watchdog with 4-level escalation |
 | `internal/ape/cycle.go` | CycleOrchestrator — ties all 5 stages together |
+| `internal/ape/orchestration_policy.go` | Orchestration policy — cooldown, dedupe, source-tier validation |
+| `internal/ape/safety_validator.go` | Safety enforcement — blast-radius estimation, protected-space blocking |
+| `internal/ape/action_snapshot.go` | Pre-mutation snapshots and rollback support |
+| `internal/ape/rsic_store.go` | Write-behind persistence for RSIC state |
 | `internal/api/handlers_self_improve.go` | HTTP handlers for 7 RSIC endpoints |
 | `internal/api/rsic_adapters.go` | Adapters bridging RSIC interfaces to concrete services |
+| `tests/integration/rsic_test.go` | 6 core RSIC integration tests |
+| `tests/integration/rsic_systems_test.go` | 10 systems-level RSIC integration tests |
+| `tests/integration/rsic_holistic_test.go` | 6 holistic tests — full pipeline verification with Neo4j mutations |
 
 ### Protected Space
 

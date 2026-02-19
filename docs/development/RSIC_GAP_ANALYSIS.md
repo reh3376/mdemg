@@ -68,7 +68,11 @@ flowchart TD
 8. **Test and CI coverage is mostly contract-level, not behavior-level** ✅ Remediated
    - UATS checks endpoint shape/status but does not deeply validate RSIC outcome quality or guardrail enforcement.
    - CI runs UATS with `continue-on-error`, so RSIC contracts are not strict merge gates.
-   - **Fix (Phase 90):** 6 core integration tests in `rsic_test.go`; 10 systems-level tests in `rsic_systems_test.go` covering cooldown rejection, source-tier validation, idempotency dedupe, calibration evolution, history filtering, dry-run structure, rollback API, watchdog state, full health composite, and Prometheus metric correctness. CI split into merge-gating core vs best-effort embedding. `--include-tag`/`--exclude-tag` added to UATS runner.
+   - **Fix (Phase 90):** 22 integration tests across 3 test files:
+     - 6 core tests in `rsic_test.go` (cycle→history, dry-run, safety, isolation, persistence, health shape).
+     - 10 systems tests in `rsic_systems_test.go` (cooldown, tier mismatch, idempotency, calibration, filtering, dry-run structure, rollback API, watchdog, health composite, Prometheus).
+     - 6 holistic tests in `rsic_holistic_test.go` — **first tests to pass the confidence gate** and verify the full reflect→plan→dispatch→execute→calibrate pipeline with real Neo4j mutations. Tests cover: confidence gate passage (0.50 > 0.30), tombstone_stale end-to-end with mutation verification, dry-run preserves state, rollback reverses tombstone, history/calibration reflect real execution, multi-action dispatch + Prometheus action-level metrics.
+   - CI split into merge-gating core vs best-effort embedding. `--include-tag`/`--exclude-tag` added to UATS runner.
 
 ## Development Plan: RSIC Hardening Phases
 

@@ -541,6 +541,146 @@ func GetRSICSignals(t *testing.T, endpoint string) map[string]any {
 	return result
 }
 
+// ─── Holistic Test Helpers ───
+
+// SeedHiddenNode creates a MemoryNode with role_type='hidden' and created_at = now - ageHours.
+// This provides the ConsolidationAgeSec > 0 data point needed to pass the confidence gate.
+func SeedHiddenNode(t *testing.T, driver neo4j.DriverWithContext, spaceID string, ageHours int) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	nodeID := fmt.Sprintf("test-hidden-%d-%d", time.Now().UnixNano(), ageHours)
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			CREATE (n:MemoryNode {
+				node_id: $nodeId, space_id: $spaceId,
+				role_type: 'hidden', content: 'test hidden node',
+				layer: 2, created_at: datetime() - duration({hours: $ageHours}),
+				updated_at: datetime()
+			}) RETURN n.node_id
+		`
+		_, err := tx.Run(ctx, cypher, map[string]any{
+			"nodeId":   nodeID,
+			"spaceId":  spaceID,
+			"ageHours": ageHours,
+		})
+		return nil, err
+	})
+	if err != nil {
+		t.Fatalf("failed to seed hidden node: %v", err)
+	}
+	return nodeID
+}
+
+// SeedObservationNodes creates count MemoryNode nodes with role_type='conversation_observation',
+// obs_type=obsType, volatile=true, stability_score=0.1, created_at = now - ageHours.
+// Used to build specific correction_rate or volatile patterns for holistic tests.
+func SeedObservationNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID string, count int, obsType string, ageHours int) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("test-obs-%s-%d", obsType, time.Now().UnixNano())
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, $count) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				role_type: 'conversation_observation', obs_type: $obsType,
+				content: 'test observation ' + toString(i),
+				volatile: true, stability_score: 0.1, is_archived: false,
+				layer: 0, created_at: datetime() - duration({hours: $ageHours}),
+				updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"count":    count,
+			"prefix":   prefix,
+			"spaceId":  spaceID,
+			"obsType":  obsType,
+			"ageHours": ageHours,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed observation nodes: %v", err)
+	}
+
+	raw := result.([]any)
+	ids := make([]string, len(raw))
+	for i, v := range raw {
+		ids[i] = v.(string)
+	}
+	return ids
+}
+
+// CountNodesByProperty counts MemoryNode nodes matching space_id and a single property filter.
+// Used to verify post-mutation state (e.g., count of is_archived=true nodes).
+func CountNodesByProperty(t *testing.T, driver neo4j.DriverWithContext, spaceID string, prop string, value any) int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := fmt.Sprintf(
+			`MATCH (n:MemoryNode {space_id: $spaceId}) WHERE n.%s = $value RETURN count(n) AS cnt`, prop)
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID,
+			"value":   value,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("cnt"); ok {
+				return v, nil
+			}
+		}
+		return int64(0), res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to count nodes by property: %v", err)
+	}
+	return int(result.(int64))
+}
+
+// RefreshDistributionCache calls GET /v1/memory/distribution to force-update
+// the in-memory edge count cache. Needed if tests seed edges and need the assessor to see them.
+func RefreshDistributionCache(t *testing.T, endpoint string, spaceID string) {
+	t.Helper()
+	client := NewTestHTTPClient()
+	url := fmt.Sprintf("%s/v1/memory/distribution?space_id=%s", endpoint, spaceID)
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Logf("warning: could not refresh distribution cache: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("warning: distribution cache refresh returned %d", resp.StatusCode)
+	}
+}
+
 // GetRSICHistory fetches RSIC cycle history and returns parsed response.
 func GetRSICHistory(t *testing.T, endpoint string, limit int) map[string]any {
 	t.Helper()
