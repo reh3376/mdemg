@@ -100,6 +100,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		return nil, fmt.Errorf("assess failed: %w", err)
 	}
+	metrics.Metrics().RSICActionTotal("assess", "completed").Inc()
 	log.Printf("RSIC %s: assess complete (health=%.2f, confidence=%.2f)", cycleID, report.OverallHealth, report.Confidence)
 
 	// Bail early if confidence is too low
@@ -132,6 +133,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		return nil, fmt.Errorf("reflect failed: %w", err)
 	}
+	metrics.Metrics().RSICActionTotal("reflect", "completed").Inc()
 	log.Printf("RSIC %s: reflect complete (%d insights)", cycleID, len(insights))
 
 	if len(insights) == 0 {

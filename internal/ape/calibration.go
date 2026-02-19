@@ -114,6 +114,9 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 
 	// Emit calibration confidence gauges
 	m := metrics.Metrics()
+	if len(c.actionHistory) == 0 {
+		m.RSICCalibrationConfidence("overall").Set(0.5)
+	}
 	for actionType, outcomes := range c.actionHistory {
 		if len(outcomes) == 0 {
 			continue
