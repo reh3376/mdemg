@@ -60,9 +60,10 @@ flowchart TD
    - `Dispatcher.activeTasks` keeps completed/failed tasks without explicit lifecycle cleanup policy.
    - Long-running instances can accumulate stale task metadata.
 
-7. **Spec and docs drift exists around RSIC source-of-truth**
+7. **Spec and docs drift exists around RSIC source-of-truth** ✅ Remediated
    - `AGENT_HANDOFF.md` references `docs/specs/phase60b-rsic.md`, but this spec path is not present.
    - API docs under `docs/development/API_REFERENCE.md` describe only a subset of RSIC endpoints, despite implementation exposing full endpoint set.
+   - **Fix:** AGENT_HANDOFF.md references updated to point to `RSIC_GAP_ANALYSIS.md` + phase 87-91 specs. API_REFERENCE.md updated with 4 missing endpoints (`assess`, `report`, `report/{taskID}`, `calibration`). All 9 RSIC endpoints now documented.
 
 8. **Test and CI coverage is mostly contract-level, not behavior-level** ✅ Remediated
    - UATS checks endpoint shape/status but does not deeply validate RSIC outcome quality or guardrail enforcement.
