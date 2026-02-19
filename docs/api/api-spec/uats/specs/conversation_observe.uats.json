@@ -20,7 +20,10 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "72317870ab6d95a3e90f8980aaaa8acbab24643bc3883e24a9c0df0637d07e86"
+    "sha256": "e7a0875c6178be52cd1703b76c0a6504374a6bddae3dccd33b4adb1857caae14",
+    "tags": [
+      "embedding_required"
+    ]
   },
   "variables": {
     "test_space": "uats-observe-test"

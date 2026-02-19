@@ -20,7 +20,10 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "a149e0a9e0f5a7e14edb8f5ce3b4d83637e85ce956aa89ce647e1079b8f979eb"
+    "tags": [
+      "embedding_required"
+    ],
+    "sha256": "b099acc50a76e1be498632832b7c4ab4103f9162f9a40d84de96d5165e3bf1f3"
   },
   "variables": {
     "test_space": "demo"

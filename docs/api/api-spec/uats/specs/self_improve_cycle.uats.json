@@ -20,7 +20,10 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "893e1d037b698ca5db7cfba27235326fa5310881ab241641f5bd66a830fd60ed"
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "ba9c0db9dd02e159fcbe572fd5d75e5352f5aedd89d089ae30f793a70a1f2402"
   },
   "variables": {
     "test_space": "uats-rsic-test"

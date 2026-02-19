@@ -344,6 +344,10 @@ Phases are organized into **numbered series** to group related work:
 | 75C | L5 Emergent Layer — Unblock Emergence | ✅ | `docs/features/l5-emergent-layer.md` |
 | 76 | Neo4j State Monitor & Space Overview | ✅ | `docs/api/api-spec/uats/specs/neo4j_overview.uats.json` |
 | 80 | CMS ANN Meta-Cognition & Self-Improvement Enforcement | ✅ | `docs/specs/phase80-cms-metacognition.md` |
+| 87 | RSIC Orchestration Activation | ✅ | `docs/specs/phase87-rsic-orchestration-activation.md` |
+| 88 | RSIC Safety & Policy Enforcement | ✅ | `docs/specs/phase88-rsic-safety-policy-enforcement.md` |
+| 89 | RSIC Persistence & Multi-Space Correctness | ✅ | `docs/specs/phase89-rsic-persistence-multi-space.md` |
+| 90 | RSIC Conformance & CI Gating | ✅ | `docs/specs/phase90-rsic-conformance-ci-gating.md` |
 | 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ | `internal/api/handlers_filewatcher.go`, `internal/plugins/events.go` |
 
 ---
@@ -371,8 +375,11 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 76**: `docs/features/neo4j-state-monitor.md` | JSON: `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`.
 - **Phase 80**: `docs/specs/phase80-cms-metacognition.md` | JSON: `docs/api/api-spec/uats/specs/session_anomalies.uats.json`, `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`.
 - **Phase 81-86**: `docs/specs/FRAMEWORK_GOVERNANCE.md`, `docs/development/UXTS_FRAMEWORK_MATRIX.md` | JSON: `docs/tests/ubts/schema/ubts.schema.json`, `docs/tests/usts/schema/usts.schema.json`, `docs/tests/uams/schema/uams.schema.json`, `docs/tests/uvts/schema/uvts.schema.json`, `docs/api/api-spec/uots/schema/uots.schema.json`.
-- **Phase 87**: `docs/specs/phase87-rsic-orchestration-activation.md` | JSON: `docs/api/api-spec/uats/drafts/self_improve_cycle_trigger_metadata.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_health_orchestration.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_history_trigger_source_filter.phase87.uats.json`, `docs/api/api-spec/uats/drafts/self_improve_cycle_idempotency.phase87.uats.json`.
-- **Phase 88-91**: `docs/development/RSIC_GAP_ANALYSIS.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`, `docs/api/api-spec/uats/specs/self_improve_history.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health.uats.json`, `docs/api/api-spec/uats/specs/self_improve_signals.uats.json`.
+- **Phase 87**: `docs/specs/phase87-rsic-orchestration-activation.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle_trigger_metadata.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health_orchestration.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_history_trigger_source_filter.phase87.uats.json`, `docs/api/api-spec/uats/specs/self_improve_cycle_idempotency.phase87.uats.json`. Go: `internal/ape/orchestration_policy.go`.
+- **Phase 88**: `docs/specs/phase88-rsic-safety-policy-enforcement.md` | JSON: `docs/api/api-spec/uats/specs/self_improve_cycle_dry_run.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health_safety.phase88.uats.json`, `docs/api/api-spec/uats/specs/self_improve_rollback_list.phase88.uats.json`. Go: `internal/ape/safety_validator.go`, `internal/ape/action_snapshot.go`.
+- **Phase 89**: `docs/specs/phase89-rsic-persistence-multi-space.md` | Go: `internal/ape/rsic_store.go`. Config: `RSIC_PERSISTENCE_ENABLED`, `RSIC_WATCHDOG_SPACE_ID`.
+- **Phase 90**: `docs/specs/phase90-rsic-conformance-ci-gating.md` | Go: `tests/integration/rsic_test.go` (6 integration tests). CI: `.github/workflows/ci.yml` (pipeline split). Make: `test-rsic*` targets. Runner: `--include-tag`/`--exclude-tag`/sequential mode.
+- **Phase 91**: `docs/development/RSIC_GAP_ANALYSIS.md` (Gap #6: Observability & Alerting) | Planned.
 
 ---
 

@@ -877,6 +877,7 @@ class Validator:
         self.skip_hash = skip_hash
         self.resolver = VariableResolver(spec.variables)
         self.engine = AssertionEngine(self.resolver)
+        self.last_response_body = None
     
     def validate(self, variant: Optional[Dict] = None) -> SpecResult:
         """Run validation."""
@@ -939,7 +940,10 @@ class Validator:
             body = response.json() if response.text else None
         except json.JSONDecodeError:
             body = response.text
-        
+
+        # Store parsed body for sequential mode access
+        self.last_response_body = body
+
         # Check status code
         status_result = self.engine.check_status(response.status_code, expected.get("status"))
         result.assertions.append(status_result)
@@ -1105,12 +1109,16 @@ class Reporter:
 class Runner:
     """Main test runner."""
     
-    def __init__(self, base_url: str, token: Optional[str] = None, 
-                 skip_hash: bool = False, timeout: int = 30):
+    def __init__(self, base_url: str, token: Optional[str] = None,
+                 skip_hash: bool = False, timeout: int = 30,
+                 include_tag: Optional[str] = None,
+                 exclude_tag: Optional[str] = None):
         self.base_url = base_url
         self.token = token
         self.skip_hash = skip_hash
         self.timeout = timeout
+        self.include_tag = include_tag
+        self.exclude_tag = exclude_tag
         self.reporter = Reporter()
     
     def run_spec(self, spec_path: Path) -> List[SpecResult]:
@@ -1190,22 +1198,53 @@ class Runner:
         results.append(result)
 
         # Run variants
+        sequential = loader.config.get("sequential", False)
+        prev_response_body = None
+
         for variant in loader.variants:
             if variant.get("skip", False):
                 continue
 
             validator = Validator(loader, client, self.token, self.skip_hash)
+
+            # For sequential mode, inject prev_response fields as variables
+            if sequential and prev_response_body is not None:
+                if isinstance(prev_response_body, dict):
+                    for k, v in prev_response_body.items():
+                        validator.resolver.set(f"prev_{k}", v)
+
             result = validator.validate(variant)
             result.hash_verified = hash_verified
             self.reporter.print_result(result)
             results.append(result)
+
+            # Capture response body for next variant in sequential mode
+            if sequential:
+                prev_response_body = validator.last_response_body
 
         return results
     
     def run_all(self, spec_dir: Path, pattern: str = "*.uats.json") -> TestReport:
         """Run all specs in directory."""
         specs = sorted(spec_dir.glob(pattern))
-        
+
+        # Tag-based filtering
+        if self.include_tag or self.exclude_tag:
+            filtered = []
+            for sp in specs:
+                try:
+                    with open(sp) as f:
+                        cfg = json.load(f).get("config", {})
+                    tags = cfg.get("tags", [])
+                except Exception:
+                    tags = []
+                if self.include_tag and self.include_tag not in tags:
+                    continue
+                if self.exclude_tag and self.exclude_tag in tags:
+                    continue
+                filtered.append(sp)
+            specs = filtered
+
         all_results = []
         passed = failed = errors = skipped = 0
 
@@ -1264,6 +1303,10 @@ def main():
     val_all.add_argument("--timeout", type=int, default=30)
     val_all.add_argument("--report", type=Path)
     val_all.add_argument("--skip-hash", action="store_true", help="Skip spec file hash verification")
+    val_all.add_argument("--include-tag", type=str, dest="include_tag",
+                         help="Only run specs with this tag in config.tags")
+    val_all.add_argument("--exclude-tag", type=str, dest="exclude_tag",
+                         help="Skip specs with this tag in config.tags")
 
     # add-hashes
     add_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to spec files")
@@ -1295,7 +1338,9 @@ def main():
         sys.exit(1 if has_failures else 0)
     
     elif args.cmd == "validate-all":
-        runner = Runner(args.base_url, args.token, args.skip_hash, args.timeout)
+        runner = Runner(args.base_url, args.token, args.skip_hash, args.timeout,
+                        include_tag=getattr(args, 'include_tag', None),
+                        exclude_tag=getattr(args, 'exclude_tag', None))
         report = runner.run_all(args.spec_dir, args.pattern)
 
         if args.report:

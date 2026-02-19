@@ -21,7 +21,10 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "5b2f62df87d2f69e57f72d174d4d30158fbb8105c3b0c9537a532d237af7db27"
+    "sha256": "f4294cef365a052dcfa45ef8c263df13f723c6fedc633836160bacb29aec1dda",
+    "tags": [
+      "embedding_required"
+    ]
   },
   "variables": {
     "test_space": "uats-recall-tags-test"

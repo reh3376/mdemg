@@ -21,7 +21,10 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "3554a6512a2d64f0ce00e6eecbcea98710de84da5643b5712a358cbca50d5619"
+    "sha256": "ca014ed64d39967307461ec17af88de1a02dc92b8e6c8e6e22158350f444f3ca",
+    "tags": [
+      "embedding_required"
+    ]
   },
   "variables": {
     "test_space": "uats-observe-pinned-test"

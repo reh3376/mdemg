@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Phase 90: RSIC Conformance & CI Gating**: 6 Go integration tests (`tests/integration/rsic_test.go`), CI UATS pipeline split (core merge-gating vs embedding best-effort), UATS tag filtering (`--include-tag`/`--exclude-tag`), sequential mode for idempotency testing, Make targets (`test-rsic`, `test-rsic-unit`, `test-rsic-integration`, `test-rsic-uats`). Idempotency spec promoted from drafts, 7 draft stubs cleaned up. 109 specs, 180 variants, 100% passing.
+- **Phase 89: RSIC Persistence & Multi-Space Correctness**: Write-behind persistence via Neo4j `RSICState` nodes (30s flush goroutine, dirty key tracking). Multi-space compliance (`RSICWatchdogSpaceID` config). DateTime coercion for Neo4j. Health endpoint persistence block. Session identity aggregation via `SessionTracker.GetAllStates()`.
+- **Phase 88: RSIC Safety & Policy Enforcement**: Safety validator with blast-radius estimation and protected-space blocking. Dry-run mode with mutation deltas. Rollback support (tombstone/graduate reversible). `SafetyVersion = "phase88-v1"` stamped on all outcomes. 3 UATS specs.
+- **Phase 87: RSIC Orchestration Activation**: Trigger source tracking (`manual_api`, `micro_auto`, `session_periodic`, `macro_cron`, `watchdog_force`). Cooldown/dedupe/overlap policy with configurable bounds (`RSIC_TRIGGER_COOLDOWN_SEC`, `RSIC_TRIGGER_DEDUPE_SEC`). Trigger metadata in cycle outcomes, health, and history responses. Macro cron scheduler, session-periodic meso on resume. 3 UATS promoted from drafts.
 - **Cross-Space Graph Orphan Cleanup**: `POST /v1/memory/cleanup/graph-orphans` — scans all or specified spaces for zero-edge nodes with scan/consolidate/archive/delete fix actions. Protected space enforcement (mdemg-dev skipped for destructive actions). UATS spec with 6 variants.
 - **Phase 49 Complete (LLM Plugin SDK)**: All deliverables verified — plugin scaffolding (`cmd/plugin-scaffold/`), validation framework (`cmd/plugin-validate/`, `internal/plugins/validator.go`), creation API (`POST /v1/plugins/create`, `GET /v1/plugins/{id}`, `POST /v1/plugins/{id}/validate`), capability gap detection (`internal/gaps/`). UATS specs: `plugin_create.uats.json` (6 variants), `capability_gaps.uats.json`, `capability_gaps_full.uats.json` (4 variants), `gap_interviews.uats.json`.
 - **Phase 9.4: Plugin-Specific Triggers**: File watcher REST API (start/status/stop), event-driven module updates with `EventDispatcher`, wildcard subscription support. 3 UATS specs, 7 variants.
@@ -25,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed (Unreleased)
 
+- **Phase 90: CycleOutcome missing `idempotency_key`**: Added field to struct and all 4 return paths in `RunCycle`. Dedup fast-path response now includes `trigger_source` and `idempotency_key`. `Hydrate()` filters expired trigger records to prevent stale cooldown on server restart.
 - **Ingestion whitelist**: `getEnabledLanguages()` now includes all 27 registered parsers (was missing yaml, toml, ini, dockerfile, shell, cuda, cypher + new parsers)
 - **OpenAPI parser routing**: YAML parser now skips files containing `openapi:` or `swagger:` markers to ensure OpenAPI parser handles them (Go map iteration order is non-deterministic)
 - **Makefile parser `:=` assignment**: Fixed disambiguation logic that incorrectly rejected `:=` variable assignments as target definitions

@@ -83,6 +83,12 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// Phase 88: Determine dry-run mode early (needed for all return paths)
 	isDryRun := opts != nil && opts.DryRun
 
+	// Phase 90: Extract idempotency key for all return paths
+	var idempotencyKey string
+	if opts != nil {
+		idempotencyKey = opts.IdempotencyKey
+	}
+
 	log.Printf("RSIC cycle %s started (tier=%s, space=%s, source=%s)", cycleID, tier, spaceID, meta.TriggerSource)
 
 	// Stage 1: Assess
@@ -94,20 +100,23 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	// Bail early if confidence is too low
 	if report.Confidence < c.cfg.RSICMinConfidence {
-		return &CycleOutcome{
-			CycleID:       cycleID,
-			Tier:          tier,
-			SpaceID:       spaceID,
-			StartedAt:     startedAt,
-			CompletedAt:   time.Now(),
-			Error:         fmt.Sprintf("confidence %.2f below threshold %.2f", report.Confidence, c.cfg.RSICMinConfidence),
-			TriggerSource: meta.TriggerSource,
-			TriggerID:     meta.TriggerID,
-			TriggeredAt:   meta.TriggeredAt,
-			PolicyVersion: meta.PolicyVersion,
-			DryRun:        isDryRun,
-			SafetyVersion: SafetyVersion,
-		}, nil
+		outcome := &CycleOutcome{
+			CycleID:        cycleID,
+			Tier:           tier,
+			SpaceID:        spaceID,
+			StartedAt:      startedAt,
+			CompletedAt:    time.Now(),
+			Error:          fmt.Sprintf("confidence %.2f below threshold %.2f", report.Confidence, c.cfg.RSICMinConfidence),
+			TriggerSource:  meta.TriggerSource,
+			TriggerID:      meta.TriggerID,
+			TriggeredAt:    meta.TriggeredAt,
+			PolicyVersion:  meta.PolicyVersion,
+			IdempotencyKey: idempotencyKey,
+			DryRun:         isDryRun,
+			SafetyVersion:  SafetyVersion,
+		}
+		c.calibrator.UpdateCalibration(outcome, nil, nil)
+		return outcome, nil
 	}
 
 	// Stage 2: Reflect
@@ -127,14 +136,16 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			MetricsBefore: map[string]float64{
 				"overall_health": report.OverallHealth,
 			},
-			TriggerSource: meta.TriggerSource,
-			TriggerID:     meta.TriggerID,
-			TriggeredAt:   meta.TriggeredAt,
-			PolicyVersion: meta.PolicyVersion,
-			DryRun:        isDryRun,
-			SafetyVersion: SafetyVersion,
+			TriggerSource:  meta.TriggerSource,
+			TriggerID:      meta.TriggerID,
+			TriggeredAt:    meta.TriggeredAt,
+			PolicyVersion:  meta.PolicyVersion,
+			IdempotencyKey: idempotencyKey,
+			DryRun:         isDryRun,
+			SafetyVersion:  SafetyVersion,
 		}
 		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
+		c.calibrator.UpdateCalibration(outcome, nil, nil)
 		if c.watchdog != nil {
 			c.watchdog.RecordCycle()
 		}
@@ -185,23 +196,25 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// Phase 88: Dry-run early return with deltas
 	if isDryRun {
 		outcome := &CycleOutcome{
-			CycleID:       cycleID,
-			Tier:          tier,
-			SpaceID:       spaceID,
-			StartedAt:     startedAt,
-			CompletedAt:   time.Now(),
-			Insights:      insights,
-			DryRun:        true,
-			SafetyVersion: SafetyVersion,
-			SafetySummary: c.dispatcher.GetSafetySummary(),
-			Deltas:        c.dispatcher.GetDeltas(),
-			TriggerSource: meta.TriggerSource,
-			TriggerID:     meta.TriggerID,
-			TriggeredAt:   meta.TriggeredAt,
-			PolicyVersion: meta.PolicyVersion,
-			MetricsBefore: baseline,
+			CycleID:        cycleID,
+			Tier:           tier,
+			SpaceID:        spaceID,
+			StartedAt:      startedAt,
+			CompletedAt:    time.Now(),
+			Insights:       insights,
+			DryRun:         true,
+			SafetyVersion:  SafetyVersion,
+			SafetySummary:  c.dispatcher.GetSafetySummary(),
+			Deltas:         c.dispatcher.GetDeltas(),
+			TriggerSource:  meta.TriggerSource,
+			TriggerID:      meta.TriggerID,
+			TriggeredAt:    meta.TriggeredAt,
+			PolicyVersion:  meta.PolicyVersion,
+			IdempotencyKey: idempotencyKey,
+			MetricsBefore:  baseline,
 		}
 		log.Printf("RSIC %s: dry-run complete (%d deltas)", cycleID, len(outcome.Deltas))
+		c.calibrator.UpdateCalibration(outcome, tasks, nil)
 		return outcome, nil
 	}
 
@@ -214,6 +227,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	outcome.TriggerID = meta.TriggerID
 	outcome.TriggeredAt = meta.TriggeredAt
 	outcome.PolicyVersion = meta.PolicyVersion
+	outcome.IdempotencyKey = idempotencyKey
 
 	// Phase 88: Attach safety metadata
 	outcome.SafetyVersion = SafetyVersion

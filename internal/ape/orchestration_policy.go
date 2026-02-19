@@ -91,9 +91,13 @@ func (p *OrchestrationPolicy) Hydrate(triggers []TriggerRecord, counters map[str
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Rebuild lastTrigger map from persisted triggers
+	// Rebuild lastTrigger map from persisted triggers, skipping expired records
+	now := time.Now()
 	if triggers != nil {
 		for _, tr := range triggers {
+			if now.Sub(tr.Timestamp).Seconds() >= float64(p.cooldownSec) {
+				continue // expired — no cooldown effect
+			}
 			key := fmt.Sprintf("%s:%s", tr.Source, tr.SpaceID)
 			p.lastTrigger[key] = tr
 		}

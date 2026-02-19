@@ -36,11 +36,12 @@ func (c *Calibrator) SetStore(s *RSICStore) {
 }
 
 // Hydrate loads persisted calibration state from the store.
-func (c *Calibrator) Hydrate(spaceID string) error {
+// The spaceID parameter is ignored — calibration is stored globally.
+func (c *Calibrator) Hydrate(_ string) error {
 	if c.store == nil {
 		return nil
 	}
-	history, actions, err := c.store.LoadCalibration(spaceID)
+	history, actions, err := c.store.LoadCalibration("global")
 	if err != nil {
 		return err
 	}
@@ -119,9 +120,9 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 		c.cycleHistory = c.cycleHistory[len(c.cycleHistory)-100:]
 	}
 
-	// Phase 89: Persist calibration state
-	if c.store != nil && outcome != nil {
-		c.store.SaveCalibration(outcome.SpaceID, c.cycleHistory, c.actionHistory)
+	// Phase 89: Persist calibration state (global — calibrator tracks all spaces)
+	if c.store != nil {
+		c.store.SaveCalibration("global", c.cycleHistory, c.actionHistory)
 	}
 }
 

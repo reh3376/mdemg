@@ -139,12 +139,20 @@ jobs:
           mkdir -p /tmp/uats-test-codebase
           echo 'package main' > /tmp/uats-test-codebase/main.go
 
-      - name: Run UATS Contract Tests
-        continue-on-error: true  # Some specs require embedding provider (unavailable in CI)
+      - name: Run UATS Contract Tests (Core)
         run: |
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
-            --base-url http://localhost:${{ env.MDEMG_PORT }}
+            --base-url http://localhost:${{ env.MDEMG_PORT }} \
+            --exclude-tag embedding_required
+
+      - name: Run UATS Contract Tests (Embedding)
+        continue-on-error: true
+        run: |
+          python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+            --spec-dir docs/api/api-spec/uats/specs/ \
+            --base-url http://localhost:${{ env.MDEMG_PORT }} \
+            --include-tag embedding_required
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5

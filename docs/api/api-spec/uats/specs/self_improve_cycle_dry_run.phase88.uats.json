@@ -21,7 +21,10 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "a8ca357e163e6cee63db3da2e2f493f5b431ad518d8d7a6a43d622f259ef6316"
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "eee34dd49ef9e24258399ab64142a03fc738263a0114c608ee9d26c90a0d208d"
   },
   "variables": {
     "test_space": "uats-rsic-phase88-dryrun",

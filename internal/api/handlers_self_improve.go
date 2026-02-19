@@ -146,11 +146,18 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 	if s.orchestrationPolicy != nil {
 		// Fast-path dedupe check
 		if dedupeResult := s.orchestrationPolicy.CheckDedupe(req.IdempotencyKey); dedupeResult != nil {
-			writeJSON(w, http.StatusOK, map[string]any{
+			resp := map[string]any{
 				"cycle_id":       dedupeResult.OriginalCycleID,
 				"dedupe":         dedupeResult,
 				"policy_version": ape.PolicyVersion,
-			})
+			}
+			if req.TriggerSource != "" {
+				resp["trigger_source"] = req.TriggerSource
+			}
+			if req.IdempotencyKey != "" {
+				resp["idempotency_key"] = req.IdempotencyKey
+			}
+			writeJSON(w, http.StatusOK, resp)
 			return
 		}
 
