@@ -64,9 +64,10 @@ flowchart TD
    - `AGENT_HANDOFF.md` references `docs/specs/phase60b-rsic.md`, but this spec path is not present.
    - API docs under `docs/development/API_REFERENCE.md` describe only a subset of RSIC endpoints, despite implementation exposing full endpoint set.
 
-8. **Test and CI coverage is mostly contract-level, not behavior-level**
+8. **Test and CI coverage is mostly contract-level, not behavior-level** ✅ Remediated
    - UATS checks endpoint shape/status but does not deeply validate RSIC outcome quality or guardrail enforcement.
    - CI runs UATS with `continue-on-error`, so RSIC contracts are not strict merge gates.
+   - **Fix (Phase 90):** 6 core integration tests in `rsic_test.go`; 10 systems-level tests in `rsic_systems_test.go` covering cooldown rejection, source-tier validation, idempotency dedupe, calibration evolution, history filtering, dry-run structure, rollback API, watchdog state, full health composite, and Prometheus metric correctness. CI split into merge-gating core vs best-effort embedding. `--include-tag`/`--exclude-tag` added to UATS runner.
 
 ## Development Plan: RSIC Hardening Phases
 

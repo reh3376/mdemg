@@ -384,6 +384,163 @@ func GetRSICHealth(t *testing.T, endpoint string) map[string]any {
 	return result
 }
 
+// TriggerRSICCycleRaw triggers an RSIC cycle and returns (statusCode, body) without
+// fataling on non-200. Used by rejection/dedupe tests that expect 409 or alternate 200.
+func TriggerRSICCycleRaw(t *testing.T, endpoint, spaceID string, opts map[string]any) (int, map[string]any) {
+	t.Helper()
+
+	body := map[string]any{"space_id": spaceID, "tier": "micro"}
+	for k, v := range opts {
+		body[k] = v
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal cycle request: %v", err)
+	}
+
+	client := NewTestHTTPClient()
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/self-improve/cycle", bytes.NewReader(bodyBytes))
+	if err != nil {
+		t.Fatalf("failed to create cycle request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("cycle request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode cycle response (status %d): %v", resp.StatusCode, err)
+	}
+	return resp.StatusCode, result
+}
+
+// GetRSICCalibration fetches the RSIC calibration endpoint and returns parsed response.
+func GetRSICCalibration(t *testing.T, endpoint string) map[string]any {
+	t.Helper()
+
+	client := NewTestHTTPClient()
+	resp, err := client.Get(endpoint + "/v1/self-improve/calibration")
+	if err != nil {
+		t.Fatalf("calibration request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("calibration returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode calibration response: %v", err)
+	}
+	return result
+}
+
+// GetRSICHistoryFiltered fetches RSIC history with filter query parameters.
+func GetRSICHistoryFiltered(t *testing.T, endpoint string, limit int, filters map[string]string) map[string]any {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/v1/self-improve/history?limit=%d", endpoint, limit)
+	for k, v := range filters {
+		url += fmt.Sprintf("&%s=%s", k, v)
+	}
+
+	client := NewTestHTTPClient()
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatalf("filtered history request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("filtered history returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode filtered history response: %v", err)
+	}
+	return result
+}
+
+// GetRSICRollbackList fetches the rollback snapshot list (GET /v1/self-improve/rollback).
+func GetRSICRollbackList(t *testing.T, endpoint string) map[string]any {
+	t.Helper()
+
+	client := NewTestHTTPClient()
+	resp, err := client.Get(endpoint + "/v1/self-improve/rollback")
+	if err != nil {
+		t.Fatalf("rollback list request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("rollback list returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode rollback list response: %v", err)
+	}
+	return result
+}
+
+// PostRSICRollback attempts a rollback by snapshot_id and returns (statusCode, body).
+func PostRSICRollback(t *testing.T, endpoint, snapshotID string) (int, map[string]any) {
+	t.Helper()
+
+	body := map[string]any{"snapshot_id": snapshotID}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal rollback request: %v", err)
+	}
+
+	client := NewTestHTTPClient()
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/self-improve/rollback", bytes.NewReader(bodyBytes))
+	if err != nil {
+		t.Fatalf("failed to create rollback request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("rollback request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode rollback response (status %d): %v", resp.StatusCode, err)
+	}
+	return resp.StatusCode, result
+}
+
+// GetRSICSignals fetches the signals endpoint (GET /v1/self-improve/signals).
+func GetRSICSignals(t *testing.T, endpoint string) map[string]any {
+	t.Helper()
+
+	client := NewTestHTTPClient()
+	resp, err := client.Get(endpoint + "/v1/self-improve/signals")
+	if err != nil {
+		t.Fatalf("signals request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("signals returned status %d", resp.StatusCode)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode signals response: %v", err)
+	}
+	return result
+}
+
 // GetRSICHistory fetches RSIC cycle history and returns parsed response.
 func GetRSICHistory(t *testing.T, endpoint string, limit int) map[string]any {
 	t.Helper()
