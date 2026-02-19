@@ -2056,6 +2056,104 @@ Aggregated session health: watchdog state, observation rate, active anomalies.
 }
 ```
 
+### POST /v1/self-improve/assess
+
+Runs the RSIC assessment stage only (no reflect/plan/dispatch). Returns health metrics and confidence score for a given space.
+
+**Request Body**:
+```json
+{
+  "space_id": "mdemg-dev",
+  "tier": "micro"
+}
+```
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `space_id` | Yes | — | Target memory space |
+| `tier` | No | `"meso"` | Cycle tier (`micro`, `meso`, `macro`) |
+
+**Response** (200):
+```json
+{
+  "space_id": "mdemg-dev",
+  "tier": "micro",
+  "timestamp": "2026-02-19T12:00:00Z",
+  "retrieval_quality": 0.85,
+  "task_performance": 0.70,
+  "memory_health": 0.92,
+  "edge_health": 0.78,
+  "overall_health": 0.81,
+  "confidence": 0.75,
+  "learning_phase": "warm",
+  "edge_count": 12450,
+  "orphan_count": 15,
+  "total_nodes": 258,
+  "orphan_ratio": 0.058,
+  "correction_rate": 0.02,
+  "consolidation_age_sec": 3600,
+  "volatile_count": 20,
+  "permanent_count": 238,
+  "avg_edge_weight": 0.45
+}
+```
+
+**Error Codes**: `400` (missing space_id), `405` (not POST), `500` (internal), `503` (RSIC not initialised).
+
+### GET /v1/self-improve/report
+
+Lists all active RSIC task statuses.
+
+**Response** (200):
+```json
+{
+  "active_tasks": {
+    "task-abc123": "running",
+    "task-def456": "completed"
+  }
+}
+```
+
+### GET /v1/self-improve/report/{taskID}
+
+Returns progress reports for a specific RSIC task.
+
+**Response** (200):
+```json
+{
+  "task_id": "task-abc123",
+  "reports": [
+    {
+      "task_id": "task-abc123",
+      "cycle_id": "rsic-micro-abc123",
+      "status": "completed",
+      "progress_pct": 1.0,
+      "milestone": "dispatch_complete",
+      "summary": "Consolidated 5 volatile nodes",
+      "metrics_delta": {"orphan_ratio": -0.02},
+      "timestamp": "2026-02-19T12:01:00Z"
+    }
+  ]
+}
+```
+
+### GET /v1/self-improve/calibration
+
+Returns current per-action confidence scores from the calibrator.
+
+**Response** (200):
+```json
+{
+  "calibration": {
+    "trigger_consolidation": 1.0,
+    "prune_decayed_edges": 0.85,
+    "graduate_volatile": 0.90
+  }
+}
+```
+
+**Error Codes**: `405` (not GET), `503` (RSIC not initialised).
+
 ### GET /v1/self-improve/signals
 
 Signal emission/response effectiveness stats (Hebbian learning).
@@ -2072,6 +2170,7 @@ Signal emission/response effectiveness stats (Hebbian learning).
       "response_rate": 0.6
     }
   ],
+  "enabled": true,
   "count": 1
 }
 ```

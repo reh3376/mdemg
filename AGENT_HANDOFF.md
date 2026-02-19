@@ -336,7 +336,7 @@ Phases are organized into **numbered series** to group related work:
 | 50 | Public Readiness | 📋 | `docs/development/repo-to-public-roadmap.md` |
 | 51 | Web Scraper Ingestion | ✅ | `docs/specs/phase51-web-scraper-ingestion.md` |
 | 60 | CMS Advanced II | ✅ | `docs/specs/phase60-cms-advanced-ii.md` |
-| 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ | `docs/specs/phase60b-rsic.md` |
+| 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ | `docs/development/RSIC_GAP_ANALYSIS.md`, phases 87-91 specs |
 | 45.5 | Constraint Detection & Consolidation | ✅ | `internal/hidden/constraint_nodes.go`, `internal/conversation/constraint_detector.go` |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
 | 70 | Neo4j Backup (Full & Partial) with Scheduler | ✅ | `docs/specs/phase70-neo4j-backup.md` |
@@ -731,7 +731,7 @@ score = (recency_weight × recency_score) +
 
 **Completed:** 2026-02-07
 **Priority:** Critical (Highest)
-**Spec:** `docs/specs/phase60b-rsic.md`
+**Spec:** `docs/development/RSIC_GAP_ANALYSIS.md` (gap analysis), phases 87-91 specs (hardening)
 **Dependencies:** Phase 60 (CMS Advanced II), Phase 43A (CMS Enforcement), Phase 45.5 (APE Scheduler)
 
 **Supporting artifacts (docs + JSON):** `docs/development/RSIC_GAP_ANALYSIS.md`, `docs/api/api-spec/uats/specs/self_improve_assess.uats.json`, `docs/api/api-spec/uats/specs/self_improve_cycle.uats.json`, `docs/api/api-spec/uats/specs/self_improve_health.uats.json`
@@ -983,7 +983,7 @@ MDEMG implements this natively. Future portable spec (USIC — Universal Self-Im
 | `internal/ape/cycle.go` | Cycle orchestrator — runs inline stages, dispatches execute, monitors |
 | `internal/ape/types_rsic.go` | All RSIC types (report, insights, actions, task spec, progress) |
 | `internal/api/handlers_self_improve.go` | HTTP handlers for 7 new endpoints |
-| `docs/specs/phase60b-rsic.md` | Full specification document |
+| `docs/development/RSIC_GAP_ANALYSIS.md` | Gap analysis and hardening roadmap (phases 87-91) |
 | `docs/api/api-spec/uats/specs/self_improve_*.uats.json` | UATS specs for all endpoints |
 
 #### Configuration
