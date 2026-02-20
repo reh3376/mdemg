@@ -232,6 +232,7 @@ type Config struct {
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
 	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
 	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 
 	// Context Cooler tuning (Phase 45.5)
 	CoolerReinforcementWindowHours  int     // COOLER_REINFORCEMENT_WINDOW_HOURS — reinforcement window (default: 2)
@@ -1238,6 +1239,10 @@ func FromEnv() (Config, error) {
 	}
 	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
 	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
+	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Context Cooler tuning (Phase 45.5)
 	coolerReinfWindowHours, err := atoi("COOLER_REINFORCEMENT_WINDOW_HOURS", 2)
@@ -1880,6 +1885,7 @@ func FromEnv() (Config, error) {
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:  rsicPersistenceEnabled,
+		SpacePruneIntervalHours: spacePruneIntervalHours,
 
 		CoolerReinforcementWindowHours:  coolerReinfWindowHours,
 		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,

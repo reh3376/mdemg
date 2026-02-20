@@ -66,6 +66,7 @@ type Server struct {
 	stopCooler         chan struct{}
 	stopInterviewer    chan struct{}
 	stopScheduledSync  chan struct{}
+	stopSpacePrune     chan struct{}
 
 	// Phase 3: Production readiness components
 	cbRegistry     *circuitbreaker.Registry
@@ -516,6 +517,7 @@ func (s *Server) Shutdown() {
 	s.StopWeeklyGapInterviews()
 	s.StopScheduledSync()
 	s.StopRSICWatchdog()
+	s.StopSpacePruneScheduler()
 	if s.rsicStore != nil {
 		s.rsicStore.Stop()
 	}
@@ -848,6 +850,41 @@ func (s *Server) StopContextCoolerProcessing() {
 	if s.stopCooler != nil {
 		close(s.stopCooler)
 		s.stopCooler = nil
+	}
+}
+
+// StartSpacePruneScheduler starts a background goroutine that periodically
+// prunes spaces marked prunable or orphaned (no TapRoot).
+func (s *Server) StartSpacePruneScheduler(interval time.Duration) {
+	if interval <= 0 {
+		log.Println("Space prune scheduler disabled (interval=0)")
+		return
+	}
+	s.stopSpacePrune = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		log.Printf("Space prune scheduler started (interval=%v)", interval)
+		for {
+			select {
+			case <-ticker.C:
+				pruned, deleted, errors := s.runAutoSpacePrune()
+				if pruned > 0 || errors > 0 {
+					log.Printf("[auto-prune] pruned=%d spaces, deleted=%d nodes, errors=%d", pruned, deleted, errors)
+				}
+			case <-s.stopSpacePrune:
+				log.Println("Space prune scheduler stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopSpacePruneScheduler stops the background space prune goroutine.
+func (s *Server) StopSpacePruneScheduler() {
+	if s.stopSpacePrune != nil {
+		close(s.stopSpacePrune)
+		s.stopSpacePrune = nil
 	}
 }
 
@@ -1202,6 +1239,11 @@ func (s *Server) Routes() http.Handler {
 
 	// SSE streaming endpoint for job progress (Phase 48.3.3)
 	mux.HandleFunc("/v1/jobs/", s.handleJobStream)
+
+	// Admin: space lifecycle management
+	mux.HandleFunc("/v1/admin/spaces/prune", s.handleAdminSpacePrune)
+	mux.HandleFunc("/v1/admin/spaces/", s.handleAdminSpaceUpdate)
+	mux.HandleFunc("/v1/admin/spaces", s.handleAdminSpaces)
 
 	// Wrap mux with middleware stack
 	// Order (outermost to innermost):

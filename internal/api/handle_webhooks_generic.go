@@ -535,7 +535,7 @@ func (s *Server) processGenericWebhookEvent(payload genericWebhookPayload, rawBo
 		payload.Source, resp.SuccessCount, resp.TotalItems)
 
 	// Update TapRoot freshness
-	if err := s.retriever.UpdateTapRootFreshness(ctx, spaceID, fmt.Sprintf("%s-webhook", payload.Source)); err != nil {
+	if err := s.retriever.UpdateTapRootFreshness(ctx, spaceID, fmt.Sprintf("%s-webhook", payload.Source), IsPrunablePrefix(spaceID)); err != nil {
 		log.Printf("[webhook] %s: failed to update TapRoot freshness: %v", payload.Source, err)
 	}
 

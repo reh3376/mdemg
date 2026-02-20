@@ -1,0 +1,72 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Spaces Update",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "spaces",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-19",
+    "description": "Validates PATCH /v1/admin/spaces/{space_id} for updating space prunable flag, including protected space guard.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "35d1b2e32b6752e668303a28ed308d2a5d73828f6d3d265c41a5668c11b62e15"
+  },
+  "request": {
+    "method": "PATCH",
+    "path": "/v1/admin/spaces/mdemg-dev",
+    "body": {
+      "prunable": true
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 403,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "contains": "protected"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "not_found",
+      "description": "Update a nonexistent space returns 404",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/admin/spaces/nonexistent-space-xyz",
+        "body": {
+          "prunable": true
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "contains": "not found"
+          }
+        ]
+      }
+    }
+  ]
+}

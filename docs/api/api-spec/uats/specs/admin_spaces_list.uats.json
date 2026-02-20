@@ -1,0 +1,75 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Spaces List",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "spaces",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-19",
+    "description": "Validates GET /v1/admin/spaces returns space listing with prunable status and counts.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "cd9ca010663ef8895ae029e9bd1c08ee09ac6e33d976d630d255a46ff500c03e"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/admin/spaces"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.spaces",
+        "type": "array"
+      },
+      {
+        "path": "$.total",
+        "type": "integer"
+      },
+      {
+        "path": "$.prunable_count",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "filter_prunable",
+      "description": "Filter to non-prunable spaces only",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/spaces",
+        "query": {
+          "prunable": "false"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.spaces",
+            "type": "array"
+          },
+          {
+            "path": "$.total",
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  ]
+}

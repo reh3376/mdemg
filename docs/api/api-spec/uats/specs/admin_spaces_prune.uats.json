@@ -1,0 +1,88 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Spaces Prune",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "spaces",
+      "prune"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-19",
+    "description": "Validates POST /v1/admin/spaces/prune for batch pruning of prunable spaces with dry-run support.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "dccf73af5ee0d0178a0961da562d365570425c8bc12474d8873062cc62101f64"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/admin/spaces/prune",
+    "body": {
+      "dry_run": true
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.dry_run",
+        "equals": true
+      },
+      {
+        "path": "$.results",
+        "type": "array"
+      },
+      {
+        "path": "$.spaces_pruned",
+        "type": "integer"
+      },
+      {
+        "path": "$.total_nodes_deleted",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "execute",
+      "description": "Execute pruning (non-dry-run)",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/prune",
+        "body": {
+          "dry_run": false
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.dry_run",
+            "equals": false
+          },
+          {
+            "path": "$.results",
+            "type": "array"
+          }
+        ]
+      }
+    }
+  ]
+}

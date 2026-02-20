@@ -75,7 +75,8 @@ func (imp *Importer) Import(ctx context.Context, chunks []*pb.SpaceChunk) (*Impo
 	// Ensure TapRoot exists for the space
 	if len(chunks) > 0 {
 		spaceID := chunks[0].SpaceId
-		if err := imp.ensureTapRoot(ctx, spaceID); err != nil {
+		prunable := strings.HasPrefix(spaceID, "test-") || strings.HasPrefix(spaceID, "uats-")
+		if err := imp.ensureTapRoot(ctx, spaceID, prunable); err != nil {
 			return nil, fmt.Errorf("ensure taproot: %w", err)
 		}
 	}
@@ -176,13 +177,13 @@ func (imp *Importer) getLocalSchemaVersion(ctx context.Context) (int, error) {
 	return int(result.(int64)), nil
 }
 
-func (imp *Importer) ensureTapRoot(ctx context.Context, spaceID string) error {
+func (imp *Importer) ensureTapRoot(ctx context.Context, spaceID string, prunable bool) error {
 	sess := imp.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		_, err := tx.Run(ctx, `MERGE (t:TapRoot {space_id: $spaceId}) ON CREATE SET t.created_at = datetime()`,
-			map[string]any{"spaceId": spaceID})
+		_, err := tx.Run(ctx, `MERGE (t:TapRoot {space_id: $spaceId}) ON CREATE SET t.created_at = datetime(), t.prunable = $prunable`,
+			map[string]any{"spaceId": spaceID, "prunable": prunable})
 		return nil, err
 	})
 	return err

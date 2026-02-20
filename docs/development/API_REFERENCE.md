@@ -2323,6 +2323,80 @@ Rolls back a specific snapshot (Phase 88).
 
 ---
 
+## Admin — Space Lifecycle Management
+
+### GET /v1/admin/spaces
+
+List all spaces with metadata (node counts, prunable status, orphan detection).
+
+**Query parameters:**
+- `prunable` — Filter by prunable status (`true`, `false`, or omit for all)
+- `limit` — Max spaces to return (default 100, max 500)
+
+**Response** (`200 OK`):
+```json
+{
+  "spaces": [
+    {
+      "space_id": "mdemg-dev",
+      "prunable": false,
+      "protected": true,
+      "created_at": "2026-01-28T20:24:27.46Z",
+      "last_ingest_at": "2026-02-19T22:08:14.216Z",
+      "ingest_count": 182,
+      "node_count": 19186,
+      "observation_count": 324
+    }
+  ],
+  "total": 1,
+  "prunable_count": 0
+}
+```
+
+### PATCH /v1/admin/spaces/{space_id}
+
+Update space metadata (currently only `prunable` flag). Protected spaces cannot be marked prunable.
+
+**Request body:**
+```json
+{ "prunable": true }
+```
+
+**Response** (`200 OK`):
+```json
+{ "space_id": "test-abc", "prunable": true, "updated": true }
+```
+
+### POST /v1/admin/spaces/prune
+
+Execute batch pruning of prunable/orphan spaces. Supports dry-run mode.
+
+**Request body:**
+```json
+{ "dry_run": true, "batch_size": 10000, "max_spaces": 50 }
+```
+
+**Response** (`200 OK`):
+```json
+{
+  "dry_run": true,
+  "spaces_pruned": 2,
+  "spaces_skipped": 0,
+  "total_nodes_deleted": 150,
+  "results": [
+    { "space_id": "test-abc", "nodes_deleted": 100, "status": "dry_run" },
+    { "space_id": "uats-xyz", "nodes_deleted": 50, "status": "dry_run" }
+  ]
+}
+```
+
+**Auto-prune scheduler:** A background goroutine runs `runAutoSpacePrune()` on a configurable interval.
+
+**Environment variable:**
+- `SPACE_PRUNE_INTERVAL_HOURS` — Interval in hours (default: 24, 0 = disabled)
+
+---
+
 ## Error Responses
 
 All endpoints return errors in a consistent format:

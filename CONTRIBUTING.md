@@ -539,6 +539,16 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 | GET | `/v1/symbols/relationships?space_id=X` | Relationship edge counts by type |
 | GET | `/v1/symbols/{id}/relationships?space_id=X` | Incoming/outgoing edges for a symbol |
 
+### Admin — Space Lifecycle Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/admin/spaces` | List all spaces with metadata and prunable status |
+| PATCH | `/v1/admin/spaces/{id}` | Update space metadata (prunable flag) |
+| POST | `/v1/admin/spaces/prune` | Batch prune prunable/orphan spaces (dry-run supported) |
+
+Auto-prune scheduler runs in the background on a configurable interval (`SPACE_PRUNE_INTERVAL_HOURS`, default 24, 0 = disabled).
+
 ### System, Plugins & Monitoring
 
 | Method | Endpoint | Description |

@@ -249,7 +249,7 @@ func (s *Server) processLinearWebhookEvent(payload linearWebhookPayload, rawBody
 		resp.SuccessCount, resp.TotalItems, payload.Type, payload.Action)
 
 	// Update TapRoot freshness
-	if err := s.retriever.UpdateTapRootFreshness(ingestCtx, spaceID, "linear-webhook"); err != nil {
+	if err := s.retriever.UpdateTapRootFreshness(ingestCtx, spaceID, "linear-webhook", IsPrunablePrefix(spaceID)); err != nil {
 		log.Printf("[webhook] linear: failed to update TapRoot freshness: %v", err)
 	}
 

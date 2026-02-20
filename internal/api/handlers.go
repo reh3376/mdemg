@@ -35,6 +35,12 @@ func IsProtectedSpace(spaceID string) bool {
 	return ProtectedSpaces[spaceID]
 }
 
+// IsPrunablePrefix returns true if the space_id has a prefix indicating
+// it was created for testing/temporary use (test-, uats-).
+func IsPrunablePrefix(spaceID string) bool {
+	return strings.HasPrefix(spaceID, "test-") || strings.HasPrefix(spaceID, "uats-")
+}
+
 // HealthCheck represents the status of a single health check component.
 type HealthCheck struct {
 	Status  string `json:"status"`            // "healthy", "unhealthy", "degraded"
@@ -632,7 +638,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 
 	// Update TapRoot freshness after successful batch ingest
 	if resp.SuccessCount > 0 {
-		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "batch-ingest"); err != nil {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "batch-ingest", IsPrunablePrefix(req.SpaceID)); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
 		}
 		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
@@ -2560,7 +2566,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 			log.Printf("Ingestion job %s completed: total=%d ingested=%d errors=%d",
 				job.ID, evt.Total, evt.Ingested, evt.Errors)
 			// Update TapRoot freshness on successful completion
-			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest", IsPrunablePrefix(spaceID)); err != nil {
 				log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 			}
 			s.TriggerAPEEventWithContext("source_changed", map[string]string{
@@ -2597,7 +2603,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 		})
 		log.Printf("Ingestion job %s completed (no progress events)", job.ID)
 		// Update TapRoot freshness on fallback completion
-		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest"); err != nil {
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest", IsPrunablePrefix(spaceID)); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 		}
 		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
@@ -2911,7 +2917,7 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 
 	// Update TapRoot freshness after successful file ingest
 	if successCount > 0 {
-		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest"); err != nil {
+		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest", IsPrunablePrefix(req.SpaceID)); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
 		}
 		s.TriggerAPEEventWithContext("source_changed", map[string]string{
@@ -3084,7 +3090,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 
 	// Update TapRoot freshness on successful file ingest job
 	if successCount > 0 {
-		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest"); err != nil {
+		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest", IsPrunablePrefix(spaceID)); err != nil {
 			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
 		}
 		s.TriggerAPEEventWithContext("source_changed", map[string]string{

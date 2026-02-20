@@ -312,7 +312,7 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	freshnessCtx, freshnessCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer freshnessCancel()
 	if s.retriever != nil {
-		if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest"); err != nil {
+		if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest", IsPrunablePrefix(job.SpaceID)); err != nil {
 			log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
 		}
 	}
