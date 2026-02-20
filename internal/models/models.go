@@ -913,6 +913,59 @@ type GraphOrphanNode struct {
 	Status    string `json:"status,omitempty"`
 }
 
+// =============================================================================
+// ADMIN: SPACE LIFECYCLE MANAGEMENT
+// =============================================================================
+
+// SpaceInfo represents a single space in the admin spaces listing.
+type SpaceInfo struct {
+	SpaceID          string `json:"space_id"`
+	Prunable         bool   `json:"prunable"`
+	Protected        bool   `json:"protected"`
+	CreatedAt        string `json:"created_at,omitempty"`
+	LastIngestAt     string `json:"last_ingest_at,omitempty"`
+	IngestCount      int    `json:"ingest_count"`
+	NodeCount        int    `json:"node_count"`
+	ObservationCount int    `json:"observation_count"`
+}
+
+// AdminSpacesResponse - response from GET /v1/admin/spaces
+type AdminSpacesResponse struct {
+	Spaces        []SpaceInfo `json:"spaces"`
+	Total         int         `json:"total"`
+	PrunableCount int         `json:"prunable_count"`
+}
+
+// AdminSpaceUpdateRequest - request for PATCH /v1/admin/spaces/{space_id}
+type AdminSpaceUpdateRequest struct {
+	Prunable *bool `json:"prunable"`
+}
+
+// AdminSpacePruneRequest - request for POST /v1/admin/spaces/prune
+type AdminSpacePruneRequest struct {
+	DryRun    bool `json:"dry_run"`
+	BatchSize int  `json:"batch_size"`
+	MaxSpaces int  `json:"max_spaces"`
+}
+
+// SpacePruneResult - result for a single space in prune response
+type SpacePruneResult struct {
+	SpaceID      string `json:"space_id"`
+	NodesDeleted int    `json:"nodes_deleted"`
+	Status       string `json:"status"` // "pruned", "dry_run", "skipped", "error"
+	DurationMs   int64  `json:"duration_ms"`
+	Error        string `json:"error,omitempty"`
+}
+
+// AdminSpacePruneResponse - response from POST /v1/admin/spaces/prune
+type AdminSpacePruneResponse struct {
+	DryRun            bool              `json:"dry_run"`
+	SpacesPruned      int               `json:"spaces_pruned"`
+	SpacesSkipped     int               `json:"spaces_skipped"`
+	TotalNodesDeleted int               `json:"total_nodes_deleted"`
+	Results           []SpacePruneResult `json:"results"`
+}
+
 // Neo4jOverviewResponse - response for GET /v1/neo4j/overview
 type Neo4jOverviewResponse struct {
 	Database   DatabaseOverview `json:"database"`

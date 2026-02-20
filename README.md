@@ -281,6 +281,16 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/backup/restore` | POST | Trigger restore from full backup |
 | `/v1/backup/restore/status/{id}` | GET | Restore job status |
 
+### Admin — Space Lifecycle
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/admin/spaces` | GET | List all spaces with metadata and prunable status |
+| `/v1/admin/spaces/{id}` | PATCH | Update space metadata (prunable flag) |
+| `/v1/admin/spaces/prune` | POST | Batch prune prunable/orphan spaces (dry-run supported) |
+
+A background auto-prune scheduler runs every 24 hours by default (`SPACE_PRUNE_INTERVAL_HOURS`, 0 to disable).
+
 ### Conversation Memory System (CMS)
 
 | Endpoint | Method | Description |

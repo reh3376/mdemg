@@ -69,6 +69,11 @@ func main() {
 	// Start RSIC macro cron scheduler (Phase 87)
 	srv.StartMacroCronScheduler()
 
+	// Start automatic space prune scheduler
+	if cfg.SpacePruneIntervalHours > 0 {
+		srv.StartSpacePruneScheduler(time.Duration(cfg.SpacePruneIntervalHours) * time.Hour)
+	}
+
 	h := &http.Server{
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,

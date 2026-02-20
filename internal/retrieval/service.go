@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -169,21 +170,28 @@ func (s *Service) ClearQueryCache() int {
 	return count
 }
 
+// IsPrunableSpace returns true if a space_id has a test/temp prefix (test-, uats-).
+func IsPrunableSpace(spaceID string) bool {
+	return strings.HasPrefix(spaceID, "test-") || strings.HasPrefix(spaceID, "uats-")
+}
+
 // UpdateTapRootFreshness updates the TapRoot node for a space with the latest
 // ingest timestamp and type. Creates the TapRoot if it doesn't exist.
-func (s *Service) UpdateTapRootFreshness(ctx context.Context, spaceID, ingestType string) error {
+// On creation, auto-detects prunable status from space_id prefix.
+func (s *Service) UpdateTapRootFreshness(ctx context.Context, spaceID, ingestType string, prunable bool) error {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
 	_, err := session.Run(ctx, `
 		MERGE (t:TapRoot {space_id: $spaceId})
-		ON CREATE SET t.name = 'tap_root', t.created_at = datetime()
+		ON CREATE SET t.name = 'tap_root', t.created_at = datetime(), t.prunable = $prunable
 		SET t.last_ingest_at = datetime(),
 		    t.last_ingest_type = $ingestType,
 		    t.ingest_count = coalesce(t.ingest_count, 0) + 1
 	`, map[string]any{
 		"spaceId":    spaceID,
 		"ingestType": ingestType,
+		"prunable":   prunable,
 	})
 	if err != nil {
 		return fmt.Errorf("update TapRoot freshness: %w", err)
@@ -1192,6 +1200,7 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 		"confidence":    req.Confidence,
 		"embedding":     req.Embedding, // May be nil/empty
 		"canonicalTime": canonicalTimeStr,
+		"prunable":      IsPrunableSpace(req.SpaceID),
 	}
 
 	// Determine merge key: prefer path if provided, else use node_id
@@ -1216,7 +1225,7 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 		if mergeKey == "path" {
 			cypher = `
 MERGE (t:TapRoot {space_id:$spaceId})
-ON CREATE SET t.name='tap_root', t.created_at=datetime()
+ON CREATE SET t.name='tap_root', t.created_at=datetime(), t.prunable=$prunable
 WITH t
 MERGE (n:MemoryNode {space_id:$spaceId, path:$mergeValue})
 ON CREATE SET n.node_id=$nodeId,
@@ -1254,7 +1263,7 @@ RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_coun
 		} else {
 			cypher = `
 MERGE (t:TapRoot {space_id:$spaceId})
-ON CREATE SET t.name='tap_root', t.created_at=datetime()
+ON CREATE SET t.name='tap_root', t.created_at=datetime(), t.prunable=$prunable
 WITH t
 MERGE (n:MemoryNode {space_id:$spaceId, node_id:$mergeValue})
 ON CREATE SET n.path=coalesce($path, $mergeValue),
