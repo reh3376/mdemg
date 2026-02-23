@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"mdemg/cmd/ingest-codebase/languages"
+	"mdemg/internal/languages"
 )
 
 // ParserConfig controls section chunking thresholds.

@@ -33,14 +33,16 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
    docker compose up -d
    ```
 
-5. Build the server:
+5. Build the unified CLI:
    ```bash
-   go build -o bin/mdemg ./cmd/server
+   make build-cli
+   # Or directly:
+   go build -o bin/mdemg ./cmd/mdemg
    ```
 
 6. Run the server:
    ```bash
-   ./bin/mdemg
+   ./bin/mdemg serve
    ```
 
 ## Code Style

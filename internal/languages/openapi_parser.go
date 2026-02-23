@@ -138,24 +138,11 @@ var (
 	// Paths - look for path patterns at correct indentation
 	openapiPathPattern = regexp.MustCompile(`(?m)^  (/[^:\n]*):`)
 
-	// HTTP methods under paths
-	openapiMethodPattern = regexp.MustCompile(`(?m)^    (get|post|put|delete|patch|options|head):\s*$`)
-
 	// Operation ID
 	openapiOperationIdPattern = regexp.MustCompile(`(?m)^\s+operationId:\s*["']?([^"'\n]+)["']?`)
 
-	// Tags on operations
-	openapiTagPattern = regexp.MustCompile(`(?m)^\s+tags:\s*$`)
-
 	// Parameters
 	openapiParameterNamePattern = regexp.MustCompile(`(?m)^\s+-\s+name:\s*["']?([^"'\n]+)["']?`)
-	openapiParameterInPattern   = regexp.MustCompile(`(?m)^\s+in:\s*["']?([^"'\n]+)["']?`)
-
-	// Schemas in components
-	openapiSchemaPattern = regexp.MustCompile(`(?m)^    (\w+):\s*$`)
-
-	// Security schemes
-	openapiSecuritySchemePattern = regexp.MustCompile(`(?m)^    (\w+):\s*$`)
 
 	// Server URLs
 	openapiServerUrlPattern = regexp.MustCompile(`(?m)^\s+-?\s*url:\s*["']?([^"'\n]+)["']?`)

@@ -119,8 +119,6 @@ var (
 	constraintRegex = regexp.MustCompile(`(?i)CREATE\s+CONSTRAINT\s+(\w+)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:ON|FOR)`)
 	// CREATE INDEX - Neo4j syntax: CREATE [type] INDEX name [IF NOT EXISTS] FOR/ON
 	indexRegex = regexp.MustCompile(`(?i)CREATE\s+(?:BTREE\s+|FULLTEXT\s+|POINT\s+|RANGE\s+|TEXT\s+)?INDEX\s+(\w+)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:ON|FOR)`)
-	// Property keys in {key: value}
-	propertyRegex = regexp.MustCompile(`\{([^}]+)\}`)
 	// CALL procedure
 	callRegex = regexp.MustCompile(`(?i)CALL\s+([\w.]+)`)
 )

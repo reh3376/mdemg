@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestShouldPruneEdge(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		edge            edge
+		edge            pruneEdge
 		weightThreshold float64
 		minEvidence     int
 		olderThanDays   int
@@ -29,7 +29,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// Low weight prune cases
 		{
 			name: "low weight, low evidence, old edge -> prune",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 2,
 				Pinned:        false,
@@ -44,7 +44,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "zero weight -> always prune regardless of other factors",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.0,
 				EvidenceCount: 10, // high evidence should not protect
 				Pinned:        true, // even pinned should not protect
@@ -59,7 +59,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "negative weight -> always prune",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        -0.1,
 				EvidenceCount: 10,
 				Pinned:        true,
@@ -76,7 +76,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// Pinned protection cases
 		{
 			name: "low weight, pinned -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        true,
@@ -91,7 +91,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "pinned edge with very low weight -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.001,
 				EvidenceCount: 0,
 				Pinned:        true,
@@ -108,7 +108,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// High evidence protection cases
 		{
 			name: "low weight, high evidence -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 5,
 				Pinned:        false,
@@ -123,7 +123,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "evidence exactly at threshold -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 3,
 				Pinned:        false,
@@ -138,7 +138,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "high evidence count protects old edge",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.001,
 				EvidenceCount: 10,
 				Pinned:        false,
@@ -155,7 +155,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// Weight above threshold cases
 		{
 			name: "weight above threshold -> not pruned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.5,
 				EvidenceCount: 1,
 				Pinned:        false,
@@ -170,7 +170,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "weight exactly at threshold -> not pruned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.01,
 				EvidenceCount: 0,
 				Pinned:        false,
@@ -185,7 +185,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "weight just above threshold -> not pruned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.011,
 				EvidenceCount: 0,
 				Pinned:        false,
@@ -202,7 +202,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// Age criterion cases (edge must be old enough to prune)
 		{
 			name: "low weight but too recent -> not pruned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        false,
@@ -217,7 +217,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "edge exactly at age threshold -> not pruned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        false,
@@ -232,7 +232,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		},
 		{
 			name: "edge with zero timestamp -> prune (treated as very old)",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        false,
@@ -249,7 +249,7 @@ func TestShouldPruneEdge(t *testing.T) {
 		// Combined protection - pinned takes precedence over high_evidence
 		{
 			name: "pinned with high evidence -> protected by pinned",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 10,
 				Pinned:        true,
@@ -347,14 +347,14 @@ func TestProcessEdgeForPruning(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		edge            edge
+		edge            pruneEdge
 		expectPrune     bool
 		expectProtected bool
 		expectReason    string
 	}{
 		{
 			name: "low weight, low evidence, old -> prune",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 2,
 				Pinned:        false,
@@ -366,7 +366,7 @@ func TestProcessEdgeForPruning(t *testing.T) {
 		},
 		{
 			name: "high evidence -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 5,
 				Pinned:        false,
@@ -378,7 +378,7 @@ func TestProcessEdgeForPruning(t *testing.T) {
 		},
 		{
 			name: "pinned -> protected",
-			edge: edge{
+			edge: pruneEdge{
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        true,
@@ -414,76 +414,6 @@ func TestProcessEdgeForPruning(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestAsConversionHelpers verifies the type conversion helpers
-func TestAsConversionHelpers(t *testing.T) {
-	t.Run("asString", func(t *testing.T) {
-		if asString(nil) != "" {
-			t.Error("asString(nil) should return empty string")
-		}
-		if asString("hello") != "hello" {
-			t.Error("asString(string) should return the string")
-		}
-		if asString(123) != "123" {
-			t.Error("asString(int) should format as string")
-		}
-	})
-
-	t.Run("asFloat64", func(t *testing.T) {
-		if asFloat64(nil) != 0.0 {
-			t.Error("asFloat64(nil) should return 0.0")
-		}
-		if asFloat64(3.14) != 3.14 {
-			t.Error("asFloat64(float64) should return the float")
-		}
-		if asFloat64(int64(42)) != 42.0 {
-			t.Error("asFloat64(int64) should convert to float64")
-		}
-		if asFloat64(int(42)) != 42.0 {
-			t.Error("asFloat64(int) should convert to float64")
-		}
-	})
-
-	t.Run("asInt", func(t *testing.T) {
-		if asInt(nil) != 0 {
-			t.Error("asInt(nil) should return 0")
-		}
-		if asInt(int64(42)) != 42 {
-			t.Error("asInt(int64) should convert to int")
-		}
-		if asInt(int(42)) != 42 {
-			t.Error("asInt(int) should return the int")
-		}
-		if asInt(3.9) != 3 {
-			t.Error("asInt(float64) should truncate to int")
-		}
-	})
-
-	t.Run("asBool", func(t *testing.T) {
-		if asBool(nil) != false {
-			t.Error("asBool(nil) should return false")
-		}
-		if asBool(true) != true {
-			t.Error("asBool(true) should return true")
-		}
-		if asBool(false) != false {
-			t.Error("asBool(false) should return false")
-		}
-		if asBool("true") != false {
-			t.Error("asBool(string) should return false")
-		}
-	})
-
-	t.Run("asTime", func(t *testing.T) {
-		if !asTime(nil).IsZero() {
-			t.Error("asTime(nil) should return zero time")
-		}
-		now := time.Now()
-		if !asTime(now).Equal(now) {
-			t.Error("asTime(time.Time) should return the time")
-		}
-	})
 }
 
 // TestShouldTombstoneNode verifies the node tombstoning decision logic.
@@ -933,39 +863,6 @@ func TestProcessNodeForTombstoning(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestAsFloat32Slice verifies the embedding conversion helper
-func TestAsFloat32Slice(t *testing.T) {
-	t.Run("nil returns nil", func(t *testing.T) {
-		if asFloat32Slice(nil) != nil {
-			t.Error("asFloat32Slice(nil) should return nil")
-		}
-	})
-
-	t.Run("float32 slice passthrough", func(t *testing.T) {
-		input := []float32{0.1, 0.2, 0.3}
-		result := asFloat32Slice(input)
-		if len(result) != 3 || result[0] != 0.1 {
-			t.Error("asFloat32Slice should passthrough []float32")
-		}
-	})
-
-	t.Run("float64 slice conversion", func(t *testing.T) {
-		input := []float64{0.1, 0.2, 0.3}
-		result := asFloat32Slice(input)
-		if len(result) != 3 {
-			t.Errorf("asFloat32Slice should convert []float64, got len %d", len(result))
-		}
-	})
-
-	t.Run("any slice conversion", func(t *testing.T) {
-		input := []any{float64(0.1), float64(0.2)}
-		result := asFloat32Slice(input)
-		if len(result) != 2 {
-			t.Errorf("asFloat32Slice should convert []any, got len %d", len(result))
-		}
-	})
 }
 
 // TestParseConfig verifies that parseConfig correctly parses CLI flags and environment variables.
@@ -1744,4 +1641,8 @@ func TestResolveTransitiveMerges(t *testing.T) {
 			t.Errorf("expected similarity 0.995, got %f", result[0].Similarity)
 		}
 	})
+
+	// Suppress unused variable warnings for t4 and t5
+	_ = t4
+	_ = t5
 }

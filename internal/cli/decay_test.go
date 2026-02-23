@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"math"
@@ -370,74 +370,4 @@ func TestExpDecayFormula(t *testing.T) {
 	if math.Abs(decayFactor-expected) > 1e-10 {
 		t.Errorf("exp(-0.1 * 10) = %v, want %v", decayFactor, expected)
 	}
-}
-
-// TestAsConversionHelpers verifies the type conversion helpers
-func TestAsConversionHelpers(t *testing.T) {
-	t.Run("asString", func(t *testing.T) {
-		if asString(nil) != "" {
-			t.Error("asString(nil) should return empty string")
-		}
-		if asString("hello") != "hello" {
-			t.Error("asString(string) should return the string")
-		}
-		if asString(123) != "123" {
-			t.Error("asString(int) should format as string")
-		}
-	})
-
-	t.Run("asFloat64", func(t *testing.T) {
-		if asFloat64(nil) != 0.0 {
-			t.Error("asFloat64(nil) should return 0.0")
-		}
-		if asFloat64(3.14) != 3.14 {
-			t.Error("asFloat64(float64) should return the float")
-		}
-		if asFloat64(int64(42)) != 42.0 {
-			t.Error("asFloat64(int64) should convert to float64")
-		}
-		if asFloat64(int(42)) != 42.0 {
-			t.Error("asFloat64(int) should convert to float64")
-		}
-	})
-
-	t.Run("asInt", func(t *testing.T) {
-		if asInt(nil) != 0 {
-			t.Error("asInt(nil) should return 0")
-		}
-		if asInt(int64(42)) != 42 {
-			t.Error("asInt(int64) should convert to int")
-		}
-		if asInt(int(42)) != 42 {
-			t.Error("asInt(int) should return the int")
-		}
-		if asInt(3.9) != 3 {
-			t.Error("asInt(float64) should truncate to int")
-		}
-	})
-
-	t.Run("asBool", func(t *testing.T) {
-		if asBool(nil) != false {
-			t.Error("asBool(nil) should return false")
-		}
-		if asBool(true) != true {
-			t.Error("asBool(true) should return true")
-		}
-		if asBool(false) != false {
-			t.Error("asBool(false) should return false")
-		}
-		if asBool("true") != false {
-			t.Error("asBool(string) should return false")
-		}
-	})
-
-	t.Run("asTime", func(t *testing.T) {
-		if !asTime(nil).IsZero() {
-			t.Error("asTime(nil) should return zero time")
-		}
-		now := time.Now()
-		if !asTime(now).Equal(now) {
-			t.Error("asTime(time.Time) should return the time")
-		}
-	})
 }

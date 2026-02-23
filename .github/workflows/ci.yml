@@ -26,14 +26,14 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Build server
-        run: go build -v -o bin/mdemg ./cmd/server
+      - name: Build unified CLI
+        run: go build -v -o bin/mdemg ./cmd/mdemg
 
-      - name: Build ingest-codebase
-        run: go build -v -o bin/ingest-codebase ./cmd/ingest-codebase
-
-      - name: Build MCP server
-        run: go build -v -o bin/mdemg-mcp ./cmd/mcp-server
+      - name: Build legacy binaries
+        run: |
+          go build -v -o bin/mdemg-server ./cmd/server
+          go build -v -o bin/ingest-codebase ./cmd/ingest-codebase
+          go build -v -o bin/mdemg-mcp ./cmd/mcp-server
 
   test:
     name: Test
@@ -99,8 +99,8 @@ jobs:
             -p testpassword \
             "MATCH (s:SchemaMeta {key:'schema'}) RETURN s.current_version AS version"
 
-      - name: Build server for integration tests
-        run: go build -o bin/mdemg ./cmd/server
+      - name: Build unified CLI for integration tests
+        run: go build -o bin/mdemg ./cmd/mdemg
 
       - name: Start MDEMG server
         run: |
@@ -113,7 +113,7 @@ jobs:
           export PORT_FILE_PATH=.mdemg.port
           export EMBEDDING_PROVIDER=
           export REQUIRED_SCHEMA_VERSION=10
-          ./bin/mdemg &
+          ./bin/mdemg serve &
 
           # Wait for port file (server writes it after binding)
           timeout 30s bash -c 'until [ -f .mdemg.port ]; do sleep 1; done'

@@ -99,8 +99,8 @@ backups/
 .mdemg.port
 .mdemg.port.tmp
 
-# Build artifacts
-mdemg
+# Build artifacts (binary in repo root, not cmd/mdemg/ source)
+/mdemg
 
 # Neo4j data
 mdemg_neo4j/

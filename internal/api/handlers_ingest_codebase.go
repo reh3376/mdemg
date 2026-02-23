@@ -282,8 +282,8 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 
 	log.Printf("[ingest-codebase] Starting job %s: space=%s path=%s", job.ID, job.SpaceID, job.Path)
 
-	// Run ingest-codebase CLI from current working directory
-	cmd := exec.CommandContext(ctx, "./bin/ingest-codebase", args...)
+	// Run unified CLI ingest subcommand from current working directory
+	cmd := exec.CommandContext(ctx, "./bin/mdemg", append([]string{"ingest"}, args...)...)
 
 	output, err := cmd.CombinedOutput()
 

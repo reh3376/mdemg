@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"math"
@@ -194,22 +194,22 @@ func TestBuildClusters(t *testing.T) {
 			name: "single cluster of 3",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2, 0.3},
-					NeighborIDs: []string{"node-b", "node-c"},
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2, 0.3},
+					neighborIDs: []string{"node-b", "node-c"},
 				},
 				{
-					NodeID:      "node-b",
-					Layer:       0,
-					Embedding:   []float64{0.2, 0.3, 0.4},
-					NeighborIDs: []string{"node-a", "node-c"},
+					nodeID:      "node-b",
+					layer:       0,
+					embedding:   []float64{0.2, 0.3, 0.4},
+					neighborIDs: []string{"node-a", "node-c"},
 				},
 				{
-					NodeID:      "node-c",
-					Layer:       0,
-					Embedding:   []float64{0.3, 0.4, 0.5},
-					NeighborIDs: []string{"node-a", "node-b"},
+					nodeID:      "node-c",
+					layer:       0,
+					embedding:   []float64{0.3, 0.4, 0.5},
+					neighborIDs: []string{"node-a", "node-b"},
 				},
 			},
 			minSize:          3,
@@ -220,16 +220,16 @@ func TestBuildClusters(t *testing.T) {
 			name: "two separate clusters",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2, 0.3},
-					NeighborIDs: []string{"node-b", "node-c"},
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2, 0.3},
+					neighborIDs: []string{"node-b", "node-c"},
 				},
 				{
-					NodeID:      "node-d",
-					Layer:       0,
-					Embedding:   []float64{0.4, 0.5, 0.6},
-					NeighborIDs: []string{"node-e", "node-f"},
+					nodeID:      "node-d",
+					layer:       0,
+					embedding:   []float64{0.4, 0.5, 0.6},
+					neighborIDs: []string{"node-e", "node-f"},
 				},
 			},
 			minSize:          3,
@@ -240,16 +240,16 @@ func TestBuildClusters(t *testing.T) {
 			name: "nodes already assigned skip",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2, 0.3},
-					NeighborIDs: []string{"node-b", "node-c", "node-d"},
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2, 0.3},
+					neighborIDs: []string{"node-b", "node-c", "node-d"},
 				},
 				{
-					NodeID:      "node-b",
-					Layer:       0,
-					Embedding:   []float64{0.2, 0.3, 0.4},
-					NeighborIDs: []string{"node-a", "node-c"},
+					nodeID:      "node-b",
+					layer:       0,
+					embedding:   []float64{0.2, 0.3, 0.4},
+					neighborIDs: []string{"node-a", "node-c"},
 				},
 			},
 			minSize:          3,
@@ -274,10 +274,10 @@ func TestBuildClusters(t *testing.T) {
 					len(result), tt.expectedClusters)
 			}
 
-			for i, cluster := range result {
-				if i < len(tt.expectedMembers) && len(cluster.Members) != tt.expectedMembers[i] {
+			for i, c := range result {
+				if i < len(tt.expectedMembers) && len(c.members) != tt.expectedMembers[i] {
 					t.Errorf("cluster[%d] has %d members, want %d",
-						i, len(cluster.Members), tt.expectedMembers[i])
+						i, len(c.members), tt.expectedMembers[i])
 				}
 			}
 		})
@@ -296,10 +296,10 @@ func TestBuildClusters_MinSize(t *testing.T) {
 			name: "cluster below min size excluded",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2},
-					NeighborIDs: []string{"node-b"}, // only 2 total, below minSize 3
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2},
+					neighborIDs: []string{"node-b"}, // only 2 total, below minSize 3
 				},
 			},
 			minSize:          3,
@@ -309,10 +309,10 @@ func TestBuildClusters_MinSize(t *testing.T) {
 			name: "cluster exactly at min size included",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2},
-					NeighborIDs: []string{"node-b", "node-c"}, // exactly 3
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2},
+					neighborIDs: []string{"node-b", "node-c"}, // exactly 3
 				},
 			},
 			minSize:          3,
@@ -322,10 +322,10 @@ func TestBuildClusters_MinSize(t *testing.T) {
 			name: "min size 2",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2},
-					NeighborIDs: []string{"node-b"}, // 2 total, meets minSize 2
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2},
+					neighborIDs: []string{"node-b"}, // 2 total, meets minSize 2
 				},
 			},
 			minSize:          2,
@@ -335,16 +335,16 @@ func TestBuildClusters_MinSize(t *testing.T) {
 			name: "larger min size filters out small clusters",
 			candidates: []clusterCandidate{
 				{
-					NodeID:      "node-a",
-					Layer:       0,
-					Embedding:   []float64{0.1, 0.2},
-					NeighborIDs: []string{"node-b", "node-c", "node-d"}, // 4 total
+					nodeID:      "node-a",
+					layer:       0,
+					embedding:   []float64{0.1, 0.2},
+					neighborIDs: []string{"node-b", "node-c", "node-d"}, // 4 total
 				},
 				{
-					NodeID:      "node-e",
-					Layer:       0,
-					Embedding:   []float64{0.3, 0.4},
-					NeighborIDs: []string{"node-f"}, // 2 total - below minSize 5
+					nodeID:      "node-e",
+					layer:       0,
+					embedding:   []float64{0.3, 0.4},
+					neighborIDs: []string{"node-f"}, // 2 total - below minSize 5
 				},
 			},
 			minSize:          5,
@@ -368,10 +368,10 @@ func TestBuildClusters_MinSize(t *testing.T) {
 func TestBuildClusters_LayerPreserved(t *testing.T) {
 	candidates := []clusterCandidate{
 		{
-			NodeID:      "node-a",
-			Layer:       2,
-			Embedding:   []float64{0.1, 0.2, 0.3},
-			NeighborIDs: []string{"node-b", "node-c"},
+			nodeID:      "node-a",
+			layer:       2,
+			embedding:   []float64{0.1, 0.2, 0.3},
+			neighborIDs: []string{"node-b", "node-c"},
 		},
 	}
 
@@ -381,8 +381,8 @@ func TestBuildClusters_LayerPreserved(t *testing.T) {
 		t.Fatalf("expected 1 cluster, got %d", len(result))
 	}
 
-	if result[0].Layer != 2 {
-		t.Errorf("cluster Layer = %d, want 2", result[0].Layer)
+	if result[0].layer != 2 {
+		t.Errorf("cluster layer = %d, want 2", result[0].layer)
 	}
 }
 
@@ -391,16 +391,16 @@ func TestBuildClusters_EmbeddingsPreserved(t *testing.T) {
 	expectedEmb := []float64{0.1, 0.2, 0.3}
 	candidates := []clusterCandidate{
 		{
-			NodeID:      "node-a",
-			Layer:       0,
-			Embedding:   expectedEmb,
-			NeighborIDs: []string{"node-b", "node-c"},
+			nodeID:      "node-a",
+			layer:       0,
+			embedding:   expectedEmb,
+			neighborIDs: []string{"node-b", "node-c"},
 		},
 		{
-			NodeID:      "node-b",
-			Layer:       0,
-			Embedding:   []float64{0.4, 0.5, 0.6},
-			NeighborIDs: []string{"node-a"},
+			nodeID:      "node-b",
+			layer:       0,
+			embedding:   []float64{0.4, 0.5, 0.6},
+			neighborIDs: []string{"node-a"},
 		},
 	}
 
@@ -412,13 +412,13 @@ func TestBuildClusters_EmbeddingsPreserved(t *testing.T) {
 
 	// Find member node-a and verify its embedding
 	var found bool
-	for _, member := range result[0].Members {
-		if member.NodeID == "node-a" {
+	for _, member := range result[0].members {
+		if member.nodeID == "node-a" {
 			found = true
-			if len(member.Embedding) != len(expectedEmb) {
-				t.Errorf("member embedding length = %d, want %d", len(member.Embedding), len(expectedEmb))
+			if len(member.embedding) != len(expectedEmb) {
+				t.Errorf("member embedding length = %d, want %d", len(member.embedding), len(expectedEmb))
 			}
-			for i, v := range member.Embedding {
+			for i, v := range member.embedding {
 				if v != expectedEmb[i] {
 					t.Errorf("member embedding[%d] = %v, want %v", i, v, expectedEmb[i])
 				}
@@ -570,166 +570,6 @@ func TestConfigValidation_MaxPromotions(t *testing.T) {
 	}
 }
 
-// TestAsConversionHelpers verifies the type conversion helpers
-func TestAsConversionHelpers(t *testing.T) {
-	t.Run("asString", func(t *testing.T) {
-		if asString(nil) != "" {
-			t.Error("asString(nil) should return empty string")
-		}
-		if asString("hello") != "hello" {
-			t.Error("asString(string) should return the string")
-		}
-		if asString(123) != "123" {
-			t.Error("asString(int) should format as string")
-		}
-	})
-
-	t.Run("asFloat64", func(t *testing.T) {
-		if asFloat64(nil) != 0.0 {
-			t.Error("asFloat64(nil) should return 0.0")
-		}
-		if asFloat64(3.14) != 3.14 {
-			t.Error("asFloat64(float64) should return the float")
-		}
-		if asFloat64(int64(42)) != 42.0 {
-			t.Error("asFloat64(int64) should convert to float64")
-		}
-		if asFloat64(int(42)) != 42.0 {
-			t.Error("asFloat64(int) should convert to float64")
-		}
-	})
-
-	t.Run("asInt", func(t *testing.T) {
-		if asInt(nil) != 0 {
-			t.Error("asInt(nil) should return 0")
-		}
-		if asInt(int64(42)) != 42 {
-			t.Error("asInt(int64) should convert to int")
-		}
-		if asInt(int(42)) != 42 {
-			t.Error("asInt(int) should return the int")
-		}
-		if asInt(3.9) != 3 {
-			t.Error("asInt(float64) should truncate to int")
-		}
-	})
-
-	t.Run("asBool", func(t *testing.T) {
-		if asBool(nil) != false {
-			t.Error("asBool(nil) should return false")
-		}
-		if asBool(true) != true {
-			t.Error("asBool(true) should return true")
-		}
-		if asBool(false) != false {
-			t.Error("asBool(false) should return false")
-		}
-		if asBool("true") != false {
-			t.Error("asBool(string) should return false")
-		}
-	})
-}
-
-// TestAsFloat64Slice verifies the float64 slice conversion helper
-func TestAsFloat64Slice(t *testing.T) {
-	t.Run("nil input", func(t *testing.T) {
-		result := asFloat64Slice(nil)
-		if result != nil {
-			t.Error("asFloat64Slice(nil) should return nil")
-		}
-	})
-
-	t.Run("empty slice", func(t *testing.T) {
-		result := asFloat64Slice([]any{})
-		if len(result) != 0 {
-			t.Error("asFloat64Slice([]) should return empty slice")
-		}
-	})
-
-	t.Run("float64 values", func(t *testing.T) {
-		input := []any{1.0, 2.0, 3.0}
-		result := asFloat64Slice(input)
-		if len(result) != 3 {
-			t.Fatalf("asFloat64Slice length = %d, want 3", len(result))
-		}
-		if result[0] != 1.0 || result[1] != 2.0 || result[2] != 3.0 {
-			t.Errorf("asFloat64Slice values = %v, want [1.0, 2.0, 3.0]", result)
-		}
-	})
-
-	t.Run("mixed numeric values", func(t *testing.T) {
-		input := []any{int64(1), 2.0, int(3)}
-		result := asFloat64Slice(input)
-		if len(result) != 3 {
-			t.Fatalf("asFloat64Slice length = %d, want 3", len(result))
-		}
-		if result[0] != 1.0 || result[1] != 2.0 || result[2] != 3.0 {
-			t.Errorf("asFloat64Slice values = %v, want [1.0, 2.0, 3.0]", result)
-		}
-	})
-
-	t.Run("direct float64 slice", func(t *testing.T) {
-		input := []float64{1.0, 2.0, 3.0}
-		result := asFloat64Slice(input)
-		if len(result) != 3 {
-			t.Fatalf("asFloat64Slice length = %d, want 3", len(result))
-		}
-		if result[0] != 1.0 || result[1] != 2.0 || result[2] != 3.0 {
-			t.Errorf("asFloat64Slice values = %v, want [1.0, 2.0, 3.0]", result)
-		}
-	})
-}
-
-// TestAsStringSlice verifies the string slice conversion helper
-func TestAsStringSlice(t *testing.T) {
-	t.Run("nil input", func(t *testing.T) {
-		result := asStringSlice(nil)
-		if result != nil {
-			t.Error("asStringSlice(nil) should return nil")
-		}
-	})
-
-	t.Run("empty slice", func(t *testing.T) {
-		result := asStringSlice([]any{})
-		if len(result) != 0 {
-			t.Error("asStringSlice([]) should return empty slice")
-		}
-	})
-
-	t.Run("string values", func(t *testing.T) {
-		input := []any{"a", "b", "c"}
-		result := asStringSlice(input)
-		if len(result) != 3 {
-			t.Fatalf("asStringSlice length = %d, want 3", len(result))
-		}
-		if result[0] != "a" || result[1] != "b" || result[2] != "c" {
-			t.Errorf("asStringSlice values = %v, want [a, b, c]", result)
-		}
-	})
-
-	t.Run("mixed values", func(t *testing.T) {
-		input := []any{"a", 123, nil}
-		result := asStringSlice(input)
-		if len(result) != 3 {
-			t.Fatalf("asStringSlice length = %d, want 3", len(result))
-		}
-		if result[0] != "a" || result[1] != "123" || result[2] != "" {
-			t.Errorf("asStringSlice values = %v, want [a, 123, ]", result)
-		}
-	})
-
-	t.Run("direct string slice", func(t *testing.T) {
-		input := []string{"x", "y", "z"}
-		result := asStringSlice(input)
-		if len(result) != 3 {
-			t.Fatalf("asStringSlice length = %d, want 3", len(result))
-		}
-		if result[0] != "x" || result[1] != "y" || result[2] != "z" {
-			t.Errorf("asStringSlice values = %v, want [x, y, z]", result)
-		}
-	})
-}
-
 // TestTruncateID verifies the ID truncation helper
 func TestTruncateID(t *testing.T) {
 	tests := []struct {
@@ -784,16 +624,16 @@ func TestGenerateAbstractionName(t *testing.T) {
 		{
 			name: "single member",
 			members: []clusterMember{
-				{NodeID: "node-a"},
+				{nodeID: "node-a"},
 			},
 			contains: "node-a",
 		},
 		{
 			name: "multiple members",
 			members: []clusterMember{
-				{NodeID: "node-a"},
-				{NodeID: "node-b"},
-				{NodeID: "node-c"},
+				{nodeID: "node-a"},
+				{nodeID: "node-b"},
+				{nodeID: "node-c"},
 			},
 			contains: "Abstraction",
 		},

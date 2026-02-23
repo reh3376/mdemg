@@ -95,11 +95,9 @@ var (
 	dockerArgRegex        = regexp.MustCompile(`(?i)^ARG\s+(\w+)(?:=(.*))?`)
 	dockerEnvRegex        = regexp.MustCompile(`(?i)^ENV\s+(\w+)(?:=|\s+)(.*)`)
 	dockerExposeRegex     = regexp.MustCompile(`(?i)^EXPOSE\s+(.+)`)
-	dockerLabelRegex      = regexp.MustCompile(`(?i)^LABEL\s+(.+)`)
 	dockerEntrypointRegex = regexp.MustCompile(`(?i)^ENTRYPOINT\s+(.+)`)
 	dockerCmdRegex        = regexp.MustCompile(`(?i)^CMD\s+(.+)`)
 	dockerWorkdirRegex    = regexp.MustCompile(`(?i)^WORKDIR\s+(.+)`)
-	dockerCopyRegex       = regexp.MustCompile(`(?i)^COPY\s+(?:--from=(\S+)\s+)?(.+)`)
 	dockerVolumeRegex     = regexp.MustCompile(`(?i)^VOLUME\s+(.+)`)
 )
 

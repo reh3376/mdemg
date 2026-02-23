@@ -94,7 +94,6 @@ func (p *ProtobufParser) ParseFile(root, path string, extractSymbols bool) ([]Co
 var (
 	protoSyntaxPattern  = regexp.MustCompile(`(?m)^\s*syntax\s*=\s*"(proto[23])"\s*;`)
 	protoPackagePattern = regexp.MustCompile(`(?m)^\s*package\s+([\w.]+)\s*;`)
-	protoImportPattern  = regexp.MustCompile(`(?m)^\s*import\s+(?:public\s+|weak\s+)?"([^"]+)"\s*;`)
 	protoOptionPattern  = regexp.MustCompile(`(?m)^\s*option\s+(\w+)\s*=\s*"([^"]+)"\s*;`)
 	protoMessagePattern = regexp.MustCompile(`(?m)^\s*message\s+(\w+)\s*\{`)
 	protoEnumPattern    = regexp.MustCompile(`(?m)^\s*enum\s+(\w+)\s*\{`)

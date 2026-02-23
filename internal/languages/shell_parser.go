@@ -137,8 +137,6 @@ var (
 	assignRegex = regexp.MustCompile(`^([A-Z][A-Z0-9_]*)=(.*)`)
 	// readonly VAR=value
 	readonlyRegex = regexp.MustCompile(`^readonly\s+(\w+)(?:=(.*))?`)
-	// local VAR=value (inside functions)
-	localRegex = regexp.MustCompile(`^\s*local\s+(\w+)(?:=(.*))?`)
 	// source or . include
 	sourceRegex = regexp.MustCompile(`^(?:source|\.\s+)(.+)`)
 	// alias name='command'
