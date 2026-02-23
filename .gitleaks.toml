@@ -1,0 +1,10 @@
+# Gitleaks configuration — allowlist for test fixtures and non-secret values
+
+[allowlist]
+  description = "MDEMG allowlist for test fixtures"
+
+  # UATS/USTS test spec files contain dummy API keys and idempotency tokens
+  paths = [
+    '''docs/api/api-spec/uats/specs/.*\.json''',
+    '''docs/tests/usts/specs/.*\.json''',
+  ]

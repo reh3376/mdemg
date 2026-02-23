@@ -1281,7 +1281,8 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.retriever.Reflect(r.Context(), req)
 	if err != nil {
-		writeInternalError(w, err, "reflect")
+		log.Printf("ERROR [reflect]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "reflect failed"})
 		return
 	}
 
