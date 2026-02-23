@@ -79,9 +79,9 @@ help:
 
 .PHONY: test-api test-api-% test-smoke test-all uats-setup
 
-# Run all UATS API validation tests
+# Run all UATS API validation tests (all specs, requires all modules enabled)
 test-api:
-	@echo "Running UATS API validation (101 specs)..."
+	@echo "Running UATS API validation..."
 	@mkdir -p /tmp/uats-test-codebase
 	@echo 'package main' > /tmp/uats-test-codebase/main.go
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \

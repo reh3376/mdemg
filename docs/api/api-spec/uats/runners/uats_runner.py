@@ -1117,8 +1117,9 @@ class Runner:
         self.token = token
         self.skip_hash = skip_hash
         self.timeout = timeout
-        self.include_tag = include_tag
-        self.exclude_tag = exclude_tag
+        # Support comma-separated tags: "embedding_required,unts" → ["embedding_required", "unts"]
+        self.include_tags = [t.strip() for t in include_tag.split(",")] if include_tag else []
+        self.exclude_tags = [t.strip() for t in exclude_tag.split(",")] if exclude_tag else []
         self.reporter = Reporter()
     
     def run_spec(self, spec_path: Path) -> List[SpecResult]:
@@ -1228,8 +1229,8 @@ class Runner:
         """Run all specs in directory."""
         specs = sorted(spec_dir.glob(pattern))
 
-        # Tag-based filtering
-        if self.include_tag or self.exclude_tag:
+        # Tag-based filtering (supports comma-separated values)
+        if self.include_tags or self.exclude_tags:
             filtered = []
             for sp in specs:
                 try:
@@ -1238,9 +1239,9 @@ class Runner:
                     tags = cfg.get("tags", [])
                 except Exception:
                     tags = []
-                if self.include_tag and self.include_tag not in tags:
+                if self.include_tags and not any(t in tags for t in self.include_tags):
                     continue
-                if self.exclude_tag and self.exclude_tag in tags:
+                if self.exclude_tags and any(t in tags for t in self.exclude_tags):
                     continue
                 filtered.append(sp)
             specs = filtered
@@ -1304,9 +1305,9 @@ def main():
     val_all.add_argument("--report", type=Path)
     val_all.add_argument("--skip-hash", action="store_true", help="Skip spec file hash verification")
     val_all.add_argument("--include-tag", type=str, dest="include_tag",
-                         help="Only run specs with this tag in config.tags")
+                         help="Only run specs with this tag (comma-separated for multiple)")
     val_all.add_argument("--exclude-tag", type=str, dest="exclude_tag",
-                         help="Skip specs with this tag in config.tags")
+                         help="Skip specs with this tag (comma-separated for multiple)")
 
     # add-hashes
     add_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to spec files")
