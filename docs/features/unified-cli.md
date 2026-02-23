@@ -424,6 +424,34 @@ Export profiles:
 ./bin/mdemg space info --space-id=my-project
 ```
 
+### Delete a Space
+
+```bash
+# Delete with interactive confirmation
+./bin/mdemg space delete --space-id=my-test-space
+
+# Skip confirmation
+./bin/mdemg space delete --space-id=my-test-space --yes
+```
+
+Protected spaces (`mdemg-dev`) cannot be deleted. Deletion is batched and irreversible.
+
+### Rename a Space
+
+```bash
+./bin/mdemg space rename --from=old-project --to=new-project
+```
+
+Updates `space_id` on all nodes in batch. The target name must not already exist. Protected spaces cannot be renamed.
+
+### Copy a Space
+
+```bash
+./bin/mdemg space copy --from=production --to=staging
+```
+
+Duplicates all nodes and edges from the source space. New nodes receive fresh `node_id` values to avoid collisions. The target space must not already exist.
+
 ### Remote Space Transfer
 
 ```bash
