@@ -19,11 +19,13 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/db"
 	"mdemg/internal/plugins"
+	"mdemg/migrations"
 )
 
 func newServeCmd() *cobra.Command {
 	var port int
 	var dbURI string
+	var autoMigrate bool
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -37,6 +39,7 @@ The server will:
   - Load configuration from .env file (if present)
   - Apply CLI flag overrides (--port, --db-uri)
   - Connect to Neo4j database
+  - Apply pending migrations (if --auto-migrate)
   - Verify schema version
   - Initialize plugin manager (if enabled)
   - Start periodic background tasks (consolidation, sync, RSIC, pruning)
@@ -45,17 +48,18 @@ The server will:
 
 See config.FromEnv() for the full list of environment variable options.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(cmd, args, port, dbURI)
+			return runServe(cmd, args, port, dbURI, autoMigrate)
 		},
 	}
 
 	cmd.Flags().IntVar(&port, "port", 0, "Listen port (overrides LISTEN_ADDR env var)")
 	cmd.Flags().StringVar(&dbURI, "db-uri", "", "Neo4j URI (overrides NEO4J_URI env var)")
+	cmd.Flags().BoolVar(&autoMigrate, "auto-migrate", false, "Apply pending database migrations before starting")
 
 	return cmd
 }
 
-func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
+func runServe(cmd *cobra.Command, args []string, port int, dbURI string, autoMigrate bool) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
@@ -74,6 +78,17 @@ func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 	defer driver.Close(context.Background())
+
+	// Auto-migrate if requested
+	if autoMigrate {
+		applied, migrateErr := db.RunMigrations(context.Background(), driver, migrations.FS)
+		if migrateErr != nil {
+			return fmt.Errorf("auto-migrate failed: %w", migrateErr)
+		}
+		if applied > 0 {
+			log.Printf("auto-migrate: applied %d migration(s)", applied)
+		}
+	}
 
 	// Readiness check: schema version
 	if err := db.AssertSchemaVersion(context.Background(), driver, cfg.RequiredSchemaVersion); err != nil {

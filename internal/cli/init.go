@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -410,22 +409,6 @@ func writeIDEConfigs(dir string, port int, env environmentInfo) []string {
 	return written
 }
 
-// countMigrations counts the number of V*.cypher migration files
-// to determine the current schema version.
-func countMigrations() int {
-	patterns := []string{
-		"migrations/V*.cypher",
-		"../migrations/V*.cypher",
-	}
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err == nil && len(matches) > 0 {
-			return len(matches)
-		}
-	}
-	return 17 // fallback to known current version
-}
-
 // ParseIgnoreFile reads a .mdemgignore file and returns the list of patterns.
 func ParseIgnoreFile(path string) ([]string, error) {
 	data, err := os.ReadFile(path)
@@ -461,9 +444,3 @@ func FindIgnoreFile(startDir string) string {
 	return ""
 }
 
-// portFromString converts a ":PORT" or "PORT" string to an int.
-func portFromString(s string) int {
-	s = strings.TrimPrefix(s, ":")
-	n, _ := strconv.Atoi(s)
-	return n
-}

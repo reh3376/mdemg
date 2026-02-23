@@ -115,7 +115,7 @@ func AssertSchemaVersion(ctx context.Context, driver neo4j.DriverWithContext, re
 		return fmt.Errorf("unexpected schema version type: %T", verAny)
 	}
 	if int(ver) < required {
-		return fmt.Errorf("schema version %d < required %d", ver, required)
+		return fmt.Errorf("schema version %d < required %d — run 'mdemg db migrate' to upgrade", ver, required)
 	}
 	return nil
 }

@@ -152,6 +152,18 @@ Checks:
 
 ---
 
+## Embedding Provider
+
+### Check Provider Status
+
+```bash
+./bin/mdemg embeddings check
+```
+
+Performs an actual test embedding (not just a connectivity probe) and reports dimensions, provider, and status. Shows setup instructions when disabled, remediation steps on failure.
+
+---
+
 ## Starting the Server
 
 ```bash
@@ -166,16 +178,20 @@ The server reads configuration from environment variables (via `.env` file), wit
 
 # Override Neo4j URI (default from NEO4J_URI env var)
 ./bin/mdemg serve --db-uri=bolt://other-host:7687
+
+# Auto-apply pending migrations before starting
+./bin/mdemg serve --auto-migrate
 ```
 
 The server will:
 
 1. Load `.env` configuration
 2. Connect to Neo4j
-3. Verify schema version
-4. Initialize plugins (if enabled)
-5. Start background tasks (consolidation, sync, RSIC, pruning)
-6. Listen on the configured port (default `:9999`)
+3. Apply pending migrations (if `--auto-migrate`)
+4. Verify schema version (auto-detected if `REQUIRED_SCHEMA_VERSION` not set)
+5. Initialize plugins (if enabled)
+6. Start background tasks (consolidation, sync, RSIC, pruning)
+7. Listen on the configured port (default `:9999`)
 
 Graceful shutdown on `SIGINT`/`SIGTERM`.
 
@@ -439,6 +455,46 @@ The watcher debounces rapid file changes (default 500ms) and automatically inges
 ---
 
 ## Database Management
+
+### Migrations
+
+```bash
+# Show migration status (current version, pending)
+./bin/mdemg db migrate --status
+
+# Preview what would be applied
+./bin/mdemg db migrate --dry-run
+
+# Apply all pending migrations
+./bin/mdemg db migrate
+
+# Use filesystem migrations instead of embedded
+./bin/mdemg db migrate --migrations-dir ./migrations
+```
+
+Migrations are embedded in the binary. Re-running is idempotent (0 applied if up to date).
+
+### Docker Container
+
+```bash
+# Start a lightweight Neo4j for development
+./bin/mdemg db start
+./bin/mdemg db start --port=7688 --password=mypassword
+
+# Check container and schema status
+./bin/mdemg db status
+
+# Stop the container (data volume preserved)
+./bin/mdemg db stop
+
+# Stop and remove container
+./bin/mdemg db stop --remove
+
+# Open interactive cypher-shell
+./bin/mdemg db shell
+```
+
+`db start` creates a container with 1GB heap and 512MB page cache (suitable for development). Data persists in a Docker volume (`mdemg-neo4j-data`).
 
 ### Reset a Space
 

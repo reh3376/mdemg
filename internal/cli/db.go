@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"mdemg/internal/api"
 	"mdemg/internal/db"
+	"mdemg/migrations"
 )
 
 // newDBCmd creates the parent `db` command with subcommands
@@ -23,6 +26,11 @@ func newDBCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newDBResetCmd())
+	cmd.AddCommand(newDBMigrateCmd())
+	cmd.AddCommand(newDBStartCmd())
+	cmd.AddCommand(newDBStopCmd())
+	cmd.AddCommand(newDBStatusCmd())
+	cmd.AddCommand(newDBShellCmd())
 
 	return cmd
 }
@@ -229,4 +237,347 @@ func protectedSpaceList() []string {
 		list = append(list, id)
 	}
 	return list
+}
+
+// newDBMigrateCmd creates the `db migrate` subcommand
+func newDBMigrateCmd() *cobra.Command {
+	var (
+		statusOnly    bool
+		dryRun        bool
+		migrationsDir string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Apply pending database migrations",
+		Long: `Apply pending Neo4j schema migrations.
+
+By default, uses migrations embedded in the binary. Use --migrations-dir
+to override with a filesystem directory (useful during development).
+
+Examples:
+  mdemg db migrate              # Apply all pending migrations
+  mdemg db migrate --status     # Show current/available versions
+  mdemg db migrate --dry-run    # Show what would be applied`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("config error: %w", err)
+			}
+
+			ctx := context.Background()
+			driver, err := db.NewDriver(cfg)
+			if err != nil {
+				return fmt.Errorf("database connection failed: %w", err)
+			}
+			defer driver.Close(ctx)
+
+			// Choose migration source
+			var migFS fs.FS
+			if migrationsDir != "" {
+				migFS = os.DirFS(migrationsDir)
+				fmt.Printf("Using migrations from: %s\n", migrationsDir)
+			} else {
+				migFS = migrations.FS
+				fmt.Println("Using embedded migrations")
+			}
+
+			available, err := db.DiscoverMigrations(migFS)
+			if err != nil {
+				return fmt.Errorf("discover migrations: %w", err)
+			}
+
+			status, err := db.GetMigrationStatus(ctx, driver, available)
+			if err != nil {
+				return fmt.Errorf("get migration status: %w", err)
+			}
+
+			fmt.Printf("Current version:   %d\n", status.CurrentVersion)
+			fmt.Printf("Available version: %d\n", status.AvailableVersion)
+			fmt.Printf("Applied:           %d migrations\n", len(status.Applied))
+			fmt.Printf("Pending:           %d migrations\n", len(status.Pending))
+
+			if statusOnly {
+				if len(status.Pending) > 0 {
+					fmt.Println("\nPending migrations:")
+					for _, m := range status.Pending {
+						fmt.Printf("  %s (%d statements)\n", m.Filename, len(m.Statements))
+					}
+				}
+				return nil
+			}
+
+			if len(status.Pending) == 0 {
+				fmt.Println("\nDatabase is up to date.")
+				return nil
+			}
+
+			if dryRun {
+				fmt.Println("\nDry run — would apply:")
+				for _, m := range status.Pending {
+					fmt.Printf("  %s (%d statements)\n", m.Filename, len(m.Statements))
+				}
+				return nil
+			}
+
+			fmt.Println()
+			for _, mig := range status.Pending {
+				fmt.Printf("Applying %s (%d statements)...\n", mig.Filename, len(mig.Statements))
+				if err := db.ApplyMigration(ctx, driver, mig); err != nil {
+					return fmt.Errorf("migration failed: %w", err)
+				}
+				fmt.Printf("  Applied version %d\n", mig.Version)
+			}
+
+			fmt.Printf("\nDone. Applied %d migrations (version %d -> %d)\n",
+				len(status.Pending), status.CurrentVersion, status.AvailableVersion)
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&statusOnly, "status", false, "Show migration status only")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be applied without applying")
+	cmd.Flags().StringVar(&migrationsDir, "migrations-dir", "", "Override embedded migrations with filesystem directory")
+
+	return cmd
+}
+
+// newDBStartCmd creates the `db start` subcommand
+func newDBStartCmd() *cobra.Command {
+	var (
+		boltPort int
+		httpPort int
+		password string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "start",
+		Short: "Start a local Neo4j container for development",
+		Long: `Start a lightweight Neo4j Docker container for local development.
+
+Uses reduced memory settings (1GB heap, 512MB page cache) suitable for
+development. Data is persisted in a Docker volume.
+
+Examples:
+  mdemg db start
+  mdemg db start --port 7688 --password mypassword`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !DockerAvailable() {
+				return fmt.Errorf("docker is not installed or not in PATH\nInstall Docker: https://docs.docker.com/get-docker/")
+			}
+
+			state, err := InspectContainer(neo4jContainerName)
+			if err != nil {
+				return fmt.Errorf("inspect container: %w", err)
+			}
+
+			if state.Running {
+				fmt.Printf("Container '%s' is already running\n", neo4jContainerName)
+				fmt.Printf("  Bolt:  bolt://localhost:%d\n", boltPort)
+				fmt.Printf("  HTTP:  http://localhost:%d\n", httpPort)
+				return nil
+			}
+
+			if state.Exists {
+				// Container exists but not running — start it
+				fmt.Printf("Starting existing container '%s'...\n", neo4jContainerName)
+				_, err := RunDockerCommand("start", neo4jContainerName)
+				if err != nil {
+					return fmt.Errorf("start container: %w", err)
+				}
+			} else {
+				// Create and start new container
+				fmt.Printf("Creating container '%s'...\n", neo4jContainerName)
+				dockerArgs := []string{
+					"run", "-d",
+					"--name", neo4jContainerName,
+					"-p", fmt.Sprintf("%d:7687", boltPort),
+					"-p", fmt.Sprintf("%d:7474", httpPort),
+					"-e", fmt.Sprintf("NEO4J_AUTH=neo4j/%s", password),
+					"-e", "NEO4J_server_memory_heap_initial__size=512m",
+					"-e", "NEO4J_server_memory_heap_max__size=1g",
+					"-e", "NEO4J_server_memory_pagecache_size=512m",
+					"-e", "NEO4J_PLUGINS=[\"apoc\"]",
+					"-v", neo4jVolumeName + ":/data",
+					neo4jImage,
+				}
+				_, err := RunDockerCommand(dockerArgs...)
+				if err != nil {
+					return fmt.Errorf("create container: %w", err)
+				}
+			}
+
+			// Wait for bolt port
+			fmt.Printf("Waiting for Neo4j to be ready...")
+			if err := WaitForPort("localhost", boltPort, 60*time.Second); err != nil {
+				fmt.Println(" timeout")
+				return fmt.Errorf("neo4j did not become ready: %w", err)
+			}
+			fmt.Println(" ready")
+
+			fmt.Println()
+			fmt.Printf("Neo4j is running:\n")
+			fmt.Printf("  Bolt:     bolt://localhost:%d\n", boltPort)
+			fmt.Printf("  Browser:  http://localhost:%d\n", httpPort)
+			fmt.Printf("  User:     neo4j\n")
+			fmt.Printf("  Password: %s\n", password)
+			fmt.Printf("  Volume:   %s\n", neo4jVolumeName)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVar(&boltPort, "port", neo4jDefaultPort, "Bolt protocol port")
+	cmd.Flags().IntVar(&httpPort, "http-port", neo4jDefaultHTTP, "HTTP browser port")
+	cmd.Flags().StringVar(&password, "password", "mdemg-dev", "Neo4j password")
+
+	return cmd
+}
+
+// newDBStopCmd creates the `db stop` subcommand
+func newDBStopCmd() *cobra.Command {
+	var remove bool
+
+	cmd := &cobra.Command{
+		Use:   "stop",
+		Short: "Stop the local Neo4j container",
+		Long: `Stop the MDEMG Neo4j development container.
+
+Use --remove to also remove the container (data volume is preserved).`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !DockerAvailable() {
+				return fmt.Errorf("docker is not installed or not in PATH")
+			}
+
+			state, err := InspectContainer(neo4jContainerName)
+			if err != nil {
+				return fmt.Errorf("inspect container: %w", err)
+			}
+
+			if !state.Exists {
+				fmt.Printf("Container '%s' does not exist\n", neo4jContainerName)
+				return nil
+			}
+
+			if state.Running {
+				fmt.Printf("Stopping container '%s'...\n", neo4jContainerName)
+				if _, err := RunDockerCommand("stop", neo4jContainerName); err != nil {
+					return fmt.Errorf("stop container: %w", err)
+				}
+				fmt.Println("Stopped")
+			} else {
+				fmt.Printf("Container '%s' is not running (status: %s)\n", neo4jContainerName, state.Status)
+			}
+
+			if remove {
+				fmt.Printf("Removing container '%s'...\n", neo4jContainerName)
+				if _, err := RunDockerCommand("rm", neo4jContainerName); err != nil {
+					return fmt.Errorf("remove container: %w", err)
+				}
+				fmt.Println("Removed (data volume preserved)")
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&remove, "remove", false, "Also remove the container (data volume is preserved)")
+
+	return cmd
+}
+
+// newDBStatusCmd creates the `db status` subcommand
+func newDBStatusCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show database container and schema status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println("Container:")
+			if !DockerAvailable() {
+				fmt.Println("  Docker: not installed")
+			} else {
+				state, err := InspectContainer(neo4jContainerName)
+				if err != nil {
+					fmt.Printf("  Error: %v\n", err)
+				} else if !state.Exists {
+					fmt.Printf("  %s: not created\n", neo4jContainerName)
+				} else {
+					fmt.Printf("  %s: %s\n", neo4jContainerName, state.Status)
+				}
+			}
+
+			fmt.Println()
+			fmt.Println("Schema:")
+
+			cfg, err := loadConfig()
+			if err != nil {
+				fmt.Printf("  Config error: %v\n", err)
+				return nil
+			}
+
+			ctx := context.Background()
+			driver, err := db.NewDriver(cfg)
+			if err != nil {
+				fmt.Printf("  Connection: failed (%v)\n", err)
+				return nil
+			}
+			defer driver.Close(ctx)
+
+			if err := db.VerifyConnectivity(ctx, driver); err != nil {
+				fmt.Printf("  Connection: unreachable (%v)\n", err)
+				return nil
+			}
+			fmt.Println("  Connection: ok")
+
+			ver, err := db.GetSchemaVersion(ctx, driver)
+			if err != nil {
+				fmt.Printf("  Schema version: unknown (%v)\n", err)
+			} else {
+				fmt.Printf("  Schema version: %d\n", ver)
+			}
+
+			maxVer, err := migrations.MaxVersion()
+			if err == nil {
+				fmt.Printf("  Available version: %d\n", maxVer)
+				if ver < maxVer {
+					fmt.Printf("  Status: %d migration(s) pending — run 'mdemg db migrate'\n", maxVer-ver)
+				} else {
+					fmt.Println("  Status: up to date")
+				}
+			}
+
+			return nil
+		},
+	}
+}
+
+// newDBShellCmd creates the `db shell` subcommand
+func newDBShellCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "shell",
+		Short: "Open an interactive cypher-shell session",
+		Long: `Open an interactive cypher-shell inside the running Neo4j container.
+
+Requires the mdemg-neo4j-dev container to be running.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !DockerAvailable() {
+				return fmt.Errorf("docker is not installed or not in PATH")
+			}
+
+			state, err := InspectContainer(neo4jContainerName)
+			if err != nil {
+				return fmt.Errorf("inspect container: %w", err)
+			}
+			if !state.Exists || !state.Running {
+				return fmt.Errorf("container '%s' is not running — run 'mdemg db start' first", neo4jContainerName)
+			}
+
+			// exec into container with interactive cypher-shell
+			shellCmd := exec.Command("docker", "exec", "-it", neo4jContainerName,
+				"cypher-shell", "-u", "neo4j", "-p", "mdemg-dev")
+			shellCmd.Stdin = os.Stdin
+			shellCmd.Stdout = os.Stdout
+			shellCmd.Stderr = os.Stderr
+			return shellCmd.Run()
+		},
+	}
 }

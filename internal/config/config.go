@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"mdemg/migrations"
 )
 
 type Config struct {
@@ -437,7 +439,12 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	if reqVer <= 0 {
-		return Config{}, errors.New("REQUIRED_SCHEMA_VERSION must be > 0")
+		// Auto-detect from embedded migrations
+		autoVer, verErr := migrations.MaxVersion()
+		if verErr != nil {
+			return Config{}, fmt.Errorf("REQUIRED_SCHEMA_VERSION not set and auto-detect failed: %w", verErr)
+		}
+		reqVer = autoVer
 	}
 
 	candK, err := atoi("DEFAULT_CANDIDATE_K", 200)
