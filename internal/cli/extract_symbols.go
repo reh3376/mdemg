@@ -76,6 +76,11 @@ For UPTS (Universal Parser Test Specification) testing, use:
 
 This outputs JSON to stdout in UPTS-compatible format.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve space ID: explicit flag > global flag > env var > default
+			if resolved := resolveSpaceID(cmd); resolved != "" {
+				cfg.spaceID = resolved
+			}
+
 			// Handle positional argument for --json mode
 			if cfg.jsonOutput && cfg.path == "" && len(args) > 0 {
 				cfg.path = args[0]

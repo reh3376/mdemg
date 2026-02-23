@@ -23,16 +23,20 @@ import (
 )
 
 func newServeCmd() *cobra.Command {
+	var port int
+	var dbURI string
+
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the MDEMG HTTP API server",
 		Long: `Start the MDEMG HTTP API server.
 
-The server reads all configuration from environment variables (via .env file or ENV).
-No CLI flags are supported - use environment variables for configuration.
+Configuration is primarily read from environment variables (via .env file or ENV).
+CLI flags override environment variables for common settings.
 
 The server will:
   - Load configuration from .env file (if present)
+  - Apply CLI flag overrides (--port, --db-uri)
   - Connect to Neo4j database
   - Verify schema version
   - Initialize plugin manager (if enabled)
@@ -40,21 +44,33 @@ The server will:
   - Start HTTP server with graceful shutdown support
   - Write port file for client discovery
 
-Configuration is controlled entirely through environment variables.
-See config.FromEnv() for available options.`,
-		RunE: runServe,
+See config.FromEnv() for the full list of environment variable options.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runServe(cmd, args, port, dbURI)
+		},
 	}
+
+	cmd.Flags().IntVar(&port, "port", 0, "Listen port (overrides LISTEN_ADDR env var)")
+	cmd.Flags().StringVar(&dbURI, "db-uri", "", "Neo4j URI (overrides NEO4J_URI env var)")
 
 	return cmd
 }
 
-func runServe(cmd *cobra.Command, args []string) error {
+func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
 	// Load .env file if present (silently ignore if not found)
 	_ = godotenv.Load()
 
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
+	}
+
+	// CLI flag overrides
+	if port > 0 {
+		cfg.ListenAddr = fmt.Sprintf(":%d", port)
+	}
+	if dbURI != "" {
+		cfg.Neo4jURI = dbURI
 	}
 
 	driver, err := db.NewDriver(cfg)

@@ -95,6 +95,11 @@ Protected edges (high evidence count or pinned) are never pruned.`,
 				return err
 			}
 
+			// Resolve space ID from global flag / env var if not set locally
+			if cfg.SpaceID == "" {
+				cfg.SpaceID = resolveSpaceID(cmd)
+			}
+
 			// Print banner
 			fmt.Println("MDEMG Decay Job")
 			fmt.Println("===============")

@@ -9,6 +9,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// resolveSpaceID returns the space ID using the following priority:
+//  1. Local --space-id flag (if explicitly passed by the user)
+//  2. Global --space-id persistent flag
+//  3. MDEMG_SPACE_ID environment variable
+//  4. The local flag's default value (e.g., "codebase" for ingest, "" for consolidate)
+func resolveSpaceID(cmd *cobra.Command) string {
+	// If user explicitly passed --space-id on this command, use that
+	if f := cmd.Flags().Lookup("space-id"); f != nil && f.Changed {
+		return f.Value.String()
+	}
+	// Global persistent --space-id flag
+	if f := cmd.Root().PersistentFlags().Lookup("space-id"); f != nil && f.Changed {
+		return f.Value.String()
+	}
+	// MDEMG_SPACE_ID environment variable
+	if v := os.Getenv("MDEMG_SPACE_ID"); v != "" {
+		return v
+	}
+	// Fall back to the local flag's default (e.g., "codebase" for ingest, "" for consolidate)
+	if f := cmd.Flags().Lookup("space-id"); f != nil {
+		return f.DefValue
+	}
+	return ""
+}
+
 // Build-time variables set via -ldflags
 var (
 	Version   = "dev"
@@ -35,6 +60,7 @@ Use "mdemg <command> --help" for more information about a command.`,
 
 	// Global persistent flags
 	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose output")
+	rootCmd.PersistentFlags().String("space-id", "", "Default space ID (overrides MDEMG_SPACE_ID env var)")
 
 	// Register all subcommands
 	rootCmd.AddCommand(newServeCmd())

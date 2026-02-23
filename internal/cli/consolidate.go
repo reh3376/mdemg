@@ -81,6 +81,11 @@ Examples:
 			fmt.Println("=======================")
 			fmt.Println()
 
+			// Resolve space ID from flag / global flag / env var
+			if cfg.spaceID == "" {
+				cfg.spaceID = resolveSpaceID(cmd)
+			}
+
 			// Load Neo4j connection from environment
 			if err := loadConsolidateNeo4jConfig(&cfg); err != nil {
 				return err
@@ -152,8 +157,7 @@ Examples:
 
 	// Common flags
 	cmd.Flags().BoolVar(&cfg.dryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
-	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to process (REQUIRED)")
-	cmd.MarkFlagRequired("space-id")
+	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to process (or set MDEMG_SPACE_ID)")
 
 	return cmd
 }

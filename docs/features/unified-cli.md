@@ -37,13 +37,46 @@ Every subcommand supports `--help` for detailed flag documentation.
 
 ---
 
+## Default Space ID
+
+Almost every command requires `--space-id`. Rather than passing it every time, you can set a default:
+
+```bash
+# Option 1: Environment variable (recommended for scripting)
+export MDEMG_SPACE_ID=my-project
+./bin/mdemg consolidate --hidden-layer          # uses my-project
+./bin/mdemg decay                                # uses my-project
+./bin/mdemg ingest --path=.                      # uses my-project (overrides "codebase" default)
+
+# Option 2: Global CLI flag
+./bin/mdemg --space-id=my-project consolidate --hidden-layer
+./bin/mdemg --space-id=my-project prune
+
+# Option 3: Per-command flag (always wins)
+./bin/mdemg --space-id=default ingest --space-id=other --path=.  # uses "other"
+```
+
+**Resolution order**: command `--space-id` flag > global `--space-id` flag > `MDEMG_SPACE_ID` env var > command default (e.g., "codebase" for ingest).
+
+---
+
 ## Starting the Server
 
 ```bash
 ./bin/mdemg serve
 ```
 
-The server reads all configuration from environment variables (via `.env` file). No CLI flags — use `config.FromEnv()` options. The server will:
+The server reads configuration from environment variables (via `.env` file), with CLI flag overrides for common settings:
+
+```bash
+# Override port (default from LISTEN_ADDR env var)
+./bin/mdemg serve --port=8080
+
+# Override Neo4j URI (default from NEO4J_URI env var)
+./bin/mdemg serve --db-uri=bolt://other-host:7687
+```
+
+The server will:
 
 1. Load `.env` configuration
 2. Connect to Neo4j
@@ -254,6 +287,20 @@ Remove weak edges, tombstone orphan nodes, and optionally merge redundant nodes.
 | `--merge-enabled` | false | Enable node merging (destructive) |
 | `--similarity-threshold` | 0.98 | Vector similarity threshold for merge |
 
+### Recommended Workflow: Decay then Prune
+
+Decay and prune are designed to run in sequence. Decay weakens stale edges based on time; prune removes the weakened edges and orphaned nodes. Running prune without first running decay may leave edges that should have been weakened but weren't.
+
+```bash
+# Step 1: Decay weakens old edges
+./bin/mdemg decay --space-id=my-project --dry-run=false
+
+# Step 2: Prune removes weak edges and orphaned nodes
+./bin/mdemg prune --space-id=my-project --dry-run=false
+```
+
+Always run with `--dry-run` first (the default) to preview changes before applying them.
+
 ---
 
 ## Extracting Code Symbols
@@ -458,8 +505,15 @@ All commands support:
 Generate shell completions for tab-completion support:
 
 ```bash
-# Bash
-./bin/mdemg completion bash > /etc/bash_completion.d/mdemg
+# Bash (system-wide, requires root)
+sudo ./bin/mdemg completion bash > /etc/bash_completion.d/mdemg
+
+# Bash (user-local, Homebrew on macOS)
+./bin/mdemg completion bash > "$(brew --prefix)/etc/bash_completion.d/mdemg"
+
+# Bash (user-local, no Homebrew)
+mkdir -p ~/.local/share/bash-completion/completions
+./bin/mdemg completion bash > ~/.local/share/bash-completion/completions/mdemg
 
 # Zsh
 ./bin/mdemg completion zsh > "${fpath[1]}/_mdemg"

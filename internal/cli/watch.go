@@ -50,18 +50,22 @@ into the MDEMG memory graph. Supports filtering by file extension and directory 
 Example:
   mdemg watch --space-id myproject --path ./src --debounce 500`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cfg.spaceID == "" {
+				cfg.spaceID = resolveSpaceID(cmd)
+			}
+			if cfg.spaceID == "" {
+				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
+			}
 			return runWatch(cfg)
 		},
 	}
 
-	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "MDEMG space ID (required)")
+	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "MDEMG space ID (or set MDEMG_SPACE_ID)")
 	cmd.Flags().StringVar(&cfg.path, "path", ".", "Directory to watch")
 	cmd.Flags().StringVar(&cfg.endpoint, "endpoint", "", "MDEMG API endpoint (auto-resolved if empty)")
 	cmd.Flags().StringVar(&cfg.extensions, "extensions", defaultExtensions, "Comma-separated file extensions to watch")
 	cmd.Flags().StringVar(&cfg.exclude, "exclude", defaultExcludes, "Comma-separated directories to exclude")
 	cmd.Flags().IntVar(&cfg.debounceMs, "debounce", 500, "Debounce window in milliseconds")
-
-	cmd.MarkFlagRequired("space-id")
 
 	return cmd
 }

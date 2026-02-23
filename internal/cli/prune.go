@@ -40,9 +40,12 @@ func newPruneCmd() *cobra.Command {
 				return errors.New("NEO4J_URI/NEO4J_USER/NEO4J_PASS environment variables are required")
 			}
 
-			// Validate required flags
+			// Resolve space ID from flag / global flag / env var
 			if cfg.SpaceID == "" {
-				return errors.New("--space-id is required")
+				cfg.SpaceID = resolveSpaceID(cmd)
+			}
+			if cfg.SpaceID == "" {
+				return errors.New("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
 
 			// Validate flag values
@@ -102,7 +105,7 @@ func newPruneCmd() *cobra.Command {
 
 	// Processing options
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
-	cmd.Flags().StringVar(&cfg.SpaceID, "space-id", "", "Space ID to process (REQUIRED)")
+	cmd.Flags().StringVar(&cfg.SpaceID, "space-id", "", "Space ID to process (or set MDEMG_SPACE_ID)")
 	cmd.Flags().IntVar(&cfg.BatchSize, "batch-size", 1000, "Process items in batches of this size")
 
 	return cmd

@@ -34,6 +34,10 @@ func newIngestCmd() *cobra.Command {
 		Short: "Ingest a codebase into MDEMG",
 		Long:  "Walks a codebase and ingests files into MDEMG with optimized batch processing and configurable timeouts.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve space ID: explicit flag > global flag > env var > default
+			if resolved := resolveSpaceID(cmd); resolved != "" {
+				cfg.spaceID = resolved
+			}
 			return runIngest(cfg)
 		},
 	}

@@ -69,11 +69,14 @@ func newSpaceExportCmd() *cobra.Command {
 		Long: `Export a MDEMG space to a .mdemg file.
 Supports selective export via profiles and filters.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cfg.spaceID == "" {
+				cfg.spaceID = resolveSpaceID(cmd)
+			}
 			return runSpaceExport(cmd.Context(), cfg)
 		},
 	}
 
-	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to export (required)")
+	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to export (or set MDEMG_SPACE_ID)")
 	cmd.Flags().StringVar(&cfg.output, "output", "", "Output .mdemg file path (default: <space-id>.mdemg)")
 	cmd.Flags().StringVar(&cfg.profile, "profile", "full", "Export profile: full | codebase | cms | learned | metadata")
 	cmd.Flags().StringVar(&cfg.repoDir, "repo", "", "Git repo path; if set, export fails unless repo is clean and up to date with origin/main")
@@ -88,12 +91,13 @@ Supports selective export via profiles and filters.`,
 	cmd.Flags().StringVar(&cfg.sinceTimestamp, "since-timestamp", "", "Phase 4: export only entities updated after this (ISO8601)")
 	cmd.Flags().StringVar(&cfg.sinceCursor, "since-cursor", "", "Phase 4: opaque cursor from prior export next_cursor (used if -since-timestamp empty)")
 
-	cmd.MarkFlagRequired("space-id")
-
 	return cmd
 }
 
 func runSpaceExport(ctx context.Context, cfg *exportConfig) error {
+	if cfg.spaceID == "" {
+		return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
+	}
 	outPath := cfg.output
 	if outPath == "" {
 		outPath = cfg.spaceID + ".mdemg"
@@ -309,17 +313,22 @@ func newSpaceInfoCmd() *cobra.Command {
 		Short: "Show detailed info for one space",
 		Long:  `Show detailed information for a specific MDEMG space.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cfg.spaceID == "" {
+				cfg.spaceID = resolveSpaceID(cmd)
+			}
 			return runSpaceInfo(cmd.Context(), cfg)
 		},
 	}
 
-	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID (required)")
-	cmd.MarkFlagRequired("space-id")
+	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID (or set MDEMG_SPACE_ID)")
 
 	return cmd
 }
 
 func runSpaceInfo(ctx context.Context, cfg *infoConfig) error {
+	if cfg.spaceID == "" {
+		return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
+	}
 	driver, err := newDriver()
 	if err != nil {
 		return fmt.Errorf("neo4j config: %w", err)
@@ -427,21 +436,26 @@ func newSpacePullCmd() *cobra.Command {
 		Short: "Pull a space from a remote gRPC server to a .mdemg file",
 		Long:  `Pull a MDEMG space from a remote gRPC server and save it to a .mdemg file.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cfg.spaceID == "" {
+				cfg.spaceID = resolveSpaceID(cmd)
+			}
 			return runSpacePull(cmd.Context(), cfg)
 		},
 	}
 
 	cmd.Flags().StringVar(&cfg.remote, "remote", "", "Remote gRPC address (host:port, required)")
-	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to pull (required)")
+	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to pull (or set MDEMG_SPACE_ID)")
 	cmd.Flags().StringVar(&cfg.output, "output", "", "Output .mdemg file path (default: <space-id>.mdemg)")
 
 	cmd.MarkFlagRequired("remote")
-	cmd.MarkFlagRequired("space-id")
 
 	return cmd
 }
 
 func runSpacePull(ctx context.Context, cfg *pullConfig) error {
+	if cfg.spaceID == "" {
+		return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
+	}
 	outPath := cfg.output
 	if outPath == "" {
 		outPath = cfg.spaceID + ".mdemg"
