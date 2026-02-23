@@ -394,7 +394,10 @@ func runIngest(cfg *ingestConfig) error {
 		return nil
 	}
 
-	// Load .env
+	// Load config (YAML → .env → env vars)
+	if cfgPath := config.FindConfigFile(); cfgPath != "" {
+		_ = config.LoadYAMLConfig(cfgPath)
+	}
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Note: No .env file found, using defaults/flags")
 	}
@@ -407,6 +410,18 @@ func runIngest(cfg *ingestConfig) error {
 
 	if cfg.codebasePath == "" {
 		return fmt.Errorf("--path is required")
+	}
+
+	// Load .mdemgignore patterns
+	var ignorePatterns []config.IgnorePattern
+	if ignPath := config.FindIgnoreFile(cfg.codebasePath); ignPath != "" {
+		var err error
+		ignorePatterns, err = config.ParseIgnoreFile(ignPath)
+		if err != nil {
+			log.Printf("Warning: failed to parse %s: %v", ignPath, err)
+		} else {
+			log.Printf("Loaded %d ignore patterns from %s", len(ignorePatterns), ignPath)
+		}
 	}
 
 	// Apply preset
@@ -507,7 +522,7 @@ func runIngest(cfg *ingestConfig) error {
 
 	diagSummary := languages.NewDiagnosticSummary()
 
-	elements, err := walkCodebase(cfg, excludeSet, excludePatterns, diagSummary)
+	elements, err := walkCodebase(cfg, excludeSet, excludePatterns, ignorePatterns, diagSummary)
 	if err != nil {
 		return fmt.Errorf("failed to walk codebase: %v", err)
 	}
@@ -845,7 +860,7 @@ func getEnabledLanguages(cfg *ingestConfig) map[string]bool {
 	}
 }
 
-func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns []string, diagSummary *languages.DiagnosticSummary) ([]codeElement, error) {
+func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns []string, ignorePatterns []config.IgnorePattern, diagSummary *languages.DiagnosticSummary) ([]codeElement, error) {
 	var elements []codeElement
 	enabledLangs := getEnabledLanguages(cfg)
 
@@ -854,12 +869,30 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 			return nil
 		}
 
+		// Compute relative path for .mdemgignore matching
+		relPath, _ := filepath.Rel(cfg.codebasePath, path)
+
 		if info.IsDir() {
 			if excludeSet[info.Name()] {
 				if cfg.verbose {
 					log.Printf("Skipping excluded directory: %s", path)
 				}
 				return filepath.SkipDir
+			}
+			// Check .mdemgignore patterns for directories
+			if len(ignorePatterns) > 0 && relPath != "." && config.MatchesIgnorePatterns(relPath, true, ignorePatterns) {
+				if cfg.verbose {
+					log.Printf("Skipping directory (mdemgignore): %s", path)
+				}
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check .mdemgignore patterns for files
+		if len(ignorePatterns) > 0 && config.MatchesIgnorePatterns(relPath, false, ignorePatterns) {
+			if cfg.verbose {
+				log.Printf("Skipping file (mdemgignore): %s", path)
 			}
 			return nil
 		}

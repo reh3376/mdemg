@@ -7,7 +7,7 @@
 # Configuration (environment variables):
 #   MDEMG_SPACE_ID     - Target space ID (default: basename of repo)
 #   MDEMG_ENDPOINT     - MDEMG API endpoint (default: reads .mdemg.port, falls back to http://localhost:9999)
-#   MDEMG_INGEST_BIN   - Path to ingest-codebase binary (default: mdemg ingest-codebase in PATH)
+#   MDEMG_INGEST_BIN   - Path to mdemg binary (default: mdemg in PATH, falls back to ingest-codebase)
 #   MDEMG_SKIP_PATTERNS - Comma-separated patterns to skip (default: .git,node_modules,vendor)
 #   MDEMG_VERBOSE      - Enable verbose output (default: false)
 #   MDEMG_DISABLED     - Set to "true" to disable the hook
@@ -36,15 +36,20 @@ fi
 VERBOSE="${MDEMG_VERBOSE:-false}"
 SKIP_PATTERNS="${MDEMG_SKIP_PATTERNS:-.git,node_modules,vendor,.worktrees}"
 
-# Find ingest-codebase binary
+# Find mdemg binary (preferred) or legacy ingest-codebase
+INGEST_CMD=""
 if [ -n "$MDEMG_INGEST_BIN" ]; then
-    INGEST_BIN="$MDEMG_INGEST_BIN"
+    INGEST_CMD="$MDEMG_INGEST_BIN"
+elif command -v mdemg &> /dev/null; then
+    INGEST_CMD="mdemg ingest"
+elif [ -f "$REPO_ROOT/bin/mdemg" ]; then
+    INGEST_CMD="$REPO_ROOT/bin/mdemg ingest"
 elif command -v ingest-codebase &> /dev/null; then
-    INGEST_BIN="ingest-codebase"
+    INGEST_CMD="ingest-codebase"
 elif [ -f "$REPO_ROOT/bin/ingest-codebase" ]; then
-    INGEST_BIN="$REPO_ROOT/bin/ingest-codebase"
+    INGEST_CMD="$REPO_ROOT/bin/ingest-codebase"
 else
-    echo "mdemg-git-hook: ingest-codebase not found. Set MDEMG_INGEST_BIN or add to PATH."
+    echo "mdemg-git-hook: mdemg binary not found. Set MDEMG_INGEST_BIN or add to PATH."
     exit 1
 fi
 
@@ -85,7 +90,7 @@ if [ -n "$MDEMG_LOG_FILE" ]; then
 fi
 
 # Run incremental ingestion (in background to not block commit)
-nohup "$INGEST_BIN" "${ARGS[@]}" > /dev/null 2>&1 &
+nohup $INGEST_CMD "${ARGS[@]}" > /dev/null 2>&1 &
 
 if [ "$VERBOSE" = "true" ]; then
     echo "mdemg-git-hook: Incremental ingestion started for space '$SPACE_ID'"

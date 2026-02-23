@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"mdemg/internal/api"
 	"mdemg/internal/config"
@@ -57,10 +56,7 @@ See config.FromEnv() for the full list of environment variable options.`,
 }
 
 func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
-	// Load .env file if present (silently ignore if not found)
-	_ = godotenv.Load()
-
-	cfg, err := config.FromEnv()
+	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}

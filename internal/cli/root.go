@@ -63,7 +63,9 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.PersistentFlags().String("space-id", "", "Default space ID (overrides MDEMG_SPACE_ID env var)")
 
 	// Register all subcommands
+	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newServeCmd())
+	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newMCPCmd())
 	rootCmd.AddCommand(newIngestCmd())
 	rootCmd.AddCommand(newConsolidateCmd())

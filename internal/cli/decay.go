@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"mdemg/internal/cli/neo4jutil"
-
+	"github.com/joho/godotenv"
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
+
+	"mdemg/internal/cli/neo4jutil"
+	"mdemg/internal/config"
 )
 
 // edge represents a relationship in the graph for decay processing
@@ -85,6 +87,12 @@ Edges are pruned if ALL of the following are true:
 
 Protected edges (high evidence count or pinned) are never pruned.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config (YAML → .env → env vars)
+			if cfgPath := config.FindConfigFile(); cfgPath != "" {
+				_ = config.LoadYAMLConfig(cfgPath)
+			}
+			_ = godotenv.Load()
+
 			// Parse environment variables for Neo4j connection
 			if err := parseNeo4jEnv(&cfg); err != nil {
 				return err

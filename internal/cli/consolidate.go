@@ -7,12 +7,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/spf13/cobra"
+
 	"mdemg/internal/cli/neo4jutil"
 	"mdemg/internal/config"
 	"mdemg/internal/hidden"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/spf13/cobra"
 )
 
 // consolidateConfig holds CLI and environment configuration for the consolidation job
@@ -85,6 +86,12 @@ Examples:
 			if cfg.spaceID == "" {
 				cfg.spaceID = resolveSpaceID(cmd)
 			}
+
+			// Load config (YAML → .env → env vars)
+			if cfgPath := config.FindConfigFile(); cfgPath != "" {
+				_ = config.LoadYAMLConfig(cfgPath)
+			}
+			_ = godotenv.Load()
 
 			// Load Neo4j connection from environment
 			if err := loadConsolidateNeo4jConfig(&cfg); err != nil {
