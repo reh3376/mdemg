@@ -86,6 +86,10 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   make test-rsic-integration  # RSIC integration tests (full stack, 6 tests)
   make test-rsic-uats         # RSIC contract tests (14 specs)
 
+  # UNTS hash verification tests
+  make test-unts              # UNTS unit tests (no server required)
+  make test-unts-uats         # UNTS UATS contract tests (8 specs, requires UNTS_ENABLED=true)
+
   # Smoke tests (health + readiness only)
   make test-smoke
 
@@ -227,18 +231,26 @@ python docs/tests/uvts/runners/uvts_runner.py \
 
 Thresholds: `mean_score`, `strong_evidence_pct`, `high_score_rate_pct`, `min_category_score`. Profiles: `quick` (16q), `standard` (40q), `full` (120q).
 
-**UNTS (Universal Hash Test Specification)** maintains a current and historical record of SHA-256 hash verification for all framework-protected files across UPTS, UATS, UBTS, USTS, UOBS, UAMS, and UDTS. Registry lives in `docs/specs/unts-registry.json`. Implementation is in `internal/unts/` with gRPC service defined in `api/proto/unts.proto`.
+**UNTS (Universal Hash Test Specification)** maintains a current and historical record of SHA-256 hash verification for all framework-protected files across UPTS, UATS, UBTS, USTS, UOBS, UAMS, and UDTS. Registry lives in `docs/specs/unts-registry.json`. Implementation is in `internal/unts/` with gRPC service defined in `api/proto/unts.proto` and REST handlers in `internal/api/handlers_unts.go`.
 
 ```bash
 # Run UNTS Go unit tests
 go test ./internal/unts/... -v
+
+# Run UNTS UATS contract tests (requires running server with UNTS_ENABLED=true)
+make test-unts-uats
+
+# Run all UNTS tests (unit only, no server required)
+make test-unts
 
 # UDTS contract tests for UNTS gRPC service
 export UDTS_TARGET=localhost:50051
 go test ./tests/udts/... -run TestUNTS -v
 ```
 
-Core capabilities: `ListVerifiedFiles`, `GetFileStatus`, `GetHashHistory`, `VerifyNow`, `RevertToPreviousHash`, `UpdateHash`, `RegisterTrackedFile`. Each tracked file retains up to 3 historical hash values for revert. See `docs/specs/unts-hash-verification.md` for the full specification and `docs/specs/FRAMEWORK_GOVERNANCE.md` for governance context.
+**REST Endpoints (8):** `POST /v1/hash-verification/register`, `GET /v1/hash-verification/files`, `GET /v1/hash-verification/files/{path}`, `POST /v1/hash-verification/verify`, `POST /v1/hash-verification/verify-all`, `POST /v1/hash-verification/update`, `POST /v1/hash-verification/revert`, `POST /v1/hash-verification/scan`. Config: `UNTS_ENABLED` (default: false), `UNTS_BASE_PATH` (default: "."). Returns 503 when disabled.
+
+**gRPC RPCs (7):** `ListVerifiedFiles`, `GetFileStatus`, `GetHashHistory`, `VerifyNow`, `RevertToPreviousHash`, `UpdateHash`, `RegisterTrackedFile`. Each tracked file retains up to 3 historical hash values for revert. See `docs/specs/unts-hash-verification.md` for the full specification and `docs/specs/FRAMEWORK_GOVERNANCE.md` for governance context.
 
 ### Universal Test Specification Summary
 
@@ -538,6 +550,21 @@ Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endp
 |--------|----------|-------------|
 | GET | `/v1/symbols/relationships?space_id=X` | Relationship edge counts by type |
 | GET | `/v1/symbols/{id}/relationships?space_id=X` | Incoming/outgoing edges for a symbol |
+
+### Hash Verification — UNTS (Phase 38)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/hash-verification/register` | Register a file for hash tracking |
+| GET | `/v1/hash-verification/files` | List tracked files (optional `?framework=`/`?status=` filters) |
+| GET | `/v1/hash-verification/files/{path}` | Get single file status and history |
+| POST | `/v1/hash-verification/verify` | Verify single file hash against expected |
+| POST | `/v1/hash-verification/verify-all` | Verify all tracked files |
+| POST | `/v1/hash-verification/update` | Update expected hash for a file |
+| POST | `/v1/hash-verification/revert` | Revert to a previous hash from history |
+| POST | `/v1/hash-verification/scan` | Scan manifest + specs to auto-register files |
+
+Config: `UNTS_ENABLED` (default: false), `UNTS_BASE_PATH` (default: "."). Returns 503 when disabled.
 
 ### Admin — Space Lifecycle Management
 
