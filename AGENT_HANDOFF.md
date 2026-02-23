@@ -272,7 +272,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 5 (CRDT + Lineage) | **Phase 35** | CRDT for Learned Edges + Space Lineage | ✅ Complete |
 | Phase 7 (Observation Forwarding) | **Phase 36** | Selective Observation Forwarding (CMS) | 📋 Planned |
 | Phase 8 (Agent Health) | **Phase 37** | Agent Health / Heartbeat / Presence | ✅ Complete |
-| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | 📋 Spec Complete |
+| — (UNTS) | **Phase 38** | Hash Verification (UNTS / Nash Verification) | ✅ Complete |
 | Phase 1 (Cleanup) | **Phase 41** | Space Cleanup | ✅ Complete |
 | Phase 2 (Self-Ingest) | **Phase 42** | Self-Ingest MDEMG Codebase | ✅ Complete |
 | Phase 3A (CMS Enforcement) | **Phase 43A** | CMS Agent Enforcement | ✅ Complete |
@@ -321,7 +321,7 @@ Phases are organized into **numbered series** to group related work:
 | 35 | CRDT + Lineage | ✅ | `docs/specs/development-space-collaboration.md` §Phase 5 |
 | 36 | Observation Forwarding | 📋 | `docs/specs/development-space-collaboration.md` §Phase 7 |
 | 37 | Agent Health / Presence | ✅ | `docs/specs/development-space-collaboration.md` §Phase 8 |
-| 38 | UNTS Hash Verification | 📋 | `docs/specs/unts-hash-verification.md` (spec complete, implementation not started) |
+| 38 | UNTS Hash Verification | ✅ | `docs/specs/unts-hash-verification.md` (gRPC + REST API complete) |
 | 41 | Space Cleanup | ✅ | `docs/specs/phase1-space-cleanup.md` |
 | 42 | Self-Ingest | ✅ | `docs/specs/phase2-self-ingest.md` |
 | 43A | CMS Enforcement | ✅ | `docs/specs/phase3a-cms-enforcement.md` |
@@ -361,7 +361,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 33**: `docs/specs/phase3-inter-agent-comms.md` | JSON: `docs/api/api-spec/udts/specs/devspace_connect.udts.json`.
 - **Phase 34**: `docs/specs/phase4-incremental-sync.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_export_delta.udts.json`.
 - **Phase 35-37**: `docs/specs/development-space-collaboration.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json`, `docs/api/api-spec/udts/specs/devspace_presence.udts.json`.
-- **Phase 38**: `docs/specs/unts-hash-verification.md` | JSON: `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json`.
+- **Phase 38**: `docs/specs/unts-hash-verification.md` | JSON: `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | UATS: 8 specs (`hash_verification_*.uats.json`).
 - **Phase 41-42**: `docs/specs/phase1-space-cleanup.md`, `docs/specs/phase2-self-ingest.md` | JSON: `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`, `docs/api/api-spec/uats/specs/ingest_codebase.uats.json`.
 - **Phase 43A-43C**: `docs/specs/phase3a-cms-enforcement.md`, `docs/specs/phase3b-cms-quality.md`, `docs/specs/phase3c-multi-agent.md` | JSON: `docs/api/api-spec/uats/specs/conversation_resume.uats.json`, `docs/api/api-spec/uats/specs/conversation_observe.uats.json`, `docs/api/api-spec/uats/specs/conversation_volatile_stats.uats.json`.
 - **Phase 44**: `docs/specs/phase4-linear-crud.md` | JSON: `docs/api/api-spec/uats/specs/webhooks_generic.uats.json`.
@@ -632,12 +632,12 @@ Returns embedding provider health status with active probe validation.
 
 ### Phase 38: UNTS Hash Verification (Nash Verification) ✅
 
-**Completed:** 2026-02-06
+**Completed:** 2026-02-06 (gRPC backend), 2026-02-23 (REST API layer)
 **Spec:** `docs/specs/unts-hash-verification.md`
 
 **Supporting artifacts (docs + JSON):** `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json`
 
-**What it does:** Central registry + API for hash verification of all framework-protected files. Current + historical (last 3) hashes per file. Revert capability.
+**What it does:** Central registry + API for hash verification of all framework-protected files. Current + historical (last 3) hashes per file. Revert capability. Both gRPC and REST interfaces.
 
 **Key Files:**
 
@@ -649,8 +649,22 @@ Returns embedding provider health status with active probe validation.
 | Scanners | `internal/unts/scanner.go` | Ingest from manifest.sha256 and UDTS specs |
 | Core logic | `internal/unts/registry.go` | VerifyNow, UpdateHash, RevertToPreviousHash |
 | gRPC server | `internal/unts/server.go` | Service implementation |
-| Tests | `internal/unts/registry_test.go` | 10 test functions |
-| UDTS spec | `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | Contract tests |
+| REST handlers | `internal/api/handlers_unts.go` | 8 HTTP endpoints |
+| Tests | `internal/unts/registry_test.go`, `server_test.go` | 55 test functions |
+| UDTS spec | `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | gRPC contract tests |
+| UATS specs | `docs/api/api-spec/uats/specs/hash_verification_*.uats.json` | 8 REST contract specs (19 variants) |
+
+**REST Endpoints (Phase 38 REST layer):**
+- `POST /v1/hash-verification/register` — Register a file for tracking
+- `GET  /v1/hash-verification/files/{path}` — Get single file status
+- `GET  /v1/hash-verification/files` — List all tracked files (optional `?framework=`/`?status=` filters)
+- `POST /v1/hash-verification/verify` — Verify single file hash
+- `POST /v1/hash-verification/verify-all` — Verify all tracked files
+- `POST /v1/hash-verification/update` — Update expected hash
+- `POST /v1/hash-verification/revert` — Revert to previous hash from history
+- `POST /v1/hash-verification/scan` — Scan manifest + UDTS specs to register files
+
+**Config:** `UNTS_ENABLED` (default: false), `UNTS_BASE_PATH` (default: ".")
 
 **gRPC RPCs:**
 - `ListVerifiedFiles` — List all tracked files
@@ -2047,50 +2061,26 @@ Use `docs/specs/TEMPLATE.md` for new phase specs. Required sections: Overview, R
 
 ## 13. Planned Phases
 
-### Phase 38: UNTS Hash Verification — Registry, Monitoring & Configuration
+### Phase 38: UNTS Hash Verification — Registry, Monitoring & Configuration ✅
 
-**Status:** Spec complete (`docs/specs/unts-hash-verification.md`), implementation not started
+**Status:** Complete (gRPC backend: 2026-02-06, REST API layer: 2026-02-23)
 **Spec Date:** 2026-01-22
 **Dependencies:** None
 
-**What it does:** Maintains a current and historical record of hash verification for all MDEMG files protected by hash verification across frameworks (UPTS, UATS, UBTS, USTS, UOTS, UAMS, UDTS).
+**What it does:** Maintains a current and historical record of hash verification for all MDEMG files protected by hash verification across frameworks (UPTS, UATS, UBTS, USTS, UOTS, UAMS, UDTS). Both gRPC and REST interfaces are implemented.
 
-**Data Model:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `path` | string | Repo-relative path |
-| `framework` | string | manifest, udts, uats, ubts, usts, uots, uams, upts |
-| `current_hash` | string | SHA-256 hex (64 chars) |
-| `status` | enum | verified, mismatch, unknown, reverted |
-| `history` | array | Last 3 hash values with timestamps and source |
-| `source_ref` | string | Where hash is enforced |
-
-**API Surface (7 endpoints):**
-
-| Endpoint | Description |
-|----------|-------------|
-| `ListVerifiedFiles` | List all tracked files with status |
-| `GetFileStatus` | Single file status |
-| `GetHashHistory` | Full history for revert UI |
-| `RevertToPreviousHash` | Set expected hash to a previous value |
-| `UpdateHash` | Manual/CI update of expected hash |
-| `VerifyNow` | Recompute hashes, compare, update status |
-| `RegisterTrackedFile` | Add new path to registry |
-
-**Implementation Order:** Registry format → Scanners (manifest.sha256, UDTS) → Core logic → API service → UATS specs → Observability
-
-**Open Design Questions:**
-1. REST (consistent with all other MDEMG endpoints) vs gRPC (as specced)? REST recommended for consistency.
-2. MVP file-based storage (`unts-registry.json`) vs Neo4j? Neo4j avoids adding a new storage layer.
-3. UPTS hash plan has 3 unresolved questions (hard error vs warning, in-place vs new dir, default behavior)
-4. UATS specs needed but not yet defined in the spec
+**Design Decisions Resolved:**
+1. REST + gRPC: Both implemented. REST handlers call Registry/Scanner directly (not through gRPC).
+2. File-based storage: `unts-registry.json` — simple, no Neo4j dependency.
+3. Config: `UNTS_ENABLED` (default: false), `UNTS_BASE_PATH` (default: ".").
+4. 8 UATS specs (19 variants, 100% pass rate) defined and validated.
 
 **Key Files:**
 - `docs/specs/unts-hash-verification.md` — Primary spec
-- `docs/lang-parser/lang-parse-spec/upts-hash-plan/` — UPTS-specific hash verification (v1.1)
-- `docs/specs/FRAMEWORK_GOVERNANCE.md` — Governance context
-- `docs/specs/manifest.sha256` — Existing manifest (22 entries)
+- `internal/unts/registry.go`, `scanner.go`, `server.go` — Core logic + gRPC
+- `internal/api/handlers_unts.go` — REST handlers (8 endpoints)
+- `docs/api/api-spec/uats/specs/hash_verification_*.uats.json` — 8 UATS specs
+- `Makefile` targets: `test-unts`, `test-unts-uats`
 
 ---
 

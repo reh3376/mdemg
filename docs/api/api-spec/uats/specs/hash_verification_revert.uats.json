@@ -1,0 +1,125 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Revert",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Reverts a tracked file to a previous hash (register + update via base/variant1, then revert)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ],
+    "sequential": true
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "path": "test/revert-target.txt",
+      "framework": "manifest",
+      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source": "manual"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.path",
+        "type": "string",
+        "value": "test/revert-target.txt"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "update_hash",
+      "description": "Update hash to create history entry",
+      "request": {
+        "path": "/v1/hash-verification/update",
+        "body": {
+          "path": "test/revert-target.txt",
+          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source": "manual"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.current_hash",
+            "type": "string",
+            "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      }
+    },
+    {
+      "name": "revert_to_original",
+      "description": "Revert to original hash from history",
+      "request": {
+        "path": "/v1/hash-verification/revert",
+        "body": {
+          "path": "test/revert-target.txt",
+          "target_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.path",
+            "type": "string",
+            "value": "test/revert-target.txt"
+          },
+          {
+            "path": "$.current_hash",
+            "type": "string",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "path": "$.status",
+            "type": "string",
+            "value": "reverted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hash_not_in_history",
+      "description": "Target hash not in history returns 400",
+      "request": {
+        "path": "/v1/hash-verification/revert",
+        "body": {
+          "path": "test/revert-target.txt",
+          "target_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

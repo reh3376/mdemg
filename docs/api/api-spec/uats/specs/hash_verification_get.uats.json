@@ -1,0 +1,107 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Get",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Gets a single tracked file by path (registers first via base, then queries via variant)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ],
+    "sequential": true
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "path": "test/get-file.txt",
+      "framework": "manifest",
+      "hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "source": "manual"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.path",
+        "type": "string",
+        "value": "test/get-file.txt"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "get_registered_file",
+      "description": "Get the file registered in base request",
+      "request": {
+        "method": "GET",
+        "path": "/v1/hash-verification/files/test/get-file.txt",
+        "headers": {},
+        "body": ""
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.path",
+            "type": "string",
+            "value": "test/get-file.txt"
+          },
+          {
+            "path": "$.framework",
+            "type": "string"
+          },
+          {
+            "path": "$.current_hash",
+            "type": "string"
+          },
+          {
+            "path": "$.status",
+            "type": "string"
+          },
+          {
+            "path": "$.history",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "not_found",
+      "description": "Untracked file returns 404",
+      "request": {
+        "method": "GET",
+        "path": "/v1/hash-verification/files/nonexistent/file.txt",
+        "headers": {},
+        "body": ""
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

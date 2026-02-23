@@ -281,6 +281,21 @@ Install the post-commit hook to automatically ingest changes on every commit:
 | `/v1/backup/restore` | POST | Trigger restore from full backup |
 | `/v1/backup/restore/status/{id}` | GET | Restore job status |
 
+### Hash Verification (UNTS)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/hash-verification/register` | POST | Register a file for hash tracking |
+| `/v1/hash-verification/files` | GET | List tracked files (optional `?framework=`/`?status=` filters) |
+| `/v1/hash-verification/files/{path}` | GET | Get single file status and history |
+| `/v1/hash-verification/verify` | POST | Verify single file hash against expected |
+| `/v1/hash-verification/verify-all` | POST | Verify all tracked files |
+| `/v1/hash-verification/update` | POST | Update expected hash for a file |
+| `/v1/hash-verification/revert` | POST | Revert to a previous hash from history |
+| `/v1/hash-verification/scan` | POST | Scan manifest + specs to register files |
+
+Requires `UNTS_ENABLED=true` and `UNTS_BASE_PATH` (default: `.`). Returns 503 when disabled.
+
 ### Admin — Space Lifecycle
 
 | Endpoint | Method | Description |
@@ -465,6 +480,7 @@ Exposes all MDEMG metrics in Prometheus format.
 | 76 | Neo4j State Monitor & Space Overview | ✅ Complete |
 | 75 | Cross-File Relationship Extraction & Graph Topology Hardening | ✅ Complete |
 | 70 | Neo4j Backup & Restore (Full & Partial) with Scheduler | ✅ Complete |
+| 38 | UNTS Hash Verification REST API (8 endpoints, 8 UATS specs) | ✅ Complete |
 | 60b | Recursive Self-Improvement Cycle (RSIC) | ✅ Complete |
 | 60 | CMS Advanced Functionality II (Templates, Snapshots, Relevance, Truncation, Org-Review) | ✅ Complete |
 | 51 | Web Scraper Ingestion Module | ✅ Complete |

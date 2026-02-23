@@ -144,7 +144,7 @@ jobs:
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --exclude-tag embedding_required
+            --exclude-tag embedding_required,unts
 
       - name: Run UATS Contract Tests (Embedding)
         continue-on-error: true

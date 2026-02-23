@@ -38,6 +38,7 @@ import (
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/transfer"
+	"mdemg/internal/unts"
 	"mdemg/internal/validation"
 )
 
@@ -108,6 +109,10 @@ type Server struct {
 
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
+
+	// Phase 38: UNTS Hash Verification
+	untsRegistry *unts.Registry
+	untsScanner  *unts.Scanner
 
 	// Phase 9.4: Event dispatch for non-APE modules
 	eventDispatcher *plugins.EventDispatcher
@@ -455,6 +460,18 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		log.Printf("RSIC persistence disabled")
 	}
 
+	// Phase 38: Initialize UNTS Hash Verification
+	var untsReg *unts.Registry
+	var untsScan *unts.Scanner
+	if cfg.UNTSEnabled {
+		untsReg = unts.NewRegistry(cfg.UNTSBasePath)
+		if err := untsReg.Load(); err != nil {
+			log.Printf("WARNING: UNTS registry load failed: %v", err)
+		}
+		untsScan = unts.NewScanner(untsReg, cfg.UNTSBasePath)
+		log.Printf("UNTS hash verification enabled (base: %s)", cfg.UNTSBasePath)
+	}
+
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
 	log.Printf("Signal learner initialized (decay=%.2f, boost=%.2f)", cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
@@ -497,6 +514,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
 		signalLearner:           signalLearner,
+		untsRegistry:            untsReg,
+		untsScanner:             untsScan,
 		eventDispatcher:         plugins.NewEventDispatcher(pluginMgr),
 	}
 }
@@ -1244,6 +1263,16 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/admin/spaces/prune", s.handleAdminSpacePrune)
 	mux.HandleFunc("/v1/admin/spaces/", s.handleAdminSpaceUpdate)
 	mux.HandleFunc("/v1/admin/spaces", s.handleAdminSpaces)
+
+	// Hash Verification (Phase 38: UNTS REST API)
+	mux.HandleFunc("/v1/hash-verification/register", s.handleHashVerificationRegister)
+	mux.HandleFunc("/v1/hash-verification/files/", s.handleHashVerificationFileRoute)
+	mux.HandleFunc("/v1/hash-verification/files", s.handleHashVerificationList)
+	mux.HandleFunc("/v1/hash-verification/verify-all", s.handleHashVerificationVerifyAll)
+	mux.HandleFunc("/v1/hash-verification/verify", s.handleHashVerificationVerify)
+	mux.HandleFunc("/v1/hash-verification/update", s.handleHashVerificationUpdate)
+	mux.HandleFunc("/v1/hash-verification/revert", s.handleHashVerificationRevert)
+	mux.HandleFunc("/v1/hash-verification/scan", s.handleHashVerificationScan)
 
 	// Wrap mux with middleware stack
 	// Order (outermost to innermost):

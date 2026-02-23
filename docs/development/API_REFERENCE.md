@@ -2397,6 +2397,127 @@ Execute batch pruning of prunable/orphan spaces. Supports dry-run mode.
 
 ---
 
+## Hash Verification — UNTS (Phase 38)
+
+Hash verification REST API for tracking SHA-256 hashes of framework-protected files. Requires `UNTS_ENABLED=true`. Returns 503 when disabled.
+
+### POST /v1/hash-verification/register
+
+Register a file for hash tracking.
+
+**Request Body:**
+```json
+{
+  "path": "docs/specs/manifest.sha256",
+  "framework": "manifest",
+  "hash": "<sha256>",
+  "source_ref": "",
+  "source": "manual"
+}
+```
+
+**Response (200):** `FileRecord` with `path`, `framework`, `current_hash`, `status`, `updated_at`, `history`.
+
+**Errors:** 400 (missing path), 503 (UNTS disabled).
+
+### GET /v1/hash-verification/files
+
+List all tracked files. Optional query params: `?framework=manifest`, `?status=verified`.
+
+**Response (200):**
+```json
+{
+  "files": [...],
+  "total": 42
+}
+```
+
+### GET /v1/hash-verification/files/{path}
+
+Get a single tracked file by repo-relative path (URL path suffix after `/files/`).
+
+**Response (200):** `FileRecord` with `path`, `framework`, `current_hash`, `status`, `history` (array of last 3 hashes).
+
+**Errors:** 404 (file not tracked).
+
+### POST /v1/hash-verification/verify
+
+Verify a single file's actual hash against expected.
+
+**Request Body:**
+```json
+{"path": "docs/specs/manifest.sha256"}
+```
+
+**Response (200):**
+```json
+{
+  "path": "docs/specs/manifest.sha256",
+  "status": "verified",
+  "expected_hash": "<sha256>",
+  "actual_hash": "<sha256>"
+}
+```
+
+Status values: `verified`, `mismatch`, `unknown`.
+
+**Errors:** 404 (file not tracked).
+
+### POST /v1/hash-verification/verify-all
+
+Verify all tracked files. Optional `framework` filter in body.
+
+**Response (200):**
+```json
+{
+  "results": [...],
+  "total": 42,
+  "verified": 40,
+  "mismatched": 2
+}
+```
+
+### POST /v1/hash-verification/update
+
+Update the expected hash for a tracked file (pushes current hash to history).
+
+**Request Body:**
+```json
+{"path": "...", "hash": "<new_sha256>", "source": "manual"}
+```
+
+**Response (200):** Updated `FileRecord`.
+
+**Errors:** 404 (file not tracked).
+
+### POST /v1/hash-verification/revert
+
+Revert to a previous hash from the file's history.
+
+**Request Body:**
+```json
+{"path": "...", "target_hash": "<old_sha256>"}
+```
+
+**Response (200):** Updated `FileRecord` with `status: "reverted"`.
+
+**Errors:** 400 (target hash not in history), 404 (file not tracked).
+
+### POST /v1/hash-verification/scan
+
+Trigger a full scan of `manifest.sha256` and UDTS spec files to auto-register hashes.
+
+**Response (200):**
+```json
+{"scanned": true, "files_registered": 22}
+```
+
+**Configuration:**
+- `UNTS_ENABLED` — Enable hash verification REST API (default: `false`)
+- `UNTS_BASE_PATH` — Repository root for file hashing (default: `.`)
+
+---
+
 ## Error Responses
 
 All endpoints return errors in a consistent format:

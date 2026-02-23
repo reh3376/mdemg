@@ -1,0 +1,108 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Update",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Updates the expected hash for a tracked file (registers first via base)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ],
+    "sequential": true
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "path": "test/update-target.txt",
+      "framework": "manifest",
+      "hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source": "manual"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.path",
+        "type": "string",
+        "value": "test/update-target.txt"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "update_registered",
+      "description": "Update hash of file registered in base",
+      "request": {
+        "path": "/v1/hash-verification/update",
+        "body": {
+          "path": "test/update-target.txt",
+          "hash": "2222222222222222222222222222222222222222222222222222222222222222",
+          "source": "manual"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.path",
+            "type": "string",
+            "value": "test/update-target.txt"
+          },
+          {
+            "path": "$.current_hash",
+            "type": "string",
+            "value": "2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "path": "$.status",
+            "type": "string"
+          },
+          {
+            "path": "$.history",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "untracked_file",
+      "description": "Updating untracked file returns 404",
+      "request": {
+        "path": "/v1/hash-verification/update",
+        "body": {
+          "path": "nonexistent/file.txt",
+          "hash": "abc123",
+          "source": "manual"
+        }
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

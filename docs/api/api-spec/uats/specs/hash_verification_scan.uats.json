@@ -1,0 +1,44 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Scan",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Triggers a full scan of manifest and spec files to register hashes",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/scan"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.scanned",
+        "type": "boolean",
+        "value": true
+      },
+      {
+        "path": "$.files_registered",
+        "type": "integer"
+      }
+    ]
+  }
+}
