@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-02-16
+**Date:** 2026-02-23
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -260,6 +260,8 @@ Phases are organized into **numbered series** to group related work:
 | **50s** | 44-52 | **Advanced Features** — Modular intelligence, symbols, incremental updates, caching, LLM SDK, public readiness |
 | **70s** | 70-79 | **Operations & Reliability** — Backup, restore, disaster recovery, monitoring, operational tooling |
 | **80s** | 80-89 | **Meta-Cognition & Self-Improvement** — ANN meta-cognition, self-assessment enforcement, adaptive learning |
+| **90s** | 90-91 | **RSIC Hardening** — Conformance, CI gating, observability, operations |
+| **92-100** | 92-100 | **Deployable Package** — Gap analysis, unified CLI, config, database, IDE, build, release, onboarding |
 
 ### Mapping from Old to New
 
@@ -349,6 +351,16 @@ Phases are organized into **numbered series** to group related work:
 | 89 | RSIC Persistence & Multi-Space Correctness | ✅ | `docs/specs/phase89-rsic-persistence-multi-space.md` |
 | 90 | RSIC Conformance & CI Gating | ✅ | `docs/specs/phase90-rsic-conformance-ci-gating.md` |
 | 9.4 | Plugin-Specific Triggers (File Watcher + Events) | ✅ | `internal/api/handlers_filewatcher.go`, `internal/plugins/events.go` |
+| 91 | RSIC Observability & Operations | ✅ | `docs/specs/phase91-rsic-observability-operations.md` |
+| 92 | Gap Analysis — Deployable Package | ✅ | `docs/specs/phase92-gap-analysis.md` |
+| 93 | Unified CLI Foundation | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 2 |
+| 94 | Config Simplification + Project Init | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 3, §Gap 5 |
+| 95 | Database + Embedding + Migrations | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 4, §Gap 6, §Gap 7 |
+| 96 | IDE + Repo Integration | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 8, §Gap 12 |
+| 97 | Process Lifecycle + Security | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 10, §Gap 14 |
+| 98 | Cross-Platform Build + Release | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 1, §Gap 11, §Gap 15 |
+| 99 | Onboarding + Polish | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 9, §Gap 13 |
+| 100 | Deployable Package (Mac) | 📋 | `docs/specs/phase92-gap-analysis.md` §Acceptance Criteria |
 
 ---
 
@@ -380,6 +392,15 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 89**: `docs/specs/phase89-rsic-persistence-multi-space.md` | Go: `internal/ape/rsic_store.go`. Config: `RSIC_PERSISTENCE_ENABLED`, `RSIC_WATCHDOG_SPACE_ID`.
 - **Phase 90**: `docs/specs/phase90-rsic-conformance-ci-gating.md` | Go: `tests/integration/rsic_test.go` (6 core tests), `tests/integration/rsic_systems_test.go` (10 systems tests), `tests/integration/rsic_holistic_test.go` (6 holistic tests — full pipeline with Neo4j mutations). CI: `.github/workflows/ci.yml` (pipeline split). Make: `test-rsic*` targets. Runner: `--include-tag`/`--exclude-tag`/sequential mode.
 - **Phase 91**: `docs/specs/phase91-rsic-observability-operations.md` | Go: `internal/metrics/collectors.go` (12 RSIC metrics), `internal/ape/cycle.go`, `internal/ape/orchestration_policy.go`, `internal/ape/safety_validator.go`, `internal/ape/watchdog.go`, `internal/ape/calibration.go`, `internal/ape/task_dispatch.go`. Dashboard: `deploy/docker/grafana/dashboards/mdemg-rsic.json`. Alerts: `deploy/docker/prometheus/alerts/rsic.yaml`. Runbook: `docs/architecture/14_Operations_Runbook.md` §11. JSON: `docs/api/api-spec/uats/specs/prometheus_rsic_metrics.phase91.uats.json`.
+- **Phase 92**: `docs/specs/phase92-gap-analysis.md` — Full gap analysis with 15 categories, dependency graph, and Phase 93-100 roadmap.
+- **Phase 93 (Planned)**: Unified CLI Foundation — Cobra CLI merging 12 binaries into single `mdemg` command. Depends on: nothing.
+- **Phase 94 (Planned)**: Config Simplification + Project Init — YAML config, profiles, `mdemg init`, `.mdemg/` directory convention. Depends on: Phase 93.
+- **Phase 95 (Planned)**: Database + Embedding + Migrations — Go-native migration runner, managed Neo4j, embedder validation. Depends on: Phase 93.
+- **Phase 96 (Planned)**: IDE + Repo Integration — MCP auto-config, `.mdemgignore`, hooks CLI, file watching CLI. Depends on: Phase 94.
+- **Phase 97 (Planned)**: Process Lifecycle + Security — Daemon mode, start/stop/restart, keychain secrets. Depends on: Phase 95.
+- **Phase 98 (Planned)**: Cross-Platform Build + Release — goreleaser, Homebrew tap, curl installer, self-update. Depends on: Phase 97.
+- **Phase 99 (Planned)**: Onboarding + Polish — README rewrite, quickstart, demo mode, test framework portability. Depends on: Phase 98.
+- **Phase 100 (Planned)**: Deployable Package (Mac) — Integration test: `brew install mdemg` → `mdemg init` → working system. Depends on: Phase 99.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 
@@ -1917,6 +1938,90 @@ Main RSIC gap sets identified:
 - `docs/api/api-spec/uats/specs/prometheus_rsic_metrics.phase91.uats.json`
 - `docs/development/RSIC_GAP_ANALYSIS.md`
 
+### Deployable Package Phases (92-100)
+
+#### Phase 92: Gap Analysis — Deployable MDEMG Package (Complete)
+
+- ✅ Comprehensive gap analysis document: `docs/specs/phase92-gap-analysis.md`
+- ✅ 15 gap categories analyzed against Phase 100 requirements
+- ✅ Phase dependency graph and summary table
+- ✅ Phase 100 acceptance criteria defined
+- ✅ AGENT_HANDOFF.md updated with Phases 92-100
+
+**Supporting artifacts (docs + JSON):**
+- `docs/specs/phase92-gap-analysis.md`
+
+#### Phase 93: Unified CLI Foundation (Planned)
+
+- Merge 12 separate binaries (`cmd/server`, `cmd/mcp-server`, `cmd/ingest-codebase`, `cmd/consolidate`, `cmd/decay`, `cmd/prune`, `cmd/extract-symbols`, `cmd/watch`, `cmd/space-transfer`, `cmd/plugin-scaffold`, `cmd/plugin-validate`, `cmd/reset-db`) into single `mdemg` binary with Cobra subcommands.
+- Subcommands: `serve`, `init`, `ingest`, `mcp`, `consolidate`, `decay`, `prune`, `status`, `version`, `config`, `db`, `plugin`, `space`.
+- Shared flag groups, shell completion, global --verbose/--quiet/--config/--format flags.
+- **Effort**: XL | **Depends on**: Nothing — this is the foundation for all subsequent phases.
+
+#### Phase 94: Config Simplification + Project Init (Planned)
+
+- `mdemg.yaml` as primary config format with grouped sections (server, neo4j, embedding, learning, rsic, plugins).
+- Layered config resolution: defaults < config file < .env < env vars < CLI flags.
+- Profiles: `dev` (minimal) vs `production` (full config).
+- `mdemg config wizard/show/validate` commands.
+- `mdemg init` creates `.mdemg/config.yaml`, `.mdemgignore`, detects environment.
+- **Effort**: L | **Depends on**: Phase 93.
+
+#### Phase 95: Database + Embedding + Migrations (Planned)
+
+- `mdemg db start/stop/status/migrate/shell` commands.
+- Go-native migration runner reads `migrations/V*.cypher`, applies pending, updates `SchemaMeta`.
+- Lightweight Neo4j profile (1GB heap, 512MB page cache) for development.
+- `mdemg embeddings check` validates provider availability.
+- Remove manual `REQUIRED_SCHEMA_VERSION` env var.
+- **Effort**: L | **Depends on**: Phase 93.
+
+#### Phase 96: IDE + Repo Integration (Planned)
+
+- `mdemg init` writes IDE config files (`.cursor/mcp.json`, `.vscode/settings.json`, `.claude/mcp.json`).
+- MCP auto-starts with `mdemg serve`.
+- `mdemg hooks install --ide claude-code` for optional hook installation.
+- `.mdemgignore` convention (gitignore syntax), seeded from `.gitignore`.
+- `mdemg watch` CLI frontend for file-system watching.
+- **Effort**: M | **Depends on**: Phase 94.
+
+#### Phase 97: Process Lifecycle + Security (Planned)
+
+- `mdemg serve` (foreground, dev) and `mdemg start` (background daemon, PID file).
+- `mdemg stop/restart/status` for lifecycle management.
+- Neo4j container lifecycle integrated with daemon.
+- `mdemg config set-secret` uses platform keychain (macOS Keychain, Linux secret-tool).
+- Security model documentation.
+- **Effort**: M | **Depends on**: Phase 95.
+
+#### Phase 98: Cross-Platform Build + Release (Planned)
+
+- goreleaser configuration with CGO cross-compilation (Zig CC or Docker multi-arch).
+- Pre-built binaries: darwin/arm64, darwin/amd64, linux/amd64.
+- Homebrew tap + formula.
+- `curl -sSL ... | sh` installer script.
+- `mdemg version` with build-time SemVer embedding.
+- `mdemg upgrade` self-update command.
+- CI workflow: tag push → goreleaser → GitHub Release.
+- **Effort**: L | **Depends on**: Phase 97.
+
+#### Phase 99: Onboarding + Polish (Planned)
+
+- README rewritten for developer adopters (3-step quickstart).
+- `docs/quickstart.md` — 10-minute tutorial.
+- `mdemg demo` command with sample data.
+- UATS runner portability for adopter use.
+- FAQ and configuration examples.
+- **Effort**: M | **Depends on**: Phase 98.
+
+#### Phase 100: Deployable Package — Mac (Planned)
+
+- Integration test: `brew install mdemg` → `mdemg init` → `mdemg db start` → `mdemg ingest .` → working system.
+- 10 acceptance criteria verified (see `docs/specs/phase92-gap-analysis.md`).
+- **Effort**: S | **Depends on**: Phase 99.
+
+---
+
 ### UDTS (Active)
 
 | File | Tests |
@@ -2310,4 +2415,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-16 — 102 UATS specs, 172 variants, 172 passing (100%). Neo4j: 2 spaces, 20,041 nodes (whk-wms + mdemg-dev). Backup permanently enabled. Grafana Neo4j dashboard + 7 alert rules deployed. Phase 49 (LLM Plugin SDK) complete. Cross-space graph orphan cleanup endpoint operational. All phases through 80 complete.*
+*Last updated: 2026-02-23 — All phases through 91 complete. Phase 92 gap analysis produced Phases 93-100 roadmap for deployable MDEMG package. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. Neo4j: 2 spaces (whk-wms + mdemg-dev).*
