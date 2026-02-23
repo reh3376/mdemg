@@ -152,7 +152,9 @@ func LoadYAMLConfig(path string) error {
 			val = m.convert(val)
 		}
 		if val != "" {
-			os.Setenv(m.envVar, val)
+			if err := os.Setenv(m.envVar, val); err != nil {
+				return fmt.Errorf("set %s: %w", m.envVar, err)
+			}
 		}
 	}
 

@@ -77,6 +77,7 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.AddCommand(newSpaceCmd())
 	rootCmd.AddCommand(newPluginCmd())
 	rootCmd.AddCommand(newEmbeddingsCmd())
+	rootCmd.AddCommand(newHooksCmd())
 	rootCmd.AddCommand(newVersionCmd())
 
 	return rootCmd

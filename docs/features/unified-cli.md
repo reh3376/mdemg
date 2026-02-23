@@ -75,7 +75,7 @@ The wizard:
 2. Prompts for space ID, Neo4j URI, embedding provider
 3. Generates `.mdemg/config.yaml` and `.mdemgignore`
 4. Optionally installs a git post-commit hook
-5. Optionally writes IDE MCP configs (`.cursor/mcp.json`, `.vscode/mcp.json`)
+5. Optionally writes IDE MCP configs (`.cursor/mcp.json`, `.vscode/mcp.json`, `.claude/mcp.json`)
 
 Override specific settings:
 ```bash
@@ -652,15 +652,55 @@ This generates a complete plugin scaffold:
 
 ---
 
+## Git Hook Management
+
+Manage MDEMG git hooks for automatic code ingestion on commit.
+
+### Install
+
+```bash
+mdemg hooks install                      # Install with default space ID
+mdemg hooks install --space-id myproj    # Install with custom space ID
+mdemg hooks install --force              # Overwrite existing hook
+```
+
+### Uninstall
+
+```bash
+mdemg hooks uninstall                    # Remove MDEMG hooks only
+```
+
+Only removes hooks installed by MDEMG (identified by the `# MDEMG` marker). Non-MDEMG hooks are left untouched.
+
+### List
+
+```bash
+mdemg hooks list                         # Show hook status
+```
+
+See [docs/features/ide-repo-integration.md](ide-repo-integration.md) for full details.
+
+---
+
 ## MCP Server (IDE Integration)
 
-Start the MCP server for integration with AI coding assistants (Cursor, etc.):
+Start the MCP server for integration with AI coding assistants (Cursor, Claude Code, etc.):
 
 ```bash
 ./bin/mdemg mcp
 ```
 
 The MCP server runs in stdio mode for agent communication. It provides memory tools (recall, observe, ingest) through the Model Context Protocol.
+
+### Co-located with HTTP Server
+
+Start both the HTTP API and MCP server in one process:
+
+```bash
+./bin/mdemg serve --mcp
+```
+
+The MCP subprocess receives the correct `MDEMG_ENDPOINT` automatically. Both are shut down gracefully together.
 
 ---
 

@@ -32,9 +32,12 @@ mdemg serve
 
 # Ingest your codebase
 mdemg ingest --path .
+
+# Install git hook for automatic ingestion on commit
+mdemg hooks install
 ```
 
-`mdemg init` creates a `.mdemg/config.yaml` with your project settings and a `.mdemgignore` for exclusion patterns. `mdemg db start` launches a lightweight Neo4j container; `mdemg db migrate` applies schema migrations automatically. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
+`mdemg init` creates a `.mdemg/config.yaml` with your project settings, a `.mdemgignore` for exclusion patterns, and IDE MCP configs (Cursor, VS Code, Claude Code). `mdemg db start` launches a lightweight Neo4j container; `mdemg db migrate` applies schema migrations automatically. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
 
 ---
 
