@@ -234,6 +234,10 @@ type Config struct {
 	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
 	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 
+	// Phase 38: UNTS Hash Verification
+	UNTSEnabled  bool   // UNTS_ENABLED — enable hash verification REST API (default: false)
+	UNTSBasePath string // UNTS_BASE_PATH — repository root for file hashing (default: ".")
+
 	// Context Cooler tuning (Phase 45.5)
 	CoolerReinforcementWindowHours  int     // COOLER_REINFORCEMENT_WINDOW_HOURS — reinforcement window (default: 2)
 	CoolerStabilityIncreasePerReinf float64 // COOLER_STABILITY_INCREASE_PER_REINFORCEMENT (default: 0.15)
@@ -1244,6 +1248,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Phase 38: UNTS Hash Verification
+	untsEnabled := getBool("UNTS_ENABLED", false)
+	untsBasePath := get("UNTS_BASE_PATH", ".")
+
 	// Context Cooler tuning (Phase 45.5)
 	coolerReinfWindowHours, err := atoi("COOLER_REINFORCEMENT_WINDOW_HOURS", 2)
 	if err != nil {
@@ -1886,6 +1894,10 @@ func FromEnv() (Config, error) {
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:  rsicPersistenceEnabled,
 		SpacePruneIntervalHours: spacePruneIntervalHours,
+
+		// Phase 38: UNTS Hash Verification
+		UNTSEnabled:  untsEnabled,
+		UNTSBasePath: untsBasePath,
 
 		CoolerReinforcementWindowHours:  coolerReinfWindowHours,
 		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,

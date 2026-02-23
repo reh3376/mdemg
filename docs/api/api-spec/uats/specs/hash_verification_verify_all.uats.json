@@ -1,0 +1,55 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Verify All",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Verifies all tracked files against their expected hashes",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/verify-all",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {}
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.results",
+        "type": "array"
+      },
+      {
+        "path": "$.total",
+        "type": "integer"
+      },
+      {
+        "path": "$.verified",
+        "type": "integer"
+      },
+      {
+        "path": "$.mismatched",
+        "type": "integer"
+      }
+    ]
+  }
+}

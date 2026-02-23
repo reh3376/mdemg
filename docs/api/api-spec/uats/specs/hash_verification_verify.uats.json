@@ -1,0 +1,102 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Verify",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Verifies a single tracked file against its expected hash (registers first via base)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ],
+    "sequential": true
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "path": "test/verify-target.txt",
+      "framework": "manifest",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source": "manual"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.path",
+        "type": "string",
+        "value": "test/verify-target.txt"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "verify_registered",
+      "description": "Verify the file registered in base",
+      "request": {
+        "path": "/v1/hash-verification/verify",
+        "body": {
+          "path": "test/verify-target.txt"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.path",
+            "type": "string"
+          },
+          {
+            "path": "$.status",
+            "type": "string"
+          },
+          {
+            "path": "$.expected_hash",
+            "type": "string"
+          },
+          {
+            "path": "$.actual_hash",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "untracked_file",
+      "description": "Untracked file returns 404",
+      "request": {
+        "path": "/v1/hash-verification/verify",
+        "body": {
+          "path": "nonexistent/file.txt"
+        }
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification List",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Lists all tracked files with optional framework/status filters",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/hash-verification/files"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.files",
+        "type": "array"
+      },
+      {
+        "path": "$.total",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "filter_by_framework",
+      "description": "Filter files by framework",
+      "request": {
+        "path": "/v1/hash-verification/files?framework=manifest"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.files",
+            "type": "array"
+          },
+          {
+            "path": "$.total",
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  ]
+}

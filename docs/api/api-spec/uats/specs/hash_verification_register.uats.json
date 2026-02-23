@@ -1,0 +1,89 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification Register",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-23",
+    "description": "Registers a file for hash verification tracking",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "unts"
+    ]
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hash-verification/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "path": "docs/specs/manifest.sha256",
+      "framework": "manifest",
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_ref": "",
+      "source": "manual"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.path",
+        "type": "string",
+        "value": "docs/specs/manifest.sha256"
+      },
+      {
+        "path": "$.framework",
+        "type": "string",
+        "value": "manifest"
+      },
+      {
+        "path": "$.current_hash",
+        "type": "string"
+      },
+      {
+        "path": "$.status",
+        "type": "string"
+      },
+      {
+        "path": "$.updated_at",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_path",
+      "description": "Missing path field returns 400",
+      "request": {
+        "body": {
+          "path": "",
+          "framework": "manifest",
+          "hash": "abc123"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

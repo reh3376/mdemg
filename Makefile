@@ -148,3 +148,19 @@ test-rsic-uats:
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--include-tag rsic
+
+# ============================================================
+# UNTS Testing Targets
+# ============================================================
+.PHONY: test-unts test-unts-uats
+
+test-unts:
+	@echo "Running UNTS unit tests..."
+	go test -v ./internal/unts/...
+
+test-unts-uats:
+	@echo "Running UNTS UATS contract tests..."
+	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+		--spec-dir docs/api/api-spec/uats/specs/ \
+		--base-url $(BASE_URL) \
+		--include-tag unts
