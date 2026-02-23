@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-02-23 (All phases complete through Phase 91. Phase D validated. Space Pruning Framework + auto-prune scheduler. Security hardening complete: gosec, gitleaks, error sanitization. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
+**Updated**: 2026-02-23 (All phases complete through Phase 91. Phase 92 gap analysis complete — Phases 93-100 roadmap for deployable MDEMG package. Phase D validated. Space Pruning Framework + auto-prune scheduler. Security hardening complete: gosec, gitleaks, error sanitization. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved 0.733, Edge Attention achieved **0.898 avg score** (+58.4% from v4 baseline, 100% high-score rate)
@@ -1474,6 +1474,53 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 - [x] Retrieval returns concern/comparison nodes when appropriate
 - [x] Generated summaries are accurate and useful
 - [x] No regression in high-performing categories (data flow: 0.719, minor -0.7%)
+
+---
+
+## Phases 92-100: Deployable MDEMG Package Roadmap
+
+**Added**: 2026-02-23
+**Gap Analysis**: `docs/specs/phase92-gap-analysis.md`
+**Goal**: Package MDEMG as a developer tool installable via `brew install mdemg` or curl installer.
+
+### Phase Dependency Chain
+
+```
+92 (Gap Analysis) → 93 (Unified CLI) → 94 (Config + Init) → 96 (IDE + Repo)
+                                     → 95 (DB + Embed)    → 97 (Lifecycle + Security)
+                                                           → 98 (Build + Release)
+                                                           → 99 (Onboarding)
+                                                           → 100 (Deployable Package)
+```
+
+### Phase Summary
+
+| Phase | Name | Effort | Status |
+|-------|------|--------|--------|
+| 92 | Gap Analysis | S | ✅ Complete |
+| 93 | Unified CLI Foundation (Cobra, merge 12 binaries) | XL | 📋 Planned |
+| 94 | Config Simplification + Project Init (YAML, mdemg init) | L | 📋 Planned |
+| 95 | Database + Embedding + Migrations (Go runner, managed Neo4j) | L | 📋 Planned |
+| 96 | IDE + Repo Integration (MCP auto-config, .mdemgignore) | M | 📋 Planned |
+| 97 | Process Lifecycle + Security (daemon, keychain) | M | 📋 Planned |
+| 98 | Cross-Platform Build + Release (goreleaser, Homebrew) | L | 📋 Planned |
+| 99 | Onboarding + Polish (quickstart, demo, FAQ) | M | 📋 Planned |
+| 100 | Deployable Package — Mac (integration test) | S | 📋 Planned |
+
+### Phase 100 Acceptance Criteria
+
+1. `brew install mdemg` succeeds on macOS (arm64 + amd64)
+2. `mdemg init` in a fresh git repo creates `.mdemg/`, detects environment
+3. `mdemg db start` launches Neo4j; `mdemg db migrate` applies schemas
+4. `mdemg ingest .` indexes the codebase
+5. `mdemg start` runs server + MCP in background
+6. IDE can discover and use MCP tools
+7. CMS observe/resume endpoints work
+8. Retrieval returns relevant results
+9. RSIC cycle runs on schedule
+10. `mdemg upgrade` self-updates
+
+See `docs/specs/phase92-gap-analysis.md` for the complete 15-gap analysis with current state, required state, effort estimates, and dependencies.
 
 ---
 
