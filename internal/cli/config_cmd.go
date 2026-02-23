@@ -205,7 +205,7 @@ func testNeo4jReachable(uri string) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 

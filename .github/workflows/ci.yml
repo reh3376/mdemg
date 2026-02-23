@@ -74,33 +74,15 @@ jobs:
           # Additional wait for Neo4j to fully initialize
           sleep 5
 
+      - name: Build unified CLI
+        run: go build -o bin/mdemg ./cmd/mdemg
+
       - name: Apply Neo4j migrations
         run: |
-          # Install cypher-shell
-          wget -q https://dist.neo4j.org/cypher-shell/cypher-shell-5.15.0.zip -O /tmp/cypher-shell.zip
-          unzip -q /tmp/cypher-shell.zip -d /tmp
-          chmod +x /tmp/cypher-shell-5.15.0/bin/cypher-shell
-
-          # Apply each migration in order
-          for migration in migrations/V*.cypher; do
-            echo "Applying $migration..."
-            /tmp/cypher-shell-5.15.0/bin/cypher-shell \
-              -a bolt://localhost:7687 \
-              -u neo4j \
-              -p testpassword \
-              --file "$migration"
-          done
-
-          # Verify schema version
-          echo "Verifying schema version..."
-          /tmp/cypher-shell-5.15.0/bin/cypher-shell \
-            -a bolt://localhost:7687 \
-            -u neo4j \
-            -p testpassword \
-            "MATCH (s:SchemaMeta {key:'schema'}) RETURN s.current_version AS version"
-
-      - name: Build unified CLI for integration tests
-        run: go build -o bin/mdemg ./cmd/mdemg
+          export NEO4J_URI=bolt://localhost:7687
+          export NEO4J_USER=neo4j
+          export NEO4J_PASS=testpassword
+          ./bin/mdemg db migrate
 
       - name: Start MDEMG server
         run: |
@@ -112,7 +94,6 @@ jobs:
           export PORT_RANGE_END=10099
           export PORT_FILE_PATH=.mdemg.port
           export EMBEDDING_PROVIDER=
-          export REQUIRED_SCHEMA_VERSION=10
           ./bin/mdemg serve &
 
           # Wait for port file (server writes it after binding)

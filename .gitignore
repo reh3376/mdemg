@@ -101,6 +101,8 @@ backups/
 
 # Build artifacts (binary in repo root, not cmd/mdemg/ source)
 /mdemg
+/extract-symbols
+/watch
 
 # Neo4j data
 mdemg_neo4j/

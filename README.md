@@ -17,18 +17,27 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 # Build the CLI
 make build-cli
 
+# Start a local Neo4j (requires Docker)
+mdemg db start
+
+# Apply database migrations
+mdemg db migrate
+
 # Initialize in your project directory
 cd /path/to/your/project
 mdemg init
 
-# Start the server (requires Neo4j running on localhost:7687)
+# Start the server
 mdemg serve
 
 # Ingest your codebase
 mdemg ingest --path .
+
+# Install git hook for automatic ingestion on commit
+mdemg hooks install
 ```
 
-`mdemg init` creates a `.mdemg/config.yaml` with your project settings and a `.mdemgignore` for exclusion patterns. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
+`mdemg init` creates a `.mdemg/config.yaml` with your project settings, a `.mdemgignore` for exclusion patterns, and IDE MCP configs (Cursor, VS Code, Claude Code). `mdemg db start` launches a lightweight Neo4j container; `mdemg db migrate` applies schema migrations automatically. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
 
 ---
 

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -216,7 +215,7 @@ func runInit(flags initFlags) error {
 			installHook = answer == "yes"
 		}
 		if installHook {
-			if err := installGitHook(cwd, opts.SpaceID); err != nil {
+			if err := InstallGitHook(cwd, opts.SpaceID, false); err != nil {
 				fmt.Printf("  Warning: git hook installation failed: %v\n", err)
 			} else {
 				fmt.Println("  Installed .git/hooks/post-commit")
@@ -227,7 +226,7 @@ func runInit(flags initFlags) error {
 	// IDE integration
 	if !flags.noIDE {
 		installIDE := false
-		if env.hasCursor || env.hasVSCode {
+		if env.hasCursor || env.hasVSCode || env.hasClaude {
 			if flags.defaults {
 				installIDE = true
 			} else {
@@ -237,6 +236,9 @@ func runInit(flags initFlags) error {
 				}
 				if env.hasVSCode {
 					ides = append(ides, "VS Code")
+				}
+				if env.hasClaude {
+					ides = append(ides, "Claude Code")
 				}
 				answer := promptLine(
 					fmt.Sprintf("Configure MCP for %s? (yes/no) [yes]", strings.Join(ides, ", ")),
@@ -271,11 +273,12 @@ func runInit(flags initFlags) error {
 
 // environmentInfo holds detection results.
 type environmentInfo struct {
-	neo4jReachable bool
+	neo4jReachable  bool
 	ollamaReachable bool
-	isGitRepo      bool
-	hasCursor      bool
-	hasVSCode      bool
+	isGitRepo       bool
+	hasCursor       bool
+	hasVSCode       bool
+	hasClaude       bool
 }
 
 func detectEnvironment(dir string) environmentInfo {
@@ -284,7 +287,7 @@ func detectEnvironment(dir string) environmentInfo {
 	// Detect Neo4j
 	conn, err := net.DialTimeout("tcp", "localhost:7687", 2*time.Second)
 	if err == nil {
-		conn.Close()
+		_ = conn.Close()
 		env.neo4jReachable = true
 	}
 
@@ -308,6 +311,9 @@ func detectEnvironment(dir string) environmentInfo {
 	if _, err := os.Stat(filepath.Join(dir, ".vscode")); err == nil {
 		env.hasVSCode = true
 	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude")); err == nil {
+		env.hasClaude = true
+	}
 
 	return env
 }
@@ -322,51 +328,6 @@ func promptLine(prompt, defaultVal string) string {
 		}
 	}
 	return defaultVal
-}
-
-// installGitHook creates a minimal post-commit hook that calls mdemg ingest.
-func installGitHook(repoDir, spaceID string) error {
-	hookDir := filepath.Join(repoDir, ".git", "hooks")
-	hookPath := filepath.Join(hookDir, "post-commit")
-
-	// Don't overwrite existing hooks
-	if _, err := os.Stat(hookPath); err == nil {
-		return fmt.Errorf("post-commit hook already exists (use scripts/install-git-hook --force to overwrite)")
-	}
-
-	hook := fmt.Sprintf(`#!/bin/bash
-# MDEMG auto-ingestion hook (installed by mdemg init)
-# Set MDEMG_DISABLED=true to temporarily disable
-
-if [ "$MDEMG_DISABLED" = "true" ]; then exit 0; fi
-
-REPO_ROOT=$(git rev-parse --show-toplevel)
-SPACE_ID="${MDEMG_SPACE_ID:-%s}"
-
-# Find mdemg binary
-if command -v mdemg &> /dev/null; then
-    MDEMG_BIN="mdemg"
-elif [ -f "$REPO_ROOT/bin/mdemg" ]; then
-    MDEMG_BIN="$REPO_ROOT/bin/mdemg"
-else
-    exit 0  # silently skip if mdemg not found
-fi
-
-# Run incremental ingestion in background
-nohup "$MDEMG_BIN" ingest \
-    --path "$REPO_ROOT" \
-    --space-id "$SPACE_ID" \
-    --incremental \
-    --since "HEAD~1" \
-    --archive-deleted \
-    --quiet \
-    > /dev/null 2>&1 &
-`, spaceID)
-
-	if err := os.MkdirAll(hookDir, 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(hookPath, []byte(hook), 0755)
 }
 
 // writeIDEConfigs updates MCP configuration for detected IDEs.
@@ -407,23 +368,16 @@ func writeIDEConfigs(dir string, port int, env environmentInfo) []string {
 		}
 	}
 
-	return written
-}
-
-// countMigrations counts the number of V*.cypher migration files
-// to determine the current schema version.
-func countMigrations() int {
-	patterns := []string{
-		"migrations/V*.cypher",
-		"../migrations/V*.cypher",
-	}
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err == nil && len(matches) > 0 {
-			return len(matches)
+	if env.hasClaude {
+		mcpPath := filepath.Join(dir, ".claude", "mcp.json")
+		if _, err := os.Stat(mcpPath); os.IsNotExist(err) {
+			if err := os.WriteFile(mcpPath, []byte(mcpConfig), 0644); err == nil {
+				written = append(written, mcpPath)
+			}
 		}
 	}
-	return 17 // fallback to known current version
+
+	return written
 }
 
 // ParseIgnoreFile reads a .mdemgignore file and returns the list of patterns.
@@ -461,9 +415,3 @@ func FindIgnoreFile(startDir string) string {
 	return ""
 }
 
-// portFromString converts a ":PORT" or "PORT" string to an int.
-func portFromString(s string) int {
-	s = strings.TrimPrefix(s, ":")
-	n, _ := strconv.Atoi(s)
-	return n
-}

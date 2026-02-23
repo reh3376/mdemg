@@ -395,8 +395,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 92**: `docs/specs/phase92-gap-analysis.md` — Full gap analysis with 15 categories, dependency graph, and Phase 93-100 roadmap.
 - **Phase 93**: `docs/specs/phase93-unified-cli-foundation.md` | Go: `cmd/mdemg/main.go`, `internal/cli/root.go`, `internal/cli/version.go`, `internal/cli/serve.go`, `internal/cli/mcp.go`, `internal/cli/ingest.go`, `internal/cli/consolidate.go`, `internal/cli/decay.go`, `internal/cli/prune.go`, `internal/cli/extract_symbols.go`, `internal/cli/watch.go`, `internal/cli/db.go`, `internal/cli/space.go`, `internal/cli/plugin.go`, `internal/cli/neo4jutil/conversions.go`. Make: `build-cli` target. CI: unified build + `mdemg serve`.
 - **Phase 94**: `docs/specs/phase94-config-project-init.md` | Go: `internal/config/yaml_config.go` (YAML loader, ignore patterns), `internal/cli/config_loader.go` (shared loadConfig), `internal/cli/init.go` (init wizard), `internal/cli/config_cmd.go` (config show/validate). Modified: `internal/cli/root.go`, `serve.go`, `db.go`, `ingest.go`, `consolidate.go`, `decay.go`, `prune.go`, `space.go` (YAML+godotenv wiring). Housekeeping: `.env.example` (schema 4→17), `scripts/mdemg-git-hook` (prefer mdemg ingest).
-- **Phase 95 (Planned)**: Database + Embedding + Migrations — Go-native migration runner, managed Neo4j, embedder validation. Depends on: Phase 93.
-- **Phase 96 (Planned)**: IDE + Repo Integration — MCP auto-config, `.mdemgignore`, hooks CLI, file watching CLI. Depends on: Phase 94.
+- **Phase 95 (Complete)**: Database + Embedding + Migrations — Go-native migration runner with embedded `*.cypher` files, `mdemg db migrate/start/stop/status/shell` commands, `mdemg embeddings check`, `--auto-migrate` on serve, `REQUIRED_SCHEMA_VERSION` auto-detection, CI simplified (no cypher-shell). Spec: `docs/specs/phase95-database-embedding-migrations.md`. Feature: `docs/features/database-embedding-migrations.md`.
+- **Phase 96 (Complete)**: IDE + Repo Integration — `mdemg hooks install/uninstall/list`, `.claude/mcp.json` generation, `mdemg serve --mcp` subprocess. Spec: `docs/specs/phase96-ide-repo-integration.md`. Feature: `docs/features/ide-repo-integration.md`.
 - **Phase 97 (Planned)**: Process Lifecycle + Security — Daemon mode, start/stop/restart, keychain secrets. Depends on: Phase 95.
 - **Phase 98 (Planned)**: Cross-Platform Build + Release — goreleaser, Homebrew tap, curl installer, self-update. Depends on: Phase 97.
 - **Phase 99 (Planned)**: Onboarding + Polish — README rewrite, quickstart, demo mode, test framework portability. Depends on: Phase 98.
@@ -1967,22 +1967,27 @@ Main RSIC gap sets identified:
 - `mdemg init` creates `.mdemg/config.yaml`, `.mdemgignore`, detects environment.
 - **Effort**: L | **Depends on**: Phase 93.
 
-#### Phase 95: Database + Embedding + Migrations (Planned)
+#### Phase 95: Database + Embedding + Migrations (Complete)
 
-- `mdemg db start/stop/status/migrate/shell` commands.
-- Go-native migration runner reads `migrations/V*.cypher`, applies pending, updates `SchemaMeta`.
-- Lightweight Neo4j profile (1GB heap, 512MB page cache) for development.
-- `mdemg embeddings check` validates provider availability.
-- Remove manual `REQUIRED_SCHEMA_VERSION` env var.
+- `mdemg db migrate` — Go-native migration runner with embedded `*.cypher` files (`//go:embed`). Statement splitting handles `CALL {} IN TRANSACTIONS` blocks. Idempotent re-application. Flags: `--status`, `--dry-run`, `--migrations-dir`.
+- `mdemg db start/stop/status/shell` — Docker container management. Lightweight dev profile (1GB heap, 512MB page cache). Container: `mdemg-neo4j-dev`, volume: `mdemg-neo4j-data`.
+- `mdemg embeddings check` — actual test embedding (not just probe). Reports dimensions, provider status.
+- `mdemg serve --auto-migrate` — applies pending migrations before starting.
+- `REQUIRED_SCHEMA_VERSION` auto-detects from `migrations.MaxVersion()` if unset.
+- CI simplified: replaced cypher-shell download + loop with `./bin/mdemg db migrate`.
+- 10 unit tests in `internal/db/migrate_test.go`.
+- **Spec**: `docs/specs/phase95-database-embedding-migrations.md`
+- **Feature**: `docs/features/database-embedding-migrations.md`
 - **Effort**: L | **Depends on**: Phase 93.
 
-#### Phase 96: IDE + Repo Integration (Planned)
+#### Phase 96: IDE + Repo Integration (Complete)
 
-- `mdemg init` writes IDE config files (`.cursor/mcp.json`, `.vscode/settings.json`, `.claude/mcp.json`).
-- MCP auto-starts with `mdemg serve`.
-- `mdemg hooks install --ide claude-code` for optional hook installation.
-- `.mdemgignore` convention (gitignore syntax), seeded from `.gitignore`.
-- `mdemg watch` CLI frontend for file-system watching.
+- `mdemg hooks install/uninstall/list` — standalone git hook management with `--force`, `--space-id`, `--type` flags. Shared `InstallGitHook()` used by both `mdemg init` and `mdemg hooks install`.
+- `.claude/mcp.json` generation — `mdemg init` now detects Claude Code (`.claude/` dir) and writes MCP config alongside Cursor and VS Code configs.
+- `mdemg serve --mcp` — launches MCP server as a subprocess with correct `MDEMG_ENDPOINT`. Graceful shutdown of both HTTP and MCP processes.
+- Pre-existing lint fixes: 3 `errcheck` violations resolved (`conn.Close()`, `os.Setenv()`).
+- **Spec**: `docs/specs/phase96-ide-repo-integration.md`
+- **Feature**: `docs/features/ide-repo-integration.md`
 - **Effort**: M | **Depends on**: Phase 94.
 
 #### Phase 97: Process Lifecycle + Security (Planned)

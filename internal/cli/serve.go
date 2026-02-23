@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -19,11 +20,14 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/db"
 	"mdemg/internal/plugins"
+	"mdemg/migrations"
 )
 
 func newServeCmd() *cobra.Command {
 	var port int
 	var dbURI string
+	var autoMigrate bool
+	var mcpEnabled bool
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -37,6 +41,7 @@ The server will:
   - Load configuration from .env file (if present)
   - Apply CLI flag overrides (--port, --db-uri)
   - Connect to Neo4j database
+  - Apply pending migrations (if --auto-migrate)
   - Verify schema version
   - Initialize plugin manager (if enabled)
   - Start periodic background tasks (consolidation, sync, RSIC, pruning)
@@ -45,17 +50,19 @@ The server will:
 
 See config.FromEnv() for the full list of environment variable options.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(cmd, args, port, dbURI)
+			return runServe(cmd, args, port, dbURI, autoMigrate, mcpEnabled)
 		},
 	}
 
 	cmd.Flags().IntVar(&port, "port", 0, "Listen port (overrides LISTEN_ADDR env var)")
 	cmd.Flags().StringVar(&dbURI, "db-uri", "", "Neo4j URI (overrides NEO4J_URI env var)")
+	cmd.Flags().BoolVar(&autoMigrate, "auto-migrate", false, "Apply pending database migrations before starting")
+	cmd.Flags().BoolVar(&mcpEnabled, "mcp", false, "Start MCP server subprocess alongside HTTP server")
 
 	return cmd
 }
 
-func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
+func runServe(cmd *cobra.Command, args []string, port int, dbURI string, autoMigrate bool, mcpEnabled bool) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
@@ -74,6 +81,17 @@ func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 	defer driver.Close(context.Background())
+
+	// Auto-migrate if requested
+	if autoMigrate {
+		applied, migrateErr := db.RunMigrations(context.Background(), driver, migrations.FS)
+		if migrateErr != nil {
+			return fmt.Errorf("auto-migrate failed: %w", migrateErr)
+		}
+		if applied > 0 {
+			log.Printf("auto-migrate: applied %d migration(s)", applied)
+		}
+	}
 
 	// Readiness check: schema version
 	if err := db.AssertSchemaVersion(context.Background(), driver, cfg.RequiredSchemaVersion); err != nil {
@@ -154,6 +172,26 @@ func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
 		log.Printf("port file written: %s", portFile)
 	}
 
+	// Start MCP subprocess if requested
+	var mcpCmd *exec.Cmd
+	if mcpEnabled {
+		mcpBin, err := os.Executable()
+		if err != nil {
+			mcpBin = "mdemg"
+		}
+		mcpCmd = exec.Command(mcpBin, "mcp")
+		mcpCmd.Env = append(os.Environ(), fmt.Sprintf("MDEMG_ENDPOINT=http://localhost:%s", portStr))
+		mcpCmd.Stdin = os.Stdin
+		mcpCmd.Stdout = os.Stdout
+		mcpCmd.Stderr = os.Stderr
+		if err := mcpCmd.Start(); err != nil {
+			log.Printf("warning: failed to start MCP subprocess: %v", err)
+			mcpCmd = nil
+		} else {
+			log.Printf("MCP server started (pid=%d, endpoint=http://localhost:%s)", mcpCmd.Process.Pid, portStr)
+		}
+	}
+
 	// Set up graceful shutdown
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
@@ -205,7 +243,20 @@ func runServe(cmd *cobra.Command, args []string, port int, dbURI string) error {
 			}
 		}
 
-		// Step 4: Remove port file
+		// Step 4: Stop MCP subprocess
+		if mcpCmd != nil && mcpCmd.Process != nil {
+			log.Println("stopping MCP subprocess...")
+			_ = mcpCmd.Process.Signal(syscall.SIGTERM)
+			done := make(chan error, 1)
+			go func() { done <- mcpCmd.Wait() }()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				_ = mcpCmd.Process.Kill()
+			}
+		}
+
+		// Step 5: Remove port file
 		os.Remove(portFile)
 	}()
 

@@ -152,7 +152,9 @@ func LoadYAMLConfig(path string) error {
 			val = m.convert(val)
 		}
 		if val != "" {
-			os.Setenv(m.envVar, val)
+			if err := os.Setenv(m.envVar, val); err != nil {
+				return fmt.Errorf("set %s: %w", m.envVar, err)
+			}
 		}
 	}
 
@@ -279,7 +281,7 @@ func ValidateConfigFile(path string) []ConfigError {
 		errs = append(errs, ConfigError{Field: "neo4j.uri", Message: "not set (required for server to start)", Level: "warning"})
 	}
 	if cfg.Schema.Version == 0 && os.Getenv("REQUIRED_SCHEMA_VERSION") == "" {
-		errs = append(errs, ConfigError{Field: "schema.version", Message: "not set (required for server to start)", Level: "warning"})
+		errs = append(errs, ConfigError{Field: "schema.version", Message: "not set (will auto-detect from embedded migrations)", Level: "info"})
 	}
 
 	return errs
