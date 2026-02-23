@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -409,7 +410,8 @@ func (s *Server) handleSelfImproveRollback(w http.ResponseWriter, r *http.Reques
 			SnapshotID string `json:"snapshot_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			log.Printf("ERROR [rollback JSON]: %v", err)
+			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 		if req.SnapshotID == "" {
@@ -419,9 +421,10 @@ func (s *Server) handleSelfImproveRollback(w http.ResponseWriter, r *http.Reques
 
 		result, err := s.snapshotStore.Rollback(r.Context(), req.SnapshotID)
 		if err != nil {
+			log.Printf("ERROR [rollback %s]: %v", req.SnapshotID, err)
 			writeJSON(w, http.StatusNotFound, map[string]any{
 				"rolled_back":         false,
-				"error":               err.Error(),
+				"error":               "snapshot not found or rollback window expired",
 				"rollback_window_sec": s.cfg.RSICRollbackWindow,
 			})
 			return

@@ -12,6 +12,7 @@ linters:
     - errcheck
     - ineffassign
     - unused
+    - gosec
   settings:
     errcheck:
       exclude-functions:
@@ -39,6 +40,19 @@ linters:
         - "-QF*"       # disable quickfix suggestions (style, not bugs)
         - "-ST*"       # disable style enforcement
         - "-S1*"       # disable simple suggestions
+    gosec:
+      excludes:
+        - G104         # unhandled errors — covered by errcheck with exclusions
+        - G115         # integer overflow conversion — false positives on safe casts
+        - G117         # exported secret fields — config structs intentionally hold secrets
+        - G204         # subprocess with variable — intentional exec for docker/git/ingest
+        - G301         # directory permissions 0755 — standard for runtime directories
+        - G304         # file inclusion via variable — expected for file-serving CLIs
+        - G306         # WriteFile permissions >0600 — 0644 is standard for logs/ports
+        - G404         # weak random for jitter — crypto/rand not needed for delay jitter
+        - G703         # path traversal — plugin paths are constructed from validated config
+        - G704         # SSRF via taint — HTTP clients call configured, trusted endpoints
+        - G706         # log injection — internal log lines use controlled values; log forging is low-risk
     govet:
       enable:
         - nilness
@@ -57,6 +71,7 @@ linters:
           - staticcheck
           - ineffassign
           - unused
+          - gosec
       # Exclude generated protobuf files
       - path: \.pb\.go
         linters:
@@ -68,12 +83,14 @@ linters:
           - staticcheck
           - ineffassign
           - unused
+          - gosec
       - path: ^plugins/
         linters:
           - errcheck
           - staticcheck
           - ineffassign
           - unused
+          - gosec
 
 issues:
   max-issues-per-linter: 0

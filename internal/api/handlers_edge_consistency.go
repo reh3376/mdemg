@@ -21,7 +21,7 @@ func (s *Server) handleStaleEdgeStats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := s.retriever.GetStaleEdgeStats(r.Context(), spaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "stale edge stats")
 		return
 	}
 
@@ -52,7 +52,7 @@ func (s *Server) handleRefreshStaleEdges(w http.ResponseWriter, r *http.Request)
 
 	refreshed, err := s.retriever.RefreshAllStaleEdges(r.Context(), req.SpaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "refresh stale edges")
 		return
 	}
 

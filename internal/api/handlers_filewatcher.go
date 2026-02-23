@@ -38,7 +38,7 @@ func (s *Server) handleFileWatcherStart(w http.ResponseWriter, r *http.Request) 
 	// Resolve to absolute path
 	absPath, err := filepath.Abs(req.Path)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid path: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid path"})
 		return
 	}
 
