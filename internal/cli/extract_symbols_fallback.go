@@ -2311,7 +2311,6 @@ func parseMarkdown(filePath string) ([]fallbackSymbol, bool, error) {
 				}
 			} else {
 				inCodeBlock = false
-				codeBlockLang = ""
 			}
 			continue
 		}

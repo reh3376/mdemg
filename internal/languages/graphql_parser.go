@@ -109,7 +109,6 @@ var (
 	// Fields and enum values
 	gqlFieldPattern     = regexp.MustCompile(`(?m)^\s*(\w+)(?:\s*\([^)]*\))?\s*:\s*(\[?\w+!?\]?!?)`)
 	gqlEnumValuePattern = regexp.MustCompile(`(?m)^\s*([A-Z][A-Z0-9_]*)(?:\s|$)`)
-	gqlArgumentPattern  = regexp.MustCompile(`(\w+)\s*:\s*([\w\[\]!]+)(?:\s*=\s*([^,)]+))?`)
 
 	// Query/Mutation operations
 	gqlQueryOpPattern    = regexp.MustCompile(`(?m)^\s*query\s+(\w+)`)

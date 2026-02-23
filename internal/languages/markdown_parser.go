@@ -89,9 +89,6 @@ var (
 
 	// Links: [text](url)
 	mdLinkPattern = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-
-	// Frontmatter: ---\n...\n---
-	mdFrontmatterPattern = regexp.MustCompile(`(?s)^---\n(.+?)\n---`)
 )
 
 // ExtractSymbols parses markdown content and returns UPTS-validated symbols.
@@ -125,7 +122,6 @@ func (p *MarkdownParser) ExtractSymbols(content string) []Symbol {
 			} else {
 				// Ending a code block
 				inCodeBlock = false
-				codeBlockLang = ""
 			}
 			continue
 		}
@@ -148,11 +144,8 @@ func (p *MarkdownParser) ExtractSymbols(content string) []Symbol {
 			// Determine parent from heading stack
 			parent := ""
 			if level > 1 && len(headingStack) > 0 {
-				// Find the nearest higher-level heading
-				for i := len(headingStack) - 1; i >= 0; i-- {
-					parent = headingStack[i]
-					break
-				}
+				// Get the nearest higher-level heading (last element in stack)
+				parent = headingStack[len(headingStack)-1]
 			}
 
 			// Update heading stack

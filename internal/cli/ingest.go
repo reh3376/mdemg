@@ -92,7 +92,7 @@ func newIngestCmd() *cobra.Command {
 	// Info flags
 	cmd.Flags().BoolVar(&cfg.listLanguages, "list-languages", false, "List supported languages and exit")
 
-	cmd.MarkFlagRequired("path")
+	_ = cmd.MarkFlagRequired("path")
 
 	return cmd
 }
@@ -365,7 +365,7 @@ type gitDiffResult struct {
 func runIngest(cfg *ingestConfig) error {
 	// Log output priority
 	if cfg.logFile != "" {
-		f, err := os.OpenFile(cfg.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		f, err := os.OpenFile(cfg.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return fmt.Errorf("failed to open log file %s: %v", cfg.logFile, err)
 		}
@@ -1198,17 +1198,25 @@ func generateSummaryAdapter(elem summarize.CodeElement) string {
 	})
 }
 
+// titleCase capitalizes the first letter of a string.
+func titleCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 func generateSummary(elem codeElement) string {
 	var summary strings.Builder
 	maxLen := 700
 
 	switch elem.Kind {
 	case "package", "config":
-		summary.WriteString(fmt.Sprintf("%s: %s", strings.Title(elem.Kind), elem.Name))
+		summary.WriteString(fmt.Sprintf("%s: %s", titleCase(elem.Kind), elem.Name))
 	case "function", "method":
-		summary.WriteString(fmt.Sprintf("%s %s", strings.Title(elem.Kind), elem.Name))
+		summary.WriteString(fmt.Sprintf("%s %s", titleCase(elem.Kind), elem.Name))
 	case "struct", "interface", "type":
-		summary.WriteString(fmt.Sprintf("%s %s", strings.Title(elem.Kind), elem.Name))
+		summary.WriteString(fmt.Sprintf("%s %s", titleCase(elem.Kind), elem.Name))
 	case "const", "var":
 		summary.WriteString(fmt.Sprintf("Constant %s", elem.Name))
 	case "export":

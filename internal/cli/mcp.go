@@ -489,7 +489,7 @@ func (m *mcpServer) memoryStatusHandler(ctx context.Context, request mcp.CallToo
 
 	body, _ := io.ReadAll(resp.Body)
 	var status map[string]any
-	json.Unmarshal(body, &status)
+	_ = json.Unmarshal(body, &status)
 
 	var sb strings.Builder
 	sb.WriteString("MDEMG Memory System Status\n\n")

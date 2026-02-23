@@ -118,8 +118,8 @@ This command creates all necessary files for a new MDEMG plugin including:
 	cmd.Flags().StringVar(&outputDir, "output", "./plugins", "Output directory for the plugin")
 	cmd.Flags().StringVar(&version, "version", "1.0.0", "Initial version for the plugin")
 
-	cmd.MarkFlagRequired("name")
-	cmd.MarkFlagRequired("type")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("type")
 
 	return cmd
 }

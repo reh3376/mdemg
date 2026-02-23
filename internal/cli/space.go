@@ -203,7 +203,7 @@ func newSpaceImportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.input, "input", "", "Input .mdemg file path (required)")
 	cmd.Flags().StringVar(&cfg.conflict, "conflict", "skip", "On node collision: skip | overwrite | error")
 
-	cmd.MarkFlagRequired("input")
+	_ = cmd.MarkFlagRequired("input")
 
 	return cmd
 }
@@ -408,7 +408,7 @@ func runSpaceServe(ctx context.Context, cfg *serveConfig) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	defer lis.Close()
+	defer func() { _ = lis.Close() }()
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterSpaceTransferServer(grpcServer, transfer.NewGRPCServer(driver))
@@ -454,7 +454,7 @@ func newSpacePullCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to pull (or set MDEMG_SPACE_ID)")
 	cmd.Flags().StringVar(&cfg.output, "output", "", "Output .mdemg file path (default: <space-id>.mdemg)")
 
-	cmd.MarkFlagRequired("remote")
+	_ = cmd.MarkFlagRequired("remote")
 
 	return cmd
 }
@@ -695,8 +695,8 @@ Examples:
 
 	cmd.Flags().StringVar(&cfg.from, "from", "", "Current space ID (required)")
 	cmd.Flags().StringVar(&cfg.to, "to", "", "New space ID (required)")
-	cmd.MarkFlagRequired("from")
-	cmd.MarkFlagRequired("to")
+	_ = cmd.MarkFlagRequired("from")
+	_ = cmd.MarkFlagRequired("to")
 
 	return cmd
 }
@@ -796,8 +796,8 @@ Examples:
 
 	cmd.Flags().StringVar(&cfg.from, "from", "", "Source space ID (required)")
 	cmd.Flags().StringVar(&cfg.to, "to", "", "Target space ID (required)")
-	cmd.MarkFlagRequired("from")
-	cmd.MarkFlagRequired("to")
+	_ = cmd.MarkFlagRequired("from")
+	_ = cmd.MarkFlagRequired("to")
 
 	return cmd
 }

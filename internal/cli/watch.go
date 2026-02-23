@@ -97,7 +97,7 @@ func runWatch(cfg *watchConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	// Create debouncer
 	deb := newFileDebouncer(
@@ -268,6 +268,7 @@ func ingestFiles(endpoint, spaceID string, files []string) {
 	backoff := 1 * time.Second
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		//nolint:gosec // URL constructed from user-configured endpoint
 		resp, reqErr := http.Post(url, "application/json", bytes.NewReader(body))
 		if reqErr != nil {
 			log.Printf("mdemg-watch: ingest request failed (attempt %d/%d): %v", attempt, maxRetries, reqErr)
