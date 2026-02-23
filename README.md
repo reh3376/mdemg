@@ -454,6 +454,8 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| — | Space Pruning Framework (admin API, auto-prune scheduler, UATS specs) | ✅ Complete |
+| D | Validation (2nd codebase benchmark, 28K scale test, architecture docs) | ✅ Complete |
 | 91 | RSIC Observability & Operations (Prometheus metrics, Grafana dashboard, alert rules) | ✅ Complete |
 | 90 | RSIC Conformance & CI Gating (integration tests, CI split, tag filtering) | ✅ Complete |
 | 89 | RSIC Persistence & Multi-Space Correctness (write-behind, RSICState nodes) | ✅ Complete |
@@ -472,8 +474,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Priority | Phase | Task | Description |
 |----------|-------|------|-------------|
-| 1 | 50 | Public Readiness | Security hardening, governance, CI/CD, onboarding |
-| 2 | D | Validation | 2nd codebase benchmark + scale test (10K→100K) |
+| 1 | 50 | Public Readiness | Security hardening, secret scrubbing, error sanitization |
 
 ### Planned
 
