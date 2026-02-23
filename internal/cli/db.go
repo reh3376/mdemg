@@ -8,11 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"mdemg/internal/api"
-	"mdemg/internal/config"
 	"mdemg/internal/db"
 )
 
@@ -66,10 +64,7 @@ Examples:
 				return fmt.Errorf("space '%s' is protected and cannot be deleted", spaceID)
 			}
 
-			// Load env
-			_ = godotenv.Load()
-
-			cfg, err := config.FromEnv()
+			cfg, err := loadConfig()
 			if err != nil {
 				return fmt.Errorf("config error: %w", err)
 			}

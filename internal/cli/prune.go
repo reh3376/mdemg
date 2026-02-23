@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"mdemg/internal/cli/neo4jutil"
-
+	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
+
+	"mdemg/internal/cli/neo4jutil"
+	"mdemg/internal/config"
 )
 
 // newPruneCmd creates the prune command
@@ -23,6 +25,12 @@ func newPruneCmd() *cobra.Command {
 		Use:   "prune",
 		Short: "Prune weak edges, tombstone orphan nodes, and merge redundant nodes",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config (YAML → .env → env vars)
+			if cfgPath := config.FindConfigFile(); cfgPath != "" {
+				_ = config.LoadYAMLConfig(cfgPath)
+			}
+			_ = godotenv.Load()
+
 			// Environment variables for Neo4j connection
 			get := func(k, def string) string {
 				v := strings.TrimSpace(os.Getenv(k))

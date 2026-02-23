@@ -14,16 +14,18 @@ import (
 	"strings"
 	"time"
 
-	devspacepb "mdemg/api/devspacepb"
-	pb "mdemg/api/transferpb"
-	"mdemg/internal/api"
-	"mdemg/internal/devspace"
-	"mdemg/internal/transfer"
-
+	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	devspacepb "mdemg/api/devspacepb"
+	pb "mdemg/api/transferpb"
+	"mdemg/internal/api"
+	"mdemg/internal/config"
+	"mdemg/internal/devspace"
+	"mdemg/internal/transfer"
 )
 
 // newSpaceCmd returns the parent "space" command with all subcommands.
@@ -514,6 +516,12 @@ func getEnv(key, defaultVal string) string {
 }
 
 func newDriver() (neo4j.DriverWithContext, error) {
+	// Load config (YAML → .env → env vars)
+	if cfgPath := config.FindConfigFile(); cfgPath != "" {
+		_ = config.LoadYAMLConfig(cfgPath)
+	}
+	_ = godotenv.Load()
+
 	uri := getEnv("NEO4J_URI", "")
 	user := getEnv("NEO4J_USER", "")
 	pass := getEnv("NEO4J_PASS", "")

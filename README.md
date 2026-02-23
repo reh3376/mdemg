@@ -11,6 +11,27 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ---
 
+## Quick Start
+
+```bash
+# Build the CLI
+make build-cli
+
+# Initialize in your project directory
+cd /path/to/your/project
+mdemg init
+
+# Start the server (requires Neo4j running on localhost:7687)
+mdemg serve
+
+# Ingest your codebase
+mdemg ingest --path .
+```
+
+`mdemg init` creates a `.mdemg/config.yaml` with your project settings and a `.mdemgignore` for exclusion patterns. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
+
+---
+
 ## Reproduce the Benchmark
 
 Everything needed to independently verify our results is included.

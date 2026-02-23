@@ -60,6 +60,98 @@ export MDEMG_SPACE_ID=my-project
 
 ---
 
+## Project Initialization
+
+Initialize a new MDEMG project in the current directory:
+
+```bash
+mdemg init                    # Interactive wizard
+mdemg init --defaults         # Non-interactive with sensible defaults
+mdemg init --yes              # Alias for --defaults
+```
+
+The wizard:
+1. Detects your environment (Neo4j, Ollama, Git, IDE)
+2. Prompts for space ID, Neo4j URI, embedding provider
+3. Generates `.mdemg/config.yaml` and `.mdemgignore`
+4. Optionally installs a git post-commit hook
+5. Optionally writes IDE MCP configs (`.cursor/mcp.json`, `.vscode/mcp.json`)
+
+Override specific settings:
+```bash
+mdemg init --defaults --neo4j-uri bolt://db:7687 --embedding-provider openai
+mdemg init --defaults --no-hooks --no-ide
+```
+
+### `.mdemg/config.yaml`
+
+The YAML config exposes ~20 commonly-adjusted settings. It is read before `.env` and `FromEnv()`, setting env vars only when not already set:
+
+```yaml
+neo4j:
+  uri: bolt://localhost:7687
+  user: neo4j
+server:
+  port: 9999
+embedding:
+  provider: ollama
+  model: nomic-embed-text
+  endpoint: http://localhost:11434
+schema:
+  version: 17
+```
+
+**Priority** (lowest → highest): defaults → `.mdemg/config.yaml` → `.env` → env vars → CLI flags.
+
+Secrets (passwords, API keys) should stay in `.env` or env vars — never in `config.yaml`.
+
+### `.mdemgignore`
+
+Gitignore-style exclusion patterns for `mdemg ingest`. Place in the project root:
+
+```
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+build/
+dist/
+
+# Binary files
+*.exe
+*.dll
+*.min.js
+```
+
+Patterns are applied during the file walk phase, before any file is parsed. Supports `#` comments, `!` negation, and directory patterns ending with `/`.
+
+---
+
+## Configuration Management
+
+### Show Effective Config
+
+```bash
+mdemg config show             # Human-readable table with sources
+mdemg config show --json      # Machine-readable JSON
+```
+
+Output shows each setting's value and where it came from (`yaml`, `env`, or `default`). Secrets are masked.
+
+### Validate Config
+
+```bash
+mdemg config validate
+```
+
+Checks:
+- YAML syntax and field values
+- Neo4j reachability (TCP probe on configured URI)
+- Embedding provider reachability (HTTP probe)
+
+---
+
 ## Starting the Server
 
 ```bash
