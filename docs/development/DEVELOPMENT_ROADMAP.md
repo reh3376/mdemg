@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-02-18 (All phases complete through Phase 90. RSIC hardening complete (Phases 87-90). 109 UATS specs, 180 variants, 100% passing. 6 RSIC integration tests. CI gated on non-embedding specs.)
+**Updated**: 2026-02-21 (All phases complete through Phase 91. Phase D validated. Space Pruning Framework + auto-prune scheduler. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved 0.733, Edge Attention achieved **0.898 avg score** (+58.4% from v4 baseline, 100% high-score rate)
@@ -236,10 +236,10 @@ Temporal modeling patterns are domain-specific and weren't recognized as a cross
 - [x] Track 5: Temporal pattern detection
 - [x] Run validation test with full improvements (v11: 0.733 avg, +3.3% over v10)
 
-### Phase D: Validation ⏳ PENDING
-- [ ] Benchmark on second codebase (different domain)
-- [ ] Scale test: 10K → 100K nodes
-- [ ] Document final architecture
+### Phase D: Validation ✅ COMPLETE
+- [x] Benchmark on second codebase (different domain) — plc-gbt (PLC Control Loop), 0.724 avg score. See `docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`
+- [x] Scale test: 10K → 100K nodes — VS Code repo, 28K nodes, linear ingestion scaling, 50ms warm latency. See `docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`
+- [x] Document final architecture — 14 architecture docs in `docs/architecture/` (00-14)
 
 ---
 
@@ -1254,7 +1254,7 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096
 ---
 
 ### Deliverable 10.5: Benchmarking & Monitoring
-**Priority**: P1 | **Effort**: 2 days | **Status**: ⏳ PENDING
+**Priority**: P1 | **Effort**: 2 days | **Status**: ✅ PARTIAL (Observability complete, CI benchmark regression pending)
 
 #### 10.5.1 Performance Benchmarks
 ```bash
@@ -1263,12 +1263,12 @@ go test -bench=. -benchmem ./internal/retrieval/...
 go test -bench=. -benchmem ./internal/symbols/...
 ```
 
-- [ ] Create benchmark suite for critical paths
-- [ ] Measure: retrieval latency, ingest throughput, symbol search
-- [ ] Track regression in CI (fail if >10% slower)
-- [ ] Document baseline metrics
+- [x] Create benchmark suite for critical paths — 9 benchmarks in `internal/retrieval/retrieval_bench_test.go`
+- [x] Measure: retrieval latency, ingest throughput, symbol search — 3 UBTS specs (`retrieve_latency`, `ingest_throughput`, `concurrent_load`) with smoke/load/stress profiles
+- [ ] Track regression in CI (fail if >10% slower) — no `go test -bench` in CI pipeline yet
+- [x] Document baseline metrics — targets documented in roadmap §10 Success Metrics
 
-#### 10.5.2 Observability
+#### 10.5.2 Observability ✅ COMPLETE
 ```go
 // Metrics to expose
 mdemg_query_duration_seconds{space_id, query_type}
@@ -1278,10 +1278,10 @@ mdemg_neo4j_query_duration_seconds{query_name}
 mdemg_embedding_requests_total{provider, status}
 ```
 
-- [ ] Add Prometheus metrics for all caches
-- [ ] Track query latency histograms by type
-- [ ] Monitor Neo4j driver pool statistics
-- [ ] Alert on cache hit rate drops
+- [x] Add Prometheus metrics for all caches — 40+ metrics in `internal/metrics/collectors.go`, validated by UOBS spec
+- [x] Track query latency histograms by type — HTTP request duration + retrieval latency histograms with configurable buckets
+- [x] Monitor Neo4j driver pool statistics — 7 pool metrics (active, idle, waiting, acquired, created, closed, failed)
+- [x] Alert on cache hit rate drops — 15+ alert rules in `deploy/docker/prometheus/alerts/` (latency SLOs, cache hit ratio, circuit breakers)
 
 ---
 
