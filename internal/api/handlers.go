@@ -2515,7 +2515,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 	// Build CLI arguments from job config
 	args := buildIngestArgsFromConfig(job.Config, s.cfg.ListenAddr)
 
-	cmd := exec.CommandContext(ctx, "./bin/ingest-codebase", args...)
+	cmd := exec.CommandContext(ctx, "./bin/mdemg", append([]string{"ingest"}, args...)...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

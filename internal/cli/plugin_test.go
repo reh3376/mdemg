@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -124,15 +124,15 @@ func TestGeneratePlugin(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		config     PluginConfig
+		config     pluginScaffoldConfig
 		wantFiles  []string
 		wantInFile map[string][]string // file -> strings that should be present
 	}{
 		{
 			name: "ingestion plugin",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:       "Linear Parser",
-				Type:       ModuleTypeIngestion,
+				Type:       moduleTypeIngestion,
 				OutputDir:  tempDir,
 				Version:    "1.0.0",
 				ModuleID:   "linear-parser",
@@ -174,9 +174,9 @@ func TestGeneratePlugin(t *testing.T) {
 		},
 		{
 			name: "reasoning plugin",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:       "Custom Ranker",
-				Type:       ModuleTypeReasoning,
+				Type:       moduleTypeReasoning,
 				OutputDir:  tempDir,
 				Version:    "2.0.0",
 				ModuleID:   "custom-ranker",
@@ -215,9 +215,9 @@ func TestGeneratePlugin(t *testing.T) {
 		},
 		{
 			name: "ape plugin",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:       "Session Reflector",
-				Type:       ModuleTypeAPE,
+				Type:       moduleTypeAPE,
 				OutputDir:  tempDir,
 				Version:    "1.0.0",
 				ModuleID:   "session-reflector",
@@ -297,17 +297,29 @@ func TestGeneratePlugin(t *testing.T) {
 	}
 }
 
+// generateManifestForTest is a test helper that generates manifest JSON
+// using executeTemplate + getManifestTemplate, replacing the old
+// GenerateManifest function that no longer exists in the cli package.
+func generateManifestForTest(cfg pluginScaffoldConfig) ([]byte, error) {
+	tmpl := getManifestTemplate(cfg.Type)
+	result, err := executeTemplate("manifest.json", tmpl, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(result), nil
+}
+
 func TestGenerateManifest(t *testing.T) {
 	tests := []struct {
 		name   string
-		config PluginConfig
+		config pluginScaffoldConfig
 		check  func(t *testing.T, data map[string]interface{})
 	}{
 		{
 			name: "ingestion manifest",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:     "Test Plugin",
-				Type:     ModuleTypeIngestion,
+				Type:     moduleTypeIngestion,
 				Version:  "1.0.0",
 				ModuleID: "test-plugin",
 			},
@@ -326,9 +338,9 @@ func TestGenerateManifest(t *testing.T) {
 		},
 		{
 			name: "reasoning manifest",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:     "Test Reasoner",
-				Type:     ModuleTypeReasoning,
+				Type:     moduleTypeReasoning,
 				Version:  "1.0.0",
 				ModuleID: "test-reasoner",
 			},
@@ -347,9 +359,9 @@ func TestGenerateManifest(t *testing.T) {
 		},
 		{
 			name: "ape manifest",
-			config: PluginConfig{
+			config: pluginScaffoldConfig{
 				Name:     "Test APE",
-				Type:     ModuleTypeAPE,
+				Type:     moduleTypeAPE,
 				Version:  "1.0.0",
 				ModuleID: "test-ape",
 			},
@@ -370,9 +382,9 @@ func TestGenerateManifest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manifestBytes, err := GenerateManifest(tt.config)
+			manifestBytes, err := generateManifestForTest(tt.config)
 			if err != nil {
-				t.Fatalf("GenerateManifest() error = %v", err)
+				t.Fatalf("generateManifestForTest() error = %v", err)
 			}
 
 			var data map[string]interface{}
@@ -401,14 +413,14 @@ func TestExecuteTemplate(t *testing.T) {
 	tests := []struct {
 		name     string
 		tmpl     string
-		config   PluginConfig
+		config   pluginScaffoldConfig
 		wantErr  bool
 		contains []string
 	}{
 		{
 			name:   "simple template",
 			tmpl:   "Module: {{.ModuleID}}, Version: {{.Version}}",
-			config: PluginConfig{ModuleID: "test-module", Version: "1.0.0"},
+			config: pluginScaffoldConfig{ModuleID: "test-module", Version: "1.0.0"},
 			contains: []string{
 				"Module: test-module",
 				"Version: 1.0.0",
@@ -417,7 +429,7 @@ func TestExecuteTemplate(t *testing.T) {
 		{
 			name:   "template with type condition",
 			tmpl:   "{{if eq .Type \"INGESTION\"}}ingestion{{else}}other{{end}}",
-			config: PluginConfig{Type: ModuleTypeIngestion},
+			config: pluginScaffoldConfig{Type: moduleTypeIngestion},
 			contains: []string{
 				"ingestion",
 			},
@@ -425,7 +437,7 @@ func TestExecuteTemplate(t *testing.T) {
 		{
 			name:    "invalid template",
 			tmpl:    "{{.InvalidField}",
-			config:  PluginConfig{},
+			config:  pluginScaffoldConfig{},
 			wantErr: true,
 		},
 	}
@@ -456,7 +468,7 @@ func TestExecuteTemplate(t *testing.T) {
 
 func TestGetManifestTemplate(t *testing.T) {
 	// Verify each type returns a non-empty template
-	types := []ModuleType{ModuleTypeIngestion, ModuleTypeReasoning, ModuleTypeAPE}
+	types := []moduleType{moduleTypeIngestion, moduleTypeReasoning, moduleTypeAPE}
 
 	for _, mt := range types {
 		tmpl := getManifestTemplate(mt)
@@ -471,19 +483,19 @@ func TestGetManifestTemplate(t *testing.T) {
 
 func TestGetHandlerTemplate(t *testing.T) {
 	tests := []struct {
-		moduleType ModuleType
+		moduleType moduleType
 		contains   []string
 	}{
 		{
-			moduleType: ModuleTypeIngestion,
+			moduleType: moduleTypeIngestion,
 			contains:   []string{"Matches", "Parse", "Sync", "IngestionModuleServer"},
 		},
 		{
-			moduleType: ModuleTypeReasoning,
+			moduleType: moduleTypeReasoning,
 			contains:   []string{"Process", "ReasoningModuleServer", "boostFactor"},
 		},
 		{
-			moduleType: ModuleTypeAPE,
+			moduleType: moduleTypeAPE,
 			contains:   []string{"Execute", "GetSchedule", "APEModuleServer", "CronExpression"},
 		},
 	}
@@ -508,9 +520,9 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 	// This test verifies that the generated code at least parses correctly
 	// by checking that templates don't have obvious syntax errors
 
-	config := PluginConfig{
+	config := pluginScaffoldConfig{
 		Name:       "Test Module",
-		Type:       ModuleTypeIngestion,
+		Type:       moduleTypeIngestion,
 		Version:    "1.0.0",
 		ModuleID:   "test-module",
 		StructName: "TestModule",
@@ -529,7 +541,7 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 	}
 
 	// Test handler templates for each type
-	for _, mt := range []ModuleType{ModuleTypeIngestion, ModuleTypeReasoning, ModuleTypeAPE} {
+	for _, mt := range []moduleType{moduleTypeIngestion, moduleTypeReasoning, moduleTypeAPE} {
 		config.Type = mt
 		handlerTmpl := getHandlerTemplate(mt)
 		handlerResult, err := executeTemplate("handler.go", handlerTmpl, config)
@@ -550,9 +562,9 @@ func TestPluginDirectoryStructure(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	config := PluginConfig{
+	config := pluginScaffoldConfig{
 		Name:       "Test Plugin",
-		Type:       ModuleTypeIngestion,
+		Type:       moduleTypeIngestion,
 		OutputDir:  tempDir,
 		Version:    "1.0.0",
 		ModuleID:   "test-plugin",
@@ -600,9 +612,9 @@ func TestManifestJSONValidity(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	for _, mt := range []ModuleType{ModuleTypeIngestion, ModuleTypeReasoning, ModuleTypeAPE} {
+	for _, mt := range []moduleType{moduleTypeIngestion, moduleTypeReasoning, moduleTypeAPE} {
 		t.Run(string(mt), func(t *testing.T) {
-			config := PluginConfig{
+			config := pluginScaffoldConfig{
 				Name:       "Test Plugin",
 				Type:       mt,
 				OutputDir:  tempDir,

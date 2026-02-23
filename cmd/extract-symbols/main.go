@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"mdemg/cmd/ingest-codebase/languages"
+	"mdemg/internal/languages"
 	"mdemg/internal/symbols"
 )
 

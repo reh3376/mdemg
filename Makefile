@@ -8,16 +8,29 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-parser test test-parsers clean
+.PHONY: all build build-cli build-parser test test-parsers clean
+
+# Build-time version info
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS := -ldflags "-X mdemg/internal/cli.Version=$(VERSION) -X mdemg/internal/cli.Commit=$(COMMIT) -X mdemg/internal/cli.BuildDate=$(BUILD_DATE)"
 
 # Default target
 all: build
 
-# Build all binaries
-build: build-parser
+# Build all binaries (unified CLI + parser tools)
+build: build-cli build-parser
 	@echo "Build complete"
 
-# Build the parser tools
+# Build the unified MDEMG CLI binary
+build-cli:
+	@echo "Building mdemg unified CLI..."
+	@mkdir -p bin
+	go build $(LDFLAGS) -o bin/mdemg ./cmd/mdemg
+	@echo "Built bin/mdemg ($(VERSION))"
+
+# Build the parser tools (legacy standalone binaries)
 build-parser:
 	@echo "Building extract-symbols..."
 	@mkdir -p bin
@@ -58,21 +71,22 @@ dev-setup:
 	go mod download
 	@echo "Done"
 
-# Run the MDEMG server
-run:
-	go run ./cmd/mdemg
+# Run the MDEMG server via unified CLI
+run: build-cli
+	./bin/mdemg serve
 
 # Help target
 help:
 	@echo "MDEMG Makefile targets:"
-	@echo "  build          - Build all binaries"
-	@echo "  build-parser   - Build ingest-codebase parser"
+	@echo "  build          - Build all binaries (unified CLI + parsers)"
+	@echo "  build-cli      - Build unified mdemg CLI binary"
+	@echo "  build-parser   - Build standalone parser tools"
 	@echo "  test           - Run all tests"
 	@echo "  test-parsers   - Run UPTS parser validation (all languages)"
 	@echo "  test-parser-X  - Run UPTS validation for language X (go, python, typescript)"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
-	@echo "  run            - Run MDEMG server"
+	@echo "  run            - Build and run MDEMG server"
 # ============================================================
 # UATS API Testing Targets
 # ============================================================

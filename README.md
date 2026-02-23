@@ -194,30 +194,35 @@ cp .env.example .env
 # Start Neo4j
 docker compose up -d
 
-# Build the server
-go build -o bin/mdemg ./cmd/server
+# Build the unified CLI
+make build-cli
+# Or directly:
+go build -o bin/mdemg ./cmd/mdemg
 
 # Run the server
-./bin/mdemg
+./bin/mdemg serve
+
+# Print version info
+./bin/mdemg version
+
+# See all available commands
+./bin/mdemg --help
 ```
 
 ### Ingest a Codebase
 
 ```bash
-# Build the ingestion tool
-go build -o bin/ingest-codebase ./cmd/ingest-codebase
-
 # Ingest a codebase
-./bin/ingest-codebase --space-id=my-project --path=/path/to/repo
+./bin/mdemg ingest --space-id=my-project --path=/path/to/repo
 
 # Incremental ingest (only changed files since last commit)
-./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --incremental
+./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --incremental
 
 # Quiet mode (suppress non-error output, useful for hooks/CI)
-./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --quiet
+./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --quiet
 
 # Log to file instead of stderr
-./bin/ingest-codebase --space-id=my-project --path=/path/to/repo --log-file /tmp/ingest.log
+./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --log-file /tmp/ingest.log
 
 # Run consolidation to create concept layers
 curl -X POST http://localhost:9999/v1/memory/consolidate \
