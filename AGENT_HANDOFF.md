@@ -284,7 +284,7 @@ Phases are organized into **numbered series** to group related work:
 | Phase 9 (Incremental Updates) | **Phase 47** | Incremental Update & Re-Ingestion | 🔄 Partial |
 | Phase 10 (Query Optimization) | **Phase 48** | Query Optimization & Caching | ✅ Complete (10.1-10.2) |
 | Phase 11 (LLM SDK) | **Phase 49** | LLM Plugin SDK & Self-Improvement | ✅ Complete |
-| Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | 📋 Planned |
+| Phase 7 (Public Readiness) | **Phase 50** | Public Readiness & Open Source Hardening | ⏳ Partial (7.1 ✅, 7.2 ✅) |
 | — (Web Scraper) | **Phase 51** | Web Scraper Ingestion Module | ✅ Complete |
 | — (CMS Advanced II) | **Phase 60** | CMS Advanced Functionality II | ✅ Complete |
 | — (RSIC) | **Phase 60b** | Recursive Self-Improvement Cycle | ✅ Complete |
@@ -1659,7 +1659,7 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 ---
 
-### Phase 50: Public Readiness & Open Source Hardening 📋
+### Phase 50: Public Readiness & Open Source Hardening ⏳
 
 **Spec:** `docs/development/repo-to-public-roadmap.md`
 
@@ -1667,11 +1667,17 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 
 | Area | Status | Tasks |
 |------|--------|-------|
-| Governance & Collaboration | 📋 | PR/Issue templates, CONTRIBUTING.md, CODE_OF_CONDUCT.md |
-| Security Hardening | 📋 | Secret scrubbing, path normalization, error sanitization |
+| Governance & Collaboration | ✅ | PR/Issue templates, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CODEOWNERS, SECURITY.md |
+| Security Hardening | ✅ | Gitleaks CI, gosec enabled, error sanitization (20 handlers fixed), path normalization (0 in Go source) |
 | Repository Restructuring | 📋 | Standard Go layout, docs consolidation |
-| CI/CD Guards | 📋 | GitHub Actions, integration CI with Neo4j |
+| CI/CD Guards | ✅ | GitHub Actions (build, test, lint, security), golangci-lint (6 linters), UATS contract tests |
 | Public Onboarding | 📋 | README overhaul, SemVer releases, MIT License |
+
+**Security hardening details (Deliverable 7.2):**
+- **Gitleaks**: Added to `.github/workflows/ci.yml` security job
+- **Gosec**: Enabled in `.golangci.yml` with documented exclusions for false-positive categories
+- **Error sanitization**: 20 raw `err.Error()` leaks fixed across 7 handler files; `readJSON` utility sanitized
+- **Files modified**: `handlers.go`, `handlers_backup.go`, `handlers_edge_consistency.go`, `handlers_relationships.go`, `handlers_filewatcher.go`, `handlers_ingest_codebase.go`, `handlers_self_improve.go`, `server.go`
 
 ---
 

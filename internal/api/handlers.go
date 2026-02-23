@@ -304,7 +304,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.retriever.Retrieve(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "retrieve")
 		return
 	}
 
@@ -408,7 +408,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	// Normalize timestamp according to format enum
 	normalized, err := models.NormalizeTimestamp(req.Timestamp, req.TimestampFormat)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid timestamp format"})
 		return
 	}
 	req.Timestamp = normalized
@@ -417,7 +417,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	if req.CanonicalTime != "" {
 		normalizedCT, err := models.NormalizeTimestamp(req.CanonicalTime, req.TimestampFormat)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "canonical_time: " + err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid canonical_time format"})
 			return
 		}
 		req.CanonicalTime = normalizedCT
@@ -444,7 +444,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	out, err := s.retriever.IngestObservation(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "ingest observation")
 		return
 	}
 
@@ -540,7 +540,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.retriever.BatchIngestObservations(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "batch ingest")
 		return
 	}
 
@@ -1281,7 +1281,8 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.retriever.Reflect(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		log.Printf("ERROR [reflect]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "reflect failed"})
 		return
 	}
 

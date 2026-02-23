@@ -23,7 +23,7 @@ func (s *Server) handleRelationshipStats(w http.ResponseWriter, r *http.Request)
 
 	stats, err := s.symbolStore.RelationshipStats(r.Context(), spaceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "relationship stats")
 		return
 	}
 
@@ -58,7 +58,7 @@ func (s *Server) handleSymbolRelationships(w http.ResponseWriter, r *http.Reques
 
 	rels, err := s.symbolStore.QueryRelationships(r.Context(), spaceID, symbolID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "query relationships")
 		return
 	}
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -31,7 +32,8 @@ func (s *Server) handleBackupTrigger(w http.ResponseWriter, r *http.Request) {
 
 	backupID, err := s.backupSvc.Trigger(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		log.Printf("ERROR [trigger backup]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup trigger failed"})
 		return
 	}
 
@@ -104,7 +106,7 @@ func (s *Server) handleBackupList(w http.ResponseWriter, r *http.Request) {
 	typeFilter := r.URL.Query().Get("type")
 	manifests, err := s.backupSvc.ListBackups(typeFilter, 0)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "list backups")
 		return
 	}
 
@@ -161,11 +163,11 @@ func (s *Server) handleBackupByID(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.backupSvc.DeleteBackup(backupID); err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "backup not found"})
 		} else if strings.Contains(err.Error(), "keep_forever") {
-			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "backup is protected (keep_forever)"})
 		} else {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			writeInternalError(w, err, "delete backup")
 		}
 		return
 	}
@@ -199,7 +201,8 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 
 	restoreID, err := s.backupSvc.Restore(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		log.Printf("ERROR [restore backup]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup restore failed"})
 		return
 	}
 

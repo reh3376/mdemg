@@ -1391,7 +1391,8 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		log.Printf("ERROR [readJSON]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return false
 	}
 	return true

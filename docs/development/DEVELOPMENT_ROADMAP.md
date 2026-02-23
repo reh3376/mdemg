@@ -1,7 +1,7 @@
 # MDEMG Development Roadmap
 
 **Created**: 2026-01-22
-**Updated**: 2026-02-21 (All phases complete through Phase 91. Phase D validated. Space Pruning Framework + auto-prune scheduler. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
+**Updated**: 2026-02-23 (All phases complete through Phase 91. Phase D validated. Space Pruning Framework + auto-prune scheduler. Security hardening complete: gosec, gitleaks, error sanitization. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)
 **Goal**: Improve retrieval quality from 0.567 avg score to 0.70+ avg score
 **Result**: v11 achieved 0.733, Edge Attention achieved **0.898 avg score** (+58.4% from v4 baseline, 100% high-score rate)
@@ -304,8 +304,8 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [x] Implement **Reflection Module** (`plugins/reflection-module/`)
   - Subscribes to `session_end`, `consolidate` events
   - Hourly scheduled execution
-- [ ] Implement **Context Cooler**: Manage volatile short-term observations and their "graduation" to long-term memory.
-- [ ] Implement **Constraint Module**: Detects non-code commitments and tags them as high-priority constraints.
+- [x] Implement **Context Cooler** (`internal/conversation/cooler.go`, 440 lines, 6 tests): Graduation, decay, tombstoning, reinforcement. Config: 5 `COOLER_*` env vars.
+- [x] Implement **Constraint Module** (`internal/conversation/constraint_detector.go`, 191 lines, 5 tests): 5 constraint types (must, must_not, should, should_not, deadline), auto-tagging, cooler integration. Config: 3 `CONSTRAINT_*` env vars.
 
 ## Phase 8: Symbol-Level Indexing (Evidence-Locked Retrieval)
 
@@ -503,10 +503,10 @@ SYMBOL_EXTRACT_PRIVATE=false            # Include non-exported symbols
 SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 ```
 
-#### 8.3.3 Batch Processing
-- [ ] Process symbols in batches of 100 for Neo4j writes
-- [ ] Use UNWIND for efficient bulk creation
-- [ ] Implement deduplication: update existing symbols on re-ingest
+#### 8.3.3 Batch Processing ✅ COMPLETE
+- [x] Process symbols in batches for Neo4j writes — `UNWIND $symbols` in `internal/symbols/store.go:187`
+- [x] Use UNWIND for efficient bulk creation — symbols and relationships both use UNWIND
+- [x] Implement deduplication: `MERGE` on `{space_id, symbol_id}` with `ON CREATE SET` / `ON MATCH SET`
 
 #### 8.3.4 File Changes
 | File | Status | Changes |
@@ -878,7 +878,7 @@ go run ./cmd/ingest-codebase --incremental --space-id="my-project" --quiet --log
 ---
 
 ### Deliverable 9.2: Time-Based Scheduled Sync
-**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PARTIAL (Freshness tracking complete, APE INGEST pending)
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE (Freshness tracking + StartScheduledSync covers use case; APE INGEST action deferred — not needed)
 
 #### 9.2.1 APE Scheduled Ingestion
 Leverage existing APE scheduler for periodic re-ingestion:
@@ -999,29 +999,18 @@ POST /v1/memory/ingest/files
 ---
 
 ### Deliverable 9.5: Conflict Resolution & Consistency
-**Priority**: P2 | **Effort**: 1-2 days | **Status**: ⏳ PENDING
+**Priority**: P2 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE
 
-#### 9.5.1 Concurrent Update Handling
-- [ ] Optimistic locking on MemoryNode updates (version field)
-- [ ] Last-write-wins for concurrent ingestion
-- [ ] Log conflicts for audit trail
+#### 9.5.1 Concurrent Update Handling ✅ COMPLETE
+- [x] Optimistic locking on MemoryNode updates — `internal/optimistic/lock.go` (214 lines, 17 tests), exponential backoff with jitter
+- [x] Versioned node/edge updates — `internal/retrieval/versioned_update.go` (425 lines), `ingest_retry.go` (225 lines)
+- [x] Conflict logging via version mismatch detection and retry exhaustion reporting
 
-#### 9.5.2 Orphan Detection
-```cypher
-// Find MemoryNodes whose source files no longer exist
-MATCH (m:MemoryNode {space_id: $space_id})
-WHERE m.file_path IS NOT NULL
-  AND NOT EXISTS {
-    // Check file exists in latest ingest
-    MATCH (t:TapRoot {space_id: $space_id})-[:CONTAINS]->(m)
-    WHERE m.updated_at >= t.last_ingest_at
-  }
-RETURN m.node_id, m.file_path
-```
-
-- [ ] Run orphan detection after incremental ingest
-- [ ] Options: archive, delete, or flag for review
-- [ ] `POST /v1/memory/cleanup/orphans` endpoint
+#### 9.5.2 Orphan Detection ✅ COMPLETE
+- [x] `POST /v1/memory/cleanup/orphans` — timestamp-based L0 orphan detection, actions: count/list/archive/delete
+- [x] `POST /v1/memory/cleanup/graph-orphans` — cross-space zero-edge node scan, actions: scan/consolidate/archive/delete
+- [x] Options: archive, delete, flag for review, dry-run support, protected-space blocking
+- [x] 3 UATS specs (9 variants) — `orphan_cleanup.uats.json`, `graph_orphan_cleanup.uats.json`
 
 #### 9.5.3 Edge Consistency ✅ COMPLETE
 - [x] Refresh edges when connected nodes change (`RefreshStaleCoactivationEdges`)
@@ -1394,12 +1383,14 @@ MDEMG is being prepared for public release. This phase focuses on security, gove
 - [x] Set up GitHub Actions for automated linting and integration testing.
 - [x] CODEOWNERS, dependabot, auto-PR workflow, parser-tests workflow.
 - [x] SECURITY.md, CODE_OF_CONDUCT.md.
-- [x] Expanded `golangci-lint` config (staticcheck, errcheck, ineffassign, unused).
+- [x] Expanded `golangci-lint` config (govet, staticcheck, errcheck, ineffassign, unused, gosec — 6 linters).
 - [x] UATS contract tests added to CI pipeline.
 
-### Deliverable 7.2: Security Hardening
-- [ ] Perform secret scrubbing and path normalization across scripts and API handlers.
-- [ ] Implement user-friendly error sanitization.
+### Deliverable 7.2: Security Hardening ✅ COMPLETE
+- [x] Perform secret scrubbing and path normalization across scripts and API handlers. (Zero hardcoded paths in Go source; benchmarks/archives contain `/Users/` metadata — acceptable for historical data)
+- [x] Implement user-friendly error sanitization — `sanitizeError()` + `writeInternalError()` in `server.go`. All 20 raw `err.Error()` leaks sanitized across 7 handler files; `readJSON` utility sanitized (affects all JSON-parsing endpoints)
+- [x] Add secret scanning (gitleaks) to CI pipeline — `.github/workflows/ci.yml` security job
+- [x] Enable gosec in `.golangci.yml` — security-focused static analysis with documented exclusions for known false-positive categories (G104, G204, G304, G704, G706, etc.)
 
 ---
 

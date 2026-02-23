@@ -186,7 +186,8 @@ func (s *Server) handleIngestCodebase(w http.ResponseWriter, r *http.Request) {
 
 	var req IngestCodebaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON: " + err.Error()})
+		log.Printf("ERROR [ingest codebase JSON]: %v", err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
