@@ -9,16 +9,16 @@
     "think_time_ms": 500
   },
   "query_variations": [
-    {"query_text": "how does the retrieval system work"},
-    {"query_text": "explain hidden layer clustering"},
-    {"query_text": "what is Hebbian learning"},
-    {"query_text": "database schema migration"},
-    {"query_text": "API authentication flow"},
-    {"query_text": "circuit breaker pattern"},
-    {"query_text": "rate limiting configuration"},
-    {"query_text": "embedding cache implementation"},
-    {"query_text": "conversation memory system"},
-    {"query_text": "plugin architecture design"}
+    {"query_text": "how does the retrieval system work", "content_1": "Load test retrieval system architecture", "content_2": "Load test vector similarity search", "content_3": "Load test graph traversal"},
+    {"query_text": "explain hidden layer clustering", "content_1": "Load test hidden layer concepts", "content_2": "Load test clustering algorithms", "content_3": "Load test abstraction layers"},
+    {"query_text": "what is Hebbian learning", "content_1": "Load test Hebbian edges", "content_2": "Load test co-activation weights", "content_3": "Load test learning decay"},
+    {"query_text": "database schema migration", "content_1": "Load test schema versioning", "content_2": "Load test migration runner", "content_3": "Load test Cypher statements"},
+    {"query_text": "API authentication flow", "content_1": "Load test auth middleware", "content_2": "Load test API key validation", "content_3": "Load test request headers"},
+    {"query_text": "circuit breaker pattern", "content_1": "Load test circuit states", "content_2": "Load test failure thresholds", "content_3": "Load test recovery timeout"},
+    {"query_text": "rate limiting configuration", "content_1": "Load test rate limits", "content_2": "Load test burst allowance", "content_3": "Load test sliding window"},
+    {"query_text": "embedding cache implementation", "content_1": "Load test LRU cache", "content_2": "Load test cache hit ratio", "content_3": "Load test cache eviction"},
+    {"query_text": "conversation memory system", "content_1": "Load test session resume", "content_2": "Load test observation capture", "content_3": "Load test theme consolidation"},
+    {"query_text": "plugin architecture design", "content_1": "Load test module loading", "content_2": "Load test gRPC communication", "content_3": "Load test plugin lifecycle"}
   ],
   "assertions": {
     "all_requests_succeed": false,

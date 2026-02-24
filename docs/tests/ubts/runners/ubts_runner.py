@@ -133,18 +133,21 @@ def load_profile(profile_path: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+def render_value(value: Any, variables: Dict[str, Any]) -> Any:
+    """Recursively render template variables in any value type."""
+    if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
+        var_name = value[2:-2]
+        return variables.get(var_name, value)
+    elif isinstance(value, dict):
+        return {k: render_value(v, variables) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [render_value(item, variables) for item in value]
+    return value
+
+
 def render_payload(template: Dict[str, Any], variables: Dict[str, Any]) -> Dict[str, Any]:
     """Render a payload template with variables."""
-    result = {}
-    for key, value in template.items():
-        if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
-            var_name = value[2:-2]
-            result[key] = variables.get(var_name, value)
-        elif isinstance(value, dict):
-            result[key] = render_payload(value, variables)
-        else:
-            result[key] = value
-    return result
+    return render_value(template, variables)
 
 
 def make_request(
@@ -213,7 +216,13 @@ def run_benchmark(
     # Warmup
     warmup = spec.get("setup", {}).get("warmup_requests", 0)
     for i in range(warmup):
-        variables = {"space_id": space_id, **variations[i % len(variations)]}
+        variables = {
+            "space_id": space_id,
+            "path_1": f"ubts/warmup/{i}/a",
+            "path_2": f"ubts/warmup/{i}/b",
+            "path_3": f"ubts/warmup/{i}/c",
+            **variations[i % len(variations)],
+        }
         payload = render_payload(payload_template, variables)
         make_request(base_url, endpoint, method, payload, headers)
 
@@ -225,7 +234,14 @@ def run_benchmark(
 
     def worker(idx: int) -> tuple[float, Optional[str]]:
         variation = variations[idx % len(variations)]
-        variables = {"space_id": space_id, **variation}
+        # Generate unique paths per request to avoid constraint violations
+        variables = {
+            "space_id": space_id,
+            "path_1": f"ubts/bench/{idx}/a",
+            "path_2": f"ubts/bench/{idx}/b",
+            "path_3": f"ubts/bench/{idx}/c",
+            **variation,
+        }
         payload = render_payload(payload_template, variables)
 
         if think_time > 0:
@@ -314,6 +330,9 @@ def main():
 
     all_passed = True
     results = []
+    assertions = profile.get("assertions", {})
+    check_thresholds = assertions.get("check_thresholds", True)
+    all_requests_succeed = assertions.get("all_requests_succeed", False)
 
     for spec_path in spec_paths:
         print(f"\nLoading spec: {spec_path}")
@@ -322,8 +341,12 @@ def main():
         result = run_benchmark(spec, profile, args.base_url, args.space_id)
         results.append(result)
 
-        passed = print_results(result, spec.get("thresholds", {}))
-        if not passed:
+        thresholds = spec.get("thresholds", {}) if check_thresholds else {}
+        passed = print_results(result, thresholds)
+        if check_thresholds and not passed:
+            all_passed = False
+        if all_requests_succeed and result.failed_requests > 0:
+            print(f"\n  [✗] all_requests_succeed: {result.failed_requests} failures")
             all_passed = False
 
     # Save results if output directory specified
