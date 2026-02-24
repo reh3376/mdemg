@@ -107,6 +107,9 @@ type Server struct {
 	symbolParser   *symbols.Parser
 	symbolResolver *symbols.Resolver
 
+	// Phase 102: Intent Translation
+	intentTranslator retrieval.IntentTranslator
+
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
 
@@ -316,8 +319,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			cfg.SynthesisProvider, cfg.SynthesisModel, cfg.SynthesisMaxTokens)
 	}
 
+	// Phase 102: Initialize Intent Translator
+	var intentTrans retrieval.IntentTranslator
+	if cfg.IntentEnabled {
+		intentCfg := retrieval.IntentConfig{
+			Enabled:   true,
+			Provider:  cfg.IntentProvider,
+			Model:     cfg.IntentModel,
+			MaxTokens: cfg.IntentMaxTokens,
+			TimeoutMs: cfg.IntentTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.OpenAIEndpoint,
+			OllamaURL: cfg.OllamaEndpoint,
+		}
+		intentTrans = retrieval.NewLLMIntentTranslator(intentCfg, cbRegistry)
+		log.Printf("Intent Translation enabled (provider: %s, model: %s, timeout: %dms)",
+			cfg.IntentProvider, cfg.IntentModel, cfg.IntentTimeoutMs)
+	}
+
 	// Initialize consulting service (Agent Consulting API)
-	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth)
+	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
 	log.Printf("Consulting service initialized")
 
 	// Phase 3: Initialize metrics registry
@@ -531,6 +552,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
+		intentTranslator:        intentTrans,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,
 		untsScanner:             untsScan,

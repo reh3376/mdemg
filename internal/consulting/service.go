@@ -40,19 +40,27 @@ type ConceptFetcher interface {
 	FetchRelatedConcepts(ctx context.Context, spaceID string, results []models.RetrieveResult) ([]models.RelatedConcept, error)
 }
 
+// IntentTranslator rewrites a conversational query into keyword-dense text
+// for vector search. Defined locally to avoid circular imports with retrieval package.
+// Go implicit interface satisfaction means *retrieval.LLMIntentTranslator satisfies this.
+type IntentTranslator interface {
+	Translate(ctx context.Context, query string) (string, error)
+}
+
 // Service provides the Agent Consulting API.
 type Service struct {
-	cfg            config.Config
-	driver         neo4j.DriverWithContext
-	retriever      Retriever
-	embedder       embeddings.Embedder
-	symbolStore    SymbolLookup
-	conceptFetcher ConceptFetcher // Optional: if nil, uses internal fetchRelatedConcepts
-	synthesizer    Synthesizer    // Optional: if nil, LLM synthesis is skipped (Phase 101)
+	cfg              config.Config
+	driver           neo4j.DriverWithContext
+	retriever        Retriever
+	embedder         embeddings.Embedder
+	symbolStore      SymbolLookup
+	conceptFetcher   ConceptFetcher   // Optional: if nil, uses internal fetchRelatedConcepts
+	synthesizer      Synthesizer      // Optional: if nil, LLM synthesis is skipped (Phase 101)
+	intentTranslator IntentTranslator // Optional: if nil, intent translation is skipped (Phase 102)
 }
 
 // NewService creates a new consulting service.
-func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *retrieval.Service, embedder embeddings.Embedder, symbolStore *symbols.Store, synthesizer Synthesizer) *Service {
+func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *retrieval.Service, embedder embeddings.Embedder, symbolStore *symbols.Store, synthesizer Synthesizer, intentTranslator IntentTranslator) *Service {
 	var r Retriever
 	if retriever != nil {
 		r = retriever
@@ -62,36 +70,39 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *re
 		ss = symbolStore
 	}
 	return &Service{
-		cfg:         cfg,
-		driver:      driver,
-		retriever:   r,
-		embedder:    embedder,
-		symbolStore: ss,
-		synthesizer: synthesizer,
+		cfg:              cfg,
+		driver:           driver,
+		retriever:        r,
+		embedder:         embedder,
+		symbolStore:      ss,
+		synthesizer:      synthesizer,
+		intentTranslator: intentTranslator,
 	}
 }
 
 // NewServiceWithMocks creates a consulting service with mock dependencies for testing.
-func NewServiceWithMocks(cfg config.Config, driver neo4j.DriverWithContext, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, synthesizer Synthesizer) *Service {
+func NewServiceWithMocks(cfg config.Config, driver neo4j.DriverWithContext, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, synthesizer Synthesizer, intentTranslator IntentTranslator) *Service {
 	return &Service{
-		cfg:         cfg,
-		driver:      driver,
-		retriever:   retriever,
-		embedder:    embedder,
-		symbolStore: symbolStore,
-		synthesizer: synthesizer,
+		cfg:              cfg,
+		driver:           driver,
+		retriever:        retriever,
+		embedder:         embedder,
+		symbolStore:      symbolStore,
+		synthesizer:      synthesizer,
+		intentTranslator: intentTranslator,
 	}
 }
 
 // NewServiceWithAllMocks creates a consulting service with all mock dependencies including concept fetcher.
-func NewServiceWithAllMocks(cfg config.Config, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, conceptFetcher ConceptFetcher, synthesizer Synthesizer) *Service {
+func NewServiceWithAllMocks(cfg config.Config, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, conceptFetcher ConceptFetcher, synthesizer Synthesizer, intentTranslator IntentTranslator) *Service {
 	return &Service{
-		cfg:            cfg,
-		retriever:      retriever,
-		embedder:       embedder,
-		symbolStore:    symbolStore,
-		conceptFetcher: conceptFetcher,
-		synthesizer:    synthesizer,
+		cfg:              cfg,
+		retriever:        retriever,
+		embedder:         embedder,
+		symbolStore:      symbolStore,
+		conceptFetcher:   conceptFetcher,
+		synthesizer:      synthesizer,
+		intentTranslator: intentTranslator,
 	}
 }
 
@@ -110,6 +121,16 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 
 	// Combine context and question for retrieval
 	queryText := fmt.Sprintf("%s\n\nQuestion: %s", req.Context, req.Question)
+
+	// Phase 102: Intent Translation — rewrite query for embedding, keep original for synthesis
+	var translatedIntent string
+	if req.TranslateIntent && s.intentTranslator != nil {
+		translated, translateErr := s.intentTranslator.Translate(ctx, queryText)
+		if translateErr == nil && translated != queryText {
+			translatedIntent = translated
+			queryText = translated // Used for embedding + retrieval
+		}
+	}
 
 	// Generate query embedding (required by retrieval service)
 	if s.embedder == nil {
@@ -215,6 +236,11 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 	// Step 5: Calculate overall confidence and rationale
 	resp.Confidence = s.calculateOverallConfidence(suggestions, len(retrieveResp.Results))
 	resp.Rationale = s.generateRationale(req, suggestions, concepts)
+
+	// Phase 102: Include translated intent in response
+	if translatedIntent != "" {
+		resp.TranslatedIntent = translatedIntent
+	}
 
 	return resp, nil
 }
@@ -501,11 +527,22 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 	resp.Triggers = triggers
 	resp.Debug["trigger_count"] = len(triggers)
 
+	// Phase 102: Intent Translation — rewrite context for embedding
+	var translatedIntent string
+	queryForEmbedding := req.Context
+	if req.TranslateIntent && s.intentTranslator != nil {
+		translated, translateErr := s.intentTranslator.Translate(ctx, req.Context)
+		if translateErr == nil && translated != req.Context {
+			translatedIntent = translated
+			queryForEmbedding = translated
+		}
+	}
+
 	// Step 2: Generate query embedding from context
 	if s.embedder == nil {
 		return resp, fmt.Errorf("no embedding provider configured")
 	}
-	queryEmbedding, err := s.embedder.Embed(ctx, req.Context)
+	queryEmbedding, err := s.embedder.Embed(ctx, queryForEmbedding)
 	if err != nil {
 		return resp, fmt.Errorf("failed to generate context embedding: %w", err)
 	}
@@ -513,7 +550,7 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 	// Step 3: Retrieve relevant memories using context
 	retrieveReq := models.RetrieveRequest{
 		SpaceID:        req.SpaceID,
-		QueryText:      req.Context,
+		QueryText:      queryForEmbedding,
 		QueryEmbedding: queryEmbedding,
 		TopK:           maxSuggestions * 4, // Get more candidates for filtering
 		HopDepth:       2,
@@ -597,6 +634,11 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 
 	// Step 10: Calculate overall confidence
 	resp.Confidence = s.calculateSuggestConfidence(suggestions, len(filteredResults), len(triggers))
+
+	// Phase 102: Include translated intent in response
+	if translatedIntent != "" {
+		resp.TranslatedIntent = translatedIntent
+	}
 
 	return resp, nil
 }
