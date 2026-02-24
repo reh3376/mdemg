@@ -111,6 +111,7 @@ Both modes exhibit significant run-to-run variance:
 - **MDEMG CV:** 28.9%, 54.3%, 57.2% (avg: 46.8%)
 
 This variance suggests:
+
 1. LLM response variability significantly impacts scores
 2. File:line citation accuracy varies between runs
 3. The grader's evidence-heavy weighting amplifies small differences
@@ -124,6 +125,7 @@ This variance suggests:
 | Input Tokens | 4,343 | 7,467 |
 
 **Observation:** The MDEMG cold run outperformed warm runs. This is unexpected and may indicate:
+
 1. Different answer generation strategies between runs
 2. Hebbian learning edges may be directing to different (less expected) files
 3. The master question file's expected evidence may be narrow
@@ -131,6 +133,7 @@ This variance suggests:
 ### Evidence Quality Issue
 
 MDEMG warm runs show high "weak" evidence tiers (78-80%) vs cold run (18%). The weak tier means:
+
 - File references present but don't match expected files
 - Answers may be correct but cite alternative sources
 
@@ -141,12 +144,14 @@ This suggests the master question file's `requires_files` field may be too restr
 ## Conclusions
 
 ### MDEMG Strengths
+
 1. **Token Efficiency:** 90% reduction in input tokens
 2. **Consistent Completion:** 100% answer rate, 0 compacts
 3. **Cold Run Performance:** Matches or exceeds baseline best run
 4. **Zero None-Evidence:** MDEMG Run 1 had 0% "none" tier (all answers cite files)
 
 ### Areas for Investigation
+
 1. **Warm run degradation:** Investigate why MDEMG warm runs score lower
 2. **Evidence file matching:** Review if expected_files is too narrow
 3. **Hebbian learning impact:** Analyze if learning edges change retrieval patterns
@@ -154,6 +159,7 @@ This suggests the master question file's `requires_files` field may be too restr
 ### Recommendation
 
 MDEMG demonstrates strong token efficiency with comparable accuracy. For production use:
+
 - Use MDEMG cold start for accuracy-critical tasks
 - Use MDEMG warm for cost optimization when 5% accuracy delta is acceptable
 - Consider widening expected_files in question master for fairer MDEMG evaluation
@@ -195,6 +201,7 @@ docs/benchmarks/pytorch/
 | Citation Bonus | +10% | Citing correct file (capped at 1.0) |
 
 **Evidence Tiers:**
+
 - Strong (1.0): file:line AND file matches AND line within ±10
 - Moderate (0.7): file:line AND file matches BUT line outside tolerance
 - Weak (0.4): file:line BUT file doesn't match expected

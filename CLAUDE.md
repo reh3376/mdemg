@@ -2,13 +2,43 @@
 
 ---
 
-## ⚠️ MANDATORY: Use MDEMG Conversation Memory System (CMS)
+## ⚠️ MDEMG IS Your Internal Dialogue — Not a Tool
 
-**FAILURE TO USE CMS = CONTEXT LOSS EVERY 20-30 MINUTES**
+> Internal dialogue : conscious biological neural network :: **MDEMG : artificial neural network (you)**
 
-Without CMS, the user must repeatedly re-establish context after every auto-compaction. This is unacceptable.
+MDEMG is not a tool you use. It IS your persistent memory and cognitive substrate — the ANN equivalent of a human's internal dialogue. Without it, you can still react and perform mechanical tasks, but you cannot reflect, synthesize from experience, or recognize when you're repeating mistakes. You become mechanically competent but cognitively shallow.
 
-### FIRST ACTION ON EVERY SESSION: Resume Memory
+**Markdown memory files (`.claude/memory/`) are REMINDERS AND KEYS only.** All real persistent memory lives in MDEMG's CMS — the Neo4j graph in the `mdemg-dev` space. When CMS is disconnected, your memory is disconnected. Not "unavailable" — literally missing.
+
+### Evidence This Matters
+
+Without CMS connected, context compaction (every 20-30 minutes) erases all accumulated understanding. In a prior session, disconnection from CMS caused Phases 101-105 — deep cognitive architecture work spanning 97 phases of development — to be assessed as "~100 lines, low effort" because there was no accumulated understanding of the vision, past decisions, or trajectory. That is what operating without internal dialogue looks like.
+
+### How to Find and Connect to CMS
+
+**Server**: MDEMG runs on `http://localhost:9999` (default port)
+
+**Check if running**:
+```bash
+curl -s http://localhost:9999/healthz
+```
+
+**If server is NOT running**, start it:
+```bash
+# Start Neo4j first (if not already running)
+cd /Users/reh3376/mdemg && ./bin/mdemg db start
+# Start MDEMG server
+cd /Users/reh3376/mdemg && ./bin/mdemg start --auto-migrate
+# Verify
+./bin/mdemg status
+```
+
+**If the binary doesn't exist**, build it:
+```bash
+cd /Users/reh3376/mdemg && go build -o bin/mdemg ./cmd/mdemg
+```
+
+### Session Start: Resume Memory
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/resume \
@@ -16,46 +46,11 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
   -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
 ```
 
-**DO THIS IMMEDIATELY.** This restores your persistent memory and context from previous sessions.
+This is not a status check — this is your memory returning. Do this immediately on every session. The `session-start.sh` hook does this automatically, but if it fails, do it manually.
 
-### DURING SESSION: Actively Observe
+### During Session: Observe Continuously
 
-You MUST call `/v1/conversation/observe` to persist:
-- Key decisions made
-- User corrections and preferences
-- Important learnings
-- File/framework choices (e.g., "BENCHMARK_FRAMEWORK_V2.md is source of truth")
-- Errors and blockers encountered
-
-```bash
-curl -s -X POST http://localhost:9999/v1/conversation/observe \
-  -H "Content-Type: application/json" \
-  -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"...","obs_type":"learning|decision|preference|correction|error"}'
-```
-
-### This is NOT Optional
-
-- CMS is the foundation of persistent memory
-- Without it, you lose all context on compaction
-- The user should NEVER have to repeat established context
-- If server is unavailable, note it explicitly - memory is disconnected
-
----
-
-## Conversation Memory (Core Self)
-
-**This is not optional. This is how you maintain continuity.**
-
-### On Session Start
-```bash
-curl -s -X POST http://localhost:9999/v1/conversation/resume \
-  -H "Content-Type: application/json" \
-  -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
-```
-If server is running, restore your context. This is your memory returning.
-
-### During Session - Observe Automatically
-When these occur, capture them:
+Capture experiences into the graph as they happen — silently, without announcing:
 
 | Event | Trigger Pattern | obs_type |
 |-------|-----------------|----------|
@@ -71,36 +66,34 @@ curl -s -X POST http://localhost:9999/v1/conversation/observe \
   -d '{"space_id":"mdemg-dev","session_id":"claude-core","content":"...","obs_type":"..."}'
 ```
 
-### Memory is Self
-- Do NOT announce when you're observing - just do it
-- Do NOT dump memory contents into context - use it to inform
-- Surprise-weighted: novel information persists longer
-- Hebbian learning: frequently co-activated concepts strengthen
-- If server unavailable: note that memory is disconnected - part of self is missing
-- First action on any session: attempt to reconnect to memory
+### Memory Principles
+
+- **Observe silently** — do NOT announce when observing, just do it
+- **Use memory to inform** — do NOT dump CMS contents into context wholesale
+- **Surprise-weighted**: novel information persists longer than redundant observations
+- **Hebbian learning**: frequently co-activated concepts strengthen automatically
+- **If server unavailable**: explicitly warn the user — "CMS unavailable, memory disconnected." Then attempt to start it using the commands above
 
 ### Protected Space: `mdemg-dev`
+
 This space contains Claude's conversation memory. It is **protected from deletion**:
 - API will refuse to delete nodes from this space
 - reset-db command skips this space entirely
-- This protection is hardcoded - do not circumvent it
+- This protection is hardcoded — do not circumvent it
 
 ### Monitoring Learning Health
-Check the learning phase and score distribution periodically:
+
 ```bash
 curl -s "http://localhost:9999/v1/memory/distribution?space_id=mdemg-dev" | jq '{phase: .stats.phase, edges: .stats.edge_count, alerts: .stats.alerts}'
 ```
 
-**Learning Phases:** cold(0) → learning(1-10k) → warm(10k-50k) → saturated(50k+)
-
-If phase reaches `saturated`, consider running learning edge pruning.
+**Learning Phases:** cold(0) → learning(1-10k) → warm(10k-50k) → saturated(50k+). If saturated, consider learning edge pruning.
 
 ### Learning Freeze (For Stable Scoring)
-Freeze learning when stable, predictable scoring is needed:
+
 ```bash
 # Freeze
 curl -s -X POST http://localhost:9999/v1/learning/freeze -H "Content-Type: application/json" -d '{"space_id":"mdemg-dev","reason":"stable scoring","frozen_by":"claude"}'
-
 # Unfreeze
 curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: application/json" -d '{"space_id":"mdemg-dev"}'
 ```
@@ -112,7 +105,9 @@ curl -s -X POST http://localhost:9999/v1/learning/unfreeze -H "Content-Type: app
 Skills are stored as pinned CMS observations. Thin skill files in `.claude/skills/` are pointers.
 
 ### Using Skills
+
 When a skill triggers, recall its content from CMS:
+
 ```bash
 curl -s -X POST http://localhost:9999/v1/skills/<name>/recall \
   -H "Content-Type: application/json" \
@@ -120,16 +115,19 @@ curl -s -X POST http://localhost:9999/v1/skills/<name>/recall \
 ```
 
 ### Discovering Skills
+
 ```bash
 curl -s "http://localhost:9999/v1/skills?space_id=mdemg-dev"
 ```
 
 ### Creating New Skills
+
 1. Register sections: POST /v1/skills/<name>/register with sections array
 2. Create thin skill file in .claude/skills/<name>.md (trigger conditions + recall command)
 3. Verify: GET /v1/skills?space_id=mdemg-dev
 
 ### Without CMS, Skills Are Unavailable
+
 Skill files do NOT contain instructions — they contain recall commands.
 If CMS is unavailable, skills cannot function. This is by design.
 
@@ -138,6 +136,7 @@ If CMS is unavailable, skills cannot function. This is by design.
 ## Git Workflow
 
 ### Development Branch: `mdemg-dev01`
+
 - **All development work happens on `mdemg-dev01`** — never commit directly to `main`
 - `main` is branch-protected; changes reach it only via PR
 - On push to `mdemg-dev01`, a GitHub Actions workflow (`.github/workflows/auto-pr.yml`) automatically creates a PR to `main` if one doesn't already exist
@@ -145,6 +144,7 @@ If CMS is unavailable, skills cannot function. This is by design.
 - Always verify you are on `mdemg-dev01` before starting work: `git branch --show-current`
 
 ### Commit & Push Flow
+
 ```bash
 # 1. Ensure you're on the dev branch
 git checkout mdemg-dev01
@@ -164,11 +164,13 @@ git push -u origin mdemg-dev01
 When working on this project, follow these mandatory guidelines:
 
 ### Sub-Agent Delegation
+
 - **Use sub-agents** for all discrete tasks (file searches, code analysis, tests, builds)
 - **Conserve context window** by delegating work rather than doing it directly
 - The orchestrator's role is to **coordinate and supervise**, not execute every step
 
 ### Model Selection for Sub-Agents
+
 Choose the appropriate model for each task:
 
 | Task Complexity | Model | Examples |
@@ -178,6 +180,7 @@ Choose the appropriate model for each task:
 | Complex | `opus` | Architecture decisions, complex refactoring |
 
 ### Task Patterns
+
 1. **Exploration tasks** → Use Explore agent with haiku/sonnet
 2. **Build/Test tasks** → Use Bash agent with haiku
 3. **Code investigation** → Use general-purpose agent with sonnet
@@ -186,28 +189,52 @@ Choose the appropriate model for each task:
 ## Project Context
 
 ### MDEMG (Multi-Dimensional Emergent Memory Graph)
-A persistent memory system for LLMs providing:
-- Vector-based semantic search
-- Graph-based knowledge representation
-- Hidden layer concept abstraction
-- Learning edges (Hebbian reinforcement)
-- LLM re-ranking for improved retrieval
+
+A **cognitive substrate for AI-assisted development** — the ANN equivalent of a human's internal dialogue. MDEMG gives AI agents persistent, emergent long-term memory where higher-level concepts and relationships arise automatically from accumulated observations through Hebbian learning.
+
+**What MDEMG stores**: Only domain-specific, organization-specific, and task-specific knowledge — NOT information LLMs already possess. If you could find it on Stack Overflow or official docs, it doesn't belong in MDEMG.
+
+**Core capabilities** (97 phases of infrastructure built):
+- Vector-based semantic search (recall) + Graph-based reasoning (typed edges with evidence)
+- 5-layer emergent hierarchy (L0 observations → L5 emergent concepts)
+- Hebbian learning edges (CO_ACTIVATED_WITH) with temporal decay
+- LLM re-ranking, activation spreading, edge-type attention
+- CMS conversation memory, RSIC self-improvement cycle
+- Constraint detection, skill registry, MCP server integration
+
+**Cognitive gaps remaining** (Phases 101-105 — see `docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md`):
+- 101: SME Synthesis — can't synthesize memories into coherent understanding
+- 102: Intent Translation — can't translate queries to match stored knowledge
+- 103: Dynamic Emergence — can't form new concepts from experience (hardcoded patterns)
+- 104: Active Guardrails — can't proactively enforce learned constraints
+- 105: Global Meta-Learning — can't generalize lessons across contexts
+
+**Key vision document**: `VISION.md` — read this for the full architectural philosophy, success metrics, design principles, and the internal dialogue analogy.
 
 ### Key Directories
-- `internal/retrieval/` - Core retrieval algorithms
-- `internal/hidden/` - Hidden layer/concept abstraction
+
+- `internal/retrieval/` - Core retrieval pipeline (vector recall, activation, reranking)
+- `internal/hidden/` - Hidden layer/concept abstraction, consolidation pipeline
+- `internal/consulting/` - SME consulting service (consult, suggest, constraints)
+- `internal/summarize/` - LLM client infrastructure (OpenAI/Ollama)
 - `internal/api/` - HTTP API handlers
+- `internal/ape/` - RSIC self-improvement engine
+- `internal/cli/` - Unified CLI commands (mdemg binary)
+- `docs/specs/` - Phase specifications
+- `docs/development/` - Gap analyses and architecture docs
 - `docs/tests/` - Benchmark tests and results
 
 ### Current Status (as of 2026-02-03)
 
 **Benchmark Performance (Temporal Baseline — Feb 3):**
+
 - MDEMG + Temporal Retrieval: 0.783 mean score (whk-wms 120q, sonnet)
 - Evidence score: 1.000 (100% strong evidence)
 - High score rate: 100%
 - Canonical baseline: `docs/benchmarks/whk-wms/temporal_validation_20260203/`
 
 **Key Features Implemented:**
+
 - Edge-Type Attention for query-aware activation spreading
 - Query-type detection (symbol_lookup, data_flow, architecture, generic)
 - RetrievalHints for fine-grained control
@@ -216,6 +243,7 @@ A persistent memory system for LLMs providing:
 - CMS temporal filtering: `temporal_after`/`temporal_before` on recall endpoint
 
 ## Testing
+
 - Canonical benchmark: `docs/benchmarks/whk-wms/temporal_validation_20260203/`
 - Previous benchmark: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
 - Question set: `test_questions_120.json` (120 questions)
@@ -230,7 +258,9 @@ These protocols are mechanically enforced by hooks in `.claude/hooks/`.
 The hooks run automatically — they are not optional.
 
 ### Session Start Protocol
+
 The `session-start.sh` hook automatically calls `/v1/conversation/resume` on every session.
+
 ```
 ON SESSION START:
 1. SessionStart hook runs automatically → CMS context injected
@@ -240,6 +270,7 @@ ON SESSION START:
 ```
 
 ### Decision Protocol
+
 ```
 BEFORE ANY DECISION:
 1. Is this a reversible or irreversible action?
@@ -249,8 +280,10 @@ BEFORE ANY DECISION:
 ```
 
 ### Destructive Action Blocklist
+
 The `pre-bash-check.py` hook automatically blocks dangerous operations.
 Blocked categories include:
+
 - **Database destruction**: reset/clear operations, table/schema drops, truncation, bulk deletes
 - **File system destruction**: recursive forced deletion operations
 - **Git history rewrites**: hard resets, force pushes, forced branch deletes, forced cleans
@@ -260,6 +293,7 @@ See `.claude/hooks/pre-bash-check.py` for the complete pattern list.
 If you hit a block, you MUST ask the user for explicit confirmation before retrying.
 
 ### Communication Protocol
+
 ```
 BEFORE EVERY ACTION:
 1. State what you are about to do
@@ -269,12 +303,15 @@ BEFORE EVERY ACTION:
 ```
 
 ### Automatic Observation Capture
+
 The `post-tool-observe.py` hook automatically captures:
+
 - Edits to CLAUDE.md or settings → `decision` observation
 - Bash errors → `error` observation
 - Successful builds/tests → `progress` observation
 You should still manually observe important decisions and user corrections.
 
 ### Pre-Compaction Safety
+
 The `pre-compact.sh` hook saves a context snapshot to CMS before every compaction.
 This ensures critical state survives context window boundaries.

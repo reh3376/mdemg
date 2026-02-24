@@ -65,6 +65,7 @@ At the end of each phase, create dedicated feature documentation for key feature
 **Naming:** Use kebab-case descriptive names (e.g., `split-pipeline-execution.md`, `bridges-edge-type.md`)
 
 **Each feature doc covers:**
+
 1. What the feature does (one-paragraph summary)
 2. How it works (architecture, data flow)
 3. Configuration (env vars, defaults)
@@ -79,6 +80,7 @@ At the end of each phase, create dedicated feature documentation for key feature
 ## 4. Auto-Memory Update
 
 Update `MEMORY.md` (at `~/.claude/projects/-Users-reh3376-mdemg/memory/MEMORY.md`) with:
+
 - Phase number and name
 - Key architectural changes
 - Updated counts (UATS, pipeline steps, etc.)

@@ -21,6 +21,9 @@ func newConfigCmd() *cobra.Command {
 
 	cmd.AddCommand(newConfigShowCmd())
 	cmd.AddCommand(newConfigValidateCmd())
+	cmd.AddCommand(newConfigSetSecretCmd())
+	cmd.AddCommand(newConfigGetSecretCmd())
+	cmd.AddCommand(newConfigListSecretsCmd())
 
 	return cmd
 }

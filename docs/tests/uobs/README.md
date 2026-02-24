@@ -5,6 +5,7 @@ A standardized framework for validating observability infrastructure in MDEMG.
 ## Overview
 
 UOBS provides:
+
 - **Metrics Validation**: Verify Prometheus metrics presence and format
 - **Health Checks**: Validate health endpoint responses
 - **Tracing**: Verify distributed tracing propagation
@@ -103,6 +104,7 @@ Import `alerts/latency_slo.yaml` into Prometheus:
 ## Grafana Dashboard
 
 Import `dashboards/overview.json` into Grafana for:
+
 - Request rate and latency graphs
 - Error rate visualization
 - Circuit breaker status

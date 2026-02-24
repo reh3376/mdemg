@@ -421,12 +421,15 @@ Overall: 16/16 languages passing (100%)
 ## Troubleshooting
 
 ### "Parser not found"
+
 ```bash
 go build -o bin/extract-symbols ./cmd/extract-symbols
 ```
 
 ### "No symbols extracted"
+
 The tree-sitter grammar isn't loaded or extraction function is missing. Check:
+
 ```bash
 # See raw parser output
 ./bin/extract-symbols --json fixtures/rust_test_fixture.rs
@@ -438,7 +441,9 @@ The tree-sitter grammar isn't loaded or extraction function is missing. Check:
 ```
 
 ### "Validation still fails after regeneration"
+
 Check the validation output for specific mismatches:
+
 ```bash
 python3 upts_runner.py validate --spec=rust.upts.json --parser="./bin/extract-symbols --json" --verbose
 ```

@@ -20,6 +20,7 @@ When omitted, `timestamp_format` defaults to `rfc3339` for full backward compati
 ### Normalization
 
 All formats are parsed Go-side, then normalized to RFC3339 UTC before the value reaches Neo4j. This means:
+
 - Neo4j `datetime()` always receives a consistent RFC3339 string
 - Invalid timestamps produce clear 400 errors with format hints (e.g., `"timestamp '...' is not valid unix format. Expected: integer seconds since epoch"`)
 - Batch ingest errors include the item index (e.g., `"observations[3]: timestamp '...' is not valid rfc3339 format"`)

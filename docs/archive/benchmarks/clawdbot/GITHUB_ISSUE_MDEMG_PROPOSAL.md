@@ -39,17 +39,21 @@ The main difference is that MDEMG builds relationships between concepts rather t
 I've packaged everything needed to reproduce or modify this benchmark:
 
 ### Question Set
+
 - `test_questions_130_master.json` - 130 questions with expected answers
 - `test_questions_130_agent.json` - Same questions without answers (for blind testing)
 
 ### Grading
+
 - `grade_answers.py` - Semantic similarity grading script (pure Python, no dependencies)
 
 ### Prompts
+
 - `baseline_agent_prompt.md` - Instructions for baseline agent
 - `mdemg_agent_prompt.md` - Instructions for MDEMG agent
 
 ### Raw Results
+
 - `answers_baseline_run[1-3].jsonl` - Baseline agent responses
 - `answers_mdemg_run[1-3].jsonl` - MDEMG agent responses
 - `grades_*.json` - Per-question grading breakdown
@@ -65,6 +69,7 @@ python grade_answers.py answers.jsonl test_questions_130_master.json grades.json
 ```
 
 The grading script uses:
+
 - N-gram Jaccard similarity
 - Weighted word overlap (pseudo-IDF)
 - Key concept extraction
@@ -81,6 +86,7 @@ MDEMG is a memory system I've been working on. Key features:
 The repository is currently private while I finish hardening it for public release. If you're interested in early access or have questions about the implementation, feel free to reach out and I can provide access or more details.
 
 Once public, basic usage looks like:
+
 ```bash
 curl -X POST http://localhost:8090/v1/memory/consult \
   -d '{"space_id": "your-space", "question": "...", "include_evidence": true}'

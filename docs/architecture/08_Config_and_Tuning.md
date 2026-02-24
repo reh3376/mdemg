@@ -37,6 +37,7 @@ VECTOR_INDEX_NAME=memNodeEmbedding   # Neo4j vector index name
 The server writes a `.mdemg.port` file containing the actual bound port. Client tools (`mcp-server`, `ingest-codebase`, shell scripts) read this file automatically.
 
 **Resolution priority** (used by `config.ResolveEndpoint()`):
+
 1. `MDEMG_ENDPOINT` environment variable (explicit override)
 2. `.mdemg.port` file (dynamic discovery)
 3. `LISTEN_ADDR` environment variable (static config)
@@ -95,6 +96,7 @@ MAX_TOTAL_EDGES_FETCHED=5000         # Total edge limit (default 5000)
 ## Scoring Hyperparameters
 
 The scoring formula is:
+
 ```
 S = α*V + β*A + γ_eff*R + δ*C - φ*log(1+deg) - κ*d
 ```
@@ -134,6 +136,7 @@ TEMPORAL_HARD_FILTER=true          # Enable hard time-range filtering (default: 
 | `hard` | "in the last 7 days", "since Jan 2026" | Filters candidates by time range `[after, before)` |
 
 ### Hard-Mode Triggers
+
 - "in the last N days/weeks/months"
 - "since YYYY-MM-DD" or "since Month Year"
 - "before YYYY-MM-DD" or "before Month Year"
@@ -141,6 +144,7 @@ TEMPORAL_HARD_FILTER=true          # Enable hard time-range filtering (default: 
 - "this week/month/year"
 
 ### Soft-Mode Triggers
+
 - "recent", "recently", "latest", "newest"
 - "what changed", "what's new", "updates to"
 - "new changes", "latest changes", "recent changes"
@@ -164,6 +168,7 @@ LEARNING_EDGE_CAP_PER_REQUEST=200    # Max CO_ACTIVATED_WITH edges per request
 Learning formula: `Δw = η * a_i * a_j - μ * w_ij`
 
 Defaults (in `learning/service.go`):
+
 - `η` (learning rate): 0.1
 - `μ` (regularization): 0.01
 - `w_min`: 0.0
@@ -232,6 +237,7 @@ Formula: `w_new = w_old * exp(-decay_rate * days)`
 | Protected | - | Edges with `is_pinned=true` skip decay |
 
 Usage:
+
 ```bash
 go run ./cmd/decay --space-id ide-agent --dry-run
 go run ./cmd/decay --space-id ide-agent --execute
@@ -251,6 +257,7 @@ The `cmd/consolidate` CLI detects clusters and promotes abstractions.
 | Evidence threshold | 3 | Min evidence count for promotion |
 
 Usage:
+
 ```bash
 go run ./cmd/consolidate --space-id ide-agent --dry-run
 go run ./cmd/consolidate --space-id ide-agent --execute

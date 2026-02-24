@@ -61,6 +61,7 @@ curl -X POST http://localhost:8080/v1/conversation/observe \
 ```
 
 Response:
+
 ```json
 {
   "obs_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -91,6 +92,7 @@ curl -X POST http://localhost:8080/v1/conversation/correct \
 ```
 
 Response:
+
 ```json
 {
   "obs_id": "660e8400-e29b-41d4-a716-446655440000",
@@ -184,6 +186,7 @@ go test -v ./internal/conversation/...
 ```
 
 Tests cover:
+
 - ✅ Term novelty detection (PascalCase, acronyms, technical suffixes)
 - ✅ Correction pattern matching (8 patterns)
 - ✅ Summary generation (truncation, whitespace normalization)
@@ -198,6 +201,7 @@ Tests cover:
 ```
 
 Tests full API flow:
+
 1. Simple observation (low surprise)
 2. Domain-specific terminology (medium surprise)
 3. Explicit correction (high surprise)
@@ -282,6 +286,7 @@ Session IDs enable Phase 2's co-activation learning: observations in the same se
 ## Production Readiness
 
 ✅ Production-quality features:
+
 - Comprehensive error handling
 - Logging for debugging
 - Input validation

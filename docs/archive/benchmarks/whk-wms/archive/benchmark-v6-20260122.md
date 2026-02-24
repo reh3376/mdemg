@@ -87,6 +87,7 @@
 ## Conclusion
 
 v6 with adaptive layers and dynamic types performs **comparably** to v5:
+
 - Slight decrease in average (-1.9%) within normal variance
 - Significant improvement in worst-case (+56%)
 - Infrastructure ready for L4/L5 emergence as data accumulates

@@ -21,6 +21,7 @@ Successfully executed MDEMG benchmark with CORRECTED file:line reference require
 **File:** `benchmark_megatron_run1.py`
 
 **Key Features:**
+
 - MDEMG API integration (POST to `/v1/memory/retrieve`)
 - File system integration (searches Megatron-LM repo for symbols)
 - Line number caching to avoid repeated file reads
@@ -53,6 +54,7 @@ Output Size: 40KB
 ### Validation Results
 
 All validation checks passed:
+
 - ✓ 142 questions answered
 - ✓ All IDs sequential (1-142)
 - ✓ All required fields present
@@ -62,6 +64,7 @@ All validation checks passed:
 ### Output File Structure
 
 Each line is a JSON object:
+
 ```json
 {
   "id": 1,
@@ -74,6 +77,7 @@ Each line is a JSON object:
 ### Comparison to Baseline
 
 **Critical Difference:**
+
 - Baseline runs: Missing line numbers in references
 - This run: **ALL references include line numbers**
 

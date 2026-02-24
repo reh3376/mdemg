@@ -7,11 +7,13 @@ This framework tests MDEMG's ability to maintain codebase context across LLM con
 ## Experiment Design
 
 ### Codebase
+
 - **Repository:** whk-wms (Whiskey House Warehouse Management System)
 - **Size:** 196 MB, 8,937 code elements
 - **Tech Stack:** NestJS, Next.js, Prisma, PostgreSQL, GraphQL
 
 ### Test Set
+
 - **Total Questions:** 500
 - **Questions per Test:** 50 (randomly selected)
 - **Categories:**
@@ -22,6 +24,7 @@ This framework tests MDEMG's ability to maintain codebase context across LLM con
   - Deep Technical (100 questions)
 
 ### Scoring
+
 | Score | Meaning |
 |-------|---------|
 | 1.0 | Completely correct with specific details |
@@ -32,20 +35,23 @@ This framework tests MDEMG's ability to maintain codebase context across LLM con
 ## Metrics Tracked
 
 ### Primary Metrics
+
 1. **Average Test Score** (-1.0 to 1.0)
 2. **Total Tokens Consumed** (input + output)
 3. **Context Compressions** (number of times context was compressed)
 4. **Time Elapsed** (seconds)
 
 ### Secondary Metrics
-5. **Score by Category** (Architecture, Implementation, etc.)
-6. **Retrieval Accuracy** (MDEMG only - relevance of retrieved context)
-7. **Answer Confidence** (self-reported confidence)
-8. **Hallucination Rate** (percentage of -1.0 scores)
+
+1. **Score by Category** (Architecture, Implementation, etc.)
+2. **Retrieval Accuracy** (MDEMG only - relevance of retrieved context)
+3. **Answer Confidence** (self-reported confidence)
+4. **Hallucination Rate** (percentage of -1.0 scores)
 
 ## Test Execution Protocol
 
 ### Baseline Test (Non-MDEMG)
+
 1. Start fresh conversation
 2. Systematically read codebase files into context
 3. Answer 50 randomly selected questions
@@ -53,6 +59,7 @@ This framework tests MDEMG's ability to maintain codebase context across LLM con
 5. Document results
 
 ### MDEMG Test
+
 1. Ingest full codebase into MDEMG
 2. Run consolidation
 3. Start fresh conversation (no direct file reading)
@@ -64,6 +71,7 @@ This framework tests MDEMG's ability to maintain codebase context across LLM con
 ## Output Files
 
 Each test run produces:
+
 - `./mdemg/docs/tests/baseline-{timestamp}.md` - Baseline results
 - `./mdemg/docs/tests/mdemg-{timestamp}.md` - MDEMG results
 - `./mdemg/docs/tests/comparison-{timestamp}.md` - Comparative analysis

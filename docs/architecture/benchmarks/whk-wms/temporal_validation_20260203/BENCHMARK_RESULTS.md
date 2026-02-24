@@ -25,6 +25,7 @@
 ## This Is The New Baseline
 
 All future benchmark runs should compare against this result:
+
 - **Baseline mean: 0.783**
 - **Baseline evidence: 1.000 (100% strong)**
 - **Baseline high score rate: 100%**
@@ -46,6 +47,7 @@ All future benchmark runs should compare against this result:
 ## Temporal Mode Distribution
 
 Of the 120 benchmark questions:
+
 - **119 questions**: `mode=none` (standard retrieval, unchanged)
 - **1 question**: `mode=soft` (Q308 — "propagate comment updates to connected clients")
 - **0 questions**: `mode=hard`

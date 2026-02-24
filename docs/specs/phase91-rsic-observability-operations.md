@@ -14,6 +14,7 @@
 Phases 87-90 built the full RSIC runtime (orchestration, safety, persistence, multi-space, CI gating). All 109 UATS pass and 6 integration tests validate the vertical stack. However, there were **zero RSIC-specific Prometheus metrics** — operators had no visibility into cycle health, action outcomes, trigger rejections, watchdog state, or calibration confidence. This gap made it impossible to detect degradation, diagnose failures, or set SLOs for the RSIC subsystem.
 
 Phase 91 closes this gap with:
+
 1. **12 Prometheus metrics** across 6 RSIC files
 2. **16-panel Grafana dashboard** for real-time RSIC monitoring
 3. **8 alert rules** for automated degradation detection
@@ -68,6 +69,7 @@ Uses the existing `metrics.Metrics()` global singleton pattern — the same appr
 ### Operations Runbook (§11)
 
 Added to `docs/architecture/14_Operations_Runbook.md`:
+
 - §11.1 RSIC Health Indicators — metric table with healthy ranges
 - §11.2 Failure Mode Playbooks — diagnosis commands and remediation for all 8 alerts
 - §11.3 RSIC Safe Mode — disable all automatic triggers

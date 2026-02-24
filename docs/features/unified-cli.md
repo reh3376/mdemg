@@ -71,6 +71,7 @@ mdemg init --yes              # Alias for --defaults
 ```
 
 The wizard:
+
 1. Detects your environment (Neo4j, Ollama, Git, IDE)
 2. Prompts for space ID, Neo4j URI, embedding provider
 3. Generates `.mdemg/config.yaml` and `.mdemgignore`
@@ -78,6 +79,7 @@ The wizard:
 5. Optionally writes IDE MCP configs (`.cursor/mcp.json`, `.vscode/mcp.json`, `.claude/mcp.json`)
 
 Override specific settings:
+
 ```bash
 mdemg init --defaults --neo4j-uri bolt://db:7687 --embedding-provider openai
 mdemg init --defaults --no-hooks --no-ide
@@ -101,9 +103,9 @@ schema:
   version: 17
 ```
 
-**Priority** (lowest → highest): defaults → `.mdemg/config.yaml` → `.env` → env vars → CLI flags.
+**Priority** (lowest → highest): defaults → `.mdemg/config.yaml` → keychain → `.env` → env vars → CLI flags.
 
-Secrets (passwords, API keys) should stay in `.env` or env vars — never in `config.yaml`.
+Secrets (passwords, API keys) should use the system keychain (`mdemg config set-secret`) or stay in `.env`/env vars — never in `config.yaml`.
 
 ### `.mdemgignore`
 
@@ -146,9 +148,37 @@ mdemg config validate
 ```
 
 Checks:
+
 - YAML syntax and field values
 - Neo4j reachability (TCP probe on configured URI)
 - Embedding provider reachability (HTTP probe)
+
+### Secret Management
+
+Store secrets in the system keychain instead of plaintext `.env` files:
+
+```bash
+# Store a secret (prompts for hidden input if value omitted)
+mdemg config set-secret neo4j-password
+mdemg config set-secret openai-api-key sk-abc123
+
+# Retrieve a secret
+mdemg config get-secret neo4j-password
+
+# List known secrets and their keychain status
+mdemg config list-secrets
+```
+
+Known secret keys are automatically resolved to env vars on startup:
+
+| Key | Env Var |
+|-----|---------|
+| `neo4j-password` | `NEO4J_PASS` |
+| `openai-api-key` | `OPENAI_API_KEY` |
+| `jwt-secret` | `AUTH_JWT_SECRET` |
+| `linear-webhook` | `LINEAR_WEBHOOK_SECRET` |
+
+Keychain is opportunistic — if unavailable, MDEMG falls back silently to `.env` and env vars. See [docs/features/secret-management.md](secret-management.md) for details.
 
 ---
 
@@ -166,26 +196,56 @@ Performs an actual test embedding (not just a connectivity probe) and reports di
 
 ## Starting the Server
 
+### Background (Daemon Mode)
+
 ```bash
-./bin/mdemg serve
+./bin/mdemg start                          # Start in background
+./bin/mdemg start --port=9999              # Custom port
+./bin/mdemg start --auto-migrate           # Apply migrations on startup
+./bin/mdemg start --mcp                    # Start MCP server alongside
+./bin/mdemg start --no-db                  # Don't auto-start Neo4j
 ```
 
-The server reads configuration from environment variables (via `.env` file), with CLI flag overrides for common settings:
+The server runs as a detached process. Logs go to `.mdemg/logs/mdemg.log`, PID to `.mdemg/mdemg.pid`. If Docker is available and a Neo4j container exists but is stopped, it's started automatically.
+
+### Lifecycle Commands
 
 ```bash
-# Override port (default from LISTEN_ADDR env var)
+./bin/mdemg stop                           # Stop server (SIGTERM, 30s timeout)
+./bin/mdemg restart                        # Stop then start
+./bin/mdemg restart --port=8080            # Restart with new settings
+./bin/mdemg status                         # Show server/DB status
+```
+
+`mdemg stop` stops the MDEMG server only — Neo4j is left running.
+
+```
+MDEMG Status
+============
+  Server:    running (pid=12345)
+  Port:      9999
+  Uptime:    2h 15m
+  Log:       .mdemg/logs/mdemg.log
+  Health:    ok
+  Neo4j:     running (mdemg-neo4j-dev)
+```
+
+See [docs/features/process-lifecycle.md](process-lifecycle.md) for details.
+
+### Foreground Mode
+
+```bash
+./bin/mdemg serve                          # Foreground (for development/debugging)
 ./bin/mdemg serve --port=8080
-
-# Override Neo4j URI (default from NEO4J_URI env var)
 ./bin/mdemg serve --db-uri=bolt://other-host:7687
-
-# Auto-apply pending migrations before starting
 ./bin/mdemg serve --auto-migrate
 ```
 
+The server reads configuration from environment variables (via `.env` file), with CLI flag overrides for common settings.
+
 The server will:
 
-1. Load `.env` configuration
+1. Load configuration (defaults → yaml → keychain → .env → env vars → flags)
 2. Connect to Neo4j
 3. Apply pending migrations (if `--auto-migrate`)
 4. Verify schema version (auto-detected if `REQUIRED_SCHEMA_VERSION` not set)
@@ -361,6 +421,7 @@ Apply exponential decay to learning edges based on time since last activation.
 The decay formula: `w_new = w_old * exp(-decay_rate * days_since_activation)`
 
 Edges are pruned only when ALL of these are true:
+
 - Weight below `--prune-threshold`
 - Evidence count below `--min-evidence`
 - Edge is not pinned
@@ -545,6 +606,7 @@ Spaces are isolated graph namespaces. Export, import, list, and transfer them.
 ```
 
 Export profiles:
+
 | Profile | Includes |
 |---------|----------|
 | `full` | Everything (default) |
@@ -628,6 +690,7 @@ Duplicates all nodes and edges from the source space. New nodes receive fresh `n
 ```
 
 This generates a complete plugin scaffold:
+
 - `manifest.json` — plugin metadata
 - `main.go` — entrypoint
 - `handler.go` — business logic

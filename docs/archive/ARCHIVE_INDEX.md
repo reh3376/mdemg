@@ -41,12 +41,14 @@ docs/archive/
 **Reason:** Superseded by canonical benchmark results in `docs/benchmarks/whk-wms/benchmark_run_20260130/`
 
 Historical benchmark runs used different:
+
 - Question sets and versions
 - Grading formulas and weights
 - Agent models and configurations
 - Path handling (some had bugs)
 
 **Current canonical results:**
+
 - Location: `docs/benchmarks/whk-wms/benchmark_run_20260130/`
 - MDEMG + Edge Attention: 0.898 mean score
 - Baseline: 0.854 mean score
@@ -55,11 +57,13 @@ Historical benchmark runs used different:
 ### Investigations
 
 **BENCHMARK_RUN3_INVESTIGATION.md**
+
 - Status: Resolved
 - Issue: Benchmark variance between runs
 - Resolution: Path handling bug fixed, edge-type attention implemented
 
 **CONFIDENCE_SCORE_INVESTIGATION.md**
+
 - Status: Resolved
 - Issue: Low confidence scores in early runs
 - Resolution: Cold start behavior documented, edge attention improved consistency
@@ -69,16 +73,19 @@ Historical benchmark runs used different:
 ## Active Documentation (Not Archived)
 
 ### Benchmarks
+
 - `docs/benchmarks/whk-wms/benchmark_run_20260130/` - Canonical results
 - `docs/benchmarks/UP_TO_DATE_BENCHMARK_SUMMARY.md` - Current summary
 - `docs/benchmarks/BENCHMARK_V4_README.md` - V4 framework guide
 - `docs/benchmarks/framework/` - Benchmark utilities
 
 ### Parser
+
 - `docs/lang-parser/PARSER_SPEC.md` - Consolidated parser specification
 - `docs/lang-parser/lang-parse-spec/upts/` - UPTS test framework
 
 ### Investigations (Active)
+
 - `docs/investigations/BENCHMARK_IMPROVEMENTS.md`
 - `docs/investigations/LEARNING_EDGES_ANALYSIS.md`
 - `docs/investigations/leakage-tests/`

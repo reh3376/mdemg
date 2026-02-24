@@ -28,6 +28,7 @@
 **Claimed baseline token usage:** ~150,000 tokens
 
 At ~4 characters per token:
+
 - 150k tokens ≈ 600,000 characters
 - At ~50 chars/line average ≈ **12,000 lines readable**
 - Codebase has **680,000+ lines**
@@ -51,6 +52,7 @@ Many questions can be answered from minimal files:
 | Generic patterns | Common knowledge | ~15% |
 
 **Examples of trivial questions:**
+
 - "What ORM is used?" → Prisma (visible in any import)
 - "What frontend framework?" → Next.js (visible in package.json)
 - "What enum represents barrel disposition?" → EnumBarrelDisposition (self-evident name)
@@ -79,6 +81,7 @@ Many "deep technical" answers are framework defaults, not codebase-specific:
 ### Issue 4: No Verification of "Correct" Answers
 
 The test provides answers without verification that they're actually correct for this codebase:
+
 - No code citations
 - No file path evidence
 - Many answers are reasonable guesses, not confirmed facts
@@ -100,6 +103,7 @@ The baseline claims to have understood the codebase with "1 context compression"
 ### Problem 2: Cherry-Picked File Selection
 
 Files that would be read first (and answer most questions):
+
 1. `package.json` files (~600 lines) → Answers all framework questions
 2. `schema.prisma` (~2,900 lines) → Answers all model/enum questions
 3. `app.module.ts` → Answers architecture questions
@@ -110,6 +114,7 @@ These 4 file types could answer 60%+ of the questions while using <5% of token b
 ### Problem 3: No Blind Testing
 
 The person creating questions likely had access to:
+
 - Which files would be read
 - What information would be retained
 - How to phrase questions to match available context
@@ -123,6 +128,7 @@ This creates circular validation, not independent testing.
 ### Issue 1: Retrieval ≠ Answer Accuracy
 
 The MDEMG test measures "can the returned files answer the question" not "did the model answer correctly":
+
 - A file containing the answer doesn't guarantee correct interpretation
 - Multi-hop reasoning across files not tested
 - Partial file matches counted as success
@@ -130,6 +136,7 @@ The MDEMG test measures "can the returned files answer the question" not "did th
 ### Issue 2: Easy Path Questions Inflate Scores
 
 MDEMG excels at "where is X" questions (95% accuracy), but these are the easiest category:
+
 - File paths are exact matches
 - No reasoning required
 - Inflates overall score

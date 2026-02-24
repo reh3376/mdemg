@@ -68,7 +68,7 @@ Without these constraints, baseline agents fail catastrophically (see Run 1). MD
 | Property | Value |
 |----------|-------|
 | **Repo** | /Users/reh3376/repos/blueseer |
-| **Repo URL** | https://github.com/blueseerERP/blueseer.git |
+| **Repo URL** | <https://github.com/blueseerERP/blueseer.git> |
 | **Commit** | `1dd2ef15775ee019ee2b57794a733bf6c4ee20ba` |
 | **Files ingested** | 394 Java files |
 | **LOC ingested** | 416,002 |
@@ -126,6 +126,7 @@ Without these constraints, baseline agents fail catastrophically (see Run 1). MD
 | **Failure mode** | Context exhaustion |
 
 **Observed Behavior:**
+
 - Agent deviated from instructions to explore codebase extensively
 - Attempted to batch-generate answers via Python scripts
 - Consumed context exploring rather than writing answers incrementally
@@ -143,6 +144,7 @@ Without these constraints, baseline agents fail catastrophically (see Run 1). MD
 | **Issue** | Missing line numbers in file references |
 
 **Root Cause Analysis:**
+
 - Agent omitted line numbers starting at Question 4
 - 103/140 answers had refs like `['ordData.java']` instead of `['ordData.java:123']`
 - Grading system classified these as "weak evidence"
@@ -202,6 +204,7 @@ Without these constraints, baseline agents fail catastrophically (see Run 1). MD
 ### 1. Comparable Performance When Successful
 
 When runs completed successfully with proper evidence formatting:
+
 - Baseline: 0.830 mean score
 - MDEMG: 0.809 mean score
 - Difference: 2.5% (not statistically significant with n=2)
@@ -221,6 +224,7 @@ While MDEMG Run 2 had quality issues, it still produced 140 answers (vs Baseline
 ### 4. Baseline Requires Strict Execution Constraints
 
 **Critical finding:** Baseline agents cannot complete the 140-question benchmark without explicit instructions to:
+
 - Answer **one question at a time**
 - **Write immediately** after finding evidence
 - **Do not batch** or explore extensively
@@ -253,12 +257,14 @@ This suggests MDEMG retrieval provides more value for moderately complex questio
 **What happened:** Agent attempted broad exploration of 394 Java files, exhausted context before producing answers.
 
 **Observed behaviors across 3 restart attempts:**
+
 1. Extensive codebase exploration consuming context
 2. Attempted batch-generation via Python scripts
 3. Deviated from "one question at a time" instructions
 4. Never produced more than 6 answers despite explicit prompting
 
 **Lessons learned:**
+
 1. Large codebases require retrieval strategies - blind exploration fails
 2. Agent prompts must emphasize incremental output with extreme specificity
 3. Context exhaustion manifests as behavioral deviation (scripts, batching)
@@ -271,17 +277,20 @@ This suggests MDEMG retrieval provides more value for moderately complex questio
 **What happened:** Agent produced complete, detailed answers but omitted line numbers from file references starting at Q4.
 
 **Detection timeline:**
+
 - Q4: First answer without line numbers
 - Q7: 3 consecutive answers without line numbers (trigger point)
 - Q140: Run completed with 103/140 answers lacking line numbers
 
 **With real-time guardrails (BENCHMARK_FRAMEWORK_V2.md Section 5.2):**
+
 - Auto-interrupt would trigger at Q7 (3 consecutive violations)
 - Corrective instruction injected
 - Run continues with proper formatting
 - Failure Severity Score: 0 instead of 1
 
 **Lessons learned:**
+
 1. Agent instruction-following varies between runs
 2. Output format validation should happen during execution, not just grading
 3. Early detection (Q7) prevents degraded run (103 bad answers)
@@ -343,6 +352,7 @@ This benchmark demonstrates that **MDEMG and baseline approaches perform compara
 - **MDEMG failure**: Degraded quality but complete output
 
 The key value proposition of MDEMG may not be raw score improvement, but rather:
+
 1. **Preventing total failures** via targeted retrieval
 2. **Enabling complex questions** that require cross-file understanding
 3. **Reducing exploration overhead** so agents can focus on answering

@@ -19,12 +19,14 @@
 ## Methodology
 
 ### Baseline (grep-based search)
+
 - Extract keywords from questions (excluding stopwords)
 - Prioritize PascalCase/camelCase identifiers (likely code symbols)
 - Use ripgrep to search TypeScript/JavaScript files
 - Return top 5 matching files with line numbers
 
 ### MDEMG (semantic retrieval)
+
 - Use MDEMG `/v1/memory/retrieve` API with question as query
 - Retrieve top 10 semantically similar code elements
 - Synthesize answer from retrieved node summaries
@@ -55,6 +57,7 @@ Note: MDEMG runs 2-3 are cached, hence the fast execution.
 | File Bonus | 10% | Low | Low |
 
 Both methods achieve 100% evidence scores (file:line citations present) but have low semantic and concept overlap with expected answers. This indicates:
+
 1. The scoring is heavily weighted toward evidence presence
 2. Neither method is generating high-quality semantic answers
 3. The benchmark is measuring retrieval ability more than answer quality
@@ -62,10 +65,12 @@ Both methods achieve 100% evidence scores (file:line citations present) but have
 ### Question Category Analysis
 
 Questions where **MDEMG outperformed baseline**:
+
 - Q443 (audit log query): +0.112 (semantic understanding of query patterns)
 - Q262 (barrel-lot invariants): +0.095 (cross-module relationship understanding)
 
 Questions where **Baseline outperformed MDEMG**:
+
 - hard_sym_15 (delay constants): -0.217 (grep finds exact constant names)
 - hard_sym_18 (MAX_RETRIES): -0.158 (grep excels at symbol search)
 - hard_sym_13 (CHUNK_SIZE): -0.157 (grep finds exact matches)
@@ -90,6 +95,7 @@ Questions where **Baseline outperformed MDEMG**:
 | Total New Edges | 0 |
 
 Learning edge accumulation was not observed during this benchmark. This may indicate:
+
 - Learning feature is disabled
 - Space was recently reset
 - Configuration issue

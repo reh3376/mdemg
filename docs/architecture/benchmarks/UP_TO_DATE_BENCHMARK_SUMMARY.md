@@ -105,6 +105,7 @@ score = min(0.70 * evidence + 0.15 * semantic + 0.15 * concept + citation_bonus,
 ## Reproducibility
 
 ### Question Hash
+
 ```bash
 shasum -a 256 docs/benchmarks/whk-wms/test_questions_120_agent.json
 # 24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e
@@ -163,6 +164,7 @@ Edge-Type Attention environment variables:
 Historical benchmark runs have been archived to `docs/archive/benchmarks/`. These used different methodologies and should not be compared directly to v22 results.
 
 Archived codebases:
+
 - whk-wms (pre-v22 runs)
 - megatron-lm
 - zed

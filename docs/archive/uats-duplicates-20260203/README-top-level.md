@@ -30,6 +30,7 @@ make test-api
 UATS spec files use `"base_url": "${MDEMG_BASE_URL}"` — an environment variable reference resolved at runtime by the runner. This keeps specs environment-agnostic.
 
 **Resolution priority (highest wins):**
+
 1. `--base-url` CLI flag (the Makefile always passes this)
 2. `MDEMG_BASE_URL` environment variable (resolved from spec's `${MDEMG_BASE_URL}`)
 3. Empty string (connection will fail — ensures misconfiguration is obvious)
@@ -47,12 +48,14 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 ## Endpoint Coverage
 
 ### Health (2)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | health | GET | /healthz |
 | readiness | GET | /readyz |
 
 ### Core Memory (14)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | retrieve | POST | /v1/memory/retrieve |
@@ -71,6 +74,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 | query_metrics | GET | /v1/memory/query/metrics |
 
 ### Ingest Jobs (4)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | ingest_trigger | POST | /v1/memory/ingest/trigger |
@@ -79,6 +83,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 | ingest_jobs | GET | /v1/memory/ingest/jobs |
 
 ### Ingest Codebase (4 specs, 31 test cases)
+
 | Spec | Method | Endpoint | Variants |
 |------|--------|----------|----------|
 | ingest_codebase | POST | /v1/memory/ingest-codebase | 18 |
@@ -87,6 +92,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 | ingest_codebase_cancel | DELETE | /v1/memory/ingest-codebase/{id} | 3 |
 
 ### Learning (5)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | learning_prune | POST | /v1/learning/prune |
@@ -96,6 +102,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 | learning_freeze_status | GET | /v1/learning/freeze/status |
 
 ### Conversation CMS (7)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | conversation_observe | POST | /v1/conversation/observe |
@@ -107,6 +114,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py validate \
 | conversation_graduate | POST | /v1/conversation/graduate |
 
 ### System (9)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | capability_gaps | GET | /v1/system/capability-gaps |

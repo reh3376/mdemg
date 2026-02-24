@@ -1,7 +1,9 @@
 # Language Parser Test Framework
 
 ## Purpose
+
 Standardized approach to test each language parser module ensuring:
+
 1. All expected symbol types are extracted
 2. Line numbers are accurate
 3. Nested structures are handled correctly
@@ -12,6 +14,7 @@ Standardized approach to test each language parser module ensuring:
 ## Test Structure per Language
 
 ### 1. Test Fixture File
+
 Create a comprehensive test file that exercises all parser capabilities:
 
 ```
@@ -25,6 +28,7 @@ cmd/ingest-codebase/languages/testdata/
 ```
 
 ### 2. Expected Symbols JSON
+
 Define expected extraction results:
 
 ```
@@ -35,6 +39,7 @@ cmd/ingest-codebase/languages/testdata/
 ```
 
 ### 3. Test Runner
+
 `cmd/ingest-codebase/languages/parser_test.go`
 
 ---
@@ -313,6 +318,7 @@ curl -s -X POST "http://localhost:9999/v1/memory/retrieve" \
 ## Metrics Dashboard (Future)
 
 Track parser quality over time:
+
 ```
 | Language   | Symbol Types | Avg/File | Line Accuracy | Last Updated |
 |------------|--------------|----------|---------------|--------------|

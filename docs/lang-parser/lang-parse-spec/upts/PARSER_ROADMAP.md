@@ -46,6 +46,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 2-3 hours |
 
 **Key extractions:**
+
 - Top-level keys as symbols
 - Nested paths flattened (`jobs.build.steps[0].run`)
 - Anchors (`&name`) and aliases (`*name`) tracked
@@ -66,6 +67,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 1-2 hours |
 
 **Key extractions:**
+
 - `[section]` as symbols
 - `[[array.of.tables]]` as repeating symbols
 - Key/value pairs with types
@@ -85,6 +87,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 1-2 hours |
 
 **Key extractions:**
+
 - Flattened key paths
 - Schema-aware parsing for known files (`tsconfig`, `package.json`)
 - Preserve line numbers for evidence
@@ -104,6 +107,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 1 hour |
 
 **Key extractions:**
+
 - Key/value pairs
 - Section headers (INI)
 - Comments as doc_comment
@@ -123,6 +127,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 2 hours |
 
 **Key extractions:**
+
 - `FROM` → base image symbols
 - `ARG`/`ENV` → constants with defaults
 - `EXPOSE`, `ENTRYPOINT`, `CMD` → runtime config
@@ -143,6 +148,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 2-3 hours |
 
 **Key extractions:**
+
 - `function name()` or `name()` → functions
 - `export VAR=value` → constants
 - `source`/`.` includes
@@ -163,6 +169,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 4-6 hours |
 
 **Key extractions:**
+
 - `mod` declarations and `use` graph
 - `trait` → interface, `impl Trait for Type`
 - `pub` visibility for export detection
@@ -182,6 +189,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 3-4 hours |
 
 **Key extractions:**
+
 - Package declarations
 - Class/interface/enum with inheritance
 - Annotations (`@Override`, `@Autowired`)
@@ -201,6 +209,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 3-4 hours |
 
 **Key extractions:**
+
 - Function declarations/definitions
 - `struct`, `union`, `typedef`
 - `#define` macros (constants and function-like)
@@ -220,6 +229,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 5-7 hours |
 
 **Key extractions:**
+
 - Everything from C plus:
 - `class` with inheritance
 - `namespace` hierarchy
@@ -240,6 +250,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 3-4 hours (after C++) |
 
 **Key extractions:**
+
 - `__global__` kernels
 - `__device__` functions
 - `__constant__`, `__shared__` memory
@@ -261,6 +272,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 3-4 hours |
 
 **Key extractions:**
+
 - `CREATE TABLE` with columns and constraints
 - `DEFAULT` values (critical for evidence)
 - Indexes, views, triggers
@@ -279,6 +291,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 2-3 hours |
 
 **Key extractions:**
+
 - Node labels from `CREATE`/`MATCH`
 - Relationship types
 - Constraints and indexes
@@ -299,6 +312,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 1-2 hours |
 
 **Key extractions:**
+
 - Headings as hierarchical symbols
 - Code fences with language tags
 - Links between documents
@@ -317,6 +331,7 @@ These define runtime behavior and defaults. Quick wins with high evidence value.
 | Est. effort | 2-3 hours |
 
 **Key extractions:**
+
 - Element paths flattened
 - Key attributes as symbol metadata
 - Namespace awareness
@@ -408,6 +423,7 @@ For industrial automation and enterprise codebases, the current 22 parsers cover
 ## Completed Phases
 
 All original phases complete as of 2026-02-05:
+
 - Phase 1: Config Truth (YAML, TOML, JSON, INI, Dockerfile, Shell)
 - Phase 2: Systems Languages (Rust, Java, C, C++, CUDA)
 - Phase 3: Data & Documentation (SQL, Cypher, Markdown, XML)

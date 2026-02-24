@@ -14,10 +14,12 @@ Brief description of the feature and its purpose within MDEMG.
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: ...
 2. FR-2: ...
 
 ### Non-Functional Requirements
+
 1. NFR-1: Performance — ...
 2. NFR-2: Security — ...
 
@@ -30,6 +32,7 @@ METHOD /v1/path
 ```
 
 **Request:**
+
 ```json
 {
   "field": "type — description"
@@ -37,6 +40,7 @@ METHOD /v1/path
 ```
 
 **Response:**
+
 ```json
 {
   "field": "type — description"
@@ -44,6 +48,7 @@ METHOD /v1/path
 ```
 
 ### Error Codes
+
 | Code | Meaning |
 |------|---------|
 | 400  | ...     |
@@ -52,11 +57,13 @@ METHOD /v1/path
 ## Data Model
 
 ### Neo4j Schema Changes
+
 ```cypher
 // New nodes, constraints, indexes
 ```
 
 ### Go Types
+
 ```go
 // New or modified structs
 ```
@@ -64,13 +71,16 @@ METHOD /v1/path
 ## Test Plan
 
 ### Unit Tests
+
 - [ ] Test case 1: ...
 - [ ] Test case 2: ...
 
 ### Integration Tests
+
 - [ ] Test case 1: ...
 
 ### Benchmark Tests
+
 - [ ] Benchmark case 1: ...
 
 ## Acceptance Criteria
@@ -89,7 +99,9 @@ METHOD /v1/path
 ## Files Changed
 
 ### New Files
+
 - `path/to/new/file.go` — description
 
 ### Modified Files
+
 - `path/to/existing/file.go` — what changes

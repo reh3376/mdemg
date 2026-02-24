@@ -27,18 +27,21 @@ This document tracks improvements to MDEMG identified from the blueseer benchmar
 ### Priority 1: Critical Issues
 
 #### Task #1: Investigate Confidence Score Degradation
+
 **Status:** COMPLETED
 **Problem:** HIGH confidence dropped from 15.2% → 1.6% as learning edges accumulated (0 → 24,860).
 
 **Root Cause Identified: ACTIVATION DILUTION**
 
 The spreading activation algorithm (`internal/retrieval/activation.go:58-83`) accumulates activation from ALL incoming edges. As CO_ACTIVATED_WITH edges accumulate:
+
 1. Activation spreads through many more pathways
 2. Previously low-scoring nodes receive activation from multiple sources
 3. Score distribution compresses toward the middle
 4. Fixed confidence thresholds become harder to achieve
 
 **Key Code Path:**
+
 ```go
 // activation.go:66-71
 for _, e := range ins {
@@ -49,6 +52,7 @@ for _, e := range ins {
 ```
 
 **Scoring Formula Impact:**
+
 - `score = α*vecSim + β*activation + ...`
 - β = 0.30 (30% weight) - activation is significant
 - No normalization applied after scoring
@@ -60,10 +64,12 @@ for _, e := range ins {
 ---
 
 #### Task #5: Reduce No-Evidence Rate
+
 **Status:** Pending
 **Problem:** MDEMG returned 7/140 (4.8%) answers without file:line citations while baseline had 0%.
 
 **Analysis needed:**
+
 - Review failed questions in `answers_mdemg_run*.jsonl`
 - Identify question categories with failures
 - Check if hidden layer fallback is working
@@ -73,6 +79,7 @@ for _, e := range ins {
 ### Priority 2: Feature Enhancements
 
 #### Task #2: Add Normalized Confidence Percentiles
+
 **Status:** COMPLETED AND VERIFIED
 **Goal:** Provide both raw scores and normalized percentiles for meaningful cross-run comparisons.
 
@@ -81,6 +88,7 @@ for _, e := range ins {
 **Verification:** API now returns normalized_confidence (0-100 percentile) and confidence_level (HIGH/MEDIUM/LOW).
 
 **Implementation:**
+
 - Added `NormalizedConfidence` (0-100 percentile) and `ConfidenceLevel` (HIGH/MEDIUM/LOW) to `RetrieveResult`
 - Added `ApplyNormalizedConfidence()` function in `internal/retrieval/scoring.go`
 - Percentile formula: `100 * (n-1-rank) / (n-1)` where rank 0 = best
@@ -88,6 +96,7 @@ for _, e := range ins {
 - Added unit tests in `internal/retrieval/scoring_test.go`
 
 **API response now includes:**
+
 ```json
 {
   "score": 0.72,
@@ -99,10 +108,12 @@ for _, e := range ins {
 ---
 
 #### Task #3: Filter Non-Code Files
+
 **Status:** COMPLETED
 **Problem:** README.md, TRADEMARK_POLICY.md appearing in code-focused queries.
 
 **Implementation:**
+
 - Added `FileFilter` struct with `IncludeExtensions` and `ExcludeExtensions` fields
 - Added `CodeOnly` convenience flag (excludes md, txt, json, yaml, yml, toml, xml, csv, lock, sum)
 - Modified `vectorRecall()` and `BM25Search()` to accept and apply filters
@@ -110,6 +121,7 @@ for _, e := range ins {
 - Added unit tests in `internal/retrieval/filter_test.go`
 
 **API usage:**
+
 ```json
 {
   "query_text": "How does order processing work?",
@@ -126,10 +138,12 @@ for _, e := range ins {
 ---
 
 #### Task #6: Score Distribution Monitoring
+
 **Status:** Pending
 **Goal:** Track score distributions to detect calibration drift in production.
 
 **Metrics:**
+
 - Score histogram per space
 - Confidence level percentages
 - Learning edge count at measurement time
@@ -137,10 +151,12 @@ for _, e := range ins {
 ---
 
 #### Task #7: Learning Phase Freeze
+
 **Status:** Pending
 **Goal:** Allow freezing learning for production stability.
 
 **API:**
+
 ```bash
 mdemg space freeze <space_id>
 ```
@@ -150,6 +166,7 @@ mdemg space freeze <space_id>
 ### Priority 3: Documentation
 
 #### Task #4: Document Learning Edge Effects
+
 **Status:** Pending
 **Goal:** Create `docs/LEARNING_EDGES.md` explaining score behavior across learning phases.
 

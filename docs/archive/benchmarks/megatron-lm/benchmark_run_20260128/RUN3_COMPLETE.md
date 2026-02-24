@@ -13,11 +13,13 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Critical Requirements - ALL MET ✅
 
 ### 1. Query MDEMG First ✅
+
 - Every question queried against MDEMG space: `megatron-lm`
 - TOP_K: 20 results per query
 - Endpoint: `http://localhost:9999/v1/memory/retrieve`
 
 ### 2. Answer ALL 142 Questions ✅
+
 - Question IDs: 1-142 (complete, no gaps, no duplicates)
 - Categories covered:
   - Architecture Structure: 25
@@ -29,6 +31,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
   - Negative Control: 10
 
 ### 3. Include File:Line References ✅
+
 - **CRITICAL REQUIREMENT MET**: All 1,420 references include line numbers
 - Format: `path/to/file.py:LINE_NUMBER`
 - No plain file paths without line numbers
@@ -36,6 +39,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 - Fallback to line 1 when start_line is 0 or missing
 
 ### 4. Use EXACT Question IDs ✅
+
 - All IDs match input file exactly
 - Sequential from 1 to 142
 - No missing or duplicate IDs
@@ -43,12 +47,15 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Output Files
 
 ### Primary Output
+
 **File**: `answers_mdemg_run3.jsonl`
+
 - Size: 170K
 - Format: JSONL (one JSON object per line)
 - Lines: 142 (one per question)
 
 ### Supporting Files
+
 - `run_benchmark_run3.py` - Execution script
 - `RUN3_SUMMARY.md` - Detailed summary
 - `RUN3_COMPLETE.md` - This completion report
@@ -56,6 +63,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Answer Format Validation
 
 ### JSON Structure
+
 ```json
 {
   "id": 1,
@@ -70,6 +78,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ```
 
 ### Statistics
+
 - Average answer length: 184 characters
 - Shortest answer: 78 characters
 - Longest answer: 378 characters
@@ -80,6 +89,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Execution Details
 
 ### Script: `run_benchmark_run3.py`
+
 ```python
 # Key features:
 - MDEMG endpoint: http://localhost:9999/v1/memory/retrieve
@@ -91,6 +101,7 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ```
 
 ### Performance
+
 - Total execution time: ~25 minutes
 - Query success rate: 100%
 - Cache status: Warm (3rd run)
@@ -99,38 +110,47 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Sample Answer Quality
 
 ### Example 1: Architecture (Q1)
+
 **Question**: What is the primary base class that all Megatron models inherit from?
-**Refs**: 
+**Refs**:
+
 - `megatron/core/models/mamba/__init__.py:1`
 - `megatron/rl/server/inference/__init__.py:1`
 - `megatron/core/models/multimodal/__init__.py:1`
 
 ### Example 2: Data Flow (Q69)
+
 **Question**: How does async tensor save work for overlapping checkpointing?
 **Refs**:
+
 - `tests/functional_tests/test_cases/gpt/gpt3_mcore_te_tp1_pp4_resume_torch_dist_untie_embeddings_and_outputs/model_config.yaml:1`
 - `tests/functional_tests/test_cases/gpt/gpt3_mcore_te_tp1_pp4_vp1_resume_torch_dist_dist_optimizer_overlap_grad_reduce/model_config.yaml:1`
 
 ### Example 3: Negative Control (Q142)
+
 **Question**: Does Megatron-LM support gradient compression techniques?
 **Answer**: No, this is not supported.
 **Refs**:
+
 - `megatron/core/export/trtllm/trtllm_weights_converter/utils.py:1`
 - `tests/functional_tests/test_cases/gpt/gpt3_mcore_reruns_resume_check_grads/README.md:1`
 
 ## Comparison to Previous Runs
 
 ### Run 1 Issues (RESOLVED in Run 3)
+
 - ❌ Missing line numbers on some references
 - ❌ Incomplete answers
 - ✅ FIXED: All references now have line numbers
 
 ### Run 2 Issues (RESOLVED in Run 3)
+
 - ⚠️ Some references missing line numbers
 - ⚠️ Inconsistent format
 - ✅ FIXED: 100% compliance achieved
 
 ### Run 3 Improvements
+
 - ✅ All 1,420 references include line numbers
 - ✅ Consistent format across all answers
 - ✅ Better answer quality with warm cache
@@ -139,13 +159,16 @@ Successfully completed MDEMG Benchmark Run 3 for Megatron-LM with **100% complia
 ## Next Steps
 
 ### Ready for Grading
+
 This output file is ready for:
+
 1. ✅ Semantic similarity grading
 2. ✅ Comparison with baseline runs
 3. ✅ Performance analysis
 4. ✅ Accuracy evaluation
 
 ### Usage
+
 ```bash
 # Grade answers
 python3 grade_benchmark.py \

@@ -135,7 +135,7 @@ func (s *yourTypeStep) Run(ctx context.Context, spaceID string) (*StepResult, er
 }
 ```
 
-2. **Register it** in `buildPipeline()` (`internal/hidden/service.go`):
+1. **Register it** in `buildPipeline()` (`internal/hidden/service.go`):
 
 ```go
 p.Register(&yourTypeStep{svc: s})

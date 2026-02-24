@@ -57,6 +57,7 @@ Each line in an answer file:
 ## Grading Weights
 
 The grading script uses:
+
 - 70% evidence quality (file:line citations)
 - 15% semantic similarity (n-gram overlap)
 - 15% concept matching (technical terms)

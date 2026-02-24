@@ -36,6 +36,7 @@ python3 runners/uats_runner.py add-hashes --spec-dir specs/
 ```
 
 For each spec file:
+
 1. Compute hash (excluding existing `config.sha256`)
 2. If unchanged: print `Hash unchanged: {hash[:12]}...`
 3. If new/changed: write updated hash to file, print `Added`/`Updated`
@@ -49,6 +50,7 @@ python3 runners/uats_runner.py verify-hashes --spec-dir specs/
 ```
 
 For each spec file:
+
 - `✓` — Hash matches
 - `-` — No hash present (not an error)
 - `✗` — Hash mismatch (prints expected vs actual)

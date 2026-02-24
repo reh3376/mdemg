@@ -28,6 +28,7 @@
 **Result**: Baseline 74%, MDEMG 80% (+8%)
 
 ### Key Observation
+
 74% baseline accuracy indicates **training data leakage** - VS Code source is in the LLM's training data.
 
 ### Score Breakdown
@@ -43,6 +44,7 @@
 | **Total** | **133/180 (74%)** | **144/180 (80%)** | **+8%** |
 
 ### Conclusion
+
 MDEMG adds marginal value when priors work. VS Code is poor benchmark target due to contamination.
 
 ---
@@ -80,6 +82,7 @@ MDEMG adds marginal value when priors work. VS Code is poor benchmark target due
 | **Delta** | **+21** | **+26%** |
 
 ### Conclusion
+
 MDEMG provides critical value when priors fail. Cross-file questions defeat memorization.
 
 ---
@@ -101,6 +104,7 @@ The baseline LLM **could not provide evidence** for most questions:
 | **Effective Score** | ~0-5% |
 
 **Key Quotes from Baseline:**
+
 - "I cannot reliably cite the storage.ts constants"
 - "Cannot cite exact file paths with confidence"
 - "My training knowledge is insufficient to provide exact symbol names"
@@ -119,6 +123,7 @@ MDEMG retrieved **file paths** but the current API doesn't return file contents:
 **Limitation Identified**: MDEMG returns paths, not content. Needs Read tool integration.
 
 ### Conclusion
+
 Evidence-locked scoring **eliminates fabrication**. Baseline cannot fake file paths.
 
 ---
@@ -150,13 +155,16 @@ Evidence-locked scoring **eliminates fabrication**. Baseline cannot fake file pa
 | ev_015 | Extension host: 60s (web), 10s (local) | webWorkerExtensionHost.ts, localProcessExtensionHost.ts |
 
 ### Key Insight
+
 With tools, baseline achieves **100% with evidence**. But this required:
+
 - Direct codebase access
 - Multiple Grep searches per question
 - Reading full file contents
 - Significantly more time than MDEMG retrieval
 
 ### Conclusion
+
 Tools-enabled baseline is the **upper bound** for accuracy. MDEMG's value is **efficiency**.
 
 ---
@@ -167,6 +175,7 @@ Tools-enabled baseline is the **upper bound** for accuracy. MDEMG's value is **e
 **Hypothesis**: 8B + MDEMG ≈ Large LLM baseline
 
 **Setup**:
+
 - Model: qwen2.5-coder:7b via Ollama
 - MDEMG: vscode-scale space (28,960 nodes)
 - Questions: 6 V4 evidence-locked questions
@@ -193,6 +202,7 @@ Tools-enabled baseline is the **upper bound** for accuracy. MDEMG's value is **e
 ### Key Finding
 
 **MDEMG retrieval limitation exposed**: The current index doesn't find constant definition files.
+
 - Query for "DEFAULT_FLUSH_INTERVAL" returns `/src/vs/base/node/pfs.ts` not `/src/vs/platform/storage/common/storage.ts`
 - The 8B model then hallucinates plausible values (1000ms sounds reasonable, but wrong)
 
@@ -238,6 +248,7 @@ MDEMG's current semantic retrieval doesn't surface constant definitions reliably
 **A 7B model + grep achieves 100% accuracy** - matching the large LLM with tools.
 
 This proves:
+
 1. **Model size isn't the bottleneck** for evidence-locked questions
 2. **Grep is essential** for finding exact constant values
 3. **MDEMG alone isn't sufficient** for constant lookups (semantic ≠ literal)
@@ -257,21 +268,25 @@ Large LLM + MDEMG only = ~20% (same limitation)
 ## The Four Regimes Explained
 
 ### Regime A: Training Data Works
+
 - Questions answerable from general knowledge
 - Both agents perform well
 - MDEMG adds marginal value (+8%)
 
 ### Regime B: Priors Start Failing
+
 - Questions require cross-file correlation
 - Baseline guesses incorrectly with confidence
 - MDEMG corrects with evidence (+26%)
 
 ### Regime C: Cannot Fabricate Evidence
+
 - Questions require proof (file path, symbol, quote)
 - Baseline admits inability (~0%)
 - MDEMG finds paths but needs content access
 
 ### Regime D: Tools Are The Upper Bound
+
 - With full codebase access, baseline achieves 100%
 - But requires time and multiple searches
 - MDEMG's value proposition: **retrieval efficiency**
@@ -283,11 +298,13 @@ Large LLM + MDEMG only = ~20% (same limitation)
 ### Not "Just Retrieval"
 
 Traditional RAG:
+
 1. Embed question
 2. Return top-K documents
 3. Hope answer is there
 
 MDEMG Provides:
+
 1. **Graph-structured retrieval** - Follows relationships
 2. **Activation-based scoring** - Co-activation patterns
 3. **Evidence anchoring** - Specific file paths with scores
@@ -296,11 +313,13 @@ MDEMG Provides:
 ### The Correctness Forcing Function
 
 When baseline fails (Regime B), it fails **confidently wrong**:
+
 - StorageScope APP=0 (wrong)
 - Theme types = 3 (wrong)
 - pinnedViewlets (outdated)
 
 MDEMG doesn't guess - it retrieves and cites:
+
 - "StorageScope from storage.ts: APPLICATION=-1"
 - "ColorThemeType: dark, light, hcDark, hcLight"
 - "Storage key: pinnedViewlets2"
@@ -360,6 +379,7 @@ MDEMG doesn't guess - it retrieves and cites:
 ### What Works Well (Regime B - V3)
 
 MDEMG shines for **conceptual questions** requiring cross-file correlation:
+
 - "How does extension activation flow through the codebase?"
 - "What classes are involved in workspace trust?"
 - "Where is StorageScope used?"
@@ -369,6 +389,7 @@ Here, MDEMG's +26% improvement over baseline is real and valuable.
 ### What Needs Improvement (Regime C/E - V4)
 
 For **evidence-locked questions** requiring exact constants:
+
 - "What is DEFAULT_FLUSH_INTERVAL?" → Need symbol-level indexing
 - "What is minimumWidth in SidebarPart?" → Need property-level extraction
 

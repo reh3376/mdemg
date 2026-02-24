@@ -55,6 +55,7 @@ Response: `{ "space_id": "...", "status": "stopped" }`
 #### Config-Based Startup
 
 Watchers can also be configured at startup via env vars:
+
 - `FILE_WATCHER_ENABLED=true`
 - `FILE_WATCHER_CONFIGS=space_id:/path:ext1|ext2:debounce_ms,...`
 
@@ -76,6 +77,7 @@ Modules declare `event_subscriptions` in their manifest capabilities:
 ```
 
 Supported values:
+
 - Specific event names: `"source_changed"`, `"ingest_complete"`, etc.
 - Wildcard: `"*"` matches all events
 

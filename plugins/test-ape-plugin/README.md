@@ -48,6 +48,7 @@ MDEMG will auto-discover the plugin on startup.
 ## APE Module
 
 This module implements:
+
 - **GetSchedule**: Define when this module should run
 - **Execute**: Perform background maintenance tasks
 
@@ -55,7 +56,6 @@ This module implements:
 
 Edit `GetSchedule` to define your cron schedule and event triggers.
 Edit the handler functions (`handleSessionEnd`, etc.) to implement your logic.
-
 
 ## Configuration
 

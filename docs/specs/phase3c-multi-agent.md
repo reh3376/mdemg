@@ -14,6 +14,7 @@ Extend the Conversation Memory System to support persistent agent identities tha
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Support `agent_id` field on all CMS operations (observe, correct, resume, recall)
 2. FR-2: Store `agent_id` on MemoryNode in Neo4j with appropriate indexes
 3. FR-3: Enable cross-session resume — when `agent_id` is set, retrieve observations across all sessions for that agent
@@ -22,6 +23,7 @@ Extend the Conversation Memory System to support persistent agent identities tha
 6. FR-6: Backward compatibility — requests without `agent_id` work exactly as before
 
 ### Non-Functional Requirements
+
 1. NFR-1: Zero breaking changes — all existing API contracts preserved
 2. NFR-2: Indexed queries — `agent_id` filtering uses Neo4j composite indexes
 3. NFR-3: Agent + user coexistence — `agent_id` and `user_id` can both be set on the same observation
@@ -29,11 +31,13 @@ Extend the Conversation Memory System to support persistent agent identities tha
 ## API Contract
 
 ### Agent Identity on Observe
+
 ```
 POST /v1/conversation/observe
 ```
 
 **Request (new field):**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -46,11 +50,13 @@ POST /v1/conversation/observe
 ```
 
 ### Cross-Session Resume
+
 ```
 POST /v1/conversation/resume
 ```
 
 **Request (new field):**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -58,14 +64,17 @@ POST /v1/conversation/resume
   "max_observations": 20
 }
 ```
+
 When `agent_id` is set, `session_id` filter is skipped — observations from all sessions are returned.
 
 ### Agent-Filtered Recall
+
 ```
 POST /v1/conversation/recall
 ```
 
 **Request (new field):**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -75,11 +84,13 @@ POST /v1/conversation/recall
 ```
 
 ### Agent Identity on Correct
+
 ```
 POST /v1/conversation/correct
 ```
 
 **Request (new field):**
+
 ```json
 {
   "agent_id": "agent-claude"
@@ -89,6 +100,7 @@ POST /v1/conversation/correct
 ## Data Model
 
 ### Neo4j Schema Changes (V0011)
+
 ```cypher
 // Index for filtering observations by agent_id
 CREATE INDEX memorynode_agent_id_idx IF NOT EXISTS
@@ -104,6 +116,7 @@ FOR (n:MemoryNode) ON (n.space_id, n.agent_id, n.session_id);
 ```
 
 ### Go Types (Modified)
+
 ```go
 // Observation — added AgentID field
 type Observation struct {
@@ -118,6 +131,7 @@ type Observation struct {
 ```
 
 ### Visibility Model
+
 ```
 Private:  visible to owning agent only   (agent_id = requestor OR visibility != 'private')
 Team:     visible within space           (visibility = 'team' OR 'global')
@@ -125,15 +139,18 @@ Global:   visible to all agents          (visibility = 'global')
 ```
 
 When `agent_id` is set on the request:
+
 - Private observations: filtered by `agent_id` match (not `user_id`)
 - Team/global observations: visible to all agents in the space
 
 When `agent_id` is not set:
+
 - Falls back to `user_id`-based filtering (backward compatible)
 
 ## Test Plan
 
 ### Unit Tests
+
 - [x] TestObservation_AgentID: field exists and stores correctly
 - [x] TestObserveRequest_AgentID: request type has AgentID field
 - [x] TestCorrectRequest_AgentID: correction request has AgentID field
@@ -147,6 +164,7 @@ When `agent_id` is not set:
 - [x] TestBackwardCompatibility_NoAgentID: no AgentID = legacy behavior
 
 ### Integration Tests
+
 - [ ] End-to-end: observe with agent_id -> resume with agent_id -> verify cross-session
 - [ ] Agent isolation: two agents observe privately -> verify mutual invisibility
 - [ ] Team sharing: observe with team visibility -> verify both agents can recall
@@ -172,10 +190,12 @@ When `agent_id` is not set:
 ## Files Changed
 
 ### New Files
+
 - `migrations/V0011__agent_identity.cypher` — Neo4j indexes for agent_id
 - `internal/conversation/multi_agent_test.go` — 11 multi-agent test functions
 
 ### Modified Files
+
 - `internal/conversation/types.go` — Added `AgentID` to Observation struct
 - `internal/conversation/service.go` — Added `AgentID` to ObserveRequest, CorrectRequest, ResumeRequest, RecallRequest; agent filtering in fetchRecentObservations and findSimilarObservations; agent_id stored in Neo4j node
 - `internal/models/models.go` — Added `AgentID` to API request types (ObserveRequest, CorrectRequest, ResumeRequest, RecallRequest)

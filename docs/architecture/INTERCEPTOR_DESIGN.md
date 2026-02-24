@@ -16,6 +16,7 @@ The Interceptor Agent validates and corrects coding agent outputs against organi
 ## Problem Statement
 
 Current aci-claude-go architecture:
+
 1. Injects memory context **before** agent execution
 2. Saves insights **after** agent execution
 3. No validation of output against stored standards
@@ -477,6 +478,7 @@ func (i *InterceptorAgent) buildDialogEntry(result *InterceptionResult) string {
 **Scenario:** Coder creates a button with hardcoded colors. MDEMG has stored the project's theme system.
 
 **MDEMG Stored Concept:**
+
 ```
 Path: /concepts/ui/styling
 Name: "UI Theme System"
@@ -485,6 +487,7 @@ Layer: 2 (Concept)
 ```
 
 **MDEMG Stored Pattern (Hidden Layer):**
+
 ```
 Path: /hidden/button-styling
 Name: "Button Styling Pattern"
@@ -493,6 +496,7 @@ Layer: 1 (Hidden)
 ```
 
 **Coder Output:**
+
 ```typescript
 const Button = styled.div`
   background: #ff0000;
@@ -501,6 +505,7 @@ const Button = styled.div`
 ```
 
 **Interceptor Detection:**
+
 ```json
 {
   "approved": false,
@@ -526,6 +531,7 @@ const Button = styled.div`
 ```
 
 **Corrected Output:**
+
 ```typescript
 const Button = styled.div`
   background: ${theme.colors.primary};
@@ -534,6 +540,7 @@ const Button = styled.div`
 ```
 
 **Internal Dialog Entry:**
+
 ```
 "Corrected button styling to use theme variables per UI Theme System concept.
 Applied rules: UI Theme System, Button Styling Pattern."
@@ -544,23 +551,27 @@ Applied rules: UI Theme System, Button Styling Pattern."
 ## Implementation Phases
 
 ### Phase 2.1: Types and Interface ✅ COMPLETE
+
 - [x] Design document
 - [x] Create `internal/interceptor/types.go`
 - [x] Create `internal/interceptor/interceptor.go` interface
 
 ### Phase 2.2: Core Implementation ✅ COMPLETE
+
 - [x] Implement `QueryConcepts()`
 - [x] Implement `DetectDeviations()` with LLM prompt
 - [x] Implement `GenerateCorrection()`
 - [x] Implement `Intercept()` orchestration
 
 ### Phase 2.3: Orchestrator Integration ✅ COMPLETE
+
 - [x] Add interceptor to orchestrator
 - [x] Add configuration options
 - [x] Add internal dialog recording
 - [ ] Add revision loop (TODO: revision counter and feedback loop)
 
 ### Phase 2.4: Testing - Pending
+
 - [ ] Unit tests for deviation detection
 - [ ] Integration tests with mock MDEMG
 - [ ] End-to-end test with real concepts

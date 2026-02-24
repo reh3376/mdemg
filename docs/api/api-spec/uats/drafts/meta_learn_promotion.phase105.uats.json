@@ -1,0 +1,65 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/meta-learn",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 105 Global Meta-Learning endpoint for promoting concepts.",
+    "tags": [
+      "meta-learn",
+      "global",
+      "phase105"
+    ],
+    "sha256": "0b2ebab584f2104d22cfe392c42735d7ec448469b85a9ddc9aa923e47603dfad"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'auth-service-repo' contains highly-activated layer 4 concepts."
+      }
+    ]
+  },
+  "variables": {
+    "source_space_id": "auth-service-repo",
+    "min_layer": 4,
+    "min_activation_count": 50
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "source_space_id": "{{source_space_id}}",
+      "min_layer": "{{min_layer}}",
+      "min_activation_count": "{{min_activation_count}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.status",
+        "operator": "equals",
+        "value": "completed"
+      },
+      {
+        "path": "data.concepts_evaluated",
+        "operator": "type",
+        "value": "number"
+      },
+      {
+        "path": "data.concepts_promoted",
+        "operator": "type",
+        "value": "number"
+      },
+      {
+        "path": "data.promoted_nodes",
+        "operator": "type",
+        "value": "array"
+      }
+    ]
+  }
+}

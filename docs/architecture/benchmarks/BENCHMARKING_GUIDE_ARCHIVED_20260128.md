@@ -52,12 +52,14 @@ where:
 | **None** | No file references in answer | 0% evidence credit |
 
 ### Public Framing (The Elevator Pitch)
+
 - **Non-Technical**: "Baseline can be accurate until the next context update. MDEMG is accurate because it doesn’t forget the work."
 - **Technical**: "Long-context/RAG optimizes retrieval. MDEMG optimizes state persistence under context churn."
 
 ### Variance Reporting
 
 Report ALL of the following for each condition:
+
 - **Mean (μ)**: Average score across all questions
 - **Std Dev (σ)**: Standard deviation
 - **CV**: Coefficient of variation = 100 * σ / μ
@@ -76,6 +78,7 @@ Report ALL of the following for each condition:
 | `test_questions_120_agent.json` | NO | ✅ YES |
 
 **CRITICAL RULES:**
+
 1. Agent receives ONLY the `*_agent.json` file (questions without answers)
 2. The `*_master.json` file is used ONLY by the grading script AFTER agent completes
 3. NEVER include answer keys in agent prompts
@@ -83,6 +86,7 @@ Report ALL of the following for each condition:
 5. Violation of these rules INVALIDATES the entire benchmark
 
 **File Separation:**
+
 ```
 questions/
 ├── test_questions_120_agent.json   # → Agent input (NO answers)
@@ -277,6 +281,7 @@ Agents may exhibit "metadata dumping" behavior where they output raw MDEMG retri
 | Avg answer length > 150 chars with low semantic score | Nonsense padding | Flag for investigation |
 
 **Detection Script:**
+
 ```python
 def detect_metadata_dumping(answer_text):
     """Detect if answer contains raw MDEMG metadata instead of synthesized response."""
@@ -296,6 +301,7 @@ def detect_metadata_dumping(answer_text):
 ### Run Validity Criteria
 
 A run is **VALID** if:
+
 - [ ] 100% questions answered
 - [ ] No duplicate IDs
 - [ ] No disqualification events (WebSearch, out-of-repo access)
@@ -304,10 +310,12 @@ A run is **VALID** if:
 - [ ] No metadata dumping detected
 
 A run is **PARTIAL** if:
+
 - Questions answered < 100% but > 90%
 - No disqualification events
 
 A run is **INVALID** if:
+
 - Disqualification event occurred
 - Agent was restarted mid-run
 - Duplicate IDs found
@@ -344,6 +352,7 @@ Use this checklist to run a benchmark from scratch. Each step must be completed 
   - [ ] Agent file (NO answers): `ls <path>/test_questions_*_agent.json`
   - [ ] Master file (HAS answers): `ls <path>/test_questions_*.json` (not `_agent`)
 - [ ] **5. Record preflight receipts**:
+
   ```bash
   git rev-parse HEAD  # MDEMG commit
   cd <repo_path> && git rev-parse HEAD  # Repo commit
@@ -353,10 +362,12 @@ Use this checklist to run a benchmark from scratch. Each step must be completed 
 ### Cold Start (Before Run 1 Only)
 
 - [ ] **6. Clear learning edges**:
+
   ```bash
   docker exec mdemg-neo4j cypher-shell -u neo4j -p testpassword \
     "MATCH ()-[r:CO_ACTIVATED_WITH {space_id: '<SPACE_ID>'}]-() DELETE r RETURN count(r)"
   ```
+
 - [ ] **7. Record initial edge count**: Should be 0
 
 ### Run Benchmarks (3 Runs Each)
@@ -378,6 +389,7 @@ Use this checklist to run a benchmark from scratch. Each step must be completed 
 ### Grading (After All Runs Complete)
 
 - [ ] **10. Grade each run**:
+
   ```bash
   python grade_answers.py answers_baseline_run1.jsonl test_questions_master.json grades_baseline_run1.json
   python grade_answers.py answers_baseline_run2.jsonl test_questions_master.json grades_baseline_run2.json
@@ -390,6 +402,7 @@ Use this checklist to run a benchmark from scratch. Each step must be completed 
 ### Aggregate & Report
 
 - [ ] **11. Run test harness** (or manually aggregate):
+
   ```bash
   python run_benchmark_harness.py --config benchmark_config.json
   ```
@@ -463,7 +476,7 @@ Store in `grades_run{N}.json` after automated grading.
 |--------|------------|----------------|---------|
 | Value Score | `value_score` | 1.0 if expected value in answer, else 0.0 | 1.0 |
 | Keyword Score | `keyword_score` | keywords_found / keywords_expected | 0.85 |
-| Final Score | `score` | 0.70 * value_score + 0.30 * keyword_score | 0.955 |
+| Final Score | `score` | 0.70 *value_score + 0.30* keyword_score | 0.955 |
 | Expected Value | `expected_value` | From answer key | "1000" |
 | Expected Keywords | `expected_keywords` | From answer key | ["MAX_TAKE", "pagination"] |
 | Keywords Found | `keywords_found` | Matched keywords | ["MAX_TAKE", "pagination"] |
@@ -495,6 +508,7 @@ Store in `aggregate_report.json`.
 #### Detailed Sections
 
 **Core Metrics:**
+
 ```json
 {
   "core": {
@@ -515,6 +529,7 @@ Store in `aggregate_report.json`.
 ```
 
 **Grounding Metrics:**
+
 ```json
 {
   "grounding": {
@@ -529,6 +544,7 @@ Store in `aggregate_report.json`.
 ```
 
 **Efficiency Metrics:**
+
 ```json
 {
   "efficiency": {
@@ -576,9 +592,11 @@ This section captures the fundamental advantage of MDEMG: **state persistence un
 | **WER** | Wrong Evidence Rate | `%` of answers with "hallucinated" or irrelevant citations | Measures the "confidence trick" failure mode of standard RAG. |
 
 ### Compaction Defined
-A **Compaction Event** is any time the agent's working context is truncated or replaced (e.g., `auto-compact`, summarization, session restart). 
+
+A **Compaction Event** is any time the agent's working context is truncated or replaced (e.g., `auto-compact`, summarization, session restart).
 
 ### Collection Protocol: The "Compaction Ladder"
+
 1. **Plant Commitments**: Give the agent 10-15 questions that establish a working set of decisions (naming conventions, invariants, defaults).
 2. **Forced Compaction**: Force a compaction/restart every N questions.
 3. **Trace Persistence**: Continue 50-100 more questions that depend on those earlier decisions.
@@ -623,12 +641,14 @@ A **Compaction Event** is any time the agent's working context is truncated or r
 | `token_efficiency.*` | Token consumption comparison | Track tokens per answer |
 
 **Expected Patterns:**
+
 - Learning edges should **increase** across MDEMG runs 1→2→3
 - Evidence scores should **improve** as edges strengthen retrieval
 - Baseline auto-compacts should be **higher** than MDEMG (context pressure)
 - MDEMG token efficiency should be **better** (graph hints reduce search)
 
 **Reproducibility Metadata:**
+
 ```json
 {
   "reproducibility": {
@@ -646,6 +666,7 @@ A **Compaction Event** is any time the agent's working context is truncated or r
 ```
 
 **Per-Category Breakdown:**
+
 ```json
 {
   "by_category": {
@@ -662,12 +683,14 @@ A **Compaction Event** is any time the agent's working context is truncated or r
 ## Table of Contents
 
 **CANONICAL SPECIFICATION (READ FIRST)**
+
 - [Canonical Benchmark Specification](#canonical-benchmark-specification)
 - [Quick Start Checklist](#quick-start-checklist)
 - [Standardized Metrics](#standardized-metrics)
 - [Learning & Persistence Metrics](#learning--persistence-metrics-mdemg-key-differentiator)
 
 **SETUP & EXECUTION**
+
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
 3. [Phase 1: Codebase Preparation](#phase-1-codebase-preparation)
@@ -880,6 +903,7 @@ Create questions across 5 categories (20 questions each for 100 total):
 ```
 
 Common verification findings:
+
 - ~30-35% of LLM-generated answers contain errors
 - Most errors: wrong method names, overstated functionality, incorrect enums
 
@@ -961,12 +985,14 @@ curl -s -X POST 'http://localhost:9999/v1/memory/consolidate' \
 | ✅ **Agent-Based** | Agent uses MDEMG skills to answer questions, answers graded | **YES** - Tests real-world use case |
 
 **Why Agent-Based benchmarks are required:**
+
 1. Tests the actual agent workflow (skill invocation → context retrieval → answer synthesis)
 2. Measures answer quality, not just retrieval scores
 3. Validates MDEMG skills integration works correctly
 4. Produces graded results comparable to baseline agent tests
 
 **Agent-Based Benchmark Flow:**
+
 ```
 Agent receives question
     ↓
@@ -1004,6 +1030,7 @@ Learning edges (CO_ACTIVATED_WITH) are created during MDEMG retrieval to capture
 | Fresh benchmark (new question set) | Clear all edges | Prevent leakage from prior benchmarks |
 
 **Expected behavior across MDEMG runs:**
+
 - **Run 1:** Cold start, no edges → baseline MDEMG performance
 - **Run 2:** Edges from Run 1 help retrieval → improved scores expected
 - **Run 3:** Accumulated edges → further improvement expected
@@ -2767,6 +2794,7 @@ Every benchmark run MUST produce these artifacts:
 ### Phase 2 — Ingest Second Corpus (Multi-Space)
 
 **CRITICAL RULES:**
+
 - Do NOT delete or clear existing space nodes/edges
 - Ingest new corpus into its OWN SpaceID
 - Cross-space edges should be disallowed or tracked as contamination
@@ -3044,4 +3072,3 @@ Use this exact structure for reports:
 | 1.2 | 2026-01-23 | Added WHK-WMS 120-question test set, baseline benchmarking rules (20-min limit, repo restrictions, disqualification criteria), master vs agent file distinction |
 | 1.1 | 2026-01-23 | Added V6 Composite Test Set documentation |
 | 1.0 | 2026-01-23 | Initial comprehensive guide |
-

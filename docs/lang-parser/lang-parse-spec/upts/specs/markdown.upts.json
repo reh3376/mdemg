@@ -12,7 +12,7 @@
   "fixture": {
     "type": "file",
     "path": "../fixtures/markdown_test_fixture.md",
-    "sha256": "34adf65a63c9848e1e05af65b5eaec23fbaa8b1eef6a5c340450c17d295286b5"
+    "sha256": "49592aae8464a002287fe68c8d5099d0a146c90a66316f36349bc00b57b8acff"
   },
   "expected": {
     "symbol_count": {
@@ -39,7 +39,7 @@
       {
         "name": "Nested Section",
         "type": "heading",
-        "line": 13,
+        "line": 14,
         "parent": "Overview",
         "exported": true,
         "pattern": "P_HEADING_H3"
@@ -47,7 +47,7 @@
       {
         "name": "Deeply Nested",
         "type": "heading",
-        "line": 17,
+        "line": 18,
         "parent": "Nested Section",
         "exported": true,
         "pattern": "P_HEADING_H4"
@@ -55,42 +55,42 @@
       {
         "name": "Code Examples",
         "type": "heading",
-        "line": 21,
+        "line": 22,
         "exported": true,
         "pattern": "P_HEADING_H2"
       },
       {
         "name": "python",
         "type": "code_block",
-        "line": 25,
+        "line": 26,
         "exported": true,
         "pattern": "P_CODE_BLOCK"
       },
       {
         "name": "go",
         "type": "code_block",
-        "line": 30,
+        "line": 31,
         "exported": true,
         "pattern": "P_CODE_BLOCK"
       },
       {
         "name": "bash",
         "type": "code_block",
-        "line": 36,
+        "line": 37,
         "exported": true,
         "pattern": "P_CODE_BLOCK"
       },
       {
         "name": "External Links",
         "type": "heading",
-        "line": 40,
+        "line": 41,
         "exported": true,
         "pattern": "P_HEADING_H2"
       },
       {
         "name": "GitHub",
         "type": "link",
-        "line": 42,
+        "line": 43,
         "value": "https://github.com",
         "exported": true,
         "pattern": "P_LINK"
@@ -98,7 +98,7 @@
       {
         "name": "Documentation",
         "type": "link",
-        "line": 43,
+        "line": 44,
         "value": "https://docs.example.com",
         "exported": true,
         "pattern": "P_LINK"
@@ -106,7 +106,7 @@
       {
         "name": "API Reference",
         "type": "link",
-        "line": 44,
+        "line": 45,
         "value": "/api/reference",
         "exported": true,
         "pattern": "P_LINK"
@@ -114,14 +114,14 @@
       {
         "name": "Configuration",
         "type": "heading",
-        "line": 46,
+        "line": 47,
         "exported": true,
         "pattern": "P_HEADING_H2"
       },
       {
         "name": "Environment Variables",
         "type": "heading",
-        "line": 48,
+        "line": 49,
         "parent": "Configuration",
         "exported": true,
         "pattern": "P_HEADING_H3"
@@ -129,21 +129,21 @@
       {
         "name": "Build Settings",
         "type": "heading",
-        "line": 52,
+        "line": 53,
         "exported": true,
         "pattern": "P_HEADING_H3"
       },
       {
         "name": "Summary",
         "type": "heading",
-        "line": 56,
+        "line": 57,
         "exported": true,
         "pattern": "P_HEADING_H2"
       },
       {
         "name": "Subsection A",
         "type": "heading",
-        "line": 60,
+        "line": 61,
         "parent": "Summary",
         "exported": true,
         "pattern": "P_HEADING_H3"
@@ -151,7 +151,7 @@
       {
         "name": "Subsection B",
         "type": "heading",
-        "line": 64,
+        "line": 65,
         "exported": true,
         "pattern": "P_HEADING_H3"
       }

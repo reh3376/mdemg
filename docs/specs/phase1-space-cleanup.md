@@ -14,12 +14,14 @@ Clear all ingested codebase spaces from Neo4j to start fresh, preserving only th
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Discover all distinct `space_id` values and node counts
 2. FR-2: Delete all nodes from non-protected spaces
 3. FR-3: Preserve `mdemg-dev` space entirely (nodes, edges, learning data)
 4. FR-4: Verify post-cleanup state
 
 ### Non-Functional Requirements
+
 1. NFR-1: Cleanup completes without timeout (batch deletion)
 2. NFR-2: No data corruption in protected space
 

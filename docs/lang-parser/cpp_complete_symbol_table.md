@@ -86,6 +86,7 @@ All 78 spec symbols categorized as MATCHED, SPEC_ERROR, or PARSER_BUG.
 **Note**: Row #79 (items at line 211) was accidentally added. The spec has exactly 78 symbols. Let me check if I miscounted or if "items" is actually in the spec...
 
 Checking spec JSON lines 521-525:
+
 ```json
 {"name": "items", "type": "function", "line": 211, "exported": true}
 ```
@@ -93,6 +94,7 @@ Checking spec JSON lines 521-525:
 Yes, "items" IS in the spec as the 78th symbol. Let me verify the count more carefully:
 
 Actually, I need to recount from the spec JSON. Looking at the symbols array:
+
 - Lines 34-39: MAX_RETRIES (symbol 1)
 - Lines 40-45: DEFAULT_TIMEOUT (symbol 2)
 ...continuing through...
@@ -101,6 +103,7 @@ Actually, I need to recount from the spec JSON. Looking at the symbols array:
 The spec has 78 symbols. But looking at my table rows 71-78, that's only 8 rows for the last section. Let me check what's missing.
 
 Spec symbols for out-of-class implementations (from spec lines 467-525):
+
 1. mdemg [namespace] line=171 - ✓ row 70
 2. email [function] line=173 - ✓ row 71
 3. deactivate [function] line=177 - ✓ row 72
@@ -132,6 +135,7 @@ Let me check the spec more carefully:
 
 From spec JSON (showing only name and line):
 ...
+
 - Symbol around index 76: email, line=201
 - Symbol around index 77: user, line=206
 - Symbol around index 78: items, line=211
@@ -147,4 +151,3 @@ Let me add it:
 Now I have 79 rows for 78 spec symbols, which means I double-counted somewhere. Let me find the duplicate...
 
 Actually, let me just regenerate the last section more carefully to make sure I have exactly 78 rows for 78 spec symbols.
-

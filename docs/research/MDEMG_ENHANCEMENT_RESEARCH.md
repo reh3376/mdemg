@@ -27,6 +27,7 @@ recComponent := gamma * r       // gamma = recency weight
 ```
 
 Current parameters (from config):
+
 - `rho` (ScoringRho): decay rate per day
 - `gamma` (ScoringGamma): weight of recency component in final score
 
@@ -48,16 +49,19 @@ The [forgetting curve](https://en.wikipedia.org/wiki/Forgetting_curve) describes
 #### Two-Component Memory Theory (Bjork & Bjork)
 
 Memory has two facets:
+
 - **Storage strength**: How well-learned (doesn't decay)
 - **Retrieval strength**: How accessible now (decays but can be restored)
 
 This maps to MDEMG:
+
 - Storage strength → Node exists in graph
 - Retrieval strength → Temporal decay factor
 
 #### Memory Chain Model
 
 [SuperMemo's model](https://supermemo.guru/wiki/Forgetting_curve): Memory passes through stores with different decay rates:
+
 1. Hippocampus (fast decay, exponential)
 2. Neocortex (slow decay, power law)
 
@@ -155,6 +159,7 @@ if hasTag(c.Tags, "evergreen") || hasTag(c.Tags, "core") {
 MDEMG uses DBSCAN clustering in `internal/hidden/clustering.go` to form concepts, but does NOT merge similar existing concepts. New concepts are always created, leading to potential explosion.
 
 Current consolidation flow:
+
 ```
 L0 nodes → DBSCAN cluster → Create new L1 node → ABSTRACTS_TO edges
 ```
@@ -308,6 +313,7 @@ From [Hugging Face MoE Explained](https://huggingface.co/blog/moe):
 > The Sparsely-Gated MoE layer consists of numerous expert networks and a trainable gating network that selects a sparse combination of experts for each input.
 
 Key concepts:
+
 - **Experts**: Specialized sub-networks (in MDEMG: L0, L1, learning edges)
 - **Gating network**: Learns which experts to use for each input
 - **Top-k selection**: Only activate k experts (sparse computation)
@@ -326,6 +332,7 @@ This learns WHEN to use each memory source.
 #### Load Balancing
 
 Challenge: Gating networks tend to over-use a few experts. Solutions:
+
 - Add noise during training (`softmax(scores + noise)`)
 - Auxiliary loss to encourage balanced usage
 - Expert capacity limits
@@ -521,6 +528,7 @@ h'_i = σ(Σ_j attention(i,j) · Wh_j)
 ```
 
 Where:
+
 - `h_i, h_j`: Node feature vectors
 - `W`: Shared weight matrix
 - `a`: Attention vector
@@ -535,6 +543,7 @@ h'_i = ||_{k=1}^{K} σ(Σ_j α^k_{ij} · W^k h_j)
 ```
 
 Benefits:
+
 - Stabilizes learning
 - Captures different relationship types
 - Each head can focus on different neighbors
@@ -747,6 +756,7 @@ Based on implementation complexity and expected impact:
 ## Appendix: Code Snippets from Original MLX Concept
 
 ### Temporal Encoder
+
 ```python
 class TemporalEncoder:
     def __init__(self, dim=128, max_period=10000.0):
@@ -764,6 +774,7 @@ class TemporalEncoder:
 ```
 
 ### Gated Memory Integration
+
 ```python
 class MemoryIntegration(nn.Module):
     def __call__(self, x, episodic, graph, semantic):
@@ -777,6 +788,7 @@ class MemoryIntegration(nn.Module):
 ```
 
 ### Memory Consolidation
+
 ```python
 class MemoryConsolidator:
     def consolidate(self, episodic_store, semantic_store, cluster_threshold=0.7):

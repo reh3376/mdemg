@@ -397,10 +397,12 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 94**: `docs/specs/phase94-config-project-init.md` | Go: `internal/config/yaml_config.go` (YAML loader, ignore patterns), `internal/cli/config_loader.go` (shared loadConfig), `internal/cli/init.go` (init wizard), `internal/cli/config_cmd.go` (config show/validate). Modified: `internal/cli/root.go`, `serve.go`, `db.go`, `ingest.go`, `consolidate.go`, `decay.go`, `prune.go`, `space.go` (YAML+godotenv wiring). Housekeeping: `.env.example` (schema 4→17), `scripts/mdemg-git-hook` (prefer mdemg ingest).
 - **Phase 95 (Complete)**: Database + Embedding + Migrations — Go-native migration runner with embedded `*.cypher` files, `mdemg db migrate/start/stop/status/shell` commands, `mdemg embeddings check`, `--auto-migrate` on serve, `REQUIRED_SCHEMA_VERSION` auto-detection, CI simplified (no cypher-shell). Spec: `docs/specs/phase95-database-embedding-migrations.md`. Feature: `docs/features/database-embedding-migrations.md`.
 - **Phase 96 (Complete)**: IDE + Repo Integration — `mdemg hooks install/uninstall/list`, `.claude/mcp.json` generation, `mdemg serve --mcp` subprocess. Spec: `docs/specs/phase96-ide-repo-integration.md`. Feature: `docs/features/ide-repo-integration.md`.
-- **Phase 97 (Planned)**: Process Lifecycle + Security — Daemon mode, start/stop/restart, keychain secrets. Depends on: Phase 95.
+- **Phase 97 (Complete)**: Process Lifecycle + Secret Management — `mdemg start/stop/restart/status` daemon mode with PID/log management, `mdemg config set-secret/get-secret/list-secrets` keychain integration, auto-start Neo4j on `mdemg start`. Spec: `docs/specs/phase97-process-lifecycle-security.md`. Features: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`.
 - **Phase 98 (Planned)**: Cross-Platform Build + Release — goreleaser, Homebrew tap, curl installer, self-update. Depends on: Phase 97.
 - **Phase 99 (Planned)**: Onboarding + Polish — README rewrite, quickstart, demo mode, test framework portability. Depends on: Phase 98.
 - **Phase 100 (Planned)**: Deployable Package (Mac) — Integration test: `brew install mdemg` → `mdemg init` → working system. Depends on: Phase 99.
+- **Phase 101 (Complete)**: SME Synthesis Engine — Optional LLM synthesis for `/v1/memory/consult` via `llm_synthesis: true`. Produces coherent organizational SME narrative grounded exclusively in graph evidence with mandatory `(Node: <node_id>)` citations. Three fallback paths (flag off, synthesizer nil, LLM error). Circuit breaker protection. Spec: `docs/specs/phase101-sme-synthesis.md`. New file: `internal/consulting/synthesis.go`. Config: 5 `SYNTHESIS_*` env vars.
+- **Phase 102-105 (Planned)**: Cognitive Intelligence — `docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md`. Addresses gaps in Intent Translation, Dynamic Emergence, Active Guardrails, and Cross-Space Collective Learning.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 
@@ -1990,13 +1992,20 @@ Main RSIC gap sets identified:
 - **Feature**: `docs/features/ide-repo-integration.md`
 - **Effort**: M | **Depends on**: Phase 94.
 
-#### Phase 97: Process Lifecycle + Security (Planned)
+#### Phase 97: Process Lifecycle + Secret Management (Complete)
 
-- `mdemg serve` (foreground, dev) and `mdemg start` (background daemon, PID file).
-- `mdemg stop/restart/status` for lifecycle management.
-- Neo4j container lifecycle integrated with daemon.
-- `mdemg config set-secret` uses platform keychain (macOS Keychain, Linux secret-tool).
-- Security model documentation.
+- `mdemg start` — background daemon via detached child process (`SysProcAttr{Setsid: true}`). PID file at `.mdemg/mdemg.pid`, logs at `.mdemg/logs/mdemg.log`. Auto-starts Neo4j container if stopped (`--no-db` to skip). Flags: `--port`, `--db-uri`, `--auto-migrate`, `--mcp`, `--no-db`.
+- `mdemg stop` — SIGTERM with 30s graceful shutdown, SIGKILL fallback. Stops server only, prints Neo4j reminder.
+- `mdemg restart` — stop then start, forwarding all start flags.
+- `mdemg status` — shows PID, port, uptime, log path, Neo4j container status, and `/healthz` health check.
+- `mdemg config set-secret <key> [value]` — stores secrets in system keychain (macOS Keychain, Linux secret-tool, Windows Credential Manager) via `go-keyring`. Hidden input prompt when value omitted.
+- `mdemg config get-secret <key>` — retrieves secret (exit 1 if not found).
+- `mdemg config list-secrets` — shows known secret keys with keychain status (never prints values).
+- `secrets.ResolveSecrets()` in config loading — opportunistic keychain resolution between YAML and `.env`.
+- Config priority: defaults → yaml → keychain → .env → env vars → flags.
+- `.mdemgignore` default patterns now include `.env` and `.env.*`.
+- **Spec**: `docs/specs/phase97-process-lifecycle-security.md`
+- **Features**: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`
 - **Effort**: M | **Depends on**: Phase 95.
 
 #### Phase 98: Cross-Platform Build + Release (Planned)
@@ -2024,6 +2033,16 @@ Main RSIC gap sets identified:
 - Integration test: `brew install mdemg` → `mdemg init` → `mdemg db start` → `mdemg ingest .` → working system.
 - 10 acceptance criteria verified (see `docs/specs/phase92-gap-analysis.md`).
 - **Effort**: S | **Depends on**: Phase 99.
+
+#### Phase 101-105: Cognitive Intelligence (Planned)
+
+- **Gap Analysis**: `docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md`
+- **Phase 101**: SME Synthesis Engine (LLM-based multi-hop synthesis for `/v1/memory/consult`). Spec: `docs/specs/phase101-sme-synthesis.md`. Draft UATS: `docs/api/api-spec/uats/drafts/consult_synthesis.phase101.uats.json`. Features: `docs/features/skill-registry.md`, `docs/features/meta-cognition-enforcement.md`.
+- **Phase 102**: Intent Translation (Query rewriting before vector embedding). Spec: `docs/specs/phase102-intent-translation.md`. Draft UATS: `docs/api/api-spec/uats/drafts/retrieve_intent_translation.phase102.uats.json`, `consult_intent_translation.phase102.uats.json`. Features: `docs/features/skill-registry.md`.
+- **Phase 103**: Dynamic Emergence (LLM-generated abstraction naming for Layer 2+ nodes). Spec: `docs/specs/phase103-dynamic-emergence.md`. Draft UATS: `docs/api/api-spec/uats/drafts/consolidate_dynamic_emergence.phase103.uats.json`. Draft UVTS: `docs/tests/uvts/specs/dynamic_emergence_quality.phase103.uvts.json`. Features: `docs/features/l5-emergent-layer.md`, `docs/features/bridges-edge-type.md`.
+- **Phase 104**: Active MCP Guardrails (Proactive constraint enforcement). Spec: `docs/specs/phase104-active-mcp-guardrails.md`. Draft UATS: `docs/api/api-spec/uats/drafts/guardrail_validate.phase104.uats.json`. Draft USTS: `docs/tests/usts/specs/guardrail_enforcement.phase104.usts.json`. Features: `docs/features/constraint-nodes.md`.
+- **Phase 105**: Global Meta-Learning (Cross-space promotion of Layer 4/5 concepts). Spec: `docs/specs/phase105-global-meta-learning.md`. Draft UATS: `docs/api/api-spec/uats/drafts/meta_learn_promotion.phase105.uats.json`, `retrieve_global_space.phase105.uats.json`. Draft UDTS: `docs/api/api-spec/udts/specs/global_space_topology.phase105.udts.json`. Features: `docs/features/l5-emergent-layer.md`.
+- **Effort**: Variable | **Depends on**: Phase 100 (or independent track)
 
 ---
 

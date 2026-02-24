@@ -5,10 +5,12 @@
 ## Executive Summary
 
 Current retrieval relies solely on vector similarity, which misses:
+
 1. **Keyword matches** - Query "lib/graphql" doesn't strongly match nodes without similar embedding
 2. **Semantic understanding** - Embeddings can't capture nuanced query intent
 
 This spec introduces two complementary improvements:
+
 1. **Hybrid Retrieval**: Combine vector search with keyword/full-text search (BM25)
 2. **LLM Re-ranking**: Use lightweight LLM to re-order top candidates based on actual relevance
 
@@ -54,6 +56,7 @@ Final Results (top-K)
 ### 1.1 Problem Statement
 
 Vector similarity alone fails when:
+
 - Query contains specific identifiers ("DeltaSyncModule", "useAgentSocket")
 - Query mentions paths ("lib/graphql", "frontend/")
 - Query uses domain terminology not well-represented in embeddings
@@ -61,6 +64,7 @@ Vector similarity alone fails when:
 ### 1.2 Solution: BM25 Full-Text Search
 
 BM25 (Best Matching 25) is a ranking function that scores documents based on:
+
 - Term frequency (TF) in the document
 - Inverse document frequency (IDF) across corpus
 - Document length normalization
@@ -125,6 +129,7 @@ RRF_score(d) = Σ 1 / (k + rank_i(d))
 ```
 
 Where:
+
 - `k` is a constant (typically 60)
 - `rank_i(d)` is the rank of document d in list i
 
@@ -183,6 +188,7 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result) [
 ### 2.1 Problem Statement
 
 Even with hybrid retrieval, the top-10 results may be:
+
 - Topically related but not answering the question
 - Missing the most relevant result buried at position 15-20
 - Scoring highly due to keyword match but semantically irrelevant
@@ -190,6 +196,7 @@ Even with hybrid retrieval, the top-10 results may be:
 ### 2.2 Solution: LLM Re-ranking
 
 Use a lightweight LLM to re-score the top-N candidates based on:
+
 - How well the node's content answers the query
 - Semantic relevance beyond keyword/embedding match
 

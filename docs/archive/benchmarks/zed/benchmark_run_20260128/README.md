@@ -1,11 +1,13 @@
 # Zed Codebase Benchmark Results - MDEMG Run 1
 
 ## Summary
+
 Successfully answered all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dimensional Emergent Memory Graph) retrieval.
 
 ## Files in This Directory
 
 ### Main Output
+
 - **`answers_mdemg_run1.jsonl`** (81 KB)
   - Complete answers to all 142 questions
   - JSONL format: one JSON object per line
@@ -13,6 +15,7 @@ Successfully answered all 142 benchmark questions about the Zed codebase using M
   - Ready for evaluation and comparison
 
 ### Documentation
+
 - **`COMPLETION_REPORT.md`** - Comprehensive completion report with:
   - Task overview and execution details
   - Answer quality distribution by category
@@ -72,20 +75,25 @@ jq -r '.file_line_refs[]' answers_mdemg_run1.jsonl | sort | uniq -c
 ## Answer Quality
 
 ### High-Confidence Answers (Architecture & Service)
+
 Detailed explanations of system architecture, implementation patterns, and data flows with 200-400 character answers.
 
 ### Medium-Confidence Answers (Business Logic)
+
 Specific constraints and invariants described clearly with 100-300 character answers.
 
 ### Easy Answers (Calibration)
+
 Simple struct/trait identification with brief answers (40-100 characters).
 
 ### Control Answers (Negative Control)
+
 Questions about non-existent features correctly identified with file references showing what MDEMG found instead.
 
 ## MDEMG Retrieval Details
 
 Each question was queried using:
+
 ```
 curl -X POST 'http://localhost:9999/v1/memory/retrieve'
   -H 'Content-Type: application/json'
@@ -93,6 +101,7 @@ curl -X POST 'http://localhost:9999/v1/memory/retrieve'
 ```
 
 Results were used to:
+
 1. Extract relevant file paths (included in file_line_refs)
 2. Validate answer correctness through source code
 3. Provide context for detailed explanations
@@ -100,6 +109,7 @@ Results were used to:
 ## File References
 
 File references span across 100+ directories in the Zed codebase:
+
 - `/crates/editor/` - Editor core implementation
 - `/crates/gpui/` - UI framework
 - `/crates/project/` - Project and workspace management
@@ -112,6 +122,7 @@ File references span across 100+ directories in the Zed codebase:
 ## Validation
 
 All answers have been validated for:
+
 - ✅ Valid JSON format
 - ✅ All required fields present
 - ✅ Sequential IDs 1-142
@@ -134,6 +145,7 @@ From analyzing these 142 questions and answers:
 ## Next Steps
 
 To use these answers for evaluation:
+
 1. Compare against baseline or other retrieval methods
 2. Score answer accuracy by manual review or automated grading
 3. Analyze which question categories perform best/worst
@@ -143,6 +155,7 @@ To use these answers for evaluation:
 ## For Questions
 
 Refer to the detailed reports in COMPLETION_REPORT.md and RESULTS.md for additional information about:
+
 - How each answer was constructed
 - MDEMG retrieval performance metrics
 - Answer quality distribution

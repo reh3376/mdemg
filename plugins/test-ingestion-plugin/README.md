@@ -48,6 +48,7 @@ MDEMG will auto-discover the plugin on startup.
 ## Ingestion Module
 
 This module implements:
+
 - **Matches**: Determine if this module can handle a given source
 - **Parse**: Convert raw content into MDEMG observations
 - **Sync**: Incrementally sync with external sources
@@ -56,7 +57,6 @@ This module implements:
 
 Edit the `Matches` function to define which sources this module handles.
 Edit the `Parse` function to implement your parsing logic.
-
 
 ## Configuration
 

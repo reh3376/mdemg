@@ -30,6 +30,7 @@ Learning edges are `CO_ACTIVATED_WITH` relationships created by MDEMG's Hebbian 
 4. **Weight formula:** `w_new = (1-μ)*w_old + η*(a_i * a_j)`
 
 Where:
+
 - `η` (eta) = learning rate (default 0.02)
 - `μ` (mu) = decay rate (default 0.01)
 - `a_i, a_j` = activation levels of nodes i and j
@@ -65,16 +66,19 @@ When a query is issued:
 ### What Happens As Edges Accumulate
 
 **Cold Start (0 edges):**
+
 - Activation only spreads through structural edges (ABSTRACTS_TO, etc.)
 - Limited pathways = concentrated activation
 - Clear score differentiation between candidates
 
 **Warm (1,000-10,000 edges):**
+
 - CO_ACTIVATED_WITH edges create new pathways
 - Activation spreads to more nodes
 - Score distribution begins compressing
 
 **Saturated (10,000+ edges):**
+
 - Many overlapping pathways
 - Most nodes receive some activation
 - Scores compress toward the middle
@@ -161,6 +165,7 @@ MDEMG provides **percentile-based confidence** that's immune to edge density:
 ### For Development/Testing
 
 1. **Reset edges between benchmark runs:**
+
    ```bash
    curl -X POST http://localhost:7474/db/neo4j/tx/commit \
      -d '{"statements":[{"statement":"MATCH ()-[r:CO_ACTIVATED_WITH]->() WHERE r.space_id = \"your-space\" DELETE r"}]}'
@@ -169,6 +174,7 @@ MDEMG provides **percentile-based confidence** that's immune to edge density:
 2. **Use normalized_confidence for comparisons**
 
 3. **Track edge count alongside scores:**
+
    ```bash
    curl -X POST http://localhost:9999/v1/memory/learning/stats \
      -d '{"space_id":"your-space"}'
@@ -206,6 +212,7 @@ MDEMG provides **percentile-based confidence** that's immune to edge density:
 ### Key Metrics to Track
 
 1. **Edge count by space:**
+
    ```cypher
    MATCH ()-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->()
    RETURN count(r) as edge_count
@@ -250,6 +257,7 @@ effective_decay = base_decay / sqrt(evidence_count * surprise_factor)
 ### Session-Based Coactivation
 
 Observations in the same session are automatically linked:
+
 - Edges weighted by temporal proximity
 - Closer observations = stronger edges
 - 1-hour proximity window
@@ -259,11 +267,13 @@ Observations in the same session are automatically linked:
 ### Problem: All scores are low (< 0.5)
 
 **Causes:**
+
 1. Dense edge network (normal after heavy use)
 2. Query doesn't match indexed content
 3. Embedding quality issues
 
 **Solutions:**
+
 1. Use `normalized_confidence` instead of raw scores
 2. Check query against known-good examples
 3. Verify embedding generation is working
@@ -273,6 +283,7 @@ Observations in the same session are automatically linked:
 **Cause:** Activation dilution from many edges
 
 **Solutions:**
+
 1. This is normal - use percentile confidence
 2. Consider edge pruning if > 50k edges
 3. Adjust activation weight (β) if needed

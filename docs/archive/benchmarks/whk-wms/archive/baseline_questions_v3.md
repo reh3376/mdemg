@@ -3,6 +3,7 @@
 You have now read all files. Below are 100 questions to answer.
 
 REMINDER:
+
 - Do NOT read any files
 - Do NOT use Glob or Grep
 - Answer from memory ONLY
@@ -12,6 +13,7 @@ REMINDER:
 ## Questions
 
 ### Question 1 (Category: data_flow_integration)
+
 Trace the data flow for circuit breaker reset on successful batch.
 
 Expected Answer (for scoring):
@@ -20,6 +22,7 @@ Circuit breaker reset: 1) After batch processing, if batchResult.errorCount === 
 ---
 
 ### Question 2 (Category: architecture_structure)
+
 What is the architecture pattern for handling device sync errors across multiple modules?
 
 Expected Answer (for scoring):
@@ -28,6 +31,7 @@ Device sync errors span: DeviceSyncErrorModule (entity storage with DeviceSyncEr
 ---
 
 ### Question 3 (Category: business_logic_constraints)
+
 What constraints govern lot audit actions?
 
 Expected Answer (for scoring):
@@ -36,6 +40,7 @@ EnumLotAuditAction: Create, Increase, Decrease, Adjustment - tracks changes to L
 ---
 
 ### Question 4 (Category: cross_cutting_concerns)
+
 How does the application secure API keys for machine-to-machine authentication?
 
 Expected Answer (for scoring):
@@ -44,6 +49,7 @@ Security headers do NOT differ between development and production environments. 
 ---
 
 ### Question 5 (Category: cross_cutting_concerns)
+
 How does the feature flag guard pattern work for conditionally enabling features?
 
 Expected Answer (for scoring):
@@ -52,6 +58,7 @@ The McpFeatureFlagGuard demonstrates the pattern for feature-flag-controlled fea
 ---
 
 ### Question 6 (Category: service_relationships)
+
 What is the role of ContextService in the audit logging flow?
 
 Expected Answer (for scoring):
@@ -60,6 +67,7 @@ AuditService injects ContextService but based on createAuditLog(), context is pa
 ---
 
 ### Question 7 (Category: business_logic_constraints)
+
 What constraints govern the report generation system?
 
 Expected Answer (for scoring):
@@ -68,6 +76,7 @@ ReportType enumerates: CURRENT_INVENTORY, DAILY/WEEKLY/MONTHLY/QUARTERLY/ANNUAL_
 ---
 
 ### Question 8 (Category: architecture_structure)
+
 How does the SchedulerModule integrate with NestJS's ScheduleModule for cron jobs?
 
 Expected Answer (for scoring):
@@ -76,6 +85,7 @@ The SchedulerModule does NOT use NestJS's ScheduleModule directly in the way des
 ---
 
 ### Question 9 (Category: service_relationships)
+
 What transaction boundaries exist in the ReconciliationService.createReconciliation flow?
 
 Expected Answer (for scoring):
@@ -84,6 +94,7 @@ createReconciliation does NOT use a single wrapping transaction: 1) Creates Reco
 ---
 
 ### Question 10 (Category: business_logic_constraints)
+
 How does the audit log system track entity changes?
 
 Expected Answer (for scoring):
@@ -92,6 +103,7 @@ EnumAuditOperationType defines operations: Create, Update, Delete, UPDATE (dupli
 ---
 
 ### Question 11 (Category: architecture_structure)
+
 How does the frontend filter components architecture support persistence and responsive design?
 
 Expected Answer (for scoring):
@@ -100,6 +112,7 @@ The components/filters directory contains ResponsiveFilterBar/ with index.ts (ba
 ---
 
 ### Question 12 (Category: architecture_structure)
+
 How does the secretsManager module integrate with Azure Key Vault for credential management?
 
 Expected Answer (for scoring):
@@ -108,6 +121,7 @@ The secretsManager module does NOT currently integrate with Azure Key Vault. Ins
 ---
 
 ### Question 13 (Category: business_logic_constraints)
+
 What invariants must hold for the barrel-lot relationship?
 
 Expected Answer (for scoring):
@@ -116,6 +130,7 @@ Every barrel must have a valid lotId (foreign key to Lot). populate_barrel_detai
 ---
 
 ### Question 14 (Category: business_logic_constraints)
+
 How does the aggregated storage entries system work?
 
 Expected Answer (for scoring):
@@ -124,6 +139,7 @@ aggregated-storage-entries-response.dto.ts returns paginated storage entries for
 ---
 
 ### Question 15 (Category: data_flow_integration)
+
 How does location string parsing work for storage locations? Describe the extraction of floor, warehouse, row, bay, rick, and tier.
 
 Expected Answer (for scoring):
@@ -132,6 +148,7 @@ Location components include: LocationService for CRUD operations, LocationResolv
 ---
 
 ### Question 16 (Category: cross_cutting_concerns)
+
 How does the Public decorator work with Swagger documentation?
 
 Expected Answer (for scoring):
@@ -140,6 +157,7 @@ The @Public() decorator uses applyDecorators to combine two metadata settings. P
 ---
 
 ### Question 17 (Category: data_flow_integration)
+
 Trace the data flow for resolving customer from lot for barrel ownership.
 
 Expected Answer (for scoring):
@@ -148,6 +166,7 @@ Customer resolution flow: 1) resolveCustomerFromLot(lot) in staging service, 2) 
 ---
 
 ### Question 18 (Category: service_relationships)
+
 How does InventoryUploadService.validateCsvStructure handle header validation with BOM and encoding issues?
 
 Expected Answer (for scoring):
@@ -156,6 +175,7 @@ validateCsvStructure(): 1) Sets validationTimeout (5000ms) with cleanup; 2) Conv
 ---
 
 ### Question 19 (Category: service_relationships)
+
 How does AuditService.createAuditLogs handle bulk audit logging atomically?
 
 Expected Answer (for scoring):
@@ -164,6 +184,7 @@ createAuditLogs(dataArray): 1) Wraps all operations in prisma.$transaction(async
 ---
 
 ### Question 20 (Category: architecture_structure)
+
 What modules must be imported for the BarrelModule to function, and why does it use forwardRef for AuthModule and BarrelOwnershipModule?
 
 Expected Answer (for scoring):
@@ -172,6 +193,7 @@ The BarrelModule imports BarrelModuleBase (base CRUD operations), AuthModule (au
 ---
 
 ### Question 21 (Category: data_flow_integration)
+
 How does the consecutive empty batch detection prevent infinite loops?
 
 Expected Answer (for scoring):
@@ -180,6 +202,7 @@ Empty batch detection: 1) sessionMetrics Map tracks consecutiveEmptyBatches per 
 ---
 
 ### Question 22 (Category: cross_cutting_concerns)
+
 How does the FeatureFlagsService handle graceful shutdown and event flushing?
 
 Expected Answer (for scoring):
@@ -188,6 +211,7 @@ The FeatureFlagsService implements OnApplicationShutdown interface. In onApplica
 ---
 
 ### Question 23 (Category: business_logic_constraints)
+
 What business rules govern EnumReconciliationType and when is each type created?
 
 Expected Answer (for scoring):
@@ -196,6 +220,7 @@ EnumReconciliationType categorizes discrepancy sources: 1) INVENTORY_DISCREPANCY
 ---
 
 ### Question 24 (Category: architecture_structure)
+
 How does the DeviceSyncLogModule support mobile device troubleshooting?
 
 Expected Answer (for scoring):
@@ -204,6 +229,7 @@ DeviceSyncLogModule records detailed logs of device sync operations - what was s
 ---
 
 ### Question 25 (Category: cross_cutting_concerns)
+
 How do role guards interact with resolvers to enforce access control?
 
 Expected Answer (for scoring):
@@ -212,6 +238,7 @@ Access control is enforced through a layered guard system. The RolesGuard reads 
 ---
 
 ### Question 26 (Category: cross_cutting_concerns)
+
 How does the application handle long-running GraphQL mutations?
 
 Expected Answer (for scoring):
@@ -220,6 +247,7 @@ TimeoutInterceptor is HTTP-specific, implementing NestInterceptor. It wraps hand
 ---
 
 ### Question 27 (Category: architecture_structure)
+
 How does the frontend components/bulk-operations architecture support multi-step wizards?
 
 Expected Answer (for scoring):
@@ -228,6 +256,7 @@ The bulk-operations directory contains wizard-steps/ subdirectory with step comp
 ---
 
 ### Question 28 (Category: cross_cutting_concerns)
+
 How does the resolution system ensure idempotency for resolution operations?
 
 Expected Answer (for scoring):
@@ -236,6 +265,7 @@ Idempotency is ensured through: 1) Pre-flight validation checking if errors are 
 ---
 
 ### Question 29 (Category: cross_cutting_concerns)
+
 How does the audit service handle high-volume logging without impacting application performance?
 
 Expected Answer (for scoring):
@@ -244,6 +274,7 @@ The AuditService uses several strategies for performance: 1) Async logging - cre
 ---
 
 ### Question 30 (Category: service_relationships)
+
 What is the role of BarrelEventService.extractRelevantLocation in location string parsing?
 
 Expected Answer (for scoring):
@@ -252,6 +283,7 @@ extractRelevantLocation(locationString): 1) Splits by '-': parts = locationStrin
 ---
 
 ### Question 31 (Category: business_logic_constraints)
+
 How does the changelog system track application changes?
 
 Expected Answer (for scoring):
@@ -260,6 +292,7 @@ changelog.dto.ts defines changelog entry structure. ChangelogEntry is EnumCommen
 ---
 
 ### Question 32 (Category: cross_cutting_concerns)
+
 How does the audit correlation ID enable request tracing across services?
 
 Expected Answer (for scoring):
@@ -268,6 +301,7 @@ Correlation IDs are generated at request entry (typically a UUID v4) and propaga
 ---
 
 ### Question 33 (Category: business_logic_constraints)
+
 How does the sample type result type affect sample processing?
 
 Expected Answer (for scoring):
@@ -276,6 +310,7 @@ EnumSampleTypeTypeResultType at schema.prisma defines only TWO values: Boolean, 
 ---
 
 ### Question 34 (Category: architecture_structure)
+
 How does the backend handle WebSocket connections for GraphQL subscriptions?
 
 Expected Answer (for scoring):
@@ -284,6 +319,7 @@ AppModule's GraphQLModule.forRootAsync configures subscriptions with both 'graph
 ---
 
 ### Question 35 (Category: data_flow_integration)
+
 What is the data flow when a location is already occupied during entry event processing?
 
 Expected Answer (for scoring):
@@ -292,6 +328,7 @@ Location occupied handling: 1) In storage location processing, after location lo
 ---
 
 ### Question 36 (Category: business_logic_constraints)
+
 How does the trust mode configuration affect validation?
 
 Expected Answer (for scoring):
@@ -300,6 +337,7 @@ trust-mode-config.dto.ts defines a specific 'Trust Android Scans Mode' configura
 ---
 
 ### Question 37 (Category: business_logic_constraints)
+
 What database constraints ensure data integrity for barrel-location relationships, and how does BarrelLocationConflictException prevent conflicts?
 
 Expected Answer (for scoring):
@@ -308,6 +346,7 @@ A barrel cannot have both a storage location (locationId) AND a holding location
 ---
 
 ### Question 38 (Category: business_logic_constraints)
+
 How does the Android sync inbox handle duplicate records and what strategy prevents deadlocks during bulk inserts?
 
 Expected Answer (for scoring):
@@ -316,6 +355,7 @@ AndroidSyncInboxService.saveToInbox() uses chunked processing with CHUNK_SIZE=50
 ---
 
 ### Question 39 (Category: data_flow_integration)
+
 Trace the data flow for resolving canonical lot from a lot variation serial number.
 
 Expected Answer (for scoring):
@@ -324,6 +364,7 @@ Canonical lot resolution: 1) resolveLotFromSerialNumber() in staging service, 2)
 ---
 
 ### Question 40 (Category: service_relationships)
+
 How does the CachedStorageLocationService integrate with AndroidSyncProcessor for location validation?
 
 Expected Answer (for scoring):
@@ -332,6 +373,7 @@ AndroidSyncProcessor injects CachedStorageLocationService. In onModuleInit(), ca
 ---
 
 ### Question 41 (Category: business_logic_constraints)
+
 How does the resolution system suggest serial numbers?
 
 Expected Answer (for scoring):
@@ -340,6 +382,7 @@ Resolution services provide serial number suggestions for error correction: pred
 ---
 
 ### Question 42 (Category: data_flow_integration)
+
 How does the GraphQL subscription system propagate comment updates to connected clients? Describe the PubSub pattern and filtering mechanism.
 
 Expected Answer (for scoring):
@@ -348,6 +391,7 @@ Comment subscription flow: 1) PubSubService wraps graphql-subscriptions PubSub, 
 ---
 
 ### Question 43 (Category: architecture_structure)
+
 How does the barrel GraphQL query structure support unified filtering across multiple entity relationships?
 
 Expected Answer (for scoring):
@@ -356,6 +400,7 @@ The unifiedBarrels query in barrel.resolver.ts accepts UnifiedBarrelFilterInput 
 ---
 
 ### Question 44 (Category: cross_cutting_concerns)
+
 How does the audit system handle entity history reconstruction?
 
 Expected Answer (for scoring):
@@ -364,6 +409,7 @@ AuditService provides getEntityAuditHistory(entityType, entityId, options) (not 
 ---
 
 ### Question 45 (Category: architecture_structure)
+
 How does the frontend Table-new directory structure support different table configurations?
 
 Expected Answer (for scoring):
@@ -372,6 +418,7 @@ The Table-new directory supports different table configurations through componen
 ---
 
 ### Question 46 (Category: cross_cutting_concerns)
+
 How does the ContextService propagate user context across async operations and what data does it carry?
 
 Expected Answer (for scoring):
@@ -380,6 +427,7 @@ The ContextService uses AsyncLocalStorage from Node.js to maintain request-scope
 ---
 
 ### Question 47 (Category: architecture_structure)
+
 What is the purpose of the IndexingModule in the providers directory?
 
 Expected Answer (for scoring):
@@ -388,6 +436,7 @@ IndexingModule handles vector document indexing for RAG/semantic search capabili
 ---
 
 ### Question 48 (Category: architecture_structure)
+
 How does the BarrelOemCodeModule support cooperage/manufacturer tracking?
 
 Expected Answer (for scoring):
@@ -396,6 +445,7 @@ BarrelOemCodeModule manages barrel manufacturer codes (OEM = Original Equipment 
 ---
 
 ### Question 49 (Category: service_relationships)
+
 What is the relationship between BarrelOwnershipService and GroupTransaction for ownership transfer tracking?
 
 Expected Answer (for scoring):
@@ -404,6 +454,7 @@ In bulk transfer methods (bulkTransferOwnership, bulkUpdateOwnership, bulkEstabl
 ---
 
 ### Question 50 (Category: business_logic_constraints)
+
 What validation prevents lot variation from matching canonical lot number?
 
 Expected Answer (for scoring):
@@ -412,6 +463,7 @@ LotVariationService.create() enforces three validations: 1) createdBy is require
 ---
 
 ### Question 51 (Category: service_relationships)
+
 How does BarrelOwnershipService.getBulkBarrelOwnerships optimize fetching ownership for multiple barrels?
 
 Expected Answer (for scoring):
@@ -420,6 +472,7 @@ getBulkBarrelOwnerships(barrelIds, activeOnly = true): 1) Early return empty arr
 ---
 
 ### Question 52 (Category: service_relationships)
+
 How does FinanceService handle customer data parsing with defensive JSON handling?
 
 Expected Answer (for scoring):
@@ -428,6 +481,7 @@ parseCustomerData(customerData): 1) Early return null if !customerData || !custo
 ---
 
 ### Question 53 (Category: data_flow_integration)
+
 What is the data flow when a DumpForRegauge event is processed? How does this differ from other barrel events?
 
 Expected Answer (for scoring):
@@ -436,6 +490,7 @@ DumpForRegauge flow in handleDumpForRegaugeEvent(): 1) Extract barrelSN, operato
 ---
 
 ### Question 54 (Category: service_relationships)
+
 What services does BarrelEventService depend on for handling barrel entry events at holding locations?
 
 Expected Answer (for scoring):
@@ -444,6 +499,7 @@ BarrelEventService constructor injects: 1) PrismaService - database operations; 
 ---
 
 ### Question 55 (Category: data_flow_integration)
+
 How does the safety limits system prevent runaway inventory processing jobs? Describe the circuit breaker pattern and resource monitoring.
 
 Expected Answer (for scoring):
@@ -452,6 +508,7 @@ Safety limits in SafetyLimitsService: 1) checkSafetyLimits() evaluates: batchNum
 ---
 
 ### Question 56 (Category: architecture_structure)
+
 How does the frontend API routes structure support both proxy and direct backend calls?
 
 Expected Answer (for scoring):
@@ -460,6 +517,7 @@ Frontend API routes in app/api/ serve two purposes: graphql-proxy/route.ts forwa
 ---
 
 ### Question 57 (Category: architecture_structure)
+
 How does the WarehouseJobsModule demonstrate circular dependency resolution with BarrelModule?
 
 Expected Answer (for scoring):
@@ -468,6 +526,7 @@ WarehouseJobsModule uses forwardRef(() => BarrelModule) to defer module resoluti
 ---
 
 ### Question 58 (Category: business_logic_constraints)
+
 What is the purpose of bulk operation status tracking?
 
 Expected Answer (for scoring):
@@ -476,6 +535,7 @@ EnumBulkOperationStatus tracks multi-record operations: PENDING, RUNNING, COMPLE
 ---
 
 ### Question 59 (Category: architecture_structure)
+
 What is the purpose of the BarrelAggregatesModule and how does it optimize dashboard performance?
 
 Expected Answer (for scoring):
@@ -484,6 +544,7 @@ BarrelAggregatesModule provides server-side aggregation queries that execute ON-
 ---
 
 ### Question 60 (Category: business_logic_constraints)
+
 How does the warehouse job aggregated staging work?
 
 Expected Answer (for scoring):
@@ -492,6 +553,7 @@ GetAggregatedStagingRecordsDto provides query parameters for filtering staging r
 ---
 
 ### Question 61 (Category: data_flow_integration)
+
 How does the barrel ownership resolution work during event processing? Describe the data flow for determining customer ownership.
 
 Expected Answer (for scoring):
@@ -500,6 +562,7 @@ Ownership resolution flow: 1) When processing barrel, include barrelOwnerships r
 ---
 
 ### Question 62 (Category: data_flow_integration)
+
 Trace the data flow for time zone handling in barrel events. How are Eastern timezone DST transitions handled?
 
 Expected Answer (for scoring):
@@ -508,6 +571,7 @@ Timezone handling in BarrelEventService: 1) isEasternDST(year, month, day) deter
 ---
 
 ### Question 63 (Category: data_flow_integration)
+
 How does the warehouse job staging system track scan processing status? Describe the state machine and transitions.
 
 Expected Answer (for scoring):
@@ -516,6 +580,7 @@ Staging state machine: 1) Initial state: record created in InventoryCheckStaging
 ---
 
 ### Question 64 (Category: data_flow_integration)
+
 How does the InventoryCheckStaging processor validate barrel scans and detect issues? Describe the complete validation pipeline including BAD_QR, NOLABEL, and duplicate detection.
 
 Expected Answer (for scoring):
@@ -524,6 +589,7 @@ The validation pipeline in InventoryCheckStagingProcessor.validateAndDetectIssue
 ---
 
 ### Question 65 (Category: cross_cutting_concerns)
+
 How does the application configure different rate limit tiers for different operation types?
 
 Expected Answer (for scoring):
@@ -532,6 +598,7 @@ ThrottlerModule is configured with three tiers: short (10 req/sec for immediate 
 ---
 
 ### Question 66 (Category: service_relationships)
+
 How does the FeatureFlagsService integrate with BarrelEventService to control barrel reentry behavior?
 
 Expected Answer (for scoring):
@@ -540,6 +607,7 @@ BarrelEventService injects FeatureFlagsService. The FEATURE_FLAG_KEYS constant d
 ---
 
 ### Question 67 (Category: service_relationships)
+
 How does CustomerService implement type guards for computed field sorting detection?
 
 Expected Answer (for scoring):
@@ -548,6 +616,7 @@ CustomerService has helper functions: 1) hasCustomerNameSort(obj): checks typeof
 ---
 
 ### Question 68 (Category: architecture_structure)
+
 What is the purpose of having both HoldingLocationModule and StorageLocationModule?
 
 Expected Answer (for scoring):
@@ -556,6 +625,7 @@ StorageLocationModule handles physical warehouse locations (specific positions i
 ---
 
 ### Question 69 (Category: data_flow_integration)
+
 Trace the complete data flow for bruteforce barrel creation when barrel doesn't exist in the system.
 
 Expected Answer (for scoring):
@@ -564,6 +634,7 @@ Bruteforce creation flow: 1) BarrelEventService.findOrCreate fails to find barre
 ---
 
 ### Question 70 (Category: cross_cutting_concerns)
+
 How does the audit log query system support complex filtering and pagination?
 
 Expected Answer (for scoring):
@@ -572,6 +643,7 @@ The AuditService provides AuditLogQueryOptions supporting filters: operationType
 ---
 
 ### Question 71 (Category: business_logic_constraints)
+
 How does partial ownership transfer work and what happens to remaining percentage?
 
 Expected Answer (for scoring):
@@ -580,6 +652,7 @@ BarrelOwnershipService.transferOwnership() supports partial transfers: 1) Gets c
 ---
 
 ### Question 72 (Category: cross_cutting_concerns)
+
 How does the resolution service handle the ACKNOWLEDGE resolution path?
 
 Expected Answer (for scoring):
@@ -588,6 +661,7 @@ The ACKNOWLEDGE path marks errors as reviewed without fixing the underlying data
 ---
 
 ### Question 73 (Category: service_relationships)
+
 What transaction isolation considerations exist when BarrelEventService creates events with location checks?
 
 Expected Answer (for scoring):
@@ -596,6 +670,7 @@ createBarrelEventWithLocationAndLocationCheck uses prisma.$androidSyncTransactio
 ---
 
 ### Question 74 (Category: service_relationships)
+
 How does ReconciliationService integrate with GroupTransaction for barrel count reconciliation?
 
 Expected Answer (for scoring):
@@ -604,6 +679,7 @@ In createReconciliation(): if input.actualData contains barrelReconciliation and
 ---
 
 ### Question 75 (Category: cross_cutting_concerns)
+
 How does the multi-strategy authentication guard determine which authentication method to use?
 
 Expected Answer (for scoring):
@@ -612,6 +688,7 @@ Azure AD authentication uses @nestjs/passport with passport-azure-ad BearerStrat
 ---
 
 ### Question 76 (Category: architecture_structure)
+
 How does the BarrelSnapshotModule support point-in-time inventory queries?
 
 Expected Answer (for scoring):
@@ -620,6 +697,7 @@ BarrelSnapshotModule provides ON-DEMAND point-in-time inventory queries, NOT per
 ---
 
 ### Question 77 (Category: service_relationships)
+
 How do BullMQ processor options differ between AndroidSyncProcessor and InventoryCheckStagingProcessor, and why?
 
 Expected Answer (for scoring):
@@ -628,6 +706,7 @@ AndroidSyncProcessor: concurrency=2 (TEC-839 limit for simultaneous device uploa
 ---
 
 ### Question 78 (Category: cross_cutting_concerns)
+
 How does the resolution system handle partial batch failures?
 
 Expected Answer (for scoring):
@@ -636,6 +715,7 @@ When resolving multiple device sync errors in a batch, the ResolutionService tra
 ---
 
 ### Question 79 (Category: service_relationships)
+
 How does BarrelAuditService handle the limitation of lot filtering using current vs historical assignments?
 
 Expected Answer (for scoring):
@@ -644,6 +724,7 @@ In getInventoryAtDate() and getInventoryAggregatesAtDate(): 1) If lotNumber filt
 ---
 
 ### Question 80 (Category: service_relationships)
+
 How does GroupTransactionService validate barrel existence before creating transactions, and what error information does it provide?
 
 Expected Answer (for scoring):
@@ -652,6 +733,7 @@ In createLotEntry(), createTransfer(), createInternalMove(): 1) Fetches barrels:
 ---
 
 ### Question 81 (Category: data_flow_integration)
+
 How does the inventory upload processing system handle large CSV files? Describe the complete data transformation pipeline from file upload to database persistence.
 
 Expected Answer (for scoring):
@@ -660,6 +742,7 @@ The flow is: 1) Frontend uploads CSV to inventory-upload endpoint, 2) File is pa
 ---
 
 ### Question 82 (Category: cross_cutting_concerns)
+
 How does the application handle sensitive data in error messages and logs?
 
 Expected Answer (for scoring):
@@ -668,6 +751,7 @@ Several patterns protect sensitive data: 1) Error categorization in business-log
 ---
 
 ### Question 83 (Category: data_flow_integration)
+
 How does the CachedEventTypeService optimize event type lookups? Describe the caching strategy and its impact on transaction performance.
 
 Expected Answer (for scoring):
@@ -676,6 +760,7 @@ EventType caching: 1) CachedEventTypeService caches EventType records to avoid i
 ---
 
 ### Question 84 (Category: data_flow_integration)
+
 How does the micro-batch orchestrator improve inventory processing performance? Describe the orchestration pattern and data flow.
 
 Expected Answer (for scoring):
@@ -684,6 +769,7 @@ Micro-batch orchestration: 1) MicroBatchOrchestrator service manages fine-graine
 ---
 
 ### Question 85 (Category: cross_cutting_concerns)
+
 How does the application handle feature flag changes in real-time?
 
 Expected Answer (for scoring):
@@ -692,6 +778,7 @@ On the backend, FeatureFlagsService initializes the LaunchDarkly SDK with Launch
 ---
 
 ### Question 86 (Category: service_relationships)
+
 What cache invalidation strategy do the cached services use, and how is it coordinated?
 
 Expected Answer (for scoring):
@@ -700,6 +787,7 @@ Based on patterns: 1) CachedEventTypeService, CachedLotVariationService, CachedS
 ---
 
 ### Question 87 (Category: business_logic_constraints)
+
 What validation prevents invalid customer data references?
 
 Expected Answer (for scoring):
@@ -708,6 +796,7 @@ Customer data stored in JSON 'data' field with customerCode, name, etc. populate
 ---
 
 ### Question 88 (Category: service_relationships)
+
 What is the data flow when BarrelOwnershipService processes a partial ownership transfer?
 
 Expected Answer (for scoring):
@@ -716,6 +805,7 @@ In transferOwnership() with partial percentage: 1) Find current ownership for fr
 ---
 
 ### Question 89 (Category: cross_cutting_concerns)
+
 How does the feature flag context support multi-context targeting in LaunchDarkly?
 
 Expected Answer (for scoring):
@@ -724,6 +814,7 @@ LaunchDarkly integration uses single-context targeting, not multi-context. The c
 ---
 
 ### Question 90 (Category: data_flow_integration)
+
 What is the complete error categorization system for device sync errors? Describe the error levels and their handling.
 
 Expected Answer (for scoring):
@@ -732,6 +823,7 @@ Error categorization system: 1) EnumDeviceSyncErrorLevel from Prisma: INFO, WARN
 ---
 
 ### Question 91 (Category: data_flow_integration)
+
 What is the data flow when processing an inspection event? How are repair reasons captured and persisted?
 
 Expected Answer (for scoring):
@@ -740,6 +832,7 @@ Inspection event flow in handleInspectionEvent(): 1) Extract barrelSN, locationS
 ---
 
 ### Question 92 (Category: cross_cutting_concerns)
+
 How does the application handle concurrent resolution attempts on the same error?
 
 Expected Answer (for scoring):
@@ -748,6 +841,7 @@ The resolution system uses database transactions with Prisma to handle concurren
 ---
 
 ### Question 93 (Category: data_flow_integration)
+
 How does the progress tracking checkpoint system work for large batch processing?
 
 Expected Answer (for scoring):
@@ -756,6 +850,7 @@ Checkpoint system: 1) processBatch() returns batchResult with checkpoint object,
 ---
 
 ### Question 94 (Category: service_relationships)
+
 What queue infrastructure does AndroidSyncProcessor use to route InventoryCheck events to the staging queue?
 
 Expected Answer (for scoring):
@@ -764,6 +859,7 @@ AndroidSyncProcessor injects the staging queue via @InjectQueue('inventory-check
 ---
 
 ### Question 95 (Category: architecture_structure)
+
 How does the LoggerModule provide structured logging across the backend?
 
 Expected Answer (for scoring):
@@ -772,6 +868,7 @@ LoggerModule integrates nestjs-pino for structured JSON logging via PinoLoggerMo
 ---
 
 ### Question 96 (Category: architecture_structure)
+
 What is the purpose of the AgentModule and how does it relate to AI functionality?
 
 Expected Answer (for scoring):
@@ -780,6 +877,7 @@ AgentModule provides AI agent infrastructure, containing claude-agent.service.ts
 ---
 
 ### Question 97 (Category: architecture_structure)
+
 How does the frontend chatbot component architecture support AI-powered warehouse assistance?
 
 Expected Answer (for scoring):
@@ -788,6 +886,7 @@ The components/chatbot directory has an index.ts barrel file and shared/ subdire
 ---
 
 ### Question 98 (Category: business_logic_constraints)
+
 What business rules govern ownership type normalization, and when should strict mode vs tolerant mode be used?
 
 Expected Answer (for scoring):
@@ -796,6 +895,7 @@ The normalizeOwnershipType() method normalizes various DB formats to canonical P
 ---
 
 ### Question 99 (Category: business_logic_constraints)
+
 What constraints prevent overlapping barrel ownerships?
 
 Expected Answer (for scoring):
@@ -804,10 +904,10 @@ The ownership system prevents overlapping active ownerships through: 1) Single o
 ---
 
 ### Question 100 (Category: business_logic_constraints)
+
 How does the system enforce that barrel ownership percentages sum to 100%, and what tolerance is allowed for floating-point arithmetic?
 
 Expected Answer (for scoring):
 The system uses OWNERSHIP_SUM_TOLERANCE = 0.001 defined in barrel/constants.ts for floating-point comparison tolerance. However, the actual validation logic varies: 1) In createOwnership(), the system checks currentTotal + newPercentage > 100 with no tolerance; 2) In establishJointOwnership(), totalPercentage !== 100 is checked with exact equality; 3) In validateOwnershipUpdates() for bulk operations, Math.abs(totalPercentage - 100) > 0.01 is used (0.01 tolerance, not 0.001). The OWNERSHIP_SUM_TOLERANCE constant exists but is not consistently used across all validation paths.
 
 ---
-

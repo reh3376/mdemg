@@ -69,7 +69,9 @@
 | Confidently Wrong (-1.0) | 0 | 0 |
 
 ### Key Finding
+
 **MDEMG achieved 12.4x better accuracy than baseline** despite:
+
 - Baseline having direct file access (but context-limited)
 - MDEMG only having file paths from API (no content summaries)
 
@@ -78,6 +80,7 @@
 ## X Post Variables (to be filled)
 
 ### Post 3/5 - Concrete Capability
+
 ```
 {{REPO_NAME}} = whk-wms
 {{FILES_COUNT}} = 3,314
@@ -91,6 +94,7 @@
 ```
 
 ### Post 4/5 - Benchmarks
+
 ```
 {{REPEAT_Q_DELTA}} = _TBD_ (need multi-turn test)
 {{N_TURNS}} = _TBD_
@@ -99,6 +103,7 @@
 ```
 
 ### Post 5/5 - Compute Ask
+
 ```
 {{GPU_HOURS_RANGE}} = _TBD_
 {{SCALE_TARGET_1_EG_10M_nodes}} = 10M
@@ -128,6 +133,7 @@
 - MDEMG output: `/private/tmp/claude/-Users-reh3376-mdemg/tasks/a791d82.output`
 
 ### Previous Tests (v2)
+
 - Baseline v2: `/Users/reh3376/mdemg/docs/tests/baseline-test-2026-01-21-v2.md`
 - MDEMG v2: `/Users/reh3376/mdemg/docs/tests/mdemg-test-2026-01-21-v2.md`
 - Comparison v2: `/Users/reh3376/mdemg/docs/tests/comparison-2026-01-21-v2.md`

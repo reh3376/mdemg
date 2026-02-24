@@ -22,18 +22,21 @@
 ### Run 1 Behavior (Correct)
 
 The agent in Run 1 properly:
+
 1. Queried MDEMG for context
 2. **Interpreted and synthesized** the results into a coherent answer
 3. Cited only relevant file:line references (1-2 per question)
 4. Provided concise, accurate answers
 
 **Example Q136 (Negative Control - Hyperparameter Tuning):**
+
 ```json
 {
   "answer": "No built-in hyperparameter tuning or NAS. Requires external tools like Ray Tune, Optuna.",
   "file_line_refs": ["megatron/core/__init__.py:1"]
 }
 ```
+
 - **Score: 1.0** (correct_not_found: true)
 - Semantic score: 0.576
 - Concept score: 1.0
@@ -41,23 +44,27 @@ The agent in Run 1 properly:
 ### Runs 2-3 Behavior (Incorrect)
 
 The agent in Runs 2-3:
+
 1. Queried MDEMG for context
 2. **Dumped raw MDEMG metadata** as the answer text
 3. Included all 10 references regardless of relevance
 4. Produced nonsensical answers that copy MDEMG's internal format
 
 **Example Q136 from Run 2:**
+
 ```json
 {
   "answer": "Config: model_config.yaml in config Config: model_config.yaml in config. Related to: authentication Config: model_config.yaml in config",
   "file_line_refs": ["tests/.../model_config.yaml:1", ... (10 total)]
 }
 ```
+
 - **Score: 0.714**
 - Semantic score: 0.071 (!)
 - Concept score: 0.026 (!)
 
 **Example Q1 from Run 2 (MegatronModule question):**
+
 ```json
 {
   "answer": "Package: __init__. Python module: __init__\nFile: megatron/core/models/mamba/__init__.py\nImports: 0\n\n--- Code ---\n# Copyright (c) 2024, NVIDIA CORPORATION",
@@ -93,6 +100,7 @@ Runs 2-3 dumped irrelevant MDEMG metadata.
 The agent appears to have been instructed (or behaved) to include ALL top_k results from MDEMG retrieval. This creates noise:
 
 **Run 2 Q136 References:**
+
 ```
 - tests/functional_tests/.../model_config.yaml:1
 - tests/functional_tests/.../model_config.yaml:1
@@ -101,6 +109,7 @@ The agent appears to have been instructed (or behaved) to include ALL top_k resu
 ```
 
 **Run 1 Q136 References:**
+
 ```
 - megatron/core/__init__.py:1
 ```
@@ -127,11 +136,13 @@ Run 2's near-zero semantic/concept scores indicate the answers don't match the e
 ### Primary Issue: Agent Prompt/Behavior Difference
 
 Run 1 was executed with a methodology that:
+
 - Instructed the agent to INTERPRET MDEMG results
 - Required synthesizing actual answers
 - Limited references to most relevant
 
 Runs 2-3 methodology:
+
 - Allowed dumping raw MDEMG output as answers
 - Included all 10 top_k references
 - No quality filtering
@@ -139,6 +150,7 @@ Runs 2-3 methodology:
 ### This is NOT an MDEMG Quality Issue
 
 MDEMG returned the same types of results in all runs. The difference is how the agent USED those results:
+
 - Run 1: Agent understood results → wrote coherent answer
 - Runs 2-3: Agent copied results → produced garbage
 

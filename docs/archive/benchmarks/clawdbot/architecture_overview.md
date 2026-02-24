@@ -233,12 +233,14 @@ EmbeddingProvider {
 ## 6. Plugin/Extension System
 
 ### Loading Mechanism
+
 - **jiti**: JIT runtime TypeScript loader (no build required)
 - **Discovery**: `extensions/` and `plugins/entries` directories scanned at boot
 - **Registration**: Plugin manifest + optional JSON Schema validation
 - **Execution**: In-process (trusted code only)
 
 ### Plugin Types
+
 1. **Channel plugins** — Enable/disable messaging channels (40+ in extensions/)
 2. **Provider auth plugins** — OAuth flows (Google, Qwen, Copilot)
 3. **Memory plugins** — Core (default) or LanceDB (long-term)
@@ -246,6 +248,7 @@ EmbeddingProvider {
 5. **Service plugins** — Background services
 
 ### Manifest Format (`clawdbot.plugin.json`)
+
 ```json
 {
   "id": "plugin-id",
@@ -263,12 +266,14 @@ EmbeddingProvider {
 ## 7. Authentication/Security Mechanisms
 
 ### API Authentication
+
 - **Gateway roles**: operator (full), node (device RPC only), anonymous
 - **Scopes**: operator.admin, operator.read, operator.write, operator.approvals, operator.pairing
 - **Handshake**: TLS + role verification
 - **Timeout**: 10 seconds (configurable via CLAWDBOT_TEST_HANDSHAKE_TIMEOUT_MS)
 
 ### Tool Authorization
+
 ```typescript
 TOOL_PROFILES {
   minimal: ["session_status"]
@@ -279,16 +284,19 @@ TOOL_PROFILES {
 ```
 
 ### File System Security
+
 - **Audit**: Verifies ~/.clawdbot permissions (no world-writable)
 - **Windows ACL**: Validates ACLs on Windows
 - **Path normalization**: Prevents directory traversal
 
 ### External Content
+
 - **Threat detection**: Blocks scripts in fetched HTML
 - **MIME type validation**: Verifies file types
 - **Media sandboxing**: Vision APIs run server-side
 
 ### DM Policy / Group Policy
+
 - **allowFrom**: Allowlist of sender JIDs/IDs per channel
 - **dmPolicy**: "all" | "allowlist" | "none"
 - **groupPolicy**: Tool access controls per group
@@ -299,24 +307,28 @@ TOOL_PROFILES {
 ## 8. Database/Storage Layers
 
 ### SQLite
+
 - **Main store**: `~/.clawdbot/gateway.db`
 - **Schema**: Chat history, sessions, logs, execution approvals
 - **Locking**: `proper-lockfile` for concurrent access
 - **Backup**: Automatic rotation, compaction settings
 
 ### Session Transcripts
+
 - **Location**: `~/.clawdbot/sessions/<sessionKey>/transcript.jsonl`
 - **Format**: Newline-delimited JSON (streaming)
 - **Tracking**: File watcher (`chokidar`) for changes
 - **Encoding**: UTF-8
 
 ### Vector Store
+
 - **sqlite-vec**: Vector embedding storage
 - **Provider**: OpenAI, Gemini, node-llama-cpp (local), Ollama
 - **Search**: Hybrid (vector + BM25 keyword)
 - **Chunking**: Markdown-aware, configurable overlap
 
 ### File Store
+
 - **Media**: `~/.clawdbot/media/` (images, documents)
 - **Config**: `~/.clawdbot/config.json5` (JSON5 format)
 - **Logs**: `~/.clawdbot/logs/` (daily rotated, tslog format)
@@ -327,6 +339,7 @@ TOOL_PROFILES {
 ## 9. API Structure
 
 ### Gateway HTTP Endpoints
+
 - **WebSocket RPC**: `ws://localhost:18789` (default)
 - **REST**: `/api/*` (plugin-registered routes, Hono-based)
 - **Hooks**: `/hooks/*` (webhook ingestion, configurable base path)
@@ -338,23 +351,27 @@ TOOL_PROFILES {
 ### RPC Methods (Typebox schemas)
 
 **Read methods** (50+ routes):
+
 ```
 health, logs.tail, channels.status, models.list, agents.list,
 chat.history, sessions.list, cron.list, usage.status, tts.status
 ```
 
 **Write methods** (15+ routes):
+
 ```
 send, agent, agent.wait, talk.mode, chat.send, chat.abort,
 config.set, config.apply, config.patch, cron.create, cron.delete
 ```
 
 **Admin/Approvals** (exec.approvals.*):
+
 ```
 exec.approval.request, exec.approval.resolve, exec.approvals.list
 ```
 
 **Node/Device** (pairing, registration):
+
 ```
 node.pair.request, node.pair.approve, device.token.rotate
 ```
@@ -376,6 +393,7 @@ DEDUPE_MAX = 1000
 ## 10. Cross-Cutting Concerns
 
 ### Logging System (`src/logging/`)
+
 - **Subsystem loggers**: Per-module logging with colored output
 - **Levels**: trace, debug, info, warn, error, fatal, silent
 - **Transports**: Console (pretty/compact/JSON), file (tslog), custom via registerLogTransport
@@ -385,6 +403,7 @@ DEDUPE_MAX = 1000
 - **TTY detection**: Auto-color detection, NO_COLOR/FORCE_COLOR support
 
 ### Error Handling
+
 - **Global handlers**: Unhandled rejection + uncaught exception traps
 - **Error formatting**: Detailed context, stack traces
 - **Port conflicts**: Helpful OS process info, EADDRINUSE resolution
@@ -392,29 +411,34 @@ DEDUPE_MAX = 1000
 - **Custom ErrorCodes**: INVALID_REQUEST, UNAUTHORIZED, NOT_FOUND, INTERNAL_ERROR, etc.
 
 ### Caching & Deduplication
+
 - **Dedupe**: Message deduplication with TTL (5 min), max 1000 entries
 - **Config snapshot hash**: Prevents re-sends of unchanged config
 - **Auth profile cooldowns**: Prevent rapid re-auth attempts
 - **Session label caching**: In-memory session metadata cache
 
 ### Message Queueing & Rate Limiting
+
 - **Queue modes**: steer (priority), followup, collect, interrupt, queue
 - **Debounce**: Configurable per-session (queueDebounceMs)
 - **Dequeue lanes**: Priority routing (cron, agent, user)
 - **Cap & drop policies**: old (FIFO drop), new (LIFO drop), summarize
 
 ### Concurrency Control
+
 - **Session write lock**: Prevents concurrent session edits
 - **Lane-based scheduling**: Work distribution across processing lanes
 - **Broadcast deduplication**: Per-connection frame dedup
 
 ### Terminal UI Components (`src/terminal/`)
+
 - **Progress line**: Overwritable single-line progress
 - **Color helpers**: Cross-platform color output
 - **Link formatting**: `https://docs.clawd.bot/...` formatting
 - **CLI highlighting**: Syntax highlighting for inline code
 
 ### Diagnostics
+
 - **Diagnostic events**: Opt-in event stream for telemetry
 - **Event types**: session-state, lane-enqueue/dequeue, message-queued/processed, webhook-*, usage
 - **Conditional**: Controlled via CLAWDBOT_DIAGNOSTICS env var
@@ -424,6 +448,7 @@ DEDUPE_MAX = 1000
 ## 11. Key Constants & Configuration Values
 
 ### Tool Groups (`src/agents/tool-policy.ts`)
+
 ```typescript
 "group:fs" = ["read", "write", "edit", "apply_patch"]
 "group:runtime" = ["exec", "process"]
@@ -437,11 +462,13 @@ DEDUPE_MAX = 1000
 ```
 
 ### Memory Limits (`src/gateway/server-constants.ts`)
+
 ```typescript
 DEFAULT_MAX_CHAT_HISTORY_MESSAGES_BYTES = 6 * 1024 * 1024
 ```
 
 ### Session Defaults (`src/config/sessions/types.ts`)
+
 ```typescript
 DEFAULT_RESET_TRIGGER = "/new"
 DEFAULT_RESET_TRIGGERS = ["/new", "/reset"]
@@ -453,36 +480,43 @@ DEFAULT_IDLE_MINUTES = 60
 ## 12. Important File Paths (for benchmarking)
 
 **Configuration:**
+
 - `/src/config/types.clawdbot.ts` — Main config type (81+ properties)
 - `/src/config/zod-schema.ts` — Zod validation schema
 - `/src/config/config.ts` — Config I/O and validation
 
 **Gateway Protocol:**
+
 - `/src/gateway/protocol/schema/` — TypeBox schemas (14 files)
 - `/src/gateway/server-methods/` — RPC handlers (25+ files)
 - `/src/gateway/server-constants.ts` — Constants
 
 **Channels:**
+
 - `/src/channels/dock.ts` — 15K+ LOC multi-channel orchestration
 - `/src/channels/plugins/` — 40 channel implementations
 - `/src/channels/registry.ts` — Channel discovery
 
 **Sessions:**
+
 - `/src/config/sessions/types.ts` — Session model with 40+ properties
 - `/src/config/sessions/store.ts` — Session storage
 - `/src/config/sessions/transcript.ts` — Transcript handling
 
 **Security:**
+
 - `/src/channels/plugins/allowlist-match.ts` — Allowlist matching
 - `/src/agents/tool-policy.ts` — Tool authorization
 - `/src/security/audit.ts` — File system audit
 
 **Memory:**
+
 - `/src/memory/manager.ts` — Vector search orchestration
 - `/src/memory/embeddings.ts` — Embedding provider interface
 - `/src/memory/hybrid.ts` — BM25 + vector merging
 
 **Logging:**
+
 - `/src/logging/subsystem.ts` — 285 LOC subsystem logger
 - `/src/logging/logger.ts` — Root logger setup
 

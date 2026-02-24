@@ -403,6 +403,7 @@ go test -v ./internal/conversation/... -run "Template|Snapshot|Relevance|Truncat
 ```
 
 Tests cover:
+
 - Template CRUD operations (create, read, update, delete, list)
 - Schema validation (valid/invalid schemas)
 - Snapshot capture and retrieval (manual, auto-trigger)
@@ -426,6 +427,7 @@ All 15 UATS specs pass with 100% conformance.
 Phase 60 uses existing CMS configuration. No new environment variables required for P0 features.
 
 Future configuration (P1):
+
 ```bash
 CMS_RESUME_MAX_TOKENS=4000
 CMS_RESUME_DEFAULT_STRATEGY=task_focused

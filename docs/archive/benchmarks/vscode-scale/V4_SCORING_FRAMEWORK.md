@@ -32,6 +32,7 @@ Each answer MUST include:
 ### Evidence Verification
 
 Evidence is verified by:
+
 1. File path must exist in repo
 2. Symbol must exist in that file
 3. Value must match declared/effective value
@@ -46,6 +47,7 @@ Evidence is verified by:
 These questions ask for runtime-effective values, not just declared constants.
 
 **Why this defeats memorization:**
+
 - LLMs memorize `const DEFAULT = 100` style declarations
 - They don't trace through override chains
 - Effective values require multi-file correlation
@@ -62,6 +64,7 @@ These questions ask for runtime-effective values, not just declared constants.
 These questions require following a value through 2-3 files.
 
 **Why this defeats memorization:**
+
 - Single-file facts are memorizable
 - Cross-file relationships are not
 - Especially: "Is there a DIFFERENT value for X case?"
@@ -70,6 +73,7 @@ These questions require following a value through 2-3 files.
 > "Is the extension activation timeout DIFFERENT for local vs remote hosts?"
 >
 > Must find:
+>
 > 1. Base timeout constant
 > 2. Local host usage
 > 3. Remote host usage
@@ -80,6 +84,7 @@ These questions require following a value through 2-3 files.
 These questions ask about conditional overrides.
 
 **Why this defeats memorization:**
+
 - Default paths are documented
 - Edge case overrides are not
 - "What triggers the alternative path?" is hard to guess

@@ -94,6 +94,7 @@ During edge-type attention validation, a path translation bug was discovered and
 **Issue:** MDEMG returns paths like `/apps/whk-wms/src/...` but the runner passed these directly to agents without translating to filesystem-relative paths.
 
 **Fix:** `format_mdemg_for_prompt()` now:
+
 1. Strips `#SymbolName` suffixes from symbol-level nodes
 2. Strips leading `/` to make paths relative to cwd
 3. Deduplicates paths (same file may appear for multiple symbols)
@@ -178,6 +179,7 @@ Edge-Type Attention is controlled by these environment variables:
 | Citation Bonus | +10% | Citing correct file (capped at 1.0) |
 
 **Evidence Tiers:**
+
 - Strong (1.0): Any file:line citation exists
 - Minimal (0.5): Files mentioned without line numbers
 - None (0.0): No file references

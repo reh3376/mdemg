@@ -72,7 +72,7 @@
 | Parameter | Value |
 |-----------|-------|
 | Space ID | plc-gbt |
-| Endpoint | http://localhost:8090 |
+| Endpoint | <http://localhost:8090> |
 | candidate_k | 50 |
 | top_k | 10 |
 | hop_depth | 2 |

@@ -33,10 +33,12 @@
 ## Coverage Gates
 
 ### New Code (Phase 1+)
+
 - **Minimum**: 80% statement coverage for all new packages
 - **Target**: 90%+ for critical paths (retrieval, conversation, learning)
 
 ### Existing Code
+
 - No coverage regression allowed on existing packages
 - Incremental improvement encouraged but not gated
 

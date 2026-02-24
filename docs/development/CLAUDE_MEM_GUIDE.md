@@ -1,7 +1,7 @@
 # Claude-Mem Setup & Usage Guide
 
 **Version:** Latest (npm)
-**Repository:** https://github.com/thedotmack/claude-mem
+**Repository:** <https://github.com/thedotmack/claude-mem>
 **Status:** Installed and configured for user scope
 
 ---
@@ -9,12 +9,14 @@
 ## What is Claude-Mem?
 
 Claude-Mem is a persistent memory system for Claude Code that:
+
 - Automatically captures everything Claude does during coding sessions
 - Compresses conversations with AI for efficient storage
 - Injects relevant context back into future sessions
 - Uses ChromaDB vector storage for semantic search
 
 ### Key Benefits
+
 - Never re-explain your project context
 - Search past conversations with natural language
 - Automatic operation - no manual intervention needed
@@ -64,14 +66,17 @@ MCP Server: uvx chroma-mcp --client-type persistent
 ## Slash Commands
 
 ### `/save`
+
 Quick save of current conversation overview.
 
 ```
 /save
 ```
+
 Use when you want to explicitly preserve the current state.
 
 ### `/remember`
+
 Search your saved memories with natural language.
 
 ```
@@ -81,6 +86,7 @@ Search your saved memories with natural language.
 ```
 
 ### `/claude-mem help`
+
 Show all memory commands and features.
 
 ```
@@ -110,6 +116,7 @@ http://localhost:37777
 ```
 
 Features:
+
 - View all stored memories
 - Search and filter
 - Memory statistics
@@ -135,6 +142,7 @@ This content will NOT be stored in memory.
 ### Data Location
 
 All data stored locally:
+
 ```
 ~/.claude-mem/
 ├── chroma/          # Vector database
@@ -216,6 +224,7 @@ claude-mem config --beta endless
 ```
 
 Access beta channel:
+
 ```bash
 npm install -g claude-mem@beta
 ```

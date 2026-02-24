@@ -32,6 +32,7 @@
 ## Runner Fixes Applied (v1.1)
 
 **1. Parser command parsing:**
+
 ```python
 # v1.0 (broken with complex commands):
 subprocess.run([self.parser_cmd, str(file_path)], ...)
@@ -41,6 +42,7 @@ subprocess.run(shlex.split(self.parser_cmd) + [str(file_path)], ...)
 ```
 
 **2. Config-aware validation:**
+
 ```python
 # Now respects config flags:
 validate_signature = self.spec.config.get("validate_signature", False)
@@ -49,6 +51,7 @@ validate_parent = self.spec.config.get("validate_parent", True)
 ```
 
 **3. Conditional parent validation:**
+
 ```python
 # Only validates parent when config enables it:
 if validate_parent and exp_parent and actual_parent != exp_parent:
@@ -128,6 +131,7 @@ All 27 parsers now have UPTS validation specs.
 ### Evidence Validation
 
 Added `validate_evidence` config flag. When enabled, the test harness runs structural consistency checks:
+
 - LineEnd >= Line for symbols
 - StartLine <= EndLine for CodeElements
 - Symbol Line within CodeElement range
@@ -149,8 +153,10 @@ All new parsers emit `TRUNCATED` diagnostic when content exceeds 4000 chars. See
 
 *All previously documented issues have been resolved.*
 
-### Historical Issue 
-Fix: 
+### Historical Issue
+
+Fix:
+
 ```
 
 ---

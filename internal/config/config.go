@@ -169,6 +169,13 @@ type Config struct {
 	LLMSummaryTimeoutMs int    // Request timeout in ms (default: 30000)
 	LLMSummaryCacheSize int    // Max cached summaries (default: 5000)
 
+	// SME Synthesis settings (Phase 101)
+	SynthesisEnabled   bool   // SYNTHESIS_ENABLED — enable LLM synthesis in /consult (default: false)
+	SynthesisProvider  string // SYNTHESIS_PROVIDER — LLM provider for synthesis (openai/ollama, default: openai)
+	SynthesisModel     string // SYNTHESIS_MODEL — model for synthesis (default: gpt-4o-mini)
+	SynthesisMaxTokens int    // SYNTHESIS_MAX_TOKENS — max tokens for synthesis response (default: 2000)
+	SynthesisTimeoutMs int    // SYNTHESIS_TIMEOUT_MS — timeout for synthesis call in ms (default: 30000)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1158,6 +1165,25 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("LLM_SUMMARY_CACHE_SIZE must be >= 0")
 	}
 
+	// SME Synthesis settings (Phase 101)
+	synthesisEnabled := getBool("SYNTHESIS_ENABLED", false)
+	synthesisProvider := get("SYNTHESIS_PROVIDER", "openai")
+	synthesisModel := get("SYNTHESIS_MODEL", "gpt-4o-mini")
+	synthesisMaxTokens, err := atoi("SYNTHESIS_MAX_TOKENS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	if synthesisMaxTokens < 100 || synthesisMaxTokens > 8000 {
+		return Config{}, errors.New("SYNTHESIS_MAX_TOKENS must be in range [100, 8000]")
+	}
+	synthesisTimeoutMs, err := atoi("SYNTHESIS_TIMEOUT_MS", 30000)
+	if err != nil {
+		return Config{}, err
+	}
+	if synthesisTimeoutMs < 1000 {
+		return Config{}, errors.New("SYNTHESIS_TIMEOUT_MS must be >= 1000")
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -1825,6 +1851,14 @@ func FromEnv() (Config, error) {
 		LLMSummaryBatchSize:       llmSummaryBatchSize,
 		LLMSummaryTimeoutMs:       llmSummaryTimeoutMs,
 		LLMSummaryCacheSize:       llmSummaryCacheSize,
+
+		// Phase 101: SME Synthesis
+		SynthesisEnabled:   synthesisEnabled,
+		SynthesisProvider:  synthesisProvider,
+		SynthesisModel:     synthesisModel,
+		SynthesisMaxTokens: synthesisMaxTokens,
+		SynthesisTimeoutMs: synthesisTimeoutMs,
+
 		GapLowScoreThreshold:      gapLowScoreThreshold,
 		GapMinOccurrences:         gapMinOccurrences,
 		GapAnalysisWindowHours:    gapAnalysisWindowHours,

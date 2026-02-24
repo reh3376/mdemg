@@ -43,6 +43,7 @@
 ## Parser Categories
 
 ### Systems / Embedded (4)
+
 | Parser | Notes |
 |--------|-------|
 | C | Foundation for C++ and CUDA; macros, structs, typedefs |
@@ -51,17 +52,20 @@
 | Rust | Traits, macros, modules; evidence validation enabled |
 
 ### JVM Languages (2)
+
 | Parser | Notes |
 |--------|-------|
 | Java | Brace-depth scope tracking; annotations, generics |
 | Kotlin | Data/sealed classes, objects, companion objects, extension functions |
 
 ### .NET Languages (1)
+
 | Parser | Notes |
 |--------|-------|
 | C# | Brace-depth scope tracking; records, properties, attributes, namespaces |
 
 ### Scripting Languages (4)
+
 | Parser | Notes |
 |--------|-------|
 | Python | Protocol, dataclass, async/await, decorators |
@@ -70,6 +74,7 @@
 | Lua | Functions, local variables, module tables, metatables |
 
 ### Configuration Languages (4)
+
 | Parser | Notes |
 |--------|-------|
 | YAML | Hierarchical key paths; anchors/aliases |
@@ -78,6 +83,7 @@
 | INI | Sections and key-value pairs |
 
 ### Infrastructure / DevOps (3)
+
 | Parser | Notes |
 |--------|-------|
 | Terraform | HCL: resources, data sources, modules, variables, outputs |
@@ -85,12 +91,14 @@
 | Makefile | Targets, variables, .PHONY tracking |
 
 ### Database Languages (2)
+
 | Parser | Notes |
 |--------|-------|
 | SQL | Tables, views, procedures, triggers, indexes |
 | Cypher | Neo4j: labels, constraints, indexes |
 
 ### API Schema Languages (3)
+
 | Parser | Notes |
 |--------|-------|
 | Protocol Buffers | gRPC services, messages, enums, nested types, oneof |
@@ -98,6 +106,7 @@
 | OpenAPI | REST endpoints, HTTP methods, operationIds, schemas, security schemes |
 
 ### Documentation / Markup (3)
+
 | Parser | Notes |
 |--------|-------|
 | Markdown | Headings, code blocks, links |

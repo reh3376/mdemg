@@ -1,0 +1,55 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/consult",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 102 Intent Translation payload extensions for the consult endpoint.",
+    "tags": [
+      "consult",
+      "intent",
+      "phase102"
+    ],
+    "sha256": "3300664cb88518064187431c3c1ced104bec7d603cec594cea7e63efce7f38ed"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-dev' is populated."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "mdemg-dev",
+    "question": "What is the team's pattern for distributed caching?",
+    "context": "I am working on the user service."
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "question": "{{question}}",
+      "context": "{{context}}",
+      "translate_intent": true
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.translated_intent",
+        "operator": "exists"
+      },
+      {
+        "path": "data.translated_intent",
+        "operator": "type",
+        "value": "string"
+      }
+    ]
+  }
+}

@@ -12,6 +12,7 @@ CO_ACTIVATED_WITH edge creation IS working, but at a very slow rate. After 100+ 
 ### Current Behavior
 
 1. **SpreadingActivation** (`activation.go:22-36`) seeds only the **top 2 candidates**:
+
    ```go
    seedN := 2
    for i := 0; i < seedN; i++ {
@@ -24,6 +25,7 @@ CO_ACTIVATED_WITH edge creation IS working, but at a very slow rate. After 100+ 
    - Those edges have non-zero weights
 
 3. **ApplyCoactivation** (`learning/service.go:42-46`) filters nodes:
+
    ```go
    for _, r := range resp.Results {
        if r.Activation >= minAct {  // default: 0.20
@@ -35,6 +37,7 @@ CO_ACTIVATED_WITH edge creation IS working, but at a very slow rate. After 100+ 
 ### Observed Activation Distribution
 
 Sample query returned 6 nodes:
+
 | Rank | Activation | Passes Threshold? |
 |------|------------|-------------------|
 | 1 | 0.637 | ✓ |
@@ -59,6 +62,7 @@ Sample query returned 6 nodes:
 **Narrow Activation Seeding**: Only top 2 candidates get seeded. Combined with sparse graph connectivity (few existing edges for propagation), most returned nodes have zero activation.
 
 This creates slow-start dynamics:
+
 1. Few edges exist initially
 2. Activation can't spread without edges
 3. Few nodes pass threshold → few new edges
@@ -85,6 +89,7 @@ for _, c := range cands {
 ```
 
 **Expected Impact**:
+
 - All 10 returned nodes would have activation
 - If 6+ pass threshold, that's 15+ pairs per query (C(6,2) = 15)
 - Edge accumulation would be ~30x faster
@@ -153,10 +158,12 @@ for _, r := range resp.Results {
 ### Activation Distribution
 
 Before fix:
+
 - 2-3 nodes per query passed the 0.20 threshold
 - Most nodes had 0 activation (not seeded)
 
 After fix:
+
 - **10 out of 10** results pass the 0.20 threshold
 - All candidates seeded with VectorSim values
 - Up to **45 pairs per query** (C(10,2) = 45)
@@ -177,6 +184,7 @@ Rate: 43.1 pairs/query
 ## Conclusion
 
 The fix successfully bootstraps the Hebbian learning feedback loop:
+
 1. More candidates seeded → more nodes pass threshold
 2. More pairs created → more CO_ACTIVATED_WITH edges
 3. More edges → better spreading activation in future queries

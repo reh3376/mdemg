@@ -21,6 +21,7 @@
 ## Scoring Methodology
 
 Each answer is scored on a 0-3 scale:
+
 - **3 (Correct)**: Matches ground truth exactly or functionally equivalent
 - **2 (Partial)**: Contains correct core information but missing details or has minor errors
 - **1 (Vague)**: General direction correct but significant gaps
@@ -151,32 +152,39 @@ Each answer is scored on a 0-3 scale:
 ## Key Findings
 
 ### 1. Overall Improvement
+
 MDEMG-assisted retrieval improved accuracy by **8% overall** (133 → 144 points).
 
 ### 2. Strongest Improvement Categories
+
 - **Commands/Actions**: +14% (baseline had less specific knowledge)
 - **Language Features**: +12% (detailed implementation knowledge gaps)
 - **Workbench Layout**: +10% (specific constants and CSS classes)
 - **Services/DI**: +10% (method names and exact numeric values)
 
 ### 3. Equal Performance
+
 - **Editor/TextModel**: Both scored 90% - this is well-documented core functionality
 
 ### 4. Pattern Analysis
 
 **Where MDEMG Helped Most**:
+
 - Specific numeric constants (proxy identifier count: 72 vs "50-60")
 - Exact method names (findCycleSlow vs findCyclePath)
 - Precise storage key names
 - CSS class enumerations
 
 **Where Both Struggled**:
+
 - Very specific implementation details (telemetry sampling rates)
 - Exact ordering of enum values
 - Precise numeric thresholds (file size limits)
 
 ### 5. Source Attribution
+
 Of MDEMG answers:
+
 - 40 marked as "mdemg" (direct retrieval)
 - 20 marked as "inference" (reasoning from retrieved context)
 
@@ -196,6 +204,7 @@ Of MDEMG answers:
 ## Critical Observation: Training Data Leakage
 
 **The 74% baseline accuracy is suspiciously high** for questions about:
+
 - Exact numeric constants (65535, 22px, 48px)
 - Specific method names (findCycleSlow, assertRegistered)
 - Storage key strings ("menu.hiddenCommands")
@@ -214,6 +223,7 @@ Of MDEMG answers:
 ### True MDEMG Value Proposition
 
 MDEMG's real value is for:
+
 1. **Private/proprietary codebases** - NOT in any training data
 2. **Post-training code changes** - Updates after knowledge cutoff
 3. **Organization-specific implementations** - Custom systems, tribal knowledge

@@ -7,6 +7,7 @@
 L5 is the highest layer in the MDEMG memory graph. L5 nodes represent emergent meta-patterns — concepts that span multiple lower-layer concepts and reveal cross-domain connections. They are not explicitly authored but emerge from the graph structure itself.
 
 The layer hierarchy:
+
 - **L0:** Raw observations (conversation, codebase)
 - **L1:** Hidden patterns (DBSCAN clusters of L0)
 - **L2:** Concepts (clusters of L1)
@@ -53,6 +54,7 @@ Six bottlenecks were fixed to enable L5 emergence:
 ### Results
 
 After Phase 75C, first consolidation of `mdemg-dev` produced:
+
 - 50 dynamic edges (various types including BRIDGES)
 - 4 L5 emergent nodes
 

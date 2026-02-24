@@ -57,25 +57,30 @@ Questions about these topics had the highest correction rates:
 ## Wave 10 Detailed Corrections
 
 ### Batch 91
+
 - **Q469**: HttpExceptionFilter is Prisma-specific, not general; response format is `{message, statusCode}` only
 - **Q472**: No periodic polling for feature flags; streaming handled via LaunchDarkly SDK
 - **Q473**: No ESCALATE resolution path exists; only ACCEPT, RESOLVE, ACKNOWLEDGE, REJECT
 - **Q474**: Uses @nest-lab/throttler-storage-redis library, not custom Redis atomic ops
 
 ### Batch 92
+
 - **Q476**: Channel is `auditLogAdded` not `audit:created`; uses in-memory PubSub not Redis
 - **Q477**: Error handler includes detailed messages, not generic; AuditService sanitizes specific fields
 - **Q479**: FeatureFlagKey is `keyof typeof featureFlagRegistry`, not direct union type
 - **Q480**: Method is `getEntityAuditHistory`, not `getEntityHistory`
 
 ### Batch 93
+
 - **Q483**: No `setUserId()` method exists; context set once via `run()` with AsyncLocalStorage
 
 ### Batch 94
+
 - **Q490**: No PDF format support; sections are different from described
 - **Q494**: Cleanup DELETES records, does not archive; no hash chain integrity
 
 ### Batch 95
+
 - **Q495**: `ensureUniqueSerialNumber` queries Barrel table directly, not SerialRegistryService
 - **Q498**: Wrong AuditTrackOptions fields; no `auditFields`, `sensitiveFields`
 - **Q500**: No HttpExceptionsFilter; TimeoutInterceptor not global; auth flow differs
@@ -85,10 +90,12 @@ Questions about these topics had the highest correction rates:
 ## Impact on Test Validity
 
 ### Original Question Quality Issues (from TEST_VALIDITY_ISSUES.md)
+
 - Baseline claimed 92% accuracy
 - MDEMG claimed 88% accuracy
 
 ### After Verification
+
 - **124 of 380 questions (~33%) had incorrect answers**
 - Combined with 19 corrections from initial 43 uncertain questions
 - **Total: ~143 corrections out of 423 questions originally in verification scope**
@@ -96,10 +103,12 @@ Questions about these topics had the highest correction rates:
 ### Corrected Accuracy Expectations
 
 If the test questions themselves had ~33% answer errors:
+
 - A model achieving 90%+ is likely matching known-wrong answers
 - True accuracy on corrected questions would be lower
 
 **Recommended Test Procedure:**
+
 1. Use the corrected question set only
 2. Re-run both baseline and MDEMG tests
 3. Compare against verified ground truth

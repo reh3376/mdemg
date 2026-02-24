@@ -16,13 +16,16 @@ Nodes exist at different abstraction levels:
 | N | Principles, axioms | "Defense in depth" |
 
 **Layer behavior:**
+
 - Layers grow dynamically as data accumulates (no fixed maximum)
 - Nodes can be **promoted** to higher layers when patterns emerge
 - Promotion preserves existing edges while adding `ABSTRACTS_TO` relationships
 - Layer 1 is always concrete observations; higher layers are emergent
 
 ## Namespaces
+
 All nodes include:
+
 - `space_id` (string): tenant/agent namespace
 - `path` (string): unique addressing within `space_id` (recommended unique constraint)
 - `layer` (int): L0 (concrete) → Ln (abstract)
@@ -31,9 +34,12 @@ All nodes include:
 - timestamps + versioning
 
 ## Core labels
+
 ### `:TapRoot`
+
 Singleton per space.
 Properties:
+
 - `space_id` (unique)
 - `name`
 - `created_at`
@@ -42,8 +48,10 @@ Properties:
 - `ingest_count` — running counter of total ingestions for this space (Phase 9.2)
 
 ### `:MemoryNode`
+
 Main concept/memory node.
 Properties (minimum):
+
 - `node_id` (ULID/UUID string)
 - `space_id`
 - `name`
@@ -62,8 +70,10 @@ Properties (minimum):
 - `embedding` (vector list or VECTOR type depending on Neo4j version)
 
 ### `:Observation`
+
 Append-only event.
 Properties:
+
 - `obs_id`
 - `space_id`
 - `timestamp`
@@ -74,10 +84,13 @@ Properties:
 - `created_at`
 
 ### Optional debug labels
+
 - `:ActivationSnapshot` (store per-query activation traces for debugging)
 
 ## Relationship types (minimum set)
+
 All relationships include:
+
 - `edge_id`
 - `space_id`
 - `created_at`, `updated_at`
@@ -90,6 +103,7 @@ All relationships include:
 - `decay_rate` (float)
 
 ### Structural
+
 - `(:TapRoot)-[:HAS_LAYER]->(:Layer)` *(optional)*
 - `(:MemoryNode)-[:CONTAINS]->(:MemoryNode)`
 - `(:MemoryNode)-[:PART_OF]->(:MemoryNode)` (inverse of CONTAINS)
@@ -97,6 +111,7 @@ All relationships include:
 - `(:MemoryNode)-[:INSTANTIATES]->(:MemoryNode)` inverse of ABSTRACTS_TO
 
 ### Associative / Dynamics
+
 - `(:MemoryNode)-[:ASSOCIATED_WITH]->(:MemoryNode)`
 - `(:MemoryNode)-[:CAUSES]->(:MemoryNode)`
 - `(:MemoryNode)-[:ENABLES]->(:MemoryNode)`
@@ -105,12 +120,14 @@ All relationships include:
 - `(:MemoryNode)-[:CONTRADICTS]->(:MemoryNode)` (treat as inhibitory)
 
 ### Observation links
+
 - `(:MemoryNode)-[:HAS_OBSERVATION]->(:Observation)`
 - `(:Observation)-[:REFERS_TO]->(:MemoryNode)` (optional, if one obs links multiple nodes)
 
 ## Constraints and indexes (Cypher examples)
 
 ### Uniqueness
+
 ```cypher
 CREATE CONSTRAINT space_taproot_unique IF NOT EXISTS
 FOR (t:TapRoot) REQUIRE t.space_id IS UNIQUE;
@@ -126,6 +143,7 @@ FOR (o:Observation) REQUIRE (o.space_id, o.obs_id) IS UNIQUE;
 ```
 
 ### Helpful search indexes
+
 ```cypher
 CREATE INDEX memorynode_name IF NOT EXISTS
 FOR (n:MemoryNode) ON (n.space_id, n.name);
@@ -135,7 +153,9 @@ FOR (n:MemoryNode) ON (n.space_id, n.layer, n.role_type);
 ```
 
 ## Property conventions
+
 Neo4j relationships cannot store nested maps as flexibly as documents—prefer **flat dimension properties**:
+
 - `dim_semantic`
 - `dim_temporal`
 - `dim_causal`
@@ -144,6 +164,7 @@ Neo4j relationships cannot store nested maps as flexibly as documents—prefer *
 - `dim_contradiction` (or represent as separate edge type)
 
 Compute effective traversal weight at query time:
+
 - `w_eff = weight * (α*dim_semantic + β*dim_temporal + ...) * recency_factor`
 
 ## Layer Promotion Mechanics
@@ -169,6 +190,7 @@ Nodes are promoted to higher layers based on a **combination of signals**:
 ### Edge Stability Guarantee
 
 When a node is promoted:
+
 - **Edges are NEVER deleted** (unless explicit decay/pruning)
 - **Relationships are additive** - new `ABSTRACTS_TO` edges supplement existing
 - **Queries can traverse both layers** - concrete and abstract paths coexist

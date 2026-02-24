@@ -11,6 +11,7 @@
 ## Executive Summary
 
 The v4 test validated MDEMG's core hypothesis (100% completion vs 0% baseline), but revealed specific retrieval weaknesses:
+
 - Cross-cutting concerns: 0.45 → **0.709** (+57%) via ConcernNodes ✅
 - Architecture questions: 0.50 → **0.750** (+50%) via ComparisonNodes ✅
 - Configuration/constants: 0.45 → **0.719** (+60%) via ConfigNodes ✅
@@ -38,16 +39,21 @@ This roadmap addressed these gaps through 5 improvement tracks. **All 5 tracks a
 ---
 
 ## Track 1: Edge Strengthening (Learning Edges) ✅ COMPLETE
+
 **Priority**: P0 | **Status**: COMPLETE (v10)
 
 ### Problem (Resolved)
+
 `co_activated_edges` remained at 0 during the entire test. The learning mechanism existed but wasn't creating edges.
 
 ### Root Cause (Identified)
+
 Only top 2 candidates were seeded with activation values in `activation.go`. Combined with sparse graph connectivity, most returned nodes had zero activation and failed the 0.20 learning threshold.
 
 ### Fix Applied
+
 Modified `activation.go` to seed ALL candidates with their VectorSim values:
+
 ```go
 // Before: only top 2 seeded
 // After: all candidates seeded
@@ -57,6 +63,7 @@ for _, c := range cands {
 ```
 
 ### Results
+
 | Metric | Before Fix | After Fix | Improvement |
 |--------|------------|-----------|-------------|
 | Pairs per query | ~0.8 | **43.1** | **54x faster** |
@@ -64,23 +71,28 @@ for _, c := range cands {
 | Avg Score | 0.619 | **0.710** | **+14.6%** |
 
 ### Documentation
+
 - See `docs/LEARNING_EDGES_ANALYSIS.md` for full diagnosis
 - Commit: `3fc2136` - fix(learning): seed all candidates for Hebbian learning activation
 
 ---
 
 ## Track 2: Cross-Cutting Concern Nodes ✅ COMPLETE
+
 **Priority**: P1 | **Status**: COMPLETE
 
 ### Problem (Resolved)
+
 Questions about ACL, RBAC, authentication, and error-handling scored 0.45-0.46 (below average 0.567).
 
 ### Root Cause (Addressed)
+
 Cross-cutting concerns span multiple files/modules but weren't linked in the graph. Individual file embeddings didn't capture the "concern" abstraction.
 
 ### Implementation (Completed)
 
 #### 2.1 Concern Detection During Ingestion ✅
+
 **File**: `cmd/ingest-codebase/main.go`
 
 - ✅ Pattern-based detection for cross-cutting concerns:
@@ -94,6 +106,7 @@ Cross-cutting concerns span multiple files/modules but weren't linked in the gra
 - ✅ Tags with "concern:" prefix (e.g., "concern:authentication")
 
 #### 2.2 Concern Node Creation During Consolidation ✅
+
 **File**: `internal/hidden/service.go`
 
 - ✅ `CreateConcernNodes()` creates dedicated nodes with `role_type: 'concern'`
@@ -102,11 +115,13 @@ Cross-cutting concerns span multiple files/modules but weren't linked in the gra
 - ✅ Auto-generates summaries: "Cross-cutting concern: {type} ({count} implementations)"
 
 #### 2.3 Edge Types ✅
+
 - ✅ `IMPLEMENTS_CONCERN` edge: (base_node)-[:IMPLEMENTS_CONCERN]->(concern_node)
   - Properties: space_id, edge_id, weight, concern_type, created_at, updated_at
 - ⚠️ `SHARES_CONCERN` edge: Deferred (not critical for retrieval improvement)
 
 ### Results
+
 - Concern nodes are created during consolidation for any `concern:*` tags detected
 - Base nodes with same concern are linked to shared ConcernNode
 - Retrieval can now return concern nodes as first-class results
@@ -114,17 +129,21 @@ Cross-cutting concerns span multiple files/modules but weren't linked in the gra
 ---
 
 ## Track 3: Architectural Comparison Nodes ✅ COMPLETE
+
 **Priority**: P2 | **Status**: COMPLETE
 
 ### Problem (Resolved)
+
 Questions like "What is the purpose of having both DeltaSyncModule and SyncModule?" scored lower because understanding requires comparing two entities.
 
 ### Root Cause (Addressed)
+
 Individual file embeddings didn't capture "this module is an alternative to / complement of that module" relationships.
 
 ### Implementation (Completed)
 
 #### 3.1 Similar Module Detection ✅
+
 **File**: `internal/hidden/service.go`
 
 - ✅ `fetchModuleNodes()` finds nodes matching Module, Service, Controller, Provider, Handler, Manager patterns
@@ -132,28 +151,34 @@ Individual file embeddings didn't capture "this module is an alternative to / co
 - ✅ Embedding similarity considered for grouping
 
 #### 3.2 Comparison Node Generation ✅
+
 - ✅ `CreateComparisonNodes()` creates comparison nodes with `role_type: 'comparison'`
 - ✅ `COMPARED_IN` edges link similar modules: `(ModuleA)-[:COMPARED_IN]->(comparison)<-[:COMPARED_IN]-(ModuleB)`
 - ✅ Auto-generates summaries listing compared modules
 
 #### 3.3 Edge Types ✅
+
 - ✅ `COMPARED_IN` - links modules to their comparison node
 - ⚠️ `ALTERNATIVE_TO`, `COMPLEMENTS`, `EXTENDS` - deferred (basic comparison sufficient)
 
 ---
 
 ## Track 4: Configuration Boosting ✅ COMPLETE
+
 **Priority**: P2 | **Status**: COMPLETE
 
 ### Problem (Resolved)
+
 Questions about "runtime-config" and "system configurations" scored below average.
 
 ### Root Cause (Addressed)
+
 Configuration files are often small, with terse content that doesn't embed as distinctively as implementation code.
 
 ### Implementation (Completed)
 
 #### 4.1 Configuration Detection ✅
+
 **File**: `cmd/ingest-codebase/main.go`
 
 - ✅ `configFilePatterns` detects: `*.config.ts`, `*.config.js`, `config.json/yaml`, etc.
@@ -164,10 +189,12 @@ Configuration files are often small, with terse content that doesn't embed as di
 - ✅ Tagged with "config" tag
 
 #### 4.2 Configuration Boosting ⚠️ PARTIAL
+
 - ⚠️ Score boost not implemented in retrieval (config nodes help instead)
 - ✅ Config files are tagged and linked to config summary node
 
 #### 4.3 Configuration Node Creation ✅
+
 **File**: `internal/hidden/service.go`
 
 - ✅ `CreateConfigNodes()` creates dedicated node with `role_type: 'config'`
@@ -176,6 +203,7 @@ Configuration files are often small, with terse content that doesn't embed as di
 - ✅ Generates summary: "Configuration summary: N config files. Categories: ..."
 
 #### 4.4 Environment Variable Extraction ✅
+
 - ✅ `parseEnvFile()` extracts variable names from `.env.*` files
 - ✅ Variables listed in element content and summary
 - ✅ Comments extracted as documentation
@@ -183,17 +211,21 @@ Configuration files are often small, with terse content that doesn't embed as di
 ---
 
 ## Track 5: Temporal Pattern Detection ✅ COMPLETE
+
 **Priority**: P3 | **Status**: COMPLETE
 
 ### Problem (Resolved)
+
 Questions about `validFrom/validTo` temporal patterns scored ~0.46.
 
 ### Root Cause (Addressed)
+
 Temporal modeling patterns are domain-specific and weren't recognized as a cross-cutting concern.
 
 ### Implementation (Completed)
 
 #### 5.1 Temporal Pattern Recognition ✅
+
 **File**: `cmd/ingest-codebase/main.go`
 
 - ✅ Added "temporal" to `concernPatterns` map with comprehensive patterns:
@@ -206,12 +238,14 @@ Temporal modeling patterns are domain-specific and weren't recognized as a cross
 - ✅ Tagged with `concern:temporal`
 
 #### 5.2 Temporal Pattern Edge ✅
+
 **File**: `internal/hidden/service.go`
 
 - ✅ `SHARES_TEMPORAL_PATTERN` edge type created
 - ✅ Links all temporal entities to shared temporal pattern node
 
 #### 5.3 Temporal Documentation Node ✅
+
 - ✅ `CreateTemporalNodes()` creates summary node with `role_type: 'temporal'`
 - ✅ Auto-detects pattern categories: validity-period, effective-dates, soft-delete, versioning, audit-history, timestamps, date-ranges
 - ✅ Generates rich summary describing patterns in codebase
@@ -222,21 +256,25 @@ Temporal modeling patterns are domain-specific and weren't recognized as a cross
 ## Implementation Phases
 
 ### Phase A: Foundation ✅ COMPLETE
+
 - [x] Track 1: Debug and enable learning edges
 - [x] Track 4.1-4.2: Configuration detection and boosting
 - [x] v10 test showed 14.6% improvement (0.567 → 0.710)
 
 ### Phase B: Concern Nodes ✅ COMPLETE
+
 - [x] Track 2: Full cross-cutting concern implementation
 - [x] Track 3.1: Similar module detection
 - [x] ConcernNodes and ComparisonNodes created during consolidation
 
 ### Phase C: Advanced Relationships ✅ COMPLETE
+
 - [x] Track 3.2-3.3: Comparison nodes and edge types
 - [x] Track 5: Temporal pattern detection
 - [x] Run validation test with full improvements (v11: 0.733 avg, +3.3% over v10)
 
 ### Phase D: Validation ✅ COMPLETE
+
 - [x] Benchmark on second codebase (different domain) — plc-gbt (PLC Control Loop), 0.724 avg score. See `docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`
 - [x] Scale test: 10K → 100K nodes — VS Code repo, 28K nodes, linear ingestion scaling, 50ms warm latency. See `docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`
 - [x] Document final architecture — 14 architecture docs in `docs/architecture/` (00-14)
@@ -248,6 +286,7 @@ Temporal modeling patterns are domain-specific and weren't recognized as a cross
 This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 (Phases A-C) are foundational** and should proceed in parallel or prior to Phase 6.
 
 ### Deliverable 6.1: Jiminy (Explainable Retrieval) ✅ COMPLETE
+
 - **Priority**: P0 | **Status**: COMPLETE
 - [x] Update `/v1/memory/retrieve` to return `jiminy` block with rationale and confidence.
 - [x] Trace retrieval path (Vector → Spreading Activation → LLM Rerank) for explanation.
@@ -255,6 +294,7 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [x] **Integration**: Connect with the v9 LLM re-ranker to explain *why* specific results were promoted.
 
 ### Deliverable 6.2: Binary Sidecar Host (Plugin Manager) ✅ COMPLETE
+
 - **Priority**: P1 | **Status**: COMPLETE
 - [x] Finalize `mdemg-module.proto` with lifecycle RPCs (Handshake, HealthCheck, Shutdown).
 - [x] Implement **Plugin Manager** in Go:
@@ -267,6 +307,7 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [x] Create sample `keyword-booster` reasoning module
 
 **Documentation**: See [SDK Plugin Guide](SDK_PLUGIN_GUIDE.md) for complete plugin development documentation including:
+
 - Module types (INGESTION, REASONING, APE) with full code templates
 - manifest.json schema and configuration
 - gRPC lifecycle management
@@ -275,12 +316,14 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 **Claude Skill**: See `.claude/skills/create-plugin.md` for LLM-assisted plugin creation workflow.
 
 ### Deliverable 6.3: Code Parser Module Migration
+
 - **Priority**: P1 | **Effort**: 3-4 days
 - [ ] Extract existing Go/TS/Python parsers into a standalone **Code Perception Module**.
 - [ ] Refactor `ingest-codebase` to delegate parsing to the RPC layer.
 - [ ] Benchmark: RPC overhead vs direct call (target: <5ms added latency).
 
 ### Deliverable 6.4: Non-Code Integration Modules ✅ PARTIAL
+
 - **Priority**: P2 | **Status**: Linear CRUD COMPLETE (Phase 4), Obsidian pending
 - [x] Implement **Linear Module** (Go binary) for engineering tasks.
   - Full sync of teams, projects, and issues
@@ -295,6 +338,7 @@ This phase transforms MDEMG into a plug-and-play cognitive engine. **Tracks 1-5 
 - [ ] Define non-code specific edge types (e.g., `BLOCKS`, `ASSIGNED_TO`).
 
 ### Deliverable 6.5: Active Participant Engine (APE) ✅ COMPLETE
+
 - **Priority**: P2 | **Status**: COMPLETE
 - [x] Implement APE Scheduler (`internal/ape/scheduler.go`)
   - Cron-based scheduling
@@ -336,6 +380,7 @@ TapRoot (space_id: "vscode-scale")
 ```
 
 **Key Integration Points**:
+
 1. `cmd/ingest-codebase` - Add symbol extraction step after file processing
 2. `internal/retrieval/service.go` - Add symbol search to Retrieve()
 3. `internal/models/models.go` - Add Symbol types to request/response
@@ -344,6 +389,7 @@ TapRoot (space_id: "vscode-scale")
 ---
 
 **Benchmark Evidence**:
+
 | Query | MDEMG Returns | Ground Truth | Gap |
 |-------|---------------|--------------|-----|
 | DEFAULT_FLUSH_INTERVAL | `/src/vs/base/node/pfs.ts` | `/src/vs/platform/storage/common/storage.ts` | Wrong file |
@@ -353,9 +399,11 @@ TapRoot (space_id: "vscode-scale")
 ---
 
 ### Deliverable 8.1: Symbol Parser Infrastructure
+
 **Priority**: P0 | **Effort**: 3-4 days | **Status**: ✅ COMPLETE
 
 #### 8.1.1 Tree-Sitter Integration
+
 - [x] Add `github.com/smacker/go-tree-sitter` dependency
 - [x] Add language grammars: TypeScript, JavaScript, Go, Python (Rust pending)
 - [x] Create `internal/symbols/parser.go` with unified `ParseFile(path, lang) []Symbol` interface
@@ -375,6 +423,7 @@ TapRoot (space_id: "vscode-scale")
 | **Rust** | `const`, `static`, `fn`, `struct`, `enum`, `trait` | `pub const BUFFER_SIZE: usize = 4096` |
 
 #### 8.1.3 Symbol Data Structure
+
 ```go
 type Symbol struct {
     Name       string   // "DEFAULT_FLUSH_INTERVAL"
@@ -393,6 +442,7 @@ type Symbol struct {
 #### 8.1.4 Extraction Rules
 
 **Constants (highest priority for evidence-locked)**:
+
 ```
 TypeScript: const X = <value>; | export const X = <value>;
 Go:         const X = <value> | const X <type> = <value>
@@ -400,6 +450,7 @@ Python:     X = <value> (UPPER_CASE naming convention)
 ```
 
 **Functions**:
+
 ```
 TypeScript: function X() | export function X() | const X = () =>
 Go:         func X() | func (r *Receiver) X()
@@ -407,6 +458,7 @@ Python:     def x():
 ```
 
 **Classes/Interfaces/Types**:
+
 ```
 TypeScript: class X | interface X | type X =
 Go:         type X struct | type X interface
@@ -416,9 +468,11 @@ Python:     class X:
 ---
 
 ### Deliverable 8.2: Symbol Storage Schema
+
 **Priority**: P0 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE
 
 #### 8.2.1 Neo4j Schema (V0007 Migration)
+
 ```cypher
 // New label for symbol nodes
 // :SymbolNode - extracted code symbols with values
@@ -451,6 +505,7 @@ OPTIONS {indexConfig: {`vector.dimensions`: 1536, `vector.similarity_function`: 
 ```
 
 #### 8.2.2 SymbolNode Properties
+
 | Property | Type | Description |
 |----------|------|-------------|
 | `node_id` | string | UUID |
@@ -471,6 +526,7 @@ OPTIONS {indexConfig: {`vector.dimensions`: 1536, `vector.similarity_function`: 
 | `updated_at` | datetime | Last update timestamp |
 
 #### 8.2.3 Edge Types
+
 | Edge | Direction | Description |
 |------|-----------|-------------|
 | `DEFINED_IN` | `(SymbolNode)-[:DEFINED_IN]->(MemoryNode)` | Symbol is defined in file |
@@ -480,9 +536,11 @@ OPTIONS {indexConfig: {`vector.dimensions`: 1536, `vector.similarity_function`: 
 ---
 
 ### Deliverable 8.3: Ingestion Pipeline Integration
+
 **Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 8.3.1 Ingest Flow Update
+
 ```
 Current:  File → Summarize → Embed → Create MemoryNode
 New:      File → Summarize → Embed → Create MemoryNode
@@ -493,6 +551,7 @@ New:      File → Summarize → Embed → Create MemoryNode
 ```
 
 #### 8.3.2 Configuration
+
 ```bash
 # New environment variables
 SYMBOL_EXTRACTION_ENABLED=true          # Enable/disable symbol extraction
@@ -504,11 +563,13 @@ SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 ```
 
 #### 8.3.3 Batch Processing ✅ COMPLETE
+
 - [x] Process symbols in batches for Neo4j writes — `UNWIND $symbols` in `internal/symbols/store.go:187`
 - [x] Use UNWIND for efficient bulk creation — symbols and relationships both use UNWIND
 - [x] Implement deduplication: `MERGE` on `{space_id, symbol_id}` with `ON CREATE SET` / `ON MATCH SET`
 
 #### 8.3.4 File Changes
+
 | File | Status | Changes |
 |------|--------|---------|
 | `internal/symbols/types.go` | ✅ DONE | Symbol, FileSymbols, ParserConfig types |
@@ -530,9 +591,11 @@ SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 ---
 
 ### Deliverable 8.4: Symbol-Aware Retrieval
+
 **Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 8.4.1 Search Modes
+
 | Mode | Query | Use Case |
 |------|-------|----------|
 | `semantic` | Vector similarity on query text | "How does caching work?" |
@@ -542,6 +605,7 @@ SYMBOL_EMBED_DOC_COMMENTS=true          # Generate embeddings for doc comments
 | `hybrid` | Vector + symbol boost | Default mode |
 
 #### 8.4.2 Hybrid Scoring Formula
+
 ```
 score = α * vector_sim + β * activation + γ * recency + δ * confidence + ε * symbol_match
 
@@ -558,6 +622,7 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 #### 8.4.3 API Changes
 
 **Request** (updated `/v1/memory/retrieve`):
+
 ```json
 {
   "space_id": "vscode-scale",
@@ -570,6 +635,7 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 ```
 
 **Response** (new `symbols` and `evidence` fields):
+
 ```json
 {
   "data": {
@@ -606,11 +672,13 @@ Rebalanced: α = 0.40, β = 0.20, γ = 0.10, δ = 0.05, ε = 0.25
 ---
 
 ### Deliverable 8.5: Symbol Search Endpoint & Proto Integration
+
 **Priority**: P2 | **Effort**: 1-2 days | **Status**: 📦 ARCHIVED (2026-02-06)
 
 > **Archive Note**: Deliverables 8.5-8.6 retired per user decision. Proto integration complete; dedicated symbol endpoint deferred in favor of Phase 9 incremental updates. Symbol search remains available via `/v1/memory/retrieve` with `include_symbols: true`.
 
 #### 8.5.0 Proto Updates (`api/proto/mdemg-module.proto`) ✅ COMPLETE
+
 Extended the proto definition to support symbols in module communication:
 
 ```protobuf
@@ -663,20 +731,23 @@ message SymbolQueryResponse {
 ```
 
 This allows:
+
 - Ingestion modules to emit symbols with their observations
 - Reasoning modules to receive symbol evidence in retrieval candidates
 - Plugins to query the core symbol service via gRPC
 
-
 #### 8.5.1 New Endpoint: `GET /v1/memory/symbols`
+
 Dedicated symbol search for IDE integration and direct queries.
 
 **Request**:
+
 ```bash
 GET /v1/memory/symbols?space_id=vscode&name=DEFAULT_*&type=const&limit=20
 ```
 
 **Query Parameters**:
+
 | Param | Type | Description |
 |-------|------|-------------|
 | `space_id` | string | Required - memory space |
@@ -687,6 +758,7 @@ GET /v1/memory/symbols?space_id=vscode&name=DEFAULT_*&type=const&limit=20
 | `limit` | int | Max results (default 20) |
 
 **Response**:
+
 ```json
 {
   "data": {
@@ -709,14 +781,17 @@ GET /v1/memory/symbols?space_id=vscode&name=DEFAULT_*&type=const&limit=20
 ---
 
 ### Deliverable 8.6: Testing & Validation
+
 **Priority**: P1 | **Effort**: 2 days | **Status**: 📦 ARCHIVED (2026-02-06)
 
 > **Archive Note**: Deliverable 8.6 retired per user decision. Core symbol parsing (8.6.1 parser tests) complete. VS Code benchmark validation deferred; existing symbol integration in retrieve pipeline provides sufficient coverage for current use cases.
 
 #### 8.6.1 Unit Tests (Completed)
+
 - [x] `internal/symbols/parser_test.go` - Tree-sitter parsing for each language (12 tests)
 
 #### 8.6.2-8.6.3 Deferred
+
 Integration tests and VS Code benchmark validation archived for future consideration.
 
 ---
@@ -734,29 +809,34 @@ Integration tests and VS Code benchmark validation archived for future considera
 ### Current Progress Summary
 
 **✅ Completed (Deliverable 8.1 - Parser Infrastructure)**:
+
 - `internal/symbols/types.go` - Symbol, FileSymbols, ParserConfig structs
 - `internal/symbols/parser.go` - Tree-sitter integration for TS/JS/Go/Python
 - `internal/symbols/parser_test.go` - 12 passing unit tests
 - **Validated**: 451 symbols extracted from 49 Go files in MDEMG codebase
 
 **✅ Completed (Deliverable 8.2 - Storage Schema)**:
+
 - `migrations/V0007__symbol_nodes.cypher` - SymbolNode label, indexes, constraints
 - `internal/symbols/store.go` - Neo4j CRUD operations for SymbolNodes
 - `internal/symbols/store_test.go` - Store unit tests
 
 **✅ Completed (Deliverable 8.3 - Ingestion Integration)**:
+
 - `cmd/ingest-codebase/main.go` - `--extract-symbols` flag, extractors for TS/JS/Go/Python
 - `internal/models/models.go` - `IngestSymbol` struct, `Symbols` field on `BatchIngestItem`
 - `internal/api/handlers.go` - `storeSymbolsForBatch()` stores symbols during batch ingest
 - Symbol embedding via configured embedder (OpenAI/Ollama)
 
 **✅ Completed (Deliverable 8.4 - Retrieval Integration)**:
+
 - `internal/retrieval/service.go` - Symbol search in Retrieve() pipeline (step 1c)
 - `internal/api/server.go` - SymbolStore wiring to retrieval service
 - Symbol pattern matching: CamelCase, UPPER_CASE, snake_case extraction from queries
 - Symbol evidence attachment to retrieval results
 
 **Plugin Integration Architecture**:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CORE (mdemg)                            │
@@ -789,10 +869,12 @@ Integration tests and VS Code benchmark validation archived for future considera
 ```
 
 **📦 Archived (Deliverable 8.5-8.6)** (2026-02-06):
+
 - Symbol search endpoint and VS Code benchmark validation deferred
 - Core symbol infrastructure (8.1-8.4) complete and integrated into retrieve pipeline
 
 **📦 Archived Remaining Items** (moved to backlog):
+
 - `/v1/memory/symbols` endpoint - deferred, use retrieve with `include_symbols: true`
 - VS Code benchmark validation - deferred
 
@@ -843,9 +925,11 @@ Integration tests and VS Code benchmark validation archived for future considera
 ---
 
 ### Deliverable 9.1: Git Commit Hooks
+
 **Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE
 
 #### 9.1.1 Git Diff-Based Ingestion
+
 - [x] Add `--incremental` flag to `cmd/ingest-codebase`
 - [x] Add `--since` flag for specifying base commit (default: HEAD~1)
 - [x] Parse `git diff` to identify changed/added/deleted files
@@ -854,6 +938,7 @@ Integration tests and VS Code benchmark validation archived for future considera
 - [ ] Handle renames: update file_path, preserve node_id (deferred)
 
 #### 9.1.2 Post-Commit Hook Integration
+
 ```bash
 # .git/hooks/post-commit
 #!/bin/bash
@@ -865,6 +950,7 @@ go run ./cmd/ingest-codebase --incremental --space-id="my-project" --quiet --log
 - [ ] Create `mdemg-cli` wrapper binary (deferred - use go run for now)
 
 #### 9.1.3 CI/CD Integration
+
 ```yaml
 # GitHub Actions example
 - name: Update MDEMG Memory
@@ -878,9 +964,11 @@ go run ./cmd/ingest-codebase --incremental --space-id="my-project" --quiet --log
 ---
 
 ### Deliverable 9.2: Time-Based Scheduled Sync
+
 **Priority**: P2 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE (Freshness tracking + StartScheduledSync covers use case; APE INGEST action deferred — not needed)
 
 #### 9.2.1 APE Scheduled Ingestion
+
 Leverage existing APE scheduler for periodic re-ingestion:
 
 ```json
@@ -902,6 +990,7 @@ Leverage existing APE scheduler for periodic re-ingestion:
 - [ ] Detect stale spaces (no update in N days) and trigger refresh
 
 #### 9.2.2 Freshness Tracking ✅
+
 ```cypher
 // TapRoot freshness properties (implemented)
 MATCH (t:TapRoot {space_id: $space_id})
@@ -917,11 +1006,13 @@ SET t.last_ingest_at = datetime(),
 ---
 
 ### Deliverable 9.3: User-Triggered Updates
+
 **Priority**: P1 | **Effort**: 1 day | **Status**: ✅ COMPLETE
 
 > **UATS Coverage**: All endpoints have UATS specs in `docs/api/api-spec/uats/specs/`
 
 #### 9.3.1 Manual Re-Ingest API ✅
+
 ```bash
 POST /v1/memory/ingest/trigger
 {
@@ -934,6 +1025,7 @@ POST /v1/memory/ingest/trigger
 ```
 
 Response:
+
 ```json
 {
   "job_id": "ingest-abc123",
@@ -950,6 +1042,7 @@ Response:
 - [x] UATS specs: ingest_trigger.uats.json, ingest_status.uats.json, ingest_cancel.uats.json, ingest_jobs.uats.json
 
 #### 9.3.2 File-Level Re-Ingest ✅
+
 ```bash
 POST /v1/memory/ingest/files
 {
@@ -969,9 +1062,11 @@ POST /v1/memory/ingest/files
 ---
 
 ### Deliverable 9.4: Plugin-Specific Triggers
+
 **Priority**: P2 | **Effort**: 2 days | **Status**: ✅ COMPLETE
 
 #### 9.4.1 Linear Webhook Integration — COMPLETE
+
 - [x] Webhook receiver: `internal/api/handle_webhooks.go` — HMAC-SHA256 verification, debouncing (10s)
 - [x] Real-time issue/project sync via gRPC dispatch to `linear-module`
 - [x] Batch ingest + APE `source_changed` event triggering
@@ -979,6 +1074,7 @@ POST /v1/memory/ingest/files
 - [x] Config: `LinearWebhookSecret`, `LinearWebhookSpaceID` env vars
 
 #### 9.4.2 File Watcher REST API — COMPLETE
+
 - [x] Core: `internal/filewatcher/watcher.go` — Manager, debouncing, extension filtering, exclude patterns
 - [x] REST API: `internal/api/handlers_filewatcher.go` — 3 endpoints for runtime management
   - `POST /v1/filewatcher/start` — start watcher for a space (validates path, resolves absolute)
@@ -988,6 +1084,7 @@ POST /v1/memory/ingest/files
 - [x] 3 UATS specs: filewatcher_start, filewatcher_status, filewatcher_stop
 
 #### 9.4.3 Event-Driven Module Updates — COMPLETE
+
 - [x] `EventSubscriptions` field on manifest `Capabilities` (`internal/plugins/types.go`)
 - [x] `EventDispatcher` (`internal/plugins/events.go`) routes events to non-APE modules
 - [x] INGESTION modules: dispatched via `IngestionClient.Parse` with event metadata
@@ -999,20 +1096,24 @@ POST /v1/memory/ingest/files
 ---
 
 ### Deliverable 9.5: Conflict Resolution & Consistency
+
 **Priority**: P2 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE
 
 #### 9.5.1 Concurrent Update Handling ✅ COMPLETE
+
 - [x] Optimistic locking on MemoryNode updates — `internal/optimistic/lock.go` (214 lines, 17 tests), exponential backoff with jitter
 - [x] Versioned node/edge updates — `internal/retrieval/versioned_update.go` (425 lines), `ingest_retry.go` (225 lines)
 - [x] Conflict logging via version mismatch detection and retry exhaustion reporting
 
 #### 9.5.2 Orphan Detection ✅ COMPLETE
+
 - [x] `POST /v1/memory/cleanup/orphans` — timestamp-based L0 orphan detection, actions: count/list/archive/delete
 - [x] `POST /v1/memory/cleanup/graph-orphans` — cross-space zero-edge node scan, actions: scan/consolidate/archive/delete
 - [x] Options: archive, delete, flag for review, dry-run support, protected-space blocking
 - [x] 3 UATS specs (9 variants) — `orphan_cleanup.uats.json`, `graph_orphan_cleanup.uats.json`
 
 #### 9.5.3 Edge Consistency ✅ COMPLETE
+
 - [x] Refresh edges when connected nodes change (`RefreshStaleCoactivationEdges`)
 - [x] Re-run Hebbian learning for updated nodes (staleness cascade via `PropagateEdgeStaleness`)
 - [x] Invalidate stale hidden nodes if inputs changed (cache invalidation on edge changes)
@@ -1051,6 +1152,7 @@ POST /v1/memory/ingest/files
 **Goal**: Reduce p95 query latency by 50% and enable efficient operation at 10x current scale.
 
 **Progress** (2026-01-26):
+
 - Deliverable 10.1: Query profiling + index optimization complete (29ms avg vectorRecall)
 - Deliverable 10.2: Query result caching complete (98.9% latency improvement on repeated queries)
 
@@ -1064,19 +1166,23 @@ POST /v1/memory/ingest/files
 | Cache hit rate | N/A | 100% | On repeated queries |
 
 **New Monitoring Endpoints:**
+
 - `GET /v1/memory/cache/stats` - Cache hit rate, size, capacity, TTL
 - `GET /v1/memory/query/metrics` - Query count, slow query %, avg duration
 
 **New Neo4j Indexes:**
+
 - `memory_space_archived` - (space_id, is_archived) for archive filtering
 - `memory_created_at` - (created_at) range index for temporal queries
 
 ---
 
 ### Deliverable 10.1: Neo4j Query Optimization ✅ COMPLETE
+
 **Priority**: P1 | **Effort**: 3-4 days | **Status**: ✅ COMPLETE (2026-01-26)
 
 #### 10.1.1 Query Profiling & Analysis ✅ COMPLETE
+
 - [x] Add query timing instrumentation to Neo4j operations (`internal/retrieval/profiling.go`)
 - [x] Log slow queries (>100ms) with Cypher and sanitized parameters
 - [x] New `/v1/memory/query/metrics` endpoint for monitoring
@@ -1084,7 +1190,9 @@ POST /v1/memory/ingest/files
 - Performance baseline: vectorRecall = 29ms avg, 0% slow queries
 
 #### 10.1.2 Index Optimization ✅ COMPLETE
+
 Created missing indexes:
+
 ```cypher
 CREATE INDEX memory_space_archived IF NOT EXISTS
 FOR (m:MemoryNode) ON (m.space_id, m.is_archived);
@@ -1098,6 +1206,7 @@ FOR (m:MemoryNode) ON (m.created_at);
 - [x] Add range index for timestamp queries
 
 #### 10.1.3 Query Rewriting (Future)
+
 - [ ] Replace `OPTIONAL MATCH` with existence checks where possible
 - [ ] Use `UNWIND` for batch operations instead of multiple queries
 - [ ] Limit graph traversal depth with explicit bounds
@@ -1106,14 +1215,17 @@ FOR (m:MemoryNode) ON (m.created_at);
 ---
 
 ### Deliverable 10.2: Result Caching Layer ✅ COMPLETE
+
 **Priority**: P1 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE (2026-01-26)
 
 #### Implementation Details
+
 - **File**: `internal/retrieval/cache.go` - TTL-LRU cache implementation
 - **Tests**: `internal/retrieval/cache_test.go` - 7 test cases covering key generation, TTL, LRU eviction, space invalidation
 - **Endpoint**: `GET /v1/memory/cache/stats` - Returns cache hit rate, size, capacity, TTL
 
 #### Performance Results
+
 | Metric | Value |
 |--------|-------|
 | Cached query latency | **4ms** |
@@ -1122,6 +1234,7 @@ FOR (m:MemoryNode) ON (m.created_at);
 | Cache hit rate (repeated queries) | **100%** |
 
 #### Configuration
+
 ```bash
 QUERY_CACHE_ENABLED=true      # Feature toggle (default: true)
 QUERY_CACHE_CAPACITY=500      # LRU cache capacity (default: 500)
@@ -1129,6 +1242,7 @@ QUERY_CACHE_TTL_SECONDS=300   # TTL in seconds (default: 300)
 ```
 
 #### Original Design (Reference)
+
 ```go
 type QueryCache struct {
     cache    *lru.Cache[string, CacheEntry]
@@ -1150,13 +1264,16 @@ type CacheEntry struct {
 - [ ] Cache hit/miss metrics for monitoring
 
 #### 10.2.2 Embedding Cache Enhancement
+
 Current: In-memory LRU cache for embeddings
+
 - [ ] Add persistent cache option (Redis or disk-based)
 - [ ] Pre-warm cache on server startup for frequent queries
 - [ ] Batch embedding requests to reduce API round-trips
 - [ ] Cache embedding provider responses with content hash
 
 #### 10.2.3 Graph Structure Cache
+
 ```go
 // Cache frequently-accessed graph structures
 type GraphCache struct {
@@ -1174,25 +1291,30 @@ type GraphCache struct {
 ---
 
 ### Deliverable 10.3: Data Transmission Optimization ✅ COMPLETE
+
 **Priority**: P2 | **Effort**: 2-3 days | **Status**: ✅ COMPLETE (2026-02-06)
 
 #### 10.3.1 Response Compression
+
 - [x] Enable gzip compression for API responses (existing middleware)
 - [ ] Compress large embedding vectors in transit
 - [x] Use Protocol Buffers for internal gRPC (already in place)
 - [ ] Benchmark: JSON vs gzip JSON vs Protobuf
 
 #### 10.3.2 Pagination & Streaming
+
 - [x] Implement cursor-based pagination fields (`Cursor`, `Limit`, `NextCursor`, `HasMore` in models.go)
 - [ ] Add `limit` and `offset` to all list endpoints (retrieval logic pending)
 - [x] SSE streaming for batch ingest job progress (`GET /v1/jobs/{job_id}/stream`)
 - [ ] WebSocket support for real-time progress updates (deferred)
 
 **New Files:**
+
 - `internal/api/sse.go` — SSE streaming handler
 - `internal/api/sse_test.go` — 22 unit tests (100% coverage)
 
 #### 10.3.3 Selective Field Loading
+
 - [ ] Support field selection in retrieve requests (FieldSelector helpers exist but not applied)
 - [ ] Skip loading large fields (embedding, full content) when not needed
 - [ ] Lazy loading for symbol details and evidence
@@ -1200,23 +1322,28 @@ type GraphCache struct {
 ---
 
 ### Deliverable 10.4: Connection Pooling & Resource Management ✅ COMPLETE
+
 **Priority**: P2 | **Effort**: 1-2 days | **Status**: ✅ COMPLETE (2026-02-06)
 
 #### 10.4.1 Neo4j Connection Pool Tuning
+
 - [x] Connection pool metrics exported to Prometheus (7 gauges in collectors.go)
 - [x] Pool configuration via env vars (existing: `NEO4J_POOL_*`)
 - [x] Connection pool metrics endpoint (`/v1/system/pool-metrics`)
 
 #### 10.4.2 Embedding API Rate Limiting ✅
+
 - [x] Implement client-side rate limiting for OpenAI/Ollama (`internal/embeddings/ratelimit.go`)
 - [x] Token bucket rate limiter with configurable RPS and burst
 - [x] Circuit breaker for Ollama (matches OpenAI pattern)
 
 **New Files:**
+
 - `internal/embeddings/ratelimit.go` — Rate-limited embedder wrapper
 - `internal/embeddings/ratelimit_test.go` — 11 unit tests (100% coverage)
 
 **Configuration:**
+
 ```bash
 EMBEDDING_RATE_LIMIT_ENABLED=false
 EMBEDDING_OPENAI_RPS=500
@@ -1226,15 +1353,18 @@ EMBEDDING_OLLAMA_BURST=200
 ```
 
 #### 10.4.3 Memory Management ✅
+
 - [x] Memory pressure monitoring and backpressure (`internal/backpressure/memory.go`)
 - [x] Middleware returns 503 with Retry-After when heap > threshold
 - [x] Health endpoints bypass backpressure
 
 **New Files:**
+
 - `internal/backpressure/memory.go` — Memory pressure middleware
 - `internal/backpressure/memory_test.go` — 11 unit tests (100% coverage)
 
 **Configuration:**
+
 ```bash
 MEMORY_PRESSURE_ENABLED=false
 MEMORY_PRESSURE_THRESHOLD_MB=4096
@@ -1243,9 +1373,11 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096
 ---
 
 ### Deliverable 10.5: Benchmarking & Monitoring
+
 **Priority**: P1 | **Effort**: 2 days | **Status**: ✅ PARTIAL (Observability complete, CI benchmark regression pending)
 
 #### 10.5.1 Performance Benchmarks
+
 ```bash
 # Benchmark suite
 go test -bench=. -benchmem ./internal/retrieval/...
@@ -1258,6 +1390,7 @@ go test -bench=. -benchmem ./internal/symbols/...
 - [x] Document baseline metrics — targets documented in roadmap §10 Success Metrics
 
 #### 10.5.2 Observability ✅ COMPLETE
+
 ```go
 // Metrics to expose
 mdemg_query_duration_seconds{space_id, query_type}
@@ -1306,6 +1439,7 @@ mdemg_embedding_requests_total{provider, status}
 ---
 
 ### Deliverable 11.1: Plugin SDK Documentation ✅ COMPLETE
+
 - **Priority**: P0 | **Status**: COMPLETE (Agent: a4f38ec)
 - [x] Comprehensive plugin development guide: `docs/SDK_PLUGIN_GUIDE.md` (1,582 lines)
 - [x] Module type templates (INGESTION, REASONING, APE)
@@ -1314,6 +1448,7 @@ mdemg_embedding_requests_total{provider, status}
 - [x] Troubleshooting guide
 
 ### Deliverable 11.2: LLM Semantic Summary Service ✅ COMPLETE
+
 - **Priority**: P1 | **Status**: COMPLETE (Agent: a3bff87)
 - [x] LLM client for semantic summary generation: `internal/summarize/service.go`
 - [x] Support for OpenAI and Ollama providers
@@ -1324,6 +1459,7 @@ mdemg_embedding_requests_total{provider, status}
 - [x] CLI integration: `--llm-summary`, `--llm-summary-model`, `--llm-summary-batch`, `--llm-summary-provider`
 
 **Configuration**:
+
 ```bash
 LLM_SUMMARY_ENABLED=true           # Feature toggle (default: false)
 LLM_SUMMARY_PROVIDER=openai        # "openai" or "ollama"
@@ -1335,6 +1471,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 ```
 
 ### Deliverable 11.3: Claude Plugin Creation Skill ✅ COMPLETE
+
 - **Priority**: P1 | **Status**: COMPLETE (Agent: af9daaf)
 - [x] Claude skill for autonomous plugin creation: `.claude/skills/create-plugin.md` (931 lines)
 - [x] Decision framework for choosing plugin type
@@ -1343,6 +1480,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 - [x] Validation checklist
 
 ### Deliverable 11.4: Plugin Scaffolding Generator ✅ COMPLETE
+
 - **Priority**: P1 | **Status**: COMPLETE
 - [x] CLI command: `cmd/plugin-scaffold/main.go`
 - [x] Scaffold generator: `internal/plugins/scaffold/scaffold.go`
@@ -1351,6 +1489,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 - [x] Validates against proto definitions
 
 ### Deliverable 11.5: Plugin Validation & Testing Framework ✅ COMPLETE
+
 - **Priority**: P1 | **Status**: COMPLETE
 - [x] Automated manifest.json validation: `internal/plugins/validator.go`
 - [x] Validation CLI: `cmd/plugin-validate/main.go`
@@ -1358,6 +1497,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 - [x] Health check simulation
 
 ### Deliverable 11.6: Plugin Creation API for LLM Agents ✅ COMPLETE
+
 - **Priority**: P2 | **Status**: COMPLETE
 - [x] `POST /v1/plugins/create` endpoint: `internal/api/plugin_handlers.go`
 - [x] `GET /v1/plugins/{id}` — retrieve plugin by ID
@@ -1365,6 +1505,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 - [x] UATS spec: `plugin_create.uats.json` (6 variants)
 
 ### Deliverable 11.7: Capability Gap Detection ✅ COMPLETE
+
 - **Priority**: P2 | **Status**: COMPLETE
 - [x] Gap detector: `internal/gaps/detector.go`
 - [x] Gap store: `internal/gaps/store.go`
@@ -1379,6 +1520,7 @@ LLM_SUMMARY_CACHE_SIZE=1000        # LRU cache size
 MDEMG is being prepared for public release. This phase focuses on security, governance, and the establishment of a collaboration framework to allow external contributors to build SME Modules.
 
 ### Deliverable 7.1: Governance & CI/CD Guards ✅ COMPLETE
+
 - [x] Implement Issue/PR templates and `CONTRIBUTING.md`.
 - [x] Set up GitHub Actions for automated linting and integration testing.
 - [x] CODEOWNERS, dependabot, auto-PR workflow, parser-tests workflow.
@@ -1387,6 +1529,7 @@ MDEMG is being prepared for public release. This phase focuses on security, gove
 - [x] UATS contract tests added to CI pipeline.
 
 ### Deliverable 7.2: Security Hardening ✅ COMPLETE
+
 - [x] Perform secret scrubbing and path normalization across scripts and API handlers. (Zero hardcoded paths in Go source; benchmarks/archives contain `/Users/` metadata — acceptable for historical data)
 - [x] Implement user-friendly error sanitization — `sanitizeError()` + `writeInternalError()` in `server.go`. All 20 raw `err.Error()` leaks sanitized across 7 handler files; `readJSON` utility sanitized (affects all JSON-parsing endpoints)
 - [x] Add secret scanning (gitleaks) to CI pipeline — `.github/workflows/ci.yml` security job
@@ -1397,7 +1540,9 @@ MDEMG is being prepared for public release. This phase focuses on security, gove
 ## Testing Strategy
 
 ### Regression Test Suite
+
 Create dedicated test questions for each improvement:
+
 - 10 questions per track (50 total)
 - Measure before/after scores
 - Track improvement percentage
@@ -1405,24 +1550,29 @@ Create dedicated test questions for each improvement:
 ### Test Questions by Track
 
 **Track 1 (Learning Edges)**:
+
 - Repeat the same question 5 times, measure if retrieval improves
 
 **Track 2 (Cross-Cutting)**:
+
 - "How does authentication work across the application?"
 - "What modules use the ACL interceptor?"
 - "How are errors handled globally?"
 
 **Track 3 (Comparison)**:
+
 - "What's the difference between ServiceA and ServiceB?"
 - "Why are there two sync modules?"
 - "Compare the validation approaches in X and Y"
 
 **Track 4 (Configuration)**:
+
 - "What environment variables are required?"
 - "How is the database configured?"
 - "What runtime configurations exist?"
 
 **Track 5 (Temporal)**:
+
 - "How does temporal ownership work?"
 - "What entities use validFrom/validTo?"
 - "How are date ranges validated?"
@@ -1432,6 +1582,7 @@ Create dedicated test questions for each improvement:
 ## Migration Path
 
 ### Schema Changes (V0006)
+
 ```cypher
 // New edge types
 CREATE CONSTRAINT concern_edge IF NOT EXISTS
@@ -1447,6 +1598,7 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 ```
 
 ### Backward Compatibility
+
 - All changes are additive (new edge types, new node types)
 - Existing queries continue to work
 - New consolidation creates new nodes alongside existing structure
@@ -1471,6 +1623,7 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 | Max score | ~0.72 | ~0.78 | 0.814 | **0.866** | - |
 
 ### Qualitative
+
 - [x] Retrieval returns concern/comparison nodes when appropriate
 - [x] Generated summaries are accurate and useful
 - [x] No regression in high-performing categories (data flow: 0.719, minor -0.7%)
@@ -1527,6 +1680,7 @@ See `docs/specs/phase92-gap-analysis.md` for the complete 15-gap analysis with c
 ## Appendix: File Locations
 
 ### Core Files to Modify
+
 ```
 mdemg_build/
 ├── service/
@@ -1544,6 +1698,7 @@ mdemg_build/
 ```
 
 ### Test Files
+
 ```
 docs/tests/
 ├── track_1_learning_questions.json

@@ -1,0 +1,77 @@
+{
+  "$schema": "../schema/uvts.schema.json",
+  "config": {
+    "version": "1.0",
+    "test_type": "semantic-validation",
+    "description": "Validates the semantic quality of LLM-generated names for dense clusters during Dynamic Emergence.",
+    "tags": ["consolidate", "emergence", "semantic-quality", "phase103"],
+    "sha256": "PENDING"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "mock",
+        "action": "inject_cluster",
+        "description": "Inject a simulated cluster of nodes representing a specific domain concept."
+      }
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "uvts_database_connection_cluster",
+      "description": "A cluster of nodes primarily describing database pooling and connection strings.",
+      "input": {
+        "cluster_members": [
+          "Set max_connections=10 in config.yaml",
+          "Postgres driver requires sslmode=disable for local dev",
+          "Ensure db.Close() is called in defer to prevent connection leaks",
+          "The connection pool uses standard library database/sql features"
+        ]
+      },
+      "validation": {
+        "target": "LLMEmergenceResponse",
+        "assertions": [
+          {
+            "field": "name",
+            "condition": "contains_any",
+            "values": ["Database", "Connection", "Postgres", "Pool"],
+            "case_sensitive": false
+          },
+          {
+            "field": "description",
+            "condition": "min_length",
+            "value": 20
+          },
+          {
+            "field": "proposed_label",
+            "condition": "equals",
+            "value": "EmergentConcept"
+          }
+        ]
+      }
+    },
+    {
+      "id": "uvts_auth_middleware_cluster",
+      "description": "A cluster of nodes describing JWT token validation and middleware.",
+      "input": {
+        "cluster_members": [
+          "Extract Bearer token from Authorization header",
+          "Validate JWT signature against public JWKS endpoint",
+          "Return 401 Unauthorized if token is expired",
+          "Attach user_id to request context in auth middleware"
+        ]
+      },
+      "validation": {
+        "target": "LLMEmergenceResponse",
+        "assertions": [
+          {
+            "field": "name",
+            "condition": "contains_any",
+            "values": ["Auth", "Authentication", "JWT", "Token", "Middleware", "Security"],
+            "case_sensitive": false
+          }
+        ]
+      }
+    }
+  ]
+}

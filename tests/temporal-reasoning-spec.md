@@ -44,7 +44,7 @@ Temporal constraint: explicit bounds (e.g., 2021-05-01 to 2022-01-01).
 
 Temporal intent: user’s implied preference (e.g., “latest” → prefer new).
 
-2) Data Model Changes
+1) Data Model Changes
 2.1 Core timestamps
 
 Every indexed document and chunk must have:
@@ -62,11 +62,9 @@ Every indexed document and chunk must have:
   "time_basis": "commit|mtime|frontmatter|metadata|inferred"
 }
 
-
 Rule: choose a single canonical time for ranking:
 
 canonical_time = published_at ?? updated_at ?? created_at ?? observed_at
-
 
 …and store it explicitly:
 
@@ -85,10 +83,9 @@ Later, extract event_time ranges from text when present (“On Jan 2 2024 we cha
   "event_time_confidence": "low|medium|high"
 }
 
-
 This is useful for questions like: “What happened in March 2024?” even if the file was edited later.
 
-3) Query Understanding: Temporal Intent + Constraints
+1) Query Understanding: Temporal Intent + Constraints
 3.1 Temporal parsing output schema
 
 Add a module:
@@ -140,7 +137,7 @@ If user says “recent”, “latest”, “current” without explicit date, ha
 
 If parser detects a date but is ambiguous (e.g., “04/05/06”), mark debug["ambiguous"]=True and default to ISO preference rules or require disambiguation at UX layer.
 
-4) Retrieval Pipeline Changes
+1) Retrieval Pipeline Changes
 
 Assuming you have something like:
 
@@ -197,7 +194,6 @@ For latest queries:
 
 S_time = exp(-ln(2) * age_days / half_life_days)
 
-
 Choose half_life_days default by source type:
 
 code/commits: 30
@@ -228,8 +224,7 @@ Combine scores
 
 Use a gated mixture:
 
-S_final = w_sem * norm(S_sem) + w_time * S_time + w_src * S_source
-
+S_final = w_sem *norm(S_sem) + w_time* S_time + w_src * S_source
 
 Where:
 
@@ -256,7 +251,7 @@ If historical:
 
 Prefer closer to midpoint of range (or simply highest semantic).
 
-5) Temporal Consistency Across Multi-hop Evidence
+1) Temporal Consistency Across Multi-hop Evidence
 
 When returning K chunks, you can accidentally select “best chunks” that contradict time.
 
@@ -294,7 +289,7 @@ If you already have entity linking or citations:
 
 Build a small evidence graph and ensure edges don’t violate chronology (e.g., a “policy updated 2026” should not be used to justify “2019 behavior” unless question asks “how has it changed since 2019”).
 
-6) Indexing & Metadata Sources (Git + filesystem + Obsidian)
+1) Indexing & Metadata Sources (Git + filesystem + Obsidian)
 6.1 Git-backed files
 
 For repo files:
@@ -327,7 +322,7 @@ updated_at: last update
 
 For comments, store comment_time and treat each comment as its own chunk-like item.
 
-7) APIs & Integration Points
+1) APIs & Integration Points
 7.1 Retrieval interface
 
 Add:
@@ -335,7 +330,6 @@ Add:
 class TemporalRetriever:
     def retrieve(self, query: str, k: int = 8, now: datetime | None = None) -> RetrievalResult:
         ...
-
 
 Return includes debug:
 
@@ -370,7 +364,7 @@ top 10 with semantic/time/final scores
 
 This is critical for debugging.
 
-8) Configuration
+1) Configuration
 
 Create config file (YAML/JSON):
 
@@ -396,7 +390,7 @@ temporal:
     as_of: 90
   spread_penalty_lambda: 0.2
 
-9) Testing & Evaluation
+1) Testing & Evaluation
 9.1 Unit tests
 
 Parse cases:
@@ -447,7 +441,7 @@ Non-temporal queries should not regress.
 
 Add A/B toggle: temporal enabled vs disabled.
 
-10) Implementation Plan (phased)
+1) Implementation Plan (phased)
 Phase 1 (high leverage, low risk)
 
 Add canonical timestamps to index
@@ -476,7 +470,7 @@ Learned temporal reranker (train small model on your benchmark)
 
 Per-source adaptive half-life learned from usage
 
-11) “Two Macs” angle (optional but useful)
+1) “Two Macs” angle (optional but useful)
 
 If mdemg runs distributed retrieval/indexing:
 

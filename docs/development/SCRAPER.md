@@ -98,9 +98,11 @@ curl http://localhost:9999/v1/scraper/spaces
 ## Extraction Profiles
 
 ### `documentation` (default)
+
 Removes nav, footer, header, sidebar, breadcrumbs, cookie banners. Focuses on `<main>`, `<article>`, or `.content` areas. Best for technical documentation sites.
 
 ### `generic`
+
 Minimal filtering. Removes only `<script>` and `<style>` tags. Extracts full `<body>` content.
 
 ## Job Lifecycle
@@ -134,6 +136,7 @@ go build -o plugins/docs-scraper/docs-scraper ./plugins/docs-scraper/
 ```
 
 Run tests:
+
 ```bash
 go test ./plugins/docs-scraper/... -v
 ```
@@ -151,6 +154,7 @@ Before showing content for review, the system embeds the scraped text and querie
 ## Key Files
 
 ### Core
+
 - `internal/scraper/types.go` — Domain types and constants
 - `internal/scraper/service.go` — Service skeleton
 - `internal/scraper/store.go` — Neo4j persistence
@@ -163,6 +167,7 @@ Before showing content for review, the system embeds the scraped text and querie
 - `internal/api/scraper_adapters.go` — Conversation service adapter (passes StructuredData)
 
 ### Plugin
+
 - `plugins/docs-scraper/main.go` — Entry point
 - `plugins/docs-scraper/lifecycle.go` — gRPC lifecycle
 - `plugins/docs-scraper/ingestion.go` — Matches/Parse/Sync

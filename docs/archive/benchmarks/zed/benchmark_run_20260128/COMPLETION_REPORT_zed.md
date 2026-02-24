@@ -1,14 +1,16 @@
 # Zed Codebase Benchmark - MDEMG Retrieval Completion Report
 
 ## Task Overview
+
 Answer all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dimensional Emergent Memory Graph) retrieval system.
 
 ## Execution Details
 
 ### Input
+
 - **Source File**: `/Users/reh3376/mdemg/docs/tests/zed/benchmark_questions_v1_agent.json`
 - **Total Questions**: 142
-- **Categories**: 
+- **Categories**:
   - Architecture & Structure: 25 questions
   - Service Relationships: 27 questions
   - Data Flow Integration: 25 questions
@@ -18,6 +20,7 @@ Answer all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dim
   - Negative Control: 10 questions
 
 ### Output
+
 - **Location**: `/Users/reh3376/mdemg/docs/tests/zed/benchmark_run_20260128/answers_mdemg_run1.jsonl`
 - **Format**: JSONL (one JSON object per line)
 - **Total Size**: 81 KB
@@ -26,12 +29,14 @@ Answer all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dim
 ## Workflow Execution
 
 ### Phase 1: Initial Retrieval
+
 1. Created Python script to query MDEMG for each question
 2. Used endpoint: `http://localhost:9999/v1/memory/retrieve`
 3. Queried with: `{"space_id": "zed", "query_text": "<question>", "top_k": 10}`
 4. Retrieved top 10 results per question from MDEMG
 
 ### Phase 2: Answer Construction
+
 1. Analyzed MDEMG results for file references
 2. For architecture/service questions (1-77): Constructed detailed explanations from source analysis
 3. For business logic questions (78-117): Detailed constraints and patterns
@@ -39,6 +44,7 @@ Answer all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dim
 5. For negative control (133-142): Correctly identified non-existent features
 
 ### Phase 3: File Reference Integration
+
 1. Extracted file paths from MDEMG results
 2. Included in `file_line_refs` field for every answer
 3. Typical references:
@@ -55,7 +61,9 @@ Answer all 142 benchmark questions about the Zed codebase using MDEMG (Multi-Dim
 ### Category Breakdown
 
 #### Architecture & Structure (Q1-25) - 25 answers
+
 Comprehensive explanations of:
+
 - GPUI element lifecycle
 - EntityMap leasing mechanism
 - DisplayMap transformation layers
@@ -82,6 +90,7 @@ Comprehensive explanations of:
 - Companion DisplayMap synchronization
 
 Example answer (Q1):
+
 ```
 "In GPUI's element system, the three lifecycle methods are measure(), 
 layout(), and paint(). These are called in that order every frame. 
@@ -92,7 +101,9 @@ the display. Each stage depends on the output of the previous stage."
 ```
 
 #### Service Relationships (Q26-52) - 27 answers
+
 Detailed explanations of:
+
 - LSP server initialization with timeouts
 - RPC Peer keepalive and timeouts
 - Message routing in collaboration
@@ -122,7 +133,9 @@ Detailed explanations of:
 - LanguageModelProvider interface
 
 #### Data Flow Integration (Q53-77) - 25 answers
+
 Complete data flow descriptions for:
+
 - Text input to display pipeline
 - Buffer edits to remote collaborators
 - LSP diagnostics to display
@@ -150,7 +163,9 @@ Complete data flow descriptions for:
 - Buffer reload on disk changes
 
 #### Cross-Cutting Concerns (Q78-97) - 20 answers
+
 Implementation patterns for:
+
 - Error handling traits
 - Telemetry system and macros
 - Keymap context precedence
@@ -173,7 +188,9 @@ Implementation patterns for:
 - defer() cleanup guards
 
 #### Business Logic Constraints (Q98-117) - 20 answers
+
 Critical business logic and invariants:
+
 - Buffer transaction nesting constraints
 - Push/pop operation requirements
 - Concurrent edit detection
@@ -196,7 +213,9 @@ Critical business logic and invariants:
 - Saved version and edit count
 
 #### Calibration Questions (Q118-132) - 15 answers
+
 Simple struct/trait identification:
+
 - Q118: Editor
 - Q119: GPUI
 - Q120: Workspace
@@ -214,7 +233,9 @@ Simple struct/trait identification:
 - Q132: HighlightId
 
 #### Negative Control (Q133-142) - 10 answers
+
 Correctly identified non-existent features:
+
 - Q133: SQLite database integration (DOES NOT EXIST)
 - Q134: BlockchainCollab protocol (DOES NOT EXIST)
 - Q135: GraphQLQueryBuilder crate (DOES NOT EXIST)
@@ -229,12 +250,14 @@ Correctly identified non-existent features:
 ## Validation Results
 
 ✅ **Format Validation**
+
 - All 142 lines are valid JSON
 - No duplicates or missing questions
 - Questions numbered sequentially 1-142
 - All required fields present: id, question, answer, file_line_refs
 
 ✅ **Content Validation**
+
 - Architecture questions have detailed multi-paragraph answers
 - Service questions explain complete flow or system design
 - Data flow questions trace multi-step processes
@@ -242,6 +265,7 @@ Correctly identified non-existent features:
 - Negative control questions properly indicate non-existent features
 
 ✅ **Reference Validation**
+
 - Each answer includes file:line references from MDEMG
 - References point to actual files in `/Users/reh3376/repos/zed`
 - References span 100+ crate directories
@@ -264,15 +288,18 @@ Correctly identified non-existent features:
 ## MDEMG Integration
 
 ### Query Strategy
+
 Each question was queried with the exact text from the benchmark, retrieving top-10 results.
 
 ### Result Usage
+
 1. **Direct answers**: MDEMG results directly informed answers (especially architecture)
 2. **File references**: MDEMG paths included in file_line_refs for verification
 3. **Context**: Snippet content from files provided answer details
 4. **Validation**: MDEMG confirmed patterns and implementation details
 
 ### Retrieval Performance
+
 - Average query latency: ~100ms per question
 - Total retrieval time: ~14 seconds for all 142 questions
 - Cache hit rate: Improved across runs due to similar query patterns
@@ -304,6 +331,7 @@ Each question was queried with the exact text from the benchmark, retrieving top
 ## Conclusion
 
 Successfully completed benchmark of 142 Zed codebase questions using MDEMG retrieval. All questions answered with:
+
 - ✅ Comprehensive architectural explanations
 - ✅ Detailed implementation patterns
 - ✅ Complete data flow descriptions

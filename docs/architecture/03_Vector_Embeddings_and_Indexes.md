@@ -4,13 +4,16 @@ Neo4j supports vector indexing and querying for similarity search over embedding
 can generate/store embeddings directly inside the database.
 
 ## A) Store embeddings on nodes
+
 Embeddings are stored as a list property (and in newer Neo4j versions can be stored as the `VECTOR` property type).
 
 ### Recommended properties
+
 - `:MemoryNode.embedding` — embedding for node summary/description
 - Optional: `:Observation.embedding` — embedding for raw event chunk text
 
 ## B) Create a vector index (node index)
+
 Example uses cosine similarity, typical for text embeddings.
 
 ```cypher
@@ -26,6 +29,7 @@ OPTIONS { indexConfig: {
 **Note:** If using Ollama with `nomic-embed-text`, use `768` dimensions.
 
 ## C) Query the vector index
+
 ```cypher
 WITH $queryEmbedding AS q
 CALL db.index.vector.queryNodes('memNodeEmbedding', $k, q)
@@ -35,7 +39,9 @@ ORDER BY score DESC;
 ```
 
 ## D) Generating embeddings with the Neo4j GenAI plugin
+
 ### Single value encode + store (OpenAI)
+
 ```cypher
 MATCH (n:MemoryNode {space_id:$spaceId, node_id:$nodeId})
 WITH n, (n.name || ' ' || coalesce(n.description,'') || ' ' || coalesce(n.summary,'')) AS text
@@ -48,6 +54,7 @@ RETURN n.node_id, size(n.embedding) AS dims;
 ```
 
 ### Batch encode (high throughput)
+
 ```cypher
 MATCH (n:MemoryNode {space_id:$spaceId})
 WHERE n.summary IS NOT NULL
@@ -65,7 +72,9 @@ CALL (nodes, batchStart, batchSize) {
 ```
 
 ## E) Edge embeddings (optional)
+
 If you embed relationships (e.g., edge “meaning”), you can create a relationship vector index:
+
 ```cypher
 CREATE VECTOR INDEX relEmbedding IF NOT EXISTS
 FOR ()-[r:ASSOCIATED_WITH]-()
@@ -74,5 +83,6 @@ OPTIONS { indexConfig: { `vector.dimensions`: 1536, `vector.similarity_function`
 ```
 
 ## F) Version + Java performance note
+
 Neo4j vector indexes are Lucene-backed; Neo4j also documents an optional speedup via the incubated Java Vector API
 (add JVM module flags). This matters at scale, and should be tracked in ops notes.

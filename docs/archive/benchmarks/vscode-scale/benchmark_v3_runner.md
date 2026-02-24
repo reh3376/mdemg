@@ -3,6 +3,7 @@
 ## Test Design
 
 These 20 questions are designed to:
+
 1. **Require cross-file correlation** - Each question spans 3+ files
 2. **Need specific values** - Constants, enum values, string literals
 3. **Exceed memorization** - Combinations unlikely in training data
@@ -11,12 +12,15 @@ These 20 questions are designed to:
 ## Monitoring Requirements
 
 ### Baseline Agent Monitoring
+
 - **NO tool access** - Pure LLM inference
 - Track: Every answer attempt and confidence level
 - Expected: Low accuracy, many "unknown" responses
 
 ### MDEMG Agent Monitoring
+
 Must log:
+
 1. **Every MDEMG query** - Full query text
 2. **Every result** - File paths returned, scores
 3. **Answer derivation** - Which results informed each answer
@@ -25,6 +29,7 @@ Must log:
 ### Output Format
 
 Each agent must output:
+
 ```json
 {
   "question_id": "hard_001",

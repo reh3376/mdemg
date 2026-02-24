@@ -92,140 +92,140 @@ cd plugins/my-echo-module
 package main
 
 import (
-	"context"
-	"flag"
-	"fmt"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-	"time"
+ "context"
+ "flag"
+ "fmt"
+ "log"
+ "net"
+ "os"
+ "os/signal"
+ "strings"
+ "syscall"
+ "time"
 
-	"google.golang.org/grpc"
+ "google.golang.org/grpc"
 
-	pb "mdemg/api/modulepb"
+ pb "mdemg/api/modulepb"
 )
 
 func main() {
-	socketPath := flag.String("socket", "", "Unix socket path")
-	flag.Parse()
+ socketPath := flag.String("socket", "", "Unix socket path")
+ flag.Parse()
 
-	if *socketPath == "" {
-		log.Fatal("--socket is required")
-	}
+ if *socketPath == "" {
+  log.Fatal("--socket is required")
+ }
 
-	// Remove stale socket
-	os.Remove(*socketPath)
+ // Remove stale socket
+ os.Remove(*socketPath)
 
-	// Create Unix socket listener
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	defer listener.Close()
+ // Create Unix socket listener
+ listener, err := net.Listen("unix", *socketPath)
+ if err != nil {
+  log.Fatalf("Failed to listen: %v", err)
+ }
+ defer listener.Close()
 
-	// Create gRPC server
-	server := grpc.NewServer()
-	module := &MyModule{startTime: time.Now()}
-	pb.RegisterModuleLifecycleServer(server, module)
-	pb.RegisterIngestionModuleServer(server, module)
+ // Create gRPC server
+ server := grpc.NewServer()
+ module := &MyModule{startTime: time.Now()}
+ pb.RegisterModuleLifecycleServer(server, module)
+ pb.RegisterIngestionModuleServer(server, module)
 
-	log.Printf("Module listening on %s", *socketPath)
+ log.Printf("Module listening on %s", *socketPath)
 
-	// Handle shutdown gracefully
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+ // Handle shutdown gracefully
+ sigChan := make(chan os.Signal, 1)
+ signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigChan
-		log.Println("Shutting down...")
-		server.GracefulStop()
-	}()
+ go func() {
+  <-sigChan
+  log.Println("Shutting down...")
+  server.GracefulStop()
+ }()
 
-	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+ if err := server.Serve(listener); err != nil {
+  log.Fatalf("Server error: %v", err)
+ }
 }
 
 type MyModule struct {
-	pb.UnimplementedModuleLifecycleServer
-	pb.UnimplementedIngestionModuleServer
-	startTime time.Time
+ pb.UnimplementedModuleLifecycleServer
+ pb.UnimplementedIngestionModuleServer
+ startTime time.Time
 }
 
 // ============ Lifecycle RPCs (Required for ALL modules) ============
 
 func (m *MyModule) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("Handshake: mdemg_version=%s", req.MdemgVersion)
-	return &pb.HandshakeResponse{
-		ModuleId:      "my-echo-module",
-		ModuleVersion: "1.0.0",
-		ModuleType:    pb.ModuleType_MODULE_TYPE_INGESTION,
-		Capabilities:  []string{"echo://", "text/plain"},
-		Ready:         true,
-	}, nil
+ log.Printf("Handshake: mdemg_version=%s", req.MdemgVersion)
+ return &pb.HandshakeResponse{
+  ModuleId:      "my-echo-module",
+  ModuleVersion: "1.0.0",
+  ModuleType:    pb.ModuleType_MODULE_TYPE_INGESTION,
+  Capabilities:  []string{"echo://", "text/plain"},
+  Ready:         true,
+ }, nil
 }
 
 func (m *MyModule) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	return &pb.HealthCheckResponse{
-		Healthy: true,
-		Status:  "ok",
-		Metrics: map[string]string{
-			"uptime": time.Since(m.startTime).String(),
-		},
-	}, nil
+ return &pb.HealthCheckResponse{
+  Healthy: true,
+  Status:  "ok",
+  Metrics: map[string]string{
+   "uptime": time.Since(m.startTime).String(),
+  },
+ }, nil
 }
 
 func (m *MyModule) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("Shutdown requested: reason=%s", req.Reason)
-	return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
+ log.Printf("Shutdown requested: reason=%s", req.Reason)
+ return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
 }
 
 // ============ Ingestion RPCs ============
 
 func (m *MyModule) Matches(ctx context.Context, req *pb.MatchRequest) (*pb.MatchResponse, error) {
-	matches := strings.HasPrefix(req.SourceUri, "echo://") || req.ContentType == "text/plain"
-	return &pb.MatchResponse{
-		Matches:    matches,
-		Confidence: 1.0,
-		Reason:     "matches echo:// or text/plain",
-	}, nil
+ matches := strings.HasPrefix(req.SourceUri, "echo://") || req.ContentType == "text/plain"
+ return &pb.MatchResponse{
+  Matches:    matches,
+  Confidence: 1.0,
+  Reason:     "matches echo:// or text/plain",
+ }, nil
 }
 
 func (m *MyModule) Parse(ctx context.Context, req *pb.ParseRequest) (*pb.ParseResponse, error) {
-	obs := &pb.Observation{
-		NodeId:      fmt.Sprintf("echo-%d", time.Now().UnixNano()),
-		Path:        req.SourceUri,
-		Name:        "echo-observation",
-		Content:     string(req.Content),
-		ContentType: req.ContentType,
-		Tags:        []string{"echo"},
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Source:      "my-echo-module",
-	}
-	return &pb.ParseResponse{Observations: []*pb.Observation{obs}}, nil
+ obs := &pb.Observation{
+  NodeId:      fmt.Sprintf("echo-%d", time.Now().UnixNano()),
+  Path:        req.SourceUri,
+  Name:        "echo-observation",
+  Content:     string(req.Content),
+  ContentType: req.ContentType,
+  Tags:        []string{"echo"},
+  Timestamp:   time.Now().Format(time.RFC3339),
+  Source:      "my-echo-module",
+ }
+ return &pb.ParseResponse{Observations: []*pb.Observation{obs}}, nil
 }
 
 func (m *MyModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncServer) error {
-	// Send a single observation for demonstration
-	obs := &pb.Observation{
-		NodeId:      fmt.Sprintf("echo-sync-%d", time.Now().UnixNano()),
-		Path:        "echo://sync",
-		Name:        "sync-observation",
-		Content:     "sync content",
-		ContentType: "text/plain",
-		Tags:        []string{"echo", "sync"},
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Source:      "my-echo-module",
-	}
-	return stream.Send(&pb.SyncResponse{
-		Observations: []*pb.Observation{obs},
-		Cursor:       "cursor-1",
-		HasMore:      false,
-		Stats:        &pb.SyncStats{ItemsProcessed: 1, ItemsCreated: 1},
-	})
+ // Send a single observation for demonstration
+ obs := &pb.Observation{
+  NodeId:      fmt.Sprintf("echo-sync-%d", time.Now().UnixNano()),
+  Path:        "echo://sync",
+  Name:        "sync-observation",
+  Content:     "sync content",
+  ContentType: "text/plain",
+  Tags:        []string{"echo", "sync"},
+  Timestamp:   time.Now().Format(time.RFC3339),
+  Source:      "my-echo-module",
+ }
+ return stream.Send(&pb.SyncResponse{
+  Observations: []*pb.Observation{obs},
+  Cursor:       "cursor-1",
+  HasMore:      false,
+  Stats:        &pb.SyncStats{ItemsProcessed: 1, ItemsCreated: 1},
+ })
 }
 ```
 
@@ -358,6 +358,7 @@ The manifest file defines plugin metadata and behavior:
 **Purpose**: Parse external sources (files, APIs, webhooks) into MDEMG observations.
 
 **Required Services**:
+
 - `ModuleLifecycle` (all modules)
 - `IngestionModule`
 
@@ -422,6 +423,7 @@ message SyncResponse {
 ```
 
 **Example Use Cases**:
+
 - Parse Linear issues into observations
 - Ingest Obsidian markdown notes
 - Sync Slack messages
@@ -433,207 +435,207 @@ message SyncResponse {
 package main
 
 import (
-	"context"
-	"flag"
-	"fmt"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"strings"
-	"sync/atomic"
-	"syscall"
-	"time"
+ "context"
+ "flag"
+ "fmt"
+ "log"
+ "net"
+ "os"
+ "os/signal"
+ "strings"
+ "sync/atomic"
+ "syscall"
+ "time"
 
-	"google.golang.org/grpc"
-	pb "mdemg/api/modulepb"
+ "google.golang.org/grpc"
+ pb "mdemg/api/modulepb"
 )
 
 const (
-	moduleID      = "my-ingestion-module"
-	moduleVersion = "1.0.0"
+ moduleID      = "my-ingestion-module"
+ moduleVersion = "1.0.0"
 )
 
 var requestCounter uint64
 
 func main() {
-	socketPath := flag.String("socket", "", "Unix socket path")
-	flag.Parse()
+ socketPath := flag.String("socket", "", "Unix socket path")
+ flag.Parse()
 
-	if *socketPath == "" {
-		log.Fatal("--socket is required")
-	}
+ if *socketPath == "" {
+  log.Fatal("--socket is required")
+ }
 
-	os.Remove(*socketPath)
+ os.Remove(*socketPath)
 
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	defer listener.Close()
+ listener, err := net.Listen("unix", *socketPath)
+ if err != nil {
+  log.Fatalf("Failed to listen: %v", err)
+ }
+ defer listener.Close()
 
-	server := grpc.NewServer()
-	module := &IngestionModule{startTime: time.Now()}
-	pb.RegisterModuleLifecycleServer(server, module)
-	pb.RegisterIngestionModuleServer(server, module)
+ server := grpc.NewServer()
+ module := &IngestionModule{startTime: time.Now()}
+ pb.RegisterModuleLifecycleServer(server, module)
+ pb.RegisterIngestionModuleServer(server, module)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+ log.Printf("%s: listening on %s", moduleID, *socketPath)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		log.Printf("%s: shutting down", moduleID)
-		server.GracefulStop()
-	}()
+ sigChan := make(chan os.Signal, 1)
+ signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+ go func() {
+  <-sigChan
+  log.Printf("%s: shutting down", moduleID)
+  server.GracefulStop()
+ }()
 
-	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+ if err := server.Serve(listener); err != nil {
+  log.Fatalf("Server error: %v", err)
+ }
 }
 
 type IngestionModule struct {
-	pb.UnimplementedModuleLifecycleServer
-	pb.UnimplementedIngestionModuleServer
-	startTime time.Time
-	config    map[string]string
+ pb.UnimplementedModuleLifecycleServer
+ pb.UnimplementedIngestionModuleServer
+ startTime time.Time
+ config    map[string]string
 }
 
 // ============ Lifecycle RPCs ============
 
 func (m *IngestionModule) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+ log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
 
-	// Store configuration from manifest
-	m.config = req.Config
+ // Store configuration from manifest
+ m.config = req.Config
 
-	return &pb.HandshakeResponse{
-		ModuleId:      moduleID,
-		ModuleVersion: moduleVersion,
-		ModuleType:    pb.ModuleType_MODULE_TYPE_INGESTION,
-		Capabilities:  []string{"myscheme://", "application/x-myformat"},
-		Ready:         true,
-	}, nil
+ return &pb.HandshakeResponse{
+  ModuleId:      moduleID,
+  ModuleVersion: moduleVersion,
+  ModuleType:    pb.ModuleType_MODULE_TYPE_INGESTION,
+  Capabilities:  []string{"myscheme://", "application/x-myformat"},
+  Ready:         true,
+ }, nil
 }
 
 func (m *IngestionModule) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	return &pb.HealthCheckResponse{
-		Healthy: true,
-		Status:  "ok",
-		Metrics: map[string]string{
-			"uptime":           time.Since(m.startTime).String(),
-			"requests_handled": fmt.Sprintf("%d", atomic.LoadUint64(&requestCounter)),
-		},
-	}, nil
+ return &pb.HealthCheckResponse{
+  Healthy: true,
+  Status:  "ok",
+  Metrics: map[string]string{
+   "uptime":           time.Since(m.startTime).String(),
+   "requests_handled": fmt.Sprintf("%d", atomic.LoadUint64(&requestCounter)),
+  },
+ }, nil
 }
 
 func (m *IngestionModule) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
-	return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
+ log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+ return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
 }
 
 // ============ Ingestion RPCs ============
 
 func (m *IngestionModule) Matches(ctx context.Context, req *pb.MatchRequest) (*pb.MatchResponse, error) {
-	atomic.AddUint64(&requestCounter, 1)
+ atomic.AddUint64(&requestCounter, 1)
 
-	// Check if we can handle this source
-	matches := strings.HasPrefix(req.SourceUri, "myscheme://") ||
-		req.ContentType == "application/x-myformat"
+ // Check if we can handle this source
+ matches := strings.HasPrefix(req.SourceUri, "myscheme://") ||
+  req.ContentType == "application/x-myformat"
 
-	confidence := float32(0.0)
-	reason := "not a supported source"
-	if matches {
-		confidence = 1.0
-		reason = "matches myscheme:// or application/x-myformat"
-	}
+ confidence := float32(0.0)
+ reason := "not a supported source"
+ if matches {
+  confidence = 1.0
+  reason = "matches myscheme:// or application/x-myformat"
+ }
 
-	return &pb.MatchResponse{
-		Matches:    matches,
-		Confidence: confidence,
-		Reason:     reason,
-	}, nil
+ return &pb.MatchResponse{
+  Matches:    matches,
+  Confidence: confidence,
+  Reason:     reason,
+ }, nil
 }
 
 func (m *IngestionModule) Parse(ctx context.Context, req *pb.ParseRequest) (*pb.ParseResponse, error) {
-	atomic.AddUint64(&requestCounter, 1)
+ atomic.AddUint64(&requestCounter, 1)
 
-	// Parse content into observations
-	// This is where your custom parsing logic goes
+ // Parse content into observations
+ // This is where your custom parsing logic goes
 
-	obs := &pb.Observation{
-		NodeId:      fmt.Sprintf("%s-%d", moduleID, time.Now().UnixNano()),
-		Path:        req.SourceUri,
-		Name:        "Parsed Item",
-		Content:     string(req.Content),
-		ContentType: req.ContentType,
-		Tags:        []string{"parsed", "myformat"},
-		Metadata:    map[string]string{"source_uri": req.SourceUri},
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Source:      moduleID,
-	}
+ obs := &pb.Observation{
+  NodeId:      fmt.Sprintf("%s-%d", moduleID, time.Now().UnixNano()),
+  Path:        req.SourceUri,
+  Name:        "Parsed Item",
+  Content:     string(req.Content),
+  ContentType: req.ContentType,
+  Tags:        []string{"parsed", "myformat"},
+  Metadata:    map[string]string{"source_uri": req.SourceUri},
+  Timestamp:   time.Now().Format(time.RFC3339),
+  Source:      moduleID,
+ }
 
-	return &pb.ParseResponse{
-		Observations: []*pb.Observation{obs},
-		Metadata: map[string]string{
-			"parsed_at": time.Now().Format(time.RFC3339),
-		},
-	}, nil
+ return &pb.ParseResponse{
+  Observations: []*pb.Observation{obs},
+  Metadata: map[string]string{
+   "parsed_at": time.Now().Format(time.RFC3339),
+  },
+ }, nil
 }
 
 func (m *IngestionModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncServer) error {
-	atomic.AddUint64(&requestCounter, 1)
+ atomic.AddUint64(&requestCounter, 1)
 
-	// Implement incremental sync logic
-	// Use req.Cursor to resume from last position
+ // Implement incremental sync logic
+ // Use req.Cursor to resume from last position
 
-	cursor := req.Cursor
-	var processed, created int32
+ cursor := req.Cursor
+ var processed, created int32
 
-	// Example: fetch items in batches
-	for {
-		// Fetch next batch from external source
-		items, nextCursor, hasMore := fetchItems(cursor, 50)
+ // Example: fetch items in batches
+ for {
+  // Fetch next batch from external source
+  items, nextCursor, hasMore := fetchItems(cursor, 50)
 
-		var observations []*pb.Observation
-		for _, item := range items {
-			obs := itemToObservation(item)
-			observations = append(observations, obs)
-			processed++
-			created++
-		}
+  var observations []*pb.Observation
+  for _, item := range items {
+   obs := itemToObservation(item)
+   observations = append(observations, obs)
+   processed++
+   created++
+  }
 
-		// Send batch
-		if err := stream.Send(&pb.SyncResponse{
-			Observations: observations,
-			Cursor:       nextCursor,
-			HasMore:      hasMore,
-			Stats: &pb.SyncStats{
-				ItemsProcessed: processed,
-				ItemsCreated:   created,
-			},
-		}); err != nil {
-			return err
-		}
+  // Send batch
+  if err := stream.Send(&pb.SyncResponse{
+   Observations: observations,
+   Cursor:       nextCursor,
+   HasMore:      hasMore,
+   Stats: &pb.SyncStats{
+    ItemsProcessed: processed,
+    ItemsCreated:   created,
+   },
+  }); err != nil {
+   return err
+  }
 
-		if !hasMore {
-			break
-		}
-		cursor = nextCursor
-	}
+  if !hasMore {
+   break
+  }
+  cursor = nextCursor
+ }
 
-	return nil
+ return nil
 }
 
 // Helper functions for your implementation
 func fetchItems(cursor string, limit int) ([]interface{}, string, bool) {
-	// Implement fetching from your external source
-	return nil, "", false
+ // Implement fetching from your external source
+ return nil, "", false
 }
 
 func itemToObservation(item interface{}) *pb.Observation {
-	// Convert your item to an observation
-	return &pb.Observation{}
+ // Convert your item to an observation
+ return &pb.Observation{}
 }
 ```
 
@@ -644,6 +646,7 @@ func itemToObservation(item interface{}) *pb.Observation {
 **Purpose**: Re-rank, filter, or augment retrieval results during the query pipeline.
 
 **Required Services**:
+
 - `ModuleLifecycle` (all modules)
 - `ReasoningModule`
 
@@ -680,6 +683,7 @@ message RetrievalCandidate {
 ```
 
 **Example Use Cases**:
+
 - Keyword boosting (boost exact matches)
 - Recency weighting
 - Cross-encoder re-ranking
@@ -692,225 +696,225 @@ message RetrievalCandidate {
 package main
 
 import (
-	"context"
-	"flag"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
+ "context"
+ "flag"
+ "log"
+ "net"
+ "os"
+ "os/signal"
+ "sort"
+ "strconv"
+ "strings"
+ "sync"
+ "syscall"
+ "time"
 
-	"google.golang.org/grpc"
-	pb "mdemg/api/modulepb"
+ "google.golang.org/grpc"
+ pb "mdemg/api/modulepb"
 )
 
 const (
-	moduleID      = "my-reasoning-module"
-	moduleVersion = "1.0.0"
+ moduleID      = "my-reasoning-module"
+ moduleVersion = "1.0.0"
 )
 
 func main() {
-	socketPath := flag.String("socket", "", "Unix socket path")
-	flag.Parse()
+ socketPath := flag.String("socket", "", "Unix socket path")
+ flag.Parse()
 
-	if *socketPath == "" {
-		log.Fatal("--socket is required")
-	}
+ if *socketPath == "" {
+  log.Fatal("--socket is required")
+ }
 
-	os.Remove(*socketPath)
+ os.Remove(*socketPath)
 
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	defer listener.Close()
-	defer os.Remove(*socketPath)
+ listener, err := net.Listen("unix", *socketPath)
+ if err != nil {
+  log.Fatalf("Failed to listen: %v", err)
+ }
+ defer listener.Close()
+ defer os.Remove(*socketPath)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+ log.Printf("%s: listening on %s", moduleID, *socketPath)
 
-	grpcServer := grpc.NewServer()
-	s := &ReasoningServer{
-		startTime:   time.Now(),
-		boostFactor: 0.2,
-	}
+ grpcServer := grpc.NewServer()
+ s := &ReasoningServer{
+  startTime:   time.Now(),
+  boostFactor: 0.2,
+ }
 
-	pb.RegisterModuleLifecycleServer(grpcServer, s)
-	pb.RegisterReasoningModuleServer(grpcServer, s)
+ pb.RegisterModuleLifecycleServer(grpcServer, s)
+ pb.RegisterReasoningModuleServer(grpcServer, s)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-sigChan
-		log.Printf("%s: shutting down", moduleID)
-		grpcServer.GracefulStop()
-	}()
+ sigChan := make(chan os.Signal, 1)
+ signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+ go func() {
+  <-sigChan
+  log.Printf("%s: shutting down", moduleID)
+  grpcServer.GracefulStop()
+ }()
 
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+ if err := grpcServer.Serve(listener); err != nil {
+  log.Fatalf("Server error: %v", err)
+ }
 }
 
 type ReasoningServer struct {
-	pb.UnimplementedModuleLifecycleServer
-	pb.UnimplementedReasoningModuleServer
+ pb.UnimplementedModuleLifecycleServer
+ pb.UnimplementedReasoningModuleServer
 
-	mu              sync.Mutex
-	startTime       time.Time
-	requestsHandled int64
-	boostFactor     float64
+ mu              sync.Mutex
+ startTime       time.Time
+ requestsHandled int64
+ boostFactor     float64
 }
 
 // ============ Lifecycle RPCs ============
 
 func (s *ReasoningServer) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+ log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
 
-	// Parse configuration
-	if factor, ok := req.Config["boost_factor"]; ok {
-		if f, err := strconv.ParseFloat(factor, 64); err == nil {
-			s.boostFactor = f
-		}
-	}
+ // Parse configuration
+ if factor, ok := req.Config["boost_factor"]; ok {
+  if f, err := strconv.ParseFloat(factor, 64); err == nil {
+   s.boostFactor = f
+  }
+ }
 
-	return &pb.HandshakeResponse{
-		ModuleId:      moduleID,
-		ModuleVersion: moduleVersion,
-		ModuleType:    pb.ModuleType_MODULE_TYPE_REASONING,
-		Capabilities:  []string{"keyword_boost", "recency_weight"},
-		Ready:         true,
-	}, nil
+ return &pb.HandshakeResponse{
+  ModuleId:      moduleID,
+  ModuleVersion: moduleVersion,
+  ModuleType:    pb.ModuleType_MODULE_TYPE_REASONING,
+  Capabilities:  []string{"keyword_boost", "recency_weight"},
+  Ready:         true,
+ }, nil
 }
 
 func (s *ReasoningServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	s.mu.Lock()
-	requests := s.requestsHandled
-	s.mu.Unlock()
+ s.mu.Lock()
+ requests := s.requestsHandled
+ s.mu.Unlock()
 
-	return &pb.HealthCheckResponse{
-		Healthy: true,
-		Status:  "ready",
-		Metrics: map[string]string{
-			"uptime":           time.Since(s.startTime).String(),
-			"requests_handled": strconv.FormatInt(requests, 10),
-			"boost_factor":     strconv.FormatFloat(s.boostFactor, 'f', 2, 64),
-		},
-	}, nil
+ return &pb.HealthCheckResponse{
+  Healthy: true,
+  Status:  "ready",
+  Metrics: map[string]string{
+   "uptime":           time.Since(s.startTime).String(),
+   "requests_handled": strconv.FormatInt(requests, 10),
+   "boost_factor":     strconv.FormatFloat(s.boostFactor, 'f', 2, 64),
+  },
+ }, nil
 }
 
 func (s *ReasoningServer) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
-	return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
+ log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+ return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
 }
 
 // ============ Reasoning RPC ============
 
 func (s *ReasoningServer) Process(ctx context.Context, req *pb.ProcessRequest) (*pb.ProcessResponse, error) {
-	s.mu.Lock()
-	s.requestsHandled++
-	s.mu.Unlock()
+ s.mu.Lock()
+ s.requestsHandled++
+ s.mu.Unlock()
 
-	if len(req.Candidates) == 0 {
-		return &pb.ProcessResponse{Results: req.Candidates}, nil
-	}
+ if len(req.Candidates) == 0 {
+  return &pb.ProcessResponse{Results: req.Candidates}, nil
+ }
 
-	log.Printf("%s: processing %d candidates for: %s",
-		moduleID, len(req.Candidates), truncate(req.QueryText, 50))
+ log.Printf("%s: processing %d candidates for: %s",
+  moduleID, len(req.Candidates), truncate(req.QueryText, 50))
 
-	// Extract keywords from query
-	keywords := extractKeywords(req.QueryText)
+ // Extract keywords from query
+ keywords := extractKeywords(req.QueryText)
 
-	// Score and boost candidates
-	type scored struct {
-		candidate *pb.RetrievalCandidate
-		boost     float64
-	}
+ // Score and boost candidates
+ type scored struct {
+  candidate *pb.RetrievalCandidate
+  boost     float64
+ }
 
-	results := make([]scored, len(req.Candidates))
-	for i, c := range req.Candidates {
-		// Calculate boost based on keyword matches
-		boost := calculateBoost(c.Name, c.Summary, keywords) * s.boostFactor
+ results := make([]scored, len(req.Candidates))
+ for i, c := range req.Candidates {
+  // Calculate boost based on keyword matches
+  boost := calculateBoost(c.Name, c.Summary, keywords) * s.boostFactor
 
-		// Apply boost to score
-		c.Score = c.Score + float32(boost)
+  // Apply boost to score
+  c.Score = c.Score + float32(boost)
 
-		results[i] = scored{candidate: c, boost: boost}
-	}
+  results[i] = scored{candidate: c, boost: boost}
+ }
 
-	// Sort by new score (descending)
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].candidate.Score > results[j].candidate.Score
-	})
+ // Sort by new score (descending)
+ sort.Slice(results, func(i, j int) bool {
+  return results[i].candidate.Score > results[j].candidate.Score
+ })
 
-	// Build output
-	output := make([]*pb.RetrievalCandidate, len(results))
-	for i, r := range results {
-		output[i] = r.candidate
-	}
+ // Build output
+ output := make([]*pb.RetrievalCandidate, len(results))
+ for i, r := range results {
+  output[i] = r.candidate
+ }
 
-	// Apply top_k limit
-	if req.TopK > 0 && int(req.TopK) < len(output) {
-		output = output[:req.TopK]
-	}
+ // Apply top_k limit
+ if req.TopK > 0 && int(req.TopK) < len(output) {
+  output = output[:req.TopK]
+ }
 
-	return &pb.ProcessResponse{
-		Results: output,
-		Metadata: map[string]string{
-			"keywords":     strings.Join(keywords, ","),
-			"boost_factor": strconv.FormatFloat(s.boostFactor, 'f', 2, 64),
-		},
-	}, nil
+ return &pb.ProcessResponse{
+  Results: output,
+  Metadata: map[string]string{
+   "keywords":     strings.Join(keywords, ","),
+   "boost_factor": strconv.FormatFloat(s.boostFactor, 'f', 2, 64),
+  },
+ }, nil
 }
 
 // Helper functions
 
 func extractKeywords(query string) []string {
-	stopWords := map[string]bool{
-		"the": true, "a": true, "an": true, "is": true, "are": true,
-		"was": true, "were": true, "be": true, "been": true,
-		"of": true, "at": true, "by": true, "for": true, "with": true,
-		"to": true, "from": true, "in": true, "out": true, "on": true,
-		"and": true, "or": true, "but": true, "if": true, "what": true,
-		"this": true, "that": true, "how": true, "why": true, "where": true,
-	}
+ stopWords := map[string]bool{
+  "the": true, "a": true, "an": true, "is": true, "are": true,
+  "was": true, "were": true, "be": true, "been": true,
+  "of": true, "at": true, "by": true, "for": true, "with": true,
+  "to": true, "from": true, "in": true, "out": true, "on": true,
+  "and": true, "or": true, "but": true, "if": true, "what": true,
+  "this": true, "that": true, "how": true, "why": true, "where": true,
+ }
 
-	words := strings.Fields(strings.ToLower(query))
-	var keywords []string
-	for _, word := range words {
-		word = strings.Trim(word, ".,!?;:\"'()[]{}/-")
-		if len(word) >= 2 && !stopWords[word] {
-			keywords = append(keywords, word)
-		}
-	}
-	return keywords
+ words := strings.Fields(strings.ToLower(query))
+ var keywords []string
+ for _, word := range words {
+  word = strings.Trim(word, ".,!?;:\"'()[]{}/-")
+  if len(word) >= 2 && !stopWords[word] {
+   keywords = append(keywords, word)
+  }
+ }
+ return keywords
 }
 
 func calculateBoost(name, summary string, keywords []string) float64 {
-	if len(keywords) == 0 {
-		return 0
-	}
+ if len(keywords) == 0 {
+  return 0
+ }
 
-	combined := strings.ToLower(name + " " + summary)
-	matchCount := 0
+ combined := strings.ToLower(name + " " + summary)
+ matchCount := 0
 
-	for _, kw := range keywords {
-		if strings.Contains(combined, kw) {
-			matchCount++
-		}
-	}
+ for _, kw := range keywords {
+  if strings.Contains(combined, kw) {
+   matchCount++
+  }
+ }
 
-	return float64(matchCount) / float64(len(keywords))
+ return float64(matchCount) / float64(len(keywords))
 }
 
 func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
+ if len(s) <= max {
+  return s
+ }
+ return s[:max] + "..."
 }
 ```
 
@@ -921,6 +925,7 @@ func truncate(s string, max int) string {
 **Purpose**: Background maintenance tasks that run on schedules or event triggers.
 
 **Required Services**:
+
 - `ModuleLifecycle` (all modules)
 - `APEModule`
 
@@ -970,6 +975,7 @@ message ExecuteStats {
 ```
 
 **Event Triggers**:
+
 | Event | Description |
 |-------|-------------|
 | `session_end` | User session completed |
@@ -978,6 +984,7 @@ message ExecuteStats {
 | `query` | Query was executed |
 
 **Example Use Cases**:
+
 - Session reflection/summarization
 - Knowledge consolidation
 - Stale content cleanup
@@ -990,204 +997,204 @@ message ExecuteStats {
 package main
 
 import (
-	"context"
-	"flag"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"strconv"
-	"sync"
-	"syscall"
-	"time"
+ "context"
+ "flag"
+ "log"
+ "net"
+ "os"
+ "os/signal"
+ "strconv"
+ "sync"
+ "syscall"
+ "time"
 
-	"google.golang.org/grpc"
-	pb "mdemg/api/modulepb"
+ "google.golang.org/grpc"
+ pb "mdemg/api/modulepb"
 )
 
 const (
-	moduleID      = "my-ape-module"
-	moduleVersion = "1.0.0"
+ moduleID      = "my-ape-module"
+ moduleVersion = "1.0.0"
 )
 
 func main() {
-	socketPath := flag.String("socket", "", "Unix socket path")
-	flag.Parse()
+ socketPath := flag.String("socket", "", "Unix socket path")
+ flag.Parse()
 
-	if *socketPath == "" {
-		log.Fatal("--socket is required")
-	}
+ if *socketPath == "" {
+  log.Fatal("--socket is required")
+ }
 
-	os.Remove(*socketPath)
+ os.Remove(*socketPath)
 
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	defer listener.Close()
-	defer os.Remove(*socketPath)
+ listener, err := net.Listen("unix", *socketPath)
+ if err != nil {
+  log.Fatalf("Failed to listen: %v", err)
+ }
+ defer listener.Close()
+ defer os.Remove(*socketPath)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+ log.Printf("%s: listening on %s", moduleID, *socketPath)
 
-	grpcServer := grpc.NewServer()
-	s := &APEServer{startTime: time.Now()}
+ grpcServer := grpc.NewServer()
+ s := &APEServer{startTime: time.Now()}
 
-	pb.RegisterModuleLifecycleServer(grpcServer, s)
-	pb.RegisterAPEModuleServer(grpcServer, s)
+ pb.RegisterModuleLifecycleServer(grpcServer, s)
+ pb.RegisterAPEModuleServer(grpcServer, s)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-sigChan
-		log.Printf("%s: shutting down", moduleID)
-		grpcServer.GracefulStop()
-	}()
+ sigChan := make(chan os.Signal, 1)
+ signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+ go func() {
+  <-sigChan
+  log.Printf("%s: shutting down", moduleID)
+  grpcServer.GracefulStop()
+ }()
 
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
+ if err := grpcServer.Serve(listener); err != nil {
+  log.Fatalf("Server error: %v", err)
+ }
 }
 
 type APEServer struct {
-	pb.UnimplementedModuleLifecycleServer
-	pb.UnimplementedAPEModuleServer
+ pb.UnimplementedModuleLifecycleServer
+ pb.UnimplementedAPEModuleServer
 
-	mu              sync.Mutex
-	startTime       time.Time
-	executionsTotal int64
-	lastExecution   time.Time
+ mu              sync.Mutex
+ startTime       time.Time
+ executionsTotal int64
+ lastExecution   time.Time
 }
 
 // ============ Lifecycle RPCs ============
 
 func (s *APEServer) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+ log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
 
-	return &pb.HandshakeResponse{
-		ModuleId:      moduleID,
-		ModuleVersion: moduleVersion,
-		ModuleType:    pb.ModuleType_MODULE_TYPE_APE,
-		Capabilities:  []string{"reflection", "cleanup"},
-		Ready:         true,
-	}, nil
+ return &pb.HandshakeResponse{
+  ModuleId:      moduleID,
+  ModuleVersion: moduleVersion,
+  ModuleType:    pb.ModuleType_MODULE_TYPE_APE,
+  Capabilities:  []string{"reflection", "cleanup"},
+  Ready:         true,
+ }, nil
 }
 
 func (s *APEServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	s.mu.Lock()
-	executions := s.executionsTotal
-	lastExec := s.lastExecution
-	s.mu.Unlock()
+ s.mu.Lock()
+ executions := s.executionsTotal
+ lastExec := s.lastExecution
+ s.mu.Unlock()
 
-	metrics := map[string]string{
-		"uptime":           time.Since(s.startTime).String(),
-		"executions_total": strconv.FormatInt(executions, 10),
-	}
-	if !lastExec.IsZero() {
-		metrics["last_execution"] = lastExec.Format(time.RFC3339)
-	}
+ metrics := map[string]string{
+  "uptime":           time.Since(s.startTime).String(),
+  "executions_total": strconv.FormatInt(executions, 10),
+ }
+ if !lastExec.IsZero() {
+  metrics["last_execution"] = lastExec.Format(time.RFC3339)
+ }
 
-	return &pb.HealthCheckResponse{
-		Healthy: true,
-		Status:  "ready",
-		Metrics: metrics,
-	}, nil
+ return &pb.HealthCheckResponse{
+  Healthy: true,
+  Status:  "ready",
+  Metrics: metrics,
+ }, nil
 }
 
 func (s *APEServer) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
-	return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
+ log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+ return &pb.ShutdownResponse{Success: true, Message: "goodbye"}, nil
 }
 
 // ============ APE RPCs ============
 
 func (s *APEServer) GetSchedule(ctx context.Context, req *pb.GetScheduleRequest) (*pb.GetScheduleResponse, error) {
-	return &pb.GetScheduleResponse{
-		// Run every hour
-		CronExpression: "0 * * * *",
-		// Also run on these events
-		EventTriggers: []string{"session_end", "consolidate"},
-		// Don't run more often than every 5 minutes
-		MinIntervalSeconds: 300,
-	}, nil
+ return &pb.GetScheduleResponse{
+  // Run every hour
+  CronExpression: "0 * * * *",
+  // Also run on these events
+  EventTriggers: []string{"session_end", "consolidate"},
+  // Don't run more often than every 5 minutes
+  MinIntervalSeconds: 300,
+ }, nil
 }
 
 func (s *APEServer) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.ExecuteResponse, error) {
-	start := time.Now()
+ start := time.Now()
 
-	s.mu.Lock()
-	s.executionsTotal++
-	s.lastExecution = start
-	execNum := s.executionsTotal
-	s.mu.Unlock()
+ s.mu.Lock()
+ s.executionsTotal++
+ s.lastExecution = start
+ execNum := s.executionsTotal
+ s.mu.Unlock()
 
-	log.Printf("%s: executing task %s (trigger=%s, execution #%d)",
-		moduleID, req.TaskId, req.Trigger, execNum)
+ log.Printf("%s: executing task %s (trigger=%s, execution #%d)",
+  moduleID, req.TaskId, req.Trigger, execNum)
 
-	// Perform work based on trigger type
-	var message string
-	var stats *pb.ExecuteStats
+ // Perform work based on trigger type
+ var message string
+ var stats *pb.ExecuteStats
 
-	switch req.Trigger {
-	case "event:session_end":
-		// Analyze recent session activity
-		message, stats = s.handleSessionEnd(ctx)
+ switch req.Trigger {
+ case "event:session_end":
+  // Analyze recent session activity
+  message, stats = s.handleSessionEnd(ctx)
 
-	case "event:consolidate":
-		// Post-consolidation processing
-		message, stats = s.handleConsolidate(ctx)
+ case "event:consolidate":
+  // Post-consolidation processing
+  message, stats = s.handleConsolidate(ctx)
 
-	case "schedule":
-		// Periodic maintenance
-		message, stats = s.handleScheduled(ctx)
+ case "schedule":
+  // Periodic maintenance
+  message, stats = s.handleScheduled(ctx)
 
-	default:
-		message = "Unknown trigger, no action taken"
-		stats = &pb.ExecuteStats{DurationMs: time.Since(start).Milliseconds()}
-	}
+ default:
+  message = "Unknown trigger, no action taken"
+  stats = &pb.ExecuteStats{DurationMs: time.Since(start).Milliseconds()}
+ }
 
-	stats.DurationMs = time.Since(start).Milliseconds()
+ stats.DurationMs = time.Since(start).Milliseconds()
 
-	log.Printf("%s: task %s completed in %v", moduleID, req.TaskId, time.Since(start))
+ log.Printf("%s: task %s completed in %v", moduleID, req.TaskId, time.Since(start))
 
-	return &pb.ExecuteResponse{
-		Success: true,
-		Message: message,
-		Stats:   stats,
-	}, nil
+ return &pb.ExecuteResponse{
+  Success: true,
+  Message: message,
+  Stats:   stats,
+ }, nil
 }
 
 // Task handlers
 
 func (s *APEServer) handleSessionEnd(ctx context.Context) (string, *pb.ExecuteStats) {
-	// Implement session reflection logic
-	// - Query recent observations
-	// - Generate summary nodes
-	// - Create relationship edges
+ // Implement session reflection logic
+ // - Query recent observations
+ // - Generate summary nodes
+ // - Create relationship edges
 
-	return "Session reflection completed", &pb.ExecuteStats{
-		NodesCreated: 0,
-		NodesUpdated: 0,
-		EdgesCreated: 0,
-	}
+ return "Session reflection completed", &pb.ExecuteStats{
+  NodesCreated: 0,
+  NodesUpdated: 0,
+  EdgesCreated: 0,
+ }
 }
 
 func (s *APEServer) handleConsolidate(ctx context.Context) (string, *pb.ExecuteStats) {
-	// Implement post-consolidation logic
+ // Implement post-consolidation logic
 
-	return "Post-consolidation processing completed", &pb.ExecuteStats{
-		NodesUpdated: 0,
-	}
+ return "Post-consolidation processing completed", &pb.ExecuteStats{
+  NodesUpdated: 0,
+ }
 }
 
 func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteStats) {
-	// Implement periodic maintenance
-	// - Cleanup stale data
-	// - Recalculate statistics
-	// - Detect patterns
+ // Implement periodic maintenance
+ // - Cleanup stale data
+ // - Recalculate statistics
+ // - Detect patterns
 
-	return "Scheduled maintenance completed", &pb.ExecuteStats{
-		NodesUpdated: 0,
-	}
+ return "Scheduled maintenance completed", &pb.ExecuteStats{
+  NodesUpdated: 0,
+ }
 }
 ```
 
@@ -1198,6 +1205,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
 ### Error Handling
 
 1. **Return errors in response fields, don't crash**:
+
    ```go
    func (m *Module) Parse(ctx context.Context, req *pb.ParseRequest) (*pb.ParseResponse, error) {
        result, err := doWork(req)
@@ -1212,6 +1220,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
    ```
 
 2. **Use context for cancellation**:
+
    ```go
    func (m *Module) Process(ctx context.Context, req *pb.ProcessRequest) (*pb.ProcessResponse, error) {
        select {
@@ -1224,6 +1233,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
    ```
 
 3. **Handle gRPC errors gracefully**:
+
    ```go
    import "google.golang.org/grpc/status"
 
@@ -1239,12 +1249,14 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
 ### Logging and Metrics
 
 1. **Use structured logging**:
+
    ```go
    log.Printf("%s: [%s] processing %d candidates",
        moduleID, req.QueryText[:min(20, len(req.QueryText))], len(req.Candidates))
    ```
 
 2. **Track metrics for health checks**:
+
    ```go
    type Module struct {
        mu              sync.Mutex
@@ -1278,6 +1290,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
 ### Configuration Management
 
 1. **Use manifest config for static settings**:
+
    ```json
    {
        "config": {
@@ -1289,6 +1302,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
    ```
 
 2. **Read environment variables for secrets**:
+
    ```go
    func (m *Module) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
        apiKeyEnv := req.Config["api_key_env"]
@@ -1308,6 +1322,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
    ```
 
 3. **Parse config values with defaults**:
+
    ```go
    timeout := 30 * time.Second
    if t, ok := req.Config["timeout_seconds"]; ok {
@@ -1320,6 +1335,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
 ### Testing Your Plugin
 
 1. **Unit test RPC handlers**:
+
    ```go
    func TestProcess(t *testing.T) {
        s := &ReasoningServer{boostFactor: 0.2}
@@ -1344,6 +1360,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
    ```
 
 2. **Integration test with Unix socket**:
+
    ```go
    func TestFullLifecycle(t *testing.T) {
        socketPath := "/tmp/test-module.sock"
@@ -1389,6 +1406,7 @@ func (s *APEServer) handleScheduled(ctx context.Context) (string, *pb.ExecuteSta
 **Cause**: The binary specified in `manifest.json` doesn't exist or isn't executable.
 
 **Solution**:
+
 ```bash
 # Ensure binary exists and matches manifest
 ls -la plugins/my-plugin/
@@ -1406,9 +1424,11 @@ chmod +x plugins/my-plugin/my-plugin
 **Cause**: Plugin didn't create the socket in time or crashed during startup.
 
 **Solution**:
+
 1. Increase `startup_timeout_ms` in manifest
 2. Check plugin logs for startup errors
 3. Test plugin manually:
+
    ```bash
    ./my-plugin --socket /tmp/test.sock
    # In another terminal:
@@ -1420,9 +1440,11 @@ chmod +x plugins/my-plugin/my-plugin
 **Cause**: Plugin not responding to health checks within 2 seconds.
 
 **Solution**:
+
 1. Ensure HealthCheck returns quickly (no blocking operations)
 2. Check for deadlocks in your code
 3. Add timeout to any I/O operations:
+
    ```go
    func (m *Module) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
        // Don't do heavy work here!
@@ -1441,8 +1463,10 @@ chmod +x plugins/my-plugin/my-plugin
 **Cause**: Plugin is crashing after startup.
 
 **Solution**:
+
 1. Check stderr output for panic messages
 2. Add recovery handling:
+
    ```go
    func main() {
        defer func() {
@@ -1453,27 +1477,32 @@ chmod +x plugins/my-plugin/my-plugin
        // ... rest of main
    }
    ```
+
 3. MDEMG restarts crashed modules up to 3 times with backoff (2s, 4s, 6s)
 
 ### Debugging Tips
 
 1. **Run plugin standalone**:
+
    ```bash
    ./my-plugin --socket /tmp/debug.sock
    ```
 
 2. **Test with grpcurl**:
+
    ```bash
    grpcurl -plaintext -unix /tmp/debug.sock \
        mdemg.module.v1.ModuleLifecycle/HealthCheck
    ```
 
 3. **Check socket permissions**:
+
    ```bash
    ls -la /var/run/mdemg/mdemg-*.sock
    ```
 
 4. **Enable verbose logging**:
+
    ```go
    import "google.golang.org/grpc/grpclog"
 
@@ -1483,6 +1512,7 @@ chmod +x plugins/my-plugin/my-plugin
    ```
 
 5. **Monitor module status via API**:
+
    ```bash
    curl http://localhost:8080/api/v1/modules
    ```

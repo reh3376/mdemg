@@ -1,6 +1,7 @@
 # Canonical Test Patterns for Language Parsers
 
 ## Purpose
+
 Define standardized code patterns that exist in ALL programming languages. Each language parser must correctly extract these patterns to pass validation.
 
 ---
@@ -8,6 +9,7 @@ Define standardized code patterns that exist in ALL programming languages. Each 
 ## Universal Code Patterns
 
 ### Pattern 1: Constant/Configuration Values
+
 Every language has named constant values.
 
 | Language | Syntax Example | Symbol Type |
@@ -20,6 +22,7 @@ Every language has named constant values.
 | C/C++ | `#define MAX_RETRIES 3` or `const int MAX_RETRIES = 3;` | constant |
 
 **Expected Extraction:**
+
 - Name: `MAX_RETRIES` (or language equivalent)
 - Type: `constant`
 - Value: `3`
@@ -28,6 +31,7 @@ Every language has named constant values.
 ---
 
 ### Pattern 2: Function/Method Definition
+
 Standalone functions with parameters and return types.
 
 | Language | Syntax Example |
@@ -40,6 +44,7 @@ Standalone functions with parameters and return types.
 | C/C++ | `int calculate_total(Item* items, int count) { }` |
 
 **Expected Extraction:**
+
 - Name: function name
 - Type: `function`
 - Signature: full signature with params and return type
@@ -49,6 +54,7 @@ Standalone functions with parameters and return types.
 ---
 
 ### Pattern 3: Class/Struct Definition
+
 Object-oriented or structured data type.
 
 | Language | Syntax Example |
@@ -61,6 +67,7 @@ Object-oriented or structured data type.
 | C++ | `class UserService { };` |
 
 **Expected Extraction:**
+
 - Name: class/struct name
 - Type: `class` or `struct`
 - Line number: accurate
@@ -70,6 +77,7 @@ Object-oriented or structured data type.
 ---
 
 ### Pattern 4: Interface/Trait/Protocol
+
 Abstract type definitions.
 
 | Language | Syntax Example |
@@ -82,6 +90,7 @@ Abstract type definitions.
 | C++ | `class UserRepository { virtual void method() = 0; };` (abstract) |
 
 **Expected Extraction:**
+
 - Name: interface/trait name
 - Type: `interface` or `trait`
 - Line number: accurate
@@ -89,6 +98,7 @@ Abstract type definitions.
 ---
 
 ### Pattern 5: Enumeration
+
 Named set of values.
 
 | Language | Syntax Example |
@@ -101,6 +111,7 @@ Named set of values.
 | C/C++ | `enum Status { ACTIVE, INACTIVE };` |
 
 **Expected Extraction:**
+
 - Name: enum name
 - Type: `enum`
 - Values: enum members (optional but valuable)
@@ -109,6 +120,7 @@ Named set of values.
 ---
 
 ### Pattern 6: Method (Inside Class)
+
 Member function of a class.
 
 | Language | Syntax Example |
@@ -121,6 +133,7 @@ Member function of a class.
 | C++ | `User* findById(std::string id);` |
 
 **Expected Extraction:**
+
 - Name: method name
 - Type: `method`
 - Parent: owning class/struct name
@@ -130,6 +143,7 @@ Member function of a class.
 ---
 
 ### Pattern 7: Type Alias
+
 Named type definitions.
 
 | Language | Syntax Example |
@@ -142,6 +156,7 @@ Named type definitions.
 | C/C++ | `typedef char* UserId;` or `using UserId = std::string;` |
 
 **Expected Extraction:**
+
 - Name: type alias name
 - Type: `type`
 - Line number: accurate

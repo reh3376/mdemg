@@ -39,6 +39,7 @@ MDEMG with L0-only learning edges achieves **+13.4% to +30.0% improvement** over
 ### V10 Learning Test (100 Questions)
 
 **Cold Start (Fresh Ingest)**
+
 | Metric | Baseline | MDEMG | Change |
 |--------|----------|-------|--------|
 | Mean Score | 0.619 | **0.805** | **+30.0%** |
@@ -49,6 +50,7 @@ MDEMG with L0-only learning edges achieves **+13.4% to +30.0% improvement** over
 | Learning Edges | 0 | 5,912 | +5,912 |
 
 **Warm Runs (3 Consecutive)**
+
 | Run | Score | >0.7 | <0.4 | Edges |
 |-----|-------|------|------|-------|
 | Run 1 | 0.702 | 42% | 0% | 5,912 → 7,430 |
@@ -83,6 +85,7 @@ MDEMG with L0-only learning edges achieves **+13.4% to +30.0% improvement** over
 ## Learning Edge Analysis
 
 ### Edge Accumulation
+
 ```
 Fresh ingest:     0 edges
 After 100 q:  5,912 edges (+5,912)
@@ -91,6 +94,7 @@ After 420 q: 17,100 edges (+9,670)
 ```
 
 ### Edge Quality (L0-Only Filter)
+
 - **Before fix:** Hidden nodes (L1/L2) became hubs, polluting activation
 - **After fix:** Only code↔code edges, clean activation spreading
 - **dim_semantic:** Set via path-prefix similarity (same dir = 0.8)
@@ -101,6 +105,7 @@ After 420 q: 17,100 edges (+9,670)
 ## Root Cause Fixes
 
 ### Fix 1: L0-Only Learning
+
 ```go
 // internal/learning/service.go
 if r.Layer > 0 {
@@ -109,16 +114,19 @@ if r.Layer > 0 {
 ```
 
 ### Fix 2: SQL Parser Migration Names
+
 ```go
 // sql_parser.go - Prisma migrations
 if fileType == "migration" && fileName == "migration.sql" {
     elementName = filepath.Base(filepath.Dir(relPath))
 }
 ```
+
 - **Before:** 338 nodes all named "migration.sql"
 - **After:** Each node has unique timestamped name
 
 ### Fix 3: Stop-Word Filter
+
 ```go
 var stopWords = map[string]bool{
     "for": true, "and": true, "is": true, ...
@@ -142,12 +150,14 @@ var stopWords = map[string]bool{
 ## Methodology
 
 ### Benchmark Framework V2.3
+
 - Sequential MDEMG runs (learning edge accumulation)
 - Unique output files per run
 - Automatic grading via grade_answers_v3.py
 - Evidence-weighted scoring (70% file:line, 15% semantic, 15% concept)
 
 ### Data Integrity
+
 - Fresh codebase re-ingest before benchmark
 - No answer contamination (agent-only question files)
 - Master answer file used only for post-run grading
@@ -168,10 +178,12 @@ var stopWords = map[string]bool{
 ## Files
 
 ### Git Commits
+
 - `8f67198` - fix(retrieval): optimize learning edges and activation spreading
 - `3cd6b7b` - fix(learning): L0-only learning + SQL parser unique migration names
 
 ### Output Files
+
 - `mdemg-test-v10-learning-20260128-205003.md` (cold start, 0.805)
 - `mdemg-test-v10-learning-20260128-210100.md` (warm run 1)
 - `mdemg-test-v10-learning-20260128-210113.md` (warm run 2)
@@ -184,10 +196,12 @@ var stopWords = map[string]bool{
 ## Appendix: Question Examples
 
 **MDEMG Strongest (semantic understanding):**
+
 - Q443: Audit log query patterns (+11.2%)
 - Q262: Barrel-lot invariants (+9.5%)
 
 **Grep Strongest (exact symbol search):**
+
 - hard_sym_15: Delay constants
 - hard_sym_18: MAX_RETRIES definition
 

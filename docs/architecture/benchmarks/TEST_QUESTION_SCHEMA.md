@@ -153,6 +153,7 @@ This document defines the canonical JSON schema for MDEMG benchmark test questio
 ## Validation Rules
 
 ### Master File
+
 1. All question IDs must be unique and sequential (1 to N)
 2. `expected_answer` must be non-empty
 3. `requires_files` must list at least one file
@@ -160,11 +161,13 @@ This document defines the canonical JSON schema for MDEMG benchmark test questio
 5. All file paths must be absolute and valid
 
 ### Agent File
+
 1. Must NOT contain `expected_answer`, `requires_files`, or `evidence` fields
 2. `contains_answers` must be `false`
 3. Question IDs must match the master file exactly
 
 ### Distribution
+
 - Recommended: 70-80% hard, 15-20% medium, 5-10% easy
 - At least 20 questions per major category
 - Include 5-10 calibration questions

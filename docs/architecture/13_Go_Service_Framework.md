@@ -1,12 +1,14 @@
 # Go Service Framework (API + Retrieval + Learning)
 
 This is the **reference service skeleton** for the MDEMG system. It is intentionally boring:
+
 - Go, stdlib HTTP
 - Neo4j driver
 - In-memory activation and scoring
 - Neo4j writes only for **learning deltas** and ingestion updates
 
 ## Principles (do not regress)
+
 1. **Recall is vector search**: use `db.index.vector.queryNodes` on node embeddings.
 2. **Reasoning is graph structure**: expand only a bounded neighborhood around candidates.
 3. **Activation is runtime physics**: compute spreading activation in-memory for speed and to avoid write amplification.
@@ -15,11 +17,14 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
 ---
 
 ## 1) Endpoints
+
 ### Health / readiness
+
 - `GET /healthz` — process up
 - `GET /readyz` — Neo4j reachable + schema version compatible
 
 ### Ingestion
+
 - `POST /v1/memory/ingest`
   - Append-only `Observation`
   - Upsert / resolve `MemoryNode`
@@ -27,19 +32,23 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
   - Create small, explainable edge updates (temporal adjacency, semantic association)
 
 ### Retrieval
+
 - `POST /v1/memory/retrieve`
   - Requires `query_embedding` (v1). Optionally accepts `query_text` but embedding generation is intentionally out-of-scope.
   - Vector recall → bounded expansion → activation → scoring → response
   - **Then** bounded learning delta writeback (Hebbian co-activation)
 
 ### Maintenance (optional v1 stubs)
+
 - `POST /v1/maintenance/decay`
 - `POST /v1/maintenance/consolidate`
 
 ---
 
 ## 2) Request/response contracts
+
 ### Retrieve request
+
 ```json
 {
   "space_id": "demo",
@@ -56,6 +65,7 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
 ```
 
 ### Retrieve response (shape)
+
 ```json
 {
   "data": {
@@ -82,15 +92,18 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
 ---
 
 ## 3) Bounded expansion query (Neo4j)
+
 Goal: fetch a *neighborhood subgraph* around candidate seeds while preventing hub explosions.
 
 Approach (v1):
+
 - fetch **direct neighbors** (1 hop) with a per-seed cap
 - optionally add **2-hop** edges by expanding from the first-hop nodes (also capped)
 
 Why not variable-length traversal directly? Because it’s hard to enforce per-node caps and easy to explode into the hub dimension.
 
 ### 3.1 One-hop (per seed) template
+
 ```cypher
 UNWIND $seedNodeIds AS sid
 MATCH (seed:MemoryNode {space_id:$spaceId, node_id:sid})
@@ -113,12 +126,15 @@ RETURN src, dst, rel_type, weight, dim_semantic, dim_temporal, dim_coactivation,
 ```
 
 ### 3.2 Two-hop extension
+
 Use the 1-hop result nodes as “frontier” and re-run the same pattern (dedupe in service).
 
 ---
 
 ## 4) In-memory activation physics
+
 Use the activation rule from `04_Activation_and_Learning.md`:
+
 - transient `a_i ∈ [0,1]`
 - seed from vector similarity for top candidates
 - run `T` steps over fetched subgraph
@@ -129,9 +145,11 @@ Implementation detail: store edges in adjacency lists with effective weights com
 ---
 
 ## 5) Learning deltas writeback (bounded)
+
 We update only what the system “learned” from co-activation among returned nodes.
 
 Rules:
+
 - take top-K nodes with `activation ≥ activation_min_threshold`
 - generate unique unordered pairs `(i,j)` and cap updates at `coactivation_update_cap_per_request`
 - apply a Hebbian-style update with regularization:
@@ -139,6 +157,7 @@ Rules:
   - clamp to `[w_min, w_max]`
 
 Writeback Cypher pattern:
+
 ```cypher
 UNWIND $pairs AS p
 MATCH (a:MemoryNode {space_id:$spaceId, node_id:p.a})
@@ -156,7 +175,9 @@ Note: for symmetric semantics you can also write the reverse edge, or enforce un
 ---
 
 ## 6) Readiness gate
+
 The service should refuse “ready” if:
+
 - Neo4j cannot be reached
 - required indexes are missing (vector index name)
 - `SchemaMeta.current_version < REQUIRED_SCHEMA_VERSION`

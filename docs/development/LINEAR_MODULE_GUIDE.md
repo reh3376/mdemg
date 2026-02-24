@@ -9,11 +9,13 @@ The Linear module syncs teams, projects, and issues from Linear into MDEMG's mem
    - Create a new API key with "Read" scope (for sync only) or "Read & Write" scope (for CRUD operations)
 
 2. **Add to .env:**
+
    ```
    LINEAR_API_KEY=lin_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    ```
 
 3. **Sync data:**
+
    ```bash
    # Sync everything (teams, projects, issues)
    curl -X POST http://localhost:9999/v1/modules/linear-module/sync \
@@ -272,6 +274,7 @@ curl http://localhost:9999/v1/modules | jq '.data.modules[] | select(.id == "lin
 ```
 
 Response includes:
+
 - `api_configured`: Whether LINEAR_API_KEY is set
 - `last_sync`: Timestamp of last sync
 - `requests_handled`: Number of API calls made
@@ -301,23 +304,29 @@ curl -X POST .../sync -d '{"source_id": "linear://issues", "cursor": "abc123..."
 ## Rate Limits
 
 The module respects Linear's API rate limits:
+
 - 1,500 requests/hour for API key auth
 - 100ms delay between paginated requests
 
 ## Troubleshooting
 
 ### "LINEAR_API_KEY not configured"
+
 Add `LINEAR_API_KEY=lin_api_xxx` to your `.env` file and restart the server.
 
 ### "GraphQL errors"
+
 Check that your API key has "Read" scope and hasn't expired.
 
 ### Vector dimension mismatch
+
 If you see errors about vector dimensions, ensure your vector index matches your embedding provider:
+
 - OpenAI: 1536 dimensions
 - Ollama: 768 dimensions
 
 Recreate the index if needed:
+
 ```cypher
 DROP INDEX memNodeEmbedding IF EXISTS;
 CREATE VECTOR INDEX memNodeEmbedding FOR (n:MemoryNode) ON (n.embedding)

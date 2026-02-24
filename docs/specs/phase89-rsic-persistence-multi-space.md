@@ -151,6 +151,7 @@ func (s *RSICStore) Flush(ctx context.Context) error      // writes all dirty st
 ### Cypher Patterns
 
 **Upsert state node:**
+
 ```cypher
 MERGE (s:MemoryNode:RSICState {node_id: $nodeId, space_id: $spaceId})
 SET s.rsic_type = $rsicType,
@@ -160,6 +161,7 @@ RETURN s.node_id
 ```
 
 **Load state node:**
+
 ```cypher
 MATCH (s:MemoryNode:RSICState {space_id: $spaceId, rsic_type: $rsicType})
 RETURN s.data AS data, s.updated_at AS updated_at
@@ -168,6 +170,7 @@ LIMIT 1
 ```
 
 **Cleanup expired state (called periodically):**
+
 ```cypher
 MATCH (s:MemoryNode:RSICState)
 WHERE s.updated_at < datetime() - duration({days: 30})
@@ -189,6 +192,7 @@ RSICWatchdogSpaceID string  // RSIC_WATCHDOG_SPACE_ID (default: "mdemg-dev")
 ```
 
 **server.go change:**
+
 ```go
 // Before (hard-coded):
 rsicWatchdog = ape.NewWatchdog(cfg, "mdemg-dev", nil)
@@ -214,12 +218,14 @@ The signal adapter receives `spaceID` from the watchdog, which gets it from conf
 ### Neo4j DateTime Fix
 
 **Current bug** in `rsic_adapters.go`:
+
 ```go
 // Attempts string parsing on a Neo4j native datetime
 age, _ := strconv.ParseFloat(val.(string), 64)  // PANICS or returns 0
 ```
 
 **Fix:**
+
 ```go
 switch v := val.(type) {
 case time.Time:
@@ -240,9 +246,11 @@ case string:
 ## Dispatcher Task Lifecycle Cleanup
 
 ### Problem
+
 `activeTasks` map grows unboundedly — completed/failed tasks are never removed.
 
 ### Solution
+
 Add a cleanup sweep after each cycle completes. Tasks in terminal state (`completed` or `failed`) older than 10 minutes are evicted.
 
 ```go

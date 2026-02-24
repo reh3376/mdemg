@@ -18,6 +18,7 @@ Successfully processed all 142 questions from the Megatron-LM benchmark with MDE
 ### File:Line Reference Format
 
 All answers include file:line references in the correct format:
+
 - Format: `path/to/file.py:LINE_NUMBER`
 - Example: `megatron/core/transformer/module.py:29`
 
@@ -80,6 +81,7 @@ Due to Megatron-LM source files not being available at the expected path during 
 ### Improvements for Future Runs
 
 To improve line number accuracy:
+
 1. Ensure Megatron-LM source is available at known path
 2. Enhance entity name extraction from MDEMG paths
 3. Add fallback to grep for class/function definitions

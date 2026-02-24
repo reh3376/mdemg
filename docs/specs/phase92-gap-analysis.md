@@ -235,6 +235,7 @@ The manual migration workflow (`for f in migrations/V*.cypher; do ... done`) is 
 ### Required State
 
 - `mdemg.yaml` as primary config format with grouped sections:
+
   ```yaml
   server:
     port: 9999
@@ -247,6 +248,7 @@ The manual migration workflow (`for f in migrations/V*.cypher; do ... done`) is 
     provider: ollama
     model: nomic-embed-text
   ```
+
 - Layered configuration: defaults < config file < .env < env vars < CLI flags.
 - Profiles: `dev` (minimal, sensible defaults) vs `production` (full config).
 - `mdemg config wizard` for interactive setup.

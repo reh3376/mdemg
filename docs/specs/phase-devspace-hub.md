@@ -54,6 +54,7 @@ MVP message shapes (minimal):
 For true out-of-band, hub must **store** or **reference** the export. MVP: hub stores export_id → path (server-local path where export was written); pull returns path or streams file. So client might call `PullExport` to get a path, then read file and import locally; or PullExport streams the file bytes.
 
 Simpler MVP: **PublishExport** uploads the .mdemg file to hub (stream or path); hub writes to a directory. **PullExport** returns stream of bytes (the .mdemg file) or a path. So we need either:
+
 - PullExport returns `file_path` (client must have filesystem access to hub — not great for remote)
 - PullExport streams file bytes (opaque bytes)
 - PullExport returns a URL (hub serves HTTP for that export) — then client fetches URL

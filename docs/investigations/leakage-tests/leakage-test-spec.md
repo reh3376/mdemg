@@ -70,7 +70,7 @@ LR@k = (cross-space evidence refs) / (total evidence refs across top-k)
 
 Target: 0.000
 
-2) Cross-space Citation Rate (CSR)
+1) Cross-space Citation Rate (CSR)
 
 CSR = (# questions with any cross-space evidence) / (# questions)
 

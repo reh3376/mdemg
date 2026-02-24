@@ -5,11 +5,13 @@
 **The baseline agent MUST read every file in the codebase BEFORE seeing any questions.**
 
 This forces:
+
 1. Maximum token consumption for baseline
 2. Context compression (conversation summarization)
 3. Testing of knowledge retention through compression
 
 The MDEMG agent demonstrates value by:
+
 1. Pre-ingesting codebase into persistent memory
 2. Generating hidden layer concepts (clustering)
 3. Retrieving relevant context on-demand (minimal tokens)
@@ -187,6 +189,7 @@ curl -X POST localhost:8080/v1/memory/consolidate \
 ```
 
 This creates:
+
 - Cluster nodes representing concepts
 - ABSTRACTS_TO edges from files to concepts
 - Summaries for each concept cluster

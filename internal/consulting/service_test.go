@@ -948,7 +948,7 @@ func TestFindApplicableConstraints_LowScoreIgnored(t *testing.T) {
 
 func TestNewService(t *testing.T) {
 	// NewService with nil dependencies should not panic
-	s := NewService(config.Config{}, nil, nil, nil, nil)
+	s := NewService(config.Config{}, nil, nil, nil, nil, nil)
 	if s == nil {
 		t.Error("NewService() returned nil")
 	}
@@ -965,7 +965,7 @@ func TestNewServiceWithMocks(t *testing.T) {
 	retriever := newMockRetriever()
 	symbolLookup := newMockSymbolLookup()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
 	if s == nil {
 		t.Error("NewServiceWithMocks() returned nil")
 	}
@@ -2314,7 +2314,7 @@ func TestConsult_FullFlow_Success(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -2352,7 +2352,7 @@ func TestConsult_RetrieverError(t *testing.T) {
 		return models.RetrieveResponse{}, fmt.Errorf("retrieval failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -2376,7 +2376,7 @@ func TestConsult_EmptyResults(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -2416,7 +2416,7 @@ func TestConsult_LimitsSuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -2464,7 +2464,7 @@ func TestConsult_IncludesSymbolEvidence(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2513,7 +2513,7 @@ func TestConsult_SymbolLookupError(t *testing.T) {
 		return nil, fmt.Errorf("symbol lookup failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2539,7 +2539,7 @@ func TestConsult_NoSymbolStore(t *testing.T) {
 	retriever := newMockRetriever()
 
 	// No symbol store configured
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2582,7 +2582,7 @@ func TestSuggest_FullFlow_Success(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -2618,7 +2618,7 @@ func TestSuggest_RetrieverError(t *testing.T) {
 		return models.RetrieveResponse{}, fmt.Errorf("retrieval failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -2645,7 +2645,7 @@ func TestSuggest_FiltersByMinConfidence(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:       "test-space",
@@ -2676,7 +2676,7 @@ func TestSuggest_IncludesConflicts(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:          "test-space",
@@ -2710,7 +2710,7 @@ func TestSuggest_IncludesConstraints(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:            "test-space",
@@ -2746,7 +2746,7 @@ func TestSuggest_IncludesEvidence(t *testing.T) {
 
 	symbolLookup := newMockSymbolLookup()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:         "test-space",
@@ -2787,7 +2787,7 @@ func TestSuggest_LimitsSuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -2810,7 +2810,7 @@ func TestSuggest_FilePath(t *testing.T) {
 	embedder := newMockEmbedder()
 	retriever := newMockRetriever()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:  "test-space",
@@ -3414,7 +3414,7 @@ func TestConsult_RelatedConceptsErrorPath(t *testing.T) {
 	}
 
 	// No driver, so fetchRelatedConcepts will return an error
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -3456,7 +3456,7 @@ func TestSuggest_SymbolLookupErrorContinues(t *testing.T) {
 		return nil, fmt.Errorf("symbol lookup failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:         "test-space",
@@ -3504,7 +3504,7 @@ func TestSuggest_LimitsSuggestionsAfterFiltering(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -3538,7 +3538,7 @@ func TestSuggest_RelatedConceptsErrorPath(t *testing.T) {
 	}
 
 	// No driver, so fetchRelatedConcepts will return an error
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -3575,7 +3575,7 @@ func TestConsult_LimitsManySuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -3619,7 +3619,7 @@ func TestConsult_RelatedConceptsSuccessPath(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -3666,7 +3666,7 @@ func TestSuggest_RelatedConceptsSuccessPath(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -3695,7 +3695,7 @@ func TestNewServiceWithAllMocks(t *testing.T) {
 	symbolLookup := newMockSymbolLookup()
 	conceptFetcher := newMockConceptFetcher()
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, symbolLookup, conceptFetcher)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, symbolLookup, conceptFetcher, nil)
 	if s == nil {
 		t.Error("NewServiceWithAllMocks() returned nil")
 	}
@@ -3720,7 +3720,7 @@ func TestNewService_WithNonNilRetriever(t *testing.T) {
 	// we verify the behavior via the type assignment
 
 	// First verify that nil retriever results in nil retriever field
-	s1 := NewService(config.Config{}, nil, nil, nil, nil)
+	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil)
 	if s1.retriever != nil {
 		t.Error("NewService with nil retriever should have nil retriever field")
 	}
@@ -3733,7 +3733,7 @@ func TestNewService_WithNonNilRetriever(t *testing.T) {
 // This covers lines 60-62 where the symbolStore assignment occurs.
 func TestNewService_WithNonNilSymbolStore(t *testing.T) {
 	// First verify that nil symbolStore results in nil symbolStore field
-	s1 := NewService(config.Config{}, nil, nil, nil, nil)
+	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil)
 	if s1.symbolStore != nil {
 		t.Error("NewService with nil symbolStore should have nil symbolStore field")
 	}
@@ -3747,7 +3747,7 @@ func TestNewService_PreservesConfig(t *testing.T) {
 	cfg := config.Config{
 		// Set some field to verify it's stored
 	}
-	s := NewService(cfg, nil, nil, nil, nil)
+	s := NewService(cfg, nil, nil, nil, nil, nil)
 	if s == nil {
 		t.Fatal("NewService returned nil")
 	}
@@ -3781,6 +3781,239 @@ func TestFetchRelatedConcepts_MultipleNodeIDs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no database driver configured") {
 		t.Errorf("fetchRelatedConcepts() error = %v, want 'no database driver configured'", err)
+	}
+}
+
+// =============================================================================
+// Phase 101: LLM Synthesis integration tests
+// =============================================================================
+
+// mockSynthesizer implements Synthesizer for testing.
+type mockSynthesizer struct {
+	synthesizeFn func(ctx context.Context, req SynthesisRequest) (SynthesisResult, error)
+}
+
+func (m *mockSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (SynthesisResult, error) {
+	if m.synthesizeFn != nil {
+		return m.synthesizeFn(ctx, req)
+	}
+	return SynthesisResult{}, nil
+}
+
+func TestConsult_LlmSynthesis_Success(t *testing.T) {
+	embedder := newMockEmbedder()
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "auth.go", Summary: "authentication module", Score: 0.9, Layer: 0},
+			},
+		}, nil
+	}
+
+	synth := &mockSynthesizer{
+		synthesizeFn: func(ctx context.Context, req SynthesisRequest) (SynthesisResult, error) {
+			return SynthesisResult{
+				Narrative:  "Based on the evidence, auth uses JWT (Node: n1).",
+				TokensUsed: 150,
+				LatencyMs:  200.0,
+				Provider:   "openai",
+				Model:      "gpt-4o-mini",
+			}, nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:      "test-space",
+		Context:      "working on auth",
+		Question:     "how does auth work?",
+		LlmSynthesis: true,
+	})
+
+	if err != nil {
+		t.Fatalf("Consult() error = %v", err)
+	}
+	if resp.Synthesis == "" {
+		t.Error("Synthesis should be populated when llm_synthesis=true")
+	}
+	if !strings.Contains(resp.Synthesis, "Node: n1") {
+		t.Error("Synthesis should contain node citations")
+	}
+	if resp.Debug["synthesis_tokens"] != 150 {
+		t.Errorf("synthesis_tokens = %v, want 150", resp.Debug["synthesis_tokens"])
+	}
+	if resp.Debug["synthesis_provider"] != "openai" {
+		t.Errorf("synthesis_provider = %v, want openai", resp.Debug["synthesis_provider"])
+	}
+}
+
+func TestConsult_LlmSynthesis_FallbackOnError(t *testing.T) {
+	embedder := newMockEmbedder()
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "file.go", Score: 0.8, Layer: 0},
+			},
+		}, nil
+	}
+
+	synth := &mockSynthesizer{
+		synthesizeFn: func(ctx context.Context, req SynthesisRequest) (SynthesisResult, error) {
+			return SynthesisResult{}, fmt.Errorf("openai timeout")
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:      "test-space",
+		Context:      "context",
+		Question:     "question?",
+		LlmSynthesis: true,
+	})
+
+	if err != nil {
+		t.Fatalf("Consult() should NOT fail when synthesis errors: %v", err)
+	}
+	if resp.Synthesis != "" {
+		t.Error("Synthesis should be empty on error")
+	}
+	if resp.Debug["synthesis_error"] == nil {
+		t.Error("Debug should contain synthesis_error on failure")
+	}
+	if resp.Debug["synthesis_fallback"] != true {
+		t.Error("Debug should contain synthesis_fallback=true on failure")
+	}
+	// Existing fields should still be populated
+	if len(resp.Suggestions) == 0 {
+		t.Error("Suggestions should still be populated despite synthesis failure")
+	}
+}
+
+func TestConsult_LlmSynthesis_FalseSkipsSynthesis(t *testing.T) {
+	embedder := newMockEmbedder()
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "file.go", Score: 0.8, Layer: 0},
+			},
+		}, nil
+	}
+
+	called := false
+	synth := &mockSynthesizer{
+		synthesizeFn: func(ctx context.Context, req SynthesisRequest) (SynthesisResult, error) {
+			called = true
+			return SynthesisResult{Narrative: "should not appear"}, nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:      "test-space",
+		Context:      "context",
+		Question:     "question?",
+		LlmSynthesis: false, // Synthesis off
+	})
+
+	if err != nil {
+		t.Fatalf("Consult() error = %v", err)
+	}
+	if called {
+		t.Error("Synthesizer should NOT be called when llm_synthesis=false")
+	}
+	if resp.Synthesis != "" {
+		t.Error("Synthesis field should be empty when llm_synthesis=false")
+	}
+}
+
+func TestConsult_LlmSynthesis_NilSynthesizerSkips(t *testing.T) {
+	embedder := newMockEmbedder()
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "file.go", Score: 0.8, Layer: 0},
+			},
+		}, nil
+	}
+
+	// nil synthesizer — should not panic
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:      "test-space",
+		Context:      "context",
+		Question:     "question?",
+		LlmSynthesis: true, // Requested, but synthesizer is nil
+	})
+
+	if err != nil {
+		t.Fatalf("Consult() should not panic or error with nil synthesizer: %v", err)
+	}
+	if resp.Synthesis != "" {
+		t.Error("Synthesis should be empty when synthesizer is nil")
+	}
+}
+
+func TestConsult_LlmSynthesis_PreservesExistingFields(t *testing.T) {
+	embedder := newMockEmbedder()
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "error-handler", Summary: "handles errors", Score: 0.85, Layer: 0},
+				{NodeID: "n2", Name: "workflow-doc", Summary: "workflow guide", Score: 0.75, Layer: 0, Path: "/docs/workflow.md"},
+			},
+		}, nil
+	}
+
+	synth := &mockSynthesizer{
+		synthesizeFn: func(ctx context.Context, req SynthesisRequest) (SynthesisResult, error) {
+			return SynthesisResult{Narrative: "Synthesis narrative here."}, nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:      "test-space",
+		Context:      "working on error handling",
+		Question:     "how to handle errors?",
+		LlmSynthesis: true,
+	})
+
+	if err != nil {
+		t.Fatalf("Consult() error = %v", err)
+	}
+
+	// Synthesis should be populated
+	if resp.Synthesis == "" {
+		t.Error("Synthesis should be populated")
+	}
+
+	// Existing fields must still be intact
+	if len(resp.Suggestions) == 0 {
+		t.Error("Suggestions should still be populated alongside synthesis")
+	}
+	if resp.Confidence == 0 {
+		t.Error("Confidence should be calculated")
+	}
+	if resp.Rationale == "" {
+		t.Error("Rationale should be generated")
+	}
+	if resp.SpaceID != "test-space" {
+		t.Errorf("SpaceID = %q, want test-space", resp.SpaceID)
 	}
 }
 

@@ -30,6 +30,7 @@
 - Label printing integration
 
 **Related Projects:**
+
 - 3d/2d Warehouse Viewer for faster navigation
 - Add Aggregate Reporting to WMS Based on Pivot Tables
 - Advanced Barrel Ownership Management System

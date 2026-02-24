@@ -19,6 +19,7 @@ MDEMG is an **emergent long-term memory system** designed to serve as the cognit
 MDEMG provides coding AI agents and sub-agents with what could be described as the **ANN (Artificial Neural Network) equivalent of an internal dialog**—similar to the experience humans have with biological neural networks.
 
 When humans think through problems, they draw on:
+
 - Past experiences and how they handled similar situations
 - Domain expertise accumulated over years of specialization
 - Relationships between concepts that aren't universally known
@@ -47,6 +48,7 @@ Consider a software engineering team at "Whiskey House" (hypothetical industrial
 | **Process/Controls Engineer** | P&ID relationships (what valve connects to which tank), PLC program specifics (the logic behind specific rungs), process control automation team goals, safety interlock sequences |
 
 This knowledge is:
+
 - **Not universally available** - You can't Google "Whiskey House Tank 5 level control logic"
 - **Highly contextual** - Makes sense only within the organization's context
 - **Accumulated over time** - Built up through experience and interaction
@@ -111,9 +113,9 @@ This captures the key insight: **relationships are stable, but the conceptual or
 
 MDEMG is evolving from a unified memory store into a **Modular Intelligence Engine**. Specific "Modules" can be plugged into the graph to grant it specialized perception and reasoning skills:
 
-*   **SME Ingestion Modules**: Domain-specific parsers (PLC, P&ID, Linear, Obsidian).
-*   **Reasoning Modules**: Specialized architectural pattern detectors (NestJS, Go-Micro) and **sophisticated re-ranking logic (LLM Re-ranker)**.
-*   **Active Participant Modules**: Proactive reflection, consistency checking, and explainable retrieval.
+- **SME Ingestion Modules**: Domain-specific parsers (PLC, P&ID, Linear, Obsidian).
+- **Reasoning Modules**: Specialized architectural pattern detectors (NestJS, Go-Micro) and **sophisticated re-ranking logic (LLM Re-ranker)**.
+- **Active Participant Modules**: Proactive reflection, consistency checking, and explainable retrieval.
 
 ### Benchmarking & Performance Validation
 
@@ -124,10 +126,12 @@ MDEMG's effectiveness is continuously validated through rigorous benchmarking ag
 To facilitate global collaboration while maintaining the core system's integrity, MDEMG follows strict public-readiness standards. This ensures that the engine is secure, the architecture is extensible for contributors, and the "Internal Dialog" remains a reliable substrate for all AI agents. (See [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) for the full strategy).
 
 #### Integration with Retrieval Pipeline
+
 Modules integrate with the retrieval pipeline at three critical points:
-1.  **Candidate Selection**: Perception modules tag nodes during ingest, allowing filtered recall.
-2.  **Reasoning (Re-ranking)**: Reasoning modules (like the v9 LLM re-ranker) process raw retrieval results to refine the final top-K list.
-3.  **Explanation**: The explainable retrieval layer traces which module influenced a node's score to provide a human-readable `rationale`.
+
+1. **Candidate Selection**: Perception modules tag nodes during ingest, allowing filtered recall.
+2. **Reasoning (Re-ranking)**: Reasoning modules (like the v9 LLM re-ranker) process raw retrieval results to refine the final top-K list.
+3. **Explanation**: The explainable retrieval layer traces which module influenced a node's score to provide a human-readable `rationale`.
 
 ### Multi-Dimensional Layered Graph
 
@@ -144,6 +148,7 @@ Layer 1   [Observations / Events]         ← Most concrete
 ```
 
 **Layer constraints:**
+
 - **Minimum**: 1 (raw observations only)
 - **Maximum**: Unconstrained (hardware-limited only)
 - **Growth**: Dynamic - layers emerge as data density warrants
@@ -176,11 +181,13 @@ Unlike traditional databases where structure is fixed:
 MDEMG operates as a **full active participant** in the development workflow:
 
 ### 1. Background Service
+
 - Always running, similar to claude-mem
 - API available for agent queries
 - Continuous learning from observations
 
 ### 2. Event-Driven Hooks
+
 - Git commits trigger memory updates
 - File saves capture context
 - Session events (start/end) trigger reflection
@@ -257,6 +264,7 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 | **Integration** | Background only | Active participant |
 
 **They are complementary:**
+
 - claude-mem handles session-level context
 - MDEMG handles knowledge-level emergence
 
@@ -299,6 +307,7 @@ L0 (Base Observations)    ← Raw ingested data
 3. **Upper layers** (L4-L5): Emerge broad architectural patterns, cross-cutting concerns, system-wide behaviors
 
 **Example emergence:**
+
 - L0: Individual service methods
 - L1: Hidden node grouping related methods
 - L2: "Authentication Service" concept
@@ -316,6 +325,7 @@ Backward Pass: updates flow down from abstract to concrete
 ```
 
 This enables:
+
 - Information propagation up (concrete → abstract)
 - Context propagation down (abstract → concrete)
 - Emergent representations refined through iteration
@@ -329,6 +339,7 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 ## Development Roadmap
 
 ### Phase 1: Core Infrastructure ✅ COMPLETE
+
 - [x] Neo4j graph with vector indexes
 - [x] Go service with retrieval pipeline
 - [x] Embedding generation (Ollama/OpenAI)
@@ -338,6 +349,7 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Integration test suite
 
 ### Phase 2: Emergence Mechanics ✅ COMPLETE
+
 - [x] Cluster detection for abstraction (`cmd/consolidate`)
 - [x] Layer promotion via CLI
 - [x] Automatic layer promotion triggers (Dynamic Pipeline Registry — Phase 46-PR)
@@ -345,6 +357,7 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Cross-layer relationship management (Phase 75: Cross-File Relationship Extraction)
 
 ### Phase 3: Active Participation ✅ COMPLETE
+
 - [x] Reflection endpoint (`POST /v1/memory/reflect`)
 - [x] Anomaly detection on ingest (duplicates, stale updates)
 - [x] Graph health metrics (`GET /v1/metrics`)
@@ -353,18 +366,21 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Agent consulting service API (`POST /v1/memory/consult`)
 
 ### Phase 4: IDE Integration (Partial)
+
 - [x] MCP server for IDE integration (`cmd/mcp-server/`)
 - [ ] VS Code extension
 - [ ] Cursor integration
 - [ ] Real-time memory sidebar
 
 ### Phase 5: Multi-Agent Coordination (Partial)
+
 - [x] Agent workspace isolation (DevSpace Hub — Phase 32)
 - [x] Shared memory protocols (Space Transfer — Phase 31)
 - [x] Conflict resolution between agents (CRDT merge — Phase 35)
 - [ ] Collective learning aggregation
 
 ### Phase 6: RSIC Self-Improvement Hardening ✅ COMPLETE
+
 - [x] Recursive Self-Improvement Cycle foundation (Phase 60b)
 - [x] Orchestration with trigger sources and cooldown policies (Phase 87)
 - [x] Safety enforcement with dry-run and rollback (Phase 88)

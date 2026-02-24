@@ -14,6 +14,7 @@ Ingest the MDEMG codebase into itself for self-aware development assistance. The
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Ingest all Go, proto, YAML, MD, JSON, Dockerfile, Makefile files
 2. FR-2: Extract Go symbols (functions, types, constants, interfaces)
 3. FR-3: Exclude vendor/, node_modules/, .git/, *.pb.go, binary files
@@ -22,6 +23,7 @@ Ingest the MDEMG codebase into itself for self-aware development assistance. The
 6. FR-6: MCP tools support optional `space_id` parameter (default: ide-agent)
 
 ### Non-Functional Requirements
+
 1. NFR-1: Ingestion completes within reasonable time
 2. NFR-2: No impact on mdemg-dev protected space
 
@@ -47,6 +49,7 @@ Ingest the MDEMG codebase into itself for self-aware development assistance. The
 ## MCP Server Changes
 
 Added optional `space_id` parameter to all MCP tools:
+
 - `memory_store` — store into any space
 - `memory_recall` — query any space
 - `memory_reflect` — reflect on any space
@@ -57,6 +60,7 @@ Added optional `space_id` parameter to all MCP tools:
 Default remains `ide-agent` for backward compatibility.
 
 ### File Changed
+
 - `cmd/mcp-server/main.go` — added `space_id` param and `resolveSpaceID()` helper
 
 ## Acceptance Criteria

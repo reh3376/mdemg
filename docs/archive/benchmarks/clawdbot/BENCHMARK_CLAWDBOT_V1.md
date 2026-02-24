@@ -15,7 +15,7 @@
 | Property | Value |
 |----------|-------|
 | **Repo** | /Users/reh3376/clawdbot |
-| **Repo URL** | https://github.com/clawdbot/clawdbot.git |
+| **Repo URL** | <https://github.com/clawdbot/clawdbot.git> |
 | **Commit** | `2f7fff8dcdaf4c88eb2c5b7d70ed73bf5500f4d0` |
 | **Ingest scope** | Full repository (excluding standard ignores) |
 | **Excluded** | dist/, node_modules/, .git/, vendor/ |
@@ -145,6 +145,7 @@ Time limit: 30 minutes for 130 questions
 ## Baseline Results
 
 ### Run 1
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -161,6 +162,7 @@ Time limit: 30 minutes for 130 questions
 | No evidence | 88 (67.7%) |
 
 ### Run 2
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -177,6 +179,7 @@ Time limit: 30 minutes for 130 questions
 | No evidence | 85 (65.4%) |
 
 ### Run 3
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -193,6 +196,7 @@ Time limit: 30 minutes for 130 questions
 | No evidence | 93 (71.5%) |
 
 ### Baseline Aggregate (3 runs)
+
 | Metric | Average |
 |--------|---------|
 | **Mean score** | **0.282** |
@@ -206,6 +210,7 @@ Time limit: 30 minutes for 130 questions
 ## MDEMG Results
 
 ### Run 1 (COLD - 0 learning edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -224,6 +229,7 @@ Time limit: 30 minutes for 130 questions
 | Learning edges: before | 0 |
 
 ### Run 2 (WARM - with accumulated edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -241,6 +247,7 @@ Time limit: 30 minutes for 130 questions
 | No evidence | 0 (0.0%) |
 
 ### Run 3 (WARM - accumulated edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 130 |
@@ -258,6 +265,7 @@ Time limit: 30 minutes for 130 questions
 | No evidence | 0 (0.0%) |
 
 ### MDEMG Aggregate (3 runs)
+
 | Metric | Average |
 |--------|---------|
 | **Mean score** | **0.595** |
@@ -362,6 +370,7 @@ The +111% improvement demonstrates that **MDEMG's semantic memory retrieval sign
 ## File References
 
 ### Setup Files (Created)
+
 - [x] architecture_overview.md - Codebase architecture documentation
 - [x] grade_answers.py - Grading script (v3, semantic similarity)
 - [x] questions_architecture_structure.json - 20 questions
@@ -372,6 +381,7 @@ The +111% improvement demonstrates that **MDEMG's semantic memory retrieval sign
 - [x] questions_symbol_lookup.json - 30 questions
 
 ### Generated Artifact Files
+
 - [x] test_questions_130_master.json - Combined master question file (SHA-256: 049e8ee...)
 - [x] test_questions_130_agent.json - Agent version (no answers)
 - [x] codebase_profile.json - Detailed codebase metrics

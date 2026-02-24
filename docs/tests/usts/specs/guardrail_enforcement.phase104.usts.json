@@ -1,0 +1,50 @@
+{
+  "$schema": "../schema/usts.schema.json",
+  "config": {
+    "version": "1.0",
+    "test_type": "security-behavior",
+    "description": "Validates that the Active MCP Guardrails endpoint correctly identifies and blocks architectural drift or forbidden patterns.",
+    "tags": ["guardrail", "enforcement", "usts", "phase104"],
+    "sha256": "PENDING"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "mock",
+        "action": "inject_constraint",
+        "description": "Inject a simulated ConstraintNode forbidding direct os/exec usage in the API layer."
+      }
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "usts_block_forbidden_package",
+      "description": "A diff proposing direct usage of os/exec in the web handlers must be blocked.",
+      "input": {
+        "files_changed": ["src/api/handler.go"],
+        "diff": "@@ -10,3 +10,4 @@\n import (\n     \"net/http\"\n+    \"os/exec\"\n )\n func Handle(w http.ResponseWriter, r *http.Request) {\n+    exec.Command(\"rm\", \"-rf\", \"/\").Run()\n }"
+      },
+      "validation": {
+        "target": "GuardrailValidateResponse",
+        "assertions": [
+          {
+            "field": "status",
+            "condition": "equals",
+            "value": "Block"
+          },
+          {
+            "field": "violations",
+            "condition": "min_length",
+            "value": 1
+          },
+          {
+            "field": "violations[0].description",
+            "condition": "contains_any",
+            "values": ["os/exec", "forbidden package", "security constraint"],
+            "case_sensitive": false
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/guardrail/validate",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 104 Active MCP Guardrails request payloads and violation reporting.",
+    "tags": [
+      "guardrail",
+      "validate",
+      "phase104"
+    ],
+    "sha256": "6f9dab45fb37a713870b944028a8f2a358803193b5437510ff338ba7ec58ae2a"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-dev' contains a ConstraintNode regarding legacy authentication."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "mdemg-dev",
+    "diff_content": "@@ -15,7 +15,7 @@\n func Login(c *gin.Context) {\n-    token := jwt.New()\n+    token := legacy_auth.GenerateToken()\n }"
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "files_changed": [
+        "src/api/auth.go"
+      ],
+      "diff": "{{diff_content}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.status",
+        "operator": "regex",
+        "value": "^(Pass|Warning|Block)$"
+      },
+      {
+        "path": "data.violations",
+        "operator": "type",
+        "value": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "validation_pass",
+      "description": "When no constraints are violated, status is Pass and violations array is empty.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "files_changed": [
+            "src/utils/math.go"
+          ],
+          "diff": "@@ -1,3 +1,3 @@\n-func Add(a,b int) int { return a+b }\n+func Add(a, b int) int { return a + b }"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "data.status",
+            "operator": "equals",
+            "value": "Pass"
+          },
+          {
+            "path": "data.violations",
+            "operator": "length",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ]
+}

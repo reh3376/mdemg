@@ -14,6 +14,7 @@
 ### Codebase Profile
 
 plc-gbt is a full-stack industrial automation platform for PLC golden batch testing. It includes:
+
 - Next.js frontend (TypeScript, 8,056 .ts files)
 - Python backend/analysis services (16,914 .py files)
 - JSON schemas for control loop configuration
@@ -129,9 +130,11 @@ MDEMG's largest advantage is on hard questions (+0.396), which require cross-fil
 ### Failure Analysis
 
 **MDEMG failures (score < 0.5): 1/115**
+
 - Q82 (ai_ml_integration): Score 0.440. Evidence score 0.50 (weak ref), semantic 0.33, concept 0.27. The answer found relevant files but didn't extract the specific detail asked for.
 
 **Baseline failures (score < 0.5): 45/115**
+
 - Dominated by `acd_l5x_conversion` (10/10 failed), `control_loop_architecture` (7/10), `business_logic_workflows` (6/10) — all domain-specific categories where the LLM has no parametric knowledge.
 
 ### Learning Edge Impact

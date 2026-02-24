@@ -41,6 +41,7 @@
 **Task:** Start the gRPC server with DevSpace enabled.
 
 **Commands:**
+
 ```bash
 cd <repo_root>
 export NEO4J_URI=bolt://localhost:7687
@@ -62,6 +63,7 @@ If BLOCKED, say what you tried and the exact error so the main agent can help.
 **Task:** Run UDTS tests against the running server (in a **second** terminal).
 
 **Commands:**
+
 ```bash
 cd <repo_root>
 UDTS_TARGET=localhost:50051 go test ./tests/udts/... -v -count=1
@@ -78,6 +80,7 @@ If any test failed, paste the failing test name and last few lines of output.
 ## Checkpoint 3 — Optional E2E (publish then pull)
 
 **Task:** If you have a small `.mdemg` file (or can export one with `space-transfer export -space-id demo -output /tmp/demo.mdemg`), use a gRPC client to:
+
 1. RegisterAgent(dev_space_id, agent_id).
 2. PublishExport (stream: header chunk then file bytes).
 3. ListExports and confirm the new export appears.

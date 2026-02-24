@@ -86,6 +86,7 @@ func loadGrammar(lang string) (*sitter.Language, error) {
 ```
 
 **Dependencies to install:**
+
 ```bash
 go get github.com/smacker/go-tree-sitter/rust
 go get github.com/smacker/go-tree-sitter/c
@@ -158,6 +159,7 @@ func extractSymbols(filePath string) (*SymbolOutput, error) {
 ```
 
 **Files to add:**
+
 - `cmd/extract-symbols/fallback_parsers.go` (provided in outputs)
 
 #### Option B: Use ingest-codebase for UPTS

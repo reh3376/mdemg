@@ -10,6 +10,7 @@
 ## Overview
 
 Phase 95 eliminates database bootstrapping friction. Before this phase, developers had to:
+
 1. Download `cypher-shell` externally
 2. Apply 17 migration files via a shell loop
 3. Manually set `REQUIRED_SCHEMA_VERSION` correctly
@@ -42,6 +43,7 @@ After Phase 95, a developer runs `mdemg db start && mdemg db migrate` and is rea
 ### 1. Statement Splitting
 
 Migration files contain multiple Cypher statements separated by `;`, with `//` comments and `CALL { } IN TRANSACTIONS` blocks (V0015, V0016). The splitter:
+
 - Strips `//` line comments
 - Tracks brace depth (`{`/`}`)
 - Splits on `;` only at brace depth 0
@@ -50,15 +52,19 @@ Migration files contain multiple Cypher statements separated by `;`, with `//` c
 ### 2. Migration Recording (Runner-Side)
 
 After each migration file's statements succeed, the runner records:
+
 ```cypher
 MERGE (m:Migration {version: $ver})
 ON CREATE SET m.name=$name, m.applied_at=datetime(), m.applied_by='mdemg-migrate'
 ```
+
 And updates SchemaMeta:
+
 ```cypher
 MERGE (s:SchemaMeta {key: 'schema'})
 ON MATCH SET s.current_version = CASE WHEN s.current_version < $ver THEN $ver ELSE s.current_version END
 ```
+
 This is idempotent (MERGE) — safe for V0001-V0014 which also self-record.
 
 ### 3. Embedded Migrations (`//go:embed`)
@@ -114,6 +120,7 @@ This is idempotent (MERGE) — safe for V0001-V0014 which also self-record.
 ## Testing
 
 ### Unit Tests (10 passing)
+
 - `TestSplitStatements_Simple` — basic semicolon splitting
 - `TestSplitStatements_Comments` — `//` comment stripping
 - `TestSplitStatements_CALLInTransactions` — brace-depth tracking
@@ -126,6 +133,7 @@ This is idempotent (MERGE) — safe for V0001-V0014 which also self-record.
 - `TestDiscoverMigrations_Empty` — no migration files
 
 ### E2E Verification
+
 1. `mdemg db migrate --status` — shows current/available/pending
 2. `mdemg db migrate` — applies all 17 migrations
 3. `mdemg db migrate` (rerun) — idempotent, 0 applied

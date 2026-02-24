@@ -13,12 +13,14 @@ This research explores Graph Attention Networks (GAT) and their potential applic
 ### 1.1 Original GAT (Veličković et al., 2018)
 
 **Paper:** "Graph Attention Networks" (ICLR 2018)
-**ArXiv:** https://arxiv.org/abs/1710.10903
+**ArXiv:** <https://arxiv.org/abs/1710.10903>
 
 #### Core Innovation
+
 GAT addresses shortcomings of prior Graph Convolutional Networks (GCN) by introducing **masked self-attentional layers** that operate on graph-structured data. Unlike GCN which uses uniform neighbor aggregation weighted only by graph structure (node degrees), GAT learns to assign different importance weights to different neighbors.
 
 #### Key Properties
+
 - **Attention Mechanism:** Computes attention coefficients for each edge using a learnable attention function
 - **No Matrix Operations:** Avoids costly matrix inversions or graph Laplacian computations
 - **Inductive Capability:** Can generalize to unseen graphs (important for MDEMG's dynamic memory)
@@ -26,6 +28,7 @@ GAT addresses shortcomings of prior Graph Convolutional Networks (GCN) by introd
 - **Multi-head Attention:** Similar to Transformers, uses multiple attention heads for stability
 
 #### Architecture
+
 ```
 For each node i:
 1. Compute attention coefficients: e_ij = a(Wh_i, Wh_j) for all neighbors j
@@ -34,18 +37,22 @@ For each node i:
 ```
 
 Where:
+
 - `h_i` = node feature vector
 - `W` = shared linear transformation
 - `a` = attention mechanism (typically single-layer feedforward network)
 - `σ` = activation function (ELU, LeakyReLU)
 
 #### Computational Complexity
+
 - **Space:** O(|V| + |E|) - only stores edge list and node features
 - **Time:** O(|E|) for attention computation (linear in edges)
 - **Efficient:** No matrix inversions, graph structure need not be known upfront
 
 #### Benchmark Results
+
 State-of-the-art on:
+
 - **Cora** citation network (transductive)
 - **Citeseer** citation network (transductive)
 - **Pubmed** citation network (transductive)
@@ -56,32 +63,40 @@ State-of-the-art on:
 ### 1.2 Evolution: GCN → GAT → GATv2
 
 #### Graph Convolutional Networks (GCN)
+
 - **Aggregation:** Normalized sum by node degrees
 - **Weights:** Fixed by graph structure (degree normalization)
 - **Limitation:** Uniform neighbor importance - cannot distinguish between important vs. irrelevant neighbors
 
 #### GAT (2018)
+
 - **Aggregation:** Weighted sum with learned attention
 - **Weights:** Data-dependent (node features determine importance)
 - **Limitation:** "Static attention" - ranking of neighbors is unconditioned on query node
 
 #### GATv2 (2021)
+
 **Paper:** "How Attentive are Graph Attention Networks?" (ICLR 2021)
-**ArXiv:** https://arxiv.org/abs/2105.14491
+**ArXiv:** <https://arxiv.org/abs/2105.14491>
 
 **Critical Insight:** Original GAT computes attention as:
+
 ```
 e_ij = a^T LeakyReLU(W [h_i || h_j])
 ```
+
 This creates **static attention** - the attention scores are computed from concatenated features but the query node h_i doesn't dynamically modulate the ranking.
 
 **GATv2 Fix:** Modify order of operations:
+
 ```
 e_ij = a^T LeakyReLU(W_1 h_i + W_2 h_j)
 ```
+
 Now the query node can **dynamically** adjust attention based on what it's looking for.
 
 **Benefits:**
+
 - **Dynamic Attention:** Query-conditioned neighbor ranking
 - **Universal Approximator:** Can represent any attention function
 - **Better Performance:** Outperforms GAT on 11 OGB benchmarks with same parameters
@@ -115,16 +130,19 @@ Graph Neural Networks (GNNs) are unified under the **Message Passing Neural Netw
 ### 1.4 Attention vs. Aggregation
 
 #### Uniform Aggregation (GCN, Simple MPNNs)
+
 - **Pros:** Simple, fast, no learning overhead
 - **Cons:** Treats all neighbors equally, over-smoothing on deep networks
 - **Use Case:** When graph structure already encodes importance (e.g., citation networks where all citations are roughly equal)
 
 #### Attention-Based Aggregation (GAT)
+
 - **Pros:** Learns neighbor importance, reduces over-smoothing, more expressive
 - **Cons:** Additional parameters, potential overfitting on small graphs
 - **Use Case:** When neighbors have varying relevance (e.g., social networks, knowledge graphs)
 
 #### MDEMG's Current Approach (Hybrid)
+
 - **Expansion:** Uniform traversal via `fetchOutgoingEdges` (structural + learned edge types)
 - **Activation:** Selective spreading only through `CO_ACTIVATED_WITH` edges
 - **Scoring:** Combines multiple signals (vector, activation, recency, confidence)
@@ -138,24 +156,30 @@ Graph Neural Networks (GNNs) are unified under the **Message Passing Neural Netw
 ### 2.1 Single-Layer GAT
 
 #### Attention Coefficients
+
 For edge from node j to node i:
+
 ```
 e_ij = LeakyReLU(a^T [W h_i || W h_j])
 ```
 
 Where:
+
 - `||` denotes concatenation
 - `a ∈ R^(2F')` is a learnable weight vector
 - `W ∈ R^(F' x F)` projects F-dim input to F'-dim output
 - LeakyReLU with α=0.2 (prevents dead neurons)
 
 #### Normalization
+
 Softmax across neighbors for stable gradients:
+
 ```
 α_ij = softmax_j(e_ij) = exp(e_ij) / Σ_{k∈N(i)} exp(e_ik)
 ```
 
 #### Output Features
+
 ```
 h'_i = σ(Σ_{j∈N(i)} α_ij W h_j)
 ```
@@ -169,6 +193,7 @@ h'_i = ||^K_{k=1} σ(Σ_{j∈N(i)} α^k_ij W^k h_j)
 ```
 
 Or for final layer (average instead of concat):
+
 ```
 h'_i = σ(1/K Σ^K_{k=1} Σ_{j∈N(i)} α^k_ij W^k h_j)
 ```
@@ -181,13 +206,17 @@ h'_i = σ(1/K Σ^K_{k=1} Σ_{j∈N(i)} α^k_ij W^k h_j)
 Standard GAT only uses node features. Extensions incorporate edge features:
 
 #### Edge-Conditioned Attention (GAT-Edge)
+
 ```
 e_ij = a^T [W_n h_i || W_n h_j || W_e e_ij]
 ```
+
 Where `e_ij` is the edge feature vector and `W_e` projects edge features.
 
 #### MDEMG Edge Features
+
 Current MDEMG edges have rich features:
+
 - `weight` (learned, Hebbian)
 - `dim_semantic` (cosine similarity)
 - `dim_temporal` (temporal proximity)
@@ -202,15 +231,19 @@ Current MDEMG edges have rich features:
 Modern GAT architectures add:
 
 #### Layer Normalization
+
 ```
 h'_i = LayerNorm(h_i + GAT(h_i))
 ```
+
 Stabilizes deep networks, prevents over-smoothing.
 
 #### Residual Connections
+
 ```
 h'_i = h_i + GAT(h_i)
 ```
+
 Preserves original node features, helps gradients flow.
 
 **MDEMG Equivalent:** Vector similarity is preserved alongside activation in scoring - a form of implicit residual connection.
@@ -222,6 +255,7 @@ Preserves original node features, helps gradients flow.
 ### 3.1 Simple K-Hop Traversal (Current MDEMG)
 
 #### Implementation
+
 From `/Users/reh3376/mdemg/internal/retrieval/service.go`:
 
 ```go
@@ -239,18 +273,21 @@ for d := 0; d < hopDepth; d++ {
 ```
 
 #### Characteristics
+
 - **Uniform Expansion:** All seed nodes expanded equally
 - **Degree Cap:** Top N neighbors by weight per node
 - **Edge Type Filtering:** Only allowed relationship types
 - **Decay Applied:** CO_ACTIVATED_WITH edges decay based on `evidence_count` and `last_activated_at`
 
 #### Strengths
+
 - **Simple:** Easy to understand and debug
 - **Predictable:** Deterministic traversal
 - **Efficient:** Linear in hop depth and degree cap
 - **Proven:** Works well for MDEMG's current use case
 
 #### Limitations
+
 - **No Context Awareness:** Expansion doesn't consider query context
 - **Fixed Budget:** Same MaxNeighborsPerNode for all nodes (no dynamic allocation)
 - **Binary Filtering:** Edges are either included or excluded (no soft weighting during expansion)
@@ -258,17 +295,20 @@ for d := 0; d < hopDepth; d++ {
 ### 3.2 Graph Attention Networks (GAT)
 
 #### Characteristics
+
 - **Learned Weights:** Attention coefficients computed per-query
 - **Context-Aware:** Query node features influence neighbor selection
 - **Soft Selection:** All neighbors contribute, weighted by attention
 - **Trainable:** Requires labeled data to learn attention function
 
 #### Strengths
+
 - **Adaptive:** Different queries attend to different neighbors
 - **Expressive:** Can learn complex neighbor importance patterns
 - **Smooth:** Soft attention allows gradient flow through all neighbors
 
 #### Limitations
+
 - **Training Required:** Needs supervision signal to learn attention
 - **Computational Cost:** Attention computation for all edges
 - **Overfitting Risk:** Can memorize training graph structure
@@ -282,6 +322,7 @@ for d := 0; d < hopDepth; d++ {
 | **Parameters** | 0 (no learning) | O(F \* F' \* K) | O(F \* F' \* K) |
 
 Where:
+
 - `k` = hop depth
 - `d` = average degree (capped by MaxNeighborsPerNode)
 - `n` = number of seed nodes
@@ -296,6 +337,7 @@ Where:
 ### 3.4 When Simple Hops Are Sufficient
 
 ✅ **Use K-Hop When:**
+
 - Graph structure already encodes importance (e.g., co-authorship networks)
 - Edge weights are reliable importance signals
 - Query-independent traversal is desired (caching benefits)
@@ -305,6 +347,7 @@ Where:
 ### 3.5 When GAT Helps
 
 ✅ **Use GAT When:**
+
 - Neighbors have varying relevance that's hard to precompute
 - Query context should influence neighbor selection
 - Node features are rich and informative
@@ -316,11 +359,13 @@ Where:
 MDEMG is **between** these two extremes:
 
 **K-Hop Features:**
+
 - Bounded expansion (hop_depth ≤ 3)
 - Degree caps (MaxNeighborsPerNode)
 - Edge type filtering
 
 **Attention-Like Features:**
+
 - Weight-based neighbor ranking (top N by weight)
 - Selective activation spreading (only CO_ACTIVATED_WITH)
 - Evidence-based decay (Hebbian reinforcement)
@@ -333,9 +378,10 @@ MDEMG is **between** these two extremes:
 
 ### 4.1 PyTorch Geometric (PyG)
 
-**Official Docs:** https://pytorch-geometric.readthedocs.io/
+**Official Docs:** <https://pytorch-geometric.readthedocs.io/>
 
 #### GATConv Layer
+
 ```python
 from torch_geometric.nn import GATConv
 
@@ -354,6 +400,7 @@ x_out = conv(x, edge_index)  # x: [N, in_channels], edge_index: [2, E]
 ```
 
 #### GATv2Conv Layer
+
 ```python
 from torch_geometric.nn import GATv2Conv
 
@@ -372,6 +419,7 @@ conv = GATv2Conv(
 **Recommendation:** Use `GATv2Conv` over `GATConv` - consistently outperforms in benchmarks.
 
 #### Full GAT Model
+
 ```python
 from torch_geometric.nn import GAT
 
@@ -388,16 +436,19 @@ model = GAT(
 ```
 
 #### Edge-Aware GAT
+
 PyG supports edge features via `edge_attr`:
+
 ```python
 x_out = conv(x, edge_index, edge_attr=edge_features)
 ```
 
 ### 4.2 DGL (Deep Graph Library)
 
-**Integration with Neo4j:** https://towardsdatascience.com/neo4j-dgl-a-seamless-integration-624ad6edb6c0
+**Integration with Neo4j:** <https://towardsdatascience.com/neo4j-dgl-a-seamless-integration-624ad6edb6c0>
 
 #### Neo4j → DGL → GAT Workflow
+
 ```python
 import dgl
 from neo4j import GraphDatabase
@@ -429,10 +480,12 @@ h = conv(g, node_features)
 
 ### 4.3 Neo4j Graph Data Science (GDS)
 
-**Official Docs:** https://neo4j.com/docs/graph-data-science/current/
+**Official Docs:** <https://neo4j.com/docs/graph-data-science/current/>
 
 #### Native Algorithms
+
 Neo4j GDS provides:
+
 - **PageRank** - authority scoring
 - **Node Similarity** - cosine similarity between neighborhoods
 - **Community Detection** - Louvain, Label Propagation
@@ -441,12 +494,15 @@ Neo4j GDS provides:
 **Gap:** No native GAT implementation in Neo4j GDS.
 
 #### External ML Integration
+
 For GAT, must use:
+
 1. **Export** graph to DGL/PyG via Cypher query
 2. **Train** GAT model externally
 3. **Import** learned embeddings/weights back to Neo4j
 
 **Workflow:**
+
 ```cypher
 // Export subgraph for GAT training
 MATCH (n:MemoryNode {space_id: $spaceId})-[r:CO_ACTIVATED_WITH]->(m)
@@ -459,7 +515,9 @@ RETURN n.node_id, n.embedding, m.node_id, r.weight, r.dim_semantic
 For production systems without GPU training infrastructure, consider:
 
 #### Option 1: Fixed Attention Pattern
+
 Pre-compute attention using heuristics:
+
 ```python
 def simple_attention(src_emb, dst_emb, edge_weight):
     """Lightweight attention without learning."""
@@ -471,7 +529,9 @@ def simple_attention(src_emb, dst_emb, edge_weight):
 ```
 
 #### Option 2: One-Shot Attention
+
 Compute attention on-the-fly during retrieval:
+
 ```go
 // In MDEMG fetchOutgoingEdges:
 func computeQueryAwareWeight(queryEmb, nodeEmb []float32, edgeWeight float64) float64 {
@@ -483,7 +543,9 @@ func computeQueryAwareWeight(queryEmb, nodeEmb []float32, edgeWeight float64) fl
 ```
 
 #### Option 3: Cached Attention
+
 Pre-compute attention for common query patterns:
+
 - Cache attention distributions for frequent seed nodes
 - Invalidate on ingest/consolidate
 - Trade memory for speed
@@ -497,19 +559,23 @@ Pre-compute attention for common query patterns:
 ### 5.1 Heterogeneous Graph Attention
 
 #### HEAT (Heterogeneous Edge-Featured GAT)
+
 **Paper:** "Heterogeneous Edge-Enhanced Graph Attention Network" (2021)
-**ArXiv:** https://arxiv.org/abs/2106.07161
+**ArXiv:** <https://arxiv.org/abs/2106.07161>
 
 Extends GAT to handle:
+
 - **Multiple edge types** (e.g., ASSOCIATED_WITH, GENERALIZES, CO_ACTIVATED_WITH)
 - **Edge features** (e.g., weight, dim_semantic, evidence_count)
 
 **Attention with Edge Features:**
+
 ```
 e_ij = a^T LeakyReLU([W_n h_i || W_n h_j || W_e e_ij || W_t τ(r_ij)])
 ```
 
 Where:
+
 - `e_ij` = edge feature vector
 - `τ(r_ij)` = edge type embedding
 - `W_e`, `W_t` = learnable projections for edge features and types
@@ -521,16 +587,19 @@ Where:
 **Focus:** Multi-relational graphs where edge **types** carry semantic meaning.
 
 **Type-Aware Attention:**
+
 ```
 α^r_ij = softmax_j(e^r_ij)
 e^r_ij = a_r^T [W_r h_i || W_r h_j]
 ```
 
 Each edge type `r` has its own:
+
 - Attention function `a_r`
 - Weight matrix `W_r`
 
 **MDEMG Edge Types:**
+
 - `ASSOCIATED_WITH` (semantic similarity)
 - `GENERALIZES` (abstraction)
 - `ABSTRACTS_TO` (concept hierarchy)
@@ -543,9 +612,10 @@ Each edge type `r` has its own:
 ### 5.3 GAT-Edge
 
 **Paper:** "Graph Attention Neural Network with Adjacent Edge Features" (OpenReview)
-**Link:** https://openreview.net/forum?id=d7KsesYb6E
+**Link:** <https://openreview.net/forum?id=d7KsesYb6E>
 
 **Innovation:** Combines edge features with node features in attention calculation:
+
 ```
 e_ij = a^T σ([W_n h_i || W_n h_j] + [W_e f_ij])
 ```
@@ -574,6 +644,7 @@ Current MDEMG edges already encode rich signals:
 | `last_activated_at` | Recency | Decay factor |
 
 **Proposed Edge-Aware Attention:**
+
 ```go
 func computeEdgeAttention(queryEmb, srcEmb, dstEmb []float32, edge Edge) float64 {
     // Node feature similarity
@@ -606,11 +677,13 @@ func computeEdgeAttention(queryEmb, srcEmb, dstEmb []float32, edge Edge) float64
 ### 6.1 Current Graph Traversal Architecture
 
 #### Key Files
+
 - `/Users/reh3376/mdemg/internal/retrieval/service.go` - Main retrieval logic
 - `/Users/reh3376/mdemg/internal/retrieval/activation.go` - Spreading activation
 - `/Users/reh3376/mdemg/internal/retrieval/scoring.go` - Final ranking
 
 #### Retrieval Pipeline
+
 ```
 1. vectorRecall(query_embedding, candidate_k)
    └─> Top candidate_k nodes by cosine similarity
@@ -633,11 +706,13 @@ func computeEdgeAttention(queryEmb, srcEmb, dstEmb []float32, edge Edge) float64
 #### Graph Structure (from models.go, domain/types.go)
 
 **Layers:**
+
 - **L0** (Base): Raw code/observations (leaf nodes)
 - **L1** (Hidden): DBSCAN clusters, concerns, config summaries (concern nodes)
 - **L2+** (Concepts): Higher-level abstractions (emergent_concept nodes)
 
 **Edge Types:**
+
 - `ASSOCIATED_WITH` - Semantic similarity (created on ingest if similarity > threshold)
 - `GENERALIZES` - L0→L1 abstraction (consolidation)
 - `ABSTRACTS_TO` - L1→L2 concept hierarchy (consolidation)
@@ -647,6 +722,7 @@ func computeEdgeAttention(queryEmb, srcEmb, dstEmb []float32, edge Edge) float64
 - `IMPLEMENTS_CONFIG` - Config relationships (consolidation)
 
 **Edge Features:**
+
 ```go
 type Edge struct {
     Src             string
@@ -663,6 +739,7 @@ type Edge struct {
 ### 6.2 Current Hop Depth Traversal
 
 #### Expansion Logic (service.go lines 227-251)
+
 ```go
 for d := 0; d < hopDepth; d++ {
     if len(frontier) == 0 {
@@ -691,6 +768,7 @@ for d := 0; d < hopDepth; d++ {
 ```
 
 **Characteristics:**
+
 - **Breadth-First Expansion:** All frontier nodes expanded equally
 - **Fixed Hop Budget:** `hop_depth` parameter (default 1, max 3)
 - **No Query Context:** Expansion doesn't consider query embedding
@@ -699,6 +777,7 @@ for d := 0; d < hopDepth; d++ {
 #### fetchOutgoingEdges (service.go lines 635-748)
 
 **Cypher Query Highlights:**
+
 ```cypher
 UNWIND $nodeIds AS sid
 MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
@@ -732,6 +811,7 @@ LIMIT $maxTotal  // MaxTotalEdgesFetched (global cap)
 ```
 
 **Key Features:**
+
 - **Weight-Based Ranking:** Top N neighbors by `decayedWeight`
 - **Evidence-Based Decay:** Edges with more `evidence_count` decay slower (Hebbian reinforcement)
 - **Type Filtering:** Only allowed edge types included
@@ -762,6 +842,7 @@ for _, e := range edges {
 ```
 
 **Activation Propagation:**
+
 ```go
 for t := 0; t < steps; t++ {
     next := map[string]float64{}
@@ -795,11 +876,13 @@ for t := 0; t < steps; t++ {
 ```
 
 **Degree Normalization:**
+
 - Divides by `sqrt(degree)` to prevent high-degree nodes from saturating to 1.0
 - Preserves relative signal strength
 - Documented in comments (lines 76-79)
 
 #### Effective Weight Computation
+
 ```go
 func effectiveWeight(e Edge) float64 {
     w := e.Weight
@@ -827,6 +910,7 @@ func effectiveWeight(e Edge) float64 {
 #### Final Scoring (scoring.go lines 277-494)
 
 **Score Formula:**
+
 ```
 score = α*VectorSim + β*Activation + γ*Recency + δ*Confidence
         + pathBoost + comparisonBoost + configBoost
@@ -834,6 +918,7 @@ score = α*VectorSim + β*Activation + γ*Recency + δ*Confidence
 ```
 
 Where:
+
 - **VectorSim:** Cosine similarity from initial recall
 - **Activation:** Transient activation from spreading
 - **Recency:** Exponential decay `exp(-ρ * ageDays)`
@@ -845,6 +930,7 @@ Where:
 - **RedundancyPenalty:** Penalty for nodes in same directory prefix
 
 **Hyperparameters (from config):**
+
 - α (ScoringAlpha): 0.45 - vector similarity weight
 - β (ScoringBeta): 0.35 - activation weight
 - γ (ScoringGamma): 0.10 - recency weight
@@ -856,6 +942,7 @@ Where:
 ### 6.4 Gap Analysis
 
 #### What Works Well
+
 ✅ **Hebbian Learning:** CO_ACTIVATED_WITH edges capture query co-occurrence patterns
 ✅ **Evidence-Based Decay:** Frequent patterns persist, spurious connections decay
 ✅ **Degree Normalization:** Prevents high-degree nodes from dominating activation
@@ -863,6 +950,7 @@ Where:
 ✅ **Layer-Aware:** Different treatment for L0 (code) vs. L1+ (concepts)
 
 #### Identified Gaps
+
 ❌ **Query-Independent Expansion:** Same top-N neighbors fetched regardless of query
 ❌ **No Query-Neighbor Affinity:** Expansion doesn't consider query-node similarity
 ❌ **Fixed Budget Allocation:** Same MaxNeighborsPerNode for all nodes (no dynamic allocation)
@@ -870,6 +958,7 @@ Where:
 ❌ **No Cross-Edge-Type Attention:** All CO_ACTIVATED_WITH edges treated equally during activation
 
 #### Opportunities for GAT Integration
+
 🎯 **Expansion Phase:** Apply attention to prioritize which neighbors to expand
 🎯 **Activation Phase:** Use query context to modulate activation weights
 🎯 **Edge Type Mixing:** Learn optimal blending of structural + learned edges
@@ -878,6 +967,7 @@ Where:
 ### 6.5 Proposed Graph Attention Integration Points
 
 #### Option 1: Query-Aware Expansion (Lightweight)
+
 **Integrate attention during `fetchOutgoingEdges`:**
 
 ```go
@@ -917,17 +1007,20 @@ func computeQueryAwareAttention(queryEmb, dstEmb []float32, edge Edge) float64 {
 ```
 
 **Benefits:**
+
 - No training required (uses pre-computed embeddings)
 - Query-aware neighbor selection
 - Minimal code change (modifies `fetchOutgoingEdges`)
 
 **Trade-offs:**
+
 - Requires fetching node embeddings (extra DB query or cache)
 - Slightly higher latency per hop
 
 ---
 
 #### Option 2: Learned GAT Layer (Advanced)
+
 **Train GAT model offline, apply during expansion:**
 
 ```python
@@ -1007,11 +1100,13 @@ func (s *Service) fetchOutgoingEdgesWithLearnedAttention(ctx context.Context, sp
 ```
 
 **Benefits:**
+
 - Learns optimal attention from query patterns
 - Can discover non-obvious neighbor importance
 - Higher precision than heuristic attention
 
 **Trade-offs:**
+
 - Requires training data (query logs)
 - Training/deployment complexity
 - Risk of overfitting to training queries
@@ -1019,6 +1114,7 @@ func (s *Service) fetchOutgoingEdgesWithLearnedAttention(ctx context.Context, sp
 ---
 
 #### Option 3: Hybrid Structural + Learned Attention
+
 **Use structural edges for breadth, learned attention for depth:**
 
 ```go
@@ -1062,10 +1158,12 @@ func (s *Service) expandWithHybridAttention(ctx context.Context, spaceID string,
 ```
 
 **Rationale:**
+
 - **Hop 0 (structural):** Explore diverse neighborhoods via semantic similarity and abstraction
 - **Hop 1+ (learned):** Follow query-relevant paths via Hebbian learning + attention
 
 **Benefits:**
+
 - Balances exploration (structural) and exploitation (learned)
 - Leverages both edge types effectively
 - Query-aware without abandoning structural knowledge
@@ -1075,18 +1173,22 @@ func (s *Service) expandWithHybridAttention(ctx context.Context, spaceID string,
 ### 6.6 Recommended Approach for MDEMG
 
 #### Phase 1: Lightweight Query-Aware Attention (Option 1)
+
 **Implementation:**
+
 1. Add `computeQueryAwareAttention` function
 2. Modify `fetchOutgoingEdges` to compute attention scores
 3. Re-rank neighbors by attention (instead of just weight)
 4. Gate behind feature flag: `QueryAwareExpansionEnabled`
 
 **Validation:**
+
 - Run benchmark suite (whk-wms, plc-gbt, pytorch)
 - Measure precision@5, precision@10 changes
 - Compare latency vs. current (expect +5-10ms per query)
 
 **Rollout:**
+
 - Enable for code-focused queries first (e.g., "where is X implemented")
 - Monitor cache hit rates (may decrease due to query-dependence)
 - Gradually expand to all queries
@@ -1096,17 +1198,21 @@ func (s *Service) expandWithHybridAttention(ctx context.Context, spaceID string,
 ---
 
 #### Phase 2: Edge Type Mixing Experiment (Option 3)
+
 **Implementation:**
+
 1. Implement hybrid expansion (structural hop 0, learned hop 1+)
 2. Add `EdgeTypeStrategy` config param (all, structural_first, learned_only)
 3. Run A/B test on benchmark queries
 
 **Validation:**
+
 - Compare structural-first vs. learned-only vs. hybrid
 - Measure recall improvements (especially for multi-hop queries)
 - Analyze failed queries (where did attention help/hurt?)
 
 **Rollout:**
+
 - Start with `structural_first` as default
 - Switch to `hybrid` if benchmarks show +5% improvement
 
@@ -1115,18 +1221,22 @@ func (s *Service) expandWithHybridAttention(ctx context.Context, spaceID string,
 ---
 
 #### Phase 3: Learned Attention (Option 2) - Future Work
+
 **Prerequisites:**
+
 - Collect query logs (10k+ queries with ground truth)
 - Set up PyTorch Geometric training pipeline
 - Build model serving infrastructure (ONNX Runtime or TensorFlow Lite)
 
 **Implementation:**
+
 1. Train GATv2 model on historical query co-activation patterns
 2. Export model to ONNX or TFLite
 3. Integrate inference in Go (via CGO or REST API)
 4. Cache attention weights per query pattern
 
 **Validation:**
+
 - Offline metrics: AUC, NDCG on held-out queries
 - Online A/B test: measure precision@k, user satisfaction
 
@@ -1137,6 +1247,7 @@ func (s *Service) expandWithHybridAttention(ctx context.Context, spaceID string,
 ## 7. Benchmark and Validation Plan
 
 ### 7.1 Existing Benchmarks
+
 MDEMG has established benchmarks (from docs/benchmarks/):
 
 | Benchmark | Codebase | Questions | Baseline Score | Purpose |
@@ -1148,39 +1259,54 @@ MDEMG has established benchmarks (from docs/benchmarks/):
 ### 7.2 GAT-Specific Metrics
 
 #### Precision@K
+
 Measure how many of the top-K results are relevant:
+
 ```
 P@K = (# relevant in top-K) / K
 ```
+
 **Target:** +5% improvement in P@5, P@10 with query-aware attention.
 
 #### Recall@K
+
 Measure how many relevant items are found in top-K:
+
 ```
 R@K = (# relevant in top-K) / (# total relevant)
 ```
+
 **Target:** +3% improvement in R@20 (especially for multi-hop queries).
 
 #### NDCG (Normalized Discounted Cumulative Gain)
+
 Ranking quality metric that rewards relevant items higher in the list:
+
 ```
 NDCG@K = DCG@K / IDCG@K
 DCG@K = Σ (2^rel_i - 1) / log2(i + 1)
 ```
+
 **Target:** +0.05 improvement in NDCG@10.
 
 #### Attention Diversity
+
 Measure how diverse the top-K attention weights are:
+
 ```
 Diversity = 1 - (max_attention_weight - mean_attention_weight)
 ```
+
 **Goal:** Attention should **not** collapse to single node (would indicate learned bias).
 
 #### Expansion Efficiency
+
 Measure how many nodes are expanded to achieve same recall:
+
 ```
 Efficiency = (nodes_expanded_baseline) / (nodes_expanded_with_attention)
 ```
+
 **Target:** 10-20% reduction in nodes expanded (attention prunes irrelevant branches).
 
 ### 7.3 Ablation Studies
@@ -1219,6 +1345,7 @@ Measure retrieval latency impact:
 | **Total** | 50-85ms | 60-105ms | 150ms |
 
 **Optimization Targets:**
+
 - Cache node embeddings (avoid repeated DB queries)
 - Batch attention computation (vectorized ops)
 - Early stopping (prune low-attention branches)
@@ -1228,6 +1355,7 @@ Measure retrieval latency impact:
 ## 8. Implementation Roadmap
 
 ### Phase 1: Foundation (Week 1-2)
+
 - [ ] Add `AttentionScore` field to `Edge` struct
 - [ ] Implement `computeQueryAwareAttention` (cosine sim + edge weight)
 - [ ] Add feature flag `QueryAwareExpansionEnabled`
@@ -1239,6 +1367,7 @@ Measure retrieval latency impact:
 ---
 
 ### Phase 2: Query-Aware Expansion (Week 3-4)
+
 - [ ] Modify `fetchOutgoingEdges` to re-rank by attention
 - [ ] Add node embedding cache (reduce DB queries)
 - [ ] Implement attention-based neighbor selection
@@ -1250,6 +1379,7 @@ Measure retrieval latency impact:
 ---
 
 ### Phase 3: Edge Type Mixing (Week 5-6)
+
 - [ ] Implement hybrid expansion (structural hop 0, learned hop 1+)
 - [ ] Add `EdgeTypeStrategy` config parameter
 - [ ] Experiment with different mixing strategies
@@ -1261,6 +1391,7 @@ Measure retrieval latency impact:
 ---
 
 ### Phase 4: Edge Feature Integration (Week 7-8)
+
 - [ ] Extend attention to include `dim_semantic`, `dim_temporal`, `dim_coactivation`
 - [ ] Add evidence-based attention boosting (`log(evidence_count)`)
 - [ ] Implement decay-aware attention (penalize stale edges)
@@ -1272,6 +1403,7 @@ Measure retrieval latency impact:
 ---
 
 ### Phase 5: Learned Attention (Future - Month 3+)
+
 - [ ] Collect query logs with ground truth (10k+ samples)
 - [ ] Train GATv2 model in PyTorch Geometric
 - [ ] Export model to ONNX or TFLite
@@ -1286,14 +1418,17 @@ Measure retrieval latency impact:
 ## 9. Risks and Mitigations
 
 ### Risk 1: Attention Collapse
+
 **Issue:** Attention weights collapse to single node, losing diversity.
 
 **Symptoms:**
+
 - All attention mass on one neighbor
 - Low recall (misses relevant nodes not attended to)
 - High variance in attention distribution
 
 **Mitigation:**
+
 - Add entropy regularization to attention weights
 - Clamp max attention: `attention = min(attention, 0.9)`
 - Ensure multi-head attention in learned model (k=4-8 heads)
@@ -1302,14 +1437,17 @@ Measure retrieval latency impact:
 ---
 
 ### Risk 2: Query-Dependence Breaks Caching
+
 **Issue:** Query-aware expansion means cache hit rate drops.
 
 **Symptoms:**
+
 - Cache hit rate drops from 60% to <10%
 - Latency increases (no cache benefit)
 - Higher Neo4j query load
 
 **Mitigation:**
+
 - Cache attention weights per query pattern (cluster similar queries)
 - Use query embedding hash as cache key (instead of full embedding)
 - Implement "coarse attention" for cache hits (fine attention for misses)
@@ -1318,13 +1456,16 @@ Measure retrieval latency impact:
 ---
 
 ### Risk 3: Embedding Fetch Overhead
+
 **Issue:** Fetching node embeddings for attention adds latency.
 
 **Symptoms:**
+
 - Expansion latency doubles (10ms → 20ms per hop)
 - High DB load (embedding queries)
 
 **Mitigation:**
+
 - Aggressive embedding cache (LRU cache with 10k capacity)
 - Batch embedding fetches (single query for all neighbors)
 - Lazy embedding fetch (only for top-weighted neighbors)
@@ -1333,14 +1474,17 @@ Measure retrieval latency impact:
 ---
 
 ### Risk 4: Learned Model Overfitting
+
 **Issue:** GAT model memorizes training queries, poor generalization.
 
 **Symptoms:**
+
 - High training accuracy, low test accuracy
 - Learned attention worse than heuristic on novel queries
 - Model fails on out-of-distribution query patterns
 
 **Mitigation:**
+
 - Use self-supervised training (predict co-activation, not ground truth)
 - Regularization: dropout (0.3-0.6), L2 penalty, early stopping
 - Augment training data (paraphrase queries, synonym replacement)
@@ -1349,14 +1493,17 @@ Measure retrieval latency impact:
 ---
 
 ### Risk 5: Complexity Explosion
+
 **Issue:** Adding attention increases code complexity and maintenance burden.
 
 **Symptoms:**
+
 - Hard to debug retrieval issues
 - Many hyperparameters to tune
 - Difficult to explain results to users
 
 **Mitigation:**
+
 - Start simple (Option 1: heuristic attention)
 - Gate behind feature flags (easy rollback)
 - Comprehensive logging (attention scores, neighbor selection)
@@ -1414,31 +1561,36 @@ Measure retrieval latency impact:
 ## Appendix A: Additional Resources
 
 ### Papers
-- **GAT (2018):** https://arxiv.org/abs/1710.10903
-- **GATv2 (2021):** https://arxiv.org/abs/2105.14491
-- **HEAT (2021):** https://arxiv.org/abs/2106.07161
-- **K-hop GNN (2019):** https://arxiv.org/abs/1907.06051
-- **MAGNA (Multi-hop Attention, 2021):** https://cs.stanford.edu/people/jure/pubs/magna-ijcai21.pdf
+
+- **GAT (2018):** <https://arxiv.org/abs/1710.10903>
+- **GATv2 (2021):** <https://arxiv.org/abs/2105.14491>
+- **HEAT (2021):** <https://arxiv.org/abs/2106.07161>
+- **K-hop GNN (2019):** <https://arxiv.org/abs/1907.06051>
+- **MAGNA (Multi-hop Attention, 2021):** <https://cs.stanford.edu/people/jure/pubs/magna-ijcai21.pdf>
 
 ### Implementations
-- **PyTorch Geometric:** https://pytorch-geometric.readthedocs.io/
-- **DGL (Deep Graph Library):** https://www.dgl.ai/
-- **Original GAT (TensorFlow):** https://github.com/PetarV-/GAT
+
+- **PyTorch Geometric:** <https://pytorch-geometric.readthedocs.io/>
+- **DGL (Deep Graph Library):** <https://www.dgl.ai/>
+- **Original GAT (TensorFlow):** <https://github.com/PetarV-/GAT>
 
 ### Tutorials
-- **PyG GAT Tutorial:** https://antoniolonga.github.io/Pytorch_geometric_tutorials/posts/post3.html
-- **Neo4j + DGL Integration:** https://towardsdatascience.com/neo4j-dgl-a-seamless-integration-624ad6edb6c0
-- **Graph Transformers Overview (2026):** https://medium.com/@jhahimanshu3636/graph-transformers-a-fresh-perspective-on-learning-from-graphs-f95f0378b939
+
+- **PyG GAT Tutorial:** <https://antoniolonga.github.io/Pytorch_geometric_tutorials/posts/post3.html>
+- **Neo4j + DGL Integration:** <https://towardsdatascience.com/neo4j-dgl-a-seamless-integration-624ad6edb6c0>
+- **Graph Transformers Overview (2026):** <https://medium.com/@jhahimanshu3636/graph-transformers-a-fresh-perspective-on-learning-from-graphs-f95f0378b939>
 
 ### Comparisons
-- **GCN vs GAT vs GraphSAGE:** https://apxml.com/courses/introduction-to-graph-neural-networks/chapter-3-foundational-gnn-architectures/comparing-gcn-graphsage-gat
-- **Message Passing Architectures:** https://wandb.ai/yashkotadia/benchmarking-gnns/reports/Part-2-Comparing-Message-Passing-Based-GNN-Architectures--VmlldzoyMTk4OTA
+
+- **GCN vs GAT vs GraphSAGE:** <https://apxml.com/courses/introduction-to-graph-neural-networks/chapter-3-foundational-gnn-architectures/comparing-gcn-graphsage-gat>
+- **Message Passing Architectures:** <https://wandb.ai/yashkotadia/benchmarking-gnns/reports/Part-2-Comparing-Message-Passing-Based-GNN-Architectures--VmlldzoyMTk4OTA>
 
 ---
 
 ## Appendix B: MDEMG Graph Schema Summary
 
 ### Node Types (role_type)
+
 - `null` or `"leaf"` - L0 base nodes (code, observations)
 - `"concern"` or `"hidden"` - L1 hidden layer (DBSCAN clusters, cross-cutting concerns)
 - `"emergent_concept"` - L2+ concept layer (higher abstractions)
@@ -1448,6 +1600,7 @@ Measure retrieval latency impact:
 - `"comparison"` - Comparison node (consolidation)
 
 ### Edge Types (relationship types)
+
 | Edge Type | Purpose | Created By | Weight Learned |
 |-----------|---------|------------|----------------|
 | `ASSOCIATED_WITH` | Semantic similarity | Ingest (if similarity > threshold) | Semi (initial, incremented on match) |
@@ -1461,6 +1614,7 @@ Measure retrieval latency impact:
 | `HAS_OBSERVATION` | Node→Observation | Ingest | No (metadata) |
 
 ### Edge Properties
+
 - `weight` - Learned Hebbian weight (0.0-1.0)
 - `dim_semantic` - Cosine similarity (0.0-1.0)
 - `dim_temporal` - Temporal proximity (0.0-1.0)

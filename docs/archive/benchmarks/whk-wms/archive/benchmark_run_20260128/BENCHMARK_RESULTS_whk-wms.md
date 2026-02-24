@@ -47,6 +47,7 @@
 | Run 3 (warm) | 0.702 | 42% | 0% | 7,430 | 7,430 | 0 |
 
 **Observations:**
+
 - Peak performance (0.805) achieved on cold start with fresh data
 - Stable performance (0.702) after learning edge accumulation
 - 100% consistency across warm runs (σ = 0.000)
@@ -91,6 +92,7 @@
 ## Learning Edge Analysis
 
 ### Edge Progression
+
 ```
 Cold Start:  0 → 5,912 edges (+5,912)
 Run 1:   5,912 → 7,430 edges (+1,518)
@@ -98,6 +100,7 @@ Run 2-3: 7,430 → 7,430 edges (saturated)
 ```
 
 ### Edge Quality
+
 - **L0-only filtering:** Only code↔code edges (no hidden node pollution)
 - **Path similarity:** dim_semantic set based on directory structure
 - **Stop-word filtering:** No "with", "for", etc. nodes
@@ -107,28 +110,34 @@ Run 2-3: 7,430 → 7,430 edges (saturated)
 ## Root Cause Fixes Applied
 
 ### Fix 1: L0-Only Learning (service.go)
+
 ```go
 if r.Layer > 0 {
     continue // Skip hidden/concept nodes
 }
 ```
+
 **Impact:** Prevents hidden nodes from becoming hubs that accumulate edges from unrelated code.
 
 ### Fix 2: SQL Parser Migration Names (sql_parser.go)
+
 ```go
 if fileType == "migration" && fileName == "migration.sql" {
     elementName = filepath.Base(filepath.Dir(relPath))
 }
 ```
+
 **Impact:** Eliminates 338 duplicate `migration.sql` nodes, each now has unique name.
 
 ### Fix 3: Stop-Word Filter (service.go)
+
 ```go
 func isStopWord(name string) bool {
     stopWords := map[string]bool{"for": true, "and": true, ...}
     return stopWords[strings.ToLower(name)] || len(name) < 3
 }
 ```
+
 **Impact:** Prevents low-value nodes from polluting learning edges.
 
 ---
@@ -136,12 +145,14 @@ func isStopWord(name string) bool {
 ## Methodology
 
 ### Benchmark Framework V2.3
+
 - Sequential MDEMG runs (learning edge accumulation)
 - Automatic grading against expected answers
 - Evidence-weighted scoring (file:line references)
 - Category-stratified analysis
 
 ### Data Isolation
+
 - Fresh re-ingest before cold start run
 - No answer contamination (agent-only question files)
 - Unique output files per run
@@ -167,5 +178,6 @@ func isStopWord(name string) bool {
 | `.env` | LEARNING_MAX_EDGES_PER_NODE=8, RERANK_ENABLED=false |
 
 **Git Commits:**
+
 - `8f67198` - fix(retrieval): optimize learning edges and activation spreading
 - `3cd6b7b` - fix(learning): L0-only learning + SQL parser unique migration names

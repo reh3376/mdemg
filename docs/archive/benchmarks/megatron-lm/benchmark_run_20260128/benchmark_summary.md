@@ -91,17 +91,20 @@ MDEMG Runs 2-3 were **invalidated** due to defective agent behavior:
 
 **Run 1 Answer (Correct):**
 > "No built-in hyperparameter tuning or NAS. Requires external tools like Ray Tune, Optuna."
+>
 > - Score: **1.0**
 > - Semantic: 0.576
 
 **Run 2 Answer (Defective):**
 > "Config: model_config.yaml in config Config: model_config.yaml in config. Related to: authentication..."
+>
 > - Score: 0.714
 > - Semantic: **0.071**
 
 ### Root Cause
 
 Runs 2-3 agent dumped raw MDEMG element metadata as answers instead of synthesizing proper responses. Answers contained internal format strings like:
+
 - `"Package: __init__"`
 - `"Module: ... Contains N functions"`
 - `"Related to: authentication, error-handling"`
@@ -180,6 +183,7 @@ These runs were excluded from aggregate scoring but retained for analysis purpos
 **MDEMG outperforms baseline by +0.9%** when agent behavior is correct.
 
 Key findings:
+
 1. MDEMG excels on semantic/conceptual questions (+14.7% on negative controls)
 2. Agent prompt quality is critical - improper prompting causes severe degradation
 3. Both systems achieve 100% strong evidence quality
