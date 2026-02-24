@@ -1,0 +1,78 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/consolidate",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 103 Dynamic Emergence payload extensions.",
+    "tags": [
+      "consolidate",
+      "emergence",
+      "phase103"
+    ],
+    "sha256": "00baa22d729177835a20b897d8ef1421c8694e18b56413cfa029c5eec7ff1384"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-dev' is populated with dense clusters of CO_ACTIVATED_WITH edges."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "mdemg-dev"
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "enable_dynamic_emergence": true,
+      "min_cluster_density": 0.75
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.status",
+        "operator": "equals",
+        "value": "completed"
+      },
+      {
+        "path": "data.dynamic_emergent_nodes_created",
+        "operator": "exists"
+      },
+      {
+        "path": "data.dynamic_emergent_nodes_created",
+        "operator": "type",
+        "value": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "emergence_disabled",
+      "description": "When enable_dynamic_emergence is false, the metric field is omitted.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "enable_dynamic_emergence": false
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "data.dynamic_emergent_nodes_created",
+            "operator": "not_exists"
+          }
+        ]
+      }
+    }
+  ]
+}

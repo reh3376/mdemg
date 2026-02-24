@@ -1,0 +1,80 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 102 Intent Translation extended request and response payloads.",
+    "tags": [
+      "retrieve",
+      "intent",
+      "phase102"
+    ],
+    "sha256": "03813c72ec12a9e83763ca461070266c6ef1ddb95c59ab17f1d57f80eda0eff8"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-dev' is populated with relevant architectural concepts."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "mdemg-dev",
+    "query": "How do I handle database migrations here?"
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "query": "{{query}}",
+      "translate_intent": true
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.results",
+        "operator": "type",
+        "value": "array"
+      },
+      {
+        "path": "data.translated_intent",
+        "operator": "exists"
+      },
+      {
+        "path": "data.translated_intent",
+        "operator": "type",
+        "value": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "translation_disabled",
+      "description": "When translate_intent is false, the translated_intent field is omitted.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "query": "{{query}}",
+          "translate_intent": false
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "data.translated_intent",
+            "operator": "not_exists"
+          }
+        ]
+      }
+    }
+  ]
+}

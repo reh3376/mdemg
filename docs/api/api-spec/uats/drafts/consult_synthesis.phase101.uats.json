@@ -1,0 +1,93 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/consult",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 101 SME Synthesis Engine extended request and response payloads.",
+    "tags": [
+      "consult",
+      "synthesis",
+      "phase101"
+    ],
+    "sha256": "1ab1b7b08ce153c41b142cab3f607ee7fd52d4bf9067d84df63468581a7446b2"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-dev' is populated with caching concepts."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "mdemg-dev",
+    "question": "What is the team's pattern for distributed caching?",
+    "context": "I am working on the user service and need to cache query results."
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "question": "{{question}}",
+      "context": "{{context}}",
+      "llm_synthesis": true,
+      "max_suggestions": 5
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.space_id",
+        "operator": "equals",
+        "value": "{{space_id}}"
+      },
+      {
+        "path": "data.synthesis",
+        "operator": "exists"
+      },
+      {
+        "path": "data.synthesis",
+        "operator": "type",
+        "value": "string"
+      },
+      {
+        "path": "data.suggestions",
+        "operator": "type",
+        "value": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "synthesis_disabled",
+      "description": "When llm_synthesis is false, the synthesis field is omitted.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "question": "{{question}}",
+          "context": "{{context}}",
+          "llm_synthesis": false
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "data.synthesis",
+            "operator": "not_exists"
+          },
+          {
+            "path": "data.suggestions",
+            "operator": "exists"
+          }
+        ]
+      }
+    }
+  ]
+}

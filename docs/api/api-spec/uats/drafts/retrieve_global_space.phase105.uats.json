@@ -1,0 +1,49 @@
+{
+  "$schema": "../schema/uats.schema.json",
+  "config": {
+    "version": "1.0",
+    "endpoint": "/v1/memory/retrieve",
+    "method": "POST",
+    "test_type": "contract-draft",
+    "description": "Validates Phase 105 retrieval fallback to the global meta-learning space.",
+    "tags": [
+      "retrieve",
+      "global",
+      "phase105"
+    ],
+    "sha256": "8110e3611d7d7fc47f3dd981d88bd1790ba688502b95f101be3c015e86d2f497"
+  },
+  "setup": {
+    "prerequisites": [
+      {
+        "type": "seed",
+        "action": "ingest",
+        "description": "Ensure space 'mdemg-global' contains generalized patterns."
+      }
+    ]
+  },
+  "variables": {
+    "space_id": "billing-service-repo",
+    "query": "How do we handle auth?"
+  },
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "query": "{{query}}",
+      "include_global_space": true
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "data.results",
+        "operator": "type",
+        "value": "array"
+      }
+    ]
+  }
+}
