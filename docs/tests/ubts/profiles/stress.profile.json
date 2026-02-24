@@ -9,16 +9,16 @@
     "think_time_ms": 100
   },
   "query_variations": [
-    {"query_text": "complex architectural query about system design patterns"},
-    {"query_text": "simple word"},
-    {"query_text": "medium length query about code implementation"},
-    {"query_text": "very long query text that contains multiple sentences and should exercise the embedding generation and retrieval pipeline with a significant amount of input data to process"},
-    {"query_text": "special characters: @#$% &*()"},
-    {"query_text": "unicode: \u4e2d\u6587 \u65e5\u672c\u8a9e \ud55c\uad6d\uc5b4"},
-    {"query_text": "code snippet: function foo() { return bar; }"},
-    {"query_text": "numeric: 12345 67890 0.123"},
-    {"query_text": "mixed: user123 config_v2 API-KEY"},
-    {"query_text": "empty-ish query"}
+    {"query_text": "complex architectural query about system design patterns", "content_1": "Stress test architectural patterns", "content_2": "Stress test design decisions", "content_3": "Stress test system boundaries"},
+    {"query_text": "simple word", "content_1": "Stress test simple A", "content_2": "Stress test simple B", "content_3": "Stress test simple C"},
+    {"query_text": "medium length query about code implementation", "content_1": "Stress test code analysis", "content_2": "Stress test implementation details", "content_3": "Stress test code review"},
+    {"query_text": "very long query text that contains multiple sentences and should exercise the embedding generation and retrieval pipeline with a significant amount of input data to process", "content_1": "Stress test long content processing", "content_2": "Stress test embedding pipeline throughput", "content_3": "Stress test retrieval under load"},
+    {"query_text": "special characters: @#$% &*()", "content_1": "Stress test special chars A", "content_2": "Stress test special chars B", "content_3": "Stress test special chars C"},
+    {"query_text": "unicode: \u4e2d\u6587 \u65e5\u672c\u8a9e \ud55c\uad6d\uc5b4", "content_1": "Stress test unicode A", "content_2": "Stress test unicode B", "content_3": "Stress test unicode C"},
+    {"query_text": "code snippet: function foo() { return bar; }", "content_1": "Stress test code snippet A", "content_2": "Stress test code snippet B", "content_3": "Stress test code snippet C"},
+    {"query_text": "numeric: 12345 67890 0.123", "content_1": "Stress test numeric A", "content_2": "Stress test numeric B", "content_3": "Stress test numeric C"},
+    {"query_text": "mixed: user123 config_v2 API-KEY", "content_1": "Stress test mixed A", "content_2": "Stress test mixed B", "content_3": "Stress test mixed C"},
+    {"query_text": "empty-ish query", "content_1": "Stress test minimal A", "content_2": "Stress test minimal B", "content_3": "Stress test minimal C"}
   ],
   "assertions": {
     "all_requests_succeed": false,

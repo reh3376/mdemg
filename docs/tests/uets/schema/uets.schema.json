@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mdemg.dev/schemas/uets/v1.0.0",
+  "title": "Universal Emergence Test Specification",
+  "description": "Model-agnostic test specification for evaluating LLM-driven emergence concept naming quality",
+  "type": "object",
+  "required": ["uets_version", "model", "fixture", "expected"],
+
+  "properties": {
+    "uets_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "UETS schema version"
+    },
+
+    "model": {
+      "type": "object",
+      "required": ["name", "endpoint", "model_id", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable model identifier (e.g. 'qwen2.5-72b-mlx')"
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "Model API endpoint URL"
+        },
+        "model_id": {
+          "type": "string",
+          "description": "Model identifier sent in API request (e.g. 'mlx-community/Qwen2.5-72B-Instruct-4bit')"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["openai", "ollama"],
+          "description": "API protocol type"
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": { "type": "string" },
+        "created": { "type": "string", "format": "date" },
+        "updated": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "parameters": {
+          "type": "string",
+          "description": "Model parameter count (e.g. '72B', '14B', '3B')"
+        },
+        "quantization": {
+          "type": "string",
+          "description": "Quantization method (e.g. '4bit', 'Q4_K_M', 'fp16')"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "config": {
+      "type": "object",
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.3,
+          "description": "Sampling temperature for generation"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 4000,
+          "default": 500,
+          "description": "Maximum tokens per response"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 30000,
+          "description": "Request timeout in milliseconds"
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 1,
+          "description": "Retry count on transient failures"
+        }
+      }
+    },
+
+    "fixture": {
+      "type": "object",
+      "description": "Cluster data to test the model against",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "file" },
+            "path": { "type": "string", "description": "Relative path to clusters JSON file" },
+            "sha256": { "type": "string", "description": "SHA256 hash of fixture file for integrity" }
+          },
+          "required": ["type", "path"]
+        },
+        {
+          "properties": {
+            "type": { "const": "inline" },
+            "clusters": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Cluster" }
+            }
+          },
+          "required": ["type", "clusters"]
+        }
+      ]
+    },
+
+    "expected": {
+      "type": "object",
+      "required": ["thresholds"],
+      "properties": {
+        "thresholds": {
+          "type": "object",
+          "required": ["json_valid_rate", "label_valid_rate"],
+          "properties": {
+            "json_valid_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction of responses that are valid JSON with all 3 required fields"
+            },
+            "label_valid_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction of responses with valid proposed_label"
+            },
+            "name_quality_rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction of names with 3-6 words (full score)"
+            },
+            "max_avg_latency_ms": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Maximum acceptable average latency in milliseconds"
+            }
+          }
+        }
+      }
+    },
+
+    "patterns_covered": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "E1_JSON_CONFORMANCE",
+          "E2_LABEL_CONSTRAINT",
+          "E3_NAME_QUALITY",
+          "E4_DESCRIPTION_QUALITY",
+          "E5_LATENCY"
+        ]
+      },
+      "description": "Which emergence evaluation patterns this spec covers"
+    }
+  },
+
+  "$defs": {
+    "Cluster": {
+      "type": "object",
+      "required": ["cluster_id", "members"],
+      "properties": {
+        "cluster_id": { "type": "integer" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClusterMember" },
+          "minItems": 3
+        },
+        "total_weight": { "type": "number" }
+      }
+    },
+    "ClusterMember": {
+      "type": "object",
+      "required": ["node_id", "name"],
+      "properties": {
+        "node_id": { "type": "string" },
+        "name": { "type": "string" },
+        "summary": { "type": "string" },
+        "path": { "type": "string" },
+        "layer": { "type": "integer", "minimum": 0, "maximum": 4 }
+      }
+    }
+  }
+}

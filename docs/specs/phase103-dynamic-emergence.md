@@ -2,7 +2,7 @@
 # Feature Spec: Dynamic Emergence
 
 **Phase**: 103
-**Status**: Draft
+**Status**: Complete
 **Author**: Agent
 **Date**: 2026-02-23
 
@@ -142,3 +142,49 @@ To adhere to the Framework Governance rules (`docs/specs/FRAMEWORK_GOVERNANCE.md
 ### New Files
 - `docs/api/api-spec/uats/drafts/consolidate_dynamic_emergence.phase103.uats.json`
 - `docs/tests/uvts/specs/dynamic_emergence_quality.phase103.uvts.json`
+
+---
+
+## Phase 103b: Emergence Model Evaluation & MLX Server Integration
+
+**Status**: Complete
+**Date**: 2026-02-24
+
+### Changes
+
+1. **`LLM_ENDPOINT` Config Separation**: Added `LLMEndpoint` field and `EffectiveLLMEndpoint()` method to `internal/config/config.go`. All LLM text-generation features (synthesis, intent translation, emergence naming, reranking) use `EffectiveLLMEndpoint()` which returns `LLM_ENDPOINT` if set, otherwise falls back to `OPENAI_ENDPOINT`. Embeddings stay on `OPENAI_ENDPOINT`. This allows pointing LLM calls at a local MLX server while keeping embeddings on OpenAI.
+
+2. **Ollama JSON Schema Enforcement**: Added `format` field with full JSON schema to Ollama requests in `emergence_namer.go`. Uses Ollama v0.5+ grammar-constrained output — model physically cannot produce non-conforming JSON. Also added `options.temperature: 0.3` for deterministic output.
+
+3. **UETS Framework**: New UxTS framework (Universal Emergence Test Specification) for evaluating LLM emergence naming quality. 5 evaluation patterns: E1_JSON_CONFORMANCE, E2_LABEL_CONSTRAINT, E3_NAME_QUALITY, E4_DESCRIPTION_QUALITY, E5_LATENCY. Python runner replicates exact Go emergence prompt format with `--endpoint` override for remote execution and `num_ctx` config support. 8 model specs (7/7 passing): llama3.2-3b-macstudio Q4 (100%/100%/86%, 1262ms), llama3.2-3b-ollama Q4 (100%/100%/86%, 1457ms), llama3.2-3b-fp16-macstudio (100%/100%/86%, 1568ms), qwen3-8b (100%/100%/29%, 2126ms), qwen2.5-14b (100%/100%/0%, 4398ms), qwen2.5-72b-mlx (100%/100%/57%, 4553ms), llama3.3-70b-ollama (100%/100%/86%, 24866ms). **Recommendation**: `llama3.2:3b` Q4_K_M — fastest latency with top-tier name quality; FP16 adds no measurable accuracy benefit.
+
+### Files Modified
+- `internal/config/config.go` — `LLMEndpoint` field + `EffectiveLLMEndpoint()` + FromEnv parsing
+- `internal/api/server.go` — Synthesis and intent configs use `EffectiveLLMEndpoint()`
+- `internal/hidden/step_dynamic_emergence.go` — Uses `EffectiveLLMEndpoint()`
+- `internal/hidden/emergence_namer.go` — Ollama `format` JSON schema + `options` temperature
+- `internal/hidden/emergence_namer_test.go` — Updated for format/options fields
+- `internal/retrieval/rerank.go` — Uses `EffectiveLLMEndpoint()`
+- `.env.example` — `LLM_ENDPOINT` documentation
+
+### New Files
+- `docs/tests/uets/schema/uets.schema.json` — UETS JSON schema
+- `docs/tests/uets/specs/llama3.2-3b-ollama.uets.json` — Local Ollama Q4_K_M spec
+- `docs/tests/uets/specs/llama3.2-3b-macstudio.uets.json` — Mac Studio Q4_K_M spec
+- `docs/tests/uets/specs/llama3.2-3b-fp16-macstudio.uets.json` — Mac Studio FP16 spec
+- `docs/tests/uets/specs/llama3.3-70b-ollama.uets.json` — Local Ollama 70B spec
+- `docs/tests/uets/specs/llama3.3-70b-macstudio.uets.json` — Mac Studio 70B spec
+- `docs/tests/uets/specs/qwen2.5-72b-mlx.uets.json` — MLX Server 72B spec
+- `docs/tests/uets/specs/qwen2.5-14b-ollama.uets.json` — Local Ollama 14B spec
+- `docs/tests/uets/specs/qwen3-8b-ollama.uets.json` — Local Ollama 8B spec
+- `docs/tests/uets/fixtures/clusters.json` — 7 CO_ACTIVATED_WITH clusters from Neo4j
+- `docs/tests/uets/runners/uets_runner.py` — Python runner (~550 lines)
+- `docs/tests/uets/README.md` — Framework documentation
+
+### Documents Accessed
+- `internal/config/config.go`, `internal/api/server.go`, `internal/hidden/emergence_namer.go`
+- `internal/hidden/step_dynamic_emergence.go`, `internal/retrieval/rerank.go`
+- `internal/hidden/emergence_namer_test.go`, `internal/hidden/step_dynamic_emergence_test.go`
+- `.env.example`, `docs/specs/FRAMEWORK_GOVERNANCE.md`, `docs/development/UXTS_FRAMEWORK_MATRIX.md`
+- `docs/tests/uets/README.md`, `docs/lang-parser/lang-parse-spec/upts/` (UPTS as template)
+- `AGENT_HANDOFF.md`, `CHANGELOG.md`, `docs/specs/phase103-dynamic-emergence.md`

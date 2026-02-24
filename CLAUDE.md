@@ -241,6 +241,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - Layer-specific temporal decay (L0: 0.05/day, L1: 0.02/day, L2: 0.01/day)
 - Temporal Retrieval Phase 1: time-aware query understanding (soft/hard modes)
 - CMS temporal filtering: `temporal_after`/`temporal_before` on recall endpoint
+- Phase 103: Dynamic Emergence — LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters
 
 ## Testing
 

@@ -1,0 +1,48 @@
+{
+  "uets_version": "1.0.0",
+  "model": {
+    "name": "qwen2.5-72b-mlx",
+    "endpoint": "http://172.21.21.11:8080/v1/chat/completions",
+    "model_id": "mlx-community/Qwen2.5-72B-Instruct-4bit",
+    "type": "openai"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-24",
+    "description": "Qwen2.5 72B 4-bit via MLX LM server on Mac Studio M4 Max over Thunderbolt bridge",
+    "parameters": "72B",
+    "quantization": "4bit",
+    "tags": [
+      "mlx",
+      "local",
+      "mac-studio",
+      "thunderbolt"
+    ]
+  },
+  "config": {
+    "temperature": 0.3,
+    "max_tokens": 500,
+    "timeout_ms": 60000,
+    "retries": 1
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/clusters.json",
+    "sha256": "25b59bdbfe4ed6d9d1951bf3d537d16567a663b357f461200cd5129d7172ed58"
+  },
+  "expected": {
+    "thresholds": {
+      "json_valid_rate": 0.95,
+      "label_valid_rate": 0.9,
+      "name_quality_rate": 0.50,
+      "max_avg_latency_ms": 15000
+    }
+  },
+  "patterns_covered": [
+    "E1_JSON_CONFORMANCE",
+    "E2_LABEL_CONSTRAINT",
+    "E3_NAME_QUALITY",
+    "E4_DESCRIPTION_QUALITY",
+    "E5_LATENCY"
+  ]
+}

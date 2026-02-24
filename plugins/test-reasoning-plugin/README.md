@@ -48,13 +48,13 @@ MDEMG will auto-discover the plugin on startup.
 ## Reasoning Module
 
 This module implements:
-
 - **Process**: Re-rank/filter retrieval candidates
 
 ### Customization
 
 Edit the `Process` function to implement your ranking algorithm.
 The default implementation uses keyword-based boosting.
+
 
 ## Configuration
 

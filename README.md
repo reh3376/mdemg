@@ -510,6 +510,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 103/103b | Dynamic Emergence + UETS Model Evaluation (LLM concept naming, 8-model benchmark) | ✅ Complete |
 | 102 | Intent Translation (LLM query rewriting before vector embedding) | ✅ Complete |
 | 101 | SME Synthesis Engine (LLM-driven synthesis for consult endpoint) | ✅ Complete |
 | 97 | Process Lifecycle + Secret Management (daemon mode, keychain) | ✅ Complete |
@@ -560,6 +561,7 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 - [CI/CD Integration](docs/development/CI_CD_INTEGRATION.md) - Git hooks, GitHub Actions, and scheduled sync
 - [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
 - [Backup & Restore Guide](docs/development/NEO4J_BACKUP.md) - Backup configuration, manual triggers, retention policies
+- [UETS Framework](docs/tests/uets/README.md) - Universal Emergence Test Specification for LLM model evaluation
 - [Agent Handoff](AGENT_HANDOFF.md) - Complete development context and phase registry
 
 ## Contributing

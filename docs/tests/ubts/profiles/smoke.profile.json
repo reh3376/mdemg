@@ -9,9 +9,9 @@
     "think_time_ms": 100
   },
   "query_variations": [
-    {"query_text": "database connection pooling"},
-    {"query_text": "error handling patterns"},
-    {"query_text": "authentication middleware"}
+    {"query_text": "database connection pooling", "content_1": "Smoke test observation 1a", "content_2": "Smoke test observation 1b", "content_3": "Smoke test observation 1c"},
+    {"query_text": "error handling patterns", "content_1": "Smoke test observation 2a", "content_2": "Smoke test observation 2b", "content_3": "Smoke test observation 2c"},
+    {"query_text": "authentication middleware", "content_1": "Smoke test observation 3a", "content_2": "Smoke test observation 3b", "content_3": "Smoke test observation 3c"}
   ],
   "assertions": {
     "all_requests_succeed": true,

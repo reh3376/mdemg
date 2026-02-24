@@ -1,0 +1,46 @@
+{
+  "uets_version": "1.0.0",
+  "model": {
+    "name": "qwen2.5-14b-ollama",
+    "endpoint": "http://localhost:11434/api/generate",
+    "model_id": "qwen2.5:14b",
+    "type": "ollama"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-24",
+    "description": "Qwen2.5 14B via Ollama on local machine",
+    "parameters": "14B",
+    "quantization": "Q4_K_M",
+    "tags": [
+      "ollama",
+      "local"
+    ]
+  },
+  "config": {
+    "temperature": 0.3,
+    "max_tokens": 500,
+    "timeout_ms": 30000,
+    "retries": 1
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/clusters.json",
+    "sha256": "25b59bdbfe4ed6d9d1951bf3d537d16567a663b357f461200cd5129d7172ed58"
+  },
+  "expected": {
+    "thresholds": {
+      "json_valid_rate": 0.9,
+      "label_valid_rate": 0.85,
+      "name_quality_rate": 0.0,
+      "max_avg_latency_ms": 8000
+    }
+  },
+  "patterns_covered": [
+    "E1_JSON_CONFORMANCE",
+    "E2_LABEL_CONSTRAINT",
+    "E3_NAME_QUALITY",
+    "E4_DESCRIPTION_QUALITY",
+    "E5_LATENCY"
+  ]
+}

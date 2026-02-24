@@ -24,6 +24,7 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
 | UOBS | Universal Observability Specification | Metrics/health/log observability validation | pilot |
 | UOTS | Universal Observability Test Specification | API-spec observability contract track | pilot (runner gap) |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | spec-only |
+| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active |
 
 ---
 
@@ -130,6 +131,16 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
 - Policy: remains spec-only until runner/spec-set/automation exist; target activation under the UxTS hardening plan.
 - References:
   - `docs/tests/uvts/schema/uvts.schema.json`
+
+### UETS — Emergence Quality
+
+- Scope: evaluating LLM-driven concept naming quality for dynamic emergence (Phase 103).
+- Policy: each candidate model must have a UETS spec; thresholds define minimum quality for production use.
+- References:
+  - `docs/tests/uets/README.md`
+  - `docs/tests/uets/schema/uets.schema.json`
+  - `docs/tests/uets/specs/`
+  - `docs/tests/uets/runners/uets_runner.py`
 
 ---
 

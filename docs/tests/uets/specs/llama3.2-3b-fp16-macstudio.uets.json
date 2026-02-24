@@ -1,0 +1,50 @@
+{
+  "uets_version": "1.0.0",
+  "model": {
+    "name": "llama3.2-3b-fp16-macstudio",
+    "endpoint": "http://172.21.21.11:11434/api/generate",
+    "model_id": "llama3.2:3b-instruct-fp16",
+    "type": "ollama"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-02-24",
+    "description": "Llama 3.2 3B FP16 (unquantized) via Ollama on Mac Studio M4 Max over Thunderbolt bridge",
+    "parameters": "3B",
+    "quantization": "fp16",
+    "tags": [
+      "ollama",
+      "mac-studio",
+      "thunderbolt",
+      "fp16",
+      "unquantized"
+    ]
+  },
+  "config": {
+    "temperature": 0.3,
+    "max_tokens": 500,
+    "timeout_ms": 30000,
+    "retries": 1,
+    "num_ctx": 8192
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/clusters.json",
+    "sha256": "25b59bdbfe4ed6d9d1951bf3d537d16567a663b357f461200cd5129d7172ed58"
+  },
+  "expected": {
+    "thresholds": {
+      "json_valid_rate": 0.95,
+      "label_valid_rate": 0.90,
+      "name_quality_rate": 0.70,
+      "max_avg_latency_ms": 5000
+    }
+  },
+  "patterns_covered": [
+    "E1_JSON_CONFORMANCE",
+    "E2_LABEL_CONSTRAINT",
+    "E3_NAME_QUALITY",
+    "E4_DESCRIPTION_QUALITY",
+    "E5_LATENCY"
+  ]
+}

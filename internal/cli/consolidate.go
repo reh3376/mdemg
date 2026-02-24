@@ -266,7 +266,7 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 		HiddenLayerBackwardConc: cfg.hiddenBackwardConcept,
 	}
 
-	svc := hidden.NewService(svcCfg, driver)
+	svc := hidden.NewService(svcCfg, driver, nil)
 
 	// Determine operations
 	runClustering := !cfg.forwardOnly && !cfg.backwardOnly

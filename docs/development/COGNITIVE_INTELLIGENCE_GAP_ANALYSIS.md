@@ -1,6 +1,6 @@
 # Cognitive Intelligence Gap Analysis
 
-**Status**: Active (Phases 101-102 Complete, 103-105 Planned)
+**Status**: Active (Phases 101-103b Complete, 104-105 Planned)
 **Date**: 2026-02-23 (Updated: 2026-02-24)
 **Related**: `VISION.md`, `AGENT_HANDOFF.md`
 
@@ -62,21 +62,31 @@ This was identified as a "Future" optimization in Deliverable 10.1.3 but is crit
 
 ---
 
-## Gap 3: Static Hardcoded Abstractions (The "Consolidation" Gap)
+## Gap 3: Static Hardcoded Abstractions (The "Consolidation" Gap) — CLOSED
 
-**Severity**: MEDIUM | **Effort**: M | **Phase**: 103
+**Severity**: MEDIUM | **Effort**: M | **Phase**: 103 | **Status**: Complete
 
-### Current State
+### Current State (Post-Phase 103)
 
-While the **L5 Emergent Layer** (`docs/features/l5-emergent-layer.md`) successfully clusters L3+ nodes using **BRIDGES** (`docs/features/bridges-edge-type.md`), `ANALOGOUS_TO`, and `COMPOSES_WITH` edges, lower-layer nodes (ConcernNodes, ComparisonNodes, TemporalNodes) are still created during consolidation using hardcoded regex/string matching in Go (e.g., `*auth*`, `*config*`).
+**RESOLVED.** Phase 103 introduced LLM-driven dynamic concept naming. Dense `CO_ACTIVATED_WITH` clusters that don't match any hardcoded pattern (concern, config, temporal, UI, comparison, constraint) are sent to an LLM for automatic naming and classification. The pipeline step runs at phase 22 (after hardcoded patterns at phase 20, before dynamic edges at phase 25). Creates `:MemoryNode:EmergentConcept` nodes with `role_type: 'dynamic_emergent'` and LLM-proposed labels from a constrained set (pattern, principle, bridge, concern, workflow). Fail-open per cluster, idempotent via `NOT EXISTS` subquery.
 
-### Required State
+### Implementation
 
-LLM-driven dynamic emergence across all layers. The system should detect structurally dense clusters (via `CO_ACTIVATED_WITH` edges) that *don't* match known patterns, pass the cluster's contents to the LLM Semantic Summary Service (Phase 11.2), and ask it to invent a name and description for the newly emerged abstraction.
+- Pipeline step: `internal/hidden/step_dynamic_emergence.go` (phase 22, optional)
+- LLM namer: `internal/hidden/emergence_namer.go` (OpenAI/Ollama, circuit breaker protected)
+- Core logic: `Service.CreateDynamicEmergentNodes()` in `internal/hidden/service.go`
+- Config: 8 `EMERGENCE_*` env vars, default disabled
+- API: `enable_dynamic_emergence: true` in consolidate request body
+- Spec: `docs/specs/phase103-dynamic-emergence.md`
 
-### Gap Details
+### Phase 103b: Emergence Model Evaluation
 
-The "Emergence Principle" in `VISION.md` states: "Let structure arise from data, don't impose it." Relying on hardcoded Go string matching limits emergence to only the concepts we pre-programmed. By injecting LLM-driven naming into the existing L5 union-find clustering logic, we can achieve true, unstructured dynamic emergence.
+- `LLM_ENDPOINT` env var decouples LLM text-generation from embeddings (`EffectiveLLMEndpoint()`)
+- Ollama `format` JSON schema for grammar-constrained output
+- UETS framework: 8 model specs, 7/7 passing, 5 evaluation patterns (E1-E5)
+- `num_ctx` config support, `--endpoint` CLI override for remote execution
+- Validated model: `llama3.2:3b` Q4_K_M (fastest latency, top name quality)
+- UETS: `docs/tests/uets/`
 
 ---
 
@@ -122,6 +132,7 @@ The graph currently remains siloed per workspace. Universal, abstract principles
 |-------|-------|-------------|
 | **101** | SME Synthesis Engine | Upgrade `/v1/memory/consult` to use LLM-based multi-hop synthesis instead of keyword string matching. |
 | **102** | Intent Translation | Implement query rewriting before vector embedding to align conversational queries with declarative node text. |
-| **103** | Dynamic Emergence | Replace hardcoded consolidation patterns with density-based cluster detection and LLM-generated abstraction naming. |
+| **103** | Dynamic Emergence (**Complete**) | LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters. Pipeline step at phase 22, fail-open per cluster. |
+| **103b** | Emergence Model Evaluation (**Complete**) | `LLM_ENDPOINT` config separation, UETS framework (8 model specs, 7/7 passing), `llama3.2:3b` Q4_K_M validated as default. |
 | **104** | Active MCP Guardrails | Add pre-commit/MCP-level validation against `ConstraintNodes` to proactively block architectural violations. |
 | **105** | Global Meta-Learning | Implement cross-space promotion of Layer 4/5 concepts to a global "Org-Level" graph for true cross-pollination. |

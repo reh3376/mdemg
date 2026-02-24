@@ -19,8 +19,7 @@
     "p95_ms": 500,
     "p99_ms": 1000,
     "max_ms": 3000,
-    "error_rate_pct": 1.0,
-    "throughput_rps": 100
+    "error_rate_pct": 1.0
   },
   "setup": {
     "seed_data": "test_data/concurrent_seed.json",

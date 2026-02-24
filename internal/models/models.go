@@ -495,6 +495,10 @@ type ConsolidateRequest struct {
 	SkipClustering bool   `json:"skip_clustering,omitempty"` // Skip DBSCAN clustering, only run message passing
 	SkipForward   bool   `json:"skip_forward,omitempty"`    // Skip forward pass
 	SkipBackward  bool   `json:"skip_backward,omitempty"`   // Skip backward pass
+
+	// Dynamic Emergence (Phase 103)
+	EnableDynamicEmergence bool    `json:"enable_dynamic_emergence,omitempty"` // Enable LLM-driven concept naming
+	MinClusterDensity      float64 `json:"min_cluster_density,omitempty"`      // Override min CO_ACTIVATED_WITH weight
 }
 
 // StepResultAPI is the API-layer mirror of hidden.StepResult.
@@ -539,6 +543,9 @@ type ConsolidateResponse struct {
 	ConstraintEdgesLinked  int  `json:"constraint_edges_linked"`
 	DynamicEdgesCreated    int  `json:"dynamic_edges_created"`
 	L5NodesCreated         int  `json:"l5_nodes_created"`
+
+	// Dynamic Emergence (Phase 103)
+	DynamicEmergentNodesCreated int `json:"dynamic_emergent_nodes_created,omitempty"`
 }
 
 // ObserveRequest - request for POST /v1/conversation/observe

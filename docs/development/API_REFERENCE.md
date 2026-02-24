@@ -490,7 +490,9 @@ Trigger hidden layer creation (concept abstraction).
   "space_id": "my-project",
   "skip_clustering": false,
   "skip_forward": false,
-  "skip_backward": false
+  "skip_backward": false,
+  "enable_dynamic_emergence": false,
+  "min_cluster_density": 0.0
 }
 ```
 
@@ -508,9 +510,10 @@ Trigger hidden layer creation (concept abstraction).
       "comparison": { "nodes_created": 8,  "nodes_updated": 0, "edges_created": 12, "details": {"modules_compared": 4} },
       "temporal":   { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 3, "details": {"patterns_detected": ["validFrom/validTo"]} },
       "ui":         { "nodes_created": 2,  "nodes_updated": 0, "edges_created": 6, "details": {"patterns_detected": ["store", "component"]} },
-      "constraint":    { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 1 },
-      "dynamic_edges": { "nodes_created": 0,  "nodes_updated": 0, "edges_created": 50 },
-      "emergent_l5":   { "nodes_created": 4,  "nodes_updated": 0, "edges_created": 4 }
+      "constraint":         { "nodes_created": 1,  "nodes_updated": 0, "edges_created": 1 },
+      "dynamic_emergence":  { "nodes_created": 2,  "nodes_updated": 0, "edges_created": 0 },
+      "dynamic_edges":      { "nodes_created": 0,  "nodes_updated": 0, "edges_created": 50 },
+      "emergent_l5":        { "nodes_created": 4,  "nodes_updated": 0, "edges_created": 4 }
     },
     "hidden_nodes_created": 45,
     "hidden_nodes_updated": 150,
@@ -535,14 +538,17 @@ Trigger hidden layer creation (concept abstraction).
     "constraint_nodes_updated": 0,
     "constraint_edges_linked": 1,
     "dynamic_edges_created": 50,
-    "l5_nodes_created": 4
+    "l5_nodes_created": 4,
+    "dynamic_emergent_nodes_created": 2
   }
 }
 ```
 
 > **Phase 46 (Dynamic Pipeline Registry):** The `steps` map is populated dynamically by the pipeline registry. Each registered `NodeCreator` step produces a `StepResult` entry keyed by step name. The flat fields (e.g., `concern_nodes_created`) are preserved for backward compatibility and populated from the same pipeline results. New steps added to the pipeline automatically appear in the `steps` map without API changes. See [REGISTRY.md](REGISTRY.md) for details.
 >
-> **Phase 75C (Split Execution):** The pipeline now supports `RunPhaseRange()` for selective phase execution. Pre-clustering steps (phases 10-20) run before multi-layer clustering, while post-clustering steps (phases 25-30: `dynamic_edges`, `emergent_l5`) run after clustering completes. This ensures dynamic edges and L5 nodes are created with full clustering context.
+> **Phase 75C (Split Execution):** The pipeline now supports `RunPhaseRange()` for selective phase execution. Pre-clustering steps (phases 10-22) run before multi-layer clustering, while post-clustering steps (phases 25-30: `dynamic_edges`, `emergent_l5`) run after clustering completes. This ensures dynamic edges and L5 nodes are created with full clustering context.
+>
+> **Phase 103 (Dynamic Emergence):** The `dynamic_emergence` step (phase 22) runs after hardcoded pattern steps (phase 20) and before dynamic edges (phase 25). It detects dense `CO_ACTIVATED_WITH` clusters that don't match known patterns and sends them to an LLM for naming. Enabled via `enable_dynamic_emergence: true` in the request body and `EMERGENCE_ENABLED=true` in config. Creates `:MemoryNode:EmergentConcept` nodes with `role_type: 'dynamic_emergent'`.
 
 ---
 

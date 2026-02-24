@@ -184,11 +184,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		log.Printf("Anomaly detection enabled (duplicate threshold: %.2f, timeout: %dms)", anomalyCfg.DuplicateThreshold, anomalyCfg.MaxCheckMs)
 	}
 
-	// Initialize hidden layer service
-	hid := hidden.NewService(cfg, driver)
+	// Initialize hidden layer service (circuit breaker wired later after cbRegistry init)
+	hid := hidden.NewService(cfg, driver, nil)
 	if cfg.HiddenLayerEnabled {
 		log.Printf("Hidden layer enabled (eps: %.2f, minSamples: %d, maxHidden: %d)",
 			cfg.HiddenLayerClusterEps, cfg.HiddenLayerMinSamples, cfg.HiddenLayerMaxHidden)
+	}
+	if cfg.EmergenceEnabled {
+		log.Printf("Dynamic emergence enabled (provider: %s, model: %s, minWeight: %.2f, minCluster: %d)",
+			cfg.EmergenceProvider, cfg.EmergenceModel, cfg.EmergenceMinWeight, cfg.EmergenceMinClusterSize)
 	}
 
 	// Initialize symbol store
@@ -274,6 +278,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	// Wire circuit breaker registry to services that make external API calls
 	ret.SetCircuitBreakerRegistry(cbRegistry)
+	hid.SetCircuitBreakerRegistry(cbRegistry)
 
 	// Wire circuit breaker to embedder if it supports it (OpenAI and Ollama)
 	if emb != nil {
@@ -311,7 +316,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens: cfg.SynthesisMaxTokens,
 			TimeoutMs: cfg.SynthesisTimeoutMs,
 			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.OpenAIEndpoint,
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
 			OllamaURL: cfg.OllamaEndpoint,
 		}
 		synth = consulting.NewLLMSynthesizer(synthCfg, cbRegistry)
@@ -329,7 +334,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens: cfg.IntentMaxTokens,
 			TimeoutMs: cfg.IntentTimeoutMs,
 			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.OpenAIEndpoint,
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
 			OllamaURL: cfg.OllamaEndpoint,
 		}
 		intentTrans = retrieval.NewLLMIntentTranslator(intentCfg, cbRegistry)

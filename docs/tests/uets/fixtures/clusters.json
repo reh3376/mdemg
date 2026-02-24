@@ -1,0 +1,947 @@
+[
+  {
+    "cluster_id": 1,
+    "members": [
+      {
+        "node_id": "8290ecc0-8b1c-497c-bb4a-6d395b79d851",
+        "name": null,
+        "summary": "Before every action: state what you are about to do, state why, get confirmation if it modifies data. All long-running commands should run in foreground so user can see output.",
+        "path": "",
+        "layer": 0
+      },
+      {
+        "node_id": "93b0466f-e10c-4d9f-aacf-7e9128bebc34",
+        "name": "Concept-L2-mixed-0",
+        "summary": "Meta-concept over 32 clusters. Sub-concepts: Pattern of 10 code elements in: modulepb; Pattern of 24 code elements in: hidden, models, conversation; Pattern of 5 code elements in: models",
+        "path": "",
+        "layer": 2
+      },
+      {
+        "node_id": "9d7cae5d-0b73-4aae-b311-bee4f35ef369",
+        "name": null,
+        "summary": "User correction: MDEMG codebase ingestion must use space_id=mdemg-dev (Claude CMS space), NOT a separate space. This ensures codebase knowledge is co-located with conversation memory for recall....",
+        "path": "",
+        "layer": 0
+      },
+      {
+        "node_id": "d06bea8e-f3c9-490f-a376-a2f0016246c8",
+        "name": "Concept-L2-docs-tests-1",
+        "summary": "Meta-concept over 4 clusters. Sub-concepts: Pattern of 51 code elements in: tests, blueseer, benchmark_run_20260128, plc-gbt, benchmark_run_20260128_v2; Pattern of 7 code elements in: plc-gbt; Pattern of 4 code elements in: docs",
+        "path": "",
+        "layer": 2
+      },
+      {
+        "node_id": "n_00b8e87382ac8602b52a",
+        "name": "Write",
+        "summary": "Function Write in api. Related to: authentication, error-handling, logging",
+        "path": "/internal/api/middleware.go#Write",
+        "layer": 0
+      },
+      {
+        "node_id": "n_0767e9903d42195a3bea",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: validation, logging, error-handling. Key functions: StartQueryTimer, TimeQuery, ResetQueryMetrics, sanitizeParams, compactCypher",
+        "path": "/internal/retrieval/profiling.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_0b5d271032aa29b08055",
+        "name": "Service",
+        "summary": "Struct Service in symbols. Related to: caching, error-handling, validation",
+        "path": "/internal/symbols/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_12d5f37261a1669d2122",
+        "name": "SummarizeBatch",
+        "summary": "Function SummarizeBatch in summarize. Related to: authorization, error-handling, validation. Go function summarize.SummarizeBatch\nSummarizeBatch generates semantic summaries for multiple code elements.\nUses batching to minimize API calls",
+        "path": "/internal/summarize/service.go#SummarizeBatch",
+        "layer": 0
+      },
+      {
+        "node_id": "n_14d827af8b61f0ee841b",
+        "name": "mdemg-2026-01-21.md",
+        "summary": "Documentation: mdemg-2026-01-21.md in docs. Related to: authentication, error-handling, validation",
+        "path": "/docs/tests/whk-wms/mdemg-2026-01-21.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_1784a001cc31ff924bb0",
+        "name": "mdemg-test-2026-01-21-v2.md",
+        "summary": "Documentation: mdemg-test-2026-01-21-v2.md in docs. Related to: authentication, authorization, error-handling",
+        "path": "/docs/tests/whk-wms/mdemg-test-2026-01-21-v2.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_17f173b181f93b7c47ed",
+        "name": "GetIncludeLearnedEdges",
+        "summary": "Function GetIncludeLearnedEdges in transferpb. Related to: authorization, error-handling, validation",
+        "path": "/api/transferpb/space-transfer.pb.go#GetIncludeLearnedEdges",
+        "layer": 0
+      },
+      {
+        "node_id": "n_1aff5d097df53c0c5424",
+        "name": "RetrieveResult",
+        "summary": "Struct RetrieveResult in models. Related to: temporal, authentication, authorization",
+        "path": "/internal/models/models.go#RetrieveResult",
+        "layer": 0
+      },
+      {
+        "node_id": "n_1bf74725d1b9df9f3fd0",
+        "name": "phase75-lsp-enrichment.md",
+        "summary": "Documentation: phase75-lsp-enrichment.md in docs. Related to: validation, error-handling",
+        "path": "/docs/specs/phase75-lsp-enrichment.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_25f0af18806fe6d3e896",
+        "name": "UserService",
+        "summary": "Struct UserService in testdata. Related to: temporal, error-handling, validation",
+        "path": "/docs/lang-parser/lang-parse-spec/upts/fixtures/go_test_fixture.go#UserService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2861d6b76cb877a3ca92",
+        "name": "13_Go_Service_Framework.md",
+        "summary": "Documentation: 13_Go_Service_Framework.md in docs. Related to: authorization, error-handling, validation. # Go Service Framework (API + Retrieval + Learning)\n\nThis is the **reference service skeleton** for the MDEMG system",
+        "path": "/docs/architecture/13_Go_Service_Framework.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_28c1bb56ac5216fab322",
+        "name": "Edge",
+        "summary": "Struct Edge in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#Edge",
+        "layer": 0
+      },
+      {
+        "node_id": "n_28d5dabf4f567e868566",
+        "name": "02_Graph_Schema.md",
+        "summary": "Documentation: 02_Graph_Schema.md in docs. Related to: authorization, error-handling, validation. # Graph Schema (Labels, Relationship Types, Properties)\n\nThis spec is optimized for Neo4j property graphs.\n\n> **Key Principle:** Edges are the durable truth; node organization is fluid",
+        "path": "/docs/02_Graph_Schema.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_28fa05dbbe10628844c5",
+        "name": "ClearModulesForTest",
+        "summary": "Function ClearModulesForTest in plugins",
+        "path": "/internal/plugins/testing.go#ClearModulesForTest",
+        "layer": 0
+      },
+      {
+        "node_id": "n_29e96f22159b5e538952",
+        "name": "CMS.md",
+        "summary": "Documentation: CMS.md in docs. Related to: temporal, authentication, authorization. # CMS \u2014 Conversation Memory System\n\n## Goal\n\nThe Conversation Memory System (CMS) provides **persistent memory for LLM coding agents** across context window boundaries",
+        "path": "/CMS.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2a63661836089a6d0a09",
+        "name": "SaveInterviewPrompt",
+        "summary": "Function SaveInterviewPrompt in gaps. Related to: logging, temporal, authentication",
+        "path": "/internal/gaps/interview.go#SaveInterviewPrompt",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2b04161a35215d9abb8c",
+        "name": "api",
+        "summary": "Package: api. Related to: error-handling, validation, logging. Key methods: handleObserve, handleCorrect, handleResume, handleRecall, handleConversationConsolidate. Key functions: convertObservations, convertThemes, convertConcepts, convertRecallResults, convertJiminy",
+        "path": "/internal/api/handlers_conversation.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2bb481abe63250aac59b",
+        "name": "CLAUDE.md",
+        "summary": "Documentation: CLAUDE.md in docs. Related to: authentication, authorization, error-handling",
+        "path": "/CLAUDE.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2f63d65f5de0b7a17519",
+        "name": "InjectModuleForTest",
+        "summary": "Function InjectModuleForTest in plugins",
+        "path": "/internal/plugins/testing.go#InjectModuleForTest",
+        "layer": 0
+      },
+      {
+        "node_id": "n_3b88d156c7b257d2ac5c",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: authentication, authorization, error-handling. Key methods: Rerank, rerankWithOpenAI, doRerankWithOpenAI, rerankWithOllama, doRerankWithOllama",
+        "path": "/internal/retrieval/rerank.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_3f3a74f2636024d07a4c",
+        "name": "Recall",
+        "summary": "Function Recall in conversation. Related to: error-handling, validation, logging",
+        "path": "/internal/conversation/service.go#Recall",
+        "layer": 0
+      },
+      {
+        "node_id": "n_409ecc265df9a3621faa",
+        "name": "00_README.md",
+        "summary": "Documentation: 00_README.md in docs. Related to: validation, caching, temporal",
+        "path": "/docs/00_README.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_410cc213230e3f814b2f",
+        "name": "Observe",
+        "summary": "Function Observe in api. Related to: authentication, error-handling",
+        "path": "/internal/api/scraper_adapters.go#Observe",
+        "layer": 0
+      },
+      {
+        "node_id": "n_43a5271250fc42101d87",
+        "name": "mdemg-test-v10-learning-20260122-125250.md",
+        "summary": "Documentation: mdemg-test-v10-learning-20260122-125250.md in docs. Related to: validation, logging",
+        "path": "/docs/tests/whk-wms/mdemg-test-v10-learning-20260122-125250.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_450acbdb1fe5c62855ea",
+        "name": "SetConversationService",
+        "summary": "Function SetConversationService in scraper. Related to: caching, error-handling",
+        "path": "/internal/scraper/service.go#SetConversationService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_51d305aeb68b1f43bb72",
+        "name": "NewWatchdog",
+        "summary": "Function NewWatchdog in ape. Related to: authentication, authorization, error-handling. Go function ape.NewWatchdog\nNewWatchdog creates a Watchdog",
+        "path": "/internal/ape/watchdog.go#NewWatchdog",
+        "layer": 0
+      },
+      {
+        "node_id": "n_543b39aaab4d3bb210ae",
+        "name": "CreateDynamicEdges",
+        "summary": "Function CreateDynamicEdges in hidden. Related to: temporal, authentication, authorization",
+        "path": "/internal/hidden/service.go#CreateDynamicEdges",
+        "layer": 0
+      },
+      {
+        "node_id": "n_55848fde9ec8bd21d1fd",
+        "name": "ResolveEndpoint",
+        "summary": "Function ResolveEndpoint in config. Related to: error-handling, validation, logging. Go function config.ResolveEndpoint\nResolveEndpoint determines the MDEMG API endpoint using a priority chain:\n 1",
+        "path": "/internal/config/config.go#ResolveEndpoint",
+        "layer": 0
+      },
+      {
+        "node_id": "n_5785376f79a9d92e3685",
+        "name": "GetEdges",
+        "summary": "Function GetEdges in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#GetEdges",
+        "layer": 0
+      },
+      {
+        "node_id": "n_5924040bbd60b809b0a9",
+        "name": "mdemg-api.md",
+        "summary": "Documentation: mdemg-api.md in docs",
+        "path": "/.claude/skills/mdemg-api.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_5afd6367e9e64c44c0e9",
+        "name": "04_Activation_and_Learning.md",
+        "summary": "Documentation: 04_Activation_and_Learning.md in docs. Related to: error-handling, temporal. # Activation + Learning Engine\n\nThis doc specifies the \"physics\" that produces emergent association patterns.\n\n> **Design Principle:** Local rules produce global behavior",
+        "path": "/docs/04_Activation_and_Learning.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_5f8e1ec622ef8db4badb",
+        "name": "ConversationService",
+        "summary": "Interface ConversationService in scraper. Related to: error-handling, logging",
+        "path": "/internal/scraper/reviewer.go#ConversationService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_60a471a451b911294079",
+        "name": "InsightEdge",
+        "summary": "Struct InsightEdge in retrieval. Related to: authentication, error-handling, validation",
+        "path": "/internal/retrieval/reflection.go#InsightEdge",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6599ac4744f98c4f7fe0",
+        "name": "Suggest",
+        "summary": "Function Suggest in consulting. Related to: logging, authentication, authorization. Go function consulting.Suggest\nSuggest implements context-triggered suggestions - proactive surfacing of relevant\ninformation without requiring an explicit question",
+        "path": "/internal/consulting/service.go#Suggest",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6d4b847eed7b4d92bf92",
+        "name": "Service",
+        "summary": "Struct Service in summarize. Related to: authorization, error-handling, validation",
+        "path": "/internal/summarize/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6e7bbb63460310ad4607",
+        "name": "GetLearningEdgeStats",
+        "summary": "Function GetLearningEdgeStats in api. Related to: authorization, error-handling, temporal",
+        "path": "/internal/api/rsic_adapters.go#GetLearningEdgeStats",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6ef51af06ea0ed07cf04",
+        "name": "api",
+        "summary": "Package: api. Related to: authorization, error-handling, temporal. Key methods: PruneDecayedEdges, PruneExcessEdgesPerNode, RunFullConversationConsolidation",
+        "path": "/internal/api/rsic_adapters.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6f1640d2379ab97bdd0c",
+        "name": "Service",
+        "summary": "Struct Service in observations. Related to: authentication, authorization, error-handling",
+        "path": "/internal/observations/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_6f9b393ebc1d9e53ef3c",
+        "name": "Service",
+        "summary": "Struct Service in retrieval. Related to: logging, caching, temporal",
+        "path": "/internal/retrieval/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_77fba67c4f81b75504b0",
+        "name": "article-02.md",
+        "summary": "Documentation: article-02.md in docs. Related to: temporal, authentication, error-handling",
+        "path": "/article-02.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_7ae8da2354a83255af18",
+        "name": "Authenticate",
+        "summary": "Function Authenticate in auth. Related to: authentication, error-handling",
+        "path": "/internal/auth/registry.go#Authenticate",
+        "layer": 0
+      },
+      {
+        "node_id": "n_7b314d944bcf042b4f27",
+        "name": "09_Testing_and_Simulation.md",
+        "summary": "Documentation: 09_Testing_and_Simulation.md in docs. Related to: authorization, validation",
+        "path": "/docs/09_Testing_and_Simulation.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_7e5ed33ed5acfb0b755d",
+        "name": "api",
+        "summary": "Package: api. Related to: temporal, authentication, authorization. Key methods: handleHealthz, handleReadyz, handleEmbeddingHealth, handleRetrieve, handleIngest. Key functions: toInt64, toFloat64Val, computeHealthScore, contentToText, readFileContent",
+        "path": "/internal/api/handlers.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_81abb5bb2c38acf8db5d",
+        "name": "GetData",
+        "summary": "Function GetData in devspacepb. Related to: error-handling, caching",
+        "path": "/api/devspacepb/devspace.pb.go#GetData",
+        "layer": 0
+      },
+      {
+        "node_id": "n_867f9ca90683c5b29580",
+        "name": "start-here.md",
+        "summary": "Documentation: start-here.md in docs. Related to: authentication, error-handling, validation. # MDEMG Long-Term Memory - Build Starter (for a coding agent)\n\n> **Note:** This is the original build starter document",
+        "path": "/start-here.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_88cb22669cf29602da40",
+        "name": "Service",
+        "summary": "Struct Service in learning. Related to: temporal, authentication, authorization",
+        "path": "/internal/learning/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_903f68492f0044a544ed",
+        "name": "RetrieveResponse",
+        "summary": "Struct RetrieveResponse in models. Related to: temporal, authentication, authorization",
+        "path": "/internal/models/models.go#RetrieveResponse",
+        "layer": 0
+      },
+      {
+        "node_id": "n_9542ed201ed3548712e8",
+        "name": "GetObservations",
+        "summary": "Function GetObservations in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#GetObservations",
+        "layer": 0
+      },
+      {
+        "node_id": "n_97473dd079e832e22663",
+        "name": "Service",
+        "summary": "Struct Service in scraper. Related to: caching, error-handling",
+        "path": "/internal/scraper/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_9e63c425d5a9b2de5d87",
+        "name": "MemoryNode",
+        "summary": "Struct MemoryNode in domain. Related to: authorization, temporal",
+        "path": "/internal/domain/types.go#MemoryNode",
+        "layer": 0
+      },
+      {
+        "node_id": "n_a4067354578d49f4c674",
+        "name": "Write",
+        "summary": "Function Write in metrics. Related to: error-handling",
+        "path": "/internal/metrics/middleware.go#Write",
+        "layer": 0
+      },
+      {
+        "node_id": "n_a6f6842bb6c10e2b094e",
+        "name": "06_Retrieval_API_and_Scoring.md",
+        "summary": "Documentation: 06_Retrieval_API_and_Scoring.md in docs. Related to: authentication, authorization, error-handling",
+        "path": "/docs/06_Retrieval_API_and_Scoring.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_a92a98410546239c28bc",
+        "name": "Observe",
+        "summary": "Function Observe in metrics. Related to: temporal, error-handling, validation",
+        "path": "/internal/metrics/prometheus.go#Observe",
+        "layer": 0
+      },
+      {
+        "node_id": "n_a97afde897341196e788",
+        "name": "RetrieveWithConversationContext",
+        "summary": "Function RetrieveWithConversationContext in retrieval. Related to: logging, caching, temporal",
+        "path": "/internal/retrieval/service.go#RetrieveWithConversationContext",
+        "layer": 0
+      },
+      {
+        "node_id": "n_aa19cffc0ac2599c931e",
+        "name": "repo-main-readme.md",
+        "summary": "Documentation: repo-main-readme.md in docs. Related to: validation",
+        "path": "/repo-main-readme.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_aa8e92f0dd48cfb82ebf",
+        "name": "Query",
+        "summary": "Function Query in symbols. Related to: caching, error-handling",
+        "path": "/internal/symbols/provider.go#Query",
+        "layer": 0
+      },
+      {
+        "node_id": "n_aac088328b635815f7ca",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: error-handling, validation, caching. Key methods: InvalidateSpace, Clear, Stats, evictOldest. Key functions: CacheKey",
+        "path": "/internal/retrieval/cache.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_aaeaeca361877153abed",
+        "name": "FileType",
+        "summary": "Class FileType in __main__. Related to: error-handling, validation, logging. Python class FileType in module __main__\nDescription: Factory for creating file object types  Instances of FileType are typically passed as type= arguments to the ArgumentParser add_argument() method",
+        "path": "/docs/api/api-spec/uats/.venv/lib/python3.12/site-packages/charset_normalizer/cli/__main__.py#FileType",
+        "layer": 0
+      },
+      {
+        "node_id": "n_b2df7f3e46c2a68a0506",
+        "name": "13_Go_Service_Framework.md",
+        "summary": "Documentation: 13_Go_Service_Framework.md in docs. Related to: authorization, error-handling, validation. # Go Service Framework (API + Retrieval + Learning)\n\nThis is the **reference service skeleton** for the MDEMG system",
+        "path": "/docs/13_Go_Service_Framework.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_b44748afe086aeabf83c",
+        "name": "Edge",
+        "summary": "Struct Edge in retrieval. Related to: logging, caching, temporal",
+        "path": "/internal/retrieval/service.go#Edge",
+        "layer": 0
+      },
+      {
+        "node_id": "n_bcbe857db3ff579a6e53",
+        "name": "GetEdgesUpdated",
+        "summary": "Function GetEdgesUpdated in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#GetEdgesUpdated",
+        "layer": 0
+      },
+      {
+        "node_id": "n_bd334b9ce9083dc96576",
+        "name": "RetrievalRequest",
+        "summary": "Struct RetrievalRequest in domain. Related to: authorization, temporal",
+        "path": "/internal/domain/types.go#RetrievalRequest",
+        "layer": 0
+      },
+      {
+        "node_id": "n_bfb883c84ec2c58e5087",
+        "name": "Service",
+        "summary": "Struct Service in hidden. Related to: temporal, authentication, authorization",
+        "path": "/internal/hidden/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c3c6b728e177ff38ea90",
+        "name": "Service",
+        "summary": "Struct Service in conversation. Related to: error-handling, validation, logging",
+        "path": "/internal/conversation/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c3c8bd82c7b435255572",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: temporal, validation. Key functions: GenerateJiminyExplanation, describeStrength, calculateConfidence, DetermineRetrievalPath",
+        "path": "/internal/retrieval/jiminy.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c607b6e2ff74404b99f3",
+        "name": "LearningActivity",
+        "summary": "Struct LearningActivity in models. Related to: temporal, authentication, authorization",
+        "path": "/internal/models/models.go#LearningActivity",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c9a97615bdfb1b14d313",
+        "name": "main",
+        "summary": "Package: main. Related to: authentication, error-handling, validation. Key functions: calculateDecay, daysSinceActivation, shouldPrune, processEdge, main",
+        "path": "/cmd/decay/main.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_cb4bb1c16c3134475c23",
+        "name": "VISION.md",
+        "summary": "Documentation: VISION.md in docs. Related to: authorization, error-handling, validation",
+        "path": "/VISION.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_cb847f9fd8dc2cc18c4f",
+        "name": "api",
+        "summary": "Package: api. Related to: authentication, error-handling, logging. Key methods: WriteHeader, Write, WriteHeader, Write, FilterFields. Key functions: generateRequestID, WithTraceID, extractClientIP, LoggingMiddleware, CompressionMiddleware",
+        "path": "/internal/api/middleware.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_cfb6157211ba70b90074",
+        "name": "Service",
+        "summary": "Struct Service in consulting. Related to: logging, authentication, authorization",
+        "path": "/internal/consulting/service.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_d33c40415b51a29c52b8",
+        "name": "EdgeInference",
+        "summary": "Struct EdgeInference in hidden. Related to: logging, temporal, authentication",
+        "path": "/internal/hidden/types.go#EdgeInference",
+        "layer": 0
+      },
+      {
+        "node_id": "n_d96acf09858ab0f9c615",
+        "name": "mdemg-test-v9-20260122-103900.md",
+        "summary": "Documentation: mdemg-test-v9-20260122-103900.md in docs. Related to: validation, logging",
+        "path": "/docs/tests/whk-wms/mdemg-test-v9-20260122-103900.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_ddbfd6200ab446624242",
+        "name": "mdemg-test-v10-learning-20260122-130817.md",
+        "summary": "Documentation: mdemg-test-v10-learning-20260122-130817.md in docs. Related to: validation, logging",
+        "path": "/docs/tests/whk-wms/mdemg-test-v10-learning-20260122-130817.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_df3e024950cb9b04fe88",
+        "name": "Get",
+        "summary": "Function Get in summarize. Related to: authorization, error-handling, validation",
+        "path": "/internal/summarize/service.go#Get",
+        "layer": 0
+      },
+      {
+        "node_id": "n_e0a0ef9ed5e5a0677212",
+        "name": "Retriever",
+        "summary": "Interface Retriever in consulting. Related to: logging, authentication, authorization",
+        "path": "/internal/consulting/service.go#Retriever",
+        "layer": 0
+      },
+      {
+        "node_id": "n_e45207b95471d1cf9c62",
+        "name": "Observation",
+        "summary": "Struct Observation in domain. Related to: authorization, temporal",
+        "path": "/internal/domain/types.go#Observation",
+        "layer": 0
+      },
+      {
+        "node_id": "n_e5f7b12fde2820a66285",
+        "name": "00_README.md",
+        "summary": "Documentation: 00_README.md in docs. Related to: validation, temporal",
+        "path": "/docs/architecture/00_README.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_efcc8f98b69709fdd98e",
+        "name": "LEARNING_EDGES_ANALYSIS.md",
+        "summary": "Documentation: LEARNING_EDGES_ANALYSIS.md in docs. Related to: error-handling, validation, logging. # Learning Edges Analysis\n\n**Date**: 2026-01-22\n**Status**: Root cause identified, fix proposed\n\n## Summary\n\nCO_ACTIVATED_WITH edge creation IS working, but at a very slow rate",
+        "path": "/docs/investigations/LEARNING_EDGES_ANALYSIS.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f02f368f7808502c1ded",
+        "name": "GetEntity",
+        "summary": "Function GetEntity in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#GetEntity",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f0ac506d9c06cc797a55",
+        "name": "Edge",
+        "summary": "Struct Edge in hidden. Related to: logging, temporal, authentication",
+        "path": "/internal/hidden/types.go#Edge",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f3768f261d9dc6d0f7bb",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: temporal, error-handling, logging. Key functions: SpreadingActivation, effectiveWeight, ComputeEdgeAttention, clampWeight, DefaultEdgeAttention",
+        "path": "/internal/retrieval/activation.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f37ea888de3f14781405",
+        "name": "LearningStatsProvider",
+        "summary": "Interface LearningStatsProvider in ape. Related to: authentication, authorization, error-handling",
+        "path": "/internal/ape/types_rsic.go#LearningStatsProvider",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f4229af99eab8b71522d",
+        "name": "phase70-neo4j-backup.md",
+        "summary": "Documentation: phase70-neo4j-backup.md in docs. Related to: error-handling, validation, logging",
+        "path": "/docs/specs/phase70-neo4j-backup.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f4da640c2f1a2e1bdb79",
+        "name": "RetrievalCandidate",
+        "summary": "Struct RetrievalCandidate in modulepb. Related to: authentication, error-handling, caching",
+        "path": "/api/modulepb/mdemg-module.pb.go#RetrievalCandidate",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f6713878fe343b5f54e2",
+        "name": "V4_TEST_ANALYSIS.md",
+        "summary": "Documentation: V4_TEST_ANALYSIS.md in docs. Related to: logging, caching, temporal",
+        "path": "/docs/tests/whk-wms/V4_TEST_ANALYSIS.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f87091b42b036383cb05",
+        "name": "CoactivateSession",
+        "summary": "Function CoactivateSession in learning. Related to: temporal, authentication, authorization",
+        "path": "/internal/learning/service.go#CoactivateSession",
+        "layer": 0
+      },
+      {
+        "node_id": "n_fb42e6b565d62ecfab82",
+        "name": "Service",
+        "summary": "Struct Service in anomaly. Related to: error-handling, logging",
+        "path": "/internal/anomaly/types.go#Service",
+        "layer": 0
+      },
+      {
+        "node_id": "n_fc4239e295c2bdb1ba96",
+        "name": "SnapshotTrigger",
+        "summary": "Type SnapshotTrigger in conversation. Related to: error-handling, temporal, authentication",
+        "path": "/internal/conversation/snapshot.go#SnapshotTrigger",
+        "layer": 0
+      },
+      {
+        "node_id": "n_ffc7ee997bdfcffd5ba5",
+        "name": "retrieval",
+        "summary": "Package: retrieval. Related to: authentication, error-handling, validation. Key methods: Reflect, fetchLateralEdges, fetchNodeMetadata, fetchAbstractionEdges, generateInsights. Key functions: detectClusters, sortStrings, deduplicateTriangles, mergeOverlappingClusters, detectPatterns",
+        "path": "/internal/retrieval/reflection.go",
+        "layer": 0
+      }
+    ],
+    "total_weight": 48.9994
+  },
+  {
+    "cluster_id": 2,
+    "members": [
+      {
+        "node_id": "n_1972555a08589bbf9fc8",
+        "name": "OpenAI",
+        "summary": "Struct OpenAI in embeddings. Related to: error-handling, authentication",
+        "path": "/internal/embeddings/openai.go#OpenAI",
+        "layer": 0
+      },
+      {
+        "node_id": "n_3d9199af29a48c842409",
+        "name": "Embedder",
+        "summary": "Interface Embedder in embeddings. Related to: logging, caching, error-handling",
+        "path": "/internal/embeddings/embeddings.go#Embedder",
+        "layer": 0
+      },
+      {
+        "node_id": "n_869b7bd23cc112ed8f25",
+        "name": "EmbedBatch",
+        "summary": "Function EmbedBatch in embeddings. Related to: logging, caching, error-handling",
+        "path": "/internal/embeddings/embeddings.go#EmbedBatch",
+        "layer": 0
+      },
+      {
+        "node_id": "n_aa76d746f8c561fee0b5",
+        "name": "embeddings",
+        "summary": "Package: embeddings. Related to: logging, caching, error-handling. Key methods: Name, Dimensions, Embed, EmbedBatch",
+        "path": "/internal/embeddings/embeddings.go",
+        "layer": 0
+      },
+      {
+        "node_id": "n_bcff34d3a1d625327dd4",
+        "name": "WithQueryEmbedding",
+        "summary": "Function WithQueryEmbedding in conversation. Related to: authentication, authorization, error-handling",
+        "path": "/internal/conversation/truncation.go#WithQueryEmbedding",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c4b2cfdecb8c82f4fc15",
+        "name": "CachedEmbedder",
+        "summary": "Struct CachedEmbedder in embeddings. Related to: logging, caching, error-handling",
+        "path": "/internal/embeddings/embeddings.go#CachedEmbedder",
+        "layer": 0
+      },
+      {
+        "node_id": "n_d90752db4417bf009da6",
+        "name": "Embedder",
+        "summary": "Interface Embedder in conversation. Related to: authentication, authorization, error-handling",
+        "path": "/internal/conversation/surprise.go#Embedder",
+        "layer": 0
+      },
+      {
+        "node_id": "n_ecca9fdc871c529d821f",
+        "name": "NodeEmbeddingCache",
+        "summary": "Struct NodeEmbeddingCache in retrieval. Related to: authentication, error-handling, logging",
+        "path": "/internal/retrieval/query_attention.go#NodeEmbeddingCache",
+        "layer": 0
+      },
+      {
+        "node_id": "n_ee2261d79ab9ba393bde",
+        "name": "Ollama",
+        "summary": "Struct Ollama in embeddings. Related to: error-handling",
+        "path": "/internal/embeddings/ollama.go#Ollama",
+        "layer": 0
+      },
+      {
+        "node_id": "n_fddf94753b7dda236e84",
+        "name": "NewOpenAI",
+        "summary": "Function NewOpenAI in embeddings. Related to: error-handling, authentication",
+        "path": "/internal/embeddings/openai.go#NewOpenAI",
+        "layer": 0
+      },
+      {
+        "node_id": "n_fec9c4e3657015d20aaf",
+        "name": "Embed",
+        "summary": "Function Embed in embeddings. Related to: logging, caching, error-handling",
+        "path": "/internal/embeddings/embeddings.go#Embed",
+        "layer": 0
+      }
+    ],
+    "total_weight": 5.178
+  },
+  {
+    "cluster_id": 3,
+    "members": [
+      {
+        "node_id": "n_00ba29abfc5de7f2374a",
+        "name": "Cache",
+        "summary": "Class Cache. Related to: temporal, authorization, error-handling",
+        "path": "/docs/lang-parser/lang-parse-spec/upts/fixtures/java_test_fixture.java#Cache",
+        "layer": 0
+      },
+      {
+        "node_id": "n_1143cc4371c47af7f4a8",
+        "name": "NewService",
+        "summary": "Function NewService in learning. Related to: temporal, authentication, authorization",
+        "path": "/internal/learning/service.go#NewService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_18ca8983f86fdf6b8336",
+        "name": "NewService",
+        "summary": "Function NewService in consulting. Related to: logging, authentication, authorization",
+        "path": "/internal/consulting/service.go#NewService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_51319a5886c7ca4b79d3",
+        "name": "NewService",
+        "summary": "Function NewService in hidden. Related to: temporal, authentication, authorization",
+        "path": "/internal/hidden/service.go#NewService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_5b0f778aaff217a058cd",
+        "name": "NewService",
+        "summary": "Function NewService in scraper. Related to: caching, error-handling",
+        "path": "/internal/scraper/service.go#NewService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_72f0c9a648575c409bc7",
+        "name": "NewService",
+        "summary": "Function NewService in observations. Related to: authentication, authorization, error-handling",
+        "path": "/internal/observations/service.go#NewService",
+        "layer": 0
+      },
+      {
+        "node_id": "n_e03f492d45fe5f6adfb3",
+        "name": "Cache",
+        "summary": "Struct Cache in rust_test_fixture. Related to: error-handling, validation, logging",
+        "path": "/docs/lang-parser/lang-parse-spec/upts/fixtures/rust_test_fixture.rs#Cache",
+        "layer": 0
+      }
+    ],
+    "total_weight": 3.9671
+  },
+  {
+    "cluster_id": 4,
+    "members": [
+      {
+        "node_id": "n_1d0e3a2c02adfa7c1cf8",
+        "name": "HIDDEN_LAYER_SPEC.md",
+        "summary": "Documentation: HIDDEN_LAYER_SPEC.md in docs. Related to: authorization, error-handling, validation",
+        "path": "/docs/HIDDEN_LAYER_SPEC.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_3f326100e3428c3021e2",
+        "name": "CreateHiddenNodes",
+        "summary": "Function CreateHiddenNodes in hidden. Related to: temporal, authentication, authorization. Go function hidden.CreateHiddenNodes\nCreateHiddenNodes performs hybrid DBSCAN clustering on orphan base nodes\nStrategy (hybrid - allows emergent patterns):\n 1",
+        "path": "/internal/hidden/service.go#CreateHiddenNodes",
+        "layer": 0
+      },
+      {
+        "node_id": "n_43852293259f186aefee",
+        "name": "CreateConceptNodes",
+        "summary": "Function CreateConceptNodes in hidden. Related to: temporal, authentication, authorization. Go function hidden.CreateConceptNodes\nCreateConceptNodes performs hybrid DBSCAN clustering on source layer nodes\nStrategy (hybrid - allows emergent patterns):\n 1",
+        "path": "/internal/hidden/service.go#CreateConceptNodes",
+        "layer": 0
+      },
+      {
+        "node_id": "n_a4b5797c114407714037",
+        "name": "07_Consolidation_and_Pruning.md",
+        "summary": "Documentation: 07_Consolidation_and_Pruning.md in docs. Related to: authorization, error-handling, logging",
+        "path": "/docs/07_Consolidation_and_Pruning.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c168472e1b11733841e4",
+        "name": "RECURSIVE_CONSOLIDATION_STRATEGY.md",
+        "summary": "Documentation: RECURSIVE_CONSOLIDATION_STRATEGY.md in docs. Related to: logging, caching, authorization. # MDEMG Recursive Consolidation & Semantic Consensus Strategy\n\n## 1",
+        "path": "/docs/architecture/RECURSIVE_CONSOLIDATION_STRATEGY.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_c4011ba5c2a997a81225",
+        "name": "ConcernNodeResult",
+        "summary": "Struct ConcernNodeResult in hidden. Related to: logging, temporal, authentication",
+        "path": "/internal/hidden/types.go#ConcernNodeResult",
+        "layer": 0
+      },
+      {
+        "node_id": "n_ce5df6004be3488df2fc",
+        "name": "07_Consolidation_and_Pruning.md",
+        "summary": "Documentation: 07_Consolidation_and_Pruning.md in docs. Related to: temporal, authorization, error-handling",
+        "path": "/docs/architecture/07_Consolidation_and_Pruning.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_fae32c78731a07b165e8",
+        "name": "ConversationObservation",
+        "summary": "Struct ConversationObservation in hidden. Related to: logging, temporal, authentication",
+        "path": "/internal/hidden/types.go#ConversationObservation",
+        "layer": 0
+      }
+    ],
+    "total_weight": 3.5832
+  },
+  {
+    "cluster_id": 5,
+    "members": [
+      {
+        "node_id": "n_26e0b38919b768d33983",
+        "name": "Symbol",
+        "summary": "Struct Symbol in languages. Related to: error-handling",
+        "path": "/cmd/ingest-codebase/languages/interface.go#Symbol",
+        "layer": 0
+      },
+      {
+        "node_id": "n_2a8c543013b53c273c05",
+        "name": "Symbol",
+        "summary": "Struct Symbol in main. Related to: error-handling, validation",
+        "path": "/docs/lang-parser/archive/upts-issues01/fallback_parsers.go#Symbol",
+        "layer": 0
+      },
+      {
+        "node_id": "n_574b5c70c8b8ea34854a",
+        "name": "IngestSymbolConfig",
+        "summary": "Struct IngestSymbolConfig in api. Related to: error-handling, validation, logging",
+        "path": "/internal/api/handlers_ingest_codebase.go#IngestSymbolConfig",
+        "layer": 0
+      },
+      {
+        "node_id": "n_f54058a1e362d7438621",
+        "name": "IngestSymbol",
+        "summary": "Struct IngestSymbol in main. Related to: authentication, authorization, error-handling",
+        "path": "/cmd/ingest-codebase/main.go#IngestSymbol",
+        "layer": 0
+      }
+    ],
+    "total_weight": 1.509
+  },
+  {
+    "cluster_id": 6,
+    "members": [
+      {
+        "node_id": "n_43d0877f01c64ca23674",
+        "name": "PULL_REQUEST_TEMPLATE.md",
+        "summary": "Documentation: PULL_REQUEST_TEMPLATE.md in docs. ## Summary\n\n<!-- Brief description of what this PR does and why",
+        "path": "/.github/PULL_REQUEST_TEMPLATE.md",
+        "layer": 0
+      },
+      {
+        "node_id": "n_4964aebcd12b867af5f6",
+        "name": "NewConnectionError",
+        "summary": "Class NewConnectionError in exceptions. Related to: error-handling, logging. Python class NewConnectionError in module exceptions\nInherits from: ConnectTimeoutError, HTTPError\nDescription: Raised when we fail to establish a new connection",
+        "path": "/docs/api/api-spec/uats/.venv/lib/python3.12/site-packages/urllib3/exceptions.py#NewConnectionError",
+        "layer": 0
+      },
+      {
+        "node_id": "n_d32eae517229abddc966",
+        "name": "WhereNot",
+        "summary": "Class WhereNot in jsonpath. Related to: error-handling, validation, logging. Python class WhereNot in module jsonpath\nInherits from: Where\nDescription:  Identical to ``Where``, but filters for only those nodes that do *not* have a match on the right",
+        "path": "/docs/api/api-spec/uats/.venv/lib/python3.12/site-packages/jsonpath_ng/jsonpath.py#WhereNot",
+        "layer": 0
+      }
+    ],
+    "total_weight": 0.7629
+  },
+  {
+    "cluster_id": 7,
+    "members": [
+      {
+        "node_id": "4386a9b1-be52-4a7f-8b13-96f321fd6c83",
+        "name": null,
+        "summary": "Reinforcement cycle 2: User preferences are critical \u2014 destructive command blocking, conventional commits, sub-agent delegation, CMS as metacognition system. These must persist permanently.",
+        "path": "",
+        "layer": 0
+      },
+      {
+        "node_id": "543a2a27-1c8f-4fd1-9c35-a7bc20e5e312",
+        "name": null,
+        "summary": "Reinforcement cycle 4: User preferences are critical \u2014 destructive command blocking, conventional commits, sub-agent delegation, CMS as metacognition system. These must persist permanently.",
+        "path": "",
+        "layer": 0
+      },
+      {
+        "node_id": "c9002833-c7c1-406d-b2aa-ddfcf7ef7e7f",
+        "name": null,
+        "summary": "Reinforcement cycle 3: User preferences are critical \u2014 destructive command blocking, conventional commits, sub-agent delegation, CMS as metacognition system. These must persist permanently.",
+        "path": "",
+        "layer": 0
+      }
+    ],
+    "total_weight": 0.7256
+  }
+]

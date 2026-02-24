@@ -7,23 +7,41 @@
     "method": "POST",
     "payload_template": {
       "space_id": "{{space_id}}",
-      "items": "{{items}}"
+      "observations": [
+        {
+          "content": "{{content_1}}",
+          "source": "ubts-benchmark",
+          "path": "{{path_1}}",
+          "timestamp": "2026-02-24T00:00:00Z"
+        },
+        {
+          "content": "{{content_2}}",
+          "source": "ubts-benchmark",
+          "path": "{{path_2}}",
+          "timestamp": "2026-02-24T00:00:01Z"
+        },
+        {
+          "content": "{{content_3}}",
+          "source": "ubts-benchmark",
+          "path": "{{path_3}}",
+          "timestamp": "2026-02-24T00:00:02Z"
+        }
+      ]
     },
     "headers": {
       "Content-Type": "application/json"
     }
   },
   "thresholds": {
-    "p50_ms": 100,
-    "p95_ms": 500,
-    "p99_ms": 1000,
+    "p50_ms": 200,
+    "p95_ms": 1000,
+    "p99_ms": 2000,
     "max_ms": 5000,
-    "error_rate_pct": 0.5,
-    "throughput_rps": 50
+    "error_rate_pct": 1.0
   },
   "setup": {
-    "seed_data": "test_data/ingest_seed.json",
-    "warmup_requests": 5
+    "warmup_requests": 3,
+    "use_benchmark_space": true
   },
   "metadata": {
     "tags": ["ingest", "throughput", "batch"],

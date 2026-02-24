@@ -93,7 +93,7 @@ help:
 
 .PHONY: test-api test-api-% test-smoke test-all uats-setup
 
-# Run all UATS API validation tests (all specs, requires all modules enabled)
+# Run all UATS API validation tests (excludes optional modules that require explicit enablement)
 test-api:
 	@echo "Running UATS API validation..."
 	@mkdir -p /tmp/uats-test-codebase
@@ -101,6 +101,7 @@ test-api:
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
+		--exclude-tag unts \
 		--report /tmp/api-report.json
 	@echo "Report saved to /tmp/api-report.json"
 

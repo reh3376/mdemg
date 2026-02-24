@@ -139,7 +139,7 @@ This is idempotent (MERGE) — safe for V0001-V0014 which also self-record.
 3. `mdemg db migrate` (rerun) — idempotent, 0 applied
 4. `mdemg db status` — shows container + schema info
 5. `mdemg embeddings check` — validates configured provider
-6. UATS: 190/209 variants pass (19 failures are pre-existing hash-verification stubs)
+6. UATS: 190/190 variants pass (100%). UNTS hash-verification specs (19 variants) tested separately via `make test-unts-uats` (requires `UNTS_ENABLED=true`)
 
 ---
 
