@@ -15,7 +15,7 @@
 | Property | Value |
 |----------|-------|
 | **Repo** | /Users/reh3376/repos/blueseer |
-| **Repo URL** | https://github.com/blueseerERP/blueseer.git |
+| **Repo URL** | <https://github.com/blueseerERP/blueseer.git> |
 | **Commit** | `1dd2ef15775ee019ee2b57794a733bf6c4ee20ba` |
 | **Ingest scope** | Full repository (Java files) |
 | **Excluded** | test/, .git/, build/, dist/ |
@@ -93,6 +93,7 @@ Pre-run validation:
 ## Baseline Results
 
 ### Run 1
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -105,6 +106,7 @@ Pre-run validation:
 | No evidence | 0 (0.0%) |
 
 ### Run 2
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -117,6 +119,7 @@ Pre-run validation:
 | No evidence | 0 (0.0%) |
 
 ### Run 3
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -129,6 +132,7 @@ Pre-run validation:
 | No evidence | 0 (0.0%) |
 
 ### Baseline Aggregate (3 runs)
+
 | Metric | Average |
 |--------|---------|
 | **Mean score** | **0.721** |
@@ -140,6 +144,7 @@ Pre-run validation:
 ## MDEMG Results
 
 ### Run 1 (COLD - 0 learning edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -153,6 +158,7 @@ Pre-run validation:
 | Learning edges: after | 20,124 |
 
 ### Run 2 (WARM - with accumulated edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -165,6 +171,7 @@ Pre-run validation:
 | No evidence | 10 (7.1%) |
 
 ### Run 3 (WARM - accumulated edges)
+
 | Metric | Value |
 |--------|-------|
 | Questions answered | 140 |
@@ -178,6 +185,7 @@ Pre-run validation:
 | Learning edges: final | 24,860 |
 
 ### MDEMG Aggregate (3 runs)
+
 | Metric | Average |
 |--------|---------|
 | **Mean score** | **0.693** |
@@ -215,6 +223,7 @@ The aggregate mean shows baseline slightly higher (0.721 vs 0.693), but this is 
 3. **MDEMG remained stable**: 0.703 → 0.688 → 0.688 (2.1% decline)
 
 **Score range comparison:**
+
 - Baseline: 0.623 - 0.839 (delta: **0.216**)
 - MDEMG: 0.688 - 0.703 (delta: **0.015**)
 
@@ -256,12 +265,14 @@ The aggregate mean shows baseline slightly higher (0.721 vs 0.693), but this is 
 ## File References
 
 ### Setup Files
+
 - [x] benchmark_questions_v3_master.json - 140 questions with answers
 - [x] benchmark_questions_v3_agent.json - 140 questions (no answers)
 - [x] grade_answers_v3.py - Grading script (v3, schema-aware)
 - [x] baseline_agent_prompt.txt - Baseline agent instructions
 
 ### Generated Artifact Files
+
 - [x] answers_baseline_run1.jsonl
 - [x] answers_baseline_run2.jsonl
 - [x] answers_baseline_run3.jsonl
@@ -280,6 +291,7 @@ The aggregate mean shows baseline slightly higher (0.721 vs 0.693), but this is 
 The blueseer benchmark demonstrates that **MDEMG provides 14.4x more consistent performance** compared to baseline file search. While baseline achieved a higher peak score in Run 1, its performance degraded significantly across runs, while MDEMG maintained stable, reliable performance.
 
 **Key takeaways:**
+
 - MDEMG is ideal for **production systems** requiring predictable performance
 - Baseline may achieve occasional high scores but is **unreliable** across runs
 - MDEMG's **strong evidence rate (93.6%)** ensures grounded, verifiable answers

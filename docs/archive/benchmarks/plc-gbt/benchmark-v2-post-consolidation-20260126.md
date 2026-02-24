@@ -83,6 +83,7 @@
 ### Persistent Weakness: UI/UX
 
 UI/UX category remains the weakest at 0.583 (was 0.50 in graded scoring). This suggests:
+
 - React/TypeScript component indexing needs improvement
 - UI-specific terminology may need specialized embeddings
 - Component hierarchy relationships not captured in current schema
@@ -157,6 +158,7 @@ UI/UX category remains the weakest at 0.583 (was 0.50 in graded scoring). This s
 Consolidation successfully built 418 hidden layer nodes and 13,170 learning edges, but **raw retrieval similarity scores did not improve**. This suggests the next benchmark should measure **answer quality** (graded by LLM against expected answers) rather than raw embedding similarity.
 
 The scientific baseline is now established:
+
 - **Mean retrieval score: 0.6196** (post-consolidation)
 - **UI/UX remains the weakest category** (0.583)
 - **99% of queries return scores >0.5** (consistent, no failures)

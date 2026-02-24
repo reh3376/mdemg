@@ -21,16 +21,19 @@
 ## Improvements Applied
 
 ### 1. Answer Verification (43 Questions Reviewed)
+
 - **24 verified as accurate** - no changes needed
 - **19 corrected** - answers updated based on actual code review
 - All speculative language ("likely", "probably", "suggests") removed
 
 ### 2. File Coverage Enhancement
+
 - Added 170+ related files to single-file questions
 - Used module relationship patterns (service ↔ module ↔ resolver)
 - Questions now require understanding multiple files
 
 ### 3. Quality Filtering
+
 - Removed questions answerable from single file without context
 - Prioritized questions requiring cross-module understanding
 - Kept only questions with 2+ required files or verified answers

@@ -21,6 +21,7 @@ This guide covers how to back up, restore, export, and import MDEMG memory space
 ## Prerequisites
 
 1. MDEMG server running with backup enabled:
+
    ```env
    BACKUP_ENABLED=true
    BACKUP_STORAGE_DIR=./backups
@@ -51,6 +52,7 @@ curl -s -X POST http://localhost:9999/v1/backup/trigger \
 ```
 
 **Response:**
+
 ```json
 {
   "backup_id": "bk-20260216-143022-partial_space",
@@ -82,6 +84,7 @@ curl -s http://localhost:9999/v1/backup/status/bk-20260216-143022-partial_space
 ```
 
 **Response (in progress):**
+
 ```json
 {
   "backup_id": "bk-20260216-143022-partial_space",
@@ -96,6 +99,7 @@ curl -s http://localhost:9999/v1/backup/status/bk-20260216-143022-partial_space
 ```
 
 **Response (completed):**
+
 ```json
 {
   "backup_id": "bk-20260216-143022-partial_space",
@@ -147,16 +151,19 @@ curl -s -X POST http://localhost:9999/v1/backup/trigger \
 ```
 
 **Important limitations:**
+
 - Neo4j Community Edition requires the database to be stopped for `neo4j-admin dump`. If your database is running, this will fail. Use partial backup (space export) instead.
 - Neo4j Enterprise Edition supports online dumps.
 - Full backup produces a `.dump` file (Neo4j native format), not `.mdemg`.
 - Restoring a full backup replaces the entire database.
 
 **When to use full backup:**
+
 - Disaster recovery snapshots (stop DB, backup, restart)
 - Before major schema migrations
 
 **When to use partial backup instead:**
+
 - Sharing spaces with dev teams
 - Migrating specific spaces between instances
 - Regular automated backups of a running system
@@ -182,6 +189,7 @@ curl -s -X POST http://localhost:9999/v1/backup/restore \
 | `snapshot_before` | If `true`, creates a safety backup before restoring (recommended) |
 
 **Response:**
+
 ```json
 {
   "restore_id": "rst-20260216-150000",
@@ -247,6 +255,7 @@ EOF
 ```
 
 Rename the `.mdemg` file to match the backup_id:
+
 ```bash
 mv shared-export.mdemg ./backups/imported-whk-wms.mdemg
 ```
@@ -283,6 +292,7 @@ curl -s http://localhost:9999/v1/backup/list | python3 -m json.tool
 ```
 
 Filter by type:
+
 ```bash
 curl -s "http://localhost:9999/v1/backup/list?type=partial_space" | python3 -m json.tool
 ```

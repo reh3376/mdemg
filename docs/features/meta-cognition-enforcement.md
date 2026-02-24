@@ -28,6 +28,7 @@ Hooks mechanically enforce investigation:
 ### Multi-Dimensional Watchdog
 
 The Watchdog (previously temporal-decay only) now monitors:
+
 - Session health score (via `WatchdogSignalProvider`)
 - Observation rate per hour
 - Consolidation age (seconds since last consolidation)
@@ -37,6 +38,7 @@ Critical session health (<0.2) combined with moderate decay triggers escalation.
 ### Behavioral Learning Loop
 
 `SignalLearner` tracks signal effectiveness using Hebbian learning:
+
 - `RecordEmission(code)`: Signal was emitted → strength decays (agent didn't respond yet)
 - `RecordResponse(code)`: Agent acted on signal → strength boosts
 - Strength range: 0.1 (floor) to 1.0 (ceiling)

@@ -88,6 +88,7 @@ The binary must be at `plugins/docs-scraper/docs-scraper` (matching the `binary`
 ```
 
 On startup the server will:
+
 1. Read `SCRAPER_ENABLED=true` from config
 2. Create the `scraper.Service` with Neo4j driver, embedder, and plugin manager
 3. The plugin manager discovers `plugins/docs-scraper/manifest.json`
@@ -445,10 +446,12 @@ When `follow_links: true` is set in the job options, the orchestrator performs b
 5. Processing continues until the queue is empty or `max_pages` total pages have been scraped
 
 **Defaults when follow_links=true:**
+
 - `max_depth` = 2 (seed pages + 2 levels of links)
 - `max_pages` = 50 (hard cap regardless of queue size)
 
 **Important notes:**
+
 - JavaScript-rendered sites (SPAs) will have few or no discoverable links since the scraper performs simple HTTP GETs without a headless browser
 - The delay between requests (`delay_ms`) applies to every page in the BFS traversal
 - All discovered pages go through the same quality scoring, tagging, and dedup pipeline as seed pages
@@ -558,6 +561,7 @@ Symbols are stored in the `structured_data` field of the resulting MemoryNode.
 ### Per-Section Observe
 
 For each section, the reviewer calls `conversation.Observe()` via the adapter with:
+
 - `obs_type`: `"learning"`
 - `pinned`: `true` (prevents decay/pruning)
 - `tags`: base tags + `source:web-scraper` + `url:<source_url>` + `lang:<language>` + `domain:<host>` + `topic:<heading_term>`

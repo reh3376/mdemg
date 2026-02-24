@@ -24,6 +24,7 @@
 | Questions with consistent scores (range < 0.1) | Baseline: 24, MDEMG: 20 |
 
 **Most Variable Questions:**
+
 | Question ID | Mean Score | Std Dev | Category |
 |-------------|------------|---------|----------|
 | Q39 | 0.595 | 0.422 | hard |
@@ -69,6 +70,7 @@
 ### Key Insight: MDEMG Warm Run Evidence Degradation
 
 MDEMG warm runs (2 & 3) have dramatically lower evidence quality:
+
 - **Strong+Moderate:** Cold=81.7% → Warm=15.2% average (-66.5pp)
 - **Weak tier:** Cold=18.3% → Warm=78.9% average (+60.6pp)
 
@@ -94,6 +96,7 @@ MDEMG warm runs (2 & 3) have dramatically lower evidence quality:
 ### Token-Adjusted Performance
 
 If we normalize by token budget:
+
 - MDEMG achieves **9.1x better token efficiency** overall
 - Even MDEMG's lowest-scoring run (0.409) used only 0.84% of baseline tokens
 
@@ -142,6 +145,7 @@ Analyzing lowest-scoring questions reveals patterns:
 ### MDEMG-Specific Patterns
 
 MDEMG warm runs show:
+
 - High "weak" evidence (file refs present but not matching expected)
 - Suggests graph retrieval finds alternative valid paths
 - The grader penalizes these as the master file expects specific canonical paths

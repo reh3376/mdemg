@@ -23,14 +23,17 @@
 ## The Two Regimes
 
 ### Regime A: Familiar Priors (Training Data Works)
+
 Questions answerable from general VS Code knowledge. Both agents perform well.
 
 **Example**: "What is the default fontSize?" → Both answer "14"
 
 ### Regime B: Codebase-Local Truth (MDEMG Required)
+
 Questions requiring exact defaults, runtime values, cross-file invariants.
 
 **Example**: "What are the StorageScope enum values?"
+
 - Baseline: `APPLICATION=0, PROFILE=1, WORKSPACE=2` ❌
 - MDEMG: `APPLICATION=-1, PROFILE=0, WORKSPACE=1` ✅
 
@@ -39,6 +42,7 @@ Questions requiring exact defaults, runtime values, cross-file invariants.
 ## Detailed Scoring (20 Questions)
 
 ### Scoring Criteria
+
 - **4 points**: All parts correct with evidence
 - **3 points**: All parts correct, evidence partial
 - **2 points**: Most parts correct
@@ -85,6 +89,7 @@ Questions requiring exact defaults, runtime values, cross-file invariants.
 These are cases where baseline training data was **demonstrably wrong**:
 
 ### 1. StorageScope Enum Values (hard_009)
+
 ```
 Baseline: APPLICATION=0, PROFILE=1, WORKSPACE=2
 MDEMG:    APPLICATION=-1, PROFILE=0, WORKSPACE=1  ✓
@@ -93,6 +98,7 @@ Impact: Fundamental storage API - incorrect values cause runtime errors
 ```
 
 ### 2. Theme Types Enumeration (hard_019)
+
 ```
 Baseline: ["light", "dark", "hc"]
 MDEMG:    ["dark", "light", "hcDark", "hcLight"]  ✓
@@ -101,6 +107,7 @@ Impact: VS Code has TWO high-contrast themes since 1.62
 ```
 
 ### 3. Activity Bar Storage Key (hard_006)
+
 ```
 Baseline: workbench.activity.pinnedViewlets
 MDEMG:    workbench.activity.pinnedViewlets2  ✓
@@ -109,6 +116,7 @@ Impact: Key migration happened - old key won't find pinned items
 ```
 
 ### 4. Diff Algorithm Class (hard_012)
+
 ```
 Baseline: LcsDiff
 MDEMG:    DefaultLinesDiffComputer  ✓
@@ -117,6 +125,7 @@ Impact: LcsDiff is legacy; DefaultLinesDiffComputer is current implementation
 ```
 
 ### 5. Editor fontSize Minimum (hard_004)
+
 ```
 Baseline: minimum=6
 MDEMG:    minimum=1  ✓
@@ -152,11 +161,13 @@ MDEMG made exactly 2 queries per question, demonstrating disciplined retrieval:
 ### MDEMG is NOT "just retrieval"
 
 Traditional RAG would:
+
 1. Embed the question
 2. Return top-K documents
 3. Hope the answer is in there
 
 MDEMG provides:
+
 1. **Graph-structured retrieval** - Follows relationships, not just similarity
 2. **Activation-based scoring** - Considers co-activation patterns
 3. **Evidence anchoring** - Returns specific file paths and scores
@@ -165,11 +176,13 @@ MDEMG provides:
 ### The Correctness Forcing Function
 
 When baseline fails (Regime B), it fails **confidently wrong**:
+
 - StorageScope APP=0 (wrong, confident)
 - Theme types = 3 (wrong, confident)
 - pinnedViewlets (outdated, confident)
 
 MDEMG doesn't guess - it retrieves and cites:
+
 - "StorageScope from storage.ts: APPLICATION=-1"
 - "ColorThemeType from themeService.ts: dark, light, hcDark, hcLight"
 - "Storage key from compositeBar.ts: pinnedViewlets2"
@@ -204,6 +217,7 @@ The V3 benchmark demonstrates a clear regime shift:
 | **B** | Codebase-specific, exact values | Low (55%) | Critical (+26%) |
 
 **MDEMG's value proposition is regime-dependent**:
+
 - For "what does React useState do?" → Zero value (LLM knows)
 - For "what is your company's StorageScope.APPLICATION value?" → Essential (LLM guesses wrong)
 

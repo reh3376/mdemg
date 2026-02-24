@@ -1,4 +1,5 @@
 # MDEMG Retrieval Benchmark Report for PLC-GBT
+
 **Date:** January 24, 2026
 
 ## Executive Summary
@@ -165,6 +166,7 @@ The following questions achieved excellent retrieval scores (≥0.7):
 ## Test Coverage
 
 This benchmark covers **16 knowledge domains**:
+
 - API Services (10 questions)
 - UI/UX (10 questions)
 - ACD to L5X Conversion (10 questions)
@@ -185,6 +187,7 @@ This benchmark covers **16 knowledge domains**:
 ## Conclusion
 
 The MDEMG system demonstrates **solid baseline performance** for plc-gbt document retrieval with:
+
 - **0% failure rate** - robust enough for production
 - **65% average quality score** - room for refinement
 - **23% excellent retrievals** - significant accurate results
@@ -195,6 +198,7 @@ The system is **production-ready for general queries** but would benefit from ta
 ---
 
 **Benchmark Details:**
+
 - **Test Date:** January 24, 2026
 - **Question Set:** test_questions_v2_selected.json (100 randomly selected questions)
 - **Query Parameters:** candidate_k=50, top_k=10, hop_depth=2

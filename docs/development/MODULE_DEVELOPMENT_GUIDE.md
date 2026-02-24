@@ -46,6 +46,7 @@ plugins/
 ```
 
 **Required fields:**
+
 - `id` - Unique identifier (lowercase, alphanumeric + hyphens)
 - `name` - Display name
 - `version` - Semantic version
@@ -53,6 +54,7 @@ plugins/
 - `binary` - Executable filename (relative to module directory)
 
 **Optional fields:**
+
 - `capabilities` - What the module can handle
 - `health_check_interval_ms` - Health check frequency (default: 5000)
 - `startup_timeout_ms` - Max time to become ready (default: 10000)
@@ -282,6 +284,7 @@ Reasoning modules are called in the retrieval pipeline:
 ```
 
 Results include reasoning module info in debug output:
+
 ```json
 {
   "debug": {
@@ -357,6 +360,7 @@ curl -X POST http://localhost:9999/v1/ape/trigger \
 ## Running Your Module
 
 1. **Start the binary with `--socket` flag:**
+
    ```bash
    ./my-module --socket /tmp/mdemg-plugins/mdemg-my-module.sock
    ```
@@ -443,6 +447,7 @@ curl http://localhost:8080/v1/modules | jq
 ```
 
 Response:
+
 ```json
 {
   "data": {

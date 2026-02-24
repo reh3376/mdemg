@@ -9,6 +9,7 @@ Triggers codebase ingestion as a background job. Returns immediately with a job 
 ## Quick Start
 
 ### Minimal Request
+
 ```bash
 curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
   -H "Content-Type: application/json" \
@@ -19,6 +20,7 @@ curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
 ```
 
 ### Response
+
 ```json
 {
   "job_id": "a1b2c3d4",
@@ -124,7 +126,7 @@ curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
 | `rust` | bool | `true` | Include .rs files |
 | `go` | bool | `true` | Include .go files |
 | `markdown` | bool | `true` | Include .md files |
-| `include_tests` | bool | `false` | Include test files (*_test.go, *.spec.ts) |
+| `include_tests` | bool | `false` | Include test files (*_test.go,*.spec.ts) |
 
 ### Symbol Extraction (`symbols`)
 
@@ -142,6 +144,7 @@ curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
 | `max_file_size` | int | `1048576` | Max file size in bytes (1MB default) |
 
 **Presets:**
+
 - `default`: Standard exclusions for most projects
 - `ml_cuda`: Excludes large model files, CUDA kernels
 - `web_monorepo`: Excludes node_modules, dist, build artifacts
@@ -190,11 +193,13 @@ curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
 ## Job Management
 
 ### Check Job Status
+
 ```bash
 GET /v1/memory/ingest-codebase/{job_id}
 ```
 
 **Response:**
+
 ```json
 {
   "job_id": "a1b2c3d4",
@@ -215,11 +220,13 @@ GET /v1/memory/ingest-codebase/{job_id}
 **Status values:** `queued`, `running`, `completed`, `failed`, `cancelled`
 
 ### List All Jobs
+
 ```bash
 GET /v1/memory/ingest-codebase
 ```
 
 **Response:**
+
 ```json
 {
   "jobs": [
@@ -230,11 +237,13 @@ GET /v1/memory/ingest-codebase
 ```
 
 ### Cancel Job
+
 ```bash
 DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 **Response:**
+
 ```json
 {
   "status": "cancelled",
@@ -247,6 +256,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ## Examples
 
 ### TypeScript Project (Fast)
+
 ```json
 {
   "space_id": "my-ts-app",
@@ -265,6 +275,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 ### ML/CUDA Project
+
 ```json
 {
   "space_id": "ml-training",
@@ -280,6 +291,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 ### Incremental Update
+
 ```json
 {
   "space_id": "my-project",
@@ -294,6 +306,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 ### With LLM Summaries
+
 ```json
 {
   "space_id": "documented-project",
@@ -307,6 +320,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 ### Dry Run Preview
+
 ```json
 {
   "space_id": "test",
@@ -324,6 +338,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ## Error Responses
 
 ### 400 Bad Request
+
 ```json
 {"error": "space_id is required"}
 {"error": "path is required"}
@@ -331,11 +346,13 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 ```
 
 ### 404 Not Found
+
 ```json
 {"error": "job not found"}
 ```
 
 ### 405 Method Not Allowed
+
 ```json
 "Method not allowed"
 ```
@@ -352,6 +369,7 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 | Monorepo (50K+) | 12-16 | 15-25/s | 1-3 hours |
 
 **Tips:**
+
 - Use `incremental: true` for subsequent updates
 - Use `preset: "ml_cuda"` for ML repos with large binaries
 - Increase `batch_size` for faster networks

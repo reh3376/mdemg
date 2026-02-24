@@ -80,12 +80,14 @@ This benchmark experienced significant question ID preservation problems:
 Using only fully valid runs for comparison:
 
 ### Baseline Average (Runs 1 + 3)
+
 - **Mean Score:** 0.509
 - **Standard Deviation:** 0.218
 - **Evidence Rate:** 52.1%
 - **High Score Rate:** 22.9%
 
 ### MDEMG Best Run (Run 1, 81 questions)
+
 - **Mean Score:** 0.544
 - **Standard Deviation:** 0.184
 - **Evidence Rate:** 58.0%
@@ -143,6 +145,7 @@ docs/benchmarks/whk-wms/benchmark_run_20260129/
 | Citation Bonus | +10% | Citing correct file (capped at 1.0) |
 
 **Evidence Tiers:**
+
 - Strong (1.0): file:line AND file matches AND line within ±10
 - Moderate (0.7): file:line AND file matches BUT line outside tolerance
 - Weak (0.4): file:line BUT file doesn't match expected

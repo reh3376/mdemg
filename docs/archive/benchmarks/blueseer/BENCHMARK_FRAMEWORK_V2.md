@@ -12,12 +12,14 @@
 This framework defines a rigorous, reproducible methodology for benchmarking MDEMG retrieval performance against baseline (no-retrieval) agents on codebase comprehension tasks.
 
 ### Goals
+
 - **Reproducibility**: Same inputs produce comparable outputs across runs
 - **Isolation**: Each run is independent with no cross-contamination
 - **Validation**: Real-time detection of execution issues
 - **Fairness**: Identical conditions for baseline and MDEMG agents
 
 ### Non-Goals
+
 - Speed optimization (quality over speed)
 - Parallel execution of dependent runs (sequential for learning edge accumulation)
 
@@ -67,10 +69,12 @@ curl -s "http://localhost:9999/v1/memory/stats?space_id={space_id}" > pre_benchm
 **CRITICAL**: All agent prompts must be finalized BEFORE any execution begins.
 
 Create two prompt files:
+
 - `baseline_prompt.txt` - For baseline agents
 - `mdemg_prompt.txt` - For MDEMG agents
 
 Prompts must include:
+
 - [ ] Exact file access restrictions
 - [ ] Forbidden tool list (WebSearch, WebFetch)
 - [ ] Question ID integrity rules
@@ -156,7 +160,7 @@ Read {QUESTION_FILE} and answer questions 1-{QUESTION_COUNT} sequentially.
 
 **These rules exist because every benchmark failure has been an execution issue, NOT an MDEMG quality issue.**
 
-#### NEVER DO (Violations INVALIDATE entire benchmark session):
+#### NEVER DO (Violations INVALIDATE entire benchmark session)
 
 | Rule | Violation | Consequence |
 |------|-----------|-------------|
@@ -166,7 +170,7 @@ Read {QUESTION_FILE} and answer questions 1-{QUESTION_COUNT} sequentially.
 | **NEVER let agent access master question file** | Agent sees expected answers | Contaminated benchmark, useless results |
 | **NEVER restart an agent mid-run** | Agent crashes at Q75, restart and continue | Context inconsistency, data loss |
 
-#### ALWAYS DO (Pre-run checklist - MANDATORY):
+#### ALWAYS DO (Pre-run checklist - MANDATORY)
 
 ```bash
 # 1. VERIFY no other benchmark agents running
@@ -200,6 +204,7 @@ CORRECT:
 #### UNIQUE OUTPUT FILES (MANDATORY)
 
 Each run MUST have a unique output file path:
+
 ```
 answers_baseline_run1.jsonl  ← Unique
 answers_baseline_run2.jsonl  ← Unique
@@ -216,6 +221,7 @@ answers_mdemg_run3.jsonl     ← Unique
 ### 4.1 Run Sequence
 
 **Baseline Runs** (can be parallel - no learning edge dependency):
+
 ```
 Baseline Run 1 → /tmp/answers_baseline_run1.jsonl
 Baseline Run 2 → /tmp/answers_baseline_run2.jsonl
@@ -223,6 +229,7 @@ Baseline Run 3 → /tmp/answers_baseline_run3.jsonl
 ```
 
 **MDEMG Runs** (MUST be sequential - learning edges accumulate):
+
 ```
 MDEMG Run 1 (cold) → /tmp/answers_mdemg_run1.jsonl → WAIT → Grade → Record edges
 MDEMG Run 2 (warm) → /tmp/answers_mdemg_run2.jsonl → WAIT → Grade → Record edges
@@ -265,11 +272,13 @@ echo "Learning edges: $EDGES_BEFORE -> $EDGES_AFTER (+$(($EDGES_AFTER - $EDGES_B
 **Definition:** Agent copies raw MDEMG retrieval metadata as answers instead of synthesizing proper responses.
 
 **Symptoms:**
+
 - Answers contain `"Package:"`, `"Module:"`, `"Related to:"`
 - References per question > 5 (typical: 1-3)
 - Answers look like internal data structures, not natural language
 
 **Detection Script:**
+
 ```bash
 # Check for metadata patterns in answers
 BAD_PATTERNS=$(grep -cE '"Package:|"Module:|"Related to:' answers.jsonl)
@@ -488,6 +497,7 @@ python3 grade_answers_v3.py \
 ### 6.3 Run Validity Criteria
 
 A run is **VALID** if:
+
 - [ ] 100% questions answered (140/140)
 - [ ] No duplicate IDs
 - [ ] No disqualification events
@@ -495,10 +505,12 @@ A run is **VALID** if:
 - [ ] Output passes validation
 
 A run is **PARTIAL** if:
+
 - Questions answered < 100% but > 90%
 - No disqualification events
 
 A run is **INVALID** if:
+
 - Disqualification event occurred
 - Agent was restarted mid-run
 - Duplicate IDs found
@@ -534,6 +546,7 @@ A run is **INVALID** if:
 **Symptom**: Agent stops writing answers or produces low-quality answers mid-run
 
 **Mitigation**:
+
 - Use smaller question batches (e.g., 50 instead of 140)
 - Use haiku model for efficiency
 - Monitor auto-compact events
@@ -545,6 +558,7 @@ A run is **INVALID** if:
 **Cause**: Agent lost track after context compaction
 
 **Mitigation**:
+
 - Real-time validation catches this immediately
 - If detected: discard run, do not deduplicate
 
@@ -555,6 +569,7 @@ A run is **INVALID** if:
 **Cause**: Prompt was modified between runs
 
 **Mitigation**:
+
 - Lock prompts before benchmark starts
 - Hash prompt files and include in report
 
@@ -563,6 +578,7 @@ A run is **INVALID** if:
 ## 9. Checklist for Benchmark Session
 
 ### Pre-Session
+
 - [ ] Environment validated (server, repo, scripts)
 - [ ] Space cleared and re-ingested (if clean start)
 - [ ] Prompts finalized and saved to files
@@ -570,6 +586,7 @@ A run is **INVALID** if:
 - [ ] Output directories cleared
 
 ### Per-Run
+
 - [ ] Record pre-run learning edges (MDEMG)
 - [ ] Launch agent with correct prompt
 - [ ] Monitor progress every 30 seconds
@@ -578,6 +595,7 @@ A run is **INVALID** if:
 - [ ] Grade if valid
 
 ### Post-Session
+
 - [ ] Compile results from VALID runs only
 - [ ] Calculate aggregate metrics
 - [ ] Document any excluded runs with reasons
@@ -952,6 +970,7 @@ def analyze_scores(summary):
 ```
 
 **Key Questions:**
+
 - Does MDEMG outperform baseline on average?
 - Is performance consistent across runs or declining?
 - Which difficulty levels show the largest MDEMG advantage?
@@ -999,6 +1018,7 @@ def analyze_evidence(grades_file):
 ```
 
 **Key Questions:**
+
 - What percentage of answers have strong evidence (file:line refs)?
 - Which question categories have weak evidence?
 - Are there patterns in missing evidence (e.g., cross-cutting concerns)?
@@ -1032,6 +1052,7 @@ def analyze_retrieval(mdemg_queries_log, grades_file):
 ```
 
 **Key Questions:**
+
 - Did MDEMG surface relevant files in top_k results?
 - Which questions had poor retrieval (correct file not retrieved)?
 - Are there query patterns that consistently fail?
@@ -1084,6 +1105,7 @@ def determine_root_cause(grade):
 ```
 
 **Key Questions:**
+
 - What percentage of answers score below 0.5?
 - Which categories have the most failures?
 - What are the root causes (missing evidence, wrong concepts, semantic mismatch)?
@@ -1130,6 +1152,7 @@ def analyze_learning_edges(summary):
 ```
 
 **Key Questions:**
+
 - How many edges were created per run?
 - Is edge creation rate declining (saturation)?
 - Do more edges correlate with better scores?
@@ -1333,6 +1356,7 @@ This creates a feedback loop where MDEMG learns from its own benchmark performan
 | `benchmark_questions_*_agent.json` | NO | ✅ YES |
 
 **Critical Rules:**
+
 1. Agent receives ONLY the `*_agent.json` file (questions without answers)
 2. The `*_master.json` file is used ONLY by the grading script AFTER agent completes
 3. NEVER include answer keys in agent prompts
@@ -1340,6 +1364,7 @@ This creates a feedback loop where MDEMG learns from its own benchmark performan
 5. Violation of these rules INVALIDATES the entire benchmark
 
 **File Separation:**
+
 ```
 questions/
 ├── benchmark_questions_v1_agent.json   # → Agent input (NO answers)
@@ -1369,6 +1394,7 @@ Each answer MUST be a single JSON line with these exact fields:
 | `confidence` | string | YES | "HIGH", "MEDIUM", or "LOW" |
 
 **Confidence Levels:**
+
 - **HIGH**: Found exact value in correct file with line number
 - **MEDIUM**: Found relevant file but value not confirmed
 - **LOW**: Could not locate or uncertain
@@ -1534,6 +1560,7 @@ Create questions across these categories:
 ### 17.2 Question Quality Requirements
 
 Questions MUST be:
+
 1. **Multi-file** - Require understanding 2+ files
 2. **Verifiable** - Have concrete, code-referenced answers
 3. **Non-trivial** - Cannot be answered from single function
@@ -1544,6 +1571,7 @@ Questions MUST be:
 **CRITICAL:** ~30-35% of LLM-generated answers contain errors.
 
 Common errors:
+
 - Wrong method names
 - Overstated functionality
 - Incorrect enums/constants

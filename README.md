@@ -27,8 +27,8 @@ mdemg db migrate
 cd /path/to/your/project
 mdemg init
 
-# Start the server
-mdemg serve
+# Start the server (background daemon)
+mdemg start --auto-migrate
 
 # Ingest your codebase
 mdemg ingest --path .
@@ -52,10 +52,12 @@ Everything needed to independently verify our results is included.
 - Python 3.10+ (grading + utilities)
 
 **Embeddings (choose one):**
+
 - OpenAI API key, or
 - Ollama (local embeddings)
 
 **Agent under test (choose one):**
+
 - Claude Code (recommended baseline runner), or
 - Any tool-using LLM agent that can call the MDEMG API
 
@@ -128,6 +130,7 @@ Full reproducibility details for skeptics:
 | Strong Evidence Rate | 97.9% | **100%** | +2.1pp |
 
 **Category Performance (Edge Attention):**
+
 | Category | Mean Score |
 |----------|------------|
 | Disambiguation | 0.958 |
@@ -376,6 +379,7 @@ A background auto-prune scheduler runs every 24 hours by default (`SPACE_PRUNE_I
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
 **Supported Languages (27 UPTS-validated, 100% pass rate):**
+
 - **Systems**: Go, Rust, C, C++, CUDA
 - **JVM**: Java, Kotlin
 - **.NET**: C#
@@ -387,6 +391,7 @@ MDEMG extracts code symbols during ingestion using the Unified Parser Test Schem
 - **Documentation**: Markdown, XML, Scraper Markdown (web-scraped content with section chunking)
 
 **Extracted Symbol Types:**
+
 - Functions, methods, classes, interfaces, types
 - Constants, variables, enums
 - Imports, exports, module declarations
@@ -483,6 +488,7 @@ open http://localhost:9090  # Prometheus
 ### MDEMG Overview Dashboard
 
 Pre-configured dashboard with 10 panels:
+
 - Request Rate, P95 Latency, Error Rate, Circuit Breakers
 - Request Latency Distribution (p50/p95/p99)
 - Requests by Status, Cache Hit Ratios

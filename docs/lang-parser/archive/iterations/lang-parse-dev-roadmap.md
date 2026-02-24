@@ -3,6 +3,7 @@
 ## Overview
 
 Language parsers are **critical infrastructure** for MDEMG. The quality of symbol extraction directly determines:
+
 1. Evidence quality in retrieval results (file:line references)
 2. Learning edge formation between related code elements
 3. Semantic understanding of codebase structure
@@ -33,12 +34,15 @@ Language parsers are **critical infrastructure** for MDEMG. The quality of symbo
 ## TypeScript Parser Enhancement (2026-01-28)
 
 ### Problem Identified
+
 The original TypeScript parser only extracted:
+
 - Constants (UPPER_CASE only)
 - Top-level functions
 - Arrow functions
 
 This missed ~90% of meaningful code symbols in NestJS/React codebases:
+
 - Classes (the backbone of NestJS)
 - Interfaces/Types
 - Methods (class members)
@@ -46,6 +50,7 @@ This missed ~90% of meaningful code symbols in NestJS/React codebases:
 - Decorators
 
 ### Solution Implemented
+
 Enhanced `extractSymbols()` to capture:
 
 ```go
@@ -59,6 +64,7 @@ decoratorPattern - @DecoratorName( tracking
 ```
 
 ### Symbols Now Extracted
+
 | Symbol Type | Example | Line Number |
 |-------------|---------|-------------|
 | `class` | `class UserService` | Yes |
@@ -70,6 +76,7 @@ decoratorPattern - @DecoratorName( tracking
 | `constant` | `const MAX_USERS` | Yes |
 
 ### Impact on Benchmark
+
 Before: 6.7% of file refs had real line numbers
 After: TBD (requires re-ingestion)
 
@@ -80,7 +87,9 @@ After: TBD (requires re-ingestion)
 ### P0: Critical (Blocking Evidence Quality)
 
 #### 1. TypeScript: Decorator Argument Extraction
+
 NestJS relies heavily on decorator metadata:
+
 ```typescript
 @Controller('users')  // Extract 'users' as route prefix
 @Injectable({ scope: Scope.REQUEST })  // Extract scope config
@@ -90,7 +99,9 @@ NestJS relies heavily on decorator metadata:
 **Implementation:** Parse decorator arguments and store as `DocComment` or `Value`
 
 #### 2. TypeScript: Property/Field Extraction
+
 Class properties with decorators are critical for DTOs:
+
 ```typescript
 @Field(() => ID)
 id!: string;  // Extract as field with type annotation
@@ -99,6 +110,7 @@ id!: string;  // Extract as field with type annotation
 **Implementation:** Add `fieldPattern` to capture class fields
 
 #### 3. Python: Dataclass/Pydantic Field Extraction
+
 ```python
 @dataclass
 class User:
@@ -109,6 +121,7 @@ class User:
 ### P1: High Priority
 
 #### 4. Go: Struct Field Extraction
+
 ```go
 type User struct {
     ID   int    `json:"id"`  // Extract field with tag
@@ -117,13 +130,16 @@ type User struct {
 ```
 
 #### 5. SQL: Index and Constraint Extraction
+
 ```sql
 CREATE INDEX idx_user_email ON users(email);
 ALTER TABLE users ADD CONSTRAINT fk_org FOREIGN KEY...
 ```
 
 #### 6. TypeScript: Import/Export Graph
+
 Track which symbols are imported from where:
+
 ```typescript
 import { UserService } from './user.service';
 export { UserDto } from './dto';
@@ -132,12 +148,15 @@ export { UserDto } from './dto';
 ### P2: Medium Priority
 
 #### 7. Generic AST Parser
+
 Use tree-sitter for more accurate parsing instead of regex:
+
 - Handles nested structures correctly
 - Language-agnostic foundation
 - Better multiline support
 
 #### 8. JSDoc/TSDoc Comment Extraction
+
 ```typescript
 /**
  * Finds a user by ID
@@ -148,6 +167,7 @@ async findById(id: string): Promise<User | null>
 ```
 
 #### 9. React Hook Detection
+
 ```typescript
 const [users, setUsers] = useState<User[]>([]);
 const { data } = useQuery(GET_USERS);
@@ -158,13 +178,16 @@ const { data } = useQuery(GET_USERS);
 ## Testing Requirements
 
 ### Unit Tests per Parser
+
 Each parser should have tests covering:
+
 1. Basic symbol extraction
 2. Line number accuracy
 3. Nested structure handling
 4. Edge cases (multiline, unicode, etc.)
 
 ### Integration Test: Re-ingestion Comparison
+
 ```bash
 # Before changes
 ./ingest-codebase --path $REPO --space-id test-before --dry-run | grep "symbols extracted"
@@ -176,7 +199,9 @@ Each parser should have tests covering:
 ```
 
 ### Benchmark Regression Test
+
 Run 20-question benchmark before/after parser changes:
+
 ```bash
 python3 docs/tests/whk-wms/run_benchmark_v4_agents.py --questions 20
 ```
@@ -186,6 +211,7 @@ python3 docs/tests/whk-wms/run_benchmark_v4_agents.py --questions 20
 ## Architecture Notes
 
 ### Symbol Flow
+
 ```
 Parser.extractSymbols()
   → CodeElement.Symbols[]
@@ -198,6 +224,7 @@ Parser.extractSymbols()
 ```
 
 ### Key Files
+
 - Parser implementations: `cmd/ingest-codebase/languages/*_parser.go`
 - Parser interface: `cmd/ingest-codebase/languages/interface.go`
 - Symbol storage: `internal/symbols/store.go`

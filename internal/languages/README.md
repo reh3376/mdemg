@@ -81,6 +81,7 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS/rust -v
 ```
 
 Key fields per symbol:
+
 - `name`: exact match required
 - `type`: symbol type (`function`, `struct`, `class`, `constant`, `macro`, `kernel`, etc.)
 - `line`: expected line number (±`line_tolerance`)
@@ -182,15 +183,19 @@ func (p *MyLangParser) extractSymbols(content string) []Symbol {
 ### Step 3: Key Components to Implement
 
 #### Name() and Extensions()
+
 Return the language name and supported file extensions.
 
 #### CanParse(path)
+
 Return `true` if this parser should handle the given file path. Usually checks file extension.
 
 #### IsTestFile(path)
+
 Return `true` if the file is a test file. Used to filter test files when `--include-tests=false`.
 
 #### ParseFile(root, path, extractSymbols)
+
 The main parsing function. Should:
 
 1. **Read file content** using `ReadFileContent(path)`
@@ -201,7 +206,9 @@ The main parsing function. Should:
 6. **Return CodeElement slice** for each major structure
 
 #### extractSymbols(content)
+
 Optional but recommended. Extract:
+
 - Constants with their values
 - Function signatures
 - Class/struct definitions
@@ -268,6 +275,7 @@ The parser auto-registers via `init()`, so no other changes needed.
 ### Compile-Time Registration
 
 Unlike plugin-based systems, parsers are compiled into the binary. This avoids:
+
 - Go plugin version compatibility issues
 - Runtime loading errors
 - Platform limitations (plugins don't work on Windows)
@@ -297,6 +305,7 @@ func init() {
 ```
 
 The registry provides:
+
 - `GetParser(name)` - Get parser by language name
 - `GetParserForFile(path)` - Find parser for a file path
 - `AllParsers()` - List all registered parsers
@@ -367,6 +376,7 @@ type Symbol struct {
 ### CUDA-Specific Symbol Types
 
 The CUDA parser extracts these symbol types:
+
 - `kernel` — CUDA `__global__` kernel functions (GPU entry points)
 - `function` — `__device__` functions, `__host__ __device__` functions, and plain host functions
 - `struct` — struct declarations (with `__align__` support)
@@ -375,6 +385,7 @@ The CUDA parser extracts these symbol types:
 - `constant` — `const`/`constexpr` values
 
 Example:
+
 ```go
 Symbol{
     Name: "matmul_kernel",

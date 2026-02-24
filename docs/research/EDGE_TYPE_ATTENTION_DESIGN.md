@@ -16,6 +16,7 @@ Edge-Type Attention enhances MDEMG's activation spreading by replacing uniform e
 **Expected Impact:** 5-15% improvement in architecture/concept queries where hierarchical edges matter.
 
 **Actual Impact (Validated 2026-01-30):**
+
 - Overall: **+13.2%** (0.793 → 0.898)
 - service_relationships: **+19.1%**
 - data_flow_integration: **+17.1%**
@@ -102,6 +103,7 @@ Where `attention[edge_type, query_type]` is a learnable/configurable bias matrix
 | TEMPORALLY_ADJACENT | 0.6 | 0.3 | 0.45 |
 
 **Rationale:**
+
 - Code queries benefit from CO_ACTIVATED_WITH (practical patterns observed in use)
 - Architecture queries benefit from hierarchical edges (GENERALIZES, ABSTRACTS_TO)
 - ASSOCIATED_WITH helps with semantic similarity (useful for both, more for architecture)
@@ -388,6 +390,7 @@ python3 docs/benchmarks/benchmark_runner_v3.py \
 ```
 
 **Success Criteria:**
+
 - Overall score maintains or improves (currently 0.880)
 - Architecture-category questions show improvement
 - No regression on code-focused questions

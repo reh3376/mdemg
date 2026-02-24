@@ -12,6 +12,7 @@
 Add full Create/Read/Update/Delete operations and a config-driven workflow engine to the existing Linear plugin. The CRUDModule protobuf service is designed generically for reuse by future integrations (Obsidian in Phase 5).
 
 **Data flow:**
+
 ```
 MCP Tool / REST Client
   → REST API (handlers_linear.go)
@@ -23,6 +24,7 @@ MCP Tool / REST Client
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Generic CRUDModule protobuf service with entity_type dispatch and map<string,string> fields
 2. FR-2: Linear plugin implements Create/Read/Update/Delete/List for issues, projects, and comments
 3. FR-3: REST API exposes full CRUD routes under /v1/linear/
@@ -31,6 +33,7 @@ MCP Tool / REST Client
 6. FR-6: Plugin manager supports additional_services for backward-compatible multi-service modules
 
 ### Non-Functional Requirements
+
 1. NFR-1: Performance — 100ms delay between workflow actions to respect Linear API rate limits
 2. NFR-2: Backward Compatibility — Linear stays type INGESTION, adds CRUD via additional_services
 3. NFR-3: Extensibility — CRUDModule design is generic for reuse by future plugins
@@ -53,6 +56,7 @@ POST   /v1/linear/comments        → Create comment
 ```
 
 ### Create Issue Request
+
 ```json
 {
   "title": "string — required",
@@ -67,6 +71,7 @@ POST   /v1/linear/comments        → Create comment
 ```
 
 ### CRUD Response
+
 ```json
 {
   "entity": {
@@ -78,6 +83,7 @@ POST   /v1/linear/comments        → Create comment
 ```
 
 ### Error Codes
+
 | Code | Meaning |
 |------|---------|
 | 400  | Invalid request (missing required fields, unknown entity type) |
@@ -88,6 +94,7 @@ POST   /v1/linear/comments        → Create comment
 ## Data Model
 
 ### Protobuf Changes
+
 ```protobuf
 enum ModuleType {
   MODULE_TYPE_CRUD = 4;
@@ -103,6 +110,7 @@ service CRUDModule {
 ```
 
 ### Go Types
+
 ```go
 // Manifest additions
 type Manifest struct {
@@ -122,12 +130,14 @@ type ModuleInfo struct {
 ## Test Plan
 
 ### Unit Tests
+
 - [ ] Mutation builder tests — verify GraphQL strings, field mapping, optional field omission
 - [ ] CRUD dispatch tests — entity_type routing, error responses for unknown types
 - [ ] Workflow condition tests — eq/neq/contains/changed_to matching logic
 - [ ] Workflow action tests — action type dispatch, template interpolation
 
 ### Integration Tests
+
 - [ ] REST handler tests — validation, method checks, service unavailable responses
 - [ ] End-to-end: create issue → read → update → add comment → list → delete
 
@@ -148,6 +158,7 @@ type ModuleInfo struct {
 ## Files Changed
 
 ### New Files
+
 - `plugins/linear-module/mutations.go` — GraphQL mutation builders
 - `plugins/linear-module/workflow.go` — Workflow engine implementation
 - `plugins/linear-module/workflows.yaml` — Default workflow configuration
@@ -157,6 +168,7 @@ type ModuleInfo struct {
 - `internal/api/handlers_linear_test.go` — REST handler tests
 
 ### Modified Files
+
 - `api/proto/mdemg-module.proto` — Add CRUDModule service
 - `api/modulepb/*.pb.go` — Regenerated protobuf code
 - `internal/plugins/types.go` — CRUDClient, AdditionalServices

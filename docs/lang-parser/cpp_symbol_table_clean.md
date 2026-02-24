@@ -105,6 +105,7 @@ Searching the spec JSON for "INTERNAL_LIMIT"... Let me check the spec symbols li
 Looking at spec lines 59-63 (BUFFER_SIZE) and checking if there's INTERNAL_LIMIT after it...
 
 Actually, looking at the spec constants section (lines 34-63), I see:
+
 - Lines 34-39: MAX_RETRIES
 - Lines 40-45: DEFAULT_TIMEOUT
 - Lines 46-51: API_VERSION
@@ -116,12 +117,14 @@ Then it jumps to UserId at lines 64-69.
 So INTERNAL_LIMIT is NOT in the spec! That means it's not one of the 78 expected symbols, so it doesn't contribute to the "30 failed" count.
 
 But the user's original analysis listed INTERNAL_LIMIT as a symbol that SHOULD be detected. So the issue is:
+
 - **Spec omission**: INTERNAL_LIMIT should have been in the spec but wasn't
 - **Parser bug**: Parser doesn't emit INTERNAL_LIMIT
 
 This is both a spec generation error AND a parser bug.
 
 Since INTERNAL_LIMIT is not in the 78 spec symbols, the categorization of the 78 symbols is:
+
 - 48 MATCHED
 - 30 SPEC_ERROR
 - 0 PARSER_BUG (within the 78 spec symbols)
@@ -135,12 +138,14 @@ But there's 1 additional parser bug (INTERNAL_LIMIT) that's outside the 78 symbo
 ### ❌ PARSER_BUG: Missing Symbol Not in Spec
 
 **INTERNAL_LIMIT [constant] line=24**
+
 - Fixture: `static const int INTERNAL_LIMIT = 100;`
 - Parser: Does not emit
 - Spec: Not included in 78 expected symbols
 - **Issue**: Parser fails to detect `static const` pattern
 
 This is both:
+
 1. A spec generation error (should have been included)
 2. A parser bug (parser can't detect this pattern)
 
@@ -148,19 +153,21 @@ This is both:
 
 ## Final Counts
 
-### Within 78 Spec Symbols:
+### Within 78 Spec Symbols
+
 - ✅ Matched: 48 (61.5%)
 - ⚠️ Spec errors: 30 (38.5%)
 
-### Additional Findings:
+### Additional Findings
+
 - ❌ Parser bug: 1 (INTERNAL_LIMIT - `static const` not supported)
 - ⚠️ Spec omission: 1 (INTERNAL_LIMIT should be in spec)
 
-### Spec Error Types:
+### Spec Error Types
+
 - Parameter names mistaken for symbols: 17
 - Forward class references: 4
 - Missing constructors (replaced by param names): 3
 - Wrong function names (params instead): 6
 
 **Total spec errors: 30**
-

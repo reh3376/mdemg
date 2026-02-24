@@ -54,6 +54,7 @@ If you experience or witness unacceptable behavior, report it by opening a GitHu
 If you prefer a private report, contact the repository owner/maintainers via GitHub profile messaging.
 
 When reporting, include:
+
 - What happened (links/screenshots if relevant)
 - Where it happened (issue/PR/discussion link)
 - When it happened
@@ -64,6 +65,7 @@ Reports will be handled as confidentially as possible.
 ## Attribution
 
 This Code of Conduct is inspired by the Contributor Covenant (v2.1) and adapted for the norms of engineering-focused collaboration.
+
 # Code of Conduct (Engineering-Focused)
 
 ## 1) Purpose
@@ -79,25 +81,30 @@ We’ll argue about ideas, not people.
 ## 3) Expected Behavior (Engineering Norms)
 
 ### 3.1 Be precise, not personal
+
 - Critique code and reasoning, not the author.
 - Prefer: “This fails when X happens because Y” over “This is bad.”
 - If you’re guessing, label it as a hypothesis.
 
 ### 3.2 Disagree like scientists
+
 - Bring data: benchmarks, logs, minimal repro cases, measurements.
 - If you propose a change, state: **goal**, **tradeoffs**, **alternatives considered**, **risk**.
 - If someone disproves your claim, acknowledge it and update the plan.
 
 ### 3.3 Keep discussions actionable
+
 - Use issues for decisions and PRs for implementation.
 - Avoid derailing threads; open a new issue if the scope changes.
 
 ### 3.4 Reviews are about quality, not dominance
+
 - Reviewers: be timely, specific, and propose solutions when possible.
 - Authors: treat review as collaboration, not a verdict.
 - If the review stalls, explicitly ask: “What would make this LGTM?”
 
 ### 3.5 Respect time and attention (the scarcest resource)
+
 - Use small PRs when possible.
 - Include context in PR descriptions: what/why/how tested.
 - Don’t dump 10,000 lines without justification or a migration plan.
@@ -115,7 +122,9 @@ We’ll argue about ideas, not people.
 ## 5) Engineering Safety & Security Rules
 
 ### 5.1 Never commit secrets
+
 **Do not** commit or paste:
+
 - API keys (Hugging Face, OpenAI, GitHub tokens)
 - SSH private keys
 - `.env` files with secrets
@@ -123,17 +132,21 @@ We’ll argue about ideas, not people.
 - proprietary datasets not meant for public release
 
 If you accidentally commit a secret:
+
 1. **Rotate the secret immediately.**
 2. Remove it from the repo history if necessary (maintainers will guide).
 3. Document what happened and how it’s prevented in the future.
 
 ### 5.2 Log hygiene
+
 - Logs should not include secrets or sensitive user data.
 - Redact tokens and PII before posting logs to issues/PRs.
 - Prefer minimal repro logs over full dumps.
 
 ### 5.3 Vulnerability disclosure
+
 If you discover a security issue:
+
 - Do not open a public issue with exploit details.
 - Contact the repo owner/maintainers privately via GitHub.
 - Provide a clear description, impact assessment, and suggested remediation if possible.
@@ -141,7 +154,9 @@ If you discover a security issue:
 ## 6) Contribution Etiquette (Practical Rules)
 
 ### 6.1 Issues
+
 A good issue includes:
+
 - **Expected behavior**
 - **Actual behavior**
 - **Steps to reproduce**
@@ -149,7 +164,9 @@ A good issue includes:
 - **Logs** (sanitized)
 
 ### 6.2 Pull Requests
+
 A good PR includes:
+
 - **What changed** (summary)
 - **Why** (problem statement / goal)
 - **How tested** (commands, unit tests, benchmarks)
@@ -157,24 +174,29 @@ A good PR includes:
 - **Screenshots** (if UI)
 
 ### 6.3 Tests are part of the feature
+
 - If you add functionality, add tests.
 - If tests are not feasible, explain why and what mitigations exist.
 
 ### 6.4 Performance changes require evidence
+
 - If you claim “faster” or “less memory,” include numbers and how measured.
 - Prefer before/after comparisons with the same inputs.
 
 ### 6.5 Backwards compatibility and migrations
+
 - If you break compatibility, call it out explicitly and provide a migration path.
 - Avoid silent behavior changes; document them.
 
 ### 6.6 Changelog mindset
+
 - If a change affects users, document it.
 - If the repo has release notes, update them.
 
 ## 7) Scope
 
 This Code of Conduct applies to:
+
 - GitHub issues, pull requests, discussions, and code review
 - Project documentation and community channels
 - Any place where the project is represented
@@ -182,6 +204,7 @@ This Code of Conduct applies to:
 ## 8) Enforcement
 
 Maintainers may take actions including:
+
 1. Correction request (specific change requested)
 2. Warning
 3. Temporary restriction (limited participation)
@@ -198,6 +221,7 @@ If you experience or witness unacceptable behavior:
 - Private report: contact the repository owner/maintainers via GitHub profile messaging.
 
 Include:
+
 - What happened (links/screenshots if relevant)
 - Where/when it happened
 - Who was involved

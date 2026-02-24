@@ -14,6 +14,7 @@ Transform CMS from opt-in to enforced by tracking per-session usage, exposing se
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Track whether each agent session has called `/v1/conversation/resume`
 2. FR-2: Track observation counts per session since last resume
 3. FR-3: Expose a session health endpoint with a computed health score (0.0 - 1.0)
@@ -21,6 +22,7 @@ Transform CMS from opt-in to enforced by tracking per-session usage, exposing se
 5. FR-5: Auto-expire stale session tracking data via TTL-based cleanup
 
 ### Non-Functional Requirements
+
 1. NFR-1: Performance — session tracking uses in-memory `sync.Map`, O(1) lookups
 2. NFR-2: Non-breaking — warning middleware never blocks requests, only adds headers
 3. NFR-3: Concurrency — all session state operations are goroutine-safe
@@ -31,11 +33,13 @@ Transform CMS from opt-in to enforced by tracking per-session usage, exposing se
 ### Endpoints
 
 #### Session Health
+
 ```
 GET /v1/conversation/session/health?session_id=X
 ```
 
 **Response (tracked session):**
+
 ```json
 {
   "session_id": "string",
@@ -51,6 +55,7 @@ GET /v1/conversation/session/health?session_id=X
 ```
 
 **Response (untracked session):**
+
 ```json
 {
   "session_id": "string",
@@ -62,12 +67,15 @@ GET /v1/conversation/session/health?session_id=X
 ```
 
 #### Warning Header
+
 When `/v1/memory/retrieve` or `/v1/conversation/recall` is called by a session that has not called `/resume`:
+
 ```
 X-MDEMG-Warning: session-not-resumed
 ```
 
 ### Error Codes
+
 | Code | Meaning |
 |------|---------|
 | 400  | Missing `session_id` query parameter |
@@ -100,6 +108,7 @@ type SessionTracker struct {
 ```
 
 ### Health Score Formula
+
 - **Resumed** (0.4): +0.4 if session has called `/resume`
 - **Observations** (0.0 - 0.4): +0.1 for 1+, +0.2 for 3+, +0.3 for 5+, +0.4 for 10+
 - **Recency** (0.2): +0.2 if last activity within 10 minutes
@@ -108,6 +117,7 @@ type SessionTracker struct {
 ## Test Plan
 
 ### Unit Tests
+
 - [x] TestSessionTracker_RecordResume: verify state created with Resumed=true
 - [x] TestSessionTracker_RecordObserve: verify observation count increments
 - [x] TestSessionTracker_IsResumed: verify false for unknown/observe-only, true after resume
@@ -116,6 +126,7 @@ type SessionTracker struct {
 - [x] TestSessionTracker_GetState_Unknown: verify nil for unknown sessions
 
 ### Integration Tests
+
 - [ ] End-to-end: POST /resume -> POST /observe -> GET /health -> verify score
 - [ ] Warning header: POST /retrieve without resume -> verify X-MDEMG-Warning header
 - [ ] Warning absent: POST /resume then POST /retrieve -> verify no warning header
@@ -138,10 +149,12 @@ type SessionTracker struct {
 ## Files Changed
 
 ### New Files
+
 - `internal/conversation/session_tracker.go` — SessionState, SessionTracker with sync.Map, TTL cleanup
 - `internal/conversation/session_tracker_test.go` — 6 test functions covering all tracker behavior
 
 ### Modified Files
+
 - `internal/api/server.go` — added sessionTracker field, initialization, shutdown, health route
 - `internal/api/handlers_conversation.go` — added tracking calls in handleObserve/handleResume, added handleSessionHealth handler
 - `internal/api/middleware.go` — added SessionResumeWarningMiddleware function

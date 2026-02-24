@@ -52,8 +52,9 @@ This section measures how well each condition survives **Compaction Events** (co
 | **CCC** (Context Churn Cost) | Spikes after reset | **Stable** | MDEMG |
 
 **Isolation & Reliability Proof (Multi-Corpus Test):**
-*   **RAA (Repo Attribution Accuracy)**: 100%
-*   **CRCR (Cross-Repo Contamination)**: **0%** (Proves zero mix-ups even with multiple codebases loaded simultaneously).
+
+* **RAA (Repo Attribution Accuracy)**: 100%
+* **CRCR (Cross-Repo Contamination)**: **0%** (Proves zero mix-ups even with multiple codebases loaded simultaneously).
 
 **Observation:** Mean score is close because this battery is ECR-saturated. The true differentiator is what happens when the model compacts: baseline commitments decay immediately, while MDEMG remains stable.
 
@@ -75,8 +76,8 @@ Each run must pass all checks to be included in analysis:
 
 ### Exclusion Rationale
 
-- **MDEMG Run 3:** Failed sequential constraint. Runs 2 and 3 executed in parallel, preventing Run 3 from benefiting from learning edges created by Run 2. This invalidates the warm-start hypothesis for Run 3.
-- **Baseline Run 3:** Excluded to maintain paired comparison. Including Baseline Run 3 while excluding MDEMG Run 3 would create asymmetric sample sizes (n=3 vs n=2), biasing aggregate statistics.
+* **MDEMG Run 3:** Failed sequential constraint. Runs 2 and 3 executed in parallel, preventing Run 3 from benefiting from learning edges created by Run 2. This invalidates the warm-start hypothesis for Run 3.
+* **Baseline Run 3:** Excluded to maintain paired comparison. Including Baseline Run 3 while excluding MDEMG Run 3 would create asymmetric sample sizes (n=3 vs n=2), biasing aggregate statistics.
 
 ---
 
@@ -125,6 +126,7 @@ Answers scored using semantic similarity grading (v3 script: `grade_answers.py`)
 | File Bonus | +10% | Additive if correct file basename cited; final score capped at 1.0 |
 
 **Final Score Formula:**
+
 ```
 score = min(0.70 * evidence + 0.15 * semantic + 0.15 * concept + file_bonus, 1.0)
 ```
@@ -173,19 +175,19 @@ score = min(0.70 * evidence + 0.15 * semantic + 0.15 * concept + file_bonus, 1.0
 
 ## Limitations
 
-- **Sample size:** n=2 per condition insufficient for statistical significance testing
-- **ECR ceiling effect:** High compliance rates limit differentiation; consider E-Acc for future runs
-- **No learning edge verification:** CO_ACTIVATED_WITH edge creation not independently verified
-- **Single codebase:** Results may not generalize to other repository structures
+* **Sample size:** n=2 per condition insufficient for statistical significance testing
+* **ECR ceiling effect:** High compliance rates limit differentiation; consider E-Acc for future runs
+* **No learning edge verification:** CO_ACTIVATED_WITH edge creation not independently verified
+* **Single codebase:** Results may not generalize to other repository structures
 
 ---
 
 ## Conclusions
 
-- Baseline shows slight edge in this sample; gap narrows with MDEMG warm start
-- MDEMG warm run performance suggests memory retrieval provides value after initial population
-- Higher cold-start variance in MDEMG indicates opportunity for retrieval tuning
-- Future benchmarks should use k≥5 runs and implement E-Acc for citation quality
+* Baseline shows slight edge in this sample; gap narrows with MDEMG warm start
+* MDEMG warm run performance suggests memory retrieval provides value after initial population
+* Higher cold-start variance in MDEMG indicates opportunity for retrieval tuning
+* Future benchmarks should use k≥5 runs and implement E-Acc for citation quality
 
 ---
 

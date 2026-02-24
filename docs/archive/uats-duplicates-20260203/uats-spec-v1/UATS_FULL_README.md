@@ -33,12 +33,14 @@ make test-api
 ## Endpoint Coverage
 
 ### Health (2)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | health | GET | /healthz |
 | readiness | GET | /readyz |
 
 ### Core Memory (14)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | retrieve | POST | /v1/memory/retrieve |
@@ -57,6 +59,7 @@ make test-api
 | query_metrics | GET | /v1/memory/query/metrics |
 
 ### Ingest Jobs (4)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | ingest_trigger | POST | /v1/memory/ingest/trigger |
@@ -65,6 +68,7 @@ make test-api
 | ingest_jobs | GET | /v1/memory/ingest/jobs |
 
 ### Ingest Codebase (4 specs, 31 test cases)
+
 | Spec | Method | Endpoint | Variants |
 |------|--------|----------|----------|
 | ingest_codebase | POST | /v1/memory/ingest-codebase | 18 |
@@ -73,6 +77,7 @@ make test-api
 | ingest_codebase_cancel | DELETE | /v1/memory/ingest-codebase/{id} | 3 |
 
 ### Learning (5)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | learning_prune | POST | /v1/learning/prune |
@@ -82,6 +87,7 @@ make test-api
 | learning_freeze_status | GET | /v1/learning/freeze/status |
 
 ### Conversation CMS (7)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | conversation_observe | POST | /v1/conversation/observe |
@@ -93,6 +99,7 @@ make test-api
 | conversation_graduate | POST | /v1/conversation/graduate |
 
 ### System (9)
+
 | Spec | Method | Endpoint |
 |------|--------|----------|
 | capability_gaps | GET | /v1/system/capability-gaps |
@@ -131,44 +138,44 @@ docs/api-spec/uats/
 ```makefile
 # Run all API tests
 test-api:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
-		--report /tmp/api-report.json
+ python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+  --spec-dir docs/api-spec/uats/specs/ \
+  --base-url http://localhost:8082 \
+  --report /tmp/api-report.json
 
 # Test single endpoint
 test-api-%:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/$*.uats.json \
-		--base-url http://localhost:8082
+ python3 docs/api-spec/uats/runners/uats_runner.py validate \
+  --spec docs/api-spec/uats/specs/$*.uats.json \
+  --base-url http://localhost:8082
 
 # Smoke tests only (health + readiness)
 test-smoke:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/health.uats.json \
-		--base-url http://localhost:8082
-	python3 docs/api-spec/uats/runners/uats_runner.py validate \
-		--spec docs/api-spec/uats/specs/readiness.uats.json \
-		--base-url http://localhost:8082
+ python3 docs/api-spec/uats/runners/uats_runner.py validate \
+  --spec docs/api-spec/uats/specs/health.uats.json \
+  --base-url http://localhost:8082
+ python3 docs/api-spec/uats/runners/uats_runner.py validate \
+  --spec docs/api-spec/uats/specs/readiness.uats.json \
+  --base-url http://localhost:8082
 
 # Test by category
 test-api-memory:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
-		--pattern "*retrieve*|*ingest*|*reflect*|*stats*"
+ python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+  --spec-dir docs/api-spec/uats/specs/ \
+  --base-url http://localhost:8082 \
+  --pattern "*retrieve*|*ingest*|*reflect*|*stats*"
 
 test-api-learning:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
-		--pattern "learning_*.uats.json"
+ python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+  --spec-dir docs/api-spec/uats/specs/ \
+  --base-url http://localhost:8082 \
+  --pattern "learning_*.uats.json"
 
 test-api-conversation:
-	python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api-spec/uats/specs/ \
-		--base-url http://localhost:8082 \
-		--pattern "conversation_*.uats.json"
+ python3 docs/api-spec/uats/runners/uats_runner.py validate-all \
+  --spec-dir docs/api-spec/uats/specs/ \
+  --base-url http://localhost:8082 \
+  --pattern "conversation_*.uats.json"
 ```
 
 ---

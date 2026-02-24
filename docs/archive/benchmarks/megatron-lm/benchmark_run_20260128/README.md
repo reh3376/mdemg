@@ -16,6 +16,7 @@ Executed a warm-start benchmark of the MDEMG (Multi-Dimensional Emergent Memory 
 For **each of the 142 questions**:
 
 1. **Query MDEMG**: Called the retrieve endpoint
+
    ```
    POST http://localhost:9999/v1/memory/retrieve
    Payload: {
@@ -74,6 +75,7 @@ Each line in `answers_mdemg_run2.jsonl` is a valid JSON record:
 ## Key Statistics
 
 ### Retrieval Performance
+
 - **All 142 queries** returned exactly 20 results (top_k=20)
 - **Total file references**: 2,840 unique paths
 - **Average per question**: 20 references
@@ -81,7 +83,9 @@ Each line in `answers_mdemg_run2.jsonl` is a valid JSON record:
 - **Cache hit rate**: 100% (warm start benefit)
 
 ### File Coverage
+
 Retrieved references span the entire Megatron-LM codebase:
+
 - Core models, layers, and components
 - Optimizers and training loops
 - Distributed parallel patterns
@@ -90,6 +94,7 @@ Retrieved references span the entire Megatron-LM codebase:
 - Documentation
 
 ### Timing
+
 - **Total runtime**: 103.3 seconds
 - **Per-question latency**: 0.73 seconds average
 - **Throughput**: 1.38 questions/second
@@ -98,6 +103,7 @@ Retrieved references span the entire Megatron-LM codebase:
 ## Files Generated
 
 ### Main Output
+
 ```
 answers_mdemg_run2.jsonl
   Size: 342 KB
@@ -107,6 +113,7 @@ answers_mdemg_run2.jsonl
 ```
 
 ### Documentation
+
 ```
 RUN2_SUMMARY.md                   # Executive summary
 BENCHMARK_RUN2_COMPLETE.txt       # Detailed report
@@ -114,6 +121,7 @@ README.md                         # This file
 ```
 
 ### Scripts
+
 ```
 run_mdemg_benchmark_run2.py       # Python benchmark runner script
 ```
@@ -121,11 +129,13 @@ run_mdemg_benchmark_run2.py       # Python benchmark runner script
 ## Data Validation
 
 ✅ **JSON Format**
+
 - All 142 records parse as valid JSON
 - All required fields present
 - File references consistently formatted
 
 ✅ **Data Integrity**
+
 - ID field: Sequential 1-142
 - Question field: All non-empty
 - Category field: All valid (7 categories)
@@ -134,6 +144,7 @@ run_mdemg_benchmark_run2.py       # Python benchmark runner script
 - Timestamps: ISO8601 format
 
 ✅ **MDEMG API**
+
 - Endpoint responsive: `http://localhost:9999`
 - All 142 queries succeeded
 - Top K honored: All queries returned 20 results
@@ -142,12 +153,14 @@ run_mdemg_benchmark_run2.py       # Python benchmark runner script
 ## Performance Characteristics
 
 ### Warm Start Benefits
+
 - **Cache State**: Fully warmed from Run 1
 - **Embedding Cache**: Pre-populated and stable
 - **BM25 Index**: Pre-built and ready
 - **Result Consistency**: No variance across run
 
 ### Latency Profile
+
 - **First question**: ~0.5 seconds
 - **Median**: ~0.73 seconds
 - **Last question**: ~0.73 seconds
@@ -156,6 +169,7 @@ run_mdemg_benchmark_run2.py       # Python benchmark runner script
 ## Comparison to Baselines
 
 This warm start run demonstrates:
+
 - Stable performance with warmed caches
 - Consistent 0.73s per-question latency
 - Comprehensive retrieval across all question types
@@ -188,14 +202,16 @@ For evaluation and analysis:
 ## Technical Details
 
 ### MDEMG Configuration
+
 - **Space ID**: megatron-lm
-- **Endpoint**: http://localhost:9999/v1/memory/retrieve
+- **Endpoint**: <http://localhost:9999/v1/memory/retrieve>
 - **API Version**: v1
 - **Top K**: 20 results per query
 - **Embedding Provider**: OpenAI (text-embedding-ada-002)
 - **Retrieval Mode**: Hybrid (BM25 + Vector)
 
 ### System Information
+
 - **OS**: macOS Darwin 25.2.0
 - **Python**: 3.11+
 - **MDEMG Service**: Running and healthy
@@ -252,6 +268,7 @@ with open('answers_mdemg_run2.jsonl', 'r') as f:
 ## Questions?
 
 For issues or questions about this benchmark:
+
 1. Check `BENCHMARK_RUN2_COMPLETE.txt` for detailed metrics
 2. Review individual records in `answers_mdemg_run2.jsonl`
 3. Examine source questions in `benchmark_questions_v1_agent.json`

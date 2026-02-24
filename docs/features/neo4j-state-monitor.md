@@ -18,6 +18,7 @@ The handler executes 6 batched queries instead of N*4 per-space queries:
 ### Health Score
 
 Per-space health is computed as:
+
 - **Orphan ratio** (60% weight): `(1 - orphans/total_nodes) * 0.6`
 - **Edge density** (40% weight): `min(edges/total_nodes, 1.0) * 0.4`
 
@@ -26,6 +27,7 @@ Score range: 0.0 (unhealthy) to 1.0 (healthy).
 ### Staleness Detection
 
 A space is flagged as stale when:
+
 - It has more than 10 conversation observations, AND
 - Its last consolidation was more than 7 days ago
 
@@ -40,11 +42,13 @@ curl -s http://localhost:9999/v1/neo4j/overview | jq
 ```
 
 Filter to a specific space:
+
 ```bash
 curl -s http://localhost:9999/v1/neo4j/overview | jq '.spaces[] | select(.space_id == "mdemg-dev")'
 ```
 
 Quick health check:
+
 ```bash
 curl -s http://localhost:9999/v1/neo4j/overview | jq '{status: .database.status, spaces: .database.total_spaces, nodes: .database.total_nodes}'
 ```

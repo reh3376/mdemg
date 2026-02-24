@@ -11,9 +11,11 @@ Phase 94 introduces `mdemg init` (project scaffolding wizard) and `mdemg config`
 ## Design Decisions
 
 ### YAML → Env Var Bridge (Not Viper)
+
 Rather than adding Viper, we use a simple approach: YAML file is read and converted to env vars via `os.Setenv` (only when not already set). This preserves all existing config behavior.
 
 **Layered config resolution** (lowest → highest priority):
+
 1. Hardcoded defaults (in `FromEnv()`)
 2. `.mdemg/config.yaml` (new — sets env vars before FromEnv)
 3. `.env` file (godotenv.Load)
@@ -21,6 +23,7 @@ Rather than adding Viper, we use a simple approach: YAML file is read and conver
 5. CLI flags (Cobra flag overrides)
 
 ### `.mdemg/` Directory Convention
+
 ```
 .mdemg/
   config.yaml         ← Project config (tracked in git, no secrets)
@@ -68,6 +71,7 @@ mdemg
 ## Key Features
 
 ### `mdemg init`
+
 - Interactive wizard (skip with `--defaults`)
 - Auto-detects: Neo4j (TCP probe), Ollama (HTTP), Git, IDE (.cursor/.vscode)
 - Generates: `.mdemg/config.yaml`, `.mdemgignore` (seeded from `.gitignore`)
@@ -75,17 +79,20 @@ mdemg
 - Flags: `--defaults`, `--yes`, `--space-id`, `--neo4j-uri`, `--embedding-provider`, `--no-hooks`, `--no-ide`
 
 ### `mdemg config show`
+
 - Displays effective config values with source annotations (yaml/env/default)
 - Masks secrets (passwords, API keys)
 - `--json` flag for machine-readable output
 
 ### `mdemg config validate`
+
 - Validates YAML syntax and field values
 - Tests Neo4j reachability (TCP probe)
 - Tests embedding provider reachability (HTTP probe)
 - Reports errors and warnings
 
 ### `.mdemgignore`
+
 - gitignore-style pattern syntax (line-based, `#` comments, `!` negation)
 - Applied during `mdemg ingest` file walk phase
 - Patterns for both files and directories

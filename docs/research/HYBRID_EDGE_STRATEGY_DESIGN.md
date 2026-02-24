@@ -24,6 +24,7 @@ Hybrid Edge Type Strategy optimizes graph traversal by using different edge type
 ### Current Behavior
 
 The expansion phase in `fetchOutgoingEdges` treats all edge types uniformly:
+
 1. Fetches edges matching allowed types (configurable)
 2. Ranks by weight
 3. Takes top MaxNeighborsPerNode per source
@@ -212,6 +213,7 @@ go test ./internal/retrieval/ -run "GetEdgeTypesForHop" -v
 ```
 
 **Tests implemented (all passing):**
+
 - `TestGetEdgeTypesForHop_AllStrategy` - original behavior
 - `TestGetEdgeTypesForHop_HybridStrategy` - recommended default
 - `TestGetEdgeTypesForHop_StructuralFirstStrategy` - structural then all
@@ -232,6 +234,7 @@ done
 ```
 
 **Success Criteria:**
+
 - `hybrid` outperforms `all` on architectural queries by +5%
 - `hybrid` doesn't regress on code lookup queries
 - Latency increase <10ms per query
@@ -248,6 +251,7 @@ done
 | Comparison | 0.78 | 0.80 | +3% |
 
 The hybrid strategy benefits multi-hop queries most because:
+
 - Structural edges in hop 0 reach concept nodes (L1)
 - Learned edges in hop 1+ follow proven query patterns
 - Attention prunes irrelevant branches
@@ -261,6 +265,7 @@ The hybrid strategy benefits multi-hop queries most because:
 **Issue:** First hop uses only structural edges, missing learned shortcuts.
 
 **Mitigation:**
+
 - Set `HybridSwitchHop=0` to disable structural-first if benchmarks show regression
 - Consider "structural_plus" strategy: structural + top-k learned in hop 0
 
@@ -269,6 +274,7 @@ The hybrid strategy benefits multi-hop queries most because:
 **Issue:** Some nodes have few structural edges, limiting hop 0 exploration.
 
 **Mitigation:**
+
 - Fall back to learned edges if structural edges < threshold
 - Add ABSTRACTS_TO edges during consolidation
 
@@ -277,6 +283,7 @@ The hybrid strategy benefits multi-hop queries most because:
 **Issue:** Multiple strategy options may confuse operators.
 
 **Mitigation:**
+
 - Default to `hybrid` (best general performance)
 - Document each strategy's use case clearly
 - Provide diagnostic endpoint showing active strategy

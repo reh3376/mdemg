@@ -14,6 +14,7 @@ Enable sharing of mature MDEMG space_id graphs between developer environments. A
 **Transfer mechanism:** gRPC streaming — the same transport pattern MDEMG already uses for plugins.
 
 **Data flow:**
+
 ```
 Developer A (mature space)                     Developer B (new setup)
 ┌──────────────┐                               ┌──────────────┐
@@ -26,6 +27,7 @@ Developer A (mature space)                     Developer B (new setup)
 ## Requirements
 
 ### Functional Requirements
+
 1. FR-1: Export all graph data for a given `space_id` (nodes, edges, embeddings, observations, symbols, hidden layer concepts)
 2. FR-2: Import exported data into a target Neo4j, creating nodes/edges/indexes
 3. FR-3: gRPC streaming for remote transfer (server-to-server or server-to-CLI)
@@ -35,6 +37,7 @@ Developer A (mature space)                     Developer B (new setup)
 7. FR-7: Progress reporting during export/import (node counts, edge counts, ETA)
 
 ### Non-Functional Requirements
+
 1. NFR-1: Export 100k nodes in < 5 minutes (batch Cypher reads)
 2. NFR-2: Streaming chunks of 500 nodes to avoid OOM
 3. NFR-3: Embeddings transferred as float32 arrays (no re-embedding needed)
@@ -148,6 +151,7 @@ type SpaceChunk struct {
 ## Test Plan
 
 ### Unit Tests
+
 - [x] Export produces correct chunk count (via integration + profile tests)
 - [x] Import creates expected nodes/edges (TestTransferExportImportRoundTrip)
 - [ ] Schema version mismatch rejects import (manual or add integration test)
@@ -157,6 +161,7 @@ type SpaceChunk struct {
 - [x] WriteFile/ReadFile round-trip; ExportFromRequest; ExportConfigForProfile; invalid format rejected
 
 ### Integration Tests
+
 - [x] Export → file → Import round-trip preserves all data (TestTransferExportImportRoundTrip)
 - [x] gRPC Export → Import streaming (serve + pull CLI; UDTS ListSpaces/SpaceInfo)
 - [ ] Large space (10k+ nodes) completes within timeout (manual)
@@ -183,6 +188,7 @@ type SpaceChunk struct {
 ## Files Changed
 
 ### New Files
+
 - `api/proto/space-transfer.proto` — gRPC service definition
 - `api/transferpb/space-transfer.pb.go` — Generated protobuf code
 - `api/transferpb/space-transfer_grpc.pb.go` — Generated gRPC code
@@ -198,6 +204,7 @@ type SpaceChunk struct {
 - `docs/api/api-spec/udts/` — UDTS schema, specs (ListSpaces, SpaceInfo), README
 
 ### Modified Files
+
 - None (zero conflict with other agent)
 
 ## Status: Plan complete

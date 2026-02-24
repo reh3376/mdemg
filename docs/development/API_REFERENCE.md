@@ -34,6 +34,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 Basic liveness check.
 
 **Response**:
+
 ```json
 {"status": "ok"}
 ```
@@ -43,6 +44,7 @@ Basic liveness check.
 Readiness check (verifies Neo4j schema version).
 
 **Response**:
+
 ```json
 {
   "status": "ready",
@@ -60,6 +62,7 @@ Readiness check (verifies Neo4j schema version).
 Store a single observation.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -73,6 +76,7 @@ Store a single observation.
 ```
 
 **Response**:
+
 ```json
 {
   "node_id": "mem-abc123",
@@ -86,6 +90,7 @@ Store a single observation.
 Store multiple observations in a single request.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -105,6 +110,7 @@ Store multiple observations in a single request.
 ```
 
 **Response**:
+
 ```json
 {
   "success_count": 2,
@@ -121,6 +127,7 @@ Store multiple observations in a single request.
 Trigger a background codebase re-ingestion job. Returns immediately with a job ID.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -135,6 +142,7 @@ Trigger a background codebase re-ingestion job. Returns immediately with a job I
 ```
 
 **Response** (202 Accepted):
+
 ```json
 {
   "job_id": "ingest-abc12345",
@@ -150,6 +158,7 @@ Trigger a background codebase re-ingestion job. Returns immediately with a job I
 Check the status and progress of an ingestion job.
 
 **Response**:
+
 ```json
 {
   "job_id": "ingest-abc12345",
@@ -172,6 +181,7 @@ Check the status and progress of an ingestion job.
 Cancel a running or pending ingestion job.
 
 **Response**:
+
 ```json
 {
   "job_id": "ingest-abc12345",
@@ -185,6 +195,7 @@ Cancel a running or pending ingestion job.
 List all ingestion jobs with their current status.
 
 **Response**:
+
 ```json
 {
   "jobs": [
@@ -206,6 +217,7 @@ List all ingestion jobs with their current status.
 Re-ingest specific files into memory. Synchronous for ≤50 files; returns a background job ID for >50.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -216,6 +228,7 @@ Re-ingest specific files into memory. Synchronous for ≤50 files; returns a bac
 ```
 
 **Response** (synchronous):
+
 ```json
 {
   "space_id": "my-project",
@@ -230,6 +243,7 @@ Re-ingest specific files into memory. Synchronous for ≤50 files; returns a bac
 ```
 
 **Response** (>50 files, 202 Accepted):
+
 ```json
 {
   "space_id": "my-project",
@@ -243,6 +257,7 @@ Re-ingest specific files into memory. Synchronous for ≤50 files; returns a bac
 Soft-delete a memory node (sets `is_archived=true`).
 
 **Request Body** (optional):
+
 ```json
 {
   "reason": "Outdated implementation"
@@ -250,6 +265,7 @@ Soft-delete a memory node (sets `is_archived=true`).
 ```
 
 **Response**:
+
 ```json
 {
   "node_id": "mem-abc123",
@@ -264,6 +280,7 @@ Soft-delete a memory node (sets `is_archived=true`).
 Restore an archived memory node.
 
 **Response**:
+
 ```json
 {
   "node_id": "mem-abc123",
@@ -277,6 +294,7 @@ Restore an archived memory node.
 Permanently delete a memory node. Requires `confirm=true` query parameter.
 
 **Response**:
+
 ```json
 {
   "node_id": "mem-abc123",
@@ -290,6 +308,7 @@ Permanently delete a memory node. Requires `confirm=true` query parameter.
 Archive multiple nodes in a single request.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -299,6 +318,7 @@ Archive multiple nodes in a single request.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -318,6 +338,7 @@ Archive multiple nodes in a single request.
 Semantic search with optional LLM re-ranking.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -331,6 +352,7 @@ Semantic search with optional LLM re-ranking.
 ```
 
 **Parameters**:
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `space_id` | string | Yes | Memory space identifier |
@@ -342,6 +364,7 @@ Semantic search with optional LLM re-ranking.
 | `rerank` | bool | No | Apply LLM re-ranking |
 
 **Response**:
+
 ```json
 {
   "results": [
@@ -372,6 +395,7 @@ Semantic search with optional LLM re-ranking.
 SME-style consultation with evidence-based answers.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -383,6 +407,7 @@ SME-style consultation with evidence-based answers.
 ```
 
 **Response**:
+
 ```json
 {
   "answer": "The session timeout is configured to 3600 seconds (1 hour) in src/config/auth.ts:15",
@@ -402,6 +427,7 @@ SME-style consultation with evidence-based answers.
 Context-triggered suggestions (proactive memory surfacing).
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -411,6 +437,7 @@ Context-triggered suggestions (proactive memory surfacing).
 ```
 
 **Response**:
+
 ```json
 {
   "suggestions": [
@@ -429,6 +456,7 @@ Context-triggered suggestions (proactive memory surfacing).
 Deep exploration of a topic.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -446,6 +474,7 @@ Deep exploration of a topic.
 Trigger hidden layer creation (concept abstraction).
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -456,6 +485,7 @@ Trigger hidden layer creation (concept abstraction).
 ```
 
 **Response**:
+
 ```json
 {
   "data": {
@@ -513,6 +543,7 @@ Trigger hidden layer creation (concept abstraction).
 Get Hebbian learning edge statistics.
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -530,6 +561,7 @@ Get Hebbian learning edge statistics.
 Prune decayed and excess learning edges.
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -550,6 +582,7 @@ Endpoints for the Conversation Memory System (CMS) - capturing, recalling, and m
 Capture a significant observation with auto-surprise scoring.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -565,11 +598,13 @@ Capture a significant observation with auto-surprise scoring.
 ```
 
 **Fields**:
+
 - `obs_type`: `decision`, `learning`, `preference`, `error`, `task`, `correction`
 - `visibility`: `private` (owner only), `team` (space members), `global` (everyone, default)
 - `refers_to`: Array of node IDs to create REFERS_TO edges
 
 **Response**:
+
 ```json
 {
   "obs_id": "obs-abc123",
@@ -589,6 +624,7 @@ Capture a significant observation with auto-surprise scoring.
 Capture an explicit user correction (high surprise, persistent).
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -608,6 +644,7 @@ Capture an explicit user correction (high surprise, persistent).
 Restore context after context compaction.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -621,6 +658,7 @@ Restore context after context compaction.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -656,6 +694,7 @@ Restore context after context compaction.
 Retrieve relevant conversation knowledge via semantic query.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -668,6 +707,7 @@ Retrieve relevant conversation knowledge via semantic query.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -689,6 +729,7 @@ Retrieve relevant conversation knowledge via semantic query.
 Trigger consolidation to form themes and emergent concepts.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project"
@@ -696,6 +737,7 @@ Trigger consolidation to form themes and emergent concepts.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -710,9 +752,11 @@ Trigger consolidation to form themes and emergent concepts.
 Get statistics about volatile (ungraduated) observations.
 
 **Query Parameters**:
+
 - `space_id` (required)
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -729,6 +773,7 @@ Get statistics about volatile (ungraduated) observations.
 Manually trigger graduation processing for the Context Cooler.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project"
@@ -736,6 +781,7 @@ Manually trigger graduation processing for the Context Cooler.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -758,6 +804,7 @@ Skills are CMS pinned observations with `skill:<name>` tags. The Skill Registry 
 List all registered skills discovered from pinned observations with `skill:*` tags.
 
 **Response:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -778,6 +825,7 @@ List all registered skills discovered from pinned observations with `skill:*` ta
 Recall skill content by tag. Uses direct Cypher query (not vector search) for reliable tag-based retrieval.
 
 **Request:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -787,6 +835,7 @@ Recall skill content by tag. Uses direct Cypher query (not vector search) for re
 ```
 
 **Response:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -811,6 +860,7 @@ Recall skill content by tag. Uses direct Cypher query (not vector search) for re
 Register skill sections as pinned observations. Each section becomes a permanent, non-decaying observation with `skill:<name>` and `skill:<name>:<section>` tags.
 
 **Request:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -827,6 +877,7 @@ Register skill sections as pinned observations. Each section becomes a permanent
 ```
 
 **Response:**
+
 ```json
 {
   "skill": "mdemg-api",
@@ -851,9 +902,11 @@ Templates provide structured schemas for consistent observation capture with JSO
 List all observation templates for a space.
 
 **Query Parameters**:
+
 - `space_id` (required): The memory space
 
 **Response**:
+
 ```json
 {
   "templates": [
@@ -875,6 +928,7 @@ List all observation templates for a space.
 Create a new observation template.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -894,6 +948,7 @@ Create a new observation template.
 ```
 
 **Response**:
+
 ```json
 {
   "template_id": "task_handoff",
@@ -908,6 +963,7 @@ Create a new observation template.
 Get a specific template by ID.
 
 **Query Parameters**:
+
 - `space_id` (required): The memory space
 
 **Response**: Same as single template in list response.
@@ -919,6 +975,7 @@ Update an existing template.
 **Request Body**: Same as create (all fields optional except `space_id`).
 
 **Response**:
+
 ```json
 {
   "template_id": "task_handoff",
@@ -932,9 +989,11 @@ Update an existing template.
 Delete a template.
 
 **Query Parameters**:
+
 - `space_id` (required): The memory space
 
 **Response**:
+
 ```json
 {
   "template_id": "task_handoff",
@@ -951,11 +1010,13 @@ Snapshots capture task state for session continuity, triggered manually or autom
 List snapshots for a session.
 
 **Query Parameters**:
+
 - `space_id` (required)
 - `session_id` (optional): Filter by session
 - `limit` (optional): Max results (default: 50)
 
 **Response**:
+
 ```json
 {
   "snapshots": [
@@ -980,6 +1041,7 @@ List snapshots for a session.
 Create a new task context snapshot.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -996,6 +1058,7 @@ Create a new task context snapshot.
 ```
 
 **Response**:
+
 ```json
 {
   "snapshot_id": "snap-abc123",
@@ -1011,6 +1074,7 @@ Create a new task context snapshot.
 Get a specific snapshot.
 
 **Query Parameters**:
+
 - `space_id` (required)
 
 **Response**: Same as single snapshot in list response.
@@ -1020,6 +1084,7 @@ Get a specific snapshot.
 Get the most recent snapshot for a session.
 
 **Query Parameters**:
+
 - `space_id` (required)
 - `session_id` (required)
 
@@ -1030,9 +1095,11 @@ Get the most recent snapshot for a session.
 Delete a snapshot.
 
 **Query Parameters**:
+
 - `space_id` (required)
 
 **Response**:
+
 ```json
 {
   "snapshot_id": "snap-abc123",
@@ -1045,6 +1112,7 @@ Delete a snapshot.
 Clean up old snapshots for a space.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -1054,6 +1122,7 @@ Clean up old snapshots for a space.
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -1070,10 +1139,12 @@ Workflow for flagging observations for org-level review before promotion to team
 List observations pending org-level review.
 
 **Query Parameters**:
+
 - `space_id` (required)
 - `limit` (optional): Max results (default: 50, max: 500)
 
 **Response**:
+
 ```json
 {
   "reviews": [
@@ -1097,9 +1168,11 @@ List observations pending org-level review.
 Get review statistics for a space.
 
 **Query Parameters**:
+
 - `space_id` (required)
 
 **Response**:
+
 ```json
 {
   "pending": 5,
@@ -1113,6 +1186,7 @@ Get review statistics for a space.
 Flag an observation for org-level review.
 
 **Request Body**:
+
 ```json
 {
   "obs_id": "obs-abc123",
@@ -1124,6 +1198,7 @@ Flag an observation for org-level review.
 ```
 
 **Response**:
+
 ```json
 {
   "obs_id": "obs-abc123",
@@ -1139,6 +1214,7 @@ Flag an observation for org-level review.
 Process an approve/reject decision on a flagged observation.
 
 **Request Body**:
+
 ```json
 {
   "obs_id": "obs-abc123",
@@ -1151,6 +1227,7 @@ Process an approve/reject decision on a flagged observation.
 ```
 
 **Response**:
+
 ```json
 {
   "obs_id": "obs-abc123",
@@ -1172,11 +1249,13 @@ Endpoints for capability gap detection and interview prompts.
 List all capability gaps.
 
 **Query Parameters**:
+
 - `status`: `open`, `addressed`, `dismissed`
 - `type`: `data_source`, `reasoning`, `query_pattern`
 - `space_id`: Filter by space
 
 **Response**:
+
 ```json
 {
   "data": {
@@ -1210,9 +1289,11 @@ List all capability gaps.
 Get pending interview prompts.
 
 **Query Parameters**:
+
 - `space_id` (optional)
 
 **Response**:
+
 ```json
 {
   "prompts": [
@@ -1241,6 +1322,7 @@ Get pending interview prompts.
 Manually trigger the weekly gap interview process.
 
 **Request Body** (optional):
+
 ```json
 {
   "max_prompts": 10,
@@ -1250,6 +1332,7 @@ Manually trigger the weekly gap interview process.
 ```
 
 **Response**:
+
 ```json
 {
   "total_gaps_analyzed": 8,
@@ -1266,6 +1349,7 @@ Manually trigger the weekly gap interview process.
 Mark an interview prompt as answered.
 
 **Request Body**:
+
 ```json
 {
   "observation_node_id": "obs-abc123"
@@ -1277,6 +1361,7 @@ Mark an interview prompt as answered.
 Skip an interview prompt.
 
 **Request Body**:
+
 ```json
 {
   "reason": "Not relevant to this project"
@@ -1294,6 +1379,7 @@ CRUD operations for Linear issues, projects, and comments. Requires the `linear-
 Create a new Linear issue.
 
 **Request Body**:
+
 ```json
 {
   "title": "Fix login bug",
@@ -1309,6 +1395,7 @@ Create a new Linear issue.
 **Required fields**: `title`, `team_id`
 
 **Response**:
+
 ```json
 {
   "id": "issue-uuid",
@@ -1326,6 +1413,7 @@ Create a new Linear issue.
 List Linear issues with optional filters.
 
 **Query Parameters**:
+
 | Param | Type | Description |
 |-------|------|-------------|
 | `team` | string | Filter by team key (e.g., "ENG") |
@@ -1336,6 +1424,7 @@ List Linear issues with optional filters.
 | `cursor` | string | Pagination cursor |
 
 **Response**:
+
 ```json
 {
   "issues": [
@@ -1363,6 +1452,7 @@ Read a single issue by ID.
 Update an existing issue. Only provided fields are modified.
 
 **Request Body**:
+
 ```json
 {
   "title": "Updated title",
@@ -1379,6 +1469,7 @@ Update an existing issue. Only provided fields are modified.
 Archive (soft-delete) an issue.
 
 **Response**:
+
 ```json
 {
   "success": true
@@ -1390,6 +1481,7 @@ Archive (soft-delete) an issue.
 Create a new Linear project.
 
 **Request Body**:
+
 ```json
 {
   "name": "Q1 Sprint",
@@ -1418,6 +1510,7 @@ Update an existing project.
 Add a comment to an issue.
 
 **Request Body**:
+
 ```json
 {
   "issue_id": "issue-uuid",
@@ -1428,6 +1521,7 @@ Add a comment to an issue.
 **Required fields**: `issue_id`, `body`
 
 **Response**:
+
 ```json
 {
   "id": "comment-uuid",
@@ -1448,10 +1542,12 @@ Receives Linear webhook events and ingests them as observations via the `linear-
 **Authentication:** HMAC-SHA256 signature verification via the `Linear-Signature` header.
 
 **Environment variables:**
+
 - `LINEAR_WEBHOOK_SECRET` — HMAC-SHA256 signing secret (required)
 - `LINEAR_WEBHOOK_SPACE_ID` — Target space ID for ingested observations (required)
 
 **Supported events:**
+
 - `Issue` create/update
 - `Project` update
 
@@ -1460,9 +1556,11 @@ Other event types are acknowledged with 200 but ignored.
 **Debouncing:** Rapid events for the same entity are coalesced with a 10-second window.
 
 **Request headers:**
+
 - `Linear-Signature` — HMAC-SHA256 hex digest of the request body
 
 **Response:**
+
 ```json
 {
   "status": "accepted",
@@ -1473,6 +1571,7 @@ Other event types are acknowledged with 200 but ignored.
 ```
 
 **Error responses:**
+
 - `401 Unauthorized` — Missing or invalid signature
 - `405 Method Not Allowed` — Non-POST request
 - `500 Internal Server Error` — Webhook secret not configured
@@ -1486,6 +1585,7 @@ Other event types are acknowledged with 200 but ignored.
 List all plugins.
 
 **Response**:
+
 ```json
 {
   "data": {
@@ -1511,6 +1611,7 @@ Get plugin details.
 Create a new plugin scaffold.
 
 **Request Body**:
+
 ```json
 {
   "name": "my-plugin",
@@ -1542,6 +1643,7 @@ Trigger a sync operation on an ingestion module.
 Get graph metrics (nodes, edges, hub analysis).
 
 **Response**:
+
 ```json
 {
   "total_nodes": 5000,
@@ -1564,6 +1666,7 @@ Get graph metrics (nodes, edges, hub analysis).
 Get per-space memory statistics.
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -1599,9 +1702,11 @@ Get Neo4j query execution statistics.
 Get statistics about stale edges in a space. Edges become stale when their connected nodes' embeddings change.
 
 **Query Parameters**:
+
 - `space_id` (required): The space to query
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -1621,6 +1726,7 @@ Get statistics about stale edges in a space. Edges become stale when their conne
 Trigger a refresh of stale edges in a space. Recalculates semantic similarity scores for edges marked as stale.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project"
@@ -1628,6 +1734,7 @@ Trigger a refresh of stale edges in a space. Recalculates semantic similarity sc
 ```
 
 **Response**:
+
 ```json
 {
   "space_id": "my-project",
@@ -1644,6 +1751,7 @@ Get APE (Autonomous Pattern Extraction) scheduler status.
 Manually trigger an APE event.
 
 **Request Body**:
+
 ```json
 {
   "event": "consolidation_complete"
@@ -1655,6 +1763,7 @@ Manually trigger an APE event.
 List detected capability gaps.
 
 **Response**:
+
 ```json
 {
   "data": {
@@ -1689,6 +1798,7 @@ Mark a capability gap as addressed.
 Submit feedback for capability gap detection.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -1707,9 +1817,11 @@ Submit feedback for capability gap detection.
 Returns freshness and staleness information for a space's TapRoot node.
 
 **Path Parameters**:
+
 - `space_id` - The space to check freshness for
 
 **Response** (`200 OK`):
+
 ```json
 {
   "space_id": "my-project",
@@ -1723,6 +1835,7 @@ Returns freshness and staleness information for a space's TapRoot node.
 ```
 
 **Fields**:
+
 - `last_ingest_at` - ISO8601 timestamp of last ingest (omitted if never ingested)
 - `last_ingest_type` - Type of last ingest (`codebase-ingest`, `file-ingest`)
 - `ingest_count` - Total number of ingestions for this space
@@ -1739,6 +1852,7 @@ Returns freshness and staleness information for a space's TapRoot node.
 Detect and act on L0 nodes that were not included in the most recent re-ingestion (timestamp-based orphan detection).
 
 **Request Body**:
+
 ```json
 {
   "space_id": "my-project",
@@ -1757,6 +1871,7 @@ Detect and act on L0 nodes that were not included in the most recent re-ingestio
 Cross-space zero-edge node scan and fix. Scans all (or specified) spaces for nodes with no edges.
 
 **Request Body**:
+
 ```json
 {
   "action": "scan",
@@ -1773,6 +1888,7 @@ Cross-space zero-edge node scan and fix. Scans all (or specified) spaces for nod
 **Protected spaces**: `archive` and `delete` are blocked on protected spaces (e.g., `mdemg-dev`) — returns `skipped: true`.
 
 **Response**:
+
 ```json
 {
   "action": "scan",
@@ -1833,6 +1949,7 @@ See [`docs/development/NEO4J_BACKUP.md`](NEO4J_BACKUP.md) for the full operation
 Trigger an on-demand backup (full database dump or partial space export).
 
 **Request Body**:
+
 ```json
 {
   "type": "partial_space",
@@ -1848,6 +1965,7 @@ Trigger an on-demand backup (full database dump or partial space export).
 - `label` — Optional label for identification
 
 **Response** (`202 Accepted`):
+
 ```json
 {
   "backup_id": "bk-20260208-022802-partial_space",
@@ -1861,6 +1979,7 @@ Trigger an on-demand backup (full database dump or partial space export).
 Check backup job progress.
 
 **Response** (`200 OK`):
+
 ```json
 {
   "backup_id": "bk-20260208-022802-partial_space",
@@ -1885,6 +2004,7 @@ Check backup job progress.
 List available backups. Optional `?type=full` or `?type=partial_space` filter.
 
 **Response** (`200 OK`):
+
 ```json
 {
   "backups": [
@@ -1917,6 +2037,7 @@ Get full manifest details for a specific backup.
 Delete a backup (removes data file + manifest from disk).
 
 **Response** (`200 OK`):
+
 ```json
 {
   "status": "deleted",
@@ -1929,6 +2050,7 @@ Delete a backup (removes data file + manifest from disk).
 Trigger a restore from a full database dump. Full dump only for P0.
 
 **Request Body**:
+
 ```json
 {
   "backup_id": "bk-20260208-030000-full",
@@ -1937,6 +2059,7 @@ Trigger a restore from a full database dump. Full dump only for P0.
 ```
 
 **Response** (`202 Accepted`):
+
 ```json
 {
   "restore_id": "restore-abc123",
@@ -1950,6 +2073,7 @@ Trigger a restore from a full database dump. Full dump only for P0.
 Check restore job progress.
 
 **Response** (`200 OK`):
+
 ```json
 {
   "restore_id": "restore-abc123",
@@ -1972,6 +2096,7 @@ Consolidated view of database health, all spaces, and backup status in a single 
 Returns aggregated database statistics, per-space summaries, and backup overview.
 
 **Response**:
+
 ```json
 {
   "database": {
@@ -2033,10 +2158,12 @@ Server-side anomaly detection and behavioral learning for CMS enforcement.
 Aggregated session health: watchdog state, observation rate, active anomalies.
 
 **Query Parameters**:
+
 - `session_id` (required): Session identifier
 - `space_id` (required): Memory space identifier
 
 **Response**:
+
 ```json
 {
   "session_id": "claude-core",
@@ -2061,6 +2188,7 @@ Aggregated session health: watchdog state, observation rate, active anomalies.
 Runs the RSIC assessment stage only (no reflect/plan/dispatch). Returns health metrics and confidence score for a given space.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -2074,6 +2202,7 @@ Runs the RSIC assessment stage only (no reflect/plan/dispatch). Returns health m
 | `tier` | No | `"meso"` | Cycle tier (`micro`, `meso`, `macro`) |
 
 **Response** (200):
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -2105,6 +2234,7 @@ Runs the RSIC assessment stage only (no reflect/plan/dispatch). Returns health m
 Lists all active RSIC task statuses.
 
 **Response** (200):
+
 ```json
 {
   "active_tasks": {
@@ -2119,6 +2249,7 @@ Lists all active RSIC task statuses.
 Returns progress reports for a specific RSIC task.
 
 **Response** (200):
+
 ```json
 {
   "task_id": "task-abc123",
@@ -2142,6 +2273,7 @@ Returns progress reports for a specific RSIC task.
 Returns current per-action confidence scores from the calibrator.
 
 **Response** (200):
+
 ```json
 {
   "calibration": {
@@ -2159,6 +2291,7 @@ Returns current per-action confidence scores from the calibrator.
 Signal emission/response effectiveness stats (Hebbian learning).
 
 **Response**:
+
 ```json
 {
   "signals": [
@@ -2196,6 +2329,7 @@ Phase 80 adds `anomalies` and `memory_state` fields to existing resume and recal
 **Memory States**: `healthy` (observations + themes), `nominal` (observations but no themes), `degraded` (empty resume for populated space)
 
 **Response Headers** (set on degraded state):
+
 - `X-MDEMG-Memory-State: degraded`
 - `X-MDEMG-Anomaly: empty-resume`
 
@@ -2208,6 +2342,7 @@ Phase 80 adds `anomalies` and `memory_state` fields to existing resume and recal
 Triggers an RSIC cycle with orchestration policy enforcement.
 
 **Request Body**:
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -2223,6 +2358,7 @@ Triggers an RSIC cycle with orchestration policy enforcement.
 - `idempotency_key` (Phase 87): If provided, duplicate requests within the dedupe window return the cached result.
 
 **Response (200)**:
+
 ```json
 {
   "cycle_id": "rsic-meso-abc12345",
@@ -2244,6 +2380,7 @@ Triggers an RSIC cycle with orchestration policy enforcement.
 ```
 
 **Response (409 — Cooldown/Overlap)**:
+
 ```json
 {
   "error": "trigger rejected",
@@ -2259,6 +2396,7 @@ Triggers an RSIC cycle with orchestration policy enforcement.
 Extended health endpoint with orchestration, safety, and persistence blocks.
 
 **Response (200)** includes Phase 87-90 blocks:
+
 ```json
 {
   "status": "idle",
@@ -2296,6 +2434,7 @@ Supports Phase 87 filtering by `trigger_source`, `tier`, and `space_id` query pa
 Lists available rollback snapshots (Phase 88).
 
 **Response (200)**:
+
 ```json
 {
   "snapshots": [
@@ -2317,6 +2456,7 @@ Lists available rollback snapshots (Phase 88).
 Rolls back a specific snapshot (Phase 88).
 
 **Request Body**:
+
 ```json
 { "snapshot_id": "snap-abc123" }
 ```
@@ -2330,10 +2470,12 @@ Rolls back a specific snapshot (Phase 88).
 List all spaces with metadata (node counts, prunable status, orphan detection).
 
 **Query parameters:**
+
 - `prunable` — Filter by prunable status (`true`, `false`, or omit for all)
 - `limit` — Max spaces to return (default 100, max 500)
 
 **Response** (`200 OK`):
+
 ```json
 {
   "spaces": [
@@ -2358,11 +2500,13 @@ List all spaces with metadata (node counts, prunable status, orphan detection).
 Update space metadata (currently only `prunable` flag). Protected spaces cannot be marked prunable.
 
 **Request body:**
+
 ```json
 { "prunable": true }
 ```
 
 **Response** (`200 OK`):
+
 ```json
 { "space_id": "test-abc", "prunable": true, "updated": true }
 ```
@@ -2372,11 +2516,13 @@ Update space metadata (currently only `prunable` flag). Protected spaces cannot 
 Execute batch pruning of prunable/orphan spaces. Supports dry-run mode.
 
 **Request body:**
+
 ```json
 { "dry_run": true, "batch_size": 10000, "max_spaces": 50 }
 ```
 
 **Response** (`200 OK`):
+
 ```json
 {
   "dry_run": true,
@@ -2393,6 +2539,7 @@ Execute batch pruning of prunable/orphan spaces. Supports dry-run mode.
 **Auto-prune scheduler:** A background goroutine runs `runAutoSpacePrune()` on a configurable interval.
 
 **Environment variable:**
+
 - `SPACE_PRUNE_INTERVAL_HOURS` — Interval in hours (default: 24, 0 = disabled)
 
 ---
@@ -2406,6 +2553,7 @@ Hash verification REST API for tracking SHA-256 hashes of framework-protected fi
 Register a file for hash tracking.
 
 **Request Body:**
+
 ```json
 {
   "path": "docs/specs/manifest.sha256",
@@ -2425,6 +2573,7 @@ Register a file for hash tracking.
 List all tracked files. Optional query params: `?framework=manifest`, `?status=verified`.
 
 **Response (200):**
+
 ```json
 {
   "files": [...],
@@ -2445,11 +2594,13 @@ Get a single tracked file by repo-relative path (URL path suffix after `/files/`
 Verify a single file's actual hash against expected.
 
 **Request Body:**
+
 ```json
 {"path": "docs/specs/manifest.sha256"}
 ```
 
 **Response (200):**
+
 ```json
 {
   "path": "docs/specs/manifest.sha256",
@@ -2468,6 +2619,7 @@ Status values: `verified`, `mismatch`, `unknown`.
 Verify all tracked files. Optional `framework` filter in body.
 
 **Response (200):**
+
 ```json
 {
   "results": [...],
@@ -2482,6 +2634,7 @@ Verify all tracked files. Optional `framework` filter in body.
 Update the expected hash for a tracked file (pushes current hash to history).
 
 **Request Body:**
+
 ```json
 {"path": "...", "hash": "<new_sha256>", "source": "manual"}
 ```
@@ -2495,6 +2648,7 @@ Update the expected hash for a tracked file (pushes current hash to history).
 Revert to a previous hash from the file's history.
 
 **Request Body:**
+
 ```json
 {"path": "...", "target_hash": "<old_sha256>"}
 ```
@@ -2508,11 +2662,13 @@ Revert to a previous hash from the file's history.
 Trigger a full scan of `manifest.sha256` and UDTS spec files to auto-register hashes.
 
 **Response (200):**
+
 ```json
 {"scanned": true, "files_registered": 22}
 ```
 
 **Configuration:**
+
 - `UNTS_ENABLED` — Enable hash verification REST API (default: `false`)
 - `UNTS_BASE_PATH` — Repository root for file hashing (default: `.`)
 
@@ -2529,6 +2685,7 @@ All endpoints return errors in a consistent format:
 ```
 
 **HTTP Status Codes**:
+
 - `200` - Success
 - `201` - Created
 - `207` - Multi-Status (partial success in batch operations)

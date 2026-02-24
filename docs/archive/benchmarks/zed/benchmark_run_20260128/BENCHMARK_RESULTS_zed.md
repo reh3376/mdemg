@@ -73,17 +73,20 @@
 ## Methodology
 
 ### Benchmark Protocol
+
 - **Baseline agents:** Direct codebase search (Glob/Grep/Read)
 - **MDEMG agents:** Query MDEMG API first, supplement with code search
 - **Sequential MDEMG runs:** Required for learning edge accumulation
 
 ### Grading Formula
+
 - 70% evidence score (file:line citations)
 - 15% semantic similarity (n-gram overlap)
 - 15% concept overlap (technical terms)
 - Negative control: Full credit for correctly identifying non-existent features
 
 ### Question Distribution
+
 - Architecture/Structure: 25 questions (hard)
 - Service Relationships: 27 questions (hard)
 - Data Flow/Integration: 25 questions (hard)
@@ -127,6 +130,7 @@ benchmark_run_20260128/
 ### Ingestion Commands
 
 **Megatron-LM:**
+
 ```bash
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
@@ -134,6 +138,7 @@ mdemg ingest --space-id megatron-lm --path .
 ```
 
 **PyTorch (shallow clone - recommended for size):**
+
 ```bash
 # Shallow clone - huge time saver
 git clone --depth 1 https://github.com/pytorch/pytorch.git

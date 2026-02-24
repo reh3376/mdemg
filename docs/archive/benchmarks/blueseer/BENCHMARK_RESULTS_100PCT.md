@@ -15,7 +15,7 @@
 | Property | Value |
 |----------|-------|
 | **Repo** | /Users/reh3376/repos/blueseer |
-| **Repo URL** | https://github.com/blueseerERP/blueseer.git |
+| **Repo URL** | <https://github.com/blueseerERP/blueseer.git> |
 | **Commit** | `1dd2ef15775ee019ee2b57794a733bf6c4ee20ba` |
 | **MDEMG Commit** | `8353e12f9766266cf0b5d00a0a6ad41073ba098e` |
 | **Ingest scope** | Full repository (Java files) |
@@ -208,6 +208,7 @@ The architecture_structure category scored lowest (0.812) due to lower semantic/
 ### Evidence Strategy
 
 Agents were instructed to:
+
 1. Query MDEMG for every question
 2. Read source files from retrieved results
 3. Include 4-7 specific file:line references per answer
@@ -216,11 +217,13 @@ Agents were instructed to:
 ## File References
 
 ### Setup Files
+
 - [x] benchmark_questions_v3_master.json - 140 questions with answers
 - [x] benchmark_questions_v3_agent.json - 140 questions (no answers)
 - [x] grade_answers_v3.py - Grading script (v3, schema-aware)
 
 ### Generated Artifact Files
+
 - [x] answers_mdemg_100pct.jsonl - 140 answers with file:line refs
 - [x] grades_mdemg_100pct.json - Grading results
 
@@ -234,6 +237,7 @@ This benchmark run demonstrates that **100% evidence coverage is achievable** an
 - **24% improvement** over previous MDEMG runs
 
 **Key takeaways:**
+
 - Evidence quality is the primary driver of benchmark scores (70% weight)
 - Parallel agent architecture enables efficient large-scale benchmarking
 - MDEMG retrieval consistently surfaces relevant source files

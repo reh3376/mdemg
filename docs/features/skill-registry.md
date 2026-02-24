@@ -31,6 +31,7 @@ Recall uses **direct Cypher tag matching** (not vector similarity) for determini
 ### Pinning
 
 Skill observations are created with `pinned: true`, which:
+
 - Disables temporal decay (content never ages)
 - Protects from consolidation (won't be merged or summarized)
 - Guarantees permanent availability (stability score fixed at 1.0)
@@ -105,6 +106,7 @@ curl -s -X POST http://localhost:9999/v1/skills/my-skill/register \
 ## Thin Skill Files
 
 Skill files in `.claude/skills/` are minimal pointers (typically ~20 lines) containing:
+
 - **Trigger conditions** — when the skill should activate
 - **Recall command** — the curl command to fetch content from CMS
 - **Section list** — what sections exist
@@ -127,6 +129,7 @@ curl -s -X POST http://localhost:9999/v1/skills/mdemg-api/recall \
 ## Design Rationale
 
 **Why CMS-backed instead of file-based?**
+
 - Unified storage with conversation memory
 - Protected from decay via pinning
 - API-driven updates without file edits

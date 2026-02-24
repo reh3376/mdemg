@@ -115,6 +115,7 @@ curl -s http://localhost:9999/v1/memory/spaces/my-project/freshness | jq
 ```
 
 Response:
+
 ```json
 {
   "space_id": "my-project",

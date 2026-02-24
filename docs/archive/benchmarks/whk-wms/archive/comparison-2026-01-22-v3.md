@@ -37,12 +37,14 @@
 ## Test Protocol Differences
 
 ### Baseline Agent (v3)
+
 - **Objective:** Read ALL 3,314 files from whk-wms BEFORE seeing questions
 - **Reality:** Only read ~20-50 files before context compression
 - **Constraint:** Answer from memory/compressed context only (no file re-reading)
 - **Result:** Context window limitations prevented full codebase ingestion
 
 ### MDEMG Agent (v3)
+
 - **Objective:** Answer questions using ONLY MDEMG API
 - **Method:** Query `POST /v1/memory/retrieve` for each question
 - **Constraint:** No direct file reading allowed
@@ -110,11 +112,13 @@ The baseline agent demonstrated the fundamental problem MDEMG solves:
 ## Implications for Production Use
 
 ### Current State (v3 Test)
+
 - MDEMG provides **12x better accuracy** than baseline context window approach
 - Even without populated summaries, semantic retrieval beats raw file reading
 - Graph structure (94K edges) enables cross-module understanding
 
 ### With Recommended Improvements
+
 Projected scores with enhancements:
 
 | Enhancement | Expected Impact |

@@ -12,12 +12,14 @@
 Merged 12 separate Go binaries under `cmd/` into a single `mdemg` binary using the Cobra CLI framework. This is the foundation for every subsequent phase (94-100) in the deployable package roadmap.
 
 ### Before
+
 - 12 independent binaries (`server`, `mcp-server`, `ingest-codebase`, `consolidate`, `decay`, `prune`, `extract-symbols`, `watch`, `space-transfer`, `plugin-scaffold`, `plugin-validate`, `reset-db`)
 - Each used raw `flag` package with no shared CLI framework
 - Duplicated utility functions across binaries (Neo4j type conversions)
 - `languages/` package nested inside `cmd/ingest-codebase/` blocking cross-binary imports
 
 ### After
+
 - Single `mdemg` binary with Cobra subcommand tree
 - All 12 original binaries converted to thin deprecation shims
 - Shared `neo4jutil` conversions package
@@ -108,6 +110,7 @@ mdemg
 ## Key Design Decisions
 
 ### Deprecation Shim Pattern
+
 Old binaries are not deleted — they become thin wrappers that print a deprecation warning and delegate to the unified CLI:
 
 ```go
@@ -123,13 +126,17 @@ func main() {
 This preserves backward compatibility while guiding users to the new interface.
 
 ### Shared Neo4j Conversions
+
 Functions `AsString`, `AsFloat64`, `AsInt`, `AsBool`, `AsTime`, `AsStringSlice`, `AsFloat64Slice`, `AsFloat32Slice` were duplicated across consolidate, decay, and prune. Extracted to `internal/cli/neo4jutil/conversions.go` with exported (PascalCase) names.
 
 ### Name Collision Resolution
+
 Moving all 12 binaries into the same `cli` package created name collisions. Resolved by prefixing prune-specific types/functions: `edge` → `pruneEdge`, `deleteEdge` → `deletePruneEdge`, `queryEdgeBatch` → `queryPruneEdgeBatch`, `newDriver` → `newPruneDriver`.
 
 ### Build-Time Version Injection
+
 Version, commit hash, and build date injected via ldflags:
+
 ```makefile
 LDFLAGS := -ldflags "-X mdemg/internal/cli.Version=$(VERSION) \
   -X mdemg/internal/cli.Commit=$(COMMIT) \
@@ -137,6 +144,7 @@ LDFLAGS := -ldflags "-X mdemg/internal/cli.Version=$(VERSION) \
 ```
 
 ### API Handler Binary Paths
+
 Two API handlers (`handlers_ingest_codebase.go`, `handlers.go`) exec'd `./bin/ingest-codebase` directly. Updated to `./bin/mdemg` with `append([]string{"ingest"}, args...)`.
 
 ---

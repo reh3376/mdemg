@@ -35,6 +35,7 @@ This run implements the **CRITICAL** requirement that was missing in baseline ru
 ### Sample Answers
 
 **Q1: Primary Base Class**
+
 ```
 Answer: The primary base class that all Megatron models inherit from is
 MegatronModule, which extends torch.nn.Module. It is defined in
@@ -43,6 +44,7 @@ Refs: megatron/core/transformer/module.py:29, megatron/legacy/model/module.py:22
 ```
 
 **Q118: TransformerConfig**
+
 ```
 Answer: TransformerConfig at megatron/core/transformer/transformer_config.py:34.
 Refs: megatron/core/transformer/transformer_config.py:34
@@ -51,6 +53,7 @@ Refs: megatron/core/transformer/transformer_config.py:34
 ### Technical Implementation
 
 The benchmark script:
+
 1. Queries MDEMG API for each question (`/v1/memory/retrieve`)
 2. Extracts file paths from MDEMG results (format: `/path/to/file.py#SymbolName`)
 3. Searches source files to find actual line numbers for symbols
@@ -67,6 +70,7 @@ The benchmark script:
 ### Next Steps
 
 This file is now ready for:
+
 1. Grading with semantic similarity script
 2. Comparison with baseline runs
 3. Analysis of MDEMG retrieval quality

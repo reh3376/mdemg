@@ -48,10 +48,12 @@ Both tests used the same 100 questions (random seed=42) from whk-wms-questions-f
 ## Conclusion
 
 Fresh state and current state produce **comparable results** with fresh state having a **slight edge**:
+
 - +1.2% average score improvement
 - +154% minimum score improvement (better worst-case coverage)
 
 The differences are likely due to:
+
 1. Hidden layer clustering variations based on data order
 2. Comparison node detection differences
 3. Embedding cache state

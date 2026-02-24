@@ -207,6 +207,7 @@ Source file (.go, .py, .rs, etc.)
 ### What UPTS Extracts Per File
 
 For each file, UPTS produces:
+
 - **CodeElement**: File-level container (content, summary, package, concerns, diagnostics)
 - **Symbol[]**: Individual declarations within the file
 
@@ -225,6 +226,7 @@ Notably, the UPTS JSON schema **already defines** a `Relationship` type:
 ```
 
 Supported relationship types in the schema:
+
 - `DEFINES_METHOD`
 - `EXTENDS`
 - `IMPLEMENTS`
@@ -303,6 +305,7 @@ These are capabilities that are **fundamentally impossible** with regex/AST-only
 **LSP method:** `textDocument/references`
 
 Given a symbol, LSP returns every location in the project where that symbol is used. This enables:
+
 - "Where is this function called from?"
 - "What files depend on this interface?"
 - "How widely used is this constant?"
@@ -344,6 +347,7 @@ Given a variable or parameter, returns the definition of its type.
 ### 5.6 Semantic Understanding
 
 LSP servers use actual compiler toolchains (Go's type checker, Python's type inference, TypeScript's compiler). They understand:
+
 - Which `pop` function is in scope when multiple exist
 - Whether a method satisfies an interface
 - Generic type instantiation
@@ -373,6 +377,7 @@ LSP's `documentSymbol` does not include constant values. The `detail` field some
 ### 6.2 Domain-Specific Languages (11 UPTS types with no LSP equivalent)
 
 No LSP servers exist for:
+
 - **SQL**: tables, columns, views, triggers, indexes
 - **Cypher**: labels, relationship types, constraints
 - **YAML/TOML/JSON/INI**: config sections, key paths
@@ -414,6 +419,7 @@ For the 12 programming languages that have both UPTS parsers and mature LSP serv
 - Type alias definitions
 
 **For this overlap zone, UPTS is strictly better for MDEMG because:**
+
 1. It's 50-100x faster (regex vs compiler)
 2. It extracts additional fields LSP doesn't (Value, RawValue, DocComment, Exported)
 3. It has zero external dependencies
@@ -494,6 +500,7 @@ Several projects have already proven the viability of using LSP for code indexin
 ### Gopls Scalability (from Google's blog)
 
 Gopls v0.12 achieved ~75% reduction in both memory and startup time through on-disk indexes. For a large Go repository:
+
 - Memory: ~200MB (down from ~800MB)
 - Startup: ~5 seconds (down from ~20 seconds)
 - Subsequent queries: <100ms
@@ -564,6 +571,7 @@ Go is MDEMG's implementation language and has the most mature, best-performing L
 ### 11.2 Focus on Call Hierarchy and Implementation Resolution
 
 Of LSP's many capabilities, these two provide the highest-value edges for MDEMG:
+
 - `callHierarchy/outgoingCalls` → `CALLS` edges
 - `textDocument/implementation` → `IMPLEMENTS` edges
 - `textDocument/references` → `REFERENCES` edges (lower priority — high fan-out, lower signal)
@@ -571,6 +579,7 @@ Of LSP's many capabilities, these two provide the highest-value edges for MDEMG:
 ### 11.3 Evaluate lsproxy Before Building From Scratch
 
 lsproxy (Agentic Labs) is a production-quality Rust implementation that already:
+
 - Runs language servers in Docker
 - Provides a REST API
 - Supports 15+ languages
@@ -581,6 +590,7 @@ Using lsproxy as the LSP backend could significantly reduce implementation effor
 ### 11.4 Measure Retrieval Impact
 
 Before committing to full production deployment, run a controlled experiment:
+
 1. Ingest the MDEMG codebase with UPTS only (current state)
 2. Manually add 50-100 `CALLS` edges based on gopls output
 3. Run retrieval queries with and without the edges

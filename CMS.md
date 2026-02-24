@@ -5,6 +5,7 @@
 The Conversation Memory System (CMS) provides **persistent memory for LLM coding agents** across context window boundaries. When an LLM's context window fills and compacts, all non-persistent state is lost. CMS solves this by capturing significant conversational events as structured observations stored in Neo4j, then restoring the most relevant context when a new session begins.
 
 **Core problems solved:**
+
 - Context loss on compaction (every 20-30 minutes of active work)
 - Poor context selection (what matters most to restore?)
 - Signal vs. noise (not all observations are equally valuable)
@@ -93,6 +94,7 @@ block-beta
 ### Surprise Detection
 
 Novel observations persist longer. The system detects surprise through:
+
 - **Correction patterns** — User says "No...", "Actually...", "That's wrong"
 - **Term novelty** — Domain-specific terms not seen before
 - **Embedding distance** — Semantically far from existing observations
@@ -146,6 +148,7 @@ pie title Token Budget Allocation (4000 tokens)
 ## Key Features
 
 ### Multi-Agent Support (Phase 43C)
+
 - Persistent `agent_id` on all operations
 - **Private** observations: only visible to the owning agent
 - **Team** observations: visible to all agents in the same space
@@ -153,22 +156,28 @@ pie title Token Budget Allocation (4000 tokens)
 - Cross-session resume filtered by agent identity
 
 ### Structured Observation Templates (Phase 60)
+
 JSON Schema-validated templates for common patterns:
+
 - `task_handoff` — Current task, status, goals, blockers, next steps
 - `decision` — Decision, rationale, alternatives, reversibility
 - `error` — Error type, description, resolution, prevention
 - `learning` — Topic, insight, confidence, applicability
 
 ### Task Context Snapshots (Phase 60)
+
 Auto-capture full session state before compaction events. Includes active files, blockers, and next steps. Manually triggered or automatic on session end.
 
 ### Org-Level Review (Phase 60)
+
 Valuable observations can be promoted from private to team/global visibility through a review workflow (flag → approve/reject).
 
 ### Session Health Monitoring (Phase 43A)
+
 Tracks whether agents call `/resume` on session start and how actively they observe. Warning headers (`X-MDEMG-Warning: session-not-resumed`) alert when CMS is being underutilized.
 
 ### Quality Controls (Phase 43B)
+
 - Near-duplicate detection (cosine similarity > 0.95 → merge)
 - Multi-factor quality scoring (specificity + actionability + context-richness)
 - Relevance-weighted resume ranking
@@ -227,6 +236,7 @@ flowchart TD
 ```
 
 **Automated Remediation Actions:**
+
 - `prune_decayed_edges` — Remove low-weight learning edges approaching saturation
 - `prune_excess_edges` — Trim hub nodes exceeding per-node edge cap
 - `trigger_consolidation` — Run hidden layer consolidation when orphan ratio is high or consolidation is stale
@@ -259,6 +269,7 @@ stateDiagram-v2
 RSIC tracks the historical success rate of each action type. Actions that consistently improve metrics gain higher confidence and are prioritized in future planning. Actions that fail are deprioritized below the minimum confidence threshold (default 0.3).
 
 **Safety Bounds:**
+
 - Max 5% of nodes pruned per cycle
 - Max 10% of edges pruned per cycle
 - Protected spaces (`mdemg-dev`) never modified destructively
@@ -269,6 +280,7 @@ RSIC tracks the historical success rate of each action type. Actions that consis
 **Test Coverage (22 integration tests):**
 
 RSIC is verified at three levels of integration testing:
+
 - **6 core tests** (`rsic_test.go`): Cycle→history, dry-run no delta, safety blocks protected space, multi-space isolation, persistence flush, health shape
 - **10 systems tests** (`rsic_systems_test.go`): Cooldown rejection, source-tier mismatch, idempotency dedupe, calibration accumulation, history filtering, dry-run structure, rollback API, watchdog state, health composite, Prometheus metrics
 - **6 holistic tests** (`rsic_holistic_test.go`): Full pipeline verification — confidence gate passage, tombstone_stale end-to-end with Neo4j mutation verification, dry-run preserves state, rollback reverses tombstone, history/calibration reflect real execution, multi-action dispatch with Prometheus metrics
@@ -282,6 +294,7 @@ Phase 80 transforms CMS from passive memory retrieval to active anomaly detectio
 **Server-Side Anomaly Detection:**
 
 Resume and recall handlers check for anomalous states after computing results:
+
 - **Empty Resume** (CRITICAL): Space has conversation_observation nodes but resume returned 0 observations
 - **No Themes** (MEDIUM): Observations returned but 0 themes
 - **Empty Recall** (HIGH): Query >20 chars but 0 results
@@ -291,6 +304,7 @@ Anomalies are embedded in both response body (`anomalies` array, `memory_state` 
 **Hook Circuit Breakers:**
 
 Hooks mechanically enforce investigation when degradation is detected:
+
 - **session-start.sh**: Detects 0-observation resume, emits CRITICAL warning, auto-fires RSIC micro assessment, displays health summary
 - **prompt-context.sh**: Detects empty recall for non-trivial queries, appends session health ribbon
 - **post-tool-observe.py**: Detects `X-MDEMG-Memory-State: degraded` in curl output, records error observations
@@ -299,6 +313,7 @@ Hooks mechanically enforce investigation when degradation is detected:
 **Behavioral Learning Loop:**
 
 `SignalLearner` tracks signal effectiveness using Hebbian learning:
+
 - `RecordEmission(code)`: Signal emitted, strength decays (agent hasn't responded yet)
 - `RecordResponse(code)`: Agent acted on signal, strength boosts
 - Strength range: 0.1 (floor) to 1.0 (ceiling)
@@ -309,6 +324,7 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 ## API Endpoints
 
 ### Core Operations
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/v1/conversation/observe` | Store an observation |
@@ -322,12 +338,14 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 | GET | `/v1/conversation/session/anomalies` | Detected session anomalies |
 
 ### Templates
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET/POST | `/v1/conversation/templates` | List or create templates |
 | GET/PUT/DELETE | `/v1/conversation/templates/{id}` | Template CRUD |
 
 ### Snapshots
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET/POST | `/v1/conversation/snapshot` | List or create snapshots |
@@ -336,6 +354,7 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 | GET/DELETE | `/v1/conversation/snapshot/{id}` | Get or delete snapshot |
 
 ### Org Reviews
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/v1/conversation/org-reviews` | List pending reviews |
@@ -344,6 +363,7 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 | POST | `/v1/conversation/observations/{id}/flag-org` | Flag for review |
 
 ### Self-Improvement Cycle (RSIC)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/v1/self-improve/assess` | Trigger on-demand self-assessment |
@@ -356,6 +376,7 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 | GET | `/v1/self-improve/signals` | Signal effectiveness tracking (Phase 80) |
 
 ### Skill Registry (Phase 48)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/v1/skills?space_id=X` | List registered skills (discovered from pinned observations) |
@@ -365,6 +386,7 @@ See `docs/features/meta-cognition-enforcement.md` for full details.
 Skills are CMS pinned observations with `skill:<name>` tags. Thin skill files in `.claude/skills/` are pointers that recall from CMS. Without CMS, skills cannot function.
 
 ### Pinned Observations (Phase 47)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/v1/conversation/observe` | With `pinned: true` — permanent, non-decaying observation |
@@ -372,6 +394,7 @@ Skills are CMS pinned observations with `skill:<name>` tags. Thin skill files in
 Pinned observations bypass volatile graduation: they start permanent with stability 1.0. Used by the Skill Registry to store skill instructions.
 
 ### Constraint Nodes (Phase 45.5)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/v1/constraints?space_id=X` | List constraint nodes in a space |
@@ -384,6 +407,7 @@ Constraints are auto-detected from observation content (must/must_not/should/sho
 ### Storage (Neo4j)
 
 Observations are stored as `MemoryNode` nodes in Neo4j with:
+
 - `embedding` (1536-dim vector) for semantic search
 - `surprise_score`, `stability_score`, `importance_score` for ranking
 - `obs_type`, `visibility`, `agent_id` for filtering

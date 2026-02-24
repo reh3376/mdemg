@@ -84,18 +84,22 @@ All phases of the hidden layer architecture have been implemented:
 ### Files Created/Modified
 
 **Schema & Types:**
+
 - `mdemg_build/migrations/V0005__hidden_layer_support.cypher` - Schema migration
 - `mdemg_build/service/internal/domain/types.go` - Updated MemoryNode struct
 
 **Configuration:**
+
 - `mdemg_build/service/internal/config/config.go` - Hidden layer config options
 
 **Hidden Layer Service:**
+
 - `mdemg_build/service/internal/hidden/types.go` - Type definitions
 - `mdemg_build/service/internal/hidden/clustering.go` - DBSCAN implementation
 - `mdemg_build/service/internal/hidden/service.go` - Message passing service
 
 **CLI Integration:**
+
 - `mdemg_build/service/cmd/consolidate/main.go` - Updated with hidden layer flags
 
 ### New Configuration Options
@@ -130,6 +134,7 @@ go run ./cmd/consolidate --space-id my-project --legacy --hidden-layer
 ### Technical Details
 
 See `docs/HIDDEN_LAYER_SPEC.md` for full technical specification including:
+
 - Message passing algorithms
 - DBSCAN clustering parameters
 - Forward/backward pass formulas
@@ -148,6 +153,7 @@ Current architecture injects memory context *before* agent execution. We need to
 ### Solution: MDEMG Interceptor Agent
 
 An agent that:
+
 1. Intercepts raw agent output (code, thoughts)
 2. Queries MDEMG for relevant concepts/standards
 3. Compares output against standards using LLM
@@ -181,17 +187,20 @@ An agent that:
 See `docs/INTERCEPTOR_DESIGN.md` for full design specification.
 
 **Phase 2.1: Interceptor Agent Design** ✅ Complete
+
 - [x] Define InterceptorAgent interface
 - [x] Define InterceptionResult and Deviation types
 - [x] Define configuration options
 
 **Phase 2.2: Interceptor Implementation** ✅ Complete
+
 - [x] Implement MDEMG query for relevant concepts
 - [x] Implement LLM-based deviation detection
 - [x] Implement correction generation
 - [x] Implement internal dialog recording
 
 **Phase 2.3: Orchestrator Integration** ✅ Complete
+
 - [x] Add interception point after coder returns
 - [x] Add configuration for interception behavior
 - [ ] Implement revision loop (TODO: feedback loop with counter)
@@ -213,16 +222,19 @@ See `docs/INTERCEPTOR_DESIGN.md` for full design specification.
 ### Phases
 
 **Phase 3.1: Interaction Logging** - Not Started
+
 - Add structured logging for all MDEMG interactions
 - Export in training-ready format (JSONL)
 - Privacy filtering for sensitive content
 
 **Phase 3.2: Synthetic Data Generation** - Not Started
+
 - Design templates for MDEMG interaction scenarios
 - Generate synthetic examples
 - Mix with real interaction logs
 
 **Phase 3.3: Fine-Tuning Pipeline** - Not Started (requires compute)
+
 - Select base model
 - Prepare training data
 - Run fine-tuning experiments

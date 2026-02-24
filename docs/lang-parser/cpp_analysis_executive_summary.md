@@ -59,7 +59,8 @@ The parser correctly detects:
 
 The spec generator incorrectly extracted parameter names as separate symbols:
 
-#### As Methods (7):
+#### As Methods (7)
+
 1. `id` from `findById(const UserId& id)` - line 56
 2. `user` from `save(const class User& user)` - line 57
 3. `id` from `remove(const UserId& id)` - line 58
@@ -68,7 +69,8 @@ The spec generator incorrectly extracted parameter names as separate symbols:
 6. `value` from `Item(std::string id, std::string name, int value)` - line 95
 7. `repository` from `UserService(std::shared_ptr<R> repository)` - line 118
 
-#### As Functions (17):
+#### As Functions (17)
+
 8-11. Same as #1-4 above, but as function type
 12. `email` from `User::User(..., std::string email)` - line 173
 13. `value` from `Item::Item(..., int value)` - line 187
@@ -122,11 +124,13 @@ inline constexpr size_t BUFFER_SIZE = 1024;
 ### Priority 2: Regenerate Spec (IMMEDIATE)
 
 **Fix spec generator to exclude:**
+
 1. Parameter names (check for parameter context before extracting)
 2. Forward class references (only include actual `class ClassName {` definitions)
 3. Validate constructor/destructor names (should match class name, not parameter)
 
 **Validation checklist for new spec:**
+
 - [ ] No parameter names in symbols list
 - [ ] No forward `class` references
 - [ ] All constructors have correct names (class name, not param name)
@@ -173,4 +177,3 @@ inline constexpr size_t BUFFER_SIZE = 1024;
 5. **Commit changes**: Update parser, spec, and tests (est. 10 min)
 
 **Total estimated time**: ~2 hours
-

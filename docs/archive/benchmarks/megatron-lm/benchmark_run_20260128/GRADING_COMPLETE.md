@@ -77,6 +77,7 @@ All six benchmark runs (3 baseline, 3 MDEMG) have been successfully graded using
 ## Files Generated
 
 ### Grade Files (All Updated)
+
 ```
 grades_baseline_run1.json    96K    142 questions graded
 grades_baseline_run2.json    96K    142 questions graded
@@ -87,6 +88,7 @@ grades_mdemg_run3.json       93K    142 questions graded (UPDATED)
 ```
 
 ### Documentation
+
 ```
 benchmark_summary.md         Updated with corrected results
 GRADING_COMPLETE.md          This file
@@ -97,12 +99,14 @@ GRADING_COMPLETE.md          This file
 **Grader:** `grade_answers.py` v3.1
 
 **Scoring Weights:**
+
 - 70% Evidence (file:line citations)
 - 15% Semantic similarity
 - 15% Concept overlap  
 - +10% Bonus for correct file citation
 
 **Evidence Scoring:**
+
 - Strong (file:line): 1.0
 - Weak (file only): 0.5
 - None: 0.0
@@ -164,19 +168,19 @@ GRADING_COMPLETE.md          This file
 
 ### Medium Priority
 
-3. **Optimize Architecture Queries**
+1. **Optimize Architecture Queries**
    - Improve structural understanding
    - Enhance service relationship detection
    - Consider query-type routing
 
-4. **Leverage Strengths**
+2. **Leverage Strengths**
    - Use MDEMG for semantic/conceptual questions
    - Use baseline for structural queries
    - Implement hybrid approach
 
 ### Long Term
 
-5. **Additional Testing**
+1. **Additional Testing**
    - Benchmark on more codebases
    - Validate findings across repositories
    - Test query routing effectiveness

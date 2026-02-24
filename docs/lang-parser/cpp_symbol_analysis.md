@@ -1,7 +1,9 @@
 # C++ Parser Symbol Analysis
+
 ## Categorization of All 78 Expected Symbols
 
 ### Summary
+
 - **Total expected symbols**: 78
 - **Parser emitted**: 105 symbols
 - **Matched**: 48
@@ -15,6 +17,7 @@
 These are symbols the spec incorrectly expects - they're parameter names or forward class references, not actual definitions:
 
 ### 1. Parameter Names Mistaken for Methods
+
 | Spec Symbol | Line | Context | Why It's Wrong |
 |-------------|------|---------|----------------|
 | `id [method] line=56 parent=Repository` | 56 | `findById(const UserId& id)` | Parameter name, not method name |
@@ -28,6 +31,7 @@ These are symbols the spec incorrectly expects - they're parameter names or forw
 **Count: 7 method-type parameter errors**
 
 ### 2. Parameter Names Mistaken for Functions
+
 | Spec Symbol | Line | Context | Why It's Wrong |
 |-------------|------|---------|----------------|
 | `id [function] line=56` | 56 | `findById(const UserId& id)` | Parameter name |
@@ -44,6 +48,7 @@ These are symbols the spec incorrectly expects - they're parameter names or forw
 **Count: 10 function-type parameter errors**
 
 ### 3. Forward-Declared Classes (Not Definitions)
+
 | Spec Symbol | Line | Context | Why It's Wrong |
 |-------------|------|---------|----------------|
 | `Item [class] line=29` | 29 | `using ItemList = std::vector<class Item>;` | Forward reference, actual class at line 93 |
@@ -54,6 +59,7 @@ These are symbols the spec incorrectly expects - they're parameter names or forw
 **Count: 4 forward-reference errors**
 
 ### 4. Missing Real Symbol: INTERNAL_LIMIT
+
 | Spec Expected | Parser Output | Issue |
 |---------------|---------------|-------|
 | ❌ Missing | ❌ Not emitted | `static const int INTERNAL_LIMIT = 100;` at line 24 |
@@ -65,96 +71,98 @@ These are symbols the spec incorrectly expects - they're parameter names or forw
 ## PARSER BUGS (Real Symbols Not Emitted)
 
 ### Missing Constants
+
 1. **INTERNAL_LIMIT [constant] line=24**
    - Fixture: `static const int INTERNAL_LIMIT = 100;`
    - Parser: Not emitted
    - Reason: Parser may not recognize `static const` pattern (only handles `constexpr` and `inline constexpr`)
 
 ### Missing Real Methods (Not in Parser Output)
+
 The spec expects these, but let me verify they're actual method names vs parameters:
 
-2. **findById [method] line=56 parent=Repository**
+1. **findById [method] line=56 parent=Repository**
    - Fixture: `virtual std::optional<class User> findById(const UserId& id) = 0;`
    - Parser: Emits `findById [function] line=56` and `findById [method] line=56 parent=Repository` ✓
    - Status: **MATCHED** (parser index [15], [16])
 
-3. **save [method] line=57 parent=Repository**
+2. **save [method] line=57 parent=Repository**
    - Fixture: `virtual bool save(const class User& user) = 0;`
    - Parser: Emits `save [function] line=57` and `save [method] line=57 parent=Repository` ✓
    - Status: **MATCHED** (parser index [17], [18])
 
-4. **remove [method] line=58 parent=Repository**
+3. **remove [method] line=58 parent=Repository**
    - Fixture: `virtual bool remove(const UserId& id) = 0;`
    - Parser: Emits `remove [function] line=58` and `remove [method] line=58 parent=Repository` ✓
    - Status: **MATCHED** (parser index [19], [20])
 
-5. **validate [method] line=65 parent=Validator**
+4. **validate [method] line=65 parent=Validator**
    - Fixture: `virtual bool validate(const class Item& item) = 0;`
    - Parser: Emits `validate [function] line=65` and `validate [method] line=65 parent=Validator` ✓
    - Status: **MATCHED** (parser index [24], [25])
 
-6. **User [method] line=72 parent=User** (Constructor)
+5. **User [method] line=72 parent=User** (Constructor)
    - Fixture: `User(UserId id, std::string name, std::string email);`
    - Parser: Emits `User [function] line=72` and `User [method] line=72 parent=User` ✓
    - Status: **MATCHED** (parser index [27], [28])
 
-7. **Item [method] line=95 parent=Item** (Constructor)
+6. **Item [method] line=95 parent=Item** (Constructor)
    - Fixture: `Item(std::string id, std::string name, int value);`
    - Parser: Emits `Item [function] line=95` and `Item [method] line=95 parent=Item` ✓
    - Status: **MATCHED** (parser index [44], [45])
 
-8. **UserService [method] line=118 parent=UserService** (Constructor)
+7. **UserService [method] line=118 parent=UserService** (Constructor)
    - Fixture: `explicit UserService(std::shared_ptr<R> repository);`
    - Parser: Emits `UserService [function] line=118` and `UserService [method] line=118 parent=UserService` ✓
    - Status: **MATCHED** (parser index [59], [60])
 
-9. **deactivate [function] line=177**
+8. **deactivate [function] line=177**
    - Fixture: `void User::deactivate() { ... }`
    - Parser: Emits `deactivate [function] line=177` ✓
    - Status: **MATCHED** (parser index [91])
 
-10. **deactivate [method] line=177 parent=User**
+9. **deactivate [method] line=177 parent=User**
     - Parser: Emits `deactivate [method] line=177 parent=User` ✓
     - Status: **MATCHED** (parser index [92])
 
-11. **isActive [function] line=182**
+10. **isActive [function] line=182**
     - Fixture: `bool User::isActive() const { ... }`
     - Parser: Emits `isActive [function] line=182` ✓
     - Status: **MATCHED** (parser index [93])
 
-12. **isActive [method] line=182 parent=User**
+11. **isActive [method] line=182 parent=User**
     - Parser: Emits `isActive [method] line=182 parent=User` ✓
     - Status: **MATCHED** (parser index [94])
 
-13. **isValid [function] line=191**
+12. **isValid [function] line=191**
     - Fixture: `bool Item::isValid() const { ... }`
     - Parser: Emits `isValid [function] line=191` ✓
     - Status: **MATCHED** (parser index [98])
 
-14. **isValid [method] line=191 parent=Item**
+13. **isValid [method] line=191 parent=Item**
     - Parser: Emits `isValid [method] line=191 parent=Item` ✓
     - Status: **MATCHED** (parser index [99])
 
-15. **calculateDiscount [function] line=196**
+14. **calculateDiscount [function] line=196**
     - Fixture: `double Item::calculateDiscount(double percentage) const { ... }`
     - Parser: Emits `calculateDiscount [function] line=196` ✓
     - Status: **MATCHED** (parser index [100])
 
-16. **calculateDiscount [method] line=196 parent=Item**
+15. **calculateDiscount [method] line=196 parent=Item**
     - Parser: Emits `calculateDiscount [method] line=196 parent=Item` ✓
     - Status: **MATCHED** (parser index [101])
 
-17. **validateEmail [function] line=201**
+16. **validateEmail [function] line=201**
     - Fixture: `bool validateEmail(const std::string& email) { ... }`
     - Parser: Emits `validateEmail [function] line=201` ✓
     - Status: **MATCHED** (parser index [102])
 
-18. **formatUser [function] line=206**
+17. **formatUser [function] line=206**
     - Fixture: `std::string formatUser(const User& user) { ... }`
     - Parser: Emits `formatUser [function] line=206` ✓
     - Status: **MATCHED** (parser index [103])
 
-19. **calculateTotal [function] line=211**
+18. **calculateTotal [function] line=211**
     - Fixture: `int calculateTotal(const ItemList& items) { ... }`
     - Parser: Emits `calculateTotal [function] line=211` ✓
     - Status: **MATCHED** (parser index [104])
@@ -166,10 +174,9 @@ The spec expects these, but let me verify they're actual method names vs paramet
 Let me check which spec symbols the parser correctly emits:
 
 From parser output index:
-- [0-5]: Constants (MAX_RETRIES, DEFAULT_TIMEOUT, API_VERSION, DEBUG_MODE, BUFFER_SIZE, ~~INTERNAL_LIMIT~~)
+
 - [6-8]: Type aliases (UserId, ItemList, Callback)
 - [9]: namespace mdemg
-- [10-11]: Enums (Status, Priority)
 - [12-20]: Repository class and methods
 - [21-25]: Validator class and methods
 - [26-42]: User class and methods
@@ -185,7 +192,9 @@ From parser output index:
 ## Final Categorization
 
 ### SPEC_ERROR (21 total)
+
 Parameters and forward references the spec incorrectly expects:
+
 1. `id [method] line=56 parent=Repository` - parameter
 2. `user [method] line=57 parent=Repository` - parameter
 3. `id [method] line=58 parent=Repository` - parameter
@@ -209,10 +218,13 @@ Parameters and forward references the spec incorrectly expects:
 21. `Item [class] line=65` - forward reference (actual class at line 93)
 
 ### PARSER_BUG (1 total)
+
 Real symbols the parser should emit but doesn't:
+
 1. **`INTERNAL_LIMIT [constant] line=24`** - `static const int INTERNAL_LIMIT = 100;`
 
 ### MATCHED (56 total)
+
 All other spec symbols correctly emitted by parser.
 
 ---
@@ -227,12 +239,15 @@ All other spec symbols correctly emitted by parser.
 | **TOTAL** | **78** | **100%** |
 
 ### Test Results Reconciliation
+
 - Test reported: 48 matched, 30 failed
 - Our analysis: 56 matched, 22 non-matched (21 spec errors + 1 parser bug)
 - Discrepancy: Some symbols may have been counted differently by the test harness
 
 ### Critical Finding
+
 The **only genuine parser bug** is the missing `INTERNAL_LIMIT` constant at line 24. The parser fails to recognize the `static const int` pattern and only handles:
+
 - `constexpr` declarations ✓
 - `inline constexpr` declarations ✓
 - `static const` declarations ❌

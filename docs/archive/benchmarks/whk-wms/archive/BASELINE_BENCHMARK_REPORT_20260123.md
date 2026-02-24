@@ -44,6 +44,7 @@
 | **Guess Rate** | 0% |
 
 All 20 symbol-lookup questions were answered with:
+
 - ✓ Exact file paths
 - ✓ Line numbers
 - ✓ Exact values matching expected answers
@@ -114,11 +115,13 @@ All 20 symbol-lookup questions were answered with:
 ## Observations
 
 ### Strengths
+
 1. **Symbol-lookup perfect accuracy** - All 20 evidence-locked questions answered correctly with file:line references
 2. **Time management** - Completed within limit by prioritizing high-value questions
 3. **Evidence quality** - All answers grounded with specific file references
 
 ### Limitations
+
 1. **Completion rate** - Only 50% of questions attempted due to time constraint
 2. **Complex questions** - 40% coverage on multi-file/cross-module questions
 3. **No MDEMG advantage** - Pure file search without semantic retrieval

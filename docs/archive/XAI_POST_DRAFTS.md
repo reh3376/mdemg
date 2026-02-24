@@ -8,6 +8,7 @@
 ## Short Version Options (Single Post, ~280 chars)
 
 ### Option 1 - Direct & Bold (Recommended)
+
 ```
 LLMs are stateless. Humans aren't. We built MDEMG - persistent memory that gives AI agents "internal dialog."
 
@@ -19,9 +20,11 @@ Seeking compute to prove it scales.
 
 #AGI #AIMemory
 ```
+
 (276 characters)
 
 ### Option 2 - First Principles Framing
+
 ```
 First principles: human cognition has internal monologue. LLMs don't.
 
@@ -31,9 +34,11 @@ Need compute to scale. @xAI
 
 #OpenSource #AGI
 ```
+
 (279 characters)
 
 ### Option 3 - Problem/Solution
+
 ```
 RAG retrieves. MDEMG *remembers*.
 
@@ -43,6 +48,7 @@ Looking for compute partners. @elonmusk
 
 #AIAgents #AGI
 ```
+
 (269 characters)
 
 ---
@@ -50,6 +56,7 @@ Looking for compute partners. @elonmusk
 ## Extended Thread (5 Posts)
 
 ### Post 1/5
+
 ```
 We're building "internal dialog" for AI agents.
 
@@ -59,9 +66,11 @@ LLMs don't. Every call is stateless. We think this is the bottleneck.
 
 Thread on MDEMG
 ```
+
 (271 characters)
 
 ### Post 2/5
+
 ```
 MDEMG = Multi-Dimensional Emergent Memory Graph
 
@@ -73,9 +82,11 @@ Key insight: don't store what LLMs already know. Store what they CAN'T know:
 
 Context-specific, not general.
 ```
+
 (280 characters)
 
 ### Post 3/5
+
 ```
 Technical approach:
 
@@ -86,9 +97,11 @@ Technical approach:
 
 Hidden layers prevent overfitting - learned generalizations, not memorized facts.
 ```
+
 (280 characters)
 
 ### Post 4/5
+
 ```
 The real goal: train models to NATIVELY use persistent memory.
 
@@ -98,9 +111,11 @@ Include millions of MDEMG interaction examples in training data. Model learns me
 
 Internal dialog becomes instinct.
 ```
+
 (278 characters)
 
 ### Post 5/5
+
 ```
 Currently running with autonomous coding agents. Works. But we're compute-constrained.
 
@@ -111,6 +126,7 @@ Need resources to:
 
 @elonmusk @xAI - this feels aligned with Grok's ambitions. Open to chat.
 ```
+
 (276 characters)
 
 ---
@@ -118,6 +134,7 @@ Need resources to:
 ## Alternative Hooks
 
 ### The "Grok angle"
+
 ```
 Grok is fast. But is Grok *learning* from your conversations?
 
@@ -129,6 +146,7 @@ Stateless -> Stateful is the next unlock.
 ```
 
 ### The "AGI framing"
+
 ```
 Hot take: AGI needs memory, not just scale.
 

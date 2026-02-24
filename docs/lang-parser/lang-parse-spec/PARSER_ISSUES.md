@@ -91,6 +91,6 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 ## All Issues Resolved
 
 All previously documented issues have been fixed. The parser suite now achieves:
+
 - **20/20 UPTS-validated languages passing (100%)**
 - **22 total parsers (including Markdown, XML without UPTS specs)**
-

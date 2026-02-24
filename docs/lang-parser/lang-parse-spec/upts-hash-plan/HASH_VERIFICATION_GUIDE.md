@@ -50,6 +50,7 @@ python3 upts/runners/upts_runner.py add-hashes --spec-dir upts/specs/
 ```
 
 Output:
+
 ```
 Adding SHA256 hashes to specs in upts/specs/
   ✓ c.upts.json: Hash added
@@ -67,6 +68,7 @@ python3 upts/runners/upts_runner.py verify-hashes --spec-dir upts/specs/
 ```
 
 Output:
+
 ```
   ✓ c.upts.json: Hash verified
   ✓ cpp.upts.json: Hash verified
@@ -199,6 +201,7 @@ python3 generate_spec_from_output_v1.1.py rust /tmp/rust.json "../fixtures/rust_
 ```
 
 The script will:
+
 1. Read parser output
 2. Build expected symbols
 3. Compute SHA256 of fixture
@@ -228,23 +231,23 @@ jobs:
 .PHONY: test-parsers verify-fixtures add-hashes
 
 test-parsers:
-	python3 upts/runners/upts_runner.py validate-all \
-		--spec-dir upts/specs/ \
-		--parser "./bin/extract-symbols --json"
+ python3 upts/runners/upts_runner.py validate-all \
+  --spec-dir upts/specs/ \
+  --parser "./bin/extract-symbols --json"
 
 verify-fixtures:
-	python3 upts/runners/upts_runner.py verify-hashes --spec-dir upts/specs/
+ python3 upts/runners/upts_runner.py verify-hashes --spec-dir upts/specs/
 
 add-hashes:
-	python3 upts/runners/upts_runner.py add-hashes --spec-dir upts/specs/
+ python3 upts/runners/upts_runner.py add-hashes --spec-dir upts/specs/
 
 # Regenerate spec after fixture change
 regen-spec-%:
-	./bin/extract-symbols --json upts/fixtures/$*_test_fixture.* > /tmp/$*.json
-	python3 generate_spec_from_output_v1.1.py $* /tmp/$*.json \
-		"../fixtures/$*_test_fixture.*" \
-		--fixture-root upts/specs/ \
-		--output upts/specs/$*.upts.json
+ ./bin/extract-symbols --json upts/fixtures/$*_test_fixture.* > /tmp/$*.json
+ python3 generate_spec_from_output_v1.1.py $* /tmp/$*.json \
+  "../fixtures/$*_test_fixture.*" \
+  --fixture-root upts/specs/ \
+  --output upts/specs/$*.upts.json
 ```
 
 ---
@@ -277,6 +280,7 @@ regen-spec-%:
 ### Q: What if I modify a fixture intentionally?
 
 Regenerate the spec:
+
 ```bash
 ./bin/extract-symbols --json fixtures/rust_test_fixture.rs > /tmp/rust.json
 python3 generate_spec_from_output_v1.1.py rust /tmp/rust.json "../fixtures/rust_test_fixture.rs" \
@@ -286,6 +290,7 @@ python3 generate_spec_from_output_v1.1.py rust /tmp/rust.json "../fixtures/rust_
 ### Q: Can I disable hash checking temporarily?
 
 Yes, use `--skip-hash`:
+
 ```bash
 python3 upts_runner.py validate --spec rust.upts.json --parser "./parse" --skip-hash
 ```

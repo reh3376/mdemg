@@ -13,6 +13,7 @@ The confidence score degradation (HIGH dropped 87% as learning edges accumulated
 ### The Scoring Formula
 
 From `internal/retrieval/scoring.go:293`:
+
 ```go
 s = α*vecSim + β*activation + γ*recency + δ*confidence + boosts - penalties
 ```
@@ -47,12 +48,14 @@ for t := 0; t < steps; t++ {
 ### The Dilution Problem
 
 **Run 1 (0 learning edges):**
+
 - Activation only spreads through ABSTRACTS_TO and ASSOCIATED_WITH edges
 - Limited edge count = limited spreading pathways
 - Top candidates maintain high activation relative to others
 - Score distribution: wide spread, clear differentiation
 
 **Run 3 (24,860 learning edges):**
+
 - CO_ACTIVATED_WITH edges create many new pathways
 - Activation spreads to many more nodes
 - Previously low-scoring nodes receive activation from multiple sources
@@ -131,11 +134,13 @@ for i := range items {
 ```
 
 **Pros:**
+
 - Immune to edge count changes
 - Enables meaningful cross-run comparisons
 - Simple to implement
 
 **Cons:**
+
 - Loses absolute score meaning (a weak result set still has "HIGH" top results)
 
 ### Option 2: Edge-Density Normalization
@@ -154,10 +159,12 @@ actComponent := beta * a * densityFactor
 ```
 
 **Pros:**
+
 - Maintains absolute score meaning
 - Compensates for graph growth
 
 **Cons:**
+
 - Requires tuning
 - May over-correct for legitimate dense graphs
 
@@ -177,10 +184,12 @@ for id, a := range act {
 ```
 
 **Pros:**
+
 - Preserves relative ordering
 - Maintains score differentiation
 
 **Cons:**
+
 - Changes activation semantics
 - May require recalibration of other components
 
@@ -201,16 +210,19 @@ adjustedBeta := baseBeta * reductionFactor
 ```
 
 **Pros:**
+
 - Directly addresses the root cause
 - Self-adjusting
 
 **Cons:**
+
 - Requires per-query edge count lookup
 - Complex to tune
 
 ## Recommendation
 
 **Implement Option 1 (Percentile-Based Confidence)** as the primary fix:
+
 1. Simple to implement
 2. Immune to graph density changes
 3. Enables meaningful cross-run comparisons

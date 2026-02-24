@@ -5,6 +5,7 @@ Robust benchmark validation system that **guarantees properly formatted answers*
 ## Problem Solved
 
 Previous benchmark attempts failed (0.1-0.2 scores) because:
+
 - 87-98% of answers had empty `file_line_refs`
 - Evidence is 70% of the grading formula
 - Agents didn't consistently follow format instructions
@@ -12,6 +13,7 @@ Previous benchmark attempts failed (0.1-0.2 scores) because:
 ## Solution
 
 V4 takes control of formatting away from agents:
+
 1. **Programmatic MDEMG calls** - We call the API directly
 2. **Programmatic file reading** - We read and analyze files ourselves
 3. **Code analysis extracts line numbers** - Guaranteed file:line refs
@@ -108,11 +110,13 @@ python run_benchmark_v4.py \
 ## Modes
 
 ### LLM Synthesis Mode (Recommended)
+
 - Requires `ANTHROPIC_API_KEY`
 - Uses Claude to synthesize natural answer text
 - Expected mean score: 0.85+
 
 ### Fallback Mode (No API Key)
+
 - Generates answers from code analysis only
 - Answers are structured but less fluent
 - Expected mean score: 0.70+
@@ -120,6 +124,7 @@ python run_benchmark_v4.py \
 ## Output Format
 
 Each answer in JSONL format:
+
 ```json
 {
   "id": 379,
@@ -158,13 +163,16 @@ Citation Bonus: +0.1 if correct file cited (capped at 1.0)
 ## Troubleshooting
 
 ### "MDEMG API error"
+
 - Check MDEMG is running: `curl http://localhost:9999/v1/memory/retrieve -X POST -d '{"space_id":"whk-wms","query_text":"test","top_k":1}'`
 
 ### "Files could not be read"
+
 - Verify codebase path is correct
 - Check MDEMG paths match codebase structure
 
 ### Low semantic scores
+
 - Expected in fallback mode (no LLM)
 - Set `ANTHROPIC_API_KEY` for LLM synthesis
 

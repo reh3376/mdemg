@@ -127,6 +127,7 @@ That's **18+ role_types** on a single label with zero schema enforcement.
 **Finding 2: `GENERALIZES` Semantic Overload**
 
 `GENERALIZES` is used for both:
+
 - Code files (L0) → code patterns (L1 hidden), in `createHiddenNodeWithEdges()`
 - Conversation observations → conversation themes, in `createConversationThemeWithEdges()`
 
@@ -177,6 +178,7 @@ The schema spec (`02_Graph_Schema.md`) says all edges should carry: `edge_id`, `
 **Finding 6: Upper-Layer Dynamic Edges Not Indexed**
 
 `internal/hidden/types.go` defines 10 `DynamicEdgeType` constants (`ANALOGOUS_TO`, `CONTRASTS_WITH`, `COMPOSES_WITH`, etc.) with `InferEdgeType()` and `InferNodeType()` algorithms. However:
+
 - No Neo4j migration creates indexes for them
 - `AllowedRelationshipTypes` in config doesn't include them
 - Spreading activation ignores them (only uses `CO_ACTIVATED_WITH`)
@@ -324,6 +326,7 @@ internal/symbols/queries/
 ### Example Query Files
 
 **`go/imports.scm`:**
+
 ```scheme
 ;; Match Go import declarations
 ;; Captures both single imports and grouped imports
@@ -332,6 +335,7 @@ internal/symbols/queries/
 ```
 
 **`python/imports.scm`:**
+
 ```scheme
 ;; Match Python import statements
 (import_statement
@@ -344,6 +348,7 @@ internal/symbols/queries/
 ```
 
 **`typescript/imports.scm`:**
+
 ```scheme
 ;; Match TypeScript/JavaScript import declarations
 ;; The string literal is a positional child (no named field)
@@ -352,6 +357,7 @@ internal/symbols/queries/
 ```
 
 **`c_cpp/imports.scm`:**
+
 ```scheme
 ;; Match C/C++ #include directives
 (preproc_include
@@ -359,6 +365,7 @@ internal/symbols/queries/
 ```
 
 **`rust/imports.scm`:**
+
 ```scheme
 ;; Match Rust use declarations
 (use_declaration
@@ -370,6 +377,7 @@ internal/symbols/queries/
 ```
 
 **`java/imports.scm`:**
+
 ```scheme
 ;; Match Java import declarations
 (import_declaration
@@ -434,6 +442,7 @@ Extracts class inheritance (`extends`), interface implementation (`implements`),
 ### Current State (Partially Exists)
 
 **Python tree-sitter parser** (`internal/symbols/parser.go:1174-1179`):
+
 ```go
 superclassNode := node.ChildByFieldName("superclasses")
 if superclassNode != nil {
@@ -441,11 +450,13 @@ if superclassNode != nil {
     // Already extracts base class into sym.Parent
 }
 ```
+
 This already detects `class Foo(Bar)` and stores `Bar` in `Parent`. It's one step from becoming an `EXTENDS` relationship.
 
 ### Query Files
 
 **`python/inheritance.scm`:**
+
 ```scheme
 ;; Class inheriting from base classes
 (class_definition
@@ -455,6 +466,7 @@ This already detects `class Foo(Bar)` and stores `Bar` in `Parent`. It's one ste
 ```
 
 **`typescript/inheritance.scm`:**
+
 ```scheme
 ;; Class extending another class
 (class_declaration
@@ -472,6 +484,7 @@ This already detects `class Foo(Bar)` and stores `Bar` in `Parent`. It's one ste
 ```
 
 **`java/inheritance.scm`:**
+
 ```scheme
 ;; Class extending another class
 (class_declaration
@@ -488,6 +501,7 @@ This already detects `class Foo(Bar)` and stores `Bar` in `Parent`. It's one ste
 ```
 
 **`rust/implements.scm`:**
+
 ```scheme
 ;; impl Trait for Type
 (impl_item
@@ -496,6 +510,7 @@ This already detects `class Foo(Bar)` and stores `Bar` in `Parent`. It's one ste
 ```
 
 **`c_cpp/inheritance.scm`:**
+
 ```scheme
 ;; C++ class inheritance
 (class_specifier
@@ -519,6 +534,7 @@ Extracts function/method calls within each file and creates `CALLS` edges (file-
 ### Query Files
 
 **`go/calls.scm`:**
+
 ```scheme
 ;; Direct function calls
 (call_expression
@@ -532,6 +548,7 @@ Extracts function/method calls within each file and creates `CALLS` edges (file-
 ```
 
 **`python/calls.scm`:**
+
 ```scheme
 ;; Direct function calls
 (call
@@ -545,6 +562,7 @@ Extracts function/method calls within each file and creates `CALLS` edges (file-
 ```
 
 **`typescript/calls.scm`:**
+
 ```scheme
 ;; Direct function calls
 (call_expression
@@ -623,6 +641,7 @@ Medium — 3-5 days. New post-ingestion resolution pass with Neo4j queries.
 ### What It Does
 
 Uses Go's `go/types` standard library package to perform compiler-grade analysis of Go code:
+
 - **Interface implementation resolution** — which concrete types satisfy which interfaces (impossible without the type checker because Go's implementation is implicit)
 - **Type-checked call graph** — resolve method calls through interfaces to concrete implementations
 
@@ -784,6 +803,7 @@ All existing edge-creation Cypher in `internal/hidden/service.go` (10+ CREATE ed
 **Problem:** `types.go` defines 10 `DynamicEdgeType` constants and inference algorithms, but no migration creates indexes and `AllowedRelationshipTypes` doesn't include them.
 
 **Solution:** Two options:
+
 - **Option A (Recommended):** Add a migration that creates relationship indexes for the 4 most commonly inferred types (`ANALOGOUS_TO`, `CONTRASTS_WITH`, `COMPOSES_WITH`, `BRIDGES`) and add them to `StructuralEdgeTypes` config.
 - **Option B:** Remove the unused constants and defer until upper-layer clustering is actually producing these edges.
 

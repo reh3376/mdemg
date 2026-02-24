@@ -107,6 +107,7 @@ From benchmark run 2026-01-24:
 ## 6. Expected Improvements
 
 With hidden layer nodes and 57x more learning edges, we expect:
+
 - Better cross-file retrieval via concept aggregation
 - Improved UI/UX category (was 0.50)
 - Higher Evidence Compliance Rate

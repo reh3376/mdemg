@@ -13,6 +13,7 @@
 Add a web scraping ingestion module that allows users to discover and ingest web content into MDEMG. Users can define topics for discovery or provide specific URLs. The module runs asynchronously, presents scraped content for review, and supports authenticated scraping for internal documentation.
 
 **Data flow:**
+
 ```
 User Request (topic/URLs)
   → Async Job Created

@@ -11,6 +11,7 @@
 ## Executive Summary
 
 This benchmark compares two conditions:
+
 1. **Baseline**: Agent with direct codebase access only (no MDEMG)
 2. **MDEMG**: Agent with MDEMG memory retrieval + codebase access
 
@@ -104,6 +105,7 @@ Both agents answered 100 questions about VS Code internals (constants, configura
 | **MDEMG** | 0.73 | 22% | 0.35 | 0.55 | 0.92 | 100% | 68% | 78% | 60% | 3800 | 94K |
 
 **Legend:**
+
 - **Mean**: Average accuracy score (0-1)
 - **CV%**: Coefficient of Variation (lower = more consistent)
 - **Min/p10/p90**: Score distribution
@@ -119,16 +121,21 @@ Both agents answered 100 questions about VS Code internals (constants, configura
 ## Key Findings
 
 ### 1. Accuracy Parity
+
 Both conditions achieved similar accuracy (~75% mean). MDEMG did not significantly improve answer quality for this benchmark.
 
 ### 2. Token Efficiency
+
 **Baseline used 40% fewer tokens than MDEMG** (57K vs 94K per question). MDEMG's approach of querying the API then verifying via file reads doubled the work.
 
 ### 3. Latency
+
 MDEMG was ~19% slower (3.15s vs 2.65s per question) due to additional API roundtrips.
 
 ### 4. MDEMG Usage Pattern
+
 The MDEMG agent:
+
 - Made 74 more tool calls than baseline
 - Often queried MDEMG then still read files for verification
 - Symbol data was present but not fully leveraged
@@ -138,14 +145,18 @@ The MDEMG agent:
 ## Analysis: Why MDEMG Didn't Help More
 
 ### 1. Question Type Mismatch
+
 The V6 benchmark asks for **specific constant values** (e.g., "What is DEFAULT_FLUSH_INTERVAL?"). For these:
+
 - Baseline: `grep "DEFAULT_FLUSH_INTERVAL" → read file → answer`
 - MDEMG: `query MDEMG → get file path → read file → answer`
 
 MDEMG adds a step without providing the value directly.
 
 ### 2. Symbol Data Present But Not Surfaced
+
 MDEMG extracted 6,011 symbols including:
+
 - 2,384 constants
 - 635 enums
 - 2,992 enum values
@@ -153,7 +164,9 @@ MDEMG extracted 6,011 symbols including:
 However, the retrieval API returned file paths and summaries, not the symbol values themselves. The agent had to read files anyway.
 
 ### 3. Retrieval vs Direct Search
+
 For needle-in-haystack queries (specific constant names), grep is faster than semantic search. MDEMG excels at:
+
 - "How does X relate to Y?" (conceptual)
 - "Where is authentication handled?" (cross-cutting)
 - "What modules use service Z?" (graph traversal)
@@ -163,6 +176,7 @@ For needle-in-haystack queries (specific constant names), grep is faster than se
 ## Recommendations for V8 Benchmark
 
 ### 1. Add Symbol Evidence to Retrieval Response
+
 ```json
 {
   "results": [...],
@@ -177,13 +191,16 @@ For needle-in-haystack queries (specific constant names), grep is faster than se
 ```
 
 ### 2. Question Type Distribution
+
 Create questions that leverage MDEMG's strengths:
+
 - 30% constant lookups (current)
 - 30% cross-cutting concerns ("How is auth handled?")
 - 20% architecture questions ("Compare ServiceA vs ServiceB")
 - 20% multi-hop reasoning ("Trace the storage initialization flow")
 
 ### 3. Measure Different Metrics
+
 - **Retrieval precision**: Did MDEMG return the right files?
 - **Evidence inclusion**: Did results include symbol values?
 - **Graph utilization**: Were learning edges traversed?

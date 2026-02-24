@@ -137,17 +137,20 @@ Read {QUESTIONS_FILE} and answer all {N} questions sequentially, preserving EXAC
 
 ## Common Mistakes to Avoid
 
-### WRONG - File path without line number:
+### WRONG - File path without line number
+
 ```json
 {"file_line_refs": ["megatron/core/transformer/module.py"]}
 ```
 
-### CORRECT - File path WITH line number:
+### CORRECT - File path WITH line number
+
 ```json
 {"file_line_refs": ["megatron/core/transformer/module.py:29"]}
 ```
 
 The grading script heavily penalizes missing line numbers:
+
 - With line numbers (strong evidence): 100% evidence score
 - Without line numbers (weak evidence): 50% evidence score
 - This alone accounts for ~50% of the total score difference!

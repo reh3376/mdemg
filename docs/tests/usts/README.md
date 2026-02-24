@@ -5,6 +5,7 @@ A standardized framework for defining and running security tests against MDEMG.
 ## Overview
 
 USTS provides:
+
 - **Declarative Specs**: JSON-based security test definitions
 - **OWASP Mapping**: Tests mapped to OWASP Top 10 categories
 - **Injection Payloads**: Pre-built payload libraries
@@ -153,6 +154,7 @@ Create payload files in `payloads/`:
 ```
 
 Reference in specs:
+
 ```json
 {
   "requests": [

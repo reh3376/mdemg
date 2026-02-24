@@ -26,6 +26,7 @@ mdemg db migrate
 ### Statement Splitting
 
 The migration runner handles complex Cypher files including:
+
 - `//` line comments (stripped)
 - `CALL { } IN TRANSACTIONS` blocks (brace-depth tracking)
 - Multiple statements separated by `;`

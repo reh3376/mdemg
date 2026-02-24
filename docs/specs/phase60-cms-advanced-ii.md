@@ -14,6 +14,7 @@
 Enhance the Conversation Memory System (CMS) with structured observations, intelligent resume functionality, and context window optimization. The goal is to ensure agents have necessary information for task continuity on context reset without flooding the context window with irrelevant information.
 
 **Core Objectives:**
+
 1. **Structured Observations** — Templates for consistent, parseable observation capture
 2. **Task Context Snapshots** — Auto-capture task state before compaction
 3. **Smart Resume** — Relevance-scored, token-budgeted context restoration
@@ -429,12 +430,14 @@ type OrgReviewStatus struct {
 ### Phase 60.1: Observation Templates (P0)
 
 **Files:**
+
 - `internal/conversation/templates.go` — Template CRUD operations
 - `internal/conversation/templates_test.go` — Tests
 - `internal/api/handlers_templates.go` — REST handlers
 - `migrations/V0012__observation_templates.cypher` — Schema
 
 **Tasks:**
+
 1. Create template storage schema in Neo4j
 2. Implement template CRUD service methods
 3. Add template validation against JSON Schema
@@ -444,11 +447,13 @@ type OrgReviewStatus struct {
 ### Phase 60.2: Task Context Snapshots (P0)
 
 **Files:**
+
 - `internal/conversation/snapshot.go` — Snapshot capture
 - `internal/conversation/snapshot_test.go` — Tests
 - `internal/api/handlers_snapshot.go` — REST handlers
 
 **Tasks:**
+
 1. Define TaskSnapshot schema and storage
 2. Implement manual snapshot trigger
 3. Add auto-snapshot on session end (configurable)
@@ -458,10 +463,12 @@ type OrgReviewStatus struct {
 ### Phase 60.3: Resume Relevance Scoring (P0)
 
 **Files:**
+
 - `internal/conversation/relevance.go` — Scoring algorithms
 - `internal/conversation/relevance_test.go` — Tests
 
 **Tasks:**
+
 1. Implement recency scoring (exponential decay)
 2. Implement importance scoring (based on obs_type, reinforcement)
 3. Implement task-relevance scoring (embedding similarity to query_context)
@@ -471,10 +478,12 @@ type OrgReviewStatus struct {
 ### Phase 60.4: Smart Truncation (P0)
 
 **Files:**
+
 - `internal/conversation/truncation.go` — Truncation logic
 - `internal/conversation/truncation_test.go` — Tests
 
 **Tasks:**
+
 1. Implement token counting for observations
 2. Implement tiered resume (critical/important/background)
 3. Implement observation summarization for background tier
@@ -484,11 +493,13 @@ type OrgReviewStatus struct {
 ### Phase 60.5: Org-Level Flagging (P0)
 
 **Files:**
+
 - `internal/conversation/org_review.go` — Review workflow
 - `internal/conversation/org_review_test.go` — Tests
 - `internal/api/handlers_org_review.go` — REST handlers
 
 **Tasks:**
+
 1. Add org_review fields to Observation
 2. Implement flag-for-review endpoint
 3. Implement list pending reviews endpoint

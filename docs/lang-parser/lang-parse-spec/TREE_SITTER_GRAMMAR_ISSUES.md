@@ -18,24 +18,29 @@ The following 5 languages return `ERROR` status because the tree-sitter parser c
 ## Root Cause
 
 The Go symbol parser uses tree-sitter via `github.com/smacker/go-tree-sitter`. Each language requires:
+
 1. A tree-sitter grammar (C library)
 2. Go bindings for that grammar
 3. Registration in the parser's language detection
 
 Currently, only these languages have working tree-sitter support:
+
 - Go, Python, TypeScript (working)
 
 ## Files to Review
 
 ### 1. Parser Entry Point
+
 **File:** `/Users/reh3376/mdemg/internal/symbols/parser.go`
 
 This file contains the `Parse()` function and language detection. Look for:
+
 - How languages are mapped to tree-sitter parsers
 - The `getLanguage()` or similar function
 - Import statements for tree-sitter bindings
 
 ### 2. Language-Specific Parsers
+
 **Directory:** `/Users/reh3376/mdemg/cmd/ingest-codebase/languages/`
 
 | File | Purpose |
@@ -48,9 +53,11 @@ This file contains the `Parse()` function and language detection. Look for:
 | `interface.go` | Common Symbol struct definition |
 
 ### 3. Go Module Dependencies
+
 **File:** `/Users/reh3376/mdemg/go.mod`
 
 Check for tree-sitter grammar dependencies. You may need to add:
+
 ```go
 github.com/smacker/go-tree-sitter
 github.com/tree-sitter/tree-sitter-c
@@ -61,6 +68,7 @@ github.com/tree-sitter/tree-sitter-rust
 ```
 
 ### 4. Extract-Symbols Binary
+
 **File:** `/Users/reh3376/mdemg/cmd/extract-symbols/main.go`
 
 This is the CLI that UPTS runner calls. Check how it routes to the parser.
@@ -77,6 +85,7 @@ This is the CLI that UPTS runner calls. Check how it routes to the parser.
    - `.rs` → Rust grammar
 
 4. **Test each language:**
+
 ```bash
 ./bin/extract-symbols --json docs/lang-parser/lang-parse-spec/upts/fixtures/c_test_fixture.c
 ./bin/extract-symbols --json docs/lang-parser/lang-parse-spec/upts/fixtures/cpp_test_fixture.cpp
@@ -88,6 +97,7 @@ This is the CLI that UPTS runner calls. Check how it routes to the parser.
 ## Verification Command
 
 After fixing, run:
+
 ```bash
 for lang in c cpp cuda java rust; do
   python3 docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py validate \

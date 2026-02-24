@@ -26,12 +26,15 @@
 ## Key Findings
 
 ### 1. Completion Rate: MDEMG Wins Decisively
+
 The baseline approach could only answer **26%** of questions within the time limit before context window exhaustion. MDEMG achieved **100% completion** by enabling targeted retrieval without requiring full codebase ingestion.
 
 ### 2. Accuracy Trade-off
+
 When the baseline *could* answer, it achieved very high accuracy (0.942 avg). MDEMG's lower per-question accuracy (0.615) reflects the challenge of retrieving precisely relevant context. However, the net improvement is significant: **total score improved from 0.245 to 0.615** (+151%).
 
 ### 3. Zero Wrong Answers
+
 MDEMG produced **0 completely wrong answers** (all scores were either 1.0 or 0.5). This indicates the retrieval system consistently returned relevant context, even if not perfectly aligned with expected answers.
 
 ---
@@ -81,7 +84,9 @@ MDEMG produced **0 completely wrong answers** (all scores were either 1.0 or 0.5
 ## Analysis
 
 ### Categories Where Baseline Excelled
+
 The baseline achieved near-perfect scores in categories it could reach:
+
 - **api_services**: 1.00 (baseline) vs 0.75 (MDEMG)
 - **configuration_infrastructure**: 1.00 vs 0.67
 - **database_persistence**: 1.00 vs 0.62
@@ -89,14 +94,18 @@ The baseline achieved near-perfect scores in categories it could reach:
 This suggests these categories have concentrated, easily-greppable content.
 
 ### Categories Unique to MDEMG
+
 The baseline never attempted these categories (ran out of time):
+
 - acd_l5x_conversion (0.60 avg) - 10 questions
 - n8n_workflow (0.67 avg) - 6 questions
 - security_authentication (0.57 avg) - 7 questions
 - business_logic_workflows (0.62 avg) - 8 questions
 
 ### Areas for MDEMG Improvement
+
 Lower scores in certain categories suggest retrieval gaps:
+
 - **ui_ux**: 0.50 avg - may need better component path embedding
 - **control_loop_architecture**: 0.56 avg - complex nested JSON schemas
 - **integration**: 0.50 avg - cross-system context needed
@@ -106,17 +115,21 @@ Lower scores in certain categories suggest retrieval gaps:
 ## Conclusions
 
 ### MDEMG Value Proposition Validated
+
 For large codebases (815K LOC), MDEMG provides:
+
 1. **100% question completion** vs 26% baseline
 2. **151% improvement in total score** (0.245 → 0.615)
 3. **Zero completely wrong answers**
 
 ### Trade-offs Observed
+
 1. Per-question accuracy drops when using retrieval vs full context
 2. Some categories (UI, complex schemas) need retrieval improvements
 3. Baseline excels when it can reach content (but can't scale)
 
 ### Recommendations
+
 1. **Run consolidation** to build hidden layer nodes (currently 0)
 2. **Tune RERANK_WEIGHT** to improve precision (currently 0.15)
 3. **Add category-specific retrieval strategies** for UI components and JSON schemas

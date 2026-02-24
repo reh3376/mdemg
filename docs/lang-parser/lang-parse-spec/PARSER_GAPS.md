@@ -48,6 +48,7 @@ All 20 UPTS-validated language parsers now pass at 100% with no workarounds.
 | Type alias detection | CamelCase = type expression → `type` |
 
 **Changes in:** `internal/symbols/parser.go`
+
 - `extractPythonClass()` - checks superclass for Enum/Protocol
 - `extractPythonFunction()` - accepts currentClass parameter for method detection
 - `extractPythonAssignment()` - `isPythonTypeAlias()` helper function
@@ -62,6 +63,7 @@ All 20 UPTS-validated language parsers now pass at 100% with no workarounds.
 | Abstract class detection | Handle `abstract_class_declaration` node type |
 
 **Changes in:** `internal/symbols/parser.go`
+
 - `extractTSVariableDeclaration()` - checks valueNode type for arrow functions
 - `extractTSClassMethods()` - new function to extract methods from class body
 - `extractTSMethod()` - new function to extract individual method
@@ -94,6 +96,7 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 ```
 
 Expected output:
+
 ```
 --- PASS: TestUPTS (0.02s)
     --- PASS: TestUPTS/c (0.00s)

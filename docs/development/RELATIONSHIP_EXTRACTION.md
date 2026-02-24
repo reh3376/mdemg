@@ -102,9 +102,11 @@ L5_SOURCE_MIN_LAYER=3              # Minimum layer for L5/dynamic edge source no
 Returns relationship edge counts by type for a space.
 
 **Query Parameters:**
+
 - `space_id` (required): The space to query
 
 **Response:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -122,9 +124,11 @@ Returns relationship edge counts by type for a space.
 Returns incoming and outgoing relationships for a specific symbol.
 
 **Query Parameters:**
+
 - `space_id` (required): The space to query
 
 **Response:**
+
 ```json
 {
   "space_id": "mdemg-dev",
@@ -223,6 +227,7 @@ When symbols are co-retrieved (connected to co-activated MemoryNodes via DEFINES
 To add relationship extraction for a new language or relationship type:
 
 1. Create a `.scm` file in `internal/symbols/queries/<language>/`:
+
    ```
    ;; Example: internal/symbols/queries/kotlin/imports.scm
    (import_header
@@ -244,11 +249,13 @@ To add relationship extraction for a new language or relationship type:
 ## Monitoring
 
 ### Check relationship counts
+
 ```bash
 curl -s "http://localhost:9999/v1/symbols/relationships?space_id=mdemg-dev" | jq
 ```
 
 ### Check dynamic edge creation during consolidation
+
 ```bash
 curl -s -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" \
@@ -256,6 +263,7 @@ curl -s -X POST http://localhost:9999/v1/memory/consolidate \
 ```
 
 ### Verify secondary labels
+
 ```cypher
 MATCH (n:HiddenPattern) RETURN count(n);
 MATCH (n:Concept) RETURN count(n);
@@ -263,6 +271,7 @@ MATCH (n:EmergentConcept {layer: 5}) RETURN count(n);
 ```
 
 ### Verify THEME_OF edges
+
 ```cypher
 MATCH ()-[r:THEME_OF]->() RETURN count(r);
 -- Should be >0 for spaces with conversation themes

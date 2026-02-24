@@ -28,6 +28,7 @@ This specification defines the implementation of hidden layers in MDEMG to provi
 ### Proposed Solution
 
 Add hidden layer(s) between base data (Layer 0) and concepts (Layer 2+) that:
+
 - Learn compressed representations through forward aggregation
 - Receive feedback from concepts through backward propagation
 - Provide regularization against Hebbian drift
@@ -191,6 +192,7 @@ func combineEmbeddings(current, aggregated []float64, alpha, beta float64) []flo
 ### Algorithm Selection: DBSCAN
 
 DBSCAN (Density-Based Spatial Clustering) is preferred over k-means because:
+
 - No need to specify number of clusters upfront
 - Naturally handles varying cluster sizes
 - Identifies noise points (outliers)
@@ -534,6 +536,7 @@ As data accumulates, expect layers to specialize:
 ### Emergence Indicators
 
 Monitor for these signs of healthy emergence:
+
 1. **L4/L5 nodes appearing** - System is forming high-level abstractions
 2. **Cross-domain connections** - Concepts linking unrelated modules
 3. **Stable high-layer nodes** - Embeddings not changing rapidly
@@ -635,6 +638,7 @@ func InferNodeType(metrics NodeMetrics) DynamicNodeType {
 ## Future Work: Inter-Layer Hidden Aggregators
 
 ### Current Architecture
+
 ```
 L0 ──→ L1 ──→ L2 ──→ L3 ──→ L4 ──→ L5
       ↑      ↑      ↑      ↑      ↑
@@ -642,6 +646,7 @@ L0 ──→ L1 ──→ L2 ──→ L3 ──→ L4 ──→ L5
 ```
 
 ### Proposed Enhancement: Hidden Layers Between Concepts
+
 ```
 L0 ─── H0 ──→ L1 ─── H1 ──→ L2 ─── H2 ──→ L3 ─── H3 ──→ L4 ─── H4 ──→ L5
        ↑            ↑            ↑            ↑            ↑
@@ -651,12 +656,14 @@ L0 ─── H0 ──→ L1 ─── H1 ──→ L2 ─── H2 ──→ L3
 ```
 
 Where `H_n` nodes are explicit message-passing aggregators that:
+
 1. Receive forward signals from layer N
 2. Send aggregated signals to layer N+1
 3. Receive backward signals from layer N+1
 4. Propagate refined signals back to layer N
 
 This would enable:
+
 - More nuanced information flow between layers
 - Better gradient-like feedback propagation
 - Distinct "compression" vs "concept" node types

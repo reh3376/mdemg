@@ -20,6 +20,7 @@ case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.4 && metrics.Cos
 ```
 
 **Triggering conditions:**
+
 - Layer distance > 0 (nodes must be at different layers)
 - Cosine similarity >= 0.4 (moderate semantic overlap)
 - Cosine similarity < `AnalogousMinSim` threshold (~0.7, so not high enough for ANALOGOUS_TO)

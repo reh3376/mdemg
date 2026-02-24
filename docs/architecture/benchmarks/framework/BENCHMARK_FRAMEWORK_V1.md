@@ -8,16 +8,19 @@
 ## Framework Components
 
 ### Agent Model
+
 - **Model:** Claude Haiku 4.5 (`haiku`)
 - **Required for:** All baseline and MDEMG benchmark runs
 - **Rationale:** Consistent model ensures reproducible results
 
 ### Grader
+
 - **File:** `grader_v4_locked.py`
 - **SHA-256:** `24dc39216748b79bed0b06a7f998419aefd1fc0b6da4aea385e4d79f7124aa41`
 - **Version:** V4 with V3-compatible evidence logic
 
 ### Scoring Formula
+
 ```
 final_score = min(1.0,
     0.70 * evidence_score +
@@ -39,6 +42,7 @@ final_score = min(1.0,
 ## Question Sets
 
 ### whk-wms (Primary)
+
 - **Master:** `whk-wms/test_questions_120.json`
 - **SHA-256:** `43201b16c0981fac000a6e15c95468fd8dd3ec55ae5978c365a8c21f669caaf4`
 - **Agent version:** `whk-wms/test_questions_120_agent.json`
@@ -64,6 +68,7 @@ final_score = min(1.0,
 ## Running Benchmarks
 
 ### Prerequisites
+
 ```bash
 # Verify grader integrity
 shasum -a 256 docs/benchmarks/framework/grader_v4_locked.py
@@ -71,6 +76,7 @@ shasum -a 256 docs/benchmarks/framework/grader_v4_locked.py
 ```
 
 ### Grade Answers
+
 ```bash
 python3 docs/benchmarks/framework/grader_v4_locked.py \
   <answers.jsonl> \
@@ -79,6 +85,7 @@ python3 docs/benchmarks/framework/grader_v4_locked.py \
 ```
 
 ### Answer File Format (JSONL)
+
 ```json
 {"id": 379, "question": "...", "answer": "...", "file_line_refs": ["path/file.ts:123"]}
 ```
@@ -119,6 +126,7 @@ Before comparing MDEMG changes:
 ## DO NOT MODIFY
 
 This framework is locked. To make changes:
+
 1. Create a new version (v1.1, v2.0, etc.)
 2. Document rationale
 3. Re-establish baselines

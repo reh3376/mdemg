@@ -1,6 +1,7 @@
 # C++ Parser Test: Final Categorization Summary
 
 ## Test Results
+
 - **Total spec symbols**: 78
 - **Parser emitted**: 105 symbols
 - **Matched**: 48
@@ -14,7 +15,8 @@
 
 These are symbols the spec incorrectly expects - they are parameter names or forward references, not real declarations.
 
-#### Parameters Mistaken for Methods (7):
+#### Parameters Mistaken for Methods (7)
+
 1. `id [method] line=56 parent=Repository` - parameter of `findById()`
 2. `user [method] line=57 parent=Repository` - parameter of `save()`
 3. `id [method] line=58 parent=Repository` - parameter of `remove()`
@@ -23,32 +25,47 @@ These are symbols the spec incorrectly expects - they are parameter names or for
 6. `value [method] line=95 parent=Item` - constructor parameter
 7. `repository [method] line=118 parent=UserService` - constructor parameter
 
-#### Parameters Mistaken for Functions (15):
-8. `id [function] line=56` - parameter of `findById()`
-9. `user [function] line=57` - parameter of `save()`
-10. `id [function] line=58` - parameter of `remove()`
-11. `item [function] line=65` - parameter of `validate()`
-12. `email [function] line=173` - parameter of `User::User()` constructor impl
-13. `value [function] line=187` - parameter of `Item::Item()` constructor impl
-14. `percentage [function] line=196` - parameter of `Item::calculateDiscount()`
-15. `email [function] line=201` - parameter of `validateEmail()`
-   - **Note**: Spec expects "email", parser correctly emits "validateEmail"
-16. `user [function] line=206` - parameter of `formatUser()`
-   - **Note**: Spec expects "user", parser correctly emits "formatUser"
-17. `items [function] line=211` - parameter of `calculateTotal()`
-   - **Note**: Spec expects "items", parser correctly emits "calculateTotal"
+#### Parameters Mistaken for Functions (15)
 
-#### Forward Class References (4):
-23. `Item [class] line=29` - forward ref in `using ItemList = std::vector<class Item>;`
-   - **Actual class definition**: line 93
-24. `User [class] line=56` - forward ref in `std::optional<class User> findById(...)`
-   - **Actual class definition**: line 70
-25. `User [class] line=57` - forward ref in `save(const class User& user)`
-   - **Actual class definition**: line 70
-26. `Item [class] line=65` - forward ref in `validate(const class Item& item)`
-   - **Actual class definition**: line 93
+1. `id [function] line=56` - parameter of `findById()`
+2. `user [function] line=57` - parameter of `save()`
+3. `id [function] line=58` - parameter of `remove()`
+4. `item [function] line=65` - parameter of `validate()`
+5. `email [function] line=173` - parameter of `User::User()` constructor impl
+6. `value [function] line=187` - parameter of `Item::Item()` constructor impl
+7. `percentage [function] line=196` - parameter of `Item::calculateDiscount()`
+8. `email [function] line=201` - parameter of `validateEmail()`
 
-#### Missing Methods Due to Incorrect Expectations (3):
+- **Note**: Spec expects "email", parser correctly emits "validateEmail"
+
+1. `user [function] line=206` - parameter of `formatUser()`
+
+- **Note**: Spec expects "user", parser correctly emits "formatUser"
+
+1. `items [function] line=211` - parameter of `calculateTotal()`
+
+- **Note**: Spec expects "items", parser correctly emits "calculateTotal"
+
+#### Forward Class References (4)
+
+1. `Item [class] line=29` - forward ref in `using ItemList = std::vector<class Item>;`
+
+- **Actual class definition**: line 93
+
+1. `User [class] line=56` - forward ref in `std::optional<class User> findById(...)`
+
+- **Actual class definition**: line 70
+
+1. `User [class] line=57` - forward ref in `save(const class User& user)`
+
+- **Actual class definition**: line 70
+
+1. `Item [class] line=65` - forward ref in `validate(const class Item& item)`
+
+- **Actual class definition**: line 93
+
+#### Missing Methods Due to Incorrect Expectations (3)
+
 The spec has parameter names instead of constructor names for these:
 27. Missing `User [method] line=72` - spec has "email" parameter instead
 28. Missing `Item [method] line=95` - spec has "value" parameter instead
@@ -86,7 +103,9 @@ These are real symbols that should be detected but aren't:
 ## Critical Findings
 
 ### 1. Parser Bug (MUST FIX)
+
 The C++ parser fails to detect `static const` constant declarations:
+
 ```cpp
 static const int INTERNAL_LIMIT = 100;  // ❌ NOT DETECTED
 ```
@@ -94,15 +113,19 @@ static const int INTERNAL_LIMIT = 100;  // ❌ NOT DETECTED
 **Recommendation**: Update parser to handle `static const` pattern in addition to existing `constexpr` support.
 
 ### 2. Spec Generation Error
+
 The spec was incorrectly generated with parameter names as separate symbols. This accounts for 26 of the 30 failures (87% of failures are spec errors).
 
 **Recommendation**: Regenerate spec using corrected spec generator that:
+
 - Excludes parameter names
 - Excludes forward class references
 - Only includes actual symbol definitions
 
 ### 3. Validated Parser Behavior
+
 The parser correctly handles:
+
 - ✓ All class declarations (except forward refs)
 - ✓ All method declarations and implementations
 - ✓ All constructor and destructor declarations
@@ -117,28 +140,35 @@ The parser correctly handles:
 - ✓ Constants (`constexpr`, `inline constexpr`)
 
 **Missing support**:
+
 - ❌ `static const` constants
 
 ---
 
 ## Matched Symbols Breakdown (48 total)
 
-### Constants (5):
+### Constants (5)
+
 - MAX_RETRIES, DEFAULT_TIMEOUT, API_VERSION, DEBUG_MODE, BUFFER_SIZE
 
-### Type Aliases (3):
+### Type Aliases (3)
+
 - UserId, ItemList, Callback
 
-### Namespaces (2):
+### Namespaces (2)
+
 - mdemg (line 34, line 171)
 
-### Enums (2):
+### Enums (2)
+
 - Status, Priority
 
-### Classes (6):
+### Classes (6)
+
 - Repository, Validator, User, Item, UserService, BaseEntity, AdminUser
 
-### Methods & Functions (30):
+### Methods & Functions (30)
+
 All expected methods, constructors, destructors, and implementations correctly detected.
 
 ---
@@ -146,11 +176,13 @@ All expected methods, constructors, destructors, and implementations correctly d
 ## Recommendations
 
 ### Immediate Action
+
 1. **Fix parser**: Add support for `static const` constant detection
 2. **Regenerate spec**: Use corrected generator to remove parameter names and forward refs
 3. **Re-run tests**: Expect 100% pass rate after fixes
 
 ### Long-term
+
 - Add regression tests for `static const` pattern
 - Validate spec generation with manual review before committing
 - Consider adding spec linter to detect common generation errors (parameter names, forward refs)
@@ -162,4 +194,3 @@ All expected methods, constructors, destructors, and implementations correctly d
 - **Spec**: `/Users/reh3376/mdemg/docs/lang-parser/lang-parse-spec/upts/specs/cpp.upts.json`
 - **Fixture**: `/Users/reh3376/mdemg/docs/lang-parser/lang-parse-spec/upts/fixtures/cpp_test_fixture.cpp`
 - **Parser output**: Provided by user (105 symbols)
-

@@ -57,6 +57,7 @@ Results from both calls are merged into the single `steps` map in the API respon
 ## Configuration
 
 No additional configuration. Phase ranges are hardcoded in the service methods:
+
 - `RunNodeCreationPipeline()` → `RunPhaseRange(ctx, spaceID, nil, 10, 20)`
 - `RunPostClusteringPipeline()` → `RunPhaseRange(ctx, spaceID, nil, 25, 30)`
 

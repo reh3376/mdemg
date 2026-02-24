@@ -14,12 +14,14 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 ### Development Setup
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/reh3376/mdemg.git
    cd mdemg
    ```
 
 2. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
@@ -29,11 +31,13 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
    - Embedding provider credentials
 
 4. Start Neo4j (if using Docker):
+
    ```bash
    docker compose up -d
    ```
 
 5. Build the unified CLI:
+
    ```bash
    make build-cli
    # Or directly:
@@ -41,6 +45,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
    ```
 
 6. Run the server:
+
    ```bash
    ./bin/mdemg serve
    ```
@@ -58,6 +63,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 - Write tests for new functionality
 - Run existing tests before submitting:
+
   ```bash
   # Unit tests
   go test ./internal/...
@@ -98,6 +104,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   # All tests (UPTS + UATS)
   make test-all
   ```
+
 - Include both unit tests and integration tests where appropriate
 
 ### Test Frameworks
@@ -132,11 +139,13 @@ When adding a new language parser or modifying an existing one:
    - See existing specs for examples of the full schema
 
 **UATS (Universal API Test Specification)** validates API endpoints against JSON spec files. Specs live in `docs/api/api-spec/uats/specs/`. The `--base-url` flag in the Makefile dynamically reads the server's port from `.mdemg.port` (see Dynamic Port Allocation below). To add or update an API test:
+
 1. Create or edit `docs/api/api-spec/uats/specs/<endpoint>.uats.json`
 2. Run `make test-api-<endpoint>` to validate
 3. Install UATS dependencies: `make uats-setup`
 
 **UATS Tag Filtering** (Phase 90): Specs support optional tags in their `config.tags` array for selective execution:
+
 ```bash
 # Run only RSIC specs
 python3 runners/uats_runner.py validate-all --spec-dir specs/ --base-url ... --include-tag rsic
@@ -144,6 +153,7 @@ python3 runners/uats_runner.py validate-all --spec-dir specs/ --base-url ... --i
 # Run all non-embedding specs (CI merge-gating)
 python3 runners/uats_runner.py validate-all --spec-dir specs/ --base-url ... --exclude-tag embedding_required
 ```
+
 Tags: `rsic` (14 RSIC/self-improve specs), `embedding_required` (4 embedding-dependent specs). **CI splits UATS into merge-gating (core) and best-effort (embedding).**
 
 **UATS Sequential Mode**: Specs with `"sequential": true` in config run variants in order with previous response fields available as `prev_*` variables (used for idempotency testing).
@@ -311,6 +321,7 @@ Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.json`. 
 ### Pull Request Process
 
 1. Fork the repository and create a feature branch:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -320,6 +331,7 @@ Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.json`. 
 3. Write or update tests as needed
 
 4. Commit your changes with clear, descriptive messages:
+
    ```bash
    git commit -m "feat: add new retrieval optimization"
    ```

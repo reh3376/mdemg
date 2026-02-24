@@ -68,6 +68,7 @@ MDEMG is a **cognitive substrate** for AI coding agents where higher-level conce
 > "Edges are the durable truth; node organization is fluid."
 
 Relationships persist while concepts can migrate between layers as understanding deepens. When a node is promoted to a higher layer:
+
 - Edges are NEVER deleted (unless explicit decay/pruning)
 - Relationships are additive — new `ABSTRACTS_TO` edges supplement existing
 - Queries can traverse both layers — concrete and abstract paths coexist
@@ -82,18 +83,21 @@ Relationships persist while concepts can migrate between layers as understanding
 ## Quick Reference
 
 ### Key Labels
+
 - `:TapRoot` — Singleton per space_id
 - `:MemoryNode` — Main memory nodes (has `embedding` property)
 - `:Observation` — Append-only events
 - `:SchemaMeta` — Schema version tracking
 
 ### Key Relationships
+
 - `ASSOCIATED_WITH` — Semantic similarity
 - `CO_ACTIVATED_WITH` — Learning signal (Hebbian)
 - `CAUSES`, `ENABLES` — Causal links
 - `ABSTRACTS_TO` / `INSTANTIATES` — Layer hierarchy
 
 ### Promotion Signals
+
 | Signal | Description |
 |--------|-------------|
 | Frequency | Pattern appears across multiple contexts |

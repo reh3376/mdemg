@@ -6,6 +6,7 @@ This benchmark was run after fixing the Python parser regex to eliminate false p
 class name extraction from docstrings (e.g., "class that" in "A dummy class that is...").
 
 ### Changes Under Test
+
 - **Python parser fix**: Changed class regex from `class\s+(\w+)` to
   `(?m)^\s*class\s+(\w+)\s*[:\(]` requiring line-start anchor and colon/parenthesis
   after class name
@@ -15,6 +16,7 @@ class name extraction from docstrings (e.g., "class that" in "A dummy class that
   ("that", "for", "is", "so", etc.) are extracted
 
 ### Test Setup
+
 - **Codebase**: Megatron-LM (NVIDIA's large model training framework)
 - **Ingestion**: 1,704 elements, 13.6 elements/sec, ml_cuda preset
 - **Questions**: 142 questions from `benchmark_questions_v1_master.json`
@@ -54,6 +56,7 @@ class name extraction from docstrings (e.g., "class that" in "A dummy class that
 ## Analysis
 
 ### MDEMG Strengths
+
 - Consistent 17-18x improvement over baseline across all runs
 - Cold run (Run 1) performed best at 27.5%, suggesting initial retrieval
   quality is strong without needing warm-up
@@ -61,17 +64,20 @@ class name extraction from docstrings (e.g., "class that" in "A dummy class that
   when using `code_only: true`
 
 ### MDEMG Variance
+
 - Run-to-run variance: 22.5% - 27.5% (5.0 pp spread)
 - This variance is expected from embedding-based retrieval with
   different query orderings affecting cache behavior
 
 ### Baseline Observations
+
 - gpt-4o-mini has very limited knowledge of Megatron-LM file paths
 - Nearly all baseline hits are lucky guesses on common file names
 - Confirms that MDEMG retrieval provides genuine value over LLM
   parametric knowledge alone
 
 ### Limitations
+
 - Hit rate metric only checks if the exact expected file appears in top 5
 - Does not grade answer quality or semantic correctness
 - Some questions reference multiple files; partial matches not counted

@@ -8,6 +8,7 @@
 ## Execution Summary
 
 ### Status: ✓ COMPLETE
+
 - **Total Questions:** 142/142 answered
 - **Output File:** `answers_mdemg_run1.jsonl`
 - **Execution Time:** ~45 minutes
@@ -37,17 +38,20 @@
 ### MDEMG Effectiveness
 
 **Strengths:**
+
 - Successfully retrieved relevant files for most architecture questions
 - Good performance on questions about specific classes (MegatronModule, TransformerConfig, GPTModel)
 - Helpful for finding core implementation files
 
 **Limitations:**
+
 - 69/142 answers (48.6%) received config file hints rather than source code
 - Many YAML test configuration files appeared in top results instead of actual implementation
 - Required fallback to direct grep/search for many questions
 - Distribution alerts showed "highly compressed" scores for many queries
 
 **MDEMG Query Examples:**
+
 ```
 Query: "What is the primary base class..."
 Top Result: /.gitlab/labeler-config.yml (not helpful)
@@ -108,6 +112,7 @@ Config Files Referenced: 69 (48.6% - indicates MDEMG limitation)
 ## Comparison to Baseline
 
 Baseline runs (without MDEMG) will be compared after grading. Expected differences:
+
 - **MDEMG advantages:** Faster file discovery, broader context awareness
 - **MDEMG disadvantages:** Config file noise, may miss implementation details
 - **Quality:** TBD based on semantic similarity grading

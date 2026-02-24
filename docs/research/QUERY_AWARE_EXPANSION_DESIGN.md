@@ -23,6 +23,7 @@ Query-Aware Expansion enhances MDEMG's graph traversal by applying attention-bas
 ### Current Behavior (Pre-V0009)
 
 The expansion phase in `fetchOutgoingEdges` selects neighbors based on:
+
 1. Edge type filtering (allowed relationship types)
 2. Evidence-based decay for CO_ACTIVATED_WITH edges
 3. **Edge weight ranking** (top MaxNeighborsPerNode by weight)
@@ -43,6 +44,7 @@ From `docs/research/GAT_RESEARCH.md`:
 ### Core Concept
 
 After fetching candidate edges, re-rank them by **attention score** that combines:
+
 1. **Query-destination similarity**: Cosine similarity between query embedding and destination node embedding
 2. **Edge signal**: Existing edge features (weight, dim_semantic, dim_coactivation, dim_temporal)
 
@@ -85,6 +87,7 @@ func ComputeQueryAwareAttention(queryEmb, dstEmb []float32, edge Edge, attention
 #### 3. Edge Re-ranking
 
 After `fetchOutgoingEdges` returns candidates:
+
 1. Fetch missing destination embeddings (from cache or DB)
 2. Compute attention scores for each edge
 3. Sort by attention score descending
@@ -122,6 +125,7 @@ go test ./internal/retrieval/ -run "NodeEmbeddingCache\|QueryAware\|Cosine"
 ```
 
 Tests cover:
+
 - Cosine similarity computation
 - Attention score calculation
 - LRU cache eviction
@@ -136,6 +140,7 @@ Tests cover:
 #### Test Run Results
 
 Ran benchmark_runner_v2.py with 120 questions:
+
 - Questions answered: 120/120
 - Graded Mean Score: 0.716
 - Strong Evidence: 99.2%
@@ -152,6 +157,7 @@ Tested retrieval with identical queries, QA Expansion enabled vs disabled:
 | "safety limits processing" | Same results | Same results |
 
 **Conclusion:** Query-Aware Expansion does NOT change retrieval results for the tested queries. This is expected since:
+
 1. The feature only affects neighbor selection during graph expansion (hops 1-3)
 2. If vector recall returns the same initial candidates, expansion starts from the same seeds
 3. The attention re-ranking primarily helps when there are many high-weight edges to choose from
@@ -182,6 +188,7 @@ Tested retrieval with identical queries, QA Expansion enabled vs disabled:
 | Cross-Cutting | Low (0.55-0.65) | +10% |
 
 Query-aware expansion benefits multi-hop and cross-cutting queries most because:
+
 - Multi-hop: Attention prunes irrelevant branches early
 - Cross-cutting: Query context helps find related concerns across distant nodes
 
@@ -190,14 +197,17 @@ Query-aware expansion benefits multi-hop and cross-cutting queries most because:
 ## Risks and Mitigations
 
 ### Risk 1: Embedding Fetch Latency
+
 **Issue:** Fetching node embeddings adds DB queries.
 **Mitigation:** Aggressive LRU caching (5000 capacity default), batch fetching.
 
 ### Risk 2: Cache Hit Rate Decrease
+
 **Issue:** Query-dependent expansion may reduce cache effectiveness.
 **Mitigation:** Feature can be disabled; cache size is configurable.
 
 ### Risk 3: Query-Cache Interaction
+
 **Issue:** Query cache stores full results, but attention changes per-query.
 **Mitigation:** Query embedding is part of cache key, so different queries get different cached results.
 
@@ -206,11 +216,14 @@ Query-aware expansion benefits multi-hop and cross-cutting queries most because:
 ## Future Enhancements
 
 ### Phase 2: Hybrid Edge Type Strategy
+
 From GAT Research:
+
 - First hop: Structural edges (ASSOCIATED_WITH, GENERALIZES) for breadth
 - Subsequent hops: Learned edges (CO_ACTIVATED_WITH) with attention for depth
 
 ### Phase 3: Learned Attention Model
+
 Train GATv2 model on query co-activation patterns for improved attention computation.
 
 ---

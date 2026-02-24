@@ -90,6 +90,7 @@
 ## Conclusion
 
 v8 with path-boost and comparison-boost scoring achieves the primary goal:
+
 - **architecture_structure category improved by +2.2%** (from worst to middle)
 - **Minimum score improved by +14.5%** (better worst-case handling)
 - Overall average slightly improved (+0.4%)

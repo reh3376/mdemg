@@ -47,6 +47,7 @@ Phase 90 closes both gaps:
 ## Current State
 
 ### What Exists
+
 | Layer | Coverage | Merge-Gating? |
 |-------|----------|---------------|
 | Unit tests (internal/ape/) | 60+ tests, pure logic | Yes (go test) |
@@ -54,6 +55,7 @@ Phase 90 closes both gaps:
 | Go integration tests | 8 files (retrieval, ingest, etc.) | Yes (go test -tags=integration) |
 
 ### What's Missing
+
 | Gap | Impact |
 |-----|--------|
 | No RSIC integration tests | Full-stack RSIC regressions undetected |
@@ -71,42 +73,49 @@ Phase 90 closes both gaps:
 New file with 6 behavior-level tests, all using `//go:build integration` tag.
 
 #### Test 1: `TestRSIC_CycleCreatesHistory`
+
 - Trigger a micro cycle via `POST /v1/self-improve/cycle`
 - Assert 200 response with `cycle_id`, `tier: "micro"`, `actions` array
 - Query `GET /v1/self-improve/history` and verify the cycle appears
 - Verify `GET /v1/self-improve/health` reports `cycles_run >= 1`
 
 #### Test 2: `TestRSIC_DryRunProducesNoDelta`
+
 - Observe 3 nodes into a test space (via `POST /v1/conversation/observe`)
 - Trigger a cycle with `dry_run: true`
 - Assert response has `dry_run: true` and non-empty `actions`
 - Query Neo4j directly — verify no new edges/nodes were created beyond the 3 observations
 
 #### Test 3: `TestRSIC_SafetyBlocksProtectedSpace`
+
 - Trigger a cycle targeting `space_id: "mdemg-dev"` (protected)
 - Assert the cycle completes but destructive actions are skipped
 - Verify `safety_blocked` count in the cycle outcome > 0 (or actions list shows blocked)
 
 #### Test 4: `TestRSIC_MultiSpaceCycleIsolation`
+
 - Create two test spaces (A and B), observe 3 nodes into each
 - Trigger a cycle for space A only
 - Verify cycle only touched space A (check actions reference space A)
 - Verify space B graph state is unchanged (node count same as after observations)
 
 #### Test 5: `TestRSIC_PersistenceSurvivesFlush`
+
 - Trigger a cycle, note the `calibration` confidence in health response
 - Call `GET /v1/self-improve/health` — record `persistence.state_nodes` count
 - Assert `persistence.state_nodes > 0` (RSICState nodes exist in Neo4j)
 - Directly query Neo4j for `(:MemoryNode:RSICState)` nodes — verify they exist with correct `rsic_type` values
 
 #### Test 6: `TestRSIC_WatchdogStateInHealth`
+
 - Trigger 2 cycles to build watchdog history
 - Call `GET /v1/self-improve/health`
 - Assert `watchdog` block exists with `decay_score`, `cycles_seen`, `last_cycle_at`
 - Assert `orchestration` block exists with `policy_version`
 - Assert `persistence` block exists (Phase 89)
 
-#### Helper additions to `helpers_test.go`:
+#### Helper additions to `helpers_test.go`
+
 ```go
 // ObserveTestNode creates a minimal observation in the test space.
 func ObserveTestNode(t *testing.T, endpoint, spaceID, content string) {
@@ -156,7 +165,8 @@ This requires adding tag-based filtering to the UATS runner (see Step 3).
 
 Extend `uats_runner.py` to support a `tags` field in spec configs and CLI filtering.
 
-#### Spec-level tag field:
+#### Spec-level tag field
+
 ```json
 {
   "config": {
@@ -167,14 +177,16 @@ Extend `uats_runner.py` to support a `tags` field in spec configs and CLI filter
 }
 ```
 
-#### CLI flags:
+#### CLI flags
+
 - `--include-tag TAG` — only run specs with this tag
 - `--exclude-tag TAG` — skip specs with this tag
 - Tags are optional; specs without tags are included by default (unless `--include-tag` is specified)
 
-#### Tag classification for existing specs:
+#### Tag classification for existing specs
 
 **`embedding_required` (specs that need embedding provider):**
+
 - `retrieve_semantic.uats.json`
 - `retrieve_hybrid.uats.json`
 - `retrieve_vector.uats.json`
@@ -183,6 +195,7 @@ Extend `uats_runner.py` to support a `tags` field in spec configs and CLI filter
 - Any spec whose assertions depend on vector similarity scoring
 
 **No tag (core — merge-gating):**
+
 - All health/readiness specs
 - All self_improve (RSIC) specs
 - All conversation CMS specs
@@ -208,25 +221,25 @@ Add to `Makefile`:
 
 # Run all RSIC tests (unit + integration + UATS)
 test-rsic: test-rsic-unit test-rsic-integration test-rsic-uats
-	@echo "All RSIC tests complete"
+ @echo "All RSIC tests complete"
 
 # RSIC unit tests only (no server needed)
 test-rsic-unit:
-	@echo "Running RSIC unit tests..."
-	go test -v ./internal/ape/... -run "TestRSIC|TestCalibr|TestDispatch|TestDateTime|TestOrchestration|TestSafety|TestAction|TestWatchdog"
+ @echo "Running RSIC unit tests..."
+ go test -v ./internal/ape/... -run "TestRSIC|TestCalibr|TestDispatch|TestDateTime|TestOrchestration|TestSafety|TestAction|TestWatchdog"
 
 # RSIC integration tests (requires running server + Neo4j)
 test-rsic-integration:
-	@echo "Running RSIC integration tests..."
-	go test -v -tags=integration ./tests/integration/... -run "TestRSIC_"
+ @echo "Running RSIC integration tests..."
+ go test -v -tags=integration ./tests/integration/... -run "TestRSIC_"
 
 # RSIC UATS contract tests only
 test-rsic-uats:
-	@echo "Running RSIC UATS contract tests..."
-	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
-		--spec-dir docs/api/api-spec/uats/specs/ \
-		--base-url $(BASE_URL) \
-		--include-tag rsic
+ @echo "Running RSIC UATS contract tests..."
+ python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
+  --spec-dir docs/api/api-spec/uats/specs/ \
+  --base-url $(BASE_URL) \
+  --include-tag rsic
 ```
 
 Also add an `rsic` tag to all 12 self_improve specs for targeted execution.
@@ -235,7 +248,8 @@ Also add an `rsic` tag to all 12 self_improve specs for targeted execution.
 
 ### 5. Draft Cleanup
 
-#### Promote Phase 87 idempotency spec:
+#### Promote Phase 87 idempotency spec
+
 The spec `drafts/self_improve_cycle_idempotency.phase87.uats.json` requires sequential execution (two requests with same idempotency key). Add sequential support to the runner:
 
 - New spec config field: `"sequential": true`
@@ -244,8 +258,10 @@ The spec `drafts/self_improve_cycle_idempotency.phase87.uats.json` requires sequ
 
 After adding sequential support, move the spec to `specs/`.
 
-#### Remove promoted stubs from drafts/:
+#### Remove promoted stubs from drafts/
+
 Delete the 6 Phase 88 draft files that were already promoted to `specs/`:
+
 - `drafts/self_improve_cycle_dry_run.phase88.uats.json`
 - `drafts/self_improve_health_safety.phase88.uats.json`
 - `drafts/self_improve_rollback_list.phase88.uats.json`
@@ -257,7 +273,8 @@ Delete the 6 Phase 88 draft files that were already promoted to `specs/`:
 
 Add `tags` array to each spec's config section.
 
-#### Tags to add:
+#### Tags to add
+
 | Tag | Meaning | Specs |
 |-----|---------|-------|
 | `rsic` | RSIC/self-improve endpoint | 12+ self_improve specs |
@@ -287,6 +304,7 @@ Tags are additive — a spec can have multiple tags (e.g., `["rsic", "phase87"]`
 ## Verification Plan
 
 ### Automated
+
 1. `go build ./...` — zero errors
 2. `go vet ./...` — clean
 3. `go test -v ./internal/ape/...` — all unit tests pass
@@ -295,6 +313,7 @@ Tags are additive — a spec can have multiple tags (e.g., `["rsic", "phase87"]`
 6. `make test-api` — existing 108+ specs, 100%
 
 ### Manual CI Verification
+
 1. Push to `mdemg-dev01` — verify CI runs two UATS steps
 2. Verify core UATS step (non-embedding) is merge-gating (no continue-on-error)
 3. Verify embedding UATS step has continue-on-error

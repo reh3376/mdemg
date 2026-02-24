@@ -5,6 +5,7 @@ A standardized framework for defining and running performance benchmarks against
 ## Overview
 
 UBTS provides:
+
 - **Declarative Specs**: JSON-based benchmark definitions
 - **Reusable Profiles**: Load configurations (smoke, load, stress)
 - **Automated Runner**: Python script for executing benchmarks
@@ -126,6 +127,7 @@ benchmark:
 ## Success Criteria
 
 Phase 3 benchmarks must meet:
+
 - p95 latency < 250ms under 100 concurrent requests
 - Error rate < 0.1% under normal load
 - Throughput > 100 rps sustained

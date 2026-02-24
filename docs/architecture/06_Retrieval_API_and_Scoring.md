@@ -25,6 +25,7 @@
 `POST /v1/memory/retrieve`
 
 ### Request Body
+
 ```json
 {
   "space_id": "ide-agent",
@@ -52,6 +53,7 @@
 | `temporal_before` | No | - | ISO 8601 timestamp: force hard filter before this time |
 
 ### Response
+
 ```json
 {
   "data": {
@@ -77,6 +79,7 @@
 `POST /v1/memory/ingest`
 
 ### Request Body
+
 ```json
 {
   "space_id": "ide-agent",
@@ -92,6 +95,7 @@
 ```
 
 ### Response
+
 ```json
 {
   "data": {
@@ -106,6 +110,7 @@
 ```
 
 **Features:**
+
 - Auto-generates embedding if not provided
 - Creates semantic ASSOCIATED_WITH edges to similar nodes (configurable via `SEMANTIC_EDGE_*`)
 - Runs non-blocking anomaly detection (duplicate/stale checks)
@@ -119,6 +124,7 @@
 Bulk ingest up to 100 observations in a single request.
 
 ### Request Body
+
 ```json
 {
   "space_id": "ide-agent",
@@ -141,6 +147,7 @@ Bulk ingest up to 100 observations in a single request.
 ```
 
 ### Response (HTTP 200 or 207 for partial success)
+
 ```json
 {
   "data": {
@@ -157,6 +164,7 @@ Bulk ingest up to 100 observations in a single request.
 ```
 
 **Configuration:**
+
 - `BATCH_INGEST_MAX_ITEMS=100` - Maximum observations per request
 
 ---
@@ -168,6 +176,7 @@ Bulk ingest up to 100 observations in a single request.
 Search for code symbols extracted during codebase ingestion.
 
 ### Query Parameters
+
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `space_id` | Yes | - | Memory space to search |
@@ -179,6 +188,7 @@ Search for code symbols extracted during codebase ingestion.
 | `limit` | No | 50 | Maximum results (max 500) |
 
 ### Response
+
 ```json
 {
   "symbols": [
@@ -208,6 +218,7 @@ Search for code symbols extracted during codebase ingestion.
 Start a background re-ingestion job (non-blocking).
 
 ### Request Body
+
 ```json
 {
   "space_id": "my-project",
@@ -227,6 +238,7 @@ Start a background re-ingestion job (non-blocking).
 | `extract_symbols` | No | true | Extract code symbols |
 
 ### Response
+
 ```json
 {
   "job_id": "abc-123-def",
@@ -239,6 +251,7 @@ Start a background re-ingestion job (non-blocking).
 `GET /v1/memory/ingest/status/{job_id}`
 
 ### Response
+
 ```json
 {
   "job_id": "abc-123-def",
@@ -259,6 +272,7 @@ Start a background re-ingestion job (non-blocking).
 `POST /v1/memory/ingest/cancel/{job_id}`
 
 ### Response
+
 ```json
 {
   "job_id": "abc-123-def",
@@ -271,6 +285,7 @@ Start a background re-ingestion job (non-blocking).
 `GET /v1/memory/ingest/jobs`
 
 ### Response
+
 ```json
 {
   "jobs": [
@@ -300,6 +315,7 @@ Start a background re-ingestion job (non-blocking).
 Returns Neo4j connection pool statistics and Go runtime metrics.
 
 ### Response
+
 ```json
 {
   "connection_pool": {
@@ -316,6 +332,7 @@ Returns Neo4j connection pool statistics and Go runtime metrics.
 ```
 
 **Configuration:**
+
 ```
 NEO4J_MAX_POOL_SIZE=100           # Max connections (default: 100)
 NEO4J_ACQUIRE_TIMEOUT_SEC=60      # Connection acquire timeout (default: 60)
@@ -334,6 +351,7 @@ NEO4J_CONN_IDLE_TIMEOUT_SEC=0     # Idle timeout, 0=disabled (default: 0)
 Deep context exploration using 3-stage traversal for comprehensive topic understanding.
 
 ### Request Body
+
 ```json
 {
   "space_id": "ide-agent",
@@ -353,6 +371,7 @@ Deep context exploration using 3-stage traversal for comprehensive topic underst
 | `max_nodes` | No | 50 | Cap on returned nodes |
 
 ### Response
+
 ```json
 {
   "data": {
@@ -386,6 +405,7 @@ Deep context exploration using 3-stage traversal for comprehensive topic underst
 ```
 
 ### 3-Stage Traversal
+
 1. **SEED** - Vector search for topic-related memories
 2. **EXPAND** - Lateral traversal via CO_ACTIVATED_WITH and ASSOCIATED_WITH edges
 3. **ABSTRACT** - Upward traversal via ABSTRACTS_TO edges to find generalizations
@@ -399,11 +419,13 @@ Deep context exploration using 3-stage traversal for comprehensive topic underst
 Returns graph health metrics and statistics.
 
 ### Query Parameters
+
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `space_id` | No | Filter metrics to specific space (global if omitted) |
 
 ### Response
+
 ```json
 {
   "data": {
@@ -439,6 +461,7 @@ Returns graph health metrics and statistics.
 ## 10) Health Check Endpoints
 
 ### Liveness Probe
+
 `GET /healthz`
 
 ```json
@@ -450,6 +473,7 @@ Returns graph health metrics and statistics.
 ```
 
 ### Readiness Probe
+
 `GET /readyz`
 
 ```json
@@ -468,6 +492,7 @@ Returns graph health metrics and statistics.
 ## Candidate Generation (Vector + Graph)
 
 ### Vector Recall
+
 1. Embed query_text (or use provided query_embedding)
 2. Query vector index on `:MemoryNode.embedding`
 
@@ -481,9 +506,11 @@ ORDER BY score DESC;
 ```
 
 ### Graph Expansion
+
 For each candidate, fetch neighborhood edges within allowed types and within hop_depth.
 
 **Recommendations:**
+
 - Restrict to useful edge types (avoid CONTAINS exploding unless filtered)
 - Apply degree caps (ignore nodes with out-degree > N unless structural anchors)
 - Configurable via `MAX_NEIGHBORS_PER_NODE`, `MAX_TOTAL_EDGES_FETCHED`
@@ -503,11 +530,13 @@ score = α*vector_sim + β*activation + γ_eff*recency + δ*confidence - κ*redu
 ```
 
 Where `γ_eff` depends on temporal mode:
+
 - **none** (default): `γ_eff = γ` — no change to scoring
 - **soft** ("recent changes to auth"): `γ_eff = γ × TEMPORAL_SOFT_BOOST` (default 3.0×)
 - **hard** ("in the last 7 days"): candidates filtered by time range before scoring
 
 **Default Hyperparameters:**
+
 | Symbol | Name | Default | Description |
 |--------|------|---------|-------------|
 | α | vector weight | 0.55 | Vector similarity contribution |
@@ -519,6 +548,7 @@ Where `γ_eff` depends on temporal mode:
 | ρ | recency decay | 0.05 | Decay rate per day |
 
 **Penalties:**
+
 - `hub_penalty`: proportional to log(degree) to avoid generic nodes dominating
 - `redundancy`: penalizes near-duplicates (same abstraction parent, same path prefix)
 
@@ -533,6 +563,7 @@ The retrieval pipeline detects temporal intent from natural language queries:
 | `hard` | "in the last N days", "since DATE" | Candidates filtered to `[after, before)` range |
 
 **Pipeline integration points:**
+
 1. `ComputeRetrievalHints()` — parses temporal intent from query text
 2. After BM25 fusion — hard-mode filter removes out-of-range candidates
 3. `ScoreAndRankWithBreakdown()` — soft-mode multiplies gamma for recency boost
@@ -548,12 +579,14 @@ The retrieval pipeline detects temporal intent from natural language queries:
 ## Explainability
 
 Each result includes:
+
 - `vector_sim` - Raw cosine similarity to query
 - `activation` - Computed activation score
 - `temporal_boost` - Additional score from temporal recency boost (0 when mode=none)
 - `top_incoming_contributors[]` - List of (src_node_id, relType, w_eff, src_activation)
 
 For detailed explanations, return:
+
 - Top contributing paths: (seed → ... → result) with edge weights and types
 - Evidence counts and timestamps for edges used
 - Temporal boost contribution when applicable
@@ -563,10 +596,12 @@ For detailed explanations, return:
 ## Learning Updates After Retrieval
 
 For final top-K nodes:
+
 1. Update/create `CO_ACTIVATED_WITH` edges among nodes above activation threshold
 2. Increment evidence counts, update timestamps
 3. Optional: strengthen `ABSTRACTS_TO` edges if consistent
 
 **Constraints:**
+
 - Learning updates bounded per request (`LEARNING_EDGE_CAP_PER_REQUEST=200`)
 - Hebbian formula: `Δw = η * a_i * a_j - μ * w_ij`

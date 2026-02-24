@@ -8,6 +8,7 @@
 ## Executive Summary
 
 This experiment compared two approaches for answering questions about a large codebase:
+
 1. **Baseline**: Direct file reading into LLM context (traditional RAG-free approach)
 2. **MDEMG**: Memory-assisted retrieval with semantic search
 
@@ -83,11 +84,13 @@ This experiment compared two approaches for answering questions about a large co
 ### Baseline Approach
 
 **Strengths:**
+
 - Complete context enables nuanced answers
 - Can synthesize information across multiple files
 - Good for domain/conceptual questions
 
 **Weaknesses:**
+
 - Context window limited (~200k tokens)
 - Compression loses detail
 - Cannot scale to very large codebases
@@ -96,6 +99,7 @@ This experiment compared two approaches for answering questions about a large co
 ### MDEMG Approach
 
 **Strengths:**
+
 - Unlimited scalability
 - Precise file retrieval
 - Persistent memory across sessions
@@ -103,6 +107,7 @@ This experiment compared two approaches for answering questions about a large co
 - Fast incremental updates
 
 **Weaknesses:**
+
 - Returns paths, not content (requires follow-up read)
 - Less effective for quantitative questions
 - Requires semantic embedding quality
@@ -110,26 +115,30 @@ This experiment compared two approaches for answering questions about a large co
 
 ## Recommendations
 
-### Use Baseline When:
+### Use Baseline When
+
 - Codebase fits in context window (<50k LOC)
 - Questions require deep synthesis
 - Domain understanding is critical
 - One-time analysis needed
 
-### Use MDEMG When:
+### Use MDEMG When
+
 - Codebase is large (>50k LOC)
 - Questions are about code location
 - Ongoing assistance needed
 - Multiple sessions over time
 - Token budget is limited
 
-### Hybrid Approach (Optimal):
+### Hybrid Approach (Optimal)
+
 1. **Index with MDEMG** for persistent memory
 2. **Query MDEMG** to identify relevant files
 3. **Read specific files** identified by MDEMG
 4. **Answer with focused context**
 
 This hybrid approach combines:
+
 - MDEMG's retrieval precision
 - Direct reading's context quality
 - Minimal token usage
@@ -150,6 +159,7 @@ The experiment demonstrates that MDEMG successfully trades a small accuracy decr
 ---
 
 **Files Generated:**
+
 - `baseline-2026-01-21.md` - Baseline test results
 - `mdemg-2026-01-21.md` - MDEMG test results
 - `comparison-2026-01-21.md` - This comparison report

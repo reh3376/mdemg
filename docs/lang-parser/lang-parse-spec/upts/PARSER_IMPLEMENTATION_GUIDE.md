@@ -123,6 +123,7 @@ func loadGrammar(lang string) (*sitter.Language, error) {
 ```
 
 **Install dependencies:**
+
 ```bash
 go get github.com/smacker/go-tree-sitter/rust
 go get github.com/smacker/go-tree-sitter/c
@@ -261,6 +262,7 @@ All parsers (tree-sitter and fallback) must output this JSON structure:
 ```
 
 **Valid types:**
+
 - Code: `constant`, `function`, `class`, `method`, `interface`, `enum`, `type`, `struct`, `trait`, `macro`, `module`, `namespace`
 - CUDA: `kernel`, `variable`
 - SQL: `table`, `column`, `index`, `view`, `trigger`, `constraint`
@@ -341,6 +343,7 @@ TYPE_COMPAT = {
 ## Fixes Applied (Historical)
 
 ### Python Parser
+
 | Issue | Fix | File |
 |-------|-----|------|
 | Protocol → `class` | Check superclasses for `Protocol` | `internal/symbols/parser.go` |
@@ -349,6 +352,7 @@ TYPE_COMPAT = {
 | Type aliases → `variable` | `isPythonTypeAlias()` helper | `internal/symbols/parser.go` |
 
 ### TypeScript Parser
+
 | Issue | Fix | File |
 |-------|-----|------|
 | Arrow functions → `constant` | Check `arrow_function` node type | `internal/symbols/parser.go` |
@@ -356,6 +360,7 @@ TYPE_COMPAT = {
 | Abstract classes skipped | Handle `abstract_class_declaration` | `internal/symbols/parser.go` |
 
 ### UPTS Runner
+
 | Issue | Fix | File |
 |-------|-----|------|
 | shlex parsing errors | Use Python list for command | `upts_runner.py` |
@@ -438,6 +443,7 @@ make test-parsers
 **Cause:** Tree-sitter grammar not loaded for that language.
 
 **Fix:** Add grammar to `loadGrammar()` in `internal/symbols/parser.go`:
+
 ```go
 case "X":
     return X.GetLanguage(), nil
@@ -453,7 +459,8 @@ case "X":
 
 **Cause:** Parser reports different line numbers than expected.
 
-**Fix:** 
+**Fix:**
+
 1. Check `line_tolerance` in UPTS spec (default: 2)
 2. Verify fixture hasn't changed
 3. Check parser is using 1-indexed lines
@@ -463,6 +470,7 @@ case "X":
 **Cause:** Parser not tracking class context during AST walk.
 
 **Fix:** Maintain current class/struct context during parsing:
+
 ```go
 var currentClass string
 // When entering class: currentClass = className

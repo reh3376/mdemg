@@ -1,4 +1,5 @@
 # Temporal Decay Research for MDEMG
+
 **Research Date**: 2026-01-30
 **Author**: Claude (Sonnet 4.5)
 **Purpose**: Comprehensive research on temporal decay mechanisms for integration into MDEMG retrieval system
@@ -22,38 +23,46 @@ The [Ebbinghaus forgetting curve](https://en.wikipedia.org/wiki/Forgetting_curve
 **Mathematical Formulations**:
 
 1. **Exponential Decay** (most common):
+
    ```
    R = exp(-t/S)
    ```
+
    Where:
    - R = retrievability (memory retention, 0.0-1.0)
    - t = time elapsed since learning
    - S = relative memory strength
 
 2. **Ebbinghaus' Original Formula**:
+
    ```
    b = 100k / (c * log(t) + k)
    ```
+
    Where:
    - b = savings (retained knowledge)
    - t = time in minutes
    - c = 1.25, k = 1.84 (empirical constants)
 
 3. **Power Law Formula** (Wixted & Carpenter 2007):
+
    ```
    P(recall) = m(1 + ht)^(-f)
    ```
+
    Where:
    - m = degree of initial learning (probability at t=0)
    - h = scaling factor on time
    - f = exponential memory decay factor
 
 **Key Insights**:
+
 - Forgetting follows exponential decay initially, but when memories of different stability are mixed, the aggregate curve approximates a power law
 - Replication studies ([Murre & Dros, 2015](https://pmc.ncbi.nlm.nih.gov/articles/PMC4492928/)) confirm the original findings remain valid
 - The decay rate is not constant—it depends on initial encoding strength and reinforcement
 
 **Sources**:
+
 - [Replication and Analysis of Ebbinghaus' Forgetting Curve - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4492928/)
 - [Forgetting curve - Wikipedia](https://en.wikipedia.org/wiki/Forgetting_curve)
 - [Ebbinghaus's Forgetting Curve: How to Overcome It](https://whatfix.com/blog/ebbinghaus-forgetting-curve/)
@@ -63,27 +72,33 @@ The [Ebbinghaus forgetting curve](https://en.wikipedia.org/wiki/Forgetting_curve
 [ACT-R (Adaptive Control of Thought—Rational)](https://en.wikipedia.org/wiki/ACT-R) is a cognitive architecture that models human memory using power law decay.
 
 **Base-Level Activation Formula**:
+
 ```
 Bi = ln(Σⁿⱼ₌₁ tⱼ^(-d))
 ```
+
 Where:
+
 - Bi = base-level activation of memory chunk i
 - n = number of prior occurrences (frequency effect)
 - tⱼ = time since jth occurrence
 - d = decay parameter (typically 0.5 in ACT-R)
 
 **Why Power Law vs Exponential?**
+
 - Power law better matches empirical human memory data
 - Captures both frequency (how often) and recency (how recently) effects
 - Every retrieval creates a new memory trace that decays independently
 - The sum of multiple exponential decays approximates a power law
 
 **Practical Implications for MDEMG**:
+
 - Memories accessed frequently should decay slower
 - Recent activations should have stronger influence
 - Multiple retrievals should reinforce memory strength
 
 **Sources**:
+
 - [ACT-R - Wikipedia](https://en.wikipedia.org/wiki/ACT-R)
 - [An Integrated Computational Framework for the Neurobiology of Memory Based on the ACT-R Declarative Memory System](https://link.springer.com/article/10.1007/s42113-023-00189-y)
 - [Hybrid Personalization Using Declarative and Procedural Memory Modules of the Cognitive Architecture ACT-R](https://arxiv.org/html/2505.05083v1)
@@ -91,11 +106,13 @@ Where:
 ### 1.3 Biological Memory Systems
 
 **Hippocampus vs Neocortex**:
+
 - **Hippocampus**: Rapid encoding, fast decay (hours to days)
 - **Neocortex**: Slow consolidation, slower decay (months to years)
 - **Systems Consolidation**: Memories migrate from hippocampus to neocortex through repeated reactivation
 
 **Parallels to MDEMG**:
+
 - Layer 0 (observations) = hippocampus-like fast encoding
 - Layer 1+ (concepts) = neocortex-like consolidated knowledge
 - Consolidation process strengthens important patterns while pruning transient details
@@ -111,34 +128,41 @@ Modern recommendation systems extensively use temporal decay to prioritize recen
 **Common Formulas**:
 
 1. **Exponential Decay**:
+
    ```
    W = e^(-λt)
    ```
+
    Where:
    - W = weight
    - λ = decay rate
    - t = time since interaction
 
 2. **Half-Life Decay**:
+
    ```
    W = 0.5^(t / h)
    ```
+
    Where:
    - h = half-life period
    - t = time elapsed
 
 **Implementation Strategies**:
+
 - Apply decay during training (SGD step) rather than pre-processing
 - Session-based: treat 30-minute windows as atomic units
 - Recent co-occurrences get higher weight than older ones
 - Exponential decay with λ values typically 0.001 to 0.1 per day
 
 **Key Findings**:
+
 - [Recency weighting](https://customers.ai/recency-weighted-scoring) significantly improves click-through rates
 - [Session-based recommenders](https://www.mdpi.com/2079-9292/15/1/84) use GRUs or attention mechanisms for short-term preferences
 - Time decay is "quintessential" for POI (point-of-interest) recommendations to avoid stale results
 
 **Sources**:
+
 - [Application of collaborative filtering algorithm based on time decay function in music teaching recommendation model - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC11639207/)
 - [Recency-based spatio-temporal similarity exploration for POI recommendation in location-based social networks](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2024.1331642/full)
 - [A Half-Life Decaying Model for Recommender Systems with Matrix Factorization](https://ceur-ws.org/Vol-2038/paper1.pdf)
@@ -149,17 +173,20 @@ Modern recommendation systems extensively use temporal decay to prioritize recen
 Search engines (Google, Bing, AI search) use sophisticated temporal signals to balance freshness and relevance.
 
 **Freshness Signal Strategies**:
+
 - **Query-Dependent**: Time-sensitive queries (news, events) heavily weight recency; evergreen topics prioritize quality
 - **Content Decay Patterns**: Citation rates drop 40-60% after 90 days without updates
 - **Temporal Metadata**: "Last-modified" dates, publication dates, update frequency
 - **Half-Life Decay**: Blend semantic similarity with temporal decay in re-ranking
 
 **Implementation Details**:
+
 - AI algorithms dynamically adjust recency weighting based on query intent
 - Fused semantic-temporal scores: `score = α * cosine_sim + β * time_decay`
 - Content refresh cycles: weeks 1-4 (peak), weeks 5-12 (decline), weeks 13-26 (decay)
 
 **Sources**:
+
 - [How Content Freshness Helps Ranking in ChatGPT - Recency Bias for LLMs](https://www.mattakumar.com/blog/how-to-rank-in-chatgpt-using-recency-bias/)
 - [5 AI Search Ranking Signals That Make or Break Your Content Visibility in 2026](https://espy-go.com/resources/ai-search-algorithm-factors/)
 - [Solving Freshness in RAG: A Simple Recency Prior and the Limits of Heuristic Trend Detection](https://arxiv.org/html/2509.19376)
@@ -171,6 +198,7 @@ Search engines (Google, Bing, AI search) use sophisticated temporal signals to b
 [MemGPT](https://research.memgpt.ai/) implements hierarchical memory with "cognitive triage" for strategic forgetting.
 
 **Key Mechanisms**:
+
 - **Memory Tiers**: Main memory (fixed context), archival storage (unlimited)
 - **Strategic Forgetting**: Summarization and targeted deletion
 - **Cognitive Triage**: LLM evaluates future value of information fragments
@@ -179,11 +207,13 @@ Search engines (Google, Bing, AI search) use sophisticated temporal signals to b
 - **Temporal Reasoning**: Models ordering and dating of events over long horizons
 
 **Lessons for MDEMG**:
+
 - Importance scoring should guide retention vs decay
 - Metadata about access patterns informs triage decisions
 - Both under-retrieval (missing relevant) and over-retrieval (noise) harm performance
 
 **Sources**:
+
 - [MemGPT: Towards LLMs as Operating Systems](https://arxiv.org/pdf/2310.08560)
 - [MemGPT: Engineering Semantic Memory through Adaptive Retention and Context Summarization](https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory-through-adaptive-retention-and-context-summarization/)
 
@@ -200,9 +230,11 @@ Search engines (Google, Bing, AI search) use sophisticated temporal signals to b
 ### 3.1 Power Law vs Exponential Decay: When to Use Each
 
 **Exponential Decay**:
+
 ```
 score *= exp(-λ * t)
 ```
+
 - **Characteristics**: Constant decay rate, memoryless process
 - **Use When**:
   - Systems in thermodynamic equilibrium (boring, well-behaved)
@@ -212,9 +244,11 @@ score *= exp(-λ * t)
 - **Example**: News articles (yesterday's news is old news)
 
 **Power Law Decay**:
+
 ```
 score *= 1 / (1 + t)^α
 ```
+
 - **Characteristics**: No characteristic scale, "heavy tail" retention
 - **Use When**:
   - Modeling human-like memory
@@ -227,6 +261,7 @@ score *= 1 / (1 + t)^α
 [Power law vs exponential decay research](https://memory.psych.upenn.edu/files/pubs/KahaAdle02.pdf) shows exponential decay can be decisively identified from power law only if flux decays several orders of magnitude. In practice, short time scales often appear as power law, long time scales as exponential.
 
 **Sources**:
+
 - [Note on the power law of forgetting - Michael J. Kahana](https://memory.psych.upenn.edu/files/pubs/KahaAdle02.pdf)
 - [Power Law versus Exponential State Transition Dynamics - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC2996311/)
 - [Power law - Wikipedia](https://en.wikipedia.org/wiki/Power_law)
@@ -234,29 +269,35 @@ score *= 1 / (1 + t)^α
 ### 3.2 Hybrid Approaches
 
 **Weighted Combination**:
+
 ```
 score = α * vector_sim + β * activation + γ * recency + δ * importance
 recency = exp(-ρ * days)  or  1 / (1 + days)^σ
 ```
 
 **Importance Weighting**:
+
 ```
 decay_rate = base_rate * (1 - importance_score)
 score *= exp(-decay_rate * days)
 ```
+
 - High importance → slower decay
 - Low importance → faster decay
 
 **Access-Aware Decay**:
+
 ```
 effective_age = days_since_creation - β * days_since_last_access
 score *= exp(-λ * effective_age)
 ```
+
 - Recent access "resets" the age partially
 
 ### 3.3 Adaptive Decay Rates
 
 **Context-Dependent**:
+
 ```
 if is_evergreen_content(node):
     decay_rate = 0.01  # Slow decay
@@ -267,9 +308,11 @@ else:
 ```
 
 **Access Pattern Learning**:
+
 ```
 decay_rate = base_rate / (1 + log(1 + access_count))
 ```
+
 - Frequently accessed nodes decay slower
 
 ---
@@ -284,12 +327,15 @@ From the ["Attention Is All You Need"](https://kazemnejad.com/blog/transformer_a
 PE(t, 2i)   = sin(t / 10000^(2i/d))
 PE(t, 2i+1) = cos(t / 10000^(2i/d))
 ```
+
 Where:
+
 - t = time position (e.g., days since creation)
 - i = dimension index
 - d = embedding dimensions
 
 **Properties**:
+
 - No learned parameters (reduces overfitting)
 - Generalizes to unseen time ranges
 - Encodes relative temporal distances
@@ -299,6 +345,7 @@ Where:
 Could augment node embeddings with temporal encoding to make vector similarity time-aware.
 
 **Sources**:
+
 - [Transformer Architecture: The Positional Encoding](https://kazemnejad.com/blog/transformer_architecture_positional_encoding/)
 - [Understanding Sinusoidal Positional Encoding in Transformers](https://medium.com/@pranay.janupalli/understanding-sinusoidal-positional-encoding-in-transformers-26c4c161b7cc)
 - [Positional Encoding in Transformer-Based Time Series Models: A Survey](https://arxiv.org/html/2502.12370v1)
@@ -308,11 +355,13 @@ Could augment node embeddings with temporal encoding to make vector similarity t
 **Approach**: Train a small neural network to map `(days_since_creation, days_since_access, access_count)` → temporal_factor
 
 **Advantages**:
+
 - Adaptive to data patterns
 - Can learn complex decay curves
 - Flexibility for different content types
 
 **Disadvantages**:
+
 - Requires training data
 - Risk of overfitting
 - Less interpretable
@@ -326,21 +375,25 @@ Most pretrained models ([BERT](https://www.ibm.com/think/topics/positional-encod
 ### 5.1 When to Apply Decay
 
 **Option 1: Read-Time (Query Time)**
+
 - Calculate decay factor during retrieval
 - Advantages: Always current, no batch jobs
 - Disadvantages: Adds latency per query
 
 **Option 2: Write-Time (Update Time)**
+
 - Periodically update scores in database
 - Advantages: Fast queries, pre-computed
 - Disadvantages: Stale between updates, batch job overhead
 
 **Option 3: Hybrid**
+
 - Store `created_at`, `last_accessed_at` timestamps
 - Compute decay on-the-fly during scoring
 - Update access timestamps on retrieval
 
 **Recommendation for MDEMG**: Hybrid approach (Option 3)
+
 - Already have timestamp infrastructure (`updated_at`, `created_at`)
 - Scoring happens in-memory after vector recall (minimal overhead)
 - Decay job can prune edges, retrieval can apply decay to scores
@@ -352,6 +405,7 @@ Not all memories should decay equally. Some knowledge is timeless.
 **Strategies**:
 
 1. **Tag-Based Exemption**:
+
    ```go
    if hasTag(node.Tags, "evergreen") || hasTag(node.Tags, "definition") {
        decay_factor = 1.0  // No decay
@@ -359,6 +413,7 @@ Not all memories should decay equally. Some knowledge is timeless.
    ```
 
 2. **Layer-Based Decay Rates**:
+
    ```go
    switch node.Layer {
    case 0:  // Observations
@@ -371,6 +426,7 @@ Not all memories should decay equally. Some knowledge is timeless.
    ```
 
 3. **Importance-Adjusted Decay**:
+
    ```go
    if node.Confidence > 0.9 {
        decay_rate *= 0.5  // Halve decay for high-confidence nodes
@@ -380,11 +436,13 @@ Not all memories should decay equally. Some knowledge is timeless.
 ### 5.3 Decay Granularity
 
 **Time Units**:
+
 - Days: Good for most content (MDEMG's current unit)
 - Hours: For real-time/conversation memory
 - Interactions: For session-based decay (N queries since last access)
 
 **Update Frequency**:
+
 - Continuous: On every retrieval (access updates timestamp)
 - Daily: Batch job runs once per day
 - On-demand: Triggered by API endpoint
@@ -392,11 +450,13 @@ Not all memories should decay equally. Some knowledge is timeless.
 ### 5.4 Computational Cost
 
 **Complexity Analysis**:
+
 - Exponential: `exp(-λt)` → ~10-20 CPU cycles
 - Power law: `1/(1+t)^α` → ~5-10 CPU cycles (if α is integer)
 - Logarithmic: `log(1+t)` → ~20-30 CPU cycles
 
 For 1000 candidates scored per query:
+
 - Exponential decay adds ~0.01-0.02ms per query
 - Negligible compared to vector search (10-100ms) and LLM reranking (500-2000ms)
 
@@ -411,16 +471,19 @@ For 1000 candidates scored per query:
 **Existing Decay Mechanisms**:
 
 1. **Edge Decay** (`cmd/decay/main.go`):
+
    ```go
    // Line 44-60: calculateDecay function
    decayFactor := math.Exp(-decayRate * daysSince)
    newWeight = e.Weight * decayFactor
    ```
+
    - Applies to `CO_ACTIVATED_WITH` edge weights
    - Formula: `w_new = w_old * exp(-0.1 * days)`
    - Used for pruning weak edges, not retrieval scoring
 
 2. **Recency in Scoring** (`internal/retrieval/scoring.go`):
+
    ```go
    // Line 348-355: recency factor
    ageDays := now.Sub(c.UpdatedAt).Hours() / 24.0
@@ -428,16 +491,19 @@ For 1000 candidates scored per query:
    // ...
    s := vecComponent + actComponent + recComponent + ...
    ```
+
    - Uses `cfg.ScoringRho` (default unknown, likely ~0.01-0.05)
    - Applies to final score via `gamma * r` term
    - Only considers `updated_at`, not `last_accessed_at`
 
 **Timestamp Fields Available**:
+
 - `created_at`: When node was first ingested
 - `updated_at`: When node was last modified
 - `last_accessed_at`: (Used in edge decay, may not be on nodes)
 
 **Gap Analysis**:
+
 - ✅ Has basic exponential recency decay
 - ❌ No access-aware decay (doesn't track retrieval events)
 - ❌ No layer-specific decay rates
@@ -450,12 +516,14 @@ For 1000 candidates scored per query:
 **Priority 1: Extend Scoring Formula**
 
 **Current** (`scoring.go:384`):
+
 ```go
 s := vecComponent + actComponent + recComponent + confComponent +
      pb + cb - hubPenComponent - redPenComponent
 ```
 
 **Proposed Enhancement**:
+
 ```go
 // Add layer-specific and importance-weighted decay
 recencyDecay := calculateRecencyDecay(c, now, cfg)
@@ -501,6 +569,7 @@ func calculateRecencyDecay(c Candidate, now time.Time, cfg config.Config) float6
 **Priority 3: Add Access Tracking**
 
 Update `updated_at` timestamp on retrieval:
+
 ```go
 // In Retrieve service after scoring
 for _, result := range topKResults {
@@ -509,6 +578,7 @@ for _, result := range topKResults {
 ```
 
 Modify decay to consider last access:
+
 ```go
 // Use last_accessed_at if available, else updated_at
 effectiveAge := daysSince(c.LastAccessedAt, now)
@@ -539,16 +609,19 @@ type Config struct {
 ### 6.4 Impact on Benchmark Scores
 
 **Hypothesis**: Temporal decay should improve benchmark performance on:
+
 1. **Time-sensitive queries**: "Recent changes to...", "Latest implementation of..."
 2. **Evolutionary codebases**: Prefer newer patterns over deprecated ones
 3. **Bug fix tracking**: Recent fixes more relevant than old issues
 
 **Potential Risks**:
+
 1. **Over-decay**: Important foundational knowledge gets buried
 2. **Benchmark bias**: If test questions don't specify recency, may hurt scores
 3. **Cold start**: New ingestions have unfair advantage over older (but still relevant) nodes
 
 **Mitigation Strategies**:
+
 - Layer-specific decay (slower for concepts)
 - Importance weighting (confidence score protects valuable nodes)
 - Configurable decay rates (tune per use case)
@@ -561,18 +634,21 @@ type Config struct {
 ### 7.1 Recommended Approach for MDEMG
 
 **Phase 1: Extend Existing Recency Decay** (1-2 hours implementation)
+
 1. Add layer-specific decay rates (fast for L0, slow for L2+)
 2. Add importance-weighted decay (confidence > 0.8 gets 50% decay reduction)
 3. Make decay mode configurable (exponential vs power law)
 4. Add config parameters for tuning
 
 **Phase 2: Access-Aware Decay** (2-3 hours)
+
 1. Add `last_accessed_at` timestamp to nodes (schema update)
 2. Update timestamp on retrieval (background goroutine)
 3. Use last access time in decay calculation
 4. Add access count field for frequency-based adjustments
 
 **Phase 3: Adaptive Decay** (4-6 hours)
+
 1. Implement tag-based decay exemptions (evergreen content)
 2. Learn optimal decay rates per content type
 3. Dynamic decay based on query patterns
@@ -581,6 +657,7 @@ type Config struct {
 ### 7.2 Tuning Guidelines
 
 **Decay Rate Selection**:
+
 - **0.01**: Very slow decay (99% retention after 1 week)
 - **0.05**: Slow decay (95% retention after 1 week)
 - **0.10**: Medium decay (90% retention after 1 week) — **MDEMG current default**
@@ -588,12 +665,14 @@ type Config struct {
 - **0.50**: Very fast decay (60% retention after 1 week)
 
 **Power Law Alpha Selection**:
+
 - **0.3**: Gentle decay, long tail
 - **0.5**: ACT-R default, balanced
 - **0.7**: Steeper decay, shorter tail
 - **1.0**: Linear reciprocal (1/days)
 
 **Testing Protocol**:
+
 1. Baseline: Run benchmarks with current scoring
 2. Experiment: Enable temporal decay with default rates
 3. Tune: Adjust layer-specific rates based on benchmark results
@@ -603,16 +682,19 @@ type Config struct {
 ### 7.3 Success Metrics
 
 **Retrieval Quality**:
+
 - Benchmark score delta (target: +3-5% for time-sensitive queries)
 - Evidence compliance rate (should maintain or improve)
 - User feedback on relevance (qualitative)
 
 **System Health**:
+
 - Query latency delta (target: <5ms increase)
 - Memory usage (timestamp storage minimal)
 - Cache hit rate (may decrease initially due to timestamp updates)
 
 **Decay Effectiveness**:
+
 - Pruning rate of old edges (from decay job)
 - Age distribution of top-K results (shift toward newer)
 - Reactivation rate of "forgotten" nodes (should be low)
@@ -637,6 +719,7 @@ The implementation complexity is low (1-6 hours across phases), computational ov
 ## 9. References
 
 ### Cognitive Science & Memory
+
 - [Replication and Analysis of Ebbinghaus' Forgetting Curve - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC4492928/)
 - [Forgetting curve - Wikipedia](https://en.wikipedia.org/wiki/Forgetting_curve)
 - [ACT-R - Wikipedia](https://en.wikipedia.org/wiki/ACT-R)
@@ -644,21 +727,25 @@ The implementation complexity is low (1-6 hours across phases), computational ov
 - [Note on the power law of forgetting - Michael J. Kahana](https://memory.psych.upenn.edu/files/pubs/KahaAdle02.pdf)
 
 ### Recommendation Systems
+
 - [Application of collaborative filtering algorithm based on time decay function - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC11639207/)
 - [Recency-based spatio-temporal similarity exploration for POI recommendation](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2024.1331642/full)
 - [A Half-Life Decaying Model for Recommender Systems with Matrix Factorization](https://ceur-ws.org/Vol-2038/paper1.pdf)
 - [Exponential Decay Function-Based Time-Aware Recommender System](https://thesai.org/Downloads/Volume13No10/Paper_71-Exponential_Decay_Function_Based_Time_Aware_Recommender_System.pdf)
 
 ### Search Engines & AI Search
+
 - [How Content Freshness Helps Ranking in ChatGPT](https://www.mattakumar.com/blog/how-to-rank-in-chatgpt-using-recency-bias/)
 - [5 AI Search Ranking Signals That Make or Break Your Content Visibility in 2026](https://espy-go.com/resources/ai-search-algorithm-factors/)
 - [Solving Freshness in RAG: A Simple Recency Prior](https://arxiv.org/html/2509.19376)
 
 ### Memory-Augmented Systems
+
 - [MemGPT: Towards LLMs as Operating Systems](https://arxiv.org/pdf/2310.08560)
 - [MemGPT: Engineering Semantic Memory through Adaptive Retention](https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory-through-adaptive-retention-and-context-summarization/)
 
 ### Positional Encoding
+
 - [Transformer Architecture: The Positional Encoding](https://kazemnejad.com/blog/transformer_architecture_positional_encoding/)
 - [Understanding Sinusoidal Positional Encoding in Transformers](https://medium.com/@pranay.janupalli/understanding-sinusoidal-positional-encoding-in-transformers-26c4c161b7cc)
 - [Positional Encoding in Transformer-Based Time Series Models: A Survey](https://arxiv.org/html/2502.12370v1)

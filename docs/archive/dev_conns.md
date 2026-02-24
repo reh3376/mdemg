@@ -4,18 +4,20 @@
 
 | Setting | Value |
 |---------|-------|
-| Browser | http://localhost:7474 |
+| Browser | <http://localhost:7474> |
 | Bolt URI | bolt://localhost:7687 |
 | Username | neo4j |
 | Password | testpassword |
 | Container | mdemg-neo4j |
 
 ### Cypher Shell Access
+
 ```bash
 docker exec -it mdemg-neo4j cypher-shell -u neo4j -p testpassword
 ```
 
 ### Quick Queries
+
 ```bash
 # Check schema version
 docker exec mdemg-neo4j cypher-shell -u neo4j -p testpassword "MATCH (s:SchemaMeta {key:'schema'}) RETURN s.current_version"
@@ -31,13 +33,14 @@ docker exec mdemg-neo4j cypher-shell -u neo4j -p testpassword "SHOW CONSTRAINTS"
 
 | Setting | Value |
 |---------|-------|
-| Base URL | http://localhost:8082 |
+| Base URL | <http://localhost:8082> |
 | Health Check | GET /healthz |
 | Readiness | GET /readyz |
 | Retrieve | POST /v1/memory/retrieve |
 | Ingest | POST /v1/memory/ingest |
 
 ### Start Service
+
 ```bash
 cd mdemg_build/service
 source .env
@@ -45,6 +48,7 @@ go run ./cmd/server
 ```
 
 ### Test Endpoints
+
 ```bash
 # Health check
 curl -s http://localhost:8082/healthz | jq

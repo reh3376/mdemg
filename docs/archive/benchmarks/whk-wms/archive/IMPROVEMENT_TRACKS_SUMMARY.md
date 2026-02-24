@@ -22,18 +22,22 @@
 ## The 5 Improvement Tracks
 
 ### Track 1: Hebbian Learning Edges
+
 **Problem**: CO_ACTIVATED_WITH edges weren't being created (0 edges after 100 queries).
 
 **Fix**: Seed ALL vector recall candidates with activation values, not just top 2.
 
 **Impact**:
+
 - Edges created: 0 → 8,748
 - Score improvement: +14.6% (v4→v10)
 
 ### Track 2: Cross-Cutting Concern Nodes
+
 **Problem**: Questions about authentication, ACL, error-handling scored 0.45-0.46.
 
 **Solution**:
+
 - Detect concern patterns during ingestion (auth, validation, logging, caching)
 - Create dedicated `concern:*` nodes during consolidation
 - Link implementing files via `IMPLEMENTS_CONCERN` edges
@@ -41,9 +45,11 @@
 **Impact**: Cross-cutting questions: 0.45 → 0.709 (+57%)
 
 ### Track 3: Architectural Comparison Nodes
+
 **Problem**: "What's the difference between X and Y?" questions scored below average.
 
 **Solution**:
+
 - Detect similar modules by naming patterns (e.g., SyncModule vs DeltaSyncModule)
 - Create comparison nodes with `role_type: 'comparison'`
 - Link modules via `COMPARED_IN` edges
@@ -51,9 +57,11 @@
 **Impact**: Architecture questions: 0.50 → 0.750 (+50%)
 
 ### Track 4: Configuration Summary Nodes
+
 **Problem**: Configuration questions scored below average due to terse file content.
 
 **Solution**:
+
 - Detect config files by patterns (*.config.ts, /config/, etc.)
 - Extract environment variables from .env files
 - Create config summary node with `role_type: 'config'`
@@ -61,9 +69,11 @@
 **Impact**: Configuration retrieval improved through dedicated nodes
 
 ### Track 5: Temporal Pattern Nodes
+
 **Problem**: Questions about validFrom/validTo temporal patterns scored ~0.46.
 
 **Solution**:
+
 - Detect temporal patterns (validity periods, soft deletes, versioning, audit trails)
 - Tag with `concern:temporal`
 - Create temporal summary node with `SHARES_TEMPORAL_PATTERN` edges
@@ -114,6 +124,7 @@
 ## Architecture Summary
 
 ### Node Types Created During Consolidation
+
 1. **Hidden Nodes** (layer 1) - DBSCAN clusters of related base nodes
 2. **Concept Nodes** (layer 2+) - Higher-level abstractions
 3. **Concern Nodes** (`role_type: 'concern'`) - Cross-cutting concerns
@@ -122,6 +133,7 @@
 6. **Temporal Nodes** (`role_type: 'temporal'`) - Temporal pattern summaries
 
 ### Key Edge Types
+
 - `CO_ACTIVATED_WITH` - Hebbian learning edges (strengthened by co-retrieval)
 - `IMPLEMENTS_CONCERN` - Links files to concern nodes
 - `COMPARED_IN` - Links modules to comparison nodes

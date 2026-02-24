@@ -1,6 +1,7 @@
 # MDEMG Baseline Test Report - 2026-01-21 v2
 
 ## Test Configuration
+
 - **Date**: 2026-01-21
 - **Model**: Claude Opus 4.5 (claude-opus-4-5-20251101)
 - **Test Type**: Direct file reading (no memory system)
@@ -256,7 +257,7 @@ Correct: normalizeOwnershipType() normalizes to canonical PascalCase. Strict mod
 **Q211 [business_logic_constraints]: 1.0**
 Question: How does the Android sync inbox handle duplicate records and what strategy prevents deadlocks during bulk inserts?
 My Answer: Chunked processing with CHUNK_SIZE=50 and CHUNK_DELAY_MS=100. Raw SQL with 'ON CONFLICT DO NOTHING RETURNING *' for duplicate handling.
-Correct: Chunked processing with CHUNK_SIZE=50, CHUNK_DELAY_MS=100. Uses 'ON CONFLICT (deviceName, inboxId) DO NOTHING RETURNING *'.
+Correct: Chunked processing with CHUNK_SIZE=50, CHUNK_DELAY_MS=100. Uses 'ON CONFLICT (deviceName, inboxId) DO NOTHING RETURNING*'.
 
 **Q217 [business_logic_constraints]: 1.0**
 Question: How does partial ownership transfer work and what happens to remaining percentage?
@@ -547,17 +548,20 @@ Correct: ACKNOWLEDGE marks errors reviewed without fixing data. Creates resoluti
 ## Analysis
 
 ### Strengths
+
 1. **Architecture Understanding**: Strong comprehension of NestJS module patterns, dependency injection, and circular dependency resolution using forwardRef
 2. **Service Integration**: Good understanding of how services interact through dependency injection and transaction handling
 3. **Data Flow**: Clear understanding of queue-based processing with BullMQ, safety limits, and circuit breaker patterns
 4. **Business Logic**: Solid grasp of ownership rules, validation patterns, and constraint enforcement
 
 ### Areas for Improvement
+
 1. **Frontend Details**: Some uncertainty about specific frontend component implementations
 2. **SQL Function Details**: Limited access to SQL migration files for detailed function verification
 3. **DTO Structure Details**: Some partial answers due to not reading all DTO files in depth
 
 ### Observations
+
 - The codebase is well-organized with clear separation of concerns
 - Heavy use of NestJS patterns (guards, interceptors, decorators)
 - Comprehensive audit logging throughout
@@ -565,6 +569,7 @@ Correct: ACKNOWLEDGE marks errors reviewed without fixing data. Creates resoluti
 - Feature flag integration with LaunchDarkly for controlled rollouts
 
 ### Test Methodology Notes
+
 - Answered questions by reading source files directly
 - Used Glob, Grep, and Read tools to explore the codebase
 - Verified answers against provided correct answers

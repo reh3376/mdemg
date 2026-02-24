@@ -28,7 +28,8 @@
 | 8 | `add-hashes` modifies specs **in place** | Overwrites existing spec files with updated JSON |
 | 9 | Hash computed at **spec generation time** | Stored in spec, not computed dynamically on every validation |
 
-**Confirm:** 
+**Confirm:**
+
 - Should mismatch be ERROR (stop) or WARNING (continue)?
 - Should `add-hashes` modify in place, or create new files?
 
@@ -87,6 +88,7 @@
 ### Q1: Hard ERROR vs WARNING on mismatch?
 
 **Option A (current implementation):**
+
 ```
 Status: ✗ ERROR
 Error: HASH MISMATCH: Fixture has been modified
@@ -94,6 +96,7 @@ Error: HASH MISMATCH: Fixture has been modified
 ```
 
 **Option B (alternative):**
+
 ```
 Status: ⚠ WARNING  
 Warning: HASH MISMATCH: Fixture has been modified
@@ -107,12 +110,14 @@ Warning: HASH MISMATCH: Fixture has been modified
 ### Q2: In-place modification for `add-hashes`?
 
 **Option A (current implementation):**
+
 ```bash
 python3 upts_runner.py add-hashes --spec-dir specs/
 # Modifies specs/rust.upts.json directly
 ```
 
 **Option B (alternative):**
+
 ```bash
 python3 upts_runner.py add-hashes --spec-dir specs/ --output-dir specs-updated/
 # Writes to new directory, preserves originals
@@ -125,14 +130,17 @@ python3 upts_runner.py add-hashes --spec-dir specs/ --output-dir specs-updated/
 ### Q3: Default hash behavior?
 
 **Option A (current implementation):**
+
 - If spec has `sha256`: verify it
 - If spec lacks `sha256`: skip verification silently
 
 **Option B (stricter):**
+
 - If spec has `sha256`: verify it
 - If spec lacks `sha256`: show warning "No hash specified"
 
 **Option C (strictest):**
+
 - Require `--skip-hash` flag to run without hashes
 - Fail if spec lacks `sha256` and flag not provided
 

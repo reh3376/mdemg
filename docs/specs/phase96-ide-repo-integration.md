@@ -11,6 +11,7 @@
 Phase 96 closes Gap 8 (IDE Integration) and Gap 12 (Repo Integration) from `docs/specs/phase92-gap-analysis.md`. It adds standalone git hook management (`mdemg hooks install/uninstall/list`), Claude Code MCP config generation, and an `--mcp` flag on `mdemg serve` for co-located MCP subprocess management.
 
 **Key finding**: Most Phase 96 functionality already existed from Phases 93-94:
+
 - MCP server (`internal/cli/mcp.go` — 1434 lines, 20 tools, stdio mode)
 - `mdemg init` writes `.cursor/mcp.json` and `.vscode/mcp.json` (`writeIDEConfigs()`)
 - `.mdemgignore` fully implemented (`ParseIgnoreFile`, `FindIgnoreFile`, `MatchesIgnorePatterns`)
@@ -19,6 +20,7 @@ Phase 96 closes Gap 8 (IDE Integration) and Gap 12 (Repo Integration) from `docs
 - Git hook script (`scripts/mdemg-git-hook` — 98 lines)
 
 **What was actually missing** (and implemented here):
+
 1. `mdemg hooks install/uninstall/list` commands (standalone hook management)
 2. `.claude/mcp.json` generation in `writeIDEConfigs()`
 3. MCP auto-start with `mdemg serve --mcp` (subprocess)
@@ -32,15 +34,18 @@ Phase 96 closes Gap 8 (IDE Integration) and Gap 12 (Repo Integration) from `docs
 New file. Top-level `mdemg hooks` command with 3 subcommands.
 
 **`mdemg hooks install`** — flags: `--type git|all` (default: git), `--force`, `--space-id`
+
 - Calls shared `InstallGitHook(dir, spaceID, force)` function
 - `--force` overwrites existing hooks (unlike init which refuses)
 - Reports what was installed
 
 **`mdemg hooks uninstall`** — flags: `--type git|all`
+
 - Removes `.git/hooks/post-commit` only if it contains the `# MDEMG` marker
 - Non-MDEMG hooks are left untouched
 
 **`mdemg hooks list`**
+
 - Reports post-commit hook status (installed mdemg / installed non-mdemg / not installed)
 - Reports standalone hook script presence
 
@@ -64,6 +69,7 @@ New file. Top-level `mdemg hooks` command with 3 subcommands.
 ### 4. Pre-existing Lint Fixes
 
 Fixed 3 pre-existing `errcheck` lint violations:
+
 - `config_cmd.go:208`: `conn.Close()` → `_ = conn.Close()`
 - `init.go:290`: `conn.Close()` → `_ = conn.Close()`
 - `yaml_config.go:155`: `os.Setenv()` → checked with error return
@@ -97,11 +103,13 @@ Fixed 3 pre-existing `errcheck` lint violations:
 ## Verification
 
 ### Build & Lint
+
 - `go build ./...` — clean
 - `go vet ./...` — clean
 - `golangci-lint run ./...` — 0 issues
 
 ### E2E Tests
+
 1. `mdemg hooks list` — shows hook status correctly
 2. `mdemg hooks install --space-id test` — installs post-commit hook
 3. `mdemg hooks list` — shows "installed (mdemg)"

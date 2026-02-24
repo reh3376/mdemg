@@ -92,6 +92,7 @@ POST /v1/backup/trigger
 ```
 
 Response (202):
+
 ```json
 {
   "backup_id": "bk-20260208-022802-partial_space",

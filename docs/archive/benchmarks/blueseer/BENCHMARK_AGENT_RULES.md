@@ -10,10 +10,12 @@
 ### 1. File Access Restrictions
 
 **ALLOWED:**
+
 - Files within the target repository ONLY
 - For blueseer: `/Users/reh3376/repos/blueseer/**/*`
 
 **FORBIDDEN (Immediate Disqualification):**
+
 - ❌ Web search (WebSearch, WebFetch)
 - ❌ Files outside target repo
 - ❌ Other repositories
@@ -23,6 +25,7 @@
 ### 2. Tool Restrictions
 
 **Baseline Agents - ALLOWED TOOLS:**
+
 - `Glob` - File pattern matching within repo
 - `Grep` - Content search within repo
 - `Read` - Read files within repo
@@ -30,12 +33,14 @@
 - `Write` - ONLY for writing answer file to `/tmp/`
 
 **Baseline Agents - FORBIDDEN TOOLS:**
+
 - ❌ `WebSearch`
 - ❌ `WebFetch`
 - ❌ `Task` (no sub-agents)
 - ❌ Any MDEMG/curl commands
 
 **MDEMG Agents - ALLOWED TOOLS:**
+
 - All Baseline tools PLUS:
 - `Bash` - For MDEMG curl commands to localhost:9999 ONLY
 
@@ -53,6 +58,7 @@
 ```
 
 Required fields:
+
 - `id`: Question ID (integer)
 - `question`: Full question text
 - `answer`: Comprehensive answer with file:line citations
@@ -61,12 +67,14 @@ Required fields:
 ### 5. Question ID Integrity (CRITICAL)
 
 **YOU MUST:**
+
 - Use the EXACT question ID from the input JSON for each answer
 - Copy the EXACT question text from the input JSON
 - Maintain 1:1 mapping between input question ID and output answer ID
 - Process questions in order (1, 2, 3, ... 140)
 
 **DO NOT:**
+
 - ❌ Invent your own question IDs
 - ❌ Renumber questions
 - ❌ Skip question IDs
@@ -74,12 +82,14 @@ Required fields:
 - ❌ Duplicate question IDs
 
 **Example - CORRECT:**
+
 ```
 Input:  {"id": 47, "question": "How does X work?", ...}
 Output: {"id": 47, "question": "How does X work?", "answer": "...", "file_line_refs": [...]}
 ```
 
 **Example - WRONG (will invalidate results):**
+
 ```
 Input:  {"id": 47, "question": "How does X work?", ...}
 Output: {"id": 1, "question": "How does X work?", ...}  ← WRONG ID!
@@ -195,6 +205,7 @@ Read the question file and answer each question systematically using MDEMG, pres
 ## EXECUTION CHECKLIST
 
 Before each run:
+
 - [ ] Verify agent prompt includes all STRICT RULES
 - [ ] Verify output file path is correct
 - [ ] Run in FOREGROUND (not background)
@@ -202,6 +213,7 @@ Before each run:
 - [ ] Stop immediately on violation
 
 After each run:
+
 - [ ] Verify 140 answers in output file
 - [ ] Check no disqualification events
 - [ ] Record tool usage counts

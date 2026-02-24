@@ -37,6 +37,7 @@ Learning edges at start: 0 (fresh)
 **MDEMG Run 1 Score: 0.783**
 
 This is within the established baseline range:
+
 - Expected MDEMG range: 0.78-0.81
 - Run 1 score: 0.783 (within range)
 
@@ -45,6 +46,7 @@ This is within the established baseline range:
 ## Run 2 Analysis
 
 Run 2 showed agent output variance:
+
 - 50.8% of answers had empty `file_line_refs: []`
 - This triggers "weak" evidence tier (0.4 score) instead of "strong" (1.0)
 - Semantic/concept scores were unaffected
@@ -76,6 +78,7 @@ benchmark_run_20260130_fresh/
 ## Current State
 
 **Established:** MDEMG on whk-wms achieves 0.783 mean score with:
+
 - 100% question completion
 - 100% strong evidence (file:line citations)
 - 8% coefficient of variation (stable)

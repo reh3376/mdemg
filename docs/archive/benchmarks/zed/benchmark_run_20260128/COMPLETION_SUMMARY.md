@@ -1,9 +1,11 @@
 # Zed Codebase Benchmark - Completion Summary
 
 ## Overview
+
 Successfully answered all 142 benchmark questions about the Zed editor codebase.
 
 ## Output File
+
 - **Location**: `/Users/reh3376/mdemg/docs/tests/zed/benchmark_run_20260128/answers_baseline_run1.jsonl`
 - **Format**: JSONL (one JSON object per line)
 - **Total Lines**: 142 (one answer per question)
@@ -24,6 +26,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 ## Key Topics Covered
 
 ### Architecture & Structure (Q1-Q25)
+
 - GPUI element lifecycle (request_layout, prepaint, paint)
 - EntityMap double-leasing prevention mechanism
 - DisplayMap layer hierarchy and coordinate transformations
@@ -33,6 +36,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - Project store decomposition (BufferStore, LspStore, etc.)
 
 ### Service Relationships (Q26-Q52)
+
 - LSP server initialization sequence and timeouts
 - RPC Peer keepalive and connection management
 - Settings resolution hierarchy
@@ -41,6 +45,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - Language model provider registry
 
 ### Data Flow Integration (Q53-Q77)
+
 - Character input to display pipeline
 - Buffer edit propagation to collaborators
 - LSP diagnostics flow
@@ -54,6 +59,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - Block decoration system
 
 ### Cross-Cutting Concerns (Q78-Q97)
+
 - Error handling with ErrorCodeExt trait
 - Telemetry event logging
 - Keymap context precedence
@@ -65,6 +71,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - anyhow error context methods
 
 ### Business Logic Constraints (Q98-Q117)
+
 - Buffer transaction depth invariants
 - Selection start/end ordering
 - UndoMap edit tracking
@@ -76,6 +83,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - Anchor version validation
 
 ### Calibration Questions (Q118-Q132)
+
 - Main struct names: Editor, Workspace, Project, MultiBuffer
 - Framework: GPUI
 - Key traits: FileSystem, Render, RenderOnce
@@ -84,6 +92,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 - Main entry point location
 
 ### Negative Control (Q133-Q142)
+
 - Correctly identified non-existent features:
   - No SQLite integration
   - No BlockchainCollab protocol
@@ -99,6 +108,7 @@ Successfully answered all 142 benchmark questions about the Zed editor codebase.
 ## Answer Format
 
 Each answer includes:
+
 ```json
 {
   "id": <question_number>,
@@ -109,6 +119,7 @@ Each answer includes:
 ```
 
 ## Key Crates Referenced
+
 - `crates/gpui` - UI framework and element system
 - `crates/editor` - Editor and DisplayMap implementation
 - `crates/text` - Buffer and text editing
@@ -123,6 +134,7 @@ Each answer includes:
 - `crates/collab` - Collaborative editing
 
 ## Verification Results
+
 ✓ All 142 questions answered
 ✓ All answers include file:line references
 ✓ Correct JSON format (JSONL)
@@ -131,6 +143,7 @@ Each answer includes:
 ✓ References point to valid Zed codebase locations
 
 ## Notes
+
 - Answers are based on source code analysis of the Zed codebase
 - Coordinate mapping answers assume understanding of SumTree data structures
 - RPC/collaboration answers based on protocol buffer definitions

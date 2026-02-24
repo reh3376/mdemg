@@ -16,6 +16,7 @@ Your parser tests had inconsistent formats:
 ## Solution
 
 UPTS provides:
+
 1. **Single JSON Schema** - canonical definition for all languages
 2. **Normalized specs** - consistent field names across all languages
 3. **Language-agnostic runner** - validates any parser implementation
@@ -227,24 +228,32 @@ Every language parser should handle these 7 patterns:
 ## Validation Rules
 
 ### Line Tolerance
+
 ```json
 "config": {"line_tolerance": 2}
 ```
+
 Allows ±2 lines from expected. Useful when comments shift line numbers.
 
 ### Type Compatibility
+
 These types are considered equivalent:
+
 - `class` ↔ `struct`
 - `interface` ↔ `trait` ↔ `protocol`
 
 ### Parent Matching
+
 For methods, `parent` must match exactly:
+
 ```json
 {"name": "find_by_id", "type": "method", "parent": "UserService"}
 ```
 
 ### Signature Validation
+
 Use `signature_contains` for partial matches:
+
 ```json
 {"name": "fetch_user", "signature_contains": ["async", "user_id", "Optional"]}
 ```
@@ -287,6 +296,7 @@ Use `signature_contains` for partial matches:
 ### Parser Output Contract
 
 Your Go parsers (`*_parser.go`) should output:
+
 ```go
 type SymbolOutput struct {
     Symbols []Symbol `json:"symbols"`
@@ -336,11 +346,13 @@ jobs:
 ## Adding a New Language
 
 1. **Create fixture** in `fixtures/`:
+
    ```
    fixtures/rust_test_fixture.rs
    ```
 
 2. **Create spec** in `specs/`:
+
    ```json
    {
      "upts_version": "1.0.0",
@@ -352,6 +364,7 @@ jobs:
    ```
 
 3. **Run validation**:
+
    ```bash
    python runners/upts_runner.py validate --spec specs/rust.upts.json --parser ./parser
    ```

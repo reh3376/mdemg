@@ -2,6 +2,7 @@
 
 **Date:** 2026-01-29  
 **Files Analyzed:**
+
 - `go_expected.json`
 - `python_expected.json`
 - `typescript_expected.json`
@@ -89,11 +90,13 @@ Your three existing `*_expected.json` files have **17 distinct inconsistencies**
 | `decorators` | ❌ | ❌ | ❌ |
 
 **Example - Python has `value`:**
+
 ```json
 {"name": "MAX_RETRIES", "type": "constant", "line_number": 12, "value": "3"}
 ```
 
 **Example - Go lacks `value`:**
+
 ```json
 {"name": "MaxRetries", "type": "constant", "line": 13}
 ```
@@ -127,6 +130,7 @@ Your three existing `*_expected.json` files have **17 distinct inconsistencies**
 | TypeScript | ❌ No |
 
 **Python Example:**
+
 ```json
 "enhancements_made": {
   "methods_extraction": "Methods inside classes now correctly typed as 'method' with Parent set",
@@ -145,18 +149,21 @@ Your three existing `*_expected.json` files have **17 distinct inconsistencies**
 ### 8. `parent` Field Has Different Meanings
 
 **Go/TypeScript:** `parent` means "method belongs to this class/struct"
+
 ```json
 {"name": "FindByID", "type": "method", "parent": "UserService"}
 ```
 
 **Python:** `parent` means BOTH:
+
 - Method belongs to class: `{"name": "find_by_id", "parent": "UserService"}`
 - Class inherits from: `{"name": "User", "parent": "BaseEntity"}`
 - Enum inherits from: `{"name": "Status", "parent": "Enum"}`
 
 **Impact:** `parent` is overloaded with two different meanings in Python.
 
-**UPTS Fix:** 
+**UPTS Fix:**
+
 - Use `parent` only for method ownership
 - Add `extends` for class inheritance
 - Add `base_class` in `language_specific` for Python enums/protocols
@@ -174,11 +181,13 @@ Your three existing `*_expected.json` files have **17 distinct inconsistencies**
 | Interfaces | ✅ | ✅ | ✅ |
 
 **Go methods lack `exported`:**
+
 ```json
 {"name": "FindByID", "type": "method", "line": 50, "parent": "UserService"}
 ```
 
 **Python methods have `exported`:**
+
 ```json
 {"name": "find_by_id", "type": "method", "line_number": 60, "exported": true, "parent": "UserRepository"}
 ```
@@ -201,6 +210,7 @@ Your three existing `*_expected.json` files have **17 distinct inconsistencies**
 **Impact:** Test runners must know `struct` ≈ `class` for comparison.
 
 **UPTS Fix:** Define type compatibility groups in schema:
+
 ```json
 {"class": ["class", "struct"], "interface": ["interface", "trait", "protocol"]}
 ```
@@ -224,6 +234,7 @@ None of the files link symbols to canonical patterns (P1-P7).
 None of the files test graph relationships.
 
 **Example relationships that should be tested:**
+
 - `UserService` → `DEFINES_METHOD` → `findById`
 - `AdminUser` → `EXTENDS` → `BaseEntity`
 - `AdminUser` → `IMPLEMENTS` → `UserDto`
@@ -239,6 +250,7 @@ None of the files test graph relationships.
 None of the files explicitly test what should NOT be extracted.
 
 **Examples that should be excluded:**
+
 - Private struct fields (`repo`, `logger` in Go)
 - Constructor parameters
 - Node modules / vendor code
@@ -258,6 +270,7 @@ None of the files explicitly test what should NOT be extracted.
 | TypeScript | ❌ No |
 
 **Python Example:**
+
 ```json
 {"name": "calculate_total", "signature": "def calculate_total(items: List[\"Item\"]) -> int"}
 ```
@@ -283,6 +296,7 @@ None of the files include a hash of the fixture content.
 ### 16. Expected Count Position Varies
 
 **Go/TypeScript:** `expected_count` at end
+
 ```json
 {
   "expected_symbols": [...],
@@ -292,6 +306,7 @@ None of the files include a hash of the fixture content.
 ```
 
 **Python:** `expected_count` near top
+
 ```json
 {
   "language": "python",

@@ -56,6 +56,7 @@ The MDEMG test revealed critical gaps in the current implementation:
 ### 3. Why Baseline Won
 
 The baseline agent could:
+
 - Read actual file contents
 - Trace imports and dependencies
 - Find specific function implementations
@@ -64,6 +65,7 @@ The baseline agent could:
 ### 4. Root Cause Analysis
 
 The MDEMG API returns:
+
 ```json
 {
   "nodes": [
@@ -80,6 +82,7 @@ The MDEMG API returns:
 ```
 
 Without populated `summary` fields or content retrieval, the agent cannot:
+
 - Understand what each file does
 - Answer implementation-specific questions
 - Trace code flows
@@ -107,17 +110,17 @@ Without populated `summary` fields or content retrieval, the agent cannot:
 
 ### Medium-Term Improvements
 
-4. **Enhance hidden layer**
+1. **Enhance hidden layer**
    - Cluster by semantic similarity + structural relationships
    - Generate cluster summaries
    - Use for high-level architecture questions
 
-5. **Add observation tracking**
+2. **Add observation tracking**
    - Record which files are accessed together
    - Strengthen CO_ACTIVATED_WITH edges
    - Improve retrieval for related code
 
-6. **Implement semantic chunking**
+3. **Implement semantic chunking**
    - Break files into function-level nodes
    - Store function signatures and docstrings
    - Enable precise code retrieval
@@ -145,6 +148,7 @@ The current MDEMG implementation provides good **file discovery** but fails at *
 3. Missing cross-module relationships (cannot trace flows)
 
 **Next Steps:**
+
 1. Implement summary generation during ingestion
 2. Add content retrieval endpoint
 3. Re-run comparison test

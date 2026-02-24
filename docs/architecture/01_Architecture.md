@@ -26,11 +26,13 @@ Layer 1   [Observations / Events]         ← Most concrete
 ```
 
 **Layer constraints:**
+
 - **Minimum**: 1 (raw observations only)
 - **Maximum**: Unconstrained (hardware-limited only)
 - **Growth**: Dynamic - layers emerge as data density warrants
 
 ## High-level components
+
 1. **Neo4j**: property graph store for nodes/edges + weights + provenance.
 2. **Neo4j Vector Index**: fast nearest-neighbor search over embeddings.
 3. **Embedding generation**:
@@ -46,6 +48,7 @@ Layer 1   [Observations / Events]         ← Most concrete
    - health checks / anomaly detection
 
 ## Online flow (retrieve)
+
 1. Query comes in (text + policy context).
 2. Create query embedding (GenAI plugin or external).
 3. Vector search: top N candidates via `db.index.vector.queryNodes`.
@@ -59,6 +62,7 @@ Layer 1   [Observations / Events]         ← Most concrete
    - bump evidence counts / timestamps
 
 ## Online flow (ingest)
+
 1. Observation arrives with timestamp/source/content/tags.
 2. Resolve target node(s) or create new.
 3. Append observation event (immutable log).
@@ -71,6 +75,7 @@ Layer 1   [Observations / Events]         ← Most concrete
 7. Optionally enqueue for consolidation evaluation.
 
 ## Offline flow (maintenance)
+
 - **Decay job**: exponentially decay weights + prune weak edges.
 - **Consolidation job**:
   - detect stable clusters at layer k
@@ -79,11 +84,14 @@ Layer 1   [Observations / Events]         ← Most concrete
   - compress redundant lateral edges
 
 ## Key decision: where activation “lives”
+
 Activation values are **transient**. Do NOT permanently write per-query activation to nodes unless:
+
 - you store debug snapshots in a dedicated label (recommended for debugging only)
 - or you want a short-lived cache with TTL semantics (hard in vanilla Neo4j)
 
 Recommended:
+
 - compute activation in the Memory Service runtime,
 - write only *learning deltas* back to the graph.
 
@@ -92,17 +100,20 @@ Recommended:
 MDEMG operates as a **full active participant** in the autonomous development workflow:
 
 ### 1. aci-claude-go Native Integration
+
 - The primary consumer of MDEMG services.
 - Uses `internal/orchestrator` to coordinate memory ingestion and retrieval.
 - Facilitates **Internal Dialog** persistence across multi-agent sessions.
 - Triggers **Autonomous Self-Reflection** after subtask completion.
 
 ### 2. Background Service
+
 - Always running, similar to claude-mem.
 - API available for agent queries and TUI dashboard stats.
 - Continuous learning from observations gathered during coding sessions.
 
 ### 3. Event-Driven Hooks
+
 - Git worktree transitions trigger memory updates.
 - Spec status changes (planning -> completed) trigger consolidation.
 - Session lifecycle events (start/end) trigger higher-order reflection.

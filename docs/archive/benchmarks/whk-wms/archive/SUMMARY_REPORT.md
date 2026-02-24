@@ -34,20 +34,23 @@
 
 ## Key Findings
 
-### MDEMG Excels At:
+### MDEMG Excels At
+
 1. **Path/Location Queries** - "Where is the auth module?" (95% accuracy)
 2. **Enum/Model Lookups** - "What enum represents barrel status?" (93% top-1 precision)
 3. **Token Efficiency** - 300x reduction in token cost per session
 4. **Scalability** - No context window limits, unlimited codebase size
 5. **Persistence** - Knowledge retained across sessions
 
-### Baseline Excels At:
+### Baseline Excels At
+
 1. **Holistic Understanding** - Cross-file synthesis after reading
 2. **Domain Questions** - "What is a lot in distillery context?" (95% accuracy)
 3. **Configuration Details** - Version numbers, counts, package.json specifics
 4. **One-Time Deep Analysis** - When full context is available
 
-### Both Struggle With:
+### Both Struggle With
+
 - Multi-hop reasoning requiring connection of multiple files
 - Quantitative questions ("How many test files exist?")
 - Deep technical implementation details
@@ -57,12 +60,14 @@
 ## Performance Metrics
 
 ### MDEMG Ingestion
+
 - **Elements Indexed:** 8,904
 - **Ingestion Time:** 10m 36s (14.0 elements/sec)
 - **Consolidation Time:** 5.4s
 - **Errors:** 0
 
 ### MDEMG Retrieval
+
 - **Query Latency:** <50ms
 - **Top-1 Accuracy:** 90%
 - **Top-5 Accuracy:** 95%
@@ -72,20 +77,23 @@
 
 ## Recommendations
 
-### Use MDEMG When:
+### Use MDEMG When
+
 - Codebase exceeds 50k LOC
 - Questions focus on code location/structure
 - Multiple sessions over time
 - Token budget is constrained
 - Incremental updates needed
 
-### Use Baseline When:
+### Use Baseline When
+
 - Codebase fits in context (<50k LOC)
 - Deep synthesis required
 - One-time analysis
 - Domain understanding critical
 
 ### Optimal: Hybrid Approach
+
 1. Query MDEMG for relevant files
 2. Read only those specific files
 3. Answer with focused context

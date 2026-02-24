@@ -41,6 +41,7 @@ docs/tests/uams/
 Each UAMS spec defines:
 
 ### Method Metadata
+
 ```json
 {
   "method": {
@@ -53,7 +54,9 @@ Each UAMS spec defines:
 ```
 
 ### Credential Extraction
+
 Defines where and how credentials are extracted from requests:
+
 ```json
 {
   "credentials": {
@@ -70,6 +73,7 @@ Defines where and how credentials are extracted from requests:
 ```
 
 ### Validation Rules
+
 ```json
 {
   "validation": {
@@ -82,6 +86,7 @@ Defines where and how credentials are extracted from requests:
 ```
 
 ### Principal Construction
+
 ```json
 {
   "principal": {
@@ -92,6 +97,7 @@ Defines where and how credentials are extracted from requests:
 ```
 
 ### Error Responses
+
 ```json
 {
   "errors": [

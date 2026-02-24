@@ -17,11 +17,13 @@ This is NOT a parser bug. The parser works correctly. The specs were written wit
 ## Why Previous Fix Attempts Failed
 
 ### Attempt 1: TREE_SITTER_GRAMMAR_ISSUES.md
+
 - **What it provided:** Instructions to add tree-sitter grammar imports and extraction functions
 - **What it fixed:** Parser now loads grammars and extracts symbols (went from ERROR to FAIL)
 - **What it missed:** The specs still have wrong line numbers
 
 ### Attempt 2: upts-v1.2.tar.gz
+
 - **What it provided:** Updated specs for all 16 languages
 - **What happened:** It overwrote our working specs for the 11 passing languages
 - **Why it failed:** The specs in the tarball were generated without running the actual parser against the fixtures. Line numbers were guessed or based on an outdated fixture version.
@@ -31,6 +33,7 @@ This is NOT a parser bug. The parser works correctly. The specs were written wit
 ## The Core Issue: Spec vs Parser Output
 
 The UPTS validation works by:
+
 1. Running `./bin/extract-symbols --json <fixture>`
 2. Comparing the output against `expected.symbols` in the spec
 3. Matching by `name` + `type`, then checking `line`, `parent`, `value`, etc.
@@ -45,7 +48,7 @@ The UPTS validation works by:
 
 The fixture file defines symbols at specific line numbers. The parser reads this file and reports what it finds.
 
-### What the Parser Extracts (ACTUAL):
+### What the Parser Extracts (ACTUAL)
 
 ```json
 {"name": "UserId",      "type": "type",   "line": 13, "parent": null}
@@ -58,7 +61,7 @@ The fixture file defines symbols at specific line numbers. The parser reads this
 {"name": "find_by_id",  "type": "method", "line": 76, "parent": "UserService<R>"}
 ```
 
-### What the Spec Expects (WRONG):
+### What the Spec Expects (WRONG)
 
 ```json
 {"name": "UserId",      "type": "type",   "line": 12, "parent": null}
@@ -71,7 +74,7 @@ The fixture file defines symbols at specific line numbers. The parser reads this
 {"name": "find_by_id",  "type": "method", "line": 72, "parent": "UserService"}
 ```
 
-### The Mismatches:
+### The Mismatches
 
 | Symbol | Spec Line | Actual Line | Spec Parent | Actual Parent |
 |--------|-----------|-------------|-------------|---------------|
@@ -91,10 +94,13 @@ The fixture file defines symbols at specific line numbers. The parser reads this
 ## Why This Happens
 
 ### Line Number Drift
+
 The fixtures may have been edited after the specs were written, or the specs were written by manually counting lines (prone to off-by-one errors, especially with comments and blank lines).
 
 ### Parent Name Differences
+
 The parser extracts the full type as written in the code:
+
 - Code: `impl<R: Repository> UserService<R>`
 - Parser extracts parent: `UserService<R>`
 - Spec expects: `UserService`
@@ -135,7 +141,7 @@ For each of the 5 failing languages:
 3. **Update the spec** with correct line numbers and parent values
 4. **Verify** with `upts_runner.py validate`
 
-### Files to Update:
+### Files to Update
 
 | Language | Spec File | Fixture File |
 |----------|-----------|--------------|
@@ -181,6 +187,7 @@ python3 docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py validate \
 ## Key Insight
 
 The tarball you provided contained specs that were **not generated from actual parser output**. They were likely:
+
 - Written manually by looking at fixtures
 - Generated from a different parser version
 - Based on fixtures that were later modified

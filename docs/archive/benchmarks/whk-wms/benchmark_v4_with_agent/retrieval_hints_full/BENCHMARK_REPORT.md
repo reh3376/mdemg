@@ -82,10 +82,12 @@ The significant drop in correct file rate suggests the retrieval layer changes m
 ## Comparison to Baseline
 
 ### Baseline (Reference)
+
 - Mean: 0.863
 - Correct File Rate: 75.8%
 
 ### Current Run
+
 - Mean: 0.782 (-9.4%)
 - Correct File Rate: 13.3% (-62.5pp)
 

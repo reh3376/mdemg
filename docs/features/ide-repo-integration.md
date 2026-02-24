@@ -51,6 +51,7 @@ MDEMG Hook Status
 ```
 
 States for post-commit hook:
+
 - `installed (mdemg)` — MDEMG-managed hook is active
 - `installed (non-mdemg)` — a hook exists but wasn't installed by MDEMG
 - `not installed` — no post-commit hook present
@@ -133,7 +134,7 @@ mdemg serve
 mdemg mcp
 ```
 
-The MCP server discovers the HTTP endpoint via priority chain: `MDEMG_ENDPOINT` env var > `.mdemg.port` file > `LISTEN_ADDR` > default (http://localhost:9999).
+The MCP server discovers the HTTP endpoint via priority chain: `MDEMG_ENDPOINT` env var > `.mdemg.port` file > `LISTEN_ADDR` > default (<http://localhost:9999>).
 
 ---
 
