@@ -6,7 +6,6 @@ Line numbers are predictable for UPTS validation.
 ## Overview
 
 This document tests the Markdown parser's ability to extract:
-
 - Headings at various levels
 - Code blocks with language specifiers
 - Links to external resources
