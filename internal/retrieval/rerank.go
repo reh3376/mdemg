@@ -240,7 +240,7 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, prompt string) ([]floa
 		return nil, 0, fmt.Errorf("marshal request: %w", err)
 	}
 
-	endpoint := s.cfg.OpenAIEndpoint + "/chat/completions"
+	endpoint := s.cfg.EffectiveLLMEndpoint() + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, 0, fmt.Errorf("create request: %w", err)

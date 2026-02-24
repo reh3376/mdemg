@@ -1341,7 +1341,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 	// Step 1: Run node-creation pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
 	if !req.SkipClustering {
-		pipelineResult, err := s.hiddenLayer.RunNodeCreationPipeline(r.Context(), req.SpaceID)
+		pipelineResult, err := s.hiddenLayer.RunNodeCreationPipeline(r.Context(), req.SpaceID, req.EnableDynamicEmergence)
 		if err != nil {
 			writeInternalError(w, err, "node creation pipeline")
 			return
@@ -1391,6 +1391,9 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 			resp.ConstraintNodesCreated = sr.NodesCreated
 			resp.ConstraintNodesUpdated = sr.NodesUpdated
 			resp.ConstraintEdgesLinked = sr.EdgesCreated
+		}
+		if sr, ok := pipelineResult.Steps["dynamic_emergence"]; ok {
+			resp.DynamicEmergentNodesCreated = sr.NodesCreated
 		}
 	}
 

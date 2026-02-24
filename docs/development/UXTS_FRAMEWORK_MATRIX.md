@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-02-16
+Last updated: 2026-02-24
 
 ---
 
@@ -20,6 +20,7 @@ Last updated: 2026-02-16
 | UOBS | Universal Observability Specification | Metrics/health/log observability validation | pilot |
 | UOTS | Universal Observability Test Specification | Observability contract specs (API-spec track) | pilot (runner gap) |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only |
+| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality evaluation | active |
 
 ---
 
@@ -37,6 +38,7 @@ Last updated: 2026-02-16
 | UOBS | `docs/tests/uobs/schema/uobs.schema.json` | `docs/tests/uobs/specs/*.uobs.json` | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
 | UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/*.uots.json` | runner path referenced in README but not present | no CI gate |
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | no canonical spec set yet | none | none |
+| UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/*.uets.json` | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 
 ---
 
@@ -71,4 +73,5 @@ Last updated: 2026-02-16
 - `docs/api/api-spec/uats/README.md`
 - `docs/api/api-spec/udts/README.md`
 - `docs/lang-parser/lang-parse-spec/upts/README.md`
+- `docs/tests/uets/README.md`
 - `AGENT_HANDOFF.md` (Governance & Testing Frameworks)

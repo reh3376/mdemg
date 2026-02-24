@@ -7,42 +7,56 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 )
 
 // Service handles hidden layer operations including clustering and message passing
 type Service struct {
-	cfg      config.Config
-	driver   neo4j.DriverWithContext
-	pipeline *Pipeline
+	cfg        config.Config
+	driver     neo4j.DriverWithContext
+	pipeline   *Pipeline
+	cbRegistry *circuitbreaker.Registry
 }
 
-// NewService creates a new hidden layer service
-func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
-	s := &Service{cfg: cfg, driver: driver}
+// NewService creates a new hidden layer service.
+// cbRegistry may be nil (e.g. CLI consolidation); LLM steps that need it will skip gracefully.
+func NewService(cfg config.Config, driver neo4j.DriverWithContext, cbRegistry *circuitbreaker.Registry) *Service {
+	s := &Service{cfg: cfg, driver: driver, cbRegistry: cbRegistry}
 	s.pipeline = s.buildPipeline()
 	return s
+}
+
+// SetCircuitBreakerRegistry sets the circuit breaker registry after construction.
+// This is needed when the registry is initialized after the hidden service.
+func (s *Service) SetCircuitBreakerRegistry(reg *circuitbreaker.Registry) {
+	s.cbRegistry = reg
 }
 
 // buildPipeline registers all node-creation steps in phase order.
 func (s *Service) buildPipeline() *Pipeline {
 	p := NewPipeline()
-	p.Register(&hiddenStep{svc: s})      // phase 10 — required
-	p.Register(&concernStep{svc: s})     // phase 20
-	p.Register(&configStep{svc: s})      // phase 20
-	p.Register(&comparisonStep{svc: s})  // phase 20
-	p.Register(&temporalStep{svc: s})    // phase 20
-	p.Register(&uiStep{svc: s})          // phase 20
-	p.Register(&constraintStep{svc: s})    // phase 20
-	p.Register(&dynamicEdgesStep{svc: s})  // phase 25 — dynamic edges (after clustering)
-	p.Register(&emergentL5Step{svc: s})    // phase 30 — post-processing
+	p.Register(&hiddenStep{svc: s})             // phase 10 — required
+	p.Register(&concernStep{svc: s})            // phase 20
+	p.Register(&configStep{svc: s})             // phase 20
+	p.Register(&comparisonStep{svc: s})         // phase 20
+	p.Register(&temporalStep{svc: s})           // phase 20
+	p.Register(&uiStep{svc: s})                 // phase 20
+	p.Register(&constraintStep{svc: s})         // phase 20
+	p.Register(&dynamicEmergenceStep{svc: s})   // phase 22 — LLM-driven concept naming (Phase 103)
+	p.Register(&dynamicEdgesStep{svc: s})       // phase 25 — dynamic edges (after clustering)
+	p.Register(&emergentL5Step{svc: s})         // phase 30 — post-processing
 	return p
 }
 
-// RunNodeCreationPipeline runs only the node-creation steps of consolidation (phase 10-20).
-// This is the public entry point used by the API handler for the first pipeline pass.
-func (s *Service) RunNodeCreationPipeline(ctx context.Context, spaceID string) (*PipelineResult, error) {
-	return s.pipeline.RunPhaseRange(ctx, spaceID, nil, 10, 20)
+// RunNodeCreationPipeline runs the node-creation steps of consolidation (phase 10-22).
+// When enableEmergence is false, the dynamic_emergence step (phase 22) is skipped.
+func (s *Service) RunNodeCreationPipeline(ctx context.Context, spaceID string, enableEmergence bool) (*PipelineResult, error) {
+	skip := map[string]bool{}
+	if !enableEmergence {
+		skip["dynamic_emergence"] = true
+	}
+	return s.pipeline.RunPhaseRange(ctx, spaceID, skip, 10, 22)
 }
 
 // RunPostClusteringPipeline runs the post-clustering steps (phase 25-30: dynamic edges, L5).
@@ -2823,6 +2837,257 @@ RETURN l5.node_id AS l5Id`
 		})
 		if err != nil {
 			fmt.Printf("warning: failed to create L5 node: %v\n", err)
+			continue
+		}
+		created++
+	}
+
+	return created, nil
+}
+
+// CreateDynamicEmergentNodes discovers dense CO_ACTIVATED_WITH clusters that don't match
+// any hardcoded pattern and names them via LLM. This is the core of Phase 103: Dynamic Emergence.
+func (s *Service) CreateDynamicEmergentNodes(ctx context.Context, spaceID string, namer *EmergenceNamer) (int, error) {
+	if namer == nil {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	minWeight := s.cfg.EmergenceMinWeight
+	if minWeight <= 0 {
+		minWeight = 0.3
+	}
+
+	// Step 1: Query CO_ACTIVATED_WITH edges between L0-L4 nodes that:
+	// - Have weight >= minWeight
+	// - Don't already have a role_type (i.e., not classified by hardcoded patterns)
+	// - Don't already share a dynamic_emergent parent (idempotency)
+	clusterCypher := `
+MATCH (a:MemoryNode {space_id: $spaceId})-[r:CO_ACTIVATED_WITH]->(b:MemoryNode {space_id: $spaceId})
+WHERE a.layer >= 0 AND a.layer <= 4
+  AND b.layer >= 0 AND b.layer <= 4
+  AND r.weight >= $minWeight
+  AND NOT a.role_type IN ['concern','config','comparison','temporal','ui','constraint','dynamic_emergent']
+  AND NOT b.role_type IN ['concern','config','comparison','temporal','ui','constraint','dynamic_emergent']
+  AND NOT EXISTS {
+    MATCH (a)-[:ABSTRACTS_TO]->(ec:MemoryNode {space_id: $spaceId, role_type: 'dynamic_emergent'})
+    WHERE (b)-[:ABSTRACTS_TO]->(ec)
+  }
+RETURN a.node_id AS sourceId, b.node_id AS targetId,
+       a.name AS sourceName, b.name AS targetName,
+       a.summary AS sourceSummary, b.summary AS targetSummary,
+       a.path AS sourcePath, b.path AS targetPath,
+       a.layer AS sourceLayer, b.layer AS targetLayer,
+       r.weight AS weight
+ORDER BY weight DESC
+LIMIT 200`
+
+	type edgePair struct {
+		SourceID, TargetID           string
+		SourceName, TargetName       string
+		SourceSummary, TargetSummary string
+		SourcePath, TargetPath       string
+		SourceLayer, TargetLayer     int
+		Weight                       float64
+	}
+
+	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, clusterCypher, map[string]any{
+			"spaceId":   spaceID,
+			"minWeight": minWeight,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var pairs []edgePair
+		for res.Next(ctx) {
+			rec := res.Record()
+			p := edgePair{
+				SourceID:      asString(rec.Values[0]),
+				TargetID:      asString(rec.Values[1]),
+				SourceName:    asString(rec.Values[2]),
+				TargetName:    asString(rec.Values[3]),
+				SourceSummary: asString(rec.Values[4]),
+				TargetSummary: asString(rec.Values[5]),
+				SourcePath:    asString(rec.Values[6]),
+				TargetPath:    asString(rec.Values[7]),
+				SourceLayer:   asInt(rec.Values[8]),
+				TargetLayer:   asInt(rec.Values[9]),
+				Weight:        asFloat64(rec.Values[10]),
+			}
+			pairs = append(pairs, p)
+		}
+		return pairs, res.Err()
+	})
+	if err != nil {
+		return 0, fmt.Errorf("dynamic emergence cluster query: %w", err)
+	}
+
+	pairList := pairs.([]edgePair)
+	if len(pairList) == 0 {
+		return 0, nil
+	}
+
+	// Step 2: Union-find clustering (same pattern as CreateL5EmergentNodes)
+	parent := make(map[string]string)
+	var find func(string) string
+	find = func(x string) string {
+		if parent[x] == "" || parent[x] == x {
+			parent[x] = x
+			return x
+		}
+		parent[x] = find(parent[x])
+		return parent[x]
+	}
+	union := func(a, b string) {
+		fa, fb := find(a), find(b)
+		if fa != fb {
+			parent[fa] = fb
+		}
+	}
+
+	// Build node info map and cluster weights
+	type nodeInfo struct {
+		Name, Summary, Path string
+		Layer               int
+	}
+	nodeMap := make(map[string]nodeInfo)
+	clusterWeight := make(map[string]float64) // root -> total weight
+
+	for _, p := range pairList {
+		union(p.SourceID, p.TargetID)
+		nodeMap[p.SourceID] = nodeInfo{p.SourceName, p.SourceSummary, p.SourcePath, p.SourceLayer}
+		nodeMap[p.TargetID] = nodeInfo{p.TargetName, p.TargetSummary, p.TargetPath, p.TargetLayer}
+	}
+
+	// Accumulate weights per cluster
+	for _, p := range pairList {
+		root := find(p.SourceID)
+		clusterWeight[root] += p.Weight
+	}
+
+	// Build clusters
+	clusters := make(map[string][]string)
+	for id := range nodeMap {
+		root := find(id)
+		clusters[root] = append(clusters[root], id)
+	}
+
+	// Step 3: Filter by min size and sort by total weight (densest first)
+	minClusterSize := s.cfg.EmergenceMinClusterSize
+	if minClusterSize < 2 {
+		minClusterSize = 3
+	}
+	maxClusters := s.cfg.EmergenceMaxClusters
+	if maxClusters < 1 {
+		maxClusters = 10
+	}
+
+	type rankedCluster struct {
+		root    string
+		members []string
+		weight  float64
+	}
+	var ranked []rankedCluster
+	for root, members := range clusters {
+		if len(members) < minClusterSize {
+			continue
+		}
+		ranked = append(ranked, rankedCluster{root: root, members: members, weight: clusterWeight[root]})
+	}
+
+	// Sort by weight descending
+	for i := 0; i < len(ranked); i++ {
+		for j := i + 1; j < len(ranked); j++ {
+			if ranked[j].weight > ranked[i].weight {
+				ranked[i], ranked[j] = ranked[j], ranked[i]
+			}
+		}
+	}
+
+	// Cap at maxClusters
+	if len(ranked) > maxClusters {
+		ranked = ranked[:maxClusters]
+	}
+
+	// Step 4: For each cluster, build node summaries and call LLM
+	created := 0
+	for _, rc := range ranked {
+		nodes := make([]ClusterNodeSummary, 0, len(rc.members))
+		maxLayer := 0
+		for _, id := range rc.members {
+			info := nodeMap[id]
+			nodes = append(nodes, ClusterNodeSummary{
+				NodeID:  id,
+				Name:    info.Name,
+				Summary: info.Summary,
+				Path:    info.Path,
+				Layer:   info.Layer,
+			})
+			if info.Layer > maxLayer {
+				maxLayer = info.Layer
+			}
+		}
+
+		// Call LLM for naming
+		result, err := namer.Name(ctx, nodes)
+		if err != nil {
+			// Fail-open: skip this cluster, continue with next
+			fmt.Printf("warning: emergence namer failed for cluster (root=%s, %d members): %v\n",
+				rc.root, len(rc.members), err)
+			continue
+		}
+
+		// Create EmergentConcept node at layer = max(member.layer) + 1
+		targetLayer := maxLayer + 1
+		memberIDs := rc.members
+
+		createCypher := `
+WITH $members AS memberIds, $name AS nodeName, $description AS nodeDesc,
+     $label AS nodeLabel, $spaceId AS sid, $layer AS targetLayer
+CREATE (ec:MemoryNode:EmergentConcept {
+    node_id: randomUUID(),
+    space_id: sid,
+    name: nodeName,
+    summary: nodeDesc,
+    layer: targetLayer,
+    role_type: 'dynamic_emergent',
+    proposed_label: nodeLabel,
+    created_at: datetime(),
+    updated_at: datetime(),
+    version: 1,
+    status: 'active'
+})
+WITH ec, memberIds
+UNWIND memberIds AS mid
+MATCH (m:MemoryNode {space_id: ec.space_id, node_id: mid})
+CREATE (m)-[:ABSTRACTS_TO {
+    space_id: ec.space_id,
+    edge_id: randomUUID(),
+    created_at: datetime(),
+    updated_at: datetime(),
+    weight: 1.0,
+    evidence_count: 1,
+    version: 1,
+    status: 'active'
+}]->(ec)
+RETURN ec.node_id AS ecId`
+
+		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, createCypher, map[string]any{
+				"members":     memberIDs,
+				"name":        result.Name,
+				"description": result.Description,
+				"label":       result.ProposedLabel,
+				"spaceId":     spaceID,
+				"layer":       targetLayer,
+			})
+			return nil, err
+		})
+		if err != nil {
+			fmt.Printf("warning: failed to create dynamic emergent node: %v\n", err)
 			continue
 		}
 		created++

@@ -41,6 +41,7 @@ type Config struct {
 	OpenAIAPIKey        string
 	OpenAIModel         string // default: text-embedding-ada-002
 	OpenAIEndpoint      string // default: https://api.openai.com/v1
+	LLMEndpoint         string // LLM_ENDPOINT — override endpoint for LLM text-generation (default: uses OpenAIEndpoint)
 	OllamaEndpoint      string // default: http://localhost:11434
 	OllamaModel         string // default: nomic-embed-text
 
@@ -182,6 +183,16 @@ type Config struct {
 	IntentModel     string // INTENT_MODEL — model for intent translation (default: gpt-4o-mini)
 	IntentMaxTokens int    // INTENT_MAX_TOKENS — max tokens for rewritten query (default: 150)
 	IntentTimeoutMs int    // INTENT_TIMEOUT_MS — timeout for intent translation in ms (default: 2000)
+
+	// Dynamic Emergence settings (Phase 103)
+	EmergenceEnabled        bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
+	EmergenceProvider       string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
+	EmergenceModel          string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
+	EmergenceMaxTokens      int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
+	EmergenceTimeoutMs      int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
+	EmergenceMinWeight      float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
+	EmergenceMinClusterSize int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
+	EmergenceMaxClusters    int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -400,6 +411,15 @@ type Config struct {
 	CMSRecallTopK          int     // CMS_RECALL_TOP_K — default top-K for recall queries (default: 10)
 	CMSSummaryMaxChars     int     // CMS_SUMMARY_MAX_CHARS — max character length for generated summaries (default: 200)
 	CMSJiminyBaseConfidence float64 // CMS_JIMINY_BASE_CONFIDENCE — base confidence for Jiminy rationale (default: 0.5)
+}
+
+// EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
+// If LLMEndpoint is set, it is used; otherwise falls back to OpenAIEndpoint.
+func (c Config) EffectiveLLMEndpoint() string {
+	if c.LLMEndpoint != "" {
+		return c.LLMEndpoint
+	}
+	return c.OpenAIEndpoint
 }
 
 func FromEnv() (Config, error) {
@@ -794,6 +814,7 @@ func FromEnv() (Config, error) {
 	openaiKey := get("OPENAI_API_KEY", "")
 	openaiModel := get("OPENAI_MODEL", "text-embedding-ada-002")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
+	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "nomic-embed-text")
 
@@ -1208,6 +1229,46 @@ func FromEnv() (Config, error) {
 	}
 	if intentTimeoutMs < 200 {
 		return Config{}, errors.New("INTENT_TIMEOUT_MS must be >= 200")
+	}
+
+	// Dynamic Emergence settings (Phase 103)
+	emergenceEnabled := getBool("EMERGENCE_ENABLED", false)
+	emergenceProvider := get("EMERGENCE_PROVIDER", "openai")
+	emergenceModel := get("EMERGENCE_MODEL", "gpt-4o-mini")
+	emergenceMaxTokens, err := atoi("EMERGENCE_MAX_TOKENS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if emergenceMaxTokens < 100 || emergenceMaxTokens > 4000 {
+		return Config{}, errors.New("EMERGENCE_MAX_TOKENS must be in range [100, 4000]")
+	}
+	emergenceTimeoutMs, err := atoi("EMERGENCE_TIMEOUT_MS", 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	if emergenceTimeoutMs < 1000 {
+		return Config{}, errors.New("EMERGENCE_TIMEOUT_MS must be >= 1000")
+	}
+	emergenceMinWeight, err := atof("EMERGENCE_MIN_WEIGHT", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	if emergenceMinWeight < 0.0 || emergenceMinWeight > 1.0 {
+		return Config{}, errors.New("EMERGENCE_MIN_WEIGHT must be in range [0.0, 1.0]")
+	}
+	emergenceMinClusterSize, err := atoi("EMERGENCE_MIN_CLUSTER_SIZE", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if emergenceMinClusterSize < 2 {
+		return Config{}, errors.New("EMERGENCE_MIN_CLUSTER_SIZE must be >= 2")
+	}
+	emergenceMaxClusters, err := atoi("EMERGENCE_MAX_CLUSTERS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if emergenceMaxClusters < 1 {
+		return Config{}, errors.New("EMERGENCE_MAX_CLUSTERS must be >= 1")
 	}
 
 	// Capability gap detection settings (Task #23)
@@ -1764,6 +1825,7 @@ func FromEnv() (Config, error) {
 		OpenAIAPIKey: openaiKey,
 		OpenAIModel: openaiModel,
 		OpenAIEndpoint: openaiEndpoint,
+		LLMEndpoint:    llmEndpoint,
 		OllamaEndpoint: ollamaEndpoint,
 		OllamaModel: ollamaModel,
 		EmbeddingCacheEnabled:     embCacheEnabled,
@@ -1891,6 +1953,16 @@ func FromEnv() (Config, error) {
 		IntentModel:     intentModel,
 		IntentMaxTokens: intentMaxTokens,
 		IntentTimeoutMs: intentTimeoutMs,
+
+		// Phase 103: Dynamic Emergence
+		EmergenceEnabled:        emergenceEnabled,
+		EmergenceProvider:       emergenceProvider,
+		EmergenceModel:          emergenceModel,
+		EmergenceMaxTokens:      emergenceMaxTokens,
+		EmergenceTimeoutMs:      emergenceTimeoutMs,
+		EmergenceMinWeight:      emergenceMinWeight,
+		EmergenceMinClusterSize: emergenceMinClusterSize,
+		EmergenceMaxClusters:    emergenceMaxClusters,
 
 		GapLowScoreThreshold:      gapLowScoreThreshold,
 		GapMinOccurrences:         gapMinOccurrences,
