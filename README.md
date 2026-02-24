@@ -510,6 +510,14 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 102 | Intent Translation (LLM query rewriting before vector embedding) | ✅ Complete |
+| 101 | SME Synthesis Engine (LLM-driven synthesis for consult endpoint) | ✅ Complete |
+| 97 | Process Lifecycle + Secret Management (daemon mode, keychain) | ✅ Complete |
+| 96 | IDE + Repo Integration (git hooks, MCP config, serve --mcp) | ✅ Complete |
+| 95 | Database + Embedding + Migrations (Go-native runner, Docker mgmt) | ✅ Complete |
+| 94 | Config Simplification + Project Init (YAML config, mdemg init) | ✅ Complete |
+| 93 | Unified CLI Foundation (12 binaries → single mdemg binary) | ✅ Complete |
+| 92 | Gap Analysis — Deployable Package (15-gap analysis, Phase 93-100 roadmap) | ✅ Complete |
 | — | Space Pruning Framework (admin API, auto-prune scheduler, UATS specs) | ✅ Complete |
 | D | Validation (2nd codebase benchmark, 28K scale test, architecture docs) | ✅ Complete |
 | 91 | RSIC Observability & Operations (Prometheus metrics, Grafana dashboard, alert rules) | ✅ Complete |

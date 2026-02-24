@@ -176,6 +176,13 @@ type Config struct {
 	SynthesisMaxTokens int    // SYNTHESIS_MAX_TOKENS — max tokens for synthesis response (default: 2000)
 	SynthesisTimeoutMs int    // SYNTHESIS_TIMEOUT_MS — timeout for synthesis call in ms (default: 30000)
 
+	// Intent Translation settings (Phase 102)
+	IntentEnabled   bool   // INTENT_ENABLED — enable query rewriting before embedding (default: false)
+	IntentProvider  string // INTENT_PROVIDER — LLM provider for intent translation (openai/ollama, default: openai)
+	IntentModel     string // INTENT_MODEL — model for intent translation (default: gpt-4o-mini)
+	IntentMaxTokens int    // INTENT_MAX_TOKENS — max tokens for rewritten query (default: 150)
+	IntentTimeoutMs int    // INTENT_TIMEOUT_MS — timeout for intent translation in ms (default: 2000)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1184,6 +1191,25 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("SYNTHESIS_TIMEOUT_MS must be >= 1000")
 	}
 
+	// Intent Translation settings (Phase 102)
+	intentEnabled := getBool("INTENT_ENABLED", false)
+	intentProvider := get("INTENT_PROVIDER", "openai")
+	intentModel := get("INTENT_MODEL", "gpt-4o-mini")
+	intentMaxTokens, err := atoi("INTENT_MAX_TOKENS", 150)
+	if err != nil {
+		return Config{}, err
+	}
+	if intentMaxTokens < 10 || intentMaxTokens > 500 {
+		return Config{}, errors.New("INTENT_MAX_TOKENS must be in range [10, 500]")
+	}
+	intentTimeoutMs, err := atoi("INTENT_TIMEOUT_MS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	if intentTimeoutMs < 200 {
+		return Config{}, errors.New("INTENT_TIMEOUT_MS must be >= 200")
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -1858,6 +1884,13 @@ func FromEnv() (Config, error) {
 		SynthesisModel:     synthesisModel,
 		SynthesisMaxTokens: synthesisMaxTokens,
 		SynthesisTimeoutMs: synthesisTimeoutMs,
+
+		// Phase 102: Intent Translation
+		IntentEnabled:   intentEnabled,
+		IntentProvider:  intentProvider,
+		IntentModel:     intentModel,
+		IntentMaxTokens: intentMaxTokens,
+		IntentTimeoutMs: intentTimeoutMs,
 
 		GapLowScoreThreshold:      gapLowScoreThreshold,
 		GapMinOccurrences:         gapMinOccurrences,

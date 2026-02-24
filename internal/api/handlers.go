@@ -286,6 +286,18 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Phase 102: Intent Translation — rewrite query before embedding
+	var translatedIntent string
+	if req.TranslateIntent && s.intentTranslator != nil && req.QueryText != "" {
+		translated, translateErr := s.intentTranslator.Translate(r.Context(), req.QueryText)
+		if translateErr != nil {
+			log.Printf("intent translation failed (using original): %v", translateErr)
+		} else if translated != req.QueryText {
+			translatedIntent = translated
+			req.QueryText = translated
+		}
+	}
+
 	// Generate embedding from query_text if provided and no embedding given
 	if len(req.QueryEmbedding) == 0 && req.QueryText != "" {
 		if s.embedder == nil {
@@ -387,6 +399,11 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			}
 			resp.Debug["distribution_alerts"] = alerts
 		}
+	}
+
+	// Phase 102: Include translated intent in response
+	if translatedIntent != "" {
+		resp.TranslatedIntent = translatedIntent
 	}
 
 	writeJSON(w, http.StatusOK, resp)

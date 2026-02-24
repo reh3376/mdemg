@@ -25,6 +25,9 @@ type RetrieveRequest struct {
 	TemporalAfter  string `json:"temporal_after,omitempty"`  // ISO8601: force hard filter after this time
 	TemporalBefore string `json:"temporal_before,omitempty"` // ISO8601: force hard filter before this time
 
+	// Intent Translation (Phase 102)
+	TranslateIntent bool `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding
+
 	// Pagination fields (Phase 48.3)
 	Cursor string `json:"cursor,omitempty"` // Node ID to start after for cursor pagination
 	Limit  int    `json:"limit,omitempty"`  // Max results per page (default: 50, max: 500)
@@ -83,6 +86,9 @@ type RetrieveResponse struct {
 	NextCursor string `json:"next_cursor,omitempty"` // Cursor for next page (empty if no more results)
 	HasMore    bool   `json:"has_more"`              // True if more results are available
 	TotalCount int    `json:"total_count,omitempty"` // Total matching results (optional, may be expensive)
+
+	// Intent Translation (Phase 102)
+	TranslatedIntent string `json:"translated_intent,omitempty"` // Rewritten query from intent translation
 }
 
 // EvidenceMetrics tracks evidence compliance for retrieval quality measurement.
@@ -376,6 +382,7 @@ type ConsultRequest struct {
 	MaxSuggestions int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions to return (default 5)
 	IncludeEvidence bool    `json:"include_evidence,omitempty"` // Include symbol evidence for suggestions
 	LlmSynthesis    bool    `json:"llm_synthesis,omitempty"`    // Enable LLM synthesis for narrative response (Phase 101)
+	TranslateIntent bool    `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding (Phase 102)
 }
 
 // ConsultResponse - response from the Agent Consulting Service
@@ -386,6 +393,7 @@ type ConsultResponse struct {
 	Confidence      float64           `json:"confidence"`                 // Overall confidence 0.0-1.0
 	Rationale       string            `json:"rationale,omitempty"`        // Why these suggestions
 	Synthesis       string            `json:"synthesis,omitempty"`        // LLM-generated narrative (Phase 101)
+	TranslatedIntent string           `json:"translated_intent,omitempty"` // Rewritten query from intent translation (Phase 102)
 	Debug           map[string]any    `json:"debug,omitempty"`
 }
 
@@ -430,6 +438,7 @@ type SuggestRequest struct {
 	IncludeEvidence    bool     `json:"include_evidence,omitempty"`                                  // Include symbol evidence
 	IncludeConflicts   bool     `json:"include_conflicts,omitempty"`                                 // Detect potential conflicts
 	IncludeConstraints bool     `json:"include_constraints,omitempty"`                               // Include architectural constraints
+	TranslateIntent    bool     `json:"translate_intent,omitempty"`                                  // Enable LLM query rewriting before embedding (Phase 102)
 }
 
 // SuggestResponse - response from context-triggered suggestion endpoint
@@ -440,8 +449,9 @@ type SuggestResponse struct {
 	Conflicts       []ConflictWarning  `json:"conflicts,omitempty"`        // Potential conflicts with existing knowledge
 	Constraints     []Constraint       `json:"constraints,omitempty"`      // Relevant architectural constraints
 	RelatedConcepts []RelatedConcept   `json:"related_concepts,omitempty"` // Higher-level concepts
-	Confidence      float64            `json:"confidence"`                 // Overall confidence
-	Debug           map[string]any     `json:"debug,omitempty"`
+	Confidence       float64            `json:"confidence"`                  // Overall confidence
+	TranslatedIntent string             `json:"translated_intent,omitempty"` // Rewritten query from intent translation (Phase 102)
+	Debug            map[string]any     `json:"debug,omitempty"`
 }
 
 // ContextTrigger explains what in the context triggered suggestions

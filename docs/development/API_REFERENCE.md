@@ -362,6 +362,7 @@ Semantic search with optional LLM re-ranking.
 | `include_hidden` | bool | No | Include hidden layer nodes |
 | `min_score` | float | No | Minimum similarity score |
 | `rerank` | bool | No | Apply LLM re-ranking |
+| `translate_intent` | bool | No | Rewrite query via LLM before embedding (Phase 102). Requires `INTENT_ENABLED=true` |
 
 **Response**:
 
@@ -383,6 +384,7 @@ Semantic search with optional LLM re-ranking.
       ]
     }
   ],
+  "translated_intent": "auth service login authentication workflow session management",
   "debug": {
     "query_time_ms": 45,
     "embedding_provider": "openai"
@@ -402,7 +404,8 @@ SME-style consultation with evidence-based answers.
   "context": "Investigating authentication flow",
   "question": "What is the session timeout value?",
   "max_suggestions": 5,
-  "include_evidence": true
+  "include_evidence": true,
+  "translate_intent": true
 }
 ```
 
@@ -418,9 +421,12 @@ SME-style consultation with evidence-based answers.
       "relevance": 0.92,
       "evidence": [...]
     }
-  ]
+  ],
+  "translated_intent": "session timeout configuration value auth settings"
 }
 ```
+
+When `translate_intent: true`, the response includes `translated_intent` showing the keyword-dense rewrite used for vector embedding. Requires `INTENT_ENABLED=true` server config. Falls back silently to original query on error.
 
 ### POST /v1/memory/suggest
 
@@ -432,7 +438,8 @@ Context-triggered suggestions (proactive memory surfacing).
 {
   "space_id": "my-project",
   "context": "User is editing authentication code",
-  "max_suggestions": 3
+  "max_suggestions": 3,
+  "translate_intent": true
 }
 ```
 
@@ -447,9 +454,12 @@ Context-triggered suggestions (proactive memory surfacing).
       "relevance": 0.88,
       "reason": "Related to authentication patterns"
     }
-  ]
+  ],
+  "translated_intent": "authentication code editing security patterns session management"
 }
 ```
+
+When `translate_intent: true`, the response includes `translated_intent` showing the keyword-dense rewrite. Requires `INTENT_ENABLED=true`. Falls back silently on error.
 
 ### POST /v1/memory/reflect
 

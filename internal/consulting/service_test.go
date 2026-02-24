@@ -948,7 +948,7 @@ func TestFindApplicableConstraints_LowScoreIgnored(t *testing.T) {
 
 func TestNewService(t *testing.T) {
 	// NewService with nil dependencies should not panic
-	s := NewService(config.Config{}, nil, nil, nil, nil, nil)
+	s := NewService(config.Config{}, nil, nil, nil, nil, nil, nil)
 	if s == nil {
 		t.Error("NewService() returned nil")
 	}
@@ -965,7 +965,7 @@ func TestNewServiceWithMocks(t *testing.T) {
 	retriever := newMockRetriever()
 	symbolLookup := newMockSymbolLookup()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil, nil)
 	if s == nil {
 		t.Error("NewServiceWithMocks() returned nil")
 	}
@@ -2314,7 +2314,7 @@ func TestConsult_FullFlow_Success(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -2352,7 +2352,7 @@ func TestConsult_RetrieverError(t *testing.T) {
 		return models.RetrieveResponse{}, fmt.Errorf("retrieval failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -2376,7 +2376,7 @@ func TestConsult_EmptyResults(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -2416,7 +2416,7 @@ func TestConsult_LimitsSuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -2464,7 +2464,7 @@ func TestConsult_IncludesSymbolEvidence(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2513,7 +2513,7 @@ func TestConsult_SymbolLookupError(t *testing.T) {
 		return nil, fmt.Errorf("symbol lookup failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2539,7 +2539,7 @@ func TestConsult_NoSymbolStore(t *testing.T) {
 	retriever := newMockRetriever()
 
 	// No symbol store configured
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:         "test-space",
@@ -2582,7 +2582,7 @@ func TestSuggest_FullFlow_Success(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -2618,7 +2618,7 @@ func TestSuggest_RetrieverError(t *testing.T) {
 		return models.RetrieveResponse{}, fmt.Errorf("retrieval failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -2645,7 +2645,7 @@ func TestSuggest_FiltersByMinConfidence(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:       "test-space",
@@ -2676,7 +2676,7 @@ func TestSuggest_IncludesConflicts(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:          "test-space",
@@ -2710,7 +2710,7 @@ func TestSuggest_IncludesConstraints(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:            "test-space",
@@ -2746,7 +2746,7 @@ func TestSuggest_IncludesEvidence(t *testing.T) {
 
 	symbolLookup := newMockSymbolLookup()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:         "test-space",
@@ -2787,7 +2787,7 @@ func TestSuggest_LimitsSuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -2810,7 +2810,7 @@ func TestSuggest_FilePath(t *testing.T) {
 	embedder := newMockEmbedder()
 	retriever := newMockRetriever()
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:  "test-space",
@@ -3414,7 +3414,7 @@ func TestConsult_RelatedConceptsErrorPath(t *testing.T) {
 	}
 
 	// No driver, so fetchRelatedConcepts will return an error
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -3456,7 +3456,7 @@ func TestSuggest_SymbolLookupErrorContinues(t *testing.T) {
 		return nil, fmt.Errorf("symbol lookup failed")
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, symbolLookup, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:         "test-space",
@@ -3504,7 +3504,7 @@ func TestSuggest_LimitsSuggestionsAfterFiltering(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID:        "test-space",
@@ -3538,7 +3538,7 @@ func TestSuggest_RelatedConceptsErrorPath(t *testing.T) {
 	}
 
 	// No driver, so fetchRelatedConcepts will return an error
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -3575,7 +3575,7 @@ func TestConsult_LimitsManySuggestions(t *testing.T) {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: results}, nil
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:        "test-space",
@@ -3619,7 +3619,7 @@ func TestConsult_RelatedConceptsSuccessPath(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil, nil)
 
 	req := models.ConsultRequest{
 		SpaceID:  "test-space",
@@ -3666,7 +3666,7 @@ func TestSuggest_RelatedConceptsSuccessPath(t *testing.T) {
 		}, nil
 	}
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, nil, conceptFetcher, nil, nil)
 
 	req := models.SuggestRequest{
 		SpaceID: "test-space",
@@ -3695,7 +3695,7 @@ func TestNewServiceWithAllMocks(t *testing.T) {
 	symbolLookup := newMockSymbolLookup()
 	conceptFetcher := newMockConceptFetcher()
 
-	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, symbolLookup, conceptFetcher, nil)
+	s := NewServiceWithAllMocks(config.Config{}, retriever, embedder, symbolLookup, conceptFetcher, nil, nil)
 	if s == nil {
 		t.Error("NewServiceWithAllMocks() returned nil")
 	}
@@ -3720,7 +3720,7 @@ func TestNewService_WithNonNilRetriever(t *testing.T) {
 	// we verify the behavior via the type assignment
 
 	// First verify that nil retriever results in nil retriever field
-	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil)
+	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil, nil)
 	if s1.retriever != nil {
 		t.Error("NewService with nil retriever should have nil retriever field")
 	}
@@ -3733,7 +3733,7 @@ func TestNewService_WithNonNilRetriever(t *testing.T) {
 // This covers lines 60-62 where the symbolStore assignment occurs.
 func TestNewService_WithNonNilSymbolStore(t *testing.T) {
 	// First verify that nil symbolStore results in nil symbolStore field
-	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil)
+	s1 := NewService(config.Config{}, nil, nil, nil, nil, nil, nil)
 	if s1.symbolStore != nil {
 		t.Error("NewService with nil symbolStore should have nil symbolStore field")
 	}
@@ -3747,7 +3747,7 @@ func TestNewService_PreservesConfig(t *testing.T) {
 	cfg := config.Config{
 		// Set some field to verify it's stored
 	}
-	s := NewService(cfg, nil, nil, nil, nil, nil)
+	s := NewService(cfg, nil, nil, nil, nil, nil, nil)
 	if s == nil {
 		t.Fatal("NewService returned nil")
 	}
@@ -3800,6 +3800,18 @@ func (m *mockSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) 
 	return SynthesisResult{}, nil
 }
 
+// mockIntentTranslator implements IntentTranslator for testing.
+type mockIntentTranslator struct {
+	translateFn func(ctx context.Context, query string) (string, error)
+}
+
+func (m *mockIntentTranslator) Translate(ctx context.Context, query string) (string, error) {
+	if m.translateFn != nil {
+		return m.translateFn(ctx, query)
+	}
+	return query, nil
+}
+
 func TestConsult_LlmSynthesis_Success(t *testing.T) {
 	embedder := newMockEmbedder()
 	retriever := newMockRetriever()
@@ -3824,7 +3836,7 @@ func TestConsult_LlmSynthesis_Success(t *testing.T) {
 		},
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth, nil)
 
 	resp, err := s.Consult(context.Background(), models.ConsultRequest{
 		SpaceID:      "test-space",
@@ -3868,7 +3880,7 @@ func TestConsult_LlmSynthesis_FallbackOnError(t *testing.T) {
 		},
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth, nil)
 
 	resp, err := s.Consult(context.Background(), models.ConsultRequest{
 		SpaceID:      "test-space",
@@ -3915,7 +3927,7 @@ func TestConsult_LlmSynthesis_FalseSkipsSynthesis(t *testing.T) {
 		},
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth, nil)
 
 	resp, err := s.Consult(context.Background(), models.ConsultRequest{
 		SpaceID:      "test-space",
@@ -3948,7 +3960,7 @@ func TestConsult_LlmSynthesis_NilSynthesizerSkips(t *testing.T) {
 	}
 
 	// nil synthesizer — should not panic
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, nil)
 
 	resp, err := s.Consult(context.Background(), models.ConsultRequest{
 		SpaceID:      "test-space",
@@ -3984,7 +3996,7 @@ func TestConsult_LlmSynthesis_PreservesExistingFields(t *testing.T) {
 		},
 	}
 
-	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth)
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, synth, nil)
 
 	resp, err := s.Consult(context.Background(), models.ConsultRequest{
 		SpaceID:      "test-space",
@@ -4014,6 +4026,138 @@ func TestConsult_LlmSynthesis_PreservesExistingFields(t *testing.T) {
 	}
 	if resp.SpaceID != "test-space" {
 		t.Errorf("SpaceID = %q, want test-space", resp.SpaceID)
+	}
+}
+
+// =============================================================================
+// Phase 102: Intent Translation tests
+// =============================================================================
+
+func TestConsult_IntentTranslation_Success(t *testing.T) {
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "Redis session store", Summary: "Architecture Decision: Redis selected for session state", Score: 0.8, Layer: 0},
+			},
+		}, nil
+	}
+	embedder := newMockEmbedder()
+	translator := &mockIntentTranslator{
+		translateFn: func(ctx context.Context, query string) (string, error) {
+			return "Redis session state architecture decision rationale caching", nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, translator)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:         "test",
+		Context:         "Working on caching",
+		Question:        "Why do we use Redis?",
+		TranslateIntent: true,
+	})
+	if err != nil {
+		t.Fatalf("Consult() error = %v", err)
+	}
+	if resp.TranslatedIntent == "" {
+		t.Error("expected TranslatedIntent to be populated")
+	}
+	if resp.TranslatedIntent != "Redis session state architecture decision rationale caching" {
+		t.Errorf("TranslatedIntent = %q, want translated query", resp.TranslatedIntent)
+	}
+}
+
+func TestConsult_IntentTranslation_FallbackOnError(t *testing.T) {
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "test", Summary: "test", Score: 0.8, Layer: 0},
+			},
+		}, nil
+	}
+	embedder := newMockEmbedder()
+	translator := &mockIntentTranslator{
+		translateFn: func(ctx context.Context, query string) (string, error) {
+			return "", fmt.Errorf("LLM unavailable")
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, translator)
+
+	resp, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:         "test",
+		Context:         "Working on something",
+		Question:        "How does it work?",
+		TranslateIntent: true,
+	})
+	if err != nil {
+		t.Fatalf("Consult() should not fail on translation error, got %v", err)
+	}
+	if resp.TranslatedIntent != "" {
+		t.Error("TranslatedIntent should be empty on translation error")
+	}
+}
+
+func TestConsult_IntentTranslation_FalseSkips(t *testing.T) {
+	retriever := newMockRetriever()
+	embedder := newMockEmbedder()
+	called := false
+	translator := &mockIntentTranslator{
+		translateFn: func(ctx context.Context, query string) (string, error) {
+			called = true
+			return "should not be called", nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, translator)
+
+	_, err := s.Consult(context.Background(), models.ConsultRequest{
+		SpaceID:         "test",
+		Context:         "Working on something",
+		Question:        "How does it work?",
+		TranslateIntent: false, // Explicitly false
+	})
+	if err != nil {
+		t.Fatalf("Consult() error = %v", err)
+	}
+	if called {
+		t.Error("translator should not be called when TranslateIntent is false")
+	}
+}
+
+func TestSuggest_IntentTranslation_Success(t *testing.T) {
+	retriever := newMockRetriever()
+	retriever.retrieveFn = func(ctx context.Context, req models.RetrieveRequest) (models.RetrieveResponse, error) {
+		return models.RetrieveResponse{
+			SpaceID: req.SpaceID,
+			Results: []models.RetrieveResult{
+				{NodeID: "n1", Name: "auth pattern", Summary: "Authentication uses JWT tokens", Score: 0.9, Layer: 0},
+			},
+		}, nil
+	}
+	embedder := newMockEmbedder()
+	translator := &mockIntentTranslator{
+		translateFn: func(ctx context.Context, query string) (string, error) {
+			return "JWT authentication token pattern security", nil
+		},
+	}
+
+	s := NewServiceWithMocks(config.Config{}, nil, retriever, embedder, nil, nil, translator)
+
+	resp, err := s.Suggest(context.Background(), models.SuggestRequest{
+		SpaceID:         "test",
+		Context:         "Working on auth flow",
+		TranslateIntent: true,
+	})
+	if err != nil {
+		t.Fatalf("Suggest() error = %v", err)
+	}
+	if resp.TranslatedIntent == "" {
+		t.Error("expected TranslatedIntent to be populated")
 	}
 }
 
