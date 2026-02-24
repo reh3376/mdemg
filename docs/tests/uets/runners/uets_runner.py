@@ -216,8 +216,8 @@ class UETSLoader:
 class ModelInterface:
     """Send emergence naming requests to OpenAI-compatible or Ollama endpoints."""
 
-    def __init__(self, model_cfg: dict, run_cfg: dict):
-        self.endpoint = model_cfg["endpoint"]
+    def __init__(self, model_cfg: dict, run_cfg: dict, endpoint_override: str = ""):
+        self.endpoint = endpoint_override or model_cfg["endpoint"]
         self.model_id = model_cfg["model_id"]
         self.api_type = model_cfg["type"]
         self.temperature = run_cfg.get("temperature", 0.3)
@@ -704,9 +704,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Run model
     model_cfg = spec["model"]
     run_cfg = spec.get("config", {})
-    interface = ModelInterface(model_cfg, run_cfg)
+    endpoint_override = getattr(args, "endpoint", "") or ""
+    interface = ModelInterface(model_cfg, run_cfg, endpoint_override=endpoint_override)
 
-    print(f"Testing {model_cfg['name']} against {len(clusters)} clusters...")
+    effective_endpoint = endpoint_override or model_cfg["endpoint"]
+    print(f"Testing {model_cfg['name']} @ {effective_endpoint} against {len(clusters)} clusters...")
     results = []
     start = time.monotonic()
     for cluster in clusters:
@@ -766,9 +768,11 @@ def cmd_validate_all(args: argparse.Namespace) -> int:
 
         model_cfg = spec["model"]
         run_cfg = spec.get("config", {})
-        interface = ModelInterface(model_cfg, run_cfg)
+        endpoint_override = getattr(args, "endpoint", "") or ""
+        interface = ModelInterface(model_cfg, run_cfg, endpoint_override=endpoint_override)
 
-        print(f"Testing {model_cfg['name']}...")
+        effective_endpoint = endpoint_override or model_cfg["endpoint"]
+        print(f"Testing {model_cfg['name']} @ {effective_endpoint}...")
         results = []
         start = time.monotonic()
         for cluster in clusters:
@@ -881,12 +885,14 @@ def main() -> int:
     p_val.add_argument("--spec", required=True, help="Path to .uets.json spec file")
     p_val.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     p_val.add_argument("--report", help="Output JSON report path")
+    p_val.add_argument("--endpoint", help="Override model endpoint URL (run any spec against any host)")
 
     # validate-all
     p_all = sub.add_parser("validate-all", help="Validate all UETS specs in directory")
     p_all.add_argument("--spec-dir", required=True, help="Directory containing .uets.json specs")
     p_all.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     p_all.add_argument("--report", help="Output JSON report path")
+    p_all.add_argument("--endpoint", help="Override model endpoint URL for all specs")
 
     # add-hashes
     p_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to fixture references")

@@ -64,7 +64,23 @@ python uets_runner.py validate-all --spec-dir ../specs/ --report report.json
 | `verify-hashes --spec-dir <dir>` | Verify fixture integrity via hashes |
 | `extract-clusters --output <path>` | Extract clusters from Neo4j into fixture JSON |
 
-Common flags: `--skip-hash` (skip fixture verification), `--report <path>` (JSON report output).
+Common flags: `--skip-hash` (skip fixture verification), `--report <path>` (JSON report output), `--endpoint <url>` (override model endpoint).
+
+### Remote Execution
+
+Use `--endpoint` to run any spec against any host without modifying the spec file:
+
+```bash
+# Run a local spec against the Mac Studio Ollama
+python uets_runner.py validate --spec ../specs/llama3.2-3b-ollama.uets.json \
+  --endpoint http://172.21.21.11:11434/api/generate
+
+# Run all specs against a specific endpoint
+python uets_runner.py validate-all --spec-dir ../specs/ \
+  --endpoint http://172.21.21.11:11434/api/generate
+```
+
+Specs also include `metadata.tags` to indicate intended host (e.g., `["mac-studio", "thunderbolt"]` vs `["local"]`).
 
 ## Spec Format
 
