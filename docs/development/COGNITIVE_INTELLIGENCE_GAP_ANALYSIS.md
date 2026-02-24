@@ -79,6 +79,15 @@ This was identified as a "Future" optimization in Deliverable 10.1.3 but is crit
 - API: `enable_dynamic_emergence: true` in consolidate request body
 - Spec: `docs/specs/phase103-dynamic-emergence.md`
 
+### Phase 103b: Emergence Model Evaluation
+
+- `LLM_ENDPOINT` env var decouples LLM text-generation from embeddings (`EffectiveLLMEndpoint()`)
+- Ollama `format` JSON schema for grammar-constrained output
+- UETS framework: 8 model specs, 7/7 passing, 5 evaluation patterns (E1-E5)
+- `num_ctx` config support, `--endpoint` CLI override for remote execution
+- Validated model: `llama3.2:3b` Q4_K_M (fastest latency, top name quality)
+- UETS: `docs/tests/uets/`
+
 ---
 
 ## Gap 4: Active Guardrail Enforcement
@@ -124,5 +133,6 @@ The graph currently remains siloed per workspace. Universal, abstract principles
 | **101** | SME Synthesis Engine | Upgrade `/v1/memory/consult` to use LLM-based multi-hop synthesis instead of keyword string matching. |
 | **102** | Intent Translation | Implement query rewriting before vector embedding to align conversational queries with declarative node text. |
 | **103** | Dynamic Emergence (**Complete**) | LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters. Pipeline step at phase 22, fail-open per cluster. |
+| **103b** | Emergence Model Evaluation (**Complete**) | `LLM_ENDPOINT` config separation, UETS framework (8 model specs, 7/7 passing), `llama3.2:3b` Q4_K_M validated as default. |
 | **104** | Active MCP Guardrails | Add pre-commit/MCP-level validation against `ConstraintNodes` to proactively block architectural violations. |
 | **105** | Global Meta-Learning | Implement cross-space promotion of Layer 4/5 concepts to a global "Org-Level" graph for true cross-pollination. |

@@ -156,7 +156,7 @@ To adhere to the Framework Governance rules (`docs/specs/FRAMEWORK_GOVERNANCE.md
 
 2. **Ollama JSON Schema Enforcement**: Added `format` field with full JSON schema to Ollama requests in `emergence_namer.go`. Uses Ollama v0.5+ grammar-constrained output — model physically cannot produce non-conforming JSON. Also added `options.temperature: 0.3` for deterministic output.
 
-3. **UETS Framework**: New UxTS framework (Universal Emergence Test Specification) for evaluating LLM emergence naming quality. 5 evaluation patterns: E1_JSON_CONFORMANCE, E2_LABEL_CONSTRAINT, E3_NAME_QUALITY, E4_DESCRIPTION_QUALITY, E5_LATENCY. Python runner replicates exact Go emergence prompt format. 4 model specs with baseline results: llama3.2-3b (100%/100%/86%), qwen2.5-72b-mlx (100%/100%/57%), qwen2.5-14b (100%/100%/0%), qwen3-8b (100%/100%/29%).
+3. **UETS Framework**: New UxTS framework (Universal Emergence Test Specification) for evaluating LLM emergence naming quality. 5 evaluation patterns: E1_JSON_CONFORMANCE, E2_LABEL_CONSTRAINT, E3_NAME_QUALITY, E4_DESCRIPTION_QUALITY, E5_LATENCY. Python runner replicates exact Go emergence prompt format with `--endpoint` override for remote execution and `num_ctx` config support. 8 model specs (7/7 passing): llama3.2-3b-macstudio Q4 (100%/100%/86%, 1262ms), llama3.2-3b-ollama Q4 (100%/100%/86%, 1457ms), llama3.2-3b-fp16-macstudio (100%/100%/86%, 1568ms), qwen3-8b (100%/100%/29%, 2126ms), qwen2.5-14b (100%/100%/0%, 4398ms), qwen2.5-72b-mlx (100%/100%/57%, 4553ms), llama3.3-70b-ollama (100%/100%/86%, 24866ms). **Recommendation**: `llama3.2:3b` Q4_K_M — fastest latency with top-tier name quality; FP16 adds no measurable accuracy benefit.
 
 ### Files Modified
 - `internal/config/config.go` — `LLMEndpoint` field + `EffectiveLLMEndpoint()` + FromEnv parsing
@@ -169,7 +169,14 @@ To adhere to the Framework Governance rules (`docs/specs/FRAMEWORK_GOVERNANCE.md
 
 ### New Files
 - `docs/tests/uets/schema/uets.schema.json` — UETS JSON schema
-- `docs/tests/uets/specs/*.uets.json` — 4 model specs
+- `docs/tests/uets/specs/llama3.2-3b-ollama.uets.json` — Local Ollama Q4_K_M spec
+- `docs/tests/uets/specs/llama3.2-3b-macstudio.uets.json` — Mac Studio Q4_K_M spec
+- `docs/tests/uets/specs/llama3.2-3b-fp16-macstudio.uets.json` — Mac Studio FP16 spec
+- `docs/tests/uets/specs/llama3.3-70b-ollama.uets.json` — Local Ollama 70B spec
+- `docs/tests/uets/specs/llama3.3-70b-macstudio.uets.json` — Mac Studio 70B spec
+- `docs/tests/uets/specs/qwen2.5-72b-mlx.uets.json` — MLX Server 72B spec
+- `docs/tests/uets/specs/qwen2.5-14b-ollama.uets.json` — Local Ollama 14B spec
+- `docs/tests/uets/specs/qwen3-8b-ollama.uets.json` — Local Ollama 8B spec
 - `docs/tests/uets/fixtures/clusters.json` — 7 CO_ACTIVATED_WITH clusters from Neo4j
 - `docs/tests/uets/runners/uets_runner.py` — Python runner (~550 lines)
 - `docs/tests/uets/README.md` — Framework documentation

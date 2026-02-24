@@ -16,6 +16,7 @@ uets/
 │   ├── qwen2.5-14b-ollama.uets.json
 │   ├── qwen3-8b-ollama.uets.json
 │   ├── llama3.3-70b-ollama.uets.json
+│   ├── llama3.3-70b-macstudio.uets.json
 │   ├── llama3.2-3b-ollama.uets.json
 │   ├── llama3.2-3b-macstudio.uets.json
 │   └── llama3.2-3b-fp16-macstudio.uets.json
