@@ -197,10 +197,6 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	symResolver := symbols.NewResolver(driver)
 	log.Printf("Symbol store initialized (parser + resolver for relationship extraction)")
 
-	// Initialize consulting service (Agent Consulting API)
-	cons := consulting.NewService(cfg, driver, ret, emb, symStore)
-	log.Printf("Consulting service initialized")
-
 	// Initialize gap detector for capability gap detection
 	// Collect registered ingestion sources from plugins
 	var registeredSources []string
@@ -301,6 +297,28 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			log.Printf("Embedding rate limiting enabled (%.0f rps, burst: %d)", rps, burst)
 		}
 	}
+
+	// Initialize synthesis engine (Phase 101: SME Synthesis)
+	var synth consulting.Synthesizer
+	if cfg.SynthesisEnabled {
+		synthCfg := consulting.SynthesisConfig{
+			Enabled:   true,
+			Provider:  cfg.SynthesisProvider,
+			Model:     cfg.SynthesisModel,
+			MaxTokens: cfg.SynthesisMaxTokens,
+			TimeoutMs: cfg.SynthesisTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.OpenAIEndpoint,
+			OllamaURL: cfg.OllamaEndpoint,
+		}
+		synth = consulting.NewLLMSynthesizer(synthCfg, cbRegistry)
+		log.Printf("SME Synthesis enabled (provider: %s, model: %s, maxTokens: %d)",
+			cfg.SynthesisProvider, cfg.SynthesisModel, cfg.SynthesisMaxTokens)
+	}
+
+	// Initialize consulting service (Agent Consulting API)
+	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth)
+	log.Printf("Consulting service initialized")
 
 	// Phase 3: Initialize metrics registry
 	// Start with defaults (includes histogram buckets) and override specific fields

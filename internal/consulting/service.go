@@ -48,10 +48,11 @@ type Service struct {
 	embedder       embeddings.Embedder
 	symbolStore    SymbolLookup
 	conceptFetcher ConceptFetcher // Optional: if nil, uses internal fetchRelatedConcepts
+	synthesizer    Synthesizer    // Optional: if nil, LLM synthesis is skipped (Phase 101)
 }
 
 // NewService creates a new consulting service.
-func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *retrieval.Service, embedder embeddings.Embedder, symbolStore *symbols.Store) *Service {
+func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *retrieval.Service, embedder embeddings.Embedder, symbolStore *symbols.Store, synthesizer Synthesizer) *Service {
 	var r Retriever
 	if retriever != nil {
 		r = retriever
@@ -66,28 +67,31 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, retriever *re
 		retriever:   r,
 		embedder:    embedder,
 		symbolStore: ss,
+		synthesizer: synthesizer,
 	}
 }
 
 // NewServiceWithMocks creates a consulting service with mock dependencies for testing.
-func NewServiceWithMocks(cfg config.Config, driver neo4j.DriverWithContext, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup) *Service {
+func NewServiceWithMocks(cfg config.Config, driver neo4j.DriverWithContext, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, synthesizer Synthesizer) *Service {
 	return &Service{
 		cfg:         cfg,
 		driver:      driver,
 		retriever:   retriever,
 		embedder:    embedder,
 		symbolStore: symbolStore,
+		synthesizer: synthesizer,
 	}
 }
 
 // NewServiceWithAllMocks creates a consulting service with all mock dependencies including concept fetcher.
-func NewServiceWithAllMocks(cfg config.Config, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, conceptFetcher ConceptFetcher) *Service {
+func NewServiceWithAllMocks(cfg config.Config, retriever Retriever, embedder embeddings.Embedder, symbolStore SymbolLookup, conceptFetcher ConceptFetcher, synthesizer Synthesizer) *Service {
 	return &Service{
 		cfg:            cfg,
 		retriever:      retriever,
 		embedder:       embedder,
 		symbolStore:    symbolStore,
 		conceptFetcher: conceptFetcher,
+		synthesizer:    synthesizer,
 	}
 }
 
@@ -183,6 +187,30 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 	}
 
 	resp.Suggestions = suggestions
+
+	// Step 4.5: LLM Synthesis (Phase 101)
+	if req.LlmSynthesis && s.synthesizer != nil {
+		synthReq := SynthesisRequest{
+			SpaceID:     req.SpaceID,
+			Question:    req.Question,
+			Context:     req.Context,
+			Results:     retrieveResp.Results,
+			Concepts:    concepts,
+			Suggestions: suggestions,
+		}
+		synthResult, synthErr := s.synthesizer.Synthesize(ctx, synthReq)
+		if synthErr != nil {
+			// Graceful fallback: log, populate debug, do NOT fail the request
+			resp.Debug["synthesis_error"] = synthErr.Error()
+			resp.Debug["synthesis_fallback"] = true
+		} else {
+			resp.Synthesis = synthResult.Narrative
+			resp.Debug["synthesis_tokens"] = synthResult.TokensUsed
+			resp.Debug["synthesis_latency_ms"] = synthResult.LatencyMs
+			resp.Debug["synthesis_provider"] = synthResult.Provider
+			resp.Debug["synthesis_model"] = synthResult.Model
+		}
+	}
 
 	// Step 5: Calculate overall confidence and rationale
 	resp.Confidence = s.calculateOverallConfidence(suggestions, len(retrieveResp.Results))

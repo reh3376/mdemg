@@ -375,6 +375,7 @@ type ConsultRequest struct {
 	Tags     []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"` // Optional filtering tags
 	MaxSuggestions int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions to return (default 5)
 	IncludeEvidence bool    `json:"include_evidence,omitempty"` // Include symbol evidence for suggestions
+	LlmSynthesis    bool    `json:"llm_synthesis,omitempty"`    // Enable LLM synthesis for narrative response (Phase 101)
 }
 
 // ConsultResponse - response from the Agent Consulting Service
@@ -384,6 +385,7 @@ type ConsultResponse struct {
 	RelatedConcepts []RelatedConcept  `json:"related_concepts,omitempty"` // Higher-level concepts
 	Confidence      float64           `json:"confidence"`                 // Overall confidence 0.0-1.0
 	Rationale       string            `json:"rationale,omitempty"`        // Why these suggestions
+	Synthesis       string            `json:"synthesis,omitempty"`        // LLM-generated narrative (Phase 101)
 	Debug           map[string]any    `json:"debug,omitempty"`
 }
 
