@@ -223,6 +223,7 @@ class ModelInterface:
         self.temperature = run_cfg.get("temperature", 0.3)
         self.max_tokens = run_cfg.get("max_tokens", 500)
         self.timeout_ms = run_cfg.get("timeout_ms", 30000)
+        self.num_ctx = run_cfg.get("num_ctx", 0)  # Ollama context window size (0 = use model default)
 
     def _build_user_prompt(self, cluster: Cluster) -> str:
         lines = ["## Cluster Members"]
@@ -312,7 +313,10 @@ class ModelInterface:
             "prompt": prompt,
             "stream": False,
             "format": schema,
-            "options": {"temperature": self.temperature},
+            "options": {
+                "temperature": self.temperature,
+                **({"num_ctx": self.num_ctx} if self.num_ctx > 0 else {}),
+            },
         }).encode()
 
         parsed = urllib.parse.urlparse(self.endpoint)

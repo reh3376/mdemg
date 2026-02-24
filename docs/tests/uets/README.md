@@ -16,7 +16,9 @@ uets/
 │   ├── qwen2.5-14b-ollama.uets.json
 │   ├── qwen3-8b-ollama.uets.json
 │   ├── llama3.3-70b-ollama.uets.json
-│   └── llama3.2-3b-ollama.uets.json
+│   ├── llama3.2-3b-ollama.uets.json
+│   ├── llama3.2-3b-macstudio.uets.json
+│   └── llama3.2-3b-fp16-macstudio.uets.json
 ├── fixtures/
 │   └── clusters.json                 # Extracted CO_ACTIVATED_WITH clusters
 ├── runners/
@@ -80,7 +82,8 @@ Each `.uets.json` spec defines a model endpoint and expected quality thresholds:
   "config": {
     "temperature": 0.3,
     "max_tokens": 500,
-    "timeout_ms": 60000
+    "timeout_ms": 60000,
+    "num_ctx": 8192
   },
   "fixture": {
     "type": "file",
@@ -141,6 +144,24 @@ JSON reports include per-model aggregates and per-cluster details:
   ]
 }
 ```
+
+## Benchmark Results (2026-02-24)
+
+All 7 specs passing (7 clusters per model, warm runs):
+
+| Model | JSON% | Label% | Name% | Avg Latency | Host |
+|-------|-------|--------|-------|-------------|------|
+| llama3.2-3b-macstudio (Q4) | 100% | 100% | 85.7% | 1262ms | Mac Studio |
+| llama3.2-3b-ollama (Q4) | 100% | 100% | 85.7% | 1457ms | MacBook |
+| llama3.2-3b-fp16-macstudio | 100% | 100% | 85.7% | 1568ms | Mac Studio |
+| qwen3-8b-ollama | 100% | 100% | 28.6% | 2126ms | MacBook |
+| qwen2.5-14b-ollama | 100% | 100% | 0.0% | 4398ms | MacBook |
+| qwen2.5-72b-mlx | 100% | 100% | 57.1% | 4553ms | Mac Studio |
+| llama3.3-70b-ollama | 100% | 100% | 85.7% | 24866ms | MacBook |
+
+**Recommendation**: `llama3.2:3b` Q4_K_M is the best model for emergence naming — fastest latency with top-tier name quality. FP16 adds no measurable accuracy benefit. Larger models (70B, 72B) are 4-20x slower with equal or worse name quality.
+
+**Infrastructure**: Mac Studio M4 Max (128GB) via Thunderbolt bridge (`172.21.21.11`). Ollama with `OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0`.
 
 ## Relationship to Phase 103
 
