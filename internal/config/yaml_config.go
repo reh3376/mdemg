@@ -398,6 +398,10 @@ func GenerateIgnoreFile(projectDir string) ([]byte, error) {
 		"*.min.js",
 		"*.bundle.js",
 		"*.map",
+		"",
+		"# Secrets / environment",
+		".env",
+		".env.*",
 	)
 
 	// Seed from .gitignore if it exists
