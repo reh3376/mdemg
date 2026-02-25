@@ -191,6 +191,8 @@ func New(cfg Config) (Embedder, error) {
 		embedder, err = NewOpenAI(cfg)
 	case "ollama":
 		embedder, err = NewOllama(cfg)
+	case "stub":
+		embedder = NewStub()
 	case "", "none":
 		return nil, ErrNoProvider
 	default:

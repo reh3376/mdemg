@@ -93,7 +93,10 @@ jobs:
           export PORT_RANGE_START=10000
           export PORT_RANGE_END=10099
           export PORT_FILE_PATH=.mdemg.port
-          export EMBEDDING_PROVIDER=
+          export EMBEDDING_PROVIDER=stub
+          export BACKUP_ENABLED=true
+          export BACKUP_STORAGE_DIR=/tmp/mdemg-backups
+          mkdir -p /tmp/mdemg-backups
           ./bin/mdemg serve &
 
           # Wait for port file (server writes it after binding)
@@ -120,20 +123,12 @@ jobs:
           mkdir -p /tmp/uats-test-codebase
           echo 'package main' > /tmp/uats-test-codebase/main.go
 
-      - name: Run UATS Contract Tests (Core)
+      - name: Run UATS Contract Tests
         run: |
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --exclude-tag embedding_required,unts,llm_required
-
-      - name: Run UATS Contract Tests (Embedding)
-        continue-on-error: true
-        run: |
-          python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
-            --spec-dir docs/api/api-spec/uats/specs/ \
-            --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --include-tag embedding_required
+            --exclude-tag unts,llm_required
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5
