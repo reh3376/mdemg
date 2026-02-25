@@ -2672,7 +2672,7 @@ ON MATCH SET
 // CreateL5EmergentNodes creates L5 emergent concepts from L4 nodes
 // connected by high-evidence ANALOGOUS_TO or BRIDGES edges.
 // L5 represents meta-patterns spanning multiple L4 domains.
-func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string) (int, error) {
+func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string, namer *EmergenceNamer) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -2786,25 +2786,51 @@ LIMIT 20`
 			continue
 		}
 
-		// Build L5 node name from member names
+		// Collect member names and build ClusterNodeSummary for LLM naming
 		names := make([]string, 0, len(members))
+		clusterNodes := make([]ClusterNodeSummary, 0, len(members))
 		for _, m := range members {
-			if n, ok := nameMap[m]; ok && n != "" {
-				names = append(names, n)
+			if nm, ok := nameMap[m]; ok && nm != "" {
+				names = append(names, nm)
+				clusterNodes = append(clusterNodes, ClusterNodeSummary{
+					NodeID: m,
+					Name:   nm,
+					Layer:  5, // These are L3+ nodes being unified into L5
+				})
 			}
 		}
-		l5Name := "Emergent: " + strings.Join(names, " ∩ ")
-		if len(l5Name) > 200 {
-			l5Name = l5Name[:200]
+
+		// Try LLM naming first; fall back to mechanical name
+		var l5Name, l5Summary, l5Label string
+		if namer != nil {
+			result, err := namer.NameL5Concept(ctx, clusterNodes)
+			if err != nil {
+				fmt.Printf("L5 LLM naming failed (falling back to mechanical): %v\n", err)
+			} else {
+				l5Name = result.Name
+				l5Summary = result.Description
+				l5Label = result.ProposedLabel
+			}
+		}
+
+		// Fallback: mechanical intersection name
+		if l5Name == "" {
+			l5Name = "Emergent: " + strings.Join(names, " ∩ ")
+			if len(l5Name) > 200 {
+				l5Name = l5Name[:200]
+			}
 		}
 
 		// Create L5 node + ABSTRACTS_TO edges from members
 		createCypher := `
-WITH $members AS memberIds, $name AS l5Name, $spaceId AS sid
+WITH $members AS memberIds, $name AS l5Name, $spaceId AS sid,
+     $summary AS l5Summary, $label AS l5Label
 CREATE (l5:MemoryNode:EmergentConcept {
     node_id: randomUUID(),
     space_id: sid,
     name: l5Name,
+    summary: CASE WHEN l5Summary <> '' THEN l5Summary ELSE null END,
+    proposed_label: CASE WHEN l5Label <> '' THEN l5Label ELSE null END,
     layer: 5,
     role_type: 'emergent_concept',
     created_at: datetime(),
@@ -2831,6 +2857,8 @@ RETURN l5.node_id AS l5Id`
 			_, err := tx.Run(ctx, createCypher, map[string]any{
 				"members": members,
 				"name":    l5Name,
+				"summary": l5Summary,
+				"label":   l5Label,
 				"spaceId": spaceID,
 			})
 			return nil, err

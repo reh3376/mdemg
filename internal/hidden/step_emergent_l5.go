@@ -16,7 +16,26 @@ func (s *emergentL5Step) Run(ctx context.Context, spaceID string) (*StepResult, 
 		return &StepResult{NodesCreated: 0}, nil
 	}
 
-	created, err := s.svc.CreateL5EmergentNodes(ctx, spaceID)
+	// Create EmergenceNamer for LLM-driven L5 concept naming.
+	// Uses the same emergence config as Phase 103 dynamic emergence.
+	// If emergence is disabled or namer creation fails, L5 nodes
+	// will fall back to mechanical intersection names.
+	var namer *EmergenceNamer
+	if s.svc.cfg.EmergenceEnabled {
+		namerCfg := EmergenceNamerConfig{
+			Enabled:   s.svc.cfg.EmergenceEnabled,
+			Provider:  s.svc.cfg.EmergenceProvider,
+			Model:     s.svc.cfg.EmergenceModel,
+			MaxTokens: s.svc.cfg.EmergenceMaxTokens,
+			TimeoutMs: s.svc.cfg.EmergenceTimeoutMs,
+			OpenAIKey: s.svc.cfg.OpenAIAPIKey,
+			OpenAIURL: s.svc.cfg.EffectiveLLMEndpoint(),
+			OllamaURL: s.svc.cfg.OllamaEndpoint,
+		}
+		namer = NewEmergenceNamer(namerCfg, s.svc.cbRegistry)
+	}
+
+	created, err := s.svc.CreateL5EmergentNodes(ctx, spaceID, namer)
 	if err != nil {
 		return nil, err
 	}
