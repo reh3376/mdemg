@@ -84,6 +84,9 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	mcpSrv.registerLinearAddCommentTool(s)
 	mcpSrv.registerLinearSearchTool(s)
 
+	// Guardrail tools (Phase 104)
+	mcpSrv.registerValidateChangesTool(s)
+
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
 		return fmt.Errorf("MCP server error: %w", err)
@@ -1281,6 +1284,113 @@ func (m *mcpServer) linearSearchHandler(ctx context.Context, request mcp.CallToo
 		state, _ := fields["state"].(string)
 
 		sb.WriteString(fmt.Sprintf("%d. **%s** — %s [%s]\n", i+1, identifier, title, state))
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+// =============================================================================
+// Guardrail Tools (Phase 104)
+// =============================================================================
+
+// validate_changes - Check proposed code changes against active organizational constraints
+func (m *mcpServer) registerValidateChangesTool(s *server.MCPServer) {
+	tool := mcp.NewTool("validate_changes",
+		mcp.WithDescription(`Validate proposed code changes against active organizational constraints.
+
+Checks the diff against constraint nodes (must, must_not, should, should_not) in the memory graph.
+Returns Pass, Warning, or Block status with specific constraint violations.
+
+Use this before committing changes to ensure compliance with organizational rules and patterns.`),
+		mcp.WithString("diff",
+			mcp.Required(),
+			mcp.Description("The unified diff of proposed changes")),
+		mcp.WithString("files_changed",
+			mcp.Required(),
+			mcp.Description("Comma-separated list of changed file paths")),
+		mcp.WithString("space_id",
+			mcp.Description("Space ID to check constraints against (default: ide-agent)")),
+	)
+
+	s.AddTool(tool, m.validateChangesHandler)
+}
+
+func (m *mcpServer) validateChangesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	diff, _ := args["diff"].(string)
+	if diff == "" {
+		return newToolResultError("diff is required"), nil
+	}
+
+	filesStr, _ := args["files_changed"].(string)
+	if filesStr == "" {
+		return newToolResultError("files_changed is required"), nil
+	}
+
+	spaceID, _ := args["space_id"].(string)
+	if spaceID == "" {
+		spaceID = defaultSpaceID
+	}
+
+	// Parse comma-separated files
+	var files []string
+	for _, f := range strings.Split(filesStr, ",") {
+		f = strings.TrimSpace(f)
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+
+	// Call guardrail validate API
+	body := map[string]any{
+		"space_id":      spaceID,
+		"files_changed": files,
+		"diff":          diff,
+	}
+
+	resp, err := m.callMDEMG("/v1/memory/guardrail/validate", body)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Guardrail validation failed: %v", err)), nil
+	}
+
+	// Format response as markdown
+	data, _ := resp["data"].(map[string]any)
+	if data == nil {
+		return newToolResultError("unexpected response format from guardrail API"), nil
+	}
+
+	status, _ := data["status"].(string)
+	violations, _ := data["violations"].([]any)
+	warnings, _ := data["warnings"].([]any)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("## Guardrail Status: %s\n\n", status))
+
+	if len(violations) > 0 {
+		sb.WriteString("### Violations (Block)\n\n")
+		for i, v := range violations {
+			vMap, _ := v.(map[string]any)
+			desc, _ := vMap["description"].(string)
+			rationale, _ := vMap["rationale"].(string)
+			nodeID, _ := vMap["constraint_node_id"].(string)
+			sb.WriteString(fmt.Sprintf("%d. **%s** (constraint: %s)\n   %s\n\n", i+1, desc, nodeID, rationale))
+		}
+	}
+
+	if len(warnings) > 0 {
+		sb.WriteString("### Warnings\n\n")
+		for i, w := range warnings {
+			wMap, _ := w.(map[string]any)
+			desc, _ := wMap["description"].(string)
+			rationale, _ := wMap["rationale"].(string)
+			nodeID, _ := wMap["constraint_node_id"].(string)
+			sb.WriteString(fmt.Sprintf("%d. **%s** (constraint: %s)\n   %s\n\n", i+1, desc, nodeID, rationale))
+		}
+	}
+
+	if len(violations) == 0 && len(warnings) == 0 {
+		sb.WriteString("No constraint violations or warnings found.\n")
 	}
 
 	return mcp.NewToolResultText(sb.String()), nil

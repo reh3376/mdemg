@@ -21,7 +21,7 @@ This gap analysis evaluates the current implementation against the long-term cog
 | 1 | Shallow SME Synthesis | HIGH | L | 101 |
 | 2 | Query Rigidity (Intent Translation) | HIGH | M | 102 |
 | 3 | Static Hardcoded Abstractions | MEDIUM | M | 103 |
-| 4 | Active Guardrail Enforcement | HIGH | L | 104 |
+| 4 | ~~Active Guardrail Enforcement~~ **(Closed)** | HIGH | L | 104 |
 | 5 | Cross-Space Collective Learning | MEDIUM | XL | 105 |
 
 ---
@@ -134,5 +134,5 @@ The graph currently remains siloed per workspace. Universal, abstract principles
 | **102** | Intent Translation | Implement query rewriting before vector embedding to align conversational queries with declarative node text. |
 | **103** | Dynamic Emergence (**Complete**) | LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters. Pipeline step at phase 22, fail-open per cluster. |
 | **103b** | Emergence Model Evaluation (**Complete**) | `LLM_ENDPOINT` config separation, UETS framework (8 model specs, 7/7 passing), `llama3.2:3b` Q4_K_M validated as default. |
-| **104** | Active MCP Guardrails | Add pre-commit/MCP-level validation against `ConstraintNodes` to proactively block architectural violations. |
+| **104** | Active MCP Guardrails (**Complete**) | `POST /v1/memory/guardrail/validate` endpoint, MCP `validate_changes` tool, 4-step pipeline (diff parse → constraint retrieval → LLM eval → response build), fail-open, dual provider (OpenAI/Ollama). |
 | **105** | Global Meta-Learning | Implement cross-space promotion of Layer 4/5 concepts to a global "Org-Level" graph for true cross-pollination. |

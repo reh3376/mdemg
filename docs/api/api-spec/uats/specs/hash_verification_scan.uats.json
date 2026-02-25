@@ -21,7 +21,8 @@
     "timeout_ms": 10000,
     "tags": [
       "unts"
-    ]
+    ],
+    "sha256": "d674e223282653eb1f331fd3e48374ed65ab4fe99c887753e77f7b132f593e63"
   },
   "request": {
     "method": "POST",

@@ -510,6 +510,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| 104 | Active MCP Guardrails (constraint validation pipeline, MCP tool) | ✅ Complete |
 | 103/103b | Dynamic Emergence + UETS Model Evaluation (LLM concept naming, 8-model benchmark) | ✅ Complete |
 | 102 | Intent Translation (LLM query rewriting before vector embedding) | ✅ Complete |
 | 101 | SME Synthesis Engine (LLM-driven synthesis for consult endpoint) | ✅ Complete |

@@ -1,0 +1,131 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Guardrail Validate",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "guardrail",
+      "validate",
+      "phase104"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-02-24",
+    "description": "Validates proposed code changes against active organizational constraints (Phase 104 Active MCP Guardrails).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "guardrail",
+      "validate",
+      "phase104"
+    ],
+    "sha256": "68974b14bca79b6a1c88ba720d0d4bdc7a96f1962439d5036e54cdeab6b8588e"
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "diff_content": "@@ -15,7 +15,7 @@\n func Login(c *gin.Context) {\n-    token := jwt.New()\n+    token := legacy_auth.GenerateToken()\n }"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/guardrail/validate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "files_changed": [
+        "src/api/auth.go"
+      ],
+      "diff": "{{diff_content}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.status",
+        "regex": "^(Pass|Warning|Block)$"
+      },
+      {
+        "path": "$.data.violations",
+        "type": "array"
+      },
+      {
+        "path": "$.data.warnings",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Returns 400 when space_id is missing from request body.",
+      "request": {
+        "body": {
+          "space_id": "",
+          "files_changed": [
+            "src/api/auth.go"
+          ],
+          "diff": "{{diff_content}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_diff",
+      "description": "Returns 400 when diff is missing from request body.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "files_changed": [
+            "src/api/auth.go"
+          ],
+          "diff": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_files_changed",
+      "description": "Returns 400 when files_changed is missing from request body.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "files_changed": [],
+          "diff": "{{diff_content}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ]
+}
