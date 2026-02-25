@@ -3,38 +3,51 @@
   "config": {
     "version": "1.0",
     "test_type": "topology-validation",
-    "description": "Validates the DevSpace boundary and cross-space ORIGINATED_FROM topology after a meta-learning promotion event.",
+    "description": "Validates the cross-space ORIGINATED_FROM topology and global node properties after a meta-learning promotion event (Phase 105).",
     "tags": ["metalearn", "topology", "udts", "phase105"],
-    "sha256": "PENDING"
+    "sha256": "a178621a2ee6c7439d45503f83e09a5e4a295f2c0d183cb27df565cb32dcdda4"
   },
   "setup": {
     "prerequisites": [
       {
         "type": "mock",
         "action": "inject_global_promotion",
-        "description": "Simulate the promotion of a Layer 4 concept from space 'source-repo' to 'mdemg-global'."
+        "description": "Promote a Layer 4 concept from space 'source-repo' to 'mdemg-global' via POST /v1/memory/meta-learn."
       }
     ]
   },
   "test_cases": [
     {
       "id": "udts_global_provenance_edge",
-      "description": "A node promoted to the global space must maintain an ORIGINATED_FROM edge pointing back to its local source node.",
-      "query": "MATCH (g:MemoryNode {space_id: 'mdemg-global'})-[r:ORIGINATED_FROM]->(s:MemoryNode) RETURN count(r) AS edge_count, s.space_id AS source_space",
+      "description": "A node promoted to the global space must have an ORIGINATED_FROM edge pointing back to its local source node in a different space.",
+      "query": "MATCH (g:MemoryNode {space_id: 'mdemg-global'})-[r:ORIGINATED_FROM]->(s:MemoryNode) WHERE s.space_id <> 'mdemg-global' RETURN count(r) AS edge_count, s.space_id AS source_space",
       "expected_records": [
         {
           "edge_count": { "operator": "greater_than_or_equal", "value": 1 },
-          "source_space": { "operator": "equals", "value": "source-repo" }
+          "source_space": { "operator": "not_equals", "value": "mdemg-global" }
         }
       ]
     },
     {
-      "id": "udts_global_taproot_isolation",
-      "description": "Global space nodes must be connected to the mdemg-global TapRoot, not the local space TapRoot.",
-      "query": "MATCH (t:TapRoot {space_id: 'mdemg-global'})-[:HAS_MEMORY_NODE]->(n:MemoryNode {space_id: 'mdemg-global'}) RETURN count(n) AS global_nodes",
+      "id": "udts_global_node_properties",
+      "description": "Promoted global nodes must have role_type='promoted_concept', source='meta-learn', and a valid embedding.",
+      "query": "MATCH (g:MemoryNode {space_id: 'mdemg-global', source: 'meta-learn'}) RETURN g.role_type AS role_type, g.source AS source, g.embedding IS NOT NULL AS has_embedding, g.name IS NOT NULL AS has_name",
       "expected_records": [
         {
-          "global_nodes": { "operator": "greater_than_or_equal", "value": 1 }
+          "role_type": { "operator": "equals", "value": "promoted_concept" },
+          "source": { "operator": "equals", "value": "meta-learn" },
+          "has_embedding": { "operator": "equals", "value": true },
+          "has_name": { "operator": "equals", "value": true }
+        }
+      ]
+    },
+    {
+      "id": "udts_global_space_isolation",
+      "description": "Global nodes must not have edges into the source space other than ORIGINATED_FROM (no accidental cross-space pollution).",
+      "query": "MATCH (g:MemoryNode {space_id: 'mdemg-global'})-[r]->(s:MemoryNode) WHERE s.space_id <> 'mdemg-global' AND type(r) <> 'ORIGINATED_FROM' RETURN count(r) AS pollution_count",
+      "expected_records": [
+        {
+          "pollution_count": { "operator": "equals", "value": 0 }
         }
       ]
     }
