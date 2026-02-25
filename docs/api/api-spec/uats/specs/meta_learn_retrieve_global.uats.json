@@ -1,0 +1,62 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Retrieve with Global Space",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "retrieve",
+      "meta-learn",
+      "phase105",
+      "embedding_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-02-25",
+    "description": "Tests the include_global_space flag on the retrieve endpoint (Phase 105 Global Meta-Learning).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "retrieve",
+      "meta-learn",
+      "phase105",
+      "embedding_required"
+    ],
+    "sha256": "2c112631536f3d621b8daa918bae7b4a21b06b6073c6798d41bdbe3dfe4a7864"
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "query_text": "architectural patterns"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/retrieve",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "query_text": "{{query_text}}",
+      "include_global_space": true,
+      "top_k": 5
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.results",
+        "type": "array"
+      },
+      {
+        "path": "$.space_id",
+        "equals": "{{space_id}}"
+      }
+    ]
+  }
+}

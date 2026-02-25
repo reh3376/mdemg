@@ -28,6 +28,9 @@ type RetrieveRequest struct {
 	// Intent Translation (Phase 102)
 	TranslateIntent bool `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding
 
+	// Global Meta-Learning (Phase 105)
+	IncludeGlobalSpace bool `json:"include_global_space,omitempty"` // Include mdemg-global space in retrieval results
+
 	// Pagination fields (Phase 48.3)
 	Cursor string `json:"cursor,omitempty"` // Node ID to start after for cursor pagination
 	Limit  int    `json:"limit,omitempty"`  // Max results per page (default: 50, max: 500)
@@ -1054,4 +1057,32 @@ type BackupSummary struct {
 	CreatedAt string   `json:"created_at"`
 	SizeBytes int64    `json:"size_bytes"`
 	Spaces    []string `json:"spaces,omitempty"`
+}
+
+// =============================================================================
+// PHASE 105: GLOBAL META-LEARNING (Cross-Space Collective Learning)
+// =============================================================================
+
+// MetaLearnRequest — POST /v1/memory/meta-learn
+// Triggers promotion of high-value concepts from a source space to the global space.
+type MetaLearnRequest struct {
+	SourceSpaceID  string `json:"source_space_id" validate:"required,min=1,max=256"`
+	MinLayer       int    `json:"min_layer,omitempty"`
+	MinUpdateCount int    `json:"min_update_count,omitempty"`
+}
+
+// PromotedConcept — a single concept promoted to the global space
+type PromotedConcept struct {
+	ID            string `json:"id"`
+	OriginalID    string `json:"original_id"`
+	Name          string `json:"name"`
+	GlobalSpaceID string `json:"global_space_id"`
+}
+
+// MetaLearnResponse — response from meta-learn endpoint
+type MetaLearnResponse struct {
+	Status            string            `json:"status"`
+	ConceptsEvaluated int               `json:"concepts_evaluated"`
+	ConceptsPromoted  int               `json:"concepts_promoted"`
+	PromotedNodes     []PromotedConcept `json:"promoted_nodes"`
 }

@@ -1,0 +1,110 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Meta-Learn Promote",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "meta-learn",
+      "phase105",
+      "llm_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-02-25",
+    "description": "Promotes high-value L4/L5 concepts from a source space to the global mdemg-global space (Phase 105 Global Meta-Learning).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "tags": [
+      "meta-learn",
+      "phase105",
+      "llm_required"
+    ],
+    "sha256": "733c5d8a6d4bccdeda653a7150c0089375a5699f41f5b6f822c20d65a2d03c8c"
+  },
+  "variables": {
+    "source_space_id": "uats-test-space"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/meta-learn",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "source_space_id": "{{source_space_id}}",
+      "min_layer": 4,
+      "min_update_count": 5
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.status",
+        "equals": "ok"
+      },
+      {
+        "path": "$.data.concepts_evaluated",
+        "type": "number"
+      },
+      {
+        "path": "$.data.concepts_promoted",
+        "type": "number"
+      },
+      {
+        "path": "$.data.promoted_nodes",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_source_space_id",
+      "description": "Returns 400 when source_space_id is missing from request body.",
+      "request": {
+        "body": {
+          "source_space_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_space_no_candidates",
+      "description": "Returns 200 with 0 concepts when source space has no L4+ nodes.",
+      "request": {
+        "body": {
+          "source_space_id": "uats-empty-space",
+          "min_layer": 4,
+          "min_update_count": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.concepts_evaluated",
+            "equals": 0
+          },
+          {
+            "path": "$.data.concepts_promoted",
+            "equals": 0
+          }
+        ]
+      }
+    }
+  ]
+}

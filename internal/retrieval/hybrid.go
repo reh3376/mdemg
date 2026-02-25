@@ -32,7 +32,7 @@ type BM25Result struct {
 
 // BM25Search performs full-text search using Neo4j's Lucene-based fulltext index.
 // This complements vector search by finding exact keyword matches.
-func (s *Service) BM25Search(ctx context.Context, spaceID, query string, topK int, filter FileFilter) ([]BM25Result, error) {
+func (s *Service) BM25Search(ctx context.Context, spaceIDs []string, query string, topK int, filter FileFilter) ([]BM25Result, error) {
 	if !s.cfg.HybridRetrievalEnabled {
 		return nil, nil
 	}
@@ -44,9 +44,9 @@ func (s *Service) BM25Search(ctx context.Context, spaceID, query string, topK in
 	escapedQuery := escapeLuceneQuery(query)
 
 	params := map[string]any{
-		"spaceId": spaceID,
-		"query":   escapedQuery,
-		"topK":    topK,
+		"spaceIds": spaceIDs,
+		"query":    escapedQuery,
+		"topK":     topK,
 	}
 
 	// Add filter parameters if specified
@@ -66,7 +66,7 @@ func (s *Service) BM25Search(ctx context.Context, spaceID, query string, topK in
 		cypher := `
 CALL db.index.fulltext.queryNodes("memNodeFullText", $query)
 YIELD node, score
-WHERE node.space_id = $spaceId
+WHERE node.space_id IN $spaceIds
   AND NOT coalesce(node.is_archived, false)` + filterClause + `
 RETURN node.node_id AS node_id,
        node.path AS path,

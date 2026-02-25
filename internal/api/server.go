@@ -29,6 +29,7 @@ import (
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
 	"mdemg/internal/hidden"
+	"mdemg/internal/metalearn"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
 	"mdemg/internal/metrics"
@@ -113,6 +114,9 @@ type Server struct {
 
 	// Phase 104: Active MCP Guardrails
 	guardrailValidator guardrail.Validator
+
+	// Phase 105: Global Meta-Learning
+	metaLearnSvc *metalearn.Service
 
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
@@ -365,6 +369,24 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			cfg.GuardrailProvider, cfg.GuardrailModel, cfg.GuardrailMaxConstraints)
 	}
 
+	// Phase 105: Initialize Global Meta-Learning service
+	var metaLearnSvc *metalearn.Service
+	if cfg.MetaLearnEnabled && emb != nil {
+		genCfg := metalearn.GeneralizerConfig{
+			Enabled:   true,
+			Provider:  cfg.MetaLearnProvider,
+			Model:     cfg.MetaLearnModel,
+			MaxTokens: cfg.MetaLearnMaxTokens,
+			TimeoutMs: cfg.MetaLearnTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
+			OllamaURL: cfg.OllamaEndpoint,
+		}
+		metaLearnSvc = metalearn.NewService(driver, emb, genCfg, cbRegistry, cfg.MetaLearnGlobalSpaceID)
+		log.Printf("Global Meta-Learning enabled (provider: %s, model: %s, globalSpace: %s)",
+			cfg.MetaLearnProvider, cfg.MetaLearnModel, cfg.MetaLearnGlobalSpaceID)
+	}
+
 	// Initialize consulting service (Agent Consulting API)
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
 	log.Printf("Consulting service initialized")
@@ -582,6 +604,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupScheduler:         backupSched,
 		intentTranslator:        intentTrans,
 		guardrailValidator:      guardrailVal,
+		metaLearnSvc:            metaLearnSvc,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,
 		untsScanner:             untsScan,
@@ -1243,6 +1266,9 @@ func (s *Server) Routes() http.Handler {
 
 	// Active MCP Guardrails (Phase 104)
 	mux.HandleFunc("/v1/memory/guardrail/validate", s.handleGuardrailValidate)
+
+	// Global Meta-Learning (Phase 105)
+	mux.HandleFunc("/v1/memory/meta-learn", s.handleMetaLearn)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)
