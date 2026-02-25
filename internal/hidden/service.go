@@ -33,6 +33,52 @@ func (s *Service) SetCircuitBreakerRegistry(reg *circuitbreaker.Registry) {
 	s.cbRegistry = reg
 }
 
+// newEmergenceNamer constructs an EmergenceNamer from the service config.
+// Returns nil when emergence is disabled or cbRegistry is nil — callers handle nil gracefully.
+func (s *Service) newEmergenceNamer() *EmergenceNamer {
+	if !s.cfg.EmergenceEnabled {
+		return nil
+	}
+	return NewEmergenceNamer(EmergenceNamerConfig{
+		Enabled:   s.cfg.EmergenceEnabled,
+		Provider:  s.cfg.EmergenceProvider,
+		Model:     s.cfg.EmergenceModel,
+		MaxTokens: s.cfg.EmergenceMaxTokens,
+		TimeoutMs: s.cfg.EmergenceTimeoutMs,
+		OpenAIKey: s.cfg.OpenAIAPIKey,
+		OpenAIURL: s.cfg.EffectiveLLMEndpoint(),
+		OllamaURL: s.cfg.OllamaEndpoint,
+	}, s.cbRegistry)
+}
+
+// baseNodesToClusterSummaries converts BaseNode slice to ClusterNodeSummary for LLM naming.
+// BaseNode.Path holds the node name (per fetchOrphanLayerNodesWithName).
+func baseNodesToClusterSummaries(members []BaseNode) []ClusterNodeSummary {
+	summaries := make([]ClusterNodeSummary, len(members))
+	for i, m := range members {
+		summaries[i] = ClusterNodeSummary{
+			NodeID: m.NodeID,
+			Name:   m.Path, // Path field stores name for layer 1+ nodes
+			Path:   m.Path,
+		}
+	}
+	return summaries
+}
+
+// emergentConceptNodesToClusterSummaries converts EmergentConceptNode slice to ClusterNodeSummary.
+func emergentConceptNodesToClusterSummaries(members []EmergentConceptNode) []ClusterNodeSummary {
+	summaries := make([]ClusterNodeSummary, len(members))
+	for i, m := range members {
+		summaries[i] = ClusterNodeSummary{
+			NodeID:  m.NodeID,
+			Name:    m.Name,
+			Summary: m.Summary,
+			Layer:   m.Layer,
+		}
+	}
+	return summaries
+}
+
 // buildPipeline registers all node-creation steps in phase order.
 func (s *Service) buildPipeline() *Pipeline {
 	p := NewPipeline()
@@ -586,10 +632,20 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 				}
 			}
 
-			// Name based on most common name prefix pattern
+			// Name based on most common name prefix pattern (mechanical fallback)
 			uniqueID := existingCount + clusterID
 			inferredName := inferConceptName(members)
 			name := fmt.Sprintf("Concept-L%d-%s-%d", targetLayer, inferredName, uniqueID)
+			if targetLayer == 5 {
+				if namer := s.newEmergenceNamer(); namer != nil {
+					clusterNodes := baseNodesToClusterSummaries(members)
+					if result, llmErr := namer.NameL5Concept(ctx, clusterNodes); llmErr != nil {
+						fmt.Printf("L5 concept LLM naming failed (using mechanical): %v\n", llmErr)
+					} else {
+						name = result.Name
+					}
+				}
+			}
 			err := s.createConceptNodeWithEdges(ctx, spaceID, name, centroid, members, targetLayer)
 			if err != nil {
 				return created, merged, fmt.Errorf("create concept node %s: %w", name, err)
@@ -640,6 +696,16 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 
 				uniqueID := existingCount + clusterID
 				name := fmt.Sprintf("Concept-L%d-%s-%d", targetLayer, sanitizePathPrefix(namePrefix), uniqueID)
+				if targetLayer == 5 {
+					if namer := s.newEmergenceNamer(); namer != nil {
+						clusterNodes := baseNodesToClusterSummaries(subMembers)
+						if result, llmErr := namer.NameL5Concept(ctx, clusterNodes); llmErr != nil {
+							fmt.Printf("L5 concept LLM naming failed (using mechanical): %v\n", llmErr)
+						} else {
+							name = result.Name
+						}
+					}
+				}
 				err := s.createConceptNodeWithEdges(ctx, spaceID, name, centroid, subMembers, targetLayer)
 				if err != nil {
 					return created, merged, fmt.Errorf("create concept node %s: %w", name, err)
@@ -3059,17 +3125,22 @@ LIMIT 200`
 			}
 		}
 
-		// Call LLM for naming
-		result, err := namer.Name(ctx, nodes)
+		// Create EmergentConcept node at layer = max(member.layer) + 1
+		targetLayer := maxLayer + 1
+
+		// Call LLM for naming — use L5-specific meta-concept prompt for top-layer nodes
+		var result *EmergenceNamingResult
+		if targetLayer >= 5 {
+			result, err = namer.NameL5Concept(ctx, nodes)
+		} else {
+			result, err = namer.Name(ctx, nodes)
+		}
 		if err != nil {
 			// Fail-open: skip this cluster, continue with next
 			fmt.Printf("warning: emergence namer failed for cluster (root=%s, %d members): %v\n",
 				rc.root, len(rc.members), err)
 			continue
 		}
-
-		// Create EmergentConcept node at layer = max(member.layer) + 1
-		targetLayer := maxLayer + 1
 		memberIDs := rc.members
 
 		createCypher := `
@@ -4394,9 +4465,19 @@ func (s *Service) ClusterEmergentConcepts(ctx context.Context, spaceID string, t
 		// Calculate aggregate metadata
 		avgSurprise, sessionCount := calculateEmergentConceptMetadata(members)
 
-		// Create unique name
+		// Create unique name (mechanical fallback)
 		uniqueID := existingCount + conceptID
 		name := fmt.Sprintf("EmergentConcept-L%d-%s-%d", targetLayer, sanitizeConceptName(summary), uniqueID)
+		if targetLayer == 5 {
+			if namer := s.newEmergenceNamer(); namer != nil {
+				clusterNodes := emergentConceptNodesToClusterSummaries(members)
+				if llmResult, llmErr := namer.NameL5Concept(ctx, clusterNodes); llmErr != nil {
+					fmt.Printf("L5 emergent concept LLM naming failed (using mechanical): %v\n", llmErr)
+				} else {
+					name = llmResult.Name
+				}
+			}
+		}
 
 		// Create the emergent concept node and ABSTRACTS_TO edges
 		edgesCreated, err := s.createEmergentConceptWithEdges(ctx, spaceID, name, summary, centroid, members, keywords, avgSurprise, sessionCount, targetLayer)
