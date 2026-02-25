@@ -20,9 +20,9 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "a32913c22b1f6745bb2fbfe435fffd3867582918f352cce3e0272ca2933bdd3a",
+    "sha256": "79b6935715162b51a64722cbad95dc2efcb9ef97ed633ed39835921dfa40958b",
     "tags": [
-      "embedding_required"
+      "backup_required"
     ]
   },
   "variables": {},
