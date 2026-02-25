@@ -79,8 +79,38 @@ Your task: Name the emergent concept they collectively represent.
 
 {"name": "<concept>", "description": "<why>", "proposed_label": "<label>"}`
 
+const l5EmergenceSystemPrompt = `You are an AI concept discovery engine analyzing the highest layer of a knowledge graph.
+
+You have found a cluster of ABSTRACT CONCEPTS (not raw code nodes) that are
+structurally connected via analogous, bridging, or compositional relationships.
+These are already higher-level abstractions — your job is to name the META-CONCEPT
+that unifies them into a single coherent idea.
+
+Think like a human synthesizing understanding: not "memory A intersected with memory B"
+but "the underlying principle that connects them."
+
+## Rules
+- Name MUST be concise (3-6 words), abstract, and meaningful
+- Name should capture the ESSENCE, not list the components
+- Description MUST explain the unifying principle (1-2 sentences)
+- proposed_label MUST be one of: "pattern", "principle", "bridge", "concern", "workflow"
+- Output ONLY valid JSON — no markdown, no preamble
+
+{"name": "<concept>", "description": "<why>", "proposed_label": "<label>"}`
+
 // Name sends cluster members to the LLM and returns a naming result.
 func (n *EmergenceNamer) Name(ctx context.Context, nodes []ClusterNodeSummary) (*EmergenceNamingResult, error) {
+	return n.nameWithPrompt(ctx, emergenceSystemPrompt, nodes)
+}
+
+// NameL5Concept names a meta-concept from higher-level abstract nodes (L3+).
+// Uses a system prompt tailored for synthesizing meaning from already-abstract concepts.
+func (n *EmergenceNamer) NameL5Concept(ctx context.Context, nodes []ClusterNodeSummary) (*EmergenceNamingResult, error) {
+	return n.nameWithPrompt(ctx, l5EmergenceSystemPrompt, nodes)
+}
+
+// nameWithPrompt is the shared implementation for Name and NameL5Concept.
+func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, nodes []ClusterNodeSummary) (*EmergenceNamingResult, error) {
 	if !n.cfg.Enabled {
 		return nil, fmt.Errorf("emergence namer is disabled")
 	}
@@ -109,9 +139,9 @@ func (n *EmergenceNamer) Name(ctx context.Context, nodes []ClusterNodeSummary) (
 
 	switch n.cfg.Provider {
 	case "ollama":
-		raw, err = n.nameWithOllama(timeoutCtx, userPrompt)
+		raw, err = n.nameWithOllama(timeoutCtx, sysPrompt, userPrompt)
 	default: // "openai" or unset
-		raw, err = n.nameWithOpenAI(timeoutCtx, userPrompt)
+		raw, err = n.nameWithOpenAI(timeoutCtx, sysPrompt, userPrompt)
 	}
 
 	if err != nil {
@@ -161,13 +191,13 @@ type emergenceOpenAIChatResponse struct {
 	} `json:"choices"`
 }
 
-func (n *EmergenceNamer) nameWithOpenAI(ctx context.Context, userPrompt string) (string, error) {
+func (n *EmergenceNamer) nameWithOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
 	if n.cbRegistry != nil {
 		cb := n.cbRegistry.Get("openai-emergence")
 		var result string
 		err := cb.Execute(ctx, func(ctx context.Context) error {
 			var innerErr error
-			result, innerErr = n.doNameWithOpenAI(ctx, userPrompt)
+			result, innerErr = n.doNameWithOpenAI(ctx, sysPrompt, userPrompt)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -175,10 +205,10 @@ func (n *EmergenceNamer) nameWithOpenAI(ctx context.Context, userPrompt string) 
 		}
 		return result, err
 	}
-	return n.doNameWithOpenAI(ctx, userPrompt)
+	return n.doNameWithOpenAI(ctx, sysPrompt, userPrompt)
 }
 
-func (n *EmergenceNamer) doNameWithOpenAI(ctx context.Context, userPrompt string) (string, error) {
+func (n *EmergenceNamer) doNameWithOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
 	maxTokens := n.cfg.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = 500
@@ -187,7 +217,7 @@ func (n *EmergenceNamer) doNameWithOpenAI(ctx context.Context, userPrompt string
 	reqBody := emergenceOpenAIChatRequest{
 		Model: n.cfg.Model,
 		Messages: []emergenceOpenAIMessage{
-			{Role: "system", Content: emergenceSystemPrompt},
+			{Role: "system", Content: sysPrompt},
 			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.3,
@@ -245,13 +275,13 @@ type emergenceOllamaGenerateResponse struct {
 	Response string `json:"response"`
 }
 
-func (n *EmergenceNamer) nameWithOllama(ctx context.Context, userPrompt string) (string, error) {
+func (n *EmergenceNamer) nameWithOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
 	if n.cbRegistry != nil {
 		cb := n.cbRegistry.Get("ollama-emergence")
 		var result string
 		err := cb.Execute(ctx, func(ctx context.Context) error {
 			var innerErr error
-			result, innerErr = n.doNameWithOllama(ctx, userPrompt)
+			result, innerErr = n.doNameWithOllama(ctx, sysPrompt, userPrompt)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -259,7 +289,7 @@ func (n *EmergenceNamer) nameWithOllama(ctx context.Context, userPrompt string) 
 		}
 		return result, err
 	}
-	return n.doNameWithOllama(ctx, userPrompt)
+	return n.doNameWithOllama(ctx, sysPrompt, userPrompt)
 }
 
 // ollamaEmergenceSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
@@ -273,8 +303,8 @@ var ollamaEmergenceSchema = json.RawMessage(`{
 	"required": ["name", "description", "proposed_label"]
 }`)
 
-func (n *EmergenceNamer) doNameWithOllama(ctx context.Context, userPrompt string) (string, error) {
-	prompt := emergenceSystemPrompt + "\n\n" + userPrompt
+func (n *EmergenceNamer) doNameWithOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
+	prompt := sysPrompt + "\n\n" + userPrompt
 
 	reqBody := emergenceOllamaGenerateRequest{
 		Model:   n.cfg.Model,
@@ -321,12 +351,10 @@ func (n *EmergenceNamer) doNameWithOllama(ctx context.Context, userPrompt string
 // stripCodeFence removes markdown code fences that LLMs sometimes wrap around JSON.
 func stripCodeFence(s string) string {
 	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "```json") {
-		s = strings.TrimPrefix(s, "```json")
-		s = strings.TrimSuffix(s, "```")
-	} else if strings.HasPrefix(s, "```") {
-		s = strings.TrimPrefix(s, "```")
-		s = strings.TrimSuffix(s, "```")
+	if after, ok := strings.CutPrefix(s, "```json"); ok {
+		s = strings.TrimSuffix(after, "```")
+	} else if after, ok := strings.CutPrefix(s, "```"); ok {
+		s = strings.TrimSuffix(after, "```")
 	}
 	return strings.TrimSpace(s)
 }

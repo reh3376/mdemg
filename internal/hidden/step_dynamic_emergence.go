@@ -15,17 +15,7 @@ func (s *dynamicEmergenceStep) Run(ctx context.Context, spaceID string) (*StepRe
 		return &StepResult{NodesCreated: 0}, nil
 	}
 
-	namerCfg := EmergenceNamerConfig{
-		Enabled:   s.svc.cfg.EmergenceEnabled,
-		Provider:  s.svc.cfg.EmergenceProvider,
-		Model:     s.svc.cfg.EmergenceModel,
-		MaxTokens: s.svc.cfg.EmergenceMaxTokens,
-		TimeoutMs: s.svc.cfg.EmergenceTimeoutMs,
-		OpenAIKey: s.svc.cfg.OpenAIAPIKey,
-		OpenAIURL: s.svc.cfg.EffectiveLLMEndpoint(),
-		OllamaURL: s.svc.cfg.OllamaEndpoint,
-	}
-	namer := NewEmergenceNamer(namerCfg, s.svc.cbRegistry)
+	namer := s.svc.newEmergenceNamer()
 
 	created, err := s.svc.CreateDynamicEmergentNodes(ctx, spaceID, namer)
 	if err != nil {

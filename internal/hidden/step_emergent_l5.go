@@ -16,7 +16,11 @@ func (s *emergentL5Step) Run(ctx context.Context, spaceID string) (*StepResult, 
 		return &StepResult{NodesCreated: 0}, nil
 	}
 
-	created, err := s.svc.CreateL5EmergentNodes(ctx, spaceID)
+	// Create EmergenceNamer for LLM-driven L5 concept naming.
+	// If emergence is disabled, namer is nil and L5 nodes fall back to mechanical names.
+	namer := s.svc.newEmergenceNamer()
+
+	created, err := s.svc.CreateL5EmergentNodes(ctx, spaceID, namer)
 	if err != nil {
 		return nil, err
 	}

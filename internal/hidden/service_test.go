@@ -2,6 +2,8 @@ package hidden
 
 import (
 	"testing"
+
+	"mdemg/internal/config"
 )
 
 func TestAsString(t *testing.T) {
@@ -236,5 +238,99 @@ func TestEdgeStruct(t *testing.T) {
 	}
 	if edge.Weight != 0.85 {
 		t.Errorf("Edge.Weight = %f, want 0.85", edge.Weight)
+	}
+}
+
+func TestNewEmergenceNamer_DisabledReturnsNil(t *testing.T) {
+	s := &Service{cfg: config.Config{EmergenceEnabled: false}}
+	namer := s.newEmergenceNamer()
+	if namer != nil {
+		t.Error("expected nil namer when emergence is disabled")
+	}
+}
+
+func TestNewEmergenceNamer_EnabledReturnsNamer(t *testing.T) {
+	s := &Service{cfg: config.Config{
+		EmergenceEnabled:   true,
+		EmergenceProvider:  "ollama",
+		EmergenceModel:     "llama3.2",
+		EmergenceMaxTokens: 500,
+		EmergenceTimeoutMs: 10000,
+	}}
+	namer := s.newEmergenceNamer()
+	if namer == nil {
+		t.Fatal("expected non-nil namer when emergence is enabled")
+	}
+	if !namer.cfg.Enabled {
+		t.Error("namer.cfg.Enabled should be true")
+	}
+	if namer.cfg.Provider != "ollama" {
+		t.Errorf("namer.cfg.Provider = %q, want %q", namer.cfg.Provider, "ollama")
+	}
+	if namer.cfg.Model != "llama3.2" {
+		t.Errorf("namer.cfg.Model = %q, want %q", namer.cfg.Model, "llama3.2")
+	}
+}
+
+func TestBaseNodesToClusterSummaries(t *testing.T) {
+	members := []BaseNode{
+		{NodeID: "n1", SpaceID: "sp", Path: "Hidden-auth-1"},
+		{NodeID: "n2", SpaceID: "sp", Path: "Hidden-config-2"},
+	}
+	summaries := baseNodesToClusterSummaries(members)
+	if len(summaries) != 2 {
+		t.Fatalf("expected 2 summaries, got %d", len(summaries))
+	}
+	if summaries[0].NodeID != "n1" {
+		t.Errorf("summaries[0].NodeID = %q, want %q", summaries[0].NodeID, "n1")
+	}
+	if summaries[0].Name != "Hidden-auth-1" {
+		t.Errorf("summaries[0].Name = %q, want %q", summaries[0].Name, "Hidden-auth-1")
+	}
+	if summaries[0].Path != "Hidden-auth-1" {
+		t.Errorf("summaries[0].Path = %q, want %q", summaries[0].Path, "Hidden-auth-1")
+	}
+	if summaries[1].Name != "Hidden-config-2" {
+		t.Errorf("summaries[1].Name = %q, want %q", summaries[1].Name, "Hidden-config-2")
+	}
+}
+
+func TestBaseNodesToClusterSummaries_Empty(t *testing.T) {
+	summaries := baseNodesToClusterSummaries(nil)
+	if len(summaries) != 0 {
+		t.Errorf("expected 0 summaries for nil input, got %d", len(summaries))
+	}
+}
+
+func TestEmergentConceptNodesToClusterSummaries(t *testing.T) {
+	members := []EmergentConceptNode{
+		{NodeID: "ec1", Name: "Auth Pattern", Summary: "Authentication workflows", Layer: 3},
+		{NodeID: "ec2", Name: "Config Pattern", Summary: "Configuration management", Layer: 4},
+	}
+	summaries := emergentConceptNodesToClusterSummaries(members)
+	if len(summaries) != 2 {
+		t.Fatalf("expected 2 summaries, got %d", len(summaries))
+	}
+	if summaries[0].NodeID != "ec1" {
+		t.Errorf("summaries[0].NodeID = %q, want %q", summaries[0].NodeID, "ec1")
+	}
+	if summaries[0].Name != "Auth Pattern" {
+		t.Errorf("summaries[0].Name = %q, want %q", summaries[0].Name, "Auth Pattern")
+	}
+	if summaries[0].Summary != "Authentication workflows" {
+		t.Errorf("summaries[0].Summary = %q, want %q", summaries[0].Summary, "Authentication workflows")
+	}
+	if summaries[0].Layer != 3 {
+		t.Errorf("summaries[0].Layer = %d, want %d", summaries[0].Layer, 3)
+	}
+	if summaries[1].Layer != 4 {
+		t.Errorf("summaries[1].Layer = %d, want %d", summaries[1].Layer, 4)
+	}
+}
+
+func TestEmergentConceptNodesToClusterSummaries_Empty(t *testing.T) {
+	summaries := emergentConceptNodesToClusterSummaries(nil)
+	if len(summaries) != 0 {
+		t.Errorf("expected 0 summaries for nil input, got %d", len(summaries))
 	}
 }

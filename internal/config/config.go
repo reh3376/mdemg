@@ -194,6 +194,14 @@ type Config struct {
 	EmergenceMinClusterSize int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
 	EmergenceMaxClusters    int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
 
+	// Active MCP Guardrails settings (Phase 104)
+	GuardrailEnabled        bool   // GUARDRAIL_ENABLED — enable guardrail validation (default: false)
+	GuardrailProvider       string // GUARDRAIL_PROVIDER — LLM provider for evaluation (openai/ollama, default: openai)
+	GuardrailModel          string // GUARDRAIL_MODEL — model for evaluation (default: gpt-4o-mini)
+	GuardrailMaxTokens      int    // GUARDRAIL_MAX_TOKENS — max tokens for evaluation response (default: 1000, range 100-4000)
+	GuardrailTimeoutMs      int    // GUARDRAIL_TIMEOUT_MS — timeout for evaluation in ms (default: 5000, min 1000)
+	GuardrailMaxConstraints int    // GUARDRAIL_MAX_CONSTRAINTS — max constraints per evaluation (default: 10, range 1-50)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1271,6 +1279,32 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("EMERGENCE_MAX_CLUSTERS must be >= 1")
 	}
 
+	// Active MCP Guardrails settings (Phase 104)
+	guardrailEnabled := getBool("GUARDRAIL_ENABLED", false)
+	guardrailProvider := get("GUARDRAIL_PROVIDER", "openai")
+	guardrailModel := get("GUARDRAIL_MODEL", "gpt-4o-mini")
+	guardrailMaxTokens, err := atoi("GUARDRAIL_MAX_TOKENS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if guardrailMaxTokens < 100 || guardrailMaxTokens > 4000 {
+		return Config{}, errors.New("GUARDRAIL_MAX_TOKENS must be in range [100, 4000]")
+	}
+	guardrailTimeoutMs, err := atoi("GUARDRAIL_TIMEOUT_MS", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if guardrailTimeoutMs < 1000 {
+		return Config{}, errors.New("GUARDRAIL_TIMEOUT_MS must be >= 1000")
+	}
+	guardrailMaxConstraints, err := atoi("GUARDRAIL_MAX_CONSTRAINTS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if guardrailMaxConstraints < 1 || guardrailMaxConstraints > 50 {
+		return Config{}, errors.New("GUARDRAIL_MAX_CONSTRAINTS must be in range [1, 50]")
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -1963,6 +1997,14 @@ func FromEnv() (Config, error) {
 		EmergenceMinWeight:      emergenceMinWeight,
 		EmergenceMinClusterSize: emergenceMinClusterSize,
 		EmergenceMaxClusters:    emergenceMaxClusters,
+
+		// Phase 104: Active MCP Guardrails
+		GuardrailEnabled:        guardrailEnabled,
+		GuardrailProvider:       guardrailProvider,
+		GuardrailModel:          guardrailModel,
+		GuardrailMaxTokens:      guardrailMaxTokens,
+		GuardrailTimeoutMs:      guardrailTimeoutMs,
+		GuardrailMaxConstraints: guardrailMaxConstraints,
 
 		GapLowScoreThreshold:      gapLowScoreThreshold,
 		GapMinOccurrences:         gapMinOccurrences,

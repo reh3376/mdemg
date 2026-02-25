@@ -27,6 +27,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
+	"mdemg/internal/guardrail"
 	"mdemg/internal/hidden"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
@@ -109,6 +110,9 @@ type Server struct {
 
 	// Phase 102: Intent Translation
 	intentTranslator retrieval.IntentTranslator
+
+	// Phase 104: Active MCP Guardrails
+	guardrailValidator guardrail.Validator
 
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
@@ -342,6 +346,25 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			cfg.IntentProvider, cfg.IntentModel, cfg.IntentTimeoutMs)
 	}
 
+	// Phase 104: Initialize Guardrail Validator
+	var guardrailVal guardrail.Validator
+	if cfg.GuardrailEnabled {
+		guardrailCfg := guardrail.GuardrailConfig{
+			Enabled:        true,
+			Provider:       cfg.GuardrailProvider,
+			Model:          cfg.GuardrailModel,
+			MaxTokens:      cfg.GuardrailMaxTokens,
+			TimeoutMs:      cfg.GuardrailTimeoutMs,
+			OpenAIKey:      cfg.OpenAIAPIKey,
+			OpenAIURL:      cfg.EffectiveLLMEndpoint(),
+			OllamaURL:      cfg.OllamaEndpoint,
+			MaxConstraints: cfg.GuardrailMaxConstraints,
+		}
+		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
+		log.Printf("Active MCP Guardrails enabled (provider: %s, model: %s, maxConstraints: %d)",
+			cfg.GuardrailProvider, cfg.GuardrailModel, cfg.GuardrailMaxConstraints)
+	}
+
 	// Initialize consulting service (Agent Consulting API)
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
 	log.Printf("Consulting service initialized")
@@ -558,6 +581,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
 		intentTranslator:        intentTrans,
+		guardrailValidator:      guardrailVal,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,
 		untsScanner:             untsScan,
@@ -1216,6 +1240,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversation/graduate", s.handleProcessGraduations)
 	mux.HandleFunc("/v1/conversation/session/health", s.handleSessionHealth)
 	mux.HandleFunc("/v1/conversation/session/anomalies", s.handleSessionAnomalies)
+
+	// Active MCP Guardrails (Phase 104)
+	mux.HandleFunc("/v1/memory/guardrail/validate", s.handleGuardrailValidate)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)

@@ -12,13 +12,18 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Consolidation](#consolidation)
 - [Learning System](#learning-system)
 - [Conversation Memory](#conversation-memory)
+- [Constraints (Phase 45.5)](#constraints-phase-455)
+- [Active Guardrails (Phase 104)](#active-guardrails-phase-104)
 - [Skill Registry](#skill-registry-phase-48)
 - [Capability Gaps](#capability-gaps)
 - [Linear Integration](#linear-integration)
+- [Web Scraper](#web-scraper)
 - [Webhooks](#webhooks)
+- [Symbol Relationships](#symbol-relationships)
 - [Plugins & Modules](#plugins--modules)
 - [Cleanup & Orphan Management](#cleanup--orphan-management)
 - [File Watcher](#file-watcher-phase-94)
+- [Job Streaming (SSE)](#job-streaming-sse)
 - [System & Monitoring](#system--monitoring)
 - [Backup & Restore](#backup--restore-phase-70)
 - [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
@@ -52,6 +57,32 @@ Readiness check (verifies Neo4j schema version).
   "embedding_dimensions": 1536
 }
 ```
+
+### GET /v1/embedding/health
+
+Active health check for the configured embedding provider. Generates a real test embedding to measure latency and detect failures.
+
+**Response**:
+
+```json
+{
+  "status": "healthy",
+  "provider": "openai",
+  "model": "text-embedding-ada-002",
+  "dimensions": 1536,
+  "latency_ms": 42.0,
+  "cache_enabled": true,
+  "cache_hit_rate": 0.87,
+  "error_count_24h": 0,
+  "success_rate_24h": 1.0,
+  "circuit_breaker": "closed",
+  "last_error": "",
+  "last_error_at": "",
+  "configured_env_var": true
+}
+```
+
+**Status Values**: `healthy` (all checks pass), `degraded` (high error rate), `unhealthy` (embedding generation fails).
 
 ---
 
@@ -251,6 +282,43 @@ Re-ingest specific files into memory. Synchronous for ≤50 files; returns a bac
   "job_id": "ingest-files-abc12345"
 }
 ```
+
+### POST /v1/memory/ingest-codebase
+
+**Deprecated** — prefer `/v1/memory/ingest/trigger`. Trigger a codebase ingestion job with fine-grained options. All responses include `Deprecation: true` and `Link` headers pointing to the successor endpoint.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "my-project",
+  "path": "/path/to/codebase",
+  "source": { "type": "local", "branch": "main" },
+  "languages": { "go": true, "typescript": true, "include_tests": false },
+  "symbols": { "extract": true, "max_per_file": 500 },
+  "exclusions": { "preset": "default", "directories": ["vendor", "node_modules"] },
+  "processing": { "batch_size": 50, "workers": 4 },
+  "options": { "incremental": false, "consolidate": true, "dry_run": false }
+}
+```
+
+**Required**: `space_id`, `path`
+
+**Response** (202 Accepted):
+
+```json
+{
+  "job_id": "a1b2c3d4",
+  "status": "queued",
+  "space_id": "my-project",
+  "path": "/path/to/codebase"
+}
+```
+
+Also supports:
+- `GET /v1/memory/ingest-codebase` — list all jobs
+- `GET /v1/memory/ingest-codebase/{job_id}` — get job status with stats
+- `DELETE /v1/memory/ingest-codebase/{job_id}` — cancel a running job
 
 ### POST /v1/memory/nodes/{node_id}/archive
 
@@ -475,6 +543,45 @@ Deep exploration of a topic.
 }
 ```
 
+### GET /v1/memory/symbols
+
+Search the symbol store by name, type, file path, or fulltext query.
+
+**Query Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `space_id` | string | Required. Memory space identifier |
+| `q` | string | Fulltext search query (takes priority over `name`) |
+| `name` | string | Symbol name pattern (supports `*` wildcard suffix for prefix match) |
+| `type` | string | Symbol type filter (`const`, `var`, `function`, `class`, etc.) |
+| `file` | string | File path filter |
+| `exported` | bool | Filter by export status |
+| `limit` | int | Max results (default 50, max 500) |
+
+At least one of `name`, `type`, `file`, or `q` is required.
+
+**Response**:
+
+```json
+{
+  "space_id": "my-space",
+  "symbols": [
+    {
+      "name": "MyFunc",
+      "type": "function",
+      "file_path": "internal/foo/bar.go",
+      "line": 42,
+      "line_end": 55,
+      "exported": true,
+      "signature": "func MyFunc(x int) error",
+      "doc_comment": "MyFunc does..."
+    }
+  ],
+  "count": 1
+}
+```
+
 ---
 
 ## Consolidation
@@ -584,6 +691,98 @@ Prune decayed and excess learning edges.
   "decayed_deleted": 45,
   "excess_deleted": 12,
   "total_deleted": 57
+}
+```
+
+### POST /v1/learning/freeze
+
+Freeze Hebbian learning edge creation/updates for a space. When frozen, no new `CO_ACTIVATED_WITH` edges are created. Useful for stable scoring during benchmarks.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "my-project",
+  "reason": "stable scoring for benchmark",
+  "frozen_by": "claude"
+}
+```
+
+**Response**:
+
+```json
+{
+  "space_id": "my-project",
+  "status": "frozen",
+  "state": {
+    "frozen": true,
+    "frozen_at": "2026-02-24T10:00:00Z",
+    "reason": "stable scoring for benchmark",
+    "frozen_by": "claude"
+  },
+  "message": "Learning has been frozen for this space. No new edges will be created."
+}
+```
+
+### POST /v1/learning/unfreeze
+
+Resume Hebbian learning edge creation/updates for a previously frozen space.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "my-project"
+}
+```
+
+**Response**:
+
+```json
+{
+  "space_id": "my-project",
+  "status": "unfrozen",
+  "state": {
+    "frozen": false
+  },
+  "message": "Learning has been resumed for this space."
+}
+```
+
+### GET /v1/learning/freeze/status
+
+Get freeze state for a space (or all spaces if `space_id` is omitted).
+
+**Query Parameters**:
+
+- `space_id` (optional): If provided, returns status for that space only
+
+**Response** (single space):
+
+```json
+{
+  "space_id": "my-project",
+  "state": {
+    "frozen": true,
+    "frozen_at": "2026-02-24T10:00:00Z",
+    "reason": "stable scoring for benchmark",
+    "frozen_by": "claude"
+  }
+}
+```
+
+**Response** (all spaces):
+
+```json
+{
+  "frozen_spaces": {
+    "my-project": {
+      "frozen": true,
+      "frozen_at": "2026-02-24T10:00:00Z",
+      "reason": "benchmark"
+    }
+  },
+  "count": 1
 }
 ```
 
@@ -809,6 +1008,149 @@ Manually trigger graduation processing for the Context Cooler.
 }
 ```
 
+### GET /v1/conversation/session/health
+
+CMS usage health metrics for a specific conversation session.
+
+**Query Parameters**:
+
+- `session_id` (required): Session identifier
+
+**Response**:
+
+```json
+{
+  "session_id": "claude-core",
+  "space_id": "mdemg-dev",
+  "resumed": true,
+  "observations_since_resume": 14,
+  "health_score": 0.82,
+  "tracked": true,
+  "last_resume_at": "2026-02-24T10:00:00Z",
+  "last_observe_at": "2026-02-24T10:45:00Z",
+  "last_activity_at": "2026-02-24T10:45:00Z"
+}
+```
+
+If the session is not tracked, returns `"tracked": false` with zero values.
+
+---
+
+## Constraints (Phase 45.5)
+
+Constraint nodes represent organizational rules extracted from observations during consolidation.
+
+### GET /v1/constraints
+
+List all active (non-archived) constraint nodes for a space.
+
+**Query Parameters**:
+
+- `space_id` (required)
+
+**Response**:
+
+```json
+{
+  "space_id": "my-project",
+  "constraints": [
+    {
+      "node_id": "node-abc",
+      "name": "no-direct-neo4j-in-handlers",
+      "constraint_type": "architectural",
+      "content": "Handlers should not contain direct Neo4j queries...",
+      "confidence": 0.95,
+      "created_at": "2026-02-20T10:00:00Z",
+      "updated_at": "2026-02-20T10:00:00Z",
+      "source_count": 3
+    }
+  ]
+}
+```
+
+### GET /v1/constraints/stats
+
+Summary statistics about constraints grouped by type.
+
+**Query Parameters**:
+
+- `space_id` (required)
+
+**Response**:
+
+```json
+{
+  "space_id": "my-project",
+  "total_constraint_nodes": 12,
+  "by_type": [
+    {
+      "constraint_type": "architectural",
+      "count": 7,
+      "avg_confidence": 0.88
+    }
+  ],
+  "tagged_observation_count": 42
+}
+```
+
+---
+
+## Active Guardrails (Phase 104)
+
+Validates proposed code changes against active constraint nodes. Returns Pass/Warning/Block status. Fail-open: if any pipeline step fails, returns Pass with a warning.
+
+**Configuration**: `GUARDRAIL_ENABLED=true` required. Returns 503 when disabled.
+
+### POST /v1/memory/guardrail/validate
+
+Validate a proposed code change against active constraints in a space.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "my-project",
+  "files_changed": ["src/api/auth.go"],
+  "diff": "@@ -15,7 +15,7 @@\n func Login(c *gin.Context) {\n-    token := jwt.New()\n+    token := legacy_auth.GenerateToken()\n }"
+}
+```
+
+**Fields**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `space_id` | string | Yes | Memory space with constraint nodes |
+| `files_changed` | []string | Yes | List of changed file paths |
+| `diff` | string | Yes | Unified diff of proposed changes |
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "status": "Warning",
+    "violations": [],
+    "warnings": [
+      {
+        "constraint_node_id": "node-abc",
+        "description": "Change uses legacy authentication library",
+        "rationale": "Constraint 'prefer-jwt-auth' (should) recommends using jwt package"
+      }
+    ]
+  }
+}
+```
+
+**Status Values**:
+
+| Status | Meaning |
+|--------|---------|
+| `Pass` | No violations or warnings |
+| `Warning` | Only `should`/`should_not` constraints triggered |
+| `Block` | At least one `must`/`must_not` constraint violated |
+
+**Error Codes**: `400` (missing required fields), `405` (not POST), `503` (guardrail not enabled).
+
 ---
 
 ## Skill Registry (Phase 48)
@@ -1021,7 +1363,7 @@ Delete a template.
 
 Snapshots capture task state for session continuity, triggered manually or automatically on session end/compaction.
 
-#### GET /v1/conversation/snapshots
+#### GET /v1/conversation/snapshot
 
 List snapshots for a session.
 
@@ -1052,7 +1394,7 @@ List snapshots for a session.
 }
 ```
 
-#### POST /v1/conversation/snapshots
+#### POST /v1/conversation/snapshot
 
 Create a new task context snapshot.
 
@@ -1085,7 +1427,7 @@ Create a new task context snapshot.
 }
 ```
 
-#### GET /v1/conversation/snapshots/{snapshot_id}
+#### GET /v1/conversation/snapshot/{snapshot_id}
 
 Get a specific snapshot.
 
@@ -1095,7 +1437,7 @@ Get a specific snapshot.
 
 **Response**: Same as single snapshot in list response.
 
-#### GET /v1/conversation/snapshots/latest
+#### GET /v1/conversation/snapshot/latest
 
 Get the most recent snapshot for a session.
 
@@ -1106,7 +1448,7 @@ Get the most recent snapshot for a session.
 
 **Response**: Single snapshot object.
 
-#### DELETE /v1/conversation/snapshots/{snapshot_id}
+#### DELETE /v1/conversation/snapshot/{snapshot_id}
 
 Delete a snapshot.
 
@@ -1123,7 +1465,7 @@ Delete a snapshot.
 }
 ```
 
-#### POST /v1/conversation/snapshots/cleanup
+#### POST /v1/conversation/snapshot/cleanup
 
 Clean up old snapshots for a space.
 
@@ -1197,7 +1539,7 @@ Get review statistics for a space.
 }
 ```
 
-#### POST /v1/conversation/org-reviews/flag
+#### POST /v1/conversation/observations/{obs_id}/flag
 
 Flag an observation for org-level review.
 
@@ -1225,7 +1567,7 @@ Flag an observation for org-level review.
 }
 ```
 
-#### POST /v1/conversation/org-reviews/decision
+#### POST /v1/conversation/org-reviews/{obs_id}/decision
 
 Process an approve/reject decision on a flagged observation.
 
@@ -1549,6 +1891,140 @@ Add a comment to an issue.
 
 ---
 
+## Web Scraper
+
+Web content scraping and ingestion pipeline.
+
+### POST /v1/scraper/jobs
+
+Create a new scrape job.
+
+**Request Body**:
+
+```json
+{
+  "urls": ["https://example.com/docs"],
+  "target_space_id": "my-space",
+  "options": {
+    "extraction_profile": "documentation",
+    "max_depth": 3,
+    "max_pages": 50,
+    "follow_links": true,
+    "delay_ms": 500,
+    "timeout_ms": 30000
+  }
+}
+```
+
+**Required**: `urls`
+
+**Response** (202 Accepted):
+
+```json
+{
+  "job_id": "scrape-a1b2c3d4",
+  "status": "pending",
+  "urls": ["https://example.com/docs"],
+  "target_space_id": "my-space",
+  "total_urls": 1,
+  "processed_urls": 0,
+  "created_at": "2026-02-24T10:00:00Z"
+}
+```
+
+### GET /v1/scraper/jobs
+
+List all scrape jobs.
+
+**Response**:
+
+```json
+{
+  "jobs": [ /* array of ScrapeJobResponse */ ],
+  "count": 3
+}
+```
+
+### GET /v1/scraper/jobs/{id}
+
+Get scrape job details including scraped content.
+
+**Response**:
+
+```json
+{
+  "job_id": "scrape-a1b2c3d4",
+  "status": "completed",
+  "contents": [
+    {
+      "content_id": "cid-123",
+      "url": "https://example.com/docs",
+      "title": "My Docs",
+      "content_preview": "...",
+      "quality_score": 0.91,
+      "suggested_tags": ["go", "api"],
+      "status": "pending_review",
+      "word_count": 1200
+    }
+  ]
+}
+```
+
+### DELETE /v1/scraper/jobs/{id}
+
+Cancel a scrape job.
+
+**Response**: `{ "job_id": "...", "status": "cancelled", "message": "job cancelled" }`
+
+### POST /v1/scraper/jobs/{id}/review
+
+Review and approve/reject scraped content for ingestion.
+
+**Request Body**:
+
+```json
+{
+  "decisions": [
+    {
+      "content_id": "cid-123",
+      "action": "approve",
+      "space_id": "override-space"
+    }
+  ]
+}
+```
+
+**Actions**: `approve` (ingest into memory), `reject` (discard), `edit` (modify then ingest, requires `edit_content`).
+
+**Response**:
+
+```json
+{
+  "job_id": "scrape-a1b2c3d4",
+  "reviewed": 2,
+  "ingested": [{ "content_id": "cid-123", "node_id": "mem-abc", "url": "https://..." }],
+  "rejected": 1,
+  "status": "completed"
+}
+```
+
+### GET /v1/scraper/spaces
+
+List all available target spaces with node counts.
+
+**Response**:
+
+```json
+{
+  "spaces": [
+    { "space_id": "my-space", "node_count": 1500 }
+  ],
+  "count": 1
+}
+```
+
+---
+
 ## Webhooks
 
 ### POST /v1/webhooks/linear
@@ -1591,6 +2067,89 @@ Other event types are acknowledged with 200 but ignored.
 - `401 Unauthorized` — Missing or invalid signature
 - `405 Method Not Allowed` — Non-POST request
 - `500 Internal Server Error` — Webhook secret not configured
+
+### POST /v1/webhooks/{source}
+
+Generic webhook handler for VCS and issue-tracking platforms. Supports GitHub, GitLab, Bitbucket, and custom sources.
+
+**Path Parameters**: `{source}` — webhook source identifier (e.g., `github`, `gitlab`, `bitbucket`)
+
+**Authentication** (source-dependent):
+- GitHub: `X-Hub-Signature-256` (HMAC-SHA256)
+- GitLab: `X-Gitlab-Token`
+- Bitbucket: `X-Hub-Signature` (HMAC-SHA256)
+
+**Configuration**: `WEBHOOK_CONFIGS` env var — `source:secret:space_id,...`
+
+**Debouncing**: Rapid events for the same entity are coalesced with a 10-second window.
+
+**Response** (202 Accepted):
+
+```json
+{
+  "status": "accepted",
+  "source": "github",
+  "entity_type": "push",
+  "action": "",
+  "debounce": "github:abc123sha"
+}
+```
+
+---
+
+## Symbol Relationships
+
+Query symbol-level code relationships (calls, imports, implements).
+
+### GET /v1/symbols/relationships
+
+Get relationship counts by type for a space.
+
+**Query Parameters**:
+
+- `space_id` (required)
+
+**Response**:
+
+```json
+{
+  "space_id": "my-space",
+  "counts": {
+    "CALLS": 412,
+    "IMPORTS": 87,
+    "IMPLEMENTS": 23
+  }
+}
+```
+
+### GET /v1/symbols/{id}/relationships
+
+Get all relationships for a specific symbol node.
+
+**Path Parameters**: `{id}` — symbol node ID
+
+**Query Parameters**:
+
+- `space_id` (required)
+
+**Response**:
+
+```json
+{
+  "space_id": "my-space",
+  "symbol_id": "sym-abc123",
+  "relationships": [
+    {
+      "source_id": "sym-abc123",
+      "target_id": "sym-def456",
+      "type": "CALLS",
+      "file_path": "internal/api/handler.go",
+      "line": 42
+    }
+  ],
+  "count": 5
+}
+```
 
 ---
 
@@ -1709,9 +2268,65 @@ Get per-space memory statistics.
 
 Get query result cache statistics.
 
+### DELETE /v1/memory/cache
+
+Clear query result cache. Requires `confirm=true` query parameter.
+
+**Query Parameters**:
+
+- `confirm` (required): Must be `"true"` to proceed
+- `space_id` (optional): Clear only this space's cache entries; omit for global clear
+
+**Response**:
+
+```json
+{
+  "message": "Cache cleared for space",
+  "entries_cleared": 42,
+  "space_id": "my-space"
+}
+```
+
 ### GET /v1/memory/query/metrics
 
 Get Neo4j query execution statistics.
+
+### GET /v1/memory/distribution
+
+Score distribution statistics and learning phase info for a space.
+
+**Query Parameters**:
+
+- `space_id` (required)
+- `history_limit` (optional, default 10, max 100): Number of historical distributions
+
+**Response**:
+
+```json
+{
+  "stats": {
+    "phase": "warm",
+    "edge_count": 12500,
+    "alerts": [],
+    "phase_thresholds": {
+      "learning": 1,
+      "warm": 10000,
+      "saturated": 50000
+    }
+  },
+  "history": []
+}
+```
+
+**Learning Phases**: `cold` (0 edges), `learning` (1-10k), `warm` (10k-50k), `saturated` (50k+).
+
+### GET /v1/prometheus
+
+Prometheus-format metrics endpoint. Returns `text/plain` in Prometheus exposition format.
+
+Includes: circuit breaker metrics, cache hit ratios, Neo4j connection pool stats, per-space graph metrics, container resource metrics, and memory pressure metrics.
+
+**Configuration**: `METRICS_ENABLED=true` required.
 
 ### GET /v1/memory/edges/stale/stats?space_id={space_id}
 
@@ -1771,6 +2386,31 @@ Manually trigger an APE event.
 ```json
 {
   "event": "consolidation_complete"
+}
+```
+
+### GET /v1/system/pool-metrics
+
+Neo4j connection pool stats with Go runtime memory and goroutine metrics.
+
+**Response**:
+
+```json
+{
+  "connection_pool": {
+    "active": 5,
+    "idle": 15,
+    "max": 50
+  },
+  "runtime": {
+    "goroutines": 42,
+    "heap_alloc_mb": 128.5,
+    "heap_sys_mb": 256.0,
+    "heap_objects": 50000,
+    "gc_pause_ns": 300000,
+    "gc_total_pause_ms": 12.5,
+    "num_gc": 85
+  }
 }
 ```
 
@@ -1858,6 +2498,33 @@ Returns freshness and staleness information for a space's TapRoot node.
 - `is_stale` - Whether the space is considered stale based on `SYNC_STALE_THRESHOLD_HOURS`
 - `stale_hours` - Hours since last ingest
 - `threshold_hours` - Configured staleness threshold in hours
+
+### GET /v1/memory/freshness
+
+Batch freshness check for multiple spaces in a single request.
+
+**Query Parameters**:
+
+- `space_ids` (required): Comma-separated list of space IDs (max 100)
+
+**Response**:
+
+```json
+{
+  "spaces": [
+    {
+      "space_id": "my-space",
+      "ingest_count": 5,
+      "last_ingest_at": "2026-02-20T10:00:00Z",
+      "last_ingest_type": "codebase-ingest",
+      "stale_hours": 96,
+      "is_stale": true,
+      "threshold_hours": 48
+    }
+  ],
+  "threshold_hours": 48
+}
+```
 
 ---
 
@@ -1951,6 +2618,42 @@ Get file watcher status.
 ### POST /v1/filewatcher/stop
 
 Stop file watching.
+
+---
+
+## Job Streaming (SSE)
+
+### GET /v1/jobs/{job_id}/stream
+
+Server-Sent Events (SSE) stream for real-time job progress. Polls every 500ms, sending events only on status/progress changes. Connection times out after 5 minutes.
+
+**Content-Type**: `text/event-stream`
+
+**SSE Events**:
+
+| Event | When | Data |
+|-------|------|------|
+| `connected` | Immediately on connection | `{ job_id, status }` |
+| `progress` | On status/progress change | Full progress object |
+| `complete` | Job reaches terminal state | `{ final_status, result, error }` |
+| `timeout` | After 5-minute connection | — |
+| `error` | Job disappears mid-stream | Error details |
+
+**Progress event data**:
+
+```json
+{
+  "job_id": "scrape-a1b2c3d4",
+  "status": "running",
+  "progress": {
+    "total": 10,
+    "current": 4,
+    "percentage": 40.0,
+    "phase": "scraping",
+    "rate": 2.5
+  }
+}
+```
 
 ---
 

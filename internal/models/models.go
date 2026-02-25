@@ -1020,6 +1020,27 @@ type SpaceOverview struct {
 	OrphanCount       int64         `json:"orphan_count"`
 }
 
+// GuardrailValidateRequest is the request body for POST /v1/memory/guardrail/validate
+type GuardrailValidateRequest struct {
+	SpaceID      string   `json:"space_id"      validate:"required"`
+	FilesChanged []string `json:"files_changed" validate:"required"`
+	Diff         string   `json:"diff"          validate:"required"`
+}
+
+// GuardrailViolation represents a single constraint violation or warning.
+type GuardrailViolation struct {
+	ConstraintNodeID string `json:"constraint_node_id"`
+	Description      string `json:"description"`
+	Rationale        string `json:"rationale"`
+}
+
+// GuardrailValidateResponse is the response body for POST /v1/memory/guardrail/validate
+type GuardrailValidateResponse struct {
+	Status     string               `json:"status"` // "Pass", "Warning", "Block"
+	Violations []GuardrailViolation `json:"violations"`
+	Warnings   []GuardrailViolation `json:"warnings"`
+}
+
 // BackupOverview - backup status summary
 type BackupOverview struct {
 	LastFull    *BackupSummary `json:"last_full,omitempty"`
