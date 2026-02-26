@@ -96,6 +96,8 @@ jobs:
           export EMBEDDING_PROVIDER=stub
           export BACKUP_ENABLED=true
           export BACKUP_STORAGE_DIR=/tmp/mdemg-backups
+          export METALEARN_ENABLED=true
+          export METALEARN_GLOBAL_SPACE_ID=mdemg-global
           mkdir -p /tmp/mdemg-backups
           ./bin/mdemg serve &
 

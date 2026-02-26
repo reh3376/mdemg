@@ -130,9 +130,9 @@ The graph currently remains siloed per workspace. Universal, abstract principles
 
 | Phase | Title | Description |
 |-------|-------|-------------|
-| **101** | SME Synthesis Engine | Upgrade `/v1/memory/consult` to use LLM-based multi-hop synthesis instead of keyword string matching. |
-| **102** | Intent Translation | Implement query rewriting before vector embedding to align conversational queries with declarative node text. |
+| **101** | SME Synthesis Engine (**Complete**) | Upgrade `/v1/memory/consult` to use LLM-based multi-hop synthesis instead of keyword string matching. |
+| **102** | Intent Translation (**Complete**) | Implement query rewriting before vector embedding to align conversational queries with declarative node text. |
 | **103** | Dynamic Emergence (**Complete**) | LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters. Pipeline step at phase 22, fail-open per cluster. |
 | **103b** | Emergence Model Evaluation (**Complete**) | `LLM_ENDPOINT` config separation, UETS framework (8 model specs, 7/7 passing), `llama3.2:3b` Q4_K_M validated as default. |
 | **104** | Active MCP Guardrails (**Complete**) | `POST /v1/memory/guardrail/validate` endpoint, MCP `validate_changes` tool, 4-step pipeline (diff parse → constraint retrieval → LLM eval → response build), fail-open, dual provider (OpenAI/Ollama). |
-| **105** | Global Meta-Learning | Implement cross-space promotion of Layer 4/5 concepts to a global "Org-Level" graph for true cross-pollination. |
+| **105** | Global Meta-Learning (**Complete**) | `POST /v1/memory/meta-learn` promotes L4/L5 concepts to `mdemg-global` space via LLM generalization. Retrieval supports `include_global_space: true` for cross-space vector+BM25 search. `ORIGINATED_FROM` edges track provenance. |

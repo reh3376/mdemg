@@ -27,7 +27,8 @@ import (
 // ProtectedSpaces contains space IDs that cannot be deleted.
 // These spaces contain critical data (e.g., Claude's conversation memory).
 var ProtectedSpaces = map[string]bool{
-	"mdemg-dev": true, // Claude's conversation memory - DO NOT DELETE
+	"mdemg-dev":    true, // Claude's conversation memory - DO NOT DELETE
+	"mdemg-global": true, // Global meta-learning space (Phase 105) - DO NOT DELETE
 }
 
 // IsProtectedSpace checks if a space is protected from deletion

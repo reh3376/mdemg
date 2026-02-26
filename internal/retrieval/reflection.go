@@ -69,7 +69,7 @@ func (s *Service) Reflect(ctx context.Context, req models.ReflectRequest) (model
 	// Stage 1: SEED - Vector search for topic using embedding
 	// Use vectorRecall to find core memories matching the topic
 	// Note: Reflect doesn't support file filtering - it explores all nodes
-	cands, err := s.vectorRecall(ctx, req.SpaceID, req.TopicEmbedding, DefaultReflectSeedK, FileFilter{})
+	cands, err := s.vectorRecall(ctx, []string{req.SpaceID}, req.TopicEmbedding, DefaultReflectSeedK, FileFilter{})
 	if err != nil {
 		return models.ReflectResponse{}, err
 	}

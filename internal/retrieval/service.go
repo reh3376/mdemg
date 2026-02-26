@@ -335,8 +335,14 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// Build file filter from request
 	filter := NewFileFilterFromRequest(req)
 
+	// Compute space IDs for multi-space retrieval (Phase 105: Global Meta-Learning)
+	spaceIDs := []string{req.SpaceID}
+	if req.IncludeGlobalSpace {
+		spaceIDs = append(spaceIDs, "mdemg-global")
+	}
+
 	// 1) Vector recall
-	vectorCands, err := s.vectorRecall(ctx, req.SpaceID, req.QueryEmbedding, candK, filter)
+	vectorCands, err := s.vectorRecall(ctx, spaceIDs, req.QueryEmbedding, candK, filter)
 	if err != nil {
 		return models.RetrieveResponse{}, err
 	}
@@ -351,7 +357,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	var cands []Candidate
 	bm25Count := 0
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
-		bm25Results, bm25Err := s.BM25Search(ctx, req.SpaceID, bm25QueryText, s.cfg.BM25TopK, filter)
+		bm25Results, bm25Err := s.BM25Search(ctx, spaceIDs, bm25QueryText, s.cfg.BM25TopK, filter)
 		if bm25Err != nil {
 			// Log warning but continue with vector-only results
 			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
@@ -417,10 +423,10 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		var fetchErr error
 		if s.cfg.EdgeTypeStrategy == "all" {
 			// Use original function for "all" strategy (backward compatible)
-			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdges(ctx, req.SpaceID, frontier)
+			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdges(ctx, spaceIDs, frontier)
 		} else {
 			// Use type-filtered function for other strategies
-			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdgesWithTypes(ctx, req.SpaceID, frontier, edgeTypes)
+			batchEdges, nextNodes, fetchErr = s.fetchOutgoingEdgesWithTypes(ctx, spaceIDs, frontier, edgeTypes)
 		}
 		if fetchErr != nil {
 			return models.RetrieveResponse{}, fetchErr
@@ -682,15 +688,15 @@ type SimilarNode struct {
 	Score  float64
 }
 
-func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32, k int, filter FileFilter) ([]Candidate, error) {
+func (s *Service) vectorRecall(ctx context.Context, spaceIDs []string, q []float32, k int, filter FileFilter) ([]Candidate, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
 	params := map[string]any{
-		"spaceId": spaceID,
-		"k":       k,
-		"q":       q,
-		"index":   s.cfg.VectorIndexName,
+		"spaceIds": spaceIDs,
+		"k":        k,
+		"q":        q,
+		"index":    s.cfg.VectorIndexName,
 	}
 
 	// Add filter parameters if specified
@@ -708,7 +714,7 @@ func (s *Service) vectorRecall(ctx context.Context, spaceID string, q []float32,
 	cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
-WHERE node.space_id = $spaceId AND NOT coalesce(node.is_archived, false)` + filterClause + `
+WHERE node.space_id IN $spaceIds AND NOT coalesce(node.is_archived, false)` + filterClause + `
 RETURN node.node_id AS node_id,
        node.path AS path,
        node.name AS name,
@@ -910,7 +916,7 @@ type edgeTraversalPack struct {
 
 // fetchOutgoingEdgesWithTypes is a variant that uses specific edge types instead of AllowedRelationshipTypes.
 // Used by the hybrid edge type strategy to fetch different edge types at different hop depths.
-func (s *Service) fetchOutgoingEdgesWithTypes(ctx context.Context, spaceID string, nodeIDs []string, edgeTypes []string) ([]Edge, []string, error) {
+func (s *Service) fetchOutgoingEdgesWithTypes(ctx context.Context, spaceIDs []string, nodeIDs []string, edgeTypes []string) ([]Edge, []string, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -925,7 +931,7 @@ func (s *Service) fetchOutgoingEdgesWithTypes(ctx context.Context, spaceID strin
 	}
 
 	params := map[string]any{
-		"spaceId":        spaceID,
+		"spaceIds":       spaceIDs,
 		"nodeIds":        nodeIDs,
 		"allowed":        edgeTypes, // Use provided edge types instead of AllowedRelationshipTypes
 		"maxNbr":         s.cfg.MaxNeighborsPerNode,
@@ -937,11 +943,13 @@ func (s *Service) fetchOutgoingEdgesWithTypes(ctx context.Context, spaceID strin
 	outAny, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Same query as fetchOutgoingEdges, but uses provided edge types
 		cypher := `UNWIND $nodeIds AS sid
-MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
+MATCH (src:MemoryNode)
+WHERE src.space_id IN $spaceIds AND src.node_id = sid
 CALL {
   WITH src
-  MATCH (src)-[r]->(dst:MemoryNode {space_id:$spaceId})
-  WHERE type(r) IN $allowed AND coalesce(r.status,'active')='active'
+  MATCH (src)-[r]->(dst:MemoryNode)
+  WHERE dst.space_id IN $spaceIds
+    AND type(r) IN $allowed AND coalesce(r.status,'active')='active'
   WITH src, r, dst, type(r) AS relType,
        CASE WHEN type(r) = 'CO_ACTIVATED_WITH' THEN
          duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
@@ -1042,7 +1050,7 @@ func (s *Service) getEdgeTypesForHop(hopDepth int) (edgeTypes []string, applyAtt
 	}
 }
 
-func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeIDs []string) ([]Edge, []string, error) {
+func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceIDs []string, nodeIDs []string) ([]Edge, []string, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -1057,7 +1065,7 @@ func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeID
 	}
 
 	params := map[string]any{
-		"spaceId":        spaceID,
+		"spaceIds":       spaceIDs,
 		"nodeIds":        nodeIDs,
 		"allowed":        s.cfg.AllowedRelationshipTypes,
 		"maxNbr":         s.cfg.MaxNeighborsPerNode,
@@ -1075,11 +1083,13 @@ func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceID string, nodeID
 		// This ensures edges that have been repeatedly strengthened persist while
 		// spurious one-off connections decay quickly.
 		cypher := `UNWIND $nodeIds AS sid
-MATCH (src:MemoryNode {space_id:$spaceId, node_id:sid})
+MATCH (src:MemoryNode)
+WHERE src.space_id IN $spaceIds AND src.node_id = sid
 CALL {
   WITH src
-  MATCH (src)-[r]->(dst:MemoryNode {space_id:$spaceId})
-  WHERE type(r) IN $allowed AND coalesce(r.status,'active')='active'
+  MATCH (src)-[r]->(dst:MemoryNode)
+  WHERE dst.space_id IN $spaceIds
+    AND type(r) IN $allowed AND coalesce(r.status,'active')='active'
   WITH src, r, dst, type(r) AS relType,
        CASE WHEN type(r) = 'CO_ACTIVATED_WITH' THEN
          duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days

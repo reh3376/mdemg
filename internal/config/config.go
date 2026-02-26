@@ -202,6 +202,16 @@ type Config struct {
 	GuardrailTimeoutMs      int    // GUARDRAIL_TIMEOUT_MS — timeout for evaluation in ms (default: 5000, min 1000)
 	GuardrailMaxConstraints int    // GUARDRAIL_MAX_CONSTRAINTS — max constraints per evaluation (default: 10, range 1-50)
 
+	// Global Meta-Learning settings (Phase 105)
+	MetaLearnEnabled        bool   // METALEARN_ENABLED — enable cross-space concept promotion (default: false)
+	MetaLearnGlobalSpaceID  string // METALEARN_GLOBAL_SPACE_ID — target global space (default: "mdemg-global")
+	MetaLearnMinLayer       int    // METALEARN_MIN_LAYER — minimum layer for promotion candidates (default: 4)
+	MetaLearnMinUpdateCount int    // METALEARN_MIN_UPDATE_COUNT — minimum update_count for candidates (default: 5)
+	MetaLearnProvider       string // METALEARN_PROVIDER — LLM provider for generalization (openai/ollama, default: from EMERGENCE_PROVIDER)
+	MetaLearnModel          string // METALEARN_MODEL — model for generalization (default: from EMERGENCE_MODEL)
+	MetaLearnMaxTokens      int    // METALEARN_MAX_TOKENS — max tokens for generalization response (default: 500, range 100-4000)
+	MetaLearnTimeoutMs      int    // METALEARN_TIMEOUT_MS — timeout for generalization in ms (default: 15000, min 1000)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -579,7 +589,7 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
 	}
 
-	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL")
+	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL,ORIGINATED_FROM")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -1305,6 +1315,40 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("GUARDRAIL_MAX_CONSTRAINTS must be in range [1, 50]")
 	}
 
+	// Global Meta-Learning settings (Phase 105)
+	metaLearnEnabled := getBool("METALEARN_ENABLED", false)
+	metaLearnGlobalSpaceID := get("METALEARN_GLOBAL_SPACE_ID", "mdemg-global")
+	metaLearnMinLayer, err := atoi("METALEARN_MIN_LAYER", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	if metaLearnMinLayer < 1 || metaLearnMinLayer > 5 {
+		return Config{}, errors.New("METALEARN_MIN_LAYER must be in range [1, 5]")
+	}
+	metaLearnMinUpdateCount, err := atoi("METALEARN_MIN_UPDATE_COUNT", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if metaLearnMinUpdateCount < 0 {
+		return Config{}, errors.New("METALEARN_MIN_UPDATE_COUNT must be >= 0")
+	}
+	metaLearnProvider := get("METALEARN_PROVIDER", emergenceProvider)
+	metaLearnModel := get("METALEARN_MODEL", emergenceModel)
+	metaLearnMaxTokens, err := atoi("METALEARN_MAX_TOKENS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if metaLearnMaxTokens < 100 || metaLearnMaxTokens > 4000 {
+		return Config{}, errors.New("METALEARN_MAX_TOKENS must be in range [100, 4000]")
+	}
+	metaLearnTimeoutMs, err := atoi("METALEARN_TIMEOUT_MS", 15000)
+	if err != nil {
+		return Config{}, err
+	}
+	if metaLearnTimeoutMs < 1000 {
+		return Config{}, errors.New("METALEARN_TIMEOUT_MS must be >= 1000")
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -2005,6 +2049,16 @@ func FromEnv() (Config, error) {
 		GuardrailMaxTokens:      guardrailMaxTokens,
 		GuardrailTimeoutMs:      guardrailTimeoutMs,
 		GuardrailMaxConstraints: guardrailMaxConstraints,
+
+		// Phase 105: Global Meta-Learning
+		MetaLearnEnabled:        metaLearnEnabled,
+		MetaLearnGlobalSpaceID:  metaLearnGlobalSpaceID,
+		MetaLearnMinLayer:       metaLearnMinLayer,
+		MetaLearnMinUpdateCount: metaLearnMinUpdateCount,
+		MetaLearnProvider:       metaLearnProvider,
+		MetaLearnModel:          metaLearnModel,
+		MetaLearnMaxTokens:      metaLearnMaxTokens,
+		MetaLearnTimeoutMs:      metaLearnTimeoutMs,
 
 		GapLowScoreThreshold:      gapLowScoreThreshold,
 		GapMinOccurrences:         gapMinOccurrences,
