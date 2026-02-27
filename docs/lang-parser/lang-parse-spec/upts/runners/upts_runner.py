@@ -6,17 +6,15 @@ Validates parser implementations against UPTS specifications.
 Language-agnostic - works with any parser that outputs standardized Symbol JSON.
 
 NEW in v1.1.0: SHA256 hash verification for fixture integrity
+Updated for Portable Agent Spec v2.2.0: canonical report format, parity checks, no --skip-hash
 
 Usage:
     # Validate single spec
     python upts_runner.py validate --spec specs/typescript.upts.json --parser ./parse
-    
+
     # Validate all specs
     python upts_runner.py validate-all --spec-dir specs/ --parser ./parse
-    
-    # Skip hash verification
-    python upts_runner.py validate --spec specs/rust.upts.json --parser ./parse --skip-hash
-    
+
     # Add hashes to existing specs
     python upts_runner.py add-hashes --spec-dir specs/
     
@@ -61,6 +59,11 @@ from typing import Optional, List, Dict, Any, Tuple, Set
 from enum import Enum
 from datetime import datetime
 import argparse
+import os
+
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'tests'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
 
 
 # ============================================================
@@ -114,7 +117,7 @@ def verify_fixture_hash(fixture_path: Path, expected_hash: Optional[str]) -> Tup
             f"  Expected: {expected_hash}\n"
             f"  Actual:   {actual_hash}\n"
             f"  File:     {fixture_path}\n"
-            f"  Action:   Regenerate spec from parser output, or run with --skip-hash"
+            f"  Action:   Regenerate spec from parser output"
         )
     
     return True, ""
@@ -163,8 +166,11 @@ class SpecResult:
     extra_symbols: List[Dict] = field(default_factory=list)
     error_message: Optional[str] = None
     duration_ms: float = 0.0
-    hash_verified: bool = False
-    hash_skipped: bool = False
+    hash_verified: Optional[bool] = None
+    hash_mismatches: List[str] = field(default_factory=list)
+    missing_symbols: List[str] = field(default_factory=list)
+    total_symbols: int = 0
+    matched_symbols: int = 0
     
     @property
     def pass_rate(self) -> float:
@@ -181,7 +187,7 @@ class SpecResult:
             "pass_rate": round(self.pass_rate, 2),
             "duration_ms": round(self.duration_ms, 2),
             "hash_verified": self.hash_verified,
-            "hash_skipped": self.hash_skipped,
+            "hash_mismatches": self.hash_mismatches,
             "failures": [
                 {"name": r.name, "type": r.sym_type, "expected_line": r.expected_line,
                  "actual_line": r.actual_line, "issues": r.issues, "pattern": r.pattern}
@@ -392,16 +398,68 @@ class MockParser(ParserInterface):
 
 
 # ============================================================
+# SCHEMA-RUNNER PARITY (Section 8)
+# ============================================================
+
+# Fields the runner enforces or recognises (advisory). Only truly unknown
+# fields that appear in NONE of the UPTS specs should trigger a parity failure.
+_UPTS_KNOWN_TOP_FIELDS = {
+    # enforced
+    "version", "language", "fixture", "expected",
+    # advisory (known schema fields, not directly tested)
+    "upts_version", "description", "config", "metadata", "patterns_covered", "variants",
+}
+_UPTS_KNOWN_FIXTURE_FIELDS = {
+    # enforced
+    "path", "sha256",
+    # advisory
+    "type",
+}
+_UPTS_KNOWN_EXPECTED_FIELDS = {
+    # enforced
+    "symbols",
+    # advisory (recognised but not enforced by this runner)
+    "relationships", "require_all_symbols", "allow_extra_symbols",
+    "symbol_count", "excluded",
+}
+_UPTS_KNOWN_SYMBOL_FIELDS = {"name", "kind", "line", "parent", "scope", "language"}
+
+
+def _validate_supported_features(spec_dict):
+    """Check for unimplemented schema fields. Returns list of error strings."""
+    errors = []
+    unknown_top = set(spec_dict.keys()) - _UPTS_KNOWN_TOP_FIELDS
+    if unknown_top:
+        errors.append(f"PARITY FAILURE: Unimplemented top-level fields: {unknown_top}")
+
+    if "fixture" in spec_dict and isinstance(spec_dict["fixture"], dict):
+        unknown_fix = set(spec_dict["fixture"].keys()) - _UPTS_KNOWN_FIXTURE_FIELDS
+        if unknown_fix:
+            errors.append(f"PARITY FAILURE: Unimplemented fixture fields: {unknown_fix}")
+
+    if "expected" in spec_dict:
+        exp = spec_dict["expected"]
+        if isinstance(exp, dict):
+            unknown_exp = set(exp.keys()) - _UPTS_KNOWN_EXPECTED_FIELDS
+            if unknown_exp:
+                errors.append(f"PARITY FAILURE: Unimplemented expected fields: {unknown_exp}")
+
+            # relationships is advisory — runner recognises but does not enforce.
+            # No parity failure for advisory fields.
+
+    return errors
+
+
+# ============================================================
 # VALIDATOR
 # ============================================================
 
 class Validator:
     """Validate parser output against UPTS spec"""
     
-    def __init__(self, spec: UPTSLoader, parser: ParserInterface, skip_hash: bool = False):
+    def __init__(self, spec: UPTSLoader, parser: ParserInterface):
         self.spec = spec
         self.parser = parser
-        self.skip_hash = skip_hash
     
     def validate(self) -> SpecResult:
         """Run validation"""
@@ -427,19 +485,22 @@ class Validator:
             result.error_message = f"Fixture not found: {fixture_path}"
             return result
         
-        # Verify fixture hash (unless skipped)
-        if self.skip_hash:
-            result.hash_skipped = True
+        # Verify fixture hash (always — never skipped)
+        hash_valid, hash_error = verify_fixture_hash(fixture_path, self.spec.fixture_hash)
+        if self.spec.fixture_hash is None or self.spec.fixture_hash == "":
+            result.hash_verified = None
+            result.hash_mismatches = []
+        elif hash_valid:
+            result.hash_verified = True
+            result.hash_mismatches = []
         else:
-            hash_valid, hash_error = verify_fixture_hash(fixture_path, self.spec.fixture_hash)
-            if not hash_valid:
-                result.status = Status.ERROR
-                result.error_message = hash_error
-                result.duration_ms = (time.time() - start) * 1000
-                return result
-            if self.spec.fixture_hash:
-                result.hash_verified = True
-        
+            result.hash_verified = False
+            result.hash_mismatches = [hash_error]
+        # Do NOT return — always continue to execute assertions
+
+        # Schema-runner parity check (Section 8)
+        parity_errors = _validate_supported_features(self.spec.spec)
+
         # Parse
         actual_symbols, error = self.parser.parse(fixture_path)
         if error:
@@ -515,22 +576,27 @@ class Validator:
                 result.error_message or ""
             ) + f" allow_extra_symbols=false: {len(result.extra_symbols)} extra symbol(s) found: {extra_names}."
 
-        # --- Schema-runner parity: explicit warning for unimplemented fields ---
-        # relationships: present in 4 specs but runner can't validate yet.
-        # NOT silently ignored — reported as warning. Does not affect pass/fail
-        # because relationship validation is supplementary to symbol matching.
-        if self.spec.spec.get("expected", {}).get("relationships"):
-            result.warnings += 1
+        # --- Schema-runner parity: apply parity failures ---
+        if parity_errors:
+            for pe in parity_errors:
+                result.missing_symbols.append(pe)
             result.error_message = (
                 result.error_message or ""
-            ) + " UNIMPLEMENTED: 'relationships' field present but validation not yet supported by runner."
+            ) + " " + "; ".join(parity_errors)
+
+        # Populate canonical tracking fields
+        result.total_symbols = result.total_expected
+        result.matched_symbols = result.matched
+        for sr in result.symbol_results:
+            if sr.status == Status.FAIL:
+                result.missing_symbols.append(sr.name)
 
         # Determine final status
-        if result.failed > 0:
+        if result.failed > 0 or parity_errors:
             result.status = Status.FAIL
         elif result.excluded_found:
             result.status = Status.WARN
-        
+
         result.duration_ms = (time.time() - start) * 1000
         return result
     
@@ -778,10 +844,10 @@ class Reporter:
         print(f"Matched: {r.matched}/{r.total_expected} ({r.pass_rate:.1f}%)")
         
         # Hash status
-        if r.hash_verified:
+        if r.hash_verified is True:
             print(f"Fixture Hash: {self._c('✓ Verified', 'green')}")
-        elif r.hash_skipped:
-            print(f"Fixture Hash: {self._c('⊘ Skipped', 'yellow')}")
+        elif r.hash_verified is False:
+            print(f"Fixture Hash: {self._c('✗ Mismatch', 'red')}")
         else:
             print(f"Fixture Hash: {self._c('○ Not specified', 'yellow')}")
         
@@ -825,9 +891,8 @@ class Reporter:
 class Runner:
     """Main test runner"""
     
-    def __init__(self, parser: ParserInterface, skip_hash: bool = False):
+    def __init__(self, parser: ParserInterface):
         self.parser = parser
-        self.skip_hash = skip_hash
         self.reporter = Reporter()
     
     def run_spec(self, spec_path: Path) -> SpecResult:
@@ -842,7 +907,7 @@ class Runner:
                 error_message=f"Spec errors: {'; '.join(loader.errors)}"
             )
         
-        validator = Validator(loader, self.parser, skip_hash=self.skip_hash)
+        validator = Validator(loader, self.parser)
         return validator.validate()
     
     def run_all(self, spec_dir: Path, pattern: str = "*.upts.json") -> TestReport:
@@ -875,6 +940,48 @@ class Runner:
         
         self.reporter.print_summary(report)
         return report
+
+
+# ============================================================
+# CANONICAL REPORT CONVERSION
+# ============================================================
+
+def _to_canonical_results(spec_results):
+    """Convert internal SpecResults to canonical Section 8A format."""
+    canonical = []
+    for sr in spec_results:
+        # Count assertions from symbol matching
+        assertions_evaluated = getattr(sr, 'total_symbols', 0) or 0
+        assertions_passed = getattr(sr, 'matched_symbols', 0) or 0
+
+        failures = []
+        if sr.status in (Status.FAIL, Status.ERROR):
+            if sr.error_message:
+                failures.append(sr.error_message)
+            for sym in getattr(sr, 'missing_symbols', []):
+                failures.append(f"Missing symbol: {sym}")
+            for sym in getattr(sr, 'extra_symbols', []):
+                name = sym.get("name", str(sym)) if isinstance(sym, dict) else str(sym)
+                failures.append(f"Extra symbol: {name}")
+
+        # Build warnings list from context (sr.warnings is an int counter)
+        warn_list = []
+        if sr.excluded_found:
+            warn_list.append(f"Excluded symbols found in output: {', '.join(sr.excluded_found)}")
+
+        canonical.append(_canonical_result(
+            spec_path=str(sr.spec_path),
+            status=sr.status.value.lower(),
+            duration_ms=getattr(sr, 'duration_ms', 0),
+            hash_verified=sr.hash_verified,
+            hash_mismatches=getattr(sr, 'hash_mismatches', []) or [],
+            assertions_evaluated=assertions_evaluated,
+            assertions_passed=assertions_passed,
+            failures=failures,
+            warnings=warn_list,
+            error=sr.error_message if sr.status == Status.ERROR else None,
+        ))
+    return canonical
 
 
 # ============================================================
@@ -979,7 +1086,6 @@ def main():
     val.add_argument("--spec", type=Path, required=True)
     val.add_argument("--parser", type=str, required=True)
     val.add_argument("--report", type=Path)
-    val.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     
     # validate-all
     val_all = sub.add_parser("validate-all", help="Validate all specs")
@@ -987,7 +1093,6 @@ def main():
     val_all.add_argument("--parser", type=str, required=True)
     val_all.add_argument("--pattern", type=str, default="*.upts.json")
     val_all.add_argument("--report", type=Path)
-    val_all.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     
     # add-hashes
     add_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to specs")
@@ -1009,27 +1114,30 @@ def main():
     args = parser.parse_args()
     
     if args.cmd == "validate":
-        runner = Runner(ParserInterface(args.parser), skip_hash=args.skip_hash)
+        runner = Runner(ParserInterface(args.parser))
         result = runner.run_spec(args.spec)
         runner.reporter.print_result(result)
-        
+
         if args.report:
-            report = TestReport(datetime.now().isoformat(), 1,
-                              1 if result.status == Status.PASS else 0,
-                              0 if result.status in (Status.PASS, Status.ERROR) else 1,
-                              1 if result.status == Status.ERROR else 0,
-                              [result])
-            runner.reporter.save_report(report, args.report)
-        
+            canonical_results = _to_canonical_results([result])
+            canonical = _canonical_report("upts", UPTS_VERSION, canonical_results,
+                                          duration_ms=result.duration_ms)
+            _save_report(canonical, args.report)
+
         sys.exit(0 if result.status == Status.PASS else 1)
     
     elif args.cmd == "validate-all":
-        runner = Runner(ParserInterface(args.parser), skip_hash=args.skip_hash)
+        runner = Runner(ParserInterface(args.parser))
         report = runner.run_all(args.spec_dir, args.pattern)
-        
+
         if args.report:
-            runner.reporter.save_report(report, args.report)
-        
+            canonical_results = _to_canonical_results(report.results)
+            total_duration = sum(r.duration_ms for r in report.results)
+            canonical = _canonical_report("upts", UPTS_VERSION, canonical_results,
+                                          duration_ms=total_duration)
+            _print_summary(canonical)
+            _save_report(canonical, args.report)
+
         sys.exit(0 if report.failed == 0 and report.errors == 0 else 1)
     
     elif args.cmd == "add-hashes":

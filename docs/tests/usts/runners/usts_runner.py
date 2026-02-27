@@ -4,23 +4,85 @@ USTS Runner - Universal Security Test Specification Runner
 
 Executes USTS security test specifications against MDEMG endpoints.
 
+Version: 1.1.0
+
 Usage:
     python usts_runner.py --spec specs/auth_required.usts.json
-    python usts_runner.py --spec "specs/*.usts.json" --output results/
+    python usts_runner.py --spec "specs/*.usts.json" --report results/usts_report.json
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
+
 import requests
+
+USTS_VERSION = "1.1.0"
+
+
+# --------------------------------------------------------------------------- #
+# Schema-runner parity: hard-fail for unimplemented spec fields               #
+# --------------------------------------------------------------------------- #
+
+_USTS_KNOWN_TOP_FIELDS = {
+    "usts_version", "test", "requests", "assertions", "metadata",
+    # Advisory fields (present in schema, not enforced by this runner):
+    "$schema", "config", "setup", "test_cases",
+}
+_USTS_KNOWN_ASSERTION_TYPES = {
+    "status_code", "status_in", "body_contains", "body_not_contains",
+    "headers_present", "headers_not_present", "response_time_ms_max",
+}
+
+
+def _validate_supported_features(spec_dict: Dict[str, Any]) -> List[str]:
+    """Fail fast when a spec uses fields or assertion types this runner
+    does not implement.
+
+    Returns a list of error strings prefixed with 'PARITY FAILURE:'.
+    Non-empty means the spec MUST be marked as fail.
+    """
+    errors: List[str] = []
+
+    unknown_top = set(spec_dict.keys()) - _USTS_KNOWN_TOP_FIELDS
+    if unknown_top:
+        errors.append(f"PARITY FAILURE: Unimplemented top-level fields: {unknown_top}")
+
+    # test_cases format is recognised but not executable — require 'test' key
+    if "test_cases" in spec_dict and "test" not in spec_dict:
+        errors.append(
+            "PARITY FAILURE: test_cases format is not implemented. "
+            "Runner requires 'test' + 'requests' format."
+        )
+
+    # Authentication tests require auth middleware on the server.
+    # Set USTS_AUTH_ENABLED=true when auth is deployed.
+    test_category = spec_dict.get("test", {}).get("category", "")
+    if test_category == "authentication" and not os.environ.get("USTS_AUTH_ENABLED"):
+        errors.append(
+            "PARITY FAILURE: Authentication test requires auth middleware. "
+            "Set USTS_AUTH_ENABLED=true when auth is deployed."
+        )
+
+    # Check assertion types
+    for atype in spec_dict.get("assertions", {}):
+        if atype not in _USTS_KNOWN_ASSERTION_TYPES:
+            errors.append(f"PARITY FAILURE: Unimplemented assertion type: {atype}")
+
+    return errors
+
 
 @dataclass
 class TestResult:
@@ -147,7 +209,8 @@ def check_assertion(assertion_name: str, assertion_value: Any, response: request
             return False, f"Response time {actual:.0f}ms exceeds max {assertion_value}ms"
         return True, ""
 
-    return True, ""
+    # Unknown assertion type -- hard-fail to prevent false passes
+    return False, f"PARITY FAILURE: Unimplemented assertion type: {assertion_name}"
 
 
 def run_request(
@@ -297,7 +360,7 @@ def main():
     parser.add_argument("--spec", required=True, help="Path to USTS spec file(s)")
     parser.add_argument("--base-url", default="http://localhost:9999", help="MDEMG base URL")
     parser.add_argument("--api-key", help="Valid API key for authenticated tests")
-    parser.add_argument("--output", help="Output directory for results")
+    parser.add_argument("--report", help="Output file path for canonical JSON report")
     args = parser.parse_args()
 
     # Set up variables for template rendering
@@ -315,56 +378,112 @@ def main():
         spec_paths = [Path(args.spec)]
 
     all_passed = True
-    results = []
+    canonical_results = []
+    report_start = datetime.now(timezone.utc)
 
     for spec_path in spec_paths:
         print(f"\nLoading spec: {spec_path}")
         spec = load_spec(spec_path)
 
+        # --- Schema-runner parity: hard-fail for unimplemented fields ---
+        parity_errors = _validate_supported_features(spec)
+        if parity_errors:
+            print("\n  Schema-runner parity FAILURES:")
+            for e in parity_errors:
+                print(f"    {e}")
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="fail",
+                failures=parity_errors,
+                hash_verified=None,
+            ))
+            all_passed = False
+            continue
+
         result = run_security_test(spec, args.base_url, variables)
-        results.append(result)
         print_results(result)
 
         if not result.passed:
             all_passed = False
 
-    # Save results if output directory specified
-    if args.output:
-        output_dir = Path(args.output)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Map SecurityTestResult to canonical fields
+        # Count total assertions: each request checks global assertions + expected_status checks
+        total_assertions = 0
+        passed_assertions = 0
+        failure_details = []
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = output_dir / f"usts_results_{timestamp}.json"
+        for tr in result.test_results:
+            # Count assertion checks from assertions_passed dict
+            total_assertions += len(tr.assertions_passed)
+            passed_assertions += sum(1 for v in tr.assertions_passed.values() if v)
 
-        with open(output_file, "w") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "overall_passed": all_passed,
-                "results": [r.to_dict() for r in results],
-            }, f, indent=2)
+            # Count expected_status / expected_status_range as assertions too
+            # (they are checked in run_request but not tracked in assertions_passed)
+            # We detect them from failures
+            for f in tr.failures:
+                if f.startswith("Expected status"):
+                    total_assertions += 1
+                    # It failed, so don't increment passed
 
-        print(f"\nResults saved to: {output_file}")
+            if tr.failures:
+                for f in tr.failures:
+                    failure_details.append(f"[{tr.name}] {f}")
 
-    # Summary
-    critical_failures = sum(1 for r in results if not r.passed and r.severity == "critical")
-    high_failures = sum(1 for r in results if not r.passed and r.severity == "high")
+        # If a request had expected_status and it passed, count it
+        for rspec in spec.get("requests", [{}]):
+            if "expected_status" in rspec or "expected_status_range" in rspec:
+                total_assertions += 1
+                # Check if this request's status check passed (no status failure in results)
+                rname = rspec.get("name", "")
+                status_failed = any(
+                    f.startswith("Expected status")
+                    for tr in result.test_results if tr.name == rname
+                    for f in tr.failures
+                )
+                if not status_failed:
+                    passed_assertions += 1
+
+        # Compute duration_ms
+        duration_ms = 0.0
+        if result.end_time and result.start_time:
+            duration_ms = (result.end_time - result.start_time).total_seconds() * 1000
+
+        spec_status = "pass" if result.passed else "fail"
+        canonical_results.append(_canonical_result(
+            spec_path=str(spec_path),
+            status=spec_status,
+            duration_ms=duration_ms,
+            hash_verified=None,
+            assertions_evaluated=total_assertions,
+            assertions_passed=passed_assertions,
+            failures=failure_details if failure_details else None,
+        ))
+
+    # Build canonical report
+    report = _canonical_report(
+        framework="usts",
+        framework_version=USTS_VERSION,
+        results=canonical_results,
+        start_time=report_start,
+    )
+
+    _print_summary(report)
+
+    if args.report:
+        _save_report(report, args.report)
+
+    # Summary (keep existing severity-based summary)
+    critical_failures = sum(
+        1 for r in canonical_results
+        if r["status"] == "fail"
+    )
 
     print(f"\n{'='*60}")
-    print(f"Security Test Summary")
-    print(f"{'='*60}")
-    print(f"Total Tests:      {len(results)}")
-    print(f"Passed:           {sum(1 for r in results if r.passed)}")
-    print(f"Failed:           {sum(1 for r in results if not r.passed)}")
-    print(f"Critical Failures: {critical_failures}")
-    print(f"High Failures:    {high_failures}")
-    print(f"{'='*60}")
     print(f"Overall: {'PASS' if all_passed else 'FAIL'}")
     print(f"{'='*60}")
 
-    # Exit with error if critical or high severity tests failed
-    if critical_failures > 0 or high_failures > 0:
-        sys.exit(2)
-    elif not all_passed:
+    # Exit with error if any tests failed
+    if not all_passed:
         sys.exit(1)
     else:
         sys.exit(0)

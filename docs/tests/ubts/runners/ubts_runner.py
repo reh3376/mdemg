@@ -4,11 +4,11 @@ UBTS Runner - Universal Benchmark Test Specification Runner
 
 Executes UBTS benchmark specifications against MDEMG endpoints.
 
-Version: 1.1.0
+Version: 1.2.0
 
 Usage:
     python ubts_runner.py --spec specs/retrieve_latency.ubts.json --profile profiles/load.profile.json
-    python ubts_runner.py --spec specs/*.ubts.json --profile profiles/smoke.profile.json --output results/
+    python ubts_runner.py --spec specs/*.ubts.json --profile profiles/smoke.profile.json --report results/ubts_report.json
 """
 
 import argparse
@@ -19,12 +19,18 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
+
 import requests
+
+UBTS_VERSION = "1.2.0"
 
 @dataclass
 class BenchmarkResult:
@@ -136,11 +142,11 @@ def load_profile(profile_path: str) -> Dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# Schema-runner parity: fail-fast for unimplemented spec/profile fields       #
+# Schema-runner parity: hard-fail for unimplemented spec/profile fields       #
 # --------------------------------------------------------------------------- #
 
 # Schema fields recognised by this runner. Anything outside this set triggers
-# a fail-fast warning so specs never silently ignore new schema additions.
+# a hard fail so specs never silently ignore new schema additions.
 _KNOWN_SPEC_KEYS = {
     "ubts_version", "benchmark", "thresholds", "setup", "metadata",
 }
@@ -150,7 +156,7 @@ _KNOWN_BENCHMARK_KEYS = {
 _KNOWN_THRESHOLD_KEYS = {
     "p50_ms", "p95_ms", "p99_ms", "max_ms", "error_rate_pct", "throughput_rps",
 }
-_KNOWN_SETUP_KEYS = {"seed_data", "warmup_requests"}
+_KNOWN_SETUP_KEYS = {"seed_data", "warmup_requests", "use_benchmark_space"}
 _KNOWN_PROFILE_PARAM_KEYS = {
     "total_requests", "concurrent_users", "ramp_up_seconds",
     "duration_seconds", "think_time_ms",
@@ -167,53 +173,53 @@ def validate_supported_features(
 ) -> List[str]:
     """Fail fast when spec/profile uses fields this runner does not implement.
 
-    Returns a list of warning strings. Non-empty means the run should SKIP or
-    WARN rather than silently ignore fields.
+    Returns a list of error strings prefixed with 'PARITY FAILURE:'.
+    Non-empty means the spec MUST be marked as fail -- not warned and skipped.
     """
-    warnings: List[str] = []
+    errors: List[str] = []
 
     # --- Spec root keys ---
     for key in spec:
         if key not in _KNOWN_SPEC_KEYS:
-            warnings.append(f"spec root key '{key}' is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented spec root key: {key}")
 
     # --- Benchmark sub-keys ---
     benchmark = spec.get("benchmark", {})
     for key in benchmark:
         if key not in _KNOWN_BENCHMARK_KEYS:
-            warnings.append(f"benchmark.{key} is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented benchmark field: {key}")
 
     # --- Threshold sub-keys ---
     thresholds = spec.get("thresholds", {})
     for key in thresholds:
         if key not in _KNOWN_THRESHOLD_KEYS:
-            warnings.append(f"thresholds.{key} is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented threshold field: {key}")
 
     # --- Setup sub-keys ---
     setup = spec.get("setup", {})
     for key in setup:
         if key not in _KNOWN_SETUP_KEYS:
-            warnings.append(f"setup.{key} is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented setup field: {key}")
     if "seed_data" in setup and setup["seed_data"]:
-        warnings.append("setup.seed_data is defined but seeding is not implemented")
+        errors.append("PARITY FAILURE: setup.seed_data is defined but seeding is not implemented")
 
     # --- Profile parameter keys ---
     params = profile.get("parameters", {})
     for key in params:
         if key not in _KNOWN_PROFILE_PARAM_KEYS:
-            warnings.append(f"profile parameter '{key}' is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented profile parameter: {key}")
     if params.get("ramp_up_seconds"):
-        warnings.append("profile.parameters.ramp_up_seconds is defined but ramp-up is not implemented")
+        errors.append("PARITY FAILURE: profile.parameters.ramp_up_seconds is defined but ramp-up is not implemented")
     if params.get("duration_seconds"):
-        warnings.append("profile.parameters.duration_seconds is defined but duration-based runs are not implemented")
+        errors.append("PARITY FAILURE: profile.parameters.duration_seconds is defined but duration-based runs are not implemented")
 
     # --- Profile assertion keys ---
     assertions = profile.get("assertions", {})
     for key in assertions:
         if key not in _KNOWN_ASSERTION_KEYS:
-            warnings.append(f"profile assertion '{key}' is not handled by the runner")
+            errors.append(f"PARITY FAILURE: Unimplemented profile assertion: {key}")
 
-    return warnings
+    return errors
 
 
 def render_value(value: Any, variables: Dict[str, Any]) -> Any:
@@ -397,7 +403,7 @@ def main():
     parser.add_argument("--profile", required=True, help="Path to profile file")
     parser.add_argument("--base-url", default="http://localhost:9999", help="MDEMG base URL")
     parser.add_argument("--space-id", default="benchmark-test", help="Space ID for tests")
-    parser.add_argument("--output", help="Output directory for results")
+    parser.add_argument("--report", help="Output file path for canonical JSON report")
     args = parser.parse_args()
 
     profile = load_profile(args.profile)
@@ -412,7 +418,8 @@ def main():
         spec_paths = [Path(args.spec)]
 
     all_passed = True
-    results = []
+    canonical_results = []
+    report_start = datetime.now(timezone.utc)
     assertions = profile.get("assertions", {})
     check_thresholds = assertions.get("check_thresholds", True)
     all_requests_succeed = assertions.get("all_requests_succeed", False)
@@ -423,32 +430,66 @@ def main():
         print(f"\nLoading spec: {spec_path}")
         spec = load_spec(spec_path)
 
-        # --- Schema-runner parity: fail-fast for unimplemented fields ---
-        parity_warnings = validate_supported_features(spec, profile)
-        if parity_warnings:
-            print("\n  Schema-runner parity warnings:")
-            for w in parity_warnings:
-                print(f"    ⚠ {w}")
+        # --- Schema-runner parity: hard-fail for unimplemented fields ---
+        parity_errors = validate_supported_features(spec, profile)
+        if parity_errors:
+            print("\n  Schema-runner parity FAILURES:")
+            for e in parity_errors:
+                print(f"    {e}")
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="fail",
+                failures=parity_errors,
+                hash_verified=None,
+            ))
+            all_passed = False
+            continue
 
         result = run_benchmark(spec, profile, args.base_url, args.space_id)
-        results.append(result)
 
         thresholds = spec.get("thresholds", {}) if check_thresholds else {}
         passed = print_results(result, thresholds)
+
+        # Build assertion counts and failure details
+        threshold_checks = result.check_thresholds(thresholds)
+        spec_failures = []
+        assertions_evaluated = len(threshold_checks)
+        assertions_passed_count = sum(1 for v in threshold_checks.values() if v)
+
         if check_thresholds and not passed:
             all_passed = False
+            for name, ok in threshold_checks.items():
+                if not ok:
+                    actual = getattr(result, name, None)
+                    if actual is None:
+                        if name == "error_rate_pct":
+                            actual = result.error_rate
+                        elif name == "throughput_rps":
+                            actual = result.throughput_rps
+                    spec_failures.append(
+                        f"Threshold {name}: actual={actual:.2f}, threshold={thresholds.get(name)}"
+                    )
+
         if all_requests_succeed and result.failed_requests > 0:
             print(f"\n  [\u2717] all_requests_succeed: {result.failed_requests} failures")
             all_passed = False
+            assertions_evaluated += 1
+            spec_failures.append(f"all_requests_succeed: {result.failed_requests} failures")
+        elif all_requests_succeed:
+            assertions_evaluated += 1
+            assertions_passed_count += 1
 
         # --- B1: Enforce min_success_rate ---
         if min_success_rate is not None:
+            assertions_evaluated += 1
             actual_rate = result.success_rate
             if actual_rate < min_success_rate:
                 print(f"\n  [\u2717] min_success_rate: {actual_rate:.2f}% < {min_success_rate}% - FAIL")
                 all_passed = False
+                spec_failures.append(f"min_success_rate: {actual_rate:.2f}% < {min_success_rate}%")
             else:
                 print(f"\n  [\u2713] min_success_rate: {actual_rate:.2f}% >= {min_success_rate}% - PASS")
+                assertions_passed_count += 1
 
         # --- B1: Enforce max_p99_degradation_pct ---
         # Baseline is ALWAYS the spec's p99_ms threshold (fixed, deterministic).
@@ -457,6 +498,7 @@ def main():
         if max_p99_degradation_pct is not None and check_thresholds:
             spec_p99 = spec.get("thresholds", {}).get("p99_ms")
             if spec_p99 and spec_p99 > 0:
+                assertions_evaluated += 1
                 actual_p99 = result.p99_ms
                 degradation_pct = ((actual_p99 - spec_p99) / spec_p99) * 100
                 if degradation_pct > max_p99_degradation_pct:
@@ -466,33 +508,49 @@ def main():
                         f"spec p99={spec_p99}ms) - FAIL"
                     )
                     all_passed = False
+                    spec_failures.append(
+                        f"max_p99_degradation_pct: {degradation_pct:.1f}% > {max_p99_degradation_pct}%"
+                    )
                 else:
                     print(
                         f"\n  [\u2713] max_p99_degradation_pct: {degradation_pct:.1f}% <= "
                         f"{max_p99_degradation_pct}% - PASS"
                     )
+                    assertions_passed_count += 1
             else:
                 print(
                     f"\n  [\u26a0] max_p99_degradation_pct: spec has no p99_ms threshold "
                     f"to compare against - SKIP"
                 )
 
-    # Save results if output directory specified
-    if args.output:
-        output_dir = Path(args.output)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Compute duration_ms from benchmark result
+        duration_ms = 0.0
+        if result.end_time and result.start_time:
+            duration_ms = (result.end_time - result.start_time).total_seconds() * 1000
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = output_dir / f"ubts_results_{timestamp}.json"
+        spec_status = "pass" if not spec_failures else "fail"
+        canonical_results.append(_canonical_result(
+            spec_path=str(spec_path),
+            status=spec_status,
+            duration_ms=duration_ms,
+            hash_verified=None,
+            assertions_evaluated=assertions_evaluated,
+            assertions_passed=assertions_passed_count,
+            failures=spec_failures if spec_failures else None,
+        ))
 
-        with open(output_file, "w") as f:
-            json.dump({
-                "profile": profile["profile_name"],
-                "timestamp": timestamp,
-                "results": [r.to_dict() for r in results],
-            }, f, indent=2)
+    # Build canonical report
+    report = _canonical_report(
+        framework="ubts",
+        framework_version=UBTS_VERSION,
+        results=canonical_results,
+        start_time=report_start,
+    )
 
-        print(f"\nResults saved to: {output_file}")
+    _print_summary(report)
+
+    if args.report:
+        _save_report(report, args.report)
 
     print(f"\n{'='*60}")
     print(f"Overall: {'PASS' if all_passed else 'FAIL'}")

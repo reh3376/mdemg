@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """
-UVTS Runner - Universal Validation Test Specification Runner
+UVTS Runner -- DEMOTED to spec-only status.
+
+This runner is not a functional test runner. UVTS is a validation framework
+that requires external grading (LLM-based evaluation). The runner generates
+test questions but does not perform assertions itself, making it a 0/0
+false-pass risk per Portable Agent Spec Section 10.1.
+
+Status: spec-only (no CI gate, no assertions)
+See: docs/development/UXTS_FRAMEWORK_MATRIX.md
 
 Executes semantic accuracy validation tests defined by UVTS specs.
 Integrates with MDEMG retrieval and LLM answer synthesis.
 
 Usage:
-    # Run standard profile
+    # Run standard profile (generates questions only)
     python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --profile standard
 
     # Run quick profile
@@ -14,6 +22,9 @@ Usage:
 
     # Run with custom output directory
     python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --output-dir /tmp/uvts_run
+
+    # Display results from a graded run
+    python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --grades grades.json --report report.json
 """
 
 import json
@@ -22,9 +33,13 @@ import sys
 import time
 import random
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
 
 # Add parent directories to path for imports
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -36,8 +51,14 @@ try:
     from answer_generator import AnswerGenerator
     from grader_v4 import Grader
 except ImportError as e:
-    print(f"Warning: Could not import benchmark modules: {e}")
-    print("Some functionality may be limited.")
+    pass  # Benchmark modules are optional; runner works without them
+
+UVTS_VERSION = "1.1.0"
+
+
+def _validate_supported_features(spec_dict: Dict[str, Any]) -> List[str]:
+    """UVTS is demoted to spec-only. Always returns a parity failure."""
+    return ["PARITY FAILURE: UVTS runner is demoted to spec-only status. No assertions are implemented."]
 
 
 class UVTSRunner:
@@ -252,6 +273,71 @@ python3 docs/benchmarks/grader_v4.py \\
         return config_summary
 
 
+def _build_graded_results(grades_file: str, spec_path: str, thresholds: Dict) -> List[Dict]:
+    """Build canonical results from a graded UVTS run."""
+    with open(grades_file) as f:
+        data = json.load(f)
+
+    grades = data.get("grades", [])
+    summary = data.get("summary", {})
+
+    assertions_evaluated = 0
+    assertions_passed_count = 0
+    failures = []
+
+    # Check mean_score threshold
+    mean_score = summary.get("mean_score", 0)
+    threshold_mean = thresholds.get("mean_score", 0.795)
+    assertions_evaluated += 1
+    if mean_score >= threshold_mean:
+        assertions_passed_count += 1
+    else:
+        failures.append(f"mean_score: {mean_score:.3f} < {threshold_mean}")
+
+    # Check strong_evidence_pct threshold
+    if "strong_evidence_pct" in thresholds:
+        assertions_evaluated += 1
+        evidence_tiers = {}
+        for g in grades:
+            tier = g.get("evidence_details", {}).get("tier", "none")
+            evidence_tiers[tier] = evidence_tiers.get(tier, 0) + 1
+        strong_pct = (evidence_tiers.get("strong", 0) / len(grades) * 100) if grades else 0
+        if strong_pct >= thresholds["strong_evidence_pct"]:
+            assertions_passed_count += 1
+        else:
+            failures.append(f"strong_evidence_pct: {strong_pct:.1f}% < {thresholds['strong_evidence_pct']}%")
+
+    # Check high_score_rate_pct threshold
+    if "high_score_rate_pct" in thresholds:
+        assertions_evaluated += 1
+        high_score_count = len([g for g in grades if g.get("scores", {}).get("final", 0) >= 0.8])
+        high_score_pct = (high_score_count / len(grades) * 100) if grades else 0
+        if high_score_pct >= thresholds["high_score_rate_pct"]:
+            assertions_passed_count += 1
+        else:
+            failures.append(f"high_score_rate_pct: {high_score_pct:.1f}% < {thresholds['high_score_rate_pct']}%")
+
+    # Check max_token_usage threshold
+    if "max_token_usage" in thresholds:
+        assertions_evaluated += 1
+        token_total = summary.get("token_usage", {}).get("total", 0)
+        if token_total <= thresholds["max_token_usage"]:
+            assertions_passed_count += 1
+        else:
+            failures.append(f"max_token_usage: {token_total} > {thresholds['max_token_usage']}")
+
+    status = "pass" if not failures else "fail"
+
+    return [_canonical_result(
+        spec_path=str(spec_path),
+        status=status,
+        hash_verified=None,
+        assertions_evaluated=assertions_evaluated,
+        assertions_passed=assertions_passed_count,
+        failures=failures if failures else None,
+    )]
+
+
 def display_results(grades_file: str, thresholds: Dict) -> None:
     """Display formatted validation results."""
     with open(grades_file) as f:
@@ -268,7 +354,7 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
     print(f"Threshold: >= {thresholds.get('mean_score', 0.795)}")
 
     passed = summary.get('mean_score', 0) >= thresholds.get('mean_score', 0.795)
-    print(f"Result: {'✅ PASS' if passed else '❌ FAIL'}")
+    print(f"Result: {'PASS' if passed else 'FAIL'}")
 
     print("\n" + "-" * 60)
     print("SCORES BY CATEGORY")
@@ -284,8 +370,8 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
     for cat in sorted(by_cat.keys()):
         scores = by_cat[cat]
         avg = sum(scores) / len(scores) if scores else 0
-        status = "✅" if avg >= thresholds.get("min_category_score", 0.6) else "⚠️"
-        print(f"  {status} {cat:30s}: {avg:.3f} ({len(scores)} questions)")
+        status = "PASS" if avg >= thresholds.get("min_category_score", 0.6) else "WARN"
+        print(f"  [{status}] {cat:30s}: {avg:.3f} ({len(scores)} questions)")
 
     print("\n" + "-" * 60)
     print("EVIDENCE QUALITY")
@@ -304,7 +390,7 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
     strong_pct = (evidence_tiers.get("strong", 0) / len(grades) * 100) if grades else 0
     threshold_strong = thresholds.get("strong_evidence_pct", 60.0)
     print(f"\n  Strong evidence: {strong_pct:.1f}% (threshold: {threshold_strong}%)")
-    print(f"  {'✅ PASS' if strong_pct >= threshold_strong else '❌ FAIL'}")
+    print(f"  {'PASS' if strong_pct >= threshold_strong else 'FAIL'}")
 
     print("\n" + "-" * 60)
     print("HIGH SCORE RATE")
@@ -316,7 +402,7 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
 
     print(f"  Scores >= 0.8: {high_score_count}/{len(grades)} ({high_score_pct:.1f}%)")
     print(f"  Threshold: {threshold_high}%")
-    print(f"  {'✅ PASS' if high_score_pct >= threshold_high else '❌ FAIL'}")
+    print(f"  {'PASS' if high_score_pct >= threshold_high else 'FAIL'}")
 
     # Token usage if available
     token_usage = summary.get("token_usage", {})
@@ -332,7 +418,7 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
         if max_tokens:
             total = token_usage.get("total", 0)
             print(f"  Limit:  {max_tokens:,}")
-            print(f"  {'✅ PASS' if total <= max_tokens else '❌ OVER LIMIT'}")
+            print(f"  {'PASS' if total <= max_tokens else 'OVER LIMIT'}")
 
     print("\n" + "=" * 60)
 
@@ -346,11 +432,14 @@ def main():
     parser.add_argument("--output-dir", default=None,
                        help="Output directory (default: auto-generated)")
     parser.add_argument("--grades", help="Path to grades.json to display results")
+    parser.add_argument("--report", help="Output file path for canonical JSON report")
 
     args = parser.parse_args()
 
+    report_start = datetime.now(timezone.utc)
+
     if args.grades:
-        # Display mode - show results from a completed run
+        # Display mode - show results from a completed run and build canonical report
         spec_path = Path(args.spec)
         try:
             with open(spec_path) as f:
@@ -358,10 +447,29 @@ def main():
         except Exception as e:
             print(f"ERROR: Failed to read spec: {e}", file=sys.stderr)
             sys.exit(1)
-        display_results(args.grades, spec.get("thresholds", {}))
-        return
 
-    # Run mode
+        thresholds = spec.get("thresholds", {})
+        display_results(args.grades, thresholds)
+
+        # Build canonical report from graded results
+        canonical_results = _build_graded_results(args.grades, str(spec_path), thresholds)
+        report = _canonical_report(
+            framework="uvts",
+            framework_version=UVTS_VERSION,
+            results=canonical_results,
+            start_time=report_start,
+        )
+
+        _print_summary(report)
+
+        if args.report:
+            _save_report(report, args.report)
+
+        # Exit based on graded results
+        all_passed = all(r["status"] == "pass" for r in canonical_results)
+        sys.exit(0 if all_passed else 1)
+
+    # Run mode (question generation only -- no assertions)
     if args.output_dir:
         output_dir = args.output_dir
     else:
@@ -382,6 +490,31 @@ def main():
         sys.exit(1)
 
     print(f"\nOutput written to: {output_dir}")
+
+    # Without --grades, this is question-generation only.
+    # Build a canonical report with error status (spec-only demotion).
+    canonical_results = [_canonical_result(
+        spec_path=str(args.spec),
+        status="error",
+        hash_verified=None,
+        assertions_evaluated=0,
+        assertions_passed=0,
+        error="UVTS runner is demoted to spec-only status. "
+              "No assertions are performed without --grades. "
+              "Run external grading and pass --grades to produce a scored report.",
+    )]
+
+    report = _canonical_report(
+        framework="uvts",
+        framework_version=UVTS_VERSION,
+        results=canonical_results,
+        start_time=report_start,
+    )
+
+    _print_summary(report)
+
+    if args.report:
+        _save_report(report, args.report)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -102,9 +102,11 @@ help:
 	@echo "  test-parsers   - Run UPTS parser validation (all languages)"
 	@echo "  test-parser-X  - Run UPTS validation for language X (go, python, typescript)"
 	@echo "  test-api       - Run all UATS API validation specs"
+	@echo "  test-udts      - Run UDTS gRPC contract tests with Section 8A report"
 	@echo "  test-ubts-smoke- Run UBTS smoke benchmark (quick, 10 requests)"
 	@echo "  test-ubts-load - Run UBTS load benchmark (1000 requests)"
 	@echo "  test-uots      - Run all UOTS observability contract specs"
+	@echo "  test-unts-report- Generate UNTS Section 8A report from registry"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Build and run MDEMG server"
@@ -183,7 +185,7 @@ test-ubts-smoke:
 		--spec "docs/tests/ubts/specs/retrieve_latency.ubts.json" \
 		--profile docs/tests/ubts/profiles/smoke.profile.json \
 		--base-url $(BASE_URL) \
-		--output /tmp/ubts-results/
+		--report /tmp/ubts-report.json
 	@echo "UBTS smoke benchmark complete"
 
 # Run UBTS load benchmark (moderate load — 1000 requests, 10 concurrent)
@@ -193,7 +195,7 @@ test-ubts-load:
 		--spec "docs/tests/ubts/specs/*.ubts.json" \
 		--profile docs/tests/ubts/profiles/load.profile.json \
 		--base-url $(BASE_URL) \
-		--output /tmp/ubts-results/
+		--report /tmp/ubts-report.json
 	@echo "UBTS load benchmark complete"
 
 # ============================================================
@@ -222,7 +224,7 @@ test-rsic-uats:
 # ============================================================
 # UNTS Testing Targets
 # ============================================================
-.PHONY: test-unts test-unts-uats
+.PHONY: test-unts test-unts-uats test-unts-report test-udts
 
 test-unts:
 	@echo "Running UNTS unit tests..."
@@ -234,3 +236,22 @@ test-unts-uats:
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--include-tag unts
+
+# Generate UNTS Section 8A report from registry
+test-unts-report:
+	@echo "Generating UNTS Section 8A report..."
+	python3 scripts/unts_report_adapter.py \
+		--registry docs/specs/unts-registry.json \
+		--report /tmp/unts-report.json
+	@echo "Report saved to /tmp/unts-report.json"
+
+# ============================================================
+# UDTS Contract Testing Targets
+# ============================================================
+
+# Run UDTS gRPC contract tests with Section 8A report
+test-udts:
+	@echo "Running UDTS gRPC contract tests..."
+	python3 docs/api/api-spec/udts/runners/udts_runner.py \
+		--report /tmp/udts-report.json
+	@echo "Report saved to /tmp/udts-report.json"

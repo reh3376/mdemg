@@ -38,10 +38,14 @@ import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import argparse
 import http.client
 import urllib.parse
+
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
 
 
 # ============================================================
@@ -66,6 +70,42 @@ Your task: Name the emergent concept they collectively represent.
 - Output ONLY valid JSON — no markdown, no preamble
 
 {"name": "<concept>", "description": "<why>", "proposed_label": "<label>"}"""
+
+
+# ============================================================
+# PARITY CHECK (Section 8 — Portable Agent Spec v2.2.0)
+# ============================================================
+
+_UETS_KNOWN_TOP_FIELDS = {"uets_version", "model", "metadata", "config", "fixture", "expected", "patterns_covered"}
+_UETS_KNOWN_CONFIG_FIELDS = {"temperature", "max_tokens", "timeout_ms", "num_ctx", "retries"}
+_UETS_KNOWN_MODEL_FIELDS = {"name", "endpoint", "model_id", "type"}
+_UETS_KNOWN_FIXTURE_FIELDS = {"type", "path", "sha256", "clusters"}
+_UETS_KNOWN_EXPECTED_FIELDS = {"thresholds"}
+
+def _validate_supported_features(spec_dict):
+    """Detect spec fields this runner does not implement (parity check)."""
+    errors = []
+    unknown_top = set(spec_dict.keys()) - _UETS_KNOWN_TOP_FIELDS
+    if unknown_top:
+        errors.append(f"PARITY FAILURE: Unimplemented top-level fields: {unknown_top}")
+    if "config" in spec_dict and isinstance(spec_dict["config"], dict):
+        unknown_cfg = set(spec_dict["config"].keys()) - _UETS_KNOWN_CONFIG_FIELDS
+        if unknown_cfg:
+            errors.append(f"PARITY FAILURE: Unimplemented config fields: {unknown_cfg}")
+        # config.retries is advisory — recognised but not enforced by this runner
+    if "model" in spec_dict and isinstance(spec_dict["model"], dict):
+        unknown_model = set(spec_dict["model"].keys()) - _UETS_KNOWN_MODEL_FIELDS
+        if unknown_model:
+            errors.append(f"PARITY FAILURE: Unimplemented model fields: {unknown_model}")
+    if "fixture" in spec_dict and isinstance(spec_dict["fixture"], dict):
+        unknown_fix = set(spec_dict["fixture"].keys()) - _UETS_KNOWN_FIXTURE_FIELDS
+        if unknown_fix:
+            errors.append(f"PARITY FAILURE: Unimplemented fixture fields: {unknown_fix}")
+    if "expected" in spec_dict and isinstance(spec_dict["expected"], dict):
+        unknown_exp = set(spec_dict["expected"].keys()) - _UETS_KNOWN_EXPECTED_FIELDS
+        if unknown_exp:
+            errors.append(f"PARITY FAILURE: Unimplemented expected fields: {unknown_exp}")
+    return errors
 
 
 # ============================================================
@@ -709,23 +749,29 @@ def cmd_validate(args: argparse.Namespace) -> int:
     spec = UETSLoader.load(spec_path)
     spec_dir = spec_path.parent
 
+    # Parity check
+    parity_errors = _validate_supported_features(spec)
+
     # Load clusters
     clusters = UETSLoader.load_clusters(spec, spec_dir)
     if not clusters:
         print(f"No clusters found in fixture for {spec_path}", file=sys.stderr)
         return 1
 
-    # Hash verification
+    # Hash verification (unconditional when hash field is present)
     fixture = spec["fixture"]
-    hash_ok = True
-    if fixture["type"] == "file" and not args.skip_hash:
+    hash_verified = None  # tristate: True/False/None
+    hash_mismatches = []
+    if fixture["type"] == "file":
         fixture_path = (spec_dir / fixture["path"]).resolve()
         sha = fixture.get("sha256")
         if sha:
             ok, msg = verify_fixture_hash(fixture_path, sha)
-            hash_ok = ok
+            hash_verified = ok
             if not ok:
+                hash_mismatches.append(msg)
                 print(f"  WARNING: {msg}", file=sys.stderr)
+        # no sha256 field → hash_verified stays None
 
     # Run model
     model_cfg = spec["model"]
@@ -747,13 +793,34 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Validate
     spec_result = Validator.validate(spec, results)
     spec_result.spec_path = str(spec_path)
-    spec_result.hash_verified = hash_ok
+    spec_result.hash_verified = hash_verified if hash_verified is not None else True
     spec_result.duration_ms = round(duration, 1)
 
     Reporter.print_result(spec_result)
 
+    # Build canonical report
+    all_failures = list(spec_result.failures) + parity_errors
+    # Count assertions: 5 threshold checks (E1-E5) are the assertions
+    thresholds = spec.get("expected", {}).get("thresholds", {})
+    assertions_evaluated = len(thresholds)
+    assertions_passed = assertions_evaluated - len(spec_result.failures)
+
+    canonical_status = "fail" if all_failures else "pass"
+    canonical_results = [_canonical_result(
+        spec_path=str(spec_path),
+        status=canonical_status,
+        duration_ms=round(duration, 1),
+        hash_verified=hash_verified,
+        hash_mismatches=hash_mismatches,
+        assertions_evaluated=assertions_evaluated,
+        assertions_passed=assertions_passed,
+        failures=all_failures if all_failures else [],
+    )]
+    report = _canonical_report("uets", UETS_VERSION, canonical_results, duration_ms=round(duration, 1))
+    _print_summary(report)
+
     if args.report:
-        Reporter.generate_report([spec_result], Path(args.report))
+        _save_report(report, args.report)
 
     return 0 if spec_result.status == "pass" else 1
 
@@ -769,28 +836,46 @@ def cmd_validate_all(args: argparse.Namespace) -> int:
 
     print(f"Found {len(spec_files)} UETS specs\n")
     all_results = []
+    canonical_results = []
+    total_start = time.monotonic()
 
     for spec_path in spec_files:
         try:
             spec = UETSLoader.load(spec_path)
         except Exception as e:
             print(f"  SKIP {spec_path.name}: {e}", file=sys.stderr)
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="error",
+                error=str(e),
+            ))
             continue
+
+        # Parity check
+        parity_errors = _validate_supported_features(spec)
 
         clusters = UETSLoader.load_clusters(spec, spec_dir)
         if not clusters:
             print(f"  SKIP {spec_path.name}: no clusters", file=sys.stderr)
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="skip",
+                warnings=["no clusters in fixture"],
+            ))
             continue
 
-        # Hash check
+        # Hash check (unconditional when hash field is present)
         fixture = spec["fixture"]
-        hash_ok = True
-        if fixture["type"] == "file" and not args.skip_hash:
+        hash_verified = None  # tristate
+        hash_mismatches = []
+        if fixture["type"] == "file":
             fp = (spec_dir / fixture["path"]).resolve()
             sha = fixture.get("sha256")
             if sha:
                 ok, msg = verify_fixture_hash(fp, sha)
-                hash_ok = ok
+                hash_verified = ok
+                if not ok:
+                    hash_mismatches.append(msg)
 
         model_cfg = spec["model"]
         run_cfg = spec.get("config", {})
@@ -808,17 +893,39 @@ def cmd_validate_all(args: argparse.Namespace) -> int:
 
         spec_result = Validator.validate(spec, results)
         spec_result.spec_path = str(spec_path)
-        spec_result.hash_verified = hash_ok
+        spec_result.hash_verified = hash_verified if hash_verified is not None else True
         spec_result.duration_ms = round(duration, 1)
         all_results.append(spec_result)
 
         Reporter.print_result(spec_result)
 
+        # Build canonical result for this spec
+        all_failures = list(spec_result.failures) + parity_errors
+        thresholds = spec.get("expected", {}).get("thresholds", {})
+        assertions_evaluated = len(thresholds)
+        assertions_passed = assertions_evaluated - len(spec_result.failures)
+        canonical_status = "fail" if all_failures else "pass"
+
+        canonical_results.append(_canonical_result(
+            spec_path=str(spec_path),
+            status=canonical_status,
+            duration_ms=round(duration, 1),
+            hash_verified=hash_verified,
+            hash_mismatches=hash_mismatches,
+            assertions_evaluated=assertions_evaluated,
+            assertions_passed=assertions_passed,
+            failures=all_failures if all_failures else [],
+        ))
+
     Reporter.print_summary_table(all_results)
     Reporter.print_overall(all_results)
 
+    total_duration = (time.monotonic() - total_start) * 1000
+    report = _canonical_report("uets", UETS_VERSION, canonical_results, duration_ms=round(total_duration, 1))
+    _print_summary(report)
+
     if args.report:
-        Reporter.generate_report(all_results, Path(args.report))
+        _save_report(report, args.report)
 
     failed = sum(1 for r in all_results if r.status == "fail")
     return 1 if failed > 0 else 0
@@ -909,14 +1016,12 @@ def main() -> int:
     # validate
     p_val = sub.add_parser("validate", help="Validate a single UETS spec")
     p_val.add_argument("--spec", required=True, help="Path to .uets.json spec file")
-    p_val.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     p_val.add_argument("--report", help="Output JSON report path")
     p_val.add_argument("--endpoint", help="Override model endpoint URL (run any spec against any host)")
 
     # validate-all
     p_all = sub.add_parser("validate-all", help="Validate all UETS specs in directory")
     p_all.add_argument("--spec-dir", required=True, help="Directory containing .uets.json specs")
-    p_all.add_argument("--skip-hash", action="store_true", help="Skip fixture hash verification")
     p_all.add_argument("--report", help="Output JSON report path")
     p_all.add_argument("--endpoint", help="Override model endpoint URL for all specs")
 

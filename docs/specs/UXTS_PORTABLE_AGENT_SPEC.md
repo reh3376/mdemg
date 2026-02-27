@@ -1,6 +1,6 @@
 # UxTS Portable Agent Specification
 
-Version: 2.2.0-draft
+Version: 2.3.0-draft
 Date: 2026-02-27
 Audience: Coding agents implementing Universal-x Test Specification governance in arbitrary codebases.
 
@@ -270,6 +270,8 @@ Specs and fixtures can include SHA256 hashes. If a spec file is modified — int
 
 6. **Framework overlap must be resolved by canonical ownership.** If two frameworks both claim "observability," define exactly what each owns (e.g., one owns runtime behavior, the other owns artifact structure). Document the split. Ambiguity here causes specs to land in the wrong framework and get validated by the wrong runner.
 
+7. **Expand before creating.** In existing codebases, agents MUST attempt to extend an existing framework before introducing a new `U<X>TS` framework. Creating a new framework requires explicit justification that extension would cause semantic overlap, schema distortion, or ownership ambiguity.
+
 ### 5.1 Hash Computation Procedure
 
 All UxTS implementations MUST use this procedure to ensure portable, deterministic hash values.
@@ -326,11 +328,55 @@ The runner itself does not have a `--skip-hash` flag. Hash verification is alway
 
 ## 6. Framework Discovery and Bootstrap
 
-When entering a new codebase, the agent should systematically discover what verification needs exist and map them to framework candidates.
+When entering a new codebase, the agent MUST systematically discover what verification needs exist, map them to framework candidates, and in brownfield repositories propose and execute prioritized remediations.
+
+### 6.0 Operating Mode (Mandatory)
+
+The agent MUST explicitly declare one operating mode at the start of work:
+
+- `greenfield`: No existing UxTS artifacts are present.
+- `brownfield`: Existing codebase already contains production constructs and/or partial UxTS artifacts.
+
+Use this decision rule:
+
+- `greenfield` only if ALL are true:
+  - No `*.u?ts.json` files exist.
+  - No framework governance artifacts exist (`FRAMEWORK_GOVERNANCE.md`, `UXTS_FRAMEWORK_MATRIX.md`, equivalent).
+  - No existing runner commands or CI jobs reference UxTS-like contract execution.
+- Otherwise use `brownfield`.
+
+In `brownfield` mode, Sections 6.1 through 6.4 are all mandatory and the agent MUST produce brownfield deliverables listed in Section 12.
 
 ### 6.1 Discovery Phase
 
 Discovery must be systematic and reproducible. Two agents running this procedure against the same codebase should produce the same framework candidates.
+
+**Recurring construct definition (normative):**
+
+A construct qualifies as recurring if ANY condition is met:
+
+- Pattern appears in `>= 3` concrete implementation instances.
+- Pattern appears in `>= 2` modules/services with similar verification semantics.
+- Pattern appears once but is high-risk (public API surface, auth/security boundary, data integrity path, compliance-critical flow, or SLO-governed path).
+
+Only recurring constructs are eligible for frameworkization candidates.
+
+#### 6.1.1 Deterministic Command Protocol (Required)
+
+Agents MUST run discovery commands in this exact order and capture raw output under `reports/uxts_discovery/` (or equivalent path documented in the discovery artifact).
+
+1. Baseline file inventory:
+   - `rg --files > reports/uxts_discovery/01_files.txt`
+2. Existing UxTS/governance inventory:
+   - `rg -n --hidden -S "UATS|UPTS|UBTS|USTS|UOTS|UOBS|UDTS|UVTS|UETS|UAMS|UNTS|FRAMEWORK_GOVERNANCE|UXTS_FRAMEWORK_MATRIX|\\.u[a-z]+ts\\.json" . > reports/uxts_discovery/02_uxts_inventory.txt`
+3. API/gRPC/runtime surface signals:
+   - `rg -n --hidden -S "router\\.|@app\\.route|http\\.HandleFunc|gin\\.|FastAPI\\(|\\.proto|grpc|/healthz|/readyz|/metrics" . > reports/uxts_discovery/03_interface_signals.txt`
+4. Parser/transformation signals:
+   - `rg -n --hidden -S "parser|parse\\(|AST|tree-sitter|symbol extractor|tokenizer|grammar" . > reports/uxts_discovery/04_parser_signals.txt`
+5. Security/benchmark/quality signals:
+   - `rg -n --hidden -S "auth|rbac|jwt|oauth|rate limit|latency|p95|p99|throughput|load test|SLO|LLM|embedding|retrieval|evaluation" . > reports/uxts_discovery/05_risk_signals.txt`
+
+If `rg` is unavailable, use an equivalent search tool and document the substitution in the discovery artifact.
 
 **Step 1: Enumerate concrete artifacts.** Search the codebase for the following file patterns, in this order. Each match is a signal for a candidate framework.
 
@@ -345,15 +391,23 @@ Discovery must be systematic and reproducible. Two agents running this procedure
 | 7 | Latency budgets in configs, existing load test scripts, SLO definitions | Performance contracts exist | Benchmark regression tests |
 | 8 | LLM API calls, model scoring functions, generation pipelines | AI quality surface exists | Quality evaluation tests |
 
-**Step 2: Deduplicate and prioritize.** If multiple signals map to the same candidate, merge them. If a signal is ambiguous (e.g., an endpoint that is both an API and a health probe), assign it to the more specific framework (health probe → observability, not API contracts).
+**Step 2: Map to existing frameworks first (mandatory).** Before proposing a new framework, map each candidate to existing frameworks already present in the repo. The default action is extension, not creation.
 
-**Step 3: Rank by drift risk.** For each candidate, estimate the cost of undetected drift. Rank higher:
+**New framework gate:** a new framework MAY be created only if all are documented:
+
+- Why no existing framework can represent the construct without semantic overlap.
+- Why schema extension would degrade clarity or ownership boundaries.
+- Proposed ownership and CI integration for the new framework.
+
+**Step 3: Deduplicate and prioritize.** If multiple signals map to the same candidate, merge them. If a signal is ambiguous (e.g., an endpoint that is both an API and a health probe), assign it to the more specific framework (health probe -> observability, not API contracts).
+
+**Step 4: Rank by drift risk.** For each candidate, estimate the cost of undetected drift. Rank higher:
 - Frameworks covering the primary external interface (APIs, gRPC) — highest drift risk.
 - Frameworks covering the core processing pipeline (parsers, transformers) — data quality risk.
 - Frameworks covering security boundaries — compliance risk.
 - Frameworks covering observability and benchmarks — operational risk.
 
-**Step 4: Bootstrap in rank order.** Start with the highest-risk candidate and complete one full framework (schema → spec → runner → CI) before starting the next. Attempting to bootstrap all frameworks in parallel leads to many incomplete frameworks instead of a few solid ones.
+**Step 5: Bootstrap in rank order.** Start with the highest-risk candidate and complete one full framework (schema -> spec -> runner -> CI) before starting the next. Attempting to bootstrap all frameworks in parallel leads to many incomplete frameworks instead of a few solid ones.
 
 **Decision rule:** If a candidate has fewer than 3 concrete artifacts in the codebase, defer it to `spec-only` status. If it has 3+, bootstrap to `pilot`.
 
@@ -410,6 +464,52 @@ Makefile                                 # Local automation targets (portable CI
 ```
 
 The `specs/` vs `drafts/` split is important: specs in `specs/` are canonical and subject to CI gating. Specs in `drafts/` are work-in-progress and excluded from automated runs. This prevents draft specs with incomplete structure from crashing runners or inflating pass counts.
+
+### 6.4 Brownfield Opportunity Backlog and Remediation Loop (Mandatory in Brownfield Mode)
+
+In `brownfield` mode, discovery is not complete until remediation opportunities are prioritized and acted on.
+
+1. Build an opportunity backlog for recurring constructs.
+2. Score each opportunity with the rubric below.
+3. Implement the top-priority opportunities.
+4. Re-run discovery and update backlog status after implementation.
+
+**Opportunity record (required fields):**
+
+| Field | Description |
+|-------|-------------|
+| `id` | Stable identifier (e.g., `OPP-001`) |
+| `construct` | Recurring construct name |
+| `evidence_paths` | File paths proving recurrence |
+| `current_state` | Current verification state (none/manual/partial/framework) |
+| `target_framework` | Existing framework to extend or proposed new framework |
+| `action_type` | `extend-existing` or `create-new` |
+| `priority_score` | Numeric score from rubric |
+| `status` | `planned`, `in_progress`, `implemented`, `waived` |
+
+**Scoring rubric (1-5 each, higher = more urgent):**
+
+| Dimension | Description |
+|-----------|-------------|
+| Recurrence | How many concrete instances exist |
+| Blast radius | Impact if drift escapes |
+| Change frequency | How often this area changes |
+| Compliance/security risk | Regulatory or security consequence |
+| Detection gap | How weak current verification is |
+
+`priority_score = recurrence + blast_radius + change_frequency + compliance_security_risk + detection_gap`
+
+Tie-breaker order: higher blast radius, then higher compliance/security risk, then higher recurrence.
+
+**Execution requirement (normative):**
+
+- Agent MUST implement at least one high-priority (`priority_score >= 18`) opportunity to `pilot` status in the same engagement.
+- If implementation is blocked, agent MUST produce a waiver entry with:
+  - blocker evidence,
+  - explicit owner,
+  - due date,
+  - interim risk mitigation.
+- A brownfield review without either implemented high-priority remediation or a documented waiver is incomplete.
 
 ---
 
@@ -824,6 +924,10 @@ The agent must produce and maintain these documents:
 | `FRAMEWORK_GOVERNANCE.md` | Policy: ownership, lifecycle rules, authority splits | Framework status change, policy update |
 | `UXTS_FRAMEWORK_MATRIX.md` | Inventory: schema/spec/runner/CI paths, counts, parity status | Any spec/runner/CI change |
 | `UXTS_FRAMEWORK_GAP_ASSESSMENT_<date>.md` | Point-in-time audit of all frameworks against the canonical contract | Periodic review or before major changes |
+| `UXTS_DISCOVERY_<date>.md` | Discovery evidence, operating mode declaration, recurring construct inventory | Every brownfield review and initial greenfield bootstrap |
+| `UXTS_OPPORTUNITY_BACKLOG_<date>.md` | Ranked recurring-construct opportunities with scoring rubric | After discovery; update when scores/status change |
+| `UXTS_REMEDIATION_PLAN_<date>.md` | Prioritized implementation plan from backlog to framework changes | After backlog creation; update as work completes |
+| `UXTS_REMEDIATION_WAIVERS_<date>.md` | Approved blockers for unimplemented high-priority opportunities | Only when execution requirement cannot be met |
 
 Machine-readable reports (produced by runners per the canonical report schema in Section 8A):
 - Per-framework run reports (e.g., `/tmp/api-report.json`) — produced by `--report` flag on every runner invocation.
@@ -851,6 +955,7 @@ Validates that on-disk reality matches documented state:
 2. **Runner existence** — every declared runner path actually exists on disk.
 3. **Fixture existence** — every fixture path referenced by a spec actually exists.
 4. **Hash coverage** — specs with hash fields contain real hashes (not empty or "PENDING").
+5. **Brownfield artifacts** — when operating mode is `brownfield`, required artifacts (`UXTS_DISCOVERY_*`, `UXTS_OPPORTUNITY_BACKLOG_*`, `UXTS_REMEDIATION_PLAN_*`) exist and are not stale.
 
 Both scripts should be wired into CI via Makefile targets (the same portable pattern used for framework runners). The canonical guard should use `block` gate mode. The drift checker can start as `soft` and promote to `block` once stable.
 
@@ -884,3 +989,8 @@ A repository is UxTS-governed when:
 7. Framework overlap is resolved with documented authority splits.
 8. Deprecated frameworks have migration plans.
 9. Every schema field in every `active` framework is classified as `enforced`, `advisory`, or hard-fail `unimplemented`.
+10. Operating mode is explicitly declared (`greenfield` or `brownfield`) with evidence (Section 6.0).
+11. In `brownfield` mode, deterministic discovery command outputs are captured and referenced (Section 6.1.1).
+12. In `brownfield` mode, a scored opportunity backlog exists and is current (Section 6.4).
+13. In `brownfield` mode, at least one high-priority opportunity is implemented to `pilot` (or higher) in the current engagement, or an explicit waiver exists with owner and due date (Section 6.4).
+14. Any new framework created in `brownfield` mode includes documented extension-first justification (Section 6.1, Step 2).

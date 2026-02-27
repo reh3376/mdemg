@@ -12,9 +12,6 @@ Usage:
     # Validate all specs
     python uats_runner.py validate-all --spec-dir specs/ --base-url http://localhost:8082
 
-    # Skip hash verification
-    python uats_runner.py validate --spec specs/health.uats.json --base-url http://localhost:8082 --skip-hash
-
     # Add SHA256 hashes to spec files
     python uats_runner.py add-hashes --spec-dir specs/
 
@@ -46,6 +43,10 @@ from enum import Enum
 from datetime import datetime
 from urllib.parse import urljoin, urlencode
 import argparse
+
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'tests'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
 
 try:
     import requests
@@ -202,8 +203,8 @@ class SpecResult:
     warnings: int = 0
     skipped: int = 0
     error_message: Optional[str] = None
-    hash_verified: bool = False
-    hash_skipped: bool = False
+    hash_verified: Optional[bool] = None
+    hash_mismatches: Optional[List[str]] = None
     variant_name: Optional[str] = None
     
     @property
@@ -234,6 +235,7 @@ class SpecResult:
             },
             "pass_rate": round(self.pass_rate, 2),
             "hash_verified": self.hash_verified,
+            "hash_mismatches": self.hash_mismatches or [],
             "failures": [
                 {"name": a.name, "path": a.path, "expected": a.expected, 
                  "actual": a.actual, "message": a.message}
@@ -432,10 +434,25 @@ class UATSLoader:
         if any(isinstance(v, dict) and "regex" in v for v in self.captures.values()):
             unsupported.append("captures.*.regex")
 
+        # Section 8 parity: request body hash verification
+        if "sha256" in request:
+            unsupported.append("request.sha256")
+
+        # Section 8 parity: percentile response time assertions
+        resp_time = expected.get("response_time", {})
+        if isinstance(resp_time, dict):
+            if "p95_ms" in resp_time or "p99_ms" in resp_time:
+                unsupported.append("expected.response_time.p95_ms/p99_ms")
+
+        # Section 8 parity: captures from status or response_time
+        for cap_name, cap_val in self.captures.items():
+            if isinstance(cap_val, dict) and cap_val.get("from") in ("status", "response_time"):
+                unsupported.append(f"captures.{cap_name}.from={cap_val['from']}")
+
         if unsupported:
             deduped = sorted(set(unsupported))
             self.errors.append(
-                "Runner does not implement these schema features: "
+                "PARITY FAILURE: Runner does not implement these schema features: "
                 + ", ".join(deduped)
             )
             self.errors.append(
@@ -936,12 +953,10 @@ class Validator:
         spec: UATSLoader,
         client: HTTPClient,
         token: Optional[str] = None,
-        skip_hash: bool = False
     ):
         self.spec = spec
         self.client = client
         self.token = token
-        self.skip_hash = skip_hash
         self.resolver = VariableResolver(spec.variables)
         self.engine = AssertionEngine(self.resolver)
         self.last_response_body = None
@@ -1210,12 +1225,11 @@ class Runner:
     """Main test runner."""
     
     def __init__(self, base_url: str, token: Optional[str] = None,
-                 skip_hash: bool = False, timeout: int = 30,
+                 timeout: int = 30,
                  include_tag: Optional[str] = None,
                  exclude_tag: Optional[str] = None):
         self.base_url = base_url
         self.token = token
-        self.skip_hash = skip_hash
         self.timeout = timeout
         # Support comma-separated tags: "embedding_required,unts" → ["embedding_required", "unts"]
         self.include_tags = [t.strip() for t in include_tag.split(",")] if include_tag else []
@@ -1236,19 +1250,18 @@ class Runner:
                 error_message=f"Spec errors: {'; '.join(loader.errors)}"
             )]
 
-        # Verify spec file hash (unless skipped)
-        if not self.skip_hash:
-            hash_valid, hash_msg = loader.verify_hash()
-            if not hash_valid and "No hash" not in hash_msg:
-                return [SpecResult(
-                    spec_path=str(spec_path),
-                    api_name=loader.api_name,
-                    method="",
-                    endpoint="",
-                    status=Status.ERROR,
-                    error_message=f"Spec hash verification failed: {hash_msg}",
-                    hash_verified=False
-                )]
+        # Verify spec file hash (always — Section 5.1)
+        hash_valid, hash_msg = loader.verify_hash()
+        if "No hash" in hash_msg:
+            _hash_verified = None
+            _hash_mismatches = []
+        elif hash_valid:
+            _hash_verified = True
+            _hash_mismatches = []
+        else:
+            _hash_verified = False
+            _hash_mismatches = [hash_msg]
+        # Do NOT return — continue to execute assertions regardless of hash result
 
         # CLI base_url takes precedence over spec's base_url
         # This allows testing against different environments (ports are dynamic)
@@ -1270,12 +1283,6 @@ class Runner:
         
         results = []
 
-        # Track hash verification status
-        hash_verified = False
-        if not self.skip_hash and loader.spec_hash:
-            hash_valid, _ = loader.verify_hash()
-            hash_verified = hash_valid
-
         # Check if entire spec is skipped (metadata.skip)
         if loader.metadata.get("skip", False):
             skip_reason = loader.metadata.get("skip_reason", "Skipped by metadata.skip=true")
@@ -1286,16 +1293,18 @@ class Runner:
                 endpoint=loader.request.get("path", "/"),
                 status=Status.SKIP,
                 error_message=skip_reason,
-                hash_verified=hash_verified
+                hash_verified=_hash_verified,
+                hash_mismatches=_hash_mismatches,
             )
             self.reporter.print_result(result)
             results.append(result)
             return results
 
         # Run main spec
-        validator = Validator(loader, client, self.token, self.skip_hash)
+        validator = Validator(loader, client, self.token)
         result = validator.validate()
-        result.hash_verified = hash_verified
+        result.hash_verified = _hash_verified
+        result.hash_mismatches = _hash_mismatches
         self.reporter.print_result(result)
         results.append(result)
 
@@ -1307,7 +1316,7 @@ class Runner:
             if variant.get("skip", False):
                 continue
 
-            validator = Validator(loader, client, self.token, self.skip_hash)
+            validator = Validator(loader, client, self.token)
 
             # For sequential mode, inject prev_response fields as variables
             if sequential and prev_response_body is not None:
@@ -1316,7 +1325,8 @@ class Runner:
                         validator.resolver.set(f"prev_{k}", v)
 
             result = validator.validate(variant)
-            result.hash_verified = hash_verified
+            result.hash_verified = _hash_verified
+            result.hash_mismatches = _hash_mismatches
             self.reporter.print_result(result)
             results.append(result)
 
@@ -1380,6 +1390,45 @@ class Runner:
 
 
 # ============================================================
+# CANONICAL REPORT CONVERSION
+# ============================================================
+
+def _to_canonical_results(spec_results):
+    """Convert internal SpecResults to canonical Section 8A format."""
+    canonical = []
+    for sr in spec_results:
+        assertions_evaluated = len(sr.assertions) if hasattr(sr, 'assertions') and sr.assertions else 0
+        assertions_passed = sum(
+            1 for a in sr.assertions if a.status == Status.PASS
+        ) if hasattr(sr, 'assertions') and sr.assertions else 0
+
+        failures = []
+        warnings = []
+        if sr.status == Status.FAIL:
+            for a in getattr(sr, 'assertions', []) or []:
+                if a.status == Status.FAIL:
+                    failures.append(f"{a.name}: {a.message}" if a.message else str(a.name))
+        if sr.status == Status.WARN:
+            for a in getattr(sr, 'assertions', []) or []:
+                if a.status == Status.WARN:
+                    warnings.append(f"{a.name}: {a.message}" if a.message else str(a.name))
+
+        canonical.append(_canonical_result(
+            spec_path=str(sr.spec_path),
+            status=sr.status.value.lower(),
+            duration_ms=sr.response_time_ms,
+            hash_verified=sr.hash_verified,
+            hash_mismatches=sr.hash_mismatches or [],
+            assertions_evaluated=assertions_evaluated,
+            assertions_passed=assertions_passed,
+            failures=failures,
+            warnings=warnings,
+            error=sr.error_message if sr.status == Status.ERROR else None,
+        ))
+    return canonical
+
+
+# ============================================================
 # CLI
 # ============================================================
 
@@ -1394,7 +1443,6 @@ def main():
     val.add_argument("--token", type=str, help="Auth token (overrides spec)")
     val.add_argument("--timeout", type=int, default=30, help="Timeout in seconds")
     val.add_argument("--report", type=Path)
-    val.add_argument("--skip-hash", action="store_true", help="Skip spec file hash verification")
 
     # validate-all
     val_all = sub.add_parser("validate-all", help="Validate all specs")
@@ -1404,7 +1452,6 @@ def main():
     val_all.add_argument("--token", type=str, help="Auth token (overrides spec)")
     val_all.add_argument("--timeout", type=int, default=30)
     val_all.add_argument("--report", type=Path)
-    val_all.add_argument("--skip-hash", action="store_true", help="Skip spec file hash verification")
     val_all.add_argument("--include-tag", type=str, dest="include_tag",
                          help="Only run specs with this tag (comma-separated for multiple)")
     val_all.add_argument("--exclude-tag", type=str, dest="exclude_tag",
@@ -1423,30 +1470,33 @@ def main():
     args = parser.parse_args()
     
     if args.cmd == "validate":
-        runner = Runner(args.base_url, args.token, args.skip_hash, args.timeout)
+        runner = Runner(args.base_url, args.token, args.timeout)
         results = runner.run_spec(args.spec)
-        
+
+        # Build and print canonical report
+        canonical_results = _to_canonical_results(results)
+        total_duration_ms = sum(r.response_time_ms for r in results)
+        canonical = _canonical_report("uats", UATS_VERSION, canonical_results, duration_ms=total_duration_ms)
+        _print_summary(canonical)
         if args.report:
-            passed = sum(1 for r in results if r.status == Status.PASS)
-            failed = sum(1 for r in results if r.status == Status.FAIL)
-            errors = sum(1 for r in results if r.status == Status.ERROR)
-            report = TestReport(
-                datetime.now().isoformat(), args.base_url,
-                1, len(results), passed, failed, errors, results
-            )
-            runner.reporter.save_report(report, args.report)
-        
+            _save_report(canonical, args.report)
+
         has_failures = any(r.status in (Status.FAIL, Status.ERROR) for r in results)
         sys.exit(1 if has_failures else 0)
     
     elif args.cmd == "validate-all":
-        runner = Runner(args.base_url, args.token, args.skip_hash, args.timeout,
+        runner = Runner(args.base_url, args.token, args.timeout,
                         include_tag=getattr(args, 'include_tag', None),
                         exclude_tag=getattr(args, 'exclude_tag', None))
         report = runner.run_all(args.spec_dir, args.pattern)
 
+        # Build and print canonical report
+        canonical_results = _to_canonical_results(report.results)
+        total_duration_ms = sum(r.response_time_ms for r in report.results)
+        canonical = _canonical_report("uats", UATS_VERSION, canonical_results, duration_ms=total_duration_ms)
+        _print_summary(canonical)
         if args.report:
-            runner.reporter.save_report(report, args.report)
+            _save_report(canonical, args.report)
 
         sys.exit(0 if report.failed == 0 and report.errors == 0 else 1)
 

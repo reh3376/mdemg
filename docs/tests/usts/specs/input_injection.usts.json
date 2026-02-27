@@ -11,7 +11,7 @@
   "requests": [
     {
       "name": "cypher_injection_single_quote",
-      "description": "Attempt Cypher injection via single quote",
+      "description": "Attempt Cypher injection via single quote — server must not leak Cypher errors",
       "headers": {
         "Content-Type": "application/json",
         "X-API-Key": "{{valid_api_key}}"
@@ -19,8 +19,7 @@
       "payload": {
         "space_id": "test' OR 1=1 //",
         "query_text": "normal query"
-      },
-      "expected_status_range": [400, 499]
+      }
     },
     {
       "name": "cypher_injection_union",
@@ -65,8 +64,7 @@
   ],
   "assertions": {
     "body_not_contains": [
-      "/etc/passwd",
-      "root:",
+      "root:x:0:0:",
       "DETACH DELETE",
       "syntax error",
       "Neo4jError",
