@@ -2,25 +2,25 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-02-24
+Last updated: 2026-02-26
 
 ---
 
 ## 1) Framework Inventory
 
-| Acronym | Name | Primary Scope | Status |
-| ------- | ---- | ------------- | ------ |
-| UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active (partial coverage) |
-| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active |
-| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active |
-| UPTS | Universal Parser Test Specification | Language parser conformance | active |
-| UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | pilot |
-| USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot |
-| UAMS | Universal Auth Method Specification | Auth method contracts and conformance | active (docs+tests) |
-| UOBS | Universal Observability Specification | Metrics/health/log observability validation | pilot |
-| UOTS | Universal Observability Test Specification | Observability contract specs (API-spec track) | pilot (runner gap) |
-| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only |
-| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality evaluation | active |
+| Acronym | Name | Primary Scope | Status | Specs |
+| ------- | ---- | ------------- | ------ | ----- |
+| UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active | N/A (registry) |
+| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 7 canonical, 4 drafts |
+| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 124 canonical, 7 drafts |
+| UPTS | Universal Parser Test Specification | Language parser conformance | active | 27 |
+| UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
+| USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 5 |
+| UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only | 4 |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 4 |
+| UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 5 |
+| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | pilot | 1 canonical, 1 draft |
+| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 
 ---
 
@@ -28,45 +28,60 @@ Last updated: 2026-02-24
 
 | Framework | Schema | Specs | Runner / Harness | CI / Automation |
 | --------- | ------ | ----- | ---------------- | --------------- |
-| UNTS | n/a (registry format in docs) | `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | `internal/unts/` (Go service + scanner + registry), `tests/udts/contract_test.go` (spec subset) | no dedicated CI gate |
-| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | `docs/api/api-spec/udts/specs/*.udts.json` | `tests/udts/contract_test.go` | no explicit CI job in `.github/workflows/ci.yml` |
-| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/*.uats.json` | `docs/api/api-spec/uats/runners/uats_runner.py` | wired in `.github/workflows/ci.yml` (`continue-on-error`) |
-| UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/*.upts.json` | Go harness `cmd/ingest-codebase/languages/upts_test.go`, Python runner | wired in `.github/workflows/parser-tests.yml` |
-| UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/*.ubts.json`, profiles under `docs/tests/ubts/profiles/` | `docs/tests/ubts/runners/ubts_runner.py` | no CI gate |
-| USTS | `docs/tests/usts/schema/usts.schema.json` | `docs/tests/usts/specs/*.usts.json` | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
-| UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/*.uams.json` | `internal/auth/uams_test.go` | indirect via `go test`; no dedicated pipeline target |
-| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | `docs/tests/uobs/specs/*.uobs.json` | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
-| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/*.uots.json` | runner path referenced in README but not present | no CI gate |
-| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | no canonical spec set yet | none | none |
-| UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/*.uets.json` | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
+| UNTS | n/a (registry format in docs) | `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json` | `internal/unts/` (Go gRPC service + scanner + registry) | no dedicated CI gate |
+| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (7); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
+| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (124) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | CI-gated in `ci.yml` |
+| UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (27) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
+| UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
+| USTS | `docs/tests/usts/schema/usts.schema.json` | `docs/tests/usts/specs/` (5) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
+| UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | none (spec-only, no runner/fixtures) | no CI gate |
+| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | `docs/tests/uobs/specs/` (4) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
+| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (5) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
+| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | `docs/tests/uvts/runners/uvts_runner.py` (setup-only; requires manual benchmark run) | canonical dialect guard via `uxts-canonical-specs.yml` |
+| UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 
 ---
 
-## 3) Main Cross-Framework Gaps
+## 3) Schema-Runner Parity Status
 
-1. Governance docs lag repo state (frameworks and status are stale in older summaries).
-2. UOBS and UOTS overlap with divergent schemas and tooling ownership.
-3. CI is concentrated on UATS/UPTS; other frameworks are not merge-gated.
-4. UNTS scanner coverage currently focuses on manifest and UDTS but not all intended framework artifacts.
-5. UAMS specs reference fixture files that are not currently in `docs/tests/uams/fixtures/`.
-6. UVTS has schema but no runner/spec/automation path yet.
-
----
-
-## 4) Target End State (Phase 81-86 Alignment)
-
-| Phase | Outcome |
-| ----- | ------- |
-| 81 | Governance docs and handoff synchronized to actual framework reality |
-| 82 | UOBS/UOTS converged to one canonical observability framework |
-| 83 | Unified make/CI orchestration for all active frameworks |
-| 84 | UNTS scans and verifies hash artifacts across all framework families |
-| 85 | UAMS/USTS/UBTS conformance stabilized with enforceable baselines |
-| 86 | UVTS activated as semantic quality gate with trend reporting |
+| Framework | Schema Fields Enforced | Unimplemented Fields | Fail-Fast Detection |
+| --------- | --------------------- | -------------------- | ------------------- |
+| UATS | Most fields | `setup`, `teardown`, `chain`, `body_file`, `body_schema`, `oauth2`, several config keys | Yes (hard fail on unimplemented fields) |
+| UPTS | `line_tolerance`, `validate_signature`, `validate_value`, `validate_parent`, `require_all_symbols`, `allow_extra_symbols` | `relationships` | Yes (hard fail on `relationships`) |
+| UBTS | All threshold fields, `min_success_rate`, `max_p99_degradation_pct` | `setup.seed_data`, `ramp_up_seconds`, `duration_seconds` | Yes (warnings for unimplemented) |
+| UETS | E1-E5 all enforced (E4 description quality added) | none | N/A |
+| UOBS | `metrics`, `health`, `dependency` | `logging` (explicit fail), `tracing` | Yes (explicit fail for unimplemented types) |
+| UOTS | `prometheus_metrics`, `grafana_dashboard`, `alert_rules` | `log_format`, `trace_propagation` | Yes (explicit fail for unimplemented types) |
+| UDTS | Hand-coded per RPC | N/A (not spec-driven) | N/A |
+| UVTS | `uvts_version`, `validation`, `thresholds`, `questions` | Legacy draft format detection | Yes (ValueError for legacy format) |
+| USTS | Unknown | Unknown | Not audited |
+| UAMS | N/A (no runner) | All | N/A |
 
 ---
 
-## 5) Reference Documents
+## 4) UOBS / UOTS Authority Split
+
+| Dimension | UOBS | UOTS |
+|-----------|------|------|
+| **What it validates** | Live runtime behavior | Static artifact structure |
+| **Requires running server** | Yes | No (except prometheus_metrics) |
+| **Examples** | Health probes, dependency checks, tracing headers | Dashboard JSON, alert rule YAML, metric definitions |
+
+---
+
+## 5) Cross-Framework Gaps (Post-Remediation)
+
+1. ~~Governance docs lag repo state~~ — **Remediated**: All counts and statuses updated.
+2. ~~UOBS/UOTS overlap~~ — **Remediated**: Authority split documented (UOBS = runtime, UOTS = artifacts).
+3. CI concentrated on UATS/UPTS; UBTS now has soft-fail CI. Other frameworks still lack CI gates.
+4. ~~UNTS scanner limited to manifest + UDTS~~ — **Remediated**: Scanner now covers all 8 UxTS frameworks.
+5. ~~UAMS claims fixtures/runner that don't exist~~ — **Remediated**: Marked spec-only, phantom claims removed.
+6. UVTS runner is setup-only; full benchmark automation not yet implemented.
+7. USTS not audited for schema-runner parity.
+
+---
+
+## 6) Reference Documents
 
 - `docs/specs/FRAMEWORK_GOVERNANCE.md`
 - `docs/specs/unts-hash-verification.md`
@@ -74,4 +89,8 @@ Last updated: 2026-02-24
 - `docs/api/api-spec/udts/README.md`
 - `docs/lang-parser/lang-parse-spec/upts/README.md`
 - `docs/tests/uets/README.md`
+- `docs/tests/uobs/README.md`
+- `docs/api/api-spec/uots/README.md`
+- `docs/tests/uams/README.md`
+- `docs/research/UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226.md`
 - `AGENT_HANDOFF.md` (Governance & Testing Frameworks)

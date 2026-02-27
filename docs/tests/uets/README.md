@@ -34,7 +34,7 @@ uets/
 | E1 | JSON Conformance | Response is valid JSON with all 3 required fields (name, description, proposed_label) |
 | E2 | Label Constraint | `proposed_label` is one of: pattern, principle, bridge, concern, workflow |
 | E3 | Name Quality | Concept name has 3-6 words (concise, descriptive) |
-| E4 | Description Quality | Description explains cluster coherence (1-2 sentences) |
+| E4 | Description Quality | Description is 10-200 words explaining cluster coherence. Threshold: `description_quality_rate` |
 | E5 | Latency | Average response time within acceptable bounds |
 
 ## Quick Start

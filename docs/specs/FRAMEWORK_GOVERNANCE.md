@@ -14,17 +14,17 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
 
 | Acronym | Name | Primary Use | Current State |
 | ------- | ---- | ----------- | ------------- |
-| UNTS | Universal Hash Test Specification | Hash verification registry, verify-now, revert | active (coverage expansion pending) |
+| UNTS | Universal Hash Test Specification | Hash verification registry, verify-now, revert | active |
 | UDTS | Universal DevSpace Test Specification | gRPC contract and integration tests | active |
-| UATS | Universal API Test Specification | HTTP acceptance contract tests | active |
-| UPTS | Universal Parser Test Specification | Parser contract conformance across languages | active |
-| UBTS | Universal Benchmark Test Specification | Throughput/latency/load regression testing | pilot |
+| UATS | Universal API Test Specification | HTTP acceptance contract tests | active (124 specs, CI-gated) |
+| UPTS | Universal Parser Test Specification | Parser contract conformance across languages | active (27 specs, CI-gated) |
+| UBTS | Universal Benchmark Test Specification | Throughput/latency/load regression testing | active (CI smoke, soft-fail) |
 | USTS | Universal Security Test Specification | Security behavior and hardening checks | pilot |
-| UAMS | Universal Auth Method Specification | Auth method contracts and conformance | active (docs + tests) |
-| UOBS | Universal Observability Specification | Metrics/health/log observability validation | pilot |
-| UOTS | Universal Observability Test Specification | API-spec observability contract track | pilot (runner gap) |
-| UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | spec-only |
-| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active |
+| UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only (no runner/fixtures) |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active |
+| UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active |
+| UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | pilot (setup-only runner) |
+| UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active (E1-E5 all enforced) |
 
 ---
 
@@ -41,6 +41,10 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
    - documentation updates in `AGENT_HANDOFF.md`
 3. Hash-protected artifacts should be discoverable by UNTS with explicit source references.
 4. Overlapping frameworks must be converged or deprecated with migration notes (applies to UOBS/UOTS).
+5. **Schema-runner parity is mandatory for promotion to `active` status.** Every field defined in a framework's schema must be either:
+   - Enforced by the runner (used in pass/fail logic), OR
+   - Detected as unimplemented with a hard fail (not silent ignore, not SKIP/WARN)
+6. **Promotion criteria** (pilot → active): schema, specs, runner with full parity, CI gate (at minimum soft-fail), documented authority scope.
 
 ---
 
@@ -89,7 +93,8 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
 ### UBTS — Benchmark
 
 - Scope: performance SLO and regression validation.
-- Policy: promote to active only after CI orchestration and baseline threshold governance.
+- Status: **active** — promoted from pilot after CI smoke gate and profile assertion enforcement added.
+- Policy: p99 degradation uses the spec's `p99_ms` threshold as fixed baseline (deterministic, no ambiguity from "previous run" comparisons).
 - References:
   - `docs/tests/ubts/README.md`
   - `docs/tests/ubts/schema/ubts.schema.json`
@@ -109,21 +114,41 @@ Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.m
 ### UAMS — Auth Method Contracts
 
 - Scope: auth method spec contracts and method conformance tests.
-- Policy: fixture-backed conformance and registry coverage required for active status.
+- Status: **spec-only** — schema and 4 specs exist, no runner or fixtures implemented.
+- Promotion criteria: requires Go test runner (`uams_runner.go`), credential fixtures, and CI gate.
 - References:
   - `docs/tests/uams/README.md`
   - `docs/tests/uams/schema/uams.schema.json`
   - `docs/tests/uams/specs/`
-  - `internal/auth/uams_test.go`
 
-### UOBS and UOTS — Observability Governance
+### UOBS — Runtime Observability Behavior
 
-- Scope: observability validation (metrics, health, logs, dashboards, alerts).
-- Policy: maintain one canonical observability framework; the non-canonical track must be deprecated or migrated.
+- Scope: **runtime** service observability behavior checks.
+- Authority: health endpoints, dependency probes, runtime metric endpoint availability, tracing/logging runtime behavior.
+- Policy: UOBS validates live service behavior at test time (active probes against running services).
 - References:
   - `docs/tests/uobs/README.md`
+  - `docs/tests/uobs/runners/uobs_runner.py`
+  - `docs/tests/uobs/specs/`
+
+### UOTS — Artifact-Level Observability Contracts
+
+- Scope: **artifact-level** observability contracts and configuration validation.
+- Authority: Prometheus metric contract sets, Grafana dashboard JSON structure, alert rule YAML validation.
+- Policy: UOTS validates static artifacts (files, exported configs) against schema; does not require a running service.
+- References:
   - `docs/api/api-spec/uots/README.md`
-  - `docs/development/UXTS_FRAMEWORK_MATRIX.md`
+  - `docs/api/api-spec/uots/runners/uots_runner.py`
+  - `docs/api/api-spec/uots/specs/`
+
+### UOBS/UOTS Authority Split
+
+| Dimension | UOBS | UOTS |
+|-----------|------|------|
+| **What it validates** | Live runtime behavior | Static artifact structure |
+| **Requires running server** | Yes | No (except prometheus_metrics) |
+| **Examples** | Health probes, dependency checks, tracing headers | Dashboard JSON, alert rule YAML, metric definitions |
+| **Failure mode** | Service behavior deviates from spec | Artifact structure/content invalid |
 
 ### UVTS — Semantic Validation
 

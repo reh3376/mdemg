@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers clean
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -39,12 +39,27 @@ build-parser:
 	go build -o bin/ingest-codebase ./cmd/ingest-codebase
 
 # Run all tests
-test: test-parsers
+test: test-parsers verify-uxts-canonical verify-uxts-drift
 	@echo "All tests complete"
+
+# Validate UPTS schema/spec enum parity
+verify-upts-schema:
+	@echo "Checking UPTS schema/spec parity..."
+	python3 scripts/verify_upts_schema_parity.py
+
+# Validate canonical UxTS specs/drafts split (UDTS + UVTS)
+verify-uxts-canonical:
+	@echo "Checking canonical UxTS specs..."
+	python3 scripts/verify_uxts_canonical_specs.py
+
+# Check for framework drift (spec counts, runner existence, fixtures, hashes)
+verify-uxts-drift:
+	@echo "Checking UxTS framework drift..."
+	python3 scripts/verify_uxts_drift.py
 
 # Run UPTS parser validation tests
 # Validates language parsers against Universal Parser Test Specifications
-test-parsers: build-parser
+test-parsers: build-parser verify-upts-schema
 	@echo "Running UPTS parser validation..."
 	python3 docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py validate-all \
 		--spec-dir docs/lang-parser/lang-parse-spec/upts/specs/ \
@@ -81,9 +96,15 @@ help:
 	@echo "  build          - Build all binaries (unified CLI + parsers)"
 	@echo "  build-cli      - Build unified mdemg CLI binary"
 	@echo "  build-parser   - Build standalone parser tools"
+	@echo "  verify-upts-schema - Check UPTS schema/spec parity"
+	@echo "  verify-uxts-canonical - Check canonical UDTS/UVTS specs vs drafts"
 	@echo "  test           - Run all tests"
 	@echo "  test-parsers   - Run UPTS parser validation (all languages)"
 	@echo "  test-parser-X  - Run UPTS validation for language X (go, python, typescript)"
+	@echo "  test-api       - Run all UATS API validation specs"
+	@echo "  test-ubts-smoke- Run UBTS smoke benchmark (quick, 10 requests)"
+	@echo "  test-ubts-load - Run UBTS load benchmark (1000 requests)"
+	@echo "  test-uots      - Run all UOTS observability contract specs"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Build and run MDEMG server"
@@ -91,7 +112,7 @@ help:
 # UATS API Testing Targets
 # ============================================================
 
-.PHONY: test-api test-api-% test-smoke test-all uats-setup
+.PHONY: test-api test-api-% test-smoke test-all test-uots uats-setup
 
 # Run all UATS API validation tests (excludes optional modules that require explicit enablement)
 test-api:
@@ -129,6 +150,15 @@ test-smoke:
 test-all: test-parsers test-api
 	@echo "All tests complete (UPTS + UATS)"
 
+# Run all UOTS observability contract tests
+test-uots:
+	@echo "Running UOTS observability validation..."
+	python3 docs/api/api-spec/uots/runners/uots_runner.py \
+		--spec-dir docs/api/api-spec/uots/specs/ \
+		--base-url $(BASE_URL) \
+		--report /tmp/uots-report.json
+	@echo "Report saved to /tmp/uots-report.json"
+
 # Install UATS dependencies
 uats-setup:
 	pip install requests jsonpath-ng
@@ -140,6 +170,31 @@ test-api-remote:
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
 		--report /tmp/api-report.json
+
+# ============================================================
+# UBTS Benchmark Testing Targets
+# ============================================================
+.PHONY: test-ubts-smoke test-ubts-load
+
+# Run UBTS smoke benchmark (quick check — 10 requests, single-threaded)
+test-ubts-smoke:
+	@echo "Running UBTS smoke benchmark..."
+	python3 docs/tests/ubts/runners/ubts_runner.py \
+		--spec "docs/tests/ubts/specs/retrieve_latency.ubts.json" \
+		--profile docs/tests/ubts/profiles/smoke.profile.json \
+		--base-url $(BASE_URL) \
+		--output /tmp/ubts-results/
+	@echo "UBTS smoke benchmark complete"
+
+# Run UBTS load benchmark (moderate load — 1000 requests, 10 concurrent)
+test-ubts-load:
+	@echo "Running UBTS load benchmark..."
+	python3 docs/tests/ubts/runners/ubts_runner.py \
+		--spec "docs/tests/ubts/specs/*.ubts.json" \
+		--profile docs/tests/ubts/profiles/load.profile.json \
+		--base-url $(BASE_URL) \
+		--output /tmp/ubts-results/
+	@echo "UBTS load benchmark complete"
 
 # ============================================================
 # RSIC Testing Targets

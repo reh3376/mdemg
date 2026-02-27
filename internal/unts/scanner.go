@@ -23,13 +23,40 @@ func NewScanner(registry *Registry, basePath string) *Scanner {
 	}
 }
 
-// ScanAll scans manifest and all UDTS specs
+// uxtsHashSource describes where to find SHA256 hashes in a UxTS framework.
+type uxtsHashSource struct {
+	framework string
+	specDir   string
+	suffix    string
+	// hashPath is a dot-separated JSON path to the SHA256 field.
+	// e.g. "config.sha256", "fixture.sha256"
+	hashPath string
+}
+
+// uxtsFrameworks lists all UxTS frameworks and their hash field locations.
+var uxtsFrameworks = []uxtsHashSource{
+	{framework: "uats", specDir: "docs/api/api-spec/uats/specs", suffix: ".uats.json", hashPath: "config.sha256"},
+	{framework: "upts", specDir: "docs/lang-parser/lang-parse-spec/upts/specs", suffix: ".upts.json", hashPath: "fixture.sha256"},
+	{framework: "ubts", specDir: "docs/tests/ubts/specs", suffix: ".ubts.json", hashPath: "config.sha256"},
+	{framework: "usts", specDir: "docs/tests/usts/specs", suffix: ".usts.json", hashPath: "config.sha256"},
+	{framework: "uots", specDir: "docs/api/api-spec/uots/specs", suffix: ".uots.json", hashPath: "config.sha256"},
+	{framework: "uams", specDir: "docs/tests/uams/specs", suffix: ".uams.json", hashPath: "config.sha256"},
+	{framework: "uets", specDir: "docs/tests/uets/specs", suffix: ".uets.json", hashPath: "fixture.sha256"},
+	{framework: "uvts", specDir: "docs/tests/uvts/specs", suffix: ".uvts.json", hashPath: "config.sha256"},
+}
+
+// ScanAll scans manifest, UDTS specs, and all UxTS framework spec hash fields.
 func (s *Scanner) ScanAll() error {
 	if err := s.ScanManifest(); err != nil {
 		return fmt.Errorf("scan manifest: %w", err)
 	}
 	if err := s.ScanUDTSSpecs(); err != nil {
 		return fmt.Errorf("scan udts: %w", err)
+	}
+	for _, src := range uxtsFrameworks {
+		if err := s.ScanUxTSSpecs(src); err != nil {
+			return fmt.Errorf("scan %s: %w", src.framework, err)
+		}
 	}
 	return nil
 }
@@ -168,9 +195,70 @@ func deriveProtoPath(service string) string {
 	}
 }
 
+// ScanUxTSSpecs scans a UxTS framework's spec directory for SHA256 hash fields.
+func (s *Scanner) ScanUxTSSpecs(src uxtsHashSource) error {
+	specsDir := filepath.Join(s.basePath, src.specDir)
+	entries, err := os.ReadDir(specsDir)
+	if os.IsNotExist(err) {
+		return nil // Missing dir is OK
+	}
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), src.suffix) {
+			continue
+		}
+
+		specPath := filepath.Join(specsDir, entry.Name())
+		data, err := os.ReadFile(specPath)
+		if err != nil {
+			fmt.Printf("warning: scan %s spec %s: %v\n", src.framework, entry.Name(), err)
+			continue
+		}
+
+		var doc map[string]any
+		if err := json.Unmarshal(data, &doc); err != nil {
+			fmt.Printf("warning: parse %s spec %s: %v\n", src.framework, entry.Name(), err)
+			continue
+		}
+
+		hash := extractHashByPath(doc, src.hashPath)
+		if hash == "" || hash == "PENDING" {
+			continue
+		}
+
+		// For spec-integrity hashes, the tracked path is the spec file itself.
+		relPath := filepath.Join(src.specDir, entry.Name())
+		if err := s.registry.Register(relPath, src.framework, hash, entry.Name(), "spec"); err != nil {
+			fmt.Printf("warning: register %s hash from %s: %v\n", src.framework, entry.Name(), err)
+		}
+	}
+
+	return nil
+}
+
+// extractHashByPath extracts a string value from a nested map using a dot-separated path.
+// e.g. extractHashByPath(doc, "config.sha256") → doc["config"]["sha256"]
+func extractHashByPath(doc map[string]any, path string) string {
+	parts := strings.Split(path, ".")
+	var current any = doc
+	for _, key := range parts {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current = m[key]
+	}
+	s, _ := current.(string)
+	return s
+}
+
 // ScanResults holds statistics from a scan operation
 type ScanResults struct {
 	ManifestFiles int
 	UDTSFiles     int
+	UxTSFiles     int
 	Errors        []string
 }

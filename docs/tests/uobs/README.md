@@ -6,11 +6,10 @@ A standardized framework for validating observability infrastructure in MDEMG.
 
 UOBS provides:
 
-- **Metrics Validation**: Verify Prometheus metrics presence and format
+- **Runtime Metrics Validation**: Verify service metrics endpoint presence and format
 - **Health Checks**: Validate health endpoint responses
 - **Tracing**: Verify distributed tracing propagation
-- **Alerting Rules**: Pre-built Prometheus alert configurations
-- **Dashboards**: Grafana dashboard templates
+- **Dependency Validation**: Validate external dependencies (embedding, DB, cache)
 
 ## Directory Structure
 
@@ -62,8 +61,21 @@ python runners/uobs_runner.py \
 |------|-------------|
 | `metrics` | Prometheus metrics validation |
 | `health` | Health endpoint validation |
-| `logging` | Log format validation |
+| `dependency` | Active dependency health/configuration checks |
+| `logging` | Log format validation (currently unimplemented in runner; returns failure) |
 | `tracing` | Distributed tracing validation |
+
+## Framework Boundary with UOTS
+
+- Use `UOTS` for artifact-level observability contracts:
+  - Prometheus metric contract sets
+  - Grafana dashboard JSON
+  - Alert rule YAML
+- Use `UOBS` for runtime observability behavior checks:
+  - endpoint health
+  - runtime metric endpoint availability
+  - dependency active probes
+  - tracing/logging runtime behavior
 
 ## Required Metrics
 

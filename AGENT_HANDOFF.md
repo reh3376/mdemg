@@ -378,8 +378,8 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 32**: `docs/specs/phase-devspace-hub.md` | JSON: `docs/api/api-spec/udts/specs/devspace_register_agent.udts.json`, `docs/api/api-spec/udts/specs/devspace_list_exports.udts.json`, `docs/api/api-spec/udts/specs/devspace_pull_export.udts.json`.
 - **Phase 33**: `docs/specs/phase3-inter-agent-comms.md` | JSON: `docs/api/api-spec/udts/specs/devspace_connect.udts.json`.
 - **Phase 34**: `docs/specs/phase4-incremental-sync.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_export_delta.udts.json`.
-- **Phase 35-37**: `docs/specs/development-space-collaboration.md` | JSON: `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json`, `docs/api/api-spec/udts/specs/devspace_presence.udts.json`.
-- **Phase 38**: `docs/specs/unts-hash-verification.md` | JSON: `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | UATS: 8 specs (`hash_verification_*.uats.json`).
+- **Phase 35-37**: `docs/specs/development-space-collaboration.md` | JSON: `docs/api/api-spec/udts/drafts/space_transfer_crdt.udts.json`, `docs/api/api-spec/udts/drafts/devspace_presence.udts.json`.
+- **Phase 38**: `docs/specs/unts-hash-verification.md` | JSON: `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/drafts/unts_hash_verification.udts.json` | UATS: 8 specs (`hash_verification_*.uats.json`).
 - **Phase 41-42**: `docs/specs/phase1-space-cleanup.md`, `docs/specs/phase2-self-ingest.md` | JSON: `docs/api/api-spec/uats/specs/neo4j_overview.uats.json`, `docs/api/api-spec/uats/specs/ingest_codebase.uats.json`.
 - **Phase 43A-43C**: `docs/specs/phase3a-cms-enforcement.md`, `docs/specs/phase3b-cms-quality.md`, `docs/specs/phase3c-multi-agent.md` | JSON: `docs/api/api-spec/uats/specs/conversation_resume.uats.json`, `docs/api/api-spec/uats/specs/conversation_observe.uats.json`, `docs/api/api-spec/uats/specs/conversation_volatile_stats.uats.json`.
 - **Phase 44**: `docs/specs/phase4-linear-crud.md` | JSON: `docs/api/api-spec/uats/specs/webhooks_generic.uats.json`.
@@ -596,7 +596,7 @@ Returns embedding provider health status with active probe validation.
 **Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 5
 
-**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json`
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/drafts/space_transfer_crdt.udts.json`
 
 **What it does:** CO_ACTIVATED_WITH edges merge with CRDT semantics (max weight, sum evidence_count) so concurrent updates from multiple agents don't lose data. Space lineage tracks origin, merges, and who shared what.
 
@@ -609,7 +609,7 @@ Returns embedding provider health status with active probe validation.
 | CRDT importer | `internal/transfer/importer.go` | Merge logic for edges |
 | Exporter lineage | `internal/transfer/exporter.go` | Records origin in exports |
 | Tests | `internal/transfer/crdt_test.go` | 7 test functions |
-| UDTS spec | `docs/api/api-spec/udts/specs/space_transfer_crdt.udts.json` | Contract tests |
+| UDTS spec | `docs/api/api-spec/udts/drafts/space_transfer_crdt.udts.json` | Contract tests |
 
 **CRDT Merge Semantics:**
 - `evidence_count`: Sum (additive)
@@ -640,7 +640,7 @@ Returns embedding provider health status with active probe validation.
 **Completed:** 2026-02-06
 **Master Plan:** `docs/specs/development-space-collaboration.md` §Phase 8
 
-**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/specs/devspace_presence.udts.json`
+**Supporting artifacts (docs + JSON):** `docs/api/api-spec/udts/drafts/devspace_presence.udts.json`
 
 **What it does:** Agents in a DevSpace have online/away/offline status via heartbeat. Bounded offline queue for disconnected agents.
 
@@ -652,7 +652,7 @@ Returns embedding provider health status with active probe validation.
 | Catalog storage | `internal/devspace/catalog.go` | `last_heartbeat` per agent |
 | Server handlers | `internal/devspace/server.go` | Presence endpoint, queue management |
 | Tests | `internal/devspace/presence_test.go` | 39 test functions (100% coverage) |
-| UDTS spec | `docs/api/api-spec/udts/specs/devspace_presence.udts.json` | Contract tests |
+| UDTS spec | `docs/api/api-spec/udts/drafts/devspace_presence.udts.json` | Contract tests |
 
 **Presence Thresholds:**
 - Online: < 30 seconds since heartbeat
@@ -668,7 +668,7 @@ Returns embedding provider health status with active probe validation.
 **Completed:** 2026-02-06 (gRPC backend), 2026-02-23 (REST API layer)
 **Spec:** `docs/specs/unts-hash-verification.md`
 
-**Supporting artifacts (docs + JSON):** `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json`
+**Supporting artifacts (docs + JSON):** `docs/specs/unts-registry.json`, `docs/specs/manifest.sha256`, `docs/api/api-spec/udts/drafts/unts_hash_verification.udts.json`
 
 **What it does:** Central registry + API for hash verification of all framework-protected files. Current + historical (last 3) hashes per file. Revert capability. Both gRPC and REST interfaces.
 
@@ -684,7 +684,7 @@ Returns embedding provider health status with active probe validation.
 | gRPC server | `internal/unts/server.go` | Service implementation |
 | REST handlers | `internal/api/handlers_unts.go` | 8 HTTP endpoints |
 | Tests | `internal/unts/registry_test.go`, `server_test.go` | 55 test functions |
-| UDTS spec | `docs/api/api-spec/udts/specs/unts_hash_verification.udts.json` | gRPC contract tests |
+| UDTS spec | `docs/api/api-spec/udts/drafts/unts_hash_verification.udts.json` | gRPC contract tests |
 | UATS specs | `docs/api/api-spec/uats/specs/hash_verification_*.uats.json` | 8 REST contract specs (19 variants) |
 
 **REST Endpoints (Phase 38 REST layer):**
@@ -1745,20 +1745,20 @@ Current framework reality is broader than the original governance table. These a
 - **USTS** (security): `docs/tests/usts/` (schema/specs/payloads/runner present)
 - **UAMS** (auth method contracts): `docs/tests/uams/` + `internal/auth/uams_test.go`
 - **UOBS** (observability validation): `docs/tests/uobs/` (schema/specs/runner/alerts/dashboard)
-- **UOTS** (observability contract track): `docs/api/api-spec/uots/` (schema/specs present; runner missing)
-- **UVTS** (semantic validation): `docs/tests/uvts/schema/uvts.schema.json` (schema-only currently)
+- **UOTS** (observability contract track): `docs/api/api-spec/uots/` (schema/specs/runner present)
+- **UVTS** (semantic validation): `docs/tests/uvts/` (schema + canonical specs + runner; legacy drafts split to `drafts/`)
 
 ### UxTS Gap Analysis (Codebase vs Intended Governance)
 
 Main issue sets identified after reviewing specs, runners, CI, and implementation:
 
 1. **Governance drift:** `FRAMEWORK_GOVERNANCE.md` and this handoff section no longer match repo reality (e.g., UBTS/USTS/UAMS/UOBS now exist; UNTS is implemented, not spec-only).
-2. **Observability split-brain:** both `UOBS` and `UOTS` exist with overlapping scope and different schemas/runners; this creates duplicated ownership and unclear source of truth.
-3. **Execution gap in automation:** CI and Make targets strongly cover UATS/UPTS, while UBTS/USTS/UOBS/UOTS/UAMS/UNTS are not consistently gated.
+2. **Observability split-brain (partially remediated):** `UOBS` and `UOTS` now both have runnable paths and documented boundary, but convergence/deprecation governance is still pending.
+3. **Execution gap in automation:** CI and Make targets strongly cover UATS/UPTS, and UDTS/UVTS now have canonical-dialect CI guards; however UBTS/USTS/UOBS/UOTS/UAMS/UNTS runtime execution is still not consistently CI-gated.
 4. **UNTS scope incomplete:** scanner currently ingests manifest + UDTS only; governance/spec intent covers UATS/UPTS/UBTS/USTS/UOTS/UAMS artifacts too.
 5. **UDTS format drift risk:** README describes one compact UDTS shape, while some UDTS specs (e.g., UNTS contract spec) use a different test-case structure; governance needs explicit versioned format policy.
 6. **UAMS artifact integrity gaps:** UAMS specs reference fixture files that are not present under `docs/tests/uams/fixtures/`; this weakens conformance confidence.
-7. **UVTS not operationalized:** schema exists, but no canonical specs/runner/CI path yet for semantic benchmark validation.
+7. **UVTS CI gap remains:** canonical UVTS specs/runner now exist, but framework is not yet CI-gated.
 
 ### Development Plan: UxTS Hardening Phases
 
@@ -2049,10 +2049,10 @@ Main RSIC gap sets identified:
 - **Gap Analysis**: `docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md`
 - **Phase 101**: SME Synthesis Engine (LLM-based multi-hop synthesis for `/v1/memory/consult`). Spec: `docs/specs/phase101-sme-synthesis.md`. Draft UATS: `docs/api/api-spec/uats/drafts/consult_synthesis.phase101.uats.json`. Features: `docs/features/skill-registry.md`, `docs/features/meta-cognition-enforcement.md`.
 - **Phase 102**: Intent Translation (Query rewriting before vector embedding). Spec: `docs/specs/phase102-intent-translation.md`. Draft UATS: `docs/api/api-spec/uats/drafts/retrieve_intent_translation.phase102.uats.json`, `consult_intent_translation.phase102.uats.json`. Features: `docs/features/intent-translation.md`.
-- **Phase 103 (Complete)**: Dynamic Emergence (LLM-driven concept naming for unclassified clusters). Spec: `docs/specs/phase103-dynamic-emergence.md`. Feature: `docs/features/dynamic-emergence.md`. New files: `internal/hidden/emergence_namer.go`, `internal/hidden/step_dynamic_emergence.go`, `internal/hidden/emergence_namer_test.go`, `internal/hidden/step_dynamic_emergence_test.go`. Draft UATS: `docs/api/api-spec/uats/drafts/consolidate_dynamic_emergence.phase103.uats.json`. Draft UVTS: `docs/tests/uvts/specs/dynamic_emergence_quality.phase103.uvts.json`.
+- **Phase 103 (Complete)**: Dynamic Emergence (LLM-driven concept naming for unclassified clusters). Spec: `docs/specs/phase103-dynamic-emergence.md`. Feature: `docs/features/dynamic-emergence.md`. New files: `internal/hidden/emergence_namer.go`, `internal/hidden/step_dynamic_emergence.go`, `internal/hidden/emergence_namer_test.go`, `internal/hidden/step_dynamic_emergence_test.go`. Draft UATS: `docs/api/api-spec/uats/drafts/consolidate_dynamic_emergence.phase103.uats.json`. Draft UVTS: `docs/tests/uvts/drafts/dynamic_emergence_quality.phase103.uvts.json`.
 - **Phase 103b (Complete)**: Emergence Model Evaluation & MLX Server Integration. `LLM_ENDPOINT` config separation + Ollama JSON schema + UETS framework. UETS: `docs/tests/uets/` (schema, 8 specs, runner, fixtures, README). New specs: `llama3.2-3b-macstudio.uets.json`, `llama3.2-3b-fp16-macstudio.uets.json`, `llama3.3-70b-macstudio.uets.json`, `llama3.3-70b-ollama.uets.json`. Modified: `internal/config/config.go` (`LLMEndpoint` + `EffectiveLLMEndpoint()`), `internal/api/server.go`, `internal/hidden/emergence_namer.go` (Ollama `format` schema), `internal/hidden/step_dynamic_emergence.go`, `internal/retrieval/rerank.go`, `.env.example`. Runner: `--endpoint` override, `num_ctx` config support. Governance: `docs/specs/FRAMEWORK_GOVERNANCE.md`, `docs/development/UXTS_FRAMEWORK_MATRIX.md`.
 - **Phase 104**: Active MCP Guardrails (Complete). Spec: `docs/specs/phase104-active-mcp-guardrails.md`. UATS: `docs/api/api-spec/uats/specs/guardrail_validate.uats.json`. Package: `internal/guardrail/` (guardrail.go, diff_parser.go, constraint_retrieval.go, llm_evaluator.go, prompt.go, response_builder.go). Handler: `internal/api/handlers_guardrail.go`. MCP: `internal/cli/mcp.go` (validate_changes tool). Features: `docs/features/constraint-nodes.md`.
-- **Phase 105**: Global Meta-Learning (Cross-space promotion of Layer 4/5 concepts). Spec: `docs/specs/phase105-global-meta-learning.md`. Draft UATS: `docs/api/api-spec/uats/drafts/meta_learn_promotion.phase105.uats.json`, `retrieve_global_space.phase105.uats.json`. Draft UDTS: `docs/api/api-spec/udts/specs/global_space_topology.phase105.udts.json`. Features: `docs/features/l5-emergent-layer.md`.
+- **Phase 105**: Global Meta-Learning (Cross-space promotion of Layer 4/5 concepts). Spec: `docs/specs/phase105-global-meta-learning.md`. Draft UATS: `docs/api/api-spec/uats/drafts/meta_learn_promotion.phase105.uats.json`, `retrieve_global_space.phase105.uats.json`. Draft UDTS: `docs/api/api-spec/udts/drafts/global_space_topology.phase105.udts.json`. Features: `docs/features/l5-emergent-layer.md`.
 - **Effort**: Variable | **Depends on**: Phase 100 (or independent track)
 
 ---

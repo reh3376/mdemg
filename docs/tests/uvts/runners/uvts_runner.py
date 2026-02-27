@@ -59,6 +59,8 @@ class UVTSRunner:
         with open(spec_path) as f:
             self.spec = json.load(f)
 
+        self._validate_spec_shape()
+
         self.validation = self.spec["validation"]
         self.thresholds = self.spec["thresholds"]
         self.categories = self.spec.get("categories", [])
@@ -72,6 +74,25 @@ class UVTSRunner:
             self.profile_settings = self.profiles[profile]
         else:
             self.profile_settings = self.profiles.get("standard", {})
+
+    def _validate_spec_shape(self) -> None:
+        """Validate runner-required spec shape before accessing required keys."""
+        required = ("uvts_version", "validation", "thresholds", "questions")
+        missing = [k for k in required if k not in self.spec]
+        if not missing:
+            return
+
+        # Legacy phase draft shape: config/setup/test_cases (not executable by this runner).
+        if {"config", "test_cases"}.issubset(self.spec.keys()):
+            raise ValueError(
+                "Unsupported legacy UVTS draft format (config/test_cases). "
+                "Use a canonical UVTS spec (uvts_version/validation/thresholds/questions)."
+            )
+
+        raise ValueError(
+            "Invalid UVTS spec shape; missing required key(s): "
+            + ", ".join(missing)
+        )
 
     def load_questions(self, master_path: str) -> List[Dict]:
         """Load and sample questions based on spec configuration."""
@@ -331,8 +352,12 @@ def main():
     if args.grades:
         # Display mode - show results from a completed run
         spec_path = Path(args.spec)
-        with open(spec_path) as f:
-            spec = json.load(f)
+        try:
+            with open(spec_path) as f:
+                spec = json.load(f)
+        except Exception as e:
+            print(f"ERROR: Failed to read spec: {e}", file=sys.stderr)
+            sys.exit(1)
         display_results(args.grades, spec.get("thresholds", {}))
         return
 
@@ -343,8 +368,18 @@ def main():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = f"uvts_run_{timestamp}"
 
-    runner = UVTSRunner(args.spec, args.profile)
-    results = runner.run(output_dir)
+    try:
+        runner = UVTSRunner(args.spec, args.profile)
+        runner.run(output_dir)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"ERROR: Missing input file: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: UVTS runner failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"\nOutput written to: {output_dir}")
 

@@ -132,6 +132,15 @@ jobs:
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
             --exclude-tag unts,llm_required
 
+      - name: Run UBTS Smoke Benchmark (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/tests/ubts/runners/ubts_runner.py \
+            --spec docs/tests/ubts/specs/retrieve_latency.ubts.json \
+            --profile docs/tests/ubts/profiles/smoke.profile.json \
+            --base-url http://localhost:${{ env.MDEMG_PORT }} \
+            --output /tmp/ubts-results/
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

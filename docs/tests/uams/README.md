@@ -17,6 +17,10 @@ UAMS is a declarative framework for defining authentication method contracts in 
 | UBTS | Benchmark tests |
 | UOBS | Observability specs |
 
+## Status
+
+**Current: spec-only** — schema and 4 spec files define auth method contracts. No automated runner or fixtures exist yet.
+
 ## Directory Structure
 
 ```
@@ -26,15 +30,15 @@ docs/tests/uams/
 ├── specs/
 │   ├── apikey.uams.json      # API key method spec
 │   ├── jwt.uams.json         # JWT Bearer method spec
+│   ├── saml.uams.json        # SAML 2.0 method spec
 │   └── none.uams.json        # No-auth method spec
-├── fixtures/
-│   ├── valid_apikey.txt      # Valid API key fixture
-│   ├── valid_jwt.txt         # Valid JWT fixture
-│   └── invalid_*.txt         # Invalid credential fixtures
-├── runners/
-│   └── uams_runner.go        # Go test harness (future)
 └── README.md
 ```
+
+### Not Yet Implemented
+
+- `fixtures/` — Credential fixtures for test execution (planned)
+- `runners/uams_runner.go` — Go test harness (planned)
 
 ## Spec Structure
 
