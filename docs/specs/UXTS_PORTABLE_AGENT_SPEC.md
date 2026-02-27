@@ -1,6 +1,6 @@
 # UxTS Portable Agent Specification
 
-Version: 2.0.0-draft
+Version: 2.1.0-draft
 Date: 2026-02-27
 Audience: Coding agents implementing Universal-x Test Specification governance in arbitrary codebases.
 
@@ -189,21 +189,44 @@ def run_spec(spec_path, base_url):
 
 The runner is the only layer that has dependencies (here: `requests`). The spec and schema are pure JSON.
 
-### Step 4: Wire into CI
+### Step 4: Wire into local automation and CI
 
-Add a Makefile target and a CI workflow step:
+Add a Makefile target (or equivalent task runner — `justfile`, `Taskfile.yml`, `package.json` scripts, etc.):
 
 ```makefile
 test-api:
 	python3 runners/uats_runner.py validate-all \
-		--spec-dir specs/ --base-url $(BASE_URL)
+		--spec-dir specs/ --base-url $(BASE_URL) --report /tmp/api-report.json
 ```
 
+Then wire the target into your CI system. The CI integration is a thin wrapper around the same command:
+
+**GitHub Actions:**
 ```yaml
-# .github/workflows/ci.yml
 - name: Run API contract tests
   run: make test-api BASE_URL=http://localhost:9999
 ```
+
+**GitLab CI:**
+```yaml
+api-contracts:
+  script: make test-api BASE_URL=http://localhost:9999
+```
+
+**Jenkins (declarative):**
+```groovy
+stage('API Contracts') {
+    steps { sh 'make test-api BASE_URL=http://localhost:9999' }
+}
+```
+
+**Azure Pipelines:**
+```yaml
+- script: make test-api BASE_URL=http://localhost:9999
+  displayName: 'Run API contract tests'
+```
+
+The pattern is always the same: the Makefile target is the portable interface, and the CI system invokes it. This means switching CI providers requires changing the workflow file but not the runners, specs, or Makefile.
 
 That is a complete UxTS framework: schema validates spec structure, specs declare contracts, runner executes contracts, CI automates execution.
 
@@ -241,11 +264,40 @@ Specs and fixtures can include SHA256 hashes. If a spec file is modified outside
 
 3. **Schema and runner must be explicitly aligned.** Every schema field must be classified as `enforced` (affects pass/fail), `advisory` (warning only), or `unimplemented` (not yet handled). An `active` framework must not have unimplemented fields that are silently ignored — this is the single largest source of false confidence.
 
-4. **Hash integrity is first-class.** Spec files and fixture files should carry SHA256 hashes. Runners should verify hashes before execution.
+4. **Hash integrity is first-class.** Spec files and fixture files should carry SHA256 hashes computed using the canonical procedure defined in Section 5.1. Runners should verify hashes before execution.
 
 5. **Fixtures are first-class test inputs.** When a spec references a static file (source code for parsing, config file for validation), that file has its own integrity controls. A stale or tampered fixture is a test that silently validates the wrong thing.
 
 6. **Framework overlap must be resolved by canonical ownership.** If two frameworks both claim "observability," define exactly what each owns (e.g., one owns runtime behavior, the other owns artifact structure). Document the split. Ambiguity here causes specs to land in the wrong framework and get validated by the wrong runner.
+
+### 5.1 Hash Computation Procedure
+
+All UxTS implementations MUST use this procedure to ensure portable, deterministic hash values.
+
+**Spec file hashes** (integrity of the spec itself):
+
+1. The hash field location is defined per framework (e.g., `config.sha256` for UATS, `fixture.sha256` for UPTS). This path is recorded in the governance matrix under `hash_field_convention`.
+2. To compute the hash: read the spec file as raw bytes, parse it as JSON, remove the hash field from the parsed structure, re-serialize to canonical JSON (sorted keys, no trailing whitespace, UTF-8, `\n` line endings), and compute SHA256 over the resulting bytes.
+3. To verify: read the stored hash value, recompute using step 2, and compare. Mismatch = integrity failure.
+
+The critical rule is **the hash field itself is excluded from the hash input**. Without this rule, embedding the hash changes the file, which changes the hash, creating an unsolvable circular dependency.
+
+**Canonical JSON serialization** for hash computation:
+- Keys sorted lexicographically at every nesting level.
+- No trailing commas, no comments.
+- Indent: 2 spaces (or 0 for compact — choose one per codebase and document it).
+- Encoding: UTF-8 without BOM.
+- Line endings: `\n` (Unix-style).
+
+**Fixture file hashes** (integrity of test input files):
+
+1. Fixture hashes are stored in the spec that references the fixture (e.g., `fixture.sha256`).
+2. To compute: read the fixture file as raw bytes, compute SHA256 over the raw bytes. No JSON parsing or re-serialization — fixtures may be any format (source code, YAML, binary).
+3. To verify: recompute and compare before executing the spec that references the fixture.
+
+**Runner behavior on hash mismatch:**
+- If `--skip-hash` flag is provided: log a warning and continue (useful during spec development).
+- Otherwise: report the spec as FAIL with hash mismatch details. Do not execute the spec.
 
 ---
 
@@ -255,22 +307,32 @@ When entering a new codebase, the agent should systematically discover what veri
 
 ### 6.1 Discovery Phase
 
-Scan the codebase for recurring patterns that need verification:
+Discovery must be systematic and reproducible. Two agents running this procedure against the same codebase should produce the same framework candidates.
 
-| Pattern | Signals | Candidate Framework |
-|---------|---------|-------------------|
-| HTTP/REST endpoints | Route definitions, handler functions, OpenAPI specs | API contract tests (UATS-like) |
-| gRPC services | `.proto` files, generated stubs | gRPC contract tests (UDTS-like) |
-| Parsers / transformers | Language grammars, AST builders, symbol extractors | Parser conformance tests (UPTS-like) |
-| Metric endpoints | Prometheus exposition, StatsD clients, metric registrations | Observability artifact tests (UOTS-like) |
-| Health/readiness probes | `/healthz`, `/readyz`, dependency checks | Runtime observability tests (UOBS-like) |
-| Auth flows | Login handlers, token validation, RBAC checks | Auth contract tests (UAMS-like) |
-| Security boundaries | Input validation, CORS, rate limiting, injection guards | Security behavior tests (USTS-like) |
-| Performance SLOs | Latency budgets, throughput targets, load test configs | Benchmark regression tests (UBTS-like) |
-| LLM/AI quality | Model output scoring, generation quality checks | Quality evaluation tests (UETS-like) |
-| Data validation | Schema conformance, semantic quality, retrieval accuracy | Validation quality tests (UVTS-like) |
+**Step 1: Enumerate concrete artifacts.** Search the codebase for the following file patterns, in this order. Each match is a signal for a candidate framework.
 
-Not every codebase needs all of these. Start with the domains that have the highest risk of silent drift — typically API contracts and whatever the core processing pipeline is.
+| Priority | Search pattern | What it signals | Candidate framework |
+|----------|---------------|-----------------|-------------------|
+| 1 | Route/handler registrations (e.g., `router.GET`, `@app.route`, `http.HandleFunc`) | HTTP API surface exists | API contract tests |
+| 2 | `.proto` files or gRPC generated code | gRPC service surface exists | gRPC contract tests |
+| 3 | Parser grammars, AST definitions, tree-sitter configs, symbol extractors | Parsing/transformation pipeline exists | Parser conformance tests |
+| 4 | Prometheus client registrations, `/metrics` endpoints, StatsD calls | Observable metrics exist | Observability artifact tests |
+| 5 | `/healthz` or `/readyz` handlers, dependency check functions | Health probes exist | Runtime observability tests |
+| 6 | Auth middleware, token validation, RBAC decorators | Auth boundary exists | Security / auth tests |
+| 7 | Latency budgets in configs, existing load test scripts, SLO definitions | Performance contracts exist | Benchmark regression tests |
+| 8 | LLM API calls, model scoring functions, generation pipelines | AI quality surface exists | Quality evaluation tests |
+
+**Step 2: Deduplicate and prioritize.** If multiple signals map to the same candidate, merge them. If a signal is ambiguous (e.g., an endpoint that is both an API and a health probe), assign it to the more specific framework (health probe → observability, not API contracts).
+
+**Step 3: Rank by drift risk.** For each candidate, estimate the cost of undetected drift. Rank higher:
+- Frameworks covering the primary external interface (APIs, gRPC) — highest drift risk.
+- Frameworks covering the core processing pipeline (parsers, transformers) — data quality risk.
+- Frameworks covering security boundaries — compliance risk.
+- Frameworks covering observability and benchmarks — operational risk.
+
+**Step 4: Bootstrap in rank order.** Start with the highest-risk candidate and complete one full framework (schema → spec → runner → CI) before starting the next. Attempting to bootstrap all frameworks in parallel leads to many incomplete frameworks instead of a few solid ones.
+
+**Decision rule:** If a candidate has fewer than 3 concrete artifacts in the codebase, defer it to `spec-only` status. If it has 3+, bootstrap to `pilot`.
 
 ### 6.2 Bootstrap Procedure
 
@@ -280,13 +342,13 @@ For each identified domain:
 
 2. **Write baseline specs from live code.** Don't write specs from documentation or assumptions. Run the actual code, capture the actual behavior, and encode that behavior as a spec. Specs generated from assumed behavior are the leading cause of false-fail on first run.
 
-3. **Build the runner.** The runner reads a spec, performs the verification, and reports structured results (pass/fail/skip, failure details, timing). Start with a `validate` command for one spec and a `validate-all` command for a directory.
+3. **Build the runner.** The runner reads a spec, performs the verification, and reports results in the canonical report format (Section 8A). Start with a `validate` command for one spec and a `validate-all` command for a directory. The runner must support `--report <path>` to write structured JSON output.
 
 4. **Add schema validation to the runner.** Before executing any spec, the runner should validate it against the framework's JSON schema. This catches structural errors early.
 
 5. **Wire into local automation.** Add a Makefile target (or equivalent) so developers can run the framework locally with one command.
 
-6. **Wire into CI.** Add a workflow step that runs the Makefile target. Start with `soft` gating (report but don't block) until you have confidence in the spec set.
+6. **Wire into CI.** Add a CI step that invokes the Makefile target. The Makefile is the portable interface — the CI step is a thin wrapper (see Section 3, Step 4 for examples across GitHub Actions, GitLab CI, Jenkins, and Azure Pipelines). Start with `soft` gating (report but don't block) until you have confidence in the spec set.
 
 7. **Add hash integrity.** Compute SHA256 for each spec file and embed it in the spec's config section. Have the runner verify hashes on load.
 
@@ -316,9 +378,12 @@ docs/
 scripts/
 ├── verify_uxts_canonical_specs.py       # Guard: no drafts in specs/
 └── verify_uxts_drift.py                 # Guard: on-disk reality matches docs
-.github/workflows/
-└── *.yml                                # CI pipelines per framework
-Makefile                                 # Local automation targets
+<ci-config>/                              # CI pipelines (platform-dependent location)
+└── *                                     #   GitHub: .github/workflows/*.yml
+                                          #   GitLab: .gitlab-ci.yml
+                                          #   Jenkins: Jenkinsfile
+                                          #   Azure: azure-pipelines.yml
+Makefile                                 # Local automation targets (portable CI interface)
 ```
 
 The `specs/` vs `drafts/` split is important: specs in `specs/` are canonical and subject to CI gating. Specs in `drafts/` are work-in-progress and excluded from automated runs. This prevents draft specs with incomplete structure from crashing runners or inflating pass counts.
@@ -351,9 +416,9 @@ Required metadata for each framework in the governance matrix:
 | `fixture_glob` | Glob pattern for fixture files (if applicable) |
 | `runner_command` | Command to execute the runner |
 | `ci_job` | CI workflow/job name |
-| `gate_mode` | `block` (failures fail CI), `soft` (report only), `observe` (metrics only) |
-| `hash_field_convention` | JSON path to hash field in specs (e.g., `config.sha256`) |
-| `status` | `active`, `pilot`, `spec-only`, `deprecated` |
+| `gate_mode` | `block` (failures fail CI), `soft` (report only), `observe` (metrics only). See Section 9 for the distinction between status and gate mode. |
+| `hash_field_convention` | JSON path to hash field in specs (e.g., `config.sha256`). See Section 5.1 for computation procedure. |
+| `status` | `spec-only`, `pilot`, `active`, `deprecated`. Status governs maturity; gate mode governs CI behavior. These are independent axes (Section 9). |
 
 ---
 
@@ -404,12 +469,104 @@ Maintain a parity table in the framework matrix documenting which fields are enf
 
 ---
 
+## 8A. Canonical Runner Report Schema
+
+All runners MUST produce structured output in a common format so that cross-framework governance tooling (drift checkers, CI aggregators, dashboards) can consume results from any framework without framework-specific parsing.
+
+### Report Structure
+
+```json
+{
+  "timestamp": "2026-02-27T14:30:00Z",
+  "framework": "uats",
+  "framework_version": "1.1.0",
+  "summary": {
+    "total_specs": 124,
+    "passed": 122,
+    "failed": 1,
+    "skipped": 1,
+    "errors": 0,
+    "pass_rate": 98.4,
+    "duration_ms": 4521
+  },
+  "results": [
+    {
+      "spec_path": "specs/health.uats.json",
+      "status": "pass",
+      "duration_ms": 42,
+      "hash_verified": true,
+      "assertions_evaluated": 3,
+      "assertions_passed": 3,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/ingest.uats.json",
+      "status": "fail",
+      "duration_ms": 187,
+      "hash_verified": true,
+      "assertions_evaluated": 8,
+      "assertions_passed": 6,
+      "failures": [
+        "expected status 201, got 500",
+        "$.node_id: expected string, got null"
+      ],
+      "warnings": [],
+      "error": null
+    }
+  ]
+}
+```
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | ISO 8601 string | When the run started |
+| `framework` | string | Framework acronym (lowercase) |
+| `framework_version` | string | Runner/spec version |
+| `summary.total_specs` | integer | Total specs processed |
+| `summary.passed` | integer | Specs with status `pass` |
+| `summary.failed` | integer | Specs with status `fail` |
+| `summary.skipped` | integer | Specs with status `skip` (hash mismatch with `--skip-hash`, or explicitly excluded) |
+| `summary.errors` | integer | Specs that could not be executed (parse error, runner crash) |
+| `summary.pass_rate` | float | `(passed / total_specs) * 100` |
+| `summary.duration_ms` | float | Total wall-clock time |
+| `results[].spec_path` | string | Relative path to spec file |
+| `results[].status` | enum | `pass`, `fail`, `skip`, `error` |
+| `results[].duration_ms` | float | Execution time for this spec |
+| `results[].hash_verified` | boolean | Whether spec hash was verified |
+| `results[].assertions_evaluated` | integer | Number of assertions actually checked |
+| `results[].assertions_passed` | integer | Number of assertions that passed |
+| `results[].failures` | string[] | Human-readable failure descriptions |
+| `results[].warnings` | string[] | Advisory messages (do not affect status) |
+| `results[].error` | string or null | Error message if status is `error` |
+
+### Status Semantics
+
+- `pass`: All evaluated assertions passed. `assertions_evaluated` must be >= 1 (0/0 is not a pass).
+- `fail`: One or more assertions failed, or an unimplemented field was detected in an `active` framework.
+- `skip`: Spec was intentionally not executed (excluded by tag filter, hash verification bypassed).
+- `error`: Runner could not execute the spec (parse failure, missing fixture, runner crash).
+
+### Output Conventions
+
+- Runners MUST write the report to the path specified by `--report <path>` flag.
+- Runners MUST also print a human-readable summary to stdout (total/passed/failed/error counts).
+- Report files use `.json` extension and UTF-8 encoding.
+
+---
+
 ## 9. Framework Maturity Lifecycle
 
-Frameworks progress through four statuses. Each transition has explicit criteria.
+Frameworks progress through three statuses. Each transition has explicit criteria. Gate mode (`soft`, `block`, `observe`) is a separate axis that governs CI behavior within a status — it is not a status itself.
 
 ```
-spec-only ──→ pilot ──→ active ──→ block
+spec-only ──→ pilot ──→ active
+                          │
+                          ├── gate_mode: soft (default on promotion)
+                          └── gate_mode: block (after demonstrated stability)
 ```
 
 ### spec-only
@@ -420,24 +577,32 @@ spec-only ──→ pilot ──→ active ──→ block
 
 ### pilot
 - Schema, specs, and runner all exist and function.
-- CI may exist but is not gating (soft-fail or observe mode).
+- CI may exist but is not gating (`observe` or `soft` mode).
 - Schema-runner parity may be incomplete.
-- **Transition to active requires:** schema-runner parity >= 95%, CI gate enabled (at minimum soft-fail), documented authority scope, no critical false-pass paths.
+- **Transition to active requires:** 100% schema-runner parity (every schema field classified as `enforced`, `advisory`, or hard-fail `unimplemented`), CI gate enabled at minimum `soft`, documented authority scope, no critical false-pass paths.
 
 ### active
 - Full schema-runner parity. Every schema field is enforced or detected-and-failed.
-- CI gate is operational (soft-fail or block).
+- CI gate is operational.
 - Spec set has meaningful coverage (not just one trivial spec).
-- **Transition to block requires:** demonstrated stability (no flaky false-fails), low false-pass rate, sufficient spec coverage for the domain.
-
-### block
-- CI gate mode is `block` — failures stop the pipeline.
-- This is the production-grade state. Treat spec changes with the same rigor as code changes.
+- Newly promoted frameworks enter `active` with `gate_mode: soft`. This allows a stabilization period where failures are visible but do not block the pipeline.
+- **Gate mode promotion to `block` requires:** demonstrated stability (no flaky false-fails over a meaningful window), low false-pass rate, sufficient spec coverage for the domain. Once promoted to `block`, failures stop the pipeline.
 
 ### deprecated
 - Framework is superseded or no longer relevant.
 - Existing specs are archived. Runner may be removed.
 - Migration path to successor framework must be documented.
+
+### Status vs Gate Mode
+
+These are independent axes. Do not conflate them.
+
+| Axis | Values | What it governs |
+|------|--------|-----------------|
+| **Status** | `spec-only`, `pilot`, `active`, `deprecated` | Framework maturity (does it have a schema? runner? parity?) |
+| **Gate mode** | `observe`, `soft`, `block` | CI behavior (does failure stop the pipeline?) |
+
+A framework's status determines what infrastructure must exist. Its gate mode determines how CI responds to failures. An `active` framework can be `soft`-gated (reporting failures without blocking) or `block`-gated (failures stop the pipeline). A `pilot` framework can be `observe`-gated (metrics only) or `soft`-gated.
 
 ---
 
@@ -606,7 +771,10 @@ The agent must produce and maintain these documents:
 | `UXTS_FRAMEWORK_MATRIX.md` | Inventory: schema/spec/runner/CI paths, counts, parity status | Any spec/runner/CI change |
 | `UXTS_FRAMEWORK_GAP_ASSESSMENT_<date>.md` | Point-in-time audit of all frameworks against the canonical contract | Periodic review or before major changes |
 
-Optional machine-readable reports:
+Machine-readable reports (produced by runners per the canonical report schema in Section 8A):
+- Per-framework run reports (e.g., `/tmp/api-report.json`) — produced by `--report` flag on every runner invocation.
+
+Optional aggregated reports:
 - `reports/schema_runner_coverage.json` — field-level parity data per framework.
 - `reports/framework_ci_gating.json` — CI gate status per framework.
 - `reports/hash_coverage.json` — hash field coverage across all frameworks.
@@ -630,7 +798,7 @@ Validates that on-disk reality matches documented state:
 3. **Fixture existence** — every fixture path referenced by a spec actually exists.
 4. **Hash coverage** — specs with hash fields contain real hashes (not empty or "PENDING").
 
-Both scripts should be wired into CI. The canonical guard should `block`. The drift checker can start as `soft` and promote to `block` once stable.
+Both scripts should be wired into CI via Makefile targets (the same portable pattern used for framework runners). The canonical guard should use `block` gate mode. The drift checker can start as `soft` and promote to `block` once stable.
 
 ---
 
