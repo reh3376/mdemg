@@ -334,3 +334,64 @@ Use this template for each session entry:
 | `--format json` support | PASS | Both init and status produce schema-compliant JSON |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
 | All unit tests pass | PASS | 32/32 pass |
+
+### Entry 2026-02-27T17:00:00Z — S2 Completion
+
+1. Timestamp (UTC): 2026-02-27T17:00:00Z
+2. Phase: S2 - Installer and Dependency Bootstrap (COMPLETE)
+3. Related roadmap sections: 5.2, 7A, 7C, 7D, 8
+4. Work completed:
+   - Created `internal/sidecar/install.go` (~210 lines):
+     - Input types: `DockerInfo`, `Neo4jImageInfo`, `PortInfo`, `SSHInfo`
+     - Output types: `PreflightCheck`, `DependencyResult`, `InstallReport` (extends `ReportEnvelope`)
+     - 6 pure evaluation functions: `EvalDockerAvailable`, `EvalNeo4jImage`, `EvalPortFree`, `EvalSSHReachable`, `EvalDockerDependency`, `EvalNeo4jDependency`
+     - Helpers: `HasPreflightFailures`, `HasDependencyFailures`, `CompareVersion`, `NewInstallReport`
+   - Created `internal/sidecar/install_test.go` (~270 lines):
+     - 33 unit tests covering all eval functions, version comparison, nil-slice safety, failure detection
+   - Created `internal/cli/sidecar_install.go` (~310 lines):
+     - Cobra command with `--dry-run`, `--no-auto-fix`, `--format text|json` flags
+     - Detection helpers: `gatherDockerInfo`, `gatherNeo4jImageInfo`, `gatherPortInfo`, `gatherSSHInfo`, `extractPort`
+     - Full install flow: state guard, config validation, detection, evaluation, auto-fix, persistence, reporting
+   - Modified `internal/cli/sidecar.go`: replaced install stub with `newSidecarInstallCmd()`
+5. Assumptions eliminated:
+   - Install report JSON conforms to `install-report.schema.json` (all required fields present).
+   - Preflight checks and dependencies are evaluated via pure functions in the `sidecar` package (no I/O).
+   - CLI layer handles all I/O (Docker commands, port probing, SSH testing) and passes results as structured types.
+   - Idempotency: re-run on installed state with unchanged config hash produces no-op.
+   - Auto-fix: pulls missing Neo4j image when `auto_fix: true` and `--no-auto-fix` not set.
+6. Decisions made:
+   - Package boundary: CLI gathers system info, `sidecar` package contains only pure evaluation functions. Matches S1 pattern.
+   - Docker version requirement: `>=20.0.0` hardcoded in CLI layer.
+   - Port availability checked via `net.Listen` (bind test, then close).
+   - SSH reachability checked via `ssh -o ConnectTimeout=5 -o BatchMode=yes <host> true`.
+   - Version comparison is lenient: empty/unparseable versions return true (no false failures).
+   - gosec G602 fix: restructured `parseVersionParts` to iterate `range 3` with bounds check on segments slice.
+7. Open questions:
+   - None for S2 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... -v` — 65/65 PASS (32 S1 + 33 S2)
+   - `mdemg sidecar install --format json` on initialized dir — valid JSON, state → installed
+   - `mdemg sidecar install --dry-run --format json` — no files written, `would-verify` actions
+   - Re-run install — no-op (empty checks/deps, state stays installed)
+   - Install from uninitialized — exit_code 2 with remediation
+   - `--no-auto-fix` — `auto_fix_enabled: false` in report
+   - Text output — formatted table with check marks, dependency versions
+9. Next actions:
+   - Begin Phase S3 (as defined in roadmap).
+
+**S2 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| One-command install works on initialized sidecar | PASS | `mdemg sidecar install` transitions initialized → installed |
+| Repeat install is no-op except version drift updates | PASS | Re-run produces empty checks/deps, state stays installed |
+| Exit code contract implemented for all preflight failure classes | PASS | ExitSuccess(0), ExitValidation(2), ExitDependency(3), ExitRuntime(4) all exercised |
+| `--dry-run` support | PASS | No mutations, `would-verify` actions, state stays initialized |
+| `--no-auto-fix` support | PASS | Reports `auto_fix_enabled: false` |
+| `--format json` support | PASS | Schema-compliant JSON with all required fields |
+| Install from wrong state fails with remediation | PASS | exit_code 2, "Run: mdemg sidecar init" |
+| All unit tests pass | PASS | 65/65 (32 S1 + 33 S2) |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
