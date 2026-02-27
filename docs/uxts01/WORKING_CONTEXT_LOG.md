@@ -1,8 +1,8 @@
-# UxTS01 Working Context Log
+# UxXTS01 Working Context Log
 
 Status: Active
 Start: 2026-02-27
-Objective: Build best-in-class consolidated UxTS framework from two source bundles.
+Objective: Build best-in-class consolidated UxXTS framework from two source bundles.
 
 ## Compression Survival Protocol
 
@@ -14,17 +14,17 @@ Objective: Build best-in-class consolidated UxTS framework from two source bundl
 ## Scope
 
 - Inputs:
-  - `/Users/reh3376/Downloads/uxts-v3.2.0`
-  - `/Users/reh3376/Downloads/UXTS_FINAL_SPEC_AND_ROADMAP_BUNDLE`
+  - Bundle A: v3.2.0 specification package
+  - Bundle B: final v3.1 spec and roadmap bundle
 - Output root:
-  - `/Users/reh3376/mdemg/docs/uxts01`
+  - this directory
 - Main deliverable:
-  - `UXTS01_PORTABLE_AGENT_SPEC.md`
+  - `UxXTS01_PORTABLE_AGENT_SPEC.md`
 
 ## Non-Goals
 
 - Rewriting source bundles in place.
-- Changing existing repository-wide UXTS docs outside `docs/uxts01`.
+- Changing existing repository-wide UxXTS docs outside this package directory.
 
 ## Checkpoints
 
@@ -36,10 +36,10 @@ Objective: Build best-in-class consolidated UxTS framework from two source bundl
 ### 2026-02-27T12:22:00Z
 - Completed source comparison and merge decisions.
 - Locked naming decision: U<XX>TS grammar with backward compatibility.
-- Next: draft UXTS01 main spec + supporting roadmap/schemas/tools/index.
+- Next: draft UxXTS01 main spec + supporting roadmap/schemas/tools/index.
 
 ### 2026-02-27T12:27:00Z
-- Drafted UXTS01 main spec and supporting roadmap/index docs.
+- Drafted UxXTS01 main spec and supporting roadmap/index docs.
 - Copied normative schemas, conformance suite, starter tools, and examples into package.
 - Added missing common schema for tool/example compatibility.
 - Next: consistency checks and final refinements.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-uxts_lint.py
-Lean lint + integrity tool for UxTS specs.
+uxxts_lint.py
+Lean lint + integrity tool for UxXTS specs.
 
 What it does:
 - Loads a framework schema and validates spec JSON against it.

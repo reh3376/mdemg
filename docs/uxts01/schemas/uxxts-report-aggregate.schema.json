@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://uxts.dev/schemas/uxts-report-aggregate.schema.json",
-  "title": "UxTS Aggregate Governance Report",
-  "description": "Normative schema for cross-framework aggregate reports. Required in full governance mode (3+ frameworks). See UXTS_PORTABLE_AGENT_SPEC Section 12.1.",
-  "_uxts_schema_version": "3.1.0",
+  "$id": "https://uxxts.dev/schemas/uxxts-report-aggregate.schema.json",
+  "title": "UxXTS Aggregate Governance Report",
+  "description": "Normative schema for cross-framework aggregate reports. Required in full governance mode (3+ frameworks). See UxXTS_PORTABLE_AGENT_SPEC Section 12.1.",
+  "_uxxts_schema_version": "3.1.0",
   "type": "object",
   "required": ["timestamp", "governance_tier", "operating_mode", "frameworks", "governance_health"],
   "additionalProperties": false,

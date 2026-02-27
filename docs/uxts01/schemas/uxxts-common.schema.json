@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "uxts-common.schema.json",
-  "title": "UxTS Common Blocks",
+  "$id": "uxxts-common.schema.json",
+  "title": "UxXTS Common Blocks",
   "type": "object",
   "definitions": {
     "metadata": {
