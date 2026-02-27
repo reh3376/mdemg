@@ -299,7 +299,7 @@ The critical rule is **the hash field itself is excluded from the hash input**. 
 
 Hash verification and assertion evaluation are **independent operations**. The runner always does both, and reports the results separately.
 
-1. **Verify hash.** Compare stored hash to computed hash. Record the result as `hash_verified: true` (match) or `hash_verified: false` (mismatch or no hash present). If mismatch, record details in `hash_mismatches[]`.
+1. **Verify hash.** If the spec has a hash field: compare stored hash to computed hash. Record `hash_verified: true` (match) or `hash_verified: false` (mismatch), and record mismatch details in `hash_mismatches[]`. If the spec has no hash field: record `hash_verified: null` (not applicable).
 2. **Execute assertions.** Run all spec assertions regardless of hash result. Record `pass` or `fail` based on assertion outcomes.
 3. **Report both.** The per-spec `status` field reflects assertion results only. The `hash_verified` and `hash_mismatches` fields reflect integrity results only. These are never conflated.
 
@@ -316,7 +316,7 @@ A spec can have four outcome combinations:
 
 Whether hash mismatches block the pipeline is a gate-mode decision, not a runner decision. The runner always reports hash status; CI decides what to do with it.
 
-- `block` gate mode: CI SHOULD treat hash mismatches as pipeline failures (separate from assertion failures). This ensures no unreviewed spec/fixture changes reach production.
+- `block` gate mode: CI MUST treat hash mismatches as pipeline failures (separate from assertion failures). This ensures no unreviewed spec/fixture changes reach production.
 - `soft` gate mode: CI reports hash mismatches visibly but does not block. This is appropriate during active development.
 - `observe` gate mode: Hash status is recorded in the report for metrics only.
 
@@ -583,7 +583,7 @@ All runners MUST produce structured output in a common format so that cross-fram
 | Field | Type | Description |
 |-------|------|-------------|
 | `results[].spec_path` | string | Relative path to spec file |
-| `results[].status` | enum | `pass`, `fail`, `skip`, `error` — based on **assertion results only** |
+| `results[].status` | enum | `pass`, `fail`, `skip`, `error` — based on **spec verification only** (assertions + parity), never hash results |
 | `results[].duration_ms` | float | Execution time for this spec |
 | `results[].hash_verified` | boolean or null | `true` = hash match, `false` = hash mismatch, `null` = no hash field in spec |
 | `results[].hash_mismatches` | string[] | Details of each hash mismatch (empty if verified or no hash) |
@@ -595,10 +595,12 @@ All runners MUST produce structured output in a common format so that cross-fram
 
 ### Status Semantics
 
-The `status` field reflects **assertion results only**. Hash verification results are reported separately via `hash_verified` and `hash_mismatches`. These are independent signals — a spec can pass assertions but have a hash mismatch, or fail assertions with a verified hash.
+The `status` field reflects **spec verification results**. Hash verification results are reported separately via `hash_verified` and `hash_mismatches`. These are independent signals — a spec can pass verification but have a hash mismatch, or fail verification with a verified hash.
 
 - `pass`: All evaluated assertions passed. `assertions_evaluated` must be >= 1 (0/0 is not a pass).
-- `fail`: One or more assertions failed, or an unimplemented field was detected in an `active` framework.
+- `fail`: Two fail classes exist:
+  - **Assertion failure:** One or more assertions evaluated and did not pass.
+  - **Parity failure:** The spec uses a field that the runner does not implement (unimplemented-field detection per Section 8). This is a fail even though no assertion was evaluated — the runner cannot verify what the spec asks for.
 - `skip`: Spec was intentionally not executed (excluded by tag filter or explicit `--exclude` flag).
 - `error`: Runner could not execute the spec (parse failure, missing fixture, runner crash).
 
