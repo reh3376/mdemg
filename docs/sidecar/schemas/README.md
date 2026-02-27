@@ -78,8 +78,6 @@ Command-specific fields may be added, but the common envelope is mandatory.
 
 ---
 
-## Change Control Checklist
-
 ## Fixtures
 
 Example report files for each schema, located in `fixtures/`:
