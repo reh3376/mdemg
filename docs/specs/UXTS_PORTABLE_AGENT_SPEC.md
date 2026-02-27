@@ -296,8 +296,13 @@ The critical rule is **the hash field itself is excluded from the hash input**. 
 3. To verify: recompute and compare before executing the spec that references the fixture.
 
 **Runner behavior on hash mismatch:**
-- If `--skip-hash` flag is provided: log a warning and continue (useful during spec development).
-- Otherwise: report the spec as FAIL with hash mismatch details. Do not execute the spec.
+- **Default (no flags):** report the spec as FAIL with hash mismatch details. Do not execute the spec's assertions. The report entry must have `status: "fail"`, `hash_verified: false`, and the mismatch details in `failures[]`.
+- **With `--skip-hash` flag:** log a warning, set `hash_verified: false` in the report, and **proceed to execute the spec normally**. The spec result is `pass` or `fail` based on assertion evaluation — NOT `skip`. The `--skip-hash` flag bypasses hash verification, not spec execution.
+
+**CI policy for `--skip-hash`:**
+- `--skip-hash` is a **development-only** convenience for iterating on spec content without recomputing hashes after every edit.
+- CI pipelines with gate mode `block` MUST NOT pass `--skip-hash`. If a CI config includes this flag, the drift checker should flag it as a governance violation.
+- CI pipelines with gate mode `soft` SHOULD NOT pass `--skip-hash`. If used, the runner must emit a loud warning in both stdout and the report's `warnings[]` field.
 
 ---
 
@@ -350,7 +355,7 @@ For each identified domain:
 
 6. **Wire into CI.** Add a CI step that invokes the Makefile target. The Makefile is the portable interface — the CI step is a thin wrapper (see Section 3, Step 4 for examples across GitHub Actions, GitLab CI, Jenkins, and Azure Pipelines). Start with `soft` gating (report but don't block) until you have confidence in the spec set.
 
-7. **Add hash integrity.** Compute SHA256 for each spec file and embed it in the spec's config section. Have the runner verify hashes on load.
+7. **Add hash integrity.** Define the framework's hash field path (e.g., `config.sha256`, `fixture.sha256`) and record it in the governance matrix under `hash_field_convention`. Compute SHA256 for each spec file using the canonical procedure (Section 5.1) and embed the hash at the defined path. Have the runner verify hashes on load.
 
 8. **Document governance.** Create a governance matrix entry recording the framework's status, schema location, spec directory, runner command, and CI gate mode.
 
@@ -529,7 +534,7 @@ All runners MUST produce structured output in a common format so that cross-fram
 | `summary.total_specs` | integer | Total specs processed |
 | `summary.passed` | integer | Specs with status `pass` |
 | `summary.failed` | integer | Specs with status `fail` |
-| `summary.skipped` | integer | Specs with status `skip` (hash mismatch with `--skip-hash`, or explicitly excluded) |
+| `summary.skipped` | integer | Specs with status `skip` (excluded by tag filter or explicit exclusion) |
 | `summary.errors` | integer | Specs that could not be executed (parse error, runner crash) |
 | `summary.pass_rate` | float | `(passed / total_specs) * 100` |
 | `summary.duration_ms` | float | Total wall-clock time |
@@ -547,7 +552,7 @@ All runners MUST produce structured output in a common format so that cross-fram
 
 - `pass`: All evaluated assertions passed. `assertions_evaluated` must be >= 1 (0/0 is not a pass).
 - `fail`: One or more assertions failed, or an unimplemented field was detected in an `active` framework.
-- `skip`: Spec was intentionally not executed (excluded by tag filter, hash verification bypassed).
+- `skip`: Spec was intentionally not executed (excluded by tag filter or explicit `--exclude` flag). Note: `--skip-hash` does NOT produce `skip` status — the spec is still executed and reports `pass` or `fail` with `hash_verified: false`.
 - `error`: Runner could not execute the spec (parse failure, missing fixture, runner crash).
 
 ### Output Conventions
