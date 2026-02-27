@@ -22,7 +22,6 @@
     "error_rate_pct": 0.1
   },
   "setup": {
-    "seed_data": "test_data/retrieve_seed.json",
     "warmup_requests": 20
   },
   "metadata": {

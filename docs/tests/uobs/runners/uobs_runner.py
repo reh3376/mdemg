@@ -6,21 +6,87 @@ Validates observability infrastructure against UOBS specifications.
 
 Usage:
     python uobs_runner.py --spec specs/prometheus_metrics.uobs.json
-    python uobs_runner.py --spec "specs/*.uobs.json" --output results/
+    python uobs_runner.py --spec "specs/*.uobs.json" --report report.json
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 import requests
+
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
+
+UOBS_VERSION = "1.1.0"
+
+# ============================================================
+# PARITY CHECK (Section 8 — Portable Agent Spec v2.2.0)
+# ============================================================
+
+_UOBS_KNOWN_TOP_FIELDS = {"uobs_version", "test", "metadata", "metrics", "health", "dependency", "logging", "tracing"}
+_UOBS_KNOWN_TEST_FIELDS = {"name", "description", "type"}
+_UOBS_KNOWN_METRICS_FIELDS = {"endpoint", "required_metrics", "format_validation"}
+_UOBS_KNOWN_HEALTH_FIELDS = {"endpoints"}
+_UOBS_KNOWN_DEPENDENCY_FIELDS = {
+    "service", "endpoint", "active_check", "thresholds",
+    "required_capabilities", "configuration_validation", "circuit_breaker",
+}
+_UOBS_KNOWN_LOGGING_FIELDS = {"format", "required_fields", "timestamp_format"}
+_UOBS_KNOWN_TRACING_FIELDS = {"trace_header", "request_id_header", "propagation_check"}
+
+_UOBS_UNIMPLEMENTED_TEST_TYPES = {"logging"}
+
+def _validate_supported_features(spec_dict):
+    """Detect spec fields this runner does not implement (parity check)."""
+    errors = []
+
+    # Test types the runner cannot execute
+    test_type = spec_dict.get("test", {}).get("type")
+    if test_type in _UOBS_UNIMPLEMENTED_TEST_TYPES:
+        errors.append(
+            f"PARITY FAILURE: test type '{test_type}' is not implemented. "
+            f"Runner supports: metrics, health, dependency, tracing."
+        )
+
+    unknown_top = set(spec_dict.keys()) - _UOBS_KNOWN_TOP_FIELDS
+    if unknown_top:
+        errors.append(f"PARITY FAILURE: Unimplemented top-level fields: {unknown_top}")
+    if "test" in spec_dict and isinstance(spec_dict["test"], dict):
+        unknown_test = set(spec_dict["test"].keys()) - _UOBS_KNOWN_TEST_FIELDS
+        if unknown_test:
+            errors.append(f"PARITY FAILURE: Unimplemented test fields: {unknown_test}")
+    if "metrics" in spec_dict and isinstance(spec_dict["metrics"], dict):
+        unknown_m = set(spec_dict["metrics"].keys()) - _UOBS_KNOWN_METRICS_FIELDS
+        if unknown_m:
+            errors.append(f"PARITY FAILURE: Unimplemented metrics fields: {unknown_m}")
+    if "health" in spec_dict and isinstance(spec_dict["health"], dict):
+        unknown_h = set(spec_dict["health"].keys()) - _UOBS_KNOWN_HEALTH_FIELDS
+        if unknown_h:
+            errors.append(f"PARITY FAILURE: Unimplemented health fields: {unknown_h}")
+    if "dependency" in spec_dict and isinstance(spec_dict["dependency"], dict):
+        unknown_d = set(spec_dict["dependency"].keys()) - _UOBS_KNOWN_DEPENDENCY_FIELDS
+        if unknown_d:
+            errors.append(f"PARITY FAILURE: Unimplemented dependency fields: {unknown_d}")
+    if "logging" in spec_dict and isinstance(spec_dict["logging"], dict):
+        unknown_l = set(spec_dict["logging"].keys()) - _UOBS_KNOWN_LOGGING_FIELDS
+        if unknown_l:
+            errors.append(f"PARITY FAILURE: Unimplemented logging fields: {unknown_l}")
+    if "tracing" in spec_dict and isinstance(spec_dict["tracing"], dict):
+        unknown_t = set(spec_dict["tracing"].keys()) - _UOBS_KNOWN_TRACING_FIELDS
+        if unknown_t:
+            errors.append(f"PARITY FAILURE: Unimplemented tracing fields: {unknown_t}")
+    return errors
+
 
 @dataclass
 class CheckResult:
@@ -74,6 +140,15 @@ def load_spec(spec_path: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+_PROM_LINE_RE = re.compile(
+    r'^[a-zA-Z_:][a-zA-Z0-9_:]*'           # metric name
+    r'(?:\{(?:[^"{}]|"(?:[^"\\]|\\.)*")*\})?'  # optional labels (handles } inside quoted values)
+    r'\s+'                                   # separator
+    r'(?:[\d.eE+-]+|NaN|\+Inf|-Inf)'        # value
+    r'(?:\s+\d+)?$'                          # optional timestamp
+)
+
+
 def validate_prometheus_format(content: str) -> tuple[bool, str]:
     """Validate Prometheus exposition format."""
     lines = content.strip().split("\n")
@@ -84,10 +159,8 @@ def validate_prometheus_format(content: str) -> tuple[bool, str]:
         if not line or line.startswith("#"):
             continue
 
-        # Basic format: metric_name{labels} value
-        # or: metric_name value
-        if not re.match(r'^[a-zA-Z_:][a-zA-Z0-9_:]*(\{[^}]*\})?\s+[\d.eE+-]+$', line):
-            errors.append(f"Line {i}: Invalid format: {line[:50]}")
+        if not _PROM_LINE_RE.match(line):
+            errors.append(f"Line {i}: Invalid format: {line[:80]}")
 
     if errors:
         return False, "; ".join(errors[:5])
@@ -665,7 +738,7 @@ def main():
     parser = argparse.ArgumentParser(description="UOBS Observability Test Runner")
     parser.add_argument("--spec", required=True, help="Path to UOBS spec file(s)")
     parser.add_argument("--base-url", default="http://localhost:9999", help="MDEMG base URL")
-    parser.add_argument("--output", help="Output directory for results")
+    parser.add_argument("--report", help="Output JSON report file path")
     args = parser.parse_args()
 
     # Handle glob patterns in spec
@@ -679,44 +752,60 @@ def main():
 
     all_passed = True
     results = []
+    canonical_results = []
+    total_start = time.monotonic()
 
     for spec_path in spec_paths:
         print(f"\nLoading spec: {spec_path}")
         spec = load_spec(spec_path)
 
+        # Parity check — short-circuit before execution
+        parity_errors = _validate_supported_features(spec)
+        if parity_errors:
+            print(f"\n  Schema-runner parity FAILURES:")
+            for e in parity_errors:
+                print(f"    {e}")
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="fail",
+                failures=parity_errors,
+                hash_verified=None,
+            ))
+            all_passed = False
+            continue
+
+        spec_start = time.monotonic()
         result = run_observability_test(spec, args.base_url)
+        spec_duration = (time.monotonic() - spec_start) * 1000
         results.append(result)
         print_results(result)
 
         if not result.passed:
             all_passed = False
 
-    # Save results if output directory specified
-    if args.output:
-        output_dir = Path(args.output)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Build canonical result
+        failures = []
+        for cr in result.results:
+            if not cr.passed:
+                failures.append(f"{cr.name}: {cr.message}")
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = output_dir / f"uobs_results_{timestamp}.json"
+        canonical_status = "pass" if result.passed else "fail"
+        canonical_results.append(_canonical_result(
+            spec_path=str(spec_path),
+            status=canonical_status,
+            duration_ms=round(spec_duration, 2),
+            hash_verified=None,  # UOBS has no hash implementation
+            assertions_evaluated=result.total_checks,
+            assertions_passed=result.passed_checks,
+            failures=failures if failures else [],
+        ))
 
-        with open(output_file, "w") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "overall_passed": all_passed,
-                "results": [r.to_dict() for r in results],
-            }, f, indent=2)
+    total_duration = (time.monotonic() - total_start) * 1000
+    report = _canonical_report("uobs", UOBS_VERSION, canonical_results, duration_ms=round(total_duration, 2))
+    _print_summary(report)
 
-        print(f"\nResults saved to: {output_file}")
-
-    print(f"\n{'='*60}")
-    print(f"Observability Test Summary")
-    print(f"{'='*60}")
-    print(f"Total Tests:  {len(results)}")
-    print(f"Passed:       {sum(1 for r in results if r.passed)}")
-    print(f"Failed:       {sum(1 for r in results if not r.passed)}")
-    print(f"{'='*60}")
-    print(f"Overall: {'PASS' if all_passed else 'FAIL'}")
-    print(f"{'='*60}")
+    if args.report:
+        _save_report(report, args.report)
 
     sys.exit(0 if all_passed else 1)
 

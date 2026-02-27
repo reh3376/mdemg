@@ -1,0 +1,118 @@
+{
+  "timestamp": "2026-02-24T20:27:16.046076Z",
+  "framework": "uets",
+  "framework_version": "1.0.0",
+  "summary": {
+    "total_specs": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "errors": 0,
+    "pass_rate": 100.0,
+    "duration_ms": 427551.7
+  },
+  "integrity": {
+    "total_hashed": 8,
+    "verified": 8,
+    "mismatched": 0,
+    "no_hash": 0
+  },
+  "results": [
+    {
+      "spec_path": "specs/llama3.2-3b-fp16-macstudio.uets.json",
+      "status": "pass",
+      "duration_ms": 12167.7,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 21,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/llama3.2-3b-macstudio.uets.json",
+      "status": "pass",
+      "duration_ms": 9187.3,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 21,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/llama3.2-3b-ollama.uets.json",
+      "status": "pass",
+      "duration_ms": 10018.9,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 21,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/llama3.3-70b-macstudio.uets.json",
+      "status": "pass",
+      "duration_ms": 124341.9,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 21,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/llama3.3-70b-ollama.uets.json",
+      "status": "pass",
+      "duration_ms": 187884.9,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 20,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/qwen2.5-14b-ollama.uets.json",
+      "status": "pass",
+      "duration_ms": 34548.8,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 14,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/qwen2.5-72b-mlx.uets.json",
+      "status": "pass",
+      "duration_ms": 32915.6,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 21,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    },
+    {
+      "spec_path": "specs/qwen3-8b-ollama.uets.json",
+      "status": "pass",
+      "duration_ms": 16486.6,
+      "hash_verified": true,
+      "hash_mismatches": [],
+      "assertions_evaluated": 21,
+      "assertions_passed": 17,
+      "failures": [],
+      "warnings": [],
+      "error": null
+    }
+  ]
+}

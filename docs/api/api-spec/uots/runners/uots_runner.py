@@ -19,14 +19,51 @@ import re
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 
 import requests
 
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'tests'))
+from uxts_report import build_result as _canonical_result, build_report as _canonical_report, print_summary as _print_summary, save_report as _save_report
+
 ROOT = Path(__file__).resolve().parents[5]
+UOTS_VERSION = "1.0.0"
+
+
+# ============================================================
+# PARITY CHECK (Section 8 — Portable Agent Spec v2.2.0)
+# ============================================================
+
+_UOTS_KNOWN_TOP_FIELDS = {"uots_version", "observability", "target", "expected", "config", "metadata"}
+_UOTS_KNOWN_OBSERVABILITY_FIELDS = {"name", "type", "tags"}
+_UOTS_KNOWN_TARGET_FIELDS = {"endpoint", "method", "file"}
+_UOTS_KNOWN_CONFIG_FIELDS = {"timeout_ms", "base_url"}
+
+def _validate_supported_features(spec_dict):
+    """Detect spec fields this runner does not implement (parity check)."""
+    errors = []
+    unknown_top = set(spec_dict.keys()) - _UOTS_KNOWN_TOP_FIELDS
+    if unknown_top:
+        errors.append(f"PARITY FAILURE: Unimplemented top-level fields: {unknown_top}")
+    if "variants" in spec_dict:
+        errors.append("PARITY FAILURE: 'variants' field is not implemented by this runner")
+    if "observability" in spec_dict and isinstance(spec_dict["observability"], dict):
+        unknown_obs = set(spec_dict["observability"].keys()) - _UOTS_KNOWN_OBSERVABILITY_FIELDS
+        if unknown_obs:
+            errors.append(f"PARITY FAILURE: Unimplemented observability fields: {unknown_obs}")
+    if "target" in spec_dict and isinstance(spec_dict["target"], dict):
+        unknown_tgt = set(spec_dict["target"].keys()) - _UOTS_KNOWN_TARGET_FIELDS
+        if unknown_tgt:
+            errors.append(f"PARITY FAILURE: Unimplemented target fields: {unknown_tgt}")
+    if "config" in spec_dict and isinstance(spec_dict["config"], dict):
+        unknown_cfg = set(spec_dict["config"].keys()) - _UOTS_KNOWN_CONFIG_FIELDS
+        if unknown_cfg:
+            errors.append(f"PARITY FAILURE: Unimplemented config fields: {unknown_cfg}")
+    return errors
 
 
 @dataclass
@@ -648,26 +685,52 @@ def main() -> int:
 
     started = time.time()
     results = [run_spec(spec_path, args.base_url) for spec_path in specs]
+    canonical_results = []
 
     for result in results:
         print_result(result)
 
-    passed = sum(1 for r in results if r.passed)
-    failed = len(results) - passed
-    duration = time.time() - started
+        # Parity check
+        try:
+            spec_dict = _load_json(Path(result.spec_path))
+            parity_errors = _validate_supported_features(spec_dict)
+        except Exception:
+            parity_errors = []
 
-    print("\n" + "=" * 72)
-    print("UOTS Summary")
-    print("=" * 72)
-    print(f"Specs:   {len(results)}")
-    print(f"Passed:  {passed}")
-    print(f"Failed:  {failed}")
-    print(f"Elapsed: {duration:.2f}s")
+        # Build canonical result
+        failures = []
+        for c in result.checks:
+            if not c.passed:
+                failures.append(f"{c.name}: {c.message}")
+        failures.extend(parity_errors)
+
+        canonical_status = "pass" if result.passed and not parity_errors else "fail"
+        # Compute duration from started_at/ended_at
+        try:
+            dt_start = datetime.fromisoformat(result.started_at)
+            dt_end = datetime.fromisoformat(result.ended_at)
+            duration_ms = (dt_end - dt_start).total_seconds() * 1000
+        except Exception:
+            duration_ms = 0.0
+
+        canonical_results.append(_canonical_result(
+            spec_path=result.spec_path,
+            status=canonical_status,
+            duration_ms=round(duration_ms, 2),
+            hash_verified=None,  # UOTS has no hash implementation
+            assertions_evaluated=result.total_checks,
+            assertions_passed=result.passed_checks,
+            failures=failures if failures else [],
+        ))
+
+    total_duration = (time.time() - started) * 1000
+    report = _canonical_report("uots", UOTS_VERSION, canonical_results, duration_ms=round(total_duration, 2))
+    _print_summary(report)
 
     if args.report:
-        save_report(args.report, results)
-        print(f"Report:  {args.report}")
+        _save_report(report, str(args.report))
 
+    failed = sum(1 for r in results if not r.passed)
     return 0 if failed == 0 else 1
 
 

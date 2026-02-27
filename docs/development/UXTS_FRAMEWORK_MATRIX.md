@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 
 ---
 
@@ -15,11 +15,11 @@ Last updated: 2026-02-26
 | UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 124 canonical, 7 drafts |
 | UPTS | Universal Parser Test Specification | Language parser conformance | active | 27 |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
-| USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 5 |
+| USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 3 canonical, 2 drafts |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only | 4 |
-| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 4 |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 3 canonical, 1 draft |
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 5 |
-| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | pilot | 1 canonical, 1 draft |
+| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 
 ---
@@ -33,11 +33,11 @@ Last updated: 2026-02-26
 | UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (124) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | CI-gated in `ci.yml` |
 | UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (27) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
-| USTS | `docs/tests/usts/schema/usts.schema.json` | `docs/tests/usts/specs/` (5) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
+| USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (3); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
 | UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | none (spec-only, no runner/fixtures) | no CI gate |
-| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | `docs/tests/uobs/specs/` (4) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
+| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (3); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
 | UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (5) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
-| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | `docs/tests/uvts/runners/uvts_runner.py` (setup-only; requires manual benchmark run) | canonical dialect guard via `uxts-canonical-specs.yml` |
+| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 
 ---
@@ -50,11 +50,11 @@ Last updated: 2026-02-26
 | UPTS | `line_tolerance`, `validate_signature`, `validate_value`, `validate_parent`, `require_all_symbols`, `allow_extra_symbols` | `relationships` | Yes (hard fail on `relationships`) |
 | UBTS | All threshold fields, `min_success_rate`, `max_p99_degradation_pct` | `setup.seed_data`, `ramp_up_seconds`, `duration_seconds` | Yes (warnings for unimplemented) |
 | UETS | E1-E5 all enforced (E4 description quality added) | none | N/A |
-| UOBS | `metrics`, `health`, `dependency` | `logging` (explicit fail), `tracing` | Yes (explicit fail for unimplemented types) |
+| UOBS | `metrics`, `health`, `dependency` | `logging` (draft), `tracing` | Yes (parity hard-fail for unimplemented types) |
 | UOTS | `prometheus_metrics`, `grafana_dashboard`, `alert_rules` | `log_format`, `trace_propagation` | Yes (explicit fail for unimplemented types) |
 | UDTS | Hand-coded per RPC | N/A (not spec-driven) | N/A |
-| UVTS | `uvts_version`, `validation`, `thresholds`, `questions` | Legacy draft format detection | Yes (ValueError for legacy format) |
-| USTS | Unknown | Unknown | Not audited |
+| UVTS | N/A (spec-only, no functional runner) | All | N/A |
+| USTS | `rate_limiting`, `data_exposure`, `injection` | `authentication` (draft, needs USTS_AUTH_ENABLED), `test_cases` format (draft) | Yes (parity hard-fail for auth, test_cases) |
 | UAMS | N/A (no runner) | All | N/A |
 
 ---
@@ -76,8 +76,8 @@ Last updated: 2026-02-26
 3. CI concentrated on UATS/UPTS; UBTS now has soft-fail CI. Other frameworks still lack CI gates.
 4. ~~UNTS scanner limited to manifest + UDTS~~ — **Remediated**: Scanner now covers all 8 UxTS frameworks.
 5. ~~UAMS claims fixtures/runner that don't exist~~ — **Remediated**: Marked spec-only, phantom claims removed.
-6. UVTS runner is setup-only; full benchmark automation not yet implemented.
-7. USTS not audited for schema-runner parity.
+6. ~~UVTS runner is setup-only~~ — **Demoted**: UVTS reclassified as spec-only (runner stub non-functional).
+7. ~~USTS not audited for schema-runner parity~~ — **Remediated**: Parity checks added. Auth/guardrail specs moved to drafts.
 
 ---
 

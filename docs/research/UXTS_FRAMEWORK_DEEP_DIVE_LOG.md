@@ -1,6 +1,6 @@
 # UxTS Framework Deep Dive Log
 
-Last updated: 2026-02-27 04:57:43 EST
+Last updated: 2026-02-27 05:39:56 EST
 Owner: Codex review session
 Purpose: Persistent, compaction-safe working log for UxTS framework review, threat/gap analysis, and portable agent specification design.
 
@@ -90,3 +90,24 @@ Purpose: Persistent, compaction-safe working log for UxTS framework review, thre
 - High-priority clarity gaps identified: lifecycle/status model inconsistency (`block` used as both status and gate mode), transition criteria conflict (`>=95%` parity vs "full parity"), and missing canonical hash procedure (no rule for excluding in-file hash field from digest input / canonicalization strategy).
 - Additional gaps: missing standardized runner report schema, no deterministic discovery/grep command procedure, and no explicit non-GitHub CI mapping guidance despite "arbitrary codebases" target.
 - File-path usability note: user-requested path `docs/UXTS_PORTABLE_AGENT_SPEC.md` does not exist; canonical document is under `docs/specs/`.
+
+### 2026-02-27 05:07:33 EST — Checkpoint 14 (Post-Update Spec Re-Review)
+- Re-reviewed updated `docs/specs/UXTS_PORTABLE_AGENT_SPEC.md` (v2.1.0-draft). Prior high-risk gaps were largely addressed: status/gate separation is now explicit, parity threshold conflict removed, hash procedure is specified, CI portability expanded, deterministic discovery improved, and canonical runner report schema added.
+- Residual issues remain: (1) contradiction between hash bypass behavior ("continue execution") and report semantics that treat bypass as `skip`, and (2) bootstrap guidance still says embed hash in `config` section, which conflicts with per-framework hash-path convention defined elsewhere.
+- Recommendation: resolve those two semantics-level mismatches to avoid divergent agent implementations.
+
+### 2026-02-27 05:20:20 EST — Checkpoint 15 (Spec v2.2.0 Hash-Intent Re-Review)
+- Reviewed `docs/specs/UXTS_PORTABLE_AGENT_SPEC.md` v2.2.0-draft after user clarified hash purpose as change-detection/review alert.
+- Major improvements confirmed: hash intent now explicit; runner behavior states "always verify, always execute"; report schema separates assertion outcomes from integrity outcomes; bootstrap hash-path guidance now aligns with per-framework `hash_field_convention`.
+- Remaining ambiguity detected: Section 5.1 Step 1 says `hash_verified=false` for "mismatch or no hash present", while later text and report schema require `hash_verified=null` when no hash field exists. This needs one canonical rule.
+- Additional minor ambiguity: block-mode integrity policy uses SHOULD (recommendation) rather than MUST (deterministic requirement), leaving CI behavior open to interpretation.
+
+### 2026-02-27 05:33:53 EST — Checkpoint 16 (Behavior-Shaping Review for Brownfield Adoption)
+- Reviewed the portable spec for its ability to induce reviewing agents to proactively scan existing codebases and propose/implement UxTS-aligned recurring-construct remediation.
+- Key gap: document strongly defines framework architecture and lifecycle, but does not yet mandate a brownfield execution loop with required remediation deliverables (opportunity backlog, prioritized implementation set, and closure criteria).
+- Recommended additions: explicit Greenfield vs Brownfield operating modes, recurring-construct detection thresholds, mandatory opportunity scoring rubric, required code-change outcomes (or documented waiver), and acceptance criteria that require both discovery artifacts and implemented remediations.
+
+### 2026-02-27 05:39:56 EST — Checkpoint 17 (Behavior-Shaping Changes Implemented)
+- Updated `docs/specs/UXTS_PORTABLE_AGENT_SPEC.md` to operationalize brownfield adoption: added mandatory operating mode declaration (greenfield vs brownfield), recurring-construct thresholds, deterministic discovery command protocol, extension-first/new-framework gate, and mandatory brownfield remediation loop.
+- Added enforceable brownfield deliverables in governance artifacts (`UXTS_DISCOVERY`, `UXTS_OPPORTUNITY_BACKLOG`, `UXTS_REMEDIATION_PLAN`, waiver artifact).
+- Strengthened acceptance criteria so brownfield engagements require scored backlog evidence plus either implemented high-priority remediation or documented waiver.
