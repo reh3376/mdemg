@@ -1,6 +1,6 @@
 # UxTS Portable Agent Specification
 
-Version: 2.1.0-draft
+Version: 2.2.0-draft
 Date: 2026-02-27
 Audience: Coding agents implementing Universal-x Test Specification governance in arbitrary codebases.
 
@@ -34,7 +34,7 @@ UxTS (Universal-x Test Specification) is a methodology for organizing programmat
 
 **Runner** — An executable program (script or binary) that reads specs, executes the verification they describe, and reports pass/fail results. The runner is the only component that actually "does" anything — specs and schemas are pure data.
 
-**Fixture** — A static input file that a spec references for testing. For example, a parser spec might reference a `.go` source file as its fixture. Fixtures have their own integrity controls (hashes) because a tampered fixture can silently invalidate test results.
+**Fixture** — A static input file that a spec references for testing. For example, a parser spec might reference a `.go` source file as its fixture. Fixtures have their own integrity controls (hashes) because a modified fixture can silently invalidate test results without anyone realizing the test inputs changed.
 
 **Framework** — The combination of schema + specs + runner + CI wiring for one concern domain. Each framework owns exactly one domain. Framework overlap is prohibited — when two frameworks claim the same domain, one must be deprecated or the domains must be split.
 
@@ -250,9 +250,9 @@ Because specs are data (not code), you can swap runners without rewriting tests.
 
 Once you have the pattern (schema + spec + runner + CI) for one domain, adding a new domain is mechanical. You don't reinvent test infrastructure — you instantiate the same pattern with a new schema and runner. This is how a single codebase can govern 11 different verification domains without 11 different test philosophies.
 
-### 4.5 Hash integrity catches tampering
+### 4.5 Hash integrity detects unreviewed changes
 
-Specs and fixtures can include SHA256 hashes. If a spec file is modified outside the normal workflow (manual edit, merge conflict, tooling bug), hash verification catches it before the test runs. This matters most for high-stakes specs (security, benchmark baselines) where a silently modified spec could hide a regression.
+Specs and fixtures can include SHA256 hashes. If a spec file is modified — intentional edit, merge conflict resolution, tooling side-effect — hash verification alerts the developer that the file changed. The hash is a change-detection mechanism: it answers "was this file modified since last review?" not "is this file correct?" Correctness is the assertions' job. The hash ensures no change goes unnoticed, which matters most for high-stakes specs (security, benchmark baselines) where an unreviewed modification could mask a regression.
 
 ---
 
@@ -264,9 +264,9 @@ Specs and fixtures can include SHA256 hashes. If a spec file is modified outside
 
 3. **Schema and runner must be explicitly aligned.** Every schema field must be classified as `enforced` (affects pass/fail), `advisory` (warning only), or `unimplemented` (not yet handled). An `active` framework must not have unimplemented fields that are silently ignored — this is the single largest source of false confidence.
 
-4. **Hash integrity is first-class.** Spec files and fixture files should carry SHA256 hashes computed using the canonical procedure defined in Section 5.1. Runners should verify hashes before execution.
+4. **Hash integrity is first-class.** Spec files and fixture files should carry SHA256 hashes computed using the canonical procedure defined in Section 5.1. Hashes are a change-detection mechanism — they alert developers that a file was modified, not that a file is incorrect. Runners always verify hashes and always execute assertions. These are independent signals reported separately (see Section 5.1 for runner behavior, Section 8A for report structure).
 
-5. **Fixtures are first-class test inputs.** When a spec references a static file (source code for parsing, config file for validation), that file has its own integrity controls. A stale or tampered fixture is a test that silently validates the wrong thing.
+5. **Fixtures are first-class test inputs.** When a spec references a static file (source code for parsing, config file for validation), that file has its own change-detection hash. A modified fixture without a corresponding spec update means the test is validating inputs the developer may not have reviewed.
 
 6. **Framework overlap must be resolved by canonical ownership.** If two frameworks both claim "observability," define exactly what each owns (e.g., one owns runtime behavior, the other owns artifact structure). Document the split. Ambiguity here causes specs to land in the wrong framework and get validated by the wrong runner.
 
@@ -295,14 +295,32 @@ The critical rule is **the hash field itself is excluded from the hash input**. 
 2. To compute: read the fixture file as raw bytes, compute SHA256 over the raw bytes. No JSON parsing or re-serialization — fixtures may be any format (source code, YAML, binary).
 3. To verify: recompute and compare before executing the spec that references the fixture.
 
-**Runner behavior on hash mismatch:**
-- **Default (no flags):** report the spec as FAIL with hash mismatch details. Do not execute the spec's assertions. The report entry must have `status: "fail"`, `hash_verified: false`, and the mismatch details in `failures[]`.
-- **With `--skip-hash` flag:** log a warning, set `hash_verified: false` in the report, and **proceed to execute the spec normally**. The spec result is `pass` or `fail` based on assertion evaluation — NOT `skip`. The `--skip-hash` flag bypasses hash verification, not spec execution.
+**Runner behavior — always execute, always report:**
 
-**CI policy for `--skip-hash`:**
-- `--skip-hash` is a **development-only** convenience for iterating on spec content without recomputing hashes after every edit.
-- CI pipelines with gate mode `block` MUST NOT pass `--skip-hash`. If a CI config includes this flag, the drift checker should flag it as a governance violation.
-- CI pipelines with gate mode `soft` SHOULD NOT pass `--skip-hash`. If used, the runner must emit a loud warning in both stdout and the report's `warnings[]` field.
+Hash verification and assertion evaluation are **independent operations**. The runner always does both, and reports the results separately.
+
+1. **Verify hash.** Compare stored hash to computed hash. Record the result as `hash_verified: true` (match) or `hash_verified: false` (mismatch or no hash present). If mismatch, record details in `hash_mismatches[]`.
+2. **Execute assertions.** Run all spec assertions regardless of hash result. Record `pass` or `fail` based on assertion outcomes.
+3. **Report both.** The per-spec `status` field reflects assertion results only. The `hash_verified` and `hash_mismatches` fields reflect integrity results only. These are never conflated.
+
+A spec can have four outcome combinations:
+
+| Assertions | Hash | Meaning |
+|-----------|------|---------|
+| pass | verified | Spec correct, file unchanged — healthy state |
+| pass | mismatch | Spec correct, but file was modified since last hash — developer should review and recompute hash |
+| fail | verified | Spec incorrect, file unchanged — real regression |
+| fail | mismatch | Spec incorrect AND file was modified — investigate whether the modification caused the failure |
+
+**CI integrity policy:**
+
+Whether hash mismatches block the pipeline is a gate-mode decision, not a runner decision. The runner always reports hash status; CI decides what to do with it.
+
+- `block` gate mode: CI SHOULD treat hash mismatches as pipeline failures (separate from assertion failures). This ensures no unreviewed spec/fixture changes reach production.
+- `soft` gate mode: CI reports hash mismatches visibly but does not block. This is appropriate during active development.
+- `observe` gate mode: Hash status is recorded in the report for metrics only.
+
+The runner itself does not have a `--skip-hash` flag. Hash verification is always performed when a hash field is present. If no hash field exists in a spec, `hash_verified` is reported as `null` (not applicable) rather than `true` or `false`.
 
 ---
 
@@ -494,12 +512,19 @@ All runners MUST produce structured output in a common format so that cross-fram
     "pass_rate": 98.4,
     "duration_ms": 4521
   },
+  "integrity": {
+    "total_hashed": 123,
+    "verified": 121,
+    "mismatched": 2,
+    "no_hash": 1
+  },
   "results": [
     {
       "spec_path": "specs/health.uats.json",
       "status": "pass",
       "duration_ms": 42,
       "hash_verified": true,
+      "hash_mismatches": [],
       "assertions_evaluated": 3,
       "assertions_passed": 3,
       "failures": [],
@@ -510,7 +535,10 @@ All runners MUST produce structured output in a common format so that cross-fram
       "spec_path": "specs/ingest.uats.json",
       "status": "fail",
       "duration_ms": 187,
-      "hash_verified": true,
+      "hash_verified": false,
+      "hash_mismatches": [
+        "config.sha256: expected abc123..., got def456..."
+      ],
       "assertions_evaluated": 8,
       "assertions_passed": 6,
       "failures": [
@@ -526,6 +554,8 @@ All runners MUST produce structured output in a common format so that cross-fram
 
 ### Required Fields
 
+**Top-level and assertion summary:**
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `timestamp` | ISO 8601 string | When the run started |
@@ -534,31 +564,48 @@ All runners MUST produce structured output in a common format so that cross-fram
 | `summary.total_specs` | integer | Total specs processed |
 | `summary.passed` | integer | Specs with status `pass` |
 | `summary.failed` | integer | Specs with status `fail` |
-| `summary.skipped` | integer | Specs with status `skip` (excluded by tag filter or explicit exclusion) |
+| `summary.skipped` | integer | Specs with status `skip` (excluded by tag filter) |
 | `summary.errors` | integer | Specs that could not be executed (parse error, runner crash) |
 | `summary.pass_rate` | float | `(passed / total_specs) * 100` |
 | `summary.duration_ms` | float | Total wall-clock time |
+
+**Integrity summary** (reported independently from assertion results):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `integrity.total_hashed` | integer | Specs that have a hash field defined |
+| `integrity.verified` | integer | Specs where stored hash matches computed hash |
+| `integrity.mismatched` | integer | Specs where stored hash does not match — files were modified |
+| `integrity.no_hash` | integer | Specs with no hash field (hash verification not applicable) |
+
+**Per-spec results:**
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `results[].spec_path` | string | Relative path to spec file |
-| `results[].status` | enum | `pass`, `fail`, `skip`, `error` |
+| `results[].status` | enum | `pass`, `fail`, `skip`, `error` — based on **assertion results only** |
 | `results[].duration_ms` | float | Execution time for this spec |
-| `results[].hash_verified` | boolean | Whether spec hash was verified |
+| `results[].hash_verified` | boolean or null | `true` = hash match, `false` = hash mismatch, `null` = no hash field in spec |
+| `results[].hash_mismatches` | string[] | Details of each hash mismatch (empty if verified or no hash) |
 | `results[].assertions_evaluated` | integer | Number of assertions actually checked |
 | `results[].assertions_passed` | integer | Number of assertions that passed |
-| `results[].failures` | string[] | Human-readable failure descriptions |
+| `results[].failures` | string[] | Human-readable assertion failure descriptions |
 | `results[].warnings` | string[] | Advisory messages (do not affect status) |
 | `results[].error` | string or null | Error message if status is `error` |
 
 ### Status Semantics
 
+The `status` field reflects **assertion results only**. Hash verification results are reported separately via `hash_verified` and `hash_mismatches`. These are independent signals — a spec can pass assertions but have a hash mismatch, or fail assertions with a verified hash.
+
 - `pass`: All evaluated assertions passed. `assertions_evaluated` must be >= 1 (0/0 is not a pass).
 - `fail`: One or more assertions failed, or an unimplemented field was detected in an `active` framework.
-- `skip`: Spec was intentionally not executed (excluded by tag filter or explicit `--exclude` flag). Note: `--skip-hash` does NOT produce `skip` status — the spec is still executed and reports `pass` or `fail` with `hash_verified: false`.
+- `skip`: Spec was intentionally not executed (excluded by tag filter or explicit `--exclude` flag).
 - `error`: Runner could not execute the spec (parse failure, missing fixture, runner crash).
 
 ### Output Conventions
 
 - Runners MUST write the report to the path specified by `--report <path>` flag.
-- Runners MUST also print a human-readable summary to stdout (total/passed/failed/error counts).
+- Runners MUST print a human-readable summary to stdout that includes both assertion results (total/passed/failed/error) and integrity results (verified/mismatched). These are separate lines — do not merge them.
 - Report files use `.json` extension and UTF-8 encoding.
 
 ---
@@ -816,8 +863,8 @@ For each framework, the agent MUST evaluate and document:
 | **False pass** | Spec passes with zero real assertions, or runner ignores assertions | Schema-runner parity, 0/0 prohibition |
 | **False fail** | Spec fails due to schema drift, environment sensitivity, or flaky assertions | Deterministic baselines, environment-variable resolution, fixture stability |
 | **Coverage blind spot** | Domain has verification needs but no specs, or specs exist but no CI gate | Framework discovery audit, CI drift checker |
-| **Integrity blind spot** | Hash fields missing or not scanned | Cross-framework hash scanner |
-| **Fixture drift** | Fixture modified without updating spec hash; stale fixture invalidates test | Fixture hash verification before execution |
+| **Undetected changes** | Hash fields missing or not scanned; file modifications go unnoticed | Cross-framework hash scanner, `integrity` summary in reports |
+| **Fixture drift** | Fixture modified without developer review; test validates unreviewed inputs | Fixture hash in spec, `hash_mismatches` in report, CI integrity gate |
 | **Dialect split** | Multiple incompatible spec formats under one framework | Canonical guard, drafts separation |
 
 ---
