@@ -1,0 +1,18 @@
+{
+  "mode": "mdemg",
+  "run": 2,
+  "model": "haiku",
+  "total": 120,
+  "processed": 15,
+  "successful": 14,
+  "failed": 1,
+  "with_refs": 14,
+  "total_duration": 824.5999999999999,
+  "start_time": "2026-02-26T13:31:32.103426",
+  "errors": [
+    {
+      "id": 262,
+      "error": "TIMEOUT after 120s"
+    }
+  ]
+}

@@ -1,0 +1,255 @@
+{
+  "generated": "2026-02-25T16:52:17.202763",
+  "baseline": {
+    "runs": 1,
+    "mean_scores": [
+      0.773
+    ],
+    "aggregate_mean": 0.773,
+    "aggregate_std": 0,
+    "all_questions_mean": 0.773,
+    "all_questions_std": 0.315,
+    "evidence_rate": 0.858,
+    "high_score_rate": 0.858,
+    "correct_file_rate": 0.717,
+    "total_questions_graded": 120
+  },
+  "mdemg": {
+    "runs": 1,
+    "mean_scores": [
+      0.816
+    ],
+    "aggregate_mean": 0.816,
+    "aggregate_std": 0,
+    "all_questions_mean": 0.816,
+    "all_questions_std": 0.265,
+    "evidence_rate": 0.883,
+    "high_score_rate": 0.883,
+    "correct_file_rate": 0.717,
+    "total_questions_graded": 120
+  },
+  "delta": {
+    "mean_improvement": 0.043,
+    "mean_improvement_pct": "+5.6%",
+    "evidence_improvement_pp": 2.5,
+    "high_score_improvement_pp": 2.5,
+    "welch_t": 1.1356,
+    "welch_p_value": 0.256658,
+    "mann_whitney_u": 8546.5,
+    "mann_whitney_p": 0.012285,
+    "statistically_significant": false
+  },
+  "by_category": {
+    "baseline": {
+      "architecture_structure": {
+        "count": 20,
+        "mean": 0.855,
+        "std": 0.199
+      },
+      "business_logic_constraints": {
+        "count": 20,
+        "mean": 0.802,
+        "std": 0.201
+      },
+      "computed_value": {
+        "count": 6,
+        "mean": 0.748,
+        "std": 0.339
+      },
+      "cross_cutting_concerns": {
+        "count": 20,
+        "mean": 0.722,
+        "std": 0.369
+      },
+      "data_flow_integration": {
+        "count": 20,
+        "mean": 0.628,
+        "std": 0.42
+      },
+      "disambiguation": {
+        "count": 8,
+        "mean": 0.967,
+        "std": 0.033
+      },
+      "relationship": {
+        "count": 6,
+        "mean": 0.939,
+        "std": 0.035
+      },
+      "service_relationships": {
+        "count": 20,
+        "mean": 0.738,
+        "std": 0.373
+      }
+    },
+    "mdemg": {
+      "architecture_structure": {
+        "count": 20,
+        "mean": 0.738,
+        "std": 0.317
+      },
+      "business_logic_constraints": {
+        "count": 20,
+        "mean": 0.787,
+        "std": 0.255
+      },
+      "computed_value": {
+        "count": 6,
+        "mean": 0.968,
+        "std": 0.018
+      },
+      "cross_cutting_concerns": {
+        "count": 20,
+        "mean": 0.781,
+        "std": 0.296
+      },
+      "data_flow_integration": {
+        "count": 20,
+        "mean": 0.813,
+        "std": 0.24
+      },
+      "disambiguation": {
+        "count": 8,
+        "mean": 0.97,
+        "std": 0.028
+      },
+      "relationship": {
+        "count": 6,
+        "mean": 0.784,
+        "std": 0.386
+      },
+      "service_relationships": {
+        "count": 20,
+        "mean": 0.86,
+        "std": 0.249
+      }
+    }
+  },
+  "per_question_deltas": [
+    {
+      "id": "165",
+      "baseline_mean": 0.0,
+      "mdemg_mean": 0.975,
+      "delta": 0.975
+    },
+    {
+      "id": "140",
+      "baseline_mean": 0.012,
+      "mdemg_mean": 0.975,
+      "delta": 0.963
+    },
+    {
+      "id": "329",
+      "baseline_mean": 0.0,
+      "mdemg_mean": 0.954,
+      "delta": 0.954
+    },
+    {
+      "id": "464",
+      "baseline_mean": 0.007,
+      "mdemg_mean": 0.952,
+      "delta": 0.945
+    },
+    {
+      "id": "444",
+      "baseline_mean": 0.01,
+      "mdemg_mean": 0.946,
+      "delta": 0.936
+    },
+    {
+      "id": "472",
+      "baseline_mean": 0.004,
+      "mdemg_mean": 0.919,
+      "delta": 0.915
+    },
+    {
+      "id": "156",
+      "baseline_mean": 0.021,
+      "mdemg_mean": 0.932,
+      "delta": 0.911
+    },
+    {
+      "id": "194",
+      "baseline_mean": 0.012,
+      "mdemg_mean": 0.922,
+      "delta": 0.91
+    },
+    {
+      "id": "318",
+      "baseline_mean": 0.007,
+      "mdemg_mean": 0.906,
+      "delta": 0.899
+    },
+    {
+      "id": "86",
+      "baseline_mean": 0.038,
+      "mdemg_mean": 0.932,
+      "delta": 0.894
+    },
+    {
+      "id": "328",
+      "baseline_mean": 0.012,
+      "mdemg_mean": 0.899,
+      "delta": 0.887
+    },
+    {
+      "id": "hard_sym_16",
+      "baseline_mean": 0.082,
+      "mdemg_mean": 0.959,
+      "delta": 0.877
+    },
+    {
+      "id": "366",
+      "baseline_mean": 0.0,
+      "mdemg_mean": 0.872,
+      "delta": 0.872
+    },
+    {
+      "id": "337",
+      "baseline_mean": 0.011,
+      "mdemg_mean": 0.802,
+      "delta": 0.791
+    },
+    {
+      "id": "268",
+      "baseline_mean": 0.005,
+      "mdemg_mean": 0.789,
+      "delta": 0.784
+    },
+    {
+      "id": "302",
+      "baseline_mean": 0.004,
+      "mdemg_mean": 0.78,
+      "delta": 0.776
+    },
+    {
+      "id": "477",
+      "baseline_mean": 0.008,
+      "mdemg_mean": 0.766,
+      "delta": 0.758
+    },
+    {
+      "id": "211",
+      "baseline_mean": 0.751,
+      "mdemg_mean": 0.985,
+      "delta": 0.234
+    },
+    {
+      "id": "hard_sym_2",
+      "baseline_mean": 0.745,
+      "mdemg_mean": 0.962,
+      "delta": 0.217
+    },
+    {
+      "id": "hard_sym_10",
+      "baseline_mean": 0.802,
+      "mdemg_mean": 0.954,
+      "delta": 0.152
+    }
+  ],
+  "canonical_baseline_comparison": {
+    "temporal_20260203_mean": 0.783,
+    "current_mdemg_mean": 0.816,
+    "delta": 0.033
+  }
+}

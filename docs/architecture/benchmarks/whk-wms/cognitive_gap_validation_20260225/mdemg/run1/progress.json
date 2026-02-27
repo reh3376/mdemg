@@ -1,0 +1,22 @@
+{
+  "mode": "mdemg",
+  "run": 1,
+  "model": "haiku",
+  "total": 120,
+  "processed": 120,
+  "successful": 97,
+  "failed": 1,
+  "with_refs": 84,
+  "total_duration": 6767.599999999997,
+  "start_time": "2026-02-25T14:56:41.483431",
+  "errors": [
+    {
+      "id": "hard_sym_17",
+      "error": "TIMEOUT after 180s"
+    }
+  ],
+  "end_time": "2026-02-25T16:51:43.629216",
+  "wall_clock_seconds": 6902.1,
+  "ref_rate": 0.865979381443299,
+  "avg_duration": 56.39666666666664
+}

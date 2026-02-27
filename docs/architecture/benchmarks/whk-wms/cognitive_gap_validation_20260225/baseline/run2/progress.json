@@ -1,0 +1,23 @@
+{
+  "mode": "baseline",
+  "run": 2,
+  "model": "haiku",
+  "total": 120,
+  "processed": 120,
+  "successful": 119,
+  "failed": 1,
+  "with_refs": 80,
+  "total_duration": 10173.799999999996,
+  "start_time": "2026-02-26T07:26:14.738410",
+  "errors": [
+    {
+      "id": "hard_sym_17",
+      "error": "TIMEOUT after 180s"
+    }
+  ],
+  "drift_count": 3,
+  "end_time": "2026-02-26T10:15:48.868516",
+  "wall_clock_seconds": 10174.1,
+  "ref_rate": 0.6722689075630253,
+  "avg_duration": 84.78166666666662
+}

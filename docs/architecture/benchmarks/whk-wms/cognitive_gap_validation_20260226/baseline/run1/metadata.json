@@ -1,0 +1,25 @@
+{
+  "session_id": "3c440aec-a23c-4086-b050-900a1056b5e9",
+  "sandbox_flags": [
+    "--setting-sources user",
+    "--strict-mcp-config",
+    "--disable-slash-commands"
+  ],
+  "telemetry_format": "stream-json",
+  "master_file_stashed": true,
+  "session_cleanup_pre": 0,
+  "session_cleanup_post": 1,
+  "sandbox_verified": null,
+  "timeout_seconds": 120,
+  "total_input_tokens": 27526,
+  "total_output_tokens": 346217,
+  "total_cache_read_tokens": 106862421,
+  "total_cache_write_tokens": 11005551,
+  "total_cost_usd": 27.472971,
+  "total_compact_events": 13,
+  "total_compact_events_heuristic": 9,
+  "total_response_chars": 404166,
+  "avg_response_chars": 3368.05,
+  "avg_input_tokens": 229.38333333333333,
+  "avg_output_tokens": 2885.141666666667
+}
