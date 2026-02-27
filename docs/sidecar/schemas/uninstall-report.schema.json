@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/uninstall-report/v1.0.0",
+  "title": "MDEMG Sidecar Uninstall Report",
+  "description": "Machine-readable report emitted by `mdemg sidecar uninstall --format json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "timestamp",
+    "result",
+    "exit_code",
+    "state_before",
+    "state_after",
+    "changes",
+    "issues",
+    "next_actions",
+    "dry_run",
+    "retain_backups",
+    "removed_artifacts",
+    "retained_artifacts",
+    "detached_adapters",
+    "services_stopped"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "command": {
+      "const": "mdemg sidecar uninstall"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "warning", "error"]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [0, 2, 3, 4, 5, 6]
+    },
+    "state_before": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "state_after": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "retain_backups": {
+      "type": "boolean",
+      "description": "Whether backups were retained (default true) or purged."
+    },
+    "removed_artifacts": {
+      "type": "array",
+      "description": "Sidecar-managed artifacts that were removed.",
+      "items": {
+        "$ref": "#/$defs/removed_artifact"
+      }
+    },
+    "retained_artifacts": {
+      "type": "array",
+      "description": "Artifacts intentionally kept during uninstall.",
+      "items": {
+        "$ref": "#/$defs/retained_artifact"
+      }
+    },
+    "detached_adapters": {
+      "type": "array",
+      "description": "Agent adapters that were detached during uninstall.",
+      "items": {
+        "$ref": "#/$defs/detached_adapter"
+      }
+    },
+    "services_stopped": {
+      "type": "array",
+      "description": "Services that were stopped during uninstall.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sidecar_state": {
+      "type": "string",
+      "enum": [
+        "uninitialized",
+        "initialized",
+        "installed",
+        "running",
+        "degraded",
+        "stopped",
+        "uninstalled"
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "remediation"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]+$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "removed_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "type"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": ["config", "generated", "lock", "log", "backup", "runtime"]
+        }
+      }
+    },
+    "retained_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "detached_adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "config_path", "restored_from_backup"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["claude-code", "codex"]
+        },
+        "config_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restored_from_backup": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uxts.dev/schemas/uxts-report.schema.json",
+  "title": "UxTS Runner Report",
+  "description": "Normative schema for runner report output. All UxTS runners MUST produce reports that validate against this schema. See UXTS_PORTABLE_AGENT_SPEC Section 8A.",
+  "_uxts_schema_version": "3.1.0",
+  "type": "object",
+  "required": ["timestamp", "framework", "framework_version", "summary", "integrity", "results"],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the run started."
+    },
+    "framework": {
+      "type": "string",
+      "pattern": "^[a-z]+$",
+      "description": "Framework acronym in lowercase (e.g., 'uats', 'upts', 'ubts')."
+    },
+    "framework_version": {
+      "type": "string",
+      "description": "Semantic version of the runner or spec schema."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_specs", "passed", "failed", "skipped", "errors", "pass_rate", "duration_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "total_specs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total specs processed."
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs with status 'pass'."
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs with status 'fail'."
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs with status 'skip' (excluded by tag filter, archived, or dependency failure)."
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs that could not be executed (parse error, runner crash)."
+        },
+        "pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "(passed / total_specs) * 100. 0 if total_specs is 0."
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total wall-clock time in milliseconds."
+        },
+        "flaky_passes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs that passed only after retry. Present when retry is enabled."
+        },
+        "archived": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs with spec_status 'archived' that were not executed."
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["total_hashed", "verified", "mismatched", "no_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "total_hashed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs that have a hash field defined."
+        },
+        "verified": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs where stored hash matches computed hash."
+        },
+        "mismatched": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs where stored hash does not match — files were modified."
+        },
+        "no_hash": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specs with no hash field (hash verification not applicable)."
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["spec_path", "status", "duration_ms", "hash_verified", "hash_mismatches", "assertions_evaluated", "assertions_passed", "failures", "warnings", "error"],
+        "additionalProperties": false,
+        "properties": {
+          "spec_path": {
+            "type": "string",
+            "description": "Relative path to spec file."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pass", "fail", "skip", "error"],
+            "description": "Spec verification result. Based on assertions + parity only, never hash results."
+          },
+          "duration_ms": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Execution time for this spec in milliseconds."
+          },
+          "hash_verified": {
+            "type": ["boolean", "null"],
+            "description": "true = hash match, false = hash mismatch, null = no hash field in spec."
+          },
+          "hash_mismatches": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Details of each hash mismatch (empty if verified or no hash)."
+          },
+          "assertions_evaluated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of assertions actually checked."
+          },
+          "assertions_passed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of assertions that passed."
+          },
+          "failures": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Human-readable assertion failure descriptions."
+          },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Advisory messages (do not affect status)."
+          },
+          "error": {
+            "type": ["string", "null"],
+            "description": "Error message if status is 'error'. SHOULD include category prefix (PARSE:, FIXTURE:, CONNECTION:, TIMEOUT:, RUNNER:, DEPENDENCY:, VERSION:)."
+          },
+          "retried": {
+            "type": "boolean",
+            "default": false,
+            "description": "true if the spec was executed more than once."
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Total execution attempts (1 = no retry)."
+          }
+        }
+      }
+    }
+  }
+}

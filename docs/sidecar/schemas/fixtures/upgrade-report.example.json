@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar upgrade",
+  "timestamp": "2026-02-27T15:00:00Z",
+  "result": "success",
+  "exit_code": 0,
+  "state_before": "installed",
+  "state_after": "installed",
+  "changes": [
+    {
+      "path": ".mdemg/sidecar.yaml",
+      "action": "migrated",
+      "backup_path": ".mdemg/backups/sidecar.yaml.1740668400"
+    },
+    {
+      "path": ".mdemg/sidecar.lock",
+      "action": "updated"
+    }
+  ],
+  "issues": [],
+  "next_actions": [
+    "Run 'mdemg sidecar doctor' to verify post-upgrade health.",
+    "Run 'mdemg sidecar restart' to apply runtime changes."
+  ],
+  "dry_run": false,
+  "version_before": "1.0.0",
+  "version_after": "1.1.0",
+  "config_migrated": true,
+  "config_migration_steps": [
+    "Added hooks.space_id_strategy field with default 'repo-basename'.",
+    "Added install.auto_fix field with default true."
+  ],
+  "rollback_snapshot_path": ".mdemg/backups/sidecar.yaml.1740668400",
+  "components_upgraded": [
+    {
+      "name": "mdemg-api",
+      "from_version": "1.0.0",
+      "to_version": "1.1.0"
+    },
+    {
+      "name": "sidecar-config",
+      "from_version": "1.0.0",
+      "to_version": "1.1.0"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar doctor",
+  "timestamp": "2026-02-27T14:31:00Z",
+  "result": "warning",
+  "exit_code": 0,
+  "state_before": "running",
+  "state_after": "running",
+  "changes": [],
+  "issues": [
+    {
+      "code": "EMBEDDER_OPTIONAL",
+      "severity": "warning",
+      "message": "Embedder service is not running. Semantic search features will be degraded.",
+      "remediation": "Start an embedder service (e.g., ollama serve) or configure EMBEDDING_PROVIDER in sidecar.yaml."
+    }
+  ],
+  "next_actions": [
+    "Start embedder service for full semantic search capability."
+  ],
+  "profile": "local",
+  "checks": [
+    {
+      "id": "config.valid",
+      "category": "configuration",
+      "status": "pass",
+      "message": "sidecar.yaml is valid and matches schema version 1.",
+      "duration_ms": 2
+    },
+    {
+      "id": "neo4j.reachable",
+      "category": "database",
+      "status": "pass",
+      "message": "Neo4j is reachable at bolt://localhost:7687.",
+      "duration_ms": 45
+    },
+    {
+      "id": "api.healthy",
+      "category": "runtime",
+      "status": "pass",
+      "message": "MDEMG API is healthy at http://localhost:9999.",
+      "duration_ms": 18
+    },
+    {
+      "id": "cms.resume",
+      "category": "cms",
+      "status": "pass",
+      "message": "CMS resume endpoint returned valid response.",
+      "duration_ms": 32
+    },
+    {
+      "id": "embedder.available",
+      "category": "embedding",
+      "status": "warn",
+      "message": "Embedder service is not running.",
+      "duration_ms": 5003,
+      "remediation": "Start an embedder service (e.g., ollama serve) or configure EMBEDDING_PROVIDER."
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "pass": 4,
+    "warn": 1,
+    "fail": 0,
+    "skip": 0
+  }
+}

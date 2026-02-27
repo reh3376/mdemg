@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar status",
+  "timestamp": "2026-02-27T14:30:00Z",
+  "result": "success",
+  "exit_code": 0,
+  "state_before": "running",
+  "state_after": "running",
+  "changes": [],
+  "issues": [],
+  "next_actions": [],
+  "profile": "local",
+  "endpoint": "http://localhost:9999",
+  "control_host": "macbook-pro.local",
+  "runtime_host": "macbook-pro.local",
+  "transport": "local",
+  "services": [
+    {
+      "name": "mdemg-api",
+      "status": "up",
+      "healthy": true,
+      "endpoint": "http://localhost:9999",
+      "port": 9999,
+      "latency_ms": 12
+    },
+    {
+      "name": "neo4j",
+      "status": "up",
+      "healthy": true,
+      "endpoint": "bolt://localhost:7687",
+      "port": 7687,
+      "latency_ms": 8
+    },
+    {
+      "name": "embedder",
+      "status": "up",
+      "healthy": true,
+      "endpoint": "http://localhost:11434",
+      "port": 11434,
+      "latency_ms": 25
+    }
+  ],
+  "health_summary": {
+    "healthy": true,
+    "service_count_total": 3,
+    "service_count_up": 3,
+    "degraded_reasons": []
+  }
+}

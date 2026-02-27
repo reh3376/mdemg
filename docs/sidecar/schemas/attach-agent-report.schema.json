@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/attach-agent-report/v1.0.0",
+  "title": "MDEMG Sidecar Attach-Agent Report",
+  "description": "Machine-readable report emitted by `mdemg sidecar attach-agent --format json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "timestamp",
+    "result",
+    "exit_code",
+    "state_before",
+    "state_after",
+    "changes",
+    "issues",
+    "next_actions",
+    "adapter_name",
+    "adapter_version",
+    "config_path",
+    "config_format",
+    "dry_run",
+    "print_only",
+    "merge_strategy",
+    "backup_manifest"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "command": {
+      "const": "mdemg sidecar attach-agent"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "warning", "error"]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [0, 2, 3, 4, 5, 6]
+    },
+    "state_before": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "state_after": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "adapter_name": {
+      "type": "string",
+      "enum": ["claude-code", "codex"],
+      "description": "Name of the agent adapter being attached."
+    },
+    "adapter_version": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+-v[0-9]+$",
+      "description": "Versioned adapter identifier (e.g., claude-code-v1, codex-v1)."
+    },
+    "config_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to the agent configuration file written or merged."
+    },
+    "config_format": {
+      "type": "string",
+      "enum": ["json", "toml"],
+      "description": "Format of the agent configuration file."
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "print_only": {
+      "type": "boolean",
+      "description": "If true, config payload was printed to stdout without writing."
+    },
+    "merge_strategy": {
+      "type": "string",
+      "enum": ["create", "merge", "replace"],
+      "description": "Strategy used to integrate MDEMG config into existing agent config."
+    },
+    "backup_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backup_path", "original_hash", "timestamp"],
+      "description": "Backup details for the original agent config file.",
+      "properties": {
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sidecar_state": {
+      "type": "string",
+      "enum": [
+        "uninitialized",
+        "initialized",
+        "installed",
+        "running",
+        "degraded",
+        "stopped",
+        "uninstalled"
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "remediation"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]+$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar attach-agent",
+  "timestamp": "2026-02-27T14:35:00Z",
+  "result": "success",
+  "exit_code": 0,
+  "state_before": "running",
+  "state_after": "running",
+  "changes": [
+    {
+      "path": ".claude/mcp.json",
+      "action": "merged",
+      "backup_path": ".mdemg/backups/mcp.json.1740667200"
+    }
+  ],
+  "issues": [],
+  "next_actions": [
+    "Restart Claude Code to pick up the updated MCP configuration.",
+    "Verify MDEMG tools appear in Claude Code tool list."
+  ],
+  "adapter_name": "claude-code",
+  "adapter_version": "claude-code-v1",
+  "config_path": ".claude/mcp.json",
+  "config_format": "json",
+  "dry_run": false,
+  "print_only": false,
+  "merge_strategy": "merge",
+  "backup_manifest": {
+    "backup_path": ".mdemg/backups/mcp.json.1740667200",
+    "original_hash": "sha256:a1b2c3d4e5f6789012345678abcdef0123456789abcdef0123456789abcdef01",
+    "timestamp": "2026-02-27T14:34:59Z"
+  }
+}

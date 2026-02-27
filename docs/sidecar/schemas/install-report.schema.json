@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/install-report/v1.0.0",
+  "title": "MDEMG Sidecar Install Report",
+  "description": "Machine-readable report emitted by `mdemg sidecar install --format json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "timestamp",
+    "result",
+    "exit_code",
+    "state_before",
+    "state_after",
+    "changes",
+    "issues",
+    "next_actions",
+    "profile",
+    "dry_run",
+    "auto_fix_enabled",
+    "preflight_checks",
+    "dependencies",
+    "installed_components",
+    "lockfile_path"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "command": {
+      "const": "mdemg sidecar install"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "warning", "error"]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [0, 2, 3, 4, 5, 6]
+    },
+    "state_before": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "state_after": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["local", "studio-remote"]
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "auto_fix_enabled": {
+      "type": "boolean"
+    },
+    "preflight_checks": {
+      "type": "array",
+      "description": "Dependency and environment checks performed before install actions.",
+      "items": {
+        "$ref": "#/$defs/preflight_check"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Dependency resolution outcomes.",
+      "items": {
+        "$ref": "#/$defs/dependency_result"
+      }
+    },
+    "installed_components": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "lockfile_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to generated or updated lockfile."
+    }
+  },
+  "$defs": {
+    "sidecar_state": {
+      "type": "string",
+      "enum": [
+        "uninitialized",
+        "initialized",
+        "installed",
+        "running",
+        "degraded",
+        "stopped",
+        "uninstalled"
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "remediation"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]+$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "preflight_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "required", "message"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "warn", "fail", "skip"]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dependency_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["present", "installed", "upgraded", "skipped", "failed"]
+        },
+        "required_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detected_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        }
+      }
+    }
+  }
+}

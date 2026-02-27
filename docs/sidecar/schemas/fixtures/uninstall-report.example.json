@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar uninstall",
+  "timestamp": "2026-02-27T16:00:00Z",
+  "result": "success",
+  "exit_code": 0,
+  "state_before": "stopped",
+  "state_after": "uninstalled",
+  "changes": [
+    {
+      "path": ".mdemg/sidecar.yaml",
+      "action": "removed",
+      "backup_path": ".mdemg/backups/sidecar.yaml.1740672000"
+    },
+    {
+      "path": ".mdemg/sidecar.lock",
+      "action": "removed"
+    },
+    {
+      "path": ".mdemg/generated/",
+      "action": "removed"
+    },
+    {
+      "path": ".mdemg/logs/sidecar.log",
+      "action": "removed"
+    }
+  ],
+  "issues": [],
+  "next_actions": [
+    "Backups retained in .mdemg/backups/. Use --purge-backups to remove.",
+    "Run 'mdemg sidecar init' to re-initialize if needed."
+  ],
+  "dry_run": false,
+  "retain_backups": true,
+  "removed_artifacts": [
+    {
+      "path": ".mdemg/sidecar.yaml",
+      "type": "config"
+    },
+    {
+      "path": ".mdemg/sidecar.lock",
+      "type": "lock"
+    },
+    {
+      "path": ".mdemg/generated/docker-compose.sidecar.yml",
+      "type": "generated"
+    },
+    {
+      "path": ".mdemg/logs/sidecar.log",
+      "type": "log"
+    }
+  ],
+  "retained_artifacts": [
+    {
+      "path": ".mdemg/backups/",
+      "reason": "Backups retained by default. Use --purge-backups to remove."
+    }
+  ],
+  "detached_adapters": [
+    {
+      "name": "claude-code",
+      "config_path": ".claude/mcp.json",
+      "restored_from_backup": true
+    },
+    {
+      "name": "codex",
+      "config_path": ".codex/config.toml",
+      "restored_from_backup": true
+    }
+  ],
+  "services_stopped": [
+    "mdemg-api",
+    "neo4j"
+  ]
+}

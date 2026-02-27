@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/status-report/v1.0.0",
+  "title": "MDEMG Sidecar Status Report",
+  "description": "Machine-readable report emitted by `mdemg sidecar status --format json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "timestamp",
+    "result",
+    "exit_code",
+    "state_before",
+    "state_after",
+    "changes",
+    "issues",
+    "next_actions",
+    "profile",
+    "endpoint",
+    "control_host",
+    "runtime_host",
+    "transport",
+    "services",
+    "health_summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Schema version for this report payload."
+    },
+    "command": {
+      "const": "mdemg sidecar status",
+      "description": "Command that emitted the report."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Report generation timestamp in UTC."
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "warning", "error"],
+      "description": "Top-level command result."
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [0, 2, 3, 4, 5, 6],
+      "description": "Process exit code aligned to roadmap contract."
+    },
+    "state_before": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "state_after": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "changes": {
+      "type": "array",
+      "description": "Mutation summary for deterministic audits (empty for read-only commands).",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "description": "Detected issues and remediations.",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "description": "Ordered follow-up actions.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["local", "studio-remote"],
+      "description": "Active sidecar profile."
+    },
+    "endpoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reachable sidecar API endpoint presented to clients."
+    },
+    "control_host": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Host where command was executed."
+    },
+    "runtime_host": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Host where runtime services are expected to run."
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["local", "docker-context", "ssh-exec"],
+      "description": "Transport path from control host to runtime host."
+    },
+    "services": {
+      "type": "array",
+      "description": "Per-service state snapshot.",
+      "items": {
+        "$ref": "#/$defs/service_status"
+      }
+    },
+    "health_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["healthy", "service_count_total", "service_count_up", "degraded_reasons"],
+      "properties": {
+        "healthy": {
+          "type": "boolean"
+        },
+        "service_count_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "service_count_up": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "degraded_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sidecar_state": {
+      "type": "string",
+      "enum": [
+        "uninitialized",
+        "initialized",
+        "installed",
+        "running",
+        "degraded",
+        "stopped",
+        "uninstalled"
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "remediation"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]+$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "service_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "healthy"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["up", "down", "degraded", "unknown"]
+        },
+        "healthy": {
+          "type": "boolean"
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
