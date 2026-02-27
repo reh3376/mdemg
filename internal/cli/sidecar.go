@@ -22,6 +22,7 @@ Commands:
   restart        Restart sidecar services
   doctor         Run diagnostics
   attach-agent   Attach an agent adapter
+  detach-agent   Detach an agent adapter
   upgrade        Upgrade sidecar version
   uninstall      Remove sidecar from project`,
 	}
@@ -33,7 +34,8 @@ Commands:
 	cmd.AddCommand(newSidecarDownCmd())
 	cmd.AddCommand(newSidecarRestartCmd())
 	cmd.AddCommand(newSidecarDoctorCmd())
-	cmd.AddCommand(newSidecarStubCmd("attach-agent", "Attach an agent adapter"))
+	cmd.AddCommand(newSidecarAttachAgentCmd())
+	cmd.AddCommand(newSidecarDetachAgentCmd())
 	cmd.AddCommand(newSidecarStubCmd("upgrade", "Upgrade sidecar version"))
 	cmd.AddCommand(newSidecarStubCmd("uninstall", "Remove sidecar from project"))
 

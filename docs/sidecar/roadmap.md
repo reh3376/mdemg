@@ -819,8 +819,8 @@ No phase beyond S1 may proceed with unresolved P0 decisions.
 
 | ID | Decision | Priority | Owner | Due | Current Default |
 |----|----------|----------|-------|-----|-----------------|
-| `DEC-001` | Codex adapter config path/schema contract | P0 | MDEMG Core | S0 end | adapter discovery + fail-fast |
-| `DEC-002` | Remote transport precedence (`docker-context` vs `ssh-exec`) | P0 | MDEMG Core | S0 end | `docker-context` primary |
+| `DEC-001` | Codex adapter config path/schema contract | P0 | MDEMG Core | S0 end | **Resolved** (ADR-0001): `.codex/config.toml`, TOML, `[mcp_servers.mdemg]` section |
+| `DEC-002` | Remote transport precedence (`docker-context` vs `ssh-exec`) | P0 | MDEMG Core | S0 end | **Resolved** (ADR-0001): `docker-context` primary, `ssh-exec` fallback, configurable override |
 | `DEC-003` | Uninstall retention policy for logs/backups | P1 | MDEMG Core | S1 end | retain backups, remove generated runtime artifacts |
 | `DEC-004` | Offline dependency bundle format/versioning | P1 | MDEMG Core | S2 end | not enabled by default |
 | `DEC-005` | CI syntax-validation approach for docs command examples | P2 | MDEMG Core | S7 end | best-effort lint + sample execution |

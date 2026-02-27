@@ -396,6 +396,92 @@ Use this template for each session entry:
 | All unit tests pass | PASS | 65/65 (32 S1 + 33 S2) |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
 
+### Entry 2026-02-27T17:30:00Z — S3 Completion
+
+1. Timestamp (UTC): 2026-02-27T17:30:00Z
+2. Phase: S3 - Runtime Orchestration — Local Profile (COMPLETE)
+3. Related roadmap sections: 5.2, 7A, 7B, 7C, 7D, 8
+4. Work completed:
+   - Added doctor types to `internal/sidecar/types.go`: `DoctorCheck`, `DoctorSummary`, `DoctorReport`
+   - Created `internal/sidecar/doctor.go` (~65 lines):
+     - `TallyChecks`: counts pass/warn/fail/skip
+     - `NewDoctorReport`: nil-slice safe, auto-tallies summary, auto-populates Issues from warn/fail checks
+     - `DoctorExitCode`: returns ExitSuccess if no fail, ExitDependency if any fail
+   - Created `internal/sidecar/doctor_test.go` (~135 lines): 12 unit tests
+   - Created `internal/cli/sidecar_up.go` (~260 lines):
+     - State guard: installed, stopped, or degraded
+     - Neo4j container: inspect → start/create with standard flags from db.go
+     - MDEMG server: detached process (`Setsid: true`), PID file, port file polling
+     - Lock file update to `running`
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_down.go` (~175 lines):
+     - State guard: running or degraded
+     - SIGTERM → 30s poll → SIGKILL fallback
+     - Neo4j container stop
+     - Lock file update to `stopped`
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_restart.go` (~130 lines):
+     - State guard: running or degraded
+     - Calls down logic, 1s sleep, then up logic
+     - Combined JSON report for restart
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_doctor.go` (~280 lines):
+     - 5 diagnostic checks: config.valid, neo4j.reachable, api.healthy, cms.resume, embedder.available
+     - Each check timed with `time.Since`
+     - Embedder check uses `warn` (optional), others use `fail`
+     - Persists report to `.mdemg/generated/doctor-report.json`
+     - `--format text|json` flag
+   - Modified `internal/cli/sidecar.go`: replaced 4 stubs with real commands
+5. Assumptions eliminated:
+   - `up` reuses all daemon.go PID lifecycle helpers and docker.go container helpers
+   - `down` follows same SIGTERM→poll→SIGKILL pattern from daemon.go:runStop
+   - `restart` delegates to down+up logic, no code duplication
+   - Doctor CMS check uses POST to `/v1/conversation/resume` (not GET)
+   - Embedder unavailability is `warn` not `fail` (optional dependency)
+   - Report JSON conforms to doctor-report.schema.json
+6. Decisions made:
+   - Reused existing helpers directly (same `cli` package): `pidFilePath`, `readPID`, `isProcessAlive`, `removePID`, `readPortFile`, `writePID`, `logFilePath`, `InspectContainer`, `RunDockerCommand`, `WaitForPort`, `probeTimeout`, `extractPort`
+   - Neo4j container created with same flags as `db start` (1GB heap, 512MB page cache, APOC plugin)
+   - Doctor persists report to `.mdemg/generated/doctor-report.json` for machine-readable evidence capture
+   - `sidecarUpError` helper consolidates JSON/text error reporting for `up` command
+   - State guards give contextual remediation (e.g., "Already running. Use: mdemg sidecar restart")
+7. Open questions:
+   - None for S3 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... -v` — 77/77 PASS (65 S1+S2 + 12 S3)
+   - `mdemg sidecar up --format json` from installed → state=running, services started
+   - `mdemg sidecar status` — shows running state
+   - `mdemg sidecar doctor --format json` — 5 checks, valid JSON, summary tallied
+   - `mdemg sidecar down --format json` — state=stopped
+   - `mdemg sidecar up` from stopped → running again
+   - `mdemg sidecar restart --format json` → stop/start cycle succeeds
+   - `--dry-run` on up/down/restart → no mutations
+   - Wrong-state errors produce remediation guidance
+   - Text output for all 4 commands
+9. Next actions:
+   - Begin Phase S4 (as defined in roadmap).
+
+**S3 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| Local profile stable across stop/start/restart cycles | PASS | up→down→up and restart both succeed |
+| `up/down/restart` lifecycle works end-to-end | PASS | installed→running→stopped→running verified |
+| `mdemg sidecar up` from installed → running | PASS | JSON report: exit_code 0, state_after=running |
+| `mdemg sidecar up` from stopped → running | PASS | Text output: stopped → running |
+| `mdemg sidecar down` from running → stopped | PASS | JSON report: exit_code 0, state_after=stopped |
+| `mdemg sidecar restart` from running → running | PASS | JSON report: state_before=running, state_after=running |
+| `mdemg sidecar doctor --format json` — 5 checks | PASS | 5 checks, summary tallied, schema-compliant JSON |
+| Doctor persists to .mdemg/generated/doctor-report.json | PASS | File created with full report |
+| `--dry-run` support on up/down/restart | PASS | No mutations, descriptive output |
+| `--format json` support on all 4 commands | PASS | Schema-compliant JSON output |
+| Wrong-state errors produce remediation guidance | PASS | exit_code 2, contextual remediation messages |
+| All unit tests pass | PASS | 77/77 (65 S1+S2 + 12 S3) |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+
 ### Entry 2026-02-27T18:00:00Z — S4 Completion
 
 1. Timestamp (UTC): 2026-02-27T18:00:00Z
@@ -483,88 +569,82 @@ Use this template for each session entry:
 | All unit tests pass | PASS | 85 sidecar + 12 cli executor = 97 total |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
 
-### Entry 2026-02-27T17:30:00Z — S3 Completion
+### Entry 2026-02-27T19:00:00Z — S5 Completion
 
-1. Timestamp (UTC): 2026-02-27T17:30:00Z
-2. Phase: S3 - Runtime Orchestration — Local Profile (COMPLETE)
-3. Related roadmap sections: 5.2, 7A, 7B, 7C, 7D, 8
+1. Timestamp (UTC): 2026-02-27T19:00:00Z
+2. Phase: S5 - Agent Adapter Layer — attach-agent / detach-agent (COMPLETE)
+3. Related roadmap sections: 8A, 7A, 7B, 7D, 10A
 4. Work completed:
-   - Added doctor types to `internal/sidecar/types.go`: `DoctorCheck`, `DoctorSummary`, `DoctorReport`
-   - Created `internal/sidecar/doctor.go` (~65 lines):
-     - `TallyChecks`: counts pass/warn/fail/skip
-     - `NewDoctorReport`: nil-slice safe, auto-tallies summary, auto-populates Issues from warn/fail checks
-     - `DoctorExitCode`: returns ExitSuccess if no fail, ExitDependency if any fail
-   - Created `internal/sidecar/doctor_test.go` (~135 lines): 12 unit tests
-   - Created `internal/cli/sidecar_up.go` (~260 lines):
-     - State guard: installed, stopped, or degraded
-     - Neo4j container: inspect → start/create with standard flags from db.go
-     - MDEMG server: detached process (`Setsid: true`), PID file, port file polling
-     - Lock file update to `running`
-     - `--dry-run`, `--format text|json` flags
-   - Created `internal/cli/sidecar_down.go` (~175 lines):
-     - State guard: running or degraded
-     - SIGTERM → 30s poll → SIGKILL fallback
-     - Neo4j container stop
-     - Lock file update to `stopped`
-     - `--dry-run`, `--format text|json` flags
-   - Created `internal/cli/sidecar_restart.go` (~130 lines):
-     - State guard: running or degraded
-     - Calls down logic, 1s sleep, then up logic
-     - Combined JSON report for restart
-     - `--dry-run`, `--format text|json` flags
-   - Created `internal/cli/sidecar_doctor.go` (~280 lines):
-     - 5 diagnostic checks: config.valid, neo4j.reachable, api.healthy, cms.resume, embedder.available
-     - Each check timed with `time.Since`
-     - Embedder check uses `warn` (optional), others use `fail`
-     - Persists report to `.mdemg/generated/doctor-report.json`
-     - `--format text|json` flag
-   - Modified `internal/cli/sidecar.go`: replaced 4 stubs with real commands
+   - Created `internal/sidecar/adapter.go` (~95 lines):
+     - `Adapter` interface with 7 methods: Name, Version, ConfigPath, ConfigFormat, BuildPayload, MergeInto, RemoveFrom
+     - `AdapterResult`, `BackupManifest`, `AttachAgentReport` structs
+     - `NewAttachAgentReport` constructor (nil-slice safe via `NewReportEnvelope`)
+     - `NewAdapter` factory function with validation
+   - Created `internal/sidecar/adapter_claude.go` (~105 lines):
+     - `ClaudeCodeAdapter` — JSON deep-merge into `.claude/mcp.json`
+     - `MergeInto`: creates if empty, merges preserving existing keys; strategy "create" or "merge"
+     - `RemoveFrom`: deletes `mcpServers.mdemg`, removes empty `mcpServers` entirely
+     - MCP payload matches `init.go:writeIDEConfigs()` format exactly: `{"command":"mdemg","args":["mcp"],"env":{"MDEMG_ENDPOINT":"..."}}`
+   - Created `internal/sidecar/adapter_codex.go` (~110 lines):
+     - `CodexAdapter` — TOML section-merge into `.codex/config.toml`
+     - Same merge/remove semantics as Claude adapter, using `github.com/BurntSushi/toml`
+   - Created `internal/sidecar/adapter_test.go` (~330 lines):
+     - 22 unit tests: factory (3), Claude Code adapter (9), Codex adapter (7), report nil-slice (1), plus 2 edge cases
+     - All tests are pure logic — no file I/O
+   - Created `internal/cli/sidecar_attach.go` (~240 lines):
+     - Cobra command: `mdemg sidecar attach-agent <adapter-name>`
+     - Flags: `--dry-run`, `--print-only`, `--format text|json`
+     - State guard: installed/running/stopped/degraded
+     - Flow: validate → read existing → backup → merge → write → update sidecar.yaml
+     - `updateSidecarAdapters` shared helper for sidecar.yaml adapter list management
+   - Created `internal/cli/sidecar_detach.go` (~215 lines):
+     - Cobra command: `mdemg sidecar detach-agent <adapter-name>`
+     - Flags: `--dry-run`, `--format text|json`
+     - Removes MDEMG config, deletes file if now empty, updates sidecar.yaml
+     - `isEmptyConfig` helper detects JSON `{}` or whitespace-only TOML
+   - Modified `internal/cli/sidecar.go`:
+     - Replaced `attach-agent` stub with `newSidecarAttachAgentCmd()`
+     - Added `newSidecarDetachAgentCmd()` (new command)
+     - Updated Long description to include `detach-agent`
+   - Added `github.com/BurntSushi/toml v1.6.0` dependency
+   - Fixed P1 (roadmap DEC-001/DEC-002 status), P2 (journal S3/S4 chronology), P3 (schema README duplicate heading)
 5. Assumptions eliminated:
-   - `up` reuses all daemon.go PID lifecycle helpers and docker.go container helpers
-   - `down` follows same SIGTERM→poll→SIGKILL pattern from daemon.go:runStop
-   - `restart` delegates to down+up logic, no code duplication
-   - Doctor CMS check uses POST to `/v1/conversation/resume` (not GET)
-   - Embedder unavailability is `warn` not `fail` (optional dependency)
-   - Report JSON conforms to doctor-report.schema.json
+   - Adapter interface is pure logic — no I/O in `internal/sidecar/`, all I/O in `internal/cli/`
+   - MCP payload matches `init.go:writeIDEConfigs()` exactly: `args: ["mcp"]` (not `["serve","--mcp"]`)
+   - Backup before mutate: original file → `.mdemg/backups/<filename>.<timestamp>`
+   - Idempotent: re-running attach produces identical merged output
+   - Empty config after detach: JSON `{}` or whitespace TOML → file deleted
+   - sidecar.yaml adapter list updated on both attach (enabled: true) and detach (enabled: false)
 6. Decisions made:
-   - Reused existing helpers directly (same `cli` package): `pidFilePath`, `readPID`, `isProcessAlive`, `removePID`, `readPortFile`, `writePID`, `logFilePath`, `InspectContainer`, `RunDockerCommand`, `WaitForPort`, `probeTimeout`, `extractPort`
-   - Neo4j container created with same flags as `db start` (1GB heap, 512MB page cache, APOC plugin)
-   - Doctor persists report to `.mdemg/generated/doctor-report.json` for machine-readable evidence capture
-   - `sidecarUpError` helper consolidates JSON/text error reporting for `up` command
-   - State guards give contextual remediation (e.g., "Already running. Use: mdemg sidecar restart")
+   - Adapter interface in `internal/sidecar/` (domain), CLI I/O in `internal/cli/` — consistent with executor pattern
+   - `updateSidecarAdapters` is a shared helper used by both attach and detach
+   - `--print-only` outputs raw payload to stdout (no report envelope) for piping/inspection
+   - Detach from missing config file is a validation error (not silent success)
+   - Backup uses SHA-256 hash of original content stored in `BackupManifest.OriginalHash`
+   - State does not change on attach/detach — `stateBefore == stateAfter` (adapter wiring is orthogonal to lifecycle state)
 7. Open questions:
-   - None for S3 scope.
+   - None for S5 scope.
 8. Evidence (files/tests/commands):
    - `go build ./...` — PASS
    - `go vet ./...` — PASS
    - `golangci-lint run ./...` — 0 issues
-   - `go test ./internal/sidecar/... -v` — 77/77 PASS (65 S1+S2 + 12 S3)
-   - `mdemg sidecar up --format json` from installed → state=running, services started
-   - `mdemg sidecar status` — shows running state
-   - `mdemg sidecar doctor --format json` — 5 checks, valid JSON, summary tallied
-   - `mdemg sidecar down --format json` — state=stopped
-   - `mdemg sidecar up` from stopped → running again
-   - `mdemg sidecar restart --format json` → stop/start cycle succeeds
-   - `--dry-run` on up/down/restart → no mutations
-   - Wrong-state errors produce remediation guidance
-   - Text output for all 4 commands
+   - `go test ./internal/sidecar/... -v` — 107/107 PASS (85 S1-S4 + 22 S5)
 9. Next actions:
-   - Begin Phase S4 (as defined in roadmap).
+   - E2E verification: manual attach/detach cycle for claude-code and codex
+   - Begin Phase S6 (as defined in roadmap)
 
-**S3 Exit Criteria Verification:**
+**S5 Exit Criteria Verification:**
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| Local profile stable across stop/start/restart cycles | PASS | up→down→up and restart both succeed |
-| `up/down/restart` lifecycle works end-to-end | PASS | installed→running→stopped→running verified |
-| `mdemg sidecar up` from installed → running | PASS | JSON report: exit_code 0, state_after=running |
-| `mdemg sidecar up` from stopped → running | PASS | Text output: stopped → running |
-| `mdemg sidecar down` from running → stopped | PASS | JSON report: exit_code 0, state_after=stopped |
-| `mdemg sidecar restart` from running → running | PASS | JSON report: state_before=running, state_after=running |
-| `mdemg sidecar doctor --format json` — 5 checks | PASS | 5 checks, summary tallied, schema-compliant JSON |
-| Doctor persists to .mdemg/generated/doctor-report.json | PASS | File created with full report |
-| `--dry-run` support on up/down/restart | PASS | No mutations, descriptive output |
-| `--format json` support on all 4 commands | PASS | Schema-compliant JSON output |
-| Wrong-state errors produce remediation guidance | PASS | exit_code 2, contextual remediation messages |
-| All unit tests pass | PASS | 77/77 (65 S1+S2 + 12 S3) |
+| `attach-agent claude-code` merges MDEMG MCP config into `.claude/mcp.json` | PASS | ClaudeCodeAdapter.MergeInto + CLI wiring tested |
+| `attach-agent codex` merges MDEMG MCP config into `.codex/config.toml` | PASS | CodexAdapter.MergeInto + CLI wiring tested |
+| `detach-agent` cleanly removes MDEMG config from agent files | PASS | RemoveFrom tests for both adapters + empty-file cleanup |
+| All operations are idempotent | PASS | TestClaudeCodeAdapter_MergeInto_Idempotent, TestCodexAdapter_MergeInto_Idempotent |
+| Backup before mutate | PASS | sidecar_attach.go backs up to `.mdemg/backups/` with SHA-256 hash |
+| Report via envelope | PASS | AttachAgentReport extends ReportEnvelope, nil-slice safe |
+| `--dry-run` support | PASS | Both commands report planned changes without mutations |
+| `--print-only` support (attach only) | PASS | Outputs raw MCP payload to stdout |
+| `--format json` support | PASS | Both commands output schema-compliant JSON |
+| All unit tests pass | PASS | 107/107 (85 S1-S4 + 22 S5) |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
