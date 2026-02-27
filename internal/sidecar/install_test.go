@@ -111,6 +111,92 @@ func TestEvalSSHReachable_Skip(t *testing.T) {
 	}
 }
 
+// --- EvalDockerContext tests ---
+
+func TestEvalDockerContext_Pass(t *testing.T) {
+	check := EvalDockerContext(DockerContextInfo{
+		ContextName: "mdemg-studio",
+		Exists:      true,
+		Functional:  true,
+		Host:        "macstudio.local",
+	})
+	if check.Status != "pass" {
+		t.Errorf("expected pass, got %s", check.Status)
+	}
+	if check.ID != "docker-context" {
+		t.Errorf("expected id docker-context, got %s", check.ID)
+	}
+}
+
+func TestEvalDockerContext_Missing(t *testing.T) {
+	check := EvalDockerContext(DockerContextInfo{
+		ContextName: "mdemg-studio",
+		Exists:      false,
+		Host:        "macstudio.local",
+	})
+	if check.Status != "fail" {
+		t.Errorf("expected fail, got %s", check.Status)
+	}
+	if check.Remediation == "" {
+		t.Error("expected remediation")
+	}
+}
+
+func TestEvalDockerContext_NotFunctional(t *testing.T) {
+	check := EvalDockerContext(DockerContextInfo{
+		ContextName: "mdemg-studio",
+		Exists:      true,
+		Functional:  false,
+		Host:        "macstudio.local",
+	})
+	if check.Status != "fail" {
+		t.Errorf("expected fail, got %s", check.Status)
+	}
+}
+
+func TestEvalDockerContext_Skip(t *testing.T) {
+	check := EvalDockerContext(DockerContextInfo{Host: ""})
+	if check.Status != "skip" {
+		t.Errorf("expected skip, got %s", check.Status)
+	}
+	if check.Required {
+		t.Error("expected required=false for skipped check")
+	}
+}
+
+// --- EvalRemoteBinary tests ---
+
+func TestEvalRemoteBinary_Available(t *testing.T) {
+	check := EvalRemoteBinary(RemoteBinaryInfo{
+		Available: true,
+		Path:      "/usr/local/bin/mdemg",
+		Version:   "0.1.0",
+	})
+	if check.Status != "pass" {
+		t.Errorf("expected pass, got %s", check.Status)
+	}
+}
+
+func TestEvalRemoteBinary_Missing(t *testing.T) {
+	check := EvalRemoteBinary(RemoteBinaryInfo{Available: false})
+	if check.Status != "warn" {
+		t.Errorf("expected warn, got %s", check.Status)
+	}
+	if check.Required {
+		t.Error("expected required=false for missing binary")
+	}
+}
+
+func TestEvalRemoteBinary_NoVersion(t *testing.T) {
+	check := EvalRemoteBinary(RemoteBinaryInfo{
+		Available: true,
+		Path:      "/usr/local/bin/mdemg",
+	})
+	if check.Status != "pass" {
+		t.Errorf("expected pass, got %s", check.Status)
+	}
+}
+
 // --- EvalDockerDependency tests ---
 
 func TestEvalDockerDependency_Present(t *testing.T) {

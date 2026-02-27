@@ -3,8 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
-	"syscall"
-	"time"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"mdemg/internal/sidecar"
@@ -80,6 +79,19 @@ func runSidecarDown(flags sidecarDownFlags) error {
 		return fmt.Errorf("cannot stop from state %q — %s", stateBefore, remediation)
 	}
 
+	// Load config for executor
+	configPath := sidecar.FindConfigFileFrom(cwd)
+	var cfg *sidecar.Config
+	if configPath != "" {
+		cfg, _ = sidecar.LoadConfig(configPath)
+	}
+
+	exec, err := newExecutor(cfg)
+	if err != nil {
+		return fmt.Errorf("create executor: %w", err)
+	}
+	defer func() { _ = exec.Close() }()
+
 	// Dry-run mode
 	if flags.dryRun {
 		env := sidecar.NewReportEnvelope("mdemg sidecar down", stateBefore, sidecar.StateStopped, sidecar.ExitSuccess)
@@ -106,32 +118,29 @@ func runSidecarDown(flags sidecarDownFlags) error {
 
 	var changes []sidecar.ReportChange
 
-	// Stop MDEMG server
+	// Determine PID to stop — for remote, use lock file's RemotePID
 	serverStopped := false
 	pidPath := pidFilePath()
 	pid, pidErr := readPID(pidPath)
-	if pidErr == nil && isProcessAlive(pid) {
+
+	// For remote profile, prefer RemotePID from lock file
+	if cfg != nil && cfg.Profile == sidecar.ProfileStudioRemote && lockPath != "" {
+		if lf, lfErr := sidecar.ReadLock(lockPath); lfErr == nil && lf.RemotePID > 0 {
+			pid = lf.RemotePID
+			pidErr = nil
+		}
+	}
+
+	if pidErr == nil && exec.DaemonRunning(pid) {
 		fmt.Printf("Stopping MDEMG server (pid=%d)...\n", pid)
 
-		if killErr := syscall.Kill(pid, syscall.SIGTERM); killErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: SIGTERM failed: %v\n", killErr)
+		if stopErr := exec.StopDaemon(pid); stopErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: stop daemon failed: %v\n", stopErr)
 		}
 
-		// Poll for process exit (30s)
-		stopped := false
-		deadline := time.Now().Add(30 * time.Second)
-		for time.Now().Before(deadline) {
-			if !isProcessAlive(pid) {
-				stopped = true
-				break
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
-
-		if !stopped {
-			fmt.Println("Warning: graceful shutdown timed out, sending SIGKILL")
-			_ = syscall.Kill(pid, syscall.SIGKILL)
-			time.Sleep(1 * time.Second)
+		// Verify it stopped
+		if exec.DaemonRunning(pid) {
+			fmt.Println("Warning: server may still be running")
 		}
 
 		_ = removePID(pidPath)
@@ -149,13 +158,13 @@ func runSidecarDown(flags sidecarDownFlags) error {
 		}
 	}
 
-	// Stop Neo4j container
+	// Stop Neo4j container via executor
 	neo4jStopped := false
-	if DockerAvailable() {
-		state, inspErr := InspectContainer(neo4jContainerName)
-		if inspErr == nil && state.Exists && state.Running {
+	if exec.DockerAvailable() {
+		inspOut, inspErr := exec.RunDocker("inspect", "--format", "{{.State.Status}}", neo4jContainerName)
+		if inspErr == nil && strings.TrimSpace(inspOut) == "running" {
 			fmt.Printf("Stopping Neo4j container '%s'...\n", neo4jContainerName)
-			if _, stopErr := RunDockerCommand("stop", neo4jContainerName); stopErr != nil {
+			if _, stopErr := exec.RunDocker("stop", neo4jContainerName); stopErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to stop Neo4j container: %v\n", stopErr)
 			} else {
 				neo4jStopped = true
@@ -165,7 +174,7 @@ func runSidecarDown(flags sidecarDownFlags) error {
 				})
 				fmt.Println("Neo4j container stopped")
 			}
-		} else if inspErr == nil && state.Exists {
+		} else if inspErr == nil {
 			fmt.Printf("Neo4j container '%s' is already stopped\n", neo4jContainerName)
 		}
 	}
@@ -176,6 +185,8 @@ func runSidecarDown(flags sidecarDownFlags) error {
 		lf, lfErr := sidecar.ReadLock(lockPath)
 		if lfErr == nil {
 			lf.State = stateAfter
+			// Clear remote PID on stop
+			lf.RemotePID = 0
 			if writeErr := sidecar.WriteLock(lockPath, lf); writeErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to update lock file: %v\n", writeErr)
 			} else {

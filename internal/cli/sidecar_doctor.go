@@ -7,7 +7,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -22,9 +24,9 @@ func newSidecarDoctorCmd() *cobra.Command {
 		Short: "Run diagnostics and health checks",
 		Long: `Run comprehensive diagnostics on the sidecar runtime.
 
-Performs 5 diagnostic checks: configuration validation, Neo4j
+Performs diagnostic checks: configuration validation, Neo4j
 reachability, API health, CMS resume, and embedder availability.
-Results are displayed as a check table.
+For studio-remote profile, adds SSH and Docker context checks.
 
 Examples:
   mdemg sidecar doctor
@@ -50,6 +52,7 @@ func runSidecarDoctor(format string) error {
 	// Load config
 	profile := "unknown"
 	endpoint := "http://localhost:9999"
+	neo4jHost := "localhost"
 
 	configPath := sidecar.FindConfigFileFrom(cwd)
 	var cfg *sidecar.Config
@@ -58,6 +61,9 @@ func runSidecarDoctor(format string) error {
 		if cfg != nil {
 			profile = string(cfg.Profile)
 			endpoint = cfg.Runtime.Endpoint
+			if cfg.Profile == sidecar.ProfileStudioRemote && cfg.Runtime.Remote.Host != "" {
+				neo4jHost = cfg.Runtime.Remote.Host
+			}
 		}
 	}
 
@@ -67,8 +73,17 @@ func runSidecarDoctor(format string) error {
 	// Check 1: config.valid
 	checks = append(checks, runConfigCheck(configPath, cfg))
 
-	// Check 2: neo4j.reachable
-	checks = append(checks, runNeo4jCheck())
+	// Remote-specific checks (before service checks)
+	if cfg != nil && cfg.Profile == sidecar.ProfileStudioRemote {
+		// Check: ssh.reachable
+		checks = append(checks, runSSHReachableCheck(cfg.Runtime.Remote.Host))
+
+		// Check: docker-context.valid
+		checks = append(checks, runDockerContextCheck())
+	}
+
+	// Check 2: neo4j.reachable (uses neo4jHost — remote or localhost)
+	checks = append(checks, runNeo4jCheck(neo4jHost))
 
 	// Check 3: api.healthy
 	checks = append(checks, runAPICheck(endpoint))
@@ -205,9 +220,10 @@ func runConfigCheck(configPath string, cfg *sidecar.Config) sidecar.DoctorCheck 
 	}
 }
 
-func runNeo4jCheck() sidecar.DoctorCheck {
+func runNeo4jCheck(host string) sidecar.DoctorCheck {
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", "localhost:7687", probeTimeout)
+	addr := net.JoinHostPort(host, "7687")
+	conn, err := net.DialTimeout("tcp", addr, probeTimeout)
 	duration := int(time.Since(start).Milliseconds())
 
 	if err != nil {
@@ -215,7 +231,7 @@ func runNeo4jCheck() sidecar.DoctorCheck {
 			ID:          "neo4j.reachable",
 			Category:    "database",
 			Status:      "fail",
-			Message:     "Neo4j unreachable on localhost:7687",
+			Message:     fmt.Sprintf("Neo4j unreachable on %s", addr),
 			DurationMs:  duration,
 			Remediation: "Start Neo4j: mdemg db start",
 		}
@@ -226,7 +242,7 @@ func runNeo4jCheck() sidecar.DoctorCheck {
 		ID:         "neo4j.reachable",
 		Category:   "database",
 		Status:     "pass",
-		Message:    "Neo4j reachable",
+		Message:    fmt.Sprintf("Neo4j reachable on %s", addr),
 		DurationMs: duration,
 	}
 }
@@ -336,6 +352,61 @@ func runEmbedderCheck() sidecar.DoctorCheck {
 		Category:   "embedding",
 		Status:     "pass",
 		Message:    "Embedder available",
+		DurationMs: duration,
+	}
+}
+
+// --- Remote-specific diagnostic checks ---
+
+func runSSHReachableCheck(host string) sidecar.DoctorCheck {
+	start := time.Now()
+	cmd := exec.Command("ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes", host, "true")
+	err := cmd.Run()
+	duration := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:          "ssh.reachable",
+			Category:    "connectivity",
+			Status:      "fail",
+			Message:     fmt.Sprintf("SSH connection to %s failed", host),
+			DurationMs:  duration,
+			Remediation: fmt.Sprintf("Verify SSH access: ssh %s true", host),
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "ssh.reachable",
+		Category:   "connectivity",
+		Status:     "pass",
+		Message:    fmt.Sprintf("SSH connection to %s successful", host),
+		DurationMs: duration,
+	}
+}
+
+func runDockerContextCheck() sidecar.DoctorCheck {
+	start := time.Now()
+	cmd := exec.Command("docker", "--context", mdemgDockerContext, "info", "--format", "{{.ServerVersion}}")
+	out, err := cmd.CombinedOutput()
+	duration := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:          "docker-context.valid",
+			Category:    "connectivity",
+			Status:      "fail",
+			Message:     fmt.Sprintf("Docker context %q not functional", mdemgDockerContext),
+			DurationMs:  duration,
+			Remediation: fmt.Sprintf("Check context: docker context inspect %s", mdemgDockerContext),
+			Evidence:    []string{strings.TrimSpace(string(out))},
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "docker-context.valid",
+		Category:   "connectivity",
+		Status:     "pass",
+		Message:    fmt.Sprintf("Docker context %q functional (Docker %s)", mdemgDockerContext, strings.TrimSpace(string(out))),
 		DurationMs: duration,
 	}
 }
