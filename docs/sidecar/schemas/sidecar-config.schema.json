@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/sidecar-config/v1.0.0",
+  "title": "MDEMG Sidecar Configuration",
+  "description": "JSON Schema for `.mdemg/sidecar.yaml` per roadmap Section 6B.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "profile",
+    "runtime",
+    "adapters",
+    "hooks",
+    "install"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["1"],
+      "description": "Schema version for sidecar configuration. Must match a version supported by the running binary."
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["local", "studio-remote"],
+      "description": "Runtime placement policy."
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "remote"],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reachable sidecar API endpoint."
+        },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host", "transport"],
+          "properties": {
+            "host": {
+              "type": "string",
+              "description": "Remote runtime host. Required non-empty when profile is studio-remote."
+            },
+            "transport": {
+              "type": "string",
+              "enum": ["docker-context", "ssh-exec"],
+              "description": "Transport mechanism for remote runtime communication."
+            }
+          }
+        }
+      }
+    },
+    "adapters": {
+      "type": "array",
+      "description": "Agent adapter configurations. Adapter names must be unique.",
+      "items": {
+        "$ref": "#/$defs/adapter"
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["space_id_strategy"],
+      "properties": {
+        "space_id_strategy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Strategy for deriving CMS space ID (e.g., repo-basename)."
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["auto_fix"],
+      "properties": {
+        "auto_fix": {
+          "type": "boolean",
+          "description": "When false, disables automatic remediation actions during install."
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "profile": {
+        "const": "studio-remote"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "runtime": {
+        "properties": {
+          "remote": {
+            "properties": {
+              "host": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "enabled"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["claude-code", "codex"],
+          "description": "Adapter identifier."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this adapter is active."
+        }
+      }
+    }
+  }
+}

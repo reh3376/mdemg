@@ -1,0 +1,38 @@
+{
+  "uats_version": "1.0.0",
+  "metadata": {
+    "id": "healthz-basic",
+    "description": "Health endpoint returns ok",
+    "tags": [
+      "smoke",
+      "health"
+    ],
+    "status": "active",
+    "owner": "platform"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/healthz"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "equals",
+        "expected": "ok"
+      },
+      {
+        "path": "$.dependencies",
+        "op": "exists"
+      }
+    ],
+    "fixture": {
+      "body_equals_file": "fixtures/health/expected.json"
+    }
+  },
+  "integrity": {
+    "hash_method": "sha256-jcs",
+    "spec_hash": "4acfec4933ca2ba5d1da43dd2b9ee42f8b7e4a8c27f273edb4090c65e19d9f7c"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "framework": "uats",
+  "spec_id": "healthz-basic",
+  "spec_path": "uxts/frameworks/uats/specs/health.uats.json",
+  "status": "pass",
+  "hash_match": true,
+  "computed_hash": "4acfec4933ca2ba5d1da43dd2b9ee42f8b7e4a8c27f273edb4090c65e19d9f7c",
+  "started_at": "2026-02-27T12:00:00Z",
+  "ended_at": "2026-02-27T12:00:01Z",
+  "duration_ms": 1000,
+  "failures": [],
+  "warnings": [],
+  "runner": {
+    "name": "uats-runner",
+    "version": "0.1.0"
+  }
+}

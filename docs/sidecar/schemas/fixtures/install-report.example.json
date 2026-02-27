@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "command": "mdemg sidecar install",
+  "timestamp": "2026-02-27T14:25:00Z",
+  "result": "success",
+  "exit_code": 0,
+  "state_before": "initialized",
+  "state_after": "installed",
+  "changes": [
+    {
+      "path": ".mdemg/sidecar.lock",
+      "action": "created"
+    },
+    {
+      "path": ".mdemg/generated/docker-compose.sidecar.yml",
+      "action": "created"
+    }
+  ],
+  "issues": [],
+  "next_actions": [
+    "Run 'mdemg sidecar up' to start services.",
+    "Run 'mdemg sidecar attach-agent --agent claude-code' to configure agent integration."
+  ],
+  "profile": "local",
+  "dry_run": false,
+  "auto_fix_enabled": true,
+  "preflight_checks": [
+    {
+      "id": "docker.available",
+      "status": "pass",
+      "required": true,
+      "message": "Docker is available and running (v27.1.1)."
+    },
+    {
+      "id": "neo4j.image",
+      "status": "pass",
+      "required": true,
+      "message": "Neo4j image neo4j:5.x is available locally."
+    },
+    {
+      "id": "port.9999.free",
+      "status": "pass",
+      "required": true,
+      "message": "Port 9999 is available for MDEMG API."
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "docker",
+      "status": "present",
+      "required_version": ">=24.0.0",
+      "detected_version": "27.1.1"
+    },
+    {
+      "name": "neo4j",
+      "status": "present",
+      "required_version": ">=5.0.0",
+      "detected_version": "5.18.0"
+    }
+  ],
+  "installed_components": [
+    "mdemg-api",
+    "neo4j",
+    "sidecar-config"
+  ],
+  "lockfile_path": ".mdemg/sidecar.lock"
+}

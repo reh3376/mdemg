@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uxts.dev/schemas/uxts-report-aggregate.schema.json",
+  "title": "UxTS Aggregate Governance Report",
+  "description": "Normative schema for cross-framework aggregate reports. Required in full governance mode (3+ frameworks). See UXTS_PORTABLE_AGENT_SPEC Section 12.1.",
+  "_uxts_schema_version": "3.1.0",
+  "type": "object",
+  "required": ["timestamp", "governance_tier", "operating_mode", "frameworks", "governance_health"],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the aggregate report was generated."
+    },
+    "governance_tier": {
+      "type": "string",
+      "enum": ["lite", "full"],
+      "description": "Current governance tier."
+    },
+    "operating_mode": {
+      "type": "string",
+      "enum": ["greenfield", "brownfield"],
+      "description": "Operating mode declared per Section 6.0."
+    },
+    "frameworks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["acronym", "status", "gate_mode", "schema_version", "summary", "integrity", "parity"],
+        "additionalProperties": false,
+        "properties": {
+          "acronym": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "description": "Framework acronym in lowercase."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["spec-only", "pilot", "active", "deprecated"],
+            "description": "Framework maturity status."
+          },
+          "gate_mode": {
+            "type": "string",
+            "enum": ["observe", "soft", "block"],
+            "description": "CI gate behavior."
+          },
+          "schema_version": {
+            "type": "string",
+            "description": "Current schema semantic version."
+          },
+          "summary": {
+            "type": "object",
+            "required": ["total_specs", "passed", "failed", "skipped", "errors"],
+            "properties": {
+              "total_specs": { "type": "integer", "minimum": 0 },
+              "passed": { "type": "integer", "minimum": 0 },
+              "failed": { "type": "integer", "minimum": 0 },
+              "skipped": { "type": "integer", "minimum": 0 },
+              "errors": { "type": "integer", "minimum": 0 },
+              "flaky_passes": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "integrity": {
+            "type": "object",
+            "required": ["total_hashed", "verified", "mismatched", "no_hash"],
+            "properties": {
+              "total_hashed": { "type": "integer", "minimum": 0 },
+              "verified": { "type": "integer", "minimum": 0 },
+              "mismatched": { "type": "integer", "minimum": 0 },
+              "no_hash": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "parity": {
+            "type": "object",
+            "required": ["enforced", "advisory", "unimplemented"],
+            "properties": {
+              "enforced": { "type": "integer", "minimum": 0, "description": "Schema fields classified as enforced." },
+              "advisory": { "type": "integer", "minimum": 0, "description": "Schema fields classified as advisory." },
+              "unimplemented": { "type": "integer", "minimum": 0, "description": "Schema fields classified as unimplemented (must be 0 for active frameworks)." }
+            }
+          }
+        }
+      }
+    },
+    "governance_health": {
+      "type": "object",
+      "required": ["total_frameworks", "active_frameworks", "pilot_frameworks", "deprecated_frameworks", "overall_pass_rate", "overall_integrity_rate", "parity_complete", "drift_clean"],
+      "additionalProperties": false,
+      "properties": {
+        "total_frameworks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total frameworks across all statuses."
+        },
+        "active_frameworks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Frameworks with status 'active'."
+        },
+        "pilot_frameworks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Frameworks with status 'pilot'."
+        },
+        "deprecated_frameworks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Frameworks with status 'deprecated'."
+        },
+        "overall_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Weighted pass rate across all active frameworks."
+        },
+        "overall_integrity_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of hashed specs with verified hashes across all frameworks."
+        },
+        "parity_complete": {
+          "type": "boolean",
+          "description": "true if all active frameworks have 0 unimplemented fields. CI can gate on this."
+        },
+        "drift_clean": {
+          "type": "boolean",
+          "description": "true if drift checker found no discrepancies. CI can gate on this."
+        }
+      }
+    },
+    "cross_framework_issues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Issues that span multiple frameworks (e.g., fixture hash conflicts, domain overlap)."
+    }
+  }
+}

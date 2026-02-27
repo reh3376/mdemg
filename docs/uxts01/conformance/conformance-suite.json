@@ -1,0 +1,355 @@
+{
+  "_uxts_conformance_suite": true,
+  "_version": "3.1.0",
+  "_description": "Conformance test suite for UxTS runner implementations. A runner claiming UxTS compliance MUST produce the expected report output for each test case. Validate with: python3 run_conformance.py --runner <runner_command>",
+  "test_cases": [
+    {
+      "id": "CONF-001",
+      "name": "Basic pass — single assertion",
+      "description": "A spec with one passing assertion should produce status 'pass' with assertions_evaluated=1.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Basic Pass", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            { "path": "$.status", "equals": "ok" }
+          ]
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "ok" }
+      },
+      "expected_report": {
+        "status": "pass",
+        "assertions_evaluated": 1,
+        "assertions_passed": 1,
+        "failures": [],
+        "error": null
+      }
+    },
+    {
+      "id": "CONF-002",
+      "name": "Basic fail — assertion mismatch",
+      "description": "A spec where the response does not match the assertion should produce status 'fail'.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Basic Fail", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            { "path": "$.status", "equals": "ok" }
+          ]
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "degraded" }
+      },
+      "expected_report": {
+        "status": "fail",
+        "assertions_evaluated": 1,
+        "assertions_passed": 0
+      }
+    },
+    {
+      "id": "CONF-003",
+      "name": "Zero assertions prohibition",
+      "description": "A spec with no executable assertions MUST produce status 'fail', not 'pass'. This is the 0/0 false pass prevention.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Zero Assertions", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": {
+          "status": 200,
+          "body_assertions": []
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": {}
+      },
+      "expected_report": {
+        "status": "fail",
+        "assertions_evaluated": 0,
+        "assertions_passed": 0
+      }
+    },
+    {
+      "id": "CONF-004",
+      "name": "Unknown field causes hard fail (parity)",
+      "description": "A spec that contains a field the runner does not implement MUST produce status 'fail' with a parity error, not silent skip.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Unknown Field", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": { "status": 200 },
+        "completely_unknown_field": { "this": "should trigger parity failure" }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": {}
+      },
+      "expected_report": {
+        "status": "fail"
+      }
+    },
+    {
+      "id": "CONF-005",
+      "name": "Unresolved environment variable causes hard fail",
+      "description": "A spec referencing ${NONEXISTENT_VAR} without a default MUST cause an error, not pass the literal string.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Env Fail", "base_url": "${NONEXISTENT_VAR_12345}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": { "status": 200 }
+      },
+      "env_vars": {},
+      "expected_report": {
+        "status": "error"
+      }
+    },
+    {
+      "id": "CONF-006",
+      "name": "Environment variable with default resolves correctly",
+      "description": "A spec using ${VAR:-default} syntax should use the default when VAR is unset.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Env Default", "base_url": "${BASE_URL:-http://localhost:9999}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            { "path": "$.status", "equals": "ok" }
+          ]
+        }
+      },
+      "env_vars": {},
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "ok" },
+        "expected_base_url": "http://localhost:9999"
+      },
+      "expected_report": {
+        "status": "pass"
+      }
+    },
+    {
+      "id": "CONF-007",
+      "name": "Hash mismatch reported independently from assertion result",
+      "description": "A spec that passes assertions but has a hash mismatch should report status='pass' AND hash_verified=false. These are independent signals.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Hash Mismatch", "base_url": "${BASE_URL}" },
+        "config": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            { "path": "$.status", "equals": "ok" }
+          ]
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "ok" }
+      },
+      "expected_report": {
+        "status": "pass",
+        "hash_verified": false
+      }
+    },
+    {
+      "id": "CONF-008",
+      "name": "Tag filtering — excluded spec reported as skip",
+      "description": "A spec excluded by --exclude-tags MUST be reported with status='skip', not omitted from the report.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Tagged Spec", "base_url": "${BASE_URL}", "tags": ["slow"] },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": { "status": 200 }
+      },
+      "runner_flags": ["--exclude-tags", "slow"],
+      "expected_report": {
+        "status": "skip"
+      }
+    },
+    {
+      "id": "CONF-009",
+      "name": "schema_match operator — structural validation",
+      "description": "The schema_match operator validates the value at path against a JSON Schema.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Schema Match", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/user/1" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            {
+              "path": "$.body",
+              "schema_match": {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "id": 1, "name": "Alice", "email": "alice@example.com" }
+      },
+      "expected_report": {
+        "status": "pass",
+        "assertions_evaluated": 1,
+        "assertions_passed": 1
+      }
+    },
+    {
+      "id": "CONF-010",
+      "name": "Report validates against normative schema",
+      "description": "The complete runner report MUST validate against schemas/uxts-report.schema.json.",
+      "validation_target": "full_report",
+      "schema_path": "schemas/uxts-report.schema.json"
+    },
+    {
+      "id": "CONF-011",
+      "name": "Variants — each variant produces independent report entry",
+      "description": "A spec with variants MUST produce one report entry per variant. Each variant's status is independent.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Multi Variant", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/status" },
+        "expected": { "status": 200 },
+        "variants": [
+          {
+            "name": "ok response",
+            "expected": {
+              "status": 200,
+              "body_assertions": [{ "path": "$.status", "equals": "ok" }]
+            }
+          },
+          {
+            "name": "has uptime field",
+            "expected": {
+              "status": 200,
+              "body_assertions": [{ "path": "$.uptime", "exists": true }]
+            }
+          }
+        ]
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "ok", "uptime": 3600 }
+      },
+      "expected_report": {
+        "entries_count": 2,
+        "entries": [
+          { "spec_path_suffix": "#ok response", "status": "pass" },
+          { "spec_path_suffix": "#has uptime field", "status": "pass" }
+        ]
+      }
+    },
+    {
+      "id": "CONF-012",
+      "name": "Variants — 0/0 prohibition applies per-variant",
+      "description": "A variant with zero executable assertions MUST fail, even if other variants in the same spec pass.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Variant Zero Assert", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/healthz" },
+        "expected": { "status": 200 },
+        "variants": [
+          {
+            "name": "has assertions",
+            "expected": {
+              "status": 200,
+              "body_assertions": [{ "path": "$.status", "equals": "ok" }]
+            }
+          },
+          {
+            "name": "no assertions",
+            "expected": {
+              "status": 200,
+              "body_assertions": []
+            }
+          }
+        ]
+      },
+      "mock_response": {
+        "status": 200,
+        "body": { "status": "ok" }
+      },
+      "expected_report": {
+        "entries": [
+          { "spec_path_suffix": "#has assertions", "status": "pass" },
+          { "spec_path_suffix": "#no assertions", "status": "fail" }
+        ]
+      }
+    },
+    {
+      "id": "CONF-013",
+      "name": "Setup failure prevents main execution",
+      "description": "When a setup action fails, the main request MUST NOT execute. Report status is 'error' with SETUP: prefix.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Setup Fail", "base_url": "${BASE_URL}" },
+        "setup": [
+          {
+            "action": "http",
+            "method": "POST",
+            "path": "/api/v1/seed",
+            "body": { "data": "test" }
+          }
+        ],
+        "request": { "method": "GET", "path": "/api/v1/data" },
+        "expected": { "status": 200 }
+      },
+      "mock_responses": {
+        "/api/v1/seed": { "status": 500, "body": { "error": "seed failed" } }
+      },
+      "expected_report": {
+        "status": "error",
+        "error_prefix": "SETUP:"
+      }
+    },
+    {
+      "id": "CONF-014",
+      "name": "items_all_match — all elements satisfy assertion",
+      "description": "The items_all_match operator validates every array element against the nested assertion.",
+      "spec": {
+        "uats_version": "1.0.0",
+        "api": { "name": "Items All Match", "base_url": "${BASE_URL}" },
+        "request": { "method": "GET", "path": "/api/v1/users" },
+        "expected": {
+          "status": 200,
+          "body_assertions": [
+            { "path": "$.users", "items_all_match": { "type_is": "object" } },
+            { "path": "$.users", "items_all_match": { "schema_match": { "type": "object", "required": ["id", "name"] } } }
+          ]
+        }
+      },
+      "mock_response": {
+        "status": 200,
+        "body": {
+          "users": [
+            { "id": 1, "name": "Alice" },
+            { "id": 2, "name": "Bob" }
+          ]
+        }
+      },
+      "expected_report": {
+        "status": "pass",
+        "assertions_evaluated": 2,
+        "assertions_passed": 2
+      }
+    }
+  ]
+}

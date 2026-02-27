@@ -1,0 +1,120 @@
+# MDEMG Sidecar Troubleshooting Guide
+
+Status: Draft  
+Date: 2026-02-27  
+Owner: MDEMG Core  
+Audience: Developers and maintainers diagnosing sidecar failures
+
+---
+
+## 1. Diagnostic Workflow
+
+Run diagnostics in this order:
+
+```bash
+mdemg sidecar status --format json
+mdemg sidecar doctor --format json
+```
+
+Review generated reports:
+
+```bash
+cat .mdemg/generated/doctor-report.json
+cat .mdemg/generated/install-report.json
+```
+
+If needed, collect logs:
+
+```bash
+tail -n 200 .mdemg/logs/sidecar.log
+tail -n 200 .mdemg/logs/mdemg.log
+```
+
+---
+
+## 2. Issue Matrix
+
+| ID | Symptom | Likely Cause | Primary Fix |
+|----|---------|--------------|-------------|
+| `TRBL-INSTALL-DOCKER` | Install fails during preflight | Docker unavailable or daemon down | Start Docker, rerun install |
+| `TRBL-INSTALL-CLI` | `mdemg` command not found | CLI not installed/in PATH | Install/build CLI, re-run |
+| `TRBL-REMOTE-SSH` | Remote profile cannot start | SSH connectivity/auth issue | Validate SSH non-interactive access |
+| `TRBL-REMOTE-CONTEXT` | Remote runtime state inconsistent | Docker context misconfigured | Recreate and select correct context |
+| `TRBL-PORT-CONFLICT` | Runtime not reachable at configured endpoint | Port already in use | Rebind port or let sidecar auto-allocate |
+| `TRBL-AGENT-CONFIG` | Attach-agent fails | Config merge conflict | Restore backup, run print-only attach, merge manually |
+| `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
+| `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |
+
+---
+
+## 3. Exit Code Quick Map
+
+| Exit Code | Class | Typical Action |
+|----------|-------|----------------|
+| `0` | Success | Continue |
+| `2` | Validation/config error | Fix config fields and rerun |
+| `3` | Dependency/environment error | Install/repair prerequisite and rerun |
+| `4` | Runtime orchestration error | Inspect status/doctor logs, then restart |
+| `5` | Permission/security policy error | Correct file/host permissions or policy flags |
+| `6` | Adapter unsupported/conflict | Use print-only/manual attach or update adapter support |
+
+---
+
+## 4. Remote Profile Specific Checks
+
+From MacBook:
+
+```bash
+ssh macstudio-tb "docker ps"
+```
+
+Verify:
+
+1. SSH succeeds without interactive prompt loop.
+2. Docker command on remote host works.
+
+If using Docker context mode:
+
+```bash
+docker context ls
+```
+
+Ensure expected context exists and is healthy.
+
+---
+
+## 5. Agent Adapter Recovery
+
+If attachment mutates config unexpectedly:
+
+1. Locate backup in `.mdemg/backups/`.
+2. Restore backup file.
+3. Re-run attach in safe mode (`--print-only` when available).
+4. Apply changes manually.
+
+---
+
+## 6. Doctor Failure Classes
+
+Each doctor failure class must map to a troubleshooting ID:
+
+1. Runtime failures -> `TRBL-PORT-CONFLICT` or `TRBL-INSTALL-DOCKER`.
+2. Remote failures -> `TRBL-REMOTE-SSH` or `TRBL-REMOTE-CONTEXT`.
+3. Adapter failures -> `TRBL-AGENT-CONFIG`.
+4. CMS failures -> `TRBL-CMS-DEGRADED`.
+
+---
+
+## 7. Escalation Template
+
+```text
+Issue ID:
+Repo:
+Profile:
+Command:
+Error output:
+Doctor JSON excerpt:
+Recent logs:
+Actions attempted:
+Current state:
+```

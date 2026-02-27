@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/sidecar/upgrade-report/v1.0.0",
+  "title": "MDEMG Sidecar Upgrade Report",
+  "description": "Machine-readable report emitted by `mdemg sidecar upgrade --format json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "timestamp",
+    "result",
+    "exit_code",
+    "state_before",
+    "state_after",
+    "changes",
+    "issues",
+    "next_actions",
+    "dry_run",
+    "version_before",
+    "version_after",
+    "config_migrated",
+    "config_migration_steps",
+    "rollback_snapshot_path",
+    "components_upgraded"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "command": {
+      "const": "mdemg sidecar upgrade"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["success", "warning", "error"]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [0, 2, 3, 4, 5, 6]
+    },
+    "state_before": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "state_after": {
+      "$ref": "#/$defs/sidecar_state"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "version_before": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "MDEMG sidecar version before upgrade."
+    },
+    "version_after": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "MDEMG sidecar version after upgrade."
+    },
+    "config_migrated": {
+      "type": "boolean",
+      "description": "Whether sidecar.yaml required migration during upgrade."
+    },
+    "config_migration_steps": {
+      "type": "array",
+      "description": "Ordered migration steps applied to sidecar.yaml.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rollback_snapshot_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to pre-upgrade config backup for rollback."
+    },
+    "components_upgraded": {
+      "type": "array",
+      "description": "Components that were upgraded.",
+      "items": {
+        "$ref": "#/$defs/component_upgrade"
+      }
+    }
+  },
+  "$defs": {
+    "sidecar_state": {
+      "type": "string",
+      "enum": [
+        "uninitialized",
+        "initialized",
+        "installed",
+        "running",
+        "degraded",
+        "stopped",
+        "uninstalled"
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "backup_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message", "remediation"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]+$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "component_upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "from_version", "to_version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
