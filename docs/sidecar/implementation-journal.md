@@ -395,3 +395,89 @@ Use this template for each session entry:
 | Install from wrong state fails with remediation | PASS | exit_code 2, "Run: mdemg sidecar init" |
 | All unit tests pass | PASS | 65/65 (32 S1 + 33 S2) |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+
+### Entry 2026-02-27T17:30:00Z — S3 Completion
+
+1. Timestamp (UTC): 2026-02-27T17:30:00Z
+2. Phase: S3 - Runtime Orchestration — Local Profile (COMPLETE)
+3. Related roadmap sections: 5.2, 7A, 7B, 7C, 7D, 8
+4. Work completed:
+   - Added doctor types to `internal/sidecar/types.go`: `DoctorCheck`, `DoctorSummary`, `DoctorReport`
+   - Created `internal/sidecar/doctor.go` (~65 lines):
+     - `TallyChecks`: counts pass/warn/fail/skip
+     - `NewDoctorReport`: nil-slice safe, auto-tallies summary, auto-populates Issues from warn/fail checks
+     - `DoctorExitCode`: returns ExitSuccess if no fail, ExitDependency if any fail
+   - Created `internal/sidecar/doctor_test.go` (~135 lines): 12 unit tests
+   - Created `internal/cli/sidecar_up.go` (~260 lines):
+     - State guard: installed, stopped, or degraded
+     - Neo4j container: inspect → start/create with standard flags from db.go
+     - MDEMG server: detached process (`Setsid: true`), PID file, port file polling
+     - Lock file update to `running`
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_down.go` (~175 lines):
+     - State guard: running or degraded
+     - SIGTERM → 30s poll → SIGKILL fallback
+     - Neo4j container stop
+     - Lock file update to `stopped`
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_restart.go` (~130 lines):
+     - State guard: running or degraded
+     - Calls down logic, 1s sleep, then up logic
+     - Combined JSON report for restart
+     - `--dry-run`, `--format text|json` flags
+   - Created `internal/cli/sidecar_doctor.go` (~280 lines):
+     - 5 diagnostic checks: config.valid, neo4j.reachable, api.healthy, cms.resume, embedder.available
+     - Each check timed with `time.Since`
+     - Embedder check uses `warn` (optional), others use `fail`
+     - Persists report to `.mdemg/generated/doctor-report.json`
+     - `--format text|json` flag
+   - Modified `internal/cli/sidecar.go`: replaced 4 stubs with real commands
+5. Assumptions eliminated:
+   - `up` reuses all daemon.go PID lifecycle helpers and docker.go container helpers
+   - `down` follows same SIGTERM→poll→SIGKILL pattern from daemon.go:runStop
+   - `restart` delegates to down+up logic, no code duplication
+   - Doctor CMS check uses POST to `/v1/conversation/resume` (not GET)
+   - Embedder unavailability is `warn` not `fail` (optional dependency)
+   - Report JSON conforms to doctor-report.schema.json
+6. Decisions made:
+   - Reused existing helpers directly (same `cli` package): `pidFilePath`, `readPID`, `isProcessAlive`, `removePID`, `readPortFile`, `writePID`, `logFilePath`, `InspectContainer`, `RunDockerCommand`, `WaitForPort`, `probeTimeout`, `extractPort`
+   - Neo4j container created with same flags as `db start` (1GB heap, 512MB page cache, APOC plugin)
+   - Doctor persists report to `.mdemg/generated/doctor-report.json` for machine-readable evidence capture
+   - `sidecarUpError` helper consolidates JSON/text error reporting for `up` command
+   - State guards give contextual remediation (e.g., "Already running. Use: mdemg sidecar restart")
+7. Open questions:
+   - None for S3 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... -v` — 77/77 PASS (65 S1+S2 + 12 S3)
+   - `mdemg sidecar up --format json` from installed → state=running, services started
+   - `mdemg sidecar status` — shows running state
+   - `mdemg sidecar doctor --format json` — 5 checks, valid JSON, summary tallied
+   - `mdemg sidecar down --format json` — state=stopped
+   - `mdemg sidecar up` from stopped → running again
+   - `mdemg sidecar restart --format json` → stop/start cycle succeeds
+   - `--dry-run` on up/down/restart → no mutations
+   - Wrong-state errors produce remediation guidance
+   - Text output for all 4 commands
+9. Next actions:
+   - Begin Phase S4 (as defined in roadmap).
+
+**S3 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| Local profile stable across stop/start/restart cycles | PASS | up→down→up and restart both succeed |
+| `up/down/restart` lifecycle works end-to-end | PASS | installed→running→stopped→running verified |
+| `mdemg sidecar up` from installed → running | PASS | JSON report: exit_code 0, state_after=running |
+| `mdemg sidecar up` from stopped → running | PASS | Text output: stopped → running |
+| `mdemg sidecar down` from running → stopped | PASS | JSON report: exit_code 0, state_after=stopped |
+| `mdemg sidecar restart` from running → running | PASS | JSON report: state_before=running, state_after=running |
+| `mdemg sidecar doctor --format json` — 5 checks | PASS | 5 checks, summary tallied, schema-compliant JSON |
+| Doctor persists to .mdemg/generated/doctor-report.json | PASS | File created with full report |
+| `--dry-run` support on up/down/restart | PASS | No mutations, descriptive output |
+| `--format json` support on all 4 commands | PASS | Schema-compliant JSON output |
+| Wrong-state errors produce remediation guidance | PASS | exit_code 2, contextual remediation messages |
+| All unit tests pass | PASS | 77/77 (65 S1+S2 + 12 S3) |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
