@@ -215,6 +215,36 @@ type HealthSummary struct {
 	DegradedReasons   []string `json:"degraded_reasons"`
 }
 
+// --- Doctor Report ---
+
+// DoctorCheck represents one diagnostic check result.
+type DoctorCheck struct {
+	ID          string   `json:"id"`
+	Category    string   `json:"category"`
+	Status      string   `json:"status"` // pass, warn, fail, skip
+	Message     string   `json:"message"`
+	DurationMs  int      `json:"duration_ms"`
+	Remediation string   `json:"remediation,omitempty"`
+	Evidence    []string `json:"evidence,omitempty"`
+}
+
+// DoctorSummary tallies check outcomes.
+type DoctorSummary struct {
+	Total int `json:"total"`
+	Pass  int `json:"pass"`
+	Warn  int `json:"warn"`
+	Fail  int `json:"fail"`
+	Skip  int `json:"skip"`
+}
+
+// DoctorReport extends ReportEnvelope with doctor-specific fields.
+type DoctorReport struct {
+	ReportEnvelope
+	Profile string        `json:"profile"`
+	Checks  []DoctorCheck `json:"checks"`
+	Summary DoctorSummary `json:"summary"`
+}
+
 // NowUTC returns the current time formatted as RFC3339 in UTC.
 func NowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)
