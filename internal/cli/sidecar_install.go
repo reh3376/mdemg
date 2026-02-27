@@ -184,6 +184,14 @@ func runSidecarInstall(flags sidecarInstallFlags) error {
 		sshInfo = gatherSSHInfo(cfg.Runtime.Remote.Host)
 	}
 
+	// Remote-specific detection
+	var dockerCtxInfo sidecar.DockerContextInfo
+	var remoteBinInfo sidecar.RemoteBinaryInfo
+	if cfg.Profile == sidecar.ProfileStudioRemote {
+		dockerCtxInfo = gatherDockerContextInfo(cfg.Runtime.Remote.Host)
+		remoteBinInfo = gatherRemoteBinaryInfo(cfg.Runtime.Remote.Host)
+	}
+
 	// Evaluate preflight checks
 	checks := []sidecar.PreflightCheck{
 		sidecar.EvalDockerAvailable(dockerInfo),
@@ -192,7 +200,15 @@ func runSidecarInstall(flags sidecarInstallFlags) error {
 		sidecar.EvalSSHReachable(sshInfo),
 	}
 
-	// Auto-fix: pull missing Neo4j image if enabled and not dry-run
+	// Add remote-specific checks for studio-remote profile
+	if cfg.Profile == sidecar.ProfileStudioRemote {
+		checks = append(checks,
+			sidecar.EvalDockerContext(dockerCtxInfo),
+			sidecar.EvalRemoteBinary(remoteBinInfo),
+		)
+	}
+
+	// Auto-fix: pull missing Neo4j image and create docker context if enabled and not dry-run
 	var components []string
 	if autoFix && !flags.dryRun {
 		for i, c := range checks {
@@ -211,6 +227,27 @@ func runSidecarInstall(flags sidecarInstallFlags) error {
 						Required:    true,
 						Message:     fmt.Sprintf("Auto-fix failed: %v", pullErr),
 						Remediation: "Pull manually: docker pull neo4j:5",
+					}
+				}
+			}
+
+			// Auto-create docker context for remote profile
+			if c.ID == "docker-context" && c.Status == "fail" && cfg.Profile == sidecar.ProfileStudioRemote {
+				fmt.Println("Auto-fix: creating Docker context for remote host...")
+				re, reErr := newRemoteExecutor(cfg.Runtime.Remote.Host, cfg.Runtime.Remote.Transport)
+				if reErr == nil {
+					if ctxErr := re.EnsureDockerContext(); ctxErr == nil {
+						dockerCtxInfo = gatherDockerContextInfo(cfg.Runtime.Remote.Host)
+						checks[i] = sidecar.EvalDockerContext(dockerCtxInfo)
+						components = append(components, "docker-context")
+					} else {
+						checks[i] = sidecar.PreflightCheck{
+							ID:          "docker-context",
+							Status:      "fail",
+							Required:    true,
+							Message:     fmt.Sprintf("Auto-fix failed: %v", ctxErr),
+							Remediation: fmt.Sprintf("Create manually: docker context create %s --docker host=ssh://%s", mdemgDockerContext, cfg.Runtime.Remote.Host),
+						}
 					}
 				}
 			}
@@ -499,6 +536,65 @@ func gatherPortInfo(port int) sidecar.PortInfo {
 	}
 	_ = ln.Close()
 	return sidecar.PortInfo{Port: port, Free: true}
+}
+
+func gatherDockerContextInfo(host string) sidecar.DockerContextInfo {
+	if host == "" {
+		return sidecar.DockerContextInfo{}
+	}
+	info := sidecar.DockerContextInfo{
+		ContextName: mdemgDockerContext,
+		Host:        host,
+	}
+
+	// Check if context exists
+	out, err := exec.Command("docker", "context", "ls", "--format", "{{.Name}}").CombinedOutput()
+	if err == nil {
+		for line := range strings.SplitSeq(string(out), "\n") {
+			if strings.TrimSpace(line) == mdemgDockerContext {
+				info.Exists = true
+				break
+			}
+		}
+	}
+
+	// If it exists, check if it's functional
+	if info.Exists {
+		cmd := exec.Command("docker", "--context", mdemgDockerContext, "info", "--format", "{{.ServerVersion}}")
+		if _, funcErr := cmd.CombinedOutput(); funcErr == nil {
+			info.Functional = true
+		}
+	}
+
+	return info
+}
+
+func gatherRemoteBinaryInfo(host string) sidecar.RemoteBinaryInfo {
+	if host == "" {
+		return sidecar.RemoteBinaryInfo{}
+	}
+
+	// Check if mdemg binary exists on remote
+	cmd := exec.Command("ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes", host, "which", "mdemg")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return sidecar.RemoteBinaryInfo{Available: false}
+	}
+
+	path := strings.TrimSpace(string(out))
+	info := sidecar.RemoteBinaryInfo{
+		Available: true,
+		Path:      path,
+	}
+
+	// Try to get version
+	verCmd := exec.Command("ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes", host, "mdemg", "version")
+	verOut, verErr := verCmd.CombinedOutput()
+	if verErr == nil {
+		info.Version = strings.TrimSpace(string(verOut))
+	}
+
+	return info
 }
 
 func gatherSSHInfo(host string) sidecar.SSHInfo {

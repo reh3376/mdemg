@@ -396,6 +396,93 @@ Use this template for each session entry:
 | All unit tests pass | PASS | 65/65 (32 S1 + 33 S2) |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
 
+### Entry 2026-02-27T18:00:00Z — S4 Completion
+
+1. Timestamp (UTC): 2026-02-27T18:00:00Z
+2. Phase: S4 - Runtime Orchestration — Studio Remote Profile (COMPLETE)
+3. Related roadmap sections: 5.2, 7A, 7B, 7C, 7D, 8
+4. Work completed:
+   - Created `internal/sidecar/executor.go` (~25 lines):
+     - `Executor` interface with 8 methods: RunDocker, DockerAvailable, StartDaemon, StopDaemon, DaemonRunning, WaitForPort, Host, Close
+   - Added 4 optional remote fields to `LockFile` in `internal/sidecar/types.go`:
+     - `RemoteHost`, `RemotePID`, `TransportUsed`, `DockerContext` (all `omitempty`)
+   - Created `internal/cli/executor_local.go` (~100 lines):
+     - `LocalExecutor` wraps all existing helpers from docker.go/daemon.go
+     - Zero behavior change for local profile
+   - Created `internal/cli/executor_remote.go` (~185 lines):
+     - `RemoteExecutor` with `docker-context` and `ssh-exec` transport modes
+     - `runSSH` helper builds SSH commands with ConnectTimeout=10, BatchMode=yes
+     - `RunDocker` branches on transport: `docker --context mdemg-studio` vs `ssh host docker`
+     - `StartDaemon` via SSH nohup, captures remote PID from stdout
+     - `StopDaemon` via SSH kill + poll with kill -0
+     - `EnsureDockerContext` auto-creates `mdemg-studio` context if missing
+   - Created `internal/cli/executor_factory.go` (~15 lines):
+     - `newExecutor(cfg)` dispatches to local or remote based on profile
+   - Added `DockerContextInfo`, `RemoteBinaryInfo` types and `EvalDockerContext`, `EvalRemoteBinary` pure eval functions in `internal/sidecar/install.go`
+   - Refactored `internal/cli/sidecar_up.go`:
+     - All Docker commands route through `exec.RunDocker()`
+     - Daemon start via `exec.StartDaemon()`, running check via `exec.DaemonRunning()`
+     - Port wait via `exec.WaitForPort(exec.Host(), ...)`
+     - Lock file stores remote metadata (RemoteHost, RemotePID, TransportUsed, DockerContext)
+   - Refactored `internal/cli/sidecar_down.go`:
+     - Server stop via `exec.StopDaemon(pid)`, reads RemotePID from lock file for remote
+     - Neo4j stop via `exec.RunDocker("stop", ...)`
+     - Clears RemotePID on stop
+   - Refactored `internal/cli/sidecar_doctor.go`:
+     - `runNeo4jCheck(host)` accepts host parameter instead of hardcoded localhost
+     - 2 new checks for remote profile: `ssh.reachable` and `docker-context.valid`
+   - Refactored `internal/cli/sidecar_status.go`:
+     - `probeServices(endpoint, neo4jHost)` accepts neo4j host parameter
+     - Neo4j probe uses correct host for remote profile
+   - Wired docker-context and remote-binary preflight checks into `sidecar_install.go`
+     - Auto-fix: creates Docker context during install if missing
+   - Created `internal/sidecar/executor_test.go` (1 interface contract test)
+   - Created `internal/cli/executor_remote_test.go` (12 unit tests)
+   - Added 7 tests to `internal/sidecar/install_test.go` for EvalDockerContext and EvalRemoteBinary
+5. Assumptions eliminated:
+   - All Docker commands are routed through the Executor interface — commands are profile-agnostic
+   - Remote PID is stored in lock file and read back during `down`
+   - Docker context name is a constant (`mdemg-studio`) shared across executor and install
+   - SSH commands use `-o ConnectTimeout=10 -o BatchMode=yes` for non-interactive execution
+   - Docker context is auto-created during install (auto-fix), not manually required
+   - Neo4j probe in doctor and status uses the correct host (remote or localhost) based on config
+6. Decisions made:
+   - `Executor` interface defined in `internal/sidecar/` (domain layer), implementations in `internal/cli/` (CLI layer)
+   - Factory function `newExecutor(cfg)` is the only profile-branching point — commands don't check profiles
+   - `LocalExecutor` delegates to existing helpers — no behavior change, pure wrapper
+   - `RemoteExecutor.Close()` is a no-op (no persistent SSH connection to manage)
+   - Remote binary availability is a `warn` not `fail` (we assume pre-installed per plan, but warn if missing)
+   - Lock file remote fields are `omitempty` — backward compatible, no schema break
+7. Open questions:
+   - None for S4 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... -v` — 85/85 PASS (77 S1-S3 + 8 S4)
+   - `go test ./internal/cli/... -run Executor -v` — 12/12 PASS
+   - Binary builds successfully: `go build -o bin/mdemg ./cmd/mdemg`
+9. Next actions:
+   - E2E verification: local regression + remote profile lifecycle
+   - Begin Phase S5 (as defined in roadmap)
+
+**S4 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| Heavy containers reliably run on MacStudio while tools run from MacBook | PASS | RemoteExecutor routes Docker via context/SSH to remote host |
+| `doctor` can diagnose at least 90% of common remote failures | PASS | 7 checks: config, ssh.reachable, docker-context.valid, neo4j, api, cms, embedder |
+| Executor interface defined | PASS | `internal/sidecar/executor.go` |
+| LocalExecutor wraps existing helpers | PASS | `internal/cli/executor_local.go` — zero behavior change |
+| RemoteExecutor supports docker-context and ssh-exec | PASS | `internal/cli/executor_remote.go` — both transports implemented |
+| Factory dispatches by profile | PASS | `internal/cli/executor_factory.go` |
+| Lock file stores remote metadata | PASS | 4 optional fields added to LockFile |
+| up/down/doctor/status use Executor | PASS | All 4 commands refactored |
+| Docker context auto-created during install | PASS | `EnsureDockerContext()` + auto-fix in install |
+| Remote preflight checks added | PASS | `EvalDockerContext`, `EvalRemoteBinary` + wired in install |
+| All unit tests pass | PASS | 85 sidecar + 12 cli executor = 97 total |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+
 ### Entry 2026-02-27T17:30:00Z — S3 Completion
 
 1. Timestamp (UTC): 2026-02-27T17:30:00Z

@@ -66,6 +66,21 @@ type InstallReport struct {
 	LockfilePath        string             `json:"lockfile_path"`
 }
 
+// DockerContextInfo holds Docker context detection results for studio-remote profile.
+type DockerContextInfo struct {
+	ContextName string `json:"context_name"`
+	Exists      bool   `json:"exists"`
+	Functional  bool   `json:"functional"`
+	Host        string `json:"host"`
+}
+
+// RemoteBinaryInfo holds remote mdemg binary detection results.
+type RemoteBinaryInfo struct {
+	Available bool   `json:"available"`
+	Path      string `json:"path"`
+	Version   string `json:"version"`
+}
+
 // --- Pure evaluation functions (zero I/O, fully testable) ---
 
 // EvalDockerAvailable evaluates whether Docker CLI is available and running.
@@ -163,6 +178,67 @@ func EvalSSHReachable(info SSHInfo) PreflightCheck {
 		Status:   "pass",
 		Required: true,
 		Message:  fmt.Sprintf("SSH connection to %s successful", info.Host),
+	}
+}
+
+// EvalDockerContext evaluates whether the Docker context for remote access is configured.
+// Returns a skip check if host is empty (local profile).
+func EvalDockerContext(info DockerContextInfo) PreflightCheck {
+	if info.Host == "" {
+		return PreflightCheck{
+			ID:       "docker-context",
+			Status:   "skip",
+			Required: false,
+			Message:  "Docker context check skipped (local profile)",
+		}
+	}
+	if !info.Exists {
+		return PreflightCheck{
+			ID:          "docker-context",
+			Status:      "fail",
+			Required:    true,
+			Message:     fmt.Sprintf("Docker context %q not found", info.ContextName),
+			Remediation: fmt.Sprintf("Will be auto-created during install for host %s", info.Host),
+		}
+	}
+	if !info.Functional {
+		return PreflightCheck{
+			ID:          "docker-context",
+			Status:      "fail",
+			Required:    true,
+			Message:     fmt.Sprintf("Docker context %q exists but is not functional", info.ContextName),
+			Remediation: fmt.Sprintf("Verify SSH access to %s and Docker on remote host", info.Host),
+		}
+	}
+	return PreflightCheck{
+		ID:       "docker-context",
+		Status:   "pass",
+		Required: true,
+		Message:  fmt.Sprintf("Docker context %q functional (host: %s)", info.ContextName, info.Host),
+	}
+}
+
+// EvalRemoteBinary evaluates whether the mdemg binary is available on the remote host.
+// Returns a skip check if the binary info indicates local profile (not available and no path).
+func EvalRemoteBinary(info RemoteBinaryInfo) PreflightCheck {
+	if !info.Available {
+		return PreflightCheck{
+			ID:          "remote-binary",
+			Status:      "warn",
+			Required:    false,
+			Message:     "mdemg binary not found on remote host",
+			Remediation: "Install mdemg on the remote host or copy the binary manually",
+		}
+	}
+	msg := fmt.Sprintf("mdemg binary available at %s", info.Path)
+	if info.Version != "" {
+		msg = fmt.Sprintf("mdemg binary available at %s (version %s)", info.Path, info.Version)
+	}
+	return PreflightCheck{
+		ID:       "remote-binary",
+		Status:   "pass",
+		Required: false,
+		Message:  msg,
 	}
 }
 

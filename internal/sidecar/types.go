@@ -135,6 +135,12 @@ type LockFile struct {
 	MdemgVersion string `json:"mdemg_version"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
+
+	// Remote profile fields (populated only for studio-remote).
+	RemoteHost    string `json:"remote_host,omitempty"`
+	RemotePID     int    `json:"remote_pid,omitempty"`
+	TransportUsed string `json:"transport_used,omitempty"`
+	DockerContext string `json:"docker_context,omitempty"`
 }
 
 // --- Exit Codes (Section 7A) ---

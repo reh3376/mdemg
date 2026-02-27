@@ -72,11 +72,12 @@ func runSidecarStatus(format string) error {
 		lock, _ = sidecar.ReadLock(lockPath)
 	}
 
-	// Determine profile/endpoint/transport
+	// Determine profile/endpoint/transport/neo4j host
 	profile := "unknown"
 	endpoint := "http://localhost:9999"
 	transport := "local"
 	runtimeHost := hostname
+	neo4jHost := "localhost"
 
 	if cfg != nil {
 		profile = string(cfg.Profile)
@@ -85,6 +86,7 @@ func runSidecarStatus(format string) error {
 			transport = string(cfg.Runtime.Remote.Transport)
 			if cfg.Runtime.Remote.Host != "" {
 				runtimeHost = cfg.Runtime.Remote.Host
+				neo4jHost = cfg.Runtime.Remote.Host
 			}
 		}
 	} else if lock != nil {
@@ -92,8 +94,8 @@ func runSidecarStatus(format string) error {
 		endpoint = lock.Endpoint
 	}
 
-	// Probe services
-	services := probeServices(endpoint)
+	// Probe services with correct neo4j host
+	services := probeServices(endpoint, neo4jHost)
 
 	// Build health summary
 	healthSummary := buildHealthSummary(services)
@@ -212,14 +214,17 @@ func runSidecarStatus(format string) error {
 }
 
 // probeServices checks reachability of the three core services.
-func probeServices(endpoint string) []sidecar.ServiceStatus {
+// neo4jHost is "localhost" for local profile, or the remote host for studio-remote.
+func probeServices(endpoint, neo4jHost string) []sidecar.ServiceStatus {
 	services := make([]sidecar.ServiceStatus, 0, 3)
 
 	// MDEMG API
 	services = append(services, probeHTTP("mdemg-api", endpoint+"/healthz", endpoint, 9999))
 
-	// Neo4j (TCP probe)
-	services = append(services, probeTCP("neo4j", "localhost:7687", "bolt://localhost:7687", 7687))
+	// Neo4j (TCP probe) — use the appropriate host
+	neo4jAddr := net.JoinHostPort(neo4jHost, "7687")
+	neo4jEndpoint := fmt.Sprintf("bolt://%s:7687", neo4jHost)
+	services = append(services, probeTCP("neo4j", neo4jAddr, neo4jEndpoint, 7687))
 
 	// Embedder (HTTP probe)
 	services = append(services, probeHTTP("embedder", "http://localhost:11434/api/tags", "http://localhost:11434", 11434))
