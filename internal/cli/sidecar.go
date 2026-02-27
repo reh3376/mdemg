@@ -28,7 +28,7 @@ Commands:
 
 	cmd.AddCommand(newSidecarInitCmd())
 	cmd.AddCommand(newSidecarStatusCmd())
-	cmd.AddCommand(newSidecarStubCmd("install", "Install sidecar dependencies and runtime"))
+	cmd.AddCommand(newSidecarInstallCmd())
 	cmd.AddCommand(newSidecarStubCmd("up", "Start sidecar services"))
 	cmd.AddCommand(newSidecarStubCmd("down", "Stop sidecar services"))
 	cmd.AddCommand(newSidecarStubCmd("restart", "Restart sidecar services"))

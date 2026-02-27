@@ -1,7 +1,7 @@
 {
   "framework": "uats",
   "spec_id": "healthz-basic",
-  "spec_path": "uxts/frameworks/uats/specs/health.uats.json",
+  "spec_path": "uxxts/frameworks/uats/specs/health.uats.json",
   "status": "pass",
   "hash_match": true,
   "computed_hash": "4acfec4933ca2ba5d1da43dd2b9ee42f8b7e4a8c27f273edb4090c65e19d9f7c",

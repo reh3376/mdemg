@@ -1,15 +1,15 @@
-# UxTS Portable Agent Specification (UxTS01)
+# UxXTS Portable Agent Specification (UxXTS01)
 
-Version: 3.3.0-uxts01
+Version: 3.3.0-uxxts01
 Date: 2026-02-27
-Audience: Developers and coding agents implementing UxTS governance in arbitrary codebases.
+Audience: Developers and coding agents implementing UxXTS governance in arbitrary codebases.
 Status: Consolidated best-in-class synthesis of v3.2.0 and the final v3.1 bundle.
 
 ---
 
 ## 0. Purpose
 
-UxTS defines a reusable governance model for declarative verification frameworks.
+UxXTS defines a reusable governance model for declarative verification frameworks.
 
 It standardizes:
 
@@ -30,7 +30,7 @@ Without a unifying model, verification systems drift into fragmented tooling wit
 2. False confidence from skipped or unimplemented assertions.
 3. Reinvention overhead when adding new verification domains.
 
-UxTS addresses this by enforcing one pattern across domains:
+UxXTS addresses this by enforcing one pattern across domains:
 
 `Schema -> Spec -> Runner -> CI Gate`
 
@@ -40,7 +40,7 @@ UxTS addresses this by enforcing one pattern across domains:
 
 ### 2.1 Four-Layer Architecture
 
-Every UxTS framework has exactly four layers:
+Every UxXTS framework has exactly four layers:
 
 1. `Schema`: authoritative structure.
 2. `Specs`: declarative contracts.
@@ -210,7 +210,7 @@ Rules:
 
 ## 5. Runner Contract
 
-A UxTS-compliant runner must:
+A UxXTS-compliant runner must:
 
 1. Discover specs (glob or explicit path).
 2. Validate schema before execution.
@@ -229,11 +229,11 @@ Recommended capability output:
 
 Runner output must validate against:
 
-1. `schemas/uxts-report.schema.json`
+1. `schemas/uxxts-report.schema.json`
 
 Aggregate governance output (full governance mode) must validate against:
 
-1. `schemas/uxts-report-aggregate.schema.json`
+1. `schemas/uxxts-report-aggregate.schema.json`
 
 Status semantics:
 
@@ -294,7 +294,7 @@ Assertion failures are non-retryable unless explicitly opt-in.
 
 ### 9.1 Operating Modes
 
-1. `greenfield`: no existing UxTS artifacts.
+1. `greenfield`: no existing UxXTS artifacts.
 2. `brownfield`: existing verification/codebase constructs.
 
 ### 9.2 Brownfield Rules
@@ -386,26 +386,26 @@ This suite includes checks for:
 
 Reference tooling in this package:
 
-1. `tools/uxts_lint.py`
-2. `tools/uxts_init.py`
+1. `tools/uxxts_lint.py`
+2. `tools/uxxts_init.py`
 
 Recommended broader CLI surface:
 
-1. `uxts validate`
-2. `uxts drift`
-3. `uxts hash`
-4. `uxts report`
-5. `uxts init`
-6. `uxts migrate`
-7. `uxts parity`
-8. `uxts secret-scan`
-9. `uxts mcp-serve`
+1. `uxxts validate`
+2. `uxxts drift`
+3. `uxxts hash`
+4. `uxxts report`
+5. `uxxts init`
+6. `uxxts migrate`
+7. `uxxts parity`
+8. `uxxts secret-scan`
+9. `uxxts mcp-serve`
 
 ---
 
 ## 15. Acceptance Criteria (Repository-Level)
 
-A repository is UxTS-governed when:
+A repository is UxXTS-governed when:
 
 1. Active frameworks satisfy schema/spec/runner/CI contract.
 2. Schema-runner parity is documented and enforced.
@@ -420,32 +420,32 @@ A repository is UxTS-governed when:
 
 ## 16. Deliberate Boundaries
 
-UxTS is not:
+UxXTS is not:
 
 1. A replacement for imperative unit/integration/E2E frameworks.
 2. A replacement for OpenAPI documentation.
 3. A replacement for consumer-dependency tracking (Pact/PactFlow).
 
-UxTS is the contract-governance layer that complements those tools.
+UxXTS is the contract-governance layer that complements those tools.
 
 ---
 
 ## 17. Supporting Files in This Package
 
-This document is the normative anchor for `docs/uxts01`.
+This document is the normative anchor for this package directory.
 
 Supporting documents and artifacts:
 
 1. `SUPPORTING_FILES.md` (index and usage map)
-2. `UXTS01_ADOPTION_ROADMAP.md` (phased rollout)
-3. `UXTS01_MERGE_DECISIONS.md` (why this synthesis was chosen)
+2. `UxXTS01_ADOPTION_ROADMAP.md` (phased rollout)
+3. `UxXTS01_MERGE_DECISIONS.md` (why this synthesis was chosen)
 4. `SOURCE_PROVENANCE_MATRIX.md` (traceability)
 5. `DECISION_REGISTER.md` (explicit decisions)
 6. `WORKING_CONTEXT_LOG.md` (checkpoint log for context durability)
-7. `schemas/uxts-common.schema.json` (portable common blocks)
-8. `schemas/uxts-report.schema.json` (normative report schema)
-9. `schemas/uxts-report-aggregate.schema.json` (normative aggregate schema)
+7. `schemas/uxxts-common.schema.json` (portable common blocks)
+8. `schemas/uxxts-report.schema.json` (normative report schema)
+9. `schemas/uxxts-report-aggregate.schema.json` (normative aggregate schema)
 10. `conformance/conformance-suite.json` (conformance tests)
-11. `tools/uxts_lint.py` (lint/integrity utility)
-12. `tools/uxts_init.py` (framework scaffolder)
+11. `tools/uxxts_lint.py` (lint/integrity utility)
+12. `tools/uxxts_init.py` (framework scaffolder)
 13. `examples/` (reference example artifacts)

@@ -14,13 +14,13 @@
       "type": "string"
     },
     "metadata": {
-      "$ref": "../../schemas/uxts-common.schema.json#/definitions/metadata"
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/metadata"
     },
     "integrity": {
-      "$ref": "../../schemas/uxts-common.schema.json#/definitions/integrity"
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/integrity"
     },
     "execution": {
-      "$ref": "../../schemas/uxts-common.schema.json#/definitions/execution"
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/execution"
     },
     "api": {
       "type": "object",
@@ -88,7 +88,7 @@
         "body_assertions": {
           "type": "array",
           "items": {
-            "$ref": "../../schemas/uxts-common.schema.json#/definitions/assertion"
+            "$ref": "../../schemas/uxxts-common.schema.json#/definitions/assertion"
           }
         },
         "fixture": {

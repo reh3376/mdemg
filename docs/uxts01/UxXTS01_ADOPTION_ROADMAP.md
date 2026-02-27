@@ -1,4 +1,4 @@
-# UxTS01 Adoption Roadmap
+# UxXTS01 Adoption Roadmap
 
 Status: Draft
 Date: 2026-02-27

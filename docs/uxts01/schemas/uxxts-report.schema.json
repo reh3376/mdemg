@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://uxts.dev/schemas/uxts-report.schema.json",
-  "title": "UxTS Runner Report",
-  "description": "Normative schema for runner report output. All UxTS runners MUST produce reports that validate against this schema. See UXTS_PORTABLE_AGENT_SPEC Section 8A.",
-  "_uxts_schema_version": "3.1.0",
+  "$id": "https://uxxts.dev/schemas/uxxts-report.schema.json",
+  "title": "UxXTS Runner Report",
+  "description": "Normative schema for runner report output. All UxXTS runners MUST produce reports that validate against this schema. See UxXTS_PORTABLE_AGENT_SPEC Section 8A.",
+  "_uxxts_schema_version": "3.1.0",
   "type": "object",
   "required": ["timestamp", "framework", "framework_version", "summary", "integrity", "results"],
   "additionalProperties": false,

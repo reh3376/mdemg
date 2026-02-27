@@ -1,25 +1,25 @@
-# UxTS01 Supporting Files Index
+# UxXTS01 Supporting Files Index
 
 Main specification:
 
-1. `UXTS01_PORTABLE_AGENT_SPEC.md`
+1. `UxXTS01_PORTABLE_AGENT_SPEC.md`
 
 Governance and synthesis context:
 
-1. `UXTS01_MERGE_DECISIONS.md`
+1. `UxXTS01_MERGE_DECISIONS.md`
 2. `SOURCE_PROVENANCE_MATRIX.md`
 3. `DECISION_REGISTER.md`
 4. `WORKING_CONTEXT_LOG.md`
 
 Rollout planning:
 
-1. `UXTS01_ADOPTION_ROADMAP.md`
+1. `UxXTS01_ADOPTION_ROADMAP.md`
 
 Normative schemas:
 
-1. `schemas/uxts-common.schema.json`
-2. `schemas/uxts-report.schema.json`
-3. `schemas/uxts-report-aggregate.schema.json`
+1. `schemas/uxxts-common.schema.json`
+2. `schemas/uxxts-report.schema.json`
+3. `schemas/uxxts-report-aggregate.schema.json`
 
 Conformance artifacts:
 
@@ -27,8 +27,8 @@ Conformance artifacts:
 
 Utilities:
 
-1. `tools/uxts_lint.py`
-2. `tools/uxts_init.py`
+1. `tools/uxxts_lint.py`
+2. `tools/uxxts_init.py`
 
 Reference examples:
 
@@ -36,11 +36,11 @@ Reference examples:
 2. `examples/frameworks/uats/_defaults.json`
 3. `examples/frameworks/uats/specs/health.uats.json`
 4. `examples/frameworks/uats/fixtures/health/expected.json`
-5. `examples/sample_uxts_report.json`
+5. `examples/sample_uxxts_report.json`
 
 Usage order:
 
-1. Read `UXTS01_PORTABLE_AGENT_SPEC.md`.
+1. Read `UxXTS01_PORTABLE_AGENT_SPEC.md`.
 2. Run examples/tools for bootstrap.
 3. Apply roadmap phases.
 4. Use conformance and schemas as enforcement contracts.

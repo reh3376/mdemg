@@ -1,18 +1,18 @@
-# UxTS01 Merge Decisions
+# UxXTS01 Merge Decisions
 
 Status: Draft
 Date: 2026-02-27
 
 ## Objective
 
-Produce a best-in-class consolidated UxTS specification by selectively combining:
+Produce a best-in-class consolidated UxXTS specification by selectively combining:
 
-1. `/Users/reh3376/Downloads/uxts-v3.2.0`
-2. `/Users/reh3376/Downloads/UXTS_FINAL_SPEC_AND_ROADMAP_BUNDLE`
+1. Bundle A: v3.2.0 specification package.
+2. Bundle B: final v3.1 spec + roadmap + starter tooling bundle.
 
 ## Selection Principles
 
-1. Preserve original UxTS intent: declarative, schema-governed, runner-portable verification.
+1. Preserve original UxXTS intent: declarative, schema-governed, runner-portable verification.
 2. Prefer normative precision over broad prose when behavior could diverge.
 3. Keep adoption path practical (low initial overhead, progressive hardening).
 4. Keep machine-readability first-class (schemas, report contracts, conformance).

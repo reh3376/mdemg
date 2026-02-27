@@ -1,4 +1,4 @@
-# UxTS01 Decision Register
+# UxXTS01 Decision Register
 
 Status: Active
 

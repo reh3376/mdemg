@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-uxts_init.py
-Creates a starter UxTS directory layout and a new framework skeleton.
+uxxts_init.py
+Creates a starter UxXTS directory layout and a new framework skeleton.
 
 This is deliberately small scaffolding:
-- creates uxts/frameworks/<framework_id> with schema.json, _defaults.json, specs/, fixtures/
+- creates uxxts/frameworks/<framework_id> with schema.json, _defaults.json, specs/, fixtures/
 - drops a minimal example spec into specs/
 """
 
@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-COMMON_SCHEMA_REF = "../../schemas/uxts-common.schema.json#/definitions/metadata"
+COMMON_SCHEMA_REF = "../../schemas/uxxts-common.schema.json#/definitions/metadata"
 
 def write_json(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,12 +30,12 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
 
     root = Path(args.root).resolve()
-    uxts_dir = root / "uxts"
-    fw_dir = uxts_dir / "frameworks" / args.framework_id
+    uxxts_dir = root / "uxxts"
+    fw_dir = uxxts_dir / "frameworks" / args.framework_id
     specs_dir = fw_dir / "specs"
     fixtures_dir = fw_dir / "fixtures"
 
-    (uxts_dir / "schemas").mkdir(parents=True, exist_ok=True)
+    (uxxts_dir / "schemas").mkdir(parents=True, exist_ok=True)
     specs_dir.mkdir(parents=True, exist_ok=True)
     fixtures_dir.mkdir(parents=True, exist_ok=True)
 
@@ -47,8 +47,8 @@ def main(argv: list[str]) -> int:
       "required": ["metadata"],
       "properties": {
         "metadata": {"$ref": COMMON_SCHEMA_REF},
-        "integrity": {"$ref": "../../schemas/uxts-common.schema.json#/definitions/integrity"},
-        "execution": {"$ref": "../../schemas/uxts-common.schema.json#/definitions/execution"},
+        "integrity": {"$ref": "../../schemas/uxxts-common.schema.json#/definitions/integrity"},
+        "execution": {"$ref": "../../schemas/uxxts-common.schema.json#/definitions/execution"},
         "payload": {"type": "object"}
       },
       "additionalProperties": False
@@ -61,7 +61,7 @@ def main(argv: list[str]) -> int:
     example = {
       "metadata": {
         "id": f"{args.framework_id}-example-1",
-        "description": "Example spec created by uxts_init.py",
+        "description": "Example spec created by uxxts_init.py",
         "tags": ["example"],
         "status": "active"
       },

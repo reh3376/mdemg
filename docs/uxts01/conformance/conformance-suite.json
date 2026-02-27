@@ -1,7 +1,7 @@
 {
-  "_uxts_conformance_suite": true,
+  "_uxxts_conformance_suite": true,
   "_version": "3.1.0",
-  "_description": "Conformance test suite for UxTS runner implementations. A runner claiming UxTS compliance MUST produce the expected report output for each test case. Validate with: python3 run_conformance.py --runner <runner_command>",
+  "_description": "Conformance test suite for UxXTS runner implementations. A runner claiming UxXTS compliance MUST produce the expected report output for each test case. Validate with: python3 run_conformance.py --runner <runner_command>",
   "test_cases": [
     {
       "id": "CONF-001",
@@ -215,9 +215,9 @@
     {
       "id": "CONF-010",
       "name": "Report validates against normative schema",
-      "description": "The complete runner report MUST validate against schemas/uxts-report.schema.json.",
+      "description": "The complete runner report MUST validate against schemas/uxxts-report.schema.json.",
       "validation_target": "full_report",
-      "schema_path": "schemas/uxts-report.schema.json"
+      "schema_path": "schemas/uxxts-report.schema.json"
     },
     {
       "id": "CONF-011",
