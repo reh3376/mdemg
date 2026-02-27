@@ -495,7 +495,36 @@ class Validator:
         for name, syms in actual_by_name.items():
             if name not in all_matched_names:
                 result.extra_symbols.extend(syms)
-        
+
+        # --- Schema-runner parity: enforce require_all_symbols ---
+        require_all = self.spec.config.get("require_all_symbols", True)
+        if require_all and result.matched < result.total_expected:
+            unmatched = result.total_expected - result.matched - result.skipped
+            if unmatched > 0:
+                result.failed += unmatched
+                result.error_message = (
+                    result.error_message or ""
+                ) + f" require_all_symbols: {unmatched} expected symbol(s) unmatched."
+
+        # --- Schema-runner parity: enforce allow_extra_symbols ---
+        allow_extra = self.spec.config.get("allow_extra_symbols", True)
+        if not allow_extra and result.extra_symbols:
+            extra_names = [s["name"] for s in result.extra_symbols[:5]]
+            result.failed += 1
+            result.error_message = (
+                result.error_message or ""
+            ) + f" allow_extra_symbols=false: {len(result.extra_symbols)} extra symbol(s) found: {extra_names}."
+
+        # --- Schema-runner parity: explicit warning for unimplemented fields ---
+        # relationships: present in 4 specs but runner can't validate yet.
+        # NOT silently ignored — reported as warning. Does not affect pass/fail
+        # because relationship validation is supplementary to symbol matching.
+        if self.spec.spec.get("expected", {}).get("relationships"):
+            result.warnings += 1
+            result.error_message = (
+                result.error_message or ""
+            ) + " UNIMPLEMENTED: 'relationships' field present but validation not yet supported by runner."
+
         # Determine final status
         if result.failed > 0:
             result.status = Status.FAIL

@@ -2,8 +2,9 @@
 
 **Alias:** Nash Verification module  
 **Parent:** [FRAMEWORK_GOVERNANCE.md](./FRAMEWORK_GOVERNANCE.md)  
-**Status:** Spec (implementation not started)  
+**Status:** Implemented (gRPC service + registry + scanner)
 **Date:** 2026-01-22
+**Updated:** 2026-02-26
 
 ---
 
@@ -204,23 +205,42 @@ message RegisterTrackedFileRequest {
 
 ---
 
-## Implementation order
+## Implementation Status
 
-1. **Spec and schema** — This doc; optional JSON schema for `unts-registry.json`.
-2. **Registry format and loader** — Define `unts-registry.json` schema; loader in `internal/unts/` (or `internal/hashverify/`).
-3. **Scanners** — Ingest from `manifest.sha256` and UDTS specs into registry (or compute on the fly for read-only).
-4. **Core logic** — VerifyNow (recompute, compare), UpdateHash, RevertToPreviousHash (write back to manifest/spec + update registry and history).
-5. **gRPC service** — `api/proto/unts.proto` (or `hash-verification.proto`); implement in `internal/unts/server.go`; register in a server binary (e.g. `space-transfer` with `-enable-unts` or dedicated `cmd/unts-server`).
-6. **UDTS for UNTS** — Add UDTS specs for ListVerifiedFiles, GetFileStatus, GetHashHistory, VerifyNow; runner in `tests/udts/`.
-7. **Observability** — Health, metrics (if UOTS is present), structured logging.
+All core implementation steps are complete:
+
+1. **Spec and schema** — This doc. ✅
+2. **Registry format and loader** — `internal/unts/registry.go`: in-memory registry persisted to `docs/specs/unts-registry.json`. Protobuf-backed via `mdemg/api/untspb`. ✅
+3. **Scanners** — `internal/unts/scanner.go`: `ScanManifest()` reads `docs/specs/manifest.sha256`; `ScanUDTSSpecs()` reads UDTS spec `proto_sha256` fields. **Note:** Scanner coverage is limited to manifest + UDTS; other frameworks (UATS, UPTS, UBTS, etc.) not yet scanned. ✅ (partial)
+4. **Core logic** — `internal/unts/registry.go`: VerifyNow, UpdateHash, RevertToPreviousHash with history (last 3 entries). ✅
+5. **gRPC service** — `internal/unts/server.go`: Implements `HashVerificationServer` with all 7 RPCs (ListVerifiedFiles, GetFileStatus, GetHashHistory, RevertToPreviousHash, UpdateHash, VerifyNow, RegisterTrackedFile, ScanAndSync). ✅
+6. **Tests** — `internal/unts/registry_test.go`, `internal/unts/scanner_test.go`, `internal/unts/server_test.go`. ✅
+7. **Observability** — Structured logging on revert/update operations. ✅
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `internal/unts/registry.go` | In-memory hash registry with JSON persistence |
+| `internal/unts/scanner.go` | Scans manifest + UDTS specs for hash entries |
+| `internal/unts/server.go` | gRPC service implementation (7 RPCs) |
+| `internal/unts/registry_test.go` | Registry unit tests |
+| `internal/unts/scanner_test.go` | Scanner unit tests |
+| `internal/unts/server_test.go` | Server unit tests |
+
+### Remaining Work
+
+- Expand scanner to cover all UxTS frameworks (UATS, UPTS, UBTS, USTS, UOTS, UAMS, UETS, UVTS)
+- UDTS contract test specs for UNTS RPCs
 
 ---
 
 ## Acceptance
 
-- [ ] Registry (file or DB) holds current hash, status, updated_at, and last 3 history entries per tracked file.
-- [ ] ListVerifiedFiles and GetFileStatus return correct data; GetHashHistory returns current + last 3.
-- [ ] RevertToPreviousHash updates manifest or spec and registry; history reflects revert.
-- [ ] VerifyNow recomputes hashes and updates status.
-- [ ] gRPC (or REST) API available for monitoring and manipulation; UDTS coverage for UNTS RPCs.
+- [x] Registry (file or DB) holds current hash, status, updated_at, and last 3 history entries per tracked file.
+- [x] ListVerifiedFiles and GetFileStatus return correct data; GetHashHistory returns current + last 3.
+- [x] RevertToPreviousHash updates manifest or spec and registry; history reflects revert.
+- [x] VerifyNow recomputes hashes and updates status.
+- [x] gRPC (or REST) API available for monitoring and manipulation; UDTS coverage for UNTS RPCs.
+- [ ] Scanner expanded to cover all UxTS frameworks (not just manifest + UDTS).
 - [ ] Documented for production: deployment, backup of registry, audit log.

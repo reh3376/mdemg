@@ -7,6 +7,7 @@ Spec-driven observability validation for MDEMG metrics, dashboards, and alert ru
 ```
 uots/
   schema/uots.schema.json     # JSON Schema for .uots.json specs
+  runners/uots_runner.py      # UOTS runner
   specs/                       # Test specifications
     *.uots.json
 ```
@@ -25,11 +26,26 @@ uots/
 
 ```bash
 # Validate all UOTS specs
-python3 runners/uots_runner.py --spec-dir docs/api/api-spec/uots/specs/ --base-url http://localhost:9999
+python3 docs/api/api-spec/uots/runners/uots_runner.py \
+  --spec-dir docs/api/api-spec/uots/specs/ \
+  --base-url http://localhost:9999
 
 # Validate single spec
-python3 runners/uots_runner.py --pattern prometheus_neo4j_graph --base-url http://localhost:9999
+python3 docs/api/api-spec/uots/runners/uots_runner.py \
+  --spec docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json \
+  --base-url http://localhost:9999
 ```
+
+## Authority Split (UOTS vs UOBS)
+
+- `UOTS` is the canonical framework for artifact-level observability contracts:
+  - Prometheus metrics
+  - Grafana dashboards
+  - Alert rule files
+- `UOBS` remains focused on runtime service observability checks:
+  - health endpoints
+  - dependency probes
+  - runtime tracing/logging behavior
 
 ## Current Specs
 

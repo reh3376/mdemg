@@ -1,0 +1,192 @@
+# MDEMG Helm Chart Values
+# Override these values for your environment
+
+replicaCount: 3
+
+image:
+  repository: mdemg
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/v1/prometheus"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mdemg.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: mdemg
+          topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+
+# Application configuration
+config:
+  # Server
+  listenAddr: ":8080"
+  logFormat: "json"
+  logSkipHealth: true
+  gracefulShutdownTimeout: 30
+
+  # Schema
+  requiredSchemaVersion: "15"
+
+  # Embedding
+  embeddingProvider: "openai"
+  embeddingCacheEnabled: true
+  embeddingCacheSize: 1000
+
+  # Query cache
+  queryCacheEnabled: true
+  queryCacheCapacity: 500
+  queryCacheTTLSeconds: 300
+
+  # Rate limiting
+  rateLimitEnabled: true
+  rateLimitRPS: 100
+  rateLimitBurst: 200
+  rateLimitByIP: true
+
+  # Circuit breaker
+  circuitBreakerEnabled: true
+  circuitBreakerThreshold: 5
+  circuitBreakerTimeout: 30
+
+  # Authentication
+  authEnabled: true
+  authMode: "apikey"
+  authSkipEndpoints: "/healthz,/readyz,/v1/prometheus"
+
+  # CORS
+  corsEnabled: false
+  corsAllowedOrigins: []
+  corsAllowedMethods: "GET,POST,PUT,DELETE"
+
+  # TLS (usually handled by ingress)
+  tlsEnabled: false
+  tlsCertFile: ""
+  tlsKeyFile: ""
+
+  # Metrics
+  metricsEnabled: true
+  metricsNamespace: "mdemg"
+
+  # Compression
+  compressionEnabled: true
+  compressionMinSize: 1024
+
+  # Neo4j connection pool
+  neo4jMaxPoolSize: 100
+  neo4jAcquireTimeoutSec: 60
+  neo4jMaxConnLifetimeSec: 3600
+
+  # Scoring parameters
+  scoringAlpha: "0.55"
+  scoringBeta: "0.30"
+  scoringGamma: "0.10"
+  scoringDelta: "0.05"
+
+  # Hidden layer
+  hiddenLayerEnabled: true
+  hiddenLayerClusterEps: "0.1"
+  hiddenLayerMinSamples: 3
+
+  # Anomaly detection
+  anomalyDetectionEnabled: true
+  anomalyDuplicateThreshold: "0.95"
+
+  # Plugins
+  pluginsEnabled: false
+
+# Secrets (reference existing secrets or create)
+secrets:
+  create: false
+  name: "mdemg-secrets"
+  # If create is true, provide values:
+  # neo4jUri: "bolt://neo4j:7687"
+  # neo4jUser: "neo4j"
+  # neo4jPass: ""
+  # openaiApiKey: ""
+  # apiKeys: ""
+
+# Neo4j subchart configuration
+neo4j:
+  enabled: false
+  # Configure neo4j subchart values here if enabled
+
+# Prometheus ServiceMonitor
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  namespace: ""
+  labels: {}

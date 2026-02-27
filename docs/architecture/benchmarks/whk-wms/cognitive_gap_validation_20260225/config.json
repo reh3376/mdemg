@@ -1,0 +1,17 @@
+{
+  "benchmark": "cognitive_gap_validation",
+  "date": "2026-02-25T11:26:19.618599",
+  "questions_file": "/Users/reh3376/mdemg/docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json",
+  "master_file": "/Users/reh3376/mdemg/docs/architecture/benchmarks/whk-wms/test_questions_120.json",
+  "codebase": "/Users/reh3376/whk-wms",
+  "mdemg_endpoint": "http://localhost:9999",
+  "mdemg_space_id": "whk-wms",
+  "model": "haiku",
+  "agent_timeout": 120,
+  "modes": [
+    "baseline",
+    "mdemg"
+  ],
+  "runs_per_mode": 3,
+  "total_questions": 3
+}

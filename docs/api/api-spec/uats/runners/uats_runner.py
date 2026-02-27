@@ -316,6 +316,10 @@ class UATSLoader:
         expected = self.spec.get("expected", {})
         if "status" not in expected:
             self.errors.append("expected.status is required")
+
+        # Prevent silent false confidence from schema fields that are not
+        # implemented by this runner yet.
+        self._validate_supported_features()
         
         return len(self.errors) == 0
     
@@ -382,6 +386,61 @@ class UATSLoader:
             return True, f"Hash valid: {actual[:12]}..."
         else:
             return False, f"Hash mismatch: expected {expected[:12]}..., got {actual[:12]}..."
+
+    def _validate_supported_features(self):
+        """Fail fast when spec uses schema fields this runner does not implement."""
+        unsupported: List[str] = []
+
+        if self.setup:
+            unsupported.append("setup")
+        if self.teardown:
+            unsupported.append("teardown")
+        if self.spec.get("chain"):
+            unsupported.append("chain")
+
+        request = self.request
+        expected = self.expected
+        config = self.config
+        auth = self.auth
+
+        if "body_file" in request:
+            unsupported.append("request.body_file")
+        if "body_file" in expected:
+            unsupported.append("expected.body_file")
+        if "body_schema" in expected:
+            unsupported.append("expected.body_schema")
+
+        for cfg_key in [
+            "retry_count",
+            "retry_delay_ms",
+            "strict_headers",
+            "strict_body",
+            "ignore_headers",
+            "validate_schema",
+            "validate_values",
+        ]:
+            if cfg_key in config:
+                unsupported.append(f"config.{cfg_key}")
+
+        if auth.get("type") == "oauth2" or "oauth2" in auth:
+            unsupported.append("auth.oauth2")
+
+        api_key = auth.get("api_key", {})
+        if auth.get("type") == "api_key" and isinstance(api_key, dict) and api_key.get("in") == "query":
+            unsupported.append("auth.api_key[in=query]")
+
+        if any(isinstance(v, dict) and "regex" in v for v in self.captures.values()):
+            unsupported.append("captures.*.regex")
+
+        if unsupported:
+            deduped = sorted(set(unsupported))
+            self.errors.append(
+                "Runner does not implement these schema features: "
+                + ", ".join(deduped)
+            )
+            self.errors.append(
+                "Remove unsupported fields or extend docs/api/api-spec/uats/runners/uats_runner.py before running this spec."
+            )
 
 
 # ============================================================
@@ -468,10 +527,17 @@ class VariableResolver:
 class HTTPClient:
     """HTTP client for making API requests."""
     
-    def __init__(self, base_url: str, timeout: int = 30, verify_ssl: bool = True):
+    def __init__(
+        self,
+        base_url: str,
+        timeout: int = 30,
+        verify_ssl: bool = True,
+        follow_redirects: bool = False,
+    ):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.follow_redirects = follow_redirects
         self.session = requests.Session()
     
     def request(
@@ -512,7 +578,8 @@ class HTTPClient:
             json=json_body,
             data=data,
             timeout=self.timeout,
-            verify=self.verify_ssl
+            verify=self.verify_ssl,
+            allow_redirects=self.follow_redirects,
         )
         response_time_ms = (time.time() - start_time) * 1000
         
@@ -884,6 +951,12 @@ class Validator:
         # Merge variant overrides
         request = self._merge_variant(self.spec.request, variant.get("request") if variant else None)
         expected = self._merge_variant(self.spec.expected, variant.get("expected") if variant else None)
+
+        # Variant-scoped variables override top-level variables.
+        if variant and isinstance(variant.get("variables"), dict):
+            variant_vars = VariableResolver(variant["variables"])
+            for name, value in variant_vars.variables.items():
+                self.resolver.set(name, value)
         
         result = SpecResult(
             spec_path=str(self.spec.spec_path),
@@ -993,6 +1066,33 @@ class Validator:
             time_result = self.engine.check_response_time(response_time, expected["response_time"])
             result.assertions.append(time_result)
             if time_result.status == Status.FAIL:
+                result.failed += 1
+            else:
+                result.passed += 1
+
+        # Config-level response time threshold.
+        if "response_time_max_ms" in self.spec.config:
+            max_ms = self.spec.config.get("response_time_max_ms")
+            cfg_time_result = AssertionResult(
+                name="config:response_time_max_ms",
+                path="config.response_time_max_ms",
+                status=Status.PASS,
+                expected=f"<= {max_ms}",
+                actual=round(response_time, 2),
+            )
+            try:
+                max_ms_val = float(max_ms)
+                if response_time > max_ms_val:
+                    cfg_time_result.status = Status.FAIL
+                    cfg_time_result.message = (
+                        f"Response time {response_time:.0f}ms exceeds config.response_time_max_ms={max_ms_val:.0f}ms"
+                    )
+            except (TypeError, ValueError):
+                cfg_time_result.status = Status.FAIL
+                cfg_time_result.message = f"Invalid config.response_time_max_ms value: {max_ms!r}"
+
+            result.assertions.append(cfg_time_result)
+            if cfg_time_result.status == Status.FAIL:
                 result.failed += 1
             else:
                 result.passed += 1
@@ -1164,7 +1264,8 @@ class Runner:
         client = HTTPClient(
             base_url=effective_base_url,
             timeout=loader.config.get("timeout_ms", self.timeout * 1000) // 1000,
-            verify_ssl=loader.config.get("verify_ssl", True)
+            verify_ssl=loader.config.get("verify_ssl", True),
+            follow_redirects=loader.config.get("follow_redirects", False),
         )
         
         results = []

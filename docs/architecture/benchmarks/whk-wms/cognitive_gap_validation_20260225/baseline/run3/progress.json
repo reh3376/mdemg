@@ -1,0 +1,18 @@
+{
+  "mode": "baseline",
+  "run": 3,
+  "model": "haiku",
+  "total": 120,
+  "processed": 120,
+  "successful": 120,
+  "failed": 0,
+  "with_refs": 106,
+  "total_duration": 8979.600000000002,
+  "start_time": "2026-02-26T10:15:55.865971",
+  "errors": [],
+  "drift_count": 1,
+  "end_time": "2026-02-26T12:45:35.600335",
+  "wall_clock_seconds": 8979.7,
+  "ref_rate": 0.8833333333333333,
+  "avg_duration": 74.83000000000001
+}

@@ -38,6 +38,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Verify UPTS schema parity
+        run: python3 scripts/verify_upts_schema_parity.py
+
       - name: Download Go dependencies
         run: go mod download
 

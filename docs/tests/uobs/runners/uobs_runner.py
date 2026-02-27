@@ -610,17 +610,17 @@ def run_observability_test(spec: Dict[str, Any], base_url: str) -> Observability
     elif test_type == "dependency":
         return run_dependency_test(spec, base_url)
     elif test_type == "logging":
-        # Logging tests require access to log output - skip for now
+        # Avoid false PASS for unimplemented logging validation.
         return ObservabilityTestResult(
             spec_name=spec["test"]["name"],
             test_type="logging",
-            total_checks=0,
+            total_checks=1,
             passed_checks=0,
-            failed_checks=0,
+            failed_checks=1,
             results=[CheckResult(
                 name="logging_test",
-                passed=True,
-                message="Logging tests require manual verification or log aggregation access",
+                passed=False,
+                message="Logging validation is not implemented in uobs_runner.py",
             )],
             end_time=datetime.now(),
         )

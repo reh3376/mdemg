@@ -1,0 +1,5437 @@
+{
+  "aggregate": {
+    "total_questions": 120,
+    "mean": 0.858,
+    "std": 0.217,
+    "cv_pct": 25.3,
+    "median": 0.918,
+    "min": 0.025,
+    "max": 1.0,
+    "p10": 0.793,
+    "p25": 0.888,
+    "p75": 0.943,
+    "p90": 0.971,
+    "high_score_rate": 0.933,
+    "evidence_rate": 0.933,
+    "evidence_accuracy_rate": 0.0,
+    "correct_file_rate": 0.825,
+    "by_difficulty": {
+      "hard": {
+        "count": 120,
+        "mean": 0.858,
+        "std": 0.217
+      }
+    },
+    "by_category": {
+      "architecture_structure": {
+        "count": 20,
+        "mean": 0.774,
+        "std": 0.294
+      },
+      "computed_value": {
+        "count": 6,
+        "mean": 0.972,
+        "std": 0.018
+      },
+      "cross_cutting_concerns": {
+        "count": 20,
+        "mean": 0.823,
+        "std": 0.274
+      },
+      "disambiguation": {
+        "count": 8,
+        "mean": 0.967,
+        "std": 0.029
+      },
+      "service_relationships": {
+        "count": 20,
+        "mean": 0.937,
+        "std": 0.027
+      },
+      "data_flow_integration": {
+        "count": 20,
+        "mean": 0.847,
+        "std": 0.201
+      },
+      "relationship": {
+        "count": 6,
+        "mean": 0.794,
+        "std": 0.352
+      },
+      "business_logic_constraints": {
+        "count": 20,
+        "mean": 0.846,
+        "std": 0.185
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": "379",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.46,
+        "concept": 0.386,
+        "citation_bonus": 0.1,
+        "final": 0.927
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-processing.processor.ts:287",
+          "safety-limits.service.ts:199",
+          "inventory-processing.processor.ts:295",
+          "inventory-processing.processor.ts:294",
+          "safety-limits.service.ts:199",
+          "inventory-processing.processor.ts:287",
+          "safety-limits.service.ts:199",
+          "inventory-processing.processor.ts:295",
+          "inventory-processing.processor.ts:294",
+          "safety-limits.service.ts:199"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.393,
+        "bigram": 0.121,
+        "trigram": 0.059,
+        "concept": 0.386,
+        "idf_weighted": 0.494
+      }
+    },
+    {
+      "id": "77",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.282,
+        "concept": 0.241,
+        "citation_bonus": 0.1,
+        "final": 0.878
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync-error-logger.service.ts:30",
+          "deviceSyncError.service.ts:13",
+          "device-sync-error-reprocessor.service.ts:33",
+          "device-sync-error-management.module.ts:1",
+          "enhanced-error-logger.service.ts:37",
+          "android-sync-error-logger.service.ts:30",
+          "deviceSyncError.service.ts:13",
+          "device-sync-error-reprocessor.service.ts:33",
+          "device-sync-error-management.module.ts:1",
+          "enhanced-error-logger.service.ts:37"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/device-sync-error-management.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.232,
+        "bigram": 0.053,
+        "trigram": 0.018,
+        "concept": 0.241,
+        "idf_weighted": 0.336
+      }
+    },
+    {
+      "id": "258",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.387,
+        "concept": 0.318,
+        "citation_bonus": 0.1,
+        "final": 0.906
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "groupTransaction.service.ts:1424",
+          "lotAudit.service.ts:185",
+          "groupTransaction.service.ts:1424",
+          "lotAudit.service.ts:185"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.315,
+        "bigram": 0.067,
+        "trigram": 0.033,
+        "concept": 0.318,
+        "idf_weighted": 0.485
+      }
+    },
+    {
+      "id": "450",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.184,
+        "concept": 0.155,
+        "citation_bonus": 0.1,
+        "final": 0.851
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "constants.ts:3",
+          "inventory-export-auth.guard.ts:28",
+          "api-key.guard.ts:15",
+          "api-key.guard.ts:12",
+          "inventory-export-auth.guard.ts:22",
+          "changelog.controller.ts:215",
+          "jwtSecretFactory.ts:4",
+          "jwt.strategy.ts:9",
+          "auth.module.ts:26",
+          "api-key.guard.ts:90",
+          "inventory-export-auth.guard.ts:156",
+          "changelog.controller.ts:227",
+          "api-key.guard.ts:95",
+          "jwtSecretFactory.ts:8",
+          "api-key.guard.ts:59",
+          "inventory-export-auth.guard.ts:48",
+          "api-key.guard.ts:68",
+          "constants.ts:3",
+          "inventory-export-auth.guard.ts:28",
+          "api-key.guard.ts:15",
+          "api-key.guard.ts:12",
+          "inventory-export-auth.guard.ts:22",
+          "changelog.controller.ts:215",
+          "jwtSecretFactory.ts:4",
+          "jwt.strategy.ts:9",
+          "auth.module.ts:26",
+          "api-key.guard.ts:90",
+          "inventory-export-auth.guard.ts:156",
+          "changelog.controller.ts:227",
+          "api-key.guard.ts:95",
+          "jwtSecretFactory.ts:8",
+          "api-key.guard.ts:59",
+          "inventory-export-auth.guard.ts:48",
+          "api-key.guard.ts:68"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/api-key.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/multi-strategy-auth.guard.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.163,
+        "bigram": 0.013,
+        "trigram": 0.0,
+        "concept": 0.155,
+        "idf_weighted": 0.245
+      }
+    },
+    {
+      "id": "424",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.425,
+        "concept": 0.363,
+        "citation_bonus": 0.1,
+        "final": 0.918
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "feature-flags.service.ts:20",
+          "flag-keys.constants.ts:8",
+          "mcp-feature-flag.guard.ts:16",
+          "mcp.controller.ts:20",
+          "feature-flags.module.ts:1",
+          "feature-flags.service.ts:20",
+          "flag-keys.constants.ts:8",
+          "mcp-feature-flag.guard.ts:16",
+          "mcp.controller.ts:20",
+          "feature-flags.module.ts:1"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/mcp/mcp-feature-flag.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.351,
+        "bigram": 0.066,
+        "trigram": 0.013,
+        "concept": 0.363,
+        "idf_weighted": 0.535
+      }
+    },
+    {
+      "id": "161",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.394,
+        "concept": 0.34,
+        "citation_bonus": 0.1,
+        "final": 0.91
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "context.service.ts:13",
+          "context.middlware.ts:12",
+          "audit-track.interceptor.ts:22",
+          "prisma.module.ts:16",
+          "context.service.ts:13",
+          "context.middlware.ts:12",
+          "audit-track.interceptor.ts:22",
+          "prisma.module.ts:16"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/context/context.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.342,
+        "bigram": 0.059,
+        "trigram": 0.015,
+        "concept": 0.34,
+        "idf_weighted": 0.477
+      }
+    },
+    {
+      "id": "270",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.565,
+        "concept": 0.414,
+        "citation_bonus": 0.1,
+        "final": 0.947
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "finance-report-templates.dto.ts:121",
+          "finance-report-templates.dto.ts:14",
+          "barrel-report-scheduler.service.ts:39",
+          "barrel-report-scheduler.service.ts:10",
+          "compliance-reporting.controller.ts:58",
+          "compliance-reporting.controller.ts:122",
+          "finance-report-templates.dto.ts:451",
+          "compliance-reporting.controller.ts:111",
+          "compliance-reporting.controller.ts:61",
+          "compliance-reporting.controller.ts:370",
+          "compliance-reporting.controller.ts:302",
+          "finance-report.processor.ts:14",
+          "finance-report-templates.dto.ts:163",
+          "barrel-report-scheduler.service.ts:14",
+          "finance-report.processor.ts:54",
+          "compliance-reporting.controller.ts:144",
+          "finance-report-templates.dto.ts:121",
+          "finance-report-templates.dto.ts:14",
+          "barrel-report-scheduler.service.ts:39",
+          "barrel-report-scheduler.service.ts:10",
+          "compliance-reporting.controller.ts:58",
+          "compliance-reporting.controller.ts:122",
+          "finance-report-templates.dto.ts:451",
+          "compliance-reporting.controller.ts:111",
+          "compliance-reporting.controller.ts:61",
+          "compliance-reporting.controller.ts:370",
+          "compliance-reporting.controller.ts:302",
+          "finance-report.processor.ts:14",
+          "finance-report-templates.dto.ts:163",
+          "barrel-report-scheduler.service.ts:14",
+          "finance-report.processor.ts:54",
+          "compliance-reporting.controller.ts:144"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/dto/finance-report-templates.dto.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.394,
+        "bigram": 0.196,
+        "trigram": 0.139,
+        "concept": 0.414,
+        "idf_weighted": 0.666
+      }
+    },
+    {
+      "id": "57",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.083,
+        "concept": 0.096,
+        "citation_bonus": 0.0,
+        "final": 0.027
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/scheduler/scheduler.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/finance.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/notification/weekly-barrel-report.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.089,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.096,
+        "idf_weighted": 0.067
+      }
+    },
+    {
+      "id": "172",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.419,
+        "concept": 0.369,
+        "citation_bonus": 0.1,
+        "final": 0.918
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "reconciliation.service.ts:186",
+          "reconciliation.service.ts:190",
+          "reconciliation.service.ts:228",
+          "reconciliation.service.ts:248",
+          "reconciliation.service.ts:277",
+          "reconciliation.service.ts:293",
+          "reconciliation.service.ts:186",
+          "reconciliation.service.ts:190",
+          "reconciliation.service.ts:228",
+          "reconciliation.service.ts:248",
+          "reconciliation.service.ts:277",
+          "reconciliation.service.ts:293"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.398,
+        "bigram": 0.056,
+        "trigram": 0.0,
+        "concept": 0.369,
+        "idf_weighted": 0.487
+      }
+    },
+    {
+      "id": "251",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.2,
+        "concept": 0.177,
+        "citation_bonus": 0.0,
+        "final": 0.757
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "audit-track.interceptor.ts:92",
+          "audit-track.interceptor.ts:112",
+          "audit-track.interceptor.ts:279",
+          "audit-track.interceptor.ts:348",
+          "audit.service.ts:1235",
+          "audit.service.ts:1254",
+          "audit.service.ts:1302",
+          "audit.service.ts:1364",
+          "audit.service.ts:1428",
+          "audit.service.ts:688",
+          "audit.service.ts:179",
+          "audit.service.ts:1457",
+          "audit-track.interceptor.ts:92",
+          "audit-track.interceptor.ts:112",
+          "audit-track.interceptor.ts:279",
+          "audit-track.interceptor.ts:348",
+          "audit.service.ts:1235",
+          "audit.service.ts:1254",
+          "audit.service.ts:1302",
+          "audit.service.ts:1364",
+          "audit.service.ts:1428",
+          "audit.service.ts:688",
+          "audit.service.ts:179",
+          "audit.service.ts:1457"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.176,
+        "bigram": 0.038,
+        "trigram": 0.01,
+        "concept": 0.177,
+        "idf_weighted": 0.224
+      }
+    },
+    {
+      "id": "31",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.445,
+        "concept": 0.377,
+        "citation_bonus": 0.1,
+        "final": 0.923
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "FilterPersistenceBridge.tsx:1",
+          "FilterPresets.tsx:10",
+          "FilterPresets.tsx:11",
+          "FilterPersistenceBridge.tsx:7",
+          "FilterPresets.tsx:80",
+          "FilterPresets.tsx:80",
+          "FilterPresets.tsx:34",
+          "ResponsiveFilterBar.tsx:72",
+          "ResponsiveFilterBar.tsx:9",
+          "FilterDrawer.tsx:28",
+          "ResponsiveFilterBar.tsx:67",
+          "FilterButton.tsx:22",
+          "useActiveFilters.ts:14",
+          "useActiveFilters.ts:14",
+          "FilterButton.tsx:22",
+          "FilterStatusDisplay.tsx:202",
+          "FilterPersistenceBridge.tsx:1",
+          "FilterPresets.tsx:10",
+          "FilterPresets.tsx:11",
+          "FilterPersistenceBridge.tsx:7",
+          "FilterPresets.tsx:80",
+          "FilterPresets.tsx:80",
+          "FilterPresets.tsx:34",
+          "ResponsiveFilterBar.tsx:72",
+          "ResponsiveFilterBar.tsx:9",
+          "FilterDrawer.tsx:28",
+          "ResponsiveFilterBar.tsx:67",
+          "FilterButton.tsx:22",
+          "useActiveFilters.ts:14",
+          "useActiveFilters.ts:14",
+          "FilterButton.tsx:22",
+          "FilterStatusDisplay.tsx:202"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/filters/ResponsiveFilterBar/index.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/FilterPersistenceBridge.tsx"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.366,
+        "bigram": 0.047,
+        "trigram": 0.0,
+        "concept": 0.377,
+        "idf_weighted": 0.595
+      }
+    },
+    {
+      "id": "69",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.398,
+        "concept": 0.327,
+        "citation_bonus": 0.1,
+        "final": 0.909
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "secretsManager.service.base.ts:1",
+          "secretsManager.service.ts:1",
+          "secretsManager.module.ts:1",
+          "secretsManager.service.base.ts:9",
+          "app.module.ts:134",
+          "azure-ad.service.ts:51",
+          "azure-ad.service.ts:58",
+          "secretsManager.service.base.ts:1",
+          "secretsManager.service.ts:1",
+          "secretsManager.module.ts:1",
+          "secretsManager.service.base.ts:9",
+          "app.module.ts:134",
+          "azure-ad.service.ts:51",
+          "azure-ad.service.ts:58"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/secrets/secretsManager.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/secrets/base/secretsManager.service.base.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.35,
+        "bigram": 0.092,
+        "trigram": 0.026,
+        "concept": 0.327,
+        "idf_weighted": 0.461
+      }
+    },
+    {
+      "id": "262",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.324,
+        "concept": 0.294,
+        "citation_bonus": 0.0,
+        "final": 0.793
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel.service.ts:1027",
+          "barrel.service.ts:3148",
+          "barrel.service.ts:1047",
+          "barrel.service.ts:1098",
+          "barrel.controller.ts:848",
+          "barrel.service.ts:1034",
+          "barrel.service.ts:1027",
+          "barrel.service.ts:3148",
+          "barrel.service.ts:1047",
+          "barrel.service.ts:1098",
+          "barrel.controller.ts:848",
+          "barrel.service.ts:1034"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/migrations/20250626000010_fix_barrel_lot_relationship/migration.sql",
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.288,
+        "bigram": 0.05,
+        "trigram": 0.0,
+        "concept": 0.294,
+        "idf_weighted": 0.372
+      }
+    },
+    {
+      "id": "277",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.482,
+        "concept": 0.4,
+        "citation_bonus": 0.0,
+        "final": 0.832
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "aggregated-storage-entries.service.ts:56",
+          "aggregated-storage-entries.resolver.ts:71",
+          "aggregated-storage-entries.service.ts:79",
+          "aggregated-storage-entries.service.ts:183",
+          "aggregated-storage-entries.service.ts:344",
+          "aggregated-storage-entries.service.ts:397",
+          "aggregated-storage-entries.service.ts:362",
+          "aggregated-storage-entries.service.ts:502",
+          "aggregated-storage-entry.dto.ts:17",
+          "aggregated-storage-entries.service.ts:73",
+          "aggregated-storage-entries.service.ts:56",
+          "aggregated-storage-entries.resolver.ts:71",
+          "aggregated-storage-entries.service.ts:79",
+          "aggregated-storage-entries.service.ts:183",
+          "aggregated-storage-entries.service.ts:344",
+          "aggregated-storage-entries.service.ts:397",
+          "aggregated-storage-entries.service.ts:362",
+          "aggregated-storage-entries.service.ts:502",
+          "aggregated-storage-entry.dto.ts:17",
+          "aggregated-storage-entries.service.ts:73"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/aggregatedStorageEntries/dto/aggregated-storage-entries-response.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/aggregatedStorageEntries/dto/breakdown.dto.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.375,
+        "bigram": 0.123,
+        "trigram": 0.046,
+        "concept": 0.4,
+        "idf_weighted": 0.566
+      }
+    },
+    {
+      "id": "336",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.18,
+        "concept": 0.174,
+        "citation_bonus": 0.1,
+        "final": 0.853
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "location-string.util.ts:8",
+          "location-string.util.ts:13",
+          "location-string.util.ts:51",
+          "location-string.util.ts:86",
+          "storageLocation.service.ts:20",
+          "barrelEvent.service.ts:553",
+          "location-string.util.ts:8",
+          "location-string.util.ts:13",
+          "location-string.util.ts:51",
+          "location-string.util.ts:86",
+          "storageLocation.service.ts:20",
+          "barrelEvent.service.ts:553"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/location-string.util.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.176,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.174,
+        "idf_weighted": 0.207
+      }
+    },
+    {
+      "id": "438",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.543,
+        "concept": 0.48,
+        "citation_bonus": 0.1,
+        "final": 0.953
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "public.decorator.ts:1",
+          "defaultAuth.guard.ts:42",
+          "main.ts:295",
+          "swagger.ts:5",
+          "barrel.controller.ts:71",
+          "public.decorator.ts:1",
+          "defaultAuth.guard.ts:42",
+          "main.ts:295",
+          "swagger.ts:5",
+          "barrel.controller.ts:71"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/decorators/public.decorator.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/defaultAuth.guard.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.474,
+        "bigram": 0.072,
+        "trigram": 0.007,
+        "concept": 0.48,
+        "idf_weighted": 0.658
+      }
+    },
+    {
+      "id": "391",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.403,
+        "concept": 0.34,
+        "citation_bonus": 0.0,
+        "final": 0.811
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel.service.ts:1027",
+          "barrel.service.ts:1047",
+          "barrel.service.ts:1098",
+          "barrel.service.ts:1123",
+          "barrel.service.ts:1240",
+          "barrel.service.ts:1261",
+          "barrel.service.ts:1027",
+          "barrel.service.ts:1047",
+          "barrel.service.ts:1098",
+          "barrel.service.ts:1123",
+          "barrel.service.ts:1240",
+          "barrel.service.ts:1261"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.resolver.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.365,
+        "bigram": 0.048,
+        "trigram": 0.008,
+        "concept": 0.34,
+        "idf_weighted": 0.505
+      }
+    },
+    {
+      "id": "183",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.682,
+        "concept": 0.548,
+        "citation_bonus": 0.1,
+        "final": 0.985
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-upload.service.ts:515",
+          "inventory-upload.service.ts:30",
+          "inventory-upload.service.ts:515",
+          "inventory-upload.service.ts:30"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-upload.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-upload.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.535,
+        "bigram": 0.195,
+        "trigram": 0.063,
+        "concept": 0.548,
+        "idf_weighted": 0.81
+      }
+    },
+    {
+      "id": "189",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.627,
+        "concept": 0.513,
+        "citation_bonus": 0.1,
+        "final": 0.971
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "audit.service.ts:259",
+          "audit.service.ts:1574",
+          "audit.service.ts:259",
+          "audit.service.ts:1574"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.5,
+        "bigram": 0.138,
+        "trigram": 0.043,
+        "concept": 0.513,
+        "idf_weighted": 0.775
+      }
+    },
+    {
+      "id": "1",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.378,
+        "concept": 0.318,
+        "citation_bonus": 0.1,
+        "final": 0.904
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel.module.ts:16",
+          "barrel.resolver.ts:103",
+          "barrelOwnership.resolver.ts:21",
+          "lotVariation.module.ts:10",
+          "user.module.ts:9",
+          "barrel.module.ts:18",
+          "barrel.module.ts:16",
+          "barrel.resolver.ts:103",
+          "barrelOwnership.resolver.ts:21",
+          "lotVariation.module.ts:10",
+          "user.module.ts:9",
+          "barrel.module.ts:18"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.316,
+        "bigram": 0.058,
+        "trigram": 0.0,
+        "concept": 0.318,
+        "idf_weighted": 0.49
+      }
+    },
+    {
+      "id": "374",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.374,
+        "concept": 0.32,
+        "citation_bonus": 0.1,
+        "final": 0.904
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-processing.service.ts:559",
+          "inventory-processing.service.ts:628",
+          "inventory-processing.service.ts:789",
+          "inventory-processing.processor.ts:278",
+          "inventory-processing.service.ts:559",
+          "inventory-processing.service.ts:628",
+          "inventory-processing.service.ts:789",
+          "inventory-processing.processor.ts:278"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.322,
+        "bigram": 0.07,
+        "trigram": 0.017,
+        "concept": 0.32,
+        "idf_weighted": 0.443
+      }
+    },
+    {
+      "id": "436",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.416,
+        "concept": 0.369,
+        "citation_bonus": 0.1,
+        "final": 0.918
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "feature-flags.service.ts:21",
+          "feature-flags.service.ts:59",
+          "feature-flags.service.ts:43",
+          "feature-flags.service.ts:21",
+          "feature-flags.service.ts:59",
+          "feature-flags.service.ts:43"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.367,
+        "bigram": 0.075,
+        "trigram": 0.007,
+        "concept": 0.369,
+        "idf_weighted": 0.478
+      }
+    },
+    {
+      "id": "220",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.429,
+        "concept": 0.353,
+        "citation_bonus": 0.1,
+        "final": 0.917
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "reconciliation.types.ts:9",
+          "reconciliation.types.ts:9",
+          "groupTransaction.service.ts:628",
+          "reconciliation.service.ts:186",
+          "reconciliation.service.ts:587",
+          "reconciliation.service.ts:198",
+          "reconciliation.service.ts:199",
+          "reconciliation.service.ts:206",
+          "reconciliation.service.ts:1376",
+          "reconciliation.service.ts:655",
+          "reconciliation.types.ts:9",
+          "reconciliation.types.ts:9",
+          "groupTransaction.service.ts:628",
+          "reconciliation.service.ts:186",
+          "reconciliation.service.ts:587",
+          "reconciliation.service.ts:198",
+          "reconciliation.service.ts:199",
+          "reconciliation.service.ts:206",
+          "reconciliation.service.ts:1376",
+          "reconciliation.service.ts:655"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.378,
+        "bigram": 0.076,
+        "trigram": 0.0,
+        "concept": 0.353,
+        "idf_weighted": 0.541
+      }
+    },
+    {
+      "id": "98",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.331,
+        "concept": 0.289,
+        "citation_bonus": 0.1,
+        "final": 0.893
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "deviceSyncLog.service.ts:23",
+          "DeviceSyncLog.ts:13",
+          "EnumDeviceSyncLogStatus.ts:3",
+          "deviceSyncLog.controller.base.ts:40",
+          "android-sync-inbox.controller.ts:87",
+          "android-sync-inbox.controller.ts:539",
+          "android-sync-inbox.controller.ts:205",
+          "android-sync-inbox.controller.ts:296",
+          "android-sync-inbox.controller.ts:141",
+          "deviceSyncLog.module.ts:9",
+          "deviceSyncLog.service.ts:23",
+          "DeviceSyncLog.ts:13",
+          "EnumDeviceSyncLogStatus.ts:3",
+          "deviceSyncLog.controller.base.ts:40",
+          "android-sync-inbox.controller.ts:87",
+          "android-sync-inbox.controller.ts:539",
+          "android-sync-inbox.controller.ts:205",
+          "android-sync-inbox.controller.ts:296",
+          "android-sync-inbox.controller.ts:141",
+          "deviceSyncLog.module.ts:9"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncLog/deviceSyncLog.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/deviceSyncError/deviceSyncError.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.28,
+        "bigram": 0.04,
+        "trigram": 0.0,
+        "concept": 0.289,
+        "idf_weighted": 0.42
+      }
+    },
+    {
+      "id": "404",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.477,
+        "concept": 0.415,
+        "citation_bonus": 0.1,
+        "final": 0.934
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "vendor.resolver.base.ts:23",
+          "defaultAuth.guard.ts:10",
+          "vendor.resolver.base.ts:31",
+          "vendor.resolver.base.ts:62",
+          "gqlAC.guard.ts:7",
+          "aclValidateRequest.interceptor.ts:20",
+          "vendor.resolver.base.ts:74",
+          "aclFilterResponse.interceptor.ts:19",
+          "vendor.resolver.base.ts:46",
+          "defaultAuth.guard.ts:84",
+          "vendor.resolver.base.ts:48",
+          "vendor.resolver.base.ts:23",
+          "defaultAuth.guard.ts:10",
+          "vendor.resolver.base.ts:31",
+          "vendor.resolver.base.ts:62",
+          "gqlAC.guard.ts:7",
+          "aclValidateRequest.interceptor.ts:20",
+          "vendor.resolver.base.ts:74",
+          "aclFilterResponse.interceptor.ts:19",
+          "vendor.resolver.base.ts:46",
+          "defaultAuth.guard.ts:84",
+          "vendor.resolver.base.ts:48"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/roles.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/roles.decorator.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/gqlAC.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/abac.util.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/interceptors/aclFilterResponse.interceptor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.406,
+        "bigram": 0.072,
+        "trigram": 0.033,
+        "concept": 0.415,
+        "idf_weighted": 0.567
+      }
+    },
+    {
+      "id": "466",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.252,
+        "concept": 0.217,
+        "citation_bonus": 0.1,
+        "final": 0.87
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "timeout.decorator.ts:9",
+          "timeout.interceptor.ts:17",
+          "inventory-upload.controller.ts:557",
+          "inventory-upload.controller.ts:464",
+          "printer-automation.resolver.ts:468",
+          "inventory-upload.controller.ts:558",
+          "printer-automation.resolver.ts:57",
+          "timeout.decorator.ts:9",
+          "timeout.interceptor.ts:17",
+          "inventory-upload.controller.ts:557",
+          "inventory-upload.controller.ts:464",
+          "printer-automation.resolver.ts:468",
+          "inventory-upload.controller.ts:558",
+          "printer-automation.resolver.ts:57"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/interceptors/timeout.interceptor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.213,
+        "bigram": 0.012,
+        "trigram": 0.0,
+        "concept": 0.217,
+        "idf_weighted": 0.342
+      }
+    },
+    {
+      "id": "60",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.305,
+        "concept": 0.268,
+        "citation_bonus": 0.0,
+        "final": 0.786
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "BulkOwnershipWizard.tsx:93",
+          "BulkOwnershipWizard.tsx:109",
+          "BulkOwnershipWizard.tsx:78",
+          "BulkOwnershipWizard.tsx:168",
+          "BulkOwnershipWizard.tsx:297",
+          "BulkOwnershipWizard.tsx:200",
+          "BulkBarrelSelectionStep.tsx:28",
+          "BulkOperationConfigStep.tsx:50",
+          "BulkBarrelSelectionStep.tsx:34",
+          "BulkOwnershipWizard.tsx:164",
+          "BulkBarrelSelectionStep.tsx:206",
+          "BulkOwnershipWizard.tsx:200",
+          "BulkOwnershipWizard.tsx:186",
+          "BulkOwnershipWizard.tsx:360",
+          "BulkOwnershipWizard.tsx:93",
+          "BulkOwnershipWizard.tsx:109",
+          "BulkOwnershipWizard.tsx:78",
+          "BulkOwnershipWizard.tsx:168",
+          "BulkOwnershipWizard.tsx:297",
+          "BulkOwnershipWizard.tsx:200",
+          "BulkBarrelSelectionStep.tsx:28",
+          "BulkOperationConfigStep.tsx:50",
+          "BulkBarrelSelectionStep.tsx:34",
+          "BulkOwnershipWizard.tsx:164",
+          "BulkBarrelSelectionStep.tsx:206",
+          "BulkOwnershipWizard.tsx:200",
+          "BulkOwnershipWizard.tsx:186",
+          "BulkOwnershipWizard.tsx:360"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/bulk-operations/index.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/bulk-operations/wizard-steps/index.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.278,
+        "bigram": 0.038,
+        "trigram": 0.023,
+        "concept": 0.268,
+        "idf_weighted": 0.351
+      }
+    },
+    {
+      "id": "481",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.371,
+        "concept": 0.31,
+        "citation_bonus": 0.1,
+        "final": 0.902
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "resolution.service.ts:672",
+          "resolution.service.ts:855",
+          "resolution.service.ts:877",
+          "resolution.service.ts:178",
+          "reconciliation.service.ts:321",
+          "resolution.service.ts:672",
+          "resolution.service.ts:855",
+          "resolution.service.ts:877",
+          "resolution.service.ts:178",
+          "reconciliation.service.ts:321"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.331,
+        "bigram": 0.091,
+        "trigram": 0.029,
+        "concept": 0.31,
+        "idf_weighted": 0.412
+      }
+    },
+    {
+      "id": "448",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.278,
+        "concept": 0.23,
+        "citation_bonus": 0.1,
+        "final": 0.876
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "audit.service.ts:1456",
+          "audit.service.ts:259",
+          "audit.service.ts:2238",
+          "audit.service.ts:2223",
+          "audit.service.ts:1481",
+          "audit.service.ts:1254",
+          "audit.service.ts:1456",
+          "audit.service.ts:259",
+          "audit.service.ts:2238",
+          "audit.service.ts:2223",
+          "audit.service.ts:1481",
+          "audit.service.ts:1254"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.266,
+        "bigram": 0.02,
+        "trigram": 0.0,
+        "concept": 0.23,
+        "idf_weighted": 0.362
+      }
+    },
+    {
+      "id": "188",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.5,
+        "concept": 0.372,
+        "citation_bonus": 0.1,
+        "final": 0.931
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:149",
+          "barrelEvent.service.ts:147",
+          "location-string.util.ts:13",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:149",
+          "barrelEvent.service.ts:149",
+          "barrelEvent.service.ts:147",
+          "location-string.util.ts:13",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:149"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.407,
+        "bigram": 0.168,
+        "trigram": 0.078,
+        "concept": 0.372,
+        "idf_weighted": 0.577
+      }
+    },
+    {
+      "id": "265",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.252,
+        "concept": 0.215,
+        "citation_bonus": 0.1,
+        "final": 0.87
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "changelog-sync.service.ts:97",
+          "changelog-sync.service.ts:71",
+          "changelog-sync.service.ts:282",
+          "changelog.service.ts:100",
+          "changelog.service.ts:100",
+          "changelog.dto.ts:65",
+          "changelog-ai.service.ts:115",
+          "changelog-ai.service.ts:127",
+          "changelog-sync.service.ts:157",
+          "changelog-sync.service.ts:157",
+          "changelog.service.ts:23",
+          "changelog.service.ts:23",
+          "changelog-sync.service.ts:97",
+          "changelog-sync.service.ts:71",
+          "changelog-sync.service.ts:282",
+          "changelog.service.ts:100",
+          "changelog.service.ts:100",
+          "changelog.dto.ts:65",
+          "changelog-ai.service.ts:115",
+          "changelog-ai.service.ts:127",
+          "changelog-sync.service.ts:157",
+          "changelog-sync.service.ts:157",
+          "changelog.service.ts:23",
+          "changelog.service.ts:23"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/changelog/dto/changelog.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.21,
+        "bigram": 0.029,
+        "trigram": 0.01,
+        "concept": 0.215,
+        "idf_weighted": 0.322
+      }
+    },
+    {
+      "id": "454",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.393,
+        "concept": 0.344,
+        "citation_bonus": 0.1,
+        "final": 0.911
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "context.middlware.ts:22",
+          "context.middlware.ts:22",
+          "context.service.ts:14",
+          "context.service.ts:14",
+          "context.service.ts:35",
+          "context.middlware.ts:41",
+          "context.middlware.ts:41",
+          "audit-track.interceptor.ts:72",
+          "audit-track.interceptor.ts:72",
+          "audit-track.interceptor.ts:377",
+          "audit-track.interceptor.ts:377",
+          "audit.service.ts:1250",
+          "audit.service.ts:1250",
+          "session-audit-tracker.service.ts:57",
+          "session-audit-tracker.service.ts:57",
+          "audit.service.ts:543",
+          "audit.service.ts:543",
+          "audit.service.ts:205",
+          "audit.service.ts:205",
+          "context.middlware.ts:22",
+          "context.middlware.ts:22",
+          "context.service.ts:14",
+          "context.service.ts:14",
+          "context.service.ts:35",
+          "context.middlware.ts:41",
+          "context.middlware.ts:41",
+          "audit-track.interceptor.ts:72",
+          "audit-track.interceptor.ts:72",
+          "audit-track.interceptor.ts:377",
+          "audit-track.interceptor.ts:377",
+          "audit.service.ts:1250",
+          "audit.service.ts:1250",
+          "session-audit-tracker.service.ts:57",
+          "session-audit-tracker.service.ts:57",
+          "audit.service.ts:543",
+          "audit.service.ts:543",
+          "audit.service.ts:205",
+          "audit.service.ts:205"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/context/context.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.34,
+        "bigram": 0.082,
+        "trigram": 0.007,
+        "concept": 0.344,
+        "idf_weighted": 0.45
+      }
+    },
+    {
+      "id": "249",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.409,
+        "concept": 0.345,
+        "citation_bonus": 0.0,
+        "final": 0.813
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "sampleType/base/SampleType.ts:98",
+          "data-generators.ts:887",
+          "data-generators.ts:887",
+          "data-generators.ts:909",
+          "data-generators.ts:909",
+          "SampleType.ts:17",
+          "sampleType/base/SampleType.ts:98",
+          "data-generators.ts:887",
+          "data-generators.ts:887",
+          "data-generators.ts:909",
+          "data-generators.ts:909",
+          "SampleType.ts:17"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.34,
+        "bigram": 0.088,
+        "trigram": 0.009,
+        "concept": 0.345,
+        "idf_weighted": 0.497
+      }
+    },
+    {
+      "id": "66",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.401,
+        "concept": 0.318,
+        "citation_bonus": 0.1,
+        "final": 0.908
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "main.ts:52",
+          "main.ts:52",
+          "main.ts:202",
+          "app.module.ts:291",
+          "app.module.ts:291",
+          "pubsub.provider.ts:1",
+          "pubsub.provider.ts:31",
+          "pubsub.provider.ts:38",
+          "pubsub.provider.ts:45",
+          "pubsub.provider.ts:119",
+          "progress.gateway.ts:22",
+          "progress.gateway.ts:22",
+          "progress.gateway.ts:48",
+          "progress.gateway.ts:48",
+          "progress.gateway.ts:126",
+          "progress.gateway.ts:126",
+          "progress.gateway.ts:282",
+          "progress.gateway.ts:282",
+          "progress.gateway.ts:105",
+          "progress.gateway.ts:105",
+          "pubsub.provider.ts:149",
+          "pubsub.provider.ts:149",
+          "main.ts:52",
+          "main.ts:52",
+          "main.ts:202",
+          "app.module.ts:291",
+          "app.module.ts:291",
+          "pubsub.provider.ts:1",
+          "pubsub.provider.ts:31",
+          "pubsub.provider.ts:38",
+          "pubsub.provider.ts:45",
+          "pubsub.provider.ts:119",
+          "progress.gateway.ts:22",
+          "progress.gateway.ts:22",
+          "progress.gateway.ts:48",
+          "progress.gateway.ts:48",
+          "progress.gateway.ts:126",
+          "progress.gateway.ts:126",
+          "progress.gateway.ts:282",
+          "progress.gateway.ts:282",
+          "progress.gateway.ts:105",
+          "progress.gateway.ts:105",
+          "pubsub.provider.ts:149",
+          "pubsub.provider.ts:149"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/app.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/pubsub/pubsub.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.334,
+        "bigram": 0.075,
+        "trigram": 0.018,
+        "concept": 0.318,
+        "idf_weighted": 0.522
+      }
+    },
+    {
+      "id": "353",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.376,
+        "concept": 0.36,
+        "citation_bonus": 0.1,
+        "final": 0.91
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:453",
+          "barrelEvent.service.ts:1731",
+          "barrelEvent.service.ts:1778",
+          "barrel.exceptions.ts:246",
+          "barrelEvent.service.ts:644",
+          "barrelEvent.service.ts:812",
+          "barrel.exceptions.ts:244",
+          "inventory-check-staging.processor.ts:834",
+          "barrelEvent.service.ts:453",
+          "barrelEvent.service.ts:1731",
+          "barrelEvent.service.ts:1778",
+          "barrel.exceptions.ts:246",
+          "barrelEvent.service.ts:644",
+          "barrelEvent.service.ts:812",
+          "barrel.exceptions.ts:244",
+          "inventory-check-staging.processor.ts:834"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.311,
+        "bigram": 0.024,
+        "trigram": 0.0,
+        "concept": 0.36,
+        "idf_weighted": 0.456
+      }
+    },
+    {
+      "id": "263",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.414,
+        "concept": 0.346,
+        "citation_bonus": 0.1,
+        "final": 0.914
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "trust-mode-config.dto.ts:4",
+          "trust-mode-config.service.ts:1",
+          "inventory-upload.controller.ts:423",
+          "android-sync.processor.ts:309",
+          "trust-mode-config.service.ts:155",
+          "trust-mode-config.service.ts:155",
+          "trust-mode-processing.service.ts:46",
+          "micro-batch-orchestrator.service.ts:165",
+          "inventory-upload.controller.ts:456",
+          "trust-mode-config.dto.ts:4",
+          "trust-mode-config.service.ts:1",
+          "inventory-upload.controller.ts:423",
+          "android-sync.processor.ts:309",
+          "trust-mode-config.service.ts:155",
+          "trust-mode-config.service.ts:155",
+          "trust-mode-processing.service.ts:46",
+          "micro-batch-orchestrator.service.ts:165",
+          "inventory-upload.controller.ts:456"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/trust-mode/dto/trust-mode-config.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/data-validation.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.339,
+        "bigram": 0.101,
+        "trigram": 0.036,
+        "concept": 0.346,
+        "idf_weighted": 0.476
+      }
+    },
+    {
+      "id": "206",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.477,
+        "concept": 0.362,
+        "citation_bonus": 0.1,
+        "final": 0.926
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel.exceptions.ts:92",
+          "barrel.service.ts:155",
+          "barrel.service.ts:571",
+          "barrel.service.ts:849",
+          "barrel.service.ts:290",
+          "barrel.service.ts:316",
+          "barrel.service.ts:80",
+          "barrel.location-constraint.spec.ts:13",
+          "barrel.exceptions.ts:92",
+          "barrel.service.ts:155",
+          "barrel.service.ts:571",
+          "barrel.service.ts:849",
+          "barrel.service.ts:290",
+          "barrel.service.ts:316",
+          "barrel.service.ts:80",
+          "barrel.location-constraint.spec.ts:13"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/errorExceptions/barrel.exceptions.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.357,
+        "bigram": 0.167,
+        "trigram": 0.122,
+        "concept": 0.362,
+        "idf_weighted": 0.521
+      }
+    },
+    {
+      "id": "211",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.513,
+        "concept": 0.415,
+        "citation_bonus": 0.1,
+        "final": 0.939
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync-inbox.service.ts:40",
+          "android-sync-inbox.service.ts:18",
+          "android-sync-inbox.listener.ts:45",
+          "android-sync-inbox.listener.ts:49",
+          "android-sync-inbox.listener.ts:59",
+          "android-sync-inbox.listener.ts:1220",
+          "android-sync-inbox.service.ts:154",
+          "android-sync-inbox.service.ts:40",
+          "android-sync-inbox.service.ts:18",
+          "android-sync-inbox.listener.ts:45",
+          "android-sync-inbox.listener.ts:49",
+          "android-sync-inbox.listener.ts:59",
+          "android-sync-inbox.listener.ts:1220",
+          "android-sync-inbox.service.ts:154"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.416,
+        "bigram": 0.114,
+        "trigram": 0.023,
+        "concept": 0.415,
+        "idf_weighted": 0.646
+      }
+    },
+    {
+      "id": "383",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.468,
+        "concept": 0.368,
+        "citation_bonus": 0.1,
+        "final": 0.925
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:1930",
+          "barrelEvent.service.ts:1953",
+          "inventory-check-staging.service.ts:88",
+          "lotVariation.service.ts:24",
+          "lotVariation.service.ts:41",
+          "lotVariation.service.ts:48",
+          "barrelEvent.service.ts:1959",
+          "inventory-check-staging.service.ts:37",
+          "cached-lot-variation.service.ts:27",
+          "cached-lot-variation.service.ts:42",
+          "barrelEvent.service.ts:1953",
+          "lotVariation.service.ts:35",
+          "barrelEvent.service.ts:1930",
+          "barrelEvent.service.ts:1953",
+          "inventory-check-staging.service.ts:88",
+          "lotVariation.service.ts:24",
+          "lotVariation.service.ts:41",
+          "lotVariation.service.ts:48",
+          "barrelEvent.service.ts:1959",
+          "inventory-check-staging.service.ts:37",
+          "cached-lot-variation.service.ts:27",
+          "cached-lot-variation.service.ts:42",
+          "barrelEvent.service.ts:1953",
+          "lotVariation.service.ts:35"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/lotVariation/lotVariation.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.411,
+        "bigram": 0.069,
+        "trigram": 0.022,
+        "concept": 0.368,
+        "idf_weighted": 0.615
+      }
+    },
+    {
+      "id": "173",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.455,
+        "concept": 0.384,
+        "citation_bonus": 0.1,
+        "final": 0.926
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync.processor.ts:62",
+          "android-sync.processor.ts:77",
+          "android-sync.processor.ts:100",
+          "cached-storage-location.service.ts:242",
+          "cached-storage-location.service.ts:44",
+          "android-sync.processor.ts:57",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:1706",
+          "barrelEvent.service.ts:582",
+          "barrelEvent.service.ts:1762",
+          "cached-storage-location.service.ts:40",
+          "cached-storage-location.service.ts:377",
+          "cached-storage-location.service.ts:64",
+          "cached-storage-location.service.ts:420",
+          "android-sync.processor.ts:62",
+          "android-sync.processor.ts:77",
+          "android-sync.processor.ts:100",
+          "cached-storage-location.service.ts:242",
+          "cached-storage-location.service.ts:44",
+          "android-sync.processor.ts:57",
+          "barrelEvent.service.ts:554",
+          "barrelEvent.service.ts:1706",
+          "barrelEvent.service.ts:582",
+          "barrelEvent.service.ts:1762",
+          "cached-storage-location.service.ts:40",
+          "cached-storage-location.service.ts:377",
+          "cached-storage-location.service.ts:64",
+          "cached-storage-location.service.ts:420"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/storageLocation/cached-storage-location.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.356,
+        "bigram": 0.096,
+        "trigram": 0.016,
+        "concept": 0.384,
+        "idf_weighted": 0.568
+      }
+    },
+    {
+      "id": "253",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.529,
+        "concept": 0.426,
+        "citation_bonus": 0.1,
+        "final": 0.943
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "resolution.service.ts:913",
+          "resolution.service.ts:927",
+          "resolution.service.ts:940",
+          "barrel-matching.service.ts:87",
+          "resolution.service.ts:1107",
+          "barrel-matching.service.ts:70",
+          "barrel-matching.service.ts:1383",
+          "barrel-matching.service.ts:1480",
+          "barrel-matching.service.ts:1615",
+          "barrel-matching.service.ts:735",
+          "barrel-matching.service.ts:855",
+          "barrel-matching.service.ts:928",
+          "resolution.service.ts:1005",
+          "resolution.service.ts:1039",
+          "resolution.service.ts:922",
+          "resolution.service.ts:913",
+          "resolution.service.ts:927",
+          "resolution.service.ts:940",
+          "barrel-matching.service.ts:87",
+          "resolution.service.ts:1107",
+          "barrel-matching.service.ts:70",
+          "barrel-matching.service.ts:1383",
+          "barrel-matching.service.ts:1480",
+          "barrel-matching.service.ts:1615",
+          "barrel-matching.service.ts:735",
+          "barrel-matching.service.ts:855",
+          "barrel-matching.service.ts:928",
+          "resolution.service.ts:1005",
+          "resolution.service.ts:1039",
+          "resolution.service.ts:922"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/predict-next-9xxx-serial.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/suggest-serial-number.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/prediction-weights.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/barrelMatching/barrel-matching.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.42,
+        "bigram": 0.106,
+        "trigram": 0.045,
+        "concept": 0.426,
+        "idf_weighted": 0.671
+      }
+    },
+    {
+      "id": "308",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.541,
+        "concept": 0.445,
+        "citation_bonus": 0.1,
+        "final": 0.948
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "pubsub.provider.ts:1",
+          "comment.resolver.ts:47",
+          "comment.resolver.ts:304",
+          "comment.resolver.ts:384",
+          "comment.resolver.ts:443",
+          "comment.resolver.ts:540",
+          "comment.resolver.ts:542",
+          "pubsub.provider.ts:119",
+          "pubsub.provider.ts:1",
+          "comment.resolver.ts:47",
+          "comment.resolver.ts:304",
+          "comment.resolver.ts:384",
+          "comment.resolver.ts:443",
+          "comment.resolver.ts:540",
+          "comment.resolver.ts:542",
+          "pubsub.provider.ts:119"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/comments/comment.resolver.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/common/pubsub.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.383,
+        "bigram": 0.142,
+        "trigram": 0.071,
+        "concept": 0.445,
+        "idf_weighted": 0.652
+      }
+    },
+    {
+      "id": "33",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.402,
+        "concept": 0.334,
+        "citation_bonus": 0.1,
+        "final": 0.91
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel-advanced-where.input.ts:266",
+          "barrel.resolver.ts:999",
+          "advanced-where-transform.util.ts:68",
+          "barrel.resolver.ts:635",
+          "barrel.resolver.ts:1224",
+          "barrel.resolver.ts:122",
+          "barrel.resolver.ts:658",
+          "barrel-advanced-where.input.ts:266",
+          "barrel.resolver.ts:999",
+          "advanced-where-transform.util.ts:68",
+          "barrel.resolver.ts:635",
+          "barrel.resolver.ts:1224",
+          "barrel.resolver.ts:122",
+          "barrel.resolver.ts:658"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.resolver.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/lib/graphql/barrel-queries.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.32,
+        "bigram": 0.069,
+        "trigram": 0.03,
+        "concept": 0.334,
+        "idf_weighted": 0.506
+      }
+    },
+    {
+      "id": "480",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.388,
+        "concept": 0.329,
+        "citation_bonus": 0.1,
+        "final": 0.908
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel-audit-table.service.ts:119",
+          "barrel-snapshot.service.ts:119",
+          "barrelAudit.service.ts:165",
+          "audit.service.ts:161",
+          "audit-dashboard.service.ts:253",
+          "audit.service.ts:346",
+          "barrelAudit.service.ts:202",
+          "barrel-audit-table.service.ts:119",
+          "barrel-snapshot.service.ts:119",
+          "barrelAudit.service.ts:165",
+          "audit.service.ts:161",
+          "audit-dashboard.service.ts:253",
+          "audit.service.ts:346",
+          "barrelAudit.service.ts:202"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.329,
+        "bigram": 0.066,
+        "trigram": 0.013,
+        "concept": 0.329,
+        "idf_weighted": 0.478
+      }
+    },
+    {
+      "id": "68",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.428,
+        "concept": 0.345,
+        "citation_bonus": 0.1,
+        "final": 0.916
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "BarrelInventoryTable.tsx:7",
+          "ColumnVisibilityDropdown.tsx:14",
+          "TableHeaderBarrelInventory.tsx:13",
+          "SortableColumnHeader.tsx:22",
+          "TableHeaderBarrelInventory.tsx:12",
+          "FilterPresets.tsx:10",
+          "FilterPersistenceBridge.tsx:6",
+          "FilterPresets.tsx:18",
+          "Search.tsx:9",
+          "BarrelInventoryTableWithSelection.tsx:53",
+          "BarrelInventoryTableWithSelection.tsx:68",
+          "TableHeaderBarrelInventory.tsx:43",
+          "BarrelInventoryTable.tsx:7",
+          "ColumnVisibilityDropdown.tsx:14",
+          "TableHeaderBarrelInventory.tsx:13",
+          "SortableColumnHeader.tsx:22",
+          "TableHeaderBarrelInventory.tsx:12",
+          "FilterPresets.tsx:10",
+          "FilterPersistenceBridge.tsx:6",
+          "FilterPresets.tsx:18",
+          "Search.tsx:9",
+          "BarrelInventoryTableWithSelection.tsx:53",
+          "BarrelInventoryTableWithSelection.tsx:68",
+          "TableHeaderBarrelInventory.tsx:43"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/BarrelInventoryTable.tsx",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/Pagination.tsx",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/Table-new/TableHeaderBarrelInventory.tsx"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.351,
+        "bigram": 0.085,
+        "trigram": 0.03,
+        "concept": 0.345,
+        "idf_weighted": 0.538
+      }
+    },
+    {
+      "id": "406",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.661,
+        "concept": 0.532,
+        "citation_bonus": 0.1,
+        "final": 0.979
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "context.service.ts:4",
+          "context.service.ts:14",
+          "context.middlware.ts:15",
+          "db-routing-context.interceptor.ts:52",
+          "context.service.ts:25",
+          "context.service.ts:59",
+          "audit.service.ts:1246",
+          "audit.service.ts:1447",
+          "context.service.spec.ts:164",
+          "context.service.spec.ts:305",
+          "context.service.ts:4",
+          "context.service.ts:14",
+          "context.middlware.ts:15",
+          "db-routing-context.interceptor.ts:52",
+          "context.service.ts:25",
+          "context.service.ts:59",
+          "audit.service.ts:1246",
+          "audit.service.ts:1447",
+          "context.service.spec.ts:164",
+          "context.service.spec.ts:305"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/context/context.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/context/context.middlware.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.515,
+        "bigram": 0.149,
+        "trigram": 0.043,
+        "concept": 0.532,
+        "idf_weighted": 0.838
+      }
+    },
+    {
+      "id": "80",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.436,
+        "concept": 0.358,
+        "citation_bonus": 0.1,
+        "final": 0.919
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "indexing.module.ts:10",
+          "indexing.service.ts:30",
+          "indexing.service.ts:88",
+          "indexing.service.ts:420",
+          "indexing.processor.ts:20",
+          "indexing.processor.ts:138",
+          "indexing.scheduler.ts:34",
+          "indexing.scheduler.ts:95",
+          "indexing.service.ts:541",
+          "indexing.service.ts:354",
+          "indexing.service.ts:268",
+          "indexing.module.ts:10",
+          "indexing.service.ts:30",
+          "indexing.service.ts:88",
+          "indexing.service.ts:420",
+          "indexing.processor.ts:20",
+          "indexing.processor.ts:138",
+          "indexing.scheduler.ts:34",
+          "indexing.scheduler.ts:95",
+          "indexing.service.ts:541",
+          "indexing.service.ts:354",
+          "indexing.service.ts:268"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/providers/indexing/indexing.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/vectorSearch/vector-search.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.351,
+        "bigram": 0.081,
+        "trigram": 0.019,
+        "concept": 0.358,
+        "idf_weighted": 0.558
+      }
+    },
+    {
+      "id": "79",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.52,
+        "concept": 0.42,
+        "citation_bonus": 0.1,
+        "final": 0.941
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOemCode.module.ts:7",
+          "barrelOemCode.service.ts:28",
+          "barrelOemCode.service.ts:71",
+          "barrelOemCode.module.ts:682",
+          "barrelOemCode.service.ts:7",
+          "barrelOemCode.service.ts:58",
+          "barrelOemCode.service.ts:105",
+          "barrelOemCode.resolver.ts:27",
+          "barrelOemCode.controller.ts:24",
+          "barrelOemCode.resolver.ts:64",
+          "barrel.resolver.ts:489",
+          "barrelOemCode.service.ts:686",
+          "barrelOemCode.module.ts:7",
+          "barrelOemCode.service.ts:28",
+          "barrelOemCode.service.ts:71",
+          "barrelOemCode.module.ts:682",
+          "barrelOemCode.service.ts:7",
+          "barrelOemCode.service.ts:58",
+          "barrelOemCode.service.ts:105",
+          "barrelOemCode.resolver.ts:27",
+          "barrelOemCode.controller.ts:24",
+          "barrelOemCode.resolver.ts:64",
+          "barrel.resolver.ts:489",
+          "barrelOemCode.service.ts:686"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOemCode/barrelOemCode.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.408,
+        "bigram": 0.084,
+        "trigram": 0.028,
+        "concept": 0.42,
+        "idf_weighted": 0.692
+      }
+    },
+    {
+      "id": "192",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.402,
+        "concept": 0.361,
+        "citation_bonus": 0.1,
+        "final": 0.914
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOwnership.service.ts:99",
+          "barrelOwnership.service.ts:141",
+          "barrelOwnership.service.ts:395",
+          "ownership-ledger.util.ts:14",
+          "barrelOwnership.service.ts:99",
+          "barrelOwnership.service.ts:141",
+          "barrelOwnership.service.ts:395",
+          "ownership-ledger.util.ts:14"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.352,
+        "bigram": 0.069,
+        "trigram": 0.023,
+        "concept": 0.361,
+        "idf_weighted": 0.449
+      }
+    },
+    {
+      "id": "226",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.463,
+        "concept": 0.355,
+        "citation_bonus": 0.1,
+        "final": 0.923
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "lotVariation.service.ts:97",
+          "lotVariation.service.ts:104",
+          "lotVariation.service.ts:24",
+          "lotVariation.service.ts:97",
+          "lotVariation.service.ts:104",
+          "lotVariation.service.ts:24"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/lotVariation/lotVariation.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/lotVariation/lotVariation.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/lotVariation/lotVariation.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.37,
+        "bigram": 0.172,
+        "trigram": 0.128,
+        "concept": 0.355,
+        "idf_weighted": 0.465
+      }
+    },
+    {
+      "id": "162",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.464,
+        "concept": 0.4,
+        "citation_bonus": 0.1,
+        "final": 0.93
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOwnership.service.ts:988",
+          "barrelOwnership.service.ts:984",
+          "barrelOwnership.service.ts:991",
+          "barrelOwnership.service.ts:993",
+          "barrelOwnership.service.ts:997",
+          "barrelOwnership.service.ts:1001",
+          "barrelOwnership.service.ts:988",
+          "barrelOwnership.service.ts:984",
+          "barrelOwnership.service.ts:991",
+          "barrelOwnership.service.ts:993",
+          "barrelOwnership.service.ts:997",
+          "barrelOwnership.service.ts:1001"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.424,
+        "bigram": 0.075,
+        "trigram": 0.008,
+        "concept": 0.4,
+        "idf_weighted": 0.547
+      }
+    },
+    {
+      "id": "171",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.515,
+        "concept": 0.431,
+        "citation_bonus": 0.1,
+        "final": 0.942
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "finance.service.ts:91",
+          "finance.service.ts:107",
+          "finance.service.ts:2689",
+          "finance.service.ts:161",
+          "finance.service.ts:91",
+          "finance.service.ts:107",
+          "finance.service.ts:2689",
+          "finance.service.ts:161"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/finance.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/finance.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/finance/finance.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.434,
+        "bigram": 0.119,
+        "trigram": 0.039,
+        "concept": 0.431,
+        "idf_weighted": 0.594
+      }
+    },
+    {
+      "id": "333",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.309,
+        "concept": 0.282,
+        "citation_bonus": 0.1,
+        "final": 0.889
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:1414",
+          "barrelEvent.service.ts:1414"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.294,
+        "bigram": 0.007,
+        "trigram": 0.0,
+        "concept": 0.282,
+        "idf_weighted": 0.379
+      }
+    },
+    {
+      "id": "119",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.546,
+        "concept": 0.456,
+        "citation_bonus": 0.1,
+        "final": 0.95
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:73",
+          "barrelEvent.service.ts:187",
+          "barrelEvent.service.ts:73",
+          "barrelEvent.service.ts:187"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-error-logger.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/lotVariation/lotVariation.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.455,
+        "bigram": 0.113,
+        "trigram": 0.009,
+        "concept": 0.456,
+        "idf_weighted": 0.675
+      }
+    },
+    {
+      "id": "310",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.197,
+        "concept": 0.175,
+        "citation_bonus": 0.0,
+        "final": 0.756
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-processing.service.ts:568",
+          "resource-monitor.service.ts:27",
+          "inventory-processing.service.ts:704",
+          "inventory-processing.service.ts:568",
+          "resource-monitor.service.ts:27",
+          "inventory-processing.service.ts:704"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/safety-limits.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.169,
+        "bigram": 0.04,
+        "trigram": 0.013,
+        "concept": 0.175,
+        "idf_weighted": 0.218
+      }
+    },
+    {
+      "id": "15",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.455,
+        "concept": 0.368,
+        "citation_bonus": 0.0,
+        "final": 0.123
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/app/api/graphql-proxy/route.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/app/api/ownership/transfer/route.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.35,
+        "bigram": 0.129,
+        "trigram": 0.051,
+        "concept": 0.368,
+        "idf_weighted": 0.535
+      }
+    },
+    {
+      "id": "18",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.38,
+        "concept": 0.332,
+        "citation_bonus": 0.1,
+        "final": 0.907
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "warehouseJobs.module.ts:1",
+          "warehouse-jobs.service.ts:1",
+          "barrel.module.ts:15",
+          "warehouseJobs.module.ts:1",
+          "warehouse-jobs.service.ts:1",
+          "barrel.module.ts:15"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/warehouseJobs/warehouseJobs.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.331,
+        "bigram": 0.086,
+        "trigram": 0.009,
+        "concept": 0.332,
+        "idf_weighted": 0.428
+      }
+    },
+    {
+      "id": "240",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.284,
+        "concept": 0.256,
+        "citation_bonus": 0.0,
+        "final": 0.781
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "bulk-ownership-operations.dto.ts:235",
+          "bulk-ownership-operations.dto.ts:216",
+          "bulk-ownership-operations.dto.ts:198",
+          "bulk-operation-response.dto.ts:45",
+          "bulk-ownership-operations.dto.ts:235",
+          "bulk-ownership-operations.dto.ts:216",
+          "bulk-ownership-operations.dto.ts:198",
+          "bulk-operation-response.dto.ts:45"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/schema.prisma",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.241,
+        "bigram": 0.025,
+        "trigram": 0.0,
+        "concept": 0.256,
+        "idf_weighted": 0.358
+      }
+    },
+    {
+      "id": "75",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.57,
+        "concept": 0.463,
+        "citation_bonus": 0.0,
+        "final": 0.155
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelAggregates/barrel-aggregates.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/barrel.resolver.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.45,
+        "bigram": 0.136,
+        "trigram": 0.038,
+        "concept": 0.463,
+        "idf_weighted": 0.704
+      }
+    },
+    {
+      "id": "283",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.337,
+        "concept": 0.28,
+        "citation_bonus": 0.1,
+        "final": 0.893
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "get-aggregated-staging-records.dto.ts:48",
+          "get-aggregated-staging-records.dto.ts:48"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/warehouseJobs/base/get-aggregated-staging-records.dto.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/warehouseJobs/base/process-barrel-fill-job.dto.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.276,
+        "bigram": 0.065,
+        "trigram": 0.016,
+        "concept": 0.28,
+        "idf_weighted": 0.422
+      }
+    },
+    {
+      "id": "338",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.37,
+        "concept": 0.308,
+        "citation_bonus": 0.0,
+        "final": 0.802
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:1909",
+          "barrelEvent.service.ts:1925",
+          "barrelEvent.service.ts:1954",
+          "barrelEvent.service.ts:1960",
+          "barrelEvent.service.ts:1985",
+          "barrelEvent.service.ts:2004",
+          "barrelEvent.service.ts:2047",
+          "barrelEvent.service.ts:3055",
+          "barrelEvent.service.ts:3066",
+          "barrelEvent.service.ts:3070",
+          "barrelEvent.service.ts:3093",
+          "barrelEvent.service.ts:3104",
+          "barrelEvent.service.ts:3226",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3262",
+          "barrelEvent.service.ts:1909",
+          "barrelEvent.service.ts:1925",
+          "barrelEvent.service.ts:1954",
+          "barrelEvent.service.ts:1960",
+          "barrelEvent.service.ts:1985",
+          "barrelEvent.service.ts:2004",
+          "barrelEvent.service.ts:2047",
+          "barrelEvent.service.ts:3055",
+          "barrelEvent.service.ts:3066",
+          "barrelEvent.service.ts:3070",
+          "barrelEvent.service.ts:3093",
+          "barrelEvent.service.ts:3104",
+          "barrelEvent.service.ts:3226",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3262"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.35,
+        "bigram": 0.037,
+        "trigram": 0.007,
+        "concept": 0.308,
+        "idf_weighted": 0.466
+      }
+    },
+    {
+      "id": "339",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.517,
+        "concept": 0.411,
+        "citation_bonus": 0.1,
+        "final": 0.939
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:3109",
+          "barrelEvent.service.ts:95",
+          "barrelEvent.service.ts:96",
+          "barrelEvent.service.ts:101",
+          "barrelEvent.service.ts:107",
+          "barrelEvent.service.ts:114",
+          "barrelEvent.service.ts:131",
+          "barrelEvent.service.ts:3138",
+          "barrelEvent.service.ts:3154",
+          "barrelEvent.service.lot-code-parsing.spec.ts:447",
+          "barrelEvent.service.lot-code-parsing.spec.ts:469",
+          "barrelEvent.service.lot-code-parsing.spec.ts:475",
+          "barrelEvent.service.lot-code-parsing.spec.ts:472",
+          "barrelEvent.service.lot-code-parsing.spec.ts:478",
+          "barrelEvent.service.ts:3109",
+          "barrelEvent.service.ts:95",
+          "barrelEvent.service.ts:96",
+          "barrelEvent.service.ts:101",
+          "barrelEvent.service.ts:107",
+          "barrelEvent.service.ts:114",
+          "barrelEvent.service.ts:131",
+          "barrelEvent.service.ts:3138",
+          "barrelEvent.service.ts:3154",
+          "barrelEvent.service.lot-code-parsing.spec.ts:447",
+          "barrelEvent.service.lot-code-parsing.spec.ts:469",
+          "barrelEvent.service.lot-code-parsing.spec.ts:475",
+          "barrelEvent.service.lot-code-parsing.spec.ts:472",
+          "barrelEvent.service.lot-code-parsing.spec.ts:478"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.416,
+        "bigram": 0.113,
+        "trigram": 0.036,
+        "concept": 0.411,
+        "idf_weighted": 0.654
+      }
+    },
+    {
+      "id": "316",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.514,
+        "concept": 0.434,
+        "citation_bonus": 0.1,
+        "final": 0.942
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "warehouse-jobs.service.ts:458",
+          "inventory-check-staging.processor.ts:215",
+          "inventory-check-staging.processor.ts:273",
+          "warehouse-jobs.service.ts:462",
+          "inventory-check-reconciliation.service.ts:40",
+          "inventory-check-reconciliation.service.ts:55",
+          "inventory-check-reconciliation.service.ts:1470",
+          "inventory-check-reconciliation.service.ts:123",
+          "warehouse-jobs.service.ts:437",
+          "inventory-check-reconciliation.service.ts:176",
+          "warehouse-jobs.service.ts:454",
+          "inventory-check-reconciliation.service.ts:250",
+          "warehouse-jobs.service.ts:458",
+          "inventory-check-staging.processor.ts:215",
+          "inventory-check-staging.processor.ts:273",
+          "warehouse-jobs.service.ts:462",
+          "inventory-check-reconciliation.service.ts:40",
+          "inventory-check-reconciliation.service.ts:55",
+          "inventory-check-reconciliation.service.ts:1470",
+          "inventory-check-reconciliation.service.ts:123",
+          "warehouse-jobs.service.ts:437",
+          "inventory-check-reconciliation.service.ts:176",
+          "warehouse-jobs.service.ts:454",
+          "inventory-check-reconciliation.service.ts:250"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.433,
+        "bigram": 0.067,
+        "trigram": 0.02,
+        "concept": 0.434,
+        "idf_weighted": 0.656
+      }
+    },
+    {
+      "id": "304",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.574,
+        "concept": 0.449,
+        "citation_bonus": 0.1,
+        "final": 0.953
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-check-staging.processor.ts:350",
+          "inventory-check-staging.processor.ts:73",
+          "inventory-check-staging.processor.ts:362",
+          "inventory-check-reconciliation.service.ts:188",
+          "inventory-check-staging.processor.ts:424",
+          "inventory-check-staging.processor.ts:489",
+          "inventory-check-staging.processor.ts:493",
+          "inventory-check-staging.processor.ts:69",
+          "inventory-check-staging.processor.ts:502",
+          "inventory-check-staging.processor.ts:593",
+          "inventory-check-staging.processor.ts:596",
+          "inventory-check-staging.processor.ts:599",
+          "inventory-check-staging.processor.ts:607",
+          "inventory-check-staging.processor.ts:706",
+          "inventory-check-staging.processor.ts:807",
+          "inventory-check-staging.processor.ts:810",
+          "inventory-check-staging.service.ts:205",
+          "inventory-check-staging.processor.ts:814",
+          "inventory-check-staging.processor.ts:829",
+          "inventory-check-staging.service.ts:369",
+          "inventory-check-staging.processor.ts:851",
+          "inventory-check-staging.processor.ts:853",
+          "inventory-check-staging.processor.ts:871",
+          "inventory-check-staging.service.ts:400",
+          "inventory-check-staging.processor.ts:877",
+          "inventory-check-staging.processor.ts:893",
+          "inventory-check-staging.processor.ts:350",
+          "inventory-check-staging.processor.ts:73",
+          "inventory-check-staging.processor.ts:362",
+          "inventory-check-reconciliation.service.ts:188",
+          "inventory-check-staging.processor.ts:424",
+          "inventory-check-staging.processor.ts:489",
+          "inventory-check-staging.processor.ts:493",
+          "inventory-check-staging.processor.ts:69",
+          "inventory-check-staging.processor.ts:502",
+          "inventory-check-staging.processor.ts:593",
+          "inventory-check-staging.processor.ts:596",
+          "inventory-check-staging.processor.ts:599",
+          "inventory-check-staging.processor.ts:607",
+          "inventory-check-staging.processor.ts:706",
+          "inventory-check-staging.processor.ts:807",
+          "inventory-check-staging.processor.ts:810",
+          "inventory-check-staging.service.ts:205",
+          "inventory-check-staging.processor.ts:814",
+          "inventory-check-staging.processor.ts:829",
+          "inventory-check-staging.service.ts:369",
+          "inventory-check-staging.processor.ts:851",
+          "inventory-check-staging.processor.ts:853",
+          "inventory-check-staging.processor.ts:871",
+          "inventory-check-staging.service.ts:400",
+          "inventory-check-staging.processor.ts:877",
+          "inventory-check-staging.processor.ts:893"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/barrelMatching/barrel-matching.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.439,
+        "bigram": 0.137,
+        "trigram": 0.049,
+        "concept": 0.449,
+        "idf_weighted": 0.737
+      }
+    },
+    {
+      "id": "482",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.4,
+        "concept": 0.329,
+        "citation_bonus": 0.1,
+        "final": 0.909
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "app.module.ts:140",
+          "app.module.ts:345",
+          "auth/gqlThrottler.guard.ts:6",
+          "graphql-proxy/route.ts:129",
+          "api-security.ts:388",
+          "app.module.ts:252",
+          "inventory-check-staging.processor.ts:35",
+          "android-sync.processor.ts:45",
+          "app.module.ts:162",
+          "app.module.ts:140",
+          "app.module.ts:345",
+          "auth/gqlThrottler.guard.ts:6",
+          "graphql-proxy/route.ts:129",
+          "api-security.ts:388",
+          "app.module.ts:252",
+          "inventory-check-staging.processor.ts:35",
+          "android-sync.processor.ts:45",
+          "app.module.ts:162"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/app.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/gqlThrottler.guard.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.341,
+        "bigram": 0.049,
+        "trigram": 0.007,
+        "concept": 0.329,
+        "idf_weighted": 0.529
+      }
+    },
+    {
+      "id": "130",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.361,
+        "concept": 0.303,
+        "citation_bonus": 0.1,
+        "final": 0.9
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "feature-flags/flag-keys.constants.ts:8",
+          "barrelEvent.service.ts:22",
+          "barrelEvent.service.ts:1788",
+          "barrelEvent.service.ts:1789",
+          "barrelEvent.service.ts:1035",
+          "barrelEvent.service.ts:620",
+          "feature-flags/flag-keys.constants.ts:8",
+          "barrelEvent.service.ts:22",
+          "barrelEvent.service.ts:1788",
+          "barrelEvent.service.ts:1789",
+          "barrelEvent.service.ts:1035",
+          "barrelEvent.service.ts:620"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/flag-keys.constants.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.306,
+        "bigram": 0.043,
+        "trigram": 0.007,
+        "concept": 0.303,
+        "idf_weighted": 0.469
+      }
+    },
+    {
+      "id": "185",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.685,
+        "concept": 0.492,
+        "citation_bonus": 0.1,
+        "final": 0.977
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "customer.service.ts:261",
+          "customer.service.ts:267",
+          "customer.service.ts:282",
+          "customer.service.ts:315",
+          "customer.service.ts:311",
+          "transfer/dto/TransferOrderByInputExtended.ts:18",
+          "transfer/dto/TransferFindManyArgsExtended.ts:14",
+          "customer.service.ts:261",
+          "customer.service.ts:267",
+          "customer.service.ts:282",
+          "customer.service.ts:315",
+          "customer.service.ts:311",
+          "transfer/dto/TransferOrderByInputExtended.ts:18",
+          "transfer/dto/TransferFindManyArgsExtended.ts:14"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/customer/customer.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/customer/customer.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/customer/customer.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.481,
+        "bigram": 0.268,
+        "trigram": 0.159,
+        "concept": 0.492,
+        "idf_weighted": 0.798
+      }
+    },
+    {
+      "id": "83",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.359,
+        "concept": 0.293,
+        "citation_bonus": 0.1,
+        "final": 0.898
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "holdingLocation/holdingLocation.module.ts:1",
+          "storageLocation/storageLocation.module.ts:1",
+          "barrelEvent.service.ts:163",
+          "barrelEvent.service.ts:483",
+          "barrelEvent.service.ts:187",
+          "barrelEvent.service.ts:525",
+          "storageLocation.service.ts:17",
+          "holdingLocation.service.ts:6",
+          "holdingLocation/holdingLocation.module.ts:1",
+          "storageLocation/storageLocation.module.ts:1",
+          "barrelEvent.service.ts:163",
+          "barrelEvent.service.ts:483",
+          "barrelEvent.service.ts:187",
+          "barrelEvent.service.ts:525",
+          "storageLocation.service.ts:17",
+          "holdingLocation.service.ts:6"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/holdingLocation/holdingLocation.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/storageLocation/storageLocation.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.303,
+        "bigram": 0.06,
+        "trigram": 0.01,
+        "concept": 0.293,
+        "idf_weighted": 0.463
+      }
+    },
+    {
+      "id": "355",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.504,
+        "concept": 0.404,
+        "citation_bonus": 0.1,
+        "final": 0.936
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:483",
+          "barrelEvent.service.ts:1909",
+          "barrelEvent.service.ts:2047",
+          "barrelEvent.service.ts:2937",
+          "barrelEvent.service.ts:2977",
+          "barrelEvent.service.ts:3055",
+          "barrelEvent.service.ts:3109",
+          "barrelEvent.service.ts:3171",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3255",
+          "barrelEvent.service.ts:3256",
+          "barrelEvent.service.ts:370",
+          "barrelEvent.service.ts:483",
+          "barrelEvent.service.ts:1909",
+          "barrelEvent.service.ts:2047",
+          "barrelEvent.service.ts:2937",
+          "barrelEvent.service.ts:2977",
+          "barrelEvent.service.ts:3055",
+          "barrelEvent.service.ts:3109",
+          "barrelEvent.service.ts:3171",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3255",
+          "barrelEvent.service.ts:3256",
+          "barrelEvent.service.ts:370"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.431,
+        "bigram": 0.071,
+        "trigram": 0.006,
+        "concept": 0.404,
+        "idf_weighted": 0.675
+      }
+    },
+    {
+      "id": "443",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.466,
+        "concept": 0.415,
+        "citation_bonus": 0.0,
+        "final": 0.832
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "audit-filter.dto.ts:21",
+          "audit-filter.dto.ts:30",
+          "audit-filter.dto.ts:221",
+          "audit-dashboard.service.ts:518",
+          "audit-dashboard.service.ts:723",
+          "audit-dashboard.service.ts:37",
+          "audit-filter.input.ts:30",
+          "audit-filter.dto.ts:21",
+          "audit-filter.dto.ts:30",
+          "audit-filter.dto.ts:221",
+          "audit-dashboard.service.ts:518",
+          "audit-dashboard.service.ts:723",
+          "audit-dashboard.service.ts:37",
+          "audit-filter.input.ts:30"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/audit/audit.module.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.395,
+        "bigram": 0.031,
+        "trigram": 0.0,
+        "concept": 0.415,
+        "idf_weighted": 0.605
+      }
+    },
+    {
+      "id": "217",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.577,
+        "concept": 0.463,
+        "citation_bonus": 0.1,
+        "final": 0.956
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOwnership/base/BarrelOwnership.ts:97",
+          "barrelOwnership/barrelOwnership.service.ts:395",
+          "ownershipTransaction/ownership-ledger.util.ts:14",
+          "barrelOwnership/base/BarrelOwnership.ts:97",
+          "barrelOwnership/barrelOwnership.service.ts:395",
+          "ownershipTransaction/ownership-ledger.util.ts:14"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.473,
+        "bigram": 0.095,
+        "trigram": 0.042,
+        "concept": 0.463,
+        "idf_weighted": 0.746
+      }
+    },
+    {
+      "id": "487",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.344,
+        "concept": 0.288,
+        "citation_bonus": 0.1,
+        "final": 0.895
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "errorConfig/error-configuration.ts:115",
+          "errorConfig/error-configuration.ts:130",
+          "resolution/base/resolution.service.ts:791",
+          "error-configuration.ts:973",
+          "parentFunctions.ts:67",
+          "childFunctions.ts:146",
+          "childFunctions.ts:298",
+          "childFunctions.ts:146",
+          "childFunctions.ts:298",
+          "resolution.service.ts:834",
+          "errorConfig/error-configuration.ts:725",
+          "childFunctions.ts:266",
+          "errorConfig/error-configuration.ts:115",
+          "errorConfig/error-configuration.ts:130",
+          "resolution/base/resolution.service.ts:791",
+          "error-configuration.ts:973",
+          "parentFunctions.ts:67",
+          "childFunctions.ts:146",
+          "childFunctions.ts:298",
+          "childFunctions.ts:146",
+          "childFunctions.ts:298",
+          "resolution.service.ts:834",
+          "errorConfig/error-configuration.ts:725",
+          "childFunctions.ts:266"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/errorConfig/types.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.302,
+        "bigram": 0.065,
+        "trigram": 0.006,
+        "concept": 0.288,
+        "idf_weighted": 0.418
+      }
+    },
+    {
+      "id": "159",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.459,
+        "concept": 0.366,
+        "citation_bonus": 0.1,
+        "final": 0.924
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "prisma/prisma.service.ts:464",
+          "prisma/prisma.service.ts:420",
+          "barrelEvent.service.ts:214",
+          "barrelEvent.service.ts:2100",
+          "barrelEvent.service.ts:1950",
+          "barrelEvent.service.ts:577",
+          "barrelEvent.service.ts:253",
+          "barrelEvent.service.ts:642",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3226",
+          "barrelEvent.service.ts:811",
+          "barrelEvent.service.ts:1789",
+          "barrelEvent.service.ts:671",
+          "barrelEvent.service.ts:597",
+          "prisma/prisma.service.ts:464",
+          "prisma/prisma.service.ts:420",
+          "barrelEvent.service.ts:214",
+          "barrelEvent.service.ts:2100",
+          "barrelEvent.service.ts:1950",
+          "barrelEvent.service.ts:577",
+          "barrelEvent.service.ts:253",
+          "barrelEvent.service.ts:642",
+          "barrelEvent.service.ts:3223",
+          "barrelEvent.service.ts:3226",
+          "barrelEvent.service.ts:811",
+          "barrelEvent.service.ts:1789",
+          "barrelEvent.service.ts:671",
+          "barrelEvent.service.ts:597"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/prisma/prisma.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.376,
+        "bigram": 0.088,
+        "trigram": 0.043,
+        "concept": 0.366,
+        "idf_weighted": 0.577
+      }
+    },
+    {
+      "id": "152",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.521,
+        "concept": 0.417,
+        "citation_bonus": 0.1,
+        "final": 0.941
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "reconciliation.service.ts:862",
+          "reconciliation.service.ts:701",
+          "reconciliation.service.ts:945",
+          "reconciliation.service.ts:1103",
+          "reconciliation.service.ts:1242",
+          "reconciliation.service.ts:1218",
+          "reconciliation.service.ts:210",
+          "reconciliation.service.ts:1434",
+          "reconciliation.service.ts:1041",
+          "reconciliation.service.ts:683",
+          "reconciliation.service.ts:862",
+          "reconciliation.service.ts:701",
+          "reconciliation.service.ts:945",
+          "reconciliation.service.ts:1103",
+          "reconciliation.service.ts:1242",
+          "reconciliation.service.ts:1218",
+          "reconciliation.service.ts:210",
+          "reconciliation.service.ts:1434",
+          "reconciliation.service.ts:1041",
+          "reconciliation.service.ts:683"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/reconciliation/reconciliation.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.425,
+        "bigram": 0.083,
+        "trigram": 0.042,
+        "concept": 0.417,
+        "idf_weighted": 0.677
+      }
+    },
+    {
+      "id": "408",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.077,
+        "concept": 0.087,
+        "citation_bonus": 0.0,
+        "final": 0.025
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/multi-strategy-auth.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/api-key.guard.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/auth/defaultAuth.guard.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.086,
+        "bigram": 0.0,
+        "trigram": 0.0,
+        "concept": 0.087,
+        "idf_weighted": 0.062
+      }
+    },
+    {
+      "id": "74",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.48,
+        "concept": 0.371,
+        "citation_bonus": 0.0,
+        "final": 0.828
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel-snapshot.controller.ts:42",
+          "barrel-snapshot.service.ts:103",
+          "barrel-snapshot.controller.ts:42",
+          "barrel-snapshot.service.ts:103"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelSnapshot/barrel-snapshot.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/app.module.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.356,
+        "bigram": 0.185,
+        "trigram": 0.118,
+        "concept": 0.371,
+        "idf_weighted": 0.504
+      }
+    },
+    {
+      "id": "133",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.541,
+        "concept": 0.408,
+        "citation_bonus": 0.1,
+        "final": 0.942
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync.processor.ts:40",
+          "inventory-check-staging.processor.ts:30",
+          "android-sync.processor.ts:40",
+          "inventory-check-staging.processor.ts:30"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.456,
+        "bigram": 0.147,
+        "trigram": 0.047,
+        "concept": 0.408,
+        "idf_weighted": 0.668
+      }
+    },
+    {
+      "id": "449",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.524,
+        "concept": 0.445,
+        "citation_bonus": 0.1,
+        "final": 0.945
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "resolution.service.ts:507",
+          "business-logic-error-handler.ts:85",
+          "business-logic-error-handler.ts:22",
+          "resolution.service.ts:507",
+          "business-logic-error-handler.ts:85",
+          "business-logic-error-handler.ts:22"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.428,
+        "bigram": 0.156,
+        "trigram": 0.076,
+        "concept": 0.445,
+        "idf_weighted": 0.544
+      }
+    },
+    {
+      "id": "165",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.568,
+        "concept": 0.456,
+        "citation_bonus": 0.1,
+        "final": 0.954
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelAudit.service.ts:202",
+          "barrelAudit.service.ts:202"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelAudit/barrelAudit.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelAudit/barrelAudit.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelAudit/barrelAudit.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.447,
+        "bigram": 0.179,
+        "trigram": 0.119,
+        "concept": 0.456,
+        "idf_weighted": 0.607
+      }
+    },
+    {
+      "id": "140",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.632,
+        "concept": 0.502,
+        "citation_bonus": 0.1,
+        "final": 0.97
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "groupTransaction.service.ts:151",
+          "groupTransaction.service.ts:151"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/groupTransaction/groupTransaction.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.446,
+        "bigram": 0.248,
+        "trigram": 0.171,
+        "concept": 0.502,
+        "idf_weighted": 0.645
+      }
+    },
+    {
+      "id": "302",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.358,
+        "concept": 0.304,
+        "citation_bonus": 0.1,
+        "final": 0.899
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-upload.controller.ts:341",
+          "csv-parsing.service.ts:102",
+          "inventory-upload.controller.ts:464",
+          "csv-parsing.service.ts:305",
+          "inventory-upload.controller.ts:557",
+          "inventory-processing.service.ts:532",
+          "inventory-processing.service.ts:1225",
+          "inventory-processing.service.ts:796",
+          "inventory-processing.service.ts:878",
+          "inventory-processing.service.ts:759",
+          "inventory-upload.controller.ts:341",
+          "csv-parsing.service.ts:102",
+          "inventory-upload.controller.ts:464",
+          "csv-parsing.service.ts:305",
+          "inventory-upload.controller.ts:557",
+          "inventory-processing.service.ts:532",
+          "inventory-processing.service.ts:1225",
+          "inventory-processing.service.ts:796",
+          "inventory-processing.service.ts:878",
+          "inventory-processing.service.ts:759"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/progress-tracking.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/gateways/progress.gateway.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.338,
+        "bigram": 0.023,
+        "trigram": 0.0,
+        "concept": 0.304,
+        "idf_weighted": 0.461
+      }
+    },
+    {
+      "id": "477",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.115,
+        "concept": 0.104,
+        "citation_bonus": 0.0,
+        "final": 0.033
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/util/business-logic-error-handler.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/lib/feature-flags/client.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.136,
+        "bigram": 0.009,
+        "trigram": 0.0,
+        "concept": 0.104,
+        "idf_weighted": 0.117
+      }
+    },
+    {
+      "id": "328",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.295,
+        "concept": 0.262,
+        "citation_bonus": 0.1,
+        "final": 0.884
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "cached-event-type.service.ts:24",
+          "cached-event-type.service.ts:108",
+          "android-sync.processor.ts:100",
+          "barrelEvent.service.ts:2103",
+          "cached-event-type.service.ts:186",
+          "cached-event-type.service.ts:24",
+          "cached-event-type.service.ts:108",
+          "android-sync.processor.ts:100",
+          "barrelEvent.service.ts:2103",
+          "cached-event-type.service.ts:186"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/eventType/cached-event-type.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.246,
+        "bigram": 0.037,
+        "trigram": 0.007,
+        "concept": 0.262,
+        "idf_weighted": 0.364
+      }
+    },
+    {
+      "id": "318",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.327,
+        "concept": 0.297,
+        "citation_bonus": 0.1,
+        "final": 0.894
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "micro-batch-orchestrator.service.ts:63",
+          "inventory-upload.controller.ts:598",
+          "micro-batch-orchestrator.service.ts:90",
+          "micro-batch-orchestrator.service.ts:139",
+          "micro-batch-orchestrator.service.ts:457",
+          "micro-batch-orchestrator.service.ts:380",
+          "micro-batch-orchestrator.service.ts:286",
+          "micro-batch-orchestrator.service.ts:660",
+          "micro-batch-orchestrator.service.ts:63",
+          "inventory-upload.controller.ts:598",
+          "micro-batch-orchestrator.service.ts:90",
+          "micro-batch-orchestrator.service.ts:139",
+          "micro-batch-orchestrator.service.ts:457",
+          "micro-batch-orchestrator.service.ts:380",
+          "micro-batch-orchestrator.service.ts:286",
+          "micro-batch-orchestrator.service.ts:660"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.284,
+        "bigram": 0.033,
+        "trigram": 0.0,
+        "concept": 0.297,
+        "idf_weighted": 0.4
+      }
+    },
+    {
+      "id": "472",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.452,
+        "concept": 0.394,
+        "citation_bonus": 0.1,
+        "final": 0.927
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "feature-flags.service.ts:36",
+          "feature-flags.service.ts:84",
+          "hooks.ts:68",
+          "client.ts:83",
+          "client.ts:457",
+          "hooks.ts:83",
+          "client.ts:388",
+          "feature-flags.service.ts:36",
+          "feature-flags.service.ts:84",
+          "hooks.ts:68",
+          "client.ts:83",
+          "client.ts:457",
+          "hooks.ts:83",
+          "client.ts:388"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/lib/feature-flags/client.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.377,
+        "bigram": 0.099,
+        "trigram": 0.013,
+        "concept": 0.394,
+        "idf_weighted": 0.525
+      }
+    },
+    {
+      "id": "194",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.309,
+        "concept": 0.261,
+        "citation_bonus": 0.1,
+        "final": 0.885
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "cached-storage-location.service.ts:17",
+          "cached-event-type.service.ts:6",
+          "cached-storage-location.service.ts:43",
+          "cached-event-reason.service.ts:36",
+          "cached-lot-variation.service.ts:39",
+          "cached-storage-location.service.ts:111",
+          "cached-storage-location.service.ts:39",
+          "cached-storage-location.service.ts:64",
+          "cached-storage-location.service.ts:323",
+          "cached-storage-location.service.ts:332",
+          "cached-storage-location.service.ts:368",
+          "cached-storage-location.service.ts:395",
+          "cached-storage-location.service.ts:47",
+          "cached-event-reason.service.ts:40",
+          "cached-event-type.service.ts:39",
+          "cached-lot-variation.service.ts:43",
+          "cached-storage-location.service.ts:242",
+          "cached-event-reason.service.ts:195",
+          "cached-storage-location.service.ts:52",
+          "cached-event-reason.service.ts:50",
+          "cached-storage-location.service.ts:126",
+          "cached-event-reason.service.ts:163",
+          "cache-invalidation.middleware.ts:1",
+          "cached-storage-location.service.ts:17",
+          "cached-event-type.service.ts:6",
+          "cached-storage-location.service.ts:43",
+          "cached-event-reason.service.ts:36",
+          "cached-lot-variation.service.ts:39",
+          "cached-storage-location.service.ts:111",
+          "cached-storage-location.service.ts:39",
+          "cached-storage-location.service.ts:64",
+          "cached-storage-location.service.ts:323",
+          "cached-storage-location.service.ts:332",
+          "cached-storage-location.service.ts:368",
+          "cached-storage-location.service.ts:395",
+          "cached-storage-location.service.ts:47",
+          "cached-event-reason.service.ts:40",
+          "cached-event-type.service.ts:39",
+          "cached-lot-variation.service.ts:43",
+          "cached-storage-location.service.ts:242",
+          "cached-event-reason.service.ts:195",
+          "cached-storage-location.service.ts:52",
+          "cached-event-reason.service.ts:50",
+          "cached-storage-location.service.ts:126",
+          "cached-event-reason.service.ts:163",
+          "cache-invalidation.middleware.ts:1"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/eventType/cached-event-type.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/prisma/prisma.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.244,
+        "bigram": 0.06,
+        "trigram": 0.0,
+        "concept": 0.261,
+        "idf_weighted": 0.395
+      }
+    },
+    {
+      "id": "268",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.378,
+        "concept": 0.329,
+        "citation_bonus": 0.0,
+        "final": 0.806
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "customer/dto/CustomerCreateInput.ts:103",
+          "customer/customer.controller.ts:195",
+          "customer/customer.resolver.ts:165",
+          "customer/customer.controller.ts:196",
+          "customer/customer.resolver.ts:166",
+          "customer/customer.resolver.ts:51",
+          "customer/customer.service.ts:39",
+          "customer/customer.resolver.ts:52",
+          "customer/base/customer.service.base.ts:48",
+          "customer/dto/CustomerCreateInput.ts:103",
+          "customer/customer.controller.ts:195",
+          "customer/customer.resolver.ts:165",
+          "customer/customer.controller.ts:196",
+          "customer/customer.resolver.ts:166",
+          "customer/customer.resolver.ts:51",
+          "customer/customer.service.ts:39",
+          "customer/customer.resolver.ts:52",
+          "customer/base/customer.service.base.ts:48"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/prisma/migrations/20250626000010_fix_barrel_lot_relationship/migration.sql",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/transfer/transfer.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.314,
+        "bigram": 0.065,
+        "trigram": 0.018,
+        "concept": 0.329,
+        "idf_weighted": 0.452
+      }
+    },
+    {
+      "id": "156",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.421,
+        "concept": 0.369,
+        "citation_bonus": 0.1,
+        "final": 0.918
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOwnership.service.ts:395",
+          "barrelOwnership.service.ts:424",
+          "barrelOwnership.service.ts:429",
+          "barrelOwnership.service.ts:430",
+          "barrelOwnership.service.ts:438",
+          "barrelOwnership.service.ts:453",
+          "barrelOwnership.service.ts:473",
+          "barrelOwnership.service.ts:99",
+          "barrelOwnership.service.ts:493",
+          "barrelOwnership.service.ts:395",
+          "barrelOwnership.service.ts:424",
+          "barrelOwnership.service.ts:429",
+          "barrelOwnership.service.ts:430",
+          "barrelOwnership.service.ts:438",
+          "barrelOwnership.service.ts:453",
+          "barrelOwnership.service.ts:473",
+          "barrelOwnership.service.ts:99",
+          "barrelOwnership.service.ts:493"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.368,
+        "bigram": 0.038,
+        "trigram": 0.007,
+        "concept": 0.369,
+        "idf_weighted": 0.53
+      }
+    },
+    {
+      "id": "464",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.539,
+        "concept": 0.405,
+        "citation_bonus": 0.1,
+        "final": 0.942
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "feature-flags/types.ts:30",
+          "client.ts:302",
+          "client.ts:305",
+          "client.ts:390",
+          "feature-flags.service.ts:89",
+          "client.ts:6",
+          "client.ts:119",
+          "types.ts:36",
+          "feature-flags/types.ts:30",
+          "client.ts:302",
+          "client.ts:305",
+          "client.ts:390",
+          "feature-flags.service.ts:89",
+          "client.ts:6",
+          "client.ts:119",
+          "types.ts:36"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/feature-flags/feature-flags.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/lib/feature-flags/client.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.394,
+        "bigram": 0.172,
+        "trigram": 0.047,
+        "concept": 0.405,
+        "idf_weighted": 0.685
+      }
+    },
+    {
+      "id": "337",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.084,
+        "concept": 0.083,
+        "citation_bonus": 0.0,
+        "final": 0.025
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync-error-logger.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.087,
+        "bigram": 0.009,
+        "trigram": 0.0,
+        "concept": 0.083,
+        "idf_weighted": 0.08
+      }
+    },
+    {
+      "id": "329",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.303,
+        "concept": 0.284,
+        "citation_bonus": 0.1,
+        "final": 0.888
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelEvent.service.ts:419",
+          "barrelEvent.service.ts:2782",
+          "barrelEvent.service.ts:2847",
+          "barrelEvent.service.ts:1288",
+          "barrelEvent.service.ts:419",
+          "barrelEvent.service.ts:2782",
+          "barrelEvent.service.ts:2847",
+          "barrelEvent.service.ts:1288"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelEvent/barrelEvent.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.246,
+        "bigram": 0.024,
+        "trigram": 0.0,
+        "concept": 0.284,
+        "idf_weighted": 0.376
+      }
+    },
+    {
+      "id": "444",
+      "category": "cross_cutting_concerns",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.482,
+        "concept": 0.417,
+        "citation_bonus": 0.1,
+        "final": 0.935
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "resolution.service.ts:507",
+          "prisma.service.ts:100",
+          "resolution.service.ts:640",
+          "resolution.service.ts:851",
+          "resolution.service.ts:507",
+          "prisma.service.ts:100",
+          "resolution.service.ts:640",
+          "resolution.service.ts:851"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/resolution/base/resolution.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.406,
+        "bigram": 0.097,
+        "trigram": 0.054,
+        "concept": 0.417,
+        "idf_weighted": 0.539
+      }
+    },
+    {
+      "id": "366",
+      "category": "data_flow_integration",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.217,
+        "concept": 0.194,
+        "citation_bonus": 0.1,
+        "final": 0.862
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "database-progress.service.ts:1",
+          "database-progress.service.ts:49",
+          "micro-batch-orchestrator.service.ts:457",
+          "database-progress.service.ts:77",
+          "micro-batch-orchestrator.service.ts:151",
+          "micro-batch-orchestrator.service.ts:567",
+          "micro-batch-orchestrator.service.ts:286",
+          "micro-batch-orchestrator.service.ts:619",
+          "database-progress.service.ts:1",
+          "database-progress.service.ts:49",
+          "micro-batch-orchestrator.service.ts:457",
+          "database-progress.service.ts:77",
+          "micro-batch-orchestrator.service.ts:151",
+          "micro-batch-orchestrator.service.ts:567",
+          "micro-batch-orchestrator.service.ts:286",
+          "micro-batch-orchestrator.service.ts:619"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/inventory-processing.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/inventory-upload/services/database-progress.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.198,
+        "bigram": 0.024,
+        "trigram": 0.0,
+        "concept": 0.194,
+        "idf_weighted": 0.257
+      }
+    },
+    {
+      "id": "116",
+      "category": "service_relationships",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.593,
+        "concept": 0.477,
+        "citation_bonus": 0.1,
+        "final": 0.96
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "staging.module.ts:30",
+          "android-sync-inbox.module.ts:57",
+          "android-sync.processor.ts:66",
+          "android-sync.processor.ts:243",
+          "inventory-check-staging.processor.ts:30",
+          "staging.module.ts:30",
+          "android-sync-inbox.module.ts:57",
+          "android-sync.processor.ts:66",
+          "android-sync.processor.ts:243",
+          "inventory-check-staging.processor.ts:30"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/staging/inventory-check-staging.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.453,
+        "bigram": 0.194,
+        "trigram": 0.112,
+        "concept": 0.477,
+        "idf_weighted": 0.643
+      }
+    },
+    {
+      "id": "82",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.535,
+        "concept": 0.439,
+        "citation_bonus": 0.1,
+        "final": 0.946
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "logger.module.ts:1",
+          "app.module.ts:172",
+          "logger.config.ts:46",
+          "logger.config.ts:11",
+          "logger.config.ts:78",
+          "logger.config.ts:96",
+          "logger.config.ts:87",
+          "barrel.service.ts:103",
+          "main.ts:178",
+          "barrel.service.ts:103",
+          "main.ts:178",
+          "main.ts:181",
+          "main.ts:196",
+          "android-sync-error-logger.service.ts:5",
+          "android-sync-error-logger.service.ts:61",
+          "logger.config.spec.ts:4",
+          "logger.module.ts:1",
+          "app.module.ts:172",
+          "logger.config.ts:46",
+          "logger.config.ts:11",
+          "logger.config.ts:78",
+          "logger.config.ts:96",
+          "logger.config.ts:87",
+          "barrel.service.ts:103",
+          "main.ts:178",
+          "barrel.service.ts:103",
+          "main.ts:178",
+          "main.ts:181",
+          "main.ts:196",
+          "android-sync-error-logger.service.ts:5",
+          "android-sync-error-logger.service.ts:61",
+          "logger.config.spec.ts:4"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/logger/logger.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/app.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.424,
+        "bigram": 0.092,
+        "trigram": 0.026,
+        "concept": 0.439,
+        "idf_weighted": 0.694
+      }
+    },
+    {
+      "id": "86",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.438,
+        "concept": 0.347,
+        "citation_bonus": 0.1,
+        "final": 0.918
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "agent.module.ts:11",
+          "claude-agent.service.ts:179",
+          "claude-agent.service.ts:52",
+          "anthropic.service.ts:82",
+          "mcp.service.ts:257",
+          "mcp.service.ts:257",
+          "claude-agent.controller.ts:39",
+          "claude-agent.controller.ts:82",
+          "claude-agent.service.ts:117",
+          "agent.module.ts:11",
+          "claude-agent.service.ts:179",
+          "claude-agent.service.ts:52",
+          "anthropic.service.ts:82",
+          "mcp.service.ts:257",
+          "mcp.service.ts:257",
+          "claude-agent.controller.ts:39",
+          "claude-agent.controller.ts:82",
+          "claude-agent.service.ts:117"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/agent/agent.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/mcp/mcp.module.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.343,
+        "bigram": 0.086,
+        "trigram": 0.034,
+        "concept": 0.347,
+        "idf_weighted": 0.571
+      }
+    },
+    {
+      "id": "43",
+      "category": "architecture_structure",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.346,
+        "concept": 0.291,
+        "citation_bonus": 0.0,
+        "final": 0.796
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "FeatureFlagChatBot.tsx:21",
+          "ChatBot.tsx:46",
+          "ChatBot.tsx:154",
+          "ChatBot.tsx:129",
+          "McpChatBot.tsx:89",
+          "McpChatBot.tsx:97",
+          "useAgentSocket.ts:86",
+          "agentService.ts:55",
+          "agentService.ts:8",
+          "ChatBotContext.tsx:26",
+          "McpChatBot.tsx:51",
+          "McpChatBot.tsx:42",
+          "ChatBot.tsx:19",
+          "McpChatBot.tsx:20",
+          "ChatBot.tsx:202",
+          "ChatBot.tsx:14",
+          "McpChatBot.tsx:16",
+          "ChatBot.tsx:161",
+          "FeatureFlagChatBot.tsx:21",
+          "ChatBot.tsx:46",
+          "ChatBot.tsx:154",
+          "ChatBot.tsx:129",
+          "McpChatBot.tsx:89",
+          "McpChatBot.tsx:97",
+          "useAgentSocket.ts:86",
+          "agentService.ts:55",
+          "agentService.ts:8",
+          "ChatBotContext.tsx:26",
+          "McpChatBot.tsx:51",
+          "McpChatBot.tsx:42",
+          "ChatBot.tsx:19",
+          "McpChatBot.tsx:20",
+          "ChatBot.tsx:202",
+          "ChatBot.tsx:14",
+          "McpChatBot.tsx:16",
+          "ChatBot.tsx:161"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/components/chatbot/index.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms-front-end/app/dashboard/chat/ChatMainPanel.tsx"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.283,
+        "bigram": 0.043,
+        "trigram": 0.0,
+        "concept": 0.291,
+        "idf_weighted": 0.463
+      }
+    },
+    {
+      "id": "210",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.701,
+        "concept": 0.5,
+        "citation_bonus": 0.1,
+        "final": 0.98
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrelOwnership.service.ts:40",
+          "barrelOwnership.service.ts:47",
+          "barrelOwnership.service.ts:48",
+          "BarrelOwnershipCreateInput.ts:41",
+          "barrelOwnership.service.ts:40",
+          "barrelOwnership.service.ts:47",
+          "barrelOwnership.service.ts:48",
+          "BarrelOwnershipCreateInput.ts:41"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.484,
+        "bigram": 0.283,
+        "trigram": 0.173,
+        "concept": 0.5,
+        "idf_weighted": 0.81
+      }
+    },
+    {
+      "id": "252",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.398,
+        "concept": 0.345,
+        "citation_bonus": 0.0,
+        "final": 0.111
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.module.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.resolver.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.36,
+        "bigram": 0.071,
+        "trigram": 0.023,
+        "concept": 0.345,
+        "idf_weighted": 0.451
+      }
+    },
+    {
+      "id": "202",
+      "category": "business_logic_constraints",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.447,
+        "concept": 0.363,
+        "citation_bonus": 0.1,
+        "final": 0.921
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "barrel/constants.ts:5",
+          "barrel.service.ts:197",
+          "barrel-create-with-ownership.input.ts:24",
+          "lib/validation/ownership.ts:101",
+          "ownership.ts:64",
+          "barrel/constants.ts:5",
+          "barrel.service.ts:197",
+          "barrel-create-with-ownership.input.ts:24",
+          "lib/validation/ownership.ts:101",
+          "ownership.ts:64"
+        ],
+        "expected_files": [
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrel/constants.ts",
+          "/Users/reh3376/whk-wms/apps/whk-wms/src/barrelOwnership/barrelOwnership.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.369,
+        "bigram": 0.119,
+        "trigram": 0.033,
+        "concept": 0.363,
+        "idf_weighted": 0.526
+      }
+    },
+    {
+      "id": "hard_sym_1",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.706,
+        "concept": 0.499,
+        "citation_bonus": 0.1,
+        "final": 0.981
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "trust-mode-processing.service.ts:127",
+          "trust-mode-processing.service.ts:127",
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75",
+          "trust-mode-processing.service.ts:491",
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75",
+          "trust-mode-processing.service.ts:127",
+          "trust-mode-processing.service.ts:127",
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75",
+          "trust-mode-processing.service.ts:491",
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/inventory-upload/trust-mode-processing.service.ts",
+          "/apps/whk-wms/src/providers/llama/llama.service.ts",
+          "/apps/whk-wms/scripts/seeding/database-commands.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.473,
+        "bigram": 0.31,
+        "trigram": 0.237,
+        "concept": 0.499,
+        "idf_weighted": 0.763
+      }
+    },
+    {
+      "id": "hard_sym_2",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.666,
+        "concept": 0.452,
+        "citation_bonus": 0.1,
+        "final": 0.968
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "auto-index.ts:9",
+          "auto-index.ts:9",
+          "auto-index.ts:63",
+          "auto-index.ts:9",
+          "auto-index.ts:9",
+          "auto-index.ts:63"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/scripts/auto-index.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.462,
+        "bigram": 0.246,
+        "trigram": 0.132,
+        "concept": 0.452,
+        "idf_weighted": 0.851
+      }
+    },
+    {
+      "id": "hard_sym_3",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.533,
+        "concept": 0.375,
+        "citation_bonus": 0.1,
+        "final": 0.936
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "resource-monitor.service.ts:31",
+          "queue-health.service.ts:58",
+          "resource-monitor.service.ts:31",
+          "queue-health.service.ts:58",
+          "resource-monitor.service.ts:31",
+          "queue-health.service.ts:58",
+          "resource-monitor.service.ts:31",
+          "queue-health.service.ts:58"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/inventory-upload/resource-monitor.service.ts",
+          "/apps/whk-wms/src/inventory-upload/queue-health.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.394,
+        "bigram": 0.189,
+        "trigram": 0.09,
+        "concept": 0.375,
+        "idf_weighted": 0.662
+      }
+    },
+    {
+      "id": "hard_sym_4",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.731,
+        "concept": 0.518,
+        "citation_bonus": 0.1,
+        "final": 0.987
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "prisma/prisma.service.ts:42",
+          "prisma/prisma.service.ts:42",
+          "prisma/prisma.service.ts:52",
+          "prisma/prisma.service.ts:125",
+          "prisma/prisma.service.ts:42",
+          "prisma/prisma.service.ts:42",
+          "prisma/prisma.service.ts:52",
+          "prisma/prisma.service.ts:125"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/prisma/prisma.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.509,
+        "bigram": 0.287,
+        "trigram": 0.167,
+        "concept": 0.518,
+        "idf_weighted": 0.864
+      }
+    },
+    {
+      "id": "hard_sym_5",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.463,
+        "concept": 0.389,
+        "citation_bonus": 0.1,
+        "final": 0.928
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "seeding/constants.ts:44",
+          "seeding/domains/index.ts:26",
+          "barrel-advanced-where.input.ts:18",
+          "barrel-advanced-where.input.ts:19",
+          "seeding/constants.ts:44",
+          "seeding/domains/index.ts:26",
+          "barrel-advanced-where.input.ts:18",
+          "barrel-advanced-where.input.ts:19"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/scripts/seeding/constants.ts",
+          "/apps/whk-wms/scripts/seeding/domains/barrels.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.382,
+        "bigram": 0.095,
+        "trigram": 0.0,
+        "concept": 0.389,
+        "idf_weighted": 0.579
+      }
+    },
+    {
+      "id": "hard_sym_6",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.907,
+        "concept": 0.579,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "staging/inventory-check-staging.processor.ts:31",
+          "providers/indexing/indexing.processor.ts:21",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "staging/inventory-check-staging.processor.ts:30",
+          "providers/indexing/indexing.processor.ts:20",
+          "androidSyncInbox/android-sync.processor.ts:40",
+          "staging/inventory-check-staging.processor.ts:31",
+          "providers/indexing/indexing.processor.ts:21",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "staging/inventory-check-staging.processor.ts:30",
+          "providers/indexing/indexing.processor.ts:20",
+          "androidSyncInbox/android-sync.processor.ts:40"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/staging/inventory-check-staging.processor.ts",
+          "/apps/whk-wms/src/providers/indexing/indexing.processor.ts",
+          "/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.585,
+        "bigram": 0.457,
+        "trigram": 0.345,
+        "concept": 0.579,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "hard_sym_7",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.687,
+        "concept": 0.462,
+        "citation_bonus": 0.1,
+        "final": 0.972
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "claude-agent.service.ts:117",
+          "claude-agent.service.ts:131",
+          "claude-agent.service.ts:179",
+          "claude-agent.service.ts:117",
+          "claude-agent.service.ts:131",
+          "claude-agent.service.ts:179"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/agent/claude-agent.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.467,
+        "bigram": 0.265,
+        "trigram": 0.162,
+        "concept": 0.462,
+        "idf_weighted": 0.861
+      }
+    },
+    {
+      "id": "hard_sym_8",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.599,
+        "concept": 0.488,
+        "citation_bonus": 0.1,
+        "final": 0.963
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "clear-bull-queues.ts:13",
+          "staging.module.ts:30",
+          "staging/inventory-check-staging.processor.ts:31",
+          "inventory-upload.module.ts:47",
+          "inventory-upload/inventory-processing.processor.ts:1",
+          "android-sync-inbox.module.ts:57",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "indexing.module.ts:14",
+          "providers/indexing/indexing.processor.ts:20",
+          "finance.module.ts:30",
+          "finance/processors/finance-report.processor.ts:1",
+          "staging.module.ts:30",
+          "staging/inventory-check-staging.processor.ts:31",
+          "inventory-upload.module.ts:47",
+          "android-sync-inbox.module.ts:57",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "scheduler.module.ts:13",
+          "indexing.module.ts:14",
+          "providers/indexing/indexing.processor.ts:20",
+          "finance.module.ts:30",
+          "clear-bull-queues.ts:13",
+          "staging.module.ts:30",
+          "staging/inventory-check-staging.processor.ts:31",
+          "inventory-upload.module.ts:47",
+          "inventory-upload/inventory-processing.processor.ts:1",
+          "android-sync-inbox.module.ts:57",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "indexing.module.ts:14",
+          "providers/indexing/indexing.processor.ts:20",
+          "finance.module.ts:30",
+          "finance/processors/finance-report.processor.ts:1",
+          "staging.module.ts:30",
+          "staging/inventory-check-staging.processor.ts:31",
+          "inventory-upload.module.ts:47",
+          "android-sync-inbox.module.ts:57",
+          "androidSyncInbox/android-sync.processor.ts:41",
+          "scheduler.module.ts:13",
+          "indexing.module.ts:14",
+          "providers/indexing/indexing.processor.ts:20",
+          "finance.module.ts:30"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/scripts/clear-bull-queues.ts",
+          "/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts",
+          "/apps/whk-wms/src/staging/inventory-check-staging.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.487,
+        "bigram": 0.218,
+        "trigram": 0.149,
+        "concept": 0.488,
+        "idf_weighted": 0.568
+      }
+    },
+    {
+      "id": "hard_sym_9",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.766,
+        "concept": 0.485,
+        "citation_bonus": 0.1,
+        "final": 0.988
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75",
+          "inventory-processing.service.ts:487",
+          "micro-batch-orchestrator.service.ts:75",
+          "micro-batch-orchestrator.service.ts:396",
+          "inventory-processing.service.ts:125",
+          "micro-batch-orchestrator.service.ts:75",
+          "inventory-processing.service.ts:487",
+          "micro-batch-orchestrator.service.ts:75",
+          "micro-batch-orchestrator.service.ts:396"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
+          "/apps/whk-wms/src/inventory-upload/services/micro-batch-orchestrator.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.481,
+        "bigram": 0.384,
+        "trigram": 0.323,
+        "concept": 0.485,
+        "idf_weighted": 0.839
+      }
+    },
+    {
+      "id": "hard_sym_10",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.758,
+        "concept": 0.523,
+        "citation_bonus": 0.1,
+        "final": 0.992
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "app/api/graphql-proxy/route.ts:9",
+          "lib/services/ownershipService.ts:28",
+          "graphql-proxy/route.ts:60000",
+          "app/api/graphql-proxy/route.ts:7",
+          "ownershipService.ts:15000",
+          "lib/services/ownershipService.ts:24",
+          "lib/services/transferService.ts:6",
+          "app/api/graphql-proxy/route.ts:9",
+          "lib/services/ownershipService.ts:28",
+          "graphql-proxy/route.ts:60000",
+          "app/api/graphql-proxy/route.ts:7",
+          "ownershipService.ts:15000",
+          "lib/services/ownershipService.ts:24",
+          "lib/services/transferService.ts:6"
+        ],
+        "expected_files": [
+          "/apps/whk-wms-front-end/app/api/graphql-proxy/route.ts",
+          "/apps/whk-wms-front-end/lib/services/ownershipService.ts",
+          "/apps/whk-wms-front-end/lib/services/transferService.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.518,
+        "bigram": 0.282,
+        "trigram": 0.177,
+        "concept": 0.523,
+        "idf_weighted": 0.939
+      }
+    },
+    {
+      "id": "hard_sym_11",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.546,
+        "concept": 0.434,
+        "citation_bonus": 0.1,
+        "final": 0.947
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "storage-event-category.enum.ts:7",
+          "storage-event-category.enum.ts:23",
+          "aggregated-storage-entries.service.ts:56",
+          "aggregated-storage-entries.service.ts:290",
+          "aggregated-storage-entries.service.ts:222",
+          "aggregated-storage-entries.service.ts:279",
+          "aggregated-storage-entries-filter.input.ts:72",
+          "aggregated-storage-entries.resolver.ts:71",
+          "storage-event-category.enum.ts:7",
+          "storage-event-category.enum.ts:23",
+          "aggregated-storage-entries.service.ts:56",
+          "aggregated-storage-entries.service.ts:290",
+          "aggregated-storage-entries.service.ts:222",
+          "aggregated-storage-entries.service.ts:279",
+          "aggregated-storage-entries-filter.input.ts:72",
+          "aggregated-storage-entries.resolver.ts:71"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/aggregatedStorageEntries/dto/storage-event-category.enum.ts",
+          "/apps/whk-wms/src/aggregatedStorageEntries/aggregated-storage-entries.resolver.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.427,
+        "bigram": 0.075,
+        "trigram": 0.052,
+        "concept": 0.434,
+        "idf_weighted": 0.734
+      }
+    },
+    {
+      "id": "hard_sym_12",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.508,
+        "concept": 0.412,
+        "citation_bonus": 0.1,
+        "final": 0.938
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync.processor.ts:52",
+          "android-sync-inbox.listener.ts:60",
+          "android-sync.processor.ts:40",
+          "android-sync-inbox.listener.ts:38",
+          "android-sync.processor.ts:52",
+          "android-sync-inbox.listener.ts:60",
+          "android-sync.processor.ts:40",
+          "android-sync-inbox.listener.ts:38"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts",
+          "/apps/whk-wms/src/androidSyncInbox/android-sync.processor.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.417,
+        "bigram": 0.06,
+        "trigram": 0.0,
+        "concept": 0.412,
+        "idf_weighted": 0.704
+      }
+    },
+    {
+      "id": "hard_sym_13",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.611,
+        "concept": 0.484,
+        "citation_bonus": 0.1,
+        "final": 0.964
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync-inbox.service.ts:18",
+          "barrel-aggregates.service.ts:27",
+          "android-sync-inbox.service.ts:17",
+          "barrel-aggregates.service.ts:23",
+          "android-sync-inbox.service.ts:18",
+          "barrel-aggregates.service.ts:27",
+          "android-sync-inbox.service.ts:17",
+          "barrel-aggregates.service.ts:23"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts",
+          "/apps/whk-wms/src/barrelAggregates/barrel-aggregates.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.474,
+        "bigram": 0.119,
+        "trigram": 0.053,
+        "concept": 0.484,
+        "idf_weighted": 0.795
+      }
+    },
+    {
+      "id": "hard_sym_14",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.539,
+        "concept": 0.431,
+        "citation_bonus": 0.1,
+        "final": 0.945
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "seeding/constants.ts:7",
+          "seeding/domains/barrels.ts:80",
+          "barrels.ts:80",
+          "barrel.service.ts:1063",
+          "barrel.resolver.ts:248",
+          "cached-storage-location.service.ts:215",
+          "sync.service.ts:359",
+          "seeding/constants.ts:7",
+          "seeding/domains/barrels.ts:80",
+          "barrels.ts:80",
+          "barrel.service.ts:1063",
+          "barrel.resolver.ts:248",
+          "cached-storage-location.service.ts:215",
+          "sync.service.ts:359"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/scripts/seeding/constants.ts",
+          "/apps/whk-wms/scripts/seeding/domains/barrels.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.427,
+        "bigram": 0.102,
+        "trigram": 0.021,
+        "concept": 0.431,
+        "idf_weighted": 0.712
+      }
+    },
+    {
+      "id": "hard_sym_15",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.877,
+        "concept": 0.563,
+        "citation_bonus": 0.1,
+        "final": 1.0
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "android-sync-inbox.listener.ts:56",
+          "android-sync-inbox.service.ts:21",
+          "llama.service.ts:898",
+          "android-sync-inbox.listener.ts:50",
+          "android-sync-inbox.service.ts:20",
+          "llama.service.ts:895",
+          "android-sync-inbox.listener.ts:56",
+          "android-sync-inbox.service.ts:21",
+          "llama.service.ts:898",
+          "android-sync-inbox.listener.ts:50",
+          "android-sync-inbox.service.ts:20",
+          "llama.service.ts:895"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts",
+          "/apps/whk-wms/src/providers/llama/llama.service.ts",
+          "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.552,
+        "bigram": 0.444,
+        "trigram": 0.293,
+        "concept": 0.563,
+        "idf_weighted": 1.0
+      }
+    },
+    {
+      "id": "hard_sym_16",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.638,
+        "concept": 0.496,
+        "citation_bonus": 0.1,
+        "final": 0.97
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "lib/config/constants.ts:17",
+          "lib/config/constants.ts:6",
+          "lib/config/constants.ts:10",
+          "lib/config/constants.ts:23",
+          "lib/config/constants.ts:21",
+          "lib/config/constants.ts:17",
+          "lib/config/constants.ts:6",
+          "lib/config/constants.ts:10",
+          "lib/config/constants.ts:23",
+          "lib/config/constants.ts:21"
+        ],
+        "expected_files": [
+          "/apps/whk-wms-front-end/lib/config/constants.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.492,
+        "bigram": 0.105,
+        "trigram": 0.028,
+        "concept": 0.496,
+        "idf_weighted": 0.89
+      }
+    },
+    {
+      "id": "hard_sym_17",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 0.0,
+        "semantic": 0.311,
+        "concept": 0.206,
+        "citation_bonus": 0.0,
+        "final": 0.078
+      },
+      "evidence_details": {
+        "tier": "none",
+        "citations_found": [],
+        "expected_files": [
+          "/apps/whk-wms/src/warehouse/warehouse.service.ts"
+        ],
+        "matched_files": false,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.258,
+        "bigram": 0.081,
+        "trigram": 0.056,
+        "concept": 0.206,
+        "idf_weighted": 0.413
+      }
+    },
+    {
+      "id": "hard_sym_18",
+      "category": "disambiguation",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.489,
+        "concept": 0.378,
+        "citation_bonus": 0.1,
+        "final": 0.93
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "printer-full-sync.service.ts:552",
+          "printer-full-sync.service.ts:670",
+          "printer-full-sync.service.ts:552",
+          "printer-full-sync.service.ts:670"
+        ],
+        "expected_files": [
+          "/apps/whk-wms-front-end/lib/services/chatBotFallback.ts",
+          "/apps/whk-wms/src/inventory-upload/inventory-processing.service.ts",
+          "/apps/whk-wms/src/androidSyncInbox/android-sync-inbox.listener.ts",
+          "/apps/whk-wms/src/printer-automation/printer-full-sync.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.39,
+        "bigram": 0.162,
+        "trigram": 0.106,
+        "concept": 0.378,
+        "idf_weighted": 0.529
+      }
+    },
+    {
+      "id": "hard_sym_19",
+      "category": "relationship",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.39,
+        "concept": 0.315,
+        "citation_bonus": 0.1,
+        "final": 0.906
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "time-period-granularity.enum.ts:7",
+          "barrel-aggregates.service.ts:14",
+          "time-period-granularity.enum.ts:21",
+          "aggregated-storage-entries.service.ts:297",
+          "aggregated-storage-entries.service.ts:351",
+          "barrel-aggregates.service.ts:961",
+          "barrel-aggregates.service.ts:968",
+          "aggregated-storage-entries-filter.input.ts:42",
+          "time-period-granularity.enum.ts:7",
+          "barrel-aggregates.service.ts:14",
+          "time-period-granularity.enum.ts:21",
+          "aggregated-storage-entries.service.ts:297",
+          "aggregated-storage-entries.service.ts:351",
+          "barrel-aggregates.service.ts:961",
+          "barrel-aggregates.service.ts:968",
+          "aggregated-storage-entries-filter.input.ts:42"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/aggregatedStorageEntries/dto/time-period-granularity.enum.ts",
+          "/apps/whk-wms/src/aggregatedStorageEntries/aggregated-storage-entries.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.309,
+        "bigram": 0.02,
+        "trigram": 0.0,
+        "concept": 0.315,
+        "idf_weighted": 0.575
+      }
+    },
+    {
+      "id": "hard_sym_20",
+      "category": "computed_value",
+      "difficulty": "hard",
+      "scores": {
+        "evidence": 1.0,
+        "semantic": 0.528,
+        "concept": 0.412,
+        "citation_bonus": 0.1,
+        "final": 0.941
+      },
+      "evidence_details": {
+        "tier": "strong",
+        "citations_found": [
+          "indexing.service.ts:268",
+          "indexing.service.ts:250",
+          "indexing.service.ts:271",
+          "indexing.service.ts:286",
+          "llama.service.ts:1305",
+          "indexing.service.ts:268",
+          "indexing.service.ts:250",
+          "indexing.service.ts:271",
+          "indexing.service.ts:286",
+          "llama.service.ts:1305"
+        ],
+        "expected_files": [
+          "/apps/whk-wms/src/providers/indexing/indexing.service.ts"
+        ],
+        "matched_files": true,
+        "line_tolerance_met": false
+      },
+      "semantic_details": {
+        "unigram": 0.405,
+        "bigram": 0.125,
+        "trigram": 0.0,
+        "concept": 0.412,
+        "idf_weighted": 0.712
+      }
+    }
+  ]
+}

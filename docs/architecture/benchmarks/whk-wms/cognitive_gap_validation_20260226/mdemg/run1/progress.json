@@ -1,0 +1,22 @@
+{
+  "mode": "mdemg",
+  "run": 1,
+  "model": "haiku",
+  "session_id": "1c01c57e-c186-49d0-b8be-e3d6780cdd44",
+  "total": 120,
+  "processed": 10,
+  "successful": 10,
+  "failed": 0,
+  "with_refs": 10,
+  "total_duration": 301.3,
+  "total_response_chars": 21351,
+  "total_input_tokens": 2501,
+  "total_output_tokens": 21624,
+  "total_cache_read_tokens": 7360081,
+  "total_cache_write_tokens": 892867,
+  "total_cost_usd": 1.96398685,
+  "total_compact_events": 0,
+  "total_compact_events_heuristic": 0,
+  "start_time": "2026-02-26T16:13:41.100200",
+  "errors": []
+}

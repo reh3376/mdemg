@@ -122,6 +122,7 @@ class NamingResult:
     proposed_label: str = ""
     label_valid: bool = False
     name_word_score: float = 0.0
+    description_quality_score: float = 0.0
     error: str = ""
 
 
@@ -134,10 +135,12 @@ class SpecResult:
     json_valid_count: int = 0
     label_valid_count: int = 0
     name_quality_count: int = 0
+    description_quality_count: int = 0
     avg_latency_ms: float = 0.0
     json_valid_rate: float = 0.0
     label_valid_rate: float = 0.0
     name_quality_rate: float = 0.0
+    description_quality_rate: float = 0.0
     hash_verified: bool = False
     duration_ms: float = 0.0
     failures: list[str] = field(default_factory=list)
@@ -390,6 +393,16 @@ class ModelInterface:
         else:
             result.name_word_score = 0.0
 
+        # E4: Score description quality (1-2 sentences, 10-200 words)
+        desc = result.description.strip()
+        desc_words = len(desc.split()) if desc else 0
+        if desc and 10 <= desc_words <= 200:
+            result.description_quality_score = 1.0
+        elif desc and 5 <= desc_words < 10:
+            result.description_quality_score = 0.5
+        else:
+            result.description_quality_score = 0.0
+
         return result
 
 
@@ -416,11 +429,13 @@ class Validator:
         json_valid = sum(1 for r in results if r.json_valid)
         label_valid = sum(1 for r in results if r.label_valid)
         name_quality = sum(1 for r in results if r.name_word_score >= 1.0)
+        desc_quality = sum(1 for r in results if r.description_quality_score >= 1.0)
         avg_latency = sum(r.latency_ms for r in results) / total
 
         json_rate = json_valid / total
         label_rate = label_valid / total
         name_rate = name_quality / total
+        desc_rate = desc_quality / total
 
         failures = []
 
@@ -445,6 +460,13 @@ class Validator:
                 f"E3_NAME_QUALITY: {name_rate:.1%} < {req_name:.1%} threshold"
             )
 
+        # E4: Description quality
+        req_desc = thresholds.get("description_quality_rate")
+        if req_desc is not None and desc_rate < req_desc:
+            failures.append(
+                f"E4_DESCRIPTION_QUALITY: {desc_rate:.1%} < {req_desc:.1%} threshold"
+            )
+
         # E5: Latency
         req_latency = thresholds.get("max_avg_latency_ms")
         if req_latency is not None and avg_latency > req_latency:
@@ -461,6 +483,7 @@ class Validator:
                 "name": r.name,
                 "proposed_label": r.proposed_label,
                 "name_word_score": r.name_word_score,
+                "description_quality_score": r.description_quality_score,
                 "latency_ms": round(r.latency_ms, 1),
             }
             if r.error:
@@ -475,10 +498,12 @@ class Validator:
             json_valid_count=json_valid,
             label_valid_count=label_valid,
             name_quality_count=name_quality,
+            description_quality_count=desc_quality,
             avg_latency_ms=round(avg_latency, 1),
             json_valid_rate=round(json_rate, 4),
             label_valid_rate=round(label_rate, 4),
             name_quality_rate=round(name_rate, 4),
+            description_quality_rate=round(desc_rate, 4),
             failures=failures,
             details=details,
         )
@@ -506,6 +531,7 @@ class Reporter:
         print(f"         JSON valid:    {result.json_valid_count}/{result.total_clusters} ({result.json_valid_rate:.1%})")
         print(f"         Label valid:   {result.label_valid_count}/{result.total_clusters} ({result.label_valid_rate:.1%})")
         print(f"         Name quality:  {result.name_quality_count}/{result.total_clusters} ({result.name_quality_rate:.1%})")
+        print(f"         Desc quality:  {result.description_quality_count}/{result.total_clusters} ({result.description_quality_rate:.1%})")
         print(f"         Avg latency:   {result.avg_latency_ms:.0f}ms")
 
         if result.failures:

@@ -142,7 +142,7 @@ type RetrieveRequest struct {
 
 ### UDTS (Universal DevSpace Test Specification)
 <!-- (Applying UDTS as this involves cross-space data boundaries and graph topology validation) -->
-* [ ] `docs/api/api-spec/udts/specs/global_space_topology.phase105.udts.json`: Validate that promoted nodes exist in `mdemg-global` and have valid `ORIGINATED_FROM` edges pointing back to the correct local `space_id`.
+* [ ] `docs/api/api-spec/udts/drafts/global_space_topology.phase105.udts.json`: Validate that promoted nodes exist in `mdemg-global` and have valid `ORIGINATED_FROM` edges pointing back to the correct local `space_id`.
 
 ### Unit Tests
 * [ ] `internal/metalearn/service_test.go`: Mock LLM generalization and verify `ORIGINATED_FROM` Cypher generation.
@@ -173,4 +173,4 @@ type RetrieveRequest struct {
 * `internal/metalearn/service.go`
 * `docs/api/api-spec/uats/drafts/meta_learn_promotion.phase105.uats.json`
 * `docs/api/api-spec/uats/drafts/retrieve_global_space.phase105.uats.json`
-* `docs/api/api-spec/udts/specs/global_space_topology.phase105.udts.json`
+* `docs/api/api-spec/udts/drafts/global_space_topology.phase105.udts.json`

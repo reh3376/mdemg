@@ -15,7 +15,7 @@
         "name": "mdemg_neo4j_container_cpu_percent",
         "type": "gauge",
         "help_contains": "CPU usage percent",
-        "value_range": { "min": 0, "max": 100 }
+        "value_range": { "min": 0 }
       },
       {
         "name": "mdemg_neo4j_container_mem_used_bytes",

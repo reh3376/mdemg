@@ -1,0 +1,44 @@
+name: UXTS Canonical Specs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/api/api-spec/**'
+      - 'docs/tests/**'
+      - 'docs/lang-parser/**'
+      - 'docs/development/UXTS_FRAMEWORK_MATRIX.md'
+      - 'scripts/verify_uxts_*.py'
+      - '.github/workflows/uxts-canonical-specs.yml'
+      - 'Makefile'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/api/api-spec/**'
+      - 'docs/tests/**'
+      - 'docs/lang-parser/**'
+      - 'docs/development/UXTS_FRAMEWORK_MATRIX.md'
+      - 'scripts/verify_uxts_*.py'
+      - '.github/workflows/uxts-canonical-specs.yml'
+      - 'Makefile'
+
+jobs:
+  canonical-spec-verification:
+    name: Verify Canonical UDTS/UVTS Specs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Verify canonical UxTS specs
+        run: python3 scripts/verify_uxts_canonical_specs.py
+
+      - name: Check UxTS framework drift (soft-fail)
+        continue-on-error: true
+        run: python3 scripts/verify_uxts_drift.py

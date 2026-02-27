@@ -1,8 +1,8 @@
 # MDEMG API Test Specifications (UATS)
 
-**Version:** 1.0.1  
-**Date:** 2026-01-29  
-**Endpoints:** 45 specs, ~90 test variants
+**Version:** 1.1.0
+**Date:** 2026-02-26
+**Specs:** 124 canonical specs + 7 drafts
 
 ---
 
@@ -121,13 +121,11 @@ docs/api/api-spec/uats/
 ├── schema/
 │   └── uats.schema.json
 ├── specs/
-│   ├── health.uats.json
-│   ├── readiness.uats.json
-│   ├── retrieve.uats.json
-│   ├── ingest.uats.json
-│   ├── ... (41 specs total)
+│   └── *.uats.json          # 124 canonical spec files
+├── drafts/
+│   └── *.uats.json          # 7 draft specs (not run in CI)
 ├── runners/
-│   └── uats_runner.py
+│   └── uats_runner.py       # v1.1.0
 └── README.md
 ```
 
@@ -217,6 +215,18 @@ pip install requests jsonpath-ng
 
 ---
 
+## Runner Feature Coverage (Current)
+
+The UATS runner enforces the fields currently used by active specs, including:
+
+- `config.response_time_max_ms`
+- `config.follow_redirects`
+- `variants[].variables`
+
+The runner now fails fast when a spec uses schema features that are defined but not implemented in runtime behavior yet (for example: `setup`, `teardown`, `chain`, `request.body_file`, `expected.body_file`, `expected.body_schema`, and OAuth2 auth mode).
+
+---
+
 ## CI Integration
 
 ```yaml
@@ -267,7 +277,7 @@ jobs:
 
 | Aspect | UPTS (Parsers) | UATS (APIs) |
 |--------|----------------|-------------|
-| Scope | 16 languages | 41 endpoints |
+| Scope | 27 languages | 124 API specs |
 | Input | Source files | HTTP requests |
 | Output | Symbols JSON | HTTP responses |
 | Validation | Symbol matching | Status, headers, body |
@@ -329,8 +339,8 @@ Pass Rate: 100.0%
 
 ## Stats
 
-- **Total Specs:** 45
-- **Categories:** 7 (Health, Memory, Ingest Jobs, Ingest Codebase, Learning, Conversation, System)
-- **Test Variants:** ~90
+- **Canonical Specs:** 124
+- **Draft Specs:** 7
+- **Categories:** 15+ (Health, Memory, Ingest Jobs, Ingest Codebase, Learning, Conversation, System, Backup, CMS, Self-Improve/RSIC, Hash Verification, Scraper, Admin Spaces, Meta-Learn, Guardrails)
 - **Most Complex:** ingest_codebase.uats.json (18 variants covering all config options)
-- **Lines of Code:** ~2,500 (runner)
+- **Runner Version:** 1.1.0 (fail-fast for unimplemented schema features)

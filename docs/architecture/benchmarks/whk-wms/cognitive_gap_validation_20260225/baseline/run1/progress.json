@@ -1,0 +1,79 @@
+{
+  "mode": "baseline",
+  "run": 1,
+  "model": "haiku",
+  "total": 120,
+  "processed": 120,
+  "successful": 88,
+  "failed": 15,
+  "with_refs": 86,
+  "total_duration": 5668.9000000000015,
+  "start_time": "2026-02-25T12:05:00.510540",
+  "errors": [
+    {
+      "id": 165,
+      "error": "TIMEOUT after 180s"
+    },
+    {
+      "id": 140,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 302,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 477,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 328,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 318,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 472,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 194,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 268,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 156,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 464,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 337,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 329,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 444,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    },
+    {
+      "id": 366,
+      "error": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa"
+    }
+  ],
+  "drift_count": 2,
+  "end_time": "2026-02-25T13:39:29.726614",
+  "wall_clock_seconds": 5669.2,
+  "ref_rate": 0.9772727272727273,
+  "avg_duration": 47.24083333333335
+}

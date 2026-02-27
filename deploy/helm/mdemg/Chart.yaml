@@ -1,0 +1,21 @@
+apiVersion: v2
+name: mdemg
+description: Multi-Dimensional Emergent Memory Graph - A persistent memory system for LLMs
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - memory
+  - llm
+  - graph
+  - neo4j
+  - semantic-search
+maintainers:
+  - name: MDEMG Team
+sources:
+  - https://github.com/your-org/mdemg
+dependencies:
+  - name: neo4j
+    version: "5.x.x"
+    repository: "https://helm.neo4j.com/neo4j"
+    condition: neo4j.enabled

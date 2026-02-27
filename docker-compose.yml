@@ -28,17 +28,24 @@ services:
     image: docker:cli
     container_name: mdemg-neo4j-monitor
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./scripts:/scripts:ro
       - ./logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD-SHELL", "docker inspect --format '{{.State.Health.Status}}' mdemg-neo4j 2>/dev/null | grep -q healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         apk add --no-cache python3 py3-pip >/dev/null 2>&1
-        python3 /scripts/monitor_container.py --container mdemg-neo4j --interval 2 --log /logs/neo4j_monitor.log --max-lines 20000 --max-bytes 5242880
+        python3 /scripts/monitor_container.py --container mdemg-neo4j --interval 2 --log /logs/neo4j_monitor.log --max-lines 20000 --max-bytes 5242880 --max-failures 10
 
 volumes:
   neo4j_data:

@@ -112,7 +112,7 @@ To adhere to the Framework Governance rules (`docs/specs/FRAMEWORK_GOVERNANCE.md
 
 ### UVTS (Universal Validation Test Specification)
 *(Note: As per `UXTS_FRAMEWORK_MATRIX.md`, UVTS is currently spec-only without a runner. We will draft the spec format to pilot the runner implementation later).*
-- [ ] `docs/tests/uvts/specs/dynamic_emergence_quality.phase103.uvts.json`: Define a benchmark cluster of text nodes and assert that the LLM-generated `Name` contains expected semantic concepts (e.g., if we feed it 5 nodes about database connections, the output name MUST contain "Database" or "Connection").
+- [ ] `docs/tests/uvts/drafts/dynamic_emergence_quality.phase103.uvts.json`: Define a benchmark cluster of text nodes and assert that the LLM-generated `Name` contains expected semantic concepts (e.g., if we feed it 5 nodes about database connections, the output name MUST contain "Database" or "Connection").
 
 ### Unit Tests
 - [ ] `internal/consolidation/service_test.go`: Mock the LLM client returning valid JSON and verify the corresponding Cypher query generation.
@@ -141,7 +141,7 @@ To adhere to the Framework Governance rules (`docs/specs/FRAMEWORK_GOVERNANCE.md
 
 ### New Files
 - `docs/api/api-spec/uats/drafts/consolidate_dynamic_emergence.phase103.uats.json`
-- `docs/tests/uvts/specs/dynamic_emergence_quality.phase103.uvts.json`
+- `docs/tests/uvts/drafts/dynamic_emergence_quality.phase103.uvts.json`
 
 ---
 

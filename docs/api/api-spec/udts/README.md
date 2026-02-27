@@ -57,7 +57,8 @@ UDTS is to gRPC what UATS is to HTTP: a language-agnostic, spec-driven test form
 ## Files
 
 - `schema/udts.schema.json` — JSON schema for `.udts.json` specs
-- `specs/*.udts.json` — Per-method or per-scenario specs
+- `specs/*.udts.json` — Canonical unary/stream RPC contract specs consumed by `tests/udts`
+- `drafts/*.udts.json` — Draft scenario-style specs (not consumed by `tests/udts` yet)
 - Runner: `tests/udts/` (Go tests that load specs and run gRPC calls)
 
 ---

@@ -96,6 +96,8 @@ def main():
     ap.add_argument("--max-lines", type=int, default=0, help="Max log lines (0 = unlimited)")
     ap.add_argument("--max-bytes", type=int, default=0, help="Max log file size in bytes (0 = unlimited)")
     ap.add_argument("--count", type=int, default=0, help="Number of samples (0 = run forever)")
+    ap.add_argument("--max-failures", type=int, default=0,
+                     help="Exit after N consecutive docker stats failures (0 = retry forever)")
     args = ap.parse_args()
 
     if not docker_exists():
@@ -127,6 +129,7 @@ def main():
         log_fp = open(args.log, "a", encoding="utf-8")
 
     i = 0
+    consecutive_failures = 0
     try:
         while True:
             ts = dt.datetime.utcnow().isoformat() + "Z"
@@ -141,8 +144,24 @@ def main():
                         args.container,
                     ]
                 )
+                consecutive_failures = 0  # Reset on success
             except subprocess.CalledProcessError as e:
-                print(f"[{ts}] ERROR running docker stats: {e.output.strip()}", file=sys.stderr)
+                consecutive_failures += 1
+                print(
+                    f"[{ts}] ERROR running docker stats ({consecutive_failures}x): "
+                    f"{e.output.strip()}",
+                    file=sys.stderr,
+                )
+                if args.max_failures > 0 and consecutive_failures >= args.max_failures:
+                    msg = (
+                        f"[{ts}] FATAL: container '{args.container}' unreachable after "
+                        f"{consecutive_failures} consecutive failures — exiting"
+                    )
+                    print(msg, file=sys.stderr)
+                    if log_fp:
+                        log_fp.write(msg + "\n")
+                        log_fp.flush()
+                    sys.exit(1)
                 time.sleep(args.interval)
                 continue
 
