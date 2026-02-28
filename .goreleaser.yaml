@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+builds:
+  - id: mdemg
+    main: ./cmd/mdemg
+    binary: mdemg
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin       # extend: add linux
+    goarch:
+      - arm64        # extend: add amd64
+    ldflags:
+      - -s -w
+      - -X mdemg/internal/cli.Version={{.Version}}
+      - -X mdemg/internal/cli.Commit={{.ShortCommit}}
+      - -X mdemg/internal/cli.BuildDate={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: reh3376
+      name: homebrew-mdemg
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    name: mdemg
+    homepage: "https://github.com/reh3376/mdemg"
+    description: "Multi-Dimensional Emergent Memory Graph — cognitive substrate for AI agents"
+    install: |
+      bin.install "mdemg"
+    test: |
+      system "#{bin}/mdemg", "version"
