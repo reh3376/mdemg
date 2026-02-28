@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration release-snapshot release-local
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -107,9 +107,23 @@ help:
 	@echo "  test-ubts-load - Run UBTS load benchmark (1000 requests)"
 	@echo "  test-uots      - Run all UOTS observability contract specs"
 	@echo "  test-unts-report- Generate UNTS Section 8A report from registry"
+	@echo "  release-snapshot- Build release snapshot locally (no publish)"
+	@echo "  release-local  - Build release locally (no publish, requires tag)"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Build and run MDEMG server"
+# ============================================================
+# Release Targets (requires goreleaser: brew install goreleaser)
+# ============================================================
+
+# Build a release snapshot locally (no publish, no tag required)
+release-snapshot:
+	goreleaser release --snapshot --clean
+
+# Build a release locally (no publish, requires a tag)
+release-local:
+	goreleaser release --skip=publish --clean
+
 # ============================================================
 # UATS API Testing Targets
 # ============================================================

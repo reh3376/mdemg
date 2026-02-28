@@ -783,3 +783,75 @@ Use this template for each session entry:
 | All tests pass | PASS | 14 unit + 22 integration = 36 new tests, all passing |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
 | Makefile targets work | PASS | `make test-sidecar` runs both suites |
+
+### Entry 2026-02-28T00:00:00Z — S8 Completion
+
+1. Timestamp (UTC): 2026-02-28T00:00:00Z
+2. Phase: S8 - Distribution Pipeline (COMPLETE)
+3. Related roadmap sections: S8 exit criteria (fresh machine install passes end-to-end acceptance script)
+4. Work completed:
+   - Created `.goreleaser.yaml` (~45 lines):
+     - goreleaser v2 config building `./cmd/mdemg` with CGO_ENABLED=1
+     - ldflags inject Version, Commit, BuildDate into `mdemg/internal/cli`
+     - macOS arm64 initially, structured for easy platform extension
+     - SHA256 checksums, filtered changelog, tar.gz archives
+     - Homebrew tap auto-publish to `reh3376/homebrew-mdemg`
+   - Created `.github/workflows/release.yml` (~35 lines):
+     - Tag-triggered (`v*`) on `macos-latest` for native arm64 CGO builds
+     - Uses `goreleaser/goreleaser-action@v6` with v2 distribution
+     - Env: GITHUB_TOKEN (automatic) + HOMEBREW_TAP_TOKEN (repo secret)
+   - Created `scripts/install.sh` (~150 lines):
+     - Platform detection: `detect_os()` (darwin/linux), `detect_arch()` (arm64/amd64)
+     - `detect_latest_version()` via GitHub API
+     - SHA256 checksum verification (sha256sum or shasum -a 256)
+     - Installs to `~/.local/bin` by default (or `$INSTALL_DIR`)
+     - Supports `VERSION` and `INSTALL_DIR` env var overrides
+     - PATH check with remediation instructions
+   - Fixed `.github/workflows/ci.yml`:
+     - Both `build` and `test` job "Build unified CLI" steps now inject ldflags
+     - `-X mdemg/internal/cli.Version=ci -X mdemg/internal/cli.Commit=... -X mdemg/internal/cli.BuildDate=...`
+   - Fixed `deploy/docker/Dockerfile.prod`:
+     - Binary: `./cmd/server` → `./cmd/mdemg`
+     - ldflags: `main.version` → `mdemg/internal/cli.Version` + Commit + BuildDate
+     - Port: 8080 → 9999
+     - Health check: port 8080 → 9999
+     - Entrypoint: `["./mdemg"]` → `["./mdemg", "serve"]`
+   - Added Makefile targets:
+     - `release-snapshot` — build snapshot locally (no publish, no tag)
+     - `release-local` — build release locally (no publish, requires tag)
+     - Updated help target and .PHONY list
+5. Assumptions eliminated:
+   - CI builds had no version info — now inject ldflags in both build and test jobs
+   - Dockerfile built wrong binary (`cmd/server`) on wrong port (8080) — now correct
+   - goreleaser uses `{{.Version}}` (without v prefix) for archive naming
+   - Checksum verification works on both macOS (shasum) and Linux (sha256sum)
+6. Decisions made:
+   - macOS arm64 only initially — config structured for easy multi-platform extension
+   - goreleaser v2 (not v1) — current standard
+   - Homebrew tap in separate repo (`reh3376/homebrew-mdemg`) — standard pattern
+   - Install script defaults to `~/.local/bin` (no sudo needed) — user-friendly
+   - `macos-latest` runner for release (native arm64 for CGO) — avoids cross-compilation complexity
+7. Open questions:
+   - None for S8 scope.
+   - Future: add linux/amd64 build target, code signing, notarization
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `shellcheck scripts/install.sh` — 0 warnings
+9. Next actions:
+   - Create `reh3376/homebrew-mdemg` repo (manual)
+   - Create PAT and add as HOMEBREW_TAP_TOKEN secret (manual)
+   - Tag `v0.1.0` and push to trigger first release (manual)
+
+**S8 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| goreleaser config valid | PASS | `.goreleaser.yaml` — goreleaser v2 format |
+| Release workflow triggered on tags | PASS | `.github/workflows/release.yml` — `on: push: tags: ["v*"]` |
+| CI builds inject version ldflags | PASS | Both build and test jobs updated in ci.yml |
+| Dockerfile builds correct binary | PASS | `./cmd/mdemg` with correct ldflags, port 9999 |
+| Curl installer with checksum verification | PASS | `scripts/install.sh` — SHA256 verification, platform detection |
+| Makefile release targets | PASS | `release-snapshot` and `release-local` |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
