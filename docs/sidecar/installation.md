@@ -190,9 +190,12 @@ To fully remove sidecar integration:
 mdemg sidecar uninstall
 ```
 
-Note: `uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+Options:
+- `--force`: Stop running services before uninstalling
+- `--keep-data`: Preserve Neo4j volume (graph data survives uninstall/reinstall)
+- `--dry-run`: Preview what would be removed
 
-Before uninstall, ensure any required backups are captured.
+The `.mdemg/` directory is automatically backed up to `.mdemg-backup-<timestamp>/` before removal.
 
 ---
 

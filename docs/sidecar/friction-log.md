@@ -13,21 +13,14 @@ Documents known limitations, workarounds, and rough edges in v0.1.0. Items here 
 
 ---
 
-## F1: `upgrade` and `uninstall` Are Stubs
+## F1: ~~`upgrade` and `uninstall` Are Stubs~~ (RESOLVED in S12)
 
-**What happens:** Running `mdemg sidecar upgrade` or `mdemg sidecar uninstall` prints "not yet implemented" and exits cleanly.
+**Resolved:** Both commands are now fully implemented. `mdemg sidecar upgrade` detects version drift and performs a controlled upgrade cycle (down → install → up). `mdemg sidecar uninstall` cleanly removes all sidecar artifacts with safety backup.
 
-**Workaround — Upgrade:**
-
-1. Build the new version: `go build -o bin/mdemg ./cmd/mdemg` (or download from release).
-2. Re-run `mdemg sidecar install` to reconcile state.
-3. Restart runtime: `mdemg sidecar restart`.
-
-**Workaround — Uninstall:**
-
-1. Stop services: `mdemg sidecar down`.
-2. Detach agents: `mdemg sidecar detach-agent claude-code`.
-3. Remove sidecar artifacts: `rm -rf .mdemg/`.
+- `upgrade` supports `--dry-run`, `--skip-restart`, and `--format json`
+- `uninstall` supports `--dry-run`, `--force`, `--keep-data`, and `--format json`
+- `.mdemg/` is always backed up before removal (to `.mdemg-backup-<timestamp>/`)
+- Full lifecycle coverage: `init → install → up → doctor → restart → upgrade → down → uninstall`
 
 ---
 

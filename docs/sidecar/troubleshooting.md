@@ -45,7 +45,7 @@ tail -n 200 .mdemg/logs/mdemg.log
 | `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
 | `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |
 | `TRBL-OLLAMA-MODELS` | Doctor reports missing Ollama models | Required models not pulled | Run `ollama pull` for each missing model |
-| `TRBL-STUB-CMD` | Command prints "not yet implemented" | `upgrade` or `uninstall` stub | See `docs/sidecar/friction-log.md` (F1) for manual workaround |
+| ~~`TRBL-STUB-CMD`~~ | ~~Command prints "not yet implemented"~~ | ~~Resolved in S12~~ | Both `upgrade` and `uninstall` are now fully implemented |
 
 ---
 
