@@ -10,7 +10,7 @@ type mockExecutor struct{}
 
 func (m *mockExecutor) RunDocker(args ...string) (string, error) { return "", nil }
 func (m *mockExecutor) DockerAvailable() bool                    { return true }
-func (m *mockExecutor) StartDaemon(_ []string) (int, error)      { return 42, nil }
+func (m *mockExecutor) StartDaemon(_ []string, _ ...string) (int, error) { return 42, nil }
 func (m *mockExecutor) StopDaemon(_ int) error                   { return nil }
 func (m *mockExecutor) DaemonRunning(_ int) bool                 { return true }
 func (m *mockExecutor) WaitForPort(_ string, _ int, _ time.Duration) error {

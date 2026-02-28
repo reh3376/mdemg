@@ -135,20 +135,21 @@ func EvalNeo4jImage(info Neo4jImageInfo) PreflightCheck {
 }
 
 // EvalPortFree evaluates whether a TCP port is available.
+// With dynamic port allocation, a busy preferred port is advisory (warn), not fatal.
 func EvalPortFree(info PortInfo) PreflightCheck {
 	if !info.Free {
 		return PreflightCheck{
 			ID:          "port-available",
-			Status:      "fail",
-			Required:    true,
-			Message:     fmt.Sprintf("Port %d is already in use", info.Port),
-			Remediation: fmt.Sprintf("Free port %d or change runtime.endpoint in sidecar.yaml", info.Port),
+			Status:      "warn",
+			Required:    false,
+			Message:     fmt.Sprintf("Port %d is in use — dynamic allocation will find a free port at startup", info.Port),
+			Remediation: fmt.Sprintf("Free port %d or let dynamic allocation handle it", info.Port),
 		}
 	}
 	return PreflightCheck{
 		ID:       "port-available",
 		Status:   "pass",
-		Required: true,
+		Required: false,
 		Message:  fmt.Sprintf("Port %d is available", info.Port),
 	}
 }

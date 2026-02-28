@@ -67,6 +67,10 @@ func runSidecarDoctor(format string) error {
 		}
 	}
 
+	// Use lock file for runtime endpoint and Neo4j port (dynamic allocation)
+	endpoint = sidecar.ResolveRuntimeEndpoint(cwd, endpoint)
+	neo4jBoltPort := sidecar.ResolveRuntimeNeo4jBoltPort(cwd, 7687)
+
 	// Run diagnostic checks
 	var checks []sidecar.DoctorCheck
 
@@ -82,8 +86,8 @@ func runSidecarDoctor(format string) error {
 		checks = append(checks, runDockerContextCheck())
 	}
 
-	// Check 2: neo4j.reachable (uses neo4jHost — remote or localhost)
-	checks = append(checks, runNeo4jCheck(neo4jHost))
+	// Check 2: neo4j.reachable (uses neo4jHost — remote or localhost, with dynamic port)
+	checks = append(checks, runNeo4jCheck(neo4jHost, neo4jBoltPort))
 
 	// Check 3: api.healthy
 	checks = append(checks, runAPICheck(endpoint))
@@ -230,9 +234,9 @@ func runConfigCheck(configPath string, cfg *sidecar.Config) sidecar.DoctorCheck 
 	}
 }
 
-func runNeo4jCheck(host string) sidecar.DoctorCheck {
+func runNeo4jCheck(host string, boltPort int) sidecar.DoctorCheck {
 	start := time.Now()
-	addr := net.JoinHostPort(host, "7687")
+	addr := net.JoinHostPort(host, fmt.Sprintf("%d", boltPort))
 	conn, err := net.DialTimeout("tcp", addr, probeTimeout)
 	duration := int(time.Since(start).Milliseconds())
 

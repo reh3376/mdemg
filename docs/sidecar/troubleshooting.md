@@ -40,7 +40,7 @@ tail -n 200 .mdemg/logs/mdemg.log
 | `TRBL-INSTALL-CLI` | `mdemg` command not found | CLI not installed/in PATH | Install/build CLI, re-run |
 | `TRBL-REMOTE-SSH` | Remote profile cannot start | SSH connectivity/auth issue | Validate SSH non-interactive access |
 | `TRBL-REMOTE-CONTEXT` | Remote runtime state inconsistent | Docker context misconfigured | Recreate and select correct context |
-| `TRBL-PORT-CONFLICT` | Runtime not reachable at configured endpoint | Port already in use | Rebind port or let sidecar auto-allocate |
+| `TRBL-PORT-CONFLICT` | Runtime not reachable at configured endpoint | Port already in use | Automatic: `sidecar up` dynamically allocates free ports. Check `.mdemg/sidecar.lock` for actual ports |
 | `TRBL-AGENT-CONFIG` | Attach-agent fails | Config merge conflict | Restore backup, run print-only attach, merge manually |
 | `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
 | `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |

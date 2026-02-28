@@ -10,7 +10,8 @@ type Executor interface {
 	// DockerAvailable returns true if Docker is accessible.
 	DockerAvailable() bool
 	// StartDaemon starts MDEMG server in background. Returns PID.
-	StartDaemon(serveArgs []string) (int, error)
+	// Extra environment variables can be passed to the daemon process.
+	StartDaemon(serveArgs []string, extraEnv ...string) (int, error)
 	// StopDaemon stops the MDEMG server process.
 	StopDaemon(pid int) error
 	// DaemonRunning checks if PID is alive.

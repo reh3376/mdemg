@@ -928,3 +928,85 @@ Use this template for each session entry:
 | Schema-fixture parity check in CI | PASS | `scripts/verify_sidecar_schemas.py` — 6/6 fixtures validated |
 | Documentation promoted to v0.1.0 | PASS | All 9 doc files updated from Draft to v0.1.0 |
 | Friction log documents known limitations | PASS | `docs/sidecar/friction-log.md` — 6 items (F1–F6) |
+
+---
+
+### Entry: Phase S10 — Dynamic Port Allocation and Multi-Project Isolation
+
+1. Timestamp (UTC): 2026-02-28T12:00:00Z
+2. Phase: S10 - Dynamic Port Allocation and Multi-Project Isolation (COMPLETE)
+3. Related: Friction log F7, user acceptance testing feedback (port 9999 conflict)
+4. Work completed:
+   - Extended `LockFile` struct (`internal/sidecar/types.go`) with 4 new fields:
+     `Neo4jBoltPort`, `Neo4jHTTPPort`, `ContainerName`, `VolumeName` (all `omitempty` for backward compat)
+   - Added 3 resolver functions (`internal/sidecar/lock.go`):
+     `ResolveRuntimeEndpoint`, `ResolveRuntimeNeo4jBoltPort`, `ResolveContainerName`
+   - Extended `Executor.StartDaemon` interface with `extraEnv ...string` variadic parameter
+   - Updated `LocalExecutor` and `RemoteExecutor` implementations to pass extra env vars to daemon
+   - Added 5 new functions to `internal/cli/docker.go`:
+     `ContainerNameForProject`, `VolumeNameForProject`, `sanitizeSlug`, `FindFreePort`, `ReadContainerPorts`
+   - Rewrote Neo4j container creation in `sidecar_up.go`:
+     project-scoped container/volume names, dynamic bolt/HTTP port allocation (ranges 7687-7787, 7474-7574),
+     passes `NEO4J_URI` to daemon via `extraEnv`, writes all runtime metadata to lock file
+   - Fixed all 6 downstream commands to use lock file resolution:
+     `sidecar_doctor.go`, `sidecar_status.go`, `sidecar_attach.go`, `sidecar_down.go`,
+     `sidecar_install.go`, `daemon.go`
+   - Changed `EvalPortFree` from `fail`/`Required:true` to `warn`/`Required:false`
+     (dynamic allocation makes busy preferred ports non-fatal)
+   - Created `internal/cli/dynamic_port_test.go` (~160 lines, 13 tests):
+     ContainerNameForProject, VolumeNameForProject, sanitizeSlug, FindFreePort
+   - Extended `internal/sidecar/lock_test.go` with 9 new tests:
+     LockFileJSON_NewFields, LockFileJSON_BackwardCompat, ResolveRuntimeEndpoint (3 variants),
+     ResolveRuntimeNeo4jBoltPort (2 variants), ResolveContainerName (2 variants)
+   - Updated existing `TestEvalPortFree_InUse` to expect `warn` instead of `fail`
+5. Assumptions eliminated:
+   - Port 9999 was the only possible MDEMG API port — now dynamically allocated
+   - `mdemg-neo4j-dev` was the only container name — now project-scoped
+   - Multiple MDEMG instances on one machine were impossible — now fully supported
+6. Decisions made:
+   - Lock file is single source of truth for runtime ports (not config, not env vars)
+   - Container slug derived from `filepath.Base(projectDir)`, sanitized, max 48 chars
+   - Port ranges: bolt 7687-7787, HTTP 7474-7574, API uses server's existing `listenWithFallback`
+   - `EvalPortFree` becomes advisory (warn) — matches dynamic allocation reality
+   - Extra env passed via variadic `...string` to avoid interface breakage
+7. Open questions:
+   - None for S10 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... ./internal/cli/...` — all PASS
+9. Next actions:
+   - Manual E2E: start sidecar in project A (port 9999), start sidecar in project B (auto-allocates)
+   - Run acceptance test: `bash scripts/sidecar-acceptance.sh --binary ./bin/mdemg`
+
+**S10 File Manifest:**
+
+| File | Action |
+|------|--------|
+| `internal/sidecar/types.go` | Modified — 4 new LockFile fields |
+| `internal/sidecar/lock.go` | Modified — 3 resolver functions |
+| `internal/sidecar/executor.go` | Modified — extraEnv variadic param |
+| `internal/sidecar/executor_test.go` | Modified — updated mock signature |
+| `internal/sidecar/lock_test.go` | Modified — 9 new tests |
+| `internal/sidecar/install.go` | Modified — EvalPortFree warn/non-required |
+| `internal/sidecar/install_test.go` | Modified — updated EvalPortFree test |
+| `internal/cli/docker.go` | Modified — 5 new functions + extractHostPort helper |
+| `internal/cli/executor_local.go` | Modified — extraEnv in StartDaemon |
+| `internal/cli/executor_remote.go` | Modified — extraEnv in StartDaemon |
+| `internal/cli/sidecar_up.go` | Modified — dynamic port orchestration |
+| `internal/cli/sidecar_down.go` | Modified — resolved container name |
+| `internal/cli/sidecar_doctor.go` | Modified — lock file endpoint + neo4j port |
+| `internal/cli/sidecar_status.go` | Modified — lock file endpoint + neo4j port |
+| `internal/cli/sidecar_attach.go` | Modified — lock file endpoint |
+| `internal/cli/daemon.go` | Modified — resolved container name |
+| `internal/cli/dynamic_port_test.go` | Created — 13 unit tests |
+| `docs/sidecar/friction-log.md` | Updated — F7 resolved |
+| `docs/sidecar/installation.md` | Updated — multi-project section |
+| `docs/sidecar/troubleshooting.md` | Updated — port conflict auto-resolve |
+| `docs/sidecar/implementation-journal.md` | Updated — S10 entry |
+
+**Documents Accessed:**
+- `internal/sidecar/types.go`, `lock.go`, `executor.go`, `executor_test.go`, `install.go`, `install_test.go`, `lock_test.go`, `config.go`
+- `internal/cli/docker.go`, `executor_local.go`, `executor_remote.go`, `executor_factory.go`, `sidecar_up.go`, `sidecar_down.go`, `sidecar_doctor.go`, `sidecar_status.go`, `sidecar_attach.go`, `sidecar_install.go`, `daemon.go`, `serve.go`
+- `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`

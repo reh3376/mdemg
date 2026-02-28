@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"mdemg/internal/sidecar"
 )
 
 // --- PID file utilities ---
@@ -128,12 +129,13 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 		return nil
 	}
 
-	// Auto-start Neo4j if needed
+	// Auto-start Neo4j if needed (use lock file container name if available)
+	startContainerName := sidecar.ResolveContainerName(".", neo4jContainerName)
 	if !noDB && DockerAvailable() {
-		state, err := InspectContainer(neo4jContainerName)
+		state, err := InspectContainer(startContainerName)
 		if err == nil && state.Exists && !state.Running {
-			fmt.Printf("Starting Neo4j container '%s'...\n", neo4jContainerName)
-			if _, err := RunDockerCommand("start", neo4jContainerName); err != nil {
+			fmt.Printf("Starting Neo4j container '%s'...\n", startContainerName)
+			if _, err := RunDockerCommand("start", startContainerName); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to start Neo4j container: %v\n", err)
 			} else {
 				fmt.Print("Waiting for Neo4j...")
@@ -395,12 +397,13 @@ func runStatus() error {
 		}
 	}
 
-	// Neo4j container status
+	// Neo4j container status (use lock file container name if available)
+	statusContainerName := sidecar.ResolveContainerName(".", neo4jContainerName)
 	if DockerAvailable() {
-		state, err := InspectContainer(neo4jContainerName)
+		state, err := InspectContainer(statusContainerName)
 		if err == nil {
 			if state.Exists {
-				fmt.Printf("  Neo4j:     %s (%s)\n", state.Status, neo4jContainerName)
+				fmt.Printf("  Neo4j:     %s (%s)\n", state.Status, statusContainerName)
 			} else {
 				fmt.Printf("  Neo4j:     not created\n")
 			}

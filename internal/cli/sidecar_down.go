@@ -158,24 +158,25 @@ func runSidecarDown(flags sidecarDownFlags) error {
 		}
 	}
 
-	// Stop Neo4j container via executor
+	// Stop Neo4j container via executor (use lock file to resolve project-scoped name)
+	resolvedContainer := sidecar.ResolveContainerName(cwd, neo4jContainerName)
 	neo4jStopped := false
 	if exec.DockerAvailable() {
-		inspOut, inspErr := exec.RunDocker("inspect", "--format", "{{.State.Status}}", neo4jContainerName)
+		inspOut, inspErr := exec.RunDocker("inspect", "--format", "{{.State.Status}}", resolvedContainer)
 		if inspErr == nil && strings.TrimSpace(inspOut) == "running" {
-			fmt.Printf("Stopping Neo4j container '%s'...\n", neo4jContainerName)
-			if _, stopErr := exec.RunDocker("stop", neo4jContainerName); stopErr != nil {
+			fmt.Printf("Stopping Neo4j container '%s'...\n", resolvedContainer)
+			if _, stopErr := exec.RunDocker("stop", resolvedContainer); stopErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to stop Neo4j container: %v\n", stopErr)
 			} else {
 				neo4jStopped = true
 				changes = append(changes, sidecar.ReportChange{
-					Path:   neo4jContainerName,
+					Path:   resolvedContainer,
 					Action: "stopped",
 				})
 				fmt.Println("Neo4j container stopped")
 			}
 		} else if inspErr == nil {
-			fmt.Printf("Neo4j container '%s' is already stopped\n", neo4jContainerName)
+			fmt.Printf("Neo4j container '%s' is already stopped\n", resolvedContainer)
 		}
 	}
 
