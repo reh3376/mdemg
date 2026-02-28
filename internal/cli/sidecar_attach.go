@@ -140,7 +140,7 @@ func runSidecarAttachAgent(flags sidecarAttachAgentFlags) error {
 		return fmt.Errorf("read config: %w", err)
 	}
 
-	endpoint := cfg.Runtime.Endpoint
+	endpoint := sidecar.ResolveRuntimeEndpoint(cwd, cfg.Runtime.Endpoint)
 
 	// Resolve project dir from config path
 	projectDir := filepath.Dir(filepath.Dir(configPath)) // .mdemg/sidecar.yaml → project root

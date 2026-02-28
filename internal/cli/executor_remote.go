@@ -82,13 +82,19 @@ func (e *RemoteExecutor) DockerAvailable() bool {
 }
 
 // StartDaemon starts the MDEMG server on the remote host via SSH.
-// Returns the remote PID.
-func (e *RemoteExecutor) StartDaemon(serveArgs []string) (int, error) {
-	// Build the remote command
+// Returns the remote PID. Extra environment variables are prepended as
+// exports in the remote command (e.g., "NEO4J_URI=bolt://localhost:7700").
+func (e *RemoteExecutor) StartDaemon(serveArgs []string, extraEnv ...string) (int, error) {
+	// Build the remote command with optional env exports
+	var envBuilder strings.Builder
+	for _, env := range extraEnv {
+		fmt.Fprintf(&envBuilder, "export %s && ", env)
+	}
+	envPrefix := envBuilder.String()
 	args := strings.Join(serveArgs, " ")
 	remoteCmd := fmt.Sprintf(
-		"mkdir -p ~/.mdemg/logs && nohup mdemg %s > ~/.mdemg/logs/mdemg.log 2>&1 & echo $!",
-		args,
+		"mkdir -p ~/.mdemg/logs && %snohup mdemg %s > ~/.mdemg/logs/mdemg.log 2>&1 & echo $!",
+		envPrefix, args,
 	)
 
 	out, err := e.runSSH("bash", "-c", fmt.Sprintf("'%s'", remoteCmd))

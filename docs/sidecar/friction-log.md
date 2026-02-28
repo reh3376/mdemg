@@ -94,3 +94,15 @@ Same applies to `detach-agent`.
 **What happens:** If Docker containers crash or the MDEMG API stops unexpectedly, sidecar does not auto-restart them. Services remain down until manually restarted.
 
 **Workaround:** Run `mdemg sidecar doctor` to diagnose, then `mdemg sidecar restart` to recover.
+
+---
+
+## F7: ~~No Dynamic Port Allocation~~ (RESOLVED in S10)
+
+**Resolved:** Dynamic port allocation is now implemented. All services (MDEMG API, Neo4j bolt, Neo4j HTTP) use dynamic port allocation with configurable preferred ports. Container names and volumes are project-scoped. Multiple MDEMG projects can run simultaneously on the same machine.
+
+- `sidecar up` automatically finds free ports if preferred ports are busy
+- Container names are derived from the project directory (e.g., `mdemg-neo4j-myproject`)
+- The lock file (`.mdemg/sidecar.lock`) is the single source of truth for runtime ports
+- All downstream commands (`doctor`, `status`, `down`, `attach-agent`) read ports from the lock file
+- `sidecar install` port check is advisory (warn), not blocking

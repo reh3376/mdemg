@@ -112,6 +112,58 @@ func CurrentStateFrom(dir string) State {
 	return lf.State
 }
 
+// ResolveRuntimeEndpoint returns the lock file's endpoint if the sidecar is
+// running; otherwise returns the config endpoint. This allows downstream
+// commands to discover the actual runtime port after dynamic allocation.
+func ResolveRuntimeEndpoint(cwd, configEndpoint string) string {
+	path := FindLockFileFrom(cwd)
+	if path == "" {
+		return configEndpoint
+	}
+	lf, err := ReadLock(path)
+	if err != nil {
+		return configEndpoint
+	}
+	if lf.State == StateRunning && lf.Endpoint != "" {
+		return lf.Endpoint
+	}
+	return configEndpoint
+}
+
+// ResolveRuntimeNeo4jBoltPort returns the Neo4j bolt port from the lock file
+// if available, otherwise returns the default.
+func ResolveRuntimeNeo4jBoltPort(cwd string, defaultPort int) int {
+	path := FindLockFileFrom(cwd)
+	if path == "" {
+		return defaultPort
+	}
+	lf, err := ReadLock(path)
+	if err != nil {
+		return defaultPort
+	}
+	if lf.Neo4jBoltPort > 0 {
+		return lf.Neo4jBoltPort
+	}
+	return defaultPort
+}
+
+// ResolveContainerName returns the container name from the lock file
+// if available, otherwise returns the default.
+func ResolveContainerName(cwd, defaultName string) string {
+	path := FindLockFileFrom(cwd)
+	if path == "" {
+		return defaultName
+	}
+	lf, err := ReadLock(path)
+	if err != nil {
+		return defaultName
+	}
+	if lf.ContainerName != "" {
+		return lf.ContainerName
+	}
+	return defaultName
+}
+
 // NewLockFile creates a fresh LockFile with the given parameters.
 func NewLockFile(profile string, endpoint string, configHash string) *LockFile {
 	now := NowUTC()

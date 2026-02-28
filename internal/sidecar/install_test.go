@@ -77,8 +77,11 @@ func TestEvalPortFree_Free(t *testing.T) {
 
 func TestEvalPortFree_InUse(t *testing.T) {
 	check := EvalPortFree(PortInfo{Port: 9999, Free: false})
-	if check.Status != "fail" {
-		t.Errorf("expected fail, got %s", check.Status)
+	if check.Status != "warn" {
+		t.Errorf("expected warn (advisory with dynamic allocation), got %s", check.Status)
+	}
+	if check.Required {
+		t.Error("expected Required=false (dynamic allocation handles conflicts)")
 	}
 	if check.Remediation == "" {
 		t.Error("expected remediation")

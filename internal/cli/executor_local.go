@@ -27,8 +27,9 @@ func (e *LocalExecutor) DockerAvailable() bool {
 }
 
 // StartDaemon starts the MDEMG server as a detached local process.
-// Returns the PID of the started process.
-func (e *LocalExecutor) StartDaemon(serveArgs []string) (int, error) {
+// Returns the PID of the started process. Extra environment variables
+// are appended to the process environment (e.g., "NEO4J_URI=bolt://localhost:7700").
+func (e *LocalExecutor) StartDaemon(serveArgs []string, extraEnv ...string) (int, error) {
 	execPath, err := os.Executable()
 	if err != nil {
 		return 0, fmt.Errorf("resolve executable: %w", err)
@@ -48,7 +49,7 @@ func (e *LocalExecutor) StartDaemon(serveArgs []string) (int, error) {
 	daemon.Stdout = logFile
 	daemon.Stderr = logFile
 	daemon.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	daemon.Env = os.Environ()
+	daemon.Env = append(os.Environ(), extraEnv...)
 
 	if startErr := daemon.Start(); startErr != nil {
 		logFile.Close()

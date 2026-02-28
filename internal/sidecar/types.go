@@ -141,6 +141,12 @@ type LockFile struct {
 	RemotePID     int    `json:"remote_pid,omitempty"`
 	TransportUsed string `json:"transport_used,omitempty"`
 	DockerContext string `json:"docker_context,omitempty"`
+
+	// Runtime ports (populated by sidecar up, read by all commands).
+	Neo4jBoltPort int    `json:"neo4j_bolt_port,omitempty"`
+	Neo4jHTTPPort int    `json:"neo4j_http_port,omitempty"`
+	ContainerName string `json:"container_name,omitempty"`
+	VolumeName    string `json:"volume_name,omitempty"`
 }
 
 // --- Exit Codes (Section 7A) ---

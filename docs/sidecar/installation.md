@@ -190,8 +190,21 @@ Before uninstall, ensure any required backups are captured.
 
 ---
 
-## 10. Common Installation Issues
+## 10. Multi-Project Support
+
+MDEMG supports running multiple sidecar instances simultaneously on the same machine. Each project gets its own:
+
+- Neo4j container (named `mdemg-neo4j-{project}`, e.g., `mdemg-neo4j-myapp`)
+- Neo4j volume (named `mdemg-neo4j-data-{project}`)
+- API server (dynamically allocated port, recorded in `.mdemg/sidecar.lock`)
+
+Port allocation is automatic — if the preferred port (9999 for API, 7687 for Neo4j bolt, 7474 for Neo4j HTTP) is occupied, sidecar scans a range to find a free port. The lock file becomes the single source of truth for runtime ports; all commands (`status`, `doctor`, `down`, `attach-agent`) read from it.
+
+---
+
+## 11. Common Installation Issues
 
 1. Docker unavailable: see `docs/sidecar/troubleshooting.md` (`TRBL-INSTALL-DOCKER`).
 2. Remote host unreachable: see `TRBL-REMOTE-SSH`.
 3. Agent config merge conflict: see `TRBL-AGENT-CONFIG`.
+4. Port conflict: now handled automatically via dynamic allocation. The `install` command shows an advisory warning if the preferred port is busy; `up` will find a free port.
