@@ -1,7 +1,7 @@
 # MDEMG Sidecar Troubleshooting Guide
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Developers and maintainers diagnosing sidecar failures
 
@@ -44,6 +44,7 @@ tail -n 200 .mdemg/logs/mdemg.log
 | `TRBL-AGENT-CONFIG` | Attach-agent fails | Config merge conflict | Restore backup, run print-only attach, merge manually |
 | `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
 | `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |
+| `TRBL-STUB-CMD` | Command prints "not yet implemented" | `upgrade` or `uninstall` stub | See `docs/sidecar/friction-log.md` (F1) for manual workaround |
 
 ---
 
@@ -96,12 +97,18 @@ If attachment mutates config unexpectedly:
 
 ## 6. Doctor Failure Classes
 
-Each doctor failure class must map to a troubleshooting ID:
+Each doctor check maps to a troubleshooting ID:
 
-1. Runtime failures -> `TRBL-PORT-CONFLICT` or `TRBL-INSTALL-DOCKER`.
-2. Remote failures -> `TRBL-REMOTE-SSH` or `TRBL-REMOTE-CONTEXT`.
-3. Adapter failures -> `TRBL-AGENT-CONFIG`.
-4. CMS failures -> `TRBL-CMS-DEGRADED`.
+| Doctor Check | Category | Failure Mapping |
+|-------------|----------|-----------------|
+| `config.valid` | configuration | `TRBL-INSTALL-CLI` |
+| `neo4j.reachable` | database | `TRBL-INSTALL-DOCKER` |
+| `api.healthy` | runtime | `TRBL-PORT-CONFLICT` |
+| `cms.resume` | cms | `TRBL-CMS-DEGRADED` |
+| `cms.observe` | cms | `TRBL-CMS-DEGRADED` |
+| `embedder.available` | embedding | `TRBL-CMS-DEGRADED` |
+| `ssh.reachable` (remote only) | connectivity | `TRBL-REMOTE-SSH` |
+| `docker-context.valid` (remote only) | connectivity | `TRBL-REMOTE-CONTEXT` |
 
 ---
 

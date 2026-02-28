@@ -1,0 +1,96 @@
+# MDEMG Sidecar v0.1.0 Friction Log
+
+Status: v0.1.0
+Date: 2026-02-28
+Owner: MDEMG Core
+Audience: Beta testers and early adopters
+
+---
+
+## Purpose
+
+Documents known limitations, workarounds, and rough edges in v0.1.0. Items here are acknowledged, not bugs — they represent scope boundaries for the initial release.
+
+---
+
+## F1: `upgrade` and `uninstall` Are Stubs
+
+**What happens:** Running `mdemg sidecar upgrade` or `mdemg sidecar uninstall` prints "not yet implemented" and exits cleanly.
+
+**Workaround — Upgrade:**
+
+1. Build the new version: `go build -o bin/mdemg ./cmd/mdemg` (or download from release).
+2. Re-run `mdemg sidecar install` to reconcile state.
+3. Restart runtime: `mdemg sidecar restart`.
+
+**Workaround — Uninstall:**
+
+1. Stop services: `mdemg sidecar down`.
+2. Detach agents: `mdemg sidecar detach-agent claude-code`.
+3. Remove sidecar artifacts: `rm -rf .mdemg/`.
+
+---
+
+## F2: macOS arm64 Only
+
+**What happens:** Pre-built binaries are only available for macOS arm64 (Apple Silicon). No Linux or Windows binaries are distributed.
+
+**Workaround:** Build from source on other platforms:
+
+```bash
+git clone https://github.com/reh3376/mdemg.git
+cd mdemg
+go build -o bin/mdemg ./cmd/mdemg
+```
+
+Requires Go 1.24+ and CGO-compatible toolchain.
+
+---
+
+## F3: Remote Profile Requires Manual SSH Key Setup
+
+**What happens:** The `studio-remote` profile assumes non-interactive SSH access is already configured. Sidecar does not set up SSH keys or manage SSH config entries.
+
+**Workaround:**
+
+1. Set up SSH key: `ssh-keygen -t ed25519`.
+2. Copy to remote host: `ssh-copy-id macstudio-tb`.
+3. Verify: `ssh macstudio-tb "echo ok"` (must not prompt).
+
+---
+
+## F4: Ollama Must Be Installed Separately
+
+**What happens:** The embedding provider (Ollama) is not installed or managed by sidecar. If Ollama is unavailable, `doctor` reports the `embedder.available` check as `warn`, not `fail`.
+
+**Workaround:** Install Ollama manually:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve &
+ollama pull nomic-embed-text
+```
+
+---
+
+## F5: `attach-agent` Uses Positional Argument
+
+**What happens:** The adapter name is a positional argument, not a flag.
+
+```bash
+# Correct
+mdemg sidecar attach-agent claude-code
+
+# Wrong (will error)
+mdemg sidecar attach-agent --agent claude-code
+```
+
+Same applies to `detach-agent`.
+
+---
+
+## F6: No Automatic Service Recovery
+
+**What happens:** If Docker containers crash or the MDEMG API stops unexpectedly, sidecar does not auto-restart them. Services remain down until manually restarted.
+
+**Workaround:** Run `mdemg sidecar doctor` to diagnose, then `mdemg sidecar restart` to recover.

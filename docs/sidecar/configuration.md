@@ -1,7 +1,7 @@
 # MDEMG Sidecar Configuration Guide
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Developers and maintainers configuring sidecar behavior
 
@@ -147,7 +147,7 @@ Prerequisites:
    ```
    Error: .codex/ directory not found. Initialize Codex in this project first:
      codex init
-   Then re-run: mdemg sidecar attach-agent --agent codex
+   Then re-run: mdemg sidecar attach-agent codex
    ```
 
 Backup:

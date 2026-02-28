@@ -1,6 +1,6 @@
 # Sidecar Release Notes Template
 
-Status: Draft Template  
+Status: v0.1.0 Template
 Owner: MDEMG Core  
 Applies To: `mdemg` releases containing sidecar changes
 

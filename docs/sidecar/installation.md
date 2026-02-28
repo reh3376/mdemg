@@ -1,7 +1,7 @@
 # MDEMG Sidecar Installation Guide
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Developers installing sidecar into an existing repository
 
@@ -20,15 +20,48 @@ Operating mode for this repository is treated as `brownfield`: install must pres
 
 ---
 
-## 2. Prerequisites
+## 2. Getting the Binary
 
-## 2.1 Required (All Profiles)
+### Homebrew (macOS)
+
+```bash
+brew install reh3376/mdemg/mdemg
+```
+
+### Curl installer (macOS/Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
+```
+
+Verifies SHA256 checksum automatically. Override install directory with `INSTALL_DIR`:
+
+```bash
+INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/reh3376/mdemg.git
+cd mdemg
+make build-cli
+# Binary at ./bin/mdemg
+```
+
+Requires Go 1.24+ and CGO-compatible toolchain.
+
+---
+
+## 3. Prerequisites
+
+## 3.1 Required (All Profiles)
 
 1. Git repository with write access.
 2. MDEMG CLI available in `PATH` or as `./bin/mdemg`.
 3. Docker engine available and healthy.
 
-## 2.2 Additional for `studio-remote`
+## 3.2 Additional for `studio-remote`
 
 1. SSH access from MacBook to MacStudio.
 2. Non-interactive SSH works (`ssh macstudio-tb` succeeds without prompt loops).
@@ -36,7 +69,7 @@ Operating mode for this repository is treated as `brownfield`: install must pres
 
 ---
 
-## 3. Preflight Checklist
+## 4. Preflight Checklist
 
 Run before installation:
 
@@ -52,7 +85,7 @@ Expected:
 
 ---
 
-## 4. Local Profile Installation (Step by Step)
+## 5. Local Profile Installation (Step by Step)
 
 From the target repository root:
 
@@ -75,7 +108,7 @@ Checkpoints:
 
 ---
 
-## 5. Studio-Remote Profile Installation (MacBook Control, MacStudio Runtime)
+## 6. Studio-Remote Profile Installation (MacBook Control, MacStudio Runtime)
 
 From the target repository root on MacBook:
 
@@ -102,14 +135,16 @@ mdemg sidecar doctor --format json
 
 ---
 
-## 6. Agent Attachment
+## 7. Agent Attachment
 
 Attach adapters after install/up:
 
 ```bash
-mdemg sidecar attach-agent --agent claude-code
-mdemg sidecar attach-agent --agent codex
+mdemg sidecar attach-agent claude-code
+mdemg sidecar attach-agent codex
 ```
+
+Note: The adapter name is a positional argument, not a flag.
 
 Checkpoints:
 
@@ -118,7 +153,7 @@ Checkpoints:
 
 ---
 
-## 7. First-Run Verification
+## 8. First-Run Verification
 
 Run a minimal workflow:
 
@@ -135,7 +170,7 @@ Verify:
 
 ---
 
-## 8. Rollback and Cleanup
+## 9. Rollback and Cleanup
 
 To stop services:
 
@@ -149,11 +184,13 @@ To fully remove sidecar integration:
 mdemg sidecar uninstall
 ```
 
+Note: `uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+
 Before uninstall, ensure any required backups are captured.
 
 ---
 
-## 9. Common Installation Issues
+## 10. Common Installation Issues
 
 1. Docker unavailable: see `docs/sidecar/troubleshooting.md` (`TRBL-INSTALL-DOCKER`).
 2. Remote host unreachable: see `TRBL-REMOTE-SSH`.

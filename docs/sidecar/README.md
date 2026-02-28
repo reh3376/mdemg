@@ -1,7 +1,7 @@
 # MDEMG Sidecar Documentation Index
 
-Status: Draft  
-Date: 2026-02-27
+Status: v0.1.0
+Date: 2026-02-28
 
 Use this index as the canonical reading order for sidecar adoption.
 Normative authority for sidecar behavior is `docs/sidecar/roadmap.md`.
@@ -28,6 +28,7 @@ External UxTS documents are informative references only for this doc set.
 
 1. Troubleshooting matrix: `docs/sidecar/troubleshooting.md`
 2. FAQ: `docs/sidecar/faq.md`
+3. Friction log (v0.1.0 known limitations): `docs/sidecar/friction-log.md`
 
 ---
 
@@ -46,7 +47,12 @@ External UxTS documents are informative references only for this doc set.
 
 ## 6. Documentation Validation Checklist
 
-Before promoting sidecar beyond draft:
+Automated:
+
+1. `make test-sidecar-schemas` — validate fixture JSON files against schemas.
+2. `make test-sidecar-acceptance` — end-to-end acceptance test of sidecar CLI flow.
+
+Manual:
 
 1. Follow installation guide on a clean repo and verify all command examples.
 2. Validate configuration examples against implemented schema.

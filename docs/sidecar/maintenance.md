@@ -1,7 +1,7 @@
 # MDEMG Sidecar Maintenance Guide
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Developers operating sidecar across active repositories
 
@@ -53,6 +53,8 @@ Operational expectations:
 
 ## 3. Upgrade Procedure
 
+Note: `mdemg sidecar upgrade` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+
 ```bash
 mdemg sidecar status
 mdemg sidecar upgrade
@@ -100,6 +102,8 @@ Restore validation:
 ---
 
 ## 6. Uninstall and Cleanup
+
+Note: `mdemg sidecar uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
 
 ```bash
 mdemg sidecar down
