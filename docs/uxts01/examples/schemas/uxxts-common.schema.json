@@ -87,8 +87,10 @@
         "hash_method": {
           "type": "string",
           "enum": [
+            "sha256-c14n-v1",
             "sha256-jcs"
-          ]
+          ],
+          "description": "Canonical hash profile identifier. `sha256-c14n-v1` is normative. `sha256-jcs` is retained as a backward-compatible alias."
         },
         "spec_hash": {
           "type": "string",

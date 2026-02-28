@@ -1010,3 +1010,62 @@ Use this template for each session entry:
 - `internal/sidecar/types.go`, `lock.go`, `executor.go`, `executor_test.go`, `install.go`, `install_test.go`, `lock_test.go`, `config.go`
 - `internal/cli/docker.go`, `executor_local.go`, `executor_remote.go`, `executor_factory.go`, `sidecar_up.go`, `sidecar_down.go`, `sidecar_doctor.go`, `sidecar_status.go`, `sidecar_attach.go`, `sidecar_install.go`, `daemon.go`, `serve.go`
 - `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`
+
+---
+
+### Entry 2026-02-28T12:00:00Z
+
+1. Timestamp (UTC): 2026-02-28T12:00:00Z
+2. Phase: S11 — Sidecar LLM Integration and Config Simplification
+3. Related roadmap sections: Config cascade, Ollama-first defaults, Doctor model checks
+4. Work completed:
+   - Added `LLM_PROVIDER` / `LLM_MODEL` top-level cascade: 2 new env vars replace 30+ individual provider/model settings
+   - Changed 6 feature defaults (rerank, summary, synthesis, intent, emergence, guardrail) from hardcoded `openai`/`gpt-4o-mini` to cascading from top-level
+   - MetaLearn already cascaded from Emergence — double inheritance now reaches LLM_PROVIDER
+   - Changed `EMBEDDING_PROVIDER` default from `""` to `"ollama"`
+   - Changed `OLLAMA_MODEL` default from `nomic-embed-text` to `qwen3-embedding:4b` (1536 dims — matches Neo4j indexes)
+   - Added `qwen3-embedding:4b` / `qwen3-embedding` to Ollama embedder dimensions table
+   - Added YAML config `llm:` section (provider/model) with env mapping and flatten support
+   - Init wizard now auto-populates LLM defaults when Ollama is detected
+   - Sidecar `up` passes 5 LLM/embedding vars to daemon via extraEnv
+   - Replaced `embedder.available` doctor check with `ollama.reachable` + `ollama.models` (validates both required models)
+   - Updated `.env.example` with Ollama-first defaults
+5. Assumptions eliminated:
+   - Default provider is now `ollama` (local, zero API keys) not `openai`
+   - `nomic-embed-text` replaced by `qwen3-embedding:4b` as default embedding model
+6. Decisions made:
+   - Config cascade is backward compatible: explicit per-feature env vars still override
+   - Doctor model check uses `warn` not `fail` for missing models (non-blocking)
+   - `ollama.models` check skips if Ollama is unreachable
+7. Open questions: none
+8. Evidence:
+   - 7 new tests pass: `TestLLMCascade_*`, `TestEmbedding_DefaultOllama`, `TestOllamaModel_DefaultQwen`, `TestBackwardCompat_ExplicitOpenAI`
+   - 3 Ollama embedder tests pass: `TestOllama_QwenDimensions`, `TestOllama_QwenBaseNameDimensions`, `TestOllama_DefaultModelIsQwen`
+   - 2 YAML tests pass: `TestYAMLConfig_LLMSection`, `TestYAMLConfig_LLMSection_GenerateRoundtrip`
+   - `go build ./...` clean, `go vet ./...` clean
+9. Next actions: lint, full test suite, commit
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `internal/config/config.go` | LLMProvider/LLMModel fields, cascade defaults, embedding/ollama defaults |
+| `internal/embeddings/ollama.go` | qwen3-embedding dimensions, default model constant |
+| `internal/config/yaml_config.go` | LLMYAML struct, env mappings, flatten, InitOptions, GenerateConfigYAML |
+| `internal/cli/init.go` | Embedding model default, LLM defaults on Ollama detection |
+| `internal/cli/sidecar_up.go` | 5 LLM/embedding vars in extraEnv |
+| `internal/cli/sidecar_doctor.go` | ollama.reachable + ollama.models checks replacing embedder.available |
+| `.env.example` | Ollama-first defaults, LLM_PROVIDER/LLM_MODEL |
+| `internal/config/config_llm_cascade_test.go` | Created — 9 cascade/YAML tests |
+| `internal/embeddings/stub_test.go` | Added 3 Ollama embedder tests |
+| `docs/sidecar/friction-log.md` | Updated F4 with new models |
+| `docs/sidecar/installation.md` | Added Ollama prerequisite |
+| `docs/sidecar/troubleshooting.md` | Added TRBL-OLLAMA-MODELS |
+| `docs/sidecar/implementation-journal.md` | S11 entry |
+
+**Documents Accessed:**
+- `internal/config/config.go`, `yaml_config.go`, `config_test.go`
+- `internal/embeddings/ollama.go`, `stub_test.go`
+- `internal/cli/init.go`, `sidecar_up.go`, `sidecar_doctor.go`
+- `.env.example`
+- `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`

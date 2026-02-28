@@ -1,0 +1,380 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mdemg.dev/schemas/upts/v1.0.0",
+  "title": "Universal Parser Test Specification",
+  "description": "Language-agnostic test specification for MDEMG language parsers",
+  "type": "object",
+  "required": [
+    "upts_version",
+    "language",
+    "fixture",
+    "expected"
+  ],
+  "properties": {
+    "upts_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "UPTS schema version"
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "c",
+        "cpp",
+        "csharp",
+        "cuda",
+        "cypher",
+        "dockerfile",
+        "dotenv",
+        "go",
+        "graphql",
+        "ini",
+        "java",
+        "javascript",
+        "json",
+        "jsonc",
+        "kotlin",
+        "lua",
+        "makefile",
+        "markdown",
+        "openapi",
+        "protobuf",
+        "python",
+        "rust",
+        "scraper-markdown",
+        "shell",
+        "sql",
+        "terraform",
+        "toml",
+        "typescript",
+        "xml",
+        "yaml"
+      ]
+    },
+    "variants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "File extensions (e.g. ['.ts', '.tsx'])"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parser_status": {
+          "type": "string",
+          "enum": [
+            "basic",
+            "functional",
+            "enhanced",
+            "complete"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "line_tolerance": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2
+        },
+        "require_all_symbols": {
+          "type": "boolean",
+          "default": true
+        },
+        "allow_extra_symbols": {
+          "type": "boolean",
+          "default": true
+        },
+        "validate_signature": {
+          "type": "boolean",
+          "default": false
+        },
+        "validate_value": {
+          "type": "boolean",
+          "default": false
+        },
+        "validate_parent": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "inline"
+            },
+            "content": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "symbols"
+      ],
+      "properties": {
+        "symbol_count": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "integer"
+                },
+                "max": {
+                  "type": "integer"
+                }
+              }
+            }
+          ]
+        },
+        "symbols": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Symbol"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "name_pattern": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Relationship"
+          }
+        }
+      }
+    },
+    "patterns_covered": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "P10_SECTION",
+          "P1_CONSTANT",
+          "P2_FUNCTION",
+          "P3_CLASS_STRUCT",
+          "P4_INTERFACE_TRAIT",
+          "P5_ENUM",
+          "P5_ENUM_VALUE",
+          "P5_NAMESPACE",
+          "P6_METHOD",
+          "P7_TYPE_ALIAS",
+          "P8_ENUM",
+          "P8_ENUM_VALUE",
+          "P9_FIELD",
+          "P_CODE_BLOCK",
+          "P_DIRECTIVE",
+          "P_EXTEND_TYPE",
+          "P_FIELD",
+          "P_HEADING_H1",
+          "P_HEADING_H2",
+          "P_HEADING_H3",
+          "P_INPUT",
+          "P_LINK",
+          "P_ROOT_OPERATION",
+          "P_SCALAR",
+          "P_UNION"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "Symbol": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "line"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "class",
+            "code_block",
+            "column",
+            "constant",
+            "constraint",
+            "device_function",
+            "endpoint",
+            "enum",
+            "enum_value",
+            "field",
+            "function",
+            "heading",
+            "index",
+            "interface",
+            "kernel",
+            "label",
+            "link",
+            "macro",
+            "method",
+            "module",
+            "namespace",
+            "package-reference",
+            "parameter",
+            "relationship_type",
+            "section",
+            "struct",
+            "table",
+            "target",
+            "trait",
+            "trigger",
+            "type",
+            "variable",
+            "view"
+          ]
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "exported": {
+          "type": "boolean"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "signature_contains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "value": {
+          "type": "string"
+        },
+        "doc_comment": {
+          "type": "string"
+        },
+        "decorators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Relationship": {
+      "type": "object",
+      "required": [
+        "source",
+        "relation",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "DEFINES_METHOD",
+            "EXTENDS",
+            "IMPLEMENTS",
+            "IMPORTS",
+            "CONTAINS"
+          ]
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -44,6 +44,7 @@ tail -n 200 .mdemg/logs/mdemg.log
 | `TRBL-AGENT-CONFIG` | Attach-agent fails | Config merge conflict | Restore backup, run print-only attach, merge manually |
 | `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
 | `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |
+| `TRBL-OLLAMA-MODELS` | Doctor reports missing Ollama models | Required models not pulled | Run `ollama pull` for each missing model |
 | `TRBL-STUB-CMD` | Command prints "not yet implemented" | `upgrade` or `uninstall` stub | See `docs/sidecar/friction-log.md` (F1) for manual workaround |
 
 ---
@@ -106,7 +107,8 @@ Each doctor check maps to a troubleshooting ID:
 | `api.healthy` | runtime | `TRBL-PORT-CONFLICT` |
 | `cms.resume` | cms | `TRBL-CMS-DEGRADED` |
 | `cms.observe` | cms | `TRBL-CMS-DEGRADED` |
-| `embedder.available` | embedding | `TRBL-CMS-DEGRADED` |
+| `ollama.reachable` | llm | `TRBL-CMS-DEGRADED` |
+| `ollama.models` | llm | `TRBL-OLLAMA-MODELS` |
 | `ssh.reachable` (remote only) | connectivity | `TRBL-REMOTE-SSH` |
 | `docker-context.valid` (remote only) | connectivity | `TRBL-REMOTE-CONTEXT` |
 

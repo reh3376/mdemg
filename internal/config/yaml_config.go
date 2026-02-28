@@ -15,11 +15,18 @@ import (
 type YAMLConfig struct {
 	Neo4j     Neo4jYAML     `yaml:"neo4j"`
 	Server    ServerYAML    `yaml:"server"`
+	LLM       LLMYAML       `yaml:"llm,omitempty"`
 	Embedding EmbeddingYAML `yaml:"embedding"`
 	Retrieval RetrievalYAML `yaml:"retrieval,omitempty"`
 	Learning  LearningYAML  `yaml:"learning,omitempty"`
 	Plugins   PluginsYAML   `yaml:"plugins,omitempty"`
 	Schema    SchemaYAML    `yaml:"schema,omitempty"`
+}
+
+// LLMYAML holds top-level LLM text-generation settings that cascade to all features.
+type LLMYAML struct {
+	Provider string `yaml:"provider,omitempty"` // "ollama" or "openai" (default: "ollama")
+	Model    string `yaml:"model,omitempty"`    // default: "llama3.2:3b-instruct-fp16"
 }
 
 // Neo4jYAML holds Neo4j connection settings.
@@ -79,6 +86,8 @@ var yamlEnvMapping = []struct {
 	{"neo4j.user", "NEO4J_USER", nil},
 	{"neo4j.password", "NEO4J_PASS", nil},
 	{"server.port", "LISTEN_ADDR", convertPort},
+	{"llm.provider", "LLM_PROVIDER", nil},
+	{"llm.model", "LLM_MODEL", nil},
 	{"embedding.provider", "EMBEDDING_PROVIDER", nil},
 	{"embedding.model", "OLLAMA_MODEL", nil},
 	{"embedding.endpoint", "OLLAMA_ENDPOINT", nil},
@@ -174,6 +183,10 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 	if cfg.Server.Port > 0 {
 		m["server.port"] = strconv.Itoa(cfg.Server.Port)
 	}
+
+	// LLM
+	setIfNonEmpty(m, "llm.provider", cfg.LLM.Provider)
+	setIfNonEmpty(m, "llm.model", cfg.LLM.Model)
 
 	// Embedding
 	setIfNonEmpty(m, "embedding.provider", cfg.Embedding.Provider)
@@ -294,6 +307,8 @@ type InitOptions struct {
 	Neo4jUser         string
 	Neo4jPassword     string
 	ServerPort        int
+	LLMProvider       string
+	LLMModel          string
 	EmbeddingProvider string
 	EmbeddingModel    string
 	EmbeddingEndpoint string
@@ -314,6 +329,13 @@ func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 		Schema: SchemaYAML{
 			Version: opts.SchemaVersion,
 		},
+	}
+
+	if opts.LLMProvider != "" {
+		cfg.LLM = LLMYAML{
+			Provider: opts.LLMProvider,
+			Model:    opts.LLMModel,
+		}
 	}
 
 	if opts.EmbeddingProvider != "" && opts.EmbeddingProvider != "disabled" {

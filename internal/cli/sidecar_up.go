@@ -273,6 +273,11 @@ func runSidecarUp(flags sidecarUpFlags) error {
 			fmt.Sprintf("NEO4J_URI=bolt://localhost:%d", actualBoltPort),
 			"NEO4J_USER=neo4j",
 			"NEO4J_PASS=mdemg-dev",
+			"EMBEDDING_PROVIDER=ollama",
+			"OLLAMA_ENDPOINT=http://localhost:11434",
+			"OLLAMA_MODEL=qwen3-embedding:4b",
+			"LLM_PROVIDER=ollama",
+			"LLM_MODEL=llama3.2:3b-instruct-fp16",
 		}
 
 		fmt.Print("Starting MDEMG server...")

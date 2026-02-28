@@ -36,6 +36,10 @@ type Config struct {
 	LearningPruneThreshold    float64 // Weight threshold below which edges are pruned
 	LearningMaxEdgesPerNode   int     // Max CO_ACTIVATED_WITH edges per node
 
+	// Top-level LLM settings (cascade to all features)
+	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "ollama")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "llama3.2:3b-instruct-fp16")
+
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
 	OpenAIAPIKey        string
@@ -43,7 +47,7 @@ type Config struct {
 	OpenAIEndpoint      string // default: https://api.openai.com/v1
 	LLMEndpoint         string // LLM_ENDPOINT — override endpoint for LLM text-generation (default: uses OpenAIEndpoint)
 	OllamaEndpoint      string // default: http://localhost:11434
-	OllamaModel         string // default: nomic-embed-text
+	OllamaModel         string // default: qwen3-embedding:4b
 
 	// Embedding cache settings
 	EmbeddingCacheEnabled bool // Feature toggle (default: true)
@@ -827,14 +831,18 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("TEMPORAL_STALE_REF_MAX_PENALTY must be >= 0")
 	}
 
+	// Top-level LLM cascade (defaults for all text-generation features)
+	llmProvider := get("LLM_PROVIDER", "ollama")
+	llmModel := get("LLM_MODEL", "llama3.2:3b-instruct-fp16")
+
 	// Embedding provider settings
-	embProvider := get("EMBEDDING_PROVIDER", "")
+	embProvider := get("EMBEDDING_PROVIDER", "ollama")
 	openaiKey := get("OPENAI_API_KEY", "")
 	openaiModel := get("OPENAI_MODEL", "text-embedding-ada-002")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
 	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
-	ollamaModel := get("OLLAMA_MODEL", "nomic-embed-text")
+	ollamaModel := get("OLLAMA_MODEL", "qwen3-embedding:4b")
 
 	// Embedding cache settings
 	embCacheEnabled := getBool("EMBEDDING_CACHE_ENABLED", true)
@@ -1073,8 +1081,8 @@ func FromEnv() (Config, error) {
 
 	// LLM Re-ranking settings (V0006)
 	rerankEnabled := getBool("RERANK_ENABLED", false)
-	rerankProvider := get("RERANK_PROVIDER", "openai")
-	rerankModel := get("RERANK_MODEL", "gpt-4o-mini")
+	rerankProvider := get("RERANK_PROVIDER", llmProvider)
+	rerankModel := get("RERANK_MODEL", llmModel)
 	rerankTopN, err := atoi("RERANK_TOP_N", 30)
 	if err != nil {
 		return Config{}, err
@@ -1180,8 +1188,8 @@ func FromEnv() (Config, error) {
 
 	// LLM Summary settings (semantic summaries for ingest)
 	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
-	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", "openai")
-	llmSummaryModel := get("LLM_SUMMARY_MODEL", "gpt-4o-mini")
+	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", llmProvider)
+	llmSummaryModel := get("LLM_SUMMARY_MODEL", llmModel)
 	llmSummaryMaxTokens, err := atoi("LLM_SUMMARY_MAX_TOKENS", 150)
 	if err != nil {
 		return Config{}, err
@@ -1213,8 +1221,8 @@ func FromEnv() (Config, error) {
 
 	// SME Synthesis settings (Phase 101)
 	synthesisEnabled := getBool("SYNTHESIS_ENABLED", false)
-	synthesisProvider := get("SYNTHESIS_PROVIDER", "openai")
-	synthesisModel := get("SYNTHESIS_MODEL", "gpt-4o-mini")
+	synthesisProvider := get("SYNTHESIS_PROVIDER", llmProvider)
+	synthesisModel := get("SYNTHESIS_MODEL", llmModel)
 	synthesisMaxTokens, err := atoi("SYNTHESIS_MAX_TOKENS", 2000)
 	if err != nil {
 		return Config{}, err
@@ -1232,8 +1240,8 @@ func FromEnv() (Config, error) {
 
 	// Intent Translation settings (Phase 102)
 	intentEnabled := getBool("INTENT_ENABLED", false)
-	intentProvider := get("INTENT_PROVIDER", "openai")
-	intentModel := get("INTENT_MODEL", "gpt-4o-mini")
+	intentProvider := get("INTENT_PROVIDER", llmProvider)
+	intentModel := get("INTENT_MODEL", llmModel)
 	intentMaxTokens, err := atoi("INTENT_MAX_TOKENS", 150)
 	if err != nil {
 		return Config{}, err
@@ -1251,8 +1259,8 @@ func FromEnv() (Config, error) {
 
 	// Dynamic Emergence settings (Phase 103)
 	emergenceEnabled := getBool("EMERGENCE_ENABLED", false)
-	emergenceProvider := get("EMERGENCE_PROVIDER", "openai")
-	emergenceModel := get("EMERGENCE_MODEL", "gpt-4o-mini")
+	emergenceProvider := get("EMERGENCE_PROVIDER", llmProvider)
+	emergenceModel := get("EMERGENCE_MODEL", llmModel)
 	emergenceMaxTokens, err := atoi("EMERGENCE_MAX_TOKENS", 500)
 	if err != nil {
 		return Config{}, err
@@ -1291,8 +1299,8 @@ func FromEnv() (Config, error) {
 
 	// Active MCP Guardrails settings (Phase 104)
 	guardrailEnabled := getBool("GUARDRAIL_ENABLED", false)
-	guardrailProvider := get("GUARDRAIL_PROVIDER", "openai")
-	guardrailModel := get("GUARDRAIL_MODEL", "gpt-4o-mini")
+	guardrailProvider := get("GUARDRAIL_PROVIDER", llmProvider)
+	guardrailModel := get("GUARDRAIL_MODEL", llmModel)
 	guardrailMaxTokens, err := atoi("GUARDRAIL_MAX_TOKENS", 1000)
 	if err != nil {
 		return Config{}, err
@@ -1899,6 +1907,8 @@ func FromEnv() (Config, error) {
 		LearningDecayPerDay:       learnDecayPerDay,
 		LearningPruneThreshold:    learnPruneThreshold,
 		LearningMaxEdgesPerNode:   learnMaxEdgesPerNode,
+		LLMProvider:               llmProvider,
+		LLMModel:                  llmModel,
 		EmbeddingProvider:         embProvider,
 		OpenAIAPIKey: openaiKey,
 		OpenAIModel: openaiModel,
