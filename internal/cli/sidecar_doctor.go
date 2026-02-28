@@ -88,10 +88,20 @@ func runSidecarDoctor(format string) error {
 	// Check 3: api.healthy
 	checks = append(checks, runAPICheck(endpoint))
 
-	// Check 4: cms.resume
-	checks = append(checks, runCMSCheck(endpoint))
+	// Derive space_id from config
+	spaceID := "mdemg-dev" // fallback
+	if cfg != nil {
+		projectDir := filepath.Dir(filepath.Dir(configPath)) // .mdemg/sidecar.yaml → project root
+		spaceID = sidecar.ResolveSpaceID(cfg, projectDir)
+	}
 
-	// Check 5: embedder.available
+	// Check 4: cms.resume
+	checks = append(checks, runCMSCheck(endpoint, spaceID))
+
+	// Check 5: cms.observe
+	checks = append(checks, runCMSObserveCheck(endpoint, spaceID))
+
+	// Check 6: embedder.available
 	checks = append(checks, runEmbedderCheck())
 
 	// Tally and build report
@@ -285,11 +295,11 @@ func runAPICheck(endpoint string) sidecar.DoctorCheck {
 	}
 }
 
-func runCMSCheck(endpoint string) sidecar.DoctorCheck {
+func runCMSCheck(endpoint, spaceID string) sidecar.DoctorCheck {
 	start := time.Now()
 	client := &http.Client{Timeout: probeTimeout}
 
-	body := `{"space_id":"mdemg-dev","session_id":"doctor-probe","max_observations":1}`
+	body := fmt.Sprintf(`{"space_id":%q,"session_id":"doctor-probe","max_observations":1}`, spaceID)
 	resp, err := client.Post( //nolint:noctx // diagnostic probe
 		endpoint+"/v1/conversation/resume",
 		"application/json",
@@ -307,7 +317,27 @@ func runCMSCheck(endpoint string) sidecar.DoctorCheck {
 			Remediation: "Start server: mdemg sidecar up",
 		}
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	// Parse response body
+	var resumeResp map[string]any
+	if decErr := json.NewDecoder(resp.Body).Decode(&resumeResp); decErr != nil {
+		resumeResp = nil
+	}
+
+	// HTTP 503 = embedder down, CMS degraded
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		evidence := []string{fmt.Sprintf("space_id: %s", spaceID), "HTTP 503: embedder unavailable"}
+		return sidecar.DoctorCheck{
+			ID:          "cms.resume",
+			Category:    "cms",
+			Status:      "warn",
+			Message:     "CMS resume degraded (embedder unavailable)",
+			DurationMs:  duration,
+			Remediation: "Start embedder service: ollama serve",
+			Evidence:    evidence,
+		}
+	}
 
 	if resp.StatusCode >= 500 {
 		return sidecar.DoctorCheck{
@@ -320,12 +350,113 @@ func runCMSCheck(endpoint string) sidecar.DoctorCheck {
 		}
 	}
 
+	// Build evidence from response body
+	evidence := []string{fmt.Sprintf("space_id: %s", spaceID)}
+	if resumeResp != nil {
+		if ms, ok := resumeResp["memory_state"]; ok {
+			evidence = append(evidence, fmt.Sprintf("memory_state: %v", ms))
+		}
+		if obs, ok := resumeResp["observations"].([]any); ok {
+			evidence = append(evidence, fmt.Sprintf("observations: %d", len(obs)))
+		}
+	}
+
 	return sidecar.DoctorCheck{
 		ID:         "cms.resume",
 		Category:   "cms",
 		Status:     "pass",
 		Message:    "CMS resume responds",
 		DurationMs: duration,
+		Evidence:   evidence,
+	}
+}
+
+func runCMSObserveCheck(endpoint, spaceID string) sidecar.DoctorCheck {
+	start := time.Now()
+	client := &http.Client{Timeout: probeTimeout}
+
+	body := fmt.Sprintf(`{"space_id":%q,"session_id":"doctor-probe","content":"[doctor-probe] connectivity check","obs_type":"context"}`, spaceID)
+	resp, err := client.Post( //nolint:noctx // diagnostic probe
+		endpoint+"/v1/conversation/observe",
+		"application/json",
+		bytes.NewBufferString(body),
+	)
+	duration := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:          "cms.observe",
+			Category:    "cms",
+			Status:      "fail",
+			Message:     "CMS observe endpoint unreachable",
+			DurationMs:  duration,
+			Remediation: "Start server: mdemg sidecar up",
+		}
+	}
+	defer resp.Body.Close()
+
+	// Parse response body
+	var observeResp map[string]any
+	if decErr := json.NewDecoder(resp.Body).Decode(&observeResp); decErr != nil {
+		observeResp = nil
+	}
+
+	// HTTP 503 = embedder down
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		evidence := []string{fmt.Sprintf("space_id: %s", spaceID), "HTTP 503: embedder unavailable"}
+		return sidecar.DoctorCheck{
+			ID:          "cms.observe",
+			Category:    "cms",
+			Status:      "warn",
+			Message:     "CMS observe degraded (embedder unavailable)",
+			DurationMs:  duration,
+			Remediation: "Start embedder service: ollama serve",
+			Evidence:    evidence,
+		}
+	}
+
+	if resp.StatusCode >= 400 {
+		return sidecar.DoctorCheck{
+			ID:          "cms.observe",
+			Category:    "cms",
+			Status:      "fail",
+			Message:     fmt.Sprintf("CMS observe returned HTTP %d", resp.StatusCode),
+			DurationMs:  duration,
+			Remediation: "Check server and database connectivity",
+		}
+	}
+
+	// Validate response has obs_id and node_id
+	evidence := []string{fmt.Sprintf("space_id: %s", spaceID)}
+	if observeResp != nil {
+		obsID, _ := observeResp["obs_id"].(string)
+		nodeID, _ := observeResp["node_id"].(string)
+		if obsID != "" {
+			evidence = append(evidence, fmt.Sprintf("obs_id: %s", obsID))
+		}
+		if nodeID != "" {
+			evidence = append(evidence, fmt.Sprintf("node_id: %s", nodeID))
+		}
+		if obsID == "" && nodeID == "" {
+			return sidecar.DoctorCheck{
+				ID:          "cms.observe",
+				Category:    "cms",
+				Status:      "warn",
+				Message:     "CMS observe returned OK but missing obs_id/node_id",
+				DurationMs:  duration,
+				Remediation: "Check database connectivity — observation may not have persisted",
+				Evidence:    evidence,
+			}
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "cms.observe",
+		Category:   "cms",
+		Status:     "pass",
+		Message:    "CMS observe functional",
+		DurationMs: duration,
+		Evidence:   evidence,
 	}
 }
 

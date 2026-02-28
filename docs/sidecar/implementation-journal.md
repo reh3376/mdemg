@@ -648,3 +648,76 @@ Use this template for each session entry:
 | `--format json` support | PASS | Both commands output schema-compliant JSON |
 | All unit tests pass | PASS | 107/107 (85 S1-S4 + 22 S5) |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+
+### Entry 2026-02-27T20:00:00Z — S6 Completion
+
+1. Timestamp (UTC): 2026-02-27T20:00:00Z
+2. Phase: S6 - CMS Workflow Packaging (COMPLETE)
+3. Related roadmap sections: 7A, 7D, 8A, 10A
+4. Work completed:
+   - Added `ResolveSpaceID(cfg, projectDir)` to `internal/sidecar/config.go`:
+     - Pure function: derives space_id from `hooks.space_id_strategy` and project directory
+     - `"repo-basename"` strategy → `strings.ToLower(filepath.Base(projectDir))`
+     - 4 test cases in `config_test.go`
+   - Enhanced `runCMSCheck` in `internal/cli/sidecar_doctor.go`:
+     - Accepts `spaceID` parameter (derived from config, not hardcoded)
+     - Parses response body: extracts `memory_state` and observation count as evidence
+     - HTTP 503 → `warn` with embedder remediation (not silent pass or fail)
+     - Evidence array populated on all outcomes
+   - Added `runCMSObserveCheck` in `internal/cli/sidecar_doctor.go`:
+     - POSTs probe observation to `/v1/conversation/observe` with sentinel content
+     - Validates: HTTP 200, non-empty `obs_id` and `node_id` in response
+     - HTTP 503 → `warn` (embedder unavailable, CMS degraded)
+     - Missing obs_id/node_id → `warn` (may not have persisted)
+   - Wired both checks into `runSidecarDoctor` with space_id from `ResolveSpaceID`
+   - Created `internal/cli/sidecar_generate_hooks.go` (~165 lines):
+     - Cobra command: `mdemg sidecar generate-hooks [--dry-run] [--format text|json]`
+     - State guard: installed/running/stopped/degraded
+     - Generates session-start script from embedded template with sidecar config values
+     - Backs up existing hook before overwriting
+     - Reports via `ReportEnvelope`
+     - Generated script follows exact pattern of existing `session-start.sh` but parameterized
+   - Wired command into `internal/cli/sidecar.go`
+   - Updated `docs/sidecar/schemas/fixtures/doctor-report.example.json`:
+     - Added `cms.observe` check with evidence (obs_id, node_id)
+     - Updated `cms.resume` with evidence (space_id, memory_state, observations)
+     - Updated summary totals (6 checks)
+5. Assumptions eliminated:
+   - CMS doctor checks no longer hardcode `mdemg-dev` — derive space_id from config
+   - HTTP 503 is explicitly handled as `warn` (embedder down) not silent pass
+   - Response bodies are parsed for evidence, not just status codes
+   - Session-start scripts are project-scoped, not global
+6. Decisions made:
+   - `ResolveSpaceID` is a pure function in `internal/sidecar/` — consistent with package boundary pattern
+   - Doctor probe observation uses `[doctor-probe]` prefix for easy filtering
+   - Generated script uses `${MDEMG_URL:-<endpoint>}` pattern to allow env override
+   - Backup before overwrite: `.mdemg/backups/session-start.sh.<timestamp>`
+7. Open questions:
+   - None for S6 scope.
+8. Evidence (files/tests/commands):
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+   - `golangci-lint run ./...` — 0 issues
+   - `go test ./internal/sidecar/... -v` — 112 PASS (107 S1-S5 + 5 S6)
+9. Next actions:
+   - E2E verification: doctor with CMS running, generate-hooks output
+   - Begin Phase S7 (as defined in roadmap)
+
+**S6 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| CMS resume/observe flows validated post-install in doctor report | PASS | `cms.resume` enhanced with body parsing + evidence, `cms.observe` added |
+| `cms.resume` handles HTTP 503 as warn | PASS | Explicit 503 check → warn status + embedder remediation |
+| `cms.resume` parses response body and reports evidence | PASS | `memory_state`, observation count extracted |
+| `cms.resume` derives space_id from config | PASS | `ResolveSpaceID(cfg, projectDir)` used |
+| `cms.observe` validates obs_id/node_id | PASS | Checks non-empty fields, warns if missing |
+| `cms.observe` handles HTTP 503 as warn | PASS | Same pattern as cms.resume |
+| `ResolveSpaceID` pure function with tests | PASS | 4 test cases in config_test.go |
+| `generate-hooks` produces project-scoped script | PASS | Uses endpoint + space_id from sidecar config |
+| `generate-hooks` backs up existing hook | PASS | Backup to `.mdemg/backups/` with timestamp |
+| `generate-hooks --dry-run` support | PASS | Shows config values and generated script |
+| `generate-hooks --format json` support | PASS | ReportEnvelope with changes and next_actions |
+| Doctor fixture updated | PASS | `cms.observe` + evidence fields added |
+| All unit tests pass | PASS | 112 total |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
