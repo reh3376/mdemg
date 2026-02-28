@@ -119,6 +119,7 @@ jobs:
         run: go test -v -tags=integration ./tests/integration/...
         env:
           TEST_MDEMG_ENDPOINT: http://localhost:${{ env.MDEMG_PORT }}
+          MDEMG_BINARY: ${{ github.workspace }}/bin/mdemg
 
       - name: Setup Python for UATS
         uses: actions/setup-python@v6
