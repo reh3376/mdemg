@@ -46,7 +46,24 @@
       "category": "cms",
       "status": "pass",
       "message": "CMS resume endpoint returned valid response.",
-      "duration_ms": 32
+      "duration_ms": 32,
+      "evidence": [
+        "space_id: mdemg-dev",
+        "memory_state: active",
+        "observations: 5"
+      ]
+    },
+    {
+      "id": "cms.observe",
+      "category": "cms",
+      "status": "pass",
+      "message": "CMS observe functional",
+      "duration_ms": 28,
+      "evidence": [
+        "space_id: mdemg-dev",
+        "obs_id: obs-abc123",
+        "node_id: node-def456"
+      ]
     },
     {
       "id": "embedder.available",
@@ -58,8 +75,8 @@
     }
   ],
   "summary": {
-    "total": 5,
-    "pass": 4,
+    "total": 6,
+    "pass": 5,
     "warn": 1,
     "fail": 0,
     "skip": 0

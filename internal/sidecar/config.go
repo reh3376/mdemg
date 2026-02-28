@@ -209,6 +209,16 @@ func MarshalConfigYAML(cfg *Config) ([]byte, error) {
 	return append([]byte(header), data...), nil
 }
 
+// ResolveSpaceID derives a space_id from the config's strategy and project directory.
+func ResolveSpaceID(cfg *Config, projectDir string) string {
+	switch cfg.Hooks.SpaceIDStrategy {
+	case "repo-basename":
+		return strings.ToLower(filepath.Base(projectDir))
+	default:
+		return strings.ToLower(filepath.Base(projectDir))
+	}
+}
+
 // HashConfig returns the SHA-256 hex digest of raw config bytes for drift detection.
 func HashConfig(data []byte) string {
 	h := sha256.Sum256(data)

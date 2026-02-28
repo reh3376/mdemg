@@ -212,6 +212,52 @@ func TestHashConfig_Deterministic(t *testing.T) {
 	}
 }
 
+func TestResolveSpaceID(t *testing.T) {
+	tests := []struct {
+		name       string
+		strategy   string
+		projectDir string
+		want       string
+	}{
+		{
+			name:       "repo-basename strategy",
+			strategy:   "repo-basename",
+			projectDir: "/home/user/MyProject",
+			want:       "myproject",
+		},
+		{
+			name:       "default falls back to repo-basename",
+			strategy:   "unknown-strategy",
+			projectDir: "/home/user/Some-Repo",
+			want:       "some-repo",
+		},
+		{
+			name:       "nested path extracts basename",
+			strategy:   "repo-basename",
+			projectDir: "/a/b/c/MDEMG",
+			want:       "mdemg",
+		},
+		{
+			name:       "already lowercase",
+			strategy:   "repo-basename",
+			projectDir: "/tmp/test-repo",
+			want:       "test-repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Hooks: HooksConfig{SpaceIDStrategy: tt.strategy},
+			}
+			got := ResolveSpaceID(cfg, tt.projectDir)
+			if got != tt.want {
+				t.Errorf("ResolveSpaceID() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFindConfigFileFrom(t *testing.T) {
 	dir := t.TempDir()
 	mdemg := filepath.Join(dir, ".mdemg")

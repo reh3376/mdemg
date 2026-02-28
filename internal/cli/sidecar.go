@@ -14,17 +14,18 @@ func newSidecarCmd() *cobra.Command {
 		Long: `Manage the MDEMG sidecar lifecycle for any repository.
 
 Commands:
-  init           Initialize sidecar configuration
-  status         Show sidecar state and service health
-  install        Install sidecar dependencies and runtime
-  up             Start sidecar services
-  down           Stop sidecar services
-  restart        Restart sidecar services
-  doctor         Run diagnostics
-  attach-agent   Attach an agent adapter
-  detach-agent   Detach an agent adapter
-  upgrade        Upgrade sidecar version
-  uninstall      Remove sidecar from project`,
+  init             Initialize sidecar configuration
+  status           Show sidecar state and service health
+  install          Install sidecar dependencies and runtime
+  up               Start sidecar services
+  down             Stop sidecar services
+  restart          Restart sidecar services
+  doctor           Run diagnostics
+  attach-agent     Attach an agent adapter
+  detach-agent     Detach an agent adapter
+  generate-hooks   Generate project-scoped session-start hook
+  upgrade          Upgrade sidecar version
+  uninstall        Remove sidecar from project`,
 	}
 
 	cmd.AddCommand(newSidecarInitCmd())
@@ -36,6 +37,7 @@ Commands:
 	cmd.AddCommand(newSidecarDoctorCmd())
 	cmd.AddCommand(newSidecarAttachAgentCmd())
 	cmd.AddCommand(newSidecarDetachAgentCmd())
+	cmd.AddCommand(newSidecarGenerateHooksCmd())
 	cmd.AddCommand(newSidecarStubCmd("upgrade", "Upgrade sidecar version"))
 	cmd.AddCommand(newSidecarStubCmd("uninstall", "Remove sidecar from project"))
 
