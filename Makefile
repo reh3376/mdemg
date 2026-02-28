@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -244,6 +244,25 @@ test-unts-report:
 		--registry docs/specs/unts-registry.json \
 		--report /tmp/unts-report.json
 	@echo "Report saved to /tmp/unts-report.json"
+
+# ============================================================
+# Sidecar Testing Targets
+# ============================================================
+
+# Run all sidecar tests (unit + integration)
+test-sidecar: test-sidecar-unit test-sidecar-integration
+
+# Run sidecar unit tests (pure-logic helpers in internal/sidecar + internal/cli)
+test-sidecar-unit:
+	@echo "Running sidecar unit tests..."
+	go test -v ./internal/sidecar/... ./internal/cli/... \
+		-run "TestExtractPort|TestDoctorStatus|TestDoctorNext|TestRunConfig|TestGenerate|TestBuildHealth|TestIsEmpty"
+
+# Run sidecar integration tests (binary-exec, requires built CLI)
+test-sidecar-integration: build-cli
+	@echo "Running sidecar integration tests..."
+	MDEMG_BINARY=$(PWD)/bin/mdemg go test -v -tags=integration \
+		./tests/integration/... -run "TestSidecar_" -timeout 120s
 
 # ============================================================
 # UDTS Contract Testing Targets
