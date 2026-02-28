@@ -1,7 +1,7 @@
 # Sidecar Report Schemas
 
-Status: Draft  
-Last Updated: 2026-02-27  
+Status: v0.1.0
+Last Updated: 2026-02-28
 Owner: MDEMG Core  
 Authority: `docs/sidecar/roadmap.md` Sections 1C, 7D, and 11.6
 
@@ -91,7 +91,7 @@ Example report files for each schema, located in `fixtures/`:
 | `upgrade-report.schema.json` | `fixtures/upgrade-report.example.json` | Version 1.0.0 to 1.1.0 with config migration |
 | `uninstall-report.schema.json` | `fixtures/uninstall-report.example.json` | Full uninstall with backups retained |
 
-Each fixture must validate against its corresponding schema. CI must enforce this.
+Each fixture must validate against its corresponding schema. CI enforces this via `make test-sidecar-schemas` (runs `scripts/verify_sidecar_schemas.py`).
 
 ---
 

@@ -1,7 +1,7 @@
 # MDEMG Sidecar FAQ
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Developers adopting sidecar in personal or team repos
 
@@ -49,6 +49,8 @@ Use:
 mdemg sidecar uninstall
 ```
 
+Note: `uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+
 Then verify no managed services/adapters remain attached.
 
 ## 9. Where do I find failures quickly?
@@ -62,3 +64,17 @@ Use local for simplicity and portability; use studio-remote when resource-intens
 ## 11. Which document is the normative authority for sidecar behavior?
 
 `docs/sidecar/roadmap.md` is the normative source for sidecar planning and implementation contracts in this directory.
+
+## 12. How do I install the mdemg binary?
+
+Three options:
+
+1. **Homebrew** (macOS): `brew install reh3376/mdemg/mdemg`
+2. **Curl installer** (macOS/Linux): `curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash`
+3. **Source**: `git clone` + `make build-cli`
+
+See `docs/sidecar/installation.md` Section 2 for details.
+
+## 13. What are stub commands?
+
+`mdemg sidecar upgrade` and `mdemg sidecar uninstall` are planned but not yet implemented. They print "not yet implemented" and exit cleanly. See `docs/sidecar/friction-log.md` for manual workarounds.

@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration release-snapshot release-local
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -107,6 +107,8 @@ help:
 	@echo "  test-ubts-load - Run UBTS load benchmark (1000 requests)"
 	@echo "  test-uots      - Run all UOTS observability contract specs"
 	@echo "  test-unts-report- Generate UNTS Section 8A report from registry"
+	@echo "  test-sidecar-schemas - Validate sidecar fixture JSON against schemas"
+	@echo "  test-sidecar-acceptance - Run sidecar end-to-end acceptance test"
 	@echo "  release-snapshot- Build release snapshot locally (no publish)"
 	@echo "  release-local  - Build release locally (no publish, requires tag)"
 	@echo "  clean          - Remove build artifacts"
@@ -277,6 +279,16 @@ test-sidecar-integration: build-cli
 	@echo "Running sidecar integration tests..."
 	MDEMG_BINARY=$(PWD)/bin/mdemg go test -v -tags=integration \
 		./tests/integration/... -run "TestSidecar_" -timeout 120s
+
+# Validate sidecar fixture JSON files against their schemas
+test-sidecar-schemas:
+	@echo "Validating sidecar schemas..."
+	python3 scripts/verify_sidecar_schemas.py
+
+# Run sidecar end-to-end acceptance test (requires built CLI)
+test-sidecar-acceptance: build-cli
+	@echo "Running sidecar acceptance test..."
+	bash scripts/sidecar-acceptance.sh --binary $(PWD)/bin/mdemg
 
 # ============================================================
 # UDTS Contract Testing Targets

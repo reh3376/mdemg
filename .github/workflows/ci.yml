@@ -91,6 +91,12 @@ jobs:
         env:
           MDEMG_BINARY: ${{ github.workspace }}/bin/mdemg
 
+      - name: Validate sidecar schemas
+        run: pip install jsonschema && python3 scripts/verify_sidecar_schemas.py
+
+      - name: Run sidecar acceptance test
+        run: bash scripts/sidecar-acceptance.sh --binary ${{ github.workspace }}/bin/mdemg
+
       - name: Apply Neo4j migrations
         run: |
           export NEO4J_URI=bolt://localhost:7687

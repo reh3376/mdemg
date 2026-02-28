@@ -1,7 +1,7 @@
 # MDEMG Sidecar Security and Operations Guide
 
-Status: Draft  
-Date: 2026-02-27  
+Status: v0.1.0
+Date: 2026-02-28
 Owner: MDEMG Core  
 Audience: Operators and maintainers
 
@@ -68,7 +68,18 @@ If compromise or severe misconfiguration is suspected:
 
 ---
 
-## 7. Operational Controls Checklist
+## 7. Distribution Security
+
+Release binaries distributed via GitHub Releases include SHA256 checksums:
+
+1. The curl installer (`scripts/install.sh`) verifies checksums automatically before installing.
+2. Homebrew tap formulae include checksum verification via goreleaser.
+3. Manual verification: download the `checksums.txt` file from the release and compare with `shasum -a 256 <binary>`.
+4. Binaries are built in CI from tagged commits on `macos-latest` runners (native arm64 for CGO).
+
+---
+
+## 8. Operational Controls Checklist
 
 1. `doctor` run before production-like use.
 2. Backup created before any adapter mutation.
