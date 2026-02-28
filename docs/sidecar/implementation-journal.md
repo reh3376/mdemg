@@ -721,3 +721,65 @@ Use this template for each session entry:
 | Doctor fixture updated | PASS | `cms.observe` + evidence fields added |
 | All unit tests pass | PASS | 112 total |
 | Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+
+---
+
+### Phase S7: Quality Gates and Hardening
+
+1. Timestamp (UTC): 2026-02-28T00:00:00Z
+2. Phase: S7
+3. Related roadmap sections: S7 exit criteria (CI gates on sidecar core scenarios)
+4. Work completed:
+   - Created `internal/cli/sidecar_helpers_test.go` (14 unit tests for CLI helper functions)
+     - `TestExtractPort` (6 cases: normal, custom, no-port, empty, bad URL, zero)
+     - `TestDoctorStatusIcon` (6 cases: pass, fail, warn, skip, unknown, empty)
+     - `TestDoctorNextActions_AllPass` and `TestDoctorNextActions_SomeFail`
+     - `TestRunConfigCheck_NoPath`, `_NilConfig`, `_Valid`, `_Invalid`
+     - `TestGenerateSessionStartScript_Shebang` and `_Content`
+     - `TestBuildHealthSummary_AllHealthy`, `_SomeDown`, `_Empty`
+     - `TestIsEmptyConfig_JSON`, `_TOML`, `_Default`
+   - Created `tests/integration/sidecar_lifecycle_test.go` (22 test functions, 34 with subtests)
+     - Binary-exec tests using `exec.Command` against `bin/mdemg`
+     - Init: dry-run JSON, defaults writes files, invalid profile, idempotency
+     - Status: uninitialized JSON, post-init JSON
+     - Install: invalid state JSON, dry-run JSON, idempotency
+     - Up: invalid state guard, dry-run post-install
+     - Doctor: no config JSON, with config JSON
+     - GenerateHooks: invalid state, dry-run
+     - Attach/Detach: invalid state, dry-run, round-trip
+     - Stubs: upgrade/uninstall print "not yet implemented"
+     - State guards matrix: 12-case table-driven test
+     - Down/Restart: invalid state guards
+   - Added CI workflow steps: sidecar unit tests + integration tests in test job
+   - Added Makefile targets: `test-sidecar`, `test-sidecar-unit`, `test-sidecar-integration`
+5. Assumptions eliminated:
+   - CLI helpers (extractPort, doctorStatusIcon, etc.) are pure functions testable without services
+   - Integration tests can run without Docker/Neo4j by using --dry-run and state simulation
+   - `writeLockState` helper enables testing any state guard without real install/up workflows
+6. Decisions made:
+   - Integration tests use JSON output parsing (not text scraping) for reliable assertions
+   - State guards matrix is table-driven to cover all invalid transitions systematically
+   - CI steps placed after "Build unified CLI" but before Neo4j-dependent steps (no service dependency)
+   - No new CI job — sidecar tests join existing `test` job
+7. Open questions:
+   - None
+8. Evidence (files/tests/commands):
+   - `go test ./internal/cli/... -run "TestExtractPort|TestDoctorStatus|..."` — 14/14 PASS
+   - `go test -v -tags=integration ./tests/integration/... -run "TestSidecar_"` — 22/22 PASS (34 with subtests)
+   - `golangci-lint run ./...` — 0 issues
+   - `go build ./...` — PASS
+   - `go vet ./...` — PASS
+9. Next actions:
+   - Push to mdemg-dev01; verify CI green
+   - Begin Phase S8 or next roadmap item
+
+**S7 Exit Criteria Verification:**
+
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| CI includes sidecar gating for core install/up/doctor scenarios | PASS | `.github/workflows/ci.yml` has "Run Sidecar Unit Tests" and "Run Sidecar Integration Tests" steps |
+| Integration tests exercise full CLI binary | PASS | `tests/integration/sidecar_lifecycle_test.go` — 22 test functions using `exec.Command` |
+| Unit tests cover all pure helper functions | PASS | `internal/cli/sidecar_helpers_test.go` — 14 tests covering 7 functions |
+| All tests pass | PASS | 14 unit + 22 integration = 36 new tests, all passing |
+| Lint passes | PASS | `golangci-lint run ./...` — 0 issues |
+| Makefile targets work | PASS | `make test-sidecar` runs both suites |
