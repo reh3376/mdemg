@@ -1,9 +1,42 @@
 # MDEMG Sidecar Roadmap
 
-Status: Draft  
-Date: 2026-02-28
-Owner: MDEMG Core  
-Primary Audience: Internal developer (MacBook + MacStudio) and future external adopters  
+Status: Draft
+Date: 2026-03-01
+Owner: MDEMG Core
+Primary Audience: Internal developer (MacBook + MacStudio) and future external adopters
+
+<!--
+=== AGENT RESUME CONTEXT (2026-03-01) ===
+
+CURRENT STATE:
+- Branch: mdemg-dev01 (all dev work here, never commit to main)
+- Last commit: 3bfff43 — Phase S14 (doc cleanup + test fixes)
+- All sidecar phases S0-S12 and S14 are COMPLETE
+- All tests passing: unit, integration (27/27), acceptance (9/9), lint clean
+- CMS server runs on localhost:9999, Neo4j via Docker
+
+WHAT JUST HAPPENED (S14):
+- Replaced all stale "not yet implemented" stub references with real S12 behavior
+- 4 files fixed: maintenance.md, faq.md, sidecar-acceptance.sh, sidecar_lifecycle_test.go
+- DoD (Section 14) and Acceptance Criteria (Section 11) fully satisfied
+
+NEXT SIDECAR WORK:
+- Phase S13 (Embedding Model Migration) is the only remaining planned sidecar phase
+- S13 consolidates embedding models to qwen3-embedding:4b (Ollama) + OpenAI
+- S13 scope is detailed below in Section 8 — read it before starting
+- S13 touches many files outside sidecar (internal/embeddings/, internal/config/, migrations/)
+
+NON-SIDECAR WORK AVAILABLE:
+- Phases 98-100 (Cross-Platform Build, Onboarding, Deployable Package) are planned
+- See AGENT_HANDOFF.md Phase Registry for full status of all phases
+
+KEY GOTCHAS:
+- Integration tests need MDEMG_BINARY env var pointing to absolute path of bin/mdemg
+- Always rebuild binary before running integration/acceptance tests: go build -o bin/mdemg ./cmd/mdemg
+- golangci-lint must pass before committing: ~/go/bin/golangci-lint run ./...
+- Follow mandatory workflow: implement → lint → test → update docs → commit
+-->
+
 Related:
 - `docs/specs/phase92-gap-analysis.md`
 - `docs/specs/phase93-unified-cli-foundation.md`

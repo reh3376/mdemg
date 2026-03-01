@@ -2,10 +2,41 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-02-28
+**Date:** 2026-03-01
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
+
+<!--
+=== AGENT RESUME CONTEXT (2026-03-01) ===
+
+LAST SESSION SUMMARY:
+- Completed Phase S14 (commit 3bfff43): documentation cleanup removing stale stub references
+- All sidecar phases S0-S12 and S14 are COMPLETE. S13 (Embedding Model Migration) is planned.
+- All 5 cognitive gap phases (101-105) are COMPLETE
+- Core infrastructure phases 92-97 are COMPLETE
+- Phases 98-100 (Cross-Platform Build, Onboarding, Deployable Package) remain PLANNED
+
+REPO STATE:
+- Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
+- Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
+- CMS: MDEMG server on localhost:9999, Neo4j in Docker container mdemg-neo4j-dev
+- All tests green: go test ./internal/cli/... ./internal/sidecar/... (unit),
+  MDEMG_BINARY=$(pwd)/bin/mdemg go test -tags=integration ./tests/integration/... (integration),
+  bash scripts/sidecar-acceptance.sh (acceptance)
+
+MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
+1. Never commit to main — all work on mdemg-dev01
+2. Sequence: implement → lint (golangci-lint run ./...) → test → update docs → commit
+3. Conventional commits (feat:, fix:, docs:)
+4. Start CMS on session start: ./bin/mdemg start --auto-migrate
+5. Resume memory: POST http://localhost:9999/v1/conversation/resume
+
+WHERE TO LOOK NEXT:
+- Sidecar: S13 spec is in docs/sidecar/roadmap.md Section 8 (Embedding Model Migration)
+- Core: Phases 98-100 specs are outlined in docs/specs/phase92-gap-analysis.md
+- Phase Registry below has full status of every phase with links to specs
+-->
 
 ---
 
