@@ -49,7 +49,7 @@ Use:
 mdemg sidecar uninstall
 ```
 
-Note: `uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+Options: `--force` (stop running services first), `--keep-data` (preserve graph data), `--dry-run`, `--format json`. The `.mdemg/` directory is automatically backed up before removal.
 
 Then verify no managed services/adapters remain attached.
 
@@ -75,6 +75,13 @@ Three options:
 
 See `docs/sidecar/installation.md` Section 2 for details.
 
-## 13. What are stub commands?
+## 13. How do I upgrade sidecar to a newer version?
 
-`mdemg sidecar upgrade` and `mdemg sidecar uninstall` are planned but not yet implemented. They print "not yet implemented" and exit cleanly. See `docs/sidecar/friction-log.md` for manual workarounds.
+Run:
+
+```bash
+mdemg sidecar upgrade --dry-run   # preview version drift and planned actions
+mdemg sidecar upgrade
+```
+
+`upgrade` detects version drift between the running sidecar and the current CLI binary, then performs a controlled upgrade cycle (down → install → up). Use `--skip-restart` to stop at the install step without restarting.

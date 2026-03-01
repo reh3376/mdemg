@@ -1119,3 +1119,50 @@ Use this template for each session entry:
 - `internal/sidecar/types.go`, `types_test.go`, `lock.go`, `install.go`, `report.go`, `adapter.go`, `config.go`
 - `internal/cli/root.go`, `docker.go`
 - `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`
+
+---
+
+### Entry 2026-02-28T20:00:00Z
+
+1. Timestamp (UTC): 2026-02-28T20:00:00Z
+2. Phase: S14 — Documentation Cleanup — Stub Resolution
+3. Related roadmap sections: Section 8A (documentation deliverables), Section 11.5 (documentation acceptance criteria), Section 14 (Definition of Done)
+4. Work completed:
+   - Removed stale stub notes from `maintenance.md` §3 (upgrade) and §6 (uninstall), replaced with real command descriptions
+   - Updated `faq.md` Q8 (removed stub note, added uninstall options), rewrote Q13 from "What are stub commands?" to "How do I upgrade sidecar?"
+   - Replaced `sidecar-acceptance.sh` Step 8 stub checks with upgrade/uninstall `--dry-run --format json` validation (9 steps total now)
+   - Replaced `TestSidecar_Stubs_NotImplemented` in integration tests with 5 real tests: `Upgrade_InvalidState`, `Upgrade_DryRun`, `Uninstall_InvalidState`, `Uninstall_RunningWithoutForce`, `Uninstall_DryRun`
+   - Added 3 state guard entries to `TestSidecar_StateGuards_Matrix`: `upgrade_from_uninitialized`, `uninstall_from_uninitialized`, `uninstall_from_initialized`
+   - Added S10, S11, S12, S14 phase entries to `roadmap.md` Section 8
+   - Added sidecar phases (S8-S12, S14) to `AGENT_HANDOFF.md` Phase Registry
+5. Assumptions eliminated:
+   - Documentation no longer claims upgrade/uninstall are stubs
+   - Tests no longer assert "not yet implemented" output
+6. Decisions made:
+   - Historical references to stubs in `implementation-journal.md` left as-is (they document what happened, not current state)
+   - Strikethrough entries in `troubleshooting.md` and `friction-log.md` left as-is (already correctly marked resolved in S12)
+7. Open questions: none
+8. Evidence:
+   - `go build ./...` clean, `go vet ./...` clean, `golangci-lint run ./...` 0 issues
+   - Integration tests: 27/27 PASS (including 5 new + 3 new state guard entries)
+   - Acceptance test: 9/9 PASS
+   - `grep -r "stub\|not yet implemented"` clean in all 4 target files
+9. Next actions: commit, push
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `docs/sidecar/maintenance.md` | Removed stub notes from §3 and §6, replaced with real command descriptions |
+| `docs/sidecar/faq.md` | Updated Q8 (removed stub note), rewrote Q13 (stub → upgrade guide) |
+| `scripts/sidecar-acceptance.sh` | Replaced Step 8 stub checks with upgrade/uninstall dry-run validation |
+| `tests/integration/sidecar_lifecycle_test.go` | Replaced `TestSidecar_Stubs_NotImplemented` with 5 real tests + 3 state guard entries |
+| `docs/sidecar/roadmap.md` | Added S10, S11, S12, S14 phase entries; updated date |
+| `docs/sidecar/implementation-journal.md` | S14 entry |
+| `AGENT_HANDOFF.md` | Added sidecar phases to Phase Registry and Artifact Index |
+
+**Documents Accessed:**
+- `docs/sidecar/maintenance.md`, `faq.md`, `roadmap.md`, `friction-log.md`, `troubleshooting.md`, `installation.md`, `implementation-journal.md`
+- `scripts/sidecar-acceptance.sh`
+- `tests/integration/sidecar_lifecycle_test.go`
+- `AGENT_HANDOFF.md`

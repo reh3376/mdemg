@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-02-23
+**Date:** 2026-02-28
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -367,6 +367,12 @@ Phases are organized into **numbered series** to group related work:
 | 103b | Emergence Model Eval & MLX | ✅ | `docs/tests/uets/` |
 | 104 | Active MCP Guardrails | ✅ | `docs/specs/phase104-active-mcp-guardrails.md` |
 | 105 | Global Meta-Learning | ✅ | `docs/specs/phase105-global-meta-learning.md` |
+| S8 | Distribution Pipeline | ✅ | `docs/sidecar/roadmap.md` §S8 |
+| S9 | Personal Beta and Public Readiness | ✅ | `docs/sidecar/roadmap.md` §S9 |
+| S10 | Dynamic Port Allocation | ✅ | `docs/sidecar/roadmap.md` §S10 |
+| S11 | Sidecar LLM Integration | ✅ | `docs/sidecar/roadmap.md` §S11 |
+| S12 | Sidecar Upgrade and Uninstall | ✅ | `docs/sidecar/roadmap.md` §S12 |
+| S14 | Documentation Cleanup — Stub Resolution | ✅ | `docs/sidecar/roadmap.md` §S14 |
 
 ---
 
@@ -413,6 +419,12 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 103b (Complete)**: Emergence Model Evaluation & MLX Server Integration — `LLM_ENDPOINT` env var decouples LLM text-generation from embeddings (synthesis, intent, emergence, reranking use `EffectiveLLMEndpoint()`, embeddings stay on `OPENAI_ENDPOINT`). Ollama `format` JSON schema for grammar-constrained output (eliminates invalid JSON). UETS (Universal Emergence Test Specification) framework for model evaluation with 5 patterns (E1-E5), 8 model specs (7/7 passing), Python runner with `--endpoint` override for remote execution. Mac Studio specs (`llama3.2-3b-macstudio`, `llama3.2-3b-fp16-macstudio`, `llama3.3-70b-macstudio`), `num_ctx` config support in runner. Recommendation: `llama3.2:3b` Q4_K_M as default emergence model (fastest latency, top name quality). Config: `LLM_ENDPOINT`. UETS: `docs/tests/uets/`. Modified: `internal/config/config.go`, `internal/api/server.go`, `internal/hidden/emergence_namer.go`, `internal/hidden/step_dynamic_emergence.go`, `internal/retrieval/rerank.go`.
 - **Phase 104 (Complete)**: Active MCP Guardrails — `POST /v1/memory/guardrail/validate` endpoint + MCP `validate_changes` tool. 4-step pipeline: diff parsing (regex symbol extraction) → constraint retrieval (vector similarity + keyword match) → LLM evaluation (OpenAI/Ollama, circuit breaker, Temperature 0.0) → response building (type-based Block/Warning/Pass mapping). Fail-open on any pipeline error. Re-validates LLM output against actual constraint types (prevents LLM from marking `should` as violation). Config: 6 `GUARDRAIL_*` env vars. New package: `internal/guardrail/` (6 files). Spec: `docs/specs/phase104-active-mcp-guardrails.md`. UATS: `docs/api/api-spec/uats/specs/guardrail_validate.uats.json`. Closes Gap 4 from Cognitive Intelligence Gap Analysis.
 - **Phase 105 (Complete)**: Global Meta-Learning (Cross-Space Collective Learning) — `POST /v1/memory/meta-learn` endpoint promotes high-value L4/L5 concepts from local spaces to shared `mdemg-global` space via LLM generalization (strips repo-specific names/paths/credentials, preserves core architectural insights). `ORIGINATED_FROM` edges link global nodes back to source. Retrieval pipeline (`/v1/memory/retrieve`, `/consult`, `/suggest`) supports `include_global_space: true` for cross-space vector+BM25 search. Multi-space support: `vectorRecall`, `BM25Search`, `fetchOutgoingEdges` all accept `spaceIDs []string`. New package: `internal/metalearn/` (generalizer.go, service.go, service_test.go — 7 unit tests). Config: 8 `METALEARN_*` env vars. Spec: `docs/specs/phase105-global-meta-learning.md`. UATS: `meta_learn_promote.uats.json` (llm_required), `meta_learn_retrieve_global.uats.json` (embedding_required). Closes Gap 5 from Cognitive Intelligence Gap Analysis — all 5 cognitive gaps now addressed.
+- **Phase S8 (Complete)**: Distribution Pipeline — goreleaser cross-compilation, Homebrew tap formula, curl installer with platform detection, signed checksums. Spec: `docs/sidecar/roadmap.md` §S8.
+- **Phase S9 (Complete)**: Personal Beta and Public Readiness — acceptance testing, documentation validation pass, friction log burn-down. Spec: `docs/sidecar/roadmap.md` §S9. Tests: `scripts/sidecar-acceptance.sh`, `tests/integration/sidecar_lifecycle_test.go`.
+- **Phase S10 (Complete)**: Dynamic Port Allocation and Multi-Project Isolation — OS-level free port detection, per-project isolation. Spec: `docs/sidecar/roadmap.md` §S10.
+- **Phase S11 (Complete)**: Sidecar LLM Integration and Config Simplification — consolidated embedding model defaults (qwen3-embedding:4b), LLM config auto-detection. Spec: `docs/sidecar/roadmap.md` §S11.
+- **Phase S12 (Complete)**: Sidecar Upgrade and Uninstall Commands — `mdemg sidecar upgrade` (version drift, down→install→up cycle), `mdemg sidecar uninstall` (7-phase cleanup, safety backup). Go: `internal/cli/sidecar_upgrade.go`, `internal/cli/sidecar_uninstall.go`. Tests: `internal/cli/sidecar_upgrade_test.go`, `internal/cli/sidecar_uninstall_test.go`. Spec: `docs/sidecar/roadmap.md` §S12.
+- **Phase S14 (Complete)**: Documentation Cleanup — Stub Resolution — removed stale stub references from `maintenance.md`, `faq.md`, `sidecar-acceptance.sh`, `sidecar_lifecycle_test.go`. Added S10-S12, S14 to roadmap. 5 new integration tests + 3 state guard entries.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 

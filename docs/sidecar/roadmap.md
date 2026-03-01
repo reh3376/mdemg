@@ -1,7 +1,7 @@
 # MDEMG Sidecar Roadmap
 
 Status: Draft  
-Date: 2026-02-27  
+Date: 2026-02-28
 Owner: MDEMG Core  
 Primary Audience: Internal developer (MacBook + MacStudio) and future external adopters  
 Related:
@@ -710,6 +710,103 @@ Exit criteria:
 2. Critical install failures < 5 percent across beta runs.
 3. Remote profile stability acceptable for daily use.
 4. Documentation walkthrough pass rate >= 95 percent for first-time setup attempts.
+
+### Phase S10: Dynamic Port Allocation and Multi-Project Isolation (complete)
+
+Goal: eliminate port collisions across concurrent sidecar instances.
+
+Deliverables:
+
+1. Dynamic port allocation with OS-level free port detection.
+2. Per-project isolation via unique port and lock file binding.
+3. Lock file records allocated port for downstream consumers.
+
+Exit criteria:
+
+1. Two sidecar instances in separate repos run simultaneously without conflict.
+
+### Phase S11: Sidecar LLM Integration and Config Simplification (complete)
+
+Goal: streamline embedding and LLM model configuration for sidecar workflows.
+
+Deliverables:
+
+1. Consolidated embedding model defaults (qwen3-embedding:4b via Ollama).
+2. LLM config auto-detection and simplified YAML surface.
+3. Doctor checks for Ollama model availability.
+
+Exit criteria:
+
+1. `sidecar init` produces working config without manual model configuration.
+
+### Phase S12: Sidecar Upgrade and Uninstall Commands (complete)
+
+Goal: replace upgrade and uninstall stubs with real implementations.
+
+Deliverables:
+
+1. `mdemg sidecar upgrade`: version drift detection, controlled upgrade cycle (down → install → up), `--dry-run`, `--skip-restart`, `--format json`.
+2. `mdemg sidecar uninstall`: 7-phase cleanup, `--force` (stop running services), `--keep-data` (preserve Neo4j volume), safety backup to `.mdemg-backup-<timestamp>/`.
+3. Full lifecycle coverage: init → install → up → doctor → restart → upgrade → down → uninstall.
+
+Exit criteria:
+
+1. Friction log F1 resolved — no manual workarounds needed.
+2. All acceptance and integration tests pass with real commands.
+
+### Phase S14: Documentation Cleanup — Stub Resolution (complete)
+
+Goal: remove all stale stub references from docs and tests after S12 implementation.
+
+Deliverables:
+
+1. `maintenance.md` §3 and §6 updated with real upgrade/uninstall descriptions.
+2. `faq.md` Q8 and Q13 updated to reflect real commands.
+3. `sidecar-acceptance.sh` Step 8 replaced with upgrade/uninstall dry-run validation.
+4. Integration test `TestSidecar_Stubs_NotImplemented` replaced with 5 real tests + 3 state guard entries.
+
+Exit criteria:
+
+1. Zero stale stub references in sidecar docs, acceptance test, and integration tests.
+2. All tests pass: unit, integration, and acceptance.
+
+### Phase S13: Embedding Model Migration (planned)
+
+Goal: consolidate embedding model options to qwen3-embedding:4b (default, Ollama) and OpenAI (alternate). Remove the legacy llama/nomic-embed-text model path entirely.
+
+Scope:
+
+1. Remove llama embedding model option from all model selection logic.
+2. Make `qwen3-embedding:4b` (Ollama) the default embedding model across the entire codebase.
+3. Make OpenAI (`text-embedding-ada-002` / `gpt-4o-mini`) the alternate — not the default.
+4. Update `ingest-codebase` handler and all other embedding consumers.
+5. Update config defaults, `.env.example`, YAML config generation, init wizard.
+6. Update Neo4j vector index dimensions if model output dimensions differ.
+7. Update all documentation: architecture docs, config reference, installation guide, feature docs, API docs, contributing guide.
+8. Update benchmark configs and test fixtures that reference embedding models.
+9. Validate with benchmark run to confirm no retrieval quality regression.
+
+Known touch points (non-exhaustive — full audit required at implementation time):
+
+- `internal/embeddings/` — provider factory, ollama.go, openai.go, config struct
+- `internal/config/config.go` — default model constants
+- `internal/config/yaml_config.go` — YAML generation defaults
+- `internal/cli/init.go` — wizard defaults
+- `internal/cli/ingest.go`, `internal/api/handlers_ingest_codebase.go` — ingest embedding usage
+- `cmd/ingest-codebase/main.go` — legacy binary
+- `.env.example` — documented defaults
+- `docs/architecture/03_Vector_Embeddings_and_Indexes.md`
+- `docs/api/INGEST_CODEBASE_API.md`
+- `migrations/V0003__vector_indexes.cypher` — index dimensions
+
+Blockers: none known. Depends on qwen3-embedding:4b being stable and validated (already validated in S11).
+
+Exit criteria:
+
+1. Only two embedding model paths remain: Ollama (qwen3-embedding:4b) and OpenAI.
+2. No references to llama embedding models in source code.
+3. All tests pass with new defaults.
+4. Benchmark confirms no retrieval quality regression.
 
 ---
 
