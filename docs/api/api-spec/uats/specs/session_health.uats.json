@@ -1,0 +1,75 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Session Health",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "conversation",
+      "session",
+      "health",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-09",
+    "description": "Validates GET /v1/conversation/session/health returns session health status",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/conversation/session/health?session_id=uats-test-session"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.session_id",
+        "op": "equals",
+        "expected": "uats-test-session"
+      },
+      {
+        "path": "$.health_score",
+        "type": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_session_id",
+      "description": "Missing session_id should return 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/conversation/session/health"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/conversation/session/health",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}
