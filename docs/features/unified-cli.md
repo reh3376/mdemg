@@ -745,6 +745,25 @@ See [docs/features/ide-repo-integration.md](ide-repo-integration.md) for full de
 
 ---
 
+## Self-Update
+
+Update the `mdemg` binary to the latest release from GitHub:
+
+```bash
+# Check for updates (dry run)
+./bin/mdemg upgrade --dry-run
+
+# Upgrade to latest release
+./bin/mdemg upgrade
+
+# Force upgrade even if already on latest version
+./bin/mdemg upgrade --force
+```
+
+The upgrade command checks GitHub Releases for the latest version, downloads the appropriate binary for your platform, verifies the SHA256 checksum, and replaces the current binary using a backup-and-replace strategy. The previous binary is preserved as a backup in case rollback is needed.
+
+---
+
 ## MCP Server (IDE Integration)
 
 Start the MCP server for integration with AI coding assistants (Cursor, Claude Code, etc.):

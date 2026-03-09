@@ -83,6 +83,7 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newHooksCmd())
 	rootCmd.AddCommand(newSidecarCmd())
+	rootCmd.AddCommand(newUpgradeCmd())
 	rootCmd.AddCommand(newVersionCmd())
 
 	return rootCmd

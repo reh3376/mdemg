@@ -27,7 +27,8 @@ NEXT SIDECAR WORK:
 - S13 touches many files outside sidecar (internal/embeddings/, internal/config/, migrations/)
 
 NON-SIDECAR WORK AVAILABLE:
-- Phases 98-100 (Cross-Platform Build, Onboarding, Deployable Package) are planned
+- Phases 99-100 (Onboarding, Deployable Package) are planned
+- Phase 98 (Cross-Platform Build + Release) is COMPLETE
 - See AGENT_HANDOFF.md Phase Registry for full status of all phases
 
 KEY GOTCHAS:

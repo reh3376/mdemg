@@ -442,7 +442,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 95 (Complete)**: Database + Embedding + Migrations — Go-native migration runner with embedded `*.cypher` files, `mdemg db migrate/start/stop/status/shell` commands, `mdemg embeddings check`, `--auto-migrate` on serve, `REQUIRED_SCHEMA_VERSION` auto-detection, CI simplified (no cypher-shell). Spec: `docs/specs/phase95-database-embedding-migrations.md`. Feature: `docs/features/database-embedding-migrations.md`.
 - **Phase 96 (Complete)**: IDE + Repo Integration — `mdemg hooks install/uninstall/list`, `.claude/mcp.json` generation, `mdemg serve --mcp` subprocess. Spec: `docs/specs/phase96-ide-repo-integration.md`. Feature: `docs/features/ide-repo-integration.md`.
 - **Phase 97 (Complete)**: Process Lifecycle + Secret Management — `mdemg start/stop/restart/status` daemon mode with PID/log management, `mdemg config set-secret/get-secret/list-secrets` keychain integration, auto-start Neo4j on `mdemg start`. Spec: `docs/specs/phase97-process-lifecycle-security.md`. Features: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`.
-- **Phase 98 (Planned)**: Cross-Platform Build + Release — goreleaser, Homebrew tap, curl installer, self-update. Depends on: Phase 97.
+- **Phase 98 (Complete)**: Cross-Platform Build + Release — `.goreleaser.yaml` with 3 build targets (darwin/arm64, darwin/amd64, linux/amd64 via Zig CC), tar.gz archives, SHA256 checksums, homebrew_casks tap distribution. `.github/workflows/release.yml` tag-triggered CI on macos-latest with Zig for Linux cross-compile. `mdemg upgrade` self-update command with `--dry-run`/`--force` flags, GitHub Releases API, checksum verification, backup-and-replace strategy. Files: `.goreleaser.yaml`, `.github/workflows/release.yml`, `internal/cli/upgrade.go`, `internal/cli/root.go`.
 - **Phase 99 (Planned)**: Onboarding + Polish — README rewrite, quickstart, demo mode, test framework portability. Depends on: Phase 98.
 - **Phase 100 (Planned)**: Deployable Package (Mac) — Integration test: `brew install mdemg` → `mdemg init` → working system. Depends on: Phase 99.
 - **Phase 101 (Complete)**: SME Synthesis Engine — Optional LLM synthesis for `/v1/memory/consult` via `llm_synthesis: true`. Produces coherent organizational SME narrative grounded exclusively in graph evidence with mandatory `(Node: <node_id>)` citations. Three fallback paths (flag off, synthesizer nil, LLM error). Circuit breaker protection. Spec: `docs/specs/phase101-sme-synthesis.md`. New file: `internal/consulting/synthesis.go`. Config: 5 `SYNTHESIS_*` env vars.
@@ -2062,15 +2062,12 @@ Main RSIC gap sets identified:
 - **Features**: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`
 - **Effort**: M | **Depends on**: Phase 95.
 
-#### Phase 98: Cross-Platform Build + Release (Planned)
+#### Phase 98: Cross-Platform Build + Release (Complete)
 
-- goreleaser configuration with CGO cross-compilation (Zig CC or Docker multi-arch).
-- Pre-built binaries: darwin/arm64, darwin/amd64, linux/amd64.
-- Homebrew tap + formula.
-- `curl -sSL ... | sh` installer script.
-- `mdemg version` with build-time SemVer embedding.
-- `mdemg upgrade` self-update command.
-- CI workflow: tag push → goreleaser → GitHub Release.
+- `.goreleaser.yaml` — 3 build targets (darwin/arm64, darwin/amd64, linux/amd64 via Zig CC), tar.gz archives, SHA256 checksums, homebrew_casks for tap distribution.
+- `.github/workflows/release.yml` — tag-triggered CI workflow on macos-latest, installs Zig for Linux cross-compile, runs goreleaser.
+- `mdemg upgrade` — self-update command with `--dry-run` and `--force` flags, GitHub Releases API for version checking, SHA256 checksum verification, backup-and-replace binary update strategy.
+- **Files**: `.goreleaser.yaml`, `.github/workflows/release.yml`, `internal/cli/upgrade.go`, `internal/cli/root.go`
 - **Effort**: L | **Depends on**: Phase 97.
 
 #### Phase 99: Onboarding + Polish (Planned)
