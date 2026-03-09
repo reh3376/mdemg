@@ -68,7 +68,7 @@ func (s *Service) Trigger(ctx context.Context, req TriggerRequest) (string, erro
 		"label":        req.Label,
 	})
 
-	go func() {
+	go func() { //nolint:gosec // G118: backup job runs in background, must outlive HTTP request
 		q.StartJob(backupID)
 		var err error
 		switch bt {

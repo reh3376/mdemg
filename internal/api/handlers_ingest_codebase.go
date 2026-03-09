@@ -216,7 +216,7 @@ func (s *Server) handleIngestCodebase(w http.ResponseWriter, r *http.Request) {
 
 	// Create job
 	jobID := uuid.New().String()[:8]
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel stored in IngestJob.Cancel for job cancellation
 
 	job := &IngestJob{
 		ID:        jobID,
@@ -232,7 +232,7 @@ func (s *Server) handleIngestCodebase(w http.ResponseWriter, r *http.Request) {
 	ingestJobsMu.Unlock()
 
 	// Start ingestion in background
-	go s.runIngestionJob(ctx, job, &req)
+	go s.runIngestionJob(ctx, job, &req) //nolint:gosec // G118: ctx from Background(), not request-scoped — job outlives handler
 
 	// Return immediately with job ID
 	writeJSON(w, http.StatusAccepted, IngestCodebaseResponse{

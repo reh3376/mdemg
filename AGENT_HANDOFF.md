@@ -2536,9 +2536,9 @@ All 4 critical packages now have unit tests:
 
 Removed `internal/observations/` and `internal/domain/` (both orphaned, zero imports).
 
-### PRE-EXISTING: Lint Warnings (8 gosec G118)
+### ~~PRE-EXISTING: Lint Warnings (8 gosec G118)~~ — RESOLVED
 
-All in goroutine context handling (`context.Background()` in goroutines). Files: `rsic_store.go`, `task_dispatch.go`, `handlers.go`, `handlers_conversation.go`, `handlers_ingest_codebase.go`, `backup/service.go`. Not blocking but should be addressed.
+All 8 false-positive G118 warnings annotated with `//nolint:gosec` and explanations. All are intentional patterns: fire-and-forget goroutines that must outlive HTTP requests, or cancel functions stored in structs. `golangci-lint run ./...` now reports 0 issues.
 
 ### DEFERRED: Release Infrastructure
 
@@ -2548,4 +2548,4 @@ All in goroutine context handling (`context.Background()` in goroutines). Files:
 
 ---
 
-*Last updated: 2026-03-09 — All phases through 105 + S0-S14 complete. 124 UATS specs, all canonical. Critical test gaps closed (4 packages: backup, filewatcher, jobs, secrets). Dead code removed (observations, domain). Partially tested packages improved (guardrail 48+ tests, scraper 29 tests, metrics 22 tests). ~10 endpoints still need UATS specs. 8 pre-existing gosec lint warnings.*
+*Last updated: 2026-03-09 — All phases through 105 + S0-S14 complete. 124 UATS specs, all canonical. Critical test gaps closed (4 packages: backup, filewatcher, jobs, secrets). Dead code removed (observations, domain). Partially tested packages improved (guardrail 48+ tests, scraper 29 tests, metrics 22 tests). Lint clean: 0 issues (8 gosec G118 false positives annotated).*

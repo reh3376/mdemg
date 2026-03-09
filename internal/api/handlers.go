@@ -2904,7 +2904,7 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		queue := jobs.GetQueue()
 		job, ctx := queue.CreateJob(jobID, "ingest-files", config)
-		go s.runIngestFilesJob(ctx, job)
+		go s.runIngestFilesJob(ctx, job) //nolint:gosec // G118: ctx from CreateJob (Background-derived), not request-scoped
 
 		writeJSON(w, http.StatusAccepted, models.IngestFilesResponse{
 			SpaceID:    req.SpaceID,
