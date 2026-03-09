@@ -2503,14 +2503,13 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 Issues discovered during gap analysis. **Never bypass — fix or document before committing.**
 
-### CRITICAL: Untested Packages (Zero Test Coverage)
+### ~~CRITICAL: Untested Packages (Zero Test Coverage)~~ — RESOLVED (commit b38c205)
 
-| Package | Files | LOC | Risk | Description |
-|---------|-------|-----|------|-------------|
-| `internal/backup/` | 6 | ~600 | 🔴 DB-CRITICAL | Backup/restore/retention for Neo4j |
-| `internal/filewatcher/` | 1 | ~415 | 🔴 FS-CRITICAL | Directory watcher with debouncing |
-| `internal/jobs/` | 1 | ~253 | 🔴 ORCHESTRATION | Background job queue with mutex state |
-| `internal/secrets/` | 1 | ~80 | 🟠 SECURITY | Keychain wrapper (macOS/Linux/Windows) |
+All 4 critical packages now have unit tests:
+- `internal/backup/` — 22 tests (manifest CRUD, retention, sha256, ensureSpaceIncluded)
+- `internal/filewatcher/` — 25 tests (watcher, debouncer, manager, config parser)
+- `internal/jobs/` — 27 tests (lifecycle, queue, cleanup, concurrency)
+- `internal/secrets/` — 5 tests (known keys, mappings, env var priority)
 
 ### HIGH: Partially Tested Packages
 
