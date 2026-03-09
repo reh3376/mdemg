@@ -390,7 +390,7 @@ Phases are organized into **numbered series** to group related work:
 | 96 | IDE + Repo Integration | ✅ | `docs/specs/phase96-ide-repo-integration.md` |
 | 97 | Process Lifecycle + Security | ✅ | `docs/specs/phase97-process-lifecycle-security.md` |
 | 98 | Cross-Platform Build + Release | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 1, §Gap 11, §Gap 15 |
-| 99 | Onboarding + Polish | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 9, §Gap 13 |
+| 99 | Onboarding + Polish | ✅ | `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go` |
 | 100 | Deployable Package (Mac) | 📋 | `docs/specs/phase92-gap-analysis.md` §Acceptance Criteria |
 | 101 | SME Synthesis Engine | ✅ | `docs/specs/phase101-sme-synthesis.md` |
 | 102 | Intent Translation | ✅ | `docs/specs/phase102-intent-translation.md` |
@@ -443,7 +443,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 96 (Complete)**: IDE + Repo Integration — `mdemg hooks install/uninstall/list`, `.claude/mcp.json` generation, `mdemg serve --mcp` subprocess. Spec: `docs/specs/phase96-ide-repo-integration.md`. Feature: `docs/features/ide-repo-integration.md`.
 - **Phase 97 (Complete)**: Process Lifecycle + Secret Management — `mdemg start/stop/restart/status` daemon mode with PID/log management, `mdemg config set-secret/get-secret/list-secrets` keychain integration, auto-start Neo4j on `mdemg start`. Spec: `docs/specs/phase97-process-lifecycle-security.md`. Features: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`.
 - **Phase 98 (Complete)**: Cross-Platform Build + Release — `.goreleaser.yaml` with 3 build targets (darwin/arm64, darwin/amd64, linux/amd64 via Zig CC), tar.gz archives, SHA256 checksums, homebrew_casks tap distribution. `.github/workflows/release.yml` tag-triggered CI on macos-latest with Zig for Linux cross-compile. `mdemg upgrade` self-update command with `--dry-run`/`--force` flags, GitHub Releases API, checksum verification, backup-and-replace strategy. Files: `.goreleaser.yaml`, `.github/workflows/release.yml`, `internal/cli/upgrade.go`, `internal/cli/root.go`.
-- **Phase 99 (Planned)**: Onboarding + Polish — README rewrite, quickstart, demo mode, test framework portability. Depends on: Phase 98.
+- **Phase 99 (Complete)**: Onboarding + Polish — README rewritten for adopter 3-step flow (install → init → ingest), `docs/quickstart.md` 10-minute tutorial, `docs/FAQ.md`, `mdemg demo` command with sample data seeding and recall demonstration. Files: `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go`, `internal/cli/root.go`.
 - **Phase 100 (Planned)**: Deployable Package (Mac) — Integration test: `brew install mdemg` → `mdemg init` → working system. Depends on: Phase 99.
 - **Phase 101 (Complete)**: SME Synthesis Engine — Optional LLM synthesis for `/v1/memory/consult` via `llm_synthesis: true`. Produces coherent organizational SME narrative grounded exclusively in graph evidence with mandatory `(Node: <node_id>)` citations. Three fallback paths (flag off, synthesizer nil, LLM error). Circuit breaker protection. Spec: `docs/specs/phase101-sme-synthesis.md`. New file: `internal/consulting/synthesis.go`. Config: 5 `SYNTHESIS_*` env vars.
 - **Phase 102 (Complete)**: Intent Translation — LLM-driven query rewriting before vector embedding for `/v1/memory/retrieve`, `/v1/memory/consult`, and `/v1/memory/suggest` via `translate_intent: true`. Rewrites conversational questions into keyword-dense search strings optimized for vector similarity against declarative graph text. Three fail-open paths (flag off, translator nil, LLM error). Temperature 0.0 for deterministic rewrites. Original question preserved for synthesis (Phase 101). Strict 2s P95 timeout. Circuit breaker protection. Spec: `docs/specs/phase102-intent-translation.md`. New file: `internal/retrieval/intent_translator.go`. Config: 5 `INTENT_*` env vars.
@@ -2070,13 +2070,13 @@ Main RSIC gap sets identified:
 - **Files**: `.goreleaser.yaml`, `.github/workflows/release.yml`, `internal/cli/upgrade.go`, `internal/cli/root.go`
 - **Effort**: L | **Depends on**: Phase 97.
 
-#### Phase 99: Onboarding + Polish (Planned)
+#### Phase 99: Onboarding + Polish (Complete)
 
-- README rewritten for developer adopters (3-step quickstart).
-- `docs/quickstart.md` — 10-minute tutorial.
-- `mdemg demo` command with sample data.
-- UATS runner portability for adopter use.
-- FAQ and configuration examples.
+- README rewritten for developer adopters with 3-step quickstart (install → init → ingest).
+- `docs/quickstart.md` — 10-minute tutorial covering install, init, ingest, query, consolidation.
+- `docs/FAQ.md` — common questions, troubleshooting, configuration reference.
+- `mdemg demo` command — seeds sample observations into `mdemg-demo` space, demonstrates semantic recall.
+- **Files**: `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go`, `internal/cli/root.go`
 - **Effort**: M | **Depends on**: Phase 98.
 
 #### Phase 100: Deployable Package — Mac (Planned)

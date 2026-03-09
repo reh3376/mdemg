@@ -1657,7 +1657,7 @@ FOR ()-[r:COMPARED_IN]-() REQUIRE r.created_at IS NOT NULL;
 | 96 | IDE + Repo Integration (MCP auto-config, .mdemgignore) | M | 📋 Planned |
 | 97 | Process Lifecycle + Security (daemon, keychain) | M | 📋 Planned |
 | 98 | Cross-Platform Build + Release (goreleaser, Homebrew) | L | ✅ Complete |
-| 99 | Onboarding + Polish (quickstart, demo, FAQ) | M | 📋 Planned |
+| 99 | Onboarding + Polish (quickstart, demo, FAQ) | M | ✅ Complete |
 | 100 | Deployable Package — Mac (integration test) | S | 📋 Planned |
 
 ### Phase 100 Acceptance Criteria
