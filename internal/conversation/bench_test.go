@@ -7,7 +7,7 @@ import (
 
 // BenchmarkScoreObservationQuality benchmarks the quality scoring function.
 func BenchmarkScoreObservationQuality(b *testing.B) {
-	content := "Use Neo4j vector index memNodeEmbedding for similarity search. Set dimensions=1536 for OpenAI ada-002. This provides fast approximate nearest neighbor lookups with cosine similarity."
+	content := "Use Neo4j vector index memNodeEmbedding for similarity search. Set dimensions=1536 for OpenAI text-embedding-3-small. This provides fast approximate nearest neighbor lookups with cosine similarity."
 	tags := []string{"neo4j", "vectors", "embeddings"}
 	metadata := map[string]any{"file": "config.go", "decision": "vector-index"}
 

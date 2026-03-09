@@ -41,7 +41,7 @@ CREATE INDEX symbol_type_name_idx IF NOT EXISTS
 FOR (s:SymbolNode) ON (s.space_id, s.symbol_type, s.name);
 
 // Vector index for semantic symbol search
-// Dimensions match the embedding model (1536 for OpenAI ada-002)
+// Dimensions match the embedding model (1536 for text-embedding-3-small / qwen3-embedding:4b)
 CREATE VECTOR INDEX symbolNodeEmbedding IF NOT EXISTS
 FOR (s:SymbolNode)
 ON s.embedding

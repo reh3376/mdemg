@@ -43,7 +43,7 @@
 |-------|----------|---------|-------------|
 | `space_id` | Yes | - | Memory space identifier |
 | `query_text` | One of query_text/query_embedding | - | Natural language query (auto-embedded) |
-| `query_embedding` | One of query_text/query_embedding | - | Pre-computed embedding (768 or 1536 dims) |
+| `query_embedding` | One of query_text/query_embedding | - | Pre-computed embedding (1536 dims default) |
 | `top_k` | No | 20 | Final results to return |
 | `candidate_k` | No | 200 | Vector recall candidates |
 | `hop_depth` | No | 2 | Graph expansion depth |

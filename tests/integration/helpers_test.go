@@ -251,7 +251,7 @@ func CreateQueryEmbedding(dims int) []float32 {
 // With Q = [1, 0, 0, ...], we create N = [similarity, sqrt(1-sim^2), 0, ...].
 //
 // Parameters:
-//   - dims: embedding dimensions (768 for default)
+//   - dims: embedding dimensions (1536 for default)
 //   - similarity: target cosine similarity (0.0 to 1.0)
 //   - perpIndex: which dimension to use for the perpendicular component (1 to dims-1)
 //

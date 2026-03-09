@@ -803,43 +803,26 @@ Exit criteria:
 1. Zero stale stub references in sidecar docs, acceptance test, and integration tests.
 2. All tests pass: unit, integration, and acceptance.
 
-### Phase S13: Embedding Model Migration (planned)
+### Phase S13: Embedding Model Migration (complete)
 
-Goal: consolidate embedding model options to qwen3-embedding:4b (default, Ollama) and OpenAI (alternate). Remove the legacy llama/nomic-embed-text model path entirely.
+Goal: consolidate embedding model options to qwen3-embedding:4b (default, Ollama) and OpenAI text-embedding-3-small (alternate). Remove the legacy nomic-embed-text model path entirely.
 
-Scope:
+Deliverables:
 
-1. Remove llama embedding model option from all model selection logic.
-2. Make `qwen3-embedding:4b` (Ollama) the default embedding model across the entire codebase.
-3. Make OpenAI (`text-embedding-ada-002` / `gpt-4o-mini`) the alternate — not the default.
-4. Update `ingest-codebase` handler and all other embedding consumers.
-5. Update config defaults, `.env.example`, YAML config generation, init wizard.
-6. Update Neo4j vector index dimensions if model output dimensions differ.
-7. Update all documentation: architecture docs, config reference, installation guide, feature docs, API docs, contributing guide.
-8. Update benchmark configs and test fixtures that reference embedding models.
-9. Validate with benchmark run to confirm no retrieval quality regression.
-
-Known touch points (non-exhaustive — full audit required at implementation time):
-
-- `internal/embeddings/` — provider factory, ollama.go, openai.go, config struct
-- `internal/config/config.go` — default model constants
-- `internal/config/yaml_config.go` — YAML generation defaults
-- `internal/cli/init.go` — wizard defaults
-- `internal/cli/ingest.go`, `internal/api/handlers_ingest_codebase.go` — ingest embedding usage
-- `cmd/ingest-codebase/main.go` — legacy binary
-- `.env.example` — documented defaults
-- `docs/architecture/03_Vector_Embeddings_and_Indexes.md`
-- `docs/api/INGEST_CODEBASE_API.md`
-- `migrations/V0003__vector_indexes.cypher` — index dimensions
-
-Blockers: none known. Depends on qwen3-embedding:4b being stable and validated (already validated in S11).
+1. Removed nomic-embed-text from Ollama dimension lookup table (`internal/embeddings/ollama.go`).
+2. Changed OpenAI default from `text-embedding-ada-002` to `text-embedding-3-small` across all code, config, CLI, and docs.
+3. Updated `.env.example`, init wizard, CLI examples, and all config comments.
+4. Updated embedding dimension validator to accept 384, 768, 1024, 1536 (supports all remaining Ollama models).
+5. Updated 10+ documentation files: architecture docs, feature docs, phase specs, API reference, AGENT_HANDOFF.md.
+6. Updated test comments and assertions in integration tests, validator tests, and bench tests.
+7. No Neo4j migration needed — all indexes already use 1536 dimensions.
 
 Exit criteria:
 
-1. Only two embedding model paths remain: Ollama (qwen3-embedding:4b) and OpenAI.
-2. No references to llama embedding models in source code.
-3. All tests pass with new defaults.
-4. Benchmark confirms no retrieval quality regression.
+1. ✅ Only two embedding model paths remain: Ollama (qwen3-embedding:4b) and OpenAI (text-embedding-3-small).
+2. ✅ No references to nomic-embed-text in source code (only historical journals).
+3. ✅ All tests pass with new defaults.
+4. ⏭️ Benchmark regression validation deferred (requires Mac Studio LLM access).
 
 ---
 

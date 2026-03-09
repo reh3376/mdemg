@@ -97,7 +97,7 @@ server:
   port: 9999
 embedding:
   provider: ollama
-  model: nomic-embed-text
+  model: qwen3-embedding:4b
   endpoint: http://localhost:11434
 schema:
   version: 17

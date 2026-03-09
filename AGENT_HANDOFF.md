@@ -100,7 +100,7 @@ It does **NOT** store general knowledge that LLMs already possess.
 | Graph DB | Neo4j 5.x | Docker: `docker compose up -d` |
 | Backend | Go (latest stable) | Service at `cmd/server/main.go` |
 | gRPC | Protocol Buffers | `api/proto/*.proto` |
-| Embeddings | OpenAI `text-embedding-3-small` (1536d) / Ollama (768d) | Configurable |
+| Embeddings | OpenAI `text-embedding-3-small` (1536d) / Ollama `qwen3-embedding:4b` (1536d) | Configurable |
 | Plugins | Binary sidecar via gRPC Unix sockets | `plugins/*/` |
 
 ### Directory Structure
@@ -403,6 +403,7 @@ Phases are organized into **numbered series** to group related work:
 | S10 | Dynamic Port Allocation | ✅ | `docs/sidecar/roadmap.md` §S10 |
 | S11 | Sidecar LLM Integration | ✅ | `docs/sidecar/roadmap.md` §S11 |
 | S12 | Sidecar Upgrade and Uninstall | ✅ | `docs/sidecar/roadmap.md` §S12 |
+| S13 | Embedding Model Migration | ✅ | `docs/sidecar/roadmap.md` §S13 |
 | S14 | Documentation Cleanup — Stub Resolution | ✅ | `docs/sidecar/roadmap.md` §S14 |
 
 ---
@@ -609,7 +610,7 @@ Returns embedding provider health status with active probe validation.
 {
   "status": "healthy",
   "provider": "openai",
-  "model": "text-embedding-ada-002",
+  "model": "text-embedding-3-small",
   "dimensions": 1536,
   "latency_ms": 923,
   "cache_enabled": true,

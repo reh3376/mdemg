@@ -41,7 +41,8 @@ func Validate(v any) error {
 	return GetValidator().Struct(v)
 }
 
-// validateEmbeddingDims validates that an embedding slice has valid dimensions (768 or 1536).
+// validateEmbeddingDims validates that an embedding slice has valid dimensions.
+// Supported: 384 (all-minilm), 768, 1024 (mxbai-embed-large), 1536 (qwen3-embedding/OpenAI).
 // Returns true for nil slices (let required/omitempty handle nil case).
 func validateEmbeddingDims(fl validator.FieldLevel) bool {
 	field := fl.Field()
@@ -51,7 +52,7 @@ func validateEmbeddingDims(fl validator.FieldLevel) bool {
 		return true
 	}
 
-	// Check slice length - must be 768 or 1536
+	// Check slice length - must be a known embedding dimension
 	length := field.Len()
-	return length == 768 || length == 1536
+	return length == 384 || length == 768 || length == 1024 || length == 1536
 }

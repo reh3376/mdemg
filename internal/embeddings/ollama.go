@@ -49,8 +49,6 @@ func NewOllama(cfg Config) (*Ollama, error) {
 
 	// Adjust dimensions based on known models
 	switch model {
-	case "nomic-embed-text":
-		o.dimensions = 768
 	case "mxbai-embed-large":
 		o.dimensions = 1024
 	case "all-minilm", "all-minilm:l6-v2":

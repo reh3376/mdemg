@@ -62,7 +62,7 @@ Reports provider type, model, endpoint reachability, and embedding dimensions.`,
 				fmt.Println("Or in .mdemg/config.yaml:")
 				fmt.Println("  embedding:")
 				fmt.Println("    provider: ollama")
-				fmt.Println("    model: nomic-embed-text")
+				fmt.Println("    model: qwen3-embedding:4b")
 				return nil
 			}
 
@@ -87,7 +87,7 @@ func checkOllama(cfg embeddings.Config) error {
 	}
 	model := cfg.OllamaModel
 	if model == "" {
-		model = "nomic-embed-text"
+		model = "qwen3-embedding:4b"
 	}
 
 	fmt.Printf("Endpoint: %s\n", endpoint)
@@ -159,7 +159,7 @@ func checkOpenAI(cfg embeddings.Config) error {
 	}
 	model := cfg.OpenAIModel
 	if model == "" {
-		model = "text-embedding-ada-002"
+		model = "text-embedding-3-small"
 	}
 
 	fmt.Printf("Endpoint: %s\n", endpoint)

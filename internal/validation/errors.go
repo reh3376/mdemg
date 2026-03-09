@@ -69,7 +69,7 @@ func formatMessage(fe validator.FieldError) string {
 	case "oneof":
 		return fmt.Sprintf("must be one of: %s", fe.Param())
 	case "embedding_dims":
-		return "must have 768 or 1536 dimensions"
+		return "must have 384, 768, 1024, or 1536 dimensions"
 	case "dive":
 		return "contains invalid items"
 	default:

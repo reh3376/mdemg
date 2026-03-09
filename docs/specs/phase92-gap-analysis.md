@@ -246,7 +246,7 @@ The manual migration workflow (`for f in migrations/V*.cypher; do ... done`) is 
     password: testpassword
   embedding:
     provider: ollama
-    model: nomic-embed-text
+    model: qwen3-embedding:4b
   ```
 
 - Layered configuration: defaults < config file < .env < env vars < CLI flags.
@@ -276,10 +276,10 @@ The 160+ env vars are overwhelming for new users. Most have sensible defaults an
 
 ### Current State
 
-- Two providers: OpenAI (`text-embedding-3-small`, 1536d) and Ollama (768d).
+- Two providers: OpenAI (`text-embedding-3-small`, 1536d) and Ollama `qwen3-embedding:4b` (1536d).
 - Optional — server starts without embedder but CMS returns 503 on embedding-dependent endpoints.
 - No bundled model. No offline fallback.
-- Ollama requires separate process installation + model download (`ollama pull nomic-embed-text`).
+- Ollama requires separate process installation + model download (`ollama pull qwen3-embedding:4b`).
 - CI has no embedding provider — 25 UATS specs tagged `embedding_required` are best-effort only.
 
 ### Required State
@@ -287,12 +287,12 @@ The 160+ env vars are overwhelming for new users. Most have sensible defaults an
 - `mdemg init` detects Ollama availability, offers to configure it.
 - `mdemg embeddings check` validates the configured provider is reachable and functional.
 - Graceful degradation: when no embedder is configured, clearly warn but allow non-embedding features to work (CMS observations, graph queries, admin operations).
-- Documentation: minimum viable setup = Ollama + `nomic-embed-text` (free, local, no API key).
+- Documentation: minimum viable setup = Ollama + `qwen3-embedding:4b` (free, local, no API key).
 - Future: consider bundling a small embedding model or providing `mdemg embeddings setup` that auto-installs Ollama + model.
 
 ### Gap Details
 
-The embedding provider is a hard dependency for core features (semantic search, consolidation, CMS recall). Without one, ~40% of the API returns 503. For a deployable package, we need clear guidance and tooling to get an embedder running with minimal friction. The path of least resistance is Ollama + nomic-embed-text (free, local, no API key required).
+The embedding provider is a hard dependency for core features (semantic search, consolidation, CMS recall). Without one, ~40% of the API returns 503. For a deployable package, we need clear guidance and tooling to get an embedder running with minimal friction. The path of least resistance is Ollama + qwen3-embedding:4b (free, local, no API key required).
 
 ### Estimated Work
 

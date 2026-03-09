@@ -170,7 +170,7 @@ func runInit(flags initFlags) error {
 		opts.LLMProvider = "ollama"
 		opts.LLMModel = "llama3.2:3b-instruct-fp16"
 	case "openai":
-		opts.EmbeddingModel = "text-embedding-ada-002"
+		opts.EmbeddingModel = "text-embedding-3-small"
 		opts.LLMProvider = "openai"
 		opts.LLMModel = "gpt-4o-mini"
 	}

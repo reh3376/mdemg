@@ -26,7 +26,7 @@ OPTIONS { indexConfig: {
 }};
 ```
 
-**Note:** If using Ollama with `nomic-embed-text`, use `768` dimensions.
+**Note:** Default Ollama model `qwen3-embedding:4b` uses `1536` dimensions (same as OpenAI `text-embedding-3-small`).
 
 ## C) Query the vector index
 
