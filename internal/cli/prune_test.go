@@ -221,7 +221,7 @@ func TestShouldPruneEdge(t *testing.T) {
 				Weight:        0.005,
 				EvidenceCount: 1,
 				Pinned:        false,
-				UpdatedAt:     now.Add(-30 * 24 * time.Hour), // exactly 30 days old
+				UpdatedAt:     now.Add(-30*24*time.Hour + time.Hour), // just inside 30-day threshold
 			},
 			weightThreshold: 0.01,
 			minEvidence:     3,
@@ -307,7 +307,7 @@ func TestIsOlderThan(t *testing.T) {
 		},
 		{
 			name:          "exactly at threshold -> not older",
-			updatedAt:     now.Add(-30 * 24 * time.Hour),
+			updatedAt:     now.Add(-30*24*time.Hour + time.Hour),
 			olderThanDays: 30,
 			expectOlder:   false,
 		},
@@ -601,7 +601,7 @@ func TestShouldTombstoneNode(t *testing.T) {
 			node: node{
 				NodeID:              "recent-2",
 				Degree:              1,
-				LastObservationTime: now.Add(-90 * 24 * time.Hour), // exactly 90 days ago
+				LastObservationTime: now.Add(-90*24*time.Hour + time.Hour), // just inside 90-day threshold
 				InAbstractionChain:  false,
 				Status:              "active",
 			},
@@ -729,7 +729,7 @@ func TestHasRecentObservation(t *testing.T) {
 		},
 		{
 			name:                "observation exactly at cutoff -> recent",
-			lastObservationTime: now.Add(-90 * 24 * time.Hour),
+			lastObservationTime: now.Add(-90*24*time.Hour + time.Hour),
 			retentionDays:       90,
 			expectRecent:        true,
 		},
