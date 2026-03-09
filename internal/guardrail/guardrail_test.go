@@ -718,3 +718,126 @@ func TestIsBlockingType(t *testing.T) {
 		})
 	}
 }
+
+// --- asString / asFloat64 tests ---
+
+func TestAsString(t *testing.T) {
+	tests := []struct {
+		input any
+		want  string
+	}{
+		{nil, ""},
+		{"hello", "hello"},
+		{42, "42"},
+		{3.14, "3.14"},
+		{true, "true"},
+		{[]int{1, 2}, "[1 2]"},
+	}
+	for _, tt := range tests {
+		got := asString(tt.input)
+		if got != tt.want {
+			t.Errorf("asString(%v) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestAsFloat64(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  float64
+	}{
+		{"nil", nil, 0.0},
+		{"float64", float64(3.14), 3.14},
+		{"float32", float32(2.5), 2.5},
+		{"int64", int64(42), 42.0},
+		{"int", int(7), 7.0},
+		{"string", "not a number", 0.0},
+		{"bool", true, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := asFloat64(tt.input)
+			if got != tt.want {
+				t.Errorf("asFloat64(%v) = %f, want %f", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- buildConstraintMap tests ---
+
+func TestBuildConstraintMap(t *testing.T) {
+	constraints := []constraintMatch{
+		{NodeID: "c1", Name: "auth-required", ConstraintType: "must"},
+		{NodeID: "c2", Name: "no-eval", ConstraintType: "must_not"},
+	}
+
+	m := buildConstraintMap(constraints)
+	if len(m) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(m))
+	}
+	if m["c1"].Name != "auth-required" {
+		t.Errorf("c1 name = %q, want %q", m["c1"].Name, "auth-required")
+	}
+	if m["c2"].ConstraintType != "must_not" {
+		t.Errorf("c2 type = %q, want %q", m["c2"].ConstraintType, "must_not")
+	}
+}
+
+func TestBuildConstraintMap_Empty(t *testing.T) {
+	m := buildConstraintMap(nil)
+	if len(m) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(m))
+	}
+}
+
+func TestBuildConstraintMap_DuplicateNodeID(t *testing.T) {
+	constraints := []constraintMatch{
+		{NodeID: "c1", Name: "first"},
+		{NodeID: "c1", Name: "second"},
+	}
+	m := buildConstraintMap(constraints)
+	// Last one wins
+	if m["c1"].Name != "second" {
+		t.Errorf("duplicate NodeID should use last value, got %q", m["c1"].Name)
+	}
+}
+
+// --- rebuildDiff tests ---
+
+func TestRebuildDiff(t *testing.T) {
+	ctx := DiffContext{
+		RemovedLines: []string{"old line 1", "old line 2"},
+		AddedLines:   []string{"new line 1"},
+	}
+
+	got := rebuildDiff(ctx)
+	want := "-old line 1\n-old line 2\n+new line 1\n"
+	if got != want {
+		t.Errorf("rebuildDiff = %q, want %q", got, want)
+	}
+}
+
+func TestRebuildDiff_Empty(t *testing.T) {
+	got := rebuildDiff(DiffContext{})
+	if got != "" {
+		t.Errorf("rebuildDiff(empty) = %q, want empty", got)
+	}
+}
+
+func TestRebuildDiff_OnlyAdded(t *testing.T) {
+	ctx := DiffContext{AddedLines: []string{"added"}}
+	got := rebuildDiff(ctx)
+	if got != "+added\n" {
+		t.Errorf("rebuildDiff = %q, want %q", got, "+added\n")
+	}
+}
+
+func TestRebuildDiff_OnlyRemoved(t *testing.T) {
+	ctx := DiffContext{RemovedLines: []string{"removed"}}
+	got := rebuildDiff(ctx)
+	if got != "-removed\n" {
+		t.Errorf("rebuildDiff = %q, want %q", got, "-removed\n")
+	}
+}
