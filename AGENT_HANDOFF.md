@@ -2499,4 +2499,54 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-02-24 — All phases through 103b complete. Phase 92 gap analysis produced Phases 93-100 roadmap for deployable MDEMG package. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. UETS: 8 model specs, 7/7 passing. Neo4j: 2 spaces (whk-wms + mdemg-dev).*
+## Known Issues & Technical Debt (2026-03-09)
+
+Issues discovered during gap analysis. **Never bypass — fix or document before committing.**
+
+### CRITICAL: Untested Packages (Zero Test Coverage)
+
+| Package | Files | LOC | Risk | Description |
+|---------|-------|-----|------|-------------|
+| `internal/backup/` | 6 | ~600 | 🔴 DB-CRITICAL | Backup/restore/retention for Neo4j |
+| `internal/filewatcher/` | 1 | ~415 | 🔴 FS-CRITICAL | Directory watcher with debouncing |
+| `internal/jobs/` | 1 | ~253 | 🔴 ORCHESTRATION | Background job queue with mutex state |
+| `internal/secrets/` | 1 | ~80 | 🟠 SECURITY | Keychain wrapper (macOS/Linux/Windows) |
+
+### HIGH: Partially Tested Packages
+
+| Package | Tested/Total | Gap |
+|---------|-------------|-----|
+| `internal/scraper/` | 1/9 | Core service, dedup, orchestrator untested |
+| `internal/metrics/` | 1/4 | Collectors, middleware, Prometheus registry |
+| `internal/guardrail/` | 2/8 | Constraint retrieval, LLM evaluator |
+
+### MEDIUM: Missing UATS Specs (~10 endpoints)
+
+- `/v1/conversation/session/health` (GET)
+- `/v1/memory/edges/stale/stats` (GET)
+- `/v1/memory/edges/stale/refresh` (POST)
+- `/v1/memory/cleanup/schedules` (GET)
+- `/v1/memory/ingest/files` (GET)
+- `/v1/memory/spaces/` (GET/POST/PUT)
+- `/v1/jobs/` (SSE)
+- `/v1/linear/comments` (GET/POST)
+- `/v1/linear/issues/` (GET/DELETE)
+- `/v1/linear/projects/` (GET/DELETE)
+
+### LOW: Dead Code
+
+- `internal/observations/` — zero imports, uses old module path `mdemg/internal/...`. Safe to remove.
+
+### PRE-EXISTING: Lint Warnings (8 gosec G118)
+
+All in goroutine context handling (`context.Background()` in goroutines). Files: `rsic_store.go`, `task_dispatch.go`, `handlers.go`, `handlers_conversation.go`, `handlers_ingest_codebase.go`, `backup/service.go`. Not blocking but should be addressed.
+
+### DEFERRED: Release Infrastructure
+
+- Create `reh3376/homebrew-mdemg` GitHub repo (needed for `brew install`)
+- Tag first release `v0.2.0` to trigger goreleaser
+- `go.sum` may need `go mod tidy` after dependency updates
+
+---
+
+*Last updated: 2026-03-09 — All phases through 105 + S0-S14 complete. 124 UATS specs, all assertion formats canonical. 22 RSIC integration tests. Neo4j: mdemg_neo4j_data volume (34K+ nodes, docker compose only). Gap analysis: 9 untested packages, ~10 endpoints missing specs, 8 pre-existing lint warnings.*

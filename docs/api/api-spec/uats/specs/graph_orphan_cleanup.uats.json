@@ -38,7 +38,7 @@
     "body_assertions": [
       {
         "path": "$.action",
-        "op": "eq",
+        "op": "equals",
         "expected": "scan"
       },
       {
@@ -76,12 +76,12 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "op": "eq",
+            "op": "equals",
             "expected": "scan"
           },
           {
             "path": "$.total_spaces",
-            "op": "eq",
+            "op": "equals",
             "expected": 1
           },
           {
@@ -108,7 +108,7 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "op": "eq",
+            "op": "equals",
             "expected": "scan"
           },
           {
@@ -136,17 +136,17 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "op": "eq",
+            "op": "equals",
             "expected": "consolidate"
           },
           {
             "path": "$.dry_run",
-            "op": "eq",
+            "op": "equals",
             "expected": true
           },
           {
             "path": "$.total_affected",
-            "op": "eq",
+            "op": "equals",
             "expected": 0
           }
         ]
@@ -169,17 +169,17 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "op": "eq",
+            "op": "equals",
             "expected": "delete"
           },
           {
             "path": "$.space_results[0].skipped",
-            "op": "eq",
+            "op": "equals",
             "expected": true
           },
           {
             "path": "$.space_results[0].skip_reason",
-            "op": "eq",
+            "op": "equals",
             "expected": "protected space"
           }
         ]
