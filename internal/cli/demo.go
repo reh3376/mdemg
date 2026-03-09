@@ -118,7 +118,7 @@ func runDemo(endpoint string) error {
 			"top_k":    3,
 		})
 
-		resp, err := http.Post(endpoint+"/v1/memory/recall", "application/json", bytes.NewReader(body))
+		resp, err := http.Post(endpoint+"/v1/memory/retrieve", "application/json", bytes.NewReader(body))
 		if err != nil {
 			fmt.Printf("    Error: %v\n\n", err)
 			continue
@@ -160,7 +160,7 @@ func runDemo(endpoint string) error {
 	fmt.Println()
 	fmt.Printf("The demo space '%s' contains sample data you can explore:\n", spaceID)
 	fmt.Println("  mdemg space list                    — list all spaces")
-	fmt.Printf("  curl localhost:9999/v1/memory/recall — query the '%s' space\n", spaceID)
+	fmt.Printf("  curl localhost:9999/v1/memory/retrieve — query the '%s' space\n", spaceID)
 	fmt.Println()
 	fmt.Println("To clean up:")
 	fmt.Printf("  curl -X DELETE localhost:9999/v1/spaces/%s\n", spaceID)

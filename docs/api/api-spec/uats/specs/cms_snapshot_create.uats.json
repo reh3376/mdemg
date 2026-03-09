@@ -56,18 +56,18 @@
       },
       {
         "path": "$.space_id",
-        "operator": "equals",
-        "value": "{{test_space}}"
+        "op": "equals",
+        "expected": "{{test_space}}"
       },
       {
         "path": "$.session_id",
-        "operator": "equals",
-        "value": "{{test_session}}"
+        "op": "equals",
+        "expected": "{{test_session}}"
       },
       {
         "path": "$.trigger",
-        "operator": "equals",
-        "value": "manual"
+        "op": "equals",
+        "expected": "manual"
       },
       {
         "path": "$.context",

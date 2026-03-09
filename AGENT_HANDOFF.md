@@ -2,28 +2,28 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-01
+**Date:** 2026-03-09
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
 <!--
-=== AGENT RESUME CONTEXT (2026-03-01) ===
+=== AGENT RESUME CONTEXT (2026-03-09) ===
 
 LAST SESSION SUMMARY:
-- Completed Phase S14 (commit 3bfff43): documentation cleanup removing stale stub references
-- All sidecar phases S0-S12 and S14 are COMPLETE. S13 (Embedding Model Migration) is planned.
-- All 5 cognitive gap phases (101-105) are COMPLETE
-- Core infrastructure phases 92-97 are COMPLETE
-- Phases 98-100 (Cross-Platform Build, Onboarding, Deployable Package) remain PLANNED
+- All sidecar phases S0-S14 COMPLETE, including S13 (Embedding Model Migration to qwen3-embedding:4b / text-embedding-3-small)
+- All 5 cognitive gap phases (101-105) COMPLETE — all gaps closed
+- Core infrastructure phases 92-100 COMPLETE
+- Phase 98: Cross-platform build + release (goreleaser, Zig CC, homebrew_casks, mdemg upgrade)
+- Phase 99: Onboarding + polish (README rewrite, quickstart, FAQ, mdemg demo)
+- Phase 100: Deployable package acceptance (9/10 criteria pass; brew install deferred until tap repo + v0.2.0 tag)
+- Deep gap analysis completed: Vision 98% aligned, 3 stale docs fixed, UATS legacy assertion format fixes in progress
 
 REPO STATE:
 - Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
-- CMS: MDEMG server on localhost:9999, Neo4j in Docker container mdemg-neo4j-dev
-- All tests green: go test ./internal/cli/... ./internal/sidecar/... (unit),
-  MDEMG_BINARY=$(pwd)/bin/mdemg go test -tags=integration ./tests/integration/... (integration),
-  bash scripts/sidecar-acceptance.sh (acceptance)
+- CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
+- CRITICAL: NEVER use `mdemg db start` — ALWAYS use `docker compose up -d neo4j` to preserve CMS data
 
 MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 1. Never commit to main — all work on mdemg-dev01
@@ -33,8 +33,10 @@ MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 5. Resume memory: POST http://localhost:9999/v1/conversation/resume
 
 WHERE TO LOOK NEXT:
-- Sidecar: S13 spec is in docs/sidecar/roadmap.md Section 8 (Embedding Model Migration)
-- Core: Phases 98-100 specs are outlined in docs/specs/phase92-gap-analysis.md
+- Remaining: Create reh3376/homebrew-mdemg GitHub repo, tag first release (v0.2.0)
+- UATS: Fix remaining specs with legacy assertion format (operator/value → op/expected)
+- Unit tests: Add coverage for internal/secrets/, internal/backup/, internal/filewatcher/
+- UATS: Write specs for 28 uncovered endpoints
 - Phase Registry below has full status of every phase with links to specs
 -->
 
@@ -389,7 +391,7 @@ Phases are organized into **numbered series** to group related work:
 | 95 | Database + Embedding + Migrations | ✅ | `docs/specs/phase95-database-embedding-migrations.md` |
 | 96 | IDE + Repo Integration | ✅ | `docs/specs/phase96-ide-repo-integration.md` |
 | 97 | Process Lifecycle + Security | ✅ | `docs/specs/phase97-process-lifecycle-security.md` |
-| 98 | Cross-Platform Build + Release | 📋 | `docs/specs/phase92-gap-analysis.md` §Gap 1, §Gap 11, §Gap 15 |
+| 98 | Cross-Platform Build + Release | ✅ | `.goreleaser.yaml`, `internal/cli/upgrade.go`, `.github/workflows/release.yml` |
 | 99 | Onboarding + Polish | ✅ | `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go` |
 | 100 | Deployable Package (Mac) | ✅ | Local acceptance tests passed (9/10 criteria; brew install deferred until tap repo + release) |
 | 101 | SME Synthesis Engine | ✅ | `docs/specs/phase101-sme-synthesis.md` |

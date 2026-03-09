@@ -49,8 +49,8 @@
       },
       {
         "path": "$.status",
-        "operator": "equals",
-        "value": "pending"
+        "op": "equals",
+        "expected": "pending"
       }
     ]
   },

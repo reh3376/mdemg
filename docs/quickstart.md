@@ -91,7 +91,7 @@ Now every `git commit` automatically updates MDEMG with your changes.
 
 ```bash
 # Semantic search
-curl -X POST http://localhost:9999/v1/memory/recall \
+curl -X POST http://localhost:9999/v1/memory/retrieve \
   -H "Content-Type: application/json" \
   -d '{"space_id": "codebase", "query": "how does authentication work?", "top_k": 5}'
 

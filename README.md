@@ -1,7 +1,7 @@
 # MDEMG - Multi-Dimensional Emergent Memory Graph
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://golang.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1.svg)](https://neo4j.com/)
 [![CI](https://github.com/reh3376/mdemg/actions/workflows/ci.yml/badge.svg)](https://github.com/reh3376/mdemg/actions/workflows/ci.yml)
 
@@ -73,22 +73,20 @@ Everything needed to independently verify our results is included.
 git clone https://github.com/reh3376/mdemg.git && cd mdemg
 cp .env.example .env  # Add your embedding provider credentials
 
-# 2. Start services
-docker compose up -d
-go build -o bin/mdemg ./cmd/server && ./bin/mdemg &
-# Server writes .mdemg.port with actual port (dynamic allocation if preferred port is busy)
+# 2. Build and start services
+go build -o bin/mdemg ./cmd/mdemg
+./bin/mdemg db start              # Launch Neo4j container
+./bin/mdemg start --auto-migrate  # Start server daemon with migrations
 
 # 3. Ingest test codebase (or use your own)
-go build -o bin/ingest-codebase ./cmd/ingest-codebase
-./bin/ingest-codebase --space-id=benchmark --path=/path/to/target-repo
+./bin/mdemg ingest --space-id=benchmark --path=/path/to/target-repo
 
-# 4. Run consolidation (reads port from .mdemg.port automatically)
-PORT=$(cat .mdemg.port 2>/dev/null || echo 9999)
-curl -X POST http://localhost:$PORT/v1/memory/consolidate \
+# 4. Run consolidation
+curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
-# 5. Run benchmark (see docs/benchmarks/whk-wms/)
-# Questions: test_questions_120_agent.json
+# 5. Run benchmark
+# Questions: docs/benchmarks/whk-wms/test_questions_120_agent.json
 # Grader: docs/benchmarks/grader_v4.py
 ```
 
@@ -214,7 +212,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 ### Prerequisites
 
-- Go 1.26+
+- Go 1.24+
 - Docker (for Neo4j)
 - Embedding provider: [Ollama](https://ollama.com) (local, recommended) or OpenAI API key
 
