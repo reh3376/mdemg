@@ -2511,13 +2511,13 @@ All 4 critical packages now have unit tests:
 - `internal/jobs/` — 27 tests (lifecycle, queue, cleanup, concurrency)
 - `internal/secrets/` — 5 tests (known keys, mappings, env var priority)
 
-### HIGH: Partially Tested Packages
+### HIGH: Partially Tested Packages — UPDATED
 
-| Package | Tested/Total | Gap |
-|---------|-------------|-----|
-| `internal/scraper/` | 1/9 | Core service, dedup, orchestrator untested |
-| `internal/metrics/` | 1/4 | Collectors, middleware, Prometheus registry |
-| `internal/guardrail/` | 2/8 | Constraint retrieval, LLM evaluator |
+| Package | Test Files | Pure Fn Coverage | Remaining Gap |
+|---------|-----------|-----------------|---------------|
+| `internal/scraper/` | 2 (parser + scraper) | 29 tests total | Store, orchestrator, reviewer need Neo4j mocks |
+| `internal/metrics/` | 1 (metrics_test) | 22 tests, all source files covered | Effectively complete |
+| `internal/guardrail/` | 2 (guardrail + diff_parser) | 48+ tests total | LLM evaluator, constraint retrieval need Neo4j/HTTP mocks |
 
 ### MEDIUM: Missing UATS Specs (~10 endpoints)
 
@@ -2532,9 +2532,9 @@ All 4 critical packages now have unit tests:
 - `/v1/linear/issues/` (GET/DELETE)
 - `/v1/linear/projects/` (GET/DELETE)
 
-### LOW: Dead Code
+### ~~LOW: Dead Code~~ — RESOLVED (commit 3dcfe10)
 
-- `internal/observations/` — zero imports, uses old module path `mdemg/internal/...`. Safe to remove.
+Removed `internal/observations/` and `internal/domain/` (both orphaned, zero imports).
 
 ### PRE-EXISTING: Lint Warnings (8 gosec G118)
 
@@ -2548,4 +2548,4 @@ All in goroutine context handling (`context.Background()` in goroutines). Files:
 
 ---
 
-*Last updated: 2026-03-09 — All phases through 105 + S0-S14 complete. 124 UATS specs, all assertion formats canonical. 22 RSIC integration tests. Neo4j: mdemg_neo4j_data volume (34K+ nodes, docker compose only). Gap analysis: 9 untested packages, ~10 endpoints missing specs, 8 pre-existing lint warnings.*
+*Last updated: 2026-03-09 — All phases through 105 + S0-S14 complete. 124 UATS specs, all canonical. Critical test gaps closed (4 packages: backup, filewatcher, jobs, secrets). Dead code removed (observations, domain). Partially tested packages improved (guardrail 48+ tests, scraper 29 tests, metrics 22 tests). ~10 endpoints still need UATS specs. 8 pre-existing gosec lint warnings.*

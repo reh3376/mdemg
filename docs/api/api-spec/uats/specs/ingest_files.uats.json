@@ -1,0 +1,101 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Ingest Files",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "ingest",
+      "files",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-09",
+    "description": "Validates POST /v1/memory/ingest/files re-ingests specific files",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/ingest/files",
+    "body": {
+      "space_id": "uats-ingest-test",
+      "files": ["/tmp/nonexistent-uats-test-file.go"]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 400,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      },
+      {
+        "path": "$.missing_files",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id should return 400",
+      "request": {
+        "body": {
+          "space_id": "",
+          "files": ["/tmp/test.go"]
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_files",
+      "description": "Empty files array should return 400",
+      "request": {
+        "body": {
+          "space_id": "test",
+          "files": []
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/ingest/files"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}
