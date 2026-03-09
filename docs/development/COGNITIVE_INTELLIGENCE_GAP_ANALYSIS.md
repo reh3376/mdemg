@@ -1,7 +1,7 @@
 # Cognitive Intelligence Gap Analysis
 
-**Status**: Active (Phases 101-103b Complete, 104-105 Planned)
-**Date**: 2026-02-23 (Updated: 2026-02-24)
+**Status**: COMPLETE — All 5 gaps closed (Phases 101-105)
+**Date**: 2026-02-23 (Updated: 2026-03-09)
 **Related**: `VISION.md`, `AGENT_HANDOFF.md`
 
 ---
@@ -16,49 +16,33 @@ This gap analysis evaluates the current implementation against the long-term cog
 
 ## Gap Analysis Summary
 
-| # | Gap | Severity | Effort | Phase |
-|---|-----|----------|--------|-------|
-| 1 | Shallow SME Synthesis | HIGH | L | 101 |
-| 2 | Query Rigidity (Intent Translation) | HIGH | M | 102 |
-| 3 | Static Hardcoded Abstractions | MEDIUM | M | 103 |
-| 4 | ~~Active Guardrail Enforcement~~ **(Closed)** | HIGH | L | 104 |
-| 5 | Cross-Space Collective Learning | MEDIUM | XL | 105 |
+| # | Gap | Severity | Effort | Phase | Status |
+|---|-----|----------|--------|-------|--------|
+| 1 | ~~Shallow SME Synthesis~~ | HIGH | L | 101 | **CLOSED** |
+| 2 | ~~Query Rigidity (Intent Translation)~~ | HIGH | M | 102 | **CLOSED** |
+| 3 | ~~Static Hardcoded Abstractions~~ | MEDIUM | M | 103 | **CLOSED** |
+| 4 | ~~Active Guardrail Enforcement~~ | HIGH | L | 104 | **CLOSED** |
+| 5 | ~~Cross-Space Collective Learning~~ | MEDIUM | XL | 105 | **CLOSED** |
 
 ---
 
-## Gap 1: Shallow SME Synthesis (The "Consult" Gap)
+## Gap 1: Shallow SME Synthesis (The "Consult" Gap) — CLOSED
 
-**Severity**: HIGH | **Effort**: L | **Phase**: 101
+**Severity**: HIGH | **Effort**: L | **Phase**: 101 | **Status**: Complete
 
-### Current State
+### Resolution (Phase 101)
 
-The `POST /v1/memory/consult` and `POST /v1/memory/suggest` endpoints use static keyword matching to classify retrieved results (e.g., if a file has "error" or "auth", it's marked as `SuggestionRisk` or `SuggestionPattern`). The response concatenates summaries from `RetrieveResult` without any true understanding or synthesis. Furthermore, the **CMS Skill Registry** (`docs/features/skill-registry.md`) relies on simple tag-based queries to recall hardcoded pointers.
-
-### Required State
-
-The Agent Consulting Service must act as a true SME. It should use an LLM Reasoning Module to synthesize the raw retrieved nodes into a coherent, context-aware answer that explicitly explains *why* the retrieved patterns matter to the user's current task.
-
-### Gap Details
-
-Currently, MDEMG returns slightly formatted search results, not true "advice." To fulfill the vision of an "Internal Dialog," the consult endpoint must perform LLM-driven multi-hop synthesis over the retrieved graph. We can leverage the existing **Meta-Cognition Enforcement** (`docs/features/meta-cognition-enforcement.md`) to dynamically trigger this deeper SME synthesis when session health drops, ensuring the agent gets real help when struggling.
+**RESOLVED.** Phase 101 upgraded the consulting service with an LLM-driven SME Synthesis Engine. The `POST /v1/memory/consult` endpoint now performs multi-hop graph traversal and LLM reasoning to synthesize retrieved nodes into coherent, context-aware answers. Implementation: `internal/consulting/synthesizer.go`, spec: `docs/specs/phase101-sme-synthesis.md`.
 
 ---
 
-## Gap 2: Query Rigidity (Intent Translation)
+## Gap 2: Query Rigidity (Intent Translation) — CLOSED
 
-**Severity**: HIGH | **Effort**: M | **Phase**: 102
+**Severity**: HIGH | **Effort**: M | **Phase**: 102 | **Status**: Complete
 
-### Current State
+### Resolution (Phase 102)
 
-The retrieval pipeline uses the exact user query string for vector embedding. If a user asks a conversational question ("Why do we use Redis?"), it embeds poorly against the factual, declarative statements stored in the codebase nodes.
-
-### Required State
-
-A Query Rewriting / Intent Extraction step before vector recall. The system should use an LLM or local model to expand queries (e.g., "Why do we use Redis?" → "redis cache session store architecture decision rationale").
-
-### Gap Details
-
-This was identified as a "Future" optimization in Deliverable 10.1.3 but is critical for AI agents that interact conversationally. We can build upon the **Skill Registry** infrastructure by creating a dedicated "Intent Translation" reasoning module that intercepts and expands queries before they hit the vector index.
+**RESOLVED.** Phase 102 added LLM query rewriting before vector embedding. Conversational queries (e.g., "Why do we use Redis?") are expanded to match declarative node text (e.g., "redis cache session store architecture decision rationale") before hitting the vector index. Implementation: `internal/retrieval/intent.go`, spec: `docs/specs/phase102-intent-translation.md`.
 
 ---
 
@@ -90,39 +74,23 @@ This was identified as a "Future" optimization in Deliverable 10.1.3 but is crit
 
 ---
 
-## Gap 4: Active Guardrail Enforcement
+## Gap 4: Active Guardrail Enforcement — CLOSED
 
-**Severity**: HIGH | **Effort**: L | **Phase**: 104
+**Severity**: HIGH | **Effort**: L | **Phase**: 104 | **Status**: Complete
 
-### Current State
+### Resolution (Phase 104)
 
-The system successfully auto-detects constraint patterns ("must", "must not", "deadline") and promotes them to **Constraint Nodes** (`docs/features/constraint-nodes.md`) during consolidation (Phase 45.5). The `Suggest()` API can surface these `ConstraintNodes` if asked. However, there is no mechanism to proactively block or warn an agent when it violates these constraints.
-
-### Required State
-
-Integration with the MCP server to actively evaluate an agent's proposed code changes against the active `ConstraintNodes` in the graph. If an agent attempts to use a `deprecated` API or violates an architectural `must`, the MCP server should proactively return an error or warning to the agent.
-
-### Gap Details
-
-MDEMG is an "Active Participant" but currently waits for the agent to call `/suggest`. Proactive guardrails are necessary for robust AI coding workflows. We have the data structure (`role_type: 'constraint'`), we just lack the pre-commit/MCP enforcement layer.
+**RESOLVED.** Phase 104 added `POST /v1/memory/guardrail/validate` and an MCP `validate_changes` tool. 4-step pipeline: diff parse → constraint retrieval → LLM evaluation → response build. Fail-open design, dual provider (OpenAI/Ollama). Proactively evaluates code changes against stored constraint nodes. Implementation: `internal/guardrail/`, spec: `docs/specs/phase104-active-mcp-guardrails.md`.
 
 ---
 
-## Gap 5: Cross-Space Collective Learning
+## Gap 5: Cross-Space Collective Learning — CLOSED
 
-**Severity**: MEDIUM | **Effort**: XL | **Phase**: 105
+**Severity**: MEDIUM | **Effort**: XL | **Phase**: 105 | **Status**: Complete
 
-### Current State
+### Resolution (Phase 105)
 
-Learning (`CO_ACTIVATED_WITH` edges) strengthens locally within a single `space_id`. Phase 5 (DevSpace CRDT) allows merging these edges during import/export. The **L5 Emergent Layer** builds powerful meta-patterns, but they remain isolated within their origin space.
-
-### Required State
-
-True "Meta-Learning" or "Collective Learning Aggregation" (unchecked in `VISION.md` Phase 5). If Agent A discovers a powerful architectural pattern in Space 1 and it emerges to an L5 Concept, the system should abstract that pattern and make it available as general SME knowledge to Agent B working in an entirely different Space 2 without requiring a full DevSpace merge.
-
-### Gap Details
-
-The graph currently remains siloed per workspace. Universal, abstract principles (e.g. L5 nodes representing cross-domain architectures) learned in one repository cannot automatically cross-pollinate to another repository in real-time. Extending the L5 emergence logic to bridge across `space_id` boundaries will fulfill the ultimate vision of a shared organizational brain.
+**RESOLVED.** Phase 105 added `POST /v1/memory/meta-learn` which promotes L4/L5 concepts to the `mdemg-global` protected space via LLM generalization (strips local specifics, preserves architectural insights). `ORIGINATED_FROM` edges track provenance. Retrieval pipeline supports `include_global_space: true` for cross-space vector+BM25 search. Multi-space support added to `vectorRecall`, `BM25Search`, `fetchOutgoingEdges`. Implementation: `internal/metalearn/`, spec: `docs/specs/phase105-global-meta-learning.md`.
 
 ---
 
