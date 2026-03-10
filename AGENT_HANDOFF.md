@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-09
+**Date:** 2026-03-10
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -30,7 +30,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - 5 cognitive gap phases (101-105) — ALL GAPS CLOSED
   101: SME Synthesis, 102: Intent Translation, 103: Dynamic Emergence,
   104: Active Guardrails, 105: Global Meta-Learning
-- Deployable package chain (93-100) — COMPLETE (9/10 criteria pass)
+- Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1 brew install verified)
 - Quality hardening (gap analysis triage) — COMPLETE
   - 129 UATS contract test specs, all using canonical assertion format
   - 148 Go test files with comprehensive coverage
@@ -41,7 +41,7 @@ REPO STATE:
 - Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
-- CRITICAL: NEVER use `mdemg db start` — ALWAYS use `docker compose up -d neo4j` to preserve CMS data
+- CRITICAL: For the mdemg-dev CMS space, ALWAYS use `docker compose up -d neo4j` to preserve CMS data (volume: mdemg_neo4j_data). For fresh projects, `mdemg db start` is safe — it creates project-scoped containers (mdemg-neo4j-{project}) with their own volumes.
 
 MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 1. Never commit to main — all work on mdemg-dev01
@@ -52,9 +52,7 @@ MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 6. NEVER bypass failed tests or bugs — at minimum document in this file's Known Issues section
 
 WHAT REMAINS TO BE DONE:
-1. RELEASE: Create `reh3376/homebrew-mdemg` GitHub repo, tag first release v0.2.0
-   - This is the last criterion for Phase 100 acceptance (9/10 pass, brew install needs tap repo)
-   - goreleaser config exists, Zig cross-compilation ready
+1. RELEASE: ~~Create homebrew-mdemg repo, tag first release~~ DONE (v0.2.1 released, brew install verified)
 2. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
 3. TESTING: ~10 endpoints still need UATS specs (spaces CRUD, jobs SSE, linear module)
 4. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
@@ -422,7 +420,7 @@ Phases are organized into **numbered series** to group related work:
 | 97 | Process Lifecycle + Security | ✅ | `docs/specs/phase97-process-lifecycle-security.md` |
 | 98 | Cross-Platform Build + Release | ✅ | `.goreleaser.yaml`, `internal/cli/upgrade.go`, `.github/workflows/release.yml` |
 | 99 | Onboarding + Polish | ✅ | `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go` |
-| 100 | Deployable Package (Mac) | ✅ | Local acceptance tests passed (9/10 criteria; brew install deferred until tap repo + release) |
+| 100 | Deployable Package (Mac) | ✅ | All 10/10 criteria pass; `brew install mdemg` verified v0.2.1 (16/16 test phases) |
 | 101 | SME Synthesis Engine | ✅ | `docs/specs/phase101-sme-synthesis.md` |
 | 102 | Intent Translation | ✅ | `docs/specs/phase102-intent-translation.md` |
 | 103 | Dynamic Emergence | ✅ | `docs/specs/phase103-dynamic-emergence.md` |
@@ -475,7 +473,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase 97 (Complete)**: Process Lifecycle + Secret Management — `mdemg start/stop/restart/status` daemon mode with PID/log management, `mdemg config set-secret/get-secret/list-secrets` keychain integration, auto-start Neo4j on `mdemg start`. Spec: `docs/specs/phase97-process-lifecycle-security.md`. Features: `docs/features/process-lifecycle.md`, `docs/features/secret-management.md`.
 - **Phase 98 (Complete)**: Cross-Platform Build + Release — `.goreleaser.yaml` with 3 build targets (darwin/arm64, darwin/amd64, linux/amd64 via Zig CC), tar.gz archives, SHA256 checksums, homebrew_casks tap distribution. `.github/workflows/release.yml` tag-triggered CI on macos-latest with Zig for Linux cross-compile. `mdemg upgrade` self-update command with `--dry-run`/`--force` flags, GitHub Releases API, checksum verification, backup-and-replace strategy. Files: `.goreleaser.yaml`, `.github/workflows/release.yml`, `internal/cli/upgrade.go`, `internal/cli/root.go`.
 - **Phase 99 (Complete)**: Onboarding + Polish — README rewritten for adopter 3-step flow (install → init → ingest), `docs/quickstart.md` 10-minute tutorial, `docs/FAQ.md`, `mdemg demo` command with sample data seeding and recall demonstration. Files: `README.md`, `docs/quickstart.md`, `docs/FAQ.md`, `internal/cli/demo.go`, `internal/cli/root.go`.
-- **Phase 100 (Complete)**: Deployable Package (Mac) — Local acceptance tests: 9/10 criteria pass (init, db, ingest, daemon, MCP, CMS, retrieval, RSIC, upgrade). `brew install` deferred until homebrew-mdemg tap repo is created and first release is tagged.
+- **Phase 100 (Complete)**: Deployable Package (Mac) — All 10/10 acceptance criteria verified (v0.2.1). `brew install mdemg` tested with 16/16 test phases passing. Key v0.2.1 fixes: project-scoped Neo4j containers, dynamic port selection, API key prompt in init wizard, `.env` secret management, `UpdateNeo4jURI()` config helper.
 - **Phase 101 (Complete)**: SME Synthesis Engine — Optional LLM synthesis for `/v1/memory/consult` via `llm_synthesis: true`. Produces coherent organizational SME narrative grounded exclusively in graph evidence with mandatory `(Node: <node_id>)` citations. Three fallback paths (flag off, synthesizer nil, LLM error). Circuit breaker protection. Spec: `docs/specs/phase101-sme-synthesis.md`. New file: `internal/consulting/synthesis.go`. Config: 5 `SYNTHESIS_*` env vars.
 - **Phase 102 (Complete)**: Intent Translation — LLM-driven query rewriting before vector embedding for `/v1/memory/retrieve`, `/v1/memory/consult`, and `/v1/memory/suggest` via `translate_intent: true`. Rewrites conversational questions into keyword-dense search strings optimized for vector similarity against declarative graph text. Three fail-open paths (flag off, translator nil, LLM error). Temperature 0.0 for deterministic rewrites. Original question preserved for synthesis (Phase 101). Strict 2s P95 timeout. Circuit breaker protection. Spec: `docs/specs/phase102-intent-translation.md`. New file: `internal/retrieval/intent_translator.go`. Config: 5 `INTENT_*` env vars.
 - **Phase 103 (Complete)**: Dynamic Emergence — LLM-driven concept naming for unclassified `CO_ACTIVATED_WITH` clusters during consolidation. Pipeline step at phase 22 (`internal/hidden/step_dynamic_emergence.go`). LLM namer (`internal/hidden/emergence_namer.go`) with OpenAI/Ollama support and circuit breaker protection. Creates `:MemoryNode:EmergentConcept` nodes with `role_type: 'dynamic_emergent'` and LLM-proposed labels. Union-find clustering, fail-open per cluster, idempotent. Config: 8 `EMERGENCE_*` env vars. Spec: `docs/specs/phase103-dynamic-emergence.md`. Feature: `docs/features/dynamic-emergence.md`. Closes Gap 3 from Cognitive Intelligence Gap Analysis.
@@ -2114,14 +2112,15 @@ Main RSIC gap sets identified:
 
 #### Phase 100: Deployable Package — Mac (Complete)
 
-- Local acceptance tests: 9/10 criteria verified.
+- All 10/10 acceptance criteria verified (v0.2.1).
 - `mdemg init --defaults` creates `.mdemg/` in fresh git repo — PASS
 - `mdemg db status` reports schema v17, up to date — PASS
 - `mdemg status` shows running daemon — PASS
 - CMS observe/resume endpoints — PASS
 - RSIC health endpoint — PASS
 - `mdemg upgrade --dry-run` — PASS
-- `brew install` — deferred (requires `reh3376/homebrew-mdemg` repo + tagged release)
+- `brew install mdemg` — PASS (v0.2.1, all 16 homebrew install test phases passed)
+- **Homebrew install test plan**: `docs/tests/homebrew-install-test-plan.md`
 - **Effort**: S | **Depends on**: Phase 99.
 
 #### Phase 101-105: Cognitive Intelligence (Planned)
@@ -2544,7 +2543,7 @@ Issues discovered during gap analysis. **Never bypass — fix or document before
 | UATS assertion format | RESOLVED | All specs use canonical `{path, op, expected}` format |
 | UATS spec coverage | NEARLY COMPLETE | 146 specs; only SSE endpoint not testable via UATS |
 | Partially tested packages | IMPROVED | Pure functions + constructors tested; remaining gaps need Neo4j/HTTP mocks |
-| Release infrastructure | DEFERRED | Homebrew tap repo + v0.2.0 tag needed |
+| Release infrastructure | RESOLVED | Homebrew tap repo created, v0.2.1 released and tested |
 | Stale legacy binaries | BLOCKED | 7 old binaries in `bin/`; deletion blocked by pre-bash-check hook |
 
 ### OPEN: Remaining UATS Coverage Gaps
@@ -2575,11 +2574,24 @@ Tests added 2026-03-10 for pure functions and constructors:
 
 7 pre-unified-CLI binaries remain: `extract-symbols`, `ingest-codebase`, `mcp-server`, `mdemg-ingest`, `mdemg-server`, `reset-db`, `server`. All functionality is now in the unified `bin/mdemg` binary. Deletion requires user confirmation due to pre-bash-check hook matching `reset-db`.
 
-### DEFERRED: Release Infrastructure
+### RESOLVED: v0.2.1 Release Fixes (Homebrew Install Testing)
 
-- Create `reh3376/homebrew-mdemg` GitHub repo (needed for `brew install`)
-- Tag first release `v0.2.0` to trigger goreleaser
-- This is the last criterion for Phase 100 full acceptance (currently 9/10)
+Discovered and fixed during homebrew install test (all 16 test phases passed):
+
+- **Project-scoped Neo4j containers** (`internal/cli/db.go`): `mdemg db start` now creates containers named `mdemg-neo4j-{project}` with project-specific volumes, preventing conflicts between multiple projects and the dev CMS volume.
+- **Dynamic port selection** (`internal/cli/db.go`): `FindFreePort()` scans 7687-7787 for an available bolt port when default 7687 is busy; auto-selects next free port.
+- **Auto-update config after db start** (`internal/config/yaml_config.go`): `UpdateNeo4jURI()` writes the actual bolt URI (including dynamic port) back to `.mdemg/config.yaml` so subsequent commands use the correct connection.
+- **API key prompt in init wizard** (`internal/cli/init.go`): When OpenAI is selected as embedding provider, `mdemg init` now prompts for the API key and writes it to `.env` (not config.yaml).
+- **`.env` file creation with secrets** (`internal/cli/init.go`): Init wizard creates `.env` with `NEO4J_PASS` and `OPENAI_API_KEY` entries, following the principle that secrets never go in config.yaml.
+- **Project-scoped containers in daemon** (`internal/cli/daemon.go`): `mdemg start` and `mdemg status` use project-scoped container names (matching `mdemg db start` behavior) instead of hardcoded `mdemg-neo4j`.
+- **README.md install instructions**: Updated with comprehensive Homebrew install flow (`brew tap reh3376/mdemg && brew install mdemg`).
+- **Homebrew formula v0.2.1**: `reh3376/homebrew-mdemg` tap repo created with updated formula and SHA256 checksums.
+
+### RESOLVED: Release Infrastructure
+
+- `reh3376/homebrew-mdemg` GitHub repo created with Homebrew formula
+- v0.2.1 tagged and released via goreleaser
+- Phase 100 acceptance now 10/10 (last criterion — brew install — verified)
 
 ### RESOLVED Items (for reference)
 
@@ -2591,4 +2603,4 @@ Tests added 2026-03-10 for pure functions and constructors:
 
 ---
 
-*Last updated: 2026-03-10 — All 105 phases + S0-S14 complete. 146 UATS specs (canonical format). 148 Go test files. golangci-lint: 0 issues. Remaining: release infrastructure (homebrew tap + v0.2.0 tag), stale binary cleanup, SSE endpoint (not UATS-testable).*
+*Last updated: 2026-03-10 — All 105 phases + S0-S14 complete. v0.2.1 released and Homebrew install verified (16/16 test phases). 146 UATS specs (canonical format). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests.*
