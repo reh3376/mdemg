@@ -1,0 +1,98 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Linear Projects",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "linear",
+      "projects",
+      "crud"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates /v1/linear/projects CRUD operations",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/linear/projects"
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "create_unavailable",
+      "description": "POST without Linear module returns 503",
+      "request": {
+        "method": "POST",
+        "path": "/v1/linear/projects",
+        "body": {
+          "name": "test project"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "read_unavailable",
+      "description": "GET single project without Linear module returns 503",
+      "request": {
+        "method": "GET",
+        "path": "/v1/linear/projects/nonexistent-id"
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "patch_not_allowed",
+      "description": "PATCH should return 405",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/linear/projects",
+        "body": {}
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

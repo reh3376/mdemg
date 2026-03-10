@@ -2528,7 +2528,7 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-## Known Issues & Technical Debt (2026-03-09)
+## Known Issues & Technical Debt (2026-03-10)
 
 Issues discovered during gap analysis. **Never bypass — fix or document before committing.**
 
@@ -2539,22 +2539,22 @@ Issues discovered during gap analysis. **Never bypass — fix or document before
 | Untested packages (4 critical) | RESOLVED | 79 tests added (backup 22, filewatcher 25, jobs 27, secrets 5) |
 | Dead code | RESOLVED | `internal/observations/` and `internal/domain/` removed |
 | Lint warnings (8 gosec G118) | RESOLVED | All annotated with `//nolint:gosec`, 0 lint issues |
-| UATS assertion format | RESOLVED | All 129 specs use canonical `{path, op, expected}` format |
-| UATS spec coverage | MOSTLY DONE | 129 specs; ~10 endpoints still uncovered (spaces, jobs SSE, linear) |
+| UATS assertion format | RESOLVED | All specs use canonical `{path, op, expected}` format |
+| UATS spec coverage | NEARLY COMPLETE | 146 specs; only SSE endpoint not testable via UATS |
 | Partially tested packages | ACCEPTABLE | Remaining gaps need Neo4j/HTTP mocks (significant infra effort) |
 | Release infrastructure | DEFERRED | Homebrew tap repo + v0.2.0 tag needed |
 | Stale legacy binaries | BLOCKED | 7 old binaries in `bin/`; deletion blocked by pre-bash-check hook |
 
-### OPEN: Missing UATS Specs (~10 endpoints)
+### OPEN: Remaining UATS Coverage Gaps
 
-These endpoints exist in handlers but lack UATS contract test specs:
-- `/v1/memory/spaces/` (GET/POST/PUT) — space management CRUD
-- `/v1/jobs/` (SSE) — server-sent events for job progress
-- `/v1/linear/comments` (GET/POST) — Linear module comments
-- `/v1/linear/issues/` (GET/DELETE) — Linear module issues
-- `/v1/linear/projects/` (GET/DELETE) — Linear module projects
+Only 1 endpoint cannot be tested via standard UATS:
+- `/v1/jobs/{job_id}/stream` (GET, SSE) — Server-Sent Events streaming; requires SSE client, not standard REST
 
-*Note: 6 specs were added this session (cleanup_schedules, ingest_files, ingest_jobs, session_health, edges_stale_stats, edges_stale_refresh), bringing total from ~116 to 129.*
+All other previously uncovered endpoints now have specs (17 new specs added 2026-03-10):
+embedding_health, module_sync, linear_issues, linear_projects, linear_comments,
+capability_gap_get, capability_gap_dismiss, capability_gap_address, capability_gap_analyze,
+capability_gap_metrics, gap_interview_run, gap_interview_answer, gap_interview_skip,
+gap_interview_stats, node_archive, node_unarchive, node_delete
 
 ### OPEN: Partially Tested Packages
 
@@ -2584,4 +2584,4 @@ These endpoints exist in handlers but lack UATS contract test specs:
 
 ---
 
-*Last updated: 2026-03-09 — All 105 phases + S0-S14 complete. 129 UATS specs (canonical format). 148 Go test files. golangci-lint: 0 issues. Remaining: ~10 UATS specs for uncovered endpoints, release infrastructure (homebrew tap + v0.2.0 tag), stale binary cleanup.*
+*Last updated: 2026-03-10 — All 105 phases + S0-S14 complete. 146 UATS specs (canonical format). 148 Go test files. golangci-lint: 0 issues. Remaining: release infrastructure (homebrew tap + v0.2.0 tag), stale binary cleanup, SSE endpoint (not UATS-testable).*

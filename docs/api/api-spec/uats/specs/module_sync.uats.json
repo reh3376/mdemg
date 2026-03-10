@@ -1,0 +1,56 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Module Sync",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "modules",
+      "sync",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates POST /v1/modules/{module_id}/sync triggers module data synchronization",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/modules/nonexistent-module/sync",
+    "body": {},
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [503, 404],
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/modules/test-module/sync"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

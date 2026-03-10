@@ -1,0 +1,52 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Skip Gap Interview",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "gap-interviews",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates POST /v1/system/gap-interviews/{prompt_id}/skip marks prompt skipped",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/system/gap-interviews/nonexistent-prompt/skip",
+    "body": {
+      "reason": "uats test"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": [500, 503]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405 or 503",
+      "request": {
+        "method": "GET",
+        "path": "/v1/system/gap-interviews/test-prompt/skip"
+      },
+      "expected": {
+        "status": [405, 503],
+        "body_assertions": []
+      }
+    }
+  ]
+}

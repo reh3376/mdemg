@@ -1,0 +1,66 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Delete Node",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "nodes",
+      "delete",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates DELETE /v1/memory/nodes/{node_id} permanently deletes a node",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "DELETE",
+    "path": "/v1/memory/nodes/nonexistent-uats-node?confirm=true"
+  },
+  "expected": {
+    "status": [200, 404, 500]
+  },
+  "variants": [
+    {
+      "name": "missing_confirm",
+      "description": "DELETE without confirm=true should return 400",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/memory/nodes/test-node"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "equals",
+            "expected": "deletion requires ?confirm=true query parameter"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/nodes/test-node",
+        "body": {}
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

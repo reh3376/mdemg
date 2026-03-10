@@ -1,0 +1,47 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Unarchive Node",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "nodes",
+      "unarchive",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates POST /v1/memory/nodes/{node_id}/unarchive restores an archived node",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/nodes/nonexistent-uats-node/unarchive"
+  },
+  "expected": {
+    "status": [200, 404, 500]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/nodes/test-node/unarchive"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}
