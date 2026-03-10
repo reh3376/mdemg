@@ -25,8 +25,8 @@ type YAMLConfig struct {
 
 // LLMYAML holds top-level LLM text-generation settings that cascade to all features.
 type LLMYAML struct {
-	Provider string `yaml:"provider,omitempty"` // "ollama" or "openai" (default: "ollama")
-	Model    string `yaml:"model,omitempty"`    // default: "llama3.2:3b-instruct-fp16"
+	Provider string `yaml:"provider,omitempty"` // "ollama" or "openai" (default: "openai")
+	Model    string `yaml:"model,omitempty"`    // default: "gpt-5-nano"
 }
 
 // Neo4jYAML holds Neo4j connection settings.
@@ -34,6 +34,8 @@ type Neo4jYAML struct {
 	URI      string `yaml:"uri,omitempty"`
 	User     string `yaml:"user,omitempty"`
 	Password string `yaml:"password,omitempty"`
+	BoltPort int    `yaml:"bolt_port,omitempty"` // Preferred bolt port (default: 7687)
+	HTTPPort int    `yaml:"http_port,omitempty"` // Preferred HTTP port (default: 7474)
 }
 
 // ServerYAML holds HTTP server settings.
@@ -85,6 +87,8 @@ var yamlEnvMapping = []struct {
 	{"neo4j.uri", "NEO4J_URI", nil},
 	{"neo4j.user", "NEO4J_USER", nil},
 	{"neo4j.password", "NEO4J_PASS", nil},
+	{"neo4j.bolt_port", "NEO4J_BOLT_PORT", nil},
+	{"neo4j.http_port", "NEO4J_HTTP_PORT", nil},
 	{"server.port", "LISTEN_ADDR", convertPort},
 	{"llm.provider", "LLM_PROVIDER", nil},
 	{"llm.model", "LLM_MODEL", nil},
@@ -178,6 +182,12 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 	setIfNonEmpty(m, "neo4j.uri", cfg.Neo4j.URI)
 	setIfNonEmpty(m, "neo4j.user", cfg.Neo4j.User)
 	setIfNonEmpty(m, "neo4j.password", cfg.Neo4j.Password)
+	if cfg.Neo4j.BoltPort > 0 {
+		m["neo4j.bolt_port"] = strconv.Itoa(cfg.Neo4j.BoltPort)
+	}
+	if cfg.Neo4j.HTTPPort > 0 {
+		m["neo4j.http_port"] = strconv.Itoa(cfg.Neo4j.HTTPPort)
+	}
 
 	// Server
 	if cfg.Server.Port > 0 {
@@ -336,6 +346,8 @@ type InitOptions struct {
 	Neo4jURI          string
 	Neo4jUser         string
 	Neo4jPassword     string
+	Neo4jBoltPort     int
+	Neo4jHTTPPort     int
 	ServerPort        int
 	LLMProvider       string
 	LLMModel          string
@@ -349,8 +361,10 @@ type InitOptions struct {
 func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 	cfg := YAMLConfig{
 		Neo4j: Neo4jYAML{
-			URI:  opts.Neo4jURI,
-			User: opts.Neo4jUser,
+			URI:      opts.Neo4jURI,
+			User:     opts.Neo4jUser,
+			BoltPort: opts.Neo4jBoltPort,
+			HTTPPort: opts.Neo4jHTTPPort,
 			// Password intentionally omitted — stays in .env or env vars
 		},
 		Server: ServerYAML{

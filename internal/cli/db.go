@@ -354,6 +354,142 @@ Examples:
 	return cmd
 }
 
+// runDBStart is the core logic for starting a Neo4j container.
+// boltPort/httpPort of 0 means "use config or auto-detect".
+func runDBStart(boltPort, httpPort int, password string) error {
+	if !DockerAvailable() {
+		return fmt.Errorf("docker is not installed or not in PATH\nInstall Docker: https://docs.docker.com/get-docker/")
+	}
+
+	// Use defaults if not specified
+	if password == "" {
+		password = "mdemg-dev" //nolint:gosec // G101: default dev password, not a credential
+	}
+	portExplicit := boltPort > 0
+	httpExplicit := httpPort > 0
+
+	// Read config ports as fallback
+	if !portExplicit || !httpExplicit {
+		if cfg, cfgErr := loadConfig(); cfgErr == nil {
+			if !portExplicit && cfg.Neo4jBoltPort > 0 {
+				boltPort = cfg.Neo4jBoltPort
+			}
+			if !httpExplicit && cfg.Neo4jHTTPPort > 0 {
+				httpPort = cfg.Neo4jHTTPPort
+			}
+		}
+	}
+	if boltPort == 0 {
+		boltPort = neo4jDefaultPort
+	}
+	if httpPort == 0 {
+		httpPort = neo4jDefaultHTTP
+	}
+
+	containerName, volumeName, err := resolveProjectContainer()
+	if err != nil {
+		return err
+	}
+
+	state, err := InspectContainer(containerName)
+	if err != nil {
+		return fmt.Errorf("inspect container: %w", err)
+	}
+
+	if state.Running {
+		actualBolt, actualHTTP := ReadContainerPorts(containerName)
+		if actualBolt == 0 {
+			actualBolt = boltPort
+		}
+		if actualHTTP == 0 {
+			actualHTTP = httpPort
+		}
+		fmt.Printf("Container '%s' is already running\n", containerName)
+		fmt.Printf("  Bolt:  bolt://localhost:%d\n", actualBolt)
+		fmt.Printf("  HTTP:  http://localhost:%d\n", actualHTTP)
+		return nil
+	}
+
+	if state.Exists {
+		fmt.Printf("Starting existing container '%s'...\n", containerName)
+		_, err := RunDockerCommand("start", containerName)
+		if err != nil {
+			return fmt.Errorf("start container: %w", err)
+		}
+		actualBolt, actualHTTP := ReadContainerPorts(containerName)
+		if actualBolt > 0 {
+			boltPort = actualBolt
+		}
+		if actualHTTP > 0 {
+			httpPort = actualHTTP
+		}
+	} else {
+		// Dynamic port selection when not explicitly set
+		if !portExplicit {
+			found, portErr := FindFreePort(boltPort, 7687, 7787)
+			if portErr != nil {
+				return fmt.Errorf("find available bolt port: %w", portErr)
+			}
+			boltPort = found
+		}
+		if !httpExplicit {
+			found, portErr := FindFreePort(httpPort, 7474, 7574)
+			if portErr != nil {
+				return fmt.Errorf("find available HTTP port: %w", portErr)
+			}
+			httpPort = found
+		}
+
+		fmt.Printf("Creating container '%s'...\n", containerName)
+		dockerArgs := []string{
+			"run", "-d",
+			"--name", containerName,
+			"-p", fmt.Sprintf("%d:7687", boltPort),
+			"-p", fmt.Sprintf("%d:7474", httpPort),
+			"-e", fmt.Sprintf("NEO4J_AUTH=neo4j/%s", password),
+			"-e", "NEO4J_server_memory_heap_initial__size=512m",
+			"-e", "NEO4J_server_memory_heap_max__size=1g",
+			"-e", "NEO4J_server_memory_pagecache_size=512m",
+			"-e", "NEO4J_PLUGINS=[\"apoc\"]",
+			"-v", volumeName + ":/data",
+			neo4jImage,
+		}
+		_, err := RunDockerCommand(dockerArgs...)
+		if err != nil {
+			return fmt.Errorf("create container: %w", err)
+		}
+	}
+
+	fmt.Printf("Waiting for Neo4j to be ready...")
+	if err := WaitForPort("localhost", boltPort, 60*time.Second); err != nil {
+		fmt.Println(" timeout")
+		return fmt.Errorf("neo4j did not become ready: %w", err)
+	}
+	fmt.Println(" ready")
+
+	boltURI := fmt.Sprintf("bolt://localhost:%d", boltPort)
+	configPath := config.FindConfigFile()
+	if configPath == "" {
+		cwd, _ := os.Getwd()
+		configPath = filepath.Join(cwd, ".mdemg", "config.yaml")
+	}
+	if err := config.UpdateNeo4jURI(configPath, boltURI); err != nil {
+		fmt.Printf("  Warning: could not update config: %v\n", err)
+	} else {
+		fmt.Printf("  Config updated: neo4j.uri = %s\n", boltURI)
+	}
+
+	fmt.Println()
+	fmt.Printf("Neo4j is running:\n")
+	fmt.Printf("  Container: %s\n", containerName)
+	fmt.Printf("  Bolt:      bolt://localhost:%d\n", boltPort)
+	fmt.Printf("  Browser:   http://localhost:%d\n", httpPort)
+	fmt.Printf("  User:      neo4j\n")
+	fmt.Printf("  Password:  %s\n", password)
+	fmt.Printf("  Volume:    %s\n", volumeName)
+	return nil
+}
+
 // newDBStartCmd creates the `db start` subcommand
 func newDBStartCmd() *cobra.Command {
 	var (
@@ -380,119 +516,16 @@ Examples:
   mdemg db start
   mdemg db start --port 7688 --password mypassword`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !DockerAvailable() {
-				return fmt.Errorf("docker is not installed or not in PATH\nInstall Docker: https://docs.docker.com/get-docker/")
+			// Pass 0 for ports not explicitly set (triggers config/auto-detect)
+			bp := boltPort
+			if !cmd.Flags().Lookup("port").Changed {
+				bp = 0
 			}
-
-			containerName, volumeName, err := resolveProjectContainer()
-			if err != nil {
-				return err
+			hp := httpPort
+			if !cmd.Flags().Lookup("http-port").Changed {
+				hp = 0
 			}
-
-			state, err := InspectContainer(containerName)
-			if err != nil {
-				return fmt.Errorf("inspect container: %w", err)
-			}
-
-			if state.Running {
-				// Show actual mapped ports from the running container
-				actualBolt, actualHTTP := ReadContainerPorts(containerName)
-				if actualBolt == 0 {
-					actualBolt = boltPort
-				}
-				if actualHTTP == 0 {
-					actualHTTP = httpPort
-				}
-				fmt.Printf("Container '%s' is already running\n", containerName)
-				fmt.Printf("  Bolt:  bolt://localhost:%d\n", actualBolt)
-				fmt.Printf("  HTTP:  http://localhost:%d\n", actualHTTP)
-				return nil
-			}
-
-			if state.Exists {
-				// Container exists but not running — start it
-				fmt.Printf("Starting existing container '%s'...\n", containerName)
-				_, err := RunDockerCommand("start", containerName)
-				if err != nil {
-					return fmt.Errorf("start container: %w", err)
-				}
-				// Discover ports baked into the existing container
-				actualBolt, actualHTTP := ReadContainerPorts(containerName)
-				if actualBolt > 0 {
-					boltPort = actualBolt
-				}
-				if actualHTTP > 0 {
-					httpPort = actualHTTP
-				}
-			} else {
-				// Dynamic port selection when flags are not explicitly set
-				if !cmd.Flags().Lookup("port").Changed {
-					found, portErr := FindFreePort(neo4jDefaultPort, 7687, 7787)
-					if portErr != nil {
-						return fmt.Errorf("find available bolt port: %w", portErr)
-					}
-					boltPort = found
-				}
-				if !cmd.Flags().Lookup("http-port").Changed {
-					found, portErr := FindFreePort(neo4jDefaultHTTP, 7474, 7574)
-					if portErr != nil {
-						return fmt.Errorf("find available HTTP port: %w", portErr)
-					}
-					httpPort = found
-				}
-
-				// Create and start new container
-				fmt.Printf("Creating container '%s'...\n", containerName)
-				dockerArgs := []string{
-					"run", "-d",
-					"--name", containerName,
-					"-p", fmt.Sprintf("%d:7687", boltPort),
-					"-p", fmt.Sprintf("%d:7474", httpPort),
-					"-e", fmt.Sprintf("NEO4J_AUTH=neo4j/%s", password),
-					"-e", "NEO4J_server_memory_heap_initial__size=512m",
-					"-e", "NEO4J_server_memory_heap_max__size=1g",
-					"-e", "NEO4J_server_memory_pagecache_size=512m",
-					"-e", "NEO4J_PLUGINS=[\"apoc\"]",
-					"-v", volumeName + ":/data",
-					neo4jImage,
-				}
-				_, err := RunDockerCommand(dockerArgs...)
-				if err != nil {
-					return fmt.Errorf("create container: %w", err)
-				}
-			}
-
-			// Wait for bolt port
-			fmt.Printf("Waiting for Neo4j to be ready...")
-			if err := WaitForPort("localhost", boltPort, 60*time.Second); err != nil {
-				fmt.Println(" timeout")
-				return fmt.Errorf("neo4j did not become ready: %w", err)
-			}
-			fmt.Println(" ready")
-
-			// Update config.yaml with actual bolt URI
-			boltURI := fmt.Sprintf("bolt://localhost:%d", boltPort)
-			configPath := config.FindConfigFile()
-			if configPath == "" {
-				// No config file found — try creating in .mdemg/ under cwd
-				cwd, _ := os.Getwd()
-				configPath = filepath.Join(cwd, ".mdemg", "config.yaml")
-			}
-			if err := config.UpdateNeo4jURI(configPath, boltURI); err != nil {
-				fmt.Printf("  Warning: could not update config: %v\n", err)
-			} else {
-				fmt.Printf("  Config updated: neo4j.uri = %s\n", boltURI)
-			}
-
-			fmt.Println()
-			fmt.Printf("Neo4j is running:\n")
-			fmt.Printf("  Container: %s\n", containerName)
-			fmt.Printf("  Bolt:      bolt://localhost:%d\n", boltPort)
-			fmt.Printf("  Browser:   http://localhost:%d\n", httpPort)
-			fmt.Printf("  User:      neo4j\n")
-			fmt.Printf("  Password:  %s\n", password)
-			fmt.Printf("  Volume:    %s\n", volumeName)
-			return nil
+			return runDBStart(bp, hp, password)
 		},
 	}
 

@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local man install-man
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -109,11 +109,30 @@ help:
 	@echo "  test-unts-report- Generate UNTS Section 8A report from registry"
 	@echo "  test-sidecar-schemas - Validate sidecar fixture JSON against schemas"
 	@echo "  test-sidecar-acceptance - Run sidecar end-to-end acceptance test"
+	@echo "  man            - Generate man pages from CLI command tree"
+	@echo "  install-man    - Install man pages to system (PREFIX=/usr/local)"
 	@echo "  release-snapshot- Build release snapshot locally (no publish)"
 	@echo "  release-local  - Build release locally (no publish, requires tag)"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Build and run MDEMG server"
+# ============================================================
+# Man Page Targets
+# ============================================================
+
+PREFIX ?= /usr/local
+
+# Generate man pages from CLI command tree
+man: build-cli
+	@echo "Generating man pages..."
+	go run ./cmd/gendocs
+	@echo "Man pages generated in man/man1/"
+
+# Install man pages to system location
+install-man: man
+	install -d $(PREFIX)/share/man/man1
+	install -m 644 man/man1/*.1 $(PREFIX)/share/man/man1/
+
 # ============================================================
 # Release Targets (requires goreleaser: brew install goreleaser)
 # ============================================================

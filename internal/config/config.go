@@ -15,6 +15,8 @@ type Config struct {
 	Neo4jURI             string
 	Neo4jUser            string
 	Neo4jPass            string
+	Neo4jBoltPort        int // NEO4J_BOLT_PORT — preferred bolt port (default: 7687)
+	Neo4jHTTPPort        int // NEO4J_HTTP_PORT — preferred HTTP port (default: 7474)
 	RequiredSchemaVersion int
 
 	VectorIndexName string
@@ -37,13 +39,13 @@ type Config struct {
 	LearningMaxEdgesPerNode   int     // Max CO_ACTIVATED_WITH edges per node
 
 	// Top-level LLM settings (cascade to all features)
-	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "ollama")
-	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "llama3.2:3b-instruct-fp16")
+	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-5-nano")
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
 	OpenAIAPIKey        string
-	OpenAIModel         string // default: text-embedding-3-small
+	OpenAIModel         string // default: gpt-5-mini
 	OpenAIEndpoint      string // default: https://api.openai.com/v1
 	LLMEndpoint         string // LLM_ENDPOINT — override endpoint for LLM text-generation (default: uses OpenAIEndpoint)
 	OllamaEndpoint      string // default: http://localhost:11434
@@ -490,6 +492,15 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("NEO4J_URI/NEO4J_USER/NEO4J_PASS are required")
 	}
 
+	neo4jBoltPort, err := atoi("NEO4J_BOLT_PORT", 7687)
+	if err != nil {
+		return Config{}, err
+	}
+	neo4jHTTPPort, err := atoi("NEO4J_HTTP_PORT", 7474)
+	if err != nil {
+		return Config{}, err
+	}
+
 	reqVer, err := atoi("REQUIRED_SCHEMA_VERSION", 0)
 	if err != nil {
 		return Config{}, err
@@ -832,13 +843,13 @@ func FromEnv() (Config, error) {
 	}
 
 	// Top-level LLM cascade (defaults for all text-generation features)
-	llmProvider := get("LLM_PROVIDER", "ollama")
-	llmModel := get("LLM_MODEL", "llama3.2:3b-instruct-fp16")
+	llmProvider := get("LLM_PROVIDER", "openai")
+	llmModel := get("LLM_MODEL", "gpt-5-nano")
 
 	// Embedding provider settings
-	embProvider := get("EMBEDDING_PROVIDER", "ollama")
+	embProvider := get("EMBEDDING_PROVIDER", "openai")
 	openaiKey := get("OPENAI_API_KEY", "")
-	openaiModel := get("OPENAI_MODEL", "text-embedding-3-small")
+	openaiModel := get("OPENAI_MODEL", "gpt-5-mini")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
 	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
@@ -1890,6 +1901,8 @@ func FromEnv() (Config, error) {
 		Neo4jURI: uri,
 		Neo4jUser: user,
 		Neo4jPass: pass,
+		Neo4jBoltPort: neo4jBoltPort,
+		Neo4jHTTPPort: neo4jHTTPPort,
 		RequiredSchemaVersion: reqVer,
 		VectorIndexName: idx,
 		DefaultCandidateK: candK,

@@ -17,6 +17,9 @@ docs/internal/
 # GoReleaser build artifacts
 dist/
 
+# Generated man pages (built at release time)
+man/
+
 # Go binaries and compiled artifacts
 bin/
 /server

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
+	"mdemg/internal/config"
+	"mdemg/internal/db"
 	"mdemg/internal/sidecar"
 )
 
@@ -366,11 +370,14 @@ func runStatus() error {
 	pid, err := readPID(pidPath)
 	running := err == nil && isProcessAlive(pid)
 
+	var serverPort string
+
 	if running {
 		fmt.Printf("  Server:    running (pid=%d)\n", pid)
 
 		// Show port
 		if portStr, err := readPortFile(); err == nil && portStr != "" {
+			serverPort = portStr
 			fmt.Printf("  Port:      %s\n", portStr)
 		}
 
@@ -382,9 +389,9 @@ func runStatus() error {
 		fmt.Printf("  Log:       %s\n", logPath)
 
 		// Health check
-		if portStr, err := readPortFile(); err == nil && portStr != "" {
+		if serverPort != "" {
 			client := &http.Client{Timeout: 3 * time.Second}
-			resp, err := client.Get(fmt.Sprintf("http://localhost:%s/healthz", portStr))
+			resp, err := client.Get(fmt.Sprintf("http://localhost:%s/healthz", serverPort))
 			if err == nil {
 				defer resp.Body.Close()
 				body, _ := io.ReadAll(resp.Body)
@@ -405,6 +412,24 @@ func runStatus() error {
 		}
 	}
 
+	// Embedding provider info
+	fmt.Println()
+	cfg, cfgErr := loadConfig()
+	if cfgErr == nil {
+		embProvider := cfg.EmbeddingProvider
+		if embProvider == "" {
+			embProvider = "disabled"
+		}
+		fmt.Printf("  Embedding: %s", embProvider)
+		switch embProvider {
+		case "openai":
+			fmt.Printf(" (model: %s)", cfg.OpenAIModel)
+		case "ollama":
+			fmt.Printf(" (model: %s)", cfg.OllamaModel)
+		}
+		fmt.Println()
+	}
+
 	// Neo4j container status (prefer project-scoped, fall back to lock file)
 	statusContainerName, _, scnErr := resolveProjectContainer()
 	if scnErr != nil {
@@ -415,6 +440,12 @@ func runStatus() error {
 		if err == nil {
 			if state.Exists {
 				fmt.Printf("  Neo4j:     %s (%s)\n", state.Status, statusContainerName)
+				// Show node count if running and config loaded
+				if state.Running && cfgErr == nil {
+					if nodeCount, ncErr := getNeo4jNodeCount(cfg); ncErr == nil {
+						fmt.Printf("  Nodes:     %d\n", nodeCount)
+					}
+				}
 			} else {
 				fmt.Printf("  Neo4j:     not created\n")
 			}
@@ -424,6 +455,30 @@ func runStatus() error {
 	}
 
 	return nil
+}
+
+// getNeo4jNodeCount queries Neo4j for the total node count.
+func getNeo4jNodeCount(cfg config.Config) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	driver, err := db.NewDriver(cfg)
+	if err != nil {
+		return 0, err
+	}
+	defer driver.Close(ctx)
+
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	result, err := session.Run(ctx, "MATCH (n) RETURN count(n) AS cnt", nil)
+	if err != nil {
+		return 0, err
+	}
+	if result.Next(ctx) {
+		return result.Record().Values[0].(int64), nil
+	}
+	return 0, fmt.Errorf("no result")
 }
 
 // formatDuration returns a human-friendly duration string.

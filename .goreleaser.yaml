@@ -54,6 +54,10 @@ archives:
     formats:
       - tar.gz
     name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
+    files:
+      - src: "man/man1/*.1"
+        dst: man/man1
+        strip_parent: true
 
 checksum:
   name_template: "checksums.txt"
@@ -67,7 +71,7 @@ changelog:
       - "^test:"
       - "^ci:"
 
-homebrew_casks:
+brews:
   - repository:
       owner: reh3376
       name: homebrew-mdemg
@@ -75,7 +79,11 @@ homebrew_casks:
     name: mdemg
     homepage: "https://github.com/reh3376/mdemg"
     description: "Multi-Dimensional Emergent Memory Graph — cognitive substrate for AI agents"
-    binaries:
-      - mdemg
     dependencies:
-      - formula: docker
+      - name: docker
+        type: optional
+    install: |
+      bin.install "mdemg"
+      man1.install Dir["man/man1/*.1"]
+    test: |
+      system "#{bin}/mdemg", "version"
