@@ -129,8 +129,11 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 		return nil
 	}
 
-	// Auto-start Neo4j if needed (use lock file container name if available)
-	startContainerName := sidecar.ResolveContainerName(".", neo4jContainerName)
+	// Auto-start Neo4j if needed (prefer project-scoped, fall back to lock file)
+	startContainerName, _, cnErr := resolveProjectContainer()
+	if cnErr != nil {
+		startContainerName = sidecar.ResolveContainerName(".", neo4jContainerName)
+	}
 	if !noDB && DockerAvailable() {
 		state, err := InspectContainer(startContainerName)
 		if err == nil && state.Exists && !state.Running {
@@ -138,8 +141,13 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 			if _, err := RunDockerCommand("start", startContainerName); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to start Neo4j container: %v\n", err)
 			} else {
+				// Discover actual bolt port from container
+				waitPort := neo4jDefaultPort
+				if actualBolt, _ := ReadContainerPorts(startContainerName); actualBolt > 0 {
+					waitPort = actualBolt
+				}
 				fmt.Print("Waiting for Neo4j...")
-				if err := WaitForPort("localhost", neo4jDefaultPort, 60*time.Second); err != nil {
+				if err := WaitForPort("localhost", waitPort, 60*time.Second); err != nil {
 					fmt.Println(" timeout")
 					fmt.Fprintf(os.Stderr, "Warning: Neo4j did not become ready: %v\n", err)
 				} else {
@@ -397,8 +405,11 @@ func runStatus() error {
 		}
 	}
 
-	// Neo4j container status (use lock file container name if available)
-	statusContainerName := sidecar.ResolveContainerName(".", neo4jContainerName)
+	// Neo4j container status (prefer project-scoped, fall back to lock file)
+	statusContainerName, _, scnErr := resolveProjectContainer()
+	if scnErr != nil {
+		statusContainerName = sidecar.ResolveContainerName(".", neo4jContainerName)
+	}
 	if DockerAvailable() {
 		state, err := InspectContainer(statusContainerName)
 		if err == nil {

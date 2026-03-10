@@ -347,7 +347,7 @@ curl -s -X POST http://localhost:9999/v1/conversation/observe \
 # Recall it
 curl -s -X POST http://localhost:9999/v1/conversation/recall \
   -H "Content-Type: application/json" \
-  -d '{"space_id":"brew-test","query":"homebrew install","max_results":5}'
+  -d '{"space_id":"brew-test","query":"homebrew install","top_k":5}'
 ```
 
 **Expected**:
