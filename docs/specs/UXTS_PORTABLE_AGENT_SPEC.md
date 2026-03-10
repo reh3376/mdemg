@@ -4,6 +4,8 @@ Version: 2.3.0-draft
 Date: 2026-02-27
 Audience: Coding agents implementing Universal-x Test Specification governance in arbitrary codebases.
 
+> **See also:** [docs/guides/UXTS_DEVELOPER_GUIDE.md](../guides/UXTS_DEVELOPER_GUIDE.md) — the comprehensive developer guide with worked examples, anti-patterns, and hands-on tutorials for all 11 UxTS frameworks.
+
 ---
 
 ## 1. The Problem UxTS Solves

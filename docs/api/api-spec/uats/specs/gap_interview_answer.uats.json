@@ -19,7 +19,8 @@
     "priority": "low"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "330ddf8f8832000a3717ae9f86f9151bb533a28dcc6fefb446c5be5b4b12223e"
   },
   "variables": {},
   "request": {
@@ -33,7 +34,11 @@
     }
   },
   "expected": {
-    "status": [200, 500, 503]
+    "status": [
+      200,
+      500,
+      503
+    ]
   },
   "variants": [
     {
@@ -44,7 +49,10 @@
         "path": "/v1/system/gap-interviews/test-prompt/answer"
       },
       "expected": {
-        "status": [405, 503],
+        "status": [
+          405,
+          503
+        ],
         "body_assertions": []
       }
     }

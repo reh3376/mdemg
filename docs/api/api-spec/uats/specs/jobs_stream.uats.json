@@ -1,0 +1,33 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Job Stream",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jobs",
+      "sse"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "SSE streaming endpoint for job status updates (tests error cases only \u2014 SSE streams are not UATS-testable)",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "1b935578dd98a6ef6f0338ebd3a810aee89a81de800b7aac77b1c648f6bba2e1"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/jobs/nonexistent-job-id/stream"
+  },
+  "expected": {
+    "status": 404
+  },
+  "variants": []
+}

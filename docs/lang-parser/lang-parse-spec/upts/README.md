@@ -22,6 +22,8 @@ UPTS provides:
 3. **Language-agnostic runner** - validates any parser implementation
 4. **Format converter** - migrate existing `*_expected.json` files
 
+> For the full UxTS methodology guide covering architecture, spec writing, CI integration, and all 11 frameworks, see [docs/guides/UXTS_DEVELOPER_GUIDE.md](../../../../docs/guides/UXTS_DEVELOPER_GUIDE.md).
+
 ---
 
 ## Current Status

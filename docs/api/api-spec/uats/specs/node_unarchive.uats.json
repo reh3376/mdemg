@@ -20,7 +20,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "997e5e45f09af105fe61136712dcda32054b0b049fb8b100f35166a7f632ce3c"
   },
   "variables": {},
   "request": {
@@ -28,7 +29,11 @@
     "path": "/v1/memory/nodes/nonexistent-uats-node/unarchive"
   },
   "expected": {
-    "status": [200, 404, 500]
+    "status": [
+      200,
+      404,
+      500
+    ]
   },
   "variants": [
     {

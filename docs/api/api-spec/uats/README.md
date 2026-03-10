@@ -2,13 +2,13 @@
 
 **Version:** 1.2.0
 **Date:** 2026-02-26
-**Specs:** 124 canonical specs + 7 drafts
+**Specs:** 152 canonical specs + 7 drafts
 
 ---
 
 ## Overview
 
-Complete UATS test suite for all MDEMG API endpoints. Validates request/response contracts, error handling, and API behavior.
+Complete UATS test suite for all MDEMG API endpoints. Validates request/response contracts, error handling, and API behavior. For the full UxTS methodology guide covering architecture, spec writing, CI integration, and all 11 frameworks, see [docs/guides/UXTS_DEVELOPER_GUIDE.md](../../../../docs/guides/UXTS_DEVELOPER_GUIDE.md).
 
 ---
 

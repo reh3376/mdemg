@@ -5,7 +5,12 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["memory", "ingest", "jobs", "read"]
+    "tags": [
+      "memory",
+      "ingest",
+      "jobs",
+      "read"
+    ]
   },
   "metadata": {
     "author": "reh3376",
@@ -15,7 +20,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "d0c06226b6b218d222d3fb7b4a9b8027b31a238e8d2b0d01364e2df4b1b40593"
   },
   "variables": {},
   "request": {
@@ -25,8 +31,14 @@
   "expected": {
     "status": 200,
     "body_assertions": [
-      {"path": "$.jobs", "type": "array"},
-      {"path": "$.count", "type": "integer"}
+      {
+        "path": "$.jobs",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "integer"
+      }
     ]
   },
   "variants": [

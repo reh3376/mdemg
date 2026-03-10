@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "91781b4dc2959179f77ed453ef80b91a3a575ff71ef30ac5d1970e52879ab93c",
+    "sha256": "e1dc936c425465b93b825c874e5ed454040eac43e5877af3007b613dd2507046",
     "tags": [
       "backup_required"
     ]

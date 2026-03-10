@@ -19,7 +19,8 @@
     "priority": "low"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "550e79f27839d1d6e6c128eea62583b06c3d94edd1670a2ac121f6fe97cbe1b4"
   },
   "variables": {},
   "request": {
@@ -31,7 +32,10 @@
     }
   },
   "expected": {
-    "status": [503, 404],
+    "status": [
+      503,
+      404
+    ],
     "body_assertions": [
       {
         "path": "$.error",

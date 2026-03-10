@@ -20,7 +20,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 30000
+    "timeout_ms": 30000,
+    "sha256": "ca4191cc82e68e46dfb155515fc65b91392e9dcc312060c9c2e1ef73d6d55617"
   },
   "variables": {},
   "request": {
@@ -28,7 +29,9 @@
     "path": "/v1/memory/ingest/files",
     "body": {
       "space_id": "uats-ingest-test",
-      "files": ["/tmp/nonexistent-uats-test-file.go"]
+      "files": [
+        "/tmp/nonexistent-uats-test-file.go"
+      ]
     },
     "headers": {
       "Content-Type": "application/json"
@@ -54,7 +57,9 @@
       "request": {
         "body": {
           "space_id": "",
-          "files": ["/tmp/test.go"]
+          "files": [
+            "/tmp/test.go"
+          ]
         }
       },
       "expected": {

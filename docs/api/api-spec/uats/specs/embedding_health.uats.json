@@ -19,7 +19,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "fa07d2993f622a0a42c5deac7f90b944ea97e66835fccc219e156f0837672483"
   },
   "variables": {},
   "request": {

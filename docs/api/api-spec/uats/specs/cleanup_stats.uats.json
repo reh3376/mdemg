@@ -1,0 +1,88 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Cleanup Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "cleanup",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Returns orphan and archived node counts for a space",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "2f6ec1ce5b99604c3671feea6f51af1a5a1096ae57c7663b697f6f849695c857"
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/cleanup/stats?space_id=mdemg-dev"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "mdemg-dev"
+      },
+      {
+        "path": "$.orphan_count",
+        "op": "exists",
+        "expected": true
+      },
+      {
+        "path": "$.archived_count",
+        "op": "exists",
+        "expected": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id query param returns 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/cleanup/stats"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists",
+            "expected": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST returns 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/stats",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

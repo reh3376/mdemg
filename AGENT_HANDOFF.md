@@ -1810,6 +1810,8 @@ MEMORY_PRESSURE_THRESHOLD_MB=4096       # default: 4096
 **Spec:** `docs/specs/FRAMEWORK_GOVERNANCE.md`
 **Operational Matrix:** `docs/development/UXTS_FRAMEWORK_MATRIX.md`
 
+**Developer Guide:** [`docs/guides/UXTS_DEVELOPER_GUIDE.md`](docs/guides/UXTS_DEVELOPER_GUIDE.md) — authoritative reference for UxTS methodology, architecture, spec writing, CI integration, anti-patterns, and all 11 frameworks.
+
 Current framework reality is broader than the original governance table. These are the active or partially-active UxTS tracks in repo now:
 
 - **UNTS** (hash verification): `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json`, `internal/unts/`, `api/proto/unts.proto`

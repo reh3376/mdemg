@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "f387baf7e782ca97c3ca786d3418ab8e8c8ee652cf4249d5699c0299ad8ea3ec"
+    "sha256": "13c7b1e18c44c5f3b42d7d4977f8a02bb3d5304b23abffe9c5934621ba38cb88"
   },
   "variables": {
     "test_space": "uats-templates-test"

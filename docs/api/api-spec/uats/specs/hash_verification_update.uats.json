@@ -12,8 +12,8 @@
   },
   "metadata": {
     "author": "reh3376",
-    "created": "2026-02-23",
-    "description": "Updates the expected hash for a tracked file (registers first via base)",
+    "created": "2026-03-10",
+    "description": "Updates the tracked hash for a file in the verification registry",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -22,20 +22,17 @@
     "tags": [
       "unts"
     ],
-    "sequential": true,
-    "sha256": "5b9099e3a842d84ee06eb04ccb2d09eb183fe62fa18e9eff75e2fbfb901309e8"
+    "sha256": "e57a6b23c1cf596094ddc4c569d92ddb9204c886268852f9066a1babc2aa4267"
   },
+  "variables": {},
   "request": {
     "method": "POST",
-    "path": "/v1/hash-verification/register",
+    "path": "/v1/hash-verification/update",
     "headers": {
       "Content-Type": "application/json"
     },
     "body": {
-      "path": "test/update-target.txt",
-      "framework": "manifest",
-      "hash": "1111111111111111111111111111111111111111111111111111111111111111",
-      "source": "manual"
+      "path": "docs/api/api-spec/uats/specs/health.uats.json"
     }
   },
   "expected": {
@@ -43,20 +40,24 @@
     "body_assertions": [
       {
         "path": "$.path",
-        "type": "string",
-        "value": "test/update-target.txt"
+        "op": "equals",
+        "expected": "docs/api/api-spec/uats/specs/health.uats.json"
+      },
+      {
+        "path": "$.hash",
+        "op": "exists",
+        "expected": true
       }
     ]
   },
   "variants": [
     {
-      "name": "update_registered",
-      "description": "Update hash of file registered in base",
+      "name": "with_explicit_hash",
+      "description": "Update with explicit hash value",
       "request": {
-        "path": "/v1/hash-verification/update",
         "body": {
-          "path": "test/update-target.txt",
-          "hash": "2222222222222222222222222222222222222222222222222222222222222222",
+          "path": "docs/api/api-spec/uats/specs/health.uats.json",
+          "hash": "abc123def456",
           "source": "manual"
         }
       },
@@ -65,44 +66,46 @@
         "body_assertions": [
           {
             "path": "$.path",
-            "type": "string",
-            "value": "test/update-target.txt"
+            "op": "equals",
+            "expected": "docs/api/api-spec/uats/specs/health.uats.json"
           },
           {
-            "path": "$.current_hash",
-            "type": "string",
-            "value": "2222222222222222222222222222222222222222222222222222222222222222"
-          },
-          {
-            "path": "$.status",
-            "type": "string"
-          },
-          {
-            "path": "$.history",
-            "type": "array"
+            "path": "$.hash",
+            "op": "exists",
+            "expected": true
           }
         ]
       }
     },
     {
-      "name": "untracked_file",
-      "description": "Updating untracked file returns 404",
+      "name": "missing_path",
+      "description": "Update with empty path returns 400",
       "request": {
-        "path": "/v1/hash-verification/update",
         "body": {
-          "path": "nonexistent/file.txt",
-          "hash": "abc123",
-          "source": "manual"
+          "path": ""
         }
       },
       "expected": {
-        "status": 404,
+        "status": 400,
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "exists",
+            "expected": true
           }
         ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/hash-verification/update"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]

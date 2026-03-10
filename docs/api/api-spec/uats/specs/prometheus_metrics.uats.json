@@ -1,54 +1,49 @@
 {
   "uats_version": "1.0.0",
   "api": {
-    "name": "Gap Interview Stats",
+    "name": "Prometheus Metrics",
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
     "tags": [
-      "system",
-      "gap-interviews",
-      "stats",
-      "read"
+      "observability",
+      "prometheus",
+      "metrics"
     ]
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-10",
-    "description": "Validates GET /v1/system/gap-interviews/stats returns interview statistics",
+    "description": "Returns Prometheus-format metrics (plain text, no JSON body assertions)",
     "test_type": "contract",
     "priority": "low"
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "db717f8956227fd40163b6f7123c5444902a1d1d967504fa7bc01033c8f23631"
+    "sha256": "fd4bf24f097aa33875a01c9471bcb8cc04b9f703737043c63e48d2917559db0f"
   },
   "variables": {},
   "request": {
     "method": "GET",
-    "path": "/v1/system/gap-interviews/stats"
+    "path": "/v1/prometheus"
   },
   "expected": {
-    "status": [
-      200,
-      503
-    ]
+    "status": 200
   },
   "variants": [
     {
       "name": "method_not_allowed",
-      "description": "POST should return 405 or 503",
+      "description": "POST returns 405",
       "request": {
         "method": "POST",
-        "path": "/v1/system/gap-interviews/stats",
+        "path": "/v1/prometheus",
+        "headers": {
+          "Content-Type": "application/json"
+        },
         "body": {}
       },
       "expected": {
-        "status": [
-          405,
-          503
-        ],
-        "body_assertions": []
+        "status": 405
       }
     }
   ]
