@@ -168,7 +168,7 @@ type Config struct {
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
 
 	// LLM Summary settings (semantic summaries for ingest)
-	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: false)
+	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: true)
 	LLMSummaryProvider  string // LLM provider for summaries (openai/ollama, default: openai)
 	LLMSummaryModel     string // Model for summaries (default: gpt-4o-mini)
 	LLMSummaryMaxTokens int    // Max tokens per summary (default: 150)
@@ -1199,7 +1199,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// LLM Summary settings (semantic summaries for ingest)
-	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
+	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", true)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", llmProvider)
 	llmSummaryModel := get("LLM_SUMMARY_MODEL", llmModel)
 	llmSummaryMaxTokens, err := atoi("LLM_SUMMARY_MAX_TOKENS", 150)
