@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	osExec "os/exec"
@@ -462,7 +463,11 @@ func getNeo4jNodeCount(cfg config.Config) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Suppress driver log output during status check
+	origOutput := log.Writer()
+	log.SetOutput(io.Discard)
 	driver, err := db.NewDriver(cfg)
+	log.SetOutput(origOutput)
 	if err != nil {
 		return 0, err
 	}

@@ -169,23 +169,14 @@ func runInit(flags initFlags) error {
 	} else if flags.defaults {
 		if hasOpenAIKey {
 			opts.EmbeddingProvider = "openai"
-		} else if env.ollamaReachable {
-			opts.EmbeddingProvider = "ollama"
 		} else {
-			opts.EmbeddingProvider = "disabled"
+			opts.EmbeddingProvider = "openai" // OpenAI is the default; user will be prompted for key
 		}
 	} else {
-		defaultProvider := "disabled"
-		if hasOpenAIKey {
-			defaultProvider = "openai"
-		} else if env.ollamaReachable {
-			defaultProvider = "ollama"
-		}
+		defaultProvider := "openai"
 		hint := ""
 		if hasOpenAIKey {
 			hint = " (OPENAI_API_KEY detected)"
-		} else if env.ollamaReachable {
-			hint = " (Ollama detected)"
 		}
 		opts.EmbeddingProvider = promptLine(
 			fmt.Sprintf("Embedding provider (ollama/openai/disabled) [%s]%s", defaultProvider, hint),
@@ -197,14 +188,24 @@ func runInit(flags initFlags) error {
 	var openAIKey string
 	switch opts.EmbeddingProvider {
 	case "ollama":
-		opts.EmbeddingModel = "qwen3-embedding:4b"
+		if flags.defaults {
+			opts.EmbeddingModel = "qwen3-embedding:4b"
+			opts.LLMModel = "llama3.2:3b-instruct-fp16"
+		} else {
+			opts.EmbeddingModel = promptLine("Embedding model [qwen3-embedding:4b]", "qwen3-embedding:4b")
+			opts.LLMModel = promptLine("Naming/LLM model [llama3.2:3b-instruct-fp16]", "llama3.2:3b-instruct-fp16")
+		}
 		opts.EmbeddingEndpoint = "http://localhost:11434"
 		opts.LLMProvider = "ollama"
-		opts.LLMModel = "llama3.2:3b-instruct-fp16"
 	case "openai":
-		opts.EmbeddingModel = "gpt-5-mini"
+		if flags.defaults {
+			opts.EmbeddingModel = "text-embedding-3-small"
+			opts.LLMModel = "gpt-5-nano"
+		} else {
+			opts.EmbeddingModel = promptLine("Embedding model [text-embedding-3-small]", "text-embedding-3-small")
+			opts.LLMModel = promptLine("Naming/LLM model [gpt-5-nano]", "gpt-5-nano")
+		}
 		opts.LLMProvider = "openai"
-		opts.LLMModel = "gpt-5-nano"
 		if !flags.defaults && !hasOpenAIKey {
 			fmt.Println()
 			fmt.Println("  OpenAI requires an API key for embeddings and LLM features.")
