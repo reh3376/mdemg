@@ -236,6 +236,36 @@ func setIfNonEmpty(m map[string]string, key, val string) {
 	}
 }
 
+// UpdateNeo4jURI reads the existing .mdemg/config.yaml, updates the neo4j.uri
+// field, and writes it back. If the config file does not exist, it creates a
+// minimal one. Other fields are preserved.
+func UpdateNeo4jURI(configPath, uri string) error {
+	// Ensure the parent directory exists
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+
+	var cfg YAMLConfig
+	if data, err := os.ReadFile(configPath); err == nil {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("parse existing config: %w", err)
+		}
+	}
+
+	cfg.Neo4j.URI = uri
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	header := "# MDEMG Project Configuration\n" +
+		"# Updated by: mdemg db start\n\n"
+
+	return os.WriteFile(configPath, []byte(header+string(data)), 0o644)
+}
+
 // ConfigError represents a validation error in the config file.
 type ConfigError struct {
 	Field   string `json:"field"`

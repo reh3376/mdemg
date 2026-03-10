@@ -7,15 +7,27 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"mdemg/internal/api"
+	"mdemg/internal/config"
 	"mdemg/internal/db"
 	"mdemg/migrations"
 )
+
+// resolveProjectContainer returns the project-scoped Neo4j container and volume
+// names based on the current working directory.
+func resolveProjectContainer() (containerName, volumeName string, err error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", "", fmt.Errorf("get working directory: %w", err)
+	}
+	return ContainerNameForProject(cwd), VolumeNameForProject(cwd), nil
+}
 
 // newDBCmd creates the parent `db` command with subcommands
 func newDBCmd() *cobra.Command {
@@ -358,6 +370,12 @@ func newDBStartCmd() *cobra.Command {
 Uses reduced memory settings (1GB heap, 512MB page cache) suitable for
 development. Data is persisted in a Docker volume.
 
+The container name and volume are scoped to the current project directory,
+so multiple projects can each have their own isolated Neo4j instance.
+
+If the default port (7687) is already in use, an available port is
+automatically selected from the range 7687-7787.
+
 Examples:
   mdemg db start
   mdemg db start --port 7688 --password mypassword`,
@@ -366,31 +384,68 @@ Examples:
 				return fmt.Errorf("docker is not installed or not in PATH\nInstall Docker: https://docs.docker.com/get-docker/")
 			}
 
-			state, err := InspectContainer(neo4jContainerName)
+			containerName, volumeName, err := resolveProjectContainer()
+			if err != nil {
+				return err
+			}
+
+			state, err := InspectContainer(containerName)
 			if err != nil {
 				return fmt.Errorf("inspect container: %w", err)
 			}
 
 			if state.Running {
-				fmt.Printf("Container '%s' is already running\n", neo4jContainerName)
-				fmt.Printf("  Bolt:  bolt://localhost:%d\n", boltPort)
-				fmt.Printf("  HTTP:  http://localhost:%d\n", httpPort)
+				// Show actual mapped ports from the running container
+				actualBolt, actualHTTP := ReadContainerPorts(containerName)
+				if actualBolt == 0 {
+					actualBolt = boltPort
+				}
+				if actualHTTP == 0 {
+					actualHTTP = httpPort
+				}
+				fmt.Printf("Container '%s' is already running\n", containerName)
+				fmt.Printf("  Bolt:  bolt://localhost:%d\n", actualBolt)
+				fmt.Printf("  HTTP:  http://localhost:%d\n", actualHTTP)
 				return nil
 			}
 
 			if state.Exists {
 				// Container exists but not running — start it
-				fmt.Printf("Starting existing container '%s'...\n", neo4jContainerName)
-				_, err := RunDockerCommand("start", neo4jContainerName)
+				fmt.Printf("Starting existing container '%s'...\n", containerName)
+				_, err := RunDockerCommand("start", containerName)
 				if err != nil {
 					return fmt.Errorf("start container: %w", err)
 				}
+				// Discover ports baked into the existing container
+				actualBolt, actualHTTP := ReadContainerPorts(containerName)
+				if actualBolt > 0 {
+					boltPort = actualBolt
+				}
+				if actualHTTP > 0 {
+					httpPort = actualHTTP
+				}
 			} else {
+				// Dynamic port selection when flags are not explicitly set
+				if !cmd.Flags().Lookup("port").Changed {
+					found, portErr := FindFreePort(neo4jDefaultPort, 7687, 7787)
+					if portErr != nil {
+						return fmt.Errorf("find available bolt port: %w", portErr)
+					}
+					boltPort = found
+				}
+				if !cmd.Flags().Lookup("http-port").Changed {
+					found, portErr := FindFreePort(neo4jDefaultHTTP, 7474, 7574)
+					if portErr != nil {
+						return fmt.Errorf("find available HTTP port: %w", portErr)
+					}
+					httpPort = found
+				}
+
 				// Create and start new container
-				fmt.Printf("Creating container '%s'...\n", neo4jContainerName)
+				fmt.Printf("Creating container '%s'...\n", containerName)
 				dockerArgs := []string{
 					"run", "-d",
-					"--name", neo4jContainerName,
+					"--name", containerName,
 					"-p", fmt.Sprintf("%d:7687", boltPort),
 					"-p", fmt.Sprintf("%d:7474", httpPort),
 					"-e", fmt.Sprintf("NEO4J_AUTH=neo4j/%s", password),
@@ -398,7 +453,7 @@ Examples:
 					"-e", "NEO4J_server_memory_heap_max__size=1g",
 					"-e", "NEO4J_server_memory_pagecache_size=512m",
 					"-e", "NEO4J_PLUGINS=[\"apoc\"]",
-					"-v", neo4jVolumeName + ":/data",
+					"-v", volumeName + ":/data",
 					neo4jImage,
 				}
 				_, err := RunDockerCommand(dockerArgs...)
@@ -415,13 +470,28 @@ Examples:
 			}
 			fmt.Println(" ready")
 
+			// Update config.yaml with actual bolt URI
+			boltURI := fmt.Sprintf("bolt://localhost:%d", boltPort)
+			configPath := config.FindConfigFile()
+			if configPath == "" {
+				// No config file found — try creating in .mdemg/ under cwd
+				cwd, _ := os.Getwd()
+				configPath = filepath.Join(cwd, ".mdemg", "config.yaml")
+			}
+			if err := config.UpdateNeo4jURI(configPath, boltURI); err != nil {
+				fmt.Printf("  Warning: could not update config: %v\n", err)
+			} else {
+				fmt.Printf("  Config updated: neo4j.uri = %s\n", boltURI)
+			}
+
 			fmt.Println()
 			fmt.Printf("Neo4j is running:\n")
-			fmt.Printf("  Bolt:     bolt://localhost:%d\n", boltPort)
-			fmt.Printf("  Browser:  http://localhost:%d\n", httpPort)
-			fmt.Printf("  User:     neo4j\n")
-			fmt.Printf("  Password: %s\n", password)
-			fmt.Printf("  Volume:   %s\n", neo4jVolumeName)
+			fmt.Printf("  Container: %s\n", containerName)
+			fmt.Printf("  Bolt:      bolt://localhost:%d\n", boltPort)
+			fmt.Printf("  Browser:   http://localhost:%d\n", httpPort)
+			fmt.Printf("  User:      neo4j\n")
+			fmt.Printf("  Password:  %s\n", password)
+			fmt.Printf("  Volume:    %s\n", volumeName)
 			return nil
 		},
 	}
@@ -448,29 +518,34 @@ Use --remove to also remove the container (data volume is preserved).`,
 				return fmt.Errorf("docker is not installed or not in PATH")
 			}
 
-			state, err := InspectContainer(neo4jContainerName)
+			containerName, _, err := resolveProjectContainer()
+			if err != nil {
+				return err
+			}
+
+			state, err := InspectContainer(containerName)
 			if err != nil {
 				return fmt.Errorf("inspect container: %w", err)
 			}
 
 			if !state.Exists {
-				fmt.Printf("Container '%s' does not exist\n", neo4jContainerName)
+				fmt.Printf("Container '%s' does not exist\n", containerName)
 				return nil
 			}
 
 			if state.Running {
-				fmt.Printf("Stopping container '%s'...\n", neo4jContainerName)
-				if _, err := RunDockerCommand("stop", neo4jContainerName); err != nil {
+				fmt.Printf("Stopping container '%s'...\n", containerName)
+				if _, err := RunDockerCommand("stop", containerName); err != nil {
 					return fmt.Errorf("stop container: %w", err)
 				}
 				fmt.Println("Stopped")
 			} else {
-				fmt.Printf("Container '%s' is not running (status: %s)\n", neo4jContainerName, state.Status)
+				fmt.Printf("Container '%s' is not running (status: %s)\n", containerName, state.Status)
 			}
 
 			if remove {
-				fmt.Printf("Removing container '%s'...\n", neo4jContainerName)
-				if _, err := RunDockerCommand("rm", neo4jContainerName); err != nil {
+				fmt.Printf("Removing container '%s'...\n", containerName)
+				if _, err := RunDockerCommand("rm", containerName); err != nil {
 					return fmt.Errorf("remove container: %w", err)
 				}
 				fmt.Println("Removed (data volume preserved)")
@@ -491,17 +566,31 @@ func newDBStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show database container and schema status",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			containerName, _, cnErr := resolveProjectContainer()
+			if cnErr != nil {
+				containerName = neo4jContainerName // fallback
+			}
+
 			fmt.Println("Container:")
 			if !DockerAvailable() {
 				fmt.Println("  Docker: not installed")
 			} else {
-				state, err := InspectContainer(neo4jContainerName)
+				state, err := InspectContainer(containerName)
 				if err != nil {
 					fmt.Printf("  Error: %v\n", err)
 				} else if !state.Exists {
-					fmt.Printf("  %s: not created\n", neo4jContainerName)
+					fmt.Printf("  %s: not created\n", containerName)
 				} else {
-					fmt.Printf("  %s: %s\n", neo4jContainerName, state.Status)
+					fmt.Printf("  %s: %s\n", containerName, state.Status)
+					if state.Running {
+						actualBolt, actualHTTP := ReadContainerPorts(containerName)
+						if actualBolt > 0 {
+							fmt.Printf("  Bolt:  bolt://localhost:%d\n", actualBolt)
+						}
+						if actualHTTP > 0 {
+							fmt.Printf("  HTTP:  http://localhost:%d\n", actualHTTP)
+						}
+					}
 				}
 			}
 
@@ -557,22 +646,27 @@ func newDBShellCmd() *cobra.Command {
 		Short: "Open an interactive cypher-shell session",
 		Long: `Open an interactive cypher-shell inside the running Neo4j container.
 
-Requires the mdemg-neo4j-dev container to be running.`,
+Requires the project's Neo4j container to be running (via mdemg db start).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !DockerAvailable() {
 				return fmt.Errorf("docker is not installed or not in PATH")
 			}
 
-			state, err := InspectContainer(neo4jContainerName)
+			containerName, _, err := resolveProjectContainer()
+			if err != nil {
+				return err
+			}
+
+			state, err := InspectContainer(containerName)
 			if err != nil {
 				return fmt.Errorf("inspect container: %w", err)
 			}
 			if !state.Exists || !state.Running {
-				return fmt.Errorf("container '%s' is not running — run 'mdemg db start' first", neo4jContainerName)
+				return fmt.Errorf("container '%s' is not running — run 'mdemg db start' first", containerName)
 			}
 
 			// exec into container with interactive cypher-shell
-			shellCmd := exec.Command("docker", "exec", "-it", neo4jContainerName,
+			shellCmd := exec.Command("docker", "exec", "-it", containerName,
 				"cypher-shell", "-u", "neo4j", "-p", "mdemg-dev")
 			shellCmd.Stdin = os.Stdin
 			shellCmd.Stdout = os.Stdout

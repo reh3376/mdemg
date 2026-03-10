@@ -163,6 +163,7 @@ func runInit(flags initFlags) error {
 	}
 
 	// Set embedding defaults based on provider
+	var openAIKey string
 	switch opts.EmbeddingProvider {
 	case "ollama":
 		opts.EmbeddingModel = "qwen3-embedding:4b"
@@ -173,6 +174,16 @@ func runInit(flags initFlags) error {
 		opts.EmbeddingModel = "text-embedding-3-small"
 		opts.LLMProvider = "openai"
 		opts.LLMModel = "gpt-4o-mini"
+		if !flags.defaults {
+			fmt.Println()
+			fmt.Println("  OpenAI requires an API key for embeddings and LLM features.")
+			fmt.Println("  The key will be stored in .env (gitignored), NOT in config.yaml.")
+			fmt.Println()
+			key := promptLine("OpenAI API key (sk-...) [press Enter to skip]", "")
+			if key != "" {
+				openAIKey = key
+			}
+		}
 	}
 
 	// Generate files
@@ -259,17 +270,52 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// Create/update .env file with secrets
+	envPath := filepath.Join(cwd, ".env")
+	envLines := []string{}
+
+	// Read existing .env if present
+	if data, err := os.ReadFile(envPath); err == nil {
+		envLines = strings.Split(strings.TrimSpace(string(data)), "\n")
+	}
+
+	// Add NEO4J_PASS if not already present
+	if !envContains(envLines, "NEO4J_PASS") {
+		envLines = append(envLines, "NEO4J_PASS=mdemg-dev")
+	}
+
+	// Add OPENAI_API_KEY if user provided one and not already present
+	if openAIKey != "" && !envContains(envLines, "OPENAI_API_KEY") {
+		envLines = append(envLines, fmt.Sprintf("OPENAI_API_KEY=%s", openAIKey))
+	}
+
+	if err := os.WriteFile(envPath, []byte(strings.Join(envLines, "\n")+"\n"), 0600); err != nil {
+		fmt.Printf("  Warning: could not write .env: %v\n", err)
+	} else {
+		fmt.Printf("  Updated %s\n", envPath)
+	}
+
 	// Print summary
 	fmt.Println()
 	fmt.Println("Initialization complete!")
 	fmt.Println()
+
+	// Build "Next steps" based on what's missing
+	step := 1
 	fmt.Println("Next steps:")
-	fmt.Printf("  1. Set Neo4j password:  echo 'NEO4J_PASS=yourpassword' >> .env\n")
-	fmt.Printf("  2. Start the server:    mdemg serve\n")
-	fmt.Printf("  3. Ingest your code:    mdemg ingest --path .\n")
+	if openAIKey == "" && opts.EmbeddingProvider == "openai" {
+		fmt.Printf("  %d. Add your OpenAI API key:  echo 'OPENAI_API_KEY=sk-...' >> .env\n", step)
+		step++
+	}
+	fmt.Printf("  %d. Start Neo4j:            mdemg db start\n", step)
+	step++
+	fmt.Printf("  %d. Start the server:       mdemg serve --auto-migrate\n", step)
+	step++
+	fmt.Printf("  %d. Ingest your code:       mdemg ingest --path .\n", step)
 	fmt.Println()
 	fmt.Println("Config file:   .mdemg/config.yaml")
 	fmt.Println("Ignore file:   .mdemgignore")
+	fmt.Println("Secrets file:  .env (gitignored)")
 	fmt.Printf("Space ID:      %s\n", opts.SpaceID)
 
 	return nil
@@ -400,6 +446,17 @@ func ParseIgnoreFile(path string) ([]string, error) {
 		patterns = append(patterns, line)
 	}
 	return patterns, nil
+}
+
+// envContains checks whether a .env line slice already has a key defined.
+func envContains(lines []string, key string) bool {
+	prefix := key + "="
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.
