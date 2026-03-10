@@ -1,6 +1,6 @@
 # Homebrew Install Test Plan
 
-**Version**: v0.2.0
+**Version**: v0.2.1
 **Date**: 2026-03-10
 **Purpose**: Validate that `brew install mdemg` delivers a fully functional MDEMG installation.
 
@@ -40,7 +40,7 @@ brew install mdemg
 
 **Expected**:
 - [ ] Tap succeeds without errors
-- [ ] Install downloads `mdemg_0.2.0_darwin_{arm64|amd64}.tar.gz`
+- [ ] Install downloads `mdemg_0.2.1_darwin_{arm64|amd64}.tar.gz`
 - [ ] SHA256 checksum passes
 - [ ] No build-from-source step (binary install only)
 
@@ -68,7 +68,7 @@ mdemg version
 ```
 
 **Expected**:
-- [ ] Outputs version `0.2.0`
+- [ ] Outputs version `0.2.1`
 - [ ] Shows commit hash (not "unknown")
 - [ ] Shows build date (not "unknown")
 
@@ -112,9 +112,11 @@ mdemg init
 ```
 
 **Expected**:
-- [ ] Interactive wizard runs (asks about Neo4j, Ollama, etc.)
+- [ ] Interactive wizard runs (asks about Neo4j, embedding provider, etc.)
+- [ ] If OpenAI selected: prompts for API key (stored in `.env`, not config.yaml)
 - [ ] Creates `.mdemg/config.yaml`
 - [ ] Creates `.mdemgignore`
+- [ ] Creates/updates `.env` with `NEO4J_PASS` and `OPENAI_API_KEY` (if provided)
 - [ ] Detects git repository
 - [ ] If `.claude/` directory exists, generates `.claude/mcp.json`
 
@@ -158,15 +160,16 @@ mdemg config validate
 ### 4.1 Start Neo4j
 
 ```bash
-# NOTE: Use docker compose, NOT mdemg db start, for existing installations
-# For fresh brew install testing, mdemg db start creates a new container
+# Each project gets its own isolated container and volume.
+# If port 7687 is in use, an available port is auto-selected (7688, 7689, etc.)
 mdemg db start
 ```
 
 **Expected**:
-- [ ] Starts a Neo4j Docker container
-- [ ] Container name includes "mdemg"
-- [ ] Reports success with connection info
+- [ ] Creates a project-scoped container (e.g., `mdemg-neo4j-<project-name>`)
+- [ ] Auto-selects available port if 7687 is busy
+- [ ] Updates `.mdemg/config.yaml` with actual bolt URI
+- [ ] Reports success with connection info (container, bolt, browser, password, volume)
 
 ### 4.2 Database status
 
@@ -175,9 +178,9 @@ mdemg db status
 ```
 
 **Expected**:
-- [ ] Shows container running status
-- [ ] Shows Neo4j bolt URI
-- [ ] Shows port mapping
+- [ ] Shows project-scoped container name and status
+- [ ] Shows actual mapped bolt and HTTP ports
+- [ ] Shows schema version info
 
 ### 4.3 Run migrations
 
@@ -218,7 +221,7 @@ kill $SERVE_PID 2>/dev/null
 
 **Expected**:
 - [ ] Server starts on port 9999 (or configured port)
-- [ ] `/healthz` returns `{"status":"ok","version":"0.2.0"}`
+- [ ] `/healthz` returns `{"status":"ok","version":"0.2.1"}`
 - [ ] Server shuts down cleanly on SIGTERM
 
 ### 5.2 Start server (daemon mode)
@@ -253,7 +256,7 @@ curl -s http://localhost:9999/readyz | python3 -m json.tool
 ```
 
 **Expected**:
-- [ ] `/healthz` returns status "ok" with version "0.2.0"
+- [ ] `/healthz` returns status "ok" with version "0.2.1"
 - [ ] `/readyz` returns readiness status
 
 ### 5.5 Stop server

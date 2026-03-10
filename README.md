@@ -11,36 +11,75 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ---
 
-## Quick Start (3 Steps)
+## Quick Start
 
-### 1. Install
+### Prerequisites
+
+- **Docker Desktop** — required for Neo4j database
+- **Embedding provider** (choose one):
+  - [OpenAI API key](https://platform.openai.com/api-keys) (recommended, requires account)
+  - [Ollama](https://ollama.com) (local, free, no API key needed)
+
+### Step 1: Install
 
 ```bash
 # macOS (Homebrew)
-brew install reh3376/mdemg/mdemg
+brew tap reh3376/mdemg
+brew install mdemg
 
-# Or build from source
-git clone https://github.com/reh3376/mdemg.git && cd mdemg
-go build -o bin/mdemg ./cmd/mdemg
+# Verify installation
+mdemg version
 ```
 
-### 2. Initialize
+<details>
+<summary>Build from source (alternative)</summary>
+
+```bash
+git clone https://github.com/reh3376/mdemg.git && cd mdemg
+go build -o bin/mdemg ./cmd/mdemg
+./bin/mdemg version
+```
+
+</details>
+
+### Step 2: Initialize a Project
 
 ```bash
 cd /path/to/your/project
-mdemg init          # Interactive wizard: detects Neo4j, Ollama, Git, IDE
-mdemg db start      # Launches Neo4j container (requires Docker)
-mdemg start --auto-migrate  # Starts server daemon with schema migrations
+mdemg init
 ```
 
-### 3. Ingest
+The interactive wizard will:
+1. Set a **space ID** (defaults to directory name)
+2. Detect **Neo4j** on localhost:7687
+3. Ask for your **embedding provider** (ollama/openai/disabled)
+4. If OpenAI: prompt for your **API key** (stored in `.env`, never in config)
+5. Create `.mdemg/config.yaml`, `.mdemgignore`, and `.env`
+6. Optionally install a **git post-commit hook** for auto-ingestion
+7. Optionally configure **MCP** for your IDE (Cursor, VS Code, Claude Code)
+
+### Step 3: Start Services
 
 ```bash
-mdemg ingest --path .       # Index your codebase
-mdemg hooks install         # Auto-ingest on every git commit
+mdemg db start              # Launches a project-scoped Neo4j container
+                            # Auto-selects port if 7687 is in use
+mdemg start --auto-migrate  # Starts server daemon + applies schema migrations
+mdemg status                # Verify everything is running
 ```
 
-That's it. Your AI agent now has persistent memory. See the [Quickstart Guide](docs/quickstart.md) for a 10-minute walkthrough, or run `mdemg demo` to try it with sample data.
+> Each project gets its own isolated Neo4j container and data volume.
+> If you have other Neo4j instances running, ports are resolved automatically.
+
+### Step 4: Ingest Your Codebase
+
+```bash
+mdemg ingest --path .       # Index your codebase into the memory graph
+mdemg hooks install         # Auto-ingest on every git commit (optional)
+```
+
+That's it. Your AI agent now has persistent memory.
+
+See the [Quickstart Guide](docs/quickstart.md) for a detailed walkthrough, or run `mdemg demo` to try it with sample data.
 
 > **Upgrading?** Run `mdemg upgrade` to self-update to the latest release.
 
@@ -214,15 +253,23 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 
 - Go 1.24+
 - Docker (for Neo4j)
-- Embedding provider: [Ollama](https://ollama.com) (local, recommended) or OpenAI API key
+- Embedding provider: [OpenAI API key](https://platform.openai.com/api-keys) or [Ollama](https://ollama.com) (local, free)
 
 ### Build from Source
 
 ```bash
 git clone https://github.com/reh3376/mdemg.git && cd mdemg
-cp .env.example .env          # Configure embedding provider
 go build -o bin/mdemg ./cmd/mdemg
 ./bin/mdemg --help            # See all commands
+```
+
+### Configure and Start
+
+```bash
+cd /path/to/your/project
+mdemg init                    # Interactive wizard creates .mdemg/config.yaml + .env
+mdemg db start                # Project-scoped Neo4j container (auto-selects free port)
+mdemg start --auto-migrate    # Server daemon with schema migrations
 ```
 
 ### Ingest a Codebase
