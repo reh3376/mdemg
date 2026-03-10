@@ -15,8 +15,8 @@ import (
 
 const (
 	defaultOpenAIEndpoint = "https://api.openai.com/v1"
-	defaultOpenAIModel    = "gpt-5-mini"
-	openAIDimensions      = 1536
+	defaultOpenAIModel    = "text-embedding-3-large"
+	openAIDimensions      = 3072
 )
 
 // OpenAI implements the Embedder interface using OpenAI's API.

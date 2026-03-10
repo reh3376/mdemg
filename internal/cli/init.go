@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
 )
@@ -200,10 +202,10 @@ func runInit(flags initFlags) error {
 		opts.LLMProvider = "ollama"
 	case "openai":
 		if flags.defaults {
-			opts.EmbeddingModel = "gpt-5-mini"
+			opts.EmbeddingModel = "text-embedding-3-large"
 			opts.LLMModel = "gpt-5-nano"
 		} else {
-			opts.EmbeddingModel = promptLine("Embedding model [gpt-5-mini]", "gpt-5-mini")
+			opts.EmbeddingModel = promptLine("Embedding model [text-embedding-3-large]", "text-embedding-3-large")
 			opts.LLMModel = promptLine("Naming/LLM model [gpt-5-nano]", "gpt-5-nano")
 		}
 		opts.LLMProvider = "openai"
@@ -339,7 +341,8 @@ func runInit(flags initFlags) error {
 	fmt.Println()
 
 	// Load .env into current process so spawned daemon inherits secrets
-	_ = godotenv.Load(envPath)
+	// Use Overload (not Load) to ensure values are set even if env vars exist as empty
+	_ = godotenv.Overload(envPath)
 
 	// Auto-start for --quick mode
 	if flags.quick {
@@ -349,6 +352,10 @@ func runInit(flags initFlags) error {
 			fmt.Printf("Warning: Neo4j start failed: %v\n", err)
 			fmt.Println("You can start it manually: mdemg db start")
 		}
+		// Reload config.yaml into env — runDBStart may have updated neo4j.uri with dynamic port
+		reloadConfigEnv()
+		// Wait for Neo4j bolt protocol to be fully ready (TCP open != bolt ready)
+		waitForBoltReady()
 		fmt.Println()
 		if err := runStart(0, "", true, false, false); err != nil {
 			fmt.Printf("Warning: server start failed: %v\n", err)
@@ -366,6 +373,10 @@ func runInit(flags initFlags) error {
 				fmt.Printf("Warning: Neo4j start failed: %v\n", err)
 				fmt.Println("You can start it manually: mdemg db start")
 			}
+			// Reload config.yaml into env — runDBStart may have updated neo4j.uri with dynamic port
+			reloadConfigEnv()
+			// Wait for Neo4j bolt protocol to be fully ready (TCP open != bolt ready)
+			waitForBoltReady()
 			fmt.Println()
 			if err := runStart(0, "", true, false, false); err != nil {
 				fmt.Printf("Warning: server start failed: %v\n", err)
@@ -498,6 +509,51 @@ func writeIDEConfigs(dir string, port int, env environmentInfo) []string {
 	}
 
 	return written
+}
+
+// waitForBoltReady waits until Neo4j bolt protocol is fully ready to serve queries.
+// WaitForPort only checks TCP connectivity, but Neo4j may not be ready for bolt queries yet.
+func waitForBoltReady() {
+	uri := os.Getenv("NEO4J_URI")
+	if uri == "" {
+		uri = "bolt://localhost:7687"
+	}
+	pass := os.Getenv("NEO4J_PASS")
+	if pass == "" {
+		pass = "mdemg-dev" //nolint:gosec // G101: default dev password, not a credential
+	}
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth("neo4j", pass, ""))
+		if err != nil {
+			cancel()
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		err = driver.VerifyConnectivity(ctx)
+		driver.Close(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// reloadConfigEnv re-reads config.yaml and forces env vars to the current YAML values.
+// This is needed after runDBStart which may update neo4j.uri with a dynamic port.
+// Without this, the spawned daemon inherits stale env vars (e.g., bolt://localhost:7687
+// instead of the actual port like bolt://localhost:7688).
+func reloadConfigEnv() {
+	cfgPath := config.FindConfigFile()
+	if cfgPath == "" {
+		return
+	}
+	// Clear NEO4J_URI so LoadYAMLConfig will set it from the updated config.yaml
+	_ = os.Unsetenv("NEO4J_URI")
+	_ = config.LoadYAMLConfig(cfgPath)
 }
 
 // ParseIgnoreFile reads a .mdemgignore file and returns the list of patterns.

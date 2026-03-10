@@ -45,7 +45,7 @@ type Config struct {
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
 	OpenAIAPIKey        string
-	OpenAIModel         string // default: gpt-5-mini
+	OpenAIModel         string // default: text-embedding-3-large
 	OpenAIEndpoint      string // default: https://api.openai.com/v1
 	LLMEndpoint         string // LLM_ENDPOINT — override endpoint for LLM text-generation (default: uses OpenAIEndpoint)
 	OllamaEndpoint      string // default: http://localhost:11434
@@ -849,7 +849,7 @@ func FromEnv() (Config, error) {
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
 	openaiKey := get("OPENAI_API_KEY", "")
-	openaiModel := get("OPENAI_MODEL", "gpt-5-mini")
+	openaiModel := get("OPENAI_MODEL", "text-embedding-3-large")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
 	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
