@@ -388,12 +388,12 @@ func TestIngestGeneratesEmbedding(t *testing.T) {
 	}
 
 	// Verify embedding dimensions - the provider will return its native dimensions:
-	// - Ollama nomic-embed-text: 768 dimensions
-	// - OpenAI ada-002: 1536 dimensions
+	// - Ollama qwen3-embedding:4b: 1536 dimensions
+	// - OpenAI text-embedding-3-small: 1536 dimensions
 	// We accept either provider's dimensions.
 	validDims := map[int]string{
-		768:  "Ollama nomic-embed-text",
-		1536: "OpenAI ada-002",
+		768:  "legacy Ollama model",
+		1536: "qwen3-embedding / OpenAI text-embedding-3-small",
 	}
 	if _, ok := validDims[ingestResp.EmbeddingDims]; !ok {
 		t.Errorf("response embedding_dims %d is not a recognized provider dimension (expected 768 or 1536)", ingestResp.EmbeddingDims)

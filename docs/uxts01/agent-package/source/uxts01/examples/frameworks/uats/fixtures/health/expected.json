@@ -1,0 +1,7 @@
+{
+  "status": "ok",
+  "dependencies": {
+    "db": "ok",
+    "cache": "ok"
+  }
+}

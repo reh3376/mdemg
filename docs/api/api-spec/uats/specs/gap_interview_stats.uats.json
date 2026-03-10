@@ -1,0 +1,48 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Gap Interview Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "gap-interviews",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates GET /v1/system/gap-interviews/stats returns interview statistics",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/gap-interviews/stats"
+  },
+  "expected": {
+    "status": [200, 503]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405 or 503",
+      "request": {
+        "method": "POST",
+        "path": "/v1/system/gap-interviews/stats",
+        "body": {}
+      },
+      "expected": {
+        "status": [405, 503],
+        "body_assertions": []
+      }
+    }
+  ]
+}

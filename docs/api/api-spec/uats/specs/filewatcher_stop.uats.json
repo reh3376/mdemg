@@ -38,13 +38,13 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "operator": "eq",
-        "value": "uats-filewatcher-test"
+        "op": "equals",
+        "expected": "uats-filewatcher-test"
       },
       {
         "path": "$.status",
-        "operator": "eq",
-        "value": "stopped"
+        "op": "equals",
+        "expected": "stopped"
       }
     ]
   },

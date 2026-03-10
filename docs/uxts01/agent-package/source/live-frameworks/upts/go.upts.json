@@ -1,0 +1,292 @@
+{
+  "upts_version": "1.0.0",
+  "language": "go",
+  "variants": [
+    ".go"
+  ],
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-01-28",
+    "updated": "2026-01-29",
+    "description": "Go parser - all applicable canonical patterns (Go has no true enums)",
+    "parser_status": "enhanced",
+    "tags": [
+      "canonical",
+      "stdlib"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_signature": false,
+    "validate_value": false,
+    "validate_parent": true,
+    "validate_evidence": true
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/go_test_fixture.go",
+    "sha256": "a95030aa689f0f6312c781aa2bf73847f2919a85b09dcac794f9a2069d8e1e98"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 17,
+      "max": 22
+    },
+    "symbols": [
+      {
+        "name": "MaxRetries",
+        "type": "constant",
+        "line": 13,
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "constant",
+          "int"
+        ]
+      },
+      {
+        "name": "DefaultTimeout",
+        "type": "constant",
+        "line": 14,
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "constant",
+          "duration"
+        ]
+      },
+      {
+        "name": "StatusActive",
+        "type": "constant",
+        "line": 16,
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "constant",
+          "string",
+          "iota-group"
+        ]
+      },
+      {
+        "name": "StatusInactive",
+        "type": "constant",
+        "line": 17,
+        "exported": true,
+        "pattern": "P1_CONSTANT",
+        "tags": [
+          "constant",
+          "string",
+          "iota-group"
+        ]
+      },
+      {
+        "name": "UserID",
+        "type": "type",
+        "line": 22,
+        "exported": true,
+        "pattern": "P7_TYPE_ALIAS",
+        "tags": [
+          "type-alias",
+          "string"
+        ]
+      },
+      {
+        "name": "ItemList",
+        "type": "type",
+        "line": 23,
+        "exported": true,
+        "pattern": "P7_TYPE_ALIAS",
+        "tags": [
+          "type-alias",
+          "slice"
+        ]
+      },
+      {
+        "name": "UserRepository",
+        "type": "interface",
+        "line": 27,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": [
+          "interface"
+        ]
+      },
+      {
+        "name": "User",
+        "type": "struct",
+        "line": 35,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": [
+          "struct",
+          "entity",
+          "json-tags"
+        ]
+      },
+      {
+        "name": "UserService",
+        "type": "struct",
+        "line": 45,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": [
+          "struct",
+          "service"
+        ]
+      },
+      {
+        "name": "FindByID",
+        "type": "method",
+        "line": 52,
+        "parent": "UserService",
+        "signature_contains": [
+          "ctx",
+          "UserID",
+          "User",
+          "error"
+        ],
+        "pattern": "P6_METHOD",
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
+      },
+      {
+        "name": "Create",
+        "type": "method",
+        "line": 57,
+        "parent": "UserService",
+        "signature_contains": [
+          "ctx",
+          "User",
+          "error"
+        ],
+        "pattern": "P6_METHOD",
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
+      },
+      {
+        "name": "Delete",
+        "type": "method",
+        "line": 62,
+        "parent": "UserService",
+        "signature_contains": [
+          "ctx",
+          "UserID",
+          "error"
+        ],
+        "pattern": "P6_METHOD",
+        "tags": [
+          "method",
+          "receiver",
+          "pointer"
+        ]
+      },
+      {
+        "name": "ValidateEmail",
+        "type": "function",
+        "line": 68,
+        "exported": true,
+        "signature_contains": [
+          "email",
+          "bool"
+        ],
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "FormatUser",
+        "type": "function",
+        "line": 73,
+        "exported": true,
+        "signature_contains": [
+          "User",
+          "string"
+        ],
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function"
+        ]
+      },
+      {
+        "name": "NewUserService",
+        "type": "function",
+        "line": 78,
+        "exported": true,
+        "signature_contains": [
+          "UserRepository",
+          "Logger",
+          "UserService"
+        ],
+        "pattern": "P2_FUNCTION",
+        "tags": [
+          "function",
+          "constructor"
+        ]
+      },
+      {
+        "name": "Item",
+        "type": "struct",
+        "line": 86,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT",
+        "tags": [
+          "struct"
+        ]
+      },
+      {
+        "name": "Logger",
+        "type": "interface",
+        "line": 91,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT",
+        "tags": [
+          "interface"
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "name": "repo",
+        "reason": "unexported struct field"
+      },
+      {
+        "name": "logger",
+        "reason": "unexported struct field"
+      }
+    ],
+    "relationships": [
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "FindByID"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "Create"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "Delete"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P6_METHOD",
+    "P7_TYPE_ALIAS"
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Refresh Stale Edges",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "edges",
+      "stale",
+      "refresh",
+      "write",
+      "embedding_required"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-09",
+    "description": "Validates POST /v1/memory/edges/stale/refresh triggers stale edge recalculation",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/edges/stale/refresh",
+    "body": {
+      "space_id": "mdemg-dev"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "mdemg-dev"
+      },
+      {
+        "path": "$.edges_refreshed",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id should return 400",
+      "request": {
+        "body": {
+          "space_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/edges/stale/refresh"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

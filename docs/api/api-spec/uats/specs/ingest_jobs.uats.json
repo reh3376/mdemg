@@ -5,44 +5,42 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": [
-      "ingest",
-      "jobs",
-      "read"
-    ]
+    "tags": ["memory", "ingest", "jobs", "read"]
   },
   "metadata": {
     "author": "reh3376",
-    "created": "2026-01-29",
-    "description": "Validates List Ingest Jobs endpoint",
+    "created": "2026-03-09",
+    "description": "Validates GET /v1/memory/ingest/jobs returns ingestion job list",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 15000,
-    "sha256": "616f965e8712772319b1198b96d3200e77c4a2bcdde0ba8bc483062c862db029"
+    "timeout_ms": 15000
   },
-  "variables": {
-    "test_space": "demo"
-  },
+  "variables": {},
   "request": {
     "method": "GET",
-    "path": "/v1/memory/ingest/jobs",
-    "query": {
-      "space_id": "{{test_space}}"
-    }
+    "path": "/v1/memory/ingest/jobs"
   },
   "expected": {
     "status": 200,
     "body_assertions": [
-      {
-        "path": "$.jobs",
-        "type": "array"
-      },
-      {
-        "path": "$.count",
-        "type": "integer"
-      }
+      {"path": "$.jobs", "type": "array"},
+      {"path": "$.count", "type": "integer"}
     ]
-  }
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/ingest/jobs",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
 }

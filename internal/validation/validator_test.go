@@ -555,7 +555,7 @@ func TestFormatValidationErrors_Messages(t *testing.T) {
 			name:            "embedding_dims message",
 			input:           testEmbeddingStruct{Embedding: make([]float32, 100)},
 			expectedField:   "embedding",
-			expectedMessage: "must have 768 or 1536 dimensions",
+			expectedMessage: "must have 384, 768, 1024, or 1536 dimensions",
 		},
 		{
 			name:            "oneof message",
@@ -1159,7 +1159,7 @@ func TestValidateRetrieveRequest_ErrorMessages(t *testing.T) {
 				QueryEmbedding: make([]float32, 512),
 			},
 			expectedField:   "query_embedding",
-			containsMessage: "768 or 1536",
+			containsMessage: "384, 768, 1024, or 1536",
 		},
 		{
 			name: "top_k exceeds max has friendly message",

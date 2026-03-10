@@ -449,21 +449,58 @@ func TestSidecar_AttachDetach_RoundTrip(t *testing.T) {
 	}
 }
 
-// --- Stub Tests ---
+// --- Upgrade Tests ---
 
-func TestSidecar_Stubs_NotImplemented(t *testing.T) {
-	for _, cmd := range []string{"upgrade", "uninstall"} {
-		t.Run(cmd, func(t *testing.T) {
-			dir := t.TempDir()
-			stdout, _, exitCode := runSidecarCmd(t, dir, cmd)
-			if exitCode != 0 {
-				t.Errorf("expected exit 0 for stub %q, got %d", cmd, exitCode)
-			}
-			if !strings.Contains(stdout, "not yet implemented") {
-				t.Errorf("expected 'not yet implemented' in output, got: %s", stdout)
-			}
-		})
+func TestSidecar_Upgrade_InvalidState(t *testing.T) {
+	dir := t.TempDir()
+	// From uninitialized — should fail
+	stdout, _, _ := runSidecarCmd(t, dir, "upgrade", "--format", "json")
+	m := parseJSON(t, stdout)
+	assertJSONField(t, m, "exit_code", "2")
+}
+
+func TestSidecar_Upgrade_DryRun(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "installed")
+	stdout, _, exitCode := runSidecarCmd(t, dir, "upgrade", "--dry-run", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("expected exit 0, got %d", exitCode)
 	}
+	m := parseJSON(t, stdout)
+	assertJSONField(t, m, "result", "dry-run")
+}
+
+// --- Uninstall Tests ---
+
+func TestSidecar_Uninstall_InvalidState(t *testing.T) {
+	dir := t.TempDir()
+	// From uninitialized — should fail
+	stdout, _, _ := runSidecarCmd(t, dir, "uninstall", "--format", "json")
+	m := parseJSON(t, stdout)
+	assertJSONField(t, m, "exit_code", "2")
+}
+
+func TestSidecar_Uninstall_RunningWithoutForce(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "running")
+	stdout, _, _ := runSidecarCmd(t, dir, "uninstall", "--format", "json")
+	m := parseJSON(t, stdout)
+	// Should reject — running state without --force
+	assertJSONField(t, m, "exit_code", "2")
+}
+
+func TestSidecar_Uninstall_DryRun(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "installed")
+	stdout, _, exitCode := runSidecarCmd(t, dir, "uninstall", "--dry-run", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("expected exit 0, got %d", exitCode)
+	}
+	m := parseJSON(t, stdout)
+	assertJSONField(t, m, "result", "dry-run")
 }
 
 // --- State Guards Matrix ---
@@ -487,6 +524,9 @@ func TestSidecar_StateGuards_Matrix(t *testing.T) {
 		{"attach_from_initialized", []string{"attach-agent", "claude-code", "--format", "json"}, "initialized"},
 		{"detach_from_uninitialized", []string{"detach-agent", "claude-code", "--format", "json"}, "uninitialized"},
 		{"detach_from_initialized", []string{"detach-agent", "claude-code", "--format", "json"}, "initialized"},
+		{"upgrade_from_uninitialized", []string{"upgrade", "--format", "json"}, "uninitialized"},
+		{"uninstall_from_uninitialized", []string{"uninstall", "--format", "json"}, "uninitialized"},
+		{"uninstall_from_initialized", []string{"uninstall", "--format", "json"}, "initialized"},
 	}
 
 	for _, tt := range tests {

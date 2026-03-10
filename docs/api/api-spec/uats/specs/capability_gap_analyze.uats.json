@@ -1,0 +1,57 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Analyze Capability Gaps",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "capability-gaps",
+      "analyze",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates POST /v1/system/capability-gaps/analyze runs gap analysis",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 30000
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/system/capability-gaps/analyze?space_id=uats-test",
+    "body": {},
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.gaps_found",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/system/capability-gaps/analyze"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

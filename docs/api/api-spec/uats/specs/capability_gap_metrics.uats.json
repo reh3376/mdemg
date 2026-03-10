@@ -1,0 +1,48 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Capability Gap Metrics",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "capability-gaps",
+      "metrics",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Validates GET /v1/system/capability-gaps/metrics returns gap detection metrics",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/system/capability-gaps/metrics"
+  },
+  "expected": {
+    "status": 200
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/system/capability-gaps/metrics",
+        "body": {}
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

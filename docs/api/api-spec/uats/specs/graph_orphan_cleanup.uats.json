@@ -38,8 +38,8 @@
     "body_assertions": [
       {
         "path": "$.action",
-        "operator": "eq",
-        "value": "scan"
+        "op": "equals",
+        "expected": "scan"
       },
       {
         "path": "$.total_spaces",
@@ -76,13 +76,13 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "operator": "eq",
-            "value": "scan"
+            "op": "equals",
+            "expected": "scan"
           },
           {
             "path": "$.total_spaces",
-            "operator": "eq",
-            "value": 1
+            "op": "equals",
+            "expected": 1
           },
           {
             "path": "$.space_results",
@@ -108,8 +108,8 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "operator": "eq",
-            "value": "scan"
+            "op": "equals",
+            "expected": "scan"
           },
           {
             "path": "$.total_spaces",
@@ -136,18 +136,18 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "operator": "eq",
-            "value": "consolidate"
+            "op": "equals",
+            "expected": "consolidate"
           },
           {
             "path": "$.dry_run",
-            "operator": "eq",
-            "value": true
+            "op": "equals",
+            "expected": true
           },
           {
             "path": "$.total_affected",
-            "operator": "eq",
-            "value": 0
+            "op": "equals",
+            "expected": 0
           }
         ]
       }
@@ -169,18 +169,18 @@
         "body_assertions": [
           {
             "path": "$.action",
-            "operator": "eq",
-            "value": "delete"
+            "op": "equals",
+            "expected": "delete"
           },
           {
             "path": "$.space_results[0].skipped",
-            "operator": "eq",
-            "value": true
+            "op": "equals",
+            "expected": true
           },
           {
             "path": "$.space_results[0].skip_reason",
-            "operator": "eq",
-            "value": "protected space"
+            "op": "equals",
+            "expected": "protected space"
           }
         ]
       }

@@ -183,7 +183,7 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 type EmbeddingHealthResponse struct {
 	Status           string  `json:"status"`                      // "healthy", "degraded", "unhealthy"
 	Provider         string  `json:"provider"`                    // e.g., "openai", "ollama"
-	Model            string  `json:"model,omitempty"`             // e.g., "text-embedding-ada-002"
+	Model            string  `json:"model,omitempty"`             // e.g., "text-embedding-3-small"
 	Dimensions       int     `json:"dimensions"`                  // e.g., 1536
 	LatencyMs        float64 `json:"latency_ms"`                  // Last probe latency
 	CacheEnabled     bool    `json:"cache_enabled"`               // Whether caching is enabled
@@ -2904,7 +2904,7 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		queue := jobs.GetQueue()
 		job, ctx := queue.CreateJob(jobID, "ingest-files", config)
-		go s.runIngestFilesJob(ctx, job)
+		go s.runIngestFilesJob(ctx, job) //nolint:gosec // G118: ctx from CreateJob (Background-derived), not request-scoped
 
 		writeJSON(w, http.StatusAccepted, models.IngestFilesResponse{
 			SpaceID:    req.SpaceID,

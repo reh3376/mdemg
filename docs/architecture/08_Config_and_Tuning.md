@@ -60,7 +60,7 @@ OPENAI_ENDPOINT=https://api.openai.com/v1
 
 # Ollama Configuration (when EMBEDDING_PROVIDER=ollama)
 OLLAMA_ENDPOINT=http://localhost:11434
-OLLAMA_MODEL=nomic-embed-text        # Embedding model (768 dims)
+OLLAMA_MODEL=qwen3-embedding:4b      # Embedding model (1536 dims)
 ```
 
 ---

@@ -165,10 +165,14 @@ func runInit(flags initFlags) error {
 	// Set embedding defaults based on provider
 	switch opts.EmbeddingProvider {
 	case "ollama":
-		opts.EmbeddingModel = "nomic-embed-text"
+		opts.EmbeddingModel = "qwen3-embedding:4b"
 		opts.EmbeddingEndpoint = "http://localhost:11434"
+		opts.LLMProvider = "ollama"
+		opts.LLMModel = "llama3.2:3b-instruct-fp16"
 	case "openai":
-		opts.EmbeddingModel = "text-embedding-ada-002"
+		opts.EmbeddingModel = "text-embedding-3-small"
+		opts.LLMProvider = "openai"
+		opts.LLMModel = "gpt-4o-mini"
 	}
 
 	// Generate files

@@ -194,20 +194,17 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 
 **What MDEMG stores**: Only domain-specific, organization-specific, and task-specific knowledge — NOT information LLMs already possess. If you could find it on Stack Overflow or official docs, it doesn't belong in MDEMG.
 
-**Core capabilities** (97 phases of infrastructure built):
+**Core capabilities** (105 phases complete, all 5 cognitive gaps closed):
 - Vector-based semantic search (recall) + Graph-based reasoning (typed edges with evidence)
 - 5-layer emergent hierarchy (L0 observations → L5 emergent concepts)
 - Hebbian learning edges (CO_ACTIVATED_WITH) with temporal decay
 - LLM re-ranking, activation spreading, edge-type attention
 - CMS conversation memory, RSIC self-improvement cycle
 - Constraint detection, skill registry, MCP server integration
-
-**Cognitive gaps remaining** (Phases 101-105 — see `docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md`):
-- 101: SME Synthesis — can't synthesize memories into coherent understanding
-- 102: Intent Translation — can't translate queries to match stored knowledge
-- 103: Dynamic Emergence — can't form new concepts from experience (hardcoded patterns)
-- 104: Active Guardrails — can't proactively enforce learned constraints
-- 105: Global Meta-Learning — can't generalize lessons across contexts
+- SME Synthesis (Phase 101), Intent Translation (Phase 102), Dynamic Emergence (Phase 103)
+- Active MCP Guardrails (Phase 104), Global Meta-Learning (Phase 105)
+- Unified CLI (`mdemg` binary), project init wizard, database management, secret management
+- 129 UATS contract test specs, 148 Go test files, 0 lint issues
 
 **Key vision document**: `VISION.md` — read this for the full architectural philosophy, success metrics, design principles, and the internal dialogue analogy.
 
@@ -224,7 +221,9 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - `docs/development/` - Gap analyses and architecture docs
 - `docs/tests/` - Benchmark tests and results
 
-### Current Status (as of 2026-02-03)
+### Current Status (as of 2026-03-09)
+
+**All development phases complete.** 105 core phases + 14 sidecar phases (S0-S14). All 5 cognitive gaps (101-105) closed. Quality hardening (gap analysis triage) complete.
 
 **Benchmark Performance (Temporal Baseline — Feb 3):**
 
@@ -233,15 +232,10 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - High score rate: 100%
 - Canonical baseline: `docs/benchmarks/whk-wms/temporal_validation_20260203/`
 
-**Key Features Implemented:**
-
-- Edge-Type Attention for query-aware activation spreading
-- Query-type detection (symbol_lookup, data_flow, architecture, generic)
-- RetrievalHints for fine-grained control
-- Layer-specific temporal decay (L0: 0.05/day, L1: 0.02/day, L2: 0.01/day)
-- Temporal Retrieval Phase 1: time-aware query understanding (soft/hard modes)
-- CMS temporal filtering: `temporal_after`/`temporal_before` on recall endpoint
-- Phase 103: Dynamic Emergence — LLM-driven concept naming for unclassified CO_ACTIVATED_WITH clusters
+**Remaining work:**
+- Release infrastructure: Create `reh3376/homebrew-mdemg` GitHub repo, tag v0.2.0
+- ~10 UATS specs for uncovered endpoints (spaces CRUD, jobs SSE, linear module)
+- IDE extensions: VS Code, Cursor, real-time memory sidebar (Phase 4 partial)
 
 ## Testing
 

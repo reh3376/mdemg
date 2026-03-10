@@ -130,7 +130,7 @@ func (s *Service) Restore(ctx context.Context, req RestoreRequest) (string, erro
 }
 
 // runRestore executes the actual restore via docker exec.
-func (s *Service) runRestore(ctx context.Context, job *jobs.Job, req RestoreRequest, m *BackupManifest) error {
+func (s *Service) runRestore(ctx context.Context, job *jobs.Job, req RestoreRequest, _ *BackupManifest) error {
 	container := s.cfg.Neo4jContainer
 	cmd := s.cfg.FullCmd
 

@@ -68,7 +68,7 @@ Active health check for the configured embedding provider. Generates a real test
 {
   "status": "healthy",
   "provider": "openai",
-  "model": "text-embedding-ada-002",
+  "model": "text-embedding-3-small",
   "dimensions": 1536,
   "latency_ms": 42.0,
   "cache_enabled": true,

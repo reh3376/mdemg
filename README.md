@@ -11,33 +11,38 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ---
 
-## Quick Start
+## Quick Start (3 Steps)
+
+### 1. Install
 
 ```bash
-# Build the CLI
-make build-cli
+# macOS (Homebrew)
+brew install reh3376/mdemg/mdemg
 
-# Start a local Neo4j (requires Docker)
-mdemg db start
-
-# Apply database migrations
-mdemg db migrate
-
-# Initialize in your project directory
-cd /path/to/your/project
-mdemg init
-
-# Start the server (background daemon)
-mdemg start --auto-migrate
-
-# Ingest your codebase
-mdemg ingest --path .
-
-# Install git hook for automatic ingestion on commit
-mdemg hooks install
+# Or build from source
+git clone https://github.com/reh3376/mdemg.git && cd mdemg
+go build -o bin/mdemg ./cmd/mdemg
 ```
 
-`mdemg init` creates a `.mdemg/config.yaml` with your project settings, a `.mdemgignore` for exclusion patterns, and IDE MCP configs (Cursor, VS Code, Claude Code). `mdemg db start` launches a lightweight Neo4j container; `mdemg db migrate` applies schema migrations automatically. See [docs/features/unified-cli.md](docs/features/unified-cli.md) for the full command reference.
+### 2. Initialize
+
+```bash
+cd /path/to/your/project
+mdemg init          # Interactive wizard: detects Neo4j, Ollama, Git, IDE
+mdemg db start      # Launches Neo4j container (requires Docker)
+mdemg start --auto-migrate  # Starts server daemon with schema migrations
+```
+
+### 3. Ingest
+
+```bash
+mdemg ingest --path .       # Index your codebase
+mdemg hooks install         # Auto-ingest on every git commit
+```
+
+That's it. Your AI agent now has persistent memory. See the [Quickstart Guide](docs/quickstart.md) for a 10-minute walkthrough, or run `mdemg demo` to try it with sample data.
+
+> **Upgrading?** Run `mdemg upgrade` to self-update to the latest release.
 
 ---
 
@@ -68,22 +73,20 @@ Everything needed to independently verify our results is included.
 git clone https://github.com/reh3376/mdemg.git && cd mdemg
 cp .env.example .env  # Add your embedding provider credentials
 
-# 2. Start services
-docker compose up -d
-go build -o bin/mdemg ./cmd/server && ./bin/mdemg &
-# Server writes .mdemg.port with actual port (dynamic allocation if preferred port is busy)
+# 2. Build and start services
+go build -o bin/mdemg ./cmd/mdemg
+./bin/mdemg db start              # Launch Neo4j container
+./bin/mdemg start --auto-migrate  # Start server daemon with migrations
 
 # 3. Ingest test codebase (or use your own)
-go build -o bin/ingest-codebase ./cmd/ingest-codebase
-./bin/ingest-codebase --space-id=benchmark --path=/path/to/target-repo
+./bin/mdemg ingest --space-id=benchmark --path=/path/to/target-repo
 
-# 4. Run consolidation (reads port from .mdemg.port automatically)
-PORT=$(cat .mdemg.port 2>/dev/null || echo 9999)
-curl -X POST http://localhost:$PORT/v1/memory/consolidate \
+# 4. Run consolidation
+curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
-# 5. Run benchmark (see docs/benchmarks/whk-wms/)
-# Questions: test_questions_120_agent.json
+# 5. Run benchmark
+# Questions: docs/benchmarks/whk-wms/test_questions_120_agent.json
 # Grader: docs/benchmarks/grader_v4.py
 ```
 
@@ -205,77 +208,29 @@ MDEMG provides long-term memory for AI agents, enabling them to:
                     └───────────────────────────────────────┘
 ```
 
-## Quick Start
+## Development Setup
 
 ### Prerequisites
 
 - Go 1.24+
 - Docker (for Neo4j)
-- Embedding provider: Ollama (local) or OpenAI API key
+- Embedding provider: [Ollama](https://ollama.com) (local, recommended) or OpenAI API key
 
-### Setup
+### Build from Source
 
 ```bash
-# Clone the repo
-git clone https://github.com/reh3376/mdemg.git
-cd mdemg
-
-# Copy environment config
-cp .env.example .env
-# Edit .env with your settings (embedding provider, Neo4j credentials)
-
-# Start Neo4j
-docker compose up -d
-
-# Build the unified CLI
-make build-cli
-# Or directly:
+git clone https://github.com/reh3376/mdemg.git && cd mdemg
+cp .env.example .env          # Configure embedding provider
 go build -o bin/mdemg ./cmd/mdemg
-
-# Run the server
-./bin/mdemg serve
-
-# Print version info
-./bin/mdemg version
-
-# See all available commands
-./bin/mdemg --help
+./bin/mdemg --help            # See all commands
 ```
 
 ### Ingest a Codebase
 
 ```bash
-# Ingest a codebase
-./bin/mdemg ingest --space-id=my-project --path=/path/to/repo
-
-# Incremental ingest (only changed files since last commit)
-./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --incremental
-
-# Quiet mode (suppress non-error output, useful for hooks/CI)
-./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --quiet
-
-# Log to file instead of stderr
-./bin/mdemg ingest --space-id=my-project --path=/path/to/repo --log-file /tmp/ingest.log
-
-# Run consolidation to create concept layers
-curl -X POST http://localhost:9999/v1/memory/consolidate \
-  -H "Content-Type: application/json" \
-  -d '{"space_id": "my-project"}'
-```
-
-### Git Commit Hook (Automatic Ingestion)
-
-Install the post-commit hook to automatically ingest changes on every commit:
-
-```bash
-# Install the hook
-./scripts/install-hook.sh /path/to/your/repo
-
-# The hook runs quietly by default. Configure via environment:
-# MDEMG_SPACE_ID - space to ingest into (default: repo directory name)
-# MDEMG_ENDPOINT - server URL (default: http://localhost:9999)
-# MDEMG_VERBOSE  - set to "true" for verbose output
-# MDEMG_LOG_FILE - redirect logs to a file
+mdemg ingest --space-id=my-project --path=/path/to/repo
+mdemg ingest --space-id=my-project --path=/path/to/repo --incremental  # Changed files only
+mdemg hooks install  # Auto-ingest on git commit
 ```
 
 ## API Endpoints
@@ -537,17 +492,8 @@ Exposes all MDEMG metrics in Prometheus format.
 | 51 | Web Scraper Ingestion Module | ✅ Complete |
 | 49 | LLM Plugin SDK (Scaffolding, Validation, Gap Detection) | ✅ Complete |
 
-### In Progress / Next Up
-
-| Priority | Phase | Task | Description |
-|----------|-------|------|-------------|
-| 1 | 50 | Public Readiness | Security hardening, secret scrubbing, error sanitization |
-
-### Planned
-
-| Phase | Name | Description |
-|-------|------|-------------|
-| 36 | Observation Forwarding | Team-visible observations via DevSpace |
+| 98 | Cross-Platform Build + Release (goreleaser, Homebrew, self-update) | ✅ Complete |
+| 99 | Onboarding + Polish (quickstart, demo, FAQ) | ✅ Complete |
 
 See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 
@@ -555,14 +501,15 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 
 ## Documentation
 
+- [Quickstart Guide](docs/quickstart.md) - 10-minute setup walkthrough
+- [FAQ](docs/FAQ.md) - Common questions and troubleshooting
+- [CLI Reference](docs/features/unified-cli.md) - All CLI commands
+- [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
 - [Architecture](docs/architecture/01_Architecture.md) - System design and components
 - [Graph Schema](docs/architecture/02_Graph_Schema.md) - Neo4j labels and relationships
 - [Retrieval & Scoring](docs/architecture/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
 - [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
-- [CI/CD Integration](docs/development/CI_CD_INTEGRATION.md) - Git hooks, GitHub Actions, and scheduled sync
-- [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
-- [Backup & Restore Guide](docs/development/NEO4J_BACKUP.md) - Backup configuration, manual triggers, retention policies
-- [UETS Framework](docs/tests/uets/README.md) - Universal Emergence Test Specification for LLM model evaluation
+- [Backup & Restore Guide](docs/development/NEO4J_BACKUP.md) - Backup configuration and retention
 - [Agent Handoff](AGENT_HANDOFF.md) - Complete development context and phase registry
 
 ## Contributing

@@ -97,7 +97,7 @@ server:
   port: 9999
 embedding:
   provider: ollama
-  model: nomic-embed-text
+  model: qwen3-embedding:4b
   endpoint: http://localhost:11434
 schema:
   version: 17
@@ -742,6 +742,41 @@ mdemg hooks list                         # Show hook status
 ```
 
 See [docs/features/ide-repo-integration.md](ide-repo-integration.md) for full details.
+
+---
+
+## Self-Update
+
+Update the `mdemg` binary to the latest release from GitHub:
+
+```bash
+# Check for updates (dry run)
+./bin/mdemg upgrade --dry-run
+
+# Upgrade to latest release
+./bin/mdemg upgrade
+
+# Force upgrade even if already on latest version
+./bin/mdemg upgrade --force
+```
+
+The upgrade command checks GitHub Releases for the latest version, downloads the appropriate binary for your platform, verifies the SHA256 checksum, and replaces the current binary using a backup-and-replace strategy. The previous binary is preserved as a backup in case rollback is needed.
+
+---
+
+## Demo
+
+Seed sample data and demonstrate MDEMG features:
+
+```bash
+# Run the demo (requires running server)
+./bin/mdemg demo
+
+# Use a custom endpoint
+./bin/mdemg demo --endpoint http://localhost:8080
+```
+
+The demo command seeds sample observations (authentication patterns, rate limits, deployment decisions) into a `mdemg-demo` space and runs semantic recall queries to demonstrate retrieval. Clean up the demo space afterward with `curl -X DELETE localhost:9999/v1/spaces/mdemg-demo`.
 
 ---
 

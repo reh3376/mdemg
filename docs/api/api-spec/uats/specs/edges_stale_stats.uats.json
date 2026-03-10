@@ -1,0 +1,84 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Stale Edge Stats",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "edges",
+      "stale",
+      "stats",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-09",
+    "description": "Validates GET /v1/memory/edges/stale/stats returns stale edge statistics",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/edges/stale/stats?space_id=mdemg-dev"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.coactivation_stale",
+        "type": "integer"
+      },
+      {
+        "path": "$.associated_stale",
+        "type": "integer"
+      },
+      {
+        "path": "$.nodes_with_stale_edges",
+        "type": "integer"
+      },
+      {
+        "path": "$.hidden_with_member_changes",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id should return 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/edges/stale/stats"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/edges/stale/stats",
+        "body": {}
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

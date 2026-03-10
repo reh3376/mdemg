@@ -1,0 +1,78 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "List Cleanup Schedules",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "cleanup",
+      "schedules",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-09",
+    "description": "Validates GET /v1/memory/cleanup/schedules returns schedule list",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 15000
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/cleanup/schedules"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.schedules",
+        "type": "array"
+      },
+      {
+        "path": "$.count",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "with_space_filter",
+      "description": "Filter schedules by space_id query parameter",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/cleanup/schedules?space_id=mdemg-dev"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.schedules",
+            "type": "array"
+          },
+          {
+            "path": "$.count",
+            "type": "integer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/cleanup/schedules",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

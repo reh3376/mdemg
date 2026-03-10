@@ -61,7 +61,7 @@ func (s *RSICStore) Start(ctx context.Context) {
 	s.cancel = cancel
 	s.flushTick = time.NewTicker(30 * time.Second)
 
-	go func() {
+	go func() { //nolint:gosec // G118: flush uses Background() intentionally — must succeed independently of parent ctx
 		for {
 			select {
 			case <-ctx.Done():

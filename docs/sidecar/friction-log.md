@@ -13,21 +13,14 @@ Documents known limitations, workarounds, and rough edges in v0.1.0. Items here 
 
 ---
 
-## F1: `upgrade` and `uninstall` Are Stubs
+## F1: ~~`upgrade` and `uninstall` Are Stubs~~ (RESOLVED in S12)
 
-**What happens:** Running `mdemg sidecar upgrade` or `mdemg sidecar uninstall` prints "not yet implemented" and exits cleanly.
+**Resolved:** Both commands are now fully implemented. `mdemg sidecar upgrade` detects version drift and performs a controlled upgrade cycle (down → install → up). `mdemg sidecar uninstall` cleanly removes all sidecar artifacts with safety backup.
 
-**Workaround — Upgrade:**
-
-1. Build the new version: `go build -o bin/mdemg ./cmd/mdemg` (or download from release).
-2. Re-run `mdemg sidecar install` to reconcile state.
-3. Restart runtime: `mdemg sidecar restart`.
-
-**Workaround — Uninstall:**
-
-1. Stop services: `mdemg sidecar down`.
-2. Detach agents: `mdemg sidecar detach-agent claude-code`.
-3. Remove sidecar artifacts: `rm -rf .mdemg/`.
+- `upgrade` supports `--dry-run`, `--skip-restart`, and `--format json`
+- `uninstall` supports `--dry-run`, `--force`, `--keep-data`, and `--format json`
+- `.mdemg/` is always backed up before removal (to `.mdemg-backup-<timestamp>/`)
+- Full lifecycle coverage: `init → install → up → doctor → restart → upgrade → down → uninstall`
 
 ---
 
@@ -61,14 +54,15 @@ Requires Go 1.24+ and CGO-compatible toolchain.
 
 ## F4: Ollama Must Be Installed Separately
 
-**What happens:** The embedding provider (Ollama) is not installed or managed by sidecar. If Ollama is unavailable, `doctor` reports the `embedder.available` check as `warn`, not `fail`.
+**What happens:** Ollama is the default provider for both embeddings (`qwen3-embedding:4b`) and text generation (`llama3.2:3b-instruct-fp16`). Sidecar does not install or manage Ollama itself. If Ollama is unavailable, `doctor` reports the `ollama.reachable` check as `warn`, not `fail`. If Ollama is running but required models are missing, `doctor` reports `ollama.models` as `warn` with `ollama pull` remediation commands.
 
-**Workaround:** Install Ollama manually:
+**Workaround:** Install Ollama and pull required models manually:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve &
-ollama pull nomic-embed-text
+ollama pull qwen3-embedding:4b
+ollama pull llama3.2:3b-instruct-fp16
 ```
 
 ---

@@ -1010,3 +1010,159 @@ Use this template for each session entry:
 - `internal/sidecar/types.go`, `lock.go`, `executor.go`, `executor_test.go`, `install.go`, `install_test.go`, `lock_test.go`, `config.go`
 - `internal/cli/docker.go`, `executor_local.go`, `executor_remote.go`, `executor_factory.go`, `sidecar_up.go`, `sidecar_down.go`, `sidecar_doctor.go`, `sidecar_status.go`, `sidecar_attach.go`, `sidecar_install.go`, `daemon.go`, `serve.go`
 - `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`
+
+---
+
+### Entry 2026-02-28T12:00:00Z
+
+1. Timestamp (UTC): 2026-02-28T12:00:00Z
+2. Phase: S11 — Sidecar LLM Integration and Config Simplification
+3. Related roadmap sections: Config cascade, Ollama-first defaults, Doctor model checks
+4. Work completed:
+   - Added `LLM_PROVIDER` / `LLM_MODEL` top-level cascade: 2 new env vars replace 30+ individual provider/model settings
+   - Changed 6 feature defaults (rerank, summary, synthesis, intent, emergence, guardrail) from hardcoded `openai`/`gpt-4o-mini` to cascading from top-level
+   - MetaLearn already cascaded from Emergence — double inheritance now reaches LLM_PROVIDER
+   - Changed `EMBEDDING_PROVIDER` default from `""` to `"ollama"`
+   - Changed `OLLAMA_MODEL` default from `nomic-embed-text` to `qwen3-embedding:4b` (1536 dims — matches Neo4j indexes)
+   - Added `qwen3-embedding:4b` / `qwen3-embedding` to Ollama embedder dimensions table
+   - Added YAML config `llm:` section (provider/model) with env mapping and flatten support
+   - Init wizard now auto-populates LLM defaults when Ollama is detected
+   - Sidecar `up` passes 5 LLM/embedding vars to daemon via extraEnv
+   - Replaced `embedder.available` doctor check with `ollama.reachable` + `ollama.models` (validates both required models)
+   - Updated `.env.example` with Ollama-first defaults
+5. Assumptions eliminated:
+   - Default provider is now `ollama` (local, zero API keys) not `openai`
+   - `nomic-embed-text` replaced by `qwen3-embedding:4b` as default embedding model
+6. Decisions made:
+   - Config cascade is backward compatible: explicit per-feature env vars still override
+   - Doctor model check uses `warn` not `fail` for missing models (non-blocking)
+   - `ollama.models` check skips if Ollama is unreachable
+7. Open questions: none
+8. Evidence:
+   - 7 new tests pass: `TestLLMCascade_*`, `TestEmbedding_DefaultOllama`, `TestOllamaModel_DefaultQwen`, `TestBackwardCompat_ExplicitOpenAI`
+   - 3 Ollama embedder tests pass: `TestOllama_QwenDimensions`, `TestOllama_QwenBaseNameDimensions`, `TestOllama_DefaultModelIsQwen`
+   - 2 YAML tests pass: `TestYAMLConfig_LLMSection`, `TestYAMLConfig_LLMSection_GenerateRoundtrip`
+   - `go build ./...` clean, `go vet ./...` clean
+9. Next actions: lint, full test suite, commit
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `internal/config/config.go` | LLMProvider/LLMModel fields, cascade defaults, embedding/ollama defaults |
+| `internal/embeddings/ollama.go` | qwen3-embedding dimensions, default model constant |
+| `internal/config/yaml_config.go` | LLMYAML struct, env mappings, flatten, InitOptions, GenerateConfigYAML |
+| `internal/cli/init.go` | Embedding model default, LLM defaults on Ollama detection |
+| `internal/cli/sidecar_up.go` | 5 LLM/embedding vars in extraEnv |
+| `internal/cli/sidecar_doctor.go` | ollama.reachable + ollama.models checks replacing embedder.available |
+| `.env.example` | Ollama-first defaults, LLM_PROVIDER/LLM_MODEL |
+| `internal/config/config_llm_cascade_test.go` | Created — 9 cascade/YAML tests |
+| `internal/embeddings/stub_test.go` | Added 3 Ollama embedder tests |
+| `docs/sidecar/friction-log.md` | Updated F4 with new models |
+| `docs/sidecar/installation.md` | Added Ollama prerequisite |
+| `docs/sidecar/troubleshooting.md` | Added TRBL-OLLAMA-MODELS |
+| `docs/sidecar/implementation-journal.md` | S11 entry |
+
+**Documents Accessed:**
+- `internal/config/config.go`, `yaml_config.go`, `config_test.go`
+- `internal/embeddings/ollama.go`, `stub_test.go`
+- `internal/cli/init.go`, `sidecar_up.go`, `sidecar_doctor.go`
+- `.env.example`
+- `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`
+
+---
+
+### Entry 2026-02-28T18:00:00Z
+
+1. Timestamp (UTC): 2026-02-28T18:00:00Z
+2. Phase: S12 — Sidecar Upgrade and Uninstall Commands
+3. Related roadmap sections: Lifecycle completion, friction log F1 resolution
+4. Work completed:
+   - Implemented `mdemg sidecar upgrade`: detects version drift between lock file `MdemgVersion` and CLI binary `Version`, performs controlled upgrade cycle (down → install → up)
+   - Implemented `mdemg sidecar uninstall`: cleanly removes all sidecar artifacts — stops services, detaches adapters, removes container/volume, backs up and removes `.mdemg/`, removes generated hooks
+   - Added `UpgradeReport` and `UninstallReport` types to `internal/sidecar/types.go` with nil-slice-safe constructors
+   - Replaced stub registrations in `sidecar.go` with real commands, removed `newSidecarStubCmd()` function
+   - Full lifecycle coverage: `init → install → up → doctor → restart → upgrade → down → uninstall`
+5. Assumptions eliminated:
+   - Users no longer need manual workarounds for upgrade or uninstall
+6. Decisions made:
+   - Upgrade uses composition pattern (calls `runSidecarDown`, `runSidecarInstall`, `runSidecarUp` directly)
+   - Uninstall backs up `.mdemg/` to `.mdemg-backup-<timestamp>/` via rename (atomic, fast)
+   - `--force` flag on uninstall stops running services first; without it, running state is rejected
+   - `--keep-data` preserves Neo4j volume for reinstall scenarios
+   - Generated hooks detected by `"Generated by: mdemg sidecar"` marker in file content
+   - Upgrade checks both version drift AND config hash changes for idempotency
+7. Open questions: none
+8. Evidence:
+   - 8 new tests pass: `TestUpgradeCmd_InvalidState`, `TestUpgradeCmd_AlreadyCurrent`, `TestUpgradeReport_NilSliceSafety`, `TestUninstallCmd_InvalidState`, `TestUninstallCmd_RunningWithoutForce`, `TestUninstallCmd_RunningWithForce_Accepted`, `TestUninstallReport_NilSliceSafety`, `TestIsSidecarGeneratedHook`
+   - `go build ./...` clean, `go vet ./...` clean, `golangci-lint run ./...` 0 issues
+   - All existing tests pass: `go test ./internal/cli/... ./internal/sidecar/...`
+9. Next actions: commit, push
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `internal/cli/sidecar_upgrade.go` | Created — upgrade command with version drift detection, down→install→up cycle |
+| `internal/cli/sidecar_uninstall.go` | Created — uninstall command with 7-phase cleanup, safety backup |
+| `internal/cli/sidecar_upgrade_test.go` | Created — 3 tests (invalid state, already current, nil-slice safety) |
+| `internal/cli/sidecar_uninstall_test.go` | Created — 5 tests (invalid states, running guard, force flag, nil-slice, hook detection) |
+| `internal/cli/sidecar.go` | Replaced stubs with real commands, removed `newSidecarStubCmd()` |
+| `internal/sidecar/types.go` | Added `UpgradeReport`, `UninstallReport` structs and constructors |
+| `docs/sidecar/friction-log.md` | F1 marked RESOLVED |
+| `docs/sidecar/installation.md` | Updated §9 with uninstall options |
+| `docs/sidecar/troubleshooting.md` | TRBL-STUB-CMD marked resolved |
+| `docs/sidecar/implementation-journal.md` | S12 entry |
+
+**Documents Accessed:**
+- `internal/cli/sidecar.go`, `sidecar_restart.go`, `sidecar_down.go`, `sidecar_install.go`, `sidecar_detach.go`, `sidecar_generate_hooks.go`, `sidecar_helpers_test.go`
+- `internal/sidecar/types.go`, `types_test.go`, `lock.go`, `install.go`, `report.go`, `adapter.go`, `config.go`
+- `internal/cli/root.go`, `docker.go`
+- `docs/sidecar/friction-log.md`, `installation.md`, `troubleshooting.md`, `implementation-journal.md`
+
+---
+
+### Entry 2026-02-28T20:00:00Z
+
+1. Timestamp (UTC): 2026-02-28T20:00:00Z
+2. Phase: S14 — Documentation Cleanup — Stub Resolution
+3. Related roadmap sections: Section 8A (documentation deliverables), Section 11.5 (documentation acceptance criteria), Section 14 (Definition of Done)
+4. Work completed:
+   - Removed stale stub notes from `maintenance.md` §3 (upgrade) and §6 (uninstall), replaced with real command descriptions
+   - Updated `faq.md` Q8 (removed stub note, added uninstall options), rewrote Q13 from "What are stub commands?" to "How do I upgrade sidecar?"
+   - Replaced `sidecar-acceptance.sh` Step 8 stub checks with upgrade/uninstall `--dry-run --format json` validation (9 steps total now)
+   - Replaced `TestSidecar_Stubs_NotImplemented` in integration tests with 5 real tests: `Upgrade_InvalidState`, `Upgrade_DryRun`, `Uninstall_InvalidState`, `Uninstall_RunningWithoutForce`, `Uninstall_DryRun`
+   - Added 3 state guard entries to `TestSidecar_StateGuards_Matrix`: `upgrade_from_uninitialized`, `uninstall_from_uninitialized`, `uninstall_from_initialized`
+   - Added S10, S11, S12, S14 phase entries to `roadmap.md` Section 8
+   - Added sidecar phases (S8-S12, S14) to `AGENT_HANDOFF.md` Phase Registry
+5. Assumptions eliminated:
+   - Documentation no longer claims upgrade/uninstall are stubs
+   - Tests no longer assert "not yet implemented" output
+6. Decisions made:
+   - Historical references to stubs in `implementation-journal.md` left as-is (they document what happened, not current state)
+   - Strikethrough entries in `troubleshooting.md` and `friction-log.md` left as-is (already correctly marked resolved in S12)
+7. Open questions: none
+8. Evidence:
+   - `go build ./...` clean, `go vet ./...` clean, `golangci-lint run ./...` 0 issues
+   - Integration tests: 27/27 PASS (including 5 new + 3 new state guard entries)
+   - Acceptance test: 9/9 PASS
+   - `grep -r "stub\|not yet implemented"` clean in all 4 target files
+9. Next actions: commit, push
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `docs/sidecar/maintenance.md` | Removed stub notes from §3 and §6, replaced with real command descriptions |
+| `docs/sidecar/faq.md` | Updated Q8 (removed stub note), rewrote Q13 (stub → upgrade guide) |
+| `scripts/sidecar-acceptance.sh` | Replaced Step 8 stub checks with upgrade/uninstall dry-run validation |
+| `tests/integration/sidecar_lifecycle_test.go` | Replaced `TestSidecar_Stubs_NotImplemented` with 5 real tests + 3 state guard entries |
+| `docs/sidecar/roadmap.md` | Added S10, S11, S12, S14 phase entries; updated date |
+| `docs/sidecar/implementation-journal.md` | S14 entry |
+| `AGENT_HANDOFF.md` | Added sidecar phases to Phase Registry and Artifact Index |
+
+**Documents Accessed:**
+- `docs/sidecar/maintenance.md`, `faq.md`, `roadmap.md`, `friction-log.md`, `troubleshooting.md`, `installation.md`, `implementation-journal.md`
+- `scripts/sidecar-acceptance.sh`
+- `tests/integration/sidecar_lifecycle_test.go`
+- `AGENT_HANDOFF.md`

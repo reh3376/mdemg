@@ -15,10 +15,7 @@ import (
 
 const (
 	defaultOllamaEndpoint = "http://localhost:11434"
-	defaultOllamaModel    = "nomic-embed-text"
-	// nomic-embed-text produces 768-dim embeddings by default
-	// mxbai-embed-large produces 1024-dim embeddings
-	// For 1536-dim compatibility, we may need to pad or use a different model
+	defaultOllamaModel = "qwen3-embedding:4b"
 )
 
 // Ollama implements the Embedder interface using Ollama's local API.
@@ -47,17 +44,17 @@ func NewOllama(cfg Config) (*Ollama, error) {
 		client: &http.Client{
 			Timeout: 60 * time.Second, // Ollama can be slower
 		},
-		dimensions: 768, // Default for nomic-embed-text
+		dimensions: 1536, // Default for qwen3-embedding:4b
 	}
 
 	// Adjust dimensions based on known models
 	switch model {
-	case "nomic-embed-text":
-		o.dimensions = 768
 	case "mxbai-embed-large":
 		o.dimensions = 1024
 	case "all-minilm", "all-minilm:l6-v2":
 		o.dimensions = 384
+	case "qwen3-embedding:4b", "qwen3-embedding":
+		o.dimensions = 1536
 	}
 
 	return o, nil

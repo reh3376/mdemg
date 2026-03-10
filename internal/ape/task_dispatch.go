@@ -96,7 +96,7 @@ func (d *Dispatcher) GetDeltas() []ActionDelta {
 func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 	for i := range tasks {
 		task := tasks[i]
-		taskCtx, cancel := context.WithTimeout(ctx, task.Timeout)
+		taskCtx, cancel := context.WithTimeout(ctx, task.Timeout) //nolint:gosec // G118: cancel stored in activeTask.cancel, called on completion
 
 		at := &activeTask{
 			Spec:      task,

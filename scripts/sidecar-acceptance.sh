@@ -157,21 +157,22 @@ else
   fail_step "sidecar detach-agent --dry-run" "invalid JSON output"
 fi
 
-# Step 8: stub commands
-echo "--- stub: upgrade"
-UPGRADE_OUT=$("$BINARY" sidecar upgrade 2>&1) || true
-if echo "$UPGRADE_OUT" | grep -q "not yet implemented"; then
-  pass_step "stub: upgrade"
+# Step 8: upgrade --dry-run
+echo "--- upgrade --dry-run"
+UPGRADE_OUT=$("$BINARY" sidecar upgrade --dry-run --format json 2>&1) || true
+if echo "$UPGRADE_OUT" | jq -e '.command' &>/dev/null; then
+  pass_step "upgrade --dry-run"
 else
-  fail_step "stub: upgrade" "expected 'not yet implemented' message"
+  fail_step "upgrade --dry-run" "invalid JSON output"
 fi
 
-echo "--- stub: uninstall"
-UNINSTALL_OUT=$("$BINARY" sidecar uninstall 2>&1) || true
-if echo "$UNINSTALL_OUT" | grep -q "not yet implemented"; then
-  pass_step "stub: uninstall"
+# Step 9: uninstall --dry-run
+echo "--- uninstall --dry-run"
+UNINSTALL_OUT=$("$BINARY" sidecar uninstall --dry-run --format json 2>&1) || true
+if echo "$UNINSTALL_OUT" | jq -e '.command' &>/dev/null; then
+  pass_step "uninstall --dry-run"
 else
-  fail_step "stub: uninstall" "expected 'not yet implemented' message"
+  fail_step "uninstall --dry-run" "invalid JSON output"
 fi
 
 # Summary

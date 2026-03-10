@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -38,20 +36,8 @@ Commands:
 	cmd.AddCommand(newSidecarAttachAgentCmd())
 	cmd.AddCommand(newSidecarDetachAgentCmd())
 	cmd.AddCommand(newSidecarGenerateHooksCmd())
-	cmd.AddCommand(newSidecarStubCmd("upgrade", "Upgrade sidecar version"))
-	cmd.AddCommand(newSidecarStubCmd("uninstall", "Remove sidecar from project"))
+	cmd.AddCommand(newSidecarUpgradeCmd())
+	cmd.AddCommand(newSidecarUninstallCmd())
 
 	return cmd
-}
-
-// newSidecarStubCmd creates a placeholder subcommand that prints "not yet implemented".
-func newSidecarStubCmd(name, short string) *cobra.Command {
-	return &cobra.Command{
-		Use:   name,
-		Short: short,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "mdemg sidecar %s: not yet implemented (planned for a future phase)\n", name)
-			return nil
-		},
-	}
 }

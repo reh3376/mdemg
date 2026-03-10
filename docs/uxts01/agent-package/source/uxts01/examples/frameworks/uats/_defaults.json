@@ -1,0 +1,21 @@
+{
+  "api": {
+    "base_url": "${BASE_URL}",
+    "headers": {
+      "Accept": "application/json"
+    }
+  },
+  "execution": {
+    "timeout_ms": 15000,
+    "execution_mode": "parallel",
+    "retries": {
+      "max_attempts": 2,
+      "backoff_ms": 250,
+      "retry_on": [
+        "NETWORK_TIMEOUT",
+        "HTTP_502",
+        "HTTP_503"
+      ]
+    }
+  }
+}

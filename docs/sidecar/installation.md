@@ -60,6 +60,12 @@ Requires Go 1.24+ and CGO-compatible toolchain.
 1. Git repository with write access.
 2. MDEMG CLI available in `PATH` or as `./bin/mdemg`.
 3. Docker engine available and healthy.
+4. Ollama installed and running (`ollama serve`).
+5. Required Ollama models pulled:
+   ```bash
+   ollama pull qwen3-embedding:4b        # embeddings (1536 dimensions)
+   ollama pull llama3.2:3b-instruct-fp16  # text generation (cognitive features)
+   ```
 
 ## 3.2 Additional for `studio-remote`
 
@@ -184,9 +190,12 @@ To fully remove sidecar integration:
 mdemg sidecar uninstall
 ```
 
-Note: `uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+Options:
+- `--force`: Stop running services before uninstalling
+- `--keep-data`: Preserve Neo4j volume (graph data survives uninstall/reinstall)
+- `--dry-run`: Preview what would be removed
 
-Before uninstall, ensure any required backups are captured.
+The `.mdemg/` directory is automatically backed up to `.mdemg-backup-<timestamp>/` before removal.
 
 ---
 

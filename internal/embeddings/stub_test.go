@@ -98,6 +98,39 @@ func TestStub_EmbedBatch(t *testing.T) {
 	}
 }
 
+func TestOllama_QwenDimensions(t *testing.T) {
+	o, err := NewOllama(Config{OllamaModel: "qwen3-embedding:4b"})
+	if err != nil {
+		t.Fatalf("NewOllama error: %v", err)
+	}
+	if o.Dimensions() != 1536 {
+		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	}
+}
+
+func TestOllama_QwenBaseNameDimensions(t *testing.T) {
+	o, err := NewOllama(Config{OllamaModel: "qwen3-embedding"})
+	if err != nil {
+		t.Fatalf("NewOllama error: %v", err)
+	}
+	if o.Dimensions() != 1536 {
+		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	}
+}
+
+func TestOllama_DefaultModelIsQwen(t *testing.T) {
+	o, err := NewOllama(Config{})
+	if err != nil {
+		t.Fatalf("NewOllama error: %v", err)
+	}
+	if o.model != "qwen3-embedding:4b" {
+		t.Errorf("model = %q, want %q", o.model, "qwen3-embedding:4b")
+	}
+	if o.Dimensions() != 1536 {
+		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	}
+}
+
 func TestStub_FactoryIntegration(t *testing.T) {
 	emb, err := New(Config{Provider: "stub"})
 	if err != nil {

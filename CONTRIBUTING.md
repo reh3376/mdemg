@@ -109,6 +109,8 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
+All test frameworks in this project follow the **UxTS (Universal-x Test Specification)** methodology — declarative JSON specs validated by executable runners governed by explicit schemas. For the comprehensive guide covering architecture, spec writing, CI integration, governance, and all 11 frameworks, see **[docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md)**.
+
 **UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
 1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.

@@ -101,13 +101,13 @@ Embedding Provider Check
 ========================
 Provider: ollama
 Endpoint: http://localhost:11434
-Model:    nomic-embed-text
+Model:    qwen3-embedding:4b
 
 Connectivity... ok
 Model check... ok
 Test embedding... ok
 
-Dimensions: 768
+Dimensions: 1536
 Status:     working
 ```
 

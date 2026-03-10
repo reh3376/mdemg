@@ -16,7 +16,7 @@ var ErrNoProvider = errors.New("no embedding provider configured")
 // Embedder generates vector embeddings from text.
 type Embedder interface {
 	// Embed generates an embedding for the given text.
-	// Returns a slice of float32 values (typically 1536 dimensions for OpenAI ada-002).
+	// Returns a slice of float32 values (typically 1536 dimensions for OpenAI/qwen3-embedding).
 	Embed(ctx context.Context, text string) ([]float32, error)
 
 	// EmbedBatch generates embeddings for multiple texts.
@@ -37,12 +37,12 @@ type Config struct {
 
 	// OpenAI settings
 	OpenAIAPIKey   string
-	OpenAIModel    string // default: text-embedding-ada-002
+	OpenAIModel    string // default: text-embedding-3-small
 	OpenAIEndpoint string // default: https://api.openai.com/v1
 
 	// Ollama settings
 	OllamaEndpoint string // default: http://localhost:11434
-	OllamaModel    string // default: nomic-embed-text
+	OllamaModel    string // default: qwen3-embedding:4b
 
 	// Cache settings
 	CacheEnabled bool // Enable LRU caching of embeddings

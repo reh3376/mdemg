@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uats.schema.json",
+  "title": "UATS \u2014 HTTP API Acceptance Test Spec",
+  "type": "object",
+  "required": [
+    "uats_version",
+    "metadata",
+    "request",
+    "expected"
+  ],
+  "properties": {
+    "uats_version": {
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/metadata"
+    },
+    "integrity": {
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/integrity"
+    },
+    "execution": {
+      "$ref": "../../schemas/uxxts-common.schema.json#/definitions/execution"
+    },
+    "api": {
+      "type": "object",
+      "required": [
+        "base_url"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "method",
+        "path"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "query": {
+          "type": "object"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {}
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "integer"
+        },
+        "body_assertions": {
+          "type": "array",
+          "items": {
+            "$ref": "../../schemas/uxxts-common.schema.json#/definitions/assertion"
+          }
+        },
+        "fixture": {
+          "type": "object",
+          "properties": {
+            "body_equals_file": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -257,6 +257,58 @@ type DoctorReport struct {
 	Summary DoctorSummary `json:"summary"`
 }
 
+// --- Upgrade Report ---
+
+// UpgradeReport extends ReportEnvelope with upgrade-specific fields.
+type UpgradeReport struct {
+	ReportEnvelope
+	PreviousVersion string `json:"previous_version"`
+	CurrentVersion  string `json:"current_version"`
+	VersionChanged  bool   `json:"version_changed"`
+	SkipRestart     bool   `json:"skip_restart"`
+}
+
+// NewUpgradeReport creates an UpgradeReport with all slices initialized to [].
+func NewUpgradeReport(
+	stateBefore, stateAfter State,
+	exitCode int,
+	previousVersion, currentVersion string,
+	versionChanged, skipRestart bool,
+) UpgradeReport {
+	return UpgradeReport{
+		ReportEnvelope:  NewReportEnvelope("mdemg sidecar upgrade", stateBefore, stateAfter, exitCode),
+		PreviousVersion: previousVersion,
+		CurrentVersion:  currentVersion,
+		VersionChanged:  versionChanged,
+		SkipRestart:     skipRestart,
+	}
+}
+
+// --- Uninstall Report ---
+
+// UninstallReport extends ReportEnvelope with uninstall-specific fields.
+type UninstallReport struct {
+	ReportEnvelope
+	Force      bool   `json:"force"`
+	KeepData   bool   `json:"keep_data"`
+	BackupPath string `json:"backup_path"`
+}
+
+// NewUninstallReport creates an UninstallReport with all slices initialized to [].
+func NewUninstallReport(
+	stateBefore, stateAfter State,
+	exitCode int,
+	force, keepData bool,
+	backupPath string,
+) UninstallReport {
+	return UninstallReport{
+		ReportEnvelope: NewReportEnvelope("mdemg sidecar uninstall", stateBefore, stateAfter, exitCode),
+		Force:          force,
+		KeepData:       keepData,
+		BackupPath:     backupPath,
+	}
+}
+
 // NowUTC returns the current time formatted as RFC3339 in UTC.
 func NowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)

@@ -53,12 +53,12 @@ Operational expectations:
 
 ## 3. Upgrade Procedure
 
-Note: `mdemg sidecar upgrade` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+`mdemg sidecar upgrade` detects version drift and performs a controlled upgrade cycle (down → install → up). Supports `--dry-run`, `--skip-restart`, and `--format json`.
 
 ```bash
 mdemg sidecar status
+mdemg sidecar upgrade --dry-run   # preview changes
 mdemg sidecar upgrade
-mdemg sidecar restart
 mdemg sidecar doctor --format json
 ```
 
@@ -103,10 +103,10 @@ Restore validation:
 
 ## 6. Uninstall and Cleanup
 
-Note: `mdemg sidecar uninstall` is currently a stub (v0.1.0). See `docs/sidecar/friction-log.md` (F1) for the manual workaround.
+`mdemg sidecar uninstall` cleanly removes all sidecar artifacts. Supports `--force` (stop running services first), `--keep-data` (preserve Neo4j volume), `--dry-run`, and `--format json`. The `.mdemg/` directory is backed up to `.mdemg-backup-<timestamp>/` before removal.
 
 ```bash
-mdemg sidecar down
+mdemg sidecar uninstall --dry-run   # preview what would be removed
 mdemg sidecar uninstall
 ```
 

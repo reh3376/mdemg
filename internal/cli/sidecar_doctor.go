@@ -105,8 +105,12 @@ func runSidecarDoctor(format string) error {
 	// Check 5: cms.observe
 	checks = append(checks, runCMSObserveCheck(endpoint, spaceID))
 
-	// Check 6: embedder.available
-	checks = append(checks, runEmbedderCheck())
+	// Check 6: ollama.reachable
+	ollamaCheck := runOllamaCheck()
+	checks = append(checks, ollamaCheck)
+
+	// Check 7: ollama.models
+	checks = append(checks, runOllamaModelsCheck(ollamaCheck.Status))
 
 	// Tally and build report
 	summary := sidecar.TallyChecks(checks)
@@ -464,7 +468,7 @@ func runCMSObserveCheck(endpoint, spaceID string) sidecar.DoctorCheck {
 	}
 }
 
-func runEmbedderCheck() sidecar.DoctorCheck {
+func runOllamaCheck() sidecar.DoctorCheck {
 	start := time.Now()
 	client := &http.Client{Timeout: probeTimeout}
 	resp, err := client.Get("http://localhost:11434/api/tags") //nolint:noctx // diagnostic probe
@@ -472,10 +476,10 @@ func runEmbedderCheck() sidecar.DoctorCheck {
 
 	if err != nil {
 		return sidecar.DoctorCheck{
-			ID:          "embedder.available",
-			Category:    "embedding",
+			ID:          "ollama.reachable",
+			Category:    "llm",
 			Status:      "warn",
-			Message:     "Embedder (Ollama) not reachable on localhost:11434",
+			Message:     "Ollama not reachable on localhost:11434",
 			DurationMs:  duration,
 			Remediation: "Install and start Ollama: https://ollama.com",
 		}
@@ -483,10 +487,101 @@ func runEmbedderCheck() sidecar.DoctorCheck {
 	resp.Body.Close()
 
 	return sidecar.DoctorCheck{
-		ID:         "embedder.available",
-		Category:   "embedding",
+		ID:         "ollama.reachable",
+		Category:   "llm",
 		Status:     "pass",
-		Message:    "Embedder available",
+		Message:    "Ollama reachable",
+		DurationMs: duration,
+	}
+}
+
+// ollamaTagsResponse represents the Ollama /api/tags response.
+type ollamaTagsResponse struct {
+	Models []ollamaModelEntry `json:"models"`
+}
+
+type ollamaModelEntry struct {
+	Name string `json:"name"`
+}
+
+func runOllamaModelsCheck(ollamaStatus string) sidecar.DoctorCheck {
+	start := time.Now()
+
+	if ollamaStatus != "pass" {
+		return sidecar.DoctorCheck{
+			ID:         "ollama.models",
+			Category:   "llm",
+			Status:     "skip",
+			Message:    "Skipped (Ollama unreachable)",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	requiredModels := []string{"qwen3-embedding:4b", "llama3.2:3b-instruct-fp16"}
+
+	client := &http.Client{Timeout: probeTimeout}
+	resp, err := client.Get("http://localhost:11434/api/tags") //nolint:noctx // diagnostic probe
+	duration := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:          "ollama.models",
+			Category:    "llm",
+			Status:      "warn",
+			Message:     "Failed to query Ollama models",
+			DurationMs:  duration,
+			Remediation: "Check Ollama: ollama list",
+		}
+	}
+	defer resp.Body.Close()
+
+	var tagsResp ollamaTagsResponse
+	if decErr := json.NewDecoder(resp.Body).Decode(&tagsResp); decErr != nil {
+		return sidecar.DoctorCheck{
+			ID:          "ollama.models",
+			Category:    "llm",
+			Status:      "warn",
+			Message:     "Failed to parse Ollama model list",
+			DurationMs:  duration,
+			Remediation: "Check Ollama: ollama list",
+		}
+	}
+
+	// Build set of available model names (normalize by stripping :latest)
+	available := make(map[string]bool)
+	for _, m := range tagsResp.Models {
+		name := strings.TrimSuffix(m.Name, ":latest")
+		available[name] = true
+	}
+
+	var missing []string
+	for _, req := range requiredModels {
+		if !available[req] {
+			missing = append(missing, req)
+		}
+	}
+
+	if len(missing) > 0 {
+		var pullCmds []string
+		for _, m := range missing {
+			pullCmds = append(pullCmds, "ollama pull "+m)
+		}
+		return sidecar.DoctorCheck{
+			ID:          "ollama.models",
+			Category:    "llm",
+			Status:      "warn",
+			Message:     fmt.Sprintf("Missing required models: %s", strings.Join(missing, ", ")),
+			DurationMs:  duration,
+			Remediation: strings.Join(pullCmds, " && "),
+			Evidence:    missing,
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "ollama.models",
+		Category:   "llm",
+		Status:     "pass",
+		Message:    fmt.Sprintf("Required models available (%s)", strings.Join(requiredModels, ", ")),
 		DurationMs: duration,
 	}
 }

@@ -1,9 +1,43 @@
 # MDEMG Sidecar Roadmap
 
-Status: Draft  
-Date: 2026-02-27  
-Owner: MDEMG Core  
-Primary Audience: Internal developer (MacBook + MacStudio) and future external adopters  
+Status: Draft
+Date: 2026-03-01
+Owner: MDEMG Core
+Primary Audience: Internal developer (MacBook + MacStudio) and future external adopters
+
+<!--
+=== AGENT RESUME CONTEXT (2026-03-01) ===
+
+CURRENT STATE:
+- Branch: mdemg-dev01 (all dev work here, never commit to main)
+- Last commit: 3bfff43 — Phase S14 (doc cleanup + test fixes)
+- All sidecar phases S0-S12 and S14 are COMPLETE
+- All tests passing: unit, integration (27/27), acceptance (9/9), lint clean
+- CMS server runs on localhost:9999, Neo4j via Docker
+
+WHAT JUST HAPPENED (S14):
+- Replaced all stale "not yet implemented" stub references with real S12 behavior
+- 4 files fixed: maintenance.md, faq.md, sidecar-acceptance.sh, sidecar_lifecycle_test.go
+- DoD (Section 14) and Acceptance Criteria (Section 11) fully satisfied
+
+NEXT SIDECAR WORK:
+- Phase S13 (Embedding Model Migration) is the only remaining planned sidecar phase
+- S13 consolidates embedding models to qwen3-embedding:4b (Ollama) + OpenAI
+- S13 scope is detailed below in Section 8 — read it before starting
+- S13 touches many files outside sidecar (internal/embeddings/, internal/config/, migrations/)
+
+NON-SIDECAR WORK AVAILABLE:
+- Phases 99-100 (Onboarding, Deployable Package) are planned
+- Phase 98 (Cross-Platform Build + Release) is COMPLETE
+- See AGENT_HANDOFF.md Phase Registry for full status of all phases
+
+KEY GOTCHAS:
+- Integration tests need MDEMG_BINARY env var pointing to absolute path of bin/mdemg
+- Always rebuild binary before running integration/acceptance tests: go build -o bin/mdemg ./cmd/mdemg
+- golangci-lint must pass before committing: ~/go/bin/golangci-lint run ./...
+- Follow mandatory workflow: implement → lint → test → update docs → commit
+-->
+
 Related:
 - `docs/specs/phase92-gap-analysis.md`
 - `docs/specs/phase93-unified-cli-foundation.md`
@@ -710,6 +744,86 @@ Exit criteria:
 2. Critical install failures < 5 percent across beta runs.
 3. Remote profile stability acceptable for daily use.
 4. Documentation walkthrough pass rate >= 95 percent for first-time setup attempts.
+
+### Phase S10: Dynamic Port Allocation and Multi-Project Isolation (complete)
+
+Goal: eliminate port collisions across concurrent sidecar instances.
+
+Deliverables:
+
+1. Dynamic port allocation with OS-level free port detection.
+2. Per-project isolation via unique port and lock file binding.
+3. Lock file records allocated port for downstream consumers.
+
+Exit criteria:
+
+1. Two sidecar instances in separate repos run simultaneously without conflict.
+
+### Phase S11: Sidecar LLM Integration and Config Simplification (complete)
+
+Goal: streamline embedding and LLM model configuration for sidecar workflows.
+
+Deliverables:
+
+1. Consolidated embedding model defaults (qwen3-embedding:4b via Ollama).
+2. LLM config auto-detection and simplified YAML surface.
+3. Doctor checks for Ollama model availability.
+
+Exit criteria:
+
+1. `sidecar init` produces working config without manual model configuration.
+
+### Phase S12: Sidecar Upgrade and Uninstall Commands (complete)
+
+Goal: replace upgrade and uninstall stubs with real implementations.
+
+Deliverables:
+
+1. `mdemg sidecar upgrade`: version drift detection, controlled upgrade cycle (down → install → up), `--dry-run`, `--skip-restart`, `--format json`.
+2. `mdemg sidecar uninstall`: 7-phase cleanup, `--force` (stop running services), `--keep-data` (preserve Neo4j volume), safety backup to `.mdemg-backup-<timestamp>/`.
+3. Full lifecycle coverage: init → install → up → doctor → restart → upgrade → down → uninstall.
+
+Exit criteria:
+
+1. Friction log F1 resolved — no manual workarounds needed.
+2. All acceptance and integration tests pass with real commands.
+
+### Phase S14: Documentation Cleanup — Stub Resolution (complete)
+
+Goal: remove all stale stub references from docs and tests after S12 implementation.
+
+Deliverables:
+
+1. `maintenance.md` §3 and §6 updated with real upgrade/uninstall descriptions.
+2. `faq.md` Q8 and Q13 updated to reflect real commands.
+3. `sidecar-acceptance.sh` Step 8 replaced with upgrade/uninstall dry-run validation.
+4. Integration test `TestSidecar_Stubs_NotImplemented` replaced with 5 real tests + 3 state guard entries.
+
+Exit criteria:
+
+1. Zero stale stub references in sidecar docs, acceptance test, and integration tests.
+2. All tests pass: unit, integration, and acceptance.
+
+### Phase S13: Embedding Model Migration (complete)
+
+Goal: consolidate embedding model options to qwen3-embedding:4b (default, Ollama) and OpenAI text-embedding-3-small (alternate). Remove the legacy nomic-embed-text model path entirely.
+
+Deliverables:
+
+1. Removed nomic-embed-text from Ollama dimension lookup table (`internal/embeddings/ollama.go`).
+2. Changed OpenAI default from `text-embedding-ada-002` to `text-embedding-3-small` across all code, config, CLI, and docs.
+3. Updated `.env.example`, init wizard, CLI examples, and all config comments.
+4. Updated embedding dimension validator to accept 384, 768, 1024, 1536 (supports all remaining Ollama models).
+5. Updated 10+ documentation files: architecture docs, feature docs, phase specs, API reference, AGENT_HANDOFF.md.
+6. Updated test comments and assertions in integration tests, validator tests, and bench tests.
+7. No Neo4j migration needed — all indexes already use 1536 dimensions.
+
+Exit criteria:
+
+1. ✅ Only two embedding model paths remain: Ollama (qwen3-embedding:4b) and OpenAI (text-embedding-3-small).
+2. ✅ No references to nomic-embed-text in source code (only historical journals).
+3. ✅ All tests pass with new defaults.
+4. ⏭️ Benchmark regression validation deferred (requires Mac Studio LLM access).
 
 ---
 

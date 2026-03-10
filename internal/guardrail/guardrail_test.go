@@ -718,3 +718,257 @@ func TestIsBlockingType(t *testing.T) {
 		})
 	}
 }
+
+// --- asString / asFloat64 tests ---
+
+func TestAsString(t *testing.T) {
+	tests := []struct {
+		input any
+		want  string
+	}{
+		{nil, ""},
+		{"hello", "hello"},
+		{42, "42"},
+		{3.14, "3.14"},
+		{true, "true"},
+		{[]int{1, 2}, "[1 2]"},
+	}
+	for _, tt := range tests {
+		got := asString(tt.input)
+		if got != tt.want {
+			t.Errorf("asString(%v) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestAsFloat64(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  float64
+	}{
+		{"nil", nil, 0.0},
+		{"float64", float64(3.14), 3.14},
+		{"float32", float32(2.5), 2.5},
+		{"int64", int64(42), 42.0},
+		{"int", int(7), 7.0},
+		{"string", "not a number", 0.0},
+		{"bool", true, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := asFloat64(tt.input)
+			if got != tt.want {
+				t.Errorf("asFloat64(%v) = %f, want %f", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- buildConstraintMap tests ---
+
+func TestBuildConstraintMap(t *testing.T) {
+	constraints := []constraintMatch{
+		{NodeID: "c1", Name: "auth-required", ConstraintType: "must"},
+		{NodeID: "c2", Name: "no-eval", ConstraintType: "must_not"},
+	}
+
+	m := buildConstraintMap(constraints)
+	if len(m) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(m))
+	}
+	if m["c1"].Name != "auth-required" {
+		t.Errorf("c1 name = %q, want %q", m["c1"].Name, "auth-required")
+	}
+	if m["c2"].ConstraintType != "must_not" {
+		t.Errorf("c2 type = %q, want %q", m["c2"].ConstraintType, "must_not")
+	}
+}
+
+func TestBuildConstraintMap_Empty(t *testing.T) {
+	m := buildConstraintMap(nil)
+	if len(m) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(m))
+	}
+}
+
+func TestBuildConstraintMap_DuplicateNodeID(t *testing.T) {
+	constraints := []constraintMatch{
+		{NodeID: "c1", Name: "first"},
+		{NodeID: "c1", Name: "second"},
+	}
+	m := buildConstraintMap(constraints)
+	// Last one wins
+	if m["c1"].Name != "second" {
+		t.Errorf("duplicate NodeID should use last value, got %q", m["c1"].Name)
+	}
+}
+
+// --- NewGuardrailService tests ---
+
+func TestNewGuardrailService(t *testing.T) {
+	cfg := GuardrailConfig{
+		Enabled:   true,
+		Provider:  "openai",
+		Model:     "gpt-4o",
+		MaxTokens: 2048,
+		TimeoutMs: 5000,
+	}
+	svc := NewGuardrailService(cfg, nil, nil, nil)
+	if svc == nil {
+		t.Fatal("NewGuardrailService returned nil")
+	}
+	if !svc.cfg.Enabled {
+		t.Error("expected cfg.Enabled to be true")
+	}
+	if svc.cfg.Provider != "openai" {
+		t.Errorf("expected Provider %q, got %q", "openai", svc.cfg.Provider)
+	}
+	if svc.cfg.MaxTokens != 2048 {
+		t.Errorf("expected MaxTokens 2048, got %d", svc.cfg.MaxTokens)
+	}
+}
+
+func TestNewGuardrailService_DisabledConfig(t *testing.T) {
+	svc := NewGuardrailService(GuardrailConfig{Enabled: false}, nil, nil, nil)
+	if svc == nil {
+		t.Fatal("NewGuardrailService returned nil")
+	}
+	if svc.cfg.Enabled {
+		t.Error("expected cfg.Enabled to be false")
+	}
+}
+
+// --- buildDiffSummary direct tests ---
+
+func TestBuildDiffSummary_Empty(t *testing.T) {
+	ctx := DiffContext{}
+	got := buildDiffSummary(ctx)
+	if got != "" {
+		t.Errorf("expected empty summary, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_FilesOnly(t *testing.T) {
+	ctx := DiffContext{FilePaths: []string{"main.go", "handler.go"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Files: main.go, handler.go") {
+		t.Errorf("expected Files line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_FunctionsOnly(t *testing.T) {
+	ctx := DiffContext{FunctionNames: []string{"Foo", "Bar"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Functions: Foo, Bar") {
+		t.Errorf("expected Functions line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_ImportsOnly(t *testing.T) {
+	ctx := DiffContext{ImportPaths: []string{"fmt", "os"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Imports: fmt, os") {
+		t.Errorf("expected Imports line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_AddedLines(t *testing.T) {
+	ctx := DiffContext{AddedLines: []string{"line1", "line2"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Added:") {
+		t.Errorf("expected Added: header, got %q", got)
+	}
+	if !strings.Contains(got, "  + line1") {
+		t.Errorf("expected '  + line1', got %q", got)
+	}
+	if !strings.Contains(got, "  + line2") {
+		t.Errorf("expected '  + line2', got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_AddedLinesMax20(t *testing.T) {
+	lines := make([]string, 30)
+	for i := range lines {
+		lines[i] = "line"
+	}
+	ctx := DiffContext{AddedLines: lines}
+	got := buildDiffSummary(ctx)
+	// Should only include 20 "  + line" entries
+	count := strings.Count(got, "  + line")
+	if count != 20 {
+		t.Errorf("expected 20 added lines in summary, got %d", count)
+	}
+}
+
+func TestBuildDiffSummary_Truncation(t *testing.T) {
+	lines := make([]string, 20)
+	for i := range lines {
+		lines[i] = strings.Repeat("x", 120)
+	}
+	ctx := DiffContext{AddedLines: lines}
+	got := buildDiffSummary(ctx)
+	if len(got) > 2000 {
+		t.Errorf("summary not truncated to 2000 chars: len=%d", len(got))
+	}
+}
+
+func TestBuildDiffSummary_AllSections(t *testing.T) {
+	ctx := DiffContext{
+		FilePaths:     []string{"a.go"},
+		FunctionNames: []string{"Init"},
+		ImportPaths:   []string{"fmt"},
+		AddedLines:    []string{"return nil"},
+	}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Files:") {
+		t.Error("missing Files section")
+	}
+	if !strings.Contains(got, "Functions:") {
+		t.Error("missing Functions section")
+	}
+	if !strings.Contains(got, "Imports:") {
+		t.Error("missing Imports section")
+	}
+	if !strings.Contains(got, "Added:") {
+		t.Error("missing Added section")
+	}
+}
+
+// --- rebuildDiff tests ---
+
+func TestRebuildDiff(t *testing.T) {
+	ctx := DiffContext{
+		RemovedLines: []string{"old line 1", "old line 2"},
+		AddedLines:   []string{"new line 1"},
+	}
+
+	got := rebuildDiff(ctx)
+	want := "-old line 1\n-old line 2\n+new line 1\n"
+	if got != want {
+		t.Errorf("rebuildDiff = %q, want %q", got, want)
+	}
+}
+
+func TestRebuildDiff_Empty(t *testing.T) {
+	got := rebuildDiff(DiffContext{})
+	if got != "" {
+		t.Errorf("rebuildDiff(empty) = %q, want empty", got)
+	}
+}
+
+func TestRebuildDiff_OnlyAdded(t *testing.T) {
+	ctx := DiffContext{AddedLines: []string{"added"}}
+	got := rebuildDiff(ctx)
+	if got != "+added\n" {
+		t.Errorf("rebuildDiff = %q, want %q", got, "+added\n")
+	}
+}
+
+func TestRebuildDiff_OnlyRemoved(t *testing.T) {
+	ctx := DiffContext{RemovedLines: []string{"removed"}}
+	got := rebuildDiff(ctx)
+	if got != "-removed\n" {
+		t.Errorf("rebuildDiff = %q, want %q", got, "-removed\n")
+	}
+}

@@ -91,7 +91,7 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 
 	// Phase 87: Micro auto-trigger (behind RSIC_MICRO_ENABLED gate)
 	if s.cfg.RSICMicroEnabled && s.orchestrationPolicy != nil && s.rsicCycle != nil && req.SpaceID != "" {
-		go func() {
+		go func() { //nolint:gosec // G118: fire-and-forget RSIC cycle, must outlive HTTP request
 			decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMicroAuto, req.SpaceID, ape.TierMicro, "")
 			if !decision.Allowed {
 				return
@@ -221,7 +221,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	// Phase 87: Session-periodic meso trigger
 	if s.orchestrationPolicy != nil && req.SpaceID != "" {
 		if _, shouldTrigger := s.orchestrationPolicy.IncrementSession(req.SpaceID); shouldTrigger {
-			go func() {
+			go func() { //nolint:gosec // G118: fire-and-forget RSIC cycle, must outlive HTTP request
 				meta := ape.TriggerMetadata{
 					TriggerSource: ape.TriggerSessionPeriodic,
 					TriggerID:     fmt.Sprintf("session_periodic:%s:%s", req.SpaceID, time.Now().Format("2006-01-02T15:04")),
