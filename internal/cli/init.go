@@ -199,10 +199,10 @@ func runInit(flags initFlags) error {
 		opts.LLMProvider = "ollama"
 	case "openai":
 		if flags.defaults {
-			opts.EmbeddingModel = "text-embedding-3-small"
+			opts.EmbeddingModel = "gpt-5-mini"
 			opts.LLMModel = "gpt-5-nano"
 		} else {
-			opts.EmbeddingModel = promptLine("Embedding model [text-embedding-3-small]", "text-embedding-3-small")
+			opts.EmbeddingModel = promptLine("Embedding model [gpt-5-mini]", "gpt-5-mini")
 			opts.LLMModel = promptLine("Naming/LLM model [gpt-5-nano]", "gpt-5-nano")
 		}
 		opts.LLMProvider = "openai"

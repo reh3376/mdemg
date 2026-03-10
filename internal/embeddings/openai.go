@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultOpenAIEndpoint = "https://api.openai.com/v1"
-	defaultOpenAIModel    = "text-embedding-3-small"
+	defaultOpenAIModel    = "gpt-5-mini"
 	openAIDimensions      = 1536
 )
 
