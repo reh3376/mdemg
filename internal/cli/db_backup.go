@@ -42,10 +42,10 @@ func newDBBackupTriggerCmd() *cobra.Command {
 		Long: `Trigger an immediate database backup.
 
 Types:
-  partial  — Cypher-based export (runs on live database, no downtime)
-  full     — Docker neo4j-admin dump (requires stopping the database)
+  partial_space — Cypher-based export (runs on live database, no downtime)
+  full          — Docker neo4j-admin dump (requires stopping the database)
 
-For most cases, use "partial" (the default).`,
+For most cases, use "partial_space" (the default).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadConfig()
 			if err != nil {
@@ -93,7 +93,7 @@ For most cases, use "partial" (the default).`,
 		},
 	}
 
-	cmd.Flags().StringVar(&backupType, "type", "partial", "Backup type: partial or full")
+	cmd.Flags().StringVar(&backupType, "type", "partial_space", "Backup type: partial_space or full")
 
 	return cmd
 }
@@ -151,7 +151,7 @@ func newDBBackupListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&limit, "limit", 10, "Maximum number of backups to show")
-	cmd.Flags().StringVar(&backupType, "type", "", "Filter by type: partial or full")
+	cmd.Flags().StringVar(&backupType, "type", "", "Filter by type: partial_space or full")
 
 	return cmd
 }
