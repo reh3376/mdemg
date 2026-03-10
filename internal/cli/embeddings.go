@@ -159,7 +159,7 @@ func checkOpenAI(cfg embeddings.Config) error {
 	}
 	model := cfg.OpenAIModel
 	if model == "" {
-		model = "text-embedding-3-small"
+		model = "text-embedding-3-large"
 	}
 
 	fmt.Printf("Endpoint: %s\n", endpoint)

@@ -89,9 +89,9 @@ func TestValidateEmbeddingDims(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "wrong dimensions (3072) fails",
+			name:        "3072 dimensions passes",
 			embedding:   make([]float32, 3072),
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "wrong dimensions (1) fails",
@@ -555,7 +555,7 @@ func TestFormatValidationErrors_Messages(t *testing.T) {
 			name:            "embedding_dims message",
 			input:           testEmbeddingStruct{Embedding: make([]float32, 100)},
 			expectedField:   "embedding",
-			expectedMessage: "must have 384, 768, 1024, or 1536 dimensions",
+			expectedMessage: "must have 384, 768, 1024, 1536, or 3072 dimensions",
 		},
 		{
 			name:            "oneof message",
@@ -775,13 +775,12 @@ func TestValidateRetrieveRequest(t *testing.T) {
 			errorField:  "query_embedding",
 		},
 		{
-			name: "query_embedding with wrong dimensions (3072) fails",
+			name: "query_embedding with 3072 dimensions passes",
 			request: models.RetrieveRequest{
 				SpaceID:        "test-space",
 				QueryEmbedding: make([]float32, 3072),
 			},
-			expectError: true,
-			errorField:  "query_embedding",
+			expectError: false,
 		},
 		{
 			name: "empty query_embedding slice with query_text passes",
@@ -1159,7 +1158,7 @@ func TestValidateRetrieveRequest_ErrorMessages(t *testing.T) {
 				QueryEmbedding: make([]float32, 512),
 			},
 			expectedField:   "query_embedding",
-			containsMessage: "384, 768, 1024, or 1536",
+			containsMessage: "384, 768, 1024, 1536, or 3072",
 		},
 		{
 			name: "top_k exceeds max has friendly message",

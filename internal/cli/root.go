@@ -62,32 +62,121 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose output")
 	rootCmd.PersistentFlags().String("space-id", "", "Default space ID (overrides MDEMG_SPACE_ID env var)")
 
-	// Register all subcommands
-	rootCmd.AddCommand(newInitCmd())
-	rootCmd.AddCommand(newServeCmd())
-	rootCmd.AddCommand(newConfigCmd())
-	rootCmd.AddCommand(newMCPCmd())
-	rootCmd.AddCommand(newIngestCmd())
-	rootCmd.AddCommand(newConsolidateCmd())
-	rootCmd.AddCommand(newDecayCmd())
-	rootCmd.AddCommand(newPruneCmd())
-	rootCmd.AddCommand(newExtractSymbolsCmd())
-	rootCmd.AddCommand(newWatchCmd())
-	rootCmd.AddCommand(newDBCmd())
-	rootCmd.AddCommand(newSpaceCmd())
-	rootCmd.AddCommand(newPluginCmd())
-	rootCmd.AddCommand(newEmbeddingsCmd())
-	rootCmd.AddCommand(newStartCmd())
-	rootCmd.AddCommand(newStopCmd())
-	rootCmd.AddCommand(newRestartCmd())
-	rootCmd.AddCommand(newStatusCmd())
-	rootCmd.AddCommand(newHooksCmd())
-	rootCmd.AddCommand(newDemoCmd())
-	rootCmd.AddCommand(newSidecarCmd())
-	rootCmd.AddCommand(newUpgradeCmd())
-	rootCmd.AddCommand(newVersionCmd())
+	// Command groups for organized help output
+	rootCmd.AddGroup(
+		&cobra.Group{ID: "start", Title: "Getting Started"},
+		&cobra.Group{ID: "server", Title: "Server Lifecycle"},
+		&cobra.Group{ID: "database", Title: "Database Management"},
+		&cobra.Group{ID: "memory", Title: "Memory & Ingestion"},
+		&cobra.Group{ID: "config", Title: "Configuration"},
+		&cobra.Group{ID: "advanced", Title: "Advanced"},
+	)
+
+	// Getting Started
+	initCmd := newInitCmd()
+	initCmd.GroupID = "start"
+	rootCmd.AddCommand(initCmd)
+
+	versionCmd := newVersionCmd()
+	versionCmd.GroupID = "start"
+	rootCmd.AddCommand(versionCmd)
+
+	// Server Lifecycle
+	startCmd := newStartCmd()
+	startCmd.GroupID = "server"
+	rootCmd.AddCommand(startCmd)
+
+	stopCmd := newStopCmd()
+	stopCmd.GroupID = "server"
+	rootCmd.AddCommand(stopCmd)
+
+	restartCmd := newRestartCmd()
+	restartCmd.GroupID = "server"
+	rootCmd.AddCommand(restartCmd)
+
+	statusCmd := newStatusCmd()
+	statusCmd.GroupID = "server"
+	rootCmd.AddCommand(statusCmd)
+
+	serveCmd := newServeCmd()
+	serveCmd.GroupID = "server"
+	rootCmd.AddCommand(serveCmd)
+
+	// Database Management
+	dbCmd := newDBCmd()
+	dbCmd.GroupID = "database"
+	rootCmd.AddCommand(dbCmd)
+
+	// Memory & Ingestion
+	ingestCmd := newIngestCmd()
+	ingestCmd.GroupID = "memory"
+	rootCmd.AddCommand(ingestCmd)
+
+	consolidateCmd := newConsolidateCmd()
+	consolidateCmd.GroupID = "memory"
+	rootCmd.AddCommand(consolidateCmd)
+
+	embeddingsCmd := newEmbeddingsCmd()
+	embeddingsCmd.GroupID = "memory"
+	rootCmd.AddCommand(embeddingsCmd)
+
+	extractSymbolsCmd := newExtractSymbolsCmd()
+	extractSymbolsCmd.GroupID = "memory"
+	rootCmd.AddCommand(extractSymbolsCmd)
+
+	// Configuration
+	configCmd := newConfigCmd()
+	configCmd.GroupID = "config"
+	rootCmd.AddCommand(configCmd)
+
+	hooksCmd := newHooksCmd()
+	hooksCmd.GroupID = "config"
+	rootCmd.AddCommand(hooksCmd)
+
+	sidecarCmd := newSidecarCmd()
+	sidecarCmd.GroupID = "config"
+	rootCmd.AddCommand(sidecarCmd)
+
+	upgradeCmd := newUpgradeCmd()
+	upgradeCmd.GroupID = "config"
+	rootCmd.AddCommand(upgradeCmd)
+
+	// Advanced
+	mcpCmd := newMCPCmd()
+	mcpCmd.GroupID = "advanced"
+	rootCmd.AddCommand(mcpCmd)
+
+	decayCmd := newDecayCmd()
+	decayCmd.GroupID = "advanced"
+	rootCmd.AddCommand(decayCmd)
+
+	pruneCmd := newPruneCmd()
+	pruneCmd.GroupID = "advanced"
+	rootCmd.AddCommand(pruneCmd)
+
+	watchCmd := newWatchCmd()
+	watchCmd.GroupID = "advanced"
+	rootCmd.AddCommand(watchCmd)
+
+	spaceCmd := newSpaceCmd()
+	spaceCmd.GroupID = "advanced"
+	rootCmd.AddCommand(spaceCmd)
+
+	pluginCmd := newPluginCmd()
+	pluginCmd.GroupID = "advanced"
+	rootCmd.AddCommand(pluginCmd)
+
+	demoCmd := newDemoCmd()
+	demoCmd.GroupID = "advanced"
+	rootCmd.AddCommand(demoCmd)
 
 	return rootCmd
+}
+
+// NewRootCmdForDocs returns the root command for documentation generation.
+// Used by cmd/gendocs to generate man pages and markdown docs.
+func NewRootCmdForDocs() *cobra.Command {
+	return newRootCmd()
 }
 
 // Execute runs the root command. This is the main entry point for the CLI.

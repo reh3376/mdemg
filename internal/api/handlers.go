@@ -549,8 +549,9 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 					emb, err := s.embedder.Embed(r.Context(), textForEmbedding)
 					if err == nil {
 						req.Observations[i].Embedding = emb
+					} else {
+						log.Printf("warning: batch ingest embedding failed for item %d: %v", i, err)
 					}
-					// Embedding errors are non-fatal for batch ingest
 				}
 			}
 		}

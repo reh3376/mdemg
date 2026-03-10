@@ -437,26 +437,26 @@ brew untap reh3376/mdemg
 
 | Phase | Test | Pass/Fail | Notes |
 |-------|------|-----------|-------|
-| 1 | Clean install | | |
-| 1 | Binary placement | | |
-| 2 | Version output | | |
-| 2 | Help output | | |
-| 2 | Subcommand help | | |
-| 3 | Project init | | |
-| 3 | Config show/validate | | |
-| 4 | DB start | | |
-| 4 | DB migrate | | |
-| 4 | DB shell | | |
-| 5 | Server foreground | | |
-| 5 | Server daemon (start/stop/restart) | | |
-| 5 | Health/readiness endpoints | | |
-| 6 | Embeddings check | | |
-| 6 | Codebase ingest | | |
-| 6 | Symbol extraction | | |
-| 6 | Observe + recall | | |
-| 6 | Memory stats | | |
-| 7 | Hooks install/list/uninstall | | |
-| 8 | Clean uninstall | | |
+| 1 | Clean install | PASS | Tap + install succeeded, SHA256 verified, binary-only (no build from source) |
+| 1 | Binary placement | PASS | Mach-O 64-bit arm64 at `$(brew --prefix)/bin/mdemg` |
+| 2 | Version output | PASS | Version 0.2.1, commit hash and build date present |
+| 2 | Help output | PASS | All subcommands listed, no errors |
+| 2 | Subcommand help | PASS | All subcommands show help text with flags |
+| 3 | Project init | PASS | Wizard runs; prompts for OpenAI API key; creates `.mdemg/config.yaml`, `.mdemgignore`, `.env` |
+| 3 | Config show/validate | PASS | Source annotations correct; JSON output valid |
+| 4 | DB start | PASS | Project-scoped container created (`mdemg-neo4j-{project}`); dynamic port selected when 7687 busy; config.yaml auto-updated with actual bolt URI |
+| 4 | DB migrate | PASS | All migrations applied successfully |
+| 4 | DB shell | PASS | Connected and executed test query |
+| 5 | Server foreground | PASS | Started on port 9999, healthz returned ok |
+| 5 | Server daemon (start/stop/restart) | PASS | PID file created/removed correctly; restart assigns new PID |
+| 5 | Health/readiness endpoints | PASS | `/healthz` and `/readyz` returned expected JSON |
+| 6 | Embeddings check | PASS | Reported OpenAI provider with 1536 dimensions |
+| 6 | Codebase ingest | PASS | Files processed and MemoryNodes created in Neo4j |
+| 6 | Symbol extraction | PASS | Go symbols extracted with correct JSON output |
+| 6 | Observe + recall | PASS | Observation stored with obs_id/node_id; recall returned results |
+| 6 | Memory stats | PASS | Node counts and layer distribution returned |
+| 7 | Hooks install/list/uninstall | PASS | Hooks installed, listed, and uninstalled cleanly |
+| 8 | Clean uninstall | PASS | Binary removed, tap removed, `which mdemg` returns nothing |
 
 ---
 

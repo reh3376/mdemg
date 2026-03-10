@@ -32,7 +32,7 @@ func setMinimalEnv(t *testing.T) {
 	t.Setenv("NEO4J_PASS", "test")
 }
 
-func TestLLMCascade_AllDefaultToOllama(t *testing.T) {
+func TestLLMCascade_AllDefaultToOpenAI(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
 
@@ -41,12 +41,12 @@ func TestLLMCascade_AllDefaultToOllama(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	// Top-level defaults
-	if cfg.LLMProvider != "ollama" {
-		t.Errorf("LLMProvider = %q, want %q", cfg.LLMProvider, "ollama")
+	// Top-level defaults (now openai/gpt-5-nano)
+	if cfg.LLMProvider != "openai" {
+		t.Errorf("LLMProvider = %q, want %q", cfg.LLMProvider, "openai")
 	}
-	if cfg.LLMModel != "llama3.2:3b-instruct-fp16" {
-		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "llama3.2:3b-instruct-fp16")
+	if cfg.LLMModel != "gpt-5-nano" {
+		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "gpt-5-nano")
 	}
 
 	// All features should cascade from top-level
@@ -64,11 +64,11 @@ func TestLLMCascade_AllDefaultToOllama(t *testing.T) {
 	}
 
 	for _, f := range features {
-		if f.provider != "ollama" {
-			t.Errorf("%s.Provider = %q, want %q", f.name, f.provider, "ollama")
+		if f.provider != "openai" {
+			t.Errorf("%s.Provider = %q, want %q", f.name, f.provider, "openai")
 		}
-		if f.model != "llama3.2:3b-instruct-fp16" {
-			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "llama3.2:3b-instruct-fp16")
+		if f.model != "gpt-5-nano" {
+			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "gpt-5-nano")
 		}
 	}
 }
@@ -101,9 +101,9 @@ func TestLLMCascade_TopLevelOverride(t *testing.T) {
 func TestLLMCascade_PerFeatureOverride(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
-	// Top-level is ollama (default), but Synthesis overrides to openai
-	t.Setenv("SYNTHESIS_PROVIDER", "openai")
-	t.Setenv("SYNTHESIS_MODEL", "gpt-4o-mini")
+	// Top-level is openai (default), Synthesis overrides to ollama
+	t.Setenv("SYNTHESIS_PROVIDER", "ollama")
+	t.Setenv("SYNTHESIS_MODEL", "llama3.2:3b-instruct-fp16")
 
 	cfg, err := FromEnv()
 	if err != nil {
@@ -111,23 +111,23 @@ func TestLLMCascade_PerFeatureOverride(t *testing.T) {
 	}
 
 	// Synthesis should use its explicit override
-	if cfg.SynthesisProvider != "openai" {
-		t.Errorf("SynthesisProvider = %q, want %q", cfg.SynthesisProvider, "openai")
+	if cfg.SynthesisProvider != "ollama" {
+		t.Errorf("SynthesisProvider = %q, want %q", cfg.SynthesisProvider, "ollama")
 	}
-	if cfg.SynthesisModel != "gpt-4o-mini" {
-		t.Errorf("SynthesisModel = %q, want %q", cfg.SynthesisModel, "gpt-4o-mini")
+	if cfg.SynthesisModel != "llama3.2:3b-instruct-fp16" {
+		t.Errorf("SynthesisModel = %q, want %q", cfg.SynthesisModel, "llama3.2:3b-instruct-fp16")
 	}
 
-	// Intent should still cascade from top-level (ollama)
-	if cfg.IntentProvider != "ollama" {
-		t.Errorf("IntentProvider = %q, want %q (should cascade from top-level)", cfg.IntentProvider, "ollama")
+	// Intent should still cascade from top-level (openai)
+	if cfg.IntentProvider != "openai" {
+		t.Errorf("IntentProvider = %q, want %q (should cascade from top-level)", cfg.IntentProvider, "openai")
 	}
 }
 
 func TestLLMCascade_MetaLearnDoubleInherit(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
-	// LLM_PROVIDER=ollama (default), no EMERGENCE_PROVIDER, no METALEARN_PROVIDER
+	// LLM_PROVIDER=openai (default), no EMERGENCE_PROVIDER, no METALEARN_PROVIDER
 	// MetaLearn → Emergence → LLM_PROVIDER
 
 	cfg, err := FromEnv()
@@ -135,15 +135,15 @@ func TestLLMCascade_MetaLearnDoubleInherit(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	if cfg.MetaLearnProvider != "ollama" {
-		t.Errorf("MetaLearnProvider = %q, want %q", cfg.MetaLearnProvider, "ollama")
+	if cfg.MetaLearnProvider != "openai" {
+		t.Errorf("MetaLearnProvider = %q, want %q", cfg.MetaLearnProvider, "openai")
 	}
-	if cfg.MetaLearnModel != "llama3.2:3b-instruct-fp16" {
-		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "llama3.2:3b-instruct-fp16")
+	if cfg.MetaLearnModel != "gpt-5-nano" {
+		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "gpt-5-nano")
 	}
 }
 
-func TestEmbedding_DefaultOllama(t *testing.T) {
+func TestEmbedding_DefaultOpenAI(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
 
@@ -152,8 +152,8 @@ func TestEmbedding_DefaultOllama(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	if cfg.EmbeddingProvider != "ollama" {
-		t.Errorf("EmbeddingProvider = %q, want %q", cfg.EmbeddingProvider, "ollama")
+	if cfg.EmbeddingProvider != "openai" {
+		t.Errorf("EmbeddingProvider = %q, want %q", cfg.EmbeddingProvider, "openai")
 	}
 }
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
 )
@@ -17,6 +20,7 @@ import (
 func newInitCmd() *cobra.Command {
 	var (
 		defaults          bool
+		quick             bool
 		spaceID           string
 		neo4jURI          string
 		embeddingProvider string
@@ -34,14 +38,20 @@ By default, runs an interactive wizard to detect your environment and
 guide you through configuration.
 
 Use --defaults for non-interactive setup with sensible defaults.
+Use --quick for non-interactive setup that also starts Neo4j and the server.
 
 Examples:
   mdemg init                    # Interactive wizard
   mdemg init --defaults         # Non-interactive with defaults
+  mdemg init --quick            # Non-interactive + auto-start
   mdemg init --neo4j-uri bolt://db:7687`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if quick {
+				defaults = true
+			}
 			return runInit(initFlags{
 				defaults:          defaults,
+				quick:             quick,
 				spaceID:           spaceID,
 				neo4jURI:          neo4jURI,
 				embeddingProvider: embeddingProvider,
@@ -53,6 +63,7 @@ Examples:
 
 	cmd.Flags().BoolVar(&defaults, "defaults", false, "Non-interactive mode with sensible defaults")
 	cmd.Flags().BoolVar(&defaults, "yes", false, "Alias for --defaults")
+	cmd.Flags().BoolVar(&quick, "quick", false, "Non-interactive setup + auto-start Neo4j and server")
 	cmd.Flags().StringVar(&spaceID, "space-id", "", "Override space ID (default: directory name)")
 	cmd.Flags().StringVar(&neo4jURI, "neo4j-uri", "", "Override Neo4j URI")
 	cmd.Flags().StringVar(&embeddingProvider, "embedding-provider", "", "Override embedding provider (ollama/openai/disabled)")
@@ -64,6 +75,7 @@ Examples:
 
 type initFlags struct {
 	defaults          bool
+	quick             bool
 	spaceID           string
 	neo4jURI          string
 	embeddingProvider string
@@ -135,26 +147,39 @@ func runInit(flags initFlags) error {
 		// Password is NOT prompted — must go in .env for security
 	}
 
+	// Neo4j ports
+	if flags.defaults {
+		opts.Neo4jBoltPort = 7687
+		opts.Neo4jHTTPPort = 7474
+	} else {
+		boltStr := promptLine("Neo4j bolt port [7687]", "7687")
+		if v, err := fmt.Sscanf(boltStr, "%d", &opts.Neo4jBoltPort); v != 1 || err != nil {
+			opts.Neo4jBoltPort = 7687
+		}
+		httpStr := promptLine("Neo4j HTTP port [7474]", "7474")
+		if v, err := fmt.Sscanf(httpStr, "%d", &opts.Neo4jHTTPPort); v != 1 || err != nil {
+			opts.Neo4jHTTPPort = 7474
+		}
+	}
+
 	// Server port
 	opts.ServerPort = 9999
 
 	// Embedding provider
+	hasOpenAIKey := os.Getenv("OPENAI_API_KEY") != ""
 	if flags.embeddingProvider != "" {
 		opts.EmbeddingProvider = flags.embeddingProvider
 	} else if flags.defaults {
-		if env.ollamaReachable {
-			opts.EmbeddingProvider = "ollama"
+		if hasOpenAIKey {
+			opts.EmbeddingProvider = "openai"
 		} else {
-			opts.EmbeddingProvider = "disabled"
+			opts.EmbeddingProvider = "openai" // OpenAI is the default; user will be prompted for key
 		}
 	} else {
-		defaultProvider := "disabled"
-		if env.ollamaReachable {
-			defaultProvider = "ollama"
-		}
+		defaultProvider := "openai"
 		hint := ""
-		if env.ollamaReachable {
-			hint = " (detected)"
+		if hasOpenAIKey {
+			hint = " (OPENAI_API_KEY detected)"
 		}
 		opts.EmbeddingProvider = promptLine(
 			fmt.Sprintf("Embedding provider (ollama/openai/disabled) [%s]%s", defaultProvider, hint),
@@ -166,15 +191,25 @@ func runInit(flags initFlags) error {
 	var openAIKey string
 	switch opts.EmbeddingProvider {
 	case "ollama":
-		opts.EmbeddingModel = "qwen3-embedding:4b"
+		if flags.defaults {
+			opts.EmbeddingModel = "qwen3-embedding:4b"
+			opts.LLMModel = "llama3.2:3b-instruct-fp16"
+		} else {
+			opts.EmbeddingModel = promptLine("Embedding model [qwen3-embedding:4b]", "qwen3-embedding:4b")
+			opts.LLMModel = promptLine("Naming/LLM model [llama3.2:3b-instruct-fp16]", "llama3.2:3b-instruct-fp16")
+		}
 		opts.EmbeddingEndpoint = "http://localhost:11434"
 		opts.LLMProvider = "ollama"
-		opts.LLMModel = "llama3.2:3b-instruct-fp16"
 	case "openai":
-		opts.EmbeddingModel = "text-embedding-3-small"
+		if flags.defaults {
+			opts.EmbeddingModel = "text-embedding-3-large"
+			opts.LLMModel = "gpt-5-nano"
+		} else {
+			opts.EmbeddingModel = promptLine("Embedding model [text-embedding-3-large]", "text-embedding-3-large")
+			opts.LLMModel = promptLine("Naming/LLM model [gpt-5-nano]", "gpt-5-nano")
+		}
 		opts.LLMProvider = "openai"
-		opts.LLMModel = "gpt-4o-mini"
-		if !flags.defaults {
+		if !flags.defaults && !hasOpenAIKey {
 			fmt.Println()
 			fmt.Println("  OpenAI requires an API key for embeddings and LLM features.")
 			fmt.Println("  The key will be stored in .env (gitignored), NOT in config.yaml.")
@@ -299,24 +334,70 @@ func runInit(flags initFlags) error {
 	fmt.Println()
 	fmt.Println("Initialization complete!")
 	fmt.Println()
+	fmt.Println("Config file:   .mdemg/config.yaml")
+	fmt.Println("Ignore file:   .mdemgignore")
+	fmt.Println("Secrets file:  .env (gitignored)")
+	fmt.Printf("Space ID:      %s\n", opts.SpaceID)
+	fmt.Println()
 
-	// Build "Next steps" based on what's missing
+	// Load .env into current process so spawned daemon inherits secrets
+	// Use Overload (not Load) to ensure values are set even if env vars exist as empty
+	_ = godotenv.Overload(envPath)
+
+	// Auto-start for --quick mode
+	if flags.quick {
+		fmt.Println("Starting Neo4j and server (--quick mode)...")
+		fmt.Println()
+		if err := runDBStart(0, 0, "mdemg-dev"); err != nil {
+			fmt.Printf("Warning: Neo4j start failed: %v\n", err)
+			fmt.Println("You can start it manually: mdemg db start")
+		}
+		// Reload config.yaml into env — runDBStart may have updated neo4j.uri with dynamic port
+		reloadConfigEnv()
+		// Wait for Neo4j bolt protocol to be fully ready (TCP open != bolt ready)
+		waitForBoltReady()
+		fmt.Println()
+		if err := runStart(0, "", true, false, false); err != nil {
+			fmt.Printf("Warning: server start failed: %v\n", err)
+			fmt.Println("You can start it manually: mdemg start --auto-migrate")
+		}
+		return nil
+	}
+
+	// Post-init auto-start prompt (interactive mode only)
+	if !flags.defaults {
+		answer := promptLine("Start Neo4j and server now? (yes/no) [yes]", "yes")
+		if answer == "yes" {
+			fmt.Println()
+			if err := runDBStart(0, 0, "mdemg-dev"); err != nil {
+				fmt.Printf("Warning: Neo4j start failed: %v\n", err)
+				fmt.Println("You can start it manually: mdemg db start")
+			}
+			// Reload config.yaml into env — runDBStart may have updated neo4j.uri with dynamic port
+			reloadConfigEnv()
+			// Wait for Neo4j bolt protocol to be fully ready (TCP open != bolt ready)
+			waitForBoltReady()
+			fmt.Println()
+			if err := runStart(0, "", true, false, false); err != nil {
+				fmt.Printf("Warning: server start failed: %v\n", err)
+				fmt.Println("You can start it manually: mdemg start --auto-migrate")
+			}
+			return nil
+		}
+	}
+
+	// Build "Next steps" for non-auto-start paths
 	step := 1
 	fmt.Println("Next steps:")
-	if openAIKey == "" && opts.EmbeddingProvider == "openai" {
+	if openAIKey == "" && opts.EmbeddingProvider == "openai" && !hasOpenAIKey {
 		fmt.Printf("  %d. Add your OpenAI API key:  echo 'OPENAI_API_KEY=sk-...' >> .env\n", step)
 		step++
 	}
 	fmt.Printf("  %d. Start Neo4j:            mdemg db start\n", step)
 	step++
-	fmt.Printf("  %d. Start the server:       mdemg serve --auto-migrate\n", step)
+	fmt.Printf("  %d. Start the server:       mdemg start --auto-migrate\n", step)
 	step++
 	fmt.Printf("  %d. Ingest your code:       mdemg ingest --path .\n", step)
-	fmt.Println()
-	fmt.Println("Config file:   .mdemg/config.yaml")
-	fmt.Println("Ignore file:   .mdemgignore")
-	fmt.Println("Secrets file:  .env (gitignored)")
-	fmt.Printf("Space ID:      %s\n", opts.SpaceID)
 
 	return nil
 }
@@ -428,6 +509,51 @@ func writeIDEConfigs(dir string, port int, env environmentInfo) []string {
 	}
 
 	return written
+}
+
+// waitForBoltReady waits until Neo4j bolt protocol is fully ready to serve queries.
+// WaitForPort only checks TCP connectivity, but Neo4j may not be ready for bolt queries yet.
+func waitForBoltReady() {
+	uri := os.Getenv("NEO4J_URI")
+	if uri == "" {
+		uri = "bolt://localhost:7687"
+	}
+	pass := os.Getenv("NEO4J_PASS")
+	if pass == "" {
+		pass = "mdemg-dev" //nolint:gosec // G101: default dev password, not a credential
+	}
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth("neo4j", pass, ""))
+		if err != nil {
+			cancel()
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		err = driver.VerifyConnectivity(ctx)
+		driver.Close(ctx)
+		cancel()
+		if err == nil {
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// reloadConfigEnv re-reads config.yaml and forces env vars to the current YAML values.
+// This is needed after runDBStart which may update neo4j.uri with a dynamic port.
+// Without this, the spawned daemon inherits stale env vars (e.g., bolt://localhost:7687
+// instead of the actual port like bolt://localhost:7688).
+func reloadConfigEnv() {
+	cfgPath := config.FindConfigFile()
+	if cfgPath == "" {
+		return
+	}
+	// Clear NEO4J_URI so LoadYAMLConfig will set it from the updated config.yaml
+	_ = os.Unsetenv("NEO4J_URI")
+	_ = config.LoadYAMLConfig(cfgPath)
 }
 
 // ParseIgnoreFile reads a .mdemgignore file and returns the list of patterns.
