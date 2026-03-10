@@ -93,4 +93,5 @@ Last updated: 2026-02-27
 - `docs/api/api-spec/uots/README.md`
 - `docs/tests/uams/README.md`
 - `docs/research/UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226.md`
+- `docs/guides/UXTS_DEVELOPER_GUIDE.md` (comprehensive UxTS methodology guide)
 - `AGENT_HANDOFF.md` (Governance & Testing Frameworks)

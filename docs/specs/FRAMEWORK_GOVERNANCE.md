@@ -6,7 +6,7 @@ Purpose: govern UxTS test and verification frameworks consistently across API co
 
 ## Canonical Matrix
 
-Use this governance file as policy and `docs/development/UXTS_FRAMEWORK_MATRIX.md` as the operational inventory with schema/spec/runner/CI mappings.
+Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` as the operational inventory with schema/spec/runner/CI mappings, and [`docs/guides/UXTS_DEVELOPER_GUIDE.md`](../guides/UXTS_DEVELOPER_GUIDE.md) as the comprehensive developer reference.
 
 ---
 

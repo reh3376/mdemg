@@ -331,6 +331,8 @@ A background auto-prune scheduler runs every 24 hours by default (`SPACE_PRUNE_I
 
 ## Symbol Extraction (UPTS)
 
+> For the comprehensive guide to UxTS methodology (architecture, spec writing, CI integration, governance, and all 11 frameworks), see [docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md).
+
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
 **Supported Languages (27 UPTS-validated, 100% pass rate):**
