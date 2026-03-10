@@ -630,7 +630,9 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 		suggestions = suggestions[:maxSuggestions]
 	}
 
-	resp.Suggestions = suggestions
+	if suggestions != nil {
+		resp.Suggestions = suggestions
+	}
 
 	// Step 10: Calculate overall confidence
 	resp.Confidence = s.calculateSuggestConfidence(suggestions, len(filteredResults), len(triggers))

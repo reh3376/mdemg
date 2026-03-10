@@ -76,7 +76,8 @@
         "body": {}
       },
       "expected": {
-        "status": 405
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]
