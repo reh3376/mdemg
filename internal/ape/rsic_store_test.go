@@ -161,7 +161,7 @@ func TestRSICStore_GetStatus_WithCachedData(t *testing.T) {
 
 func TestRSICStore_HydrationWithNilStore(t *testing.T) {
 	// Calibrator with nil store should not panic
-	cal := NewCalibrator(nil)
+	cal := NewCalibrator(nil, 0)
 	if err := cal.Hydrate("test-space"); err != nil {
 		t.Errorf("hydrate with nil store should return nil, got %v", err)
 	}
@@ -181,7 +181,7 @@ func TestRSICStore_HydrationWithNilStore(t *testing.T) {
 // ───────────── Calibrator Hydration Test ─────────────
 
 func TestCalibrator_HydrateRestoresHistory(t *testing.T) {
-	cal := NewCalibrator(nil)
+	cal := NewCalibrator(nil, 0)
 
 	// Manually inject history (simulating hydration without Neo4j)
 	cal.mu.Lock()

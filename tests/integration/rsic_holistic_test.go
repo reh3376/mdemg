@@ -319,11 +319,6 @@ func TestRSIC_Holistic_HistoryAndCalibrationReflectExecution(t *testing.T) {
 	SeedObservationNodes(t, driver, spaceID, 10, "learning", 2)
 	SeedObservationNodes(t, driver, spaceID, 3, "correction", 0)
 
-	// Get initial history count
-	histBefore := GetRSICHistory(t, cfg.MDEMGEndpoint, 200)
-	countBefore := int(histBefore["count"].(float64))
-	t.Logf("history count before: %d", countBefore)
-
 	// Trigger cycle
 	resp := TriggerRSICCycle(t, cfg.MDEMGEndpoint, spaceID, nil)
 
@@ -332,12 +327,12 @@ func TestRSIC_Holistic_HistoryAndCalibrationReflectExecution(t *testing.T) {
 		t.Fatalf("confidence gate was NOT passed: %s", errStr)
 	}
 
-	// History count should have increased by 1
+	// Verify the new cycle appears in history (count may stay flat if at capacity)
 	histAfter := GetRSICHistory(t, cfg.MDEMGEndpoint, 200)
 	countAfter := int(histAfter["count"].(float64))
-	t.Logf("history count after: %d", countAfter)
-	if countAfter < countBefore+1 {
-		t.Errorf("expected history count to increase by >= 1, got before=%d after=%d", countBefore, countAfter)
+	t.Logf("history count after cycle: %d", countAfter)
+	if countAfter < 1 {
+		t.Fatalf("expected at least 1 history entry, got %d", countAfter)
 	}
 
 	// Find our cycle in history and validate its fields

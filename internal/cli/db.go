@@ -43,6 +43,7 @@ func newDBCmd() *cobra.Command {
 	cmd.AddCommand(newDBStopCmd())
 	cmd.AddCommand(newDBStatusCmd())
 	cmd.AddCommand(newDBShellCmd())
+	cmd.AddCommand(newDBBackupCmd())
 
 	return cmd
 }

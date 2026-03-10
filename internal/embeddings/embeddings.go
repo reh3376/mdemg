@@ -37,7 +37,7 @@ type Config struct {
 
 	// OpenAI settings
 	OpenAIAPIKey   string
-	OpenAIModel    string // default: text-embedding-3-small
+	OpenAIModel    string // default: text-embedding-3-large
 	OpenAIEndpoint string // default: https://api.openai.com/v1
 
 	// Ollama settings

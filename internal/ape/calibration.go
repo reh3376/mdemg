@@ -17,18 +17,24 @@ type ActionOutcome struct {
 
 // Calibrator tracks per-action-type success rates and validates cycle outcomes.
 type Calibrator struct {
-	mu            sync.RWMutex
-	actionHistory map[string][]ActionOutcome
-	cycleHistory  []CycleOutcome
-	convSvc       ConversationStatsProvider
-	store         *RSICStore
+	mu              sync.RWMutex
+	actionHistory   map[string][]ActionOutcome
+	cycleHistory    []CycleOutcome
+	convSvc         ConversationStatsProvider
+	store           *RSICStore
+	maxHistoryItems int
 }
 
-// NewCalibrator creates a Calibrator.
-func NewCalibrator(convSvc ConversationStatsProvider) *Calibrator {
+// NewCalibrator creates a Calibrator. maxHistory sets the per-type cap on
+// history entries (0 or negative uses the default of 1000).
+func NewCalibrator(convSvc ConversationStatsProvider, maxHistory int) *Calibrator {
+	if maxHistory <= 0 {
+		maxHistory = 1000
+	}
 	return &Calibrator{
-		actionHistory: make(map[string][]ActionOutcome),
-		convSvc:       convSvc,
+		actionHistory:   make(map[string][]ActionOutcome),
+		convSvc:         convSvc,
+		maxHistoryItems: maxHistory,
 	}
 }
 
@@ -130,14 +136,15 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 		m.RSICCalibrationConfidence(actionType).Set(float64(successes) / float64(len(outcomes)))
 	}
 
-	// Trim history to last 100 entries per action type
+	// Trim history to configured max entries per action type
+	cap := c.maxHistoryItems
 	for k, v := range c.actionHistory {
-		if len(v) > 100 {
-			c.actionHistory[k] = v[len(v)-100:]
+		if len(v) > cap {
+			c.actionHistory[k] = v[len(v)-cap:]
 		}
 	}
-	if len(c.cycleHistory) > 100 {
-		c.cycleHistory = c.cycleHistory[len(c.cycleHistory)-100:]
+	if len(c.cycleHistory) > cap {
+		c.cycleHistory = c.cycleHistory[len(c.cycleHistory)-cap:]
 	}
 
 	// Phase 89: Persist calibration state (global — calibrator tracks all spaces)

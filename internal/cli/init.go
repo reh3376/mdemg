@@ -111,7 +111,11 @@ func runInit(flags initFlags) error {
 
 	// Build options from flags + detection + wizard
 	opts := config.InitOptions{
-		SchemaVersion: 17, // Current schema version
+		SchemaVersion:    18, // Current schema version (V0018 vector 3072)
+		BackupEnabled:    true,
+		BackupStorageDir: ".mdemg/backups",
+		BackupInterval:   24,  // daily partial backups
+		BackupRetention:  2,   // keep 2 most recent per type
 	}
 
 	// Space ID
@@ -224,9 +228,12 @@ func runInit(flags initFlags) error {
 	// Generate files
 	fmt.Println()
 
-	// Create .mdemg/ directory
+	// Create .mdemg/ directory and subdirectories
 	if err := os.MkdirAll(mdemgDir, 0755); err != nil {
 		return fmt.Errorf("create .mdemg/: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(mdemgDir, "backups"), 0755); err != nil {
+		return fmt.Errorf("create .mdemg/backups/: %w", err)
 	}
 
 	// Generate config.yaml
