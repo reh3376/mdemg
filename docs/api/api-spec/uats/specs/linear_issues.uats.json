@@ -95,14 +95,14 @@
     },
     {
       "name": "patch_not_allowed",
-      "description": "PATCH should return 405",
+      "description": "PATCH should return 405 or 503 (module check precedes method check)",
       "request": {
         "method": "PATCH",
         "path": "/v1/linear/issues",
         "body": {}
       },
       "expected": {
-        "status": 405,
+        "status": [405, 503],
         "body_assertions": [
           {
             "path": "$.error",

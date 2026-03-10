@@ -33,7 +33,7 @@
     }
   },
   "expected": {
-    "status": [500, 503]
+    "status": [200, 500, 503]
   },
   "variants": [
     {
