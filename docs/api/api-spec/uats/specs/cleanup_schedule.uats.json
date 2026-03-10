@@ -1,0 +1,153 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Schedule Cleanup",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "cleanup",
+      "schedule"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Creates a scheduled cleanup job for a space",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "be6e4ca0b48bf0c1ff7901001c0a32b93ef46fff9d4398afb830693f77d90347"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/cleanup/schedule",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "demo",
+      "interval_hours": 24,
+      "action": "archive",
+      "limit": 100
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "demo"
+      },
+      {
+        "path": "$.schedule_id",
+        "op": "exists",
+        "expected": true
+      },
+      {
+        "path": "$.interval_hours",
+        "op": "equals",
+        "expected": 24
+      },
+      {
+        "path": "$.status",
+        "op": "equals",
+        "expected": "enabled"
+      },
+      {
+        "path": "$.next_run_at",
+        "op": "exists",
+        "expected": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "delete_action",
+      "description": "Schedule with delete action on non-protected space",
+      "request": {
+        "body": {
+          "space_id": "demo",
+          "interval_hours": 48,
+          "action": "delete",
+          "limit": 50
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.schedule_id",
+            "op": "exists",
+            "expected": true
+          },
+          {
+            "path": "$.status",
+            "op": "equals",
+            "expected": "enabled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id returns 400",
+      "request": {
+        "body": {
+          "space_id": "",
+          "interval_hours": 24,
+          "action": "archive"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists",
+            "expected": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_interval",
+      "description": "Interval outside 1-720 range returns 400",
+      "request": {
+        "body": {
+          "space_id": "demo",
+          "interval_hours": 0,
+          "action": "archive"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists",
+            "expected": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/cleanup/schedule"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

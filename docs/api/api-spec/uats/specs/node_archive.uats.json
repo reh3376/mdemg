@@ -20,7 +20,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "5b79a17fb41238760aaa7bc4d23b9509f0e6e59bff1b05d39abaffc6f90db218"
   },
   "variables": {},
   "request": {
@@ -34,7 +35,11 @@
     }
   },
   "expected": {
-    "status": [200, 404, 500]
+    "status": [
+      200,
+      404,
+      500
+    ]
   },
   "variants": [
     {

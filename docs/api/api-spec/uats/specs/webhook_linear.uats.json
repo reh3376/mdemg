@@ -1,0 +1,67 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Linear Webhook",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "linear",
+      "webhook",
+      "linear_required"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Linear webhook receiver with HMAC signature verification (tests auth error cases \u2014 full testing requires webhook secret)",
+    "test_type": "contract",
+    "priority": "low"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "linear_required"
+    ],
+    "sha256": "a19582d5afb720d7708df8593110f10a3f2fece14ba4fd1911153e81a55f4b54"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/webhooks/linear",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "action": "create",
+      "type": "Issue",
+      "data": {
+        "id": "test-123",
+        "title": "Test issue"
+      }
+    }
+  },
+  "expected": {
+    "status": 500,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "op": "exists",
+        "expected": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/webhooks/linear"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

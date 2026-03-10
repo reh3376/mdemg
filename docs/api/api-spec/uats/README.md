@@ -2,7 +2,7 @@
 
 **Version:** 1.2.0
 **Date:** 2026-02-26
-**Specs:** 124 canonical specs + 7 drafts
+**Specs:** 152 canonical specs + 7 drafts
 
 ---
 

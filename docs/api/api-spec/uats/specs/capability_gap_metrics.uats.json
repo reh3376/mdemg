@@ -20,7 +20,8 @@
     "priority": "low"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "cbbfea648fc80435f5be995426862d445ae6f84457184ae5a5249cc9aaf506ca"
   },
   "variables": {},
   "request": {

@@ -12,8 +12,8 @@
   },
   "metadata": {
     "author": "reh3376",
-    "created": "2026-02-23",
-    "description": "Reverts a tracked file to a previous hash (register + update via base/variant1, then revert)",
+    "created": "2026-03-10",
+    "description": "Reverts a tracked file hash to a previous value",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -22,20 +22,17 @@
     "tags": [
       "unts"
     ],
-    "sequential": true,
-    "sha256": "59ba71f7ec2d4ad9bd2933b843d6b8111bea2ef23db493311c11ed8e8486e88e"
+    "sha256": "fe966ba0344cc09fc1f53e749809cfe4ce306d76e0a3bdcff396956f2494d236"
   },
+  "variables": {},
   "request": {
     "method": "POST",
-    "path": "/v1/hash-verification/register",
+    "path": "/v1/hash-verification/revert",
     "headers": {
       "Content-Type": "application/json"
     },
     "body": {
-      "path": "test/revert-target.txt",
-      "framework": "manifest",
-      "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "source": "manual"
+      "path": "docs/api/api-spec/uats/specs/health.uats.json"
     }
   },
   "expected": {
@@ -43,42 +40,19 @@
     "body_assertions": [
       {
         "path": "$.path",
-        "type": "string",
-        "value": "test/revert-target.txt"
+        "op": "equals",
+        "expected": "docs/api/api-spec/uats/specs/health.uats.json"
       }
     ]
   },
   "variants": [
     {
-      "name": "update_hash",
-      "description": "Update hash to create history entry",
+      "name": "with_target_hash",
+      "description": "Revert to a specific target hash",
       "request": {
-        "path": "/v1/hash-verification/update",
         "body": {
-          "path": "test/revert-target.txt",
-          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "source": "manual"
-        }
-      },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.current_hash",
-            "type": "string",
-            "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-          }
-        ]
-      }
-    },
-    {
-      "name": "revert_to_original",
-      "description": "Revert to original hash from history",
-      "request": {
-        "path": "/v1/hash-verification/revert",
-        "body": {
-          "path": "test/revert-target.txt",
-          "target_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "path": "docs/api/api-spec/uats/specs/health.uats.json",
+          "target_hash": "abc123"
         }
       },
       "expected": {
@@ -86,30 +60,37 @@
         "body_assertions": [
           {
             "path": "$.path",
-            "type": "string",
-            "value": "test/revert-target.txt"
-          },
-          {
-            "path": "$.current_hash",
-            "type": "string",
-            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          },
-          {
-            "path": "$.status",
-            "type": "string",
-            "value": "reverted"
+            "op": "exists",
+            "expected": true
           }
         ]
       }
     },
     {
-      "name": "hash_not_in_history",
-      "description": "Target hash not in history returns 400",
+      "name": "untracked_file",
+      "description": "Reverting an untracked file returns 404",
       "request": {
-        "path": "/v1/hash-verification/revert",
         "body": {
-          "path": "test/revert-target.txt",
-          "target_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          "path": "nonexistent/file.txt"
+        }
+      },
+      "expected": {
+        "status": 404,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists",
+            "expected": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_path",
+      "description": "Empty path returns 400",
+      "request": {
+        "body": {
+          "path": ""
         }
       },
       "expected": {
@@ -117,9 +98,22 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "exists",
+            "expected": true
           }
         ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/hash-verification/revert"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]

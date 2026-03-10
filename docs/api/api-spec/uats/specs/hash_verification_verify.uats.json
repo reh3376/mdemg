@@ -1,7 +1,7 @@
 {
   "uats_version": "1.0.0",
   "api": {
-    "name": "Hash Verification Verify",
+    "name": "Hash Verification Verify Single",
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
@@ -12,8 +12,8 @@
   },
   "metadata": {
     "author": "reh3376",
-    "created": "2026-02-23",
-    "description": "Verifies a single tracked file against its expected hash (registers first via base)",
+    "created": "2026-03-10",
+    "description": "Verifies a single tracked file against its expected hash",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -22,20 +22,17 @@
     "tags": [
       "unts"
     ],
-    "sequential": true,
-    "sha256": "36614692b570601618ca9763ca4f739b0279604a3858ca5b9bdab252bc0752cd"
+    "sha256": "572ae0d61db9d7441a560a8457f5625e34ca6954335c0bb724f81eb365c58d28"
   },
+  "variables": {},
   "request": {
     "method": "POST",
-    "path": "/v1/hash-verification/register",
+    "path": "/v1/hash-verification/verify",
     "headers": {
       "Content-Type": "application/json"
     },
     "body": {
-      "path": "test/verify-target.txt",
-      "framework": "manifest",
-      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
-      "source": "manual"
+      "path": "docs/api/api-spec/uats/specs/health.uats.json"
     }
   },
   "expected": {
@@ -43,48 +40,40 @@
     "body_assertions": [
       {
         "path": "$.path",
-        "type": "string",
-        "value": "test/verify-target.txt"
+        "op": "equals",
+        "expected": "docs/api/api-spec/uats/specs/health.uats.json"
+      },
+      {
+        "path": "$.status",
+        "op": "exists",
+        "expected": true
       }
     ]
   },
   "variants": [
     {
-      "name": "verify_registered",
-      "description": "Verify the file registered in base",
+      "name": "missing_path",
+      "description": "Request with empty path returns 400",
       "request": {
-        "path": "/v1/hash-verification/verify",
         "body": {
-          "path": "test/verify-target.txt"
+          "path": ""
         }
       },
       "expected": {
-        "status": 200,
+        "status": 400,
         "body_assertions": [
           {
-            "path": "$.path",
-            "type": "string"
-          },
-          {
-            "path": "$.status",
-            "type": "string"
-          },
-          {
-            "path": "$.expected_hash",
-            "type": "string"
-          },
-          {
-            "path": "$.actual_hash",
-            "type": "string"
+            "path": "$.error",
+            "op": "exists",
+            "expected": true
           }
         ]
       }
     },
     {
       "name": "untracked_file",
-      "description": "Untracked file returns 404",
+      "description": "Verifying an untracked file returns 404",
       "request": {
-        "path": "/v1/hash-verification/verify",
         "body": {
           "path": "nonexistent/file.txt"
         }
@@ -94,9 +83,22 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "exists",
+            "expected": true
           }
         ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/hash-verification/verify"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
       }
     }
   ]

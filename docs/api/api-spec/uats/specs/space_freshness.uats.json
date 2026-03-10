@@ -1,0 +1,103 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Space Freshness",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "spaces",
+      "freshness",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-10",
+    "description": "Returns freshness/staleness information for a space TapRoot",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "65989e26218775bc5ccc5bc91942f7f8d4cb4eb545d075fb3db78de42cd411c5"
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/spaces/mdemg-dev/freshness"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "mdemg-dev"
+      },
+      {
+        "path": "$.is_stale",
+        "op": "exists",
+        "expected": true
+      },
+      {
+        "path": "$.ingest_count",
+        "op": "exists",
+        "expected": true
+      },
+      {
+        "path": "$.threshold_hours",
+        "op": "exists",
+        "expected": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "unknown_space",
+      "description": "Unknown space returns 200 with is_stale=true and ingest_count=0",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/spaces/nonexistent-space-xyz/freshness"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.space_id",
+            "op": "equals",
+            "expected": "nonexistent-space-xyz"
+          },
+          {
+            "path": "$.is_stale",
+            "op": "equals",
+            "expected": true
+          },
+          {
+            "path": "$.ingest_count",
+            "op": "equals",
+            "expected": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST returns 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/spaces/mdemg-dev/freshness",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}
