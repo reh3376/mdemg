@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
 )
@@ -336,6 +337,9 @@ func runInit(flags initFlags) error {
 	fmt.Println("Secrets file:  .env (gitignored)")
 	fmt.Printf("Space ID:      %s\n", opts.SpaceID)
 	fmt.Println()
+
+	// Load .env into current process so spawned daemon inherits secrets
+	_ = godotenv.Load(envPath)
 
 	// Auto-start for --quick mode
 	if flags.quick {
