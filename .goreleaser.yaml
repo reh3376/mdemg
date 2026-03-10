@@ -32,22 +32,23 @@ builds:
       - -X mdemg/internal/cli.Commit={{.ShortCommit}}
       - -X mdemg/internal/cli.BuildDate={{.Date}}
 
-  - id: mdemg-linux-amd64
-    main: ./cmd/mdemg
-    binary: mdemg
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-gnu
-      - CXX=zig c++ -target x86_64-linux-gnu
-    goos:
-      - linux
-    goarch:
-      - amd64
-    ldflags:
-      - -s -w
-      - -X mdemg/internal/cli.Version={{.Version}}
-      - -X mdemg/internal/cli.Commit={{.ShortCommit}}
-      - -X mdemg/internal/cli.BuildDate={{.Date}}
+  # Linux build requires zig cross-compiler — uncomment when available
+  # - id: mdemg-linux-amd64
+  #   main: ./cmd/mdemg
+  #   binary: mdemg
+  #   env:
+  #     - CGO_ENABLED=1
+  #     - CC=zig cc -target x86_64-linux-gnu
+  #     - CXX=zig c++ -target x86_64-linux-gnu
+  #   goos:
+  #     - linux
+  #   goarch:
+  #     - amd64
+  #   ldflags:
+  #     - -s -w
+  #     - -X mdemg/internal/cli.Version={{.Version}}
+  #     - -X mdemg/internal/cli.Commit={{.ShortCommit}}
+  #     - -X mdemg/internal/cli.BuildDate={{.Date}}
 
 archives:
   - id: default
