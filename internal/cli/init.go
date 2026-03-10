@@ -185,10 +185,20 @@ func runInit(flags initFlags) error {
 		if hasOpenAIKey {
 			hint = " (OPENAI_API_KEY detected)"
 		}
-		opts.EmbeddingProvider = promptLine(
-			fmt.Sprintf("Embedding provider (ollama/openai/disabled) [%s]%s", defaultProvider, hint),
-			defaultProvider,
-		)
+		for {
+			opts.EmbeddingProvider = promptLine(
+				fmt.Sprintf("Embedding provider (ollama/openai/disabled) [%s]%s", defaultProvider, hint),
+				defaultProvider,
+			)
+			switch opts.EmbeddingProvider {
+			case "ollama", "openai", "disabled":
+				// valid
+			default:
+				fmt.Printf("  Invalid provider %q — must be ollama, openai, or disabled.\n", opts.EmbeddingProvider)
+				continue
+			}
+			break
+		}
 	}
 
 	// Set embedding defaults based on provider
