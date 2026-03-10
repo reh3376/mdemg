@@ -804,6 +804,137 @@ func TestBuildConstraintMap_DuplicateNodeID(t *testing.T) {
 	}
 }
 
+// --- NewGuardrailService tests ---
+
+func TestNewGuardrailService(t *testing.T) {
+	cfg := GuardrailConfig{
+		Enabled:   true,
+		Provider:  "openai",
+		Model:     "gpt-4o",
+		MaxTokens: 2048,
+		TimeoutMs: 5000,
+	}
+	svc := NewGuardrailService(cfg, nil, nil, nil)
+	if svc == nil {
+		t.Fatal("NewGuardrailService returned nil")
+	}
+	if !svc.cfg.Enabled {
+		t.Error("expected cfg.Enabled to be true")
+	}
+	if svc.cfg.Provider != "openai" {
+		t.Errorf("expected Provider %q, got %q", "openai", svc.cfg.Provider)
+	}
+	if svc.cfg.MaxTokens != 2048 {
+		t.Errorf("expected MaxTokens 2048, got %d", svc.cfg.MaxTokens)
+	}
+}
+
+func TestNewGuardrailService_DisabledConfig(t *testing.T) {
+	svc := NewGuardrailService(GuardrailConfig{Enabled: false}, nil, nil, nil)
+	if svc == nil {
+		t.Fatal("NewGuardrailService returned nil")
+	}
+	if svc.cfg.Enabled {
+		t.Error("expected cfg.Enabled to be false")
+	}
+}
+
+// --- buildDiffSummary direct tests ---
+
+func TestBuildDiffSummary_Empty(t *testing.T) {
+	ctx := DiffContext{}
+	got := buildDiffSummary(ctx)
+	if got != "" {
+		t.Errorf("expected empty summary, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_FilesOnly(t *testing.T) {
+	ctx := DiffContext{FilePaths: []string{"main.go", "handler.go"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Files: main.go, handler.go") {
+		t.Errorf("expected Files line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_FunctionsOnly(t *testing.T) {
+	ctx := DiffContext{FunctionNames: []string{"Foo", "Bar"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Functions: Foo, Bar") {
+		t.Errorf("expected Functions line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_ImportsOnly(t *testing.T) {
+	ctx := DiffContext{ImportPaths: []string{"fmt", "os"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Imports: fmt, os") {
+		t.Errorf("expected Imports line, got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_AddedLines(t *testing.T) {
+	ctx := DiffContext{AddedLines: []string{"line1", "line2"}}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Added:") {
+		t.Errorf("expected Added: header, got %q", got)
+	}
+	if !strings.Contains(got, "  + line1") {
+		t.Errorf("expected '  + line1', got %q", got)
+	}
+	if !strings.Contains(got, "  + line2") {
+		t.Errorf("expected '  + line2', got %q", got)
+	}
+}
+
+func TestBuildDiffSummary_AddedLinesMax20(t *testing.T) {
+	lines := make([]string, 30)
+	for i := range lines {
+		lines[i] = "line"
+	}
+	ctx := DiffContext{AddedLines: lines}
+	got := buildDiffSummary(ctx)
+	// Should only include 20 "  + line" entries
+	count := strings.Count(got, "  + line")
+	if count != 20 {
+		t.Errorf("expected 20 added lines in summary, got %d", count)
+	}
+}
+
+func TestBuildDiffSummary_Truncation(t *testing.T) {
+	lines := make([]string, 20)
+	for i := range lines {
+		lines[i] = strings.Repeat("x", 120)
+	}
+	ctx := DiffContext{AddedLines: lines}
+	got := buildDiffSummary(ctx)
+	if len(got) > 2000 {
+		t.Errorf("summary not truncated to 2000 chars: len=%d", len(got))
+	}
+}
+
+func TestBuildDiffSummary_AllSections(t *testing.T) {
+	ctx := DiffContext{
+		FilePaths:     []string{"a.go"},
+		FunctionNames: []string{"Init"},
+		ImportPaths:   []string{"fmt"},
+		AddedLines:    []string{"return nil"},
+	}
+	got := buildDiffSummary(ctx)
+	if !strings.Contains(got, "Files:") {
+		t.Error("missing Files section")
+	}
+	if !strings.Contains(got, "Functions:") {
+		t.Error("missing Functions section")
+	}
+	if !strings.Contains(got, "Imports:") {
+		t.Error("missing Imports section")
+	}
+	if !strings.Contains(got, "Added:") {
+		t.Error("missing Added section")
+	}
+}
+
 // --- rebuildDiff tests ---
 
 func TestRebuildDiff(t *testing.T) {

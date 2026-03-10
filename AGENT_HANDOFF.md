@@ -55,7 +55,7 @@ WHAT REMAINS TO BE DONE:
 1. RELEASE: Create `reh3376/homebrew-mdemg` GitHub repo, tag first release v0.2.0
    - This is the last criterion for Phase 100 acceptance (9/10 pass, brew install needs tap repo)
    - goreleaser config exists, Zig cross-compilation ready
-2. TESTING: Scraper store/orchestrator/reviewer tests (require Neo4j mock infrastructure)
+2. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
 3. TESTING: ~10 endpoints still need UATS specs (spaces CRUD, jobs SSE, linear module)
 4. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
@@ -2541,7 +2541,7 @@ Issues discovered during gap analysis. **Never bypass — fix or document before
 | Lint warnings (8 gosec G118) | RESOLVED | All annotated with `//nolint:gosec`, 0 lint issues |
 | UATS assertion format | RESOLVED | All specs use canonical `{path, op, expected}` format |
 | UATS spec coverage | NEARLY COMPLETE | 146 specs; only SSE endpoint not testable via UATS |
-| Partially tested packages | ACCEPTABLE | Remaining gaps need Neo4j/HTTP mocks (significant infra effort) |
+| Partially tested packages | IMPROVED | Pure functions + constructors tested; remaining gaps need Neo4j/HTTP mocks |
 | Release infrastructure | DEFERRED | Homebrew tap repo + v0.2.0 tag needed |
 | Stale legacy binaries | BLOCKED | 7 old binaries in `bin/`; deletion blocked by pre-bash-check hook |
 
@@ -2560,9 +2560,14 @@ gap_interview_stats, node_archive, node_unarchive, node_delete
 
 | Package | Tests | Remaining Gap |
 |---------|-------|---------------|
-| `internal/scraper/` | 29 tests (parser + scraper) | Store, orchestrator, reviewer need Neo4j mocks |
-| `internal/guardrail/` | 48+ tests (guardrail + diff_parser) | LLM evaluator, constraint retrieval need Neo4j/HTTP mocks |
+| `internal/scraper/` | 54 tests (parser + scraper + store) | Neo4j-dependent methods (CRUD, session ops) need mock infra |
+| `internal/guardrail/` | 60+ tests (guardrail + diff_parser) | LLM evaluator, constraint retrieval need Neo4j/HTTP mocks |
 | `internal/metrics/` | 22 tests, all source files covered | Effectively complete |
+
+Tests added 2026-03-10 for pure functions and constructors:
+- `scraper/store_test.go`: `getStr` (4), `getInt` (5), `getFloat` (5) — type conversion helpers
+- `scraper/scraper_test.go`: `NewDedupChecker` (3), `NewOrchestrator` (1), `NewReviewer` (1), `NewService` (1), `Service` getters (5) — constructors and wiring
+- `guardrail/guardrail_test.go`: `NewGuardrailService` (2), `buildDiffSummary` (8) — constructor and summary builder
 
 ### OPEN: Stale Legacy Binaries in `bin/`
 
