@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/joho/godotenv"
 	"mdemg/internal/config"
 	"mdemg/internal/secrets"
@@ -26,5 +28,19 @@ func loadConfig() (config.Config, error) {
 	_ = godotenv.Load()
 
 	// Layer 1+4: Defaults + env vars
-	return config.FromEnv()
+	cfg, err := config.FromEnv()
+	if err != nil {
+		return cfg, err
+	}
+
+	// Auto-detect project-scoped Neo4j container name for backups.
+	// If still the default "mdemg-neo4j", override with the project-scoped name
+	// so backup full commands target the correct container.
+	if cfg.BackupNeo4jContainer == "mdemg-neo4j" {
+		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
+			cfg.BackupNeo4jContainer = ContainerNameForProject(cwd)
+		}
+	}
+
+	return cfg, nil
 }

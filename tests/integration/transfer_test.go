@@ -12,19 +12,18 @@ import (
 )
 
 // TestTransferExportFileRoundTrip exports a space to a .mdemg file, reads it back,
-// and validates schema. Uses first available space from Neo4j; skips if none.
+// and validates schema. Uses a dedicated test space.
 func TestTransferExportFileRoundTrip(t *testing.T) {
 	driver := SetupTestNeo4j(t)
 	ctx := context.Background()
 
-	spaces, err := transfer.ListSpaces(ctx, driver)
-	if err != nil {
-		t.Fatalf("ListSpaces: %v", err)
-	}
-	if len(spaces) == 0 {
-		t.Skip("no spaces in Neo4j; create a space first to run transfer integration test")
-	}
-	spaceID := spaces[0].SpaceId
+	spaceID := GenerateTestSpaceID("transfer-file")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed nodes for file export
+	SeedObservationNodes(t, driver, spaceID, 5, "learning", 1)
 
 	// Export with metadata-only profile (fast, no large data)
 	cfg, err := transfer.ExportConfigForProfile(spaceID, transfer.ProfileMetadata)
@@ -60,23 +59,22 @@ func TestTransferExportFileRoundTrip(t *testing.T) {
 	}
 }
 
-// TestTransferExportImportRoundTrip exports a space to file and re-imports with conflict=skip.
-// Verifies the import completes successfully (idempotent re-import).
+// TestTransferExportImportRoundTrip exports a dedicated test space to file and
+// re-imports with conflict=skip. Uses a small seeded space (not CMS) to avoid
+// timeout on large datasets.
 func TestTransferExportImportRoundTrip(t *testing.T) {
 	driver := SetupTestNeo4j(t)
 	ctx := context.Background()
 
-	spaces, err := transfer.ListSpaces(ctx, driver)
-	if err != nil {
-		t.Fatalf("ListSpaces: %v", err)
-	}
-	if len(spaces) == 0 {
-		t.Skip("no spaces in Neo4j")
-	}
-	spaceID := spaces[0].SpaceId
+	spaceID := GenerateTestSpaceID("transfer-rt")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
 
-	// Export full (or codebase to keep it smaller)
-	cfg, err := transfer.ExportConfigForProfile(spaceID, transfer.ProfileCodebase)
+	// Seed a small set of nodes so the export has data
+	SeedObservationNodes(t, driver, spaceID, 10, "learning", 2)
+
+	cfg, err := transfer.ExportConfigForProfile(spaceID, transfer.ProfileFull)
 	if err != nil {
 		t.Fatalf("ExportConfigForProfile: %v", err)
 	}
@@ -106,12 +104,11 @@ func TestTransferExportImportRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Import: %v", err)
 	}
-	// Re-import with skip: nodes may be skipped (already exist)
+	// Re-import with skip: nodes should be skipped (already exist)
 	if importResult.NodesCreated+importResult.NodesSkipped+importResult.NodesOverwritten == 0 &&
 		importResult.EdgesCreated+importResult.EdgesSkipped == 0 && len(result.Chunks) > 2 {
 		t.Logf("Import reported 0 node/edge changes; chunks=%d (may be idempotent re-import)", len(result.Chunks))
 	}
-	_ = importResult
 }
 
 // TestTransferDeltaExport verifies Phase 4 incremental export: since_timestamp filters entities
@@ -120,14 +117,13 @@ func TestTransferDeltaExport(t *testing.T) {
 	driver := SetupTestNeo4j(t)
 	ctx := context.Background()
 
-	spaces, err := transfer.ListSpaces(ctx, driver)
-	if err != nil {
-		t.Fatalf("ListSpaces: %v", err)
-	}
-	if len(spaces) == 0 {
-		t.Skip("no spaces in Neo4j")
-	}
-	spaceID := spaces[0].SpaceId
+	spaceID := GenerateTestSpaceID("transfer-delta")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed nodes for delta export
+	SeedObservationNodes(t, driver, spaceID, 5, "learning", 1)
 
 	// Delta with a far-future since: no entities modified after that, so we get 0 nodes/edges
 	// but still metadata + summary with next_cursor
@@ -191,18 +187,19 @@ func TestTransferDeltaExport(t *testing.T) {
 }
 
 // TestTransferExportProfiles runs export with each profile and checks chunk structure.
+// Uses a dedicated test space to avoid timeout on large CMS datasets.
 func TestTransferExportProfiles(t *testing.T) {
 	driver := SetupTestNeo4j(t)
 	ctx := context.Background()
 
-	spaces, err := transfer.ListSpaces(ctx, driver)
-	if err != nil {
-		t.Fatalf("ListSpaces: %v", err)
-	}
-	if len(spaces) == 0 {
-		t.Skip("no spaces in Neo4j")
-	}
-	spaceID := spaces[0].SpaceId
+	spaceID := GenerateTestSpaceID("transfer-prof")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed nodes so exports have data
+	SeedObservationNodes(t, driver, spaceID, 5, "learning", 2)
+	SeedObservationNodes(t, driver, spaceID, 3, "decision", 1)
 
 	profiles := []string{transfer.ProfileFull, transfer.ProfileCodebase, transfer.ProfileCMS, transfer.ProfileLearned, transfer.ProfileMetadata}
 	for _, profile := range profiles {

@@ -78,7 +78,7 @@ func newIngestCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&cfg.progressJSON, "progress-json", false, "Emit structured JSON progress lines to stdout (logs go to stderr)")
 
 	// LLM summary flags
-	cmd.Flags().BoolVar(&cfg.llmSummary, "llm-summary", false, "Use LLM to generate semantic summaries (requires OPENAI_API_KEY)")
+	cmd.Flags().BoolVar(&cfg.llmSummary, "llm-summary", true, "Use LLM to generate semantic summaries (requires OPENAI_API_KEY)")
 	cmd.Flags().StringVar(&cfg.llmSummaryModel, "llm-summary-model", "gpt-4o-mini", "Model for LLM summaries")
 	cmd.Flags().IntVar(&cfg.llmSummaryBatch, "llm-summary-batch", 10, "Files per LLM API call for summaries")
 	cmd.Flags().StringVar(&cfg.llmSummaryProvider, "llm-summary-provider", "openai", "LLM provider for summaries (openai/ollama)")

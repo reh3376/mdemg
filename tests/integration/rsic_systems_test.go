@@ -161,26 +161,46 @@ func TestRSIC_Systems_CalibrationAccumulatesHistory(t *testing.T) {
 		CleanupSpaceWithTest(t, driver, spaceB)
 	})
 
-	// Get initial history count
-	histBefore := GetRSICHistory(t, cfg.MDEMGEndpoint, 100)
-	countBefore := int(histBefore["count"].(float64))
-	t.Logf("history count before: %d", countBefore)
-
 	// Trigger cycle on spaceA
 	ObserveTestNode(t, cfg.MDEMGEndpoint, spaceA, "calibration test node A")
-	TriggerRSICCycle(t, cfg.MDEMGEndpoint, spaceA, nil)
+	respA := TriggerRSICCycle(t, cfg.MDEMGEndpoint, spaceA, nil)
+	cycleA, _ := respA["cycle_id"].(string)
 
 	// Trigger cycle on spaceB (different space avoids cooldown)
 	ObserveTestNode(t, cfg.MDEMGEndpoint, spaceB, "calibration test node B")
-	TriggerRSICCycle(t, cfg.MDEMGEndpoint, spaceB, nil)
+	respB := TriggerRSICCycle(t, cfg.MDEMGEndpoint, spaceB, nil)
+	cycleB, _ := respB["cycle_id"].(string)
 
-	// History should have grown by at least 2
-	histAfter := GetRSICHistory(t, cfg.MDEMGEndpoint, 100)
+	// Verify both cycles appear in history (count may stay flat if at capacity)
+	histAfter := GetRSICHistory(t, cfg.MDEMGEndpoint, 200)
 	countAfter := int(histAfter["count"].(float64))
 	t.Logf("history count after: %d", countAfter)
 
-	if countAfter < countBefore+2 {
-		t.Errorf("expected history count to increase by >=2, got before=%d after=%d", countBefore, countAfter)
+	if countAfter < 2 {
+		t.Errorf("expected at least 2 history entries, got %d", countAfter)
+	}
+
+	// Verify both cycle IDs are present in the history
+	historyArr, ok := histAfter["history"].([]any)
+	if !ok {
+		t.Fatalf("expected history array, got %T", histAfter["history"])
+	}
+	foundA, foundB := false, false
+	for _, h := range historyArr {
+		if e, eOK := h.(map[string]any); eOK {
+			if e["cycle_id"] == cycleA {
+				foundA = true
+			}
+			if e["cycle_id"] == cycleB {
+				foundB = true
+			}
+		}
+	}
+	if !foundA {
+		t.Errorf("cycle %s (spaceA) not found in history", cycleA)
+	}
+	if !foundB {
+		t.Errorf("cycle %s (spaceB) not found in history", cycleB)
 	}
 
 	// Calibration endpoint should be accessible and have a calibration key

@@ -43,6 +43,7 @@ func newDBCmd() *cobra.Command {
 	cmd.AddCommand(newDBStopCmd())
 	cmd.AddCommand(newDBStatusCmd())
 	cmd.AddCommand(newDBShellCmd())
+	cmd.AddCommand(newDBBackupCmd())
 
 	return cmd
 }
@@ -452,6 +453,7 @@ func runDBStart(boltPort, httpPort int, password string) error {
 			"-e", "NEO4J_server_memory_pagecache_size=512m",
 			"-e", "NEO4J_PLUGINS=[\"apoc\"]",
 			"-v", volumeName + ":/data",
+			"-v", volumeName + "-backup:/backup",
 			neo4jImage,
 		}
 		_, err := RunDockerCommand(dockerArgs...)

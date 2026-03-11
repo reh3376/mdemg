@@ -421,6 +421,10 @@ func runStatus() error {
 		if embProvider == "" {
 			embProvider = "disabled"
 		}
+		// Redact values that look like API keys (sk-*, key-*, etc.)
+		if strings.HasPrefix(embProvider, "sk-") || strings.HasPrefix(embProvider, "key-") || len(embProvider) > 30 {
+			embProvider = "REDACTED (invalid provider — re-run mdemg init)"
+		}
 		fmt.Printf("  Embedding: %s", embProvider)
 		switch embProvider {
 		case "openai":

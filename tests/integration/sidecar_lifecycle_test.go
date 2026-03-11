@@ -18,9 +18,17 @@ import (
 func sidecarBinary(t *testing.T) string {
 	t.Helper()
 	if b := os.Getenv("MDEMG_BINARY"); b != "" {
-		return b
+		abs, err := filepath.Abs(b)
+		if err != nil {
+			return b
+		}
+		return abs
 	}
-	return "../../bin/mdemg"
+	abs, err := filepath.Abs("../../bin/mdemg")
+	if err != nil {
+		t.Fatalf("cannot resolve binary path: %v", err)
+	}
+	return abs
 }
 
 // runSidecarCmd executes `mdemg sidecar <args>` in the given directory.

@@ -1596,9 +1596,9 @@ class Runner:
             if skip_reason:
                 skip_result = SpecResult(
                     spec_path=str(spec),
-                    api_name="unknown",
-                    method="",
-                    endpoint="",
+                    api_name=cfg.get("api", {}).get("name", spec.stem),
+                    method=cfg.get("request", {}).get("method", ""),
+                    endpoint=cfg.get("request", {}).get("path", ""),
                     status=Status.SKIP,
                     error_message=skip_reason,
                 )

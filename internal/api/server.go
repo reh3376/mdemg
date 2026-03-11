@@ -473,7 +473,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicPlanner := ape.NewPlanner(cfg)
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
-	rsicCalibrator := ape.NewCalibrator(convAdapter)
+	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
 
 	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
 	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, nil)

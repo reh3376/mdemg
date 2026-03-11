@@ -17,10 +17,19 @@ type YAMLConfig struct {
 	Server    ServerYAML    `yaml:"server"`
 	LLM       LLMYAML       `yaml:"llm,omitempty"`
 	Embedding EmbeddingYAML `yaml:"embedding"`
+	Backup    BackupYAML    `yaml:"backup,omitempty"`
 	Retrieval RetrievalYAML `yaml:"retrieval,omitempty"`
 	Learning  LearningYAML  `yaml:"learning,omitempty"`
 	Plugins   PluginsYAML   `yaml:"plugins,omitempty"`
 	Schema    SchemaYAML    `yaml:"schema,omitempty"`
+}
+
+// BackupYAML holds periodic backup and retention settings.
+type BackupYAML struct {
+	Enabled        bool   `yaml:"enabled,omitempty"`         // Enable automatic backups (default: true for project repos)
+	StorageDir     string `yaml:"storage_dir,omitempty"`     // Backup directory (default: .mdemg/backups)
+	IntervalHours  int    `yaml:"interval_hours,omitempty"`  // Hours between partial backups (default: 24)
+	RetentionCount int    `yaml:"retention_count,omitempty"` // Keep last N backups per type (default: 2)
 }
 
 // LLMYAML holds top-level LLM text-generation settings that cascade to all features.
@@ -105,6 +114,11 @@ var yamlEnvMapping = []struct {
 	{"plugins.enabled", "PLUGINS_ENABLED", nil},
 	{"plugins.dir", "PLUGINS_DIR", nil},
 	{"schema.version", "REQUIRED_SCHEMA_VERSION", nil},
+	{"backup.enabled", "BACKUP_ENABLED", nil},
+	{"backup.storage_dir", "BACKUP_STORAGE_DIR", nil},
+	{"backup.interval_hours", "BACKUP_PARTIAL_INTERVAL_HOURS", nil},
+	{"backup.retention_count", "BACKUP_RETENTION_FULL_COUNT", nil},
+	{"backup.retention_count", "BACKUP_RETENTION_PARTIAL_COUNT", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.
@@ -232,6 +246,18 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 	}
 	setIfNonEmpty(m, "plugins.dir", cfg.Plugins.Dir)
 
+	// Backup
+	if cfg.Backup.Enabled {
+		m["backup.enabled"] = "true"
+	}
+	setIfNonEmpty(m, "backup.storage_dir", cfg.Backup.StorageDir)
+	if cfg.Backup.IntervalHours > 0 {
+		m["backup.interval_hours"] = strconv.Itoa(cfg.Backup.IntervalHours)
+	}
+	if cfg.Backup.RetentionCount > 0 {
+		m["backup.retention_count"] = strconv.Itoa(cfg.Backup.RetentionCount)
+	}
+
 	// Schema
 	if cfg.Schema.Version > 0 {
 		m["schema.version"] = strconv.Itoa(cfg.Schema.Version)
@@ -355,6 +381,10 @@ type InitOptions struct {
 	EmbeddingModel    string
 	EmbeddingEndpoint string
 	SchemaVersion     int
+	BackupEnabled     bool
+	BackupStorageDir  string
+	BackupInterval    int
+	BackupRetention   int
 }
 
 // GenerateConfigYAML produces a config.yaml file from wizard answers.
@@ -387,6 +417,15 @@ func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 			Provider: opts.EmbeddingProvider,
 			Model:    opts.EmbeddingModel,
 			Endpoint: opts.EmbeddingEndpoint,
+		}
+	}
+
+	if opts.BackupEnabled {
+		cfg.Backup = BackupYAML{
+			Enabled:        true,
+			StorageDir:     opts.BackupStorageDir,
+			IntervalHours:  opts.BackupInterval,
+			RetentionCount: opts.BackupRetention,
 		}
 	}
 
@@ -468,6 +507,10 @@ func GenerateIgnoreFile(projectDir string) ([]byte, error) {
 		"# Secrets / environment",
 		".env",
 		".env.*",
+		"",
+		"# MDEMG runtime",
+		".mdemg/backups/",
+		".mdemg/logs/",
 	)
 
 	// Seed from .gitignore if it exists

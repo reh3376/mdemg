@@ -168,7 +168,7 @@ type Config struct {
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
 
 	// LLM Summary settings (semantic summaries for ingest)
-	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: false)
+	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: true)
 	LLMSummaryProvider  string // LLM provider for summaries (openai/ollama, default: openai)
 	LLMSummaryModel     string // Model for summaries (default: gpt-4o-mini)
 	LLMSummaryMaxTokens int    // Max tokens per summary (default: 150)
@@ -278,6 +278,7 @@ type Config struct {
 	RSICWarnThreshold      float64 // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
 	RSICForceThreshold     float64 // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
 	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
+	RSICMaxHistoryEntries  int     // RSIC_MAX_HISTORY_ENTRIES — max calibration history entries per type (default: 1000)
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
 	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
@@ -312,8 +313,8 @@ type Config struct {
 	ScraperMaxContentLengthKB int    // SCRAPER_MAX_CONTENT_LENGTH_KB — max content length in KB (default: 500)
 
 	// Neo4j Backup & Restore (Phase 70)
-	BackupEnabled              bool   // BACKUP_ENABLED — enable backup module (default: false)
-	BackupStorageDir           string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: "./backups")
+	BackupEnabled              bool   // BACKUP_ENABLED — enable backup module (default: true)
+	BackupStorageDir           string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: ".mdemg/backups")
 	BackupFullCmd              string // BACKUP_FULL_CMD — command for full backups (default: "docker")
 	BackupNeo4jContainer       string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
 	BackupFullIntervalHours    int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
@@ -1198,7 +1199,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// LLM Summary settings (semantic summaries for ingest)
-	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", false)
+	llmSummaryEnabled := getBool("LLM_SUMMARY_ENABLED", true)
 	llmSummaryProvider := get("LLM_SUMMARY_PROVIDER", llmProvider)
 	llmSummaryModel := get("LLM_SUMMARY_MODEL", llmModel)
 	llmSummaryMaxTokens, err := atoi("LLM_SUMMARY_MAX_TOKENS", 150)
@@ -1446,6 +1447,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicMaxHistoryEntries, err := atoi("RSIC_MAX_HISTORY_ENTRIES", 1000)
+	if err != nil {
+		return Config{}, err
+	}
 	rsicMinConfidence, err := atof("RSIC_MIN_CONFIDENCE", 0.3)
 	if err != nil {
 		return Config{}, err
@@ -1537,8 +1542,8 @@ func FromEnv() (Config, error) {
 	}
 
 	// Neo4j Backup & Restore (Phase 70)
-	backupEnabled := getBool("BACKUP_ENABLED", false)
-	backupStorageDir := get("BACKUP_STORAGE_DIR", "./backups")
+	backupEnabled := getBool("BACKUP_ENABLED", true)
+	backupStorageDir := get("BACKUP_STORAGE_DIR", ".mdemg/backups")
 	backupFullCmd := get("BACKUP_FULL_CMD", "docker")
 	backupNeo4jContainer := get("BACKUP_NEO4J_CONTAINER", "mdemg-neo4j")
 	backupFullIntervalHours, err := atoi("BACKUP_FULL_INTERVAL_HOURS", 168)
@@ -1555,19 +1560,19 @@ func FromEnv() (Config, error) {
 	if backupPartialIntervalHours < 1 {
 		return Config{}, errors.New("BACKUP_PARTIAL_INTERVAL_HOURS must be >= 1")
 	}
-	backupRetentionFullCount, err := atoi("BACKUP_RETENTION_FULL_COUNT", 4)
+	backupRetentionFullCount, err := atoi("BACKUP_RETENTION_FULL_COUNT", 2)
 	if err != nil {
 		return Config{}, err
 	}
-	backupRetentionPartialCount, err := atoi("BACKUP_RETENTION_PARTIAL_COUNT", 14)
+	backupRetentionPartialCount, err := atoi("BACKUP_RETENTION_PARTIAL_COUNT", 2)
 	if err != nil {
 		return Config{}, err
 	}
-	backupRetentionMaxAgeDays, err := atoi("BACKUP_RETENTION_MAX_AGE_DAYS", 90)
+	backupRetentionMaxAgeDays, err := atoi("BACKUP_RETENTION_MAX_AGE_DAYS", 30)
 	if err != nil {
 		return Config{}, err
 	}
-	backupRetentionMaxStorageGB, err := atoi("BACKUP_RETENTION_MAX_STORAGE_GB", 50)
+	backupRetentionMaxStorageGB, err := atoi("BACKUP_RETENTION_MAX_STORAGE_GB", 2)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2153,6 +2158,7 @@ func FromEnv() (Config, error) {
 		RSICWarnThreshold:      rsicWarnThreshold,
 		RSICForceThreshold:     rsicForceThreshold,
 		RSICCalibrationDays:    rsicCalibrationDays,
+		RSICMaxHistoryEntries:  rsicMaxHistoryEntries,
 		RSICMinConfidence:      rsicMinConfidence,
 		RSICTriggerCooldownSec:  rsicTriggerCooldownSec,
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,

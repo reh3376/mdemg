@@ -233,8 +233,8 @@ func CreateTestEmbedding(dims int, seed float32) []float32 {
 }
 
 // DefaultEmbeddingDims is the default embedding dimension for tests.
-// Using 1536 to match the Neo4j vector index (OpenAI ada-002 dimension).
-const DefaultEmbeddingDims = 1536
+// Using 3072 to match the Neo4j vector index (OpenAI text-embedding-3-large dimension).
+const DefaultEmbeddingDims = 3072
 
 // CreateQueryEmbedding creates a standard query embedding [1, 0, 0, ...].
 // This is used with CreateControlledEmbedding to achieve specific cosine similarities.

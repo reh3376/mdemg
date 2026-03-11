@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-const stubDimensions = 1536
+const stubDimensions = 3072
 
 // Stub implements the Embedder interface with deterministic fixed-dimension vectors.
 // It requires no external services, making it suitable for CI and testing environments.
