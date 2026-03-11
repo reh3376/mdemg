@@ -8,7 +8,7 @@
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
 <!--
-=== AGENT RESUME CONTEXT (2026-03-09) ===
+=== AGENT RESUME CONTEXT (2026-03-10) ===
 
 WHAT IS MDEMG? (Read VISION.md for full philosophy)
 MDEMG (Multi-Dimensional Emergent Memory Graph) is a cognitive substrate for AI agents —
@@ -32,16 +32,29 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
   104: Active Guardrails, 105: Global Meta-Learning
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1 brew install verified)
 - Quality hardening (gap analysis triage) — COMPLETE
-  - 129 UATS contract test specs, all using canonical assertion format
+  - 274 UATS contract test specs, all using canonical assertion format
   - 148 Go test files with comprehensive coverage
   - golangci-lint: 0 issues
   - Dead code removed (internal/observations/, internal/domain/)
+- CI: ALL GREEN (push + pull_request) as of 2026-03-10
+
+LAST SESSION (2026-03-10):
+- Documentation overhaul: 4 wiki docs + simplified README pushed to reh3376/homebrew-mdemg
+  - docs/cli-reference.md (2,038 lines) — all commands, flags, env vars
+  - docs/api-reference.md (2,931 lines) — all HTTP endpoints with curl examples
+  - docs/cms-rsic-guide.md (1,344 lines) — CMS + RSIC usage guide
+  - docs/ingestion-guide.md (1,040 lines) — all 8 ingestion methods
+  - README.md simplified from 674 → 145 lines (links to wiki docs)
+- CI fix: stub embedder dimensions 1536→3072 to match V0018 vector index migration
+- CI fix: UATS runner now shows real spec names for skipped specs (was "unknown")
+- All CI checks passing: CI/Test (push), CI/Test (pull_request), UXTS Canonical Specs
 
 REPO STATE:
 - Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
 - CRITICAL: For the mdemg-dev CMS space, ALWAYS use `docker compose up -d neo4j` to preserve CMS data (volume: mdemg_neo4j_data). For fresh projects, `mdemg db start` is safe — it creates project-scoped containers (mdemg-neo4j-{project}) with their own volumes.
+- Embedding dimensions: 3072 (text-embedding-3-large). Stub embedder matches at 3072.
 
 MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 1. Never commit to main — all work on mdemg-dev01
@@ -53,11 +66,12 @@ MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 
 WHAT REMAINS TO BE DONE:
 1. RELEASE: ~~Create homebrew-mdemg repo, tag first release~~ DONE (v0.2.1 released, brew install verified)
-2. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
-3. TESTING: ~10 endpoints still need UATS specs (spaces CRUD, jobs SSE, linear module)
-4. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
+2. DOCUMENTATION: ~~Overhaul homebrew-mdemg docs~~ DONE (4 wiki docs + simplified README)
+3. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
+4. TESTING: ~10 endpoints still need UATS specs (spaces CRUD, jobs SSE, linear module)
+5. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
-5. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
+6. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
@@ -65,6 +79,13 @@ KEY DOCUMENTS (read in order):
 3. This file — Phase registry, architecture, known issues
 4. docs/development/COGNITIVE_INTELLIGENCE_GAP_ANALYSIS.md — 5 cognitive gaps (all closed)
 5. .claude/projects/.../memory/cognitive-architecture.md — Why gaps 101-105 matter cognitively
+
+HOMEBREW DOCUMENTATION (reh3376/homebrew-mdemg):
+- README.md — Installation, quick start, command table, troubleshooting
+- docs/cli-reference.md — Complete CLI reference (all flags, defaults, examples)
+- docs/api-reference.md — Complete API reference (all endpoints, request/response shapes)
+- docs/cms-rsic-guide.md — CMS & RSIC usage guide (workflows, practical examples)
+- docs/ingestion-guide.md — All 8 ingestion methods with setup instructions
 -->
 
 ---
@@ -77,14 +98,15 @@ KEY DOCUMENTS (read in order):
 4. [Phase Numbering Convention](#4-phase-numbering-convention)
 5. [Phase Registry](#5-phase-registry)
 6. [Completed Phases (31-33)](#6-completed-phases-31-33)
-7. [In-Progress Phases (34+)](#7-in-progress-phases-34)
-8. [Planned Phases (35-40)](#8-planned-phases-35-40)
+7. [Recently Completed Phases](#7-recently-completed-phases)
+8. [Recently Completed DevSpace Phases (35-38)](#8-recently-completed-devspace-phases-35-38)
 9. [Core Infrastructure Phases (41-52)](#9-core-infrastructure-phases-41-52)
 10. [Governance & Testing Frameworks](#10-governance--testing-frameworks)
 11. [File Inventory by Domain](#11-file-inventory-by-domain)
 12. [Development Principles](#12-development-principles)
-13. [Known Issues & Technical Debt](#13-known-issues--technical-debt)
-14. [Quick Reference Commands](#14-quick-reference-commands)
+13. [Planned Phases](#13-planned-phases)
+14. [Known Issues & Technical Debt](#14-known-issues--technical-debt)
+15. [Quick Reference Commands](#15-quick-reference-commands)
 
 ---
 
@@ -110,6 +132,10 @@ It does **NOT** store general knowledge that LLMs already possess.
 | Development Roadmap | `docs/development/DEVELOPMENT_ROADMAP.md` | Feature tracks, benchmarks, retrieval improvements (v4→v11) |
 | API Reference | `docs/development/API_REFERENCE.md` | All HTTP endpoints (1,268 lines) |
 | Collaboration Plan | `docs/specs/development-space-collaboration.md` | Master plan for DevSpace phases (the Space Transfer pipeline) |
+| Homebrew CLI Reference | `reh3376/homebrew-mdemg:docs/cli-reference.md` | Complete CLI flags, defaults, env vars (2,038 lines) |
+| Homebrew API Reference | `reh3376/homebrew-mdemg:docs/api-reference.md` | All REST endpoints with curl examples (2,931 lines) |
+| CMS & RSIC Guide | `reh3376/homebrew-mdemg:docs/cms-rsic-guide.md` | CMS + RSIC workflows and practical examples (1,344 lines) |
+| Ingestion Guide | `reh3376/homebrew-mdemg:docs/ingestion-guide.md` | All 8 ingestion methods with setup (1,040 lines) |
 
 ### Technical Invariants (Do NOT Violate)
 
@@ -129,7 +155,7 @@ It does **NOT** store general knowledge that LLMs already possess.
 | Graph DB | Neo4j 5.x | Docker: `docker compose up -d` |
 | Backend | Go (latest stable) | Service at `cmd/server/main.go` |
 | gRPC | Protocol Buffers | `api/proto/*.proto` |
-| Embeddings | OpenAI `text-embedding-3-small` (1536d) / Ollama `qwen3-embedding:4b` (1536d) | Configurable |
+| Embeddings | OpenAI `text-embedding-3-large` (3072d) / Ollama `qwen3-embedding:4b` (1536d) | Configurable; vector index at 3072d (V0018 migration) |
 | Plugins | Binary sidecar via gRPC Unix sockets | `plugins/*/` |
 
 ### Directory Structure
@@ -180,7 +206,7 @@ plugins/
   linear-module/            # Linear integration plugin
   reflection-module/        # APE reflection plugin
   keyword-booster/          # Sample reasoning plugin
-migrations/                 # Neo4j Cypher migrations (V0001-V0013)
+migrations/                 # Neo4j Cypher migrations (V0001-V0018, 3072-dim vectors)
 tests/
   integration/              # Integration tests (Neo4j required)
   udts/                     # UDTS contract tests (gRPC)
@@ -199,7 +225,7 @@ docs/
 | Label | Purpose |
 |-------|---------|
 | `:TapRoot` | Singleton per `space_id` |
-| `:MemoryNode` | Main memory nodes with embeddings (1536-dim default) |
+| `:MemoryNode` | Main memory nodes with embeddings (3072-dim, V0018 migration) |
 | `:Observation` | Append-only events linked to MemoryNodes |
 | `:SymbolNode` | Extracted code symbols (constants, functions, classes) |
 | `:SchemaMeta` | Schema version tracking |
@@ -245,22 +271,30 @@ docker compose up -d
 ### Apply Migrations
 
 ```bash
+# Modern (preferred — uses embedded migration runner):
+./bin/mdemg db migrate
+
+# Legacy (manual cypher-shell):
 for f in migrations/V*.cypher; do
   echo "Applying $f"
   docker exec -i mdemg-neo4j cypher-shell -u neo4j -p testpassword < "$f"
 done
 ```
 
-### Run the Go Service
+### Run the MDEMG Server
 
 ```bash
-cd /Users/reh3376/mdemg
-export NEO4J_URI=bolt://localhost:7687
-export NEO4J_USER=neo4j
-export NEO4J_PASS=testpassword
-export REQUIRED_SCHEMA_VERSION=4
-export VECTOR_INDEX_NAME=memNodeEmbedding
-go run ./cmd/server
+# Build the unified CLI binary
+go build -o bin/mdemg ./cmd/mdemg
+
+# Start server (daemon mode, with auto-migration)
+./bin/mdemg start --auto-migrate
+
+# Or run in foreground for development
+./bin/mdemg serve
+
+# Check status
+./bin/mdemg status
 ```
 
 ### Run Tests
@@ -272,24 +306,25 @@ go test ./internal/... -v
 # Integration tests (Neo4j must be running)
 go test -tags=integration ./tests/integration/... -v
 
-# UDTS contract tests (server must be running on port 50051/50052)
-UDTS_TARGET=localhost:50052 go test ./tests/udts/... -v
+# UATS contract tests (server must be running)
+make test-api BASE_URL=http://localhost:9999
 
-# Full build check
+# Full build + lint check
 go build ./... && go vet ./...
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
 ```
 
-### Run Space Transfer
+### Space Management
 
 ```bash
+# List spaces
+./bin/mdemg space list
+
 # Export a space to file
-go run ./cmd/space-transfer export -space-id demo -output demo.mdemg
+./bin/mdemg space export --space-id demo --output demo.mdemg
 
-# Serve gRPC for remote pulls (+ DevSpace hub)
-go run ./cmd/space-transfer serve -port 50052 -enable-devspace -devspace-data-dir ./devspace-data
-
-# Pull from remote
-go run ./cmd/space-transfer pull -remote localhost:50052 -space-id demo -output demo.mdemg
+# Import a space from file
+./bin/mdemg space import --file demo.mdemg --conflict skip
 ```
 
 ### Environment Variables
@@ -2461,6 +2496,8 @@ Cleaned up Neo4j from 140 spaces (~37K nodes) to **2 spaces (20,041 nodes)**:
 | ~~Phase 46-PR Pipeline Registry~~ | ✅ Complete | `internal/hidden/pipeline.go` | Dynamic pipeline replaces 4-file shotgun surgery. 8 unit tests. See `docs/development/REGISTRY.md`. |
 | ~~Phase 48-SR Skill Registry~~ | ✅ Complete | `internal/api/handlers_skills.go` | 3 endpoints (list/recall/register), 3 UATS specs. Migrated 2 skill files (1,450→46 lines). |
 | ~~Distribution Stats UATS failure~~ | ✅ Fixed | `docs/api/api-spec/uats/specs/` | Previously nested response path issue — now passing |
+| ~~Stub embedder dimension mismatch~~ | ✅ Fixed | `internal/embeddings/stub.go` | Stub produced 1536-dim vectors vs 3072-dim vector index (V0018). Fixed stub to 3072. CI now green. |
+| ~~UATS runner "unknown" spec names~~ | ✅ Fixed | `docs/api/api-spec/uats/runners/uats_runner.py` | Skipped specs showed "unknown" name. Now extracts real name from loaded JSON before tag filtering. |
 | Obsidian module not started | Low | Phase 44/45 | Listed in roadmap but no implementation |
 | ~~Context Cooler (APE) not started~~ | ✅ Complete | Phase 45.5 | `internal/conversation/cooler.go` (439 lines), plugin, 2 API endpoints, unit tests |
 | ~~`internal/ape/` low coverage~~ | ✅ Fixed | `internal/ape/scheduler_test.go` | 1,477-line test file |
@@ -2475,53 +2512,56 @@ Cleaned up Neo4j from 140 spaces (~37K nodes) to **2 spaces (20,041 nodes)**:
 
 ```bash
 # === Build & Verify ===
-go build ./...
-go vet ./...
-go test ./internal/... -v
-go test -tags=integration ./tests/integration/... -v
+go build -o bin/mdemg ./cmd/mdemg              # Build unified CLI binary
+go build ./...                                  # Compile all packages
+go vet ./...                                    # Static analysis
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...  # Lint (must use v2)
 
-# === Space Transfer ===
-go run ./cmd/space-transfer export -space-id demo -output demo.mdemg
-go run ./cmd/space-transfer import -input demo.mdemg -conflict skip
-go run ./cmd/space-transfer serve -port 50052 -enable-devspace
-go run ./cmd/space-transfer pull -remote localhost:50052 -space-id demo -output demo.mdemg
+# === Testing ===
+go test ./internal/... -v                       # Unit tests (30 packages)
+go test -tags=integration ./tests/integration/... -v  # Integration tests (Neo4j required)
+make test-api BASE_URL=http://localhost:9999    # Run all 274 UATS contract specs
+make test-rsic                                  # RSIC tests (unit + integration + UATS)
 
-# === Delta Export (Phase 34) ===
-go run ./cmd/space-transfer export -space-id demo -since-timestamp "2026-01-01T00:00:00Z" -output delta.mdemg
-
-# === UDTS Tests ===
-UDTS_TARGET=localhost:50052 go test ./tests/udts/... -v
-
-# === UOBS Tests (Observability) ===
-python3 docs/tests/uobs/runners/uobs_runner.py --spec "docs/tests/uobs/specs/*.uobs.json"
-python3 docs/tests/uobs/runners/uobs_runner.py --spec docs/tests/uobs/specs/embedding_health.uobs.json
-
-# === UATS Tests ===
-make test-api                                         # Run all 102 UATS specs
+# === UATS Management ===
 python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
 python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
-
-# === Health Endpoints ===
-curl http://localhost:9999/healthz                    # Liveness probe
-curl http://localhost:9999/readyz                     # Readiness probe
-curl http://localhost:9999/v1/embedding/health        # Embedding model health
-
-# === Ingestion ===
-go run ./cmd/ingest-codebase --space-id mdemg-codebase --path /Users/reh3376/mdemg --extract-symbols
-go run ./cmd/ingest-codebase --incremental --space-id mdemg-codebase --since HEAD~5
+# CI uses: --exclude-tag unts,llm_required (stub embedder handles embedding_required specs)
 
 # === Server ===
-NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASS=testpassword \
-  REQUIRED_SCHEMA_VERSION=4 go run ./cmd/server
+./bin/mdemg start --auto-migrate               # Start server daemon with migrations
+./bin/mdemg stop                                # Stop server
+./bin/mdemg status                              # Show server + db + embedding status
+./bin/mdemg serve                               # Run server in foreground (development)
 
-# === Neo4j ===
-docker compose up -d
-docker exec -i mdemg-neo4j cypher-shell -u neo4j -p testpassword
+# === Database ===
+docker compose up -d neo4j                      # Start Neo4j (preserves mdemg_neo4j_data volume)
+./bin/mdemg db migrate                          # Apply pending migrations
+./bin/mdemg db status                           # Show container and schema status
+./bin/mdemg db shell                            # Open interactive cypher-shell
 
-# === Manifest Verification ===
-# scripts/verify-manifest.sh
+# === Ingestion ===
+./bin/mdemg ingest --path . --space-id my-project --extract-symbols  # Full ingest
+./bin/mdemg ingest --path . --incremental --since HEAD~5             # Incremental
+./bin/mdemg consolidate --space-id my-project                        # Hidden layer clustering
+./bin/mdemg watch --space-id my-project --path .                     # File watcher
 
-# === Proto Regeneration ===
+# === Space Management ===
+./bin/mdemg space list                          # List all spaces
+./bin/mdemg space export --space-id demo --output demo.mdemg
+./bin/mdemg space import --file demo.mdemg --conflict skip
+
+# === Health Endpoints ===
+curl http://localhost:9999/healthz              # Liveness probe
+curl http://localhost:9999/readyz               # Readiness probe
+curl http://localhost:9999/v1/embedding/health  # Embedding model health
+
+# === CMS Memory ===
+curl -s -X POST http://localhost:9999/v1/conversation/resume \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
+
+# === Proto Regeneration (if modifying gRPC) ===
 protoc --go_out=. --go-grpc_out=. api/proto/space-transfer.proto
 protoc --go_out=. --go-grpc_out=. api/proto/devspace.proto
 protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
@@ -2541,7 +2581,7 @@ Issues discovered during gap analysis. **Never bypass — fix or document before
 | Dead code | RESOLVED | `internal/observations/` and `internal/domain/` removed |
 | Lint warnings (8 gosec G118) | RESOLVED | All annotated with `//nolint:gosec`, 0 lint issues |
 | UATS assertion format | RESOLVED | All specs use canonical `{path, op, expected}` format |
-| UATS spec coverage | NEARLY COMPLETE | 146 specs; only SSE endpoint not testable via UATS |
+| UATS spec coverage | NEARLY COMPLETE | 274 specs; only SSE endpoint not testable via UATS |
 | Partially tested packages | IMPROVED | Pure functions + constructors tested; remaining gaps need Neo4j/HTTP mocks |
 | Release infrastructure | RESOLVED | Homebrew tap repo created, v0.2.1 released and tested |
 | Stale legacy binaries | BLOCKED | 7 old binaries in `bin/`; deletion blocked by pre-bash-check hook |
