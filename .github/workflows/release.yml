@@ -9,8 +9,52 @@ permissions:
   contents: write
 
 jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build Windows amd64
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build \
+            -ldflags "-s -w -X mdemg/internal/cli.Version=$VERSION -X mdemg/internal/cli.Commit=$(git rev-parse --short HEAD) -X mdemg/internal/cli.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o mdemg.exe ./cmd/mdemg
+
+      - name: Create archive
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          Compress-Archive -Path mdemg.exe -DestinationPath "mdemg_${version}_windows_amd64.zip"
+
+      - name: Generate checksum
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sha256sum "mdemg_${VERSION}_windows_amd64.zip" > windows_checksums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: |
+            mdemg_*_windows_*.zip
+            windows_checksums.txt
+
   release:
     name: Build & Release
+    needs: build-windows
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -28,6 +72,12 @@ jobs:
         run: |
           brew install zig
 
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: dist/windows
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -37,3 +87,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Attach Windows binaries to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Upload Windows zip to the release created by GoReleaser
+          for f in dist/windows/mdemg_*_windows_*.zip; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          # Append Windows checksums to the release checksums
+          if [ -f dist/windows/windows_checksums.txt ]; then
+            # Download existing checksums, append, re-upload
+            gh release download "$TAG" -p "checksums.txt" -D /tmp/release-checksums || true
+            if [ -f /tmp/release-checksums/checksums.txt ]; then
+              cat dist/windows/windows_checksums.txt >> /tmp/release-checksums/checksums.txt
+              gh release upload "$TAG" /tmp/release-checksums/checksums.txt --clobber
+            fi
+          fi
