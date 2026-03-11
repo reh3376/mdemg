@@ -1,0 +1,6 @@
+[submodule "packaging/homebrew-mdemg"]
+	path = packaging/homebrew-mdemg
+	url = https://github.com/reh3376/homebrew-mdemg.git
+[submodule "packaging/mdemg-windows"]
+	path = packaging/mdemg-windows
+	url = https://github.com/reh3376/mdemg-windows.git
