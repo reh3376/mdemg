@@ -1,0 +1,31 @@
+{
+    "version": "0.2.8",
+    "description": "MDEMG — Multi-Dimensional Emergent Memory Graph. Persistent memory for AI agents with Hebbian learning.",
+    "homepage": "https://github.com/reh3376/mdemg",
+    "license": "MIT",
+    "notes": [
+        "MDEMG requires Docker Desktop for Neo4j.",
+        "Run 'mdemg init' to get started.",
+        "Docs: https://github.com/reh3376/homebrew-mdemg"
+    ],
+    "suggest": {
+        "Docker Desktop": ["extras/docker-desktop"]
+    },
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/reh3376/mdemg/releases/download/v0.2.8/mdemg_0.2.8_windows_amd64.zip",
+            "hash": ""
+        }
+    },
+    "bin": "mdemg.exe",
+    "checkver": {
+        "github": "https://github.com/reh3376/mdemg"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/reh3376/mdemg/releases/download/v$version/mdemg_$version_windows_amd64.zip"
+            }
+        }
+    }
+}
