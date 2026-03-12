@@ -1299,6 +1299,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/cycle", s.handleSelfImproveCycle)
 	mux.HandleFunc("/v1/self-improve/history", s.handleSelfImproveHistory)
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
+	mux.HandleFunc("/v1/self-improve/orchestration/reset", s.handleOrchestrationReset)
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 	mux.HandleFunc("/v1/self-improve/signals", s.handleSelfImproveSignals)
 	mux.HandleFunc("/v1/self-improve/rollback", s.handleSelfImproveRollback)

@@ -304,6 +304,24 @@ func (s *Server) handleSelfImproveCalibration(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// ─── POST /v1/self-improve/orchestration/reset ───
+
+func (s *Server) handleOrchestrationReset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.orchestrationPolicy == nil {
+		http.Error(w, "orchestration policy not initialised", http.StatusServiceUnavailable)
+		return
+	}
+
+	s.orchestrationPolicy.ResetState()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"reset": true,
+	})
+}
+
 // ─── GET /v1/self-improve/health ───
 
 func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request) {

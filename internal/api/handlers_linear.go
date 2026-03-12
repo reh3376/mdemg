@@ -10,6 +10,24 @@ import (
 	"mdemg/internal/plugins"
 )
 
+// isLinearUnavailableError checks if a CRUD error indicates the service is
+// unconfigured or unavailable, warranting a 503 response.
+func isLinearUnavailableError(errMsg string) bool {
+	lower := strings.ToLower(errMsg)
+	return strings.Contains(lower, "not configured") ||
+		strings.Contains(lower, "api_key") ||
+		strings.Contains(lower, "unimplemented") ||
+		strings.Contains(lower, "unknown service")
+}
+
+// linearErrorStatus returns the appropriate HTTP status for a CRUD error response.
+func linearErrorStatus(errMsg string) int {
+	if isLinearUnavailableError(errMsg) {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusBadRequest
+}
+
 // findCRUDModule finds the first CRUD-capable module (or a specific one by ID).
 func (s *Server) findCRUDModule(moduleID string) *plugins.ModuleInfo {
 	if s.pluginMgr == nil {
@@ -108,11 +126,15 @@ func (s *Server) handleLinearIssueCreate(ctx context.Context, w http.ResponseWri
 		Fields:     req,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.issue.create")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.issue.create")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -125,12 +147,16 @@ func (s *Server) handleLinearIssueRead(ctx context.Context, w http.ResponseWrite
 		Id:         id,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.issue.read")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.issue.read")
+		}
 		return
 	}
 	if !resp.Success {
-		status := http.StatusBadRequest
-		if strings.Contains(resp.Error, "not found") {
+		status := linearErrorStatus(resp.Error)
+		if status == http.StatusBadRequest && strings.Contains(resp.Error, "not found") {
 			status = http.StatusNotFound
 		}
 		writeJSON(w, status, map[string]any{"error": resp.Error})
@@ -173,11 +199,15 @@ func (s *Server) handleLinearIssueList(ctx context.Context, w http.ResponseWrite
 		Cursor:     cursor,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.issue.list")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.issue.list")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -205,11 +235,15 @@ func (s *Server) handleLinearIssueUpdate(ctx context.Context, w http.ResponseWri
 		Fields:     req,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.issue.update")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.issue.update")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -222,11 +256,15 @@ func (s *Server) handleLinearIssueDelete(ctx context.Context, w http.ResponseWri
 		Id:         id,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.issue.delete")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.issue.delete")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -293,11 +331,15 @@ func (s *Server) handleLinearProjectCreate(ctx context.Context, w http.ResponseW
 		Fields:     req,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.project.create")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.project.create")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -310,12 +352,16 @@ func (s *Server) handleLinearProjectRead(ctx context.Context, w http.ResponseWri
 		Id:         id,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.project.read")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.project.read")
+		}
 		return
 	}
 	if !resp.Success {
-		status := http.StatusBadRequest
-		if strings.Contains(resp.Error, "not found") {
+		status := linearErrorStatus(resp.Error)
+		if status == http.StatusBadRequest && strings.Contains(resp.Error, "not found") {
 			status = http.StatusNotFound
 		}
 		writeJSON(w, status, map[string]any{"error": resp.Error})
@@ -349,11 +395,15 @@ func (s *Server) handleLinearProjectList(ctx context.Context, w http.ResponseWri
 		Cursor:     cursor,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.project.list")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.project.list")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -381,11 +431,15 @@ func (s *Server) handleLinearProjectUpdate(ctx context.Context, w http.ResponseW
 		Fields:     req,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.project.update")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.project.update")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
@@ -429,11 +483,15 @@ func (s *Server) handleLinearComments(w http.ResponseWriter, r *http.Request) {
 		Fields:     req,
 	})
 	if err != nil {
-		writeInternalError(w, err, "linear.comment.create")
+		if isLinearUnavailableError(err.Error()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+		} else {
+			writeInternalError(w, err, "linear.comment.create")
+		}
 		return
 	}
 	if !resp.Success {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": resp.Error})
+		writeJSON(w, linearErrorStatus(resp.Error), map[string]any{"error": resp.Error})
 		return
 	}
 
