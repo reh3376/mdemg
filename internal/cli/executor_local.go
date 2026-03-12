@@ -5,7 +5,6 @@ import (
 	"os"
 	osExec "os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -48,7 +47,7 @@ func (e *LocalExecutor) StartDaemon(serveArgs []string, extraEnv ...string) (int
 	daemon := osExec.Command(execPath, serveArgs...)
 	daemon.Stdout = logFile
 	daemon.Stderr = logFile
-	daemon.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	setDaemonSysProcAttr(daemon)
 	daemon.Env = append(os.Environ(), extraEnv...)
 
 	if startErr := daemon.Start(); startErr != nil {
@@ -65,8 +64,8 @@ func (e *LocalExecutor) StartDaemon(serveArgs []string, extraEnv ...string) (int
 
 // StopDaemon sends SIGTERM, polls for exit (30s), then SIGKILL.
 func (e *LocalExecutor) StopDaemon(pid int) error {
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("SIGTERM: %w", err)
+	if err := terminateProcess(pid); err != nil {
+		return fmt.Errorf("terminate process: %w", err)
 	}
 
 	deadline := time.Now().Add(30 * time.Second)
@@ -78,7 +77,7 @@ func (e *LocalExecutor) StopDaemon(pid int) error {
 	}
 
 	// Force kill after timeout
-	_ = syscall.Kill(pid, syscall.SIGKILL)
+	_ = forceKillProcess(pid)
 	time.Sleep(1 * time.Second)
 	return nil
 }
