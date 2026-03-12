@@ -112,6 +112,15 @@ func runSidecarDoctor(format string) error {
 	// Check 7: ollama.models
 	checks = append(checks, runOllamaModelsCheck(ollamaCheck.Status))
 
+	// Check 8: claude.mcp — verify mdemg is configured in the right MCP config file
+	checks = append(checks, runClaudeMCPCheck(cwd))
+
+	// Check 9: claude.trust — verify project trust is accepted in ~/.claude.json
+	checks = append(checks, runClaudeTrustCheck(cwd))
+
+	// Check 10: claude.project-servers — verify enableAllProjectMcpServers is true
+	checks = append(checks, runClaudeProjectServersCheck(cwd))
+
 	// Tally and build report
 	summary := sidecar.TallyChecks(checks)
 	exitCode := sidecar.DoctorExitCode(summary)
@@ -638,6 +647,250 @@ func runDockerContextCheck() sidecar.DoctorCheck {
 		Status:     "pass",
 		Message:    fmt.Sprintf("Docker context %q functional (Docker %s)", mdemgDockerContext, strings.TrimSpace(string(out))),
 		DurationMs: duration,
+	}
+}
+
+// --- Claude Code integration checks ---
+
+// runClaudeMCPCheck verifies that mdemg is configured in the MCP config file
+// that Claude Code actually loads. Claude Code prefers .mcp.json at repo root
+// for project-scoped servers; .claude/mcp.json is ignored when .mcp.json exists.
+func runClaudeMCPCheck(dir string) sidecar.DoctorCheck {
+	start := time.Now()
+
+	// Check .mcp.json at repo root first (takes precedence in Claude Code)
+	rootMCP := filepath.Join(dir, ".mcp.json")
+	claudeMCP := filepath.Join(dir, ".claude", "mcp.json")
+
+	hasMdemgIn := func(path string) bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		var root map[string]interface{}
+		if json.Unmarshal(data, &root) != nil {
+			return false
+		}
+		servers, ok := root["mcpServers"].(map[string]interface{})
+		if !ok {
+			return false
+		}
+		_, exists := servers["mdemg"]
+		return exists
+	}
+
+	rootExists := false
+	if _, err := os.Stat(rootMCP); err == nil {
+		rootExists = true
+	}
+
+	if rootExists {
+		// .mcp.json exists — mdemg MUST be there (Claude Code ignores .claude/mcp.json)
+		if hasMdemgIn(rootMCP) {
+			return sidecar.DoctorCheck{
+				ID:         "claude.mcp",
+				Category:   "ide",
+				Status:     "pass",
+				Message:    "mdemg configured in .mcp.json",
+				DurationMs: int(time.Since(start).Milliseconds()),
+			}
+		}
+		// mdemg is missing from .mcp.json — check if it's stranded in .claude/mcp.json
+		if hasMdemgIn(claudeMCP) {
+			return sidecar.DoctorCheck{
+				ID:          "claude.mcp",
+				Category:    "ide",
+				Status:      "warn",
+				Message:     "mdemg configured in .claude/mcp.json but .mcp.json exists (Claude Code ignores .claude/mcp.json when .mcp.json is present)",
+				DurationMs:  int(time.Since(start).Milliseconds()),
+				Remediation: "Run: mdemg sidecar attach-agent claude-code (or add mdemg to .mcp.json)",
+			}
+		}
+		return sidecar.DoctorCheck{
+			ID:          "claude.mcp",
+			Category:    "ide",
+			Status:      "fail",
+			Message:     "mdemg not found in .mcp.json",
+			DurationMs:  int(time.Since(start).Milliseconds()),
+			Remediation: "Run: mdemg sidecar attach-agent claude-code",
+		}
+	}
+
+	// No .mcp.json — check .claude/mcp.json
+	if hasMdemgIn(claudeMCP) {
+		return sidecar.DoctorCheck{
+			ID:         "claude.mcp",
+			Category:   "ide",
+			Status:     "pass",
+			Message:    "mdemg configured in .claude/mcp.json",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	// Neither location has mdemg
+	if _, err := os.Stat(filepath.Join(dir, ".claude")); err == nil {
+		return sidecar.DoctorCheck{
+			ID:          "claude.mcp",
+			Category:    "ide",
+			Status:      "fail",
+			Message:     "mdemg not configured for Claude Code",
+			DurationMs:  int(time.Since(start).Milliseconds()),
+			Remediation: "Run: mdemg sidecar attach-agent claude-code",
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "claude.mcp",
+		Category:   "ide",
+		Status:     "skip",
+		Message:    "Claude Code not detected",
+		DurationMs: int(time.Since(start).Milliseconds()),
+	}
+}
+
+// runClaudeTrustCheck verifies that hasTrustDialogAccepted is true for this project
+// in ~/.claude.json. When false, Claude Code silently blocks all project-scoped MCP servers.
+func runClaudeTrustCheck(dir string) sidecar.DoctorCheck {
+	start := time.Now()
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:         "claude.trust",
+			Category:   "ide",
+			Status:     "skip",
+			Message:    "Could not determine home directory",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	claudeJSON := filepath.Join(homeDir, ".claude.json")
+	data, err := os.ReadFile(claudeJSON)
+	if err != nil {
+		return sidecar.DoctorCheck{
+			ID:         "claude.trust",
+			Category:   "ide",
+			Status:     "skip",
+			Message:    "~/.claude.json not found (Claude Code may not be installed)",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	var root map[string]interface{}
+	if json.Unmarshal(data, &root) != nil {
+		return sidecar.DoctorCheck{
+			ID:         "claude.trust",
+			Category:   "ide",
+			Status:     "skip",
+			Message:    "Could not parse ~/.claude.json",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	absDir, _ := filepath.Abs(dir)
+	projects, _ := root["projects"].(map[string]interface{})
+	if projects == nil {
+		return sidecar.DoctorCheck{
+			ID:         "claude.trust",
+			Category:   "ide",
+			Status:     "skip",
+			Message:    "No project entries in ~/.claude.json",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	proj, _ := projects[absDir].(map[string]interface{})
+	if proj == nil {
+		return sidecar.DoctorCheck{
+			ID:          "claude.trust",
+			Category:    "ide",
+			Status:      "warn",
+			Message:     "Project not yet registered in ~/.claude.json (start Claude Code in this directory first)",
+			DurationMs:  int(time.Since(start).Milliseconds()),
+			Remediation: "Launch Claude Code once in this directory, then re-run doctor",
+		}
+	}
+
+	trusted, _ := proj["hasTrustDialogAccepted"].(bool)
+	if !trusted {
+		return sidecar.DoctorCheck{
+			ID:          "claude.trust",
+			Category:    "ide",
+			Status:      "fail",
+			Message:     "Project .mcp.json not trusted — Claude Code silently blocks all project MCP servers",
+			DurationMs:  int(time.Since(start).Milliseconds()),
+			Remediation: "Accept the trust dialog when Claude Code prompts, or run: claude mcp reset-project-choices",
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "claude.trust",
+		Category:   "ide",
+		Status:     "pass",
+		Message:    "Project .mcp.json trusted",
+		DurationMs: int(time.Since(start).Milliseconds()),
+	}
+}
+
+// runClaudeProjectServersCheck verifies that enableAllProjectMcpServers is not false
+// in .claude/settings.local.json. When explicitly false, all project-scoped MCP servers
+// are silently disabled.
+func runClaudeProjectServersCheck(dir string) sidecar.DoctorCheck {
+	start := time.Now()
+
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		// File doesn't exist — that's fine, default behavior allows servers
+		return sidecar.DoctorCheck{
+			ID:         "claude.project-servers",
+			Category:   "ide",
+			Status:     "pass",
+			Message:    "No settings override (project servers allowed by default)",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	var settings map[string]interface{}
+	if json.Unmarshal(data, &settings) != nil {
+		return sidecar.DoctorCheck{
+			ID:         "claude.project-servers",
+			Category:   "ide",
+			Status:     "skip",
+			Message:    "Could not parse .claude/settings.local.json",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	val, exists := settings["enableAllProjectMcpServers"]
+	if !exists {
+		return sidecar.DoctorCheck{
+			ID:         "claude.project-servers",
+			Category:   "ide",
+			Status:     "pass",
+			Message:    "enableAllProjectMcpServers not set (defaults to allowed)",
+			DurationMs: int(time.Since(start).Milliseconds()),
+		}
+	}
+
+	enabled, ok := val.(bool)
+	if ok && !enabled {
+		return sidecar.DoctorCheck{
+			ID:          "claude.project-servers",
+			Category:    "ide",
+			Status:      "fail",
+			Message:     "enableAllProjectMcpServers is false — all project MCP servers silently disabled",
+			DurationMs:  int(time.Since(start).Milliseconds()),
+			Remediation: "Set enableAllProjectMcpServers to true in .claude/settings.local.json",
+		}
+	}
+
+	return sidecar.DoctorCheck{
+		ID:         "claude.project-servers",
+		Category:   "ide",
+		Status:     "pass",
+		Message:    "Project MCP servers enabled",
+		DurationMs: int(time.Since(start).Milliseconds()),
 	}
 }
 
