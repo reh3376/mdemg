@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "c07bb80d33515718bfad473e02b53747d446304ecf2e7628ac11005853258a3f"
+    "sha256": "8712ca101282fe90d30e5dac2ef3577b4a64e0f4973e0cd67050099a60cf125e"
   },
   "variables": {
     "test_space": "uats-neg-feedback-test"
@@ -66,6 +66,7 @@
         "method": "POST",
         "path": "/v1/learning/negative-feedback",
         "body": {
+          "space_id": "",
           "query_node_ids": [
             "n1"
           ],

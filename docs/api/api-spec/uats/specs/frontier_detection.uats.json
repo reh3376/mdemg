@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "35853588baaf7acb3d47fbd30cd5238c846e4ef4990a32098a5db98433ef706c"
+    "sha256": "ccdcf90627a19d1b4da1173601040a3da2fe9e6be9fd3beb01fb76503a29a40e"
   },
   "variables": {
     "test_space": "uats-frontier-test"
@@ -52,7 +52,10 @@
       "description": "GET without space_id should return 400",
       "request": {
         "method": "GET",
-        "path": "/v1/memory/frontiers"
+        "path": "/v1/memory/frontiers",
+        "query": {
+          "space_id": ""
+        }
       },
       "expected": {
         "status": 400,
