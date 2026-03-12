@@ -5,7 +5,7 @@
   "author": {
     "name": "whiskeyhouse"
   },
-  "repository": "https://github.com/whiskeyhouse/mdemg",
+  "repository": "https://github.com/reh3376/mdemg",
   "license": "MIT",
   "keywords": ["memory", "knowledge-graph", "mcp", "context", "semantic-search"]
 }
