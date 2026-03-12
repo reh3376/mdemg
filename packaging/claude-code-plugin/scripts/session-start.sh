@@ -5,6 +5,18 @@
 
 set -euo pipefail
 
+# ── Dependency check ─────────────────────────────────────────────
+if ! command -v jq &>/dev/null; then
+  echo "MDEMG plugin requires jq but it is not installed."
+  echo "Install via: brew install jq (macOS) or apt install jq (Linux)"
+  exit 0
+fi
+
+# ── Project root resolution ──────────────────────────────────────
+# Used by both endpoint and space ID resolution.
+# git root is authoritative; fallback to cwd for non-git dirs.
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
+
 # ── Dynamic endpoint resolution ──────────────────────────────────
 # Priority: MDEMG_ENDPOINT env > .mdemg.port file > sidecar.yaml > default
 resolve_endpoint() {
@@ -13,40 +25,32 @@ resolve_endpoint() {
     return
   fi
 
-  # Walk up from cwd to find .mdemg.port (supports nested working dirs)
-  local dir="$PWD"
-  while [ "$dir" != "/" ]; do
-    if [ -f "$dir/.mdemg.port" ]; then
-      local port
-      port=$(cat "$dir/.mdemg.port" 2>/dev/null | tr -d '[:space:]')
-      if [ -n "$port" ]; then
-        echo "http://localhost:$port"
-        return
-      fi
+  if [ -f "$PROJECT_ROOT/.mdemg.port" ]; then
+    local port
+    port=$(cat "$PROJECT_ROOT/.mdemg.port" 2>/dev/null | tr -d '[:space:]')
+    if [ -n "$port" ]; then
+      echo "http://localhost:$port"
+      return
     fi
-    # Also check sidecar.yaml for configured endpoint
-    if [ -f "$dir/.mdemg/sidecar.yaml" ]; then
-      local ep
-      ep=$(grep -E '^\s+endpoint:' "$dir/.mdemg/sidecar.yaml" 2>/dev/null | head -1 | sed 's/.*endpoint:\s*//' | tr -d '[:space:]"'"'" )
-      if [ -n "$ep" ]; then
-        echo "$ep"
-        return
-      fi
+  fi
+
+  if [ -f "$PROJECT_ROOT/.mdemg/sidecar.yaml" ]; then
+    local ep
+    ep=$(grep -E '^\s+endpoint:' "$PROJECT_ROOT/.mdemg/sidecar.yaml" 2>/dev/null | head -1 | sed 's/.*endpoint:\s*//' | tr -d '[:space:]"'"'" )
+    if [ -n "$ep" ]; then
+      echo "$ep"
+      return
     fi
-    dir=$(dirname "$dir")
-  done
+  fi
 
   echo "http://localhost:9999"
 }
 
 # ── Space ID resolution ──────────────────────────────────────────
-# Matches sidecar's "repo-basename" strategy
+# Matches sidecar's "repo-basename" strategy: lowercase basename of git root.
+# Sanitized to [a-z0-9-] to be safe in JSON and URL contexts.
 resolve_space_id() {
-  local dir="$PWD"
-  # Find git root for accurate basename
-  local git_root
-  git_root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || git_root="$dir"
-  basename "$git_root" | tr '[:upper:]' '[:lower:]'
+  basename "$PROJECT_ROOT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g'
 }
 
 MDEMG_URL=$(resolve_endpoint)
@@ -136,7 +140,7 @@ if [ -n "$RSIC_HEALTH" ]; then
   echo "RSIC Health: ${OVERALL} | Retrieval: ${RETRIEVAL} | Memory: ${MEMORY} | Learning: ${LEARN_PHASE}"
 
   HEALTH_NUM=$(echo "$OVERALL" | grep -oE '^[0-9.]+' || echo "1")
-  if [ "$(echo "$HEALTH_NUM < 0.5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+  if awk "BEGIN {exit !($HEALTH_NUM < 0.5)}" 2>/dev/null; then
     echo "DEGRADED HEALTH — run: POST /v1/self-improve/cycle {\"space_id\":\"${SPACE_ID}\",\"tier\":\"meso\"}"
   fi
 fi

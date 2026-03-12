@@ -10,10 +10,12 @@ if [ -n "${MDEMG_ENDPOINT:-}" ]; then
   exec mdemg mcp "$@"
 fi
 
-# Find project root (git root or fallback to $HOME)
+# Find project root via git. If git isn't available or we're outside a repo,
+# fall back to $HOME — .mdemg.port won't be found there, but mdemg mcp
+# will use its own default (localhost:9999).
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME")
 
-# Priority: .mdemg.port > sidecar.yaml > default
+# Priority: .mdemg.port > sidecar.yaml > default (let mdemg handle it)
 if [ -f "$PROJECT_ROOT/.mdemg.port" ]; then
   PORT=$(cat "$PROJECT_ROOT/.mdemg.port" 2>/dev/null | tr -d '[:space:]')
   if [ -n "$PORT" ]; then
