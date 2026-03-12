@@ -1221,6 +1221,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/learning/freeze", s.handleLearningFreeze)
 	mux.HandleFunc("/v1/learning/unfreeze", s.handleLearningUnfreeze)
 	mux.HandleFunc("/v1/learning/freeze/status", s.handleLearningFreezeStatus)
+	mux.HandleFunc("/v1/learning/negative-feedback", s.handleNegativeFeedback)
+	mux.HandleFunc("/v1/memory/frontiers", s.handleFrontierDetection)
 	mux.HandleFunc("/v1/memory/consult", s.handleConsult)
 	mux.HandleFunc("/v1/memory/suggest", s.handleSuggest)
 	mux.HandleFunc("/v1/memory/cache/stats", s.handleCacheStats)

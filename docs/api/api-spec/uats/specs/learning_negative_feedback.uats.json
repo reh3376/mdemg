@@ -1,0 +1,157 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Negative Feedback",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "learning",
+      "negative-feedback",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-12",
+    "description": "Validates POST /v1/learning/negative-feedback weakens or contradicts associations",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "c07bb80d33515718bfad473e02b53747d446304ecf2e7628ac11005853258a3f"
+  },
+  "variables": {
+    "test_space": "uats-neg-feedback-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/learning/negative-feedback",
+    "body": {
+      "space_id": "{{test_space}}",
+      "query_node_ids": [
+        "nonexistent-q1"
+      ],
+      "rejected_node_ids": [
+        "nonexistent-r1"
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.processed",
+        "type": "integer"
+      },
+      {
+        "path": "$.weakened",
+        "type": "integer"
+      },
+      {
+        "path": "$.contradicted",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "POST without space_id should return 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/learning/negative-feedback",
+        "body": {
+          "query_node_ids": [
+            "n1"
+          ],
+          "rejected_node_ids": [
+            "n2"
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_query_ids",
+      "description": "POST with empty query_node_ids should return 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/learning/negative-feedback",
+        "body": {
+          "space_id": "{{test_space}}",
+          "query_node_ids": [],
+          "rejected_node_ids": [
+            "n2"
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_rejected_ids",
+      "description": "POST with empty rejected_node_ids should return 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/learning/negative-feedback",
+        "body": {
+          "space_id": "{{test_space}}",
+          "query_node_ids": [
+            "n1"
+          ],
+          "rejected_node_ids": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/learning/negative-feedback"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

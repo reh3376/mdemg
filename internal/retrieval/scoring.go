@@ -591,6 +591,8 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 	// Detect if this is a code-focused query (for code type boost)
 	codeQueryDetected := isCodeQuery(queryText)
+	// Detect if this is an architecture query (for bypass multiplier)
+	archQueryDetected := isArchitectureQuery(queryText)
 
 	// Redundancy: simple path-prefix clustering
 	prefixCount := map[string]int{}
@@ -661,7 +663,16 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 		// Calculate individual weighted components using gated weights
 		vecComponent := gates.VectorWeight * c.VectorSim
-		actComponent := gates.ActivationWeight * a
+		var actComponent float64
+		if cfg.ScoringActivationSquared {
+			floored := a - cfg.ScoringActivationFloor
+			if floored < 0 {
+				floored = 0
+			}
+			actComponent = gates.ActivationWeight * floored * floored
+		} else {
+			actComponent = gates.ActivationWeight * a
+		}
 		// Temporal soft-mode: boost recency weight when temporal language detected
 		effectiveGamma := gamma
 		if hints.TemporalIntent.Mode == TemporalModeSoft {
@@ -682,7 +693,21 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		// Stale reference penalty (Phase 2 Temporal)
 		stalePenalty := stalePenalties[c.NodeID]
 
-		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect - hubPenComponent - redPenComponent - stalePenalty
+		// Value residual bypass: high-confidence vector matches get an additive bonus
+		var bypassBonus float64
+		if c.VectorSim > cfg.ScoringBypassThreshold {
+			excess := c.VectorSim - cfg.ScoringBypassThreshold
+			bypassMult := 1.0
+			if codeQueryDetected {
+				bypassMult = cfg.ScoringBypassCodeMult
+			}
+			if archQueryDetected {
+				bypassMult = cfg.ScoringBypassArchMult
+			}
+			bypassBonus = cfg.ScoringBypassWeight * excess * bypassMult
+		}
+
+		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect + bypassBonus - hubPenComponent - redPenComponent - stalePenalty
 
 		// Apply code type boost/penalty
 		// For code queries: config/doc files get penalized, code files unchanged
@@ -724,6 +749,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			LearningEdgeBoost: 0, // Set later if learning edges contributed
 			TemporalBoost:     temporalBoost,
 			StaleRefPenalty:   -stalePenalty,
+			BypassBonus:       bypassBonus,
 			FinalScore:        s,
 		}
 
@@ -830,6 +856,7 @@ type ScoreBreakdown struct {
 	LearningEdgeBoost float64 `json:"learning_edge_boost"` // boost from CO_ACTIVATED_WITH traversal
 	TemporalBoost     float64 `json:"temporal_boost"`      // additional recency from temporal soft-mode
 	StaleRefPenalty   float64 `json:"stale_ref_penalty"`   // penalty for referencing superseded content (Phase 2)
+	BypassBonus       float64 `json:"bypass_bonus"`        // value residual bypass for high-confidence vector matches
 	FinalScore        float64 `json:"final_score"`         // sum of all components
 }
 

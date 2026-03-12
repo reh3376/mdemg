@@ -436,6 +436,43 @@ type Config struct {
 	CMSRecallTopK          int     // CMS_RECALL_TOP_K — default top-K for recall queries (default: 10)
 	CMSSummaryMaxChars     int     // CMS_SUMMARY_MAX_CHARS — max character length for generated summaries (default: 200)
 	CMSJiminyBaseConfidence float64 // CMS_JIMINY_BASE_CONFIDENCE — base confidence for Jiminy rationale (default: 0.5)
+
+	// ===== ANN Optimization: Learning Subsystem =====
+	LearningCautiousDecayWindowHours int     // LEARNING_CAUTIOUS_DECAY_WINDOW_HOURS — skip decay for recently reinforced edges (default: 24, 0=disabled)
+	LearningEtaConversationMult      float64 // LEARNING_ETA_CONVERSATION_MULT — eta multiplier for conversation observations (default: 2.0)
+	LearningEtaConfigMult            float64 // LEARNING_ETA_CONFIG_MULT — eta multiplier for config↔code edges (default: 1.5)
+	LearningEtaSameDirMult           float64 // LEARNING_ETA_SAME_DIR_MULT — eta multiplier for same-directory nodes (default: 1.2)
+	LearningScheduleEnabled          bool    // LEARNING_SCHEDULE_ENABLED — enable maturity-based learning rate schedule (default: true)
+	LearningScheduleColdMult         float64 // LEARNING_SCHEDULE_COLD_MULT — eta multiplier for cold spaces (0 edges) (default: 2.0)
+	LearningScheduleLearningMult     float64 // LEARNING_SCHEDULE_LEARNING_MULT — eta multiplier for learning spaces (1-10k edges) (default: 1.0)
+	LearningScheduleWarmMult         float64 // LEARNING_SCHEDULE_WARM_MULT — eta multiplier for warm spaces (10k-50k edges) (default: 0.5)
+	LearningScheduleSatMult          float64 // LEARNING_SCHEDULE_SAT_MULT — eta multiplier for saturated spaces (50k+ edges) (default: 0.25)
+
+	// ===== ANN Optimization: Retrieval Subsystem =====
+	ScoringActivationFloor   float64 // SCORING_ACTIVATION_FLOOR — floor for squared activation (default: 0.05)
+	ScoringActivationSquared bool    // SCORING_ACTIVATION_SQUARED — enable squared activation for sparser signals (default: true)
+	ActivationHop0MinWeight  float64 // ACTIVATION_HOP0_MIN_WEIGHT — min edge weight for hop 0 spreading (default: 0.5)
+	ActivationHop1MinWeight  float64 // ACTIVATION_HOP1_MIN_WEIGHT — min edge weight for hop 1 spreading (default: 0.2)
+	ActivationHop2MinWeight  float64 // ACTIVATION_HOP2_MIN_WEIGHT — min edge weight for hop 2+ spreading (default: 0.05)
+	ScoringBypassThreshold   float64 // SCORING_BYPASS_THRESHOLD — VectorSim threshold for value residual bypass (default: 0.85)
+	ScoringBypassWeight      float64 // SCORING_BYPASS_WEIGHT — weight of bypass bonus (default: 0.15)
+	ScoringBypassCodeMult    float64 // SCORING_BYPASS_CODE_MULT — bypass multiplier for code queries (default: 1.3)
+	ScoringBypassArchMult    float64 // SCORING_BYPASS_ARCH_MULT — bypass multiplier for architecture queries (default: 0.5)
+
+	// ===== ANN Optimization: Consolidation Subsystem =====
+	L5GroundingMaxEdges      int     // L5_GROUNDING_MAX_EDGES — max GROUNDED_BY edges per L5 node (default: 5)
+	L5GroundingMinSim        float64 // L5_GROUNDING_MIN_SIM — min cosine similarity for grounding edge (default: 0.4)
+	L5GroundingInitialWeight float64 // L5_GROUNDING_INITIAL_WEIGHT — initial weight for GROUNDED_BY edges (default: 0.5)
+	EdgeAttentionGroundedBy  float64 // EDGE_ATTENTION_GROUNDED_BY — attention weight for GROUNDED_BY edges (default: 0.70)
+
+	// ===== ANN Optimization: Negative Feedback =====
+	LearningNegativeWeight        float64 // LEARNING_NEGATIVE_WEIGHT — weight reduction per negative feedback (default: 0.15)
+	LearningNegativeDecayMult     float64 // LEARNING_NEGATIVE_DECAY_MULT — decay multiplier for contradicted edges (default: 2.0)
+	LearningNegativeMaxPerRequest int     // LEARNING_NEGATIVE_MAX_PER_REQUEST — max rejected nodes per request (default: 20)
+
+	// ===== ANN Optimization: Frontier Detection =====
+	FrontierMinEvidence int // FRONTIER_MIN_EVIDENCE — min evidence_count for frontier candidates (default: 3)
+	FrontierMaxOutgoing int // FRONTIER_MAX_OUTGOING — max outgoing edges for frontier candidates (default: 2)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -605,7 +642,7 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
 	}
 
-	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL,ORIGINATED_FROM")
+	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL,ORIGINATED_FROM,GROUNDED_BY,CONTRADICTS")
 	parts := strings.Split(allowed, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -1651,6 +1688,118 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// ===== ANN Optimization: Learning Subsystem =====
+	learningCautiousDecayWindowHours, err := atoi("LEARNING_CAUTIOUS_DECAY_WINDOW_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	learningEtaConvMult, err := atof("LEARNING_ETA_CONVERSATION_MULT", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	learningEtaConfigMult, err := atof("LEARNING_ETA_CONFIG_MULT", 1.5)
+	if err != nil {
+		return Config{}, err
+	}
+	learningEtaSameDirMult, err := atof("LEARNING_ETA_SAME_DIR_MULT", 1.2)
+	if err != nil {
+		return Config{}, err
+	}
+	learningScheduleEnabled := getBool("LEARNING_SCHEDULE_ENABLED", true)
+	learningScheduleColdMult, err := atof("LEARNING_SCHEDULE_COLD_MULT", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	learningScheduleLearningMult, err := atof("LEARNING_SCHEDULE_LEARNING_MULT", 1.0)
+	if err != nil {
+		return Config{}, err
+	}
+	learningScheduleWarmMult, err := atof("LEARNING_SCHEDULE_WARM_MULT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	learningScheduleSatMult, err := atof("LEARNING_SCHEDULE_SAT_MULT", 0.25)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// ===== ANN Optimization: Retrieval Subsystem =====
+	scoringActivationFloor, err := atof("SCORING_ACTIVATION_FLOOR", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	scoringActivationSquared := getBool("SCORING_ACTIVATION_SQUARED", true)
+	activationHop0MinWeight, err := atof("ACTIVATION_HOP0_MIN_WEIGHT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	activationHop1MinWeight, err := atof("ACTIVATION_HOP1_MIN_WEIGHT", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+	activationHop2MinWeight, err := atof("ACTIVATION_HOP2_MIN_WEIGHT", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	scoringBypassThreshold, err := atof("SCORING_BYPASS_THRESHOLD", 0.85)
+	if err != nil {
+		return Config{}, err
+	}
+	scoringBypassWeight, err := atof("SCORING_BYPASS_WEIGHT", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	scoringBypassCodeMult, err := atof("SCORING_BYPASS_CODE_MULT", 1.3)
+	if err != nil {
+		return Config{}, err
+	}
+	scoringBypassArchMult, err := atof("SCORING_BYPASS_ARCH_MULT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// ===== ANN Optimization: Consolidation Subsystem =====
+	l5GroundingMaxEdges, err := atoi("L5_GROUNDING_MAX_EDGES", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	l5GroundingMinSim, err := atof("L5_GROUNDING_MIN_SIM", 0.4)
+	if err != nil {
+		return Config{}, err
+	}
+	l5GroundingInitialWeight, err := atof("L5_GROUNDING_INITIAL_WEIGHT", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionGroundedBy, err := atof("EDGE_ATTENTION_GROUNDED_BY", 0.70)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// ===== ANN Optimization: Negative Feedback =====
+	learningNegativeWeight, err := atof("LEARNING_NEGATIVE_WEIGHT", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	learningNegativeDecayMult, err := atof("LEARNING_NEGATIVE_DECAY_MULT", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	learningNegativeMaxPerRequest, err := atoi("LEARNING_NEGATIVE_MAX_PER_REQUEST", 20)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// ===== ANN Optimization: Frontier Detection =====
+	frontierMinEvidence, err := atoi("FRONTIER_MIN_EVIDENCE", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	frontierMaxOutgoing, err := atoi("FRONTIER_MAX_OUTGOING", 2)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Deterministic consolidation trigger
 	consolidateOnWatchdog := getBool("CONSOLIDATE_ON_WATCHDOG_ENABLED", true)
 
@@ -2235,6 +2384,41 @@ func FromEnv() (Config, error) {
 		CMSRecallTopK:           cmsRecallTopK,
 		CMSSummaryMaxChars:      cmsSummaryMaxChars,
 		CMSJiminyBaseConfidence: cmsJiminyBaseConfidence,
+
+		// ANN Optimization: Learning
+		LearningCautiousDecayWindowHours: learningCautiousDecayWindowHours,
+		LearningEtaConversationMult:      learningEtaConvMult,
+		LearningEtaConfigMult:            learningEtaConfigMult,
+		LearningEtaSameDirMult:           learningEtaSameDirMult,
+		LearningScheduleEnabled:          learningScheduleEnabled,
+		LearningScheduleColdMult:         learningScheduleColdMult,
+		LearningScheduleLearningMult:     learningScheduleLearningMult,
+		LearningScheduleWarmMult:         learningScheduleWarmMult,
+		LearningScheduleSatMult:          learningScheduleSatMult,
+
+		// ANN Optimization: Retrieval
+		ScoringActivationFloor:   scoringActivationFloor,
+		ScoringActivationSquared: scoringActivationSquared,
+		ActivationHop0MinWeight:  activationHop0MinWeight,
+		ActivationHop1MinWeight:  activationHop1MinWeight,
+		ActivationHop2MinWeight:  activationHop2MinWeight,
+		ScoringBypassThreshold:   scoringBypassThreshold,
+		ScoringBypassWeight:      scoringBypassWeight,
+		ScoringBypassCodeMult:    scoringBypassCodeMult,
+		ScoringBypassArchMult:    scoringBypassArchMult,
+
+		// ANN Optimization: Consolidation
+		L5GroundingMaxEdges:      l5GroundingMaxEdges,
+		L5GroundingMinSim:        l5GroundingMinSim,
+		L5GroundingInitialWeight: l5GroundingInitialWeight,
+		EdgeAttentionGroundedBy:  edgeAttentionGroundedBy,
+
+		// ANN Optimization: Negative Feedback + Frontier
+		LearningNegativeWeight:        learningNegativeWeight,
+		LearningNegativeDecayMult:     learningNegativeDecayMult,
+		LearningNegativeMaxPerRequest: learningNegativeMaxPerRequest,
+		FrontierMinEvidence:           frontierMinEvidence,
+		FrontierMaxOutgoing:           frontierMaxOutgoing,
 	}, nil
 }
 

@@ -11,7 +11,7 @@ import (
 // - edges: bounded neighborhood edges
 // - steps: number of propagation steps (typ. 2-5)
 // - lambda: step decay (prevents runaway)
-func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda float64) map[string]float64 {
+func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda float64, hopMinWeights []float64) map[string]float64 {
 	act := map[string]float64{}
 	if steps <= 0 {
 		steps = 2
@@ -74,6 +74,16 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 			next[id] = clamp01((1 - lambda) * a)
 		}
 
+		// Determine minimum weight threshold for this hop
+		minWeight := 0.0
+		if len(hopMinWeights) > 0 {
+			idx := t
+			if idx >= len(hopMinWeights) {
+				idx = len(hopMinWeights) - 1
+			}
+			minWeight = hopMinWeights[idx]
+		}
+
 		// Apply incoming excitatory and inhibitory
 		for dst, ins := range incoming {
 			acc := next[dst]
@@ -81,13 +91,23 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 			// high-degree nodes from saturating to 1.0. This preserves relative
 			// signal strength — nodes with stronger/more relevant learned edges
 			// get higher activation without all nodes converging to the same value.
-			degreeNorm := math.Sqrt(float64(len(ins)))
+			// Filter edges by minimum weight for this hop
+			var filteredCount float64
+			for _, e := range ins {
+				if effectiveWeight(e) >= minWeight {
+					filteredCount++
+				}
+			}
+			degreeNorm := math.Sqrt(filteredCount)
 			if degreeNorm < 1 {
 				degreeNorm = 1
 			}
 			for _, e := range ins {
-				srcA := act[e.Src]
 				w := effectiveWeight(e)
+				if w < minWeight {
+					continue
+				}
+				srcA := act[e.Src]
 				acc += (srcA * w) / degreeNorm
 			}
 			// inhibitory edges
@@ -149,6 +169,7 @@ type EdgeAttentionWeights struct {
 	Calls         float64 // Weight for CALLS edges
 	Extends       float64 // Weight for EXTENDS edges
 	Implements    float64 // Weight for IMPLEMENTS edges
+	GroundedBy    float64 // Weight for GROUNDED_BY edges
 }
 
 // QueryContext provides context for attention modulation
@@ -199,6 +220,9 @@ func ComputeEdgeAttention(ctx QueryContext, cfg config.Config) EdgeAttentionWeig
 	weights.Extends = 0.70
 	weights.Implements = 0.70
 
+	// L0 Skip Connection weight (ANN Optimization Phase C)
+	weights.GroundedBy = cfg.EdgeAttentionGroundedBy
+
 	// Clamp all weights to [0, 1]
 	weights.CoActivated = clampWeight(weights.CoActivated)
 	weights.Associated = clampWeight(weights.Associated)
@@ -216,6 +240,7 @@ func ComputeEdgeAttention(ctx QueryContext, cfg config.Config) EdgeAttentionWeig
 	weights.Calls = clampWeight(weights.Calls)
 	weights.Extends = clampWeight(weights.Extends)
 	weights.Implements = clampWeight(weights.Implements)
+	weights.GroundedBy = clampWeight(weights.GroundedBy)
 
 	return weights
 }
@@ -266,6 +291,8 @@ func (w EdgeAttentionWeights) GetEdgeAttention(relType string) float64 {
 		return w.Extends
 	case "IMPLEMENTS":
 		return w.Implements
+	case "GROUNDED_BY":
+		return w.GroundedBy
 	default:
 		return 0.5 // Unknown edge types get neutral weight
 	}
@@ -291,6 +318,7 @@ func DefaultEdgeAttention() EdgeAttentionWeights {
 		Calls:         0.0,
 		Extends:       0.0,
 		Implements:    0.0,
+		GroundedBy:    0.0,
 	}
 }
 
@@ -303,7 +331,7 @@ type WeightedEdge struct {
 // SpreadingActivationWithAttention computes activation with edge-type attention.
 // Unlike SpreadingActivation which only uses CO_ACTIVATED_WITH edges, this
 // includes all edge types with query-aware attention weighting.
-func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int, lambda float64, attention EdgeAttentionWeights) map[string]float64 {
+func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int, lambda float64, attention EdgeAttentionWeights, hopMinWeights []float64) map[string]float64 {
 	act := map[string]float64{}
 	if steps <= 0 {
 		steps = 2
@@ -366,15 +394,26 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 			next[id] = clamp01((1 - lambda) * a)
 		}
 
+		// Determine minimum weight threshold for this hop
+		minWeight := 0.0
+		if len(hopMinWeights) > 0 {
+			idx := t
+			if idx >= len(hopMinWeights) {
+				idx = len(hopMinWeights) - 1
+			}
+			minWeight = hopMinWeights[idx]
+		}
+
 		// Apply incoming with attention-weighted aggregation
 		for dst, ins := range incoming {
 			acc := next[dst]
 
-			// Attention-weighted degree normalization
-			// Edges with higher attention contribute more to normalization
+			// Attention-weighted degree normalization (filtered by hop min weight)
 			var totalAttnWeight float64
 			for _, we := range ins {
-				totalAttnWeight += we.AttentionWeight
+				if effectiveWeight(we.Edge) >= minWeight {
+					totalAttnWeight += we.AttentionWeight
+				}
 			}
 			degreeNorm := math.Sqrt(totalAttnWeight)
 			if degreeNorm < 1 {
@@ -382,8 +421,11 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 			}
 
 			for _, we := range ins {
-				srcA := act[we.Src]
 				w := effectiveWeight(we.Edge)
+				if w < minWeight {
+					continue
+				}
+				srcA := act[we.Src]
 				// KEY: Apply attention weight to edge contribution
 				acc += (srcA * w * we.AttentionWeight) / degreeNorm
 			}

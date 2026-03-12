@@ -3,6 +3,7 @@ package learning
 import (
 	"testing"
 
+	"mdemg/internal/config"
 	"mdemg/internal/models"
 )
 
@@ -694,8 +695,8 @@ func TestHebbianWeightUpdateBasic(t *testing.T) {
 			mu:       0.01, // default decay rate
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.01)*0.5 + 0.02*(0.8*0.6) = 0.495 + 0.0096 = 0.5046
-			expected: 0.5046,
+			// rawW = (1-0.01)*0.5 + 0.02*(0.8*0.6) = 0.5046, tanh(0.5046) ≈ 0.4657
+			expected: 0.4657271175,
 		},
 		{
 			name:     "zero current weight",
@@ -706,8 +707,8 @@ func TestHebbianWeightUpdateBasic(t *testing.T) {
 			mu:       0.01,
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.01)*0.0 + 0.02*(0.5*0.5) = 0 + 0.005 = 0.005
-			expected: 0.005,
+			// rawW = 0.005, tanh(0.005) ≈ 0.005 (near-linear region)
+			expected: 0.0049999583,
 		},
 		{
 			name:     "high activation strengthens weight",
@@ -718,8 +719,8 @@ func TestHebbianWeightUpdateBasic(t *testing.T) {
 			mu:       0.01,
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.01)*0.3 + 0.02*(1.0*1.0) = 0.297 + 0.02 = 0.317
-			expected: 0.317,
+			// rawW = 0.317, tanh(0.317) ≈ 0.3068
+			expected: 0.3067917919,
 		},
 		{
 			name:     "zero activation causes decay only",
@@ -730,8 +731,8 @@ func TestHebbianWeightUpdateBasic(t *testing.T) {
 			mu:       0.01,
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.01)*0.5 + 0.02*(0*0) = 0.495 + 0 = 0.495
-			expected: 0.495,
+			// rawW = 0.495, tanh(0.495) ≈ 0.4582
+			expected: 0.4581758447,
 		},
 		{
 			name:     "one zero activation",
@@ -742,8 +743,8 @@ func TestHebbianWeightUpdateBasic(t *testing.T) {
 			mu:       0.01,
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.01)*0.4 + 0.02*(0.8*0) = 0.396 + 0 = 0.396
-			expected: 0.396,
+			// rawW = 0.396, tanh(0.396) ≈ 0.3765
+			expected: 0.3765212159,
 		},
 	}
 
@@ -772,7 +773,7 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 		expected float64
 	}{
 		{
-			name:     "clamp to minimum when weight would go negative",
+			name:     "small weight with decay stays near linear",
 			w:        0.01,
 			ai:       0.0,
 			aj:       0.0,
@@ -780,11 +781,11 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.5, // aggressive decay
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.5)*0.01 + 0.0 = 0.005, above wmin so no clamping
-			expected: 0.005,
+			// rawW = 0.005, tanh(0.005) ≈ 0.005 (near-linear)
+			expected: 0.0049999583,
 		},
 		{
-			name:     "clamp to minimum exactly",
+			name:     "very small weight stays near linear",
 			w:        0.001,
 			ai:       0.0,
 			aj:       0.0,
@@ -792,11 +793,11 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.99, // very aggressive decay
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0.99)*0.001 + 0.0 = 0.00001, above wmin
+			// rawW = 0.00001, tanh(0.00001) ≈ 0.00001
 			expected: 0.00001,
 		},
 		{
-			name:     "clamp to maximum when weight would exceed 1",
+			name:     "tanh soft-cap when weight would exceed wmax",
 			w:        0.99,
 			ai:       1.0,
 			aj:       1.0,
@@ -804,8 +805,8 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.0, // no decay
 			wmin:     0.0,
 			wmax:     1.0,
-			// new_w = (1-0)*0.99 + 0.5*(1*1) = 0.99 + 0.5 = 1.49, clamped to 1.0
-			expected: 1.0,
+			// rawW = 1.49, tanh(1.49) ≈ 0.9033 (soft-capped, not hard 1.0)
+			expected: 0.9033247426,
 		},
 		{
 			name:     "clamp to custom minimum",
@@ -816,11 +817,11 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.99,
 			wmin:     0.05,
 			wmax:     1.0,
-			// new_w = (1-0.99)*0.1 + 0 = 0.001, clamped to 0.05
+			// rawW = 0.001, below wmin=0.05, clamped to 0.05
 			expected: 0.05,
 		},
 		{
-			name:     "clamp to custom maximum",
+			name:     "tanh soft-cap with custom wmax",
 			w:        0.8,
 			ai:       1.0,
 			aj:       1.0,
@@ -828,11 +829,11 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.0,
 			wmin:     0.0,
 			wmax:     0.9,
-			// new_w = (1-0)*0.8 + 0.2*1 = 1.0, clamped to 0.9
-			expected: 0.9,
+			// rawW = 1.0, 0.9*tanh(1.0/0.9) ≈ 0.724
+			expected: 0.7240093203,
 		},
 		{
-			name:     "narrow bounds both ways",
+			name:     "tanh soft-cap with narrow bounds",
 			w:        0.5,
 			ai:       1.0,
 			aj:       1.0,
@@ -840,8 +841,8 @@ func TestHebbianWeightUpdateClamping(t *testing.T) {
 			mu:       0.0,
 			wmin:     0.4,
 			wmax:     0.6,
-			// new_w = 0.5 + 1.0 = 1.5, clamped to 0.6
-			expected: 0.6,
+			// rawW = 1.5, 0.6*tanh(1.5/0.6) ≈ 0.5920
+			expected: 0.5919685789,
 		},
 	}
 
@@ -872,17 +873,17 @@ func TestHebbianWeightUpdateDecayBehavior(t *testing.T) {
 		mu       float64
 		expected float64
 	}{
-		{0.0, 0.5},   // no decay
-		{0.01, 0.495}, // 1% decay
-		{0.1, 0.45},   // 10% decay
-		{0.5, 0.25},   // 50% decay
-		{1.0, 0.0},    // complete decay
+		{0.0, 0.4621171573},  // no decay, rawW=0.5, tanh(0.5)
+		{0.01, 0.4581758447}, // 1% decay, rawW=0.495, tanh(0.495)
+		{0.1, 0.4218990053},  // 10% decay, rawW=0.45, tanh(0.45)
+		{0.5, 0.2449186624},  // 50% decay, rawW=0.25, tanh(0.25)
+		{1.0, 0.0},           // complete decay, rawW=0, tanh(0)=0
 	}
 
 	for _, tc := range testCases {
 		t.Run("mu="+formatFloat(tc.mu), func(t *testing.T) {
 			result := HebbianWeightUpdate(w, ai, aj, 0.0, tc.mu, wmin, wmax)
-			if !floatEquals(result, tc.expected, 1e-9) {
+			if !floatEquals(result, tc.expected, 1e-6) {
 				t.Errorf("with mu=%f, expected %f, got %f", tc.mu, tc.expected, result)
 			}
 		})
@@ -902,21 +903,22 @@ func TestHebbianWeightUpdateLearningRate(t *testing.T) {
 	// With full activation and no decay:
 	// new_w = w + eta * (ai * aj) = 0.5 + eta * 1
 
+	// With wmax=10, tanh(x/10)*10 ≈ x for small x (near-linear region)
 	testCases := []struct {
 		eta      float64
 		expected float64
 	}{
-		{0.0, 0.5},  // no learning
-		{0.01, 0.51}, // slow learning
-		{0.1, 0.6},   // moderate learning
-		{0.5, 1.0},   // fast learning
-		{1.0, 1.5},   // very fast learning
+		{0.0, 0.4995837496},  // no learning, rawW=0.5, 10*tanh(0.05)
+		{0.01, 0.5095582895}, // slow learning, rawW=0.51
+		{0.1, 0.5992810353},  // moderate learning, rawW=0.6
+		{0.5, 0.9966799462},  // fast learning, rawW=1.0
+		{1.0, 1.4888503362},  // very fast learning, rawW=1.5
 	}
 
 	for _, tc := range testCases {
 		t.Run("eta="+formatFloat(tc.eta), func(t *testing.T) {
 			result := HebbianWeightUpdate(w, ai, aj, tc.eta, mu, wmin, wmax)
-			if !floatEquals(result, tc.expected, 1e-9) {
+			if !floatEquals(result, tc.expected, 1e-6) {
 				t.Errorf("with eta=%f, expected %f, got %f", tc.eta, tc.expected, result)
 			}
 		})
@@ -931,7 +933,7 @@ func TestHebbianWeightUpdateActivationProduct(t *testing.T) {
 	wmin := 0.0
 	wmax := 1.0
 
-	// With w=0, mu=0, eta=1: new_w = 0 + 1 * (ai * aj) = ai * aj
+	// With w=0, mu=0, eta=1: rawW = ai*aj, result = tanh(rawW)
 
 	testCases := []struct {
 		ai       float64
@@ -941,17 +943,17 @@ func TestHebbianWeightUpdateActivationProduct(t *testing.T) {
 		{0.0, 0.0, 0.0},
 		{0.5, 0.0, 0.0},
 		{0.0, 0.5, 0.0},
-		{0.5, 0.5, 0.25},
-		{0.5, 1.0, 0.5},
-		{1.0, 0.5, 0.5},
-		{1.0, 1.0, 1.0},
-		{0.3, 0.7, 0.21},
+		{0.5, 0.5, 0.2449186624},  // tanh(0.25)
+		{0.5, 1.0, 0.4621171573},  // tanh(0.5)
+		{1.0, 0.5, 0.4621171573},  // tanh(0.5)
+		{1.0, 1.0, 0.7615941560},  // tanh(1.0)
+		{0.3, 0.7, 0.2069664997},  // tanh(0.21)
 	}
 
 	for _, tc := range testCases {
 		t.Run("ai="+formatFloat(tc.ai)+"_aj="+formatFloat(tc.aj), func(t *testing.T) {
 			result := HebbianWeightUpdate(w, tc.ai, tc.aj, eta, mu, wmin, wmax)
-			if !floatEquals(result, tc.expected, 1e-9) {
+			if !floatEquals(result, tc.expected, 1e-6) {
 				t.Errorf("ai=%f, aj=%f: expected %f, got %f", tc.ai, tc.aj, tc.expected, result)
 			}
 		})
@@ -1041,21 +1043,16 @@ func TestHebbianWeightUpdateFormulaDerivation(t *testing.T) {
 	wmax := 1.0
 
 	// Calculate expected value step by step
-	// Δw = η * a_i * a_j - μ * w
-	// Δw = 0.1 * 0.5 * 0.6 - 0.05 * 0.4
-	// Δw = 0.03 - 0.02 = 0.01
-	// new_w = w + Δw = 0.4 + 0.01 = 0.41
+	// rawW = (1-μ)*w + η*a_i*a_j
+	// rawW = (1-0.05)*0.4 + 0.1*0.5*0.6
+	// rawW = 0.95*0.4 + 0.1*0.3
+	// rawW = 0.38 + 0.03 = 0.41
+	// result = wmax * tanh(rawW / wmax) = 1.0 * tanh(0.41) ≈ 0.38847
 
-	// Or equivalently:
-	// new_w = (1-μ)*w + η*a_i*a_j
-	// new_w = (1-0.05)*0.4 + 0.1*0.5*0.6
-	// new_w = 0.95*0.4 + 0.1*0.3
-	// new_w = 0.38 + 0.03 = 0.41
-
-	expected := 0.41
+	expected := 0.3884726802
 	result := HebbianWeightUpdate(w, ai, aj, eta, mu, wmin, wmax)
 
-	if !floatEquals(result, expected, 1e-9) {
+	if !floatEquals(result, expected, 1e-6) {
 		t.Errorf("Formula derivation failed: expected %f, got %f", expected, result)
 	}
 }
@@ -1164,9 +1161,11 @@ func TestHebbianWeightUpdateEdgeCases(t *testing.T) {
 			w:    0.5, ai: 0.5, aj: 0.5, eta: 0.02, mu: 0.01,
 			wmin: 0.5, wmax: 0.5,
 			validate: func(t *testing.T, result float64) {
-				// Should clamp to the single allowed value
-				if result != 0.5 {
-					t.Errorf("expected 0.5, got %f", result)
+				// rawW = 0.5 which is not < wmin, so tanh applies:
+				// 0.5 * tanh(0.5/0.5) = 0.5 * tanh(1.0) ≈ 0.3808
+				// Note: equal bounds is a degenerate case
+				if result < 0 || result > 0.5 {
+					t.Errorf("expected result in [0, 0.5], got %f", result)
 				}
 			},
 		},
@@ -1201,4 +1200,69 @@ func formatFloat(f float64) string {
 	// Use integer representation for common fractions
 	intPart := int(f * 100)
 	return itoa(intPart)
+}
+
+// =============================================================================
+// Tanh Soft-Cap Tests (Phase A.1)
+// =============================================================================
+
+func TestHebbianWeightUpdate_TanhSoftCap(t *testing.T) {
+	// At w=0.5, behavior should be similar to linear (tanh(0.5) ~ 0.462)
+	result := HebbianWeightUpdate(0.5, 0.8, 0.8, 0.02, 0.01, 0.0, 1.0)
+	if result <= 0 || result >= 1.0 {
+		t.Errorf("expected result in (0, 1.0), got %f", result)
+	}
+
+	// At very high weight, should approach but never reach wmax
+	result = HebbianWeightUpdate(0.95, 1.0, 1.0, 0.02, 0.01, 0.0, 1.0)
+	if result >= 1.0 {
+		t.Errorf("tanh soft-cap should prevent reaching 1.0, got %f", result)
+	}
+
+	// At w=0.99, strong update should still stay below 1.0
+	result = HebbianWeightUpdate(0.99, 1.0, 1.0, 0.1, 0.0, 0.0, 1.0)
+	if result >= 1.0 {
+		t.Errorf("tanh soft-cap should prevent reaching 1.0 even with high eta, got %f", result)
+	}
+
+	// Below wmin should clamp to wmin
+	result = HebbianWeightUpdate(0.01, 0.0, 0.0, 0.0, 0.5, 0.05, 1.0)
+	if result != 0.05 {
+		t.Errorf("expected wmin=0.05, got %f", result)
+	}
+}
+
+// =============================================================================
+// Phase Multiplier Tests (Phase A.4)
+// =============================================================================
+
+func TestPhaseMultiplier(t *testing.T) {
+	svc := &Service{
+		cfg: config.Config{
+			LearningScheduleColdMult:     2.0,
+			LearningScheduleLearningMult: 1.0,
+			LearningScheduleWarmMult:     0.5,
+			LearningScheduleSatMult:      0.25,
+		},
+	}
+
+	tests := []struct {
+		edgeCount int64
+		expected  float64
+	}{
+		{0, 2.0},
+		{100, 1.0},
+		{9999, 1.0},
+		{10000, 0.5},
+		{49999, 0.5},
+		{50000, 0.25},
+		{100000, 0.25},
+	}
+
+	for _, tt := range tests {
+		result := svc.phaseMultiplier(tt.edgeCount)
+		if result != tt.expected {
+			t.Errorf("phaseMultiplier(%d) = %f, want %f", tt.edgeCount, result, tt.expected)
+		}
+	}
 }

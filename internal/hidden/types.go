@@ -76,6 +76,7 @@ type ConsolidationResult struct {
 	BackwardPass          *BackwardPassResult
 	DynamicEdgesCreated   int                  // Phase 75: dynamic edges created
 	L5NodesCreated        int                  // Phase 75: L5 emergent nodes created
+	L5GroundingEdgesCreated int                // ANN Opt Phase C: GROUNDED_BY edges created
 	TotalDuration         time.Duration
 }
 
@@ -144,6 +145,9 @@ const (
 	EdgeEmergesFrom  DynamicEdgeType = "EMERGES_FROM"    // Indicates emergent formation
 	EdgeBridges      DynamicEdgeType = "BRIDGES"         // Connects disparate domains
 	EdgeUnifies      DynamicEdgeType = "UNIFIES"         // Represents common abstraction
+
+	// L0 Skip Connection edge type (ANN Optimization Phase C)
+	EdgeGroundedBy   DynamicEdgeType = "GROUNDED_BY"     // L5 → L0 direct grounding
 )
 
 // DynamicNodeType represents inferred node types for upper layer concepts

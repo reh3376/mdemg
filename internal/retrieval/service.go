@@ -485,14 +485,21 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		IsArchQuery: isArchitectureQuery(req.QueryText),
 	}
 
+	// Build hop min weights from config for local-first activation spreading
+	hopMinWeights := []float64{
+		s.cfg.ActivationHop0MinWeight,
+		s.cfg.ActivationHop1MinWeight,
+		s.cfg.ActivationHop2MinWeight,
+	}
+
 	// Compute attention weights or use default (original behavior)
 	var act map[string]float64
 	if s.cfg.EdgeAttentionEnabled {
 		attention := ComputeEdgeAttention(queryCtx, s.cfg)
-		act = SpreadingActivationWithAttention(cands, edges, 2, 0.15, attention)
+		act = SpreadingActivationWithAttention(cands, edges, 2, 0.15, attention, hopMinWeights)
 	} else {
 		// Fallback to original behavior (CO_ACTIVATED_WITH only)
-		act = SpreadingActivation(cands, edges, 2, 0.15)
+		act = SpreadingActivation(cands, edges, 2, 0.15, hopMinWeights)
 	}
 
 	// 4) Initial ranking (pass query text for path-based boosting)

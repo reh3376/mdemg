@@ -138,6 +138,7 @@ type decayConfig struct {
 	PruneThreshold float64
 	MinEvidence    int
 	OlderThanDays  int
+	CautiousWindow int // Skip decay for edges reinforced within this many hours (0=disabled)
 
 	// Processing options
 	DryRun    bool
@@ -185,6 +186,7 @@ func parseConfig() (decayConfig, error) {
 	flag.Float64Var(&cfg.PruneThreshold, "prune-threshold", 0.01, "Minimum weight to keep (below = prune candidate)")
 	flag.IntVar(&cfg.MinEvidence, "min-evidence", 3, "Minimum evidence_count to protect from pruning")
 	flag.IntVar(&cfg.OlderThanDays, "older-than", 7, "Only process edges older than N days")
+	flag.IntVar(&cfg.CautiousWindow, "cautious-window", 24, "Skip decay for edges reinforced within this many hours (0=disabled)")
 	flag.BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
 	flag.StringVar(&cfg.SpaceID, "space-id", "", "Limit to specific space (empty = all)")
 	flag.IntVar(&cfg.BatchSize, "batch-size", 1000, "Process edges in batches of this size")
@@ -239,12 +241,13 @@ func newDriver(cfg decayConfig) (neo4j.DriverWithContext, error) {
 
 // decayStats tracks statistics for the decay job
 type decayStats struct {
-	scanned           int
-	decayed           int
-	pruned            int
-	protectedEvidence int
-	protectedPinned   int
-	samples           []decayResult // first few decay results for sample output
+	scanned                    int
+	decayed                    int
+	pruned                     int
+	protectedEvidence          int
+	protectedPinned            int
+	protectedRecentlyReinforced int
+	samples                    []decayResult // first few decay results for sample output
 }
 
 // runDecayJob executes the decay and pruning operations
@@ -258,6 +261,17 @@ func runDecayJob(ctx context.Context, driver neo4j.DriverWithContext, cfg decayC
 	stats := decayStats{
 		samples: make([]decayResult, 0, 5),
 	}
+
+	// Count recently-reinforced edges protected by cautious window
+	if cfg.CautiousWindow > 0 {
+		count, err := countRecentlyReinforced(ctx, driver, cfg)
+		if err != nil {
+			log.Printf("[WARN] could not count recently reinforced edges: %v", err)
+		} else {
+			stats.protectedRecentlyReinforced = count
+		}
+	}
+
 	offset := 0
 	batchNum := 0
 
@@ -403,6 +417,40 @@ DELETE r`
 	return err
 }
 
+// countRecentlyReinforced counts edges that are protected by the cautious window
+func countRecentlyReinforced(ctx context.Context, driver neo4j.DriverWithContext, cfg decayConfig) (int, error) {
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer func() { _ = sess.Close(ctx) }()
+
+	cypher := `
+MATCH ()-[r]->()
+WHERE r.last_activated_at IS NOT NULL
+  AND r.last_activated_at >= datetime() - duration({hours: $cautiousWindow})
+  AND ($spaceId = '' OR r.space_id = $spaceId)
+RETURN count(r) AS cnt`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"cautiousWindow": cfg.CautiousWindow,
+			"spaceId":        cfg.SpaceID,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("cnt")
+			if c, ok := cnt.(int64); ok {
+				return int(c), nil
+			}
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
+}
+
 // printStats outputs the job statistics
 func printStats(stats decayStats, dryRun bool) {
 	fmt.Println("\nStatistics:")
@@ -415,6 +463,7 @@ func printStats(stats decayStats, dryRun bool) {
 	}
 	fmt.Printf("- Edges protected (high evidence): %d\n", stats.protectedEvidence)
 	fmt.Printf("- Edges protected (pinned): %d\n", stats.protectedPinned)
+	fmt.Printf("- Edges protected (recently reinforced): %d\n", stats.protectedRecentlyReinforced)
 
 	// Print sample decays
 	if len(stats.samples) > 0 {
@@ -451,6 +500,11 @@ func printHeader(cfg decayConfig) {
 	fmt.Printf("Decay rate: %g\n", cfg.DecayRate)
 	fmt.Printf("Prune threshold: %g\n", cfg.PruneThreshold)
 	fmt.Printf("Min evidence to keep: %d\n", cfg.MinEvidence)
+	if cfg.CautiousWindow > 0 {
+		fmt.Printf("Cautious window: %d hours (skip recently reinforced)\n", cfg.CautiousWindow)
+	} else {
+		fmt.Println("Cautious window: disabled")
+	}
 }
 
 // queryEdgeBatch fetches a batch of edges from Neo4j for decay processing.
@@ -466,7 +520,8 @@ MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
 WHERE (r.last_activated_at IS NOT NULL AND r.last_activated_at < datetime() - duration({days: $olderThan}))
    OR (r.last_activated_at IS NULL AND r.updated_at IS NOT NULL AND r.updated_at < datetime() - duration({days: $olderThan}))
 WITH a, b, r
-WHERE $spaceId = '' OR r.space_id = $spaceId
+WHERE ($spaceId = '' OR r.space_id = $spaceId)
+  AND ($cautiousWindow = 0 OR coalesce(r.last_activated_at, datetime('1970-01-01')) < datetime() - duration({hours: $cautiousWindow}))
 RETURN id(r) AS edgeId,
        type(r) AS relType,
        a.node_id AS sourceId,
@@ -480,10 +535,11 @@ SKIP $offset
 LIMIT $batchSize`
 
 	params := map[string]any{
-		"olderThan": cfg.OlderThanDays,
-		"spaceId":   cfg.SpaceID,
-		"offset":    offset,
-		"batchSize": cfg.BatchSize,
+		"olderThan":      cfg.OlderThanDays,
+		"spaceId":        cfg.SpaceID,
+		"offset":         offset,
+		"batchSize":      cfg.BatchSize,
+		"cautiousWindow": cfg.CautiousWindow,
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
