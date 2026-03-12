@@ -381,8 +381,10 @@ func runInit(flags initFlags) error {
 			fmt.Printf("Warning: server start failed: %v\n", err)
 			fmt.Println("You can start it manually: mdemg start --auto-migrate")
 		}
+		// Wait for server to be ready before ingesting
+		waitForServerReady(opts.ServerPort)
 		// Run initial ingest so the graph isn't empty
-		runInitialIngest(cwd, opts.SpaceID)
+		runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
 		return nil
 	}
 
@@ -404,8 +406,10 @@ func runInit(flags initFlags) error {
 				fmt.Printf("Warning: server start failed: %v\n", err)
 				fmt.Println("You can start it manually: mdemg start --auto-migrate")
 			}
+			// Wait for server to be ready before ingesting
+			waitForServerReady(opts.ServerPort)
 			// Run initial ingest so the graph isn't empty
-			runInitialIngest(cwd, opts.SpaceID)
+			runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
 			return nil
 		}
 	}
@@ -625,6 +629,27 @@ func waitForBoltReady() {
 	}
 }
 
+// waitForServerReady polls the MDEMG server's /healthz endpoint until it responds 200.
+// This mirrors waitForBoltReady and prevents runInitialIngest from hitting a server
+// that hasn't finished starting (e.g., during migrations on first run).
+func waitForServerReady(port int) {
+	if port == 0 {
+		port = 9999
+	}
+	url := fmt.Sprintf("http://localhost:%d/healthz", port)
+	for i := 0; i < 30; i++ {
+		resp, err := http.Get(url) //nolint:gosec // G107: localhost health check, not user-controlled
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				return
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	fmt.Println("Warning: server did not become ready within 30s — initial ingest may fail")
+}
+
 // reloadConfigEnv re-reads config.yaml and forces env vars to the current YAML values.
 // This is needed after runDBStart which may update neo4j.uri with a dynamic port.
 // Without this, the spawned daemon inherits stale env vars (e.g., bolt://localhost:7687
@@ -668,13 +693,10 @@ func envContains(lines []string, key string) bool {
 	return false
 }
 
-// runInitialIngest performs a full ingest of the codebase after init.
-// Uses the provided spaceID (from opts.SpaceID) and leaves sinceCommit empty
-// so runIngest performs a full (non-incremental) ingest.
-func runInitialIngest(cwd, spaceID string) {
-	fmt.Println()
-	fmt.Println("Running initial ingest...")
-	if err := runIngest(&ingestConfig{
+// buildInitialIngestConfig constructs the ingest config for the initial post-init ingest.
+// llmProvider and llmModel come from the user's init wizard choices.
+func buildInitialIngestConfig(cwd, spaceID, llmProvider, llmModel string) *ingestConfig {
+	cfg := &ingestConfig{
 		codebasePath:       cwd,
 		spaceID:            spaceID,
 		batchSize:          100,
@@ -692,11 +714,29 @@ func runInitialIngest(cwd, spaceID string) {
 		includeRust:        true,
 		excludeDirs:        ".git,vendor,node_modules,.worktrees",
 		archiveDeleted:     true,
-		llmSummary:         true,
-		llmSummaryModel:    "gpt-4o-mini",
-		llmSummaryProvider: "openai",
-		llmSummaryBatch:    10,
-	}); err != nil {
+		maxFileSize:        1048576, // 1MB
+		maxElementsPerFile: 500,
+		maxSymbolsPerFile:  1000,
+	}
+
+	// Only enable LLM summaries if the user chose a provider
+	if llmProvider != "" && llmProvider != "disabled" {
+		cfg.llmSummary = true
+		cfg.llmSummaryProvider = llmProvider
+		cfg.llmSummaryModel = llmModel
+		cfg.llmSummaryBatch = 10
+	}
+
+	return cfg
+}
+
+// runInitialIngest performs a full ingest of the codebase after init.
+// Uses the provided spaceID (from opts.SpaceID) and leaves sinceCommit empty
+// so runIngest performs a full (non-incremental) ingest.
+func runInitialIngest(cwd, spaceID, llmProvider, llmModel string) {
+	fmt.Println()
+	fmt.Println("Running initial ingest...")
+	if err := runIngest(buildInitialIngestConfig(cwd, spaceID, llmProvider, llmModel)); err != nil {
 		fmt.Printf("Warning: initial ingest failed: %v\n", err)
 		fmt.Println("You can run it manually: mdemg ingest --path .")
 	}
