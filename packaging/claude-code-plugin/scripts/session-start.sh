@@ -61,9 +61,9 @@ MAX_OBS=10
 # ── Health check ─────────────────────────────────────────────────
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 2; then
   cat <<'EOF'
-MDEMG DISCONNECTED — server is not running.
-Memory is unavailable. You are operating without persistent context.
-Warn the user: "MDEMG unavailable — memory disconnected."
+CMS unavailable — memory disconnected.
+The MDEMG server is not running. You are operating without persistent context.
+Warn the user and suggest: mdemg sidecar up
 Do NOT make irreversible decisions without user confirmation.
 EOF
   exit 0
