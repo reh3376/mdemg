@@ -382,35 +382,7 @@ func runInit(flags initFlags) error {
 			fmt.Println("You can start it manually: mdemg start --auto-migrate")
 		}
 		// Run initial ingest so the graph isn't empty
-		fmt.Println()
-		fmt.Println("Running initial ingest...")
-		if err := runIngest(&ingestConfig{
-			codebasePath:   cwd,
-			spaceID:        "codebase",
-			batchSize:      100,
-			workers:        4,
-			timeout:        300,
-			delay:          50,
-			maxRetries:     3,
-			retryDelay:     2000,
-			consolidate:    true,
-			extractSymbols: true,
-			includeMd:      true,
-			includeTS:      true,
-			includePy:      true,
-			includeJava:    true,
-			includeRust:    true,
-			excludeDirs:    ".git,vendor,node_modules,.worktrees",
-			archiveDeleted: true,
-			sinceCommit:    "HEAD~1",
-			llmSummary:     true,
-			llmSummaryModel:    "gpt-4o-mini",
-			llmSummaryProvider: "openai",
-			llmSummaryBatch:    10,
-		}); err != nil {
-			fmt.Printf("Warning: initial ingest failed: %v\n", err)
-			fmt.Println("You can run it manually: mdemg ingest --path .")
-		}
+		runInitialIngest(cwd, opts.SpaceID)
 		return nil
 	}
 
@@ -433,35 +405,7 @@ func runInit(flags initFlags) error {
 				fmt.Println("You can start it manually: mdemg start --auto-migrate")
 			}
 			// Run initial ingest so the graph isn't empty
-			fmt.Println()
-			fmt.Println("Running initial ingest...")
-			if err := runIngest(&ingestConfig{
-				codebasePath:   cwd,
-				spaceID:        "codebase",
-				batchSize:      100,
-				workers:        4,
-				timeout:        300,
-				delay:          50,
-				maxRetries:     3,
-				retryDelay:     2000,
-				consolidate:    true,
-				extractSymbols: true,
-				includeMd:      true,
-				includeTS:      true,
-				includePy:      true,
-				includeJava:    true,
-				includeRust:    true,
-				excludeDirs:    ".git,vendor,node_modules,.worktrees",
-				archiveDeleted: true,
-				sinceCommit:    "HEAD~1",
-				llmSummary:     true,
-				llmSummaryModel:    "gpt-4o-mini",
-				llmSummaryProvider: "openai",
-				llmSummaryBatch:    10,
-			}); err != nil {
-				fmt.Printf("Warning: initial ingest failed: %v\n", err)
-				fmt.Println("You can run it manually: mdemg ingest --path .")
-			}
+			runInitialIngest(cwd, opts.SpaceID)
 			return nil
 		}
 	}
@@ -722,6 +666,40 @@ func envContains(lines []string, key string) bool {
 		}
 	}
 	return false
+}
+
+// runInitialIngest performs a full ingest of the codebase after init.
+// Uses the provided spaceID (from opts.SpaceID) and leaves sinceCommit empty
+// so runIngest performs a full (non-incremental) ingest.
+func runInitialIngest(cwd, spaceID string) {
+	fmt.Println()
+	fmt.Println("Running initial ingest...")
+	if err := runIngest(&ingestConfig{
+		codebasePath:       cwd,
+		spaceID:            spaceID,
+		batchSize:          100,
+		workers:            4,
+		timeout:            300,
+		delay:              50,
+		maxRetries:         3,
+		retryDelay:         2000,
+		consolidate:        true,
+		extractSymbols:     true,
+		includeMd:          true,
+		includeTS:          true,
+		includePy:          true,
+		includeJava:        true,
+		includeRust:        true,
+		excludeDirs:        ".git,vendor,node_modules,.worktrees",
+		archiveDeleted:     true,
+		llmSummary:         true,
+		llmSummaryModel:    "gpt-4o-mini",
+		llmSummaryProvider: "openai",
+		llmSummaryBatch:    10,
+	}); err != nil {
+		fmt.Printf("Warning: initial ingest failed: %v\n", err)
+		fmt.Println("You can run it manually: mdemg ingest --path .")
+	}
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.
