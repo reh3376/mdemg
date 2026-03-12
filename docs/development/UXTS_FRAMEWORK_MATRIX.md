@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-02-27
+Last updated: 2026-03-12
 
 ---
 
@@ -11,7 +11,7 @@ Last updated: 2026-02-27
 | Acronym | Name | Primary Scope | Status | Specs |
 | ------- | ---- | ------------- | ------ | ----- |
 | UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active | N/A (registry) |
-| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 7 canonical, 4 drafts |
+| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 12 canonical, 4 drafts |
 | UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 124 canonical, 7 drafts |
 | UPTS | Universal Parser Test Specification | Language parser conformance | active | 27 |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
@@ -29,7 +29,7 @@ Last updated: 2026-02-27
 | Framework | Schema | Specs | Runner / Harness | CI / Automation |
 | --------- | ------ | ----- | ---------------- | --------------- |
 | UNTS | n/a (registry format in docs) | `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json` | `internal/unts/` (Go gRPC service + scanner + registry) | no dedicated CI gate |
-| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (7); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
+| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (12); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (124) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | CI-gated in `ci.yml` |
 | UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (27) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |

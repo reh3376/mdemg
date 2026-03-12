@@ -236,6 +236,20 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// UxTS plugin
+	pluginsDir := detectPluginsDir(cwd)
+	if flags.defaults {
+		opts.PluginsEnabled = true
+		opts.PluginsDir = pluginsDir
+	} else {
+		answer := promptLine("Install UxTS plugin? (yes/no) [yes]", "yes")
+		if answer == "yes" {
+			opts.PluginsEnabled = true
+			opts.PluginsDir = pluginsDir
+			fmt.Printf("  Plugins directory: %s\n", pluginsDir)
+		}
+	}
+
 	// Generate files
 	fmt.Println()
 
@@ -740,6 +754,34 @@ func runInitialIngest(cwd, spaceID, llmProvider, llmModel string) {
 		fmt.Printf("Warning: initial ingest failed: %v\n", err)
 		fmt.Println("You can run it manually: mdemg ingest --path .")
 	}
+}
+
+// detectPluginsDir finds the best plugins directory for the current installation.
+// Checks Homebrew share, Windows install dir, and local ./plugins in order.
+func detectPluginsDir(cwd string) string {
+	// Homebrew: /opt/homebrew/share/mdemg/plugins or /usr/local/share/mdemg/plugins
+	for _, prefix := range []string{"/opt/homebrew/share/mdemg/plugins", "/usr/local/share/mdemg/plugins"} {
+		if info, err := os.Stat(prefix); err == nil && info.IsDir() {
+			return prefix
+		}
+	}
+
+	// Windows: %USERPROFILE%\mdemg\plugins
+	if home := os.Getenv("USERPROFILE"); home != "" {
+		winDir := filepath.Join(home, "mdemg", "plugins")
+		if info, err := os.Stat(winDir); err == nil && info.IsDir() {
+			return winDir
+		}
+	}
+
+	// Local project plugins directory
+	localDir := filepath.Join(cwd, "plugins")
+	if info, err := os.Stat(localDir); err == nil && info.IsDir() {
+		return localDir
+	}
+
+	// Default: relative path (works when running from project root)
+	return "./plugins"
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.

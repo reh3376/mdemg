@@ -206,6 +206,7 @@ plugins/
   linear-module/            # Linear integration plugin
   reflection-module/        # APE reflection plugin
   keyword-booster/          # Sample reasoning plugin
+  uxts-module/              # UxTS framework reasoning plugin (test coverage, compliance, drift)
 migrations/                 # Neo4j Cypher migrations (V0001-V0018, 3072-dim vectors)
 tests/
   integration/              # Integration tests (Neo4j required)
