@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mdemg": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-wrapper.sh",
+      "args": [],
+      "description": "MDEMG memory graph — semantic search, observations, and knowledge graph"
+    }
+  }
+}
