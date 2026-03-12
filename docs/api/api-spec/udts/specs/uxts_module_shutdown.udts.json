@@ -1,0 +1,21 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.module.v1.ModuleLifecycle",
+  "method": "Shutdown",
+  "request": {
+    "timeout_ms": 5000,
+    "reason": "udts_contract_test"
+  },
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "success"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "92df248f443de5b0dc6ff96ad752612ed5a10cb268e26c5a48219cb21965a780"
+  },
+  "metadata": {
+    "description": "Shutdown returns success with graceful message",
+    "tags": ["uxts-module", "lifecycle", "contract"]
+  }
+}

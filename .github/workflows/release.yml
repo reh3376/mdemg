@@ -32,11 +32,18 @@ jobs:
             -ldflags "-s -w -X mdemg/internal/cli.Version=$VERSION -X mdemg/internal/cli.Commit=$(git rev-parse --short HEAD) -X mdemg/internal/cli.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -o mdemg.exe ./cmd/mdemg
 
+      - name: Build UxTS plugin Windows amd64
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
+            -ldflags "-s -w" \
+            -o plugins/uxts-module/uxts-module.exe ./plugins/uxts-module/
+
       - name: Create archive
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
-          Compress-Archive -Path mdemg.exe -DestinationPath "mdemg_${version}_windows_amd64.zip"
+          Compress-Archive -Path mdemg.exe, plugins/uxts-module/uxts-module.exe, plugins/uxts-module/manifest.json -DestinationPath "mdemg_${version}_windows_amd64.zip"
 
       - name: Generate checksum
         shell: bash

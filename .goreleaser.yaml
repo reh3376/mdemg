@@ -32,6 +32,31 @@ builds:
       - -X mdemg/internal/cli.Commit={{.ShortCommit}}
       - -X mdemg/internal/cli.BuildDate={{.Date}}
 
+  # UxTS plugin — REASONING module for test coverage awareness
+  - id: uxts-module-darwin-arm64
+    main: ./plugins/uxts-module
+    binary: uxts-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: uxts-module-darwin-amd64
+    main: ./plugins/uxts-module
+    binary: uxts-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+
   # Linux build requires zig cross-compiler — uncomment when available
   # - id: mdemg-linux-amd64
   #   main: ./cmd/mdemg
@@ -58,6 +83,9 @@ archives:
     files:
       - src: "man/man1/*.1"
         dst: man/man1
+        strip_parent: true
+      - src: "plugins/uxts-module/manifest.json"
+        dst: plugins/uxts-module
         strip_parent: true
 
 checksum:
@@ -86,5 +114,9 @@ brews:
     install: |
       bin.install "mdemg"
       man1.install Dir["man/man1/*.1"]
+      # UxTS plugin (default-enabled REASONING module)
+      plugdir = share/"mdemg/plugins/uxts-module"
+      plugdir.install "uxts-module"
+      plugdir.install "plugins/uxts-module/manifest.json"
     test: |
       system "#{bin}/mdemg", "version"

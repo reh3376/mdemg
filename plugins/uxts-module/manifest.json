@@ -1,0 +1,23 @@
+{
+  "id": "uxts-module",
+  "name": "UxTS Framework Plugin",
+  "version": "1.0.0",
+  "type": "REASONING",
+  "binary": "uxts-module",
+  "capabilities": {
+    "pattern_detectors": ["test_coverage", "spec_compliance", "drift_detection"],
+    "event_subscriptions": ["source_changed", "ingest_complete"]
+  },
+  "health_check_interval_ms": 10000,
+  "startup_timeout_ms": 15000,
+  "config": {
+    "spec_root": "./docs",
+    "frameworks": "uats,udts,upts,ubts,usts,uobs,uots,uets,uvts",
+    "mdemg_endpoint": "http://localhost:9999",
+    "space_id": "mdemg-dev",
+    "enable_drift_check": "true",
+    "max_specs_per_event": "50",
+    "coverage_boost": "0.02",
+    "failure_penalty": "0.05"
+  }
+}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	devspacepb "mdemg/api/devspacepb"
+	modulepb "mdemg/api/modulepb"
 	pb "mdemg/api/transferpb"
 
 	"google.golang.org/grpc"
@@ -407,6 +408,262 @@ func TestDevSpaceConnect(t *testing.T) {
 		}
 		if err != nil {
 			t.Fatalf("Connect Recv: %v", err)
+		}
+	}
+}
+
+// getModuleTarget returns the Unix socket target for uxts-module UDTS tests.
+// Set UDTS_MODULE_SOCKET (e.g. /tmp/mdemg-plugins/mdemg-uxts-module.sock) to run.
+func getModuleTarget(t *testing.T) string {
+	t.Helper()
+	socketPath := os.Getenv("UDTS_MODULE_SOCKET")
+	if socketPath == "" {
+		t.Skip("UDTS_MODULE_SOCKET not set; start uxts-module first")
+	}
+	return socketPath
+}
+
+func dialModule(t *testing.T, socketPath string, _ time.Duration) *grpc.ClientConn {
+	t.Helper()
+	conn, err := grpc.NewClient("unix://"+socketPath,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		t.Fatalf("dial module socket %s: %v", socketPath, err)
+	}
+	return conn
+}
+
+// TestUxTSModuleHandshake validates the Handshake RPC contract.
+func TestUxTSModuleHandshake(t *testing.T) {
+	socketPath := getModuleTarget(t)
+	spec := loadSpec(t, "uxts_module_handshake.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ModuleLifecycle" || spec.Method != "Handshake" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewModuleLifecycleClient(conn)
+	resp, err := client.Handshake(ctx, &modulepb.HandshakeRequest{
+		MdemgVersion: "1.0.0",
+		SocketPath:   socketPath,
+		Config: map[string]string{
+			"spec_root":          "./docs",
+			"frameworks":         "uats",
+			"enable_drift_check": "false",
+		},
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Handshake: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "module_id" && resp.ModuleId == "" {
+		t.Error("expected response to have module_id")
+	}
+	if resp.ModuleType != modulepb.ModuleType_MODULE_TYPE_REASONING {
+		t.Errorf("expected REASONING type, got %v", resp.ModuleType)
+	}
+}
+
+// TestUxTSModuleHealthCheck validates the HealthCheck RPC contract.
+func TestUxTSModuleHealthCheck(t *testing.T) {
+	socketPath := getModuleTarget(t)
+	spec := loadSpec(t, "uxts_module_healthcheck.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ModuleLifecycle" || spec.Method != "HealthCheck" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewModuleLifecycleClient(conn)
+	resp, err := client.HealthCheck(ctx, &modulepb.HealthCheckRequest{})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("HealthCheck: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "healthy" && !resp.Healthy {
+		t.Error("expected healthy=true")
+	}
+	if resp.Metrics == nil || resp.Metrics["total_specs"] == "" {
+		t.Error("expected metrics to include total_specs")
+	}
+}
+
+// TestUxTSModuleShutdown validates the Shutdown RPC contract.
+func TestUxTSModuleShutdown(t *testing.T) {
+	socketPath := getModuleTarget(t)
+	spec := loadSpec(t, "uxts_module_shutdown.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ModuleLifecycle" || spec.Method != "Shutdown" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewModuleLifecycleClient(conn)
+	resp, err := client.Shutdown(ctx, &modulepb.ShutdownRequest{
+		TimeoutMs: 5000,
+		Reason:    "udts_contract_test",
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Shutdown: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "success" && !resp.Success {
+		t.Error("expected success=true")
+	}
+}
+
+// TestUxTSModuleProcessEmpty validates Process with empty candidates.
+func TestUxTSModuleProcessEmpty(t *testing.T) {
+	socketPath := getModuleTarget(t)
+	spec := loadSpec(t, "uxts_module_process_empty.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ReasoningModule" || spec.Method != "Process" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewReasoningModuleClient(conn)
+	resp, err := client.Process(ctx, &modulepb.ProcessRequest{
+		QueryText:  "empty test",
+		Candidates: []*modulepb.RetrievalCandidate{},
+		TopK:       10,
+		Context:    map[string]string{},
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Process(empty): %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "metadata" && resp.Metadata == nil {
+		t.Error("expected response to have metadata")
+	}
+	if len(resp.Results) != 0 {
+		t.Errorf("expected 0 results for empty candidates, got %d", len(resp.Results))
+	}
+}
+
+// TestUxTSModuleProcessWithCandidates validates Process annotates candidates.
+func TestUxTSModuleProcessWithCandidates(t *testing.T) {
+	socketPath := getModuleTarget(t)
+	spec := loadSpec(t, "uxts_module_process_with_candidates.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ReasoningModule" || spec.Method != "Process" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewReasoningModuleClient(conn)
+	resp, err := client.Process(ctx, &modulepb.ProcessRequest{
+		QueryText: "memory retrieval test",
+		Candidates: []*modulepb.RetrievalCandidate{
+			{
+				NodeId:  "udts-node-1",
+				Path:    "/v1/memory/retrieve",
+				Name:    "retrieve handler",
+				Summary: "Handles memory retrieval requests",
+				Score:   0.5,
+			},
+			{
+				NodeId:  "udts-node-2",
+				Path:    "/v1/other",
+				Name:    "other handler",
+				Summary: "Unrelated endpoint",
+				Score:   0.4,
+			},
+		},
+		TopK:    10,
+		Context: map[string]string{},
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Process(with candidates): %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "results" && len(resp.Results) == 0 {
+		t.Error("expected results to be non-empty")
+	}
+	if len(resp.Results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(resp.Results))
+	}
+
+	// Verify candidates have UxTS metadata annotations
+	for _, r := range resp.Results {
+		if r.Metadata == nil {
+			t.Errorf("candidate %s: expected metadata to be set", r.NodeId)
+			continue
+		}
+		if _, ok := r.Metadata["uxts_coverage_count"]; !ok {
+			t.Errorf("candidate %s: expected uxts_coverage_count metadata", r.NodeId)
 		}
 	}
 }

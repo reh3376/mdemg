@@ -1,0 +1,38 @@
+{
+  "udts_version": "1.0.0",
+  "service": "mdemg.module.v1.ReasoningModule",
+  "method": "Process",
+  "request": {
+    "query_text": "memory retrieval test",
+    "candidates": [
+      {
+        "node_id": "udts-node-1",
+        "path": "/v1/memory/retrieve",
+        "name": "retrieve handler",
+        "summary": "Handles memory retrieval requests",
+        "score": 0.5
+      },
+      {
+        "node_id": "udts-node-2",
+        "path": "/v1/other",
+        "name": "other handler",
+        "summary": "Unrelated endpoint",
+        "score": 0.4
+      }
+    ],
+    "top_k": 10,
+    "context": {}
+  },
+  "expected": {
+    "status_code": "OK",
+    "response_has_field": "results"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "proto_sha256": "92df248f443de5b0dc6ff96ad752612ed5a10cb268e26c5a48219cb21965a780"
+  },
+  "metadata": {
+    "description": "Process annotates candidates with UxTS coverage metadata",
+    "tags": ["uxts-module", "reasoning", "contract"]
+  }
+}

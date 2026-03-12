@@ -385,6 +385,8 @@ type InitOptions struct {
 	BackupStorageDir  string
 	BackupInterval    int
 	BackupRetention   int
+	PluginsEnabled    bool
+	PluginsDir        string
 }
 
 // GenerateConfigYAML produces a config.yaml file from wizard answers.
@@ -426,6 +428,13 @@ func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 			StorageDir:     opts.BackupStorageDir,
 			IntervalHours:  opts.BackupInterval,
 			RetentionCount: opts.BackupRetention,
+		}
+	}
+
+	if opts.PluginsEnabled {
+		cfg.Plugins = PluginsYAML{
+			Enabled: true,
+			Dir:     opts.PluginsDir,
 		}
 	}
 
