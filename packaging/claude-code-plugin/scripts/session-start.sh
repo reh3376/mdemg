@@ -145,14 +145,6 @@ if [ -n "$RSIC_HEALTH" ]; then
   fi
 fi
 
-# ── Reinforce recalled context ───────────────────────────────────
-if [ "$OBS_COUNT" -gt 0 ] 2>/dev/null; then
-  curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
-    -H "Content-Type: application/json" \
-    -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\",\"content\":\"Session resumed. ${OBS_COUNT} observations recalled.\",\"obs_type\":\"context\",\"tags\":[\"session-resume\"]}" \
-    --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
-fi
-
 # Trigger graduation check in background
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/graduate" \
   -H "Content-Type: application/json" \
