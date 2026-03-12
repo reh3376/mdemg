@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -62,8 +61,7 @@ func removePID(path string) error {
 }
 
 func isProcessAlive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil
+	return checkProcessAlive(pid)
 }
 
 func processUptime(pidPath string) (time.Duration, error) {
@@ -199,7 +197,7 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 	daemon := osExec.Command(execPath, serveArgs...)
 	daemon.Stdout = logFile
 	daemon.Stderr = logFile
-	daemon.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	setDaemonSysProcAttr(daemon)
 	// Inherit environment
 	daemon.Env = os.Environ()
 
@@ -280,8 +278,8 @@ func runStop() error {
 
 	// Send SIGTERM
 	fmt.Printf("Stopping MDEMG server (pid=%d)...\n", pid)
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-		return fmt.Errorf("send SIGTERM: %w", err)
+	if err := terminateProcess(pid); err != nil {
+		return fmt.Errorf("terminate process: %w", err)
 	}
 
 	// Poll for process exit (up to 30s)
@@ -297,8 +295,8 @@ func runStop() error {
 	}
 
 	// Force kill
-	fmt.Println("Warning: graceful shutdown timed out, sending SIGKILL")
-	_ = syscall.Kill(pid, syscall.SIGKILL)
+	fmt.Println("Warning: graceful shutdown timed out, force killing process")
+	_ = forceKillProcess(pid)
 	time.Sleep(1 * time.Second)
 	_ = removePID(pidPath)
 	fmt.Println("MDEMG server killed")
