@@ -76,7 +76,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-binaries
-          path: dist/windows
+          path: /tmp/windows-binaries
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
@@ -94,15 +94,15 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           # Upload Windows zip to the release created by GoReleaser
-          for f in dist/windows/mdemg_*_windows_*.zip; do
+          for f in /tmp/windows-binaries/mdemg_*_windows_*.zip; do
             gh release upload "$TAG" "$f" --clobber
           done
           # Append Windows checksums to the release checksums
-          if [ -f dist/windows/windows_checksums.txt ]; then
+          if [ -f /tmp/windows-binaries/windows_checksums.txt ]; then
             # Download existing checksums, append, re-upload
             gh release download "$TAG" -p "checksums.txt" -D /tmp/release-checksums || true
             if [ -f /tmp/release-checksums/checksums.txt ]; then
-              cat dist/windows/windows_checksums.txt >> /tmp/release-checksums/checksums.txt
+              cat /tmp/windows-binaries/windows_checksums.txt >> /tmp/release-checksums/checksums.txt
               gh release upload "$TAG" /tmp/release-checksums/checksums.txt --clobber
             fi
           fi
