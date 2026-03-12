@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -293,7 +294,7 @@ func runInit(flags initFlags) error {
 	// IDE integration
 	if !flags.noIDE {
 		installIDE := false
-		if env.hasCursor || env.hasVSCode || env.hasClaude {
+		if env.hasCursor || env.hasVSCode || env.hasClaude || env.hasRootMCP {
 			if flags.defaults {
 				installIDE = true
 			} else {
@@ -304,7 +305,9 @@ func runInit(flags initFlags) error {
 				if env.hasVSCode {
 					ides = append(ides, "VS Code")
 				}
-				if env.hasClaude {
+				if env.hasRootMCP {
+					ides = append(ides, "Claude Code (.mcp.json)")
+				} else if env.hasClaude {
 					ides = append(ides, "Claude Code")
 				}
 				answer := promptLine(
@@ -378,6 +381,10 @@ func runInit(flags initFlags) error {
 			fmt.Printf("Warning: server start failed: %v\n", err)
 			fmt.Println("You can start it manually: mdemg start --auto-migrate")
 		}
+		// Wait for server to be ready before ingesting
+		waitForServerReady(opts.ServerPort)
+		// Run initial ingest so the graph isn't empty
+		runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
 		return nil
 	}
 
@@ -399,6 +406,10 @@ func runInit(flags initFlags) error {
 				fmt.Printf("Warning: server start failed: %v\n", err)
 				fmt.Println("You can start it manually: mdemg start --auto-migrate")
 			}
+			// Wait for server to be ready before ingesting
+			waitForServerReady(opts.ServerPort)
+			// Run initial ingest so the graph isn't empty
+			runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
 			return nil
 		}
 	}
@@ -421,12 +432,13 @@ func runInit(flags initFlags) error {
 
 // environmentInfo holds detection results.
 type environmentInfo struct {
-	neo4jReachable  bool
+	neo4jReachable bool
 	ollamaReachable bool
 	isGitRepo       bool
 	hasCursor       bool
 	hasVSCode       bool
 	hasClaude       bool
+	hasRootMCP      bool // .mcp.json exists at repo root (Claude Code project-scoped config)
 }
 
 func detectEnvironment(dir string) environmentInfo {
@@ -463,6 +475,11 @@ func detectEnvironment(dir string) environmentInfo {
 		env.hasClaude = true
 	}
 
+	// Detect existing .mcp.json (Claude Code project-scoped config)
+	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); err == nil {
+		env.hasRootMCP = true
+	}
+
 	return env
 }
 
@@ -478,51 +495,104 @@ func promptLine(prompt, defaultVal string) string {
 	return defaultVal
 }
 
+// mdemgMCPEntry returns the MCP server config block for mdemg.
+func mdemgMCPEntry(endpoint string) map[string]interface{} {
+	return map[string]interface{}{
+		"command": "mdemg",
+		"args":    []string{"mcp"},
+		"env": map[string]string{
+			"MDEMG_ENDPOINT": endpoint,
+		},
+	}
+}
+
+// mergeMCPConfig reads an existing mcp.json, adds/updates the "mdemg" server entry,
+// and writes it back. Returns true if the file was modified.
+func mergeMCPConfig(mcpPath, endpoint string) (bool, error) {
+	var root map[string]interface{}
+
+	data, err := os.ReadFile(mcpPath)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", mcpPath, err)
+	}
+	if err := json.Unmarshal(data, &root); err != nil {
+		return false, fmt.Errorf("parse %s: %w", mcpPath, err)
+	}
+
+	servers, ok := root["mcpServers"].(map[string]interface{})
+	if !ok {
+		servers = make(map[string]interface{})
+		root["mcpServers"] = servers
+	}
+
+	// Skip if mdemg entry already exists
+	if _, exists := servers["mdemg"]; exists {
+		return false, nil
+	}
+
+	servers["mdemg"] = mdemgMCPEntry(endpoint)
+
+	out, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("marshal %s: %w", mcpPath, err)
+	}
+	out = append(out, '\n')
+	if err := os.WriteFile(mcpPath, out, 0644); err != nil {
+		return false, fmt.Errorf("write %s: %w", mcpPath, err)
+	}
+	return true, nil
+}
+
 // writeIDEConfigs updates MCP configuration for detected IDEs.
+// Prefers merging into existing .mcp.json at repo root (used by Claude Code for
+// project-scoped servers) over creating .claude/mcp.json. For Cursor and VS Code,
+// creates new files only if they don't already exist; merges if they do.
 // Returns a list of files that were written.
 func writeIDEConfigs(dir string, port int, env environmentInfo) []string {
 	var written []string
 	endpoint := fmt.Sprintf("http://localhost:%d", port)
 
-	mcpConfig := fmt.Sprintf(`{
-  "mcpServers": {
-    "mdemg": {
-      "command": "mdemg",
-      "args": ["mcp"],
-      "env": {
-        "MDEMG_ENDPOINT": "%s"
-      }
-    }
-  }
-}
-`, endpoint)
+	freshConfig := func() []byte {
+		out, _ := json.MarshalIndent(map[string]interface{}{
+			"mcpServers": map[string]interface{}{
+				"mdemg": mdemgMCPEntry(endpoint),
+			},
+		}, "", "  ")
+		return append(out, '\n')
+	}
 
-	if env.hasCursor {
-		mcpPath := filepath.Join(dir, ".cursor", "mcp.json")
-		// Only write if it doesn't exist (don't clobber user config)
+	// writeOrMerge handles both new-file creation and merging into existing files.
+	writeOrMerge := func(mcpPath string) {
 		if _, err := os.Stat(mcpPath); os.IsNotExist(err) {
-			if err := os.WriteFile(mcpPath, []byte(mcpConfig), 0644); err == nil {
+			if err := os.WriteFile(mcpPath, freshConfig(), 0644); err == nil {
+				written = append(written, mcpPath)
+			}
+		} else {
+			if merged, err := mergeMCPConfig(mcpPath, endpoint); err != nil {
+				fmt.Printf("  Warning: could not merge into %s: %v\n", mcpPath, err)
+			} else if merged {
 				written = append(written, mcpPath)
 			}
 		}
+	}
+
+	if env.hasCursor {
+		writeOrMerge(filepath.Join(dir, ".cursor", "mcp.json"))
 	}
 
 	if env.hasVSCode {
-		mcpPath := filepath.Join(dir, ".vscode", "mcp.json")
-		if _, err := os.Stat(mcpPath); os.IsNotExist(err) {
-			if err := os.WriteFile(mcpPath, []byte(mcpConfig), 0644); err == nil {
-				written = append(written, mcpPath)
-			}
-		}
+		writeOrMerge(filepath.Join(dir, ".vscode", "mcp.json"))
 	}
 
-	if env.hasClaude {
-		mcpPath := filepath.Join(dir, ".claude", "mcp.json")
-		if _, err := os.Stat(mcpPath); os.IsNotExist(err) {
-			if err := os.WriteFile(mcpPath, []byte(mcpConfig), 0644); err == nil {
-				written = append(written, mcpPath)
-			}
-		}
+	// Claude Code: prefer .mcp.json at repo root (project-scoped, shared config)
+	// over .claude/mcp.json. Claude Code loads .mcp.json for project servers.
+	rootMCP := filepath.Join(dir, ".mcp.json")
+	if _, err := os.Stat(rootMCP); err == nil {
+		// Existing .mcp.json found — merge into it
+		writeOrMerge(rootMCP)
+	} else if env.hasClaude {
+		// No .mcp.json — fall back to .claude/mcp.json
+		writeOrMerge(filepath.Join(dir, ".claude", "mcp.json"))
 	}
 
 	return written
@@ -557,6 +627,27 @@ func waitForBoltReady() {
 		}
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// waitForServerReady polls the MDEMG server's /healthz endpoint until it responds 200.
+// This mirrors waitForBoltReady and prevents runInitialIngest from hitting a server
+// that hasn't finished starting (e.g., during migrations on first run).
+func waitForServerReady(port int) {
+	if port == 0 {
+		port = 9999
+	}
+	url := fmt.Sprintf("http://localhost:%d/healthz", port)
+	for i := 0; i < 30; i++ {
+		resp, err := http.Get(url) //nolint:gosec // G107: localhost health check, not user-controlled
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				return
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	fmt.Println("Warning: server did not become ready within 30s — initial ingest may fail")
 }
 
 // reloadConfigEnv re-reads config.yaml and forces env vars to the current YAML values.
@@ -600,6 +691,55 @@ func envContains(lines []string, key string) bool {
 		}
 	}
 	return false
+}
+
+// buildInitialIngestConfig constructs the ingest config for the initial post-init ingest.
+// llmProvider and llmModel come from the user's init wizard choices.
+func buildInitialIngestConfig(cwd, spaceID, llmProvider, llmModel string) *ingestConfig {
+	cfg := &ingestConfig{
+		codebasePath:       cwd,
+		spaceID:            spaceID,
+		batchSize:          100,
+		workers:            4,
+		timeout:            300,
+		delay:              50,
+		maxRetries:         3,
+		retryDelay:         2000,
+		consolidate:        true,
+		extractSymbols:     true,
+		includeMd:          true,
+		includeTS:          true,
+		includePy:          true,
+		includeJava:        true,
+		includeRust:        true,
+		excludeDirs:        ".git,vendor,node_modules,.worktrees",
+		archiveDeleted:     true,
+		maxFileSize:        1048576, // 1MB
+		maxElementsPerFile: 500,
+		maxSymbolsPerFile:  1000,
+	}
+
+	// Only enable LLM summaries if the user chose a provider
+	if llmProvider != "" && llmProvider != "disabled" {
+		cfg.llmSummary = true
+		cfg.llmSummaryProvider = llmProvider
+		cfg.llmSummaryModel = llmModel
+		cfg.llmSummaryBatch = 10
+	}
+
+	return cfg
+}
+
+// runInitialIngest performs a full ingest of the codebase after init.
+// Uses the provided spaceID (from opts.SpaceID) and leaves sinceCommit empty
+// so runIngest performs a full (non-incremental) ingest.
+func runInitialIngest(cwd, spaceID, llmProvider, llmModel string) {
+	fmt.Println()
+	fmt.Println("Running initial ingest...")
+	if err := runIngest(buildInitialIngestConfig(cwd, spaceID, llmProvider, llmModel)); err != nil {
+		fmt.Printf("Warning: initial ingest failed: %v\n", err)
+		fmt.Println("You can run it manually: mdemg ingest --path .")
+	}
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.
