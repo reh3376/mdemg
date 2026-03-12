@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wrapper for mdemg mcp that resolves the endpoint dynamically.
 # Claude Code spawns MCP servers with an unpredictable cwd, so we
-# find .mdemg.port from the project root before exec-ing into mdemg.
+# walk upward from the script's own location to find the project root.
 
 set -euo pipefail
 
@@ -10,10 +10,30 @@ if [ -n "${MDEMG_ENDPOINT:-}" ]; then
   exec mdemg mcp "$@"
 fi
 
-# Find project root via git. If git isn't available or we're outside a repo,
-# fall back to $HOME — .mdemg.port won't be found there, but mdemg mcp
-# will use its own default (localhost:9999).
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME")
+# Resolve the script's real directory (handles symlinks)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
+
+# Walk upward from the script location to find project root indicators:
+# .mdemg.port, .mdemg/, or .git/
+find_project_root() {
+  local dir="$SCRIPT_DIR"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/.mdemg.port" ] || [ -d "$dir/.mdemg" ] || [ -d "$dir/.git" ]; then
+      echo "$dir"
+      return
+    fi
+    dir=$(dirname "$dir")
+  done
+  # Last resort: try git from cwd (may work if Claude Code sets cwd correctly)
+  git rev-parse --show-toplevel 2>/dev/null || echo ""
+}
+
+PROJECT_ROOT=$(find_project_root)
+
+if [ -z "$PROJECT_ROOT" ]; then
+  # No project root found — let mdemg mcp use its own defaults
+  exec mdemg mcp "$@"
+fi
 
 # Priority: .mdemg.port > sidecar.yaml > default (let mdemg handle it)
 if [ -f "$PROJECT_ROOT/.mdemg.port" ]; then

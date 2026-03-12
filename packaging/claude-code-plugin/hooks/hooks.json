@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh",
-            "timeout": 15000,
+            "timeout": 30000,
             "description": "Restore MDEMG memory context on session start"
           }
         ]
