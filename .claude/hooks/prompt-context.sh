@@ -63,6 +63,22 @@ echo "$RECALL" | jq -r '
 
 echo "═══ END CMS RECALL ═══"
 
+# --- Jiminy guidance (if enabled) ---
+if [ "${JIMINY_ENABLED:-false}" = "true" ]; then
+  GUIDANCE=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/guide" \
+    -H "Content-Type: application/json" \
+    -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | jq -Rs .),\"session_id\":\"claude-core\"}" \
+    --connect-timeout 3 --max-time 6 2>/dev/null) || true
+
+  if [ -n "$GUIDANCE" ]; then
+    AUGMENTATION=$(echo "$GUIDANCE" | jq -r '.data.prompt_augmentation // empty' 2>/dev/null)
+    if [ -n "$AUGMENTATION" ]; then
+      echo ""
+      echo "$AUGMENTATION"
+    fi
+  fi
+fi
+
 # --- Reinforce recalled observations via retrieval co-activation ---
 # The retrieve endpoint triggers spreading activation which creates learning
 # edges between co-retrieved nodes, strengthening frequently-accessed memories.

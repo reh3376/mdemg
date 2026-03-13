@@ -734,6 +734,20 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			temporalBoost = (effectiveGamma - gamma) * r
 		}
 
+		// Compute LearningEdgeBoost: measures how much CO_ACTIVATED_WITH edges
+		// contributed to this node's activation. If activation > vector seed and
+		// node has incoming CO_ACTIVATED_WITH edges, the difference is the boost.
+		learningEdgeBoost := 0.0
+		if a > c.VectorSim && a > 0.01 {
+			// Activation exceeded vector seed — learning edges contributed
+			learningEdgeBoost = (a - c.VectorSim) * gates.ActivationWeight
+			if learningEdgeBoost < 0 {
+				learningEdgeBoost = 0
+			}
+		}
+		// Add learning edge boost to final score
+		s += learningEdgeBoost
+
 		breakdown := ScoreBreakdown{
 			VectorSimilarity:  vecComponent,
 			Activation:        actComponent,
@@ -746,7 +760,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			HubPenalty:        -hubPenComponent,
 			RedundancyPenalty: -redPenComponent,
 			RerankDelta:       0, // Set later by reranker
-			LearningEdgeBoost: 0, // Set later if learning edges contributed
+			LearningEdgeBoost: learningEdgeBoost,
 			TemporalBoost:     temporalBoost,
 			StaleRefPenalty:   -stalePenalty,
 			BypassBonus:       bypassBonus,

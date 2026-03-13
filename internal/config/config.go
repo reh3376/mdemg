@@ -218,6 +218,14 @@ type Config struct {
 	MetaLearnMaxTokens      int    // METALEARN_MAX_TOKENS — max tokens for generalization response (default: 500, range 100-4000)
 	MetaLearnTimeoutMs      int    // METALEARN_TIMEOUT_MS — timeout for generalization in ms (default: 15000, min 1000)
 
+	// Jiminy Guidance settings (Phase Jiminy)
+	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: false)
+	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 6000)
+	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
+	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
+	JiminyFrontierMinSim   float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1406,6 +1414,26 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("METALEARN_TIMEOUT_MS must be >= 1000")
 	}
 
+	// Jiminy Guidance settings (Phase Jiminy)
+	jiminyEnabled := getBool("JIMINY_ENABLED", false)
+	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 6000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyMaxItems, err := atoi("JIMINY_MAX_ITEMS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyIncludeFrontiers := getBool("JIMINY_INCLUDE_FRONTIERS", true)
+	jiminyFrontierMinSim, err := atof("JIMINY_FRONTIER_MIN_SIM", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -2226,6 +2254,14 @@ func FromEnv() (Config, error) {
 		GuardrailMaxTokens:      guardrailMaxTokens,
 		GuardrailTimeoutMs:      guardrailTimeoutMs,
 		GuardrailMaxConstraints: guardrailMaxConstraints,
+
+		// Phase Jiminy: Jiminy Guidance
+		JiminyEnabled:          jiminyEnabled,
+		JiminyTimeoutMs:        jiminyTimeoutMs,
+		JiminyMaxItems:         jiminyMaxItems,
+		JiminyMinConfidence:    jiminyMinConfidence,
+		JiminyIncludeFrontiers: jiminyIncludeFrontiers,
+		JiminyFrontierMinSim:   jiminyFrontierMinSim,
 
 		// Phase 105: Global Meta-Learning
 		MetaLearnEnabled:        metaLearnEnabled,

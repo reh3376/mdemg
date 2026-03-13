@@ -1189,6 +1189,75 @@ Validate a proposed code change against active constraints in a space.
 
 ---
 
+## Jiminy Guidance Service (Phase Jiminy)
+
+Jiminy is an active inner-voice service that provides proactive, context-aware guidance to coding agents. It orchestrates multiple knowledge sources (constraints, corrections, contradictions, patterns, frontiers) from MDEMG's knowledge graph and formats them as injectable prompt augmentation.
+
+**Configuration**: `JIMINY_ENABLED=true` required. See also `JIMINY_TIMEOUT_MS`, `JIMINY_MAX_ITEMS`, `JIMINY_MIN_CONFIDENCE`, `JIMINY_INCLUDE_FRONTIERS`, `JIMINY_FRONTIER_MIN_SIM`.
+
+### POST /v1/jiminy/guide
+
+Generate proactive guidance for the current working context.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "mdemg-dev",
+  "context": "Refactoring authentication middleware to use new JWT library",
+  "file_path": "internal/auth/middleware.go",
+  "agent_output": "func NewAuthMiddleware(secret string) gin.HandlerFunc { ... }",
+  "session_id": "claude-core",
+  "max_items": 10
+}
+```
+
+**Fields**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `space_id` | string | Yes | Memory space to query |
+| `context` | string | Yes | What the agent is currently working on |
+| `file_path` | string | No | Path of the file being edited |
+| `agent_output` | string | No | Proposed code or action for review |
+| `query` | string | No | User's original query |
+| `session_id` | string | No | Session ID for correction lookup |
+| `max_items` | int | No | Max guidance items (default: 10) |
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "guidance": [
+      {
+        "type": "constraint",
+        "priority": "high",
+        "content": "[must_not] Never use deprecated auth middleware",
+        "confidence": 0.92,
+        "source_nodes": ["node-abc"]
+      }
+    ],
+    "prompt_augmentation": "═══ JIMINY GUIDANCE ═══\nCONSTRAINTS:\n  • ...\n═══ END JIMINY GUIDANCE ═══",
+    "confidence": 0.82,
+    "rationale": "Found 3 guidance items: 2 constraints, 1 correction",
+    "source_counts": {
+      "constraints": 2,
+      "corrections": 1,
+      "patterns": 0,
+      "conflicts": 0,
+      "frontiers": 0
+    }
+  }
+}
+```
+
+**Guidance Types**: `constraint`, `correction`, `pattern`, `conflict`, `risk`, `suggestion`, `frontier`.
+
+**Error Codes**: `400` (missing space_id or context), `405` (not POST), `503` (Jiminy not enabled).
+
+---
+
 ## Skill Registry (Phase 48)
 
 Skills are CMS pinned observations with `skill:<name>` tags. The Skill Registry API provides convenience endpoints for listing, recalling, and registering skills.

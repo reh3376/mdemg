@@ -28,6 +28,7 @@ import (
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
+	"mdemg/internal/jiminy"
 	"mdemg/internal/hidden"
 	"mdemg/internal/metalearn"
 	"mdemg/internal/jobs"
@@ -120,6 +121,9 @@ type Server struct {
 
 	// Phase 80: Meta-Cognition
 	signalLearner *ape.SignalLearner
+
+	// Phase Jiminy: Jiminy Guidance
+	jiminySvc *jiminy.Service
 
 	// Phase 38: UNTS Hash Verification
 	untsRegistry *unts.Registry
@@ -391,6 +395,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
 	log.Printf("Consulting service initialized")
 
+	// Phase Jiminy: Initialize Jiminy Guidance Service
+	var jiminySvc *jiminy.Service
+	if cfg.JiminyEnabled {
+		jiminySvc = jiminy.NewService(cfg, driver, cons, emb)
+		log.Printf("Jiminy guidance enabled (timeout: %dms, maxItems: %d, minConf: %.2f)",
+			cfg.JiminyTimeoutMs, cfg.JiminyMaxItems, cfg.JiminyMinConfidence)
+	}
+
 	// Phase 3: Initialize metrics registry
 	// Start with defaults (includes histogram buckets) and override specific fields
 	metricsCfg := metrics.DefaultConfig()
@@ -604,6 +616,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupScheduler:         backupSched,
 		intentTranslator:        intentTrans,
 		guardrailValidator:      guardrailVal,
+		jiminySvc:               jiminySvc,
 		metaLearnSvc:            metaLearnSvc,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,
@@ -1271,6 +1284,9 @@ func (s *Server) Routes() http.Handler {
 
 	// Global Meta-Learning (Phase 105)
 	mux.HandleFunc("/v1/memory/meta-learn", s.handleMetaLearn)
+
+	// Phase Jiminy: Jiminy Guidance
+	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)

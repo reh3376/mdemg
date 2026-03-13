@@ -1,0 +1,170 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Guide",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "guidance",
+      "phase_jiminy",
+      "embedding_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-12",
+    "description": "Validates the Jiminy guidance endpoint that provides proactive inner-voice guidance drawn from MDEMG's knowledge graph (constraints, corrections, patterns, contradictions, frontiers).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "guidance",
+      "phase_jiminy",
+      "embedding_required"
+    ],
+    "sha256": "efcec3a591e4257615c63da31d389bcf1f3575d04dd60fd1f19d53798e8198bb"
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "context_text": "Refactoring authentication middleware to use new JWT library"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "context": "{{context_text}}",
+      "session_id": "uats-test"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "guidance is array",
+        "path": "$.data.guidance",
+        "type": "array"
+      },
+      {
+        "name": "prompt_augmentation is string",
+        "path": "$.data.prompt_augmentation",
+        "type": "string"
+      },
+      {
+        "name": "confidence is number",
+        "path": "$.data.confidence",
+        "type": "number"
+      },
+      {
+        "name": "source_counts present",
+        "path": "$.data.source_counts",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "rationale is string",
+        "path": "$.data.rationale",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "with_file_path",
+      "description": "Request with optional file_path for file-specific guidance.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "{{context_text}}",
+          "file_path": "internal/auth/middleware.go",
+          "session_id": "uats-test"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "data wrapper present",
+            "path": "$.data",
+            "type": "object",
+            "exists": true
+          },
+          {
+            "name": "guidance is array",
+            "path": "$.data.guidance",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "with_agent_output",
+      "description": "Request with optional agent_output for reviewing proposed code.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "{{context_text}}",
+          "agent_output": "func NewAuthMiddleware(secret string) gin.HandlerFunc { ... }",
+          "session_id": "uats-test"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "data wrapper present",
+            "path": "$.data",
+            "type": "object",
+            "exists": true
+          },
+          {
+            "name": "guidance is array",
+            "path": "$.data.guidance",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "with_max_items",
+      "description": "Request with custom max_items limit.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "{{context_text}}",
+          "max_items": 3
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "data wrapper present",
+            "path": "$.data",
+            "type": "object",
+            "exists": true
+          },
+          {
+            "name": "guidance is array",
+            "path": "$.data.guidance",
+            "type": "array"
+          }
+        ]
+      }
+    }
+  ]
+}
