@@ -18,6 +18,16 @@ var scoringDebugEnabled = false
 // scoringDebugTerm is the term to trace through scoring
 var scoringDebugTerm = "transformerconfig"
 
+// Pre-compiled regex patterns (package-level to avoid per-request compilation)
+var (
+	quotePathRe        = regexp.MustCompile(`["']([^"']+/[^"']+)["']`)
+	cleanPrefixRe      = regexp.MustCompile(`(?i)^(?:the\s+)?`)
+	cleanSuffixRe      = regexp.MustCompile(`(?i)\s*(?:module|service|controller|handler)s?\s*$`)
+	camelCaseModuleRe  = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]+$`)
+	camelCasePatternRe = regexp.MustCompile(`[A-Z][a-z]+[A-Z][a-z]+`)
+	snakeCasePatternRe = regexp.MustCompile(`[a-z]+_[a-z]+_[a-z]+`)
+)
+
 // pathPatterns matches common path patterns in query text
 // Captures paths like "lib/graphql", "frontend/src", "services/auth", etc.
 var pathPatterns = []*regexp.Regexp{
@@ -45,8 +55,7 @@ func extractPathHints(query string) []string {
 	}
 
 	// Also extract quoted paths or explicit directory mentions
-	quoteRe := regexp.MustCompile(`["']([^"']+/[^"']+)["']`)
-	matches := quoteRe.FindAllStringSubmatch(query, -1)
+	matches := quotePathRe.FindAllStringSubmatch(query, -1)
 	for _, m := range matches {
 		if len(m) > 1 {
 			hints[strings.ToLower(m[1])] = struct{}{}
@@ -98,15 +107,15 @@ func extractComparisonTargets(query string) []string {
 // cleanModuleName extracts a clean module/service name from a phrase
 func cleanModuleName(name string) string {
 	// Remove common phrases
-	name = regexp.MustCompile(`(?i)^(?:the\s+)?`).ReplaceAllString(name, "")
-	name = regexp.MustCompile(`(?i)\s*(?:module|service|controller|handler)s?\s*$`).ReplaceAllString(name, "")
+	name = cleanPrefixRe.ReplaceAllString(name, "")
+	name = cleanSuffixRe.ReplaceAllString(name, "")
 
 	// Keep just alphanumeric and common separators
 	parts := strings.Fields(name)
 	if len(parts) > 0 {
 		// Take the last word if it looks like a module name
 		for i := len(parts) - 1; i >= 0; i-- {
-			if regexp.MustCompile(`^[A-Z][a-zA-Z0-9]+$`).MatchString(parts[i]) ||
+			if camelCaseModuleRe.MatchString(parts[i]) ||
 				strings.Contains(parts[i], "Module") ||
 				strings.Contains(parts[i], "Service") {
 				return parts[i]
@@ -331,9 +340,7 @@ func isSymbolLookupQuery(query string) bool {
 
 	// Check for CamelCase or snake_case patterns suggesting a symbol name
 	// e.g., "getUserById" or "get_user_by_id"
-	camelCasePattern := regexp.MustCompile(`[A-Z][a-z]+[A-Z][a-z]+`)
-	snakeCasePattern := regexp.MustCompile(`[a-z]+_[a-z]+_[a-z]+`)
-	if camelCasePattern.MatchString(query) || snakeCasePattern.MatchString(query) {
+	if camelCasePatternRe.MatchString(query) || snakeCasePatternRe.MatchString(query) {
 		return true
 	}
 
@@ -343,6 +350,7 @@ func isSymbolLookupQuery(query string) bool {
 // QueryGates holds adjusted weights based on query type
 type QueryGates struct {
 	VectorWeight     float64 // Adjusted alpha for vector similarity
+	BM25Weight       float64 // Adjusted weight for BM25 score
 	ActivationWeight float64 // Adjusted beta for activation
 	L1Boost          float64 // Multiplier for layer 1+ nodes (concepts)
 	QueryType        string  // Detected query type for logging/debugging
@@ -446,6 +454,7 @@ func computeQueryGates(queryText string, cfg config.Config) QueryGates {
 	// Default: balanced weights from config
 	gates := QueryGates{
 		VectorWeight:     cfg.ScoringAlpha,
+		BM25Weight:       cfg.ScoringBM25Weight,
 		ActivationWeight: cfg.ScoringBeta,
 		L1Boost:          1.0,
 		QueryType:        "generic",
@@ -454,6 +463,7 @@ func computeQueryGates(queryText string, cfg config.Config) QueryGates {
 	if isCodeQuery(queryText) {
 		// Code queries: favor vector similarity (L0 files), slightly penalize concepts
 		gates.VectorWeight = cfg.ScoringAlpha * 1.3
+		gates.BM25Weight = cfg.ScoringBM25Weight * 0.7 // Keywords less useful for exact code
 		gates.ActivationWeight = cfg.ScoringBeta * 0.7
 		gates.L1Boost = 0.85 // Slight penalty for concepts on code queries
 		gates.QueryType = "code"
@@ -461,8 +471,9 @@ func computeQueryGates(queryText string, cfg config.Config) QueryGates {
 	}
 
 	if isArchitectureQuery(queryText) {
-		// Architecture queries: favor L1 concepts, boost activation
+		// Architecture queries: favor L1 concepts, boost activation and BM25
 		gates.VectorWeight = cfg.ScoringAlpha * 0.85
+		gates.BM25Weight = cfg.ScoringBM25Weight * 1.3 // Keywords very useful for arch terms
 		gates.ActivationWeight = cfg.ScoringBeta * 1.2
 		gates.L1Boost = 1.25 // Boost for concepts on architecture queries
 		gates.QueryType = "architecture"
@@ -663,6 +674,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 		// Calculate individual weighted components using gated weights
 		vecComponent := gates.VectorWeight * c.VectorSim
+		bm25Component := gates.BM25Weight * c.BM25Score
 		var actComponent float64
 		if cfg.ScoringActivationSquared {
 			floored := a - cfg.ScoringActivationFloor
@@ -707,7 +719,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			bypassBonus = cfg.ScoringBypassWeight * excess * bypassMult
 		}
 
-		s := vecComponent + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect + bypassBonus - hubPenComponent - redPenComponent - stalePenalty
+		s := vecComponent + bm25Component + actComponent + recComponent + confComponent + pb + cb + l1BoostEffect + bypassBonus - hubPenComponent - redPenComponent - stalePenalty
 
 		// Apply code type boost/penalty
 		// For code queries: config/doc files get penalized, code files unchanged
@@ -735,12 +747,16 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		}
 
 		// Compute LearningEdgeBoost: measures how much CO_ACTIVATED_WITH edges
-		// contributed to this node's activation. If activation > vector seed and
+		// contributed to this node's activation. If activation > seed baseline and
 		// node has incoming CO_ACTIVATED_WITH edges, the difference is the boost.
 		learningEdgeBoost := 0.0
-		if a > c.VectorSim && a > 0.01 {
-			// Activation exceeded vector seed — learning edges contributed
-			learningEdgeBoost = (a - c.VectorSim) * gates.ActivationWeight
+		seedBaseline := c.VectorSim
+		if c.BM25Score > seedBaseline {
+			seedBaseline = c.BM25Score
+		}
+		if a > seedBaseline && a > 0.01 {
+			// Activation exceeded seed baseline — learning edges contributed
+			learningEdgeBoost = (a - seedBaseline) * gates.ActivationWeight
 			if learningEdgeBoost < 0 {
 				learningEdgeBoost = 0
 			}
@@ -750,6 +766,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 		breakdown := ScoreBreakdown{
 			VectorSimilarity:  vecComponent,
+			BM25Component:     bm25Component,
 			Activation:        actComponent,
 			Recency:           recComponent,
 			Confidence:        confComponent,
@@ -774,8 +791,8 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 				log.Printf("[DEBUG Scoring] '%s': NodeID=%s, Name=%s, Layer=%d", scoringDebugTerm, c.NodeID, c.Name, c.Layer)
 				log.Printf("[DEBUG Scoring]   Gates: vecW=%.3f, actW=%.3f, l1Boost=%.3f",
 					gates.VectorWeight, gates.ActivationWeight, gates.L1Boost)
-				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f, l1Boost=%.4f",
-					vecComponent, actComponent, recComponent, confComponent, pb, cb, l1BoostEffect)
+				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, bm25=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f, l1Boost=%.4f",
+					vecComponent, bm25Component, actComponent, recComponent, confComponent, pb, cb, l1BoostEffect)
 				log.Printf("[DEBUG Scoring]   Penalties: hub=%.4f (degree=%d), redundancy=%.4f (prefixCount=%d)",
 					hubPenComponent, deg[c.NodeID], redPenComponent, prefixCount[prefixOf(c.Path)])
 				log.Printf("[DEBUG Scoring]   Final: %.4f, codeTypeMult=%.2f", s, codeTypeMult)
@@ -857,6 +874,7 @@ func hasTag(tags []string, tag string) bool {
 // Used by Jiminy to explain why a result was ranked where it is.
 type ScoreBreakdown struct {
 	VectorSimilarity  float64 `json:"vector_similarity"`   // α * VectorSim (gated)
+	BM25Component     float64 `json:"bm25_component"`      // BM25 weight * BM25Score (gated)
 	Activation        float64 `json:"activation"`          // β * activation (gated)
 	Recency           float64 `json:"recency"`             // γ * recency factor
 	Confidence        float64 `json:"confidence"`          // δ * confidence

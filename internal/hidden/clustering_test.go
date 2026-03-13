@@ -361,26 +361,83 @@ func TestGroupByCluster(t *testing.T) {
 	}
 }
 
-func TestContains(t *testing.T) {
+func TestClassifyByExtension(t *testing.T) {
+	nodes := []BaseNode{
+		{NodeID: "1", Path: "internal/api/server.go"},
+		{NodeID: "2", Path: "internal/api/handlers.go"},
+		{NodeID: "3", Path: "src/service.ts"},
+		{NodeID: "4", Path: "README.md"},
+		{NodeID: "5", Path: "config.yaml"},
+		{NodeID: "6", Path: "deploy.sh"},
+		{NodeID: "7", Path: "main.py"},
+		{NodeID: "8", Path: "schema.sql"},
+		{NodeID: "9", Path: "Dockerfile"},
+		{NodeID: "10", Path: "internal/api/server.go#NewServer"},
+	}
+
+	classes := ClassifyByExtension(nodes)
+
 	tests := []struct {
-		name     string
-		slice    []int
-		val      int
-		expected bool
+		category string
+		wantIDs  []string
 	}{
-		{"found at start", []int{1, 2, 3}, 1, true},
-		{"found at end", []int{1, 2, 3}, 3, true},
-		{"found in middle", []int{1, 2, 3}, 2, true},
-		{"not found", []int{1, 2, 3}, 4, false},
-		{"empty slice", []int{}, 1, false},
+		{"go", []string{"1", "2", "10"}},
+		{"typescript", []string{"3"}},
+		{"markdown", []string{"4"}},
+		{"config", []string{"5"}},
+		{"shell", []string{"6"}},
+		{"python", []string{"7"}},
+		{"query", []string{"8"}},
+		{"other", []string{"9"}},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.slice, tt.val)
-			if result != tt.expected {
-				t.Errorf("contains(%v, %d) = %v, want %v", tt.slice, tt.val, result, tt.expected)
+		t.Run(tt.category, func(t *testing.T) {
+			got := classes[tt.category]
+			if len(got) != len(tt.wantIDs) {
+				t.Errorf("%s: got %d nodes, want %d", tt.category, len(got), len(tt.wantIDs))
+				return
+			}
+			for i, n := range got {
+				if n.NodeID != tt.wantIDs[i] {
+					t.Errorf("%s[%d]: got NodeID=%s, want %s", tt.category, i, n.NodeID, tt.wantIDs[i])
+				}
 			}
 		})
 	}
 }
+
+func TestClassifyExtension(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"server.go", "go"},
+		{"server.go#Method", "go"},
+		{"app.tsx", "typescript"},
+		{"app.js", "typescript"},
+		{"script.py", "python"},
+		{"README.md", "markdown"},
+		{"config.yaml", "config"},
+		{"config.json", "config"},
+		{"deploy.sh", "shell"},
+		{"query.cypher", "query"},
+		{"lib.rs", "rust"},
+		{"Main.java", "jvm"},
+		{"style.css", "web"},
+		{"schema.proto", "schema"},
+		{"Dockerfile", "other"},
+		{"", "other"},
+		{"noext", "other"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := classifyExtension(tt.path)
+			if got != tt.want {
+				t.Errorf("classifyExtension(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+

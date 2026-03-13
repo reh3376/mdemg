@@ -144,12 +144,38 @@ LIMIT $topK`
 	return outAny.([]BM25Result), nil
 }
 
+// luceneSpecials contains characters that must be escaped in Lucene queries
+var luceneSpecials = map[byte]bool{
+	'+': true, '-': true, '!': true, '(': true, ')': true,
+	'{': true, '}': true, '[': true, ']': true, '^': true,
+	'"': true, '~': true, '*': true, '?': true, ':': true,
+	'\\': true, '/': true,
+}
+
 // escapeLuceneQuery escapes special characters for Lucene query syntax
 func escapeLuceneQuery(query string) string {
-	// Lucene special characters: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
-	// For simple queries, we wrap in quotes for phrase matching
-	// and also allow fuzzy matching with ~
-	return query
+	var b strings.Builder
+	b.Grow(len(query) * 2)
+	for i := 0; i < len(query); i++ {
+		c := query[i]
+		if i+1 < len(query) {
+			if c == '&' && query[i+1] == '&' {
+				b.WriteString(`\&\&`)
+				i++
+				continue
+			}
+			if c == '|' && query[i+1] == '|' {
+				b.WriteString(`\|\|`)
+				i++
+				continue
+			}
+		}
+		if luceneSpecials[c] {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 // FusedCandidate represents a candidate after combining vector and BM25 results
@@ -169,17 +195,14 @@ type FusedCandidate struct {
 	Tags        []string
 }
 
-// RRFConstant is the constant k in the RRF formula: 1/(k + rank)
-// Standard value is 60, which balances contribution from different rank positions
-const RRFConstant = 60
-
 // ReciprocalRankFusion combines results from vector and BM25 search using RRF.
 // RRF score = Σ 1/(k + rank_i) for each retriever i
+// rrfK is the RRF constant (typically 60) that balances contribution from different rank positions.
 //
 // This method doesn't require score normalization and naturally handles:
 // - Different score scales between retrievers
 // - Documents appearing in only one retriever's results
-func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, vectorWeight, bm25Weight float64) []FusedCandidate {
+func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, vectorWeight, bm25Weight float64, rrfK int) []FusedCandidate {
 	// Debug: log input counts
 	if debugTraceEnabled {
 		log.Printf("[DEBUG RRF] Input: %d vector results, %d BM25 results", len(vectorResults), len(bm25Results))
@@ -189,7 +212,7 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 
 	// Process vector results
 	for rank, c := range vectorResults {
-		rrfContrib := vectorWeight / float64(RRFConstant+rank+1)
+		rrfContrib := vectorWeight / float64(rrfK+rank+1)
 
 		if existing, ok := candidateMap[c.NodeID]; ok {
 			existing.RRFScore += rrfContrib
@@ -214,7 +237,7 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 
 	// Process BM25 results
 	for rank, r := range bm25Results {
-		rrfContrib := bm25Weight / float64(RRFConstant+rank+1)
+		rrfContrib := bm25Weight / float64(rrfK+rank+1)
 
 		if existing, ok := candidateMap[r.NodeID]; ok {
 			existing.RRFScore += rrfContrib
@@ -265,9 +288,9 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 // ConvertFusedToCandidates converts fused results back to Candidate format
 // for compatibility with existing activation and scoring pipeline.
 //
-// Strategy: Use original vector similarity for scoring quality, but the
-// ordering comes from RRF (which already happened during fusion).
-// For BM25-only candidates, estimate a similarity based on their RRF rank.
+// No score fabrication: VectorSim is the real vector similarity (0.0 for BM25-only),
+// and BM25Score is the real BM25 score (0.0 for vector-only). The scoring formula
+// handles both signals separately via ScoringBM25Weight.
 func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 	if len(fused) == 0 {
 		return []Candidate{}
@@ -277,40 +300,8 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 		log.Printf("[DEBUG ConvertFused] Converting %d fused candidates", len(fused))
 	}
 
-	// Find max RRF for normalization of BM25-only candidates
-	maxRRF := fused[0].RRFScore
-	for _, f := range fused {
-		if f.RRFScore > maxRRF {
-			maxRRF = f.RRFScore
-		}
-	}
-
 	cands := make([]Candidate, len(fused))
 	for i, f := range fused {
-		// Primary score source: original vector similarity (if available)
-		score := f.VectorSim
-
-		// For candidates that came ONLY from BM25 (no vector match),
-		// estimate a score based on their BM25 rank position
-		// Top BM25 results are exact keyword matches - highly valuable!
-		if f.VectorSim == 0 && f.BM25Score > 0 {
-			// BM25 rank 1 gets 0.95, rank 5 gets ~0.75, rank 20 gets ~0.55
-			// This ensures top keyword matches compete with vector results
-			rankBoost := 0.95 - 0.02*float64(f.BM25Rank-1)
-			if rankBoost < 0.4 {
-				rankBoost = 0.4
-			}
-			score = rankBoost
-		}
-
-		// Small boost for candidates that appear in BOTH retrievers
-		if f.VectorSim > 0 && f.BM25Score > 0 {
-			score += 0.05 // Bonus for being found by both methods
-			if score > 1.0 {
-				score = 1.0
-			}
-		}
-
 		cands[i] = Candidate{
 			NodeID:     f.NodeID,
 			Path:       f.Path,
@@ -318,7 +309,8 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 			Summary:    f.Summary,
 			UpdatedAt:  f.UpdatedAt,
 			Confidence: f.Confidence,
-			VectorSim:  score,
+			VectorSim:  f.VectorSim,  // Real value, 0.0 for BM25-only
+			BM25Score:  f.BM25Score,   // Real value, 0.0 for vector-only
 			Layer:      f.Layer,
 			Tags:       f.Tags,
 		}
@@ -327,8 +319,8 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 		if debugTraceEnabled {
 			if strings.Contains(strings.ToLower(f.Name), debugTraceTerm) ||
 				strings.Contains(strings.ToLower(f.Path), debugTraceTerm) {
-				log.Printf("[DEBUG ConvertFused] '%s' at position %d: NodeID=%s, Name=%s, VectorSim=%.4f (was BM25Rank=%d)",
-					debugTraceTerm, i, f.NodeID, f.Name, score, f.BM25Rank)
+				log.Printf("[DEBUG ConvertFused] '%s' at position %d: NodeID=%s, Name=%s, VectorSim=%.4f, BM25Score=%.4f",
+					debugTraceTerm, i, f.NodeID, f.Name, f.VectorSim, f.BM25Score)
 			}
 		}
 	}

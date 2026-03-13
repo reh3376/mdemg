@@ -24,6 +24,12 @@ type Service struct {
 	queryCache        *QueryCache
 	embeddingCache    *NodeEmbeddingCache // Cache for node embeddings (query-aware expansion)
 	cbRegistry        *circuitbreaker.Registry // Circuit breaker registry for external API calls
+	intentTranslator  IntentTranslator // Optional BM25 query rewriter
+}
+
+// SetIntentTranslator sets the intent translator for BM25 query rewriting.
+func (s *Service) SetIntentTranslator(t IntentTranslator) {
+	s.intentTranslator = t
 }
 
 // FileFilter specifies file extension filtering for retrieval queries.
@@ -341,31 +347,52 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		spaceIDs = append(spaceIDs, "mdemg-global")
 	}
 
-	// 1) Vector recall
-	vectorCands, err := s.vectorRecall(ctx, spaceIDs, req.QueryEmbedding, candK, filter)
-	if err != nil {
-		return models.RetrieveResponse{}, err
-	}
-
-	// 1b) Hybrid retrieval: BM25 search + RRF fusion (if enabled and query text provided)
-	// Uses query-type aware weights from retrieval hints (V0011)
+	// 1) Vector recall + BM25 in parallel (independent Neo4j queries)
 	// For temporal queries, clean temporal keywords from BM25 query to avoid pollution
 	bm25QueryText := req.QueryText
 	if hints.TemporalIntent.Mode != TemporalModeNone {
 		bm25QueryText = CleanTemporalKeywords(req.QueryText, hints.TemporalIntent.Keywords)
 	}
+
+	// Launch BM25 concurrently if hybrid retrieval is enabled
+	type bm25Outcome struct {
+		results []BM25Result
+		err     error
+	}
+	bm25Ch := make(chan bm25Outcome, 1)
+	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
+		// Translate BM25 query for better keyword matching (fail-open)
+		if s.intentTranslator != nil {
+			if translated, tErr := s.intentTranslator.Translate(ctx, bm25QueryText); tErr == nil && translated != "" {
+				bm25QueryText = translated
+			}
+		}
+		go func() {
+			results, bm25Err := s.BM25Search(ctx, spaceIDs, bm25QueryText, s.cfg.BM25TopK, filter)
+			bm25Ch <- bm25Outcome{results, bm25Err}
+		}()
+	} else {
+		bm25Ch <- bm25Outcome{} // no BM25 needed
+	}
+
+	// Vector recall runs in main goroutine
+	vectorCands, err := s.vectorRecall(ctx, spaceIDs, req.QueryEmbedding, candK, filter)
+	if err != nil {
+		<-bm25Ch // drain channel to avoid goroutine leak
+		return models.RetrieveResponse{}, err
+	}
+
+	// Collect BM25 result and fuse
 	var cands []Candidate
 	bm25Count := 0
+	bm25Out := <-bm25Ch
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
-		bm25Results, bm25Err := s.BM25Search(ctx, spaceIDs, bm25QueryText, s.cfg.BM25TopK, filter)
-		if bm25Err != nil {
-			// Log warning but continue with vector-only results
-			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Err)
+		if bm25Out.err != nil {
+			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Out.err)
 			cands = vectorCands
 		} else {
-			bm25Count = len(bm25Results)
-			// Fuse vector and BM25 results using RRF with query-type aware weights
-			fused := ReciprocalRankFusion(vectorCands, bm25Results, hints.VectorWeight, hints.BM25Weight)
+			bm25Count = len(bm25Out.results)
+			fused := ReciprocalRankFusion(vectorCands, bm25Out.results, hints.VectorWeight, hints.BM25Weight, s.cfg.RRFConstant)
 			cands = ConvertFusedToCandidates(fused)
 		}
 	} else {
@@ -496,10 +523,10 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	var act map[string]float64
 	if s.cfg.EdgeAttentionEnabled {
 		attention := ComputeEdgeAttention(queryCtx, s.cfg)
-		act = SpreadingActivationWithAttention(cands, edges, 2, 0.15, attention, hopMinWeights)
+		act = SpreadingActivationWithAttention(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, attention, hopMinWeights)
 	} else {
 		// Fallback to original behavior (CO_ACTIVATED_WITH only)
-		act = SpreadingActivation(cands, edges, 2, 0.15, hopMinWeights)
+		act = SpreadingActivation(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, hopMinWeights)
 	}
 
 	// 4) Initial ranking (pass query text for path-based boosting)
@@ -685,6 +712,7 @@ type Candidate struct {
 	CanonicalTime time.Time // Phase 2: content-relevant time (zero = use UpdatedAt)
 	Confidence    float64
 	VectorSim     float64
+	BM25Score     float64  // Actual BM25 score (0.0 for vector-only)
 	Layer         int      // 0=base, 1=hidden/concern, 2+=concept
 	Tags          []string // Tags for scoring boosts (e.g., "config")
 }

@@ -149,7 +149,7 @@ Examples:
 	cmd.Flags().BoolVar(&cfg.multiLayer, "multi-layer", false, "Run full multi-layer consolidation (L0-L5)")
 	cmd.Flags().Float64Var(&cfg.hiddenClusterEps, "hidden-eps", 0.3, "DBSCAN epsilon (max distance)")
 	cmd.Flags().IntVar(&cfg.hiddenMinSamples, "hidden-min-samples", 3, "DBSCAN minimum samples per cluster")
-	cmd.Flags().IntVar(&cfg.hiddenMaxNodes, "hidden-max-nodes", 100, "Maximum hidden nodes to create")
+	cmd.Flags().IntVar(&cfg.hiddenMaxNodes, "hidden-max-nodes", 500, "Maximum hidden nodes to create")
 	cmd.Flags().Float64Var(&cfg.hiddenForwardAlpha, "hidden-fwd-alpha", 0.6, "Forward pass: weight of current embedding")
 	cmd.Flags().Float64Var(&cfg.hiddenForwardBeta, "hidden-fwd-beta", 0.4, "Forward pass: weight of aggregated embedding")
 	cmd.Flags().Float64Var(&cfg.hiddenBackwardSelf, "hidden-bwd-self", 0.2, "Backward pass: self weight")
@@ -248,22 +248,24 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 	fmt.Printf("Space: %s\n", cfg.spaceID)
 	fmt.Printf("Cluster Eps: %.2f\n", cfg.hiddenClusterEps)
 	fmt.Printf("Min Samples: %d\n", cfg.hiddenMinSamples)
-	fmt.Printf("Max Hidden Nodes: %d\n", cfg.hiddenMaxNodes)
+	fmt.Printf("Max Hidden Nodes: %d (dynamic floor: 10%% of source nodes)\n", cfg.hiddenMaxNodes)
 
 	// Build config for hidden service
 	svcCfg := config.Config{
 		Neo4jURI:                cfg.neo4jURI,
 		Neo4jUser:               cfg.neo4jUser,
 		Neo4jPass:               cfg.neo4jPass,
-		HiddenLayerEnabled:      !cfg.dryRun, // Disable writes in dry-run
-		HiddenLayerClusterEps:   cfg.hiddenClusterEps,
-		HiddenLayerMinSamples:   cfg.hiddenMinSamples,
-		HiddenLayerMaxHidden:    cfg.hiddenMaxNodes,
-		HiddenLayerForwardAlpha: cfg.hiddenForwardAlpha,
-		HiddenLayerForwardBeta:  cfg.hiddenForwardBeta,
-		HiddenLayerBackwardSelf: cfg.hiddenBackwardSelf,
-		HiddenLayerBackwardBase: cfg.hiddenBackwardBase,
-		HiddenLayerBackwardConc: cfg.hiddenBackwardConcept,
+		HiddenLayerEnabled:        !cfg.dryRun, // Disable writes in dry-run
+		HiddenLayerClusterEps:     cfg.hiddenClusterEps,
+		HiddenLayerMinSamples:     cfg.hiddenMinSamples,
+		HiddenLayerMaxHidden:      cfg.hiddenMaxNodes,
+		HiddenLayerMaxClusterSize: 200, // Default max cluster size before path-based splitting
+		HiddenLayerPathGroupDepth: 2,   // Default path group depth for naming
+		HiddenLayerForwardAlpha:   cfg.hiddenForwardAlpha,
+		HiddenLayerForwardBeta:    cfg.hiddenForwardBeta,
+		HiddenLayerBackwardSelf:   cfg.hiddenBackwardSelf,
+		HiddenLayerBackwardBase:   cfg.hiddenBackwardBase,
+		HiddenLayerBackwardConc:   cfg.hiddenBackwardConcept,
 	}
 
 	svc := hidden.NewService(svcCfg, driver, nil)
@@ -277,13 +279,14 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 		// Dry run: show what would happen
 		fmt.Println("\nDry run - showing potential operations:")
 		if runClustering {
-			count, err := countOrphanBaseNodes(ctx, driver, cfg.spaceID)
+			count, err := countClusterableBaseNodes(ctx, driver, cfg.spaceID)
 			if err != nil {
-				return fmt.Errorf("count orphan nodes: %w", err)
+				return fmt.Errorf("count clusterable nodes: %w", err)
 			}
-			fmt.Printf("  - Orphan base nodes available for clustering: %d\n", count)
+			fmt.Printf("  - L0 base nodes for re-clustering: %d\n", count)
 			if count >= cfg.hiddenMinSamples {
-				fmt.Printf("  - Would potentially create up to %d hidden nodes\n", min(count/cfg.hiddenMinSamples, cfg.hiddenMaxNodes))
+				maxHidden := (count + 9) / 10 // ceil(count * 0.1)
+				fmt.Printf("  - Will create %d hidden nodes (10%% of source)\n", maxHidden)
 			}
 		}
 		if runForward {
@@ -355,15 +358,16 @@ func runHiddenLayerJob(ctx context.Context, driver neo4j.DriverWithContext, cfg 
 	return nil
 }
 
-// countOrphanBaseNodes counts base nodes without a GENERALIZES edge to hidden layer
-func countOrphanBaseNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, error) {
+// countClusterableBaseNodes counts all L0 base nodes eligible for clustering.
+// This counts ALL L0 nodes (not just orphans) since re-clustering detaches old edges.
+func countClusterableBaseNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (int, error) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer func() { _ = sess.Close(ctx) }()
 
 	cypher := `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
-WHERE NOT (b)-[:GENERALIZES]->(:MemoryNode {layer: 1})
-  AND b.embedding IS NOT NULL
+WHERE b.embedding IS NOT NULL
+  AND (b.role_type IS NULL OR b.role_type <> 'conversation_observation')
 RETURN count(b) AS cnt`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -928,12 +932,4 @@ func generateAbstractionName(members []clusterMember) string {
 	}
 
 	return fmt.Sprintf("Abstraction: [%s]", joined)
-}
-
-// min returns the smaller of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

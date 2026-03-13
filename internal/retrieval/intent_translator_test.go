@@ -93,9 +93,6 @@ func TestLLMIntentTranslator_OpenAISuccess(t *testing.T) {
 	}
 
 	// Verify request structure
-	if capturedReq.Temperature != 0.0 {
-		t.Errorf("Temperature = %v, want 0.0 (deterministic)", capturedReq.Temperature)
-	}
 	if len(capturedReq.Messages) != 2 {
 		t.Fatalf("Messages count = %d, want 2 (system + user)", len(capturedReq.Messages))
 	}
@@ -108,8 +105,8 @@ func TestLLMIntentTranslator_OpenAISuccess(t *testing.T) {
 	if capturedReq.Messages[1].Content != "Why do we use Redis?" {
 		t.Errorf("Messages[1].Content = %q, want original query", capturedReq.Messages[1].Content)
 	}
-	if capturedReq.MaxTokens != 150 {
-		t.Errorf("MaxTokens = %d, want 150", capturedReq.MaxTokens)
+	if capturedReq.MaxTokens < 2000 {
+		t.Errorf("MaxTokens = %d, want >= 2000 (reasoning model minimum)", capturedReq.MaxTokens)
 	}
 }
 

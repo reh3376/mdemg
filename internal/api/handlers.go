@@ -326,40 +326,43 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		resp.Debug["embedding_provider"] = s.embedder.Name()
 	}
 
-	// Fetch symbol evidence for each result (default: true when symbol store available)
+	// Fetch symbol evidence for all results in a single batched query
 	// Can be explicitly disabled with include_evidence=false in request
 	if s.symbolStore != nil && len(resp.Results) > 0 {
 		metrics := &models.EvidenceMetrics{
 			TotalResults: len(resp.Results),
 		}
+		nodeIDs := make([]string, len(resp.Results))
 		for i := range resp.Results {
-			symbols, err := s.symbolStore.GetSymbolsForMemoryNode(r.Context(), req.SpaceID, resp.Results[i].NodeID)
-			if err != nil {
-				// Log but don't fail - evidence is optional enrichment
-				log.Printf("warning: failed to fetch symbols for node %s: %v", resp.Results[i].NodeID, err)
-				continue
-			}
-			if len(symbols) > 0 {
-				evidence := make([]models.SymbolEvidence, 0, len(symbols))
-				for _, sym := range symbols {
-					evidence = append(evidence, models.SymbolEvidence{
-						SymbolName: sym.Name,
-						SymbolType: sym.SymbolType,
-						FilePath:   sym.FilePath,
-						Line:       sym.Line,
-						LineEnd:    sym.LineEnd,
-						Value:      sym.Value,
-						RawValue:   sym.RawValue,
-						Signature:  sym.Signature,
-						DocComment: sym.DocComment,
-					})
+			nodeIDs[i] = resp.Results[i].NodeID
+		}
+		symbolsByNode, err := s.symbolStore.GetSymbolsForMemoryNodes(r.Context(), req.SpaceID, nodeIDs)
+		if err != nil {
+			log.Printf("warning: failed to batch-fetch symbols: %v", err)
+		} else {
+			for i := range resp.Results {
+				syms := symbolsByNode[resp.Results[i].NodeID]
+				if len(syms) > 0 {
+					evidence := make([]models.SymbolEvidence, 0, len(syms))
+					for _, sym := range syms {
+						evidence = append(evidence, models.SymbolEvidence{
+							SymbolName: sym.Name,
+							SymbolType: sym.SymbolType,
+							FilePath:   sym.FilePath,
+							Line:       sym.Line,
+							LineEnd:    sym.LineEnd,
+							Value:      sym.Value,
+							RawValue:   sym.RawValue,
+							Signature:  sym.Signature,
+							DocComment: sym.DocComment,
+						})
+					}
+					resp.Results[i].Evidence = evidence
+					metrics.ResultsWithEvidence++
+					metrics.TotalSymbols += len(syms)
 				}
-				resp.Results[i].Evidence = evidence
-				metrics.ResultsWithEvidence++
-				metrics.TotalSymbols += len(symbols)
 			}
 		}
-		// Calculate compliance metrics
 		if metrics.TotalResults > 0 {
 			metrics.ComplianceRate = float64(metrics.ResultsWithEvidence) / float64(metrics.TotalResults)
 		}
@@ -369,9 +372,12 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		resp.EvidenceMetrics = metrics
 	}
 
-	// Learning deltas: bounded writeback
-	_ = s.learner.ApplyCoactivation(r.Context(), req.SpaceID, resp)
-	_ = s.learner.ApplySymbolCoactivation(r.Context(), req.SpaceID, resp)
+	// Learning deltas: async writeback (don't block response on O(N²) learning)
+	go func(spaceID string, respCopy models.RetrieveResponse) { //nolint:gosec // G118: learning writeback must outlive HTTP request
+		bgCtx := context.WithoutCancel(r.Context())
+		_ = s.learner.ApplyCoactivation(bgCtx, spaceID, respCopy)
+		_ = s.learner.ApplySymbolCoactivation(bgCtx, spaceID, respCopy)
+	}(req.SpaceID, resp)
 
 	// Record query result for capability gap detection
 	if s.gapDetector != nil && req.QueryText != "" {
@@ -537,8 +543,14 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Generate embeddings for items that don't have them
+	// Generate embeddings for items that don't have them (batched single API call)
 	if s.embedder != nil {
+		// Collect texts that need embeddings
+		type needsEmb struct {
+			index int
+			text  string
+		}
+		var needs []needsEmb
 		for i := range req.Observations {
 			if len(req.Observations[i].Embedding) == 0 {
 				textForEmbedding := contentToText(req.Observations[i].Content)
@@ -546,11 +558,22 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 					textForEmbedding = req.Observations[i].Name + ": " + textForEmbedding
 				}
 				if textForEmbedding != "" {
-					emb, err := s.embedder.Embed(r.Context(), textForEmbedding)
-					if err == nil {
-						req.Observations[i].Embedding = emb
-					} else {
-						log.Printf("warning: batch ingest embedding failed for item %d: %v", i, err)
+					needs = append(needs, needsEmb{index: i, text: textForEmbedding})
+				}
+			}
+		}
+		if len(needs) > 0 {
+			texts := make([]string, len(needs))
+			for i, n := range needs {
+				texts[i] = n.text
+			}
+			embeddings, err := s.embedder.EmbedBatch(r.Context(), texts)
+			if err != nil {
+				log.Printf("warning: batch ingest embedding failed: %v", err)
+			} else {
+				for i, n := range needs {
+					if i < len(embeddings) {
+						req.Observations[n.index].Embedding = embeddings[i]
 					}
 				}
 			}
@@ -1487,6 +1510,16 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("warning: failed to generate summaries: %v", err)
 	}
 	resp.SummariesGenerated = summariesUpdated
+
+	// Step 6b: Enhance mechanical summaries with LLM (opt-in)
+	if s.hiddenLayer != nil {
+		enhanced, enhErr := s.hiddenLayer.EnhanceSummariesWithLLM(r.Context(), req.SpaceID)
+		if enhErr != nil {
+			log.Printf("warning: failed to enhance cluster summaries: %v", enhErr)
+		} else if enhanced > 0 {
+			log.Printf("Enhanced %d cluster summaries with LLM", enhanced)
+		}
+	}
 
 	// Step 6: Refresh stale edges (Phase 9.5.3)
 	edgesRefreshed, err := s.retriever.RefreshStaleEdges(r.Context(), req.SpaceID)
@@ -3096,7 +3129,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 	// Optionally trigger consolidation
 	if consolidate && successCount > 0 && s.hiddenLayer != nil {
 		job.UpdateProgress(len(files), "consolidation")
-		consolidateCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		consolidateCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		_, err := s.hiddenLayer.RunFullConversationConsolidation(consolidateCtx, spaceID)
 		cancel()
 		if err != nil {

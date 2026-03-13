@@ -97,9 +97,9 @@ type Config struct {
 	TemporalStaleRefMaxPen  float64 // TEMPORAL_STALE_REF_MAX_PENALTY (default: 0.15)
 
 	// Scoring hyperparameters for retrieval ranking
-	ScoringAlpha       float64 // Vector similarity weight (default: 0.55)
-	ScoringBeta        float64 // Activation weight (default: 0.30)
-	ScoringGamma       float64 // Recency weight (default: 0.10)
+	ScoringAlpha       float64 // Vector similarity weight (default: 0.60)
+	ScoringBeta        float64 // Activation weight (default: 0.20)
+	ScoringGamma       float64 // Recency weight (default: 0.15)
 	ScoringDelta       float64 // Confidence weight (default: 0.05)
 	ScoringPhi         float64 // Hub penalty coefficient (default: 0.08)
 	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
@@ -158,14 +158,18 @@ type Config struct {
 	BM25TopK               int     // Candidates from BM25 search (default: 100)
 	BM25Weight             float64 // Weight of BM25 in RRF fusion (default: 0.3)
 	VectorWeight           float64 // Weight of vector in RRF fusion (default: 0.7)
+	RRFConstant            int     // RRF constant k in 1/(k+rank) formula (default: 60)
 
 	// LLM Re-ranking settings (V0006)
 	RerankEnabled   bool    // Enable LLM re-ranking (default: false)
-	RerankProvider  string  // LLM provider for rerank (openai/ollama)
+	RerankProvider  string  // LLM provider for rerank (openai/ollama/jina)
 	RerankModel     string  // Model for re-ranking (default: gpt-4o-mini)
 	RerankTopN      int     // Candidates to re-rank (default: 30)
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
+	RerankJinaKey   string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
+	RerankJinaModel string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
+	RerankJinaURL   string  // RERANK_JINA_URL — Jina API base URL (default: https://api.jina.ai/v1)
 
 	// LLM Summary settings (semantic summaries for ingest)
 	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: true)
@@ -207,6 +211,18 @@ type Config struct {
 	GuardrailMaxTokens      int    // GUARDRAIL_MAX_TOKENS — max tokens for evaluation response (default: 1000, range 100-4000)
 	GuardrailTimeoutMs      int    // GUARDRAIL_TIMEOUT_MS — timeout for evaluation in ms (default: 5000, min 1000)
 	GuardrailMaxConstraints int    // GUARDRAIL_MAX_CONSTRAINTS — max constraints per evaluation (default: 10, range 1-50)
+
+	// Dynamic Reclassification settings
+	ReclassEnabled       bool    // RECLASS_ENABLED — enable LLM-based reclassification of oversized categories (default: true)
+	ReclassThreshold     float64 // RECLASS_THRESHOLD — min fraction of total nodes to trigger (default: 0.25, range: 0.05-0.90)
+	ReclassMaxSampleSize int     // RECLASS_MAX_SAMPLE_SIZE — max summaries sent to LLM per category (default: 150, range: 20-500)
+	ReclassMaxCategories int     // RECLASS_MAX_CATEGORIES — max sub-categories LLM may propose (default: 10, range: 3-20)
+	ReclassMaxIterations int     // RECLASS_MAX_ITERATIONS — max reclassification loops until convergence (default: 5, range: 1-10)
+	ReclassMaxDepth      int     // RECLASS_MAX_DEPTH — max dot-path taxonomy depth (default: 4, range: 1-10)
+	ReclassProvider      string  // RECLASS_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
+	ReclassModel         string  // RECLASS_MODEL — model name (default: gpt-5.4)
+	ReclassMaxTokens     int     // RECLASS_MAX_TOKENS — max response tokens (default: 2000, range: 500-8000)
+	ReclassTimeoutMs     int     // RECLASS_TIMEOUT_MS — LLM call timeout in ms (default: 30000, min: 5000)
 
 	// Global Meta-Learning settings (Phase 105)
 	MetaLearnEnabled        bool   // METALEARN_ENABLED — enable cross-space concept promotion (default: false)
@@ -459,9 +475,12 @@ type Config struct {
 	// ===== ANN Optimization: Retrieval Subsystem =====
 	ScoringActivationFloor   float64 // SCORING_ACTIVATION_FLOOR — floor for squared activation (default: 0.05)
 	ScoringActivationSquared bool    // SCORING_ACTIVATION_SQUARED — enable squared activation for sparser signals (default: true)
+	ScoringBM25Weight        float64 // SCORING_BM25_WEIGHT — weight for BM25 score in final scoring formula (default: 0.15)
 	ActivationHop0MinWeight  float64 // ACTIVATION_HOP0_MIN_WEIGHT — min edge weight for hop 0 spreading (default: 0.5)
 	ActivationHop1MinWeight  float64 // ACTIVATION_HOP1_MIN_WEIGHT — min edge weight for hop 1 spreading (default: 0.2)
 	ActivationHop2MinWeight  float64 // ACTIVATION_HOP2_MIN_WEIGHT — min edge weight for hop 2+ spreading (default: 0.05)
+	ActivationSteps          int     // ACTIVATION_STEPS — number of spreading activation steps (default: 2, range: [1, 10])
+	ActivationLambda         float64 // ACTIVATION_LAMBDA — spreading activation step decay (default: 0.15, range: [0, 0.9])
 	ScoringBypassThreshold   float64 // SCORING_BYPASS_THRESHOLD — VectorSim threshold for value residual bypass (default: 0.85)
 	ScoringBypassWeight      float64 // SCORING_BYPASS_WEIGHT — weight of bypass bonus (default: 0.15)
 	ScoringBypassCodeMult    float64 // SCORING_BYPASS_CODE_MULT — bypass multiplier for code queries (default: 1.3)
@@ -472,6 +491,14 @@ type Config struct {
 	L5GroundingMinSim        float64 // L5_GROUNDING_MIN_SIM — min cosine similarity for grounding edge (default: 0.4)
 	L5GroundingInitialWeight float64 // L5_GROUNDING_INITIAL_WEIGHT — initial weight for GROUNDED_BY edges (default: 0.5)
 	EdgeAttentionGroundedBy  float64 // EDGE_ATTENTION_GROUNDED_BY — attention weight for GROUNDED_BY edges (default: 0.70)
+
+	// ===== ANN Optimization: Cluster Summary =====
+	ClusterSummaryEnabled   bool   // CLUSTER_SUMMARY_ENABLED — enable LLM cluster summarization for L1-L4 (default: false)
+	ClusterSummaryProvider  string // CLUSTER_SUMMARY_PROVIDER — LLM provider for summaries (openai/ollama, default: cascade)
+	ClusterSummaryModel     string // CLUSTER_SUMMARY_MODEL — model for summaries (default: cascade)
+	ClusterSummaryMaxTokens int    // CLUSTER_SUMMARY_MAX_TOKENS — max tokens per summary (default: 100)
+	ClusterSummaryTimeoutMs int    // CLUSTER_SUMMARY_TIMEOUT_MS — timeout for summary call in ms (default: 5000)
+	ClusterSummaryBatchSize int    // CLUSTER_SUMMARY_BATCH_SIZE — max nodes per consolidation run (default: 50)
 
 	// ===== ANN Optimization: Negative Feedback =====
 	LearningNegativeWeight        float64 // LEARNING_NEGATIVE_WEIGHT — weight reduction per negative feedback (default: 0.15)
@@ -744,21 +771,21 @@ func FromEnv() (Config, error) {
 
 	// Scoring hyperparameters for retrieval ranking
 	// Weights (alpha, beta, gamma, delta) must be in [0, 1]
-	scoringAlpha, err := atof("SCORING_ALPHA", 0.55)
+	scoringAlpha, err := atof("SCORING_ALPHA", 0.60)
 	if err != nil {
 		return Config{}, err
 	}
 	if scoringAlpha < 0 || scoringAlpha > 1 {
 		return Config{}, errors.New("SCORING_ALPHA must be in range [0, 1]")
 	}
-	scoringBeta, err := atof("SCORING_BETA", 0.30)
+	scoringBeta, err := atof("SCORING_BETA", 0.20)
 	if err != nil {
 		return Config{}, err
 	}
 	if scoringBeta < 0 || scoringBeta > 1 {
 		return Config{}, errors.New("SCORING_BETA must be in range [0, 1]")
 	}
-	scoringGamma, err := atof("SCORING_GAMMA", 0.10)
+	scoringGamma, err := atof("SCORING_GAMMA", 0.15)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1135,6 +1162,13 @@ func FromEnv() (Config, error) {
 	if vectorWeight < 0 || vectorWeight > 1 {
 		return Config{}, errors.New("VECTOR_WEIGHT must be in range [0, 1]")
 	}
+	rrfConstant, err := atoi("RRF_CONSTANT", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if rrfConstant < 1 {
+		return Config{}, errors.New("RRF_CONSTANT must be >= 1")
+	}
 
 	// LLM Re-ranking settings (V0006)
 	rerankEnabled := getBool("RERANK_ENABLED", false)
@@ -1161,6 +1195,9 @@ func FromEnv() (Config, error) {
 	if rerankTimeoutMs < 100 {
 		return Config{}, errors.New("RERANK_TIMEOUT_MS must be >= 100")
 	}
+	rerankJinaKey := get("RERANK_JINA_API_KEY", "")
+	rerankJinaModel := get("RERANK_JINA_MODEL", "jina-reranker-v2-base-multilingual")
+	rerankJinaURL := get("RERANK_JINA_URL", "https://api.jina.ai/v1")
 
 	// Plugin system settings (V0006)
 	pluginsEnabled := getBool("PLUGINS_ENABLED", true)
@@ -1378,6 +1415,60 @@ func FromEnv() (Config, error) {
 	}
 	if guardrailMaxConstraints < 1 || guardrailMaxConstraints > 50 {
 		return Config{}, errors.New("GUARDRAIL_MAX_CONSTRAINTS must be in range [1, 50]")
+	}
+
+	// Dynamic Reclassification settings
+	reclassEnabled := getBool("RECLASS_ENABLED", true)
+	reclassThreshold, err := atof("RECLASS_THRESHOLD", 0.25)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassThreshold < 0.05 || reclassThreshold > 0.90 {
+		return Config{}, errors.New("RECLASS_THRESHOLD must be in range [0.05, 0.90]")
+	}
+	reclassMaxSampleSize, err := atoi("RECLASS_MAX_SAMPLE_SIZE", 150)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassMaxSampleSize < 20 || reclassMaxSampleSize > 500 {
+		return Config{}, errors.New("RECLASS_MAX_SAMPLE_SIZE must be in range [20, 500]")
+	}
+	reclassMaxCategories, err := atoi("RECLASS_MAX_CATEGORIES", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassMaxCategories < 3 || reclassMaxCategories > 20 {
+		return Config{}, errors.New("RECLASS_MAX_CATEGORIES must be in range [3, 20]")
+	}
+	reclassMaxIterations, err := atoi("RECLASS_MAX_ITERATIONS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassMaxIterations < 1 || reclassMaxIterations > 10 {
+		return Config{}, errors.New("RECLASS_MAX_ITERATIONS must be in range [1, 10]")
+	}
+	reclassMaxDepth, err := atoi("RECLASS_MAX_DEPTH", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassMaxDepth < 1 || reclassMaxDepth > 10 {
+		return Config{}, errors.New("RECLASS_MAX_DEPTH must be in range [1, 10]")
+	}
+	reclassProvider := get("RECLASS_PROVIDER", emergenceProvider)
+	reclassModel := get("RECLASS_MODEL", "gpt-5.4")
+	reclassMaxTokens, err := atoi("RECLASS_MAX_TOKENS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassMaxTokens < 500 || reclassMaxTokens > 8000 {
+		return Config{}, errors.New("RECLASS_MAX_TOKENS must be in range [500, 8000]")
+	}
+	reclassTimeoutMs, err := atoi("RECLASS_TIMEOUT_MS", 30000)
+	if err != nil {
+		return Config{}, err
+	}
+	if reclassTimeoutMs < 5000 {
+		return Config{}, errors.New("RECLASS_TIMEOUT_MS must be >= 5000")
 	}
 
 	// Global Meta-Learning settings (Phase 105)
@@ -1785,6 +1876,27 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	scoringBM25Weight, err := atof("SCORING_BM25_WEIGHT", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if scoringBM25Weight < 0 || scoringBM25Weight > 1 {
+		return Config{}, errors.New("SCORING_BM25_WEIGHT must be in range [0, 1]")
+	}
+	activationSteps, err := atoi("ACTIVATION_STEPS", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if activationSteps < 1 || activationSteps > 10 {
+		return Config{}, errors.New("ACTIVATION_STEPS must be in range [1, 10]")
+	}
+	activationLambda, err := atof("ACTIVATION_LAMBDA", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if activationLambda < 0 || activationLambda > 0.9 {
+		return Config{}, errors.New("ACTIVATION_LAMBDA must be in range [0, 0.9]")
+	}
 
 	// ===== ANN Optimization: Consolidation Subsystem =====
 	l5GroundingMaxEdges, err := atoi("L5_GROUNDING_MAX_EDGES", 5)
@@ -1826,6 +1938,32 @@ func FromEnv() (Config, error) {
 	frontierMaxOutgoing, err := atoi("FRONTIER_MAX_OUTGOING", 2)
 	if err != nil {
 		return Config{}, err
+	}
+
+	// ===== ANN Optimization: Cluster Summary =====
+	clusterSummaryEnabled := getBool("CLUSTER_SUMMARY_ENABLED", false)
+	clusterSummaryProvider := get("CLUSTER_SUMMARY_PROVIDER", llmProvider)
+	clusterSummaryModel := get("CLUSTER_SUMMARY_MODEL", llmModel)
+	clusterSummaryMaxTokens, err := atoi("CLUSTER_SUMMARY_MAX_TOKENS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if clusterSummaryMaxTokens < 20 || clusterSummaryMaxTokens > 1000 {
+		return Config{}, errors.New("CLUSTER_SUMMARY_MAX_TOKENS must be in range [20, 1000]")
+	}
+	clusterSummaryTimeoutMs, err := atoi("CLUSTER_SUMMARY_TIMEOUT_MS", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if clusterSummaryTimeoutMs < 500 {
+		return Config{}, errors.New("CLUSTER_SUMMARY_TIMEOUT_MS must be >= 500")
+	}
+	clusterSummaryBatchSize, err := atoi("CLUSTER_SUMMARY_BATCH_SIZE", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if clusterSummaryBatchSize < 1 || clusterSummaryBatchSize > 500 {
+		return Config{}, errors.New("CLUSTER_SUMMARY_BATCH_SIZE must be in range [1, 500]")
 	}
 
 	// Deterministic consolidation trigger
@@ -2185,12 +2323,16 @@ func FromEnv() (Config, error) {
 		BM25TopK:                  bm25TopK,
 		BM25Weight:                bm25Weight,
 		VectorWeight:              vectorWeight,
+		RRFConstant:               rrfConstant,
 		RerankEnabled:             rerankEnabled,
 		RerankProvider:            rerankProvider,
 		RerankModel:               rerankModel,
 		RerankTopN:                rerankTopN,
 		RerankWeight:              rerankWeight,
 		RerankTimeoutMs:           rerankTimeoutMs,
+		RerankJinaKey:             rerankJinaKey,
+		RerankJinaModel:           rerankJinaModel,
+		RerankJinaURL:             rerankJinaURL,
 		PluginsEnabled:            pluginsEnabled,
 		PluginsDir:                pluginsDir,
 		PluginSocketDir:           pluginSocketDir,
@@ -2262,6 +2404,18 @@ func FromEnv() (Config, error) {
 		JiminyMinConfidence:    jiminyMinConfidence,
 		JiminyIncludeFrontiers: jiminyIncludeFrontiers,
 		JiminyFrontierMinSim:   jiminyFrontierMinSim,
+
+		// Dynamic Reclassification
+		ReclassEnabled:       reclassEnabled,
+		ReclassThreshold:     reclassThreshold,
+		ReclassMaxSampleSize: reclassMaxSampleSize,
+		ReclassMaxCategories: reclassMaxCategories,
+		ReclassMaxIterations: reclassMaxIterations,
+		ReclassMaxDepth:      reclassMaxDepth,
+		ReclassProvider:      reclassProvider,
+		ReclassModel:         reclassModel,
+		ReclassMaxTokens:     reclassMaxTokens,
+		ReclassTimeoutMs:     reclassTimeoutMs,
 
 		// Phase 105: Global Meta-Learning
 		MetaLearnEnabled:        metaLearnEnabled,
@@ -2435,9 +2589,12 @@ func FromEnv() (Config, error) {
 		// ANN Optimization: Retrieval
 		ScoringActivationFloor:   scoringActivationFloor,
 		ScoringActivationSquared: scoringActivationSquared,
+		ScoringBM25Weight:        scoringBM25Weight,
 		ActivationHop0MinWeight:  activationHop0MinWeight,
 		ActivationHop1MinWeight:  activationHop1MinWeight,
 		ActivationHop2MinWeight:  activationHop2MinWeight,
+		ActivationSteps:          activationSteps,
+		ActivationLambda:         activationLambda,
 		ScoringBypassThreshold:   scoringBypassThreshold,
 		ScoringBypassWeight:      scoringBypassWeight,
 		ScoringBypassCodeMult:    scoringBypassCodeMult,
@@ -2448,6 +2605,14 @@ func FromEnv() (Config, error) {
 		L5GroundingMinSim:        l5GroundingMinSim,
 		L5GroundingInitialWeight: l5GroundingInitialWeight,
 		EdgeAttentionGroundedBy:  edgeAttentionGroundedBy,
+
+		// ANN Optimization: Cluster Summary
+		ClusterSummaryEnabled:   clusterSummaryEnabled,
+		ClusterSummaryProvider:  clusterSummaryProvider,
+		ClusterSummaryModel:     clusterSummaryModel,
+		ClusterSummaryMaxTokens: clusterSummaryMaxTokens,
+		ClusterSummaryTimeoutMs: clusterSummaryTimeoutMs,
+		ClusterSummaryBatchSize: clusterSummaryBatchSize,
 
 		// ANN Optimization: Negative Feedback + Frontier
 		LearningNegativeWeight:        learningNegativeWeight,

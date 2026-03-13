@@ -23,12 +23,14 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 		lambda = 0.9
 	}
 
-	// Seed: ALL candidates seeded from vector similarity
+	// Seed: ALL candidates seeded from max(VectorSim, BM25Score)
 	// This enables Hebbian learning by ensuring all returned nodes have activation values.
-	// Previously only top-2 were seeded, causing most nodes to have 0 activation
-	// and failing the learning threshold filter (see LEARNING_EDGES_ANALYSIS.md).
+	// Uses max of vector and BM25 signals so BM25-only candidates also seed properly.
 	for _, c := range cands {
 		v := c.VectorSim
+		if c.BM25Score > v {
+			v = c.BM25Score
+		}
 		if v < 0 {
 			v = 0
 		}
@@ -343,9 +345,12 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 		lambda = 0.9
 	}
 
-	// Seed: ALL candidates seeded from vector similarity
+	// Seed: ALL candidates seeded from max(VectorSim, BM25Score)
 	for _, c := range cands {
 		v := c.VectorSim
+		if c.BM25Score > v {
+			v = c.BM25Score
+		}
 		if v < 0 {
 			v = 0
 		}

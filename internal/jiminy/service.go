@@ -147,73 +147,69 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		debug["suggest_suggestions"] = len(suggestResp.Suggestions)
 	}()
 
-	// Source B: Correction vector search
+	// Source B+C: Correction vector search + contradiction checking (merged)
+	// Previously Source C duplicated Source B's findRelevantCorrections call.
+	// Now corrections feed directly into contradiction lookup in one goroutine.
 	if queryEmbedding != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			corrections, err := s.findRelevantCorrections(ctx, req.SpaceID, queryEmbedding, 5)
-			mu.Lock()
-			defer mu.Unlock()
 			if err != nil {
+				mu.Lock()
 				debug["corrections_error"] = err.Error()
+				mu.Unlock()
 				return
 			}
+
+			// Collect correction items and node IDs for contradiction checking
+			var correctionItems []GuidanceItem
+			var nodeIDs []string
 			for _, c := range corrections {
 				content := c.Content
 				if content == "" {
 					content = c.Summary
 				}
-				items = append(items, GuidanceItem{
+				correctionItems = append(correctionItems, GuidanceItem{
 					Type:        GuidanceCorrection,
 					Priority:    "high",
 					Content:     content,
 					Confidence:  c.Similarity,
 					SourceNodes: []string{c.NodeID},
 				})
+				nodeIDs = append(nodeIDs, c.NodeID)
 			}
+
+			// Check contradictions using the same node IDs (no duplicate query)
+			var contradictionItems []GuidanceItem
+			if len(nodeIDs) > 0 {
+				contradictions, cErr := s.findContradictions(ctx, req.SpaceID, nodeIDs)
+				if cErr != nil {
+					mu.Lock()
+					debug["contradictions_error"] = cErr.Error()
+					mu.Unlock()
+				} else {
+					for _, c := range contradictions {
+						contradictionItems = append(contradictionItems, GuidanceItem{
+							Type:     GuidanceConflict,
+							Priority: "high",
+							Content: fmt.Sprintf("%q contradicts %q (evidence: %d)",
+								c.SourceName, c.TargetName, c.Evidence),
+							Confidence:  c.Weight,
+							SourceNodes: []string{c.SourceNodeID, c.TargetNodeID},
+						})
+					}
+				}
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			items = append(items, correctionItems...)
+			items = append(items, contradictionItems...)
 			debug["corrections_found"] = len(corrections)
+			debug["contradictions_found"] = len(contradictionItems)
 		}()
 	}
-
-	// Source C: Contradiction checking (needs node IDs from corrections/suggestions)
-	// Run after A and B have a chance to populate node IDs by using a separate goroutine
-	// that waits briefly for initial results, then queries contradictions.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Collect node IDs from embedding-based search
-		if queryEmbedding == nil {
-			return
-		}
-		// Use a small vector search to find nearby nodes for contradiction checking
-		corrections, _ := s.findRelevantCorrections(ctx, req.SpaceID, queryEmbedding, 3)
-		var nodeIDs []string
-		for _, c := range corrections {
-			nodeIDs = append(nodeIDs, c.NodeID)
-		}
-		if len(nodeIDs) == 0 {
-			return
-		}
-		contradictions, err := s.findContradictions(ctx, req.SpaceID, nodeIDs)
-		mu.Lock()
-		defer mu.Unlock()
-		if err != nil {
-			debug["contradictions_error"] = err.Error()
-			return
-		}
-		for _, c := range contradictions {
-			items = append(items, GuidanceItem{
-				Type:     GuidanceConflict,
-				Priority: "high",
-				Content: fmt.Sprintf("%q contradicts %q (evidence: %d)",
-					c.SourceName, c.TargetName, c.Evidence),
-				Confidence:  c.Weight,
-				SourceNodes: []string{c.SourceNodeID, c.TargetNodeID},
-			})
-		}
-		debug["contradictions_found"] = len(contradictions)
-	}()
 
 	// Source D: Frontier node search (Phase J5)
 	if queryEmbedding != nil {

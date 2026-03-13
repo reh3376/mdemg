@@ -2630,6 +2630,18 @@ Tests added 2026-03-10 for pure functions and constructors:
 - `scraper/scraper_test.go`: `NewDedupChecker` (3), `NewOrchestrator` (1), `NewReviewer` (1), `NewService` (1), `Service` getters (5) — constructors and wiring
 - `guardrail/guardrail_test.go`: `NewGuardrailService` (2), `buildDiffSummary` (8) — constructor and summary builder
 
+### OPEN: DBSCAN GPU Acceleration Investigation
+
+DBSCAN clustering (`internal/hidden/clustering.go`) currently runs on CPU with goroutine parallelism. For 8,360+ nodes with 3,072-dimensional embeddings, the O(n²) distance matrix computation takes 10+ minutes even with all CPU cores. The M4 Max has 40 GPU cores (Metal 4) that are completely idle during this workload.
+
+**Investigation needed:**
+1. **Go-compatible GPU module** — look for Go bindings to Metal compute shaders or OpenCL. Libraries like `gorgonia/cu` (CUDA) won't work on Apple Silicon; need Metal-specific bindings.
+2. **Python subprocess approach** — use `cuml.DBSCAN` (RAPIDS) or `sklearn` with GPU-accelerated distance computation via PyTorch/Metal. Call from Go via subprocess with JSON/binary embedding handoff.
+3. **Apple Accelerate / AMX** — `gonum/blas` links to Apple's Accelerate framework which uses the AMX coprocessor (not GPU, but hardware-accelerated matrix math). This could speed up distance matrix computation without GPU.
+4. **Precomputed distance matrix via Metal** — write a minimal Metal compute shader for pairwise cosine distance, call via CGo + Objective-C bridge. Highest performance ceiling but most implementation effort.
+
+**Current state:** Parallel goroutine DBSCAN with precomputed float32 distance matrix. Uses all CPU cores (100% utilization). Memory: ~280MB for 8360² float32 matrix. Performance: ~10-15 minutes for full L0 clustering.
+
 ### OPEN: Stale Legacy Binaries in `bin/`
 
 7 pre-unified-CLI binaries remain: `extract-symbols`, `ingest-codebase`, `mcp-server`, `mdemg-ingest`, `mdemg-server`, `reset-db`, `server`. All functionality is now in the unified `bin/mdemg` binary. Deletion requires user confirmation due to pre-bash-check hook matching `reset-db`.

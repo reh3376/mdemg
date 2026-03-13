@@ -347,10 +347,9 @@ Code elements to summarize:
 
 // OpenAI API types
 type openAIChatRequest struct {
-	Model       string           `json:"model"`
-	Messages    []openAIMessage  `json:"messages"`
-	MaxTokens   int              `json:"max_tokens"`
-	Temperature float64          `json:"temperature"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	MaxTokens int             `json:"max_completion_tokens"`
 }
 
 type openAIMessage struct {
@@ -372,14 +371,18 @@ type openAIChatResponse struct {
 func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]string, error) {
 	prompt := s.buildPrompt(elements)
 
+	maxTokens := s.config.MaxTokens * len(elements) // Scale with batch size
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := openAIChatRequest{
 		Model: s.config.Model,
 		Messages: []openAIMessage{
 			{Role: "system", Content: "You are a helpful code analysis assistant. Respond only with valid JSON."},
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens:   s.config.MaxTokens * len(elements), // Scale with batch size
-		Temperature: 0.3,                                // Lower temperature for consistent results
+		MaxTokens: maxTokens,
 	}
 
 	body, err := json.Marshal(reqBody)

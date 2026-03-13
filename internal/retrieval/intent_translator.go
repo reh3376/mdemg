@@ -5,12 +5,14 @@ package retrieval
 
 import (
 	"bytes"
+	"container/list"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
@@ -35,9 +37,21 @@ type IntentConfig struct {
 }
 
 // LLMIntentTranslator implements IntentTranslator using OpenAI or Ollama.
+// Includes an LRU cache since temperature=0.0 produces deterministic results.
 type LLMIntentTranslator struct {
 	cfg        IntentConfig
 	cbRegistry *circuitbreaker.Registry
+
+	// LRU cache for translated queries (deterministic at temp=0.0)
+	cacheMu   sync.Mutex
+	cacheMap  map[string]*list.Element
+	cacheList *list.List
+	cacheCap  int
+}
+
+type intentCacheEntry struct {
+	query      string
+	translated string
 }
 
 // NewLLMIntentTranslator creates a new LLM-based intent translator.
@@ -45,6 +59,9 @@ func NewLLMIntentTranslator(cfg IntentConfig, cbRegistry *circuitbreaker.Registr
 	return &LLMIntentTranslator{
 		cfg:        cfg,
 		cbRegistry: cbRegistry,
+		cacheMap:   make(map[string]*list.Element, 256),
+		cacheList:  list.New(),
+		cacheCap:   256,
 	}
 }
 
@@ -77,9 +94,20 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 		return query, nil
 	}
 
-	if strings.TrimSpace(query) == "" {
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
 		return query, nil
 	}
+
+	// Check LRU cache (deterministic at temperature=0.0)
+	t.cacheMu.Lock()
+	if elem, ok := t.cacheMap[trimmed]; ok {
+		t.cacheList.MoveToFront(elem)
+		cached := elem.Value.(*intentCacheEntry).translated
+		t.cacheMu.Unlock()
+		return cached, nil
+	}
+	t.cacheMu.Unlock()
 
 	timeoutMs := t.cfg.TimeoutMs
 	if timeoutMs <= 0 {
@@ -108,6 +136,23 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 		return query, nil
 	}
 
+	// Store in LRU cache
+	t.cacheMu.Lock()
+	if _, ok := t.cacheMap[trimmed]; !ok {
+		// Evict LRU if at capacity
+		for len(t.cacheMap) >= t.cacheCap {
+			back := t.cacheList.Back()
+			if back == nil {
+				break
+			}
+			evicted := t.cacheList.Remove(back).(*intentCacheEntry)
+			delete(t.cacheMap, evicted.query)
+		}
+		elem := t.cacheList.PushFront(&intentCacheEntry{query: trimmed, translated: translated})
+		t.cacheMap[trimmed] = elem
+	}
+	t.cacheMu.Unlock()
+
 	return translated, nil
 }
 
@@ -115,10 +160,9 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 
 // Local copies of request/response types (follows established duplication pattern in rerank.go, synthesis.go)
 type intentOpenAIChatRequest struct {
-	Model       string                `json:"model"`
-	Messages    []intentOpenAIMessage `json:"messages"`
-	Temperature float64               `json:"temperature"`
-	MaxTokens   int                   `json:"max_tokens"`
+	Model     string                `json:"model"`
+	Messages  []intentOpenAIMessage `json:"messages"`
+	MaxTokens int                   `json:"max_completion_tokens"`
 }
 
 type intentOpenAIMessage struct {
@@ -160,14 +204,17 @@ func (t *LLMIntentTranslator) doTranslateWithOpenAI(ctx context.Context, query s
 		maxTokens = 150
 	}
 
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := intentOpenAIChatRequest{
 		Model: t.cfg.Model,
 		Messages: []intentOpenAIMessage{
 			{Role: "system", Content: intentSystemPrompt},
 			{Role: "user", Content: query},
 		},
-		Temperature: 0.0, // Deterministic rewrites
-		MaxTokens:   maxTokens,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

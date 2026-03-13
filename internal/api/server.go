@@ -354,19 +354,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			cfg.IntentProvider, cfg.IntentModel, cfg.IntentTimeoutMs)
 	}
 
+	// Wire intent translator to retrieval service for BM25 query rewriting
+	if intentTrans != nil {
+		ret.SetIntentTranslator(intentTrans)
+		log.Printf("Intent translator wired to retrieval service for BM25 rewriting")
+	}
+
 	// Phase 104: Initialize Guardrail Validator
 	var guardrailVal guardrail.Validator
 	if cfg.GuardrailEnabled {
 		guardrailCfg := guardrail.GuardrailConfig{
-			Enabled:        true,
-			Provider:       cfg.GuardrailProvider,
-			Model:          cfg.GuardrailModel,
-			MaxTokens:      cfg.GuardrailMaxTokens,
-			TimeoutMs:      cfg.GuardrailTimeoutMs,
-			OpenAIKey:      cfg.OpenAIAPIKey,
-			OpenAIURL:      cfg.EffectiveLLMEndpoint(),
-			OllamaURL:      cfg.OllamaEndpoint,
-			MaxConstraints: cfg.GuardrailMaxConstraints,
+			Enabled:         true,
+			Provider:        cfg.GuardrailProvider,
+			Model:           cfg.GuardrailModel,
+			MaxTokens:       cfg.GuardrailMaxTokens,
+			TimeoutMs:       cfg.GuardrailTimeoutMs,
+			OpenAIKey:       cfg.OpenAIAPIKey,
+			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
+			OllamaURL:       cfg.OllamaEndpoint,
+			MaxConstraints:  cfg.GuardrailMaxConstraints,
+			VectorIndexName: cfg.VectorIndexName,
 		}
 		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
 		log.Printf("Active MCP Guardrails enabled (provider: %s, model: %s, maxConstraints: %d)",

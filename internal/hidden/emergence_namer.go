@@ -172,10 +172,9 @@ func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, n
 // --- OpenAI integration ---
 
 type emergenceOpenAIChatRequest struct {
-	Model       string                    `json:"model"`
-	Messages    []emergenceOpenAIMessage  `json:"messages"`
-	Temperature float64                   `json:"temperature"`
-	MaxTokens   int                       `json:"max_tokens"`
+	Model     string                   `json:"model"`
+	Messages  []emergenceOpenAIMessage `json:"messages"`
+	MaxTokens int                      `json:"max_completion_tokens"`
 }
 
 type emergenceOpenAIMessage struct {
@@ -214,14 +213,17 @@ func (n *EmergenceNamer) doNameWithOpenAI(ctx context.Context, sysPrompt, userPr
 		maxTokens = 500
 	}
 
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := emergenceOpenAIChatRequest{
 		Model: n.cfg.Model,
 		Messages: []emergenceOpenAIMessage{
 			{Role: "system", Content: sysPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature: 0.3,
-		MaxTokens:   maxTokens,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

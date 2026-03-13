@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"container/list"
 	"context"
 	"log"
 	"math"
@@ -13,18 +14,18 @@ import (
 )
 
 // NodeEmbeddingCache provides an LRU cache for node embeddings to avoid repeated DB queries.
-// This is critical for query-aware expansion performance since we need to fetch
-// destination node embeddings to compute attention scores.
+// Uses container/list for O(1) access, insertion, and eviction (no linear scans).
 type NodeEmbeddingCache struct {
 	mu       sync.Mutex
-	cache    map[string]*embeddingEntry
-	order    []string // LRU order (oldest at front, most recent at end)
+	items    map[string]*list.Element // nodeID -> list element
+	lruList  *list.List              // front = most recent, back = least recent
 	capacity int
 	hits     int64
 	misses   int64
 }
 
 type embeddingEntry struct {
+	key        string
 	embedding  []float32
 	accessedAt time.Time
 }
@@ -36,73 +37,63 @@ func NewNodeEmbeddingCache(capacity int) *NodeEmbeddingCache {
 		capacity = 1
 	}
 	return &NodeEmbeddingCache{
-		cache:    make(map[string]*embeddingEntry, capacity),
-		order:    make([]string, 0, capacity),
+		items:    make(map[string]*list.Element, capacity),
+		lruList:  list.New(),
 		capacity: capacity,
 	}
 }
 
-// Get retrieves an embedding from cache. Returns nil if not found.
+// Get retrieves an embedding from cache. Returns nil if not found. O(1).
 func (c *NodeEmbeddingCache) Get(nodeID string) []float32 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	entry, ok := c.cache[nodeID]
+	elem, ok := c.items[nodeID]
 	if !ok {
 		c.misses++
 		return nil
 	}
 
 	c.hits++
+	entry := elem.Value.(*embeddingEntry)
 	entry.accessedAt = time.Now()
-	// Move to end of LRU order (most recently used)
-	c.moveToEndLocked(nodeID)
+	c.lruList.MoveToFront(elem)
 
 	return entry.embedding
 }
 
-// Put stores an embedding in cache, evicting oldest if at capacity.
+// Put stores an embedding in cache, evicting LRU if at capacity. O(1).
 func (c *NodeEmbeddingCache) Put(nodeID string, embedding []float32) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// Already in cache - update
-	if entry, ok := c.cache[nodeID]; ok {
+	if elem, ok := c.items[nodeID]; ok {
+		entry := elem.Value.(*embeddingEntry)
 		entry.embedding = embedding
 		entry.accessedAt = time.Now()
-		c.moveToEndLocked(nodeID)
+		c.lruList.MoveToFront(elem)
 		return
 	}
 
-	// Evict oldest if at capacity
-	for len(c.cache) >= c.capacity && len(c.order) > 0 {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.cache, oldest)
+	// Evict LRU if at capacity
+	for len(c.items) >= c.capacity {
+		back := c.lruList.Back()
+		if back == nil {
+			break
+		}
+		evicted := c.lruList.Remove(back).(*embeddingEntry)
+		delete(c.items, evicted.key)
 	}
 
 	// Add new entry
-	c.cache[nodeID] = &embeddingEntry{
+	entry := &embeddingEntry{
+		key:        nodeID,
 		embedding:  embedding,
 		accessedAt: time.Now(),
 	}
-	c.order = append(c.order, nodeID)
-}
-
-// moveToEndLocked moves a nodeID to the end of the LRU order.
-// Must be called with lock held.
-func (c *NodeEmbeddingCache) moveToEndLocked(nodeID string) {
-	// Find and remove from current position
-	for i := 0; i < len(c.order); i++ {
-		if c.order[i] == nodeID {
-			// Remove by shifting elements
-			copy(c.order[i:], c.order[i+1:])
-			c.order = c.order[:len(c.order)-1]
-			break
-		}
-	}
-	// Append to end (most recently used)
-	c.order = append(c.order, nodeID)
+	elem := c.lruList.PushFront(entry)
+	c.items[nodeID] = elem
 }
 
 // Stats returns cache statistics.
@@ -117,7 +108,7 @@ func (c *NodeEmbeddingCache) Stats() map[string]any {
 	}
 
 	return map[string]any{
-		"size":     len(c.cache),
+		"size":     len(c.items),
 		"capacity": c.capacity,
 		"hits":     c.hits,
 		"misses":   c.misses,
