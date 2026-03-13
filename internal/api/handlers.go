@@ -3421,11 +3421,11 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 
 	dbOverview.TotalSpaces = len(spaceData)
 
-	// 2. Edges per space (CO_ACTIVATED_WITH)
+	// 2. Total edges per space (all relationship types)
 	edgeCounts := make(map[string]int64)
 	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, `
-			MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]->(b:MemoryNode)
+			MATCH (a:MemoryNode)-[r]->(b:MemoryNode)
 			WHERE a.space_id IS NOT NULL AND a.space_id = b.space_id
 			RETURN a.space_id AS sid, count(r) AS edge_count`, nil)
 		if err != nil {
@@ -3441,6 +3441,28 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("[neo4j-overview] space edge counts query failed: %v", err)
+	}
+
+	// 2b. Learning edges per space (CO_ACTIVATED_WITH only)
+	learningEdgeCounts := make(map[string]int64)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (a:MemoryNode)-[r:CO_ACTIVATED_WITH]->(b:MemoryNode)
+			WHERE a.space_id IS NOT NULL AND a.space_id = b.space_id
+			RETURN a.space_id AS sid, count(r) AS edge_count`, nil)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			sid, _ := rec.Get("sid")
+			ec, _ := rec.Get("edge_count")
+			learningEdgeCounts[sid.(string)] = ec.(int64)
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		log.Printf("[neo4j-overview] learning edge counts query failed: %v", err)
 	}
 
 	// 3. Observation counts per space
@@ -3572,7 +3594,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 			EdgeCount:        edgeCounts[spaceID],
 			NodesByLayer:     row.LayerCounts,
 			ObservationCount: obsCounts[spaceID],
-			LearningEdges:    edgeCounts[spaceID],
+			LearningEdges:    learningEdgeCounts[spaceID],
 			OrphanCount:      orphanCounts[spaceID],
 		}
 
