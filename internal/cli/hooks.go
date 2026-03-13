@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	hook_templates "mdemg/internal/cli/hook_templates"
@@ -15,14 +16,26 @@ import (
 
 const mdemgHookMarker = "# MDEMG"
 
-// claudeHookFiles maps template filenames to their Claude Code event names and timeouts.
-var claudeHookFiles = []struct {
+// claudeHookEntry maps a template filename to its Claude Code event name and timeout.
+type claudeHookEntry struct {
 	Template string // filename in hook_templates FS
 	Event    string // Claude Code hook event
 	Timeout  int    // timeout in seconds
-}{
-	{"prompt-context.sh", "UserPromptSubmit", 12},
-	{"session-start.sh", "SessionStart", 15},
+}
+
+// claudeHookFiles returns the platform-appropriate hook entries.
+// On Windows, PowerShell scripts (.ps1) are used; on Unix, bash scripts (.sh).
+func claudeHookFiles() []claudeHookEntry {
+	if runtime.GOOS == "windows" {
+		return []claudeHookEntry{
+			{"prompt-context.ps1", "UserPromptSubmit", 12},
+			{"session-start.ps1", "SessionStart", 15},
+		}
+	}
+	return []claudeHookEntry{
+		{"prompt-context.sh", "UserPromptSubmit", 12},
+		{"session-start.sh", "SessionStart", 15},
+	}
 }
 
 func newHooksCmd() *cobra.Command {
@@ -224,7 +237,7 @@ Reports whether git hooks and Claude Code hooks are installed.`,
 			}
 
 			// Claude Code hooks
-			for _, hf := range claudeHookFiles {
+			for _, hf := range claudeHookFiles() {
 				hookPath := filepath.Join(cwd, ".claude", "hooks", hf.Template)
 				if _, err := os.Stat(hookPath); os.IsNotExist(err) {
 					fmt.Printf("  %-20s not installed\n", hf.Template+":")
@@ -313,7 +326,7 @@ func InstallClaudeHooks(dir, spaceID, serverURL string, force bool) ([]string, e
 
 	var installed []string
 
-	for _, hf := range claudeHookFiles {
+	for _, hf := range claudeHookFiles() {
 		destPath := filepath.Join(hookDir, hf.Template)
 
 		// Check for existing hook
@@ -358,7 +371,7 @@ func InstallClaudeHooks(dir, spaceID, serverURL string, force bool) ([]string, e
 // Returns the count of hooks removed.
 func UninstallClaudeHooks(dir string) (int, error) {
 	removed := 0
-	for _, hf := range claudeHookFiles {
+	for _, hf := range claudeHookFiles() {
 		hookPath := filepath.Join(dir, ".claude", "hooks", hf.Template)
 		if _, err := os.Stat(hookPath); os.IsNotExist(err) {
 			continue
@@ -439,8 +452,14 @@ func mergeClaudeSettings(settingsPath, hookDir string) error {
 	}
 
 	// Register each hook event
-	for _, hf := range claudeHookFiles {
-		hookCommand := filepath.Join(hookDir, hf.Template)
+	for _, hf := range claudeHookFiles() {
+		hookPath := filepath.Join(hookDir, hf.Template)
+
+		// On Windows, .ps1 scripts need powershell.exe invocation
+		hookCommand := hookPath
+		if strings.HasSuffix(hf.Template, ".ps1") {
+			hookCommand = fmt.Sprintf("powershell.exe -ExecutionPolicy Bypass -File \"%s\"", hookPath)
+		}
 
 		// Build the hook entry
 		hookEntry := map[string]interface{}{

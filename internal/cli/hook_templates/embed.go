@@ -6,5 +6,5 @@ import "embed"
 
 // FS contains all hook template files embedded at compile time.
 //
-//go:embed *.sh
+//go:embed *.sh *.ps1
 var FS embed.FS
