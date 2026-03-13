@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Hook: UserPromptSubmit — recall relevant CMS context for each user prompt
-# Reads the user's prompt from stdin JSON and queries CMS for relevant memory.
+# MDEMG prompt-context hook (installed by mdemg hooks install)
+# Hook: UserPromptSubmit — recall CMS context + Jiminy guidance for each prompt
 
 set -euo pipefail
 
-MDEMG_URL="${MDEMG_URL:-http://localhost:9999}"
-SPACE_ID="mdemg-dev"
+MDEMG_URL="${MDEMG_URL:-{{MDEMG_URL}}}"
+SPACE_ID="{{SPACE_ID}}"
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -36,12 +36,10 @@ RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
 RESULT_COUNT=$(echo "$RECALL" | jq -r 'if type == "array" then length elif .results then (.results | length) else 0 end' 2>/dev/null || echo "0")
 
 if [ "$RESULT_COUNT" -eq 0 ] 2>/dev/null; then
-  # Phase 80: Empty recall warning for non-trivial queries
   if [ ${#USER_PROMPT} -gt 15 ]; then
     echo "!! CMS RECALL EMPTY — No relevant memory found for this query."
     echo "!! Consider: POST /v1/conversation/observe to record this topic."
   fi
-  # Session health ribbon (1s timeout)
   HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
     --connect-timeout 1 --max-time 1 2>/dev/null) || true
   if [ -n "$HEALTH_RESP" ]; then
@@ -55,7 +53,6 @@ fi
 # Format relevant context
 echo "═══ CMS RECALL (relevant to this prompt) ═══"
 
-# Handle both array response and object-with-results response
 echo "$RECALL" | jq -r '
   (if type == "array" then . elif .results then .results else [] end)[]? |
   "  • [\(.type // .obs_type // "memory")] (score: \(.score // "?" | tostring | .[0:4])) \(.content // .summary // "no content" | .[0:200])"
@@ -80,15 +77,12 @@ if [ -n "$GUIDANCE" ]; then
 fi
 
 # --- Reinforce recalled observations via retrieval co-activation ---
-# The retrieve endpoint triggers spreading activation which creates learning
-# edges between co-retrieved nodes, strengthening frequently-accessed memories.
-# Fire-and-forget in background — don't slow down prompt delivery.
 curl -sf -X POST "${MDEMG_URL}/v1/memory/retrieve" \
   -H "Content-Type: application/json" \
   -d "{\"space_id\":\"${SPACE_ID}\",\"query_text\":$(echo "$USER_PROMPT" | jq -Rs .),\"candidate_k\":10,\"top_k\":5,\"hop_depth\":2}" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
 
-# Phase 80: Session health ribbon
+# Session health ribbon
 HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
   --connect-timeout 1 --max-time 1 2>/dev/null) || true
 if [ -n "$HEALTH_RESP" ]; then

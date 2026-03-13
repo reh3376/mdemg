@@ -339,6 +339,26 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// Claude Code hooks (Jiminy guidance + CMS recall)
+	if !flags.noHooks && env.hasClaude {
+		installClaude := flags.defaults
+		if !flags.defaults {
+			answer := promptLine("Install Claude Code hooks for Jiminy guidance? (yes/no) [yes]", "yes")
+			installClaude = answer == "yes"
+		}
+		if installClaude {
+			serverURL := fmt.Sprintf("http://localhost:%d", opts.ServerPort)
+			installed, err := InstallClaudeHooks(cwd, opts.SpaceID, serverURL, false)
+			if err != nil {
+				fmt.Printf("  Warning: Claude Code hook installation failed: %v\n", err)
+			} else {
+				for _, f := range installed {
+					fmt.Printf("  Installed %s\n", f)
+				}
+			}
+		}
+	}
+
 	// Create/update .env file with secrets
 	envPath := filepath.Join(cwd, ".env")
 	envLines := []string{}

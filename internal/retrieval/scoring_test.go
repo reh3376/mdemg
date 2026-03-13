@@ -191,3 +191,135 @@ func TestBypassBonus(t *testing.T) {
 		t.Error("vectorSim below threshold should not trigger bypass")
 	}
 }
+
+// TestLearningEdgeBoostPopulation verifies that LearningEdgeBoost is populated
+// when activation exceeds the vector seed (i.e., CO_ACTIVATED_WITH edges contributed).
+func TestLearningEdgeBoostPopulation(t *testing.T) {
+	cfg := config.Config{
+		ScoringAlpha: 0.55,
+		ScoringBeta:  0.30,
+		ScoringGamma: 0.10,
+		ScoringDelta: 0.05,
+		ScoringPhi:   0.08,
+		ScoringKappa: 0.12,
+		ScoringRhoL0: 0.05,
+		ScoringRhoL1: 0.02,
+		ScoringRhoL2: 0.01,
+	}
+
+	// Create a candidate with VectorSim = 0.5
+	cands := []Candidate{
+		{NodeID: "n1", VectorSim: 0.5, Confidence: 0.5, Name: "test-node"},
+	}
+
+	// Set activation higher than VectorSim (simulating learning edge contribution)
+	act := map[string]float64{
+		"n1": 0.8, // Higher than VectorSim 0.5 — learning edges contributed
+	}
+
+	edges := []Edge{} // No edges needed — activation is pre-computed
+	hints := RetrievalHints{QueryType: "generic"}
+
+	scored := ScoreAndRankWithBreakdown(cands, act, edges, 10, cfg, "", hints)
+	if len(scored) == 0 {
+		t.Fatal("expected at least one scored candidate")
+	}
+
+	bd := scored[0].Breakdown
+	if bd.LearningEdgeBoost <= 0 {
+		t.Errorf("LearningEdgeBoost = %f, want > 0 (activation 0.8 > VectorSim 0.5)", bd.LearningEdgeBoost)
+	}
+
+	// Verify it's included in the final score
+	if bd.FinalScore <= 0 {
+		t.Errorf("FinalScore = %f, want > 0", bd.FinalScore)
+	}
+}
+
+// TestLearningEdgeBoostZeroWhenNoContribution verifies that LearningEdgeBoost
+// is zero when activation does not exceed the vector seed.
+func TestLearningEdgeBoostZeroWhenNoContribution(t *testing.T) {
+	cfg := config.Config{
+		ScoringAlpha: 0.55,
+		ScoringBeta:  0.30,
+		ScoringGamma: 0.10,
+		ScoringDelta: 0.05,
+		ScoringPhi:   0.08,
+		ScoringKappa: 0.12,
+		ScoringRhoL0: 0.05,
+		ScoringRhoL1: 0.02,
+		ScoringRhoL2: 0.01,
+	}
+
+	cands := []Candidate{
+		{NodeID: "n1", VectorSim: 0.7, Confidence: 0.5, Name: "test-node"},
+	}
+
+	// Activation equals VectorSim — no learning edge contribution
+	act := map[string]float64{
+		"n1": 0.7,
+	}
+
+	edges := []Edge{}
+	hints := RetrievalHints{QueryType: "generic"}
+
+	scored := ScoreAndRankWithBreakdown(cands, act, edges, 10, cfg, "", hints)
+	if len(scored) == 0 {
+		t.Fatal("expected at least one scored candidate")
+	}
+
+	bd := scored[0].Breakdown
+	if bd.LearningEdgeBoost != 0 {
+		t.Errorf("LearningEdgeBoost = %f, want 0 (activation == VectorSim)", bd.LearningEdgeBoost)
+	}
+}
+
+// TestJiminyExplanationIncludesLearningEdgeBoost verifies the Jiminy explanation
+// includes "learning edge boost" text when LearningEdgeBoost is set.
+func TestJiminyExplanationIncludesLearningEdgeBoost(t *testing.T) {
+	breakdown := ScoreBreakdown{
+		VectorSimilarity:  0.35,
+		Activation:        0.15,
+		LearningEdgeBoost: 0.05,
+		FinalScore:        0.55,
+	}
+
+	explanation := GenerateJiminyExplanation(breakdown, []string{"vector_recall"})
+
+	if explanation.Rationale == "" {
+		t.Error("expected non-empty rationale")
+	}
+
+	// Check that learning edge boost is mentioned
+	found := false
+	for _, part := range []string{"learning edge boost"} {
+		if containsStr(explanation.Rationale, part) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected rationale to mention 'learning edge boost', got: %s", explanation.Rationale)
+	}
+
+	// Verify retrieval path includes learning_edge stage
+	path := DetermineRetrievalPath(breakdown, false)
+	foundStage := false
+	for _, s := range path {
+		if s == string(StageLearningEdge) {
+			foundStage = true
+		}
+	}
+	if !foundStage {
+		t.Errorf("expected retrieval path to include %q, got: %v", StageLearningEdge, path)
+	}
+}
+
+func containsStr(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

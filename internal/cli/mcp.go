@@ -87,6 +87,9 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Guardrail tools (Phase 104)
 	mcpSrv.registerValidateChangesTool(s)
 
+	// Jiminy Guidance tools (Phase Jiminy)
+	mcpSrv.registerJiminyGuideTool(s)
+
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
 		return fmt.Errorf("MCP server error: %w", err)
@@ -1540,4 +1543,73 @@ func newToolResultError(errMsg string) *mcp.CallToolResult {
 		Content: []mcp.Content{mcp.NewTextContent(errMsg)},
 		IsError: true,
 	}
+}
+
+// =============================================================================
+// Jiminy Guidance Tool (Phase Jiminy)
+// =============================================================================
+
+func (m *mcpServer) registerJiminyGuideTool(s *server.MCPServer) {
+	tool := mcp.NewTool("jiminy_guide",
+		mcp.WithDescription(`Get proactive guidance based on current context. Jiminy reviews
+your work against organizational knowledge: constraints, prior corrections, anti-patterns,
+and domain expertise. Use when starting new features, making architecture decisions, or
+working in unfamiliar code.`),
+		mcp.WithString("context", mcp.Required(),
+			mcp.Description("What you're currently working on")),
+		mcp.WithString("file_path",
+			mcp.Description("Path of the file being edited")),
+		mcp.WithString("agent_output",
+			mcp.Description("Your proposed code or action")),
+		mcp.WithString("space_id",
+			mcp.Description("Space ID to check against (default: ide-agent)")),
+	)
+
+	s.AddTool(tool, m.jiminyGuideHandler)
+}
+
+func (m *mcpServer) jiminyGuideHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	contextStr, _ := args["context"].(string)
+	if contextStr == "" {
+		return newToolResultError("context is required"), nil
+	}
+
+	spaceID, _ := args["space_id"].(string)
+	if spaceID == "" {
+		spaceID = defaultSpaceID
+	}
+
+	filePath, _ := args["file_path"].(string)
+	agentOutput, _ := args["agent_output"].(string)
+
+	body := map[string]any{
+		"space_id":     spaceID,
+		"context":      contextStr,
+		"file_path":    filePath,
+		"agent_output": agentOutput,
+	}
+
+	resp, err := m.callMDEMG("/v1/jiminy/guide", body)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Jiminy guidance failed: %v", err)), nil
+	}
+
+	data, _ := resp["data"].(map[string]any)
+	if data == nil {
+		return newToolResultError("unexpected response format from jiminy API"), nil
+	}
+
+	// Return the prompt augmentation text for direct injection
+	augmentation, _ := data["prompt_augmentation"].(string)
+	if augmentation == "" {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{mcp.NewTextContent("No relevant guidance found for this context.")},
+		}, nil
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.NewTextContent(augmentation)},
+	}, nil
 }

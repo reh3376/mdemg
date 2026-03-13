@@ -1,0 +1,137 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Guide Validation",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "guidance",
+      "phase_jiminy",
+      "validation"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-12",
+    "description": "Validates error handling and input validation for the Jiminy guidance endpoint.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "guidance",
+      "phase_jiminy",
+      "validation"
+    ],
+    "sha256": "04665b3c771c168e543c10caeab9027cec7d1487c88bef41dfc6ab74345f5dfe"
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "context_text": "Refactoring authentication middleware"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "",
+      "context": "{{context_text}}"
+    }
+  },
+  "expected": {
+    "status": 400,
+    "body_assertions": [
+      {
+        "name": "error message present",
+        "path": "$.error",
+        "exists": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_context",
+      "description": "Returns 400 when context is missing from request body.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed_get",
+      "description": "Returns 405 when using GET method instead of POST.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/guide",
+        "body": null
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed_put",
+      "description": "Returns 405 when using PUT method instead of POST.",
+      "request": {
+        "method": "PUT",
+        "path": "/v1/jiminy/guide",
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "{{context_text}}"
+        }
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "disabled_service",
+      "description": "Returns 503 when JIMINY_ENABLED is false (service unavailable). This variant tests the default state where Jiminy is not configured.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "{{context_text}}"
+        }
+      },
+      "expected": {
+        "status": [
+          200,
+          503
+        ],
+        "body_assertions": []
+      }
+    }
+  ]
+}
