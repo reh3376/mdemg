@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-10
+**Date:** 2026-03-12
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -32,22 +32,25 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
   104: Active Guardrails, 105: Global Meta-Learning
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1 brew install verified)
 - Quality hardening (gap analysis triage) — COMPLETE
-  - 274 UATS contract test specs, all using canonical assertion format
+  - 279 UATS contract test specs, all using canonical assertion format
   - 148 Go test files with comprehensive coverage
   - golangci-lint: 0 issues
   - Dead code removed (internal/observations/, internal/domain/)
+- ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-10):
-- Documentation overhaul: 4 wiki docs + simplified README pushed to reh3376/homebrew-mdemg
-  - docs/cli-reference.md (2,038 lines) — all commands, flags, env vars
-  - docs/api-reference.md (2,931 lines) — all HTTP endpoints with curl examples
-  - docs/cms-rsic-guide.md (1,344 lines) — CMS + RSIC usage guide
-  - docs/ingestion-guide.md (1,040 lines) — all 8 ingestion methods
-  - README.md simplified from 674 → 145 lines (links to wiki docs)
-- CI fix: stub embedder dimensions 1536→3072 to match V0018 vector index migration
-- CI fix: UATS runner now shows real spec names for skipped specs (was "unknown")
-- All CI checks passing: CI/Test (push), CI/Test (pull_request), UXTS Canonical Specs
+LAST SESSION (2026-03-12):
+- ANN Optimization Suite: 10 neural learning improvements across 4 subsystems
+  - Learning: tanh soft-cap, cautious decay, multi-rate eta, LR schedule
+  - Retrieval: squared activation, local-first spreading, value residual bypass
+  - Consolidation: L5 grounding (GROUNDED_BY edges)
+  - API: negative feedback endpoint, frontier detection endpoint
+  - 28 new config parameters, 17 files changed, 1272 insertions
+- Linear module fix: 503 instead of 500/400 for unconfigured service (gRPC Unimplemented detection)
+- RSIC orchestration reset: POST /v1/self-improve/orchestration/reset for test isolation
+- All 12 "pre-existing" UATS failures fixed (Linear 503 + RSIC cooldown state)
+- UATS: 279/279 specs passing (100%), 42 Go test packages passing, 0 lint issues
+- 2 new UATS specs: frontier_detection, learning_negative_feedback
 
 REPO STATE:
 - Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
@@ -68,10 +71,11 @@ WHAT REMAINS TO BE DONE:
 1. RELEASE: ~~Create homebrew-mdemg repo, tag first release~~ DONE (v0.2.1 released, brew install verified)
 2. DOCUMENTATION: ~~Overhaul homebrew-mdemg docs~~ DONE (4 wiki docs + simplified README)
 3. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
-4. TESTING: ~10 endpoints still need UATS specs (spaces CRUD, jobs SSE, linear module)
+4. TESTING: ~5 endpoints still need UATS specs (spaces CRUD, jobs SSE)
 5. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
 6. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
+7. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
@@ -2570,7 +2574,7 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-## Known Issues & Technical Debt (2026-03-10)
+## Known Issues & Technical Debt (2026-03-12)
 
 Issues discovered during gap analysis. **Never bypass — fix or document before committing.**
 
@@ -2582,7 +2586,7 @@ Issues discovered during gap analysis. **Never bypass — fix or document before
 | Dead code | RESOLVED | `internal/observations/` and `internal/domain/` removed |
 | Lint warnings (8 gosec G118) | RESOLVED | All annotated with `//nolint:gosec`, 0 lint issues |
 | UATS assertion format | RESOLVED | All specs use canonical `{path, op, expected}` format |
-| UATS spec coverage | NEARLY COMPLETE | 274 specs; only SSE endpoint not testable via UATS |
+| UATS spec coverage | NEARLY COMPLETE | 279 specs; only SSE endpoint not testable via UATS |
 | Partially tested packages | IMPROVED | Pure functions + constructors tested; remaining gaps need Neo4j/HTTP mocks |
 | Release infrastructure | RESOLVED | Homebrew tap repo created, v0.2.1 released and tested |
 | Stale legacy binaries | BLOCKED | 7 old binaries in `bin/`; deletion blocked by pre-bash-check hook |
@@ -2644,4 +2648,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-10 — All 105 phases + S0-S14 complete. v0.2.1 released and Homebrew install verified (16/16 test phases). 146 UATS specs (canonical format). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests.*
+*Last updated: 2026-03-12 — All 105 phases + S0-S14 complete + ANN Optimization Suite (10 optimizations). v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*

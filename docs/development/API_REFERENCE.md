@@ -29,6 +29,8 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
 - [Meta-Cognition & Self-Improvement](#meta-cognition--self-improvement-phase-80)
 - [RSIC Orchestration & Safety](#rsic-orchestration--safety-phases-87-90)
+- [Frontier Detection](#get-v1memoryfrontiers)
+- [Negative Feedback](#post-v1learningnegative-feedback)
 
 ---
 
@@ -785,6 +787,40 @@ Get freeze state for a space (or all spaces if `space_id` is omitted).
   "count": 1
 }
 ```
+
+### POST /v1/learning/negative-feedback
+
+Apply negative feedback to weaken or contradict learning edges for rejected retrieval results.
+
+**Request Body**:
+
+```json
+{
+  "space_id": "my-project",
+  "query_node_ids": ["mem-abc123"],
+  "rejected_node_ids": ["mem-def456", "mem-ghi789"]
+}
+```
+
+- `query_node_ids`: Node IDs from the original query/context
+- `rejected_node_ids`: Node IDs that were returned but deemed irrelevant (max 20 per request)
+
+**Response (200)**:
+
+```json
+{
+  "processed": 2,
+  "weakened": 1,
+  "contradicted": 1
+}
+```
+
+- `weakened`: Existing `CO_ACTIVATED_WITH` edges had weight reduced by `LEARNING_NEGATIVE_WEIGHT` (default 0.15)
+- `contradicted`: New `CONTRADICTS` edges created (or `evidence_count` incremented on existing ones)
+
+**Errors**: 400 (missing `space_id`, empty arrays), 405 (wrong method).
+
+**Config**: `LEARNING_NEGATIVE_WEIGHT` (0.15), `LEARNING_NEGATIVE_DECAY_MULT` (2.0), `LEARNING_NEGATIVE_MAX_PER_REQUEST` (20).
 
 ---
 
@@ -2320,6 +2356,37 @@ Score distribution statistics and learning phase info for a space.
 
 **Learning Phases**: `cold` (0 edges), `learning` (1-10k), `warm` (10k-50k), `saturated` (50k+).
 
+### GET /v1/memory/frontiers
+
+Identify frontier nodes — L3+ concepts with sufficient evidence but low outgoing degree and no L5 parent. Candidates for concept expansion.
+
+**Query Parameters**:
+
+- `space_id` (required): The space to query
+- `limit` (optional, default 20, max 100): Maximum frontier nodes to return
+
+**Response (200)**:
+
+```json
+{
+  "frontiers": [
+    {
+      "node_id": "mem-abc123",
+      "name": "AuthenticationFlow",
+      "layer": 3,
+      "summary": "Authentication and authorization patterns",
+      "outgoing_edges": 1,
+      "evidence": 5
+    }
+  ],
+  "count": 1
+}
+```
+
+**Errors**: 400 (missing `space_id`), 405 (wrong method).
+
+**Config**: `FRONTIER_MIN_EVIDENCE` (default 3), `FRONTIER_MAX_OUTGOING` (default 2).
+
 ### GET /v1/prometheus
 
 Prometheus-format metrics endpoint. Returns `text/plain` in Prometheus exposition format.
@@ -3055,6 +3122,18 @@ Phase 80 adds `anomalies` and `memory_state` fields to existing resume and recal
 ---
 
 ## RSIC Orchestration & Safety (Phases 87-90)
+
+### POST /v1/self-improve/orchestration/reset
+
+Reset all orchestration state (active cycles, cooldown, dedupe windows). Used for test isolation between UATS runs.
+
+**Response (200)**:
+
+```json
+{"reset": true}
+```
+
+**Errors**: 405 (wrong method), 503 (orchestration policy not initialised).
 
 ### POST /v1/self-improve/cycle
 

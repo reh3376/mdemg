@@ -308,27 +308,50 @@ The module respects Linear's API rate limits:
 - 1,500 requests/hour for API key auth
 - 100ms delay between paginated requests
 
+## Error Handling
+
+The Linear module returns appropriate HTTP status codes:
+
+| Status | Condition |
+|--------|-----------|
+| 200 | Successful operation |
+| 400 | Validation error (missing required fields like `team_id`) |
+| 404 | Resource not found (issue/project/comment doesn't exist) |
+| 405 | Method not allowed |
+| 503 | Linear module unavailable — API key not configured, plugin not running, or gRPC service unimplemented |
+
+**Key behavior**: When the Linear plugin is running but doesn't implement the `CRUDModule` gRPC service (e.g., during development), all CRUD endpoints return **503** with `{"error": "..."}`. The handler detects gRPC `Unimplemented` and `unknown service` errors and maps them to 503 (Service Unavailable) rather than 500 (Internal Server Error).
+
 ## Troubleshooting
 
 ### "LINEAR_API_KEY not configured"
 
-Add `LINEAR_API_KEY=lin_api_xxx` to your `.env` file and restart the server.
+Add `LINEAR_API_KEY=lin_api_xxx` to your `.env` file and restart the server. Without this, all Linear endpoints return 503.
 
 ### "GraphQL errors"
 
 Check that your API key has "Read" scope and hasn't expired.
 
+### All endpoints returning 503
+
+This means the Linear module is either:
+1. Not running — check `GET /v1/plugins` to see if the plugin is loaded
+2. Running but not implementing the CRUDModule gRPC service — the plugin binary exists but doesn't expose CRUD operations
+3. API key not configured — add `LINEAR_API_KEY` to `.env`
+
+Plugins are discovered only at server startup — if you added the plugin binary after starting the server, restart it.
+
 ### Vector dimension mismatch
 
 If you see errors about vector dimensions, ensure your vector index matches your embedding provider:
 
-- OpenAI: 1536 dimensions
-- Ollama: 768 dimensions
+- OpenAI `text-embedding-3-large`: 3072 dimensions
+- Ollama: varies by model
 
 Recreate the index if needed:
 
 ```cypher
 DROP INDEX memNodeEmbedding IF EXISTS;
 CREATE VECTOR INDEX memNodeEmbedding FOR (n:MemoryNode) ON (n.embedding)
-OPTIONS {indexConfig: {`vector.dimensions`: 1536, `vector.similarity_function`: 'COSINE'}};
+OPTIONS {indexConfig: {`vector.dimensions`: 3072, `vector.similarity_function`: 'COSINE'}};
 ```
