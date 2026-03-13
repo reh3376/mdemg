@@ -1331,6 +1331,7 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		}
 		if sr, ok := postResult.Steps["emergent_l5"]; ok {
 			result.L5NodesCreated = sr.NodesCreated
+			result.L5GroundingEdgesCreated = sr.EdgesCreated
 		}
 	}
 
@@ -2738,7 +2739,8 @@ ON MATCH SET
 // CreateL5EmergentNodes creates L5 emergent concepts from L4 nodes
 // connected by high-evidence ANALOGOUS_TO or BRIDGES edges.
 // L5 represents meta-patterns spanning multiple L4 domains.
-func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string, namer *EmergenceNamer) (int, error) {
+// Returns (nodesCreated, groundingEdgesCreated, error).
+func (s *Service) CreateL5EmergentNodes(ctx context.Context, spaceID string, namer *EmergenceNamer) (int, int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -2806,12 +2808,12 @@ LIMIT 20`
 		return pairs, res.Err()
 	})
 	if err != nil {
-		return 0, fmt.Errorf("L5 cluster query: %w", err)
+		return 0, 0, fmt.Errorf("L5 cluster query: %w", err)
 	}
 
 	pairList := pairs.([]l5Pair)
 	if len(pairList) == 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	// Group connected components (simple union-find)
@@ -2847,6 +2849,7 @@ LIMIT 20`
 	}
 
 	created := 0
+	totalGroundingEdges := 0
 	for _, members := range clusters {
 		if len(members) < 2 {
 			continue
@@ -2919,24 +2922,107 @@ CREATE (m)-[:ABSTRACTS_TO {
 }]->(l5)
 RETURN l5.node_id AS l5Id`
 
-		_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			_, err := tx.Run(ctx, createCypher, map[string]any{
+		l5NodeID, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, createCypher, map[string]any{
 				"members": members,
 				"name":    l5Name,
 				"summary": l5Summary,
 				"label":   l5Label,
 				"spaceId": spaceID,
 			})
-			return nil, err
+			if err != nil {
+				return "", err
+			}
+			// The query returns one row per ABSTRACTS_TO edge; grab l5Id from the first
+			if res.Next(ctx) {
+				id, _ := res.Record().Get("l5Id")
+				if s, ok := id.(string); ok {
+					return s, nil
+				}
+			}
+			return "", res.Err()
 		})
 		if err != nil {
 			fmt.Printf("warning: failed to create L5 node: %v\n", err)
 			continue
 		}
 		created++
+
+		// ANN Optimization Phase C: Create GROUNDED_BY edges from L5 to most representative L0 observations
+		if l5ID, ok := l5NodeID.(string); ok && l5ID != "" {
+			groundingCount, groundingErr := s.createGroundingEdges(ctx, spaceID, l5ID, members)
+			if groundingErr != nil {
+				fmt.Printf("warning: failed to create grounding edges for L5 %s: %v\n", l5ID, groundingErr)
+			} else {
+				totalGroundingEdges += groundingCount
+			}
+		}
 	}
 
-	return created, nil
+	return created, totalGroundingEdges, nil
+}
+
+// createGroundingEdges creates GROUNDED_BY edges from an L5 node to the most
+// representative L0 observations within its cluster's descendant tree.
+// This implements L0 Skip Connections (ANN Optimization Phase C), allowing
+// high-level concepts to maintain direct grounding to source observations.
+func (s *Service) createGroundingEdges(ctx context.Context, spaceID string, l5NodeID string, memberNodeIDs []string) (int, error) {
+	if s.cfg.L5GroundingMaxEdges <= 0 {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Find L0 descendants of the L5 node's cluster members via ABSTRACTS_TO chain,
+	// then pick the ones with embeddings most similar to the L5 node's embedding.
+	// Scoped to cluster descendants to avoid full-space scan.
+	cypher := `
+MATCH (l5:MemoryNode {node_id: $l5NodeId, space_id: $spaceId})
+WITH l5
+UNWIND $memberIds AS memberId
+MATCH (member:MemoryNode {node_id: memberId, space_id: $spaceId})
+// Traverse ABSTRACTS_TO chain down to L0
+MATCH (member)-[:ABSTRACTS_TO*0..5]->(l0:MemoryNode {space_id: $spaceId})
+WHERE l0.layer = 0 AND l0.embedding IS NOT NULL AND l5.embedding IS NOT NULL
+WITH DISTINCT l5, l0,
+     vector.similarity.cosine(l5.embedding, l0.embedding) AS sim
+WHERE sim >= $minSim
+ORDER BY sim DESC
+LIMIT $maxEdges
+MERGE (l5)-[r:GROUNDED_BY {space_id: $spaceId}]->(l0)
+ON CREATE SET r.weight = $initialWeight, r.similarity = sim,
+              r.evidence_count = 1, r.created_at = datetime()
+ON MATCH SET r.evidence_count = r.evidence_count + 1,
+             r.similarity = sim, r.updated_at = datetime()
+RETURN count(*) AS created`
+
+	params := map[string]any{
+		"spaceId":       spaceID,
+		"l5NodeId":      l5NodeID,
+		"memberIds":     memberNodeIDs,
+		"minSim":        s.cfg.L5GroundingMinSim,
+		"maxEdges":      s.cfg.L5GroundingMaxEdges,
+		"initialWeight": s.cfg.L5GroundingInitialWeight,
+	}
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			count, _ := res.Record().Get("created")
+			if c, ok := count.(int64); ok {
+				return int(c), nil
+			}
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return result.(int), nil
 }
 
 // CreateDynamicEmergentNodes discovers dense CO_ACTIVATED_WITH clusters that don't match

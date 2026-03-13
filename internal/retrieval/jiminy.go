@@ -72,6 +72,11 @@ func GenerateJiminyExplanation(breakdown ScoreBreakdown, path []string) JiminyEx
 		parts = append(parts, fmt.Sprintf("temporal recency boost (+%.2f)", breakdown.TemporalBoost))
 	}
 
+	// Value residual bypass
+	if breakdown.BypassBonus > 0.01 {
+		parts = append(parts, fmt.Sprintf("high-confidence vector bypass (+%.2f)", breakdown.BypassBonus))
+	}
+
 	// Stale reference penalty (Phase 2 Temporal)
 	if breakdown.StaleRefPenalty < -0.01 {
 		parts = append(parts, fmt.Sprintf("stale reference penalty (%.2f)", breakdown.StaleRefPenalty))
@@ -116,6 +121,7 @@ func GenerateJiminyExplanation(breakdown ScoreBreakdown, path []string) JiminyEx
 		"learning_edge_boost": breakdown.LearningEdgeBoost,
 		"temporal_boost":      breakdown.TemporalBoost,
 		"stale_ref_penalty":   breakdown.StaleRefPenalty,
+		"bypass_bonus":        breakdown.BypassBonus,
 		"final_score":         breakdown.FinalScore,
 	}
 

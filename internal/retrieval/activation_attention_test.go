@@ -172,7 +172,7 @@ func TestSpreadingActivationWithAttention_AllEdgeTypes(t *testing.T) {
 		Generalizes: 0.5,
 	}
 
-	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, equalAttn)
+	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, equalAttn, nil)
 
 	// Both b and c should have increased activation from a
 	if act["b"] <= 0.5 {
@@ -201,7 +201,7 @@ func TestSpreadingActivationWithAttention_CodeQueryFavorsCoActivated(t *testing.
 		Generalizes: 0.2,
 	}
 
-	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, codeAttn)
+	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, codeAttn, nil)
 
 	// b (CO_ACTIVATED) should have higher activation than c (GENERALIZES)
 	if act["b"] <= act["c"] {
@@ -227,7 +227,7 @@ func TestSpreadingActivationWithAttention_ArchQueryFavorsHierarchical(t *testing
 		Generalizes: 1.0,
 	}
 
-	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, archAttn)
+	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, archAttn, nil)
 
 	// c (GENERALIZES) should have higher activation than b (CO_ACTIVATED)
 	if act["c"] <= act["b"] {
@@ -250,7 +250,7 @@ func TestSpreadingActivationWithAttention_ZeroAttentionIgnoresEdge(t *testing.T)
 		CoActivated: 0.0,
 	}
 
-	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, zeroAttn)
+	act := SpreadingActivationWithAttention(cands, edges, 2, 0.15, zeroAttn, nil)
 
 	// b should have zero activation (no seeding, no edge contribution)
 	if act["b"] != 0.0 {

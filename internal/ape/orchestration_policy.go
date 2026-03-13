@@ -239,6 +239,17 @@ func (p *OrchestrationPolicy) CompleteCycle(spaceID string, tier CycleTier) {
 	delete(p.activeCycles, activeKey)
 }
 
+// ResetState clears all orchestration state (active cycles, cooldown, dedupe).
+// Used for test isolation between UATS runs.
+func (p *OrchestrationPolicy) ResetState() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.activeCycles = make(map[string]TriggerRecord)
+	p.lastTrigger = make(map[string]TriggerRecord)
+	p.dedupeWindow = make(map[string]TriggerRecord)
+}
+
 // CheckDedupe returns a DedupeResult for a given idempotency key (fast path).
 func (p *OrchestrationPolicy) CheckDedupe(idempotencyKey string) *DedupeResult {
 	if idempotencyKey == "" {

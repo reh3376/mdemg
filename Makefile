@@ -154,6 +154,7 @@ release-local:
 # Run all UATS API validation tests (excludes optional modules that require explicit enablement)
 test-api:
 	@echo "Running UATS API validation..."
+	@curl -s -X POST $(BASE_URL)/v1/self-improve/orchestration/reset -o /dev/null 2>/dev/null || true
 	@mkdir -p /tmp/uats-test-codebase
 	@echo 'package main' > /tmp/uats-test-codebase/main.go
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \

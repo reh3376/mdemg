@@ -526,8 +526,13 @@ Compute activation over fetched subgraph in-memory (see `04_Activation_and_Learn
 ## Final Ranking (Scoring Formula)
 
 ```
-score = α*vector_sim + β*activation + γ_eff*recency + δ*confidence - κ*redundancy - φ*hub_penalty
+score = α*vector_sim + β*activation + γ_eff*recency + δ*confidence + bypass_bonus - κ*redundancy - φ*hub_penalty
 ```
+
+**ANN Optimizations (active by default):**
+
+- **Squared Activation**: `β * max(0, activation - floor)²` replaces linear `β * activation`. Eliminates low-activation noise (floor=0.05). Config: `SCORING_ACTIVATION_SQUARED`, `SCORING_ACTIVATION_FLOOR`.
+- **Value Residual Bypass**: When `VectorSim > SCORING_BYPASS_THRESHOLD` (0.85), an additive bonus `SCORING_BYPASS_WEIGHT * excess * queryMult` bypasses the full pipeline. Query-type gated: code queries 1.3×, architecture 0.5×. Max bonus ~0.03.
 
 Where `γ_eff` depends on temporal mode:
 
@@ -604,4 +609,8 @@ For final top-K nodes:
 **Constraints:**
 
 - Learning updates bounded per request (`LEARNING_EDGE_CAP_PER_REQUEST=200`)
-- Hebbian formula: `Δw = η * a_i * a_j - μ * w_ij`
+- Hebbian formula: `Δw = η * etaMult * a_i * a_j - μ * w_ij`
+- Weight clamping: `wmax * tanh(w / wmax)` (smooth saturation, replaces hard clamp)
+- Multi-rate eta: `etaMult` varies by context (conversation 2×, config 1.5×, same-dir 1.2×)
+- Learning rate schedule: `η` scaled by space maturity (cold 2×, learning 1×, warm 0.5×, saturated 0.25×)
+- Negative feedback: `POST /v1/learning/negative-feedback` weakens or contradicts edges

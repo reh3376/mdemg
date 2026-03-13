@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "f3a50a174747ad44c58429cddd574ae4f699a03e6cae4a9025966ea019f1e35a"
+    "sha256": "d9813cd761f7e85b6d83440c909e4f54dbf69765012b6231d7ffcb9e61644a59"
   },
   "variables": {},
   "request": {
@@ -44,7 +44,8 @@
         "method": "POST",
         "path": "/v1/linear/issues",
         "body": {
-          "title": "test issue"
+          "title": "test issue",
+          "team_id": "test-team"
         },
         "headers": {
           "Content-Type": "application/json"

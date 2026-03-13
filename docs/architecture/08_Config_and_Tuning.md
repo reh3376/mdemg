@@ -165,7 +165,9 @@ Temporal queries (`soft` or `hard` mode) bypass the query cache since results ar
 LEARNING_EDGE_CAP_PER_REQUEST=200    # Max CO_ACTIVATED_WITH edges per request
 ```
 
-Learning formula: `Δw = η * a_i * a_j - μ * w_ij`
+Learning formula: `Δw = η * etaMult * a_i * a_j - μ * w_ij`
+
+Weight clamping: `wmax * tanh(w / wmax)` (smooth saturation via tanh soft-cap)
 
 Defaults (in `learning/service.go`):
 
@@ -173,6 +175,63 @@ Defaults (in `learning/service.go`):
 - `μ` (regularization): 0.01
 - `w_min`: 0.0
 - `w_max`: 1.0
+
+### ANN Learning Optimizations
+
+```bash
+# Cautious Decay — skip decay for recently reinforced edges
+LEARNING_CAUTIOUS_DECAY_WINDOW_HOURS=24   # 0=disabled
+
+# Multi-Rate Learning — context-specific eta multipliers
+LEARNING_ETA_CONVERSATION_MULT=2.0        # Conversation observations learn faster
+LEARNING_ETA_CONFIG_MULT=1.5              # Config↔code edges get stronger signal
+LEARNING_ETA_SAME_DIR_MULT=1.2            # Same-directory nodes get proximity boost
+
+# Learning Rate Schedule — maturity-based eta scaling
+LEARNING_SCHEDULE_ENABLED=true
+LEARNING_SCHEDULE_COLD_MULT=2.0           # 0 edges: accelerated learning
+LEARNING_SCHEDULE_LEARNING_MULT=1.0       # 1-10k edges: normal
+LEARNING_SCHEDULE_WARM_MULT=0.5           # 10k-50k edges: stabilizing
+LEARNING_SCHEDULE_SAT_MULT=0.25           # 50k+ edges: minimal updates
+
+# Negative Feedback
+LEARNING_NEGATIVE_WEIGHT=0.15             # Weight reduction per negative feedback
+LEARNING_NEGATIVE_DECAY_MULT=2.0          # Decay multiplier for contradicted edges
+LEARNING_NEGATIVE_MAX_PER_REQUEST=20      # Max rejected nodes per request
+```
+
+### ANN Retrieval Optimizations
+
+```bash
+# Squared Activation — sharper, sparser signals
+SCORING_ACTIVATION_FLOOR=0.05
+SCORING_ACTIVATION_SQUARED=true
+
+# Local-First Activation Spreading — per-hop weight thresholds
+ACTIVATION_HOP0_MIN_WEIGHT=0.5
+ACTIVATION_HOP1_MIN_WEIGHT=0.2
+ACTIVATION_HOP2_MIN_WEIGHT=0.05
+
+# Value Residual Bypass — bonus for high-confidence vector matches
+SCORING_BYPASS_THRESHOLD=0.85
+SCORING_BYPASS_WEIGHT=0.15
+SCORING_BYPASS_CODE_MULT=1.3
+SCORING_BYPASS_ARCH_MULT=0.5
+```
+
+### ANN Consolidation Optimizations
+
+```bash
+# L0 Skip Connections (GROUNDED_BY edges from L5 to L0)
+L5_GROUNDING_MAX_EDGES=5
+L5_GROUNDING_MIN_SIM=0.4
+L5_GROUNDING_INITIAL_WEIGHT=0.5
+EDGE_ATTENTION_GROUNDED_BY=0.70
+
+# Frontier Detection
+FRONTIER_MIN_EVIDENCE=3
+FRONTIER_MAX_OUTGOING=2
+```
 
 ---
 
