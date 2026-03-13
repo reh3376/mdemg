@@ -612,6 +612,28 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 | GET | `/v1/system/pool-metrics` | Neo4j connection pool metrics |
 | GET | `/v1/jobs/{id}/stream` | SSE streaming for job progress |
 
+### Jiminy Guidance
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/jiminy/guide` | Get proactive guidance for current context |
+
+**Request body:**
+
+```json
+{
+  "space_id": "my-project",
+  "context": "Refactoring authentication middleware",
+  "file_path": "internal/auth/middleware.go",
+  "session_id": "session-1",
+  "max_items": 10
+}
+```
+
+Required fields: `space_id`, `context`. Optional: `file_path`, `agent_output`, `query`, `session_id`, `max_items`.
+
+**Response:** Returns `guidance[]` items (type, priority, content, confidence, source_nodes), `prompt_augmentation` (injectable text block), `confidence`, `rationale`, and `source_counts`. Returns 503 when `JIMINY_ENABLED=false`.
+
 ## Reporting Issues
 
 Use the [bug report](https://github.com/reh3376/mdemg/issues/new?template=bug_report.yml) or [feature request](https://github.com/reh3376/mdemg/issues/new?template=feature_request.yml) templates when opening issues.

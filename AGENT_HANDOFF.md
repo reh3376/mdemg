@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-12
+**Date:** 2026-03-13
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -39,7 +39,16 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-12):
+LAST SESSION (2026-03-13):
+- Jiminy documentation update: Added Jiminy inner voice references to all 7 core docs
+  - Created docs/features/jiminy-inner-voice.md (full feature doc — architecture, config, API, MCP, hooks)
+  - Updated README.md (Key Features), VISION.md (Integration Mode #5), CLAUDE.md (3 edits)
+  - Updated CONTRIBUTING.md (endpoint table), 01_Architecture.md (Integration Mode #6)
+  - Updated 08_Config_and_Tuning.md (6 JIMINY_* config params + .env example)
+  - CI: ALL GREEN (Test, Lint, Security Scan, Build all passed)
+  - Commit: 7714856 on mdemg-dev01, pushed, auto-PR #131 updated
+
+PREVIOUS SESSION (2026-03-12):
 - ANN Optimization Suite: 10 neural learning improvements across 4 subsystems
   - Learning: tanh soft-cap, cautious decay, multi-rate eta, LR schedule
   - Retrieval: squared activation, local-first spreading, value residual bypass
@@ -140,6 +149,7 @@ It does **NOT** store general knowledge that LLMs already possess.
 | Homebrew API Reference | `reh3376/homebrew-mdemg:docs/api-reference.md` | All REST endpoints with curl examples (2,931 lines) |
 | CMS & RSIC Guide | `reh3376/homebrew-mdemg:docs/cms-rsic-guide.md` | CMS + RSIC workflows and practical examples (1,344 lines) |
 | Ingestion Guide | `reh3376/homebrew-mdemg:docs/ingestion-guide.md` | All 8 ingestion methods with setup (1,040 lines) |
+| Jiminy Inner Voice | `docs/features/jiminy-inner-voice.md` | Proactive guidance service — architecture, config, API, hooks |
 
 ### Technical Invariants (Do NOT Violate)
 

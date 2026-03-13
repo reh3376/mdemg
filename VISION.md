@@ -210,6 +210,10 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 - **Concept synthesis**: "This relates to the higher-level principle of..."
 - **Risk awareness**: "Previous attempts at this approach encountered..."
 
+### 5. Jiminy Inner-Voice Service
+
+Proactive guidance injected into every user prompt via Claude Code hooks. Orchestrates 4 knowledge sources in parallel (consulting constraints, correction vector search, contradiction edges, frontier detection) with a 6s timeout. The operational manifestation of the Agent Consulting Service (#4) — runs automatically rather than on-demand, acting as the agent's "conscience" that surfaces relevant constraints, past corrections, and contradictions before the agent acts.
+
 ---
 
 ## What MDEMG Stores
