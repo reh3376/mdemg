@@ -2,25 +2,38 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	hook_templates "mdemg/internal/cli/hook_templates"
 
 	"github.com/spf13/cobra"
 )
 
 const mdemgHookMarker = "# MDEMG"
 
+// claudeHookFiles maps template filenames to their Claude Code event names and timeouts.
+var claudeHookFiles = []struct {
+	Template string // filename in hook_templates FS
+	Event    string // Claude Code hook event
+	Timeout  int    // timeout in seconds
+}{
+	{"prompt-context.sh", "UserPromptSubmit", 12},
+	{"session-start.sh", "SessionStart", 15},
+}
+
 func newHooksCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hooks",
-		Short: "Manage MDEMG git hooks",
-		Long: `Manage MDEMG git hooks for automatic code ingestion.
+		Short: "Manage MDEMG hooks",
+		Long: `Manage MDEMG hooks for automatic code ingestion and Jiminy guidance.
 
 Subcommands:
-  install    Install git hooks (post-commit)
-  uninstall  Remove MDEMG-installed git hooks
+  install    Install hooks (git, claude, or all)
+  uninstall  Remove MDEMG-installed hooks
   list       Show current hook status`,
 	}
 
@@ -33,23 +46,28 @@ Subcommands:
 
 func newHooksInstallCmd() *cobra.Command {
 	var (
-		hookType string
-		force    bool
-		spaceID  string
+		hookType  string
+		force     bool
+		spaceID   string
+		serverURL string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Install MDEMG git hooks",
-		Long: `Install MDEMG git hooks for automatic code ingestion.
+		Short: "Install MDEMG hooks",
+		Long: `Install MDEMG hooks for automatic code ingestion and Jiminy guidance.
 
-The post-commit hook triggers incremental ingestion after each commit,
-running in the background to avoid blocking your workflow.
+Hook types:
+  git    — post-commit hook for incremental code ingestion
+  claude — Claude Code hooks for CMS recall, Jiminy inner voice, and session memory
+  all    — both git and claude hooks
 
 Examples:
-  mdemg hooks install                     # Install with default space ID
-  mdemg hooks install --space-id myproj   # Install with custom space ID
-  mdemg hooks install --force             # Overwrite existing hook`,
+  mdemg hooks install                          # Install git hooks (default)
+  mdemg hooks install --type claude            # Install Claude Code hooks
+  mdemg hooks install --type all               # Install all hooks
+  mdemg hooks install --type claude --force    # Overwrite existing Claude hooks
+  mdemg hooks install --space-id myproj        # Custom space ID`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -62,23 +80,47 @@ Examples:
 			if spaceID == "" {
 				spaceID = filepath.Base(cwd)
 			}
+			if serverURL == "" {
+				serverURL = "http://localhost:9999"
+			}
 
 			switch hookType {
-			case "git", "all":
+			case "git":
 				if err := InstallGitHook(cwd, spaceID, force); err != nil {
 					return err
 				}
 				fmt.Println("Installed .git/hooks/post-commit")
+			case "claude":
+				installed, err := InstallClaudeHooks(cwd, spaceID, serverURL, force)
+				if err != nil {
+					return err
+				}
+				for _, path := range installed {
+					fmt.Printf("Installed %s\n", path)
+				}
+			case "all":
+				if err := InstallGitHook(cwd, spaceID, force); err != nil {
+					return err
+				}
+				fmt.Println("Installed .git/hooks/post-commit")
+				installed, err := InstallClaudeHooks(cwd, spaceID, serverURL, force)
+				if err != nil {
+					return err
+				}
+				for _, path := range installed {
+					fmt.Printf("Installed %s\n", path)
+				}
 			default:
-				return fmt.Errorf("unknown hook type: %s (supported: git, all)", hookType)
+				return fmt.Errorf("unknown hook type: %s (supported: git, claude, all)", hookType)
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&hookType, "type", "git", "Hook type to install (git|all)")
+	cmd.Flags().StringVar(&hookType, "type", "git", "Hook type to install (git|claude|all)")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing hooks")
 	cmd.Flags().StringVar(&spaceID, "space-id", "", "Space ID for ingestion (default: directory name)")
+	cmd.Flags().StringVar(&serverURL, "server-url", "", "MDEMG server URL (default: http://localhost:9999)")
 
 	return cmd
 }
@@ -88,15 +130,16 @@ func newHooksUninstallCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove MDEMG git hooks",
-		Long: `Remove MDEMG-installed git hooks.
+		Short: "Remove MDEMG hooks",
+		Long: `Remove MDEMG-installed hooks.
 
 Only removes hooks that were installed by MDEMG (identified by the
 "# MDEMG" marker comment). Non-MDEMG hooks are left untouched.
 
 Examples:
-  mdemg hooks uninstall          # Remove MDEMG git hooks
-  mdemg hooks uninstall --type all`,
+  mdemg hooks uninstall                # Remove MDEMG git hooks
+  mdemg hooks uninstall --type claude  # Remove Claude Code hooks
+  mdemg hooks uninstall --type all     # Remove all MDEMG hooks`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -104,7 +147,7 @@ Examples:
 			}
 
 			switch hookType {
-			case "git", "all":
+			case "git":
 				removed, err := UninstallGitHook(cwd)
 				if err != nil {
 					return err
@@ -112,16 +155,39 @@ Examples:
 				if removed {
 					fmt.Println("Removed .git/hooks/post-commit")
 				} else {
-					fmt.Println("No MDEMG hooks found to remove")
+					fmt.Println("No MDEMG git hooks found to remove")
+				}
+			case "claude":
+				removed, err := UninstallClaudeHooks(cwd)
+				if err != nil {
+					return err
+				}
+				if removed > 0 {
+					fmt.Printf("Removed %d Claude Code hook(s)\n", removed)
+				} else {
+					fmt.Println("No MDEMG Claude Code hooks found to remove")
+				}
+			case "all":
+				gitRemoved, err := UninstallGitHook(cwd)
+				if err != nil {
+					fmt.Printf("  git: %v\n", err)
+				} else if gitRemoved {
+					fmt.Println("Removed .git/hooks/post-commit")
+				}
+				claudeRemoved, err := UninstallClaudeHooks(cwd)
+				if err != nil {
+					fmt.Printf("  claude: %v\n", err)
+				} else if claudeRemoved > 0 {
+					fmt.Printf("Removed %d Claude Code hook(s)\n", claudeRemoved)
 				}
 			default:
-				return fmt.Errorf("unknown hook type: %s (supported: git, all)", hookType)
+				return fmt.Errorf("unknown hook type: %s (supported: git, claude, all)", hookType)
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&hookType, "type", "git", "Hook type to uninstall (git|all)")
+	cmd.Flags().StringVar(&hookType, "type", "git", "Hook type to uninstall (git|claude|all)")
 
 	return cmd
 }
@@ -130,10 +196,9 @@ func newHooksListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Show MDEMG hook status",
-		Long: `Show the current status of MDEMG hooks in this repository.
+		Long: `Show the current status of MDEMG hooks in this project.
 
-Reports whether git hooks are installed, and whether the standalone
-hook script is present.`,
+Reports whether git hooks and Claude Code hooks are installed.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -143,27 +208,39 @@ hook script is present.`,
 			fmt.Println("MDEMG Hook Status")
 			fmt.Println("=================")
 
-			// Check git repo
+			// Git hooks
 			gitDir := filepath.Join(cwd, ".git")
 			if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-				fmt.Println("  Not a git repository")
-				return nil
-			}
-
-			// Check post-commit hook
-			hookPath := filepath.Join(cwd, ".git", "hooks", "post-commit")
-			if _, err := os.Stat(hookPath); os.IsNotExist(err) {
-				fmt.Println("  post-commit hook:  not installed")
-			} else if isMdemgHook(hookPath) {
-				fmt.Println("  post-commit hook:  installed (mdemg)")
+				fmt.Println("  git repo:          not detected")
 			} else {
-				fmt.Println("  post-commit hook:  installed (non-mdemg)")
+				hookPath := filepath.Join(cwd, ".git", "hooks", "post-commit")
+				if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+					fmt.Println("  post-commit hook:  not installed")
+				} else if isMdemgHook(hookPath) {
+					fmt.Println("  post-commit hook:  installed (mdemg)")
+				} else {
+					fmt.Println("  post-commit hook:  installed (non-mdemg)")
+				}
 			}
 
-			// Check for standalone hook script
-			scriptPath := filepath.Join(cwd, "scripts", "mdemg-git-hook")
-			if _, err := os.Stat(scriptPath); err == nil {
-				fmt.Println("  hook script:       present (scripts/mdemg-git-hook)")
+			// Claude Code hooks
+			for _, hf := range claudeHookFiles {
+				hookPath := filepath.Join(cwd, ".claude", "hooks", hf.Template)
+				if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+					fmt.Printf("  %-20s not installed\n", hf.Template+":")
+				} else if isMdemgHook(hookPath) {
+					fmt.Printf("  %-20s installed (mdemg)\n", hf.Template+":")
+				} else {
+					fmt.Printf("  %-20s installed (non-mdemg)\n", hf.Template+":")
+				}
+			}
+
+			// Settings registration
+			settingsPath := filepath.Join(cwd, ".claude", "settings.local.json")
+			if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+				fmt.Println("  settings.local:    not found")
+			} else {
+				fmt.Println("  settings.local:    present")
 			}
 
 			return nil
@@ -225,6 +302,78 @@ nohup "$MDEMG_BIN" ingest \
 	return os.WriteFile(hookPath, []byte(hook), 0755)
 }
 
+// InstallClaudeHooks installs Claude Code hooks (prompt-context, session-start)
+// from embedded templates and registers them in .claude/settings.local.json.
+// Returns the list of installed file paths.
+func InstallClaudeHooks(dir, spaceID, serverURL string, force bool) ([]string, error) {
+	hookDir := filepath.Join(dir, ".claude", "hooks")
+	if err := os.MkdirAll(hookDir, 0755); err != nil {
+		return nil, fmt.Errorf("create hook directory: %w", err)
+	}
+
+	var installed []string
+
+	for _, hf := range claudeHookFiles {
+		destPath := filepath.Join(hookDir, hf.Template)
+
+		// Check for existing hook
+		if _, err := os.Stat(destPath); err == nil {
+			if !force {
+				if isMdemgHook(destPath) {
+					continue // Already installed by MDEMG, skip silently
+				}
+				return installed, fmt.Errorf("%s already exists (non-mdemg, use --force to overwrite)", destPath)
+			}
+		}
+
+		// Read template from embedded FS
+		tmpl, err := hook_templates.FS.ReadFile(hf.Template)
+		if err != nil {
+			return installed, fmt.Errorf("read template %s: %w", hf.Template, err)
+		}
+
+		// Substitute placeholders
+		content := string(tmpl)
+		content = strings.ReplaceAll(content, "{{SPACE_ID}}", spaceID)
+		content = strings.ReplaceAll(content, "{{MDEMG_URL}}", serverURL)
+
+		// Write hook script
+		if err := os.WriteFile(destPath, []byte(content), 0755); err != nil {
+			return installed, fmt.Errorf("write %s: %w", destPath, err)
+		}
+		installed = append(installed, filepath.Join(".claude", "hooks", hf.Template))
+	}
+
+	// Register hooks in settings.local.json
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	if err := mergeClaudeSettings(settingsPath, hookDir); err != nil {
+		return installed, fmt.Errorf("register hooks in settings: %w", err)
+	}
+	installed = append(installed, ".claude/settings.local.json (hooks registered)")
+
+	return installed, nil
+}
+
+// UninstallClaudeHooks removes MDEMG-installed Claude Code hooks.
+// Returns the count of hooks removed.
+func UninstallClaudeHooks(dir string) (int, error) {
+	removed := 0
+	for _, hf := range claudeHookFiles {
+		hookPath := filepath.Join(dir, ".claude", "hooks", hf.Template)
+		if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+			continue
+		}
+		if !isMdemgHook(hookPath) {
+			continue // Not ours, don't touch
+		}
+		if err := os.Remove(hookPath); err != nil {
+			return removed, fmt.Errorf("remove %s: %w", hookPath, err)
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 // UninstallGitHook removes the post-commit hook if it was installed by MDEMG.
 // Returns true if a hook was removed, false if no MDEMG hook was found.
 func UninstallGitHook(repoDir string) (bool, error) {
@@ -262,4 +411,106 @@ func isMdemgHook(path string) bool {
 		lines++
 	}
 	return false
+}
+
+// mergeClaudeSettings reads or creates .claude/settings.local.json and ensures
+// MDEMG hooks are registered. Preserves existing settings (permissions, other hooks).
+func mergeClaudeSettings(settingsPath, hookDir string) error {
+	var root map[string]interface{}
+
+	// Read existing settings or start fresh
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("read settings: %w", err)
+		}
+		root = make(map[string]interface{})
+	} else {
+		if err := json.Unmarshal(data, &root); err != nil {
+			return fmt.Errorf("parse settings: %w", err)
+		}
+	}
+
+	// Get or create hooks map
+	hooks, ok := root["hooks"].(map[string]interface{})
+	if !ok {
+		hooks = make(map[string]interface{})
+		root["hooks"] = hooks
+	}
+
+	// Register each hook event
+	for _, hf := range claudeHookFiles {
+		hookCommand := filepath.Join(hookDir, hf.Template)
+
+		// Build the hook entry
+		hookEntry := map[string]interface{}{
+			"type":    "command",
+			"command": hookCommand,
+			"timeout": hf.Timeout,
+		}
+
+		// Check if this event already has hooks registered
+		existing, ok := hooks[hf.Event].([]interface{})
+		if !ok {
+			// No existing hooks for this event — create fresh
+			hooks[hf.Event] = []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{hookEntry},
+				},
+			}
+			continue
+		}
+
+		// Check if MDEMG hook is already registered (by command path)
+		alreadyRegistered := false
+		for _, group := range existing {
+			groupMap, ok := group.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			groupHooks, ok := groupMap["hooks"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, h := range groupHooks {
+				hMap, ok := h.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				cmd, _ := hMap["command"].(string)
+				if strings.Contains(cmd, "mdemg") || strings.Contains(cmd, "MDEMG") {
+					// Update existing entry in place
+					hMap["command"] = hookCommand
+					hMap["timeout"] = hf.Timeout
+					alreadyRegistered = true
+					break
+				}
+			}
+			if alreadyRegistered {
+				break
+			}
+		}
+
+		if !alreadyRegistered {
+			// Append new hook group
+			existing = append(existing, map[string]interface{}{
+				"hooks": []interface{}{hookEntry},
+			})
+			hooks[hf.Event] = existing
+		}
+	}
+
+	// Write back with 2-space indentation
+	out, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal settings: %w", err)
+	}
+	out = append(out, '\n')
+
+	// Ensure .claude directory exists
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		return fmt.Errorf("create settings directory: %w", err)
+	}
+
+	return os.WriteFile(settingsPath, out, 0644)
 }
