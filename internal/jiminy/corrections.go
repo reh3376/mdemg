@@ -22,6 +22,7 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 	MATCH (n:MemoryNode {space_id: $spaceId})
 	WHERE n.obs_type = 'correction' AND n.embedding IS NOT NULL
 	  AND NOT coalesce(n.is_archived, false)
+	  AND size(n.embedding) = size($embedding)
 	WITH n, vector.similarity.cosine(n.embedding, $embedding) AS sim
 	WHERE sim > 0.4
 	RETURN n.node_id AS node_id, n.content AS content, n.summary AS summary, sim

@@ -29,6 +29,7 @@ func (s *Service) findRelevantFrontiers(ctx context.Context, spaceID string, emb
 	MATCH (n:MemoryNode {space_id: $spaceId})
 	WHERE n.is_frontier = true AND n.embedding IS NOT NULL
 	  AND NOT coalesce(n.is_archived, false)
+	  AND size(n.embedding) = size($embedding)
 	WITH n, vector.similarity.cosine(n.embedding, $embedding) AS sim
 	WHERE sim > $minSim
 	RETURN n.node_id AS node_id, n.name AS name, n.summary AS summary, sim
