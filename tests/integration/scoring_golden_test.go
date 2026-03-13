@@ -420,9 +420,10 @@ func TestScoringComponentBreakdown(t *testing.T) {
 		t.Errorf("score should be positive, got %.4f", result.Score)
 	}
 
-	// With v=0.95, a~0.95, r~1.0, c=0.8, deg=0:
-	// Expected: 0.55*0.95 + 0.30*0.95 + 0.10*1.0 + 0.05*0.8 - 0.08*0 = 0.5225 + 0.285 + 0.1 + 0.04 = 0.9475
-	expectedMinScore := 0.85
+	// With v=0.95, a~0.70, r~1.0, c=0.8, deg=0 and squared activation:
+	// activation_component = 0.30 * max(0, 0.70 - 0.05)^2 = 0.30 * 0.4225 = 0.127
+	// Expected: 0.55*0.95 + 0.127 + 0.10*1.0 + 0.05*0.8 - 0.08*0 ≈ 0.82
+	expectedMinScore := 0.75
 	if result.Score < expectedMinScore {
 		t.Errorf("score should be at least %.2f for high-similarity isolated node, got %.4f",
 			expectedMinScore, result.Score)
