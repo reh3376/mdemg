@@ -324,6 +324,23 @@ go run ./cmd/consolidate --space-id ide-agent --execute
 
 ---
 
+## Jiminy Inner Voice Configuration
+
+Jiminy is the proactive guidance service that surfaces constraints, corrections, contradictions, and frontiers on every prompt.
+
+| Parameter | Default | Env Var | Description |
+|-----------|---------|---------|-------------|
+| JiminyEnabled | `true` | `JIMINY_ENABLED` | Enable Jiminy guidance service |
+| JiminyTimeoutMs | `6000` | `JIMINY_TIMEOUT_MS` | Overall timeout for Guide() in milliseconds |
+| JiminyMaxItems | `10` | `JIMINY_MAX_ITEMS` | Max guidance items returned |
+| JiminyMinConfidence | `0.3` | `JIMINY_MIN_CONFIDENCE` | Min confidence to include an item |
+| JiminyIncludeFrontiers | `true` | `JIMINY_INCLUDE_FRONTIERS` | Include frontier suggestions |
+| JiminyFrontierMinSim | `0.5` | `JIMINY_FRONTIER_MIN_SIM` | Min cosine similarity for frontiers |
+
+See `docs/features/jiminy-inner-voice.md` for the full feature guide.
+
+---
+
 ## Complete .env Example
 
 ```bash
@@ -383,4 +400,12 @@ ANOMALY_MAX_CHECK_MS=100
 TEMPORAL_ENABLED=true
 TEMPORAL_SOFT_BOOST=3.0
 TEMPORAL_HARD_FILTER=true
+
+# Jiminy Inner Voice
+JIMINY_ENABLED=true
+JIMINY_TIMEOUT_MS=6000
+JIMINY_MAX_ITEMS=10
+JIMINY_MIN_CONFIDENCE=0.3
+JIMINY_INCLUDE_FRONTIERS=true
+JIMINY_FRONTIER_MIN_SIM=0.5
 ```

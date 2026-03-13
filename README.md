@@ -225,6 +225,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
 - **Neo4j state monitoring**: Single endpoint for consolidated database health, per-space statistics (nodes, edges, layers, health score, staleness), and backup overview
 - **Meta-cognition enforcement**: Server-side anomaly detection (empty-resume, empty-recall), hook circuit breakers with CRITICAL warnings, multi-dimensional watchdog monitoring, Hebbian signal learning for adaptive enforcement
+- **Jiminy Inner Voice**: Proactive guidance service injected into every prompt — surfaces constraints, prior corrections, contradictions, and frontier exploration opportunities from the knowledge graph via 4-source parallel fan-out with 6s timeout
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
 ## Architecture

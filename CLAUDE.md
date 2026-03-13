@@ -203,6 +203,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - Constraint detection, skill registry, MCP server integration
 - SME Synthesis (Phase 101), Intent Translation (Phase 102), Dynamic Emergence (Phase 103)
 - Active MCP Guardrails (Phase 104), Global Meta-Learning (Phase 105)
+- Jiminy Inner-Voice Service (Phase Jiminy) — proactive guidance via hooks
 - Unified CLI (`mdemg` binary), project init wizard, database management, secret management
 - 129 UATS contract test specs, 148 Go test files, 0 lint issues
 
@@ -216,6 +217,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - `internal/summarize/` - LLM client infrastructure (OpenAI/Ollama)
 - `internal/api/` - HTTP API handlers
 - `internal/ape/` - RSIC self-improvement engine
+- `internal/jiminy/` - Jiminy inner voice guidance service
 - `internal/cli/` - Unified CLI commands (mdemg binary)
 - `docs/specs/` - Phase specifications
 - `docs/development/` - Gap analyses and architecture docs
@@ -305,6 +307,10 @@ The `post-tool-observe.py` hook automatically captures:
 - Bash errors → `error` observation
 - Successful builds/tests → `progress` observation
 You should still manually observe important decisions and user corrections.
+
+### Jiminy Guidance Injection
+
+The `prompt-context.sh` hook injects Jiminy guidance alongside CMS recall on every prompt. It calls `POST /v1/jiminy/guide` with the user's prompt as context, and appends the returned `═══ JIMINY GUIDANCE ═══` block to the system reminder. This surfaces constraints, prior corrections, contradictions, and frontiers proactively. The server controls enablement — if `JIMINY_ENABLED=false`, the server returns 503 and no guidance is injected.
 
 ### Pre-Compaction Safety
 

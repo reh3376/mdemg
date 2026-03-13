@@ -136,6 +136,19 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 - **Concept synthesis**: "This relates to the higher-level principle of..."
 - **Risk awareness**: "Previous attempts at this approach encountered..."
 
+### 6. Jiminy Inner-Voice Service
+
+Proactive guidance injected into every user prompt via Claude Code hooks (`prompt-context.sh`). Orchestrates 4 knowledge sources in parallel with a 6s timeout:
+
+| Source | What It Finds |
+|--------|---------------|
+| **Consulting Suggestions** | Constraints, conflicts, patterns from the graph |
+| **Correction Vector Search** | Past corrections semantically similar to current context |
+| **Contradiction Edges** | `CONTRADICTS` relationships between relevant nodes |
+| **Frontier Detection** | Thin knowledge areas where the agent should proceed carefully |
+
+Results are merged, deduplicated, filtered by confidence, and formatted as an injectable `═══ JIMINY GUIDANCE ═══` block. This is the operational manifestation of the Agent Consulting Service (#5) — it runs automatically on every prompt rather than on-demand. See `internal/jiminy/` for implementation and `docs/features/jiminy-inner-voice.md` for the full feature guide.
+
 ## Modular Intelligence Architecture
 
 MDEMG uses a **plugin-based architecture** for extensibility. Modules communicate via gRPC over Unix sockets for low latency.
@@ -186,7 +199,8 @@ MDEMG uses a **plugin-based architecture** for extensibility. Modules communicat
 5. Initial scoring         → ScoreAndRank
 6. REASONING MODULES       → plugin-based re-ranking
 7. Built-in LLM rerank     → optional LLM scoring
-8. Jiminy explanations     → explainable retrieval
+8. Jiminy explanations     → explainable retrieval (see internal/retrieval/jiminy.go)
+                             + Jiminy Guide service  → proactive guidance injection (see internal/jiminy/)
 ```
 
 ### APE Event Triggers
