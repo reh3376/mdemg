@@ -21,6 +21,27 @@ mdemg hooks install --force
 
 The post-commit hook runs `mdemg ingest` incrementally in the background after each commit. It is non-blocking and silently skips if the `mdemg` binary is not found.
 
+### Install Claude Code Hooks (J6b-J6e)
+
+```bash
+# Install Claude Code prompt-context and session-start hooks
+mdemg hooks install --type claude
+
+# Install with custom space ID
+mdemg hooks install --type claude --space-id my-project
+
+# Uninstall Claude Code hooks
+mdemg hooks uninstall --type claude
+```
+
+This installs embedded hook templates (`prompt-context.sh`/`.ps1`, `session-start.sh`/`.ps1`) into `.claude/hooks/` with `{{SPACE_ID}}` and `{{MDEMG_URL}}` placeholders substituted at install time. The hooks are registered in `.claude/settings.local.json`.
+
+- **Platform detection (J6d)**: On Windows, `.ps1` PowerShell scripts are installed (using `Invoke-RestMethod`/`ConvertFrom-Json`). On Unix, `.sh` scripts are installed. PowerShell hooks are invoked via `powershell.exe -ExecutionPolicy Bypass`.
+- **Settings merge (J6e)**: `mergeClaudeSettings()` preserves existing user settings. Existing MDEMG hooks are detected by command path and updated in-place rather than duplicated.
+- **Auto-install via init (J6c)**: `mdemg init` auto-installs Claude Code hooks when a `.claude/` directory is detected. In `--defaults`/`--quick` mode, installation is automatic.
+
+Templates are embedded in the binary via `//go:embed` (`internal/cli/hook_templates/embed.go`).
+
 To temporarily disable the hook without removing it:
 
 ```bash
@@ -68,7 +89,9 @@ States for post-commit hook:
 |-----|-----------|-------------|
 | Cursor | `.cursor/` directory | `.cursor/mcp.json` |
 | VS Code | `.vscode/` directory | `.vscode/mcp.json` |
-| Claude Code | `.claude/` directory | `.claude/mcp.json` |
+| Claude Code | `.claude/` directory | `.claude/mcp.json` + hooks (J6c) |
+
+When `.claude/` is detected, `mdemg init` also installs Claude Code hooks (`prompt-context` and `session-start`) via `mdemg hooks install --type claude`. In `--defaults`/`--quick` mode, hook installation is automatic.
 
 The generated config connects your IDE's AI agent to the MDEMG MCP server:
 

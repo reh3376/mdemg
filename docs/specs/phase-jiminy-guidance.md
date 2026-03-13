@@ -395,16 +395,34 @@ python3 runners/uats_runner.py validate --spec specs/jiminy_guide_validation.uat
 | `docs/api/api-spec/uats/specs/jiminy_guide.uats.json` | J3 | Contract test (4 variants) |
 | `docs/api/api-spec/uats/specs/jiminy_guide_validation.uats.json` | J3 | Validation test (5 variants) |
 
+| `internal/cli/hook_templates/embed.go` | J6b | `//go:embed` for hook templates |
+| `internal/cli/hook_templates/prompt-context.sh` | J6b | Parameterized bash hook template |
+| `internal/cli/hook_templates/session-start.sh` | J6b | Parameterized bash hook template |
+| `internal/cli/hook_templates/prompt-context.ps1` | J6d | Windows PowerShell hook template |
+| `internal/cli/hook_templates/session-start.ps1` | J6d | Windows PowerShell hook template |
+
 ### Modified Files
 | File | Phase | Change |
 |------|-------|--------|
 | `internal/retrieval/scoring.go` | J1 | Fixed `LearningEdgeBoost` dead code — now populated from activation data |
 | `internal/retrieval/scoring_test.go` | J1 | 3 new tests for LearningEdgeBoost |
-| `internal/config/config.go` | J2 | 6 new `JIMINY_*` config fields + parsing |
+| `internal/config/config.go` | J2,J6a | 6 new `JIMINY_*` config fields; default `JIMINY_ENABLED=true` |
 | `internal/api/server.go` | J3 | Jiminy service wiring + route registration |
 | `internal/cli/mcp.go` | J4 | `jiminy_guide` MCP tool registration |
-| `.claude/hooks/prompt-context.sh` | J3 | Hook integration (guarded by `JIMINY_ENABLED`) |
-| `.env.example` | J3 | 6 new env vars documented |
+| `.claude/hooks/prompt-context.sh` | J3,J6a | Hook integration; removed env var guard (server=single source of truth) |
+| `.env.example` | J3,J6a | 6 new env vars documented; `JIMINY_ENABLED=true` default |
+| `internal/cli/hooks.go` | J6b,J6d | Claude hook install/uninstall, platform detection, settings merge |
+| `internal/cli/init.go` | J6c | `mdemg init` wizard installs Claude hooks when `.claude/` detected |
+
+### J6 Subphases: Zero-Config Activation & Distribution
+
+| Phase | Description |
+|-------|-------------|
+| J6a | Default `JIMINY_ENABLED=true`, remove env var guard from hook |
+| J6b | Embed hook templates in binary via `//go:embed`, `mdemg hooks install --type claude` |
+| J6c | `mdemg init` wizard integration — auto-install Claude hooks when `.claude/` detected |
+| J6d | Windows PowerShell equivalents (`.ps1`) with native `Invoke-RestMethod`/`ConvertFrom-Json` |
+| J6e | Settings merge preserves existing user settings (implemented in `mergeClaudeSettings()`) |
 
 ---
 

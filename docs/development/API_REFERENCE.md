@@ -1256,6 +1256,25 @@ Generate proactive guidance for the current working context.
 
 **Error Codes**: `400` (missing space_id or context), `405` (not POST), `503` (Jiminy not enabled).
 
+### Hook Distribution (J6b-J6e)
+
+Jiminy hooks can be installed into Claude Code projects via the CLI:
+
+```bash
+# Install Claude Code hooks (prompt-context + session-start)
+mdemg hooks install --type claude
+
+# Install with custom space ID and endpoint
+mdemg hooks install --type claude --space-id my-project
+
+# Uninstall Claude Code hooks
+mdemg hooks uninstall --type claude
+```
+
+This embeds parameterized hook scripts (`.sh` on Unix, `.ps1` on Windows) into `.claude/hooks/` and registers them in `.claude/settings.local.json`. Templates use `{{SPACE_ID}}` and `{{MDEMG_URL}}` placeholders substituted at install time. Existing user settings are preserved via `mergeClaudeSettings()` (J6e).
+
+`mdemg init` auto-installs Claude Code hooks when a `.claude/` directory is detected (J6c). In `--defaults`/`--quick` mode, hooks are installed non-interactively.
+
 ---
 
 ## Skill Registry (Phase 48)
