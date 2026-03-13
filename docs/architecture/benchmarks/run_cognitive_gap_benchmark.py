@@ -24,10 +24,13 @@ Usage:
     # Full run:
     python run_cognitive_gap_benchmark.py --mode baseline --run 1
 
+    # Parallel run (12 workers — ~10 min instead of ~60 min):
+    python run_cognitive_gap_benchmark.py --mode mdemg --run 1 --parallel 12
+
     # Pilot (20 questions):
     python run_cognitive_gap_benchmark.py --mode baseline --questions-limit 20
 
-    # Resume from checkpoint:
+    # Resume from checkpoint (serial mode only):
     python run_cognitive_gap_benchmark.py --mode baseline --run 1 --start-from 45
 
     # Skip sandbox verification:
@@ -50,28 +53,33 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from datetime import datetime
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 
-# ─── Configuration ───────────────────────────────────────────────────────────
+# ─── Configuration Defaults ──────────────────────────────────────────────────
+# All values are overridable via CLI flags or environment variables.
+# Priority: CLI flag → env var → default below.
 
 SCRIPT_DIR = Path(__file__).parent
-QUESTIONS_FILE = SCRIPT_DIR / "whk-wms" / "test_questions_120_agent.json"
-MASTER_FILE = SCRIPT_DIR / "whk-wms" / "test_questions_120.json"
-OUTPUT_BASE = SCRIPT_DIR / "whk-wms" / "cognitive_gap_validation_20260226"
-CODEBASE_PATH = "/Users/reh3376/whk-wms"
-MDEMG_ENDPOINT = "http://localhost:9999"
-MDEMG_SPACE_ID = "whk-wms"
-AGENT_TIMEOUT = 120  # seconds per question (reduced from 180)
-CHECKPOINT_INTERVAL = 5  # save progress every N questions
 
-# Sandbox paths
+# Default paths (overridable via --questions, --master, --output-base, --codebase)
+DEFAULT_QUESTIONS_FILE = str(SCRIPT_DIR / "whk-wms" / "test_questions_120_agent.json")
+DEFAULT_MASTER_FILE = str(SCRIPT_DIR / "whk-wms" / "test_questions_120.json")
+DEFAULT_OUTPUT_BASE = str(SCRIPT_DIR / "whk-wms" / "cognitive_gap_validation_20260226")
+DEFAULT_CODEBASE_PATH = os.environ.get("BENCHMARK_CODEBASE_PATH", "")
+DEFAULT_MDEMG_ENDPOINT = os.environ.get("MDEMG_ENDPOINT", "http://localhost:9999")
+DEFAULT_MDEMG_SPACE_ID = os.environ.get("BENCHMARK_SPACE_ID", "")
+DEFAULT_AGENT_TIMEOUT = int(os.environ.get("BENCHMARK_AGENT_TIMEOUT", "120"))
+DEFAULT_CHECKPOINT_INTERVAL = int(os.environ.get("BENCHMARK_CHECKPOINT_INTERVAL", "5"))
+DEFAULT_MODEL = os.environ.get("BENCHMARK_MODEL", "haiku")
+DEFAULT_MAX_RETRIES = int(os.environ.get("BENCHMARK_MAX_RETRIES", "3"))
+
+# Retry backoff seconds (not typically changed via CLI)
+RETRY_BACKOFF = [30, 60, 120]
+
+# Sandbox paths (derived from codebase, set at runtime)
 STASH_DIR = SCRIPT_DIR / ".stash"
-SESSION_PROJECT_DIR = Path.home() / ".claude" / "projects" / "-Users-reh3376-whk-wms"
-
-# Retry config for rate limiting / overload
-MAX_RETRIES = 3
-RETRY_BACKOFF = [30, 60, 120]  # seconds
 
 
 # ─── File:line citation regex (matches grader_v4.py FILE_LINE_PATTERN) ───────
@@ -112,56 +120,63 @@ CRITICAL WORKFLOW — follow this exact process for EACH question:
 
 # ─── Sandbox Functions ───────────────────────────────────────────────────────
 
-def stash_master_file() -> Optional[Path]:
+def stash_master_file(master_file: Path) -> Optional[Path]:
     """Move master answer file out of reach during benchmark runs."""
     STASH_DIR.mkdir(exist_ok=True)
-    stash_path = STASH_DIR / MASTER_FILE.name
-    if MASTER_FILE.exists():
-        shutil.move(str(MASTER_FILE), str(stash_path))
+    stash_path = STASH_DIR / master_file.name
+    if master_file.exists():
+        shutil.move(str(master_file), str(stash_path))
         print(f"  Stashed master file to {stash_path}")
         return stash_path
     return None
 
 
-def unstash_master_file():
+def unstash_master_file(master_file: Path):
     """Restore master answer file after benchmark run."""
-    stash_path = STASH_DIR / MASTER_FILE.name
+    stash_path = STASH_DIR / master_file.name
     if stash_path.exists():
-        shutil.move(str(stash_path), str(MASTER_FILE))
+        shutil.move(str(stash_path), str(master_file))
         print(f"  Restored master file from stash")
 
 
-def cleanup_session_dirs() -> int:
-    """Remove ALL Claude session directories for whk-wms project.
+def cleanup_session_dirs(codebase_path: str) -> int:
+    """Remove ALL Claude session directories for the target project.
 
     MANDATORY: Must be called after every benchmark run to prevent
     cross-run context leakage. Session files accumulate and can leak
     context between benchmark runs via session continuation (-c flag).
     """
-    if not SESSION_PROJECT_DIR.exists():
+    # Derive session project dir from codebase path
+    # Claude stores sessions under ~/.claude/projects/-<path-with-dashes>/
+    safe_name = codebase_path.replace("/", "-")
+    if safe_name.startswith("-"):
+        safe_name = safe_name  # keep leading dash
+    session_project_dir = Path.home() / ".claude" / "projects" / safe_name
+
+    if not session_project_dir.exists():
         return 0
 
     count = 0
-    for entry in SESSION_PROJECT_DIR.iterdir():
+    for entry in session_project_dir.iterdir():
         if entry.is_dir() and entry.name != "memory":  # Preserve memory dir
             shutil.rmtree(entry)
             count += 1
 
     # Also clean session index files
-    for f in SESSION_PROJECT_DIR.glob("*.json"):
+    for f in session_project_dir.glob("*.json"):
         if "session" in f.name.lower():
             f.unlink()
             count += 1
 
-    print(f"  Cleaned {count} session entries from {SESSION_PROJECT_DIR}")
+    print(f"  Cleaned {count} session entries from {session_project_dir}")
     return count
 
 
-def verify_sandbox() -> bool:
+def verify_sandbox(codebase_path: str) -> bool:
     """Verify that CLI sandboxing flags actually work.
 
     Spawns a test agent and checks that:
-    1. It does NOT see whk-wms CLAUDE.md content auto-loaded
+    1. It does NOT see project CLAUDE.md content auto-loaded
     2. CLI sandbox flags are accepted without errors
     """
     print("\n  Verifying sandbox...")
@@ -179,7 +194,7 @@ def verify_sandbox() -> bool:
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=30,
-            cwd=CODEBASE_PATH, env=env,
+            cwd=codebase_path, env=env,
         )
         output = result.stdout.strip()
 
@@ -208,15 +223,19 @@ def verify_sandbox() -> bool:
 
 # ─── MDEMG API Call ──────────────────────────────────────────────────────────
 
-def call_mdemg(query: str, top_k: int = 5) -> str:
+def call_mdemg(query: str, mdemg_endpoint: str, mdemg_space_id: str, top_k: int = 5) -> str:
     """Call MDEMG retrieval API and format results as context for the agent prompt.
+
+    All API calls follow UATS contract for POST /v1/memory/retrieve:
+      - Body: {"space_id": ..., "query_text": ..., "top_k": N}
+      - Response: {"results": [...], "space_id": ..., "has_more": bool}
 
     Returns a formatted string listing relevant files with summaries.
     If the API call fails, returns a fallback message.
     """
-    url = f"{MDEMG_ENDPOINT}/v1/memory/retrieve"
+    url = f"{mdemg_endpoint}/v1/memory/retrieve"
     data = {
-        "space_id": MDEMG_SPACE_ID,
+        "space_id": mdemg_space_id,
         "query_text": query,
         "top_k": top_k,
         "include_global_space": True,
@@ -425,7 +444,10 @@ def send_to_agent(
     prompt: str,
     is_first: bool,
     system_prompt: str,
-    timeout: int = AGENT_TIMEOUT,
+    codebase_path: str,
+    model: str = "haiku",
+    timeout: int = 120,
+    max_retries: int = 3,
 ) -> Tuple[str, float, bool, Dict]:
     """Send a prompt to the sandboxed persistent agent session.
 
@@ -445,7 +467,10 @@ def send_to_agent(
         prompt: The question prompt (bare — no system instructions)
         is_first: True for the first message (creates session), False to continue
         system_prompt: System prompt injected via --append-system-prompt
+        codebase_path: Working directory for the agent subprocess
+        model: Claude model to use (default: haiku)
         timeout: Max seconds to wait
+        max_retries: Max retries on rate limiting
 
     Returns:
         (output_text, duration_seconds, success, usage_dict)
@@ -456,7 +481,7 @@ def send_to_agent(
 
     cmd = [
         "claude",
-        "--model", "haiku",
+        "--model", model,
         "--verbose",
         "--output-format", "stream-json",
         "--allowedTools", allowed_tools,
@@ -488,7 +513,7 @@ def send_to_agent(
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=CODEBASE_PATH,
+            cwd=codebase_path,
             env=env,
         )
         duration = time.time() - start
@@ -507,7 +532,7 @@ def send_to_agent(
             or result.returncode == 529
         ):
             for retry_i, wait in enumerate(RETRY_BACKOFF):
-                print(f"  Rate limited, waiting {wait}s (retry {retry_i+1}/{MAX_RETRIES})...")
+                print(f"  Rate limited, waiting {wait}s (retry {retry_i+1}/{max_retries})...")
                 time.sleep(wait)
                 start = time.time()
                 result = subprocess.run(
@@ -515,7 +540,7 @@ def send_to_agent(
                     capture_output=True,
                     text=True,
                     timeout=timeout,
-                    cwd=CODEBASE_PATH,
+                    cwd=codebase_path,
                     env=env,
                 )
                 duration = time.time() - start
@@ -540,7 +565,12 @@ def process_question(
     question: Dict,
     mode: str,
     is_first: bool,
-    timeout: int = AGENT_TIMEOUT,
+    codebase_path: str,
+    mdemg_endpoint: str = "http://localhost:9999",
+    mdemg_space_id: str = "",
+    model: str = "haiku",
+    timeout: int = 120,
+    max_retries: int = 3,
 ) -> Dict:
     """Process a single question through the sandboxed persistent agent session.
 
@@ -552,7 +582,12 @@ def process_question(
         question: Question dict with 'id' and 'question' fields
         mode: 'baseline' or 'mdemg'
         is_first: True if this is the first question (sends system prompt)
+        codebase_path: Working directory for the agent subprocess
+        mdemg_endpoint: MDEMG API URL (UATS: POST /v1/memory/retrieve)
+        mdemg_space_id: MDEMG space ID for retrieval
+        model: Claude model to use
         timeout: Max seconds per question
+        max_retries: Max retries on rate limiting
 
     Returns an answer dict matching the grader's expected input schema,
     augmented with token usage and compact event telemetry.
@@ -565,7 +600,7 @@ def process_question(
 
     # Build bare question prompt — NO system instructions in -p
     if mode == "mdemg":
-        mdemg_context = call_mdemg(q_text)
+        mdemg_context = call_mdemg(q_text, mdemg_endpoint, mdemg_space_id)
         prompt = (
             f"{mdemg_context}\n\n"
             f"QUESTION: {q_text}\n\n"
@@ -582,7 +617,10 @@ def process_question(
         prompt=prompt,
         is_first=is_first,
         system_prompt=system_prompt,
+        codebase_path=codebase_path,
+        model=model,
         timeout=timeout,
+        max_retries=max_retries,
     )
 
     # Extract citations from output
@@ -605,7 +643,7 @@ def process_question(
         "mdemg_used": mode == "mdemg",
         "confidence": confidence,
         "agent_type": mode,
-        "model": "haiku",
+        "model": model,
         "duration_seconds": round(duration, 1),
         "success": success,
         "response_chars": len(output),
@@ -630,8 +668,14 @@ def run_benchmark(
     output_dir: Path,
     run_num: int = 1,
     start_from: int = 0,
-    timeout: int = AGENT_TIMEOUT,
+    timeout: int = 120,
     session_id: str = "",
+    codebase_path: str = "",
+    mdemg_endpoint: str = "http://localhost:9999",
+    mdemg_space_id: str = "",
+    model: str = "haiku",
+    checkpoint_interval: int = 5,
+    max_retries: int = 3,
 ) -> Dict:
     """Run a full benchmark: process all questions, write answers + progress.
 
@@ -643,6 +687,12 @@ def run_benchmark(
         start_from: Question index to resume from
         timeout: Max seconds per question
         session_id: UUID for this run's session
+        codebase_path: Path to target codebase
+        mdemg_endpoint: MDEMG API endpoint
+        mdemg_space_id: MDEMG space ID
+        model: Claude model to use
+        checkpoint_interval: Save progress every N questions
+        max_retries: Max retries on rate limiting
 
     Returns:
         Stats dict including token usage aggregates
@@ -658,7 +708,7 @@ def run_benchmark(
     stats = {
         "mode": mode,
         "run": run_num,
-        "model": "haiku",
+        "model": model,
         "session_id": session_id,
         "total": len(questions),
         "processed": 0,
@@ -703,7 +753,12 @@ def run_benchmark(
             answer = process_question(
                 question, mode,
                 is_first=is_first,
+                codebase_path=codebase_path,
+                mdemg_endpoint=mdemg_endpoint,
+                mdemg_space_id=mdemg_space_id,
+                model=model,
                 timeout=timeout,
+                max_retries=max_retries,
             )
 
             # Write answer
@@ -767,7 +822,7 @@ def run_benchmark(
         stats["processed"] = i + 1
 
         # Save checkpoint
-        if (i + 1) % CHECKPOINT_INTERVAL == 0:
+        if (i + 1) % checkpoint_interval == 0:
             _save_progress(stats, progress_file)
 
         # Progress report every 10 questions
@@ -847,6 +902,440 @@ def _print_summary(stats: Dict):
             print(f"    Q{err.get('id')}: {err.get('error', err.get('exception', '?'))[:80]}")
 
 
+# ─── Parallel Execution ──────────────────────────────────────────────────────
+
+def _process_question_standalone(
+    question: Dict,
+    mode: str,
+    mdemg_endpoint: str,
+    mdemg_space_id: str,
+    codebase_path: str,
+    timeout: int,
+    system_prompt: str,
+    model: str = "haiku",
+    max_retries: int = 3,
+) -> Dict:
+    """Process a single question in a standalone agent (no session continuation).
+
+    This is the parallel-safe variant of process_question(). Each invocation
+    spawns an independent Claude CLI subprocess — no -c flag, no shared session.
+
+    All MDEMG API calls follow UATS contract:
+      - POST /v1/memory/retrieve
+      - Body: {"space_id": ..., "query_text": ..., "top_k": N}
+      - Response: {"results": [...], "space_id": ..., "has_more": bool}
+    """
+    q_id = question["id"]
+    q_text = question["question"]
+
+    # ── MDEMG retrieval (UATS-compliant: query_text, not query) ──
+    mdemg_context = "(No MDEMG context)"
+    if mode == "mdemg":
+        url = f"{mdemg_endpoint}/v1/memory/retrieve"
+        data = {
+            "space_id": mdemg_space_id,
+            "query_text": q_text,
+            "top_k": 5,
+            "include_global_space": True,
+            "translate_intent": True,
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            nodes = result.get("results", [])
+            if nodes:
+                lines = [f"RELEVANT FILES ({len(nodes)} results — read these line ranges):"]
+                for i, node in enumerate(nodes, 1):
+                    path = node.get("path", "")
+                    name = node.get("name", Path(path).name if path else "unknown")
+                    score = node.get("score", 0)
+                    evidence_refs = []
+                    for ev in node.get("evidence", []):
+                        ep = ev.get("file_path", "")
+                        el = ev.get("line", 0)
+                        sym = ev.get("symbol_name", "")
+                        if ep and el:
+                            evidence_refs.append(f"{ep}:{el} ({sym})" if sym else f"{ep}:{el}")
+                        elif ep:
+                            evidence_refs.append(ep)
+                    lines.append(f"\n  {i}. {name} (score: {score:.2f})")
+                    if path:
+                        lines.append(f"     Path: {path}")
+                    for ref in evidence_refs[:5]:
+                        lines.append(f"     -> {ref}")
+                mdemg_context = "\n".join(lines)
+            else:
+                mdemg_context = "(No relevant files found in memory — search the codebase directly)"
+        except Exception as e:
+            mdemg_context = f"(MDEMG retrieval failed: {e} — search the codebase directly)"
+
+    # ── Build prompt ──
+    if mode == "mdemg":
+        prompt = (
+            f"{mdemg_context}\n\n"
+            f"QUESTION: {q_text}\n\n"
+            f"Grep the suggested files at the indicated lines, then answer with filename.ts:123 citations:"
+        )
+    else:
+        prompt = (
+            f"QUESTION: {q_text}\n\n"
+            f"Search the codebase and answer with file:line citations:"
+        )
+
+    # ── Spawn independent agent (no -c flag) ──
+    allowed_tools = "Read,Grep,Glob"
+    cmd = [
+        "claude",
+        "--model", model,
+        "--verbose",
+        "--output-format", "stream-json",
+        "--allowedTools", allowed_tools,
+        "--setting-sources", "user",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+        "--append-system-prompt", system_prompt,
+        "-p", prompt,
+    ]
+
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    empty_usage = {
+        "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
+        "cache_write_tokens": 0, "num_turns": 0, "cost_usd": 0.0,
+        "compact_events": 0, "per_turn_cache_reads": [],
+    }
+
+    start = time.time()
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=codebase_path,
+            env=env,
+        )
+        duration = time.time() - start
+        output, usage = parse_stream_json(result.stdout)
+        if not output and result.stderr:
+            output = result.stderr.strip()
+
+        # Retry on rate limiting
+        if result.returncode != 0 and (
+            "rate limit" in (output + result.stderr).lower()
+            or "overloaded" in (output + result.stderr).lower()
+            or result.returncode == 529
+        ):
+            for retry_i, wait in enumerate(RETRY_BACKOFF):
+                time.sleep(wait)
+                start = time.time()
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True,
+                    timeout=timeout, cwd=codebase_path, env=env,
+                )
+                duration = time.time() - start
+                output, usage = parse_stream_json(result.stdout)
+                if not output and result.stderr:
+                    output = result.stderr.strip()
+                if result.returncode == 0:
+                    break
+
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        duration = time.time() - start
+        output, usage, success = f"TIMEOUT after {timeout}s", empty_usage, False
+    except Exception as e:
+        duration = time.time() - start
+        output, usage, success = f"ERROR: {e}", empty_usage, False
+
+    # ── Extract citations ──
+    file_line_refs, files_consulted = extract_citations(output)
+    if file_line_refs:
+        confidence = 0.85
+    elif files_consulted:
+        confidence = 0.6
+    else:
+        confidence = 0.4
+
+    return {
+        "id": q_id,
+        "question": q_text,
+        "answer": output,
+        "files_consulted": files_consulted,
+        "file_line_refs": file_line_refs,
+        "mdemg_used": mode == "mdemg",
+        "confidence": confidence,
+        "agent_type": mode,
+        "model": model,
+        "duration_seconds": round(duration, 1),
+        "success": success,
+        "response_chars": len(output),
+        "input_tokens": usage.get("input_tokens", 0),
+        "output_tokens": usage.get("output_tokens", 0),
+        "cache_read_tokens": usage.get("cache_read_tokens", 0),
+        "cache_write_tokens": usage.get("cache_write_tokens", 0),
+        "cost_usd": usage.get("cost_usd", 0.0),
+        "num_turns": usage.get("num_turns", 0),
+        "compact_events": usage.get("compact_events", 0),
+        "compact_events_heuristic": usage.get("compact_events_heuristic", 0),
+        "per_turn_cache_reads": usage.get("per_turn_cache_reads", []),
+    }
+
+
+def _run_batch(
+    batch_id: int,
+    questions: List[Dict],
+    mode: str,
+    mdemg_endpoint: str,
+    mdemg_space_id: str,
+    codebase_path: str,
+    timeout: int,
+    output_file: str,
+    model: str = "haiku",
+    max_retries: int = 3,
+) -> Dict:
+    """Run a batch of questions sequentially within one worker process.
+
+    Each question spawns an independent agent (no session continuation).
+    Results are written to a batch-specific JSONL file for later merging.
+    """
+    system_prompt = MDEMG_SYSTEM if mode == "mdemg" else BASELINE_SYSTEM
+    results = []
+
+    for i, question in enumerate(questions):
+        q_id = question["id"]
+        q_short = question["question"][:50] + "..."
+        print(f"  [W{batch_id}] {i+1}/{len(questions)} Q{q_id}: {q_short}", flush=True)
+
+        answer = _process_question_standalone(
+            question=question,
+            mode=mode,
+            mdemg_endpoint=mdemg_endpoint,
+            mdemg_space_id=mdemg_space_id,
+            codebase_path=codebase_path,
+            timeout=timeout,
+            system_prompt=system_prompt,
+            model=model,
+            max_retries=max_retries,
+        )
+
+        # Write immediately to batch file (append)
+        with open(output_file, "a") as f:
+            f.write(json.dumps(answer) + "\n")
+
+        results.append({
+            "id": q_id,
+            "success": answer["success"],
+            "refs": len(answer["file_line_refs"]),
+            "duration": answer["duration_seconds"],
+            "input_tokens": answer["input_tokens"],
+            "output_tokens": answer["output_tokens"],
+            "cost_usd": answer["cost_usd"],
+        })
+
+        ok_str = "OK" if answer["success"] else "FAIL"
+        print(f"  [W{batch_id}] Q{q_id} {ok_str}: {len(answer['file_line_refs'])} refs, "
+              f"{answer['duration_seconds']}s, tok:{answer['input_tokens']}/{answer['output_tokens']}",
+              flush=True)
+
+    return {
+        "batch_id": batch_id,
+        "total": len(questions),
+        "successful": sum(1 for r in results if r["success"]),
+        "failed": sum(1 for r in results if not r["success"]),
+        "with_refs": sum(1 for r in results if r["refs"] > 0),
+        "total_duration": sum(r["duration"] for r in results),
+        "total_input_tokens": sum(r["input_tokens"] for r in results),
+        "total_output_tokens": sum(r["output_tokens"] for r in results),
+        "total_cost_usd": sum(r["cost_usd"] for r in results),
+        "output_file": output_file,
+    }
+
+
+def run_benchmark_parallel(
+    questions: List[Dict],
+    mode: str,
+    output_dir: Path,
+    run_num: int = 1,
+    timeout: int = 120,
+    num_workers: int = 12,
+    session_id: str = "",
+    mdemg_endpoint: str = "http://localhost:9999",
+    mdemg_space_id: str = "",
+    codebase_path: str = "",
+    model: str = "haiku",
+    max_retries: int = 3,
+) -> Dict:
+    """Run benchmark with parallel workers using ProcessPoolExecutor.
+
+    Questions are split into N batches. Each batch runs in a separate process,
+    processing its questions sequentially. Each question spawns an independent
+    agent with no session continuation (-c flag is NOT used).
+
+    This is ~Nx faster than serial mode for N workers.
+
+    Args:
+        questions: Question list
+        mode: 'baseline' or 'mdemg'
+        output_dir: Output directory for this run
+        run_num: Run number
+        timeout: Max seconds per agent invocation
+        num_workers: Number of parallel worker processes
+        session_id: Run session UUID
+        mdemg_endpoint: MDEMG API endpoint (UATS: POST /v1/memory/retrieve)
+        mdemg_space_id: MDEMG space ID
+        codebase_path: Path to the target codebase
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Split into batches
+    batch_size = max(1, (len(questions) + num_workers - 1) // num_workers)
+    batches = []
+    for i in range(0, len(questions), batch_size):
+        batches.append(questions[i:i + batch_size])
+
+    print(f"\n{'='*70}")
+    print(f"  COGNITIVE GAP BENCHMARK — {mode.upper()} — Run {run_num} — PARALLEL ({num_workers} workers)")
+    print(f"  Questions: {len(questions)} | Batches: {len(batches)} (~{batch_size}/worker)")
+    print(f"  Session: {session_id[:12]}...")
+    print(f"  Sandbox: --setting-sources user, --strict-mcp-config, --disable-slash-commands")
+    print(f"  Mode: independent agents (no -c session continuation)")
+    print(f"  Output: {output_dir}")
+    print(f"{'='*70}\n")
+
+    start_time = time.time()
+
+    # Submit batches to process pool
+    batch_results = []
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = {}
+        for batch_id, batch_questions in enumerate(batches):
+            batch_file = str(output_dir / f"batch_{batch_id}.jsonl")
+            # Clear batch file if it exists
+            if os.path.exists(batch_file):
+                os.unlink(batch_file)
+            future = executor.submit(
+                _run_batch,
+                batch_id,
+                batch_questions,
+                mode,
+                mdemg_endpoint,
+                mdemg_space_id,
+                codebase_path,
+                timeout,
+                batch_file,
+                model,
+                max_retries,
+            )
+            futures[future] = batch_id
+
+        for future in as_completed(futures):
+            batch_id = futures[future]
+            try:
+                result = future.result()
+                batch_results.append(result)
+                print(f"\n=== Batch {batch_id} complete: "
+                      f"{result['successful']}/{result['total']} ok, "
+                      f"{result['with_refs']} with refs, "
+                      f"${result['total_cost_usd']:.4f} ===\n", flush=True)
+            except Exception as e:
+                print(f"\n=== Batch {batch_id} FAILED: {e} ===\n", flush=True)
+                batch_results.append({
+                    "batch_id": batch_id,
+                    "total": len(batches[batch_id]),
+                    "successful": 0,
+                    "failed": len(batches[batch_id]),
+                    "with_refs": 0,
+                    "total_duration": 0,
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                    "total_cost_usd": 0,
+                    "error": str(e),
+                })
+
+    # Merge batch files into answers.jsonl
+    answers_file = output_dir / "answers.jsonl"
+    answer_count = 0
+    with open(answers_file, "w") as outf:
+        for batch_id in range(len(batches)):
+            batch_file = output_dir / f"batch_{batch_id}.jsonl"
+            if batch_file.exists():
+                with open(batch_file) as inf:
+                    for line in inf:
+                        if line.strip():
+                            outf.write(line if line.endswith("\n") else line + "\n")
+                            answer_count += 1
+
+    elapsed = time.time() - start_time
+    total_successful = sum(r["successful"] for r in batch_results)
+    total_failed = sum(r["failed"] for r in batch_results)
+    total_with_refs = sum(r["with_refs"] for r in batch_results)
+    total_input = sum(r["total_input_tokens"] for r in batch_results)
+    total_output = sum(r["total_output_tokens"] for r in batch_results)
+    total_cost = sum(r["total_cost_usd"] for r in batch_results)
+    total_duration = sum(r["total_duration"] for r in batch_results)
+
+    stats = {
+        "mode": mode,
+        "run": run_num,
+        "model": model,
+        "session_id": session_id,
+        "parallel": True,
+        "num_workers": num_workers,
+        "num_batches": len(batches),
+        "total": len(questions),
+        "processed": answer_count,
+        "successful": total_successful,
+        "failed": total_failed,
+        "with_refs": total_with_refs,
+        "ref_rate": total_with_refs / max(total_successful, 1),
+        "total_duration": total_duration,
+        "wall_clock_seconds": round(elapsed, 1),
+        "avg_duration": total_duration / max(answer_count, 1),
+        "speedup": f"{total_duration / max(elapsed, 1):.1f}x",
+        "questions_per_minute": len(questions) / max(elapsed, 1) * 60,
+        "total_input_tokens": total_input,
+        "total_output_tokens": total_output,
+        "avg_input_tokens": total_input / max(answer_count, 1),
+        "avg_output_tokens": total_output / max(answer_count, 1),
+        "total_cost_usd": total_cost,
+        "total_response_chars": 0,
+        "start_time": datetime.fromtimestamp(start_time).isoformat(),
+        "end_time": datetime.now().isoformat(),
+        "batch_results": batch_results,
+        "errors": [r.get("error") for r in batch_results if r.get("error")],
+    }
+
+    # Save progress
+    _save_progress(stats, output_dir / "progress.json")
+
+    # Print summary
+    print(f"\n{'='*70}")
+    print(f"  PARALLEL BENCHMARK COMPLETE — {mode.upper()} Run {run_num}")
+    print(f"{'='*70}")
+    print(f"  Total:       {len(questions)}")
+    print(f"  Answers:     {answer_count}")
+    print(f"  Successful:  {total_successful}")
+    print(f"  Failed:      {total_failed}")
+    print(f"  With refs:   {total_with_refs} ({stats['ref_rate']*100:.1f}%)")
+    print(f"  Wall clock:  {elapsed/60:.1f} min ({elapsed:.0f}s)")
+    print(f"  CPU time:    {total_duration/60:.1f} min (sum of all agents)")
+    print(f"  Speedup:     {stats['speedup']} ({num_workers} workers)")
+    print(f"  Speed:       {stats['questions_per_minute']:.1f} q/min")
+    print(f"\n  ── Token Usage ──")
+    print(f"  Input:       {total_input:,} ({stats['avg_input_tokens']:,.0f} avg/q)")
+    print(f"  Output:      {total_output:,} ({stats['avg_output_tokens']:,.0f} avg/q)")
+    print(f"  Cost:        ${total_cost:.4f}")
+    print(f"{'='*70}")
+
+    return stats
+
+
 # ─── Post-Run Validation ─────────────────────────────────────────────────────
 
 def validate_answers(answers_file: Path, codebase: str) -> Dict:
@@ -896,27 +1385,95 @@ def main():
         help="Resume from question index (0-based)"
     )
     parser.add_argument(
-        "--questions", type=str, default=str(QUESTIONS_FILE),
-        help="Questions JSON file (agent version without answers)"
+        "--questions", type=str, default=DEFAULT_QUESTIONS_FILE,
+        help="Questions JSON file (agent version without answers) "
+             f"(default: {DEFAULT_QUESTIONS_FILE})"
     )
     parser.add_argument(
-        "--output-base", type=str, default=str(OUTPUT_BASE),
-        help="Base output directory"
+        "--master", type=str, default=DEFAULT_MASTER_FILE,
+        help="Master answer file path (stashed during runs) "
+             f"(default: {DEFAULT_MASTER_FILE})"
+    )
+    parser.add_argument(
+        "--output-base", type=str, default=DEFAULT_OUTPUT_BASE,
+        help="Base output directory "
+             f"(default: {DEFAULT_OUTPUT_BASE})"
+    )
+    parser.add_argument(
+        "--codebase", type=str, default=DEFAULT_CODEBASE_PATH,
+        help="Path to target codebase to benchmark against. "
+             "Also settable via BENCHMARK_CODEBASE_PATH env var. (REQUIRED)"
+    )
+    parser.add_argument(
+        "--mdemg-endpoint", type=str, default=DEFAULT_MDEMG_ENDPOINT,
+        help="MDEMG API endpoint URL. Also settable via MDEMG_ENDPOINT env var. "
+             f"(default: {DEFAULT_MDEMG_ENDPOINT})"
+    )
+    parser.add_argument(
+        "--space-id", type=str, default=DEFAULT_MDEMG_SPACE_ID,
+        help="MDEMG space ID for retrieval. "
+             "Also settable via BENCHMARK_SPACE_ID env var. (REQUIRED for mdemg mode)"
+    )
+    parser.add_argument(
+        "--model", type=str, default=DEFAULT_MODEL,
+        help="Claude model for agent invocations. "
+             "Also settable via BENCHMARK_MODEL env var. "
+             f"(default: {DEFAULT_MODEL})"
     )
     parser.add_argument(
         "--validate", action="store_true",
         help="Run post-hoc file validation on answers"
     )
     parser.add_argument(
-        "--timeout", type=int, default=AGENT_TIMEOUT,
-        help="Timeout per agent in seconds (default: 120)"
+        "--timeout", type=int, default=DEFAULT_AGENT_TIMEOUT,
+        help="Timeout per agent in seconds. "
+             "Also settable via BENCHMARK_AGENT_TIMEOUT env var. "
+             f"(default: {DEFAULT_AGENT_TIMEOUT})"
+    )
+    parser.add_argument(
+        "--checkpoint-interval", type=int, default=DEFAULT_CHECKPOINT_INTERVAL,
+        help="Save progress every N questions (serial mode). "
+             "Also settable via BENCHMARK_CHECKPOINT_INTERVAL env var. "
+             f"(default: {DEFAULT_CHECKPOINT_INTERVAL})"
+    )
+    parser.add_argument(
+        "--max-retries", type=int, default=DEFAULT_MAX_RETRIES,
+        help="Max retries on rate limiting/overload. "
+             "Also settable via BENCHMARK_MAX_RETRIES env var. "
+             f"(default: {DEFAULT_MAX_RETRIES})"
     )
     parser.add_argument(
         "--skip-verify", action="store_true",
         help="Skip sandbox verification check"
     )
+    parser.add_argument(
+        "--parallel", type=int, default=1,
+        help="Number of parallel workers (default: 1 = serial). "
+             "Parallel mode spawns independent agents (no -c session continuation). "
+             "Recommended: 8-12 workers. Incompatible with --start-from."
+    )
 
     args = parser.parse_args()
+
+    # Validate args
+    if args.parallel < 1:
+        parser.error("--parallel must be >= 1")
+    if args.parallel > 1 and args.start_from > 0:
+        parser.error("--start-from is not supported with --parallel > 1 (no session continuation)")
+    if not args.codebase:
+        parser.error("--codebase is required (or set BENCHMARK_CODEBASE_PATH env var)")
+    if args.mode == "mdemg" and not args.space_id:
+        parser.error("--space-id is required for mdemg mode (or set BENCHMARK_SPACE_ID env var)")
+
+    # Resolve paths
+    codebase_path = args.codebase
+    mdemg_endpoint = args.mdemg_endpoint
+    mdemg_space_id = args.space_id
+    master_file = Path(args.master)
+    model = args.model
+    timeout = args.timeout
+    checkpoint_interval = args.checkpoint_interval
+    max_retries = args.max_retries
 
     # Load questions
     with open(args.questions) as f:
@@ -928,6 +1485,10 @@ def main():
         print(f"PILOT MODE: Limited to {len(questions)} questions")
 
     print(f"Loaded {len(questions)} questions from {args.questions}")
+    print(f"Codebase: {codebase_path}")
+    print(f"Model: {model}")
+    if args.mode == "mdemg":
+        print(f"MDEMG: {mdemg_endpoint} (space: {mdemg_space_id})")
 
     # Generate unique session ID for this run
     session_id = str(uuid.uuid4())
@@ -940,10 +1501,10 @@ def main():
     print("\nPre-run sandbox setup...")
 
     # 1. Clean session directories (prevent cross-run leakage)
-    pre_clean = cleanup_session_dirs()
+    pre_clean = cleanup_session_dirs(codebase_path)
 
     # 2. Stash master answer file (prevent answer leakage)
-    stash_master_file()
+    stash_master_file(master_file)
 
     sandbox_verified = False
     post_clean = 0
@@ -951,7 +1512,7 @@ def main():
     try:
         # 3. Verify sandbox flags work
         if not args.skip_verify:
-            sandbox_verified = verify_sandbox()
+            sandbox_verified = verify_sandbox(codebase_path)
             if not sandbox_verified:
                 print("\nABORT: Sandbox verification failed. Use --skip-verify to override.")
                 sys.exit(1)
@@ -966,12 +1527,15 @@ def main():
                 "benchmark": "cognitive_gap_validation_v2_sandboxed",
                 "date": datetime.now().isoformat(),
                 "questions_file": str(args.questions),
-                "master_file": str(MASTER_FILE),
-                "codebase": CODEBASE_PATH,
-                "mdemg_endpoint": MDEMG_ENDPOINT,
-                "mdemg_space_id": MDEMG_SPACE_ID,
-                "model": "haiku",
-                "agent_timeout": args.timeout,
+                "master_file": str(master_file),
+                "codebase": codebase_path,
+                "mdemg_endpoint": mdemg_endpoint,
+                "mdemg_space_id": mdemg_space_id,
+                "model": model,
+                "agent_timeout": timeout,
+                "max_retries": max_retries,
+                "checkpoint_interval": checkpoint_interval,
+                "parallel_workers": args.parallel,
                 "modes": ["baseline", "mdemg"],
                 "runs_per_mode": 3,
                 "total_questions": len(questions),
@@ -989,19 +1553,41 @@ def main():
                 json.dump(config, f, indent=2)
 
         # ─── Run benchmark ───
-        stats = run_benchmark(
-            questions=questions,
-            mode=args.mode,
-            output_dir=output_dir,
-            run_num=args.run,
-            start_from=args.start_from,
-            timeout=args.timeout,
-            session_id=session_id,
-        )
+        if args.parallel > 1:
+            stats = run_benchmark_parallel(
+                questions=questions,
+                mode=args.mode,
+                output_dir=output_dir,
+                run_num=args.run,
+                timeout=timeout,
+                num_workers=args.parallel,
+                session_id=session_id,
+                mdemg_endpoint=mdemg_endpoint,
+                mdemg_space_id=mdemg_space_id,
+                codebase_path=codebase_path,
+                model=model,
+                max_retries=max_retries,
+            )
+        else:
+            stats = run_benchmark(
+                questions=questions,
+                mode=args.mode,
+                output_dir=output_dir,
+                run_num=args.run,
+                start_from=args.start_from,
+                timeout=timeout,
+                session_id=session_id,
+                codebase_path=codebase_path,
+                mdemg_endpoint=mdemg_endpoint,
+                mdemg_space_id=mdemg_space_id,
+                model=model,
+                checkpoint_interval=checkpoint_interval,
+                max_retries=max_retries,
+            )
 
         # ─── Post-run cleanup ───
         print("\nPost-run cleanup...")
-        post_clean = cleanup_session_dirs()
+        post_clean = cleanup_session_dirs(codebase_path)
 
         # ─── Save per-run metadata ───
         metadata = {
@@ -1016,7 +1602,9 @@ def main():
             "session_cleanup_pre": pre_clean,
             "session_cleanup_post": post_clean,
             "sandbox_verified": sandbox_verified,
-            "timeout_seconds": args.timeout,
+            "timeout_seconds": timeout,
+            "model": model,
+            "parallel_workers": args.parallel,
             # Token usage summary
             "total_input_tokens": stats.get("total_input_tokens", 0),
             "total_output_tokens": stats.get("total_output_tokens", 0),
@@ -1037,7 +1625,7 @@ def main():
         answers_file = output_dir / "answers.jsonl"
         if args.validate and answers_file.exists():
             print(f"\nRunning post-hoc file validation...")
-            validation = validate_answers(answers_file, CODEBASE_PATH)
+            validation = validate_answers(answers_file, codebase_path)
             print(f"  Total answers: {validation['total']}")
             print(f"  Valid file refs: {validation['valid_files']}")
             print(f"  Invalid (hallucinated): {validation['invalid_files']}")
@@ -1055,14 +1643,14 @@ def main():
         print(f"\nTo grade this run:")
         print(f"  python {SCRIPT_DIR / 'grader_v4.py'} \\")
         print(f"    {answers_file} \\")
-        print(f"    {MASTER_FILE} \\")
+        print(f"    {master_file} \\")
         print(f"    {output_dir / 'grades.json'}")
 
     finally:
         # ALWAYS restore master file and clean sessions, even on crash/interrupt
         print("\nFinal cleanup...")
-        unstash_master_file()
-        cleanup_session_dirs()
+        unstash_master_file(master_file)
+        cleanup_session_dirs(codebase_path)
 
 
 if __name__ == "__main__":
