@@ -23,6 +23,7 @@ type BaseNode struct {
 	NodeID               string
 	SpaceID              string
 	Path                 string    // File path for grouping
+	Summary              string    // LLM-generated summary from ingestion
 	Embedding            []float64
 	MessagePassEmbedding []float64 // Used when clustering higher layers
 }

@@ -1,8 +1,8 @@
 # Hidden Layer Architecture Technical Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-03-13
 
 ---
 
@@ -275,67 +275,80 @@ if targetLayer >= 4 {
 }
 ```
 
+### BaseNode Data Model
+
+Each L0 node is fetched as a `BaseNode` for clustering:
+
+```go
+type BaseNode struct {
+    NodeID               string
+    SpaceID              string
+    Path                 string    // File path for grouping
+    Summary              string    // LLM-generated summary from ingestion
+    Embedding            []float64
+    MessagePassEmbedding []float64 // Used when clustering higher layers
+}
+```
+
+The `Summary` field (populated during codebase ingestion) is used by the dynamic reclassifier to discover semantic sub-categories within oversized extension-based categories. Nodes with empty summaries are excluded from LLM sampling and assigned to the "misc" sub-category.
+
 ### Clustering Process
+
+The actual implementation uses **classification-then-KMeans** rather than raw DBSCAN on the full node set. This produces coherent clusters because nodes are first grouped by semantic category (Go code with Go code, docs with docs, etc.), then KMeans runs within each category.
 
 ```
 CREATE_HIDDEN_NODES(space_id):
-    # Step 1: Fetch base nodes without hidden parent
-    orphan_base = QUERY(
+    # Step 1: Fetch ALL L0 base nodes (full re-cluster each run)
+    base_nodes = QUERY(
         MATCH (b:MemoryNode {space_id: $space_id, layer: 0})
-        WHERE NOT (b)-[:GENERALIZES]->(:MemoryNode {layer: 1})
-        AND b.embedding IS NOT NULL
-        RETURN b
+        WHERE b.embedding IS NOT NULL
+          AND (b.role_type IS NULL OR b.role_type <> 'conversation_observation')
+        RETURN b.node_id, b.path, b.embedding, coalesce(b.summary, '') AS summary
     )
 
-    IF len(orphan_base) < CLUSTER_MIN_SAMPLES:
-        RETURN  # Not enough data to cluster
+    # Step 1b: Detach old L0→L1 GENERALIZES edges and remove childless L1 nodes
+    DETACH_OLD_HIDDEN_EDGES(space_id)
 
-    # Step 2: Run DBSCAN on embeddings
-    embeddings = [node.embedding for node in orphan_base]
-    labels = DBSCAN(embeddings, eps=CLUSTER_EPS, min_samples=CLUSTER_MIN_SAMPLES)
+    # Step 2: Filter to nodes with valid embeddings
+    valid_nodes = [n for n in base_nodes if len(n.embedding) > 0]
 
-    # Step 3: Create hidden nodes for each cluster
-    clusters = GROUP_BY(orphan_base, labels)
-    hidden_created = 0
+    IF len(valid_nodes) < MIN_SAMPLES:
+        RETURN 0
 
-    FOR cluster_id, members in clusters:
-        IF cluster_id == -1:  # Noise points
+    # Step 3: Classify by file extension → 14 categories
+    classes = ClassifyByExtension(valid_nodes)
+    # e.g., {"typescript": 7299, "go": 400, "config": 200, ...}
+
+    # Step 3b: Dynamic reclassification of oversized categories (RECLASS_ENABLED)
+    # If any category >= RECLASS_THRESHOLD (25%) of total nodes:
+    #   1. Sample summaries (stratified by prefix) → up to RECLASS_MAX_SAMPLE_SIZE
+    #   2. LLM proposes 3-10 semantic sub-categories with keyword patterns
+    #   3. Assign nodes to sub-categories by keyword match on summary
+    #   4. "misc" fallback for unmatched nodes
+    # Fail-open: if LLM fails, original category is preserved unchanged
+    classes = ReclassifyOversizedCategories(classes, len(valid_nodes))
+    # e.g., {"typescript-services": 640, "typescript-dto": 572, ..., "go": 400, ...}
+
+    # Step 4: KMeans within each category
+    FOR category, class_nodes in classes:
+        IF len(class_nodes) < MIN_SAMPLES:
             CONTINUE
-        IF hidden_created >= CLUSTER_MAX_HIDDEN:
-            BREAK
 
-        # Compute centroid embedding
-        centroid = MEAN([m.embedding for m in members])
+        k = ceil(len(class_nodes) * 0.1)
+        labels = KMeans(embeddings(class_nodes), k, max_iter=50)
+        clusters = GroupByCluster(class_nodes, labels)
 
-        # Generate name via LLM (optional, can use placeholder)
-        name = GENERATE_CLUSTER_NAME(members) OR f"Pattern-{cluster_id}"
+        FOR members in clusters:
+            # Split oversized clusters into chunks
+            sub_clusters = SplitLargeCluster(members, MAX_CLUSTER_SIZE)
 
-        # Create hidden node
-        hidden = CREATE(:MemoryNode {
-            space_id: space_id,
-            node_id: UUID(),
-            layer: 1,
-            role_type: 'hidden',
-            name: name,
-            embedding: centroid,
-            message_pass_embedding: centroid,
-            created_at: NOW(),
-            aggregation_count: len(members)
-        })
+            FOR sub_members in sub_clusters:
+                centroid = ComputeCentroid(embeddings(sub_members))
+                name = f"Hidden-{category}-{inferClusterName(sub_members)}-{id}"
 
-        # Create GENERALIZES edges from members to hidden
-        FOR member in members:
-            distance = 1 - COSINE_SIM(member.embedding, centroid)
-            weight = 1 - distance  # Higher weight for closer nodes
-
-            CREATE (member)-[:GENERALIZES {
-                space_id: space_id,
-                edge_id: UUID(),
-                weight: weight,
-                created_at: NOW()
-            }]->(hidden)
-
-        hidden_created++
+                # Create hidden node + GENERALIZES edges
+                CREATE_HIDDEN_NODE_WITH_EDGES(space_id, name, centroid, sub_members)
+                hidden_created++
 
     RETURN hidden_created
 ```
@@ -630,8 +643,11 @@ func InferNodeType(metrics NodeMetrics) DynamicNodeType {
 
 ### Implementation Files
 
-- `internal/hidden/types.go`: Type definitions, thresholds, metrics
-- `internal/hidden/service.go`: `InferEdgeType()`, `InferNodeType()`, `ClassifyUpperLayerNodes()`, `CreateDynamicEdges()`
+- `internal/hidden/types.go`: Type definitions (BaseNode, HiddenNode, ConceptNode, dynamic edge/node types), thresholds, metrics
+- `internal/hidden/service.go`: `CreateHiddenNodes()`, `InferEdgeType()`, `InferNodeType()`, `ClassifyUpperLayerNodes()`, `CreateDynamicEdges()`
+- `internal/hidden/clustering.go`: `ClassifyByExtension()`, `KMeansCluster()`, `SplitLargeCluster()`, `ComputeCentroid()`
+- `internal/hidden/reclassifier.go`: `ReclassifyOversizedCategories()` — LLM-driven sub-category discovery and keyword-based assignment
+- `internal/hidden/emergence_namer.go`: LLM-driven concept naming for emergent clusters (Phase 103)
 
 ---
 

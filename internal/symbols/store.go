@@ -553,6 +553,81 @@ LIMIT $max_symbols
 	return result.([]SymbolRecord), nil
 }
 
+// GetSymbolsForMemoryNodes returns symbols for multiple MemoryNodes in a single query.
+// This avoids N+1 session overhead by using UNWIND + CALL {} subquery.
+// Returns a map of nodeID -> []SymbolRecord.
+func (s *Store) GetSymbolsForMemoryNodes(ctx context.Context, spaceID string, nodeIDs []string) (map[string][]SymbolRecord, error) {
+	if len(nodeIDs) == 0 {
+		return map[string][]SymbolRecord{}, nil
+	}
+
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+
+	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+UNWIND $node_ids AS nid
+CALL {
+  WITH nid
+  MATCH (m:MemoryNode {space_id: $space_id, node_id: nid})
+
+  // Direct symbols
+  OPTIONAL MATCH (m)-[:DEFINES_SYMBOL]->(s1:SymbolNode)
+  WITH m, collect(DISTINCT s1) AS directSymbols
+
+  // Descendant symbols via GENERALIZES (for hidden/concept nodes)
+  OPTIONAL MATCH (leaf:MemoryNode {layer: 0})-[:GENERALIZES*]->(m)
+  OPTIONAL MATCH (leaf)-[:DEFINES_SYMBOL]->(s2:SymbolNode)
+  WITH m, directSymbols, collect(DISTINCT s2) AS descendantSymbols
+
+  // Parent file symbols (for fragment nodes with # in path)
+  OPTIONAL MATCH (parent:MemoryNode {space_id: $space_id, layer: 0})
+  WHERE m.path CONTAINS '#' AND parent.path = split(m.path, '#')[0]
+  OPTIONAL MATCH (parent)-[:DEFINES_SYMBOL]->(s3:SymbolNode)
+  WITH m.node_id AS nodeId, directSymbols, descendantSymbols, collect(DISTINCT s3) AS parentSymbols
+
+  // Combine, filter nulls, order, limit per node
+  WITH nodeId, directSymbols + descendantSymbols + parentSymbols AS allSymbols
+  UNWIND allSymbols AS s
+  WITH nodeId, s WHERE s IS NOT NULL
+  WITH nodeId, s ORDER BY s.context_specificity DESC, s.line
+  RETURN nodeId, collect(s)[..20] AS syms
+}
+RETURN nodeId, syms
+		`, map[string]any{
+			"space_id": spaceID,
+			"node_ids": nodeIDs,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		resultMap := make(map[string][]SymbolRecord, len(nodeIDs))
+		for res.Next(ctx) {
+			record := res.Record()
+			nid, _ := record.Get("nodeId")
+			symsAny, _ := record.Get("syms")
+			nodeID, _ := nid.(string)
+			if symList, ok := symsAny.([]any); ok {
+				records := make([]SymbolRecord, 0, len(symList))
+				for _, sym := range symList {
+					if n, ok := sym.(neo4j.Node); ok {
+						records = append(records, nodeToSymbolRecord(n))
+					}
+				}
+				if len(records) > 0 {
+					resultMap[nodeID] = records
+				}
+			}
+		}
+		return resultMap, res.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(map[string][]SymbolRecord), nil
+}
+
 // DeleteSymbolsForFile removes all symbols associated with a file.
 // Used when re-indexing a file.
 func (s *Store) DeleteSymbolsForFile(ctx context.Context, spaceID, filePath string) error {

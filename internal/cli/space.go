@@ -614,7 +614,9 @@ func runSpaceDelete(ctx context.Context, cfg *deleteConfig) error {
 
 	// Count nodes first
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	result, err := sess.Run(ctx, "MATCH (n {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.spaceID})
+	result, err := sess.Run(ctx,
+		"MATCH (n:MemoryNode {space_id: $sid}) RETURN count(n) as cnt",
+		map[string]any{"sid": cfg.spaceID})
 	if err != nil {
 		sess.Close(ctx)
 		return fmt.Errorf("count query: %w", err)
@@ -730,7 +732,7 @@ func runSpaceRename(ctx context.Context, cfg *renameConfig) error {
 
 	// Check target doesn't exist
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	result, err := sess.Run(ctx, "MATCH (n {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.to})
+	result, err := sess.Run(ctx, "MATCH (n:MemoryNode {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.to})
 	if err != nil {
 		sess.Close(ctx)
 		return fmt.Errorf("check target: %w", err)
@@ -826,7 +828,7 @@ func runSpaceCopy(ctx context.Context, cfg *copyConfig) error {
 
 	// Check source exists
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	result, err := sess.Run(ctx, "MATCH (n {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.from})
+	result, err := sess.Run(ctx, "MATCH (n:MemoryNode {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.from})
 	if err != nil {
 		sess.Close(ctx)
 		return fmt.Errorf("check source: %w", err)
@@ -843,7 +845,7 @@ func runSpaceCopy(ctx context.Context, cfg *copyConfig) error {
 
 	// Check target doesn't exist
 	sess = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	result, err = sess.Run(ctx, "MATCH (n {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.to})
+	result, err = sess.Run(ctx, "MATCH (n:MemoryNode {space_id: $sid}) RETURN count(n) as cnt", map[string]any{"sid": cfg.to})
 	if err != nil {
 		sess.Close(ctx)
 		return fmt.Errorf("check target: %w", err)

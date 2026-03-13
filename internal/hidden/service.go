@@ -3,6 +3,7 @@ package hidden
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -51,6 +52,47 @@ func (s *Service) newEmergenceNamer() *EmergenceNamer {
 	}, s.cbRegistry)
 }
 
+// newReclassifier constructs a Reclassifier from the service config.
+// Returns nil when reclassification is disabled — callers handle nil gracefully.
+func (s *Service) newReclassifier() *Reclassifier {
+	if !s.cfg.ReclassEnabled {
+		return nil
+	}
+	return NewReclassifier(ReclassifierConfig{
+		Enabled:       s.cfg.ReclassEnabled,
+		Threshold:     s.cfg.ReclassThreshold,
+		MaxSampleSize: s.cfg.ReclassMaxSampleSize,
+		MaxCategories: s.cfg.ReclassMaxCategories,
+		MaxIterations: s.cfg.ReclassMaxIterations,
+		MaxDepth:      s.cfg.ReclassMaxDepth,
+		Provider:      s.cfg.ReclassProvider,
+		Model:         s.cfg.ReclassModel,
+		MaxTokens:     s.cfg.ReclassMaxTokens,
+		TimeoutMs:     s.cfg.ReclassTimeoutMs,
+		OpenAIKey:     s.cfg.OpenAIAPIKey,
+		OpenAIURL:     s.cfg.EffectiveLLMEndpoint(),
+		OllamaURL:     s.cfg.OllamaEndpoint,
+	}, s.cbRegistry)
+}
+
+// newClusterSummarizer constructs a ClusterSummarizer from the service config.
+// Returns nil when cluster summarization is disabled — callers handle nil gracefully.
+func (s *Service) newClusterSummarizer() *ClusterSummarizer {
+	if !s.cfg.ClusterSummaryEnabled {
+		return nil
+	}
+	return NewClusterSummarizer(ClusterSummarizerConfig{
+		Enabled:   s.cfg.ClusterSummaryEnabled,
+		Provider:  s.cfg.ClusterSummaryProvider,
+		Model:     s.cfg.ClusterSummaryModel,
+		MaxTokens: s.cfg.ClusterSummaryMaxTokens,
+		TimeoutMs: s.cfg.ClusterSummaryTimeoutMs,
+		OpenAIKey: s.cfg.OpenAIAPIKey,
+		OpenAIURL: s.cfg.EffectiveLLMEndpoint(),
+		OllamaURL: s.cfg.OllamaEndpoint,
+	}, s.cbRegistry)
+}
+
 // baseNodesToClusterSummaries converts BaseNode slice to ClusterNodeSummary for LLM naming.
 // BaseNode.Path holds the node name (per fetchOrphanLayerNodesWithName).
 func baseNodesToClusterSummaries(members []BaseNode) []ClusterNodeSummary {
@@ -77,6 +119,159 @@ func emergentConceptNodesToClusterSummaries(members []EmergentConceptNode) []Clu
 		}
 	}
 	return summaries
+}
+
+// mechanicalSummaryPrefixes identifies summaries that were generated mechanically
+// and would benefit from LLM enhancement.
+var mechanicalSummaryPrefixes = []string{
+	"Pattern of ",
+	"Concept-L",
+	"Hidden concept: ",
+	"Concern: ",
+	"Cluster of ",
+}
+
+// isMechanicalSummary checks if a summary was generated mechanically.
+func isMechanicalSummary(summary string) bool {
+	for _, prefix := range mechanicalSummaryPrefixes {
+		if strings.HasPrefix(summary, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// EnhanceSummariesWithLLM replaces mechanical summaries on L1-L4 nodes with
+// LLM-generated semantic summaries. Skips L5 nodes (already have EmergenceNamer summaries).
+// Returns the number of summaries enhanced.
+func (s *Service) EnhanceSummariesWithLLM(ctx context.Context, spaceID string) (int, error) {
+	summarizer := s.newClusterSummarizer()
+	if summarizer == nil {
+		return 0, nil // Disabled or no circuit breaker
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Query L1-L4 nodes with mechanical summaries
+	batchSize := s.cfg.ClusterSummaryBatchSize
+	if batchSize <= 0 {
+		batchSize = 50
+	}
+
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.layer >= 1 AND n.layer <= 4
+  AND n.summary IS NOT NULL
+  AND NOT coalesce(n.is_archived, false)
+RETURN n.node_id AS node_id, n.name AS name, n.summary AS summary, n.layer AS layer
+LIMIT $limit`
+
+	result, err := sess.Run(ctx, cypher, map[string]any{
+		"spaceId": spaceID,
+		"limit":   batchSize * 2, // Fetch more since we'll filter
+	})
+	if err != nil {
+		return 0, fmt.Errorf("query cluster nodes: %w", err)
+	}
+
+	type clusterNode struct {
+		NodeID  string
+		Name    string
+		Summary string
+		Layer   int
+	}
+
+	var candidates []clusterNode
+	for result.Next(ctx) {
+		rec := result.Record()
+		nid, _ := rec.Get("node_id")
+		name, _ := rec.Get("name")
+		summary, _ := rec.Get("summary")
+		layer, _ := rec.Get("layer")
+
+		sumStr := fmt.Sprint(summary)
+		if !isMechanicalSummary(sumStr) {
+			continue
+		}
+
+		candidates = append(candidates, clusterNode{
+			NodeID:  fmt.Sprint(nid),
+			Name:    fmt.Sprint(name),
+			Summary: sumStr,
+			Layer:   int(layer.(int64)),
+		})
+
+		if len(candidates) >= batchSize {
+			break
+		}
+	}
+
+	if err := result.Err(); err != nil {
+		return 0, fmt.Errorf("iterate cluster nodes: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		return 0, nil
+	}
+
+	// For each candidate, fetch member names/summaries and generate LLM summary
+	enhanced := 0
+	for _, c := range candidates {
+		// Fetch members of this cluster node
+		memberCypher := `
+MATCH (n:MemoryNode {node_id: $nodeId, space_id: $spaceId})<-[:GENERALIZES|ABSTRACTS_TO]-(m:MemoryNode)
+RETURN m.name AS name, coalesce(m.summary, '') AS summary
+LIMIT 20`
+
+		memberResult, mErr := sess.Run(ctx, memberCypher, map[string]any{
+			"nodeId":  c.NodeID,
+			"spaceId": spaceID,
+		})
+		if mErr != nil {
+			continue
+		}
+
+		var memberNames, memberSummaries []string
+		for memberResult.Next(ctx) {
+			rec := memberResult.Record()
+			mn, _ := rec.Get("name")
+			ms, _ := rec.Get("summary")
+			memberNames = append(memberNames, fmt.Sprint(mn))
+			memberSummaries = append(memberSummaries, fmt.Sprint(ms))
+		}
+
+		if len(memberNames) == 0 {
+			// Fallback: use the node's own name
+			memberNames = []string{c.Name}
+			memberSummaries = []string{c.Summary}
+		}
+
+		// Call LLM for summary
+		newSummary, sErr := summarizer.Summarize(ctx, memberNames, memberSummaries, c.Layer)
+		if sErr != nil {
+			log.Printf("cluster-summary: LLM failed for %s: %v", c.NodeID, sErr)
+			continue // Fail-open: keep mechanical summary
+		}
+
+		// Update in Neo4j
+		updateCypher := `
+MATCH (n:MemoryNode {node_id: $nodeId, space_id: $spaceId})
+SET n.summary = $summary, n.updated_at = datetime()`
+
+		_, uErr := sess.Run(ctx, updateCypher, map[string]any{
+			"nodeId":  c.NodeID,
+			"spaceId": spaceID,
+			"summary": newSummary,
+		})
+		if uErr != nil {
+			continue
+		}
+
+		enhanced++
+	}
+
+	return enhanced, nil
 }
 
 // buildPipeline registers all node-creation steps in phase order.
@@ -122,17 +317,28 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		return 0, nil
 	}
 
-	// Step 1: Fetch base nodes without hidden parent
-	baseNodes, err := s.fetchOrphanBaseNodes(ctx, spaceID)
+	// Step 1: Fetch ALL base nodes (not just orphans — we re-cluster the full set)
+	baseNodes, err := s.fetchAllBaseNodes(ctx, spaceID)
 	if err != nil {
-		return 0, fmt.Errorf("fetch orphan base nodes: %w", err)
+		return 0, fmt.Errorf("fetch base nodes: %w", err)
 	}
 
 	if len(baseNodes) < s.cfg.HiddenLayerMinSamples {
 		return 0, nil // Not enough data to cluster
 	}
 
-	// Step 2: Filter to nodes with embeddings
+	log.Printf("CreateHiddenNodes: %d L0 base nodes fetched for re-clustering", len(baseNodes))
+
+	// Step 1b: Detach old GENERALIZES edges from L0→L1 and remove childless L1 nodes
+	detached, err := s.detachBaseNodeHiddenEdges(ctx, spaceID)
+	if err != nil {
+		return 0, fmt.Errorf("detach old hidden edges: %w", err)
+	}
+	if detached > 0 {
+		log.Printf("CreateHiddenNodes: detached %d old L0→L1 GENERALIZES edges", detached)
+	}
+
+	// Step 2: Filter to nodes with valid embeddings
 	validNodes := make([]BaseNode, 0, len(baseNodes))
 	for _, node := range baseNodes {
 		if len(node.Embedding) > 0 {
@@ -144,13 +350,25 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		return 0, nil
 	}
 
-	// Step 3: Extract embeddings and run DBSCAN on ALL nodes (embedding-first clustering)
-	embeddings := make([][]float64, len(validNodes))
-	for i, n := range validNodes {
-		embeddings[i] = n.Embedding
+	// Step 3: Classification-then-clustering.
+	// First classify nodes by file extension into semantic categories,
+	// then KMeans within each category. This produces coherent clusters because
+	// Go code clusters with Go code, docs with docs, config with config —
+	// regardless of embedding density distribution.
+	classes := ClassifyByExtension(validNodes)
+	log.Printf("CreateHiddenNodes: %d valid nodes classified into %d categories", len(validNodes), len(classes))
+	for cat, nodes := range classes {
+		log.Printf("  %s: %d nodes", cat, len(nodes))
 	}
-	labels := DBSCAN(embeddings, s.cfg.HiddenLayerClusterEps, s.cfg.HiddenLayerMinSamples)
-	clusters, _ := GroupByCluster(validNodes, labels)
+
+	// Dynamic reclassification of oversized categories (iterates until convergence)
+	var categoryDescriptions map[string]string
+	if s.cfg.ReclassEnabled {
+		if rc := s.newReclassifier(); rc != nil {
+			classes = rc.ReclassifyOversizedCategories(ctx, classes, len(validNodes))
+			categoryDescriptions = rc.CategoryDescriptions
+		}
+	}
 
 	// Step 4: Get existing hidden node count for unique naming
 	existingCount, err := s.countHiddenNodes(ctx, spaceID)
@@ -158,54 +376,36 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		return 0, fmt.Errorf("count existing hidden nodes: %w", err)
 	}
 
-	// Step 5: Process each natural cluster
+	// Step 5: KMeans within each classification category
 	created := 0
 	clusterID := 0
 
-	for _, members := range clusters {
-		if created >= s.cfg.HiddenLayerMaxHidden {
-			break
+	for category, classNodes := range classes {
+		if len(classNodes) < s.cfg.HiddenLayerMinSamples {
+			log.Printf("  Skipping %s: %d nodes (below min_samples=%d)", category, len(classNodes), s.cfg.HiddenLayerMinSamples)
+			continue
 		}
 
-		// For clusters within size limit, keep them intact (emergent patterns)
-		if len(members) <= s.cfg.HiddenLayerMaxClusterSize {
+		// maxHidden per class = ceil(classSize * 0.1)
+		classK := (len(classNodes) + 9) / 10
+		if classK < 1 {
+			classK = 1
+		}
+
+		embeddings := extractEmbeddings(classNodes)
+		labels := KMeansCluster(embeddings, classK, 50)
+		clusters, _ := GroupByCluster(classNodes, labels)
+		log.Printf("  %s: KMeans k=%d → %d clusters from %d nodes", category, classK, len(clusters), len(classNodes))
+
+		for _, members := range clusters {
 			if len(members) < s.cfg.HiddenLayerMinSamples {
 				continue
 			}
 
-			centroid := ComputeCentroid(extractEmbeddings(members))
-			if centroid == nil {
-				continue
-			}
-
-			// Name based on most common path pattern (descriptive)
-			uniqueID := existingCount + clusterID
-			name := fmt.Sprintf("Hidden-%s-%d", inferClusterName(members, s.cfg.HiddenLayerPathGroupDepth), uniqueID)
-			err := s.createHiddenNodeWithEdges(ctx, spaceID, name, centroid, members)
-			if err != nil {
-				return created, fmt.Errorf("create hidden node %s: %w", name, err)
-			}
-			created++
-			clusterID++
-			continue
-		}
-
-		// For oversized clusters, use path-based splitting as secondary organization
-		pathGroups := GroupByPathPrefix(members, s.cfg.HiddenLayerPathGroupDepth)
-
-		for pathPrefix, groupMembers := range pathGroups {
-			if created >= s.cfg.HiddenLayerMaxHidden {
-				break
-			}
-
-			// Split path groups that are still too large
-			subClusters := SplitLargeCluster(groupMembers, s.cfg.HiddenLayerMaxClusterSize)
+			// For oversized clusters, chunk them
+			subClusters := SplitLargeCluster(members, s.cfg.HiddenLayerMaxClusterSize)
 
 			for _, subMembers := range subClusters {
-				if created >= s.cfg.HiddenLayerMaxHidden {
-					break
-				}
-
 				if len(subMembers) < s.cfg.HiddenLayerMinSamples {
 					continue
 				}
@@ -216,17 +416,24 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 				}
 
 				uniqueID := existingCount + clusterID
-				name := fmt.Sprintf("Hidden-%s-%d", sanitizePathPrefix(pathPrefix), uniqueID)
-				err := s.createHiddenNodeWithEdges(ctx, spaceID, name, centroid, subMembers)
+				clusterName := inferClusterName(subMembers, s.cfg.HiddenLayerPathGroupDepth)
+				name := fmt.Sprintf("Hidden-%s-%s-%d", category, clusterName, uniqueID)
+				catDesc := categoryDescriptions[category] // may be "" for non-reclassified categories
+				err := s.createHiddenNodeWithEdges(ctx, spaceID, name, centroid, subMembers, category, catDesc)
 				if err != nil {
 					return created, fmt.Errorf("create hidden node %s: %w", name, err)
 				}
 				created++
 				clusterID++
+
+				if created%50 == 0 {
+					log.Printf("Hidden node progress: %d created", created)
+				}
 			}
 		}
 	}
 
+	log.Printf("Hidden node creation complete: %d nodes created", created)
 	return created, nil
 }
 
@@ -321,28 +528,19 @@ RETURN count(h) AS cnt`
 	return result.(int), nil
 }
 
-// fetchOrphanBaseNodes retrieves base layer nodes without a GENERALIZES edge to hidden layer
-func (s *Service) fetchOrphanBaseNodes(ctx context.Context, spaceID string) ([]BaseNode, error) {
+
+// fetchAllBaseNodes retrieves ALL L0 base nodes with embeddings for re-clustering.
+// Unlike fetchOrphanBaseNodes, this does not filter by existing GENERALIZES edges.
+func (s *Service) fetchAllBaseNodes(ctx context.Context, spaceID string) ([]BaseNode, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Build query with optional limit from config - now includes path for grouping
-	var cypher string
-	if s.cfg.HiddenLayerBatchSize > 0 {
-		cypher = fmt.Sprintf(`
+	cypher := `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
-WHERE NOT (b)-[:GENERALIZES]->(:MemoryNode {layer: 1})
-  AND b.embedding IS NOT NULL
-RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding
-LIMIT %d`, s.cfg.HiddenLayerBatchSize)
-	} else {
-		// No limit - process all orphan nodes
-		cypher = `
-MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
-WHERE NOT (b)-[:GENERALIZES]->(:MemoryNode {layer: 1})
-  AND b.embedding IS NOT NULL
-RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding`
-	}
+WHERE b.embedding IS NOT NULL
+  AND (b.role_type IS NULL OR b.role_type <> 'conversation_observation')
+RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding,
+       coalesce(b.summary, '') AS summary`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
@@ -356,11 +554,13 @@ RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding`
 			nodeID, _ := rec.Get("nodeId")
 			path, _ := rec.Get("path")
 			embedding, _ := rec.Get("embedding")
+			summary, _ := rec.Get("summary")
 
 			nodes = append(nodes, BaseNode{
 				NodeID:    asString(nodeID),
 				SpaceID:   spaceID,
 				Path:      asString(path),
+				Summary:   asString(summary),
 				Embedding: asFloat64Slice(embedding),
 			})
 		}
@@ -373,8 +573,67 @@ RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding`
 	return result.([]BaseNode), nil
 }
 
+// detachBaseNodeHiddenEdges removes GENERALIZES edges from L0 base nodes to L1 hidden
+// nodes, and deletes any L1 HiddenPattern nodes left with zero members.
+// This enables full re-clustering on every consolidation run.
+func (s *Service) detachBaseNodeHiddenEdges(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Delete GENERALIZES edges from L0→L1 HiddenPattern
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
+      -[r:GENERALIZES]->(h:HiddenPattern {space_id: $spaceId, layer: 1})
+DELETE r
+RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			cnt, _ := rec.Get("deleted")
+			return asInt(cnt), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	detached := result.(int)
+
+	// Remove orphaned HiddenPattern nodes (no remaining members)
+	if detached > 0 {
+		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, `
+MATCH (h:HiddenPattern {space_id: $spaceId, layer: 1})
+WHERE NOT ()-[:GENERALIZES]->(h)
+DETACH DELETE h
+RETURN count(h) AS removed`, map[string]any{"spaceId": spaceID})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				cnt, _ := rec.Get("removed")
+				removed := asInt(cnt)
+				if removed > 0 {
+					log.Printf("CreateHiddenNodes: removed %d orphaned HiddenPattern nodes", removed)
+				}
+				return removed, res.Err()
+			}
+			return 0, res.Err()
+		})
+		if err != nil {
+			return detached, fmt.Errorf("cleanup orphaned hidden nodes: %w", err)
+		}
+	}
+
+	return detached, nil
+}
+
 // createHiddenNodeWithEdges creates a hidden node and GENERALIZES edges from members
-func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, name string, centroid []float64, members []BaseNode) error {
+func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, name string, centroid []float64, members []BaseNode, category, categorySummary string) error {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -406,6 +665,8 @@ CREATE (b)-[:GENERALIZES {
   space_id: $spaceId,
   edge_id: randomUUID(),
   weight: 1.0 - point.distance(b.embedding, h.embedding) / 2.0,
+  category: $category,
+  category_summary: $categorySummary,
   created_at: datetime(),
   updated_at: datetime()
 }]->(h)
@@ -413,11 +674,13 @@ RETURN h.node_id AS hiddenId, count(b) AS edgeCount`
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId":     spaceID,
-			"name":        name,
-			"centroid":    toFloat32Slice(centroid),
-			"memberCount": len(members),
-			"memberIds":   memberIDs,
+			"spaceId":         spaceID,
+			"name":            name,
+			"centroid":        toFloat32Slice(centroid),
+			"memberCount":     len(members),
+			"memberIds":       memberIDs,
+			"category":        category,
+			"categorySummary": categorySummary,
 		})
 		if err != nil {
 			return nil, err
@@ -545,12 +808,6 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	// Higher layers represent more abstract concepts that should cluster more freely
 	layerFactor := float64(targetLayer - 1) // 1 for L2, 2 for L3, etc.
 
-	// Epsilon grows with layer: base * (1 + 0.4*layer) → L2: 1.4x, L3: 1.8x, L4: 2.2x, L5: 2.6x
-	adaptiveEps := s.cfg.HiddenLayerClusterEps * (1.0 + 0.4*layerFactor)
-	if adaptiveEps > 0.6 {
-		adaptiveEps = 0.6 // Cap at 0.6 to maintain some semantic coherence
-	}
-
 	// MinSamples shrinks with layer: base - layer (min 2) → allows smaller emergent clusters at top
 	adaptiveMinSamples := s.cfg.HiddenLayerMinSamples - int(layerFactor)
 	if adaptiveMinSamples < 2 {
@@ -578,10 +835,17 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		return 0, 0, nil
 	}
 
-	// Step 3: Run DBSCAN with ADAPTIVE parameters
+	// maxHidden = ceil(sourceNodes * 0.1) — this is the equation, NOT a configurable cap.
+	maxHidden := (len(validNodes) + 9) / 10 // ceil(len/10)
+	if maxHidden < 1 {
+		maxHidden = 1
+	}
+
+	// Step 3: KMeans clustering to partition into exactly maxHidden groups.
 	embeddings := extractEmbeddings(validNodes)
-	labels := DBSCAN(embeddings, adaptiveEps, adaptiveMinSamples)
+	labels := KMeansCluster(embeddings, maxHidden, 50)
 	clusters, _ := GroupByCluster(validNodes, labels)
+	log.Printf("L%d KMeans k=%d: %d clusters from %d nodes", targetLayer, maxHidden, len(clusters), len(validNodes))
 
 	// Step 4: Get existing concept node count for unique naming
 	existingCount, err := s.countLayerNodes(ctx, spaceID, targetLayer)
@@ -603,7 +867,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	clusterID := 0
 
 	for _, members := range clusters {
-		if created >= s.cfg.HiddenLayerMaxHidden {
+		if created >= maxHidden {
 			break
 		}
 
@@ -659,7 +923,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 		nameGroups := groupByNamePrefix(members)
 
 		for namePrefix, groupMembers := range nameGroups {
-			if created >= s.cfg.HiddenLayerMaxHidden {
+			if created >= maxHidden {
 				break
 			}
 
@@ -667,7 +931,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 			subClusters := SplitLargeCluster(groupMembers, maxConceptSize)
 
 			for _, subMembers := range subClusters {
-				if created >= s.cfg.HiddenLayerMaxHidden {
+				if created >= maxHidden {
 					break
 				}
 
@@ -3799,10 +4063,10 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 
 	result := &ConversationThemeResult{}
 
-	// Step 1: Fetch orphan conversation observations (no GENERALIZES to theme yet)
-	observations, err := s.fetchOrphanConversationObservations(ctx, spaceID)
+	// Step 1: Fetch ALL clusterable observations (noise filtered at query level)
+	observations, err := s.fetchClusterableConversationObservations(ctx, spaceID)
 	if err != nil {
-		return nil, fmt.Errorf("fetch orphan conversation observations: %w", err)
+		return nil, fmt.Errorf("fetch clusterable conversation observations: %w", err)
 	}
 
 	if len(observations) < s.cfg.HiddenLayerMinSamples {
@@ -3810,8 +4074,19 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 	}
 
 	result.ObservationsUsed = len(observations)
+	log.Printf("ClusterConversations: %d clusterable observations (noise pre-filtered)", len(observations))
 
-	// Step 2: Filter to observations with embeddings
+	// Step 2: Detach old GENERALIZES edges from observations to existing themes,
+	// and remove childless themes. This enables full re-clustering every run.
+	detached, err := s.detachObservationThemeEdges(ctx, spaceID)
+	if err != nil {
+		return nil, fmt.Errorf("detach old theme edges: %w", err)
+	}
+	if detached > 0 {
+		log.Printf("ClusterConversations: detached %d old observation→theme GENERALIZES edges", detached)
+	}
+
+	// Step 3: Filter to observations with embeddings
 	validObs := make([]ConversationObservation, 0, len(observations))
 	for _, obs := range observations {
 		if len(obs.Embedding) > 0 {
@@ -3823,26 +4098,33 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		return result, nil
 	}
 
-	// Step 3: Run DBSCAN clustering on observation embeddings
+	// Step 4: Run KMeans clustering on observation embeddings
 	embeddings := make([][]float64, len(validObs))
 	for i, obs := range validObs {
 		embeddings[i] = obs.Embedding
 	}
 
-	labels := DBSCAN(embeddings, s.cfg.HiddenLayerClusterEps, s.cfg.HiddenLayerMinSamples)
+	// maxThemes = ceil(observations * 0.1) — this is the equation, NOT a configurable cap.
+	maxThemes := (len(validObs) + 9) / 10 // ceil(len/10)
+	if maxThemes < 1 {
+		maxThemes = 1
+	}
+
+	// KMeans clustering — partition observations into exactly maxThemes groups
+	labels := KMeansCluster(embeddings, maxThemes, 50)
 	clusters, noise := groupObservationsByCluster(validObs, labels)
 	result.NoiseObservations = len(noise)
 
-	// Step 4: Get existing theme count for unique naming
+	// Step 5: Get existing theme count for unique naming
 	existingCount, err := s.countConversationThemes(ctx, spaceID)
 	if err != nil {
 		return nil, fmt.Errorf("count existing conversation themes: %w", err)
 	}
 
-	// Step 5: Create theme nodes for each cluster
+	// Step 6: Create theme nodes for each cluster
 	themeID := 0
 	for _, members := range clusters {
-		if result.ThemesCreated >= s.cfg.HiddenLayerMaxHidden {
+		if result.ThemesCreated >= maxThemes {
 			break
 		}
 
@@ -3885,30 +4167,42 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 	return result, nil
 }
 
-// fetchOrphanConversationObservations retrieves conversation_observation nodes without a theme
-func (s *Service) fetchOrphanConversationObservations(ctx context.Context, spaceID string) ([]ConversationObservation, error) {
+// fetchClusterableConversationObservations retrieves all conversation observations eligible for clustering.
+// Filters out mechanical noise (build telemetry, session machinery) that adds no cognitive value.
+// Returns ALL eligible observations regardless of existing theme edges — the caller handles
+// detaching old edges before re-clustering.
+func (s *Service) fetchClusterableConversationObservations(ctx context.Context, spaceID string) ([]ConversationObservation, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Query for conversation_observation nodes that don't have a THEME_OF edge to a theme
+	// Fetch ALL clusterable observations — noise patterns excluded at query level.
+	// No orphan filtering: caller detaches old GENERALIZES edges before re-clustering.
+	noiseFilters := `
+  AND NOT (o.content STARTS WITH 'Build/test succeeded')
+  AND NOT (o.content STARTS WITH 'Git push detected')
+  AND NOT (o.content STARTS WITH 'Ingest job')
+  AND NOT (o.content STARTS WITH 'Session resumed')
+  AND NOT (o.content STARTS WITH 'Co-activation round')
+  AND NOT (o.content STARTS WITH 'Co-activation')
+  AND NOT (o.content STARTS WITH 'Session reinforcement')
+  AND NOT (o.content STARTS WITH '[doctor-probe]')`
+
 	var cypher string
 	if s.cfg.HiddenLayerBatchSize > 0 {
 		cypher = fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE NOT (o)-[:THEME_OF]->(:MemoryNode {role_type: 'conversation_theme'})
-  AND o.embedding IS NOT NULL
+WHERE o.embedding IS NOT NULL%s
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
        o.session_id AS sessionId, o.tags AS tags
-LIMIT %d`, s.cfg.HiddenLayerBatchSize)
+LIMIT %d`, noiseFilters, s.cfg.HiddenLayerBatchSize)
 	} else {
-		cypher = `
+		cypher = fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE NOT (o)-[:THEME_OF]->(:MemoryNode {role_type: 'conversation_theme'})
-  AND o.embedding IS NOT NULL
+WHERE o.embedding IS NOT NULL%s
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
-       o.session_id AS sessionId, o.tags AS tags`
+       o.session_id AS sessionId, o.tags AS tags`, noiseFilters)
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -3948,6 +4242,65 @@ RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
 		return nil, err
 	}
 	return result.([]ConversationObservation), nil
+}
+
+// detachObservationThemeEdges removes GENERALIZES edges from conversation observations
+// to existing conversation themes, and deletes any themes left with zero members.
+// This enables full re-clustering on every consolidation run.
+func (s *Service) detachObservationThemeEdges(ctx context.Context, spaceID string) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Step 1: Delete GENERALIZES edges from observations to themes
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
+      -[r:GENERALIZES]->(t:ConversationTheme {space_id: $spaceId})
+DELETE r
+RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			cnt, _ := rec.Get("deleted")
+			return asInt(cnt), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	detached := result.(int)
+
+	// Step 2: Clean up orphaned themes (no remaining members)
+	if detached > 0 {
+		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, `
+MATCH (t:ConversationTheme {space_id: $spaceId})
+WHERE NOT ()-[:GENERALIZES]->(t)
+DETACH DELETE t
+RETURN count(t) AS removed`, map[string]any{"spaceId": spaceID})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				cnt, _ := rec.Get("removed")
+				removed := asInt(cnt)
+				if removed > 0 {
+					log.Printf("ClusterConversations: removed %d orphaned themes", removed)
+				}
+				return removed, res.Err()
+			}
+			return 0, res.Err()
+		})
+		if err != nil {
+			return detached, fmt.Errorf("cleanup orphaned themes: %w", err)
+		}
+	}
+
+	return detached, nil
 }
 
 // countConversationThemes returns the current count of conversation theme nodes

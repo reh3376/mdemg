@@ -16,15 +16,16 @@ import (
 
 // GuardrailConfig holds configuration for the guardrail validation service.
 type GuardrailConfig struct {
-	Enabled        bool
-	Provider       string // "openai" or "ollama"
-	Model          string
-	MaxTokens      int
-	TimeoutMs      int
-	OpenAIKey      string
-	OpenAIURL      string
-	OllamaURL      string
-	MaxConstraints int
+	Enabled         bool
+	Provider        string // "openai" or "ollama"
+	Model           string
+	MaxTokens       int
+	TimeoutMs       int
+	OpenAIKey       string
+	OpenAIURL       string
+	OllamaURL       string
+	MaxConstraints  int
+	VectorIndexName string // Neo4j vector index name (default: memNodeEmbedding)
 }
 
 // Validator defines the interface for guardrail validation.

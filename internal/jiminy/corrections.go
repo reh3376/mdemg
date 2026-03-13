@@ -18,23 +18,35 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
+	// Use HNSW vector index for O(log N) recall, then post-filter by obs_type
+	indexName := s.cfg.VectorIndexName
+	if indexName == "" {
+		indexName = "memNodeEmbedding"
+	}
+	candidateK := limit * 20
+	if candidateK < 50 {
+		candidateK = 50
+	}
+
 	cypher := `
-	MATCH (n:MemoryNode {space_id: $spaceId})
-	WHERE n.obs_type = 'correction' AND n.embedding IS NOT NULL
-	  AND NOT coalesce(n.is_archived, false)
-	  AND size(n.embedding) = size($embedding)
-	WITH n, vector.similarity.cosine(n.embedding, $embedding) AS sim
-	WHERE sim > 0.4
-	RETURN n.node_id AS node_id, n.content AS content, n.summary AS summary, sim
+	CALL db.index.vector.queryNodes($indexName, $candidateK, $embedding)
+	YIELD node, score
+	WHERE node.space_id = $spaceId
+	  AND node.obs_type = 'correction'
+	  AND NOT coalesce(node.is_archived, false)
+	  AND score > 0.4
+	RETURN node.node_id AS node_id, node.content AS content, node.summary AS summary, score AS sim
 	ORDER BY sim DESC LIMIT $limit`
 
 	var matches []correctionMatch
 
 	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId":   spaceID,
-			"embedding": embedding,
-			"limit":     int64(limit),
+			"spaceId":    spaceID,
+			"embedding":  embedding,
+			"limit":      int64(limit),
+			"indexName":  indexName,
+			"candidateK": int64(candidateK),
 		})
 		if err != nil {
 			return nil, err

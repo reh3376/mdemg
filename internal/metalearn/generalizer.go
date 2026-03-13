@@ -109,10 +109,9 @@ func (g *Generalizer) Generalize(ctx context.Context, name, summary, description
 // --- OpenAI integration ---
 
 type openAIChatRequest struct {
-	Model       string           `json:"model"`
-	Messages    []openAIMessage  `json:"messages"`
-	Temperature float64          `json:"temperature"`
-	MaxTokens   int              `json:"max_tokens"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	MaxTokens int             `json:"max_completion_tokens"`
 }
 
 type openAIMessage struct {
@@ -151,14 +150,17 @@ func (g *Generalizer) doGeneralizeWithOpenAI(ctx context.Context, userPrompt str
 		maxTokens = 500
 	}
 
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := openAIChatRequest{
 		Model: g.cfg.Model,
 		Messages: []openAIMessage{
 			{Role: "system", Content: generalizerSystemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature: 0.3,
-		MaxTokens:   maxTokens,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

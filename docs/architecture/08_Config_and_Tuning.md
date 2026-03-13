@@ -107,9 +107,9 @@ Current defaults (hardcoded in `scoring.go`, configurable via future update):
 
 | Symbol | Name | Default | Description |
 |--------|------|---------|-------------|
-| α | SCORING_WEIGHT_VECTOR | 0.55 | Vector similarity weight |
-| β | SCORING_WEIGHT_ACTIVATION | 0.30 | Activation score weight |
-| γ | SCORING_WEIGHT_RECENCY | 0.10 | Recency weight |
+| α | SCORING_WEIGHT_VECTOR | 0.60 | Vector similarity weight |
+| β | SCORING_WEIGHT_ACTIVATION | 0.20 | Activation score weight |
+| γ | SCORING_WEIGHT_RECENCY | 0.15 | Recency weight |
 | δ | SCORING_WEIGHT_CONFIDENCE | 0.05 | Confidence weight |
 | φ | SCORING_PENALTY_HUB | 0.08 | Hub penalty (log degree) |
 | κ | SCORING_PENALTY_REDUNDANCY | 0.12 | Path-prefix redundancy penalty |
@@ -203,6 +203,16 @@ LEARNING_NEGATIVE_MAX_PER_REQUEST=20      # Max rejected nodes per request
 ### ANN Retrieval Optimizations
 
 ```bash
+# Reciprocal Rank Fusion — k parameter for RRF combination
+RRF_CONSTANT=60                              # RRF k (default: 60, min: 1)
+
+# Spreading Activation — configurable steps and decay
+ACTIVATION_STEPS=2                           # Number of activation hops (default: 2, range: 1-10)
+ACTIVATION_LAMBDA=0.15                       # Decay factor per hop (default: 0.15, range: 0.0-0.9)
+
+# BM25 Scoring — separate signal in final scoring formula
+SCORING_BM25_WEIGHT=0.15                     # Weight for BM25 component (default: 0.15, range: 0.0-1.0)
+
 # Squared Activation — sharper, sparser signals
 SCORING_ACTIVATION_FLOOR=0.05
 SCORING_ACTIVATION_SQUARED=true
@@ -217,7 +227,37 @@ SCORING_BYPASS_THRESHOLD=0.85
 SCORING_BYPASS_WEIGHT=0.15
 SCORING_BYPASS_CODE_MULT=1.3
 SCORING_BYPASS_ARCH_MULT=0.5
+
+# Jina Cross-Encoder Reranking (alternative to LLM-based reranking)
+# RERANK_JINA_API_KEY=                        # Jina API key
+RERANK_JINA_MODEL=jina-reranker-v2-base-multilingual
+RERANK_JINA_URL=https://api.jina.ai/v1
+
+# Cluster Summarization — LLM summaries for L1-L4 nodes
+CLUSTER_SUMMARY_ENABLED=false                # Enable (default: false, opt-in)
+CLUSTER_SUMMARY_MAX_TOKENS=100
+CLUSTER_SUMMARY_TIMEOUT_MS=5000
+CLUSTER_SUMMARY_BATCH_SIZE=50
 ```
+
+### Dynamic Reclassification
+
+LLM-driven reclassification of oversized file-extension categories during consolidation. When a single category (e.g., "typescript") exceeds the threshold fraction of total L0 nodes, the reclassifier samples summaries, asks an LLM to propose semantic sub-categories, and assigns nodes via keyword matching. This produces more granular KMeans partitions and better clustering quality.
+
+```bash
+RECLASS_ENABLED=true                 # Enable dynamic reclassification (default: true)
+RECLASS_THRESHOLD=0.25               # Min fraction of total nodes to trigger (default: 0.25, range: 0.05-0.90)
+RECLASS_MAX_SAMPLE_SIZE=150          # Max summaries sent to LLM per category (default: 150, range: 20-500)
+RECLASS_MAX_CATEGORIES=10            # Max sub-categories LLM may propose (default: 10, range: 3-20)
+RECLASS_MAX_ITERATIONS=5             # Max reclassification loops until convergence (default: 5, range: 1-10)
+RECLASS_MAX_DEPTH=4                  # Max dot-path taxonomy depth (default: 4, range: 1-10)
+RECLASS_PROVIDER=                    # LLM provider: openai or ollama (cascades from EMERGENCE_PROVIDER)
+RECLASS_MODEL=gpt-5.4                # LLM model name (default: gpt-5.4)
+RECLASS_MAX_TOKENS=2000              # Max response tokens (default: 2000, range: 500-8000)
+RECLASS_TIMEOUT_MS=30000             # LLM call timeout in ms (default: 30000, min: 5000)
+```
+
+**Fail-open behavior**: If the LLM call fails (network error, invalid JSON, circuit breaker open), the original category is preserved unchanged. Consolidation continues with static classification.
 
 ### ANN Consolidation Optimizations
 

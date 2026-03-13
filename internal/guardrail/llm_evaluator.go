@@ -27,10 +27,9 @@ type llmViolation struct {
 
 // Local copies of request/response types (follows established duplication pattern in rerank.go/synthesis.go)
 type guardrailOpenAIChatRequest struct {
-	Model       string                   `json:"model"`
-	Messages    []guardrailOpenAIMessage `json:"messages"`
-	Temperature float64                  `json:"temperature"`
-	MaxTokens   int                      `json:"max_tokens"`
+	Model     string                   `json:"model"`
+	Messages  []guardrailOpenAIMessage `json:"messages"`
+	MaxTokens int                      `json:"max_completion_tokens"`
 }
 
 type guardrailOpenAIMessage struct {
@@ -120,14 +119,17 @@ func (g *GuardrailService) doEvaluateWithOpenAI(ctx context.Context, prompt stri
 		maxTokens = 1000
 	}
 
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := guardrailOpenAIChatRequest{
 		Model: g.cfg.Model,
 		Messages: []guardrailOpenAIMessage{
 			{Role: "system", Content: guardrailSystemPrompt},
 			{Role: "user", Content: prompt},
 		},
-		Temperature: 0.0, // Deterministic evaluation
-		MaxTokens:   maxTokens,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

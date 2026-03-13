@@ -25,24 +25,36 @@ func (s *Service) findRelevantFrontiers(ctx context.Context, spaceID string, emb
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
+	// Use HNSW vector index for O(log N) recall, then post-filter by is_frontier
+	indexName := s.cfg.VectorIndexName
+	if indexName == "" {
+		indexName = "memNodeEmbedding"
+	}
+	candidateK := limit * 20
+	if candidateK < 50 {
+		candidateK = 50
+	}
+
 	cypher := `
-	MATCH (n:MemoryNode {space_id: $spaceId})
-	WHERE n.is_frontier = true AND n.embedding IS NOT NULL
-	  AND NOT coalesce(n.is_archived, false)
-	  AND size(n.embedding) = size($embedding)
-	WITH n, vector.similarity.cosine(n.embedding, $embedding) AS sim
-	WHERE sim > $minSim
-	RETURN n.node_id AS node_id, n.name AS name, n.summary AS summary, sim
+	CALL db.index.vector.queryNodes($indexName, $candidateK, $embedding)
+	YIELD node, score
+	WHERE node.space_id = $spaceId
+	  AND node.is_frontier = true
+	  AND NOT coalesce(node.is_archived, false)
+	  AND score > $minSim
+	RETURN node.node_id AS node_id, node.name AS name, node.summary AS summary, score AS sim
 	ORDER BY sim DESC LIMIT $limit`
 
 	var matches []frontierMatch
 
 	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId":   spaceID,
-			"embedding": embedding,
-			"minSim":    minSim,
-			"limit":     int64(limit),
+			"spaceId":    spaceID,
+			"embedding":  embedding,
+			"minSim":     minSim,
+			"limit":      int64(limit),
+			"indexName":  indexName,
+			"candidateK": int64(candidateK),
 		})
 		if err != nil {
 			return nil, err

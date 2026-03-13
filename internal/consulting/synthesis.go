@@ -117,10 +117,9 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 
 // Local copies of request/response types (follows established duplication pattern in rerank.go)
 type synthOpenAIChatRequest struct {
-	Model       string               `json:"model"`
-	Messages    []synthOpenAIMessage `json:"messages"`
-	Temperature float64              `json:"temperature"`
-	MaxTokens   int                  `json:"max_tokens"`
+	Model     string               `json:"model"`
+	Messages  []synthOpenAIMessage `json:"messages"`
+	MaxTokens int                  `json:"max_completion_tokens"`
 }
 
 type synthOpenAIMessage struct {
@@ -163,13 +162,16 @@ func (s *LLMSynthesizer) doSynthesizeWithOpenAI(ctx context.Context, prompt stri
 		maxTokens = 2000
 	}
 
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
 	reqBody := synthOpenAIChatRequest{
 		Model: s.cfg.Model,
 		Messages: []synthOpenAIMessage{
 			{Role: "user", Content: prompt},
 		},
-		Temperature: 0.3, // Coherent prose, not deterministic scoring
-		MaxTokens:   maxTokens,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

@@ -75,6 +75,8 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, prompt)
 	case "ollama":
 		scores, tokensUsed, err = s.rerankWithOllama(timeoutCtx, prompt)
+	case "jina":
+		scores, tokensUsed, err = s.rerankWithJina(timeoutCtx, req.Query, req.Candidates[:topN])
 	default:
 		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, prompt)
 	}
@@ -182,10 +184,9 @@ func buildRerankPrompt(query string, candidates []models.RetrieveResult) string 
 
 // OpenAI chat completion request/response structures
 type openAIChatRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Temperature float64         `json:"temperature"`
-	MaxTokens   int             `json:"max_tokens"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	MaxTokens int             `json:"max_completion_tokens"`
 }
 
 type openAIMessage struct {
@@ -231,8 +232,7 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, prompt string) ([]floa
 		Messages: []openAIMessage{
 			{Role: "user", Content: prompt},
 		},
-		Temperature: 0.0, // Deterministic scoring
-		MaxTokens:   500, // Scores don't need many tokens
+		MaxTokens: 2000, // Reasoning models consume tokens for internal thought
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -391,4 +391,108 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// --- Jina cross-encoder reranking ---
+
+type jinaRerankRequest struct {
+	Model     string   `json:"model"`
+	Query     string   `json:"query"`
+	Documents []string `json:"documents"`
+	TopN      int      `json:"top_n"`
+}
+
+type jinaRerankResponse struct {
+	Results []jinaRerankResult `json:"results"`
+}
+
+type jinaRerankResult struct {
+	Index          int     `json:"index"`
+	RelevanceScore float64 `json:"relevance_score"`
+}
+
+func (s *Service) rerankWithJina(ctx context.Context, query string, candidates []models.RetrieveResult) ([]float64, int, error) {
+	if s.cbRegistry != nil {
+		cb := s.cbRegistry.Get("jina-rerank")
+		var scores []float64
+		err := cb.Execute(ctx, func(ctx context.Context) error {
+			var innerErr error
+			scores, innerErr = s.doRerankWithJina(ctx, query, candidates)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, 0, fmt.Errorf("jina rerank circuit breaker open")
+		}
+		return scores, 0, err
+	}
+	scores, err := s.doRerankWithJina(ctx, query, candidates)
+	return scores, 0, err
+}
+
+func (s *Service) doRerankWithJina(ctx context.Context, query string, candidates []models.RetrieveResult) ([]float64, error) {
+	// Build document strings: "Name | Path | Summary"
+	docs := make([]string, len(candidates))
+	for i, c := range candidates {
+		var sb strings.Builder
+		sb.WriteString(c.Name)
+		if c.Path != "" {
+			sb.WriteString(" | ")
+			sb.WriteString(c.Path)
+		}
+		if c.Summary != "" {
+			sb.WriteString(" | ")
+			sb.WriteString(c.Summary)
+		}
+		docs[i] = sb.String()
+	}
+
+	reqBody := jinaRerankRequest{
+		Model:     s.cfg.RerankJinaModel,
+		Query:     query,
+		Documents: docs,
+		TopN:      len(candidates),
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	endpoint := s.cfg.RerankJinaURL + "/rerank"
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.cfg.RerankJinaKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("jina error %d: %s", resp.StatusCode, string(body))
+	}
+
+	var jinaResp jinaRerankResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jinaResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	// Map Jina results back to ordered scores array
+	scores := make([]float64, len(candidates))
+	for i := range scores {
+		scores[i] = 0.5 // Default if not in response
+	}
+	for _, r := range jinaResp.Results {
+		if r.Index >= 0 && r.Index < len(scores) {
+			scores[r.Index] = r.RelevanceScore
+		}
+	}
+
+	return scores, nil
 }
