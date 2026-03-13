@@ -219,7 +219,7 @@ type Config struct {
 	MetaLearnTimeoutMs      int    // METALEARN_TIMEOUT_MS — timeout for generalization in ms (default: 15000, min 1000)
 
 	// Jiminy Guidance settings (Phase Jiminy)
-	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: false)
+	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
 	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 6000)
 	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
@@ -1415,7 +1415,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// Jiminy Guidance settings (Phase Jiminy)
-	jiminyEnabled := getBool("JIMINY_ENABLED", false)
+	jiminyEnabled := getBool("JIMINY_ENABLED", true)
 	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 6000)
 	if err != nil {
 		return Config{}, err
