@@ -557,7 +557,7 @@ func FromEnv() (Config, error) {
 		return v == "true" || v == "1" || v == "yes"
 	}
 
-	listen := get("LISTEN_ADDR", ":8080")
+	listen := get("LISTEN_ADDR", ":9999")
 	uri := get("NEO4J_URI", "")
 	user := get("NEO4J_USER", "")
 	pass := get("NEO4J_PASS", "")

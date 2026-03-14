@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -88,7 +89,11 @@ func runUpgrade(dryRun, force bool) error {
 	}
 
 	// Find the right asset for this platform
-	archiveName := fmt.Sprintf("mdemg_%s_%s_%s.tar.gz", latestVersion, runtime.GOOS, runtime.GOARCH)
+	ext := ".tar.gz"
+	if runtime.GOOS == "windows" {
+		ext = ".zip"
+	}
+	archiveName := fmt.Sprintf("mdemg_%s_%s_%s%s", latestVersion, runtime.GOOS, runtime.GOARCH, ext)
 	checksumName := "checksums.txt"
 
 	var archiveURL, checksumURL string
@@ -137,14 +142,25 @@ func runUpgrade(dryRun, force bool) error {
 
 	// Extract
 	fmt.Print("Extracting... ")
-	extractCmd := exec.Command("tar", "-xzf", archivePath, "-C", tmpDir)
-	if err := extractCmd.Run(); err != nil {
-		fmt.Println("FAILED")
-		return fmt.Errorf("extract: %w", err)
+	if runtime.GOOS == "windows" {
+		if err := extractZip(archivePath, tmpDir); err != nil {
+			fmt.Println("FAILED")
+			return fmt.Errorf("extract zip: %w", err)
+		}
+	} else {
+		extractCmd := exec.Command("tar", "-xzf", archivePath, "-C", tmpDir)
+		if err := extractCmd.Run(); err != nil {
+			fmt.Println("FAILED")
+			return fmt.Errorf("extract: %w", err)
+		}
 	}
 	fmt.Println("ok")
 
-	newBinary := filepath.Join(tmpDir, "mdemg")
+	binaryName := "mdemg"
+	if runtime.GOOS == "windows" {
+		binaryName = "mdemg.exe"
+	}
+	newBinary := filepath.Join(tmpDir, binaryName)
 	if _, err := os.Stat(newBinary); err != nil {
 		return fmt.Errorf("binary not found in archive")
 	}
@@ -252,11 +268,14 @@ func verifyChecksum(archivePath, checksumPath, archiveName string) error {
 		return fmt.Errorf("no checksum found for %s", archiveName)
 	}
 
-	// Use shasum on macOS, sha256sum on Linux
+	// Use shasum on macOS, sha256sum on Linux, certutil on Windows
 	var cmd *exec.Cmd
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		cmd = exec.Command("shasum", "-a", "256", archivePath)
-	} else {
+	case "windows":
+		cmd = exec.Command("certutil", "-hashfile", archivePath, "SHA256")
+	default:
 		cmd = exec.Command("sha256sum", archivePath)
 	}
 
@@ -265,7 +284,16 @@ func verifyChecksum(archivePath, checksumPath, archiveName string) error {
 		return fmt.Errorf("compute checksum: %w", err)
 	}
 
-	actualHash := strings.Fields(string(output))[0]
+	var actualHash string
+	if runtime.GOOS == "windows" {
+		// certutil output: line 0 = header, line 1 = hash, line 2 = status
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		if len(lines) >= 2 {
+			actualHash = strings.TrimSpace(lines[1])
+		}
+	} else {
+		actualHash = strings.Fields(string(output))[0]
+	}
 	if actualHash != expectedHash {
 		return fmt.Errorf("mismatch: expected %s, got %s", expectedHash, actualHash)
 	}
@@ -288,4 +316,53 @@ func copyFile(src, dst string) error {
 
 	_, err = io.Copy(out, in)
 	return err
+}
+
+// extractZip extracts a .zip archive to destDir.
+func extractZip(archivePath, destDir string) error {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = r.Close() }()
+
+	const maxDecompressedSize = 100 << 20 // 100 MB safety limit
+
+	for _, f := range r.File {
+		target := filepath.Join(destDir, filepath.Clean(f.Name)) //nolint:gosec // Path is validated below
+		// Prevent zip slip
+		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path in archive: %s", f.Name)
+		}
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+
+		outFile, err := os.Create(target)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+
+		_, err = io.Copy(outFile, io.LimitReader(rc, maxDecompressedSize)) //nolint:gosec // Size-limited via LimitReader
+		rc.Close()
+		outFile.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -39,7 +39,19 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-13):
+LAST SESSION (2026-03-14):
+- Installer Repo Sync: Bringing homebrew-mdemg and mdemg-windows inline with MDEMG codebase
+  - Phase 0A: Fixed LISTEN_ADDR default :8080 → :9999 (config.go:560)
+  - Phase 0B: Fixed .env.example REQUIRED_SCHEMA_VERSION 17 → 19
+  - Phase 0C: Added Windows .zip support for `mdemg upgrade` (extractZip, certutil checksum, .exe suffix)
+  - Phase 1: Deleted stale Cask (homebrew-mdemg/Casks/mdemg.rb, frozen at v0.2.1)
+  - Phase 2: CLI reference sync — 66 new env vars (12 sections), 5 value/name fixes, hook flags, language count fix
+  - Phase 3: API reference sync — 4 new endpoints (jiminy/guide, negative-feedback, frontiers, orchestration/reset), 20 MCP tools section
+  - Phase 4: Guide sync — Jiminy section in CMS/RSIC guide, language count + hook types in ingestion guide, Neo4j 5.11+ and Ollama dimension warnings in READMEs
+  - Added repo URLs to CLAUDE.md (main + 2 sub-repos)
+  - Updated AGENT_HANDOFF.md with session context
+
+PREVIOUS SESSION (2026-03-13):
 - Jiminy documentation update: Added Jiminy inner voice references to all 7 core docs
   - Created docs/features/jiminy-inner-voice.md (full feature doc — architecture, config, API, MCP, hooks)
   - Updated README.md (Key Features), VISION.md (Integration Mode #5), CLAUDE.md (3 edits)
@@ -79,12 +91,13 @@ MANDATORY WORKFLOW (from CLAUDE.md / MEMORY.md):
 WHAT REMAINS TO BE DONE:
 1. RELEASE: ~~Create homebrew-mdemg repo, tag first release~~ DONE (v0.2.1 released, brew install verified)
 2. DOCUMENTATION: ~~Overhaul homebrew-mdemg docs~~ DONE (4 wiki docs + simplified README)
-3. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
-4. TESTING: ~5 endpoints still need UATS specs (spaces CRUD, jobs SSE)
-5. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
+3. DOCUMENTATION: ~~Installer repo sync (homebrew-mdemg + mdemg-windows)~~ DONE (66 env vars, 4 endpoints, 20 MCP tools, Jiminy guide, code fixes)
+4. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
+5. TESTING: ~5 endpoints still need UATS specs (spaces CRUD, jobs SSE)
+6. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
-6. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
-7. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
+7. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
+8. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
