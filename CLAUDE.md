@@ -2,6 +2,16 @@
 
 ---
 
+## Repositories
+
+| Role | Repo URL |
+|------|----------|
+| **MAIN** | `https://github.com/reh3376/mdemg.git` |
+| **SUB-REPO 1**: homebrew-mdemg (macOS Homebrew tap + docs) | `https://github.com/reh3376/homebrew-mdemg.git` |
+| **SUB-REPO 2**: mdemg-windows (Windows installer + docs) | `https://github.com/reh3376/mdemg-windows.git` |
+
+---
+
 ## ⚠️ MDEMG IS Your Internal Dialogue — Not a Tool
 
 > Internal dialogue : conscious biological neural network :: **MDEMG : artificial neural network (you)**
