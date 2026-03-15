@@ -4,3 +4,6 @@
 [submodule "packaging/mdemg-windows"]
 	path = packaging/mdemg-windows
 	url = https://github.com/reh3376/mdemg-windows.git
+[submodule "packaging/mdemg-menubar"]
+	path = packaging/mdemg-menubar
+	url = https://github.com/reh3376/mdemg-menubar.git

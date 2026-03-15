@@ -141,6 +141,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	upgradeCmd.GroupID = "config"
 	rootCmd.AddCommand(upgradeCmd)
 
+	menubarCmd := newMenubarCmd()
+	menubarCmd.GroupID = "config"
+	rootCmd.AddCommand(menubarCmd)
+
 	// Advanced
 	mcpCmd := newMCPCmd()
 	mcpCmd.GroupID = "advanced"

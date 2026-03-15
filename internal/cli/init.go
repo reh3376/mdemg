@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	osExec "os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -27,6 +29,7 @@ func newInitCmd() *cobra.Command {
 		embeddingProvider string
 		noHooks           bool
 		noIDE             bool
+		noMenubar         bool
 	)
 
 	cmd := &cobra.Command{
@@ -58,6 +61,7 @@ Examples:
 				embeddingProvider: embeddingProvider,
 				noHooks:           noHooks,
 				noIDE:             noIDE,
+				noMenubar:         noMenubar,
 			})
 		},
 	}
@@ -70,6 +74,7 @@ Examples:
 	cmd.Flags().StringVar(&embeddingProvider, "embedding-provider", "", "Override embedding provider (ollama/openai/disabled)")
 	cmd.Flags().BoolVar(&noHooks, "no-hooks", false, "Skip git hook installation")
 	cmd.Flags().BoolVar(&noIDE, "no-ide", false, "Skip IDE config generation")
+	cmd.Flags().BoolVar(&noMenubar, "no-menubar", false, "Skip menu bar app installation (macOS)")
 
 	return cmd
 }
@@ -82,6 +87,7 @@ type initFlags struct {
 	embeddingProvider string
 	noHooks           bool
 	noIDE             bool
+	noMenubar         bool
 }
 
 func runInit(flags initFlags) error {
@@ -109,6 +115,11 @@ func runInit(flags initFlags) error {
 
 	// Detect environment
 	env := detectEnvironment(cwd)
+
+	// Print Docker resource warnings
+	for _, w := range env.dockerWarnings {
+		fmt.Printf("  Warning: %s\n", w)
+	}
 
 	// Build options from flags + detection + wizard
 	opts := config.InitOptions{
@@ -169,6 +180,36 @@ func runInit(flags initFlags) error {
 
 	// Server port
 	opts.ServerPort = 9999
+
+	// Port availability pre-check (interactive mode only)
+	if !flags.defaults {
+		for _, pc := range []struct {
+			name string
+			port *int
+		}{
+			{"MDEMG server", &opts.ServerPort},
+			{"Neo4j bolt", &opts.Neo4jBoltPort},
+			{"Neo4j HTTP", &opts.Neo4jHTTPPort},
+		} {
+			if err := checkPortAvailable(*pc.port); err != nil {
+				alt := suggestFreePort(*pc.port)
+				if alt > 0 {
+					fmt.Printf("  Warning: %s port %d is in use. Suggested alternative: %d\n", pc.name, *pc.port, alt)
+					answer := promptLine(fmt.Sprintf("  Use port %d instead? (yes/no) [yes]", alt), "yes")
+					if answer == "yes" || answer == "" {
+						*pc.port = alt
+					}
+				} else {
+					fmt.Printf("  Warning: %s port %d is in use (no free alternative found in +100 range)\n", pc.name, *pc.port)
+				}
+			}
+		}
+		// Sync Neo4j URI if bolt port was changed
+		if opts.Neo4jBoltPort != 7687 {
+			opts.Neo4jURI = fmt.Sprintf("bolt://localhost:%d", opts.Neo4jBoltPort)
+		}
+		fmt.Println()
+	}
 
 	// Embedding provider
 	hasOpenAIKey := os.Getenv("OPENAI_API_KEY") != ""
@@ -419,6 +460,10 @@ func runInit(flags initFlags) error {
 		waitForServerReady(opts.ServerPort)
 		// Run initial ingest so the graph isn't empty
 		runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
+		// Install menu bar app (--quick mode: silent)
+		if !flags.noMenubar {
+			installMenubarApp(true)
+		}
 		return nil
 	}
 
@@ -444,6 +489,10 @@ func runInit(flags initFlags) error {
 			waitForServerReady(opts.ServerPort)
 			// Run initial ingest so the graph isn't empty
 			runInitialIngest(cwd, opts.SpaceID, opts.LLMProvider, opts.LLMModel)
+			// Install menu bar app (interactive: prompt)
+			if !flags.noMenubar {
+				installMenubarApp(false)
+			}
 			return nil
 		}
 	}
@@ -460,19 +509,23 @@ func runInit(flags initFlags) error {
 	fmt.Printf("  %d. Start the server:       mdemg start --auto-migrate\n", step)
 	step++
 	fmt.Printf("  %d. Ingest your code:       mdemg ingest --path .\n", step)
+	step++
+	fmt.Printf("  %d. Menu bar (macOS):       mdemg menubar start\n", step)
 
 	return nil
 }
 
 // environmentInfo holds detection results.
 type environmentInfo struct {
-	neo4jReachable bool
+	neo4jReachable  bool
 	ollamaReachable bool
 	isGitRepo       bool
 	hasCursor       bool
 	hasVSCode       bool
 	hasClaude       bool
-	hasRootMCP      bool // .mcp.json exists at repo root (Claude Code project-scoped config)
+	hasRootMCP      bool     // .mcp.json exists at repo root (Claude Code project-scoped config)
+	dockerAvailable bool
+	dockerWarnings  []string
 }
 
 func detectEnvironment(dir string) environmentInfo {
@@ -514,7 +567,36 @@ func detectEnvironment(dir string) environmentInfo {
 		env.hasRootMCP = true
 	}
 
+	// Detect Docker resources
+	if DockerAvailable() {
+		env.dockerAvailable = true
+		_, env.dockerWarnings = CheckDockerResources()
+	}
+
 	return env
+}
+
+// checkPortAvailable returns an error if the given TCP port is already in use.
+func checkPortAvailable(port int) error {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return fmt.Errorf("port %d is already in use", port)
+	}
+	_ = ln.Close()
+	return nil
+}
+
+// suggestFreePort scans preferred+1 through preferred+100 for an available port.
+// Returns 0 if no free port is found.
+func suggestFreePort(preferred int) int {
+	for p := preferred + 1; p <= preferred+100; p++ {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
+		if err == nil {
+			_ = ln.Close()
+			return p
+		}
+	}
+	return 0
 }
 
 func promptLine(prompt, defaultVal string) string {
@@ -802,6 +884,83 @@ func detectPluginsDir(cwd string) string {
 
 	// Default: relative path (works when running from project root)
 	return "./plugins"
+}
+
+// installMenubarApp downloads and launches the MDEMG menu bar companion app (macOS only).
+// If silent is true, skips the user prompt and installs automatically.
+func installMenubarApp(silent bool) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	home, _ := os.UserHomeDir()
+	installDir := filepath.Join(home, "Applications")
+	appPath := filepath.Join(installDir, "MdemgMenuBar.app")
+
+	// Check if already installed
+	if info, err := os.Stat(appPath); err == nil && info.IsDir() {
+		fmt.Println("Menu bar app already installed, launching...")
+		_ = osExec.Command("open", appPath).Run()
+		return
+	}
+	// Also check /Applications
+	if info, err := os.Stat("/Applications/MdemgMenuBar.app"); err == nil && info.IsDir() {
+		fmt.Println("Menu bar app already installed, launching...")
+		_ = osExec.Command("open", "/Applications/MdemgMenuBar.app").Run()
+		return
+	}
+
+	if !silent {
+		answer := promptLine("Install MDEMG menu bar app? (yes/no) [yes]", "yes")
+		if answer != "yes" {
+			return
+		}
+	}
+
+	const downloadURL = "https://github.com/reh3376/mdemg-menubar/releases/latest/download/MdemgMenuBar.app.zip"
+
+	fmt.Print("Downloading menu bar app... ")
+
+	tmpDir, err := os.MkdirTemp("", "mdemg-menubar-*")
+	if err != nil {
+		fmt.Printf("failed: %v\n", err)
+		fmt.Println("You can install it manually: mdemg menubar start")
+		return
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	zipPath := filepath.Join(tmpDir, "MdemgMenuBar.app.zip")
+	if err := downloadFile(downloadURL, zipPath); err != nil {
+		fmt.Printf("failed: %v\n", err)
+		fmt.Println("You can install it manually: mdemg menubar start")
+		return
+	}
+	fmt.Println("ok")
+
+	// Ensure ~/Applications exists
+	if err := os.MkdirAll(installDir, 0755); err != nil {
+		fmt.Printf("Warning: could not create %s: %v\n", installDir, err)
+		return
+	}
+
+	// Extract
+	fmt.Print("Installing to ~/Applications... ")
+	if err := extractZip(zipPath, installDir); err != nil {
+		fmt.Printf("failed: %v\n", err)
+		return
+	}
+	fmt.Println("ok")
+
+	// Remove quarantine attribute (ad-hoc signed, downloaded from internet)
+	_ = osExec.Command("xattr", "-rd", "com.apple.quarantine", appPath).Run()
+
+	// Launch
+	if err := osExec.Command("open", appPath).Run(); err != nil {
+		fmt.Printf("Warning: could not launch menu bar app: %v\n", err)
+		fmt.Println("Launch it manually: mdemg menubar start")
+		return
+	}
+	fmt.Println("MDEMG menu bar app installed and launched")
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.

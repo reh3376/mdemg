@@ -82,6 +82,12 @@ func readPortFile() (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
+// removePortFile removes the .mdemg.port file (stale cleanup).
+func removePortFile() error {
+	portFile, _ := filepath.Abs(".mdemg.port")
+	return os.Remove(portFile)
+}
+
 // --- Commands ---
 
 func newStartCmd() *cobra.Command {
@@ -127,9 +133,14 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 	pidPath := pidFilePath()
 
 	// Check if already running
-	if pid, err := readPID(pidPath); err == nil && isProcessAlive(pid) {
-		fmt.Printf("MDEMG server is already running (pid=%d)\n", pid)
-		return nil
+	if pid, err := readPID(pidPath); err == nil {
+		if isProcessAlive(pid) {
+			fmt.Printf("MDEMG server is already running (pid=%d)\n", pid)
+			return nil
+		}
+		// Process died — clean up stale PID and port files
+		_ = removePID(pidPath)
+		_ = removePortFile()
 	}
 
 	// Auto-start Neo4j if needed (prefer project-scoped, fall back to lock file)
@@ -269,9 +280,10 @@ func runStop() error {
 	pid, err := readPID(pidPath)
 	if err != nil || !isProcessAlive(pid) {
 		fmt.Println("MDEMG server is not running")
-		// Clean up stale PID file
+		// Clean up stale PID and port files
 		if err == nil {
 			_ = removePID(pidPath)
+			_ = removePortFile()
 		}
 		return nil
 	}
@@ -287,6 +299,7 @@ func runStop() error {
 	for time.Now().Before(deadline) {
 		if !isProcessAlive(pid) {
 			_ = removePID(pidPath)
+			_ = removePortFile()
 			fmt.Println("MDEMG server stopped")
 			fmt.Println("Note: Neo4j container may still be running (stop with: mdemg db stop)")
 			return nil
@@ -299,6 +312,7 @@ func runStop() error {
 	_ = forceKillProcess(pid)
 	time.Sleep(1 * time.Second)
 	_ = removePID(pidPath)
+	_ = removePortFile()
 	fmt.Println("MDEMG server killed")
 	fmt.Println("Note: Neo4j container may still be running (stop with: mdemg db stop)")
 
@@ -405,9 +419,10 @@ func runStatus() error {
 		}
 	} else {
 		fmt.Println("  Server:    stopped")
-		// Clean up stale PID file
+		// Clean up stale PID and port files
 		if err == nil {
 			_ = removePID(pidPath)
+			_ = removePortFile()
 		}
 	}
 
