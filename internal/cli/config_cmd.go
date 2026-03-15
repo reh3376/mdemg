@@ -117,6 +117,11 @@ func runConfigValidate() error {
 	fmt.Println("==============================")
 	fmt.Println()
 
+	// Load config layers (YAML → keychain → .env) so env vars are populated
+	// before connectivity checks. Without this, os.Getenv calls below would
+	// miss values that only exist in config.yaml or .env.
+	_, _ = loadConfig()
+
 	hasErrors := false
 
 	// Check for config file
