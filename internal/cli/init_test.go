@@ -323,3 +323,22 @@ func TestRegisterWithMenubar_NonDefaultPort(t *testing.T) {
 		t.Errorf("serverURL = %v, want http://localhost:10000", inst["serverURL"])
 	}
 }
+
+func TestMaskKey(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"sk-proj-abc123xyz", "sk-proj-****..."},
+		{"sk-ant-longkeyvalue", "sk-ant-****..."},
+		{"short", "****..."},
+		{"abcdefghij", "abcd****..."},
+		{"sk-proj-HvPliFZCy8ohp-HoZZ1wUy0EY5lt5FM8", "sk-proj-****..."},
+	}
+	for _, tt := range tests {
+		got := maskKey(tt.input)
+		if got != tt.want {
+			t.Errorf("maskKey(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}

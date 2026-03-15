@@ -12,11 +12,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"mdemg/internal/config"
 )
 
@@ -272,7 +274,7 @@ func runInit(flags initFlags) error {
 			fmt.Println("  OpenAI requires an API key for embeddings and LLM features.")
 			fmt.Println("  The key will be stored in .env (gitignored), NOT in config.yaml.")
 			fmt.Println()
-			key := promptLine("OpenAI API key (sk-...) [press Enter to skip]", "")
+			key := promptSecret("OpenAI API key (sk-...) [press Enter to skip]")
 			if key != "" {
 				openAIKey = key
 			}
@@ -620,6 +622,46 @@ func promptLine(prompt, defaultVal string) string {
 	return defaultVal
 }
 
+// promptSecret reads a secret value without echoing it to the terminal.
+// After entry, it prints a masked version (e.g., "sk-proj-****...") so
+// pasted terminal output does not leak the real key.
+func promptSecret(prompt string) string {
+	fmt.Print(prompt + ": ")
+	fd := int(syscall.Stdin)
+	if term.IsTerminal(fd) {
+		raw, err := term.ReadPassword(fd)
+		fmt.Println() // newline after hidden input
+		if err != nil {
+			return ""
+		}
+		key := strings.TrimSpace(string(raw))
+		if key != "" {
+			fmt.Printf("  Key: %s\n", maskKey(key))
+		}
+		return key
+	}
+	// Fallback for non-terminal (piped input)
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return strings.TrimSpace(scanner.Text())
+	}
+	return ""
+}
+
+// maskKey returns a redacted version of an API key, e.g. "sk-proj-****...".
+func maskKey(key string) string {
+	if len(key) <= 8 {
+		return "****..."
+	}
+	// Show prefix up to first dash-separated segment (e.g. "sk-proj-")
+	parts := strings.SplitN(key, "-", 4)
+	if len(parts) >= 3 {
+		prefix := strings.Join(parts[:2], "-") + "-"
+		return prefix + "****..."
+	}
+	return key[:4] + "****..."
+}
+
 // mdemgMCPEntry returns the MCP server config block for mdemg.
 func mdemgMCPEntry(endpoint string) map[string]interface{} {
 	return map[string]interface{}{
@@ -910,6 +952,7 @@ func detectPluginsDir(cwd string) string {
 
 // installMenubarApp downloads and launches the MDEMG menu bar companion app (macOS only).
 // If silent is true, skips the user prompt and installs automatically.
+// Checks installed version against latest release and offers upgrade if outdated.
 func installMenubarApp(silent bool) {
 	if runtime.GOOS != "darwin" {
 		return
@@ -919,20 +962,42 @@ func installMenubarApp(silent bool) {
 	installDir := filepath.Join(home, "Applications")
 	appPath := filepath.Join(installDir, "MdemgMenuBar.app")
 
-	// Check if already installed
-	if info, err := os.Stat(appPath); err == nil && info.IsDir() {
-		fmt.Println("Menu bar app already installed, launching...")
-		_ = osExec.Command("open", appPath).Run()
-		return
-	}
-	// Also check /Applications
-	if info, err := os.Stat("/Applications/MdemgMenuBar.app"); err == nil && info.IsDir() {
-		fmt.Println("Menu bar app already installed, launching...")
-		_ = osExec.Command("open", "/Applications/MdemgMenuBar.app").Run()
-		return
+	// Check both install locations
+	existingPath := ""
+	for _, p := range []string{appPath, "/Applications/MdemgMenuBar.app"} {
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			existingPath = p
+			break
+		}
 	}
 
-	if !silent {
+	if existingPath != "" {
+		installedVersion := getMenubarVersion(existingPath)
+		latestVersion := getLatestMenubarRelease()
+
+		if latestVersion != "" && installedVersion != "" && installedVersion != latestVersion {
+			fmt.Printf("  Menu bar app update available: %s → %s\n", installedVersion, latestVersion)
+			if !silent {
+				answer := promptLine("  Upgrade menu bar app? (yes/no) [yes]", "yes")
+				if answer != "yes" {
+					fmt.Println("  Keeping current version, launching...")
+					_ = osExec.Command("open", existingPath).Run()
+					return
+				}
+			}
+			// Stop the running app before upgrading
+			_ = osExec.Command("osascript", "-e", `quit app "MdemgMenuBar"`).Run()
+			// Proceed to download and install (will overwrite)
+		} else {
+			if installedVersion != "" && latestVersion != "" {
+				fmt.Printf("Menu bar app up to date (v%s), launching...\n", installedVersion)
+			} else {
+				fmt.Println("Menu bar app already installed, launching...")
+			}
+			_ = osExec.Command("open", existingPath).Run()
+			return
+		}
+	} else if !silent {
 		answer := promptLine("Install MDEMG menu bar app? (yes/no) [yes]", "yes")
 		if answer != "yes" {
 			return
@@ -941,12 +1006,12 @@ func installMenubarApp(silent bool) {
 
 	const downloadURL = "https://github.com/reh3376/mdemg-menubar/releases/latest/download/MdemgMenuBar.app.zip"
 
-	fmt.Print("Downloading menu bar app... ")
+	fmt.Print("  Downloading menu bar app... ")
 
 	tmpDir, err := os.MkdirTemp("", "mdemg-menubar-*")
 	if err != nil {
 		fmt.Printf("failed: %v\n", err)
-		fmt.Println("You can install it manually: mdemg menubar start")
+		fmt.Println("  You can install it manually: mdemg menubar start")
 		return
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
@@ -954,39 +1019,85 @@ func installMenubarApp(silent bool) {
 	zipPath := filepath.Join(tmpDir, "MdemgMenuBar.app.zip")
 	if err := downloadFile(downloadURL, zipPath); err != nil {
 		fmt.Printf("failed: %v\n", err)
-		fmt.Println("You can install it manually: mdemg menubar start")
+		fmt.Println("  You can install it manually: mdemg menubar start")
 		return
 	}
 	fmt.Println("ok")
 
 	// Ensure ~/Applications exists
 	if err := os.MkdirAll(installDir, 0755); err != nil {
-		fmt.Printf("Warning: could not create %s: %v\n", installDir, err)
+		fmt.Printf("  Warning: could not create %s: %v\n", installDir, err)
 		return
 	}
 
-	// Extract
-	fmt.Print("Installing to ~/Applications... ")
+	// Extract (overwrites existing app if upgrading)
+	fmt.Print("  Installing to ~/Applications... ")
 	if err := extractZip(zipPath, installDir); err != nil {
 		fmt.Printf("failed: %v\n", err)
 		return
 	}
 	fmt.Println("ok")
 
+	// Use the canonical install path for post-install steps
+	targetPath := filepath.Join(installDir, "MdemgMenuBar.app")
+
 	// Ensure binary is executable (zip extraction may lose permissions)
-	binPath := filepath.Join(appPath, "Contents", "MacOS", "MdemgMenuBar")
+	binPath := filepath.Join(targetPath, "Contents", "MacOS", "MdemgMenuBar")
 	_ = os.Chmod(binPath, 0o755) //nolint:gosec // App binary must be executable
 
 	// Remove quarantine attribute (ad-hoc signed, downloaded from internet)
-	_ = osExec.Command("xattr", "-rd", "com.apple.quarantine", appPath).Run()
+	_ = osExec.Command("xattr", "-rd", "com.apple.quarantine", targetPath).Run()
 
 	// Launch
-	if err := osExec.Command("open", appPath).Run(); err != nil {
-		fmt.Printf("Warning: could not launch menu bar app: %v\n", err)
-		fmt.Println("Launch it manually: mdemg menubar start")
+	if err := osExec.Command("open", targetPath).Run(); err != nil {
+		fmt.Printf("  Warning: could not launch menu bar app: %v\n", err)
+		fmt.Println("  Launch it manually: mdemg menubar start")
 		return
 	}
-	fmt.Println("MDEMG menu bar app installed and launched")
+
+	newVersion := getMenubarVersion(targetPath)
+	if newVersion != "" {
+		fmt.Printf("  MDEMG menu bar app v%s installed and launched\n", newVersion)
+	} else {
+		fmt.Println("  MDEMG menu bar app installed and launched")
+	}
+}
+
+// getMenubarVersion reads CFBundleShortVersionString from an installed .app bundle.
+func getMenubarVersion(appPath string) string {
+	plistPath := filepath.Join(appPath, "Contents", "Info.plist")
+	out, err := osExec.Command("defaults", "read", plistPath, "CFBundleShortVersionString").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// getLatestMenubarRelease queries GitHub for the latest mdemg-menubar release tag.
+func getLatestMenubarRelease() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/reh3376/mdemg-menubar/releases/latest", nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return ""
+	}
+	// Strip leading "v" from tag (e.g. "v1.1.0" → "1.1.0")
+	return strings.TrimPrefix(release.TagName, "v")
 }
 
 // registerWithMenubar appends this project to the menubar app's instance registry.
