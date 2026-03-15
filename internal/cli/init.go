@@ -122,8 +122,10 @@ func runInit(flags initFlags) error {
 	}
 
 	// Build options from flags + detection + wizard
+	// SchemaVersion intentionally left at 0 (zero value) so it is omitted from
+	// config.yaml.  The server auto-detects the correct version from embedded
+	// migrations via migrations.MaxVersion() when REQUIRED_SCHEMA_VERSION is unset.
 	opts := config.InitOptions{
-		SchemaVersion:    18, // Current schema version (V0018 vector 3072)
 		BackupEnabled:    true,
 		BackupStorageDir: ".mdemg/backups",
 		BackupInterval:   24,  // daily partial backups
@@ -950,6 +952,10 @@ func installMenubarApp(silent bool) {
 		return
 	}
 	fmt.Println("ok")
+
+	// Ensure binary is executable (zip extraction may lose permissions)
+	binPath := filepath.Join(appPath, "Contents", "MacOS", "MdemgMenuBar")
+	_ = os.Chmod(binPath, 0o755) //nolint:gosec // App binary must be executable
 
 	// Remove quarantine attribute (ad-hoc signed, downloaded from internet)
 	_ = osExec.Command("xattr", "-rd", "com.apple.quarantine", appPath).Run()

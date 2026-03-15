@@ -705,8 +705,15 @@ func EffectiveConfig(yamlPath string) []ConfigSource {
 		yamlFlat = make(map[string]string)
 	}
 
-	// For each mapping, determine source
+	// For each mapping, determine source (deduplicate by YAML path so entries
+	// like backup.retention_count that map to multiple env vars appear only once)
+	seen := make(map[string]bool)
 	for _, m := range yamlEnvMapping {
+		if seen[m.yamlPath] {
+			continue
+		}
+		seen[m.yamlPath] = true
+
 		envVal := os.Getenv(m.envVar)
 		yamlVal := yamlFlat[m.yamlPath]
 
