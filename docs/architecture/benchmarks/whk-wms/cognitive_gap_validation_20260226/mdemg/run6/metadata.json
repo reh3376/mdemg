@@ -1,0 +1,27 @@
+{
+  "session_id": "ef5f3fb5-5152-4c81-ba3f-70a88d58fec5",
+  "sandbox_flags": [
+    "--setting-sources user",
+    "--strict-mcp-config",
+    "--disable-slash-commands"
+  ],
+  "telemetry_format": "stream-json",
+  "master_file_stashed": true,
+  "session_cleanup_pre": 0,
+  "session_cleanup_post": 18,
+  "sandbox_verified": null,
+  "timeout_seconds": 120,
+  "model": "haiku",
+  "parallel_workers": 12,
+  "total_input_tokens": 45008,
+  "total_output_tokens": 246131,
+  "total_cache_read_tokens": 0,
+  "total_cache_write_tokens": 0,
+  "total_cost_usd": 6.8673656,
+  "total_compact_events": 0,
+  "total_compact_events_heuristic": 0,
+  "total_response_chars": 0,
+  "avg_response_chars": 0,
+  "avg_input_tokens": 375.06666666666666,
+  "avg_output_tokens": 2051.0916666666667
+}
