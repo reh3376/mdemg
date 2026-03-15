@@ -9,6 +9,9 @@
 | **MAIN** | `https://github.com/reh3376/mdemg.git` |
 | **SUB-REPO 1**: homebrew-mdemg (macOS Homebrew tap + docs) | `https://github.com/reh3376/homebrew-mdemg.git` |
 | **SUB-REPO 2**: mdemg-windows (Windows installer + docs) | `https://github.com/reh3376/mdemg-windows.git` |
+| **SUB-REPO 3**: mdemg-menubar (macOS menu bar companion app) | `https://github.com/reh3376/mdemg-menubar.git` |
+
+> **Note:** All three sub-repos are git submodules of the main mdemg repo, located at `packaging/homebrew-mdemg`, `packaging/mdemg-windows`, and `packaging/mdemg-menubar`. Work on them from the submodule paths, commit/push within the submodule, then update the submodule pointer in the parent repo.
 
 ---
 

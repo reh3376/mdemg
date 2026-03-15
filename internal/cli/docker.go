@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+
 const (
 	neo4jContainerName = "mdemg-neo4j-dev"
 	neo4jVolumeName    = "mdemg-neo4j-data"
@@ -29,6 +30,54 @@ type ContainerState struct {
 func DockerAvailable() bool {
 	_, err := exec.LookPath("docker")
 	return err == nil
+}
+
+const (
+	minDockerMemoryGB = 4
+	minDockerCPUs     = 2
+)
+
+// DockerResources holds Docker Desktop resource allocation.
+type DockerResources struct {
+	MemoryBytes int64
+	CPUs        int
+}
+
+// CheckDockerResources queries Docker for allocated resources and returns warnings
+// if below minimums. Returns nil warnings if resources are adequate or Docker is unavailable.
+func CheckDockerResources() (DockerResources, []string) {
+	var res DockerResources
+
+	out, err := RunDockerCommand("info", "--format", "{{json .}}")
+	if err != nil {
+		return res, nil // Docker not running — don't warn here, other checks handle it
+	}
+
+	var info struct {
+		MemTotal int64 `json:"MemTotal"`
+		NCPU     int   `json:"NCPU"`
+	}
+	if err := json.Unmarshal([]byte(out), &info); err != nil {
+		return res, nil // Parse failure — don't block init
+	}
+
+	res.MemoryBytes = info.MemTotal
+	res.CPUs = info.NCPU
+
+	var warnings []string
+	memGB := float64(info.MemTotal) / (1024 * 1024 * 1024)
+	if memGB < float64(minDockerMemoryGB) {
+		warnings = append(warnings, fmt.Sprintf(
+			"Docker has %.1f GB RAM (minimum: %d GB) — increase via Docker Desktop > Settings > Resources",
+			memGB, minDockerMemoryGB))
+	}
+	if info.NCPU < minDockerCPUs {
+		warnings = append(warnings, fmt.Sprintf(
+			"Docker has %d CPU(s) (minimum: %d) — increase via Docker Desktop > Settings > Resources",
+			info.NCPU, minDockerCPUs))
+	}
+
+	return res, warnings
 }
 
 // InspectContainer returns the state of a named Docker container.

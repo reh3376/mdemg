@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -102,4 +103,38 @@ func TestWaitForServerReady_DefaultPort(t *testing.T) {
 	// so we just verify it handles the zero port without panic
 	// (Full timeout test would be too slow for unit tests)
 	t.Log("Verified waitForServerReady handles port=0 default")
+}
+
+func TestCheckPortAvailable_InUse(t *testing.T) {
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+
+	if err := checkPortAvailable(port); err == nil {
+		t.Errorf("checkPortAvailable(%d) = nil, want error", port)
+	}
+}
+
+func TestCheckPortAvailable_Free(t *testing.T) {
+	free := suggestFreePort(49000)
+	if free == 0 {
+		t.Skip("no free port found")
+	}
+	if err := checkPortAvailable(free); err != nil {
+		t.Errorf("checkPortAvailable(%d) = %v, want nil", free, err)
+	}
+}
+
+func TestSuggestFreePort(t *testing.T) {
+	alt := suggestFreePort(49000)
+	if alt == 0 {
+		t.Error("suggestFreePort returned 0, expected a free port")
+	}
+	if alt <= 49000 || alt > 49100 {
+		t.Errorf("suggestFreePort returned %d, expected 49001-49100", alt)
+	}
 }
