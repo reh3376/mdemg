@@ -39,7 +39,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-14):
+LAST SESSION (2026-03-15):
+- Menubar Multi-Instance Support + Plugin Path Fix
+  - 4 new Swift files: MdemgInstance model, InstanceStore (JSON registry + file watcher), InstanceScanner (auto-discovery), InstanceManagerView
+  - 5 modified Swift files: PollingManager (multi-instance state, switchToInstance, background polling), CLIExecutor (workingDirectory), AppDelegate (wiring), StatusView (instance picker), PreferencesView (instance management)
+  - Go: registerWithMenubar() in init.go — CLI auto-registration to instances.json
+  - Go: Enhanced detectPluginsDir() — dynamic brew --prefix fallback
+  - Tests: 11 new Swift tests (InstanceStore + CLI JSON compat), 6 new Go tests (registerWithMenubar + detectPluginsDir)
+  - All tests pass: 39 Swift (0 failures), Go cli package all pass
+  - Builds verified: xcodebuild BUILD SUCCEEDED, go build ./... clean, golangci-lint 0 issues
+
+PREVIOUS SESSION (2026-03-14):
 - Installer Repo Sync: Bringing homebrew-mdemg and mdemg-windows inline with MDEMG codebase
   - Phase 0A: Fixed LISTEN_ADDR default :8080 → :9999 (config.go:560)
   - Phase 0B: Fixed .env.example REQUIRED_SCHEMA_VERSION 17 → 19
