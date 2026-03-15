@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -203,6 +204,9 @@ func TestDetectPluginsDir_FallbackDefault(t *testing.T) {
 }
 
 func TestRegisterWithMenubar_CreatesFile(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("registerWithMenubar is macOS-only")
+	}
 	// Override HOME so we write to a temp directory
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
@@ -250,6 +254,9 @@ func TestRegisterWithMenubar_CreatesFile(t *testing.T) {
 }
 
 func TestRegisterWithMenubar_DeduplicatesByDirectory(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("registerWithMenubar is macOS-only")
+	}
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpHome)
@@ -283,6 +290,9 @@ func TestRegisterWithMenubar_DeduplicatesByDirectory(t *testing.T) {
 }
 
 func TestRegisterWithMenubar_NonDefaultPort(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("registerWithMenubar is macOS-only")
+	}
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpHome)
