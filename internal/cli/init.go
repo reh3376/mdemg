@@ -466,6 +466,8 @@ func runInit(flags initFlags) error {
 		if !flags.noMenubar {
 			installMenubarApp(true)
 		}
+		// Register with menubar app instance registry
+		registerWithMenubar(cwd, opts.SpaceID, opts.ServerPort)
 		return nil
 	}
 
@@ -495,6 +497,8 @@ func runInit(flags initFlags) error {
 			if !flags.noMenubar {
 				installMenubarApp(false)
 			}
+			// Register with menubar app instance registry
+			registerWithMenubar(cwd, opts.SpaceID, opts.ServerPort)
 			return nil
 		}
 	}
@@ -513,6 +517,9 @@ func runInit(flags initFlags) error {
 	fmt.Printf("  %d. Ingest your code:       mdemg ingest --path .\n", step)
 	step++
 	fmt.Printf("  %d. Menu bar (macOS):       mdemg menubar start\n", step)
+
+	// Register with menubar app instance registry
+	registerWithMenubar(cwd, opts.SpaceID, opts.ServerPort)
 
 	return nil
 }
@@ -861,12 +868,25 @@ func runInitialIngest(cwd, spaceID, llmProvider, llmModel string) {
 }
 
 // detectPluginsDir finds the best plugins directory for the current installation.
-// Checks Homebrew share, Windows install dir, and local ./plugins in order.
+// Checks Homebrew share (static + dynamic), Windows install dir, and local ./plugins in order.
 func detectPluginsDir(cwd string) string {
-	// Homebrew: /opt/homebrew/share/mdemg/plugins or /usr/local/share/mdemg/plugins
+	// Homebrew: static well-known paths first (fast, no subprocess)
 	for _, prefix := range []string{"/opt/homebrew/share/mdemg/plugins", "/usr/local/share/mdemg/plugins"} {
 		if info, err := os.Stat(prefix); err == nil && info.IsDir() {
 			return prefix
+		}
+	}
+
+	// Homebrew: dynamic lookup via brew --prefix (handles non-standard Homebrew installs)
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		if out, err := osExec.Command("brew", "--prefix", "mdemg").Output(); err == nil {
+			brewPrefix := strings.TrimSpace(string(out))
+			if brewPrefix != "" {
+				brewPlugins := filepath.Join(brewPrefix, "share", "mdemg", "plugins")
+				if info, err := os.Stat(brewPlugins); err == nil && info.IsDir() {
+					return brewPlugins
+				}
+			}
 		}
 	}
 
@@ -967,6 +987,82 @@ func installMenubarApp(silent bool) {
 		return
 	}
 	fmt.Println("MDEMG menu bar app installed and launched")
+}
+
+// registerWithMenubar appends this project to the menubar app's instance registry.
+// The registry is a JSON file at ~/Library/Application Support/com.reh3376.mdemg-menubar/instances.json.
+// This enables the menubar app to auto-discover new instances without manual configuration.
+// Deduplicates by projectDirectory — safe to call multiple times.
+func registerWithMenubar(cwd, spaceID string, port int) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	appSupportDir := filepath.Join(home, "Library", "Application Support", "com.reh3376.mdemg-menubar")
+	registryPath := filepath.Join(appSupportDir, "instances.json")
+
+	// Read existing registry
+	type menubarInstance struct {
+		ID               string `json:"id"`
+		Name             string `json:"name"`
+		ProjectDirectory string `json:"projectDirectory"`
+		ServerURL        string `json:"serverURL,omitempty"`
+		SpaceID          string `json:"spaceId"`
+		AddedAt          string `json:"addedAt"`
+		Source           string `json:"source"`
+	}
+
+	var instances []menubarInstance
+
+	if data, err := os.ReadFile(registryPath); err == nil {
+		_ = json.Unmarshal(data, &instances)
+	}
+
+	// Deduplicate by projectDirectory
+	absCwd, _ := filepath.Abs(cwd)
+	for _, inst := range instances {
+		if inst.ProjectDirectory == absCwd {
+			return // Already registered
+		}
+	}
+
+	// Build server URL only if non-default port
+	var serverURL string
+	if port != 0 && port != 9999 {
+		serverURL = fmt.Sprintf("http://localhost:%d", port)
+	}
+
+	// Create new instance entry
+	newInst := menubarInstance{
+		ID:               fmt.Sprintf("%d", time.Now().UnixNano()),
+		Name:             filepath.Base(absCwd),
+		ProjectDirectory: absCwd,
+		ServerURL:        serverURL,
+		SpaceID:          spaceID,
+		AddedAt:          time.Now().Format(time.RFC3339),
+		Source:           "cliInit",
+	}
+	instances = append(instances, newInst)
+
+	// Ensure directory exists
+	_ = os.MkdirAll(appSupportDir, 0755)
+
+	// Write atomically (temp file + rename)
+	data, err := json.MarshalIndent(instances, "", "  ")
+	if err != nil {
+		return
+	}
+
+	tmpPath := registryPath + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return
+	}
+	_ = os.Rename(tmpPath, registryPath)
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.
