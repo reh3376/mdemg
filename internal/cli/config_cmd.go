@@ -55,6 +55,11 @@ Secrets are masked with **** in the output.`,
 }
 
 func runConfigShow(jsonOutput bool) error {
+	// Load config layers (YAML → keychain → .env) so env vars are populated
+	// before building the effective config. Without this, os.Getenv calls
+	// miss values that only exist in .env when run as a subprocess.
+	_, _ = loadConfig()
+
 	yamlPath := config.FindConfigFile()
 
 	entries := config.EffectiveConfig(yamlPath)
