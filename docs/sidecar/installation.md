@@ -143,6 +143,21 @@ mdemg sidecar doctor --format json
 
 ## 7. Agent Attachment
 
+### Option A: One-Command Setup (Quickstart)
+
+Run the full sidecar onboarding sequence in one command:
+
+```bash
+mdemg sidecar quickstart
+mdemg sidecar quickstart --profile local --agents claude-code
+mdemg sidecar quickstart --endpoint http://macstudio.local:9999
+mdemg sidecar quickstart --dry-run
+```
+
+Quickstart runs: `init → install → up → attach-agent → generate-hooks`. Each step checks current state and skips if already done. Stops on the first failure and reports what succeeded.
+
+### Option B: Step-by-Step Attachment
+
 Attach adapters after install/up:
 
 ```bash
@@ -152,10 +167,22 @@ mdemg sidecar attach-agent codex
 
 Note: The adapter name is a positional argument, not a flag.
 
+For Claude Code, `attach-agent` automatically enables `enableAllProjectMcpServers` in `.claude/settings.local.json` so the MCP server is not silently disabled. Use `--no-settings` to skip this behavior if you manage settings manually.
+
+After attaching, generate Claude Code hooks:
+
+```bash
+mdemg sidecar generate-hooks
+```
+
+This writes `session-start.sh` and `prompt-context.sh` to `.claude/hooks/` and registers them in `.claude/settings.local.json`.
+
 Checkpoints:
 
 1. Agent config backups exist in `.mdemg/backups/`.
 2. Agent can list/call MDEMG tools.
+3. `.claude/settings.local.json` has `enableAllProjectMcpServers: true` (claude-code).
+4. `.claude/hooks/session-start.sh` and `.claude/hooks/prompt-context.sh` exist (after `generate-hooks`).
 
 ---
 

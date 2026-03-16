@@ -119,6 +119,8 @@ install:
 1. Include adapter entry: `- name: "claude-code"`.
 2. Adapter writes/merges `.claude/mcp.json`.
 3. Existing file must be backed up before mutation.
+4. `attach-agent claude-code` automatically sets `enableAllProjectMcpServers: true` in `.claude/settings.local.json`. This ensures the MCP server registered in `mcp.json` is not silently disabled by Claude Code. Use `--no-settings` to skip this step.
+5. `generate-hooks` writes `session-start.sh` and `prompt-context.sh` to `.claude/hooks/` and registers them in `.claude/settings.local.json`.
 
 ## 6.2 Codex
 

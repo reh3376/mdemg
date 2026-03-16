@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-15
+**Date:** 2026-03-16
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -39,7 +39,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-15, Session 2):
+LAST SESSION (2026-03-16):
+- Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure):
+  - `mdemg sidecar quickstart` — one-command onboarding (init + install + up + attach-agent + generate-hooks)
+  - `generate-hooks` now produces both session-start.sh and prompt-context.sh, registers in settings.local.json
+  - `attach-agent` enables enableAllProjectMcpServers for claude-code adapter (--no-settings to skip)
+  - PR #127 closed with comment, feat/claude-code-plugin branch deleted
+  - Files: sidecar_quickstart.go (new), sidecar_generate_hooks.go, sidecar_attach.go, sidecar.go
+  - All checks pass: go build, go vet, golangci-lint 0 issues
+  - Docs updated: README.md, CONTRIBUTING.md, CHANGELOG.md, AGENT_HANDOFF.md
+
+PREVIOUS SESSION (2026-03-15, Session 2):
 - Install Testing Bug Fixes: 3 bugs found during comprehensive install testing (34 test groups, 80+ endpoints, 29 CLI commands)
   - Bug 1 (HIGH): `space copy` infinite loop — Cypher deduplication failed for copy operations (creates new nodes, no natural termination). Replaced with two-phase approach: collect all source IDs upfront, then batch by explicit ID list. Added `:MemoryNode` label to all 6 MATCH clauses (node copy, edge copy primary, edge copy fallback, cleanup). 14,239 orphaned nodes were created from 10-node source before fix.
   - Bug 2 (MEDIUM): Full backup "database in use" — `runFullBackup()` attempted `neo4j-admin database dump` which requires exclusive DB access. Replaced with logical export by delegating to `runPartialBackup(ctx, job, record, nil)`. Both full and partial backups now produce portable `.mdemg` files. Restore auto-detects format (`.mdemg` vs legacy `.dump`).
@@ -567,6 +577,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase S11 (Complete)**: Sidecar LLM Integration and Config Simplification — consolidated embedding model defaults (qwen3-embedding:4b), LLM config auto-detection. Spec: `docs/sidecar/roadmap.md` §S11.
 - **Phase S12 (Complete)**: Sidecar Upgrade and Uninstall Commands — `mdemg sidecar upgrade` (version drift, down→install→up cycle), `mdemg sidecar uninstall` (7-phase cleanup, safety backup). Go: `internal/cli/sidecar_upgrade.go`, `internal/cli/sidecar_uninstall.go`. Tests: `internal/cli/sidecar_upgrade_test.go`, `internal/cli/sidecar_uninstall_test.go`. Spec: `docs/sidecar/roadmap.md` §S12.
 - **Phase S14 (Complete)**: Documentation Cleanup — Stub Resolution — removed stale stub references from `maintenance.md`, `faq.md`, `sidecar-acceptance.sh`, `sidecar_lifecycle_test.go`. Added S10-S12, S14 to roadmap. 5 new integration tests + 3 state guard entries.
+- **Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure)**: `mdemg sidecar quickstart` one-command onboarding (init→install→up→attach-agent→generate-hooks with state-aware skipping). `generate-hooks` now produces both `session-start.sh` and `prompt-context.sh` with parameterized endpoint/space_id/session_id, registers both in `.claude/settings.local.json`. `attach-agent` sets `enableAllProjectMcpServers: true` for claude-code adapter (`--no-settings` flag to skip). Go: `internal/cli/sidecar_quickstart.go` (new), `internal/cli/sidecar_generate_hooks.go`, `internal/cli/sidecar_attach.go`, `internal/cli/sidecar.go`. PR #127 closed.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 
@@ -2706,4 +2717,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-12 — All 105 phases + S0-S14 complete + ANN Optimization Suite (10 optimizations). v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*
+*Last updated: 2026-03-16 — All 105 phases + S0-S14 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed). v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*

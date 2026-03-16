@@ -45,6 +45,8 @@ tail -n 200 .mdemg/logs/mdemg.log
 | `TRBL-CMS-DEGRADED` | CMS checks fail in doctor | Embedder/service dependency unavailable | Fix embedder config and restart |
 | `TRBL-HOOK-CONFLICT` | Hook install skipped | Existing non-MDEMG hook present | Merge manually or use force policy |
 | `TRBL-OLLAMA-MODELS` | Doctor reports missing Ollama models | Required models not pulled | Run `ollama pull` for each missing model |
+| `TRBL-HOOKS-STALE` | Generated hooks use wrong endpoint/space | Endpoint changed since `generate-hooks` ran | Re-run `mdemg sidecar generate-hooks` to rebake current endpoint |
+| `TRBL-MCP-DISABLED` | MCP tools not visible in Claude Code | `enableAllProjectMcpServers` not set | Run `mdemg sidecar attach-agent claude-code` (sets it automatically) or manually set in `.claude/settings.local.json` |
 | ~~`TRBL-STUB-CMD`~~ | ~~Command prints "not yet implemented"~~ | ~~Resolved in S12~~ | Both `upgrade` and `uninstall` are now fully implemented |
 
 ---

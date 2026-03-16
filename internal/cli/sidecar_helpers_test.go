@@ -158,6 +158,40 @@ func TestGenerateSessionStartScript_Content(t *testing.T) {
 	}
 }
 
+// --- generatePromptContextScript ---
+
+func TestGeneratePromptContextScript_Shebang(t *testing.T) {
+	script := generatePromptContextScript("http://localhost:9999", "my-space", "my-session")
+	if !strings.HasPrefix(script, "#!/usr/bin/env bash") {
+		t.Errorf("script does not start with shebang, got prefix: %q", script[:50])
+	}
+}
+
+func TestGeneratePromptContextScript_Content(t *testing.T) {
+	script := generatePromptContextScript("http://test:8080", "test-space", "test-session")
+	for _, want := range []string{
+		"http://test:8080",
+		"test-space",
+		"test-session",
+		"/v1/conversation/recall",
+		"/v1/jiminy/guide",
+		"/v1/memory/retrieve",
+		"CMS RECALL",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("script missing %q", want)
+		}
+	}
+}
+
+func TestGeneratePromptContextScript_SkipsShortPrompts(t *testing.T) {
+	script := generatePromptContextScript("http://localhost:9999", "sp", "sess")
+	// Script should contain the short prompt guard
+	if !strings.Contains(script, "15") {
+		t.Error("script missing short prompt length check")
+	}
+}
+
 // --- buildHealthSummary ---
 
 func TestBuildHealthSummary_AllHealthy(t *testing.T) {

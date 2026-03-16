@@ -2,6 +2,7 @@ package cli
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,9 +14,10 @@ import (
 
 func newSidecarAttachAgentCmd() *cobra.Command {
 	var (
-		dryRun    bool
-		printOnly bool
-		format    string
+		dryRun     bool
+		printOnly  bool
+		noSettings bool
+		format     string
 	)
 
 	cmd := &cobra.Command{
@@ -24,7 +26,8 @@ func newSidecarAttachAgentCmd() *cobra.Command {
 		Long: `Wire MDEMG's MCP server into an AI agent's configuration.
 
 Merges MDEMG config into the agent's config file with backup,
-idempotency, and dry-run support.
+idempotency, and dry-run support. For claude-code, also enables
+enableAllProjectMcpServers in settings.local.json.
 
 Supported adapters: claude-code, codex
 
@@ -32,6 +35,7 @@ Examples:
   mdemg sidecar attach-agent claude-code
   mdemg sidecar attach-agent codex --dry-run
   mdemg sidecar attach-agent claude-code --print-only
+  mdemg sidecar attach-agent claude-code --no-settings
   mdemg sidecar attach-agent claude-code --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -39,6 +43,7 @@ Examples:
 				adapterName: args[0],
 				dryRun:      dryRun,
 				printOnly:   printOnly,
+				noSettings:  noSettings,
 				format:      format,
 			})
 		},
@@ -46,6 +51,7 @@ Examples:
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Report what would happen without making changes")
 	cmd.Flags().BoolVar(&printOnly, "print-only", false, "Print the MCP config payload to stdout and exit")
+	cmd.Flags().BoolVar(&noSettings, "no-settings", false, "Skip enabling enableAllProjectMcpServers in settings")
 	cmd.Flags().StringVar(&format, "format", "text", "Output format (text, json)")
 
 	return cmd
@@ -55,6 +61,7 @@ type sidecarAttachAgentFlags struct {
 	adapterName string
 	dryRun      bool
 	printOnly   bool
+	noSettings  bool
 	format      string
 }
 
@@ -188,11 +195,15 @@ func runSidecarAttachAgent(flags sidecarAttachAgentFlags) error {
 		report.ConfigFormat = adapter.ConfigFormat()
 		report.DryRun = true
 		report.MergeStrategy = strategy
-		report.NextActions = []string{
+		dryRunActions := []string{
 			fmt.Sprintf("Would %s %s", strategy, agentConfigPath),
 			"Would backup existing file",
 			"Would update sidecar.yaml adapters list",
 		}
+		if adapterName == sidecar.AdapterClaudeCode && !flags.noSettings {
+			dryRunActions = append(dryRunActions, "Would enable enableAllProjectMcpServers in settings.local.json")
+		}
+		report.NextActions = dryRunActions
 		if flags.format == "json" {
 			return sidecar.PrintJSON(report)
 		}
@@ -259,6 +270,18 @@ func runSidecarAttachAgent(flags sidecarAttachAgentFlags) error {
 		Action: strategy + "d", // "created" or "merged"
 	})
 
+	// Enable enableAllProjectMcpServers for Claude Code adapter
+	if adapterName == sidecar.AdapterClaudeCode && !flags.noSettings {
+		settingsPath := filepath.Join(projectDir, ".claude", "settings.local.json")
+		if settingsErr := ensureProjectMcpEnabled(settingsPath); settingsErr != nil {
+			return fmt.Errorf("enable MCP in settings: %w", settingsErr)
+		}
+		changes = append(changes, sidecar.ReportChange{
+			Path:   settingsPath,
+			Action: "updated",
+		})
+	}
+
 	// Update sidecar.yaml adapters list
 	adapterUpdated := updateSidecarAdapters(configPath, cfg, adapterName, true)
 	if adapterUpdated {
@@ -304,6 +327,43 @@ func runSidecarAttachAgent(flags sidecarAttachAgentFlags) error {
 	fmt.Println()
 
 	return nil
+}
+
+// ensureProjectMcpEnabled reads or creates .claude/settings.local.json and sets
+// enableAllProjectMcpServers to true if not already set.
+func ensureProjectMcpEnabled(settingsPath string) error {
+	var root map[string]any
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("read settings: %w", err)
+		}
+		root = make(map[string]any)
+	} else {
+		if err := json.Unmarshal(data, &root); err != nil {
+			return fmt.Errorf("parse settings: %w", err)
+		}
+	}
+
+	// Check if already enabled
+	if val, ok := root["enableAllProjectMcpServers"].(bool); ok && val {
+		return nil // already set
+	}
+
+	root["enableAllProjectMcpServers"] = true
+
+	out, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal settings: %w", err)
+	}
+	out = append(out, '\n')
+
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		return fmt.Errorf("create settings directory: %w", err)
+	}
+
+	return os.WriteFile(settingsPath, out, 0644)
 }
 
 // updateSidecarAdapters adds or enables an adapter in the sidecar.yaml config.

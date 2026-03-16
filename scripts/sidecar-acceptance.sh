@@ -157,7 +157,44 @@ else
   fail_step "sidecar detach-agent --dry-run" "invalid JSON output"
 fi
 
-# Step 8: upgrade --dry-run
+# Step 8: quickstart --dry-run
+echo "--- quickstart --dry-run"
+# Need a fresh temp dir for quickstart (it checks state from init)
+QUICKSTART_DIR="$(mktemp -d)"
+git init -q "$QUICKSTART_DIR"
+QUICKSTART_OUT=$("$BINARY" sidecar quickstart --dry-run --format json 2>&1) || true
+# Run from the quickstart dir
+pushd "$QUICKSTART_DIR" >/dev/null
+QUICKSTART_OUT=$("$BINARY" sidecar quickstart --dry-run --format json 2>&1) || true
+popd >/dev/null
+rm -rf "$QUICKSTART_DIR"
+if echo "$QUICKSTART_OUT" | jq -e '.result' &>/dev/null; then
+  QS_RESULT=$(echo "$QUICKSTART_OUT" | jq -r '.result')
+  QS_STEPS=$(echo "$QUICKSTART_OUT" | jq '.steps | length')
+  if [[ "$QS_RESULT" == "dry-run" ]]; then
+    pass_step "quickstart --dry-run ($QS_STEPS steps)"
+  else
+    pass_step "quickstart --dry-run (result=$QS_RESULT)"
+  fi
+else
+  fail_step "quickstart --dry-run" "invalid JSON output"
+fi
+
+# Step 9: generate-hooks --dry-run
+echo "--- generate-hooks --dry-run"
+GENHOOKS_OUT=$("$BINARY" sidecar generate-hooks --dry-run --format json 2>&1) || true
+if echo "$GENHOOKS_OUT" | jq -e '.result' &>/dev/null; then
+  GH_RESULT=$(echo "$GENHOOKS_OUT" | jq -r '.result')
+  if [[ "$GH_RESULT" == "dry-run" ]]; then
+    pass_step "generate-hooks --dry-run"
+  else
+    pass_step "generate-hooks --dry-run (result=$GH_RESULT)"
+  fi
+else
+  fail_step "generate-hooks --dry-run" "invalid JSON output"
+fi
+
+# Step 10: upgrade --dry-run
 echo "--- upgrade --dry-run"
 UPGRADE_OUT=$("$BINARY" sidecar upgrade --dry-run --format json 2>&1) || true
 if echo "$UPGRADE_OUT" | jq -e '.command' &>/dev/null; then
@@ -166,7 +203,7 @@ else
   fail_step "upgrade --dry-run" "invalid JSON output"
 fi
 
-# Step 9: uninstall --dry-run
+# Step 11: uninstall --dry-run
 echo "--- uninstall --dry-run"
 UNINSTALL_OUT=$("$BINARY" sidecar uninstall --dry-run --format json 2>&1) || true
 if echo "$UNINSTALL_OUT" | jq -e '.command' &>/dev/null; then

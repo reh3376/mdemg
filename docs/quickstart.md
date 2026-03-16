@@ -32,6 +32,23 @@ Verify the installation:
 mdemg version
 ```
 
+## Quick Path: Sidecar Quickstart
+
+If you want MDEMG set up for Claude Code in one command:
+
+```bash
+cd /path/to/your/project
+mdemg sidecar quickstart
+```
+
+This runs the full sidecar onboarding sequence: `init → install → up → attach-agent → generate-hooks`. It configures MCP, generates Claude Code hooks (`session-start.sh` + `prompt-context.sh`), and enables `enableAllProjectMcpServers`. Each step checks current state and skips if already done.
+
+Options: `--profile local|studio-remote`, `--agents claude-code,codex`, `--endpoint http://host:port`, `--dry-run`.
+
+See `docs/sidecar/installation.md` for detailed step-by-step instructions.
+
+---
+
 ## Step 2: Initialize Your Project
 
 Navigate to your project directory and run the interactive setup wizard:

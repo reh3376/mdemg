@@ -18,12 +18,16 @@ func newSidecarGenerateHooksCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "generate-hooks",
-		Short: "Generate project-scoped session-start hook",
-		Long: `Generate a session-start hook script with sidecar config values substituted.
+		Short: "Generate project-scoped Claude Code hooks",
+		Long: `Generate session-start and prompt-context hook scripts with sidecar config values.
 
-The generated script uses the endpoint and space_id from the sidecar
+The generated scripts use the endpoint and space_id from the sidecar
 configuration instead of hardcoded values, enabling project-scoped
-CMS memory.
+CMS memory. Both hooks are registered in .claude/settings.local.json.
+
+Generated hooks:
+  session-start.sh   — restore CMS memory context on every session start
+  prompt-context.sh  — recall relevant context + Jiminy guidance per prompt
 
 Examples:
   mdemg sidecar generate-hooks
@@ -84,18 +88,24 @@ func runSidecarGenerateHooks(format string, dryRun bool) error {
 	spaceID := sidecar.ResolveSpaceID(cfg, projectDir)
 	sessionID := "claude-core"
 
-	// Generate script content
-	script := generateSessionStartScript(endpoint, spaceID, sessionID)
+	// Generate both hook scripts
+	sessionStartScript := generateSessionStartScript(endpoint, spaceID, sessionID)
+	promptContextScript := generatePromptContextScript(endpoint, spaceID, sessionID)
 
-	// Target path
+	// Target paths
 	hookDir := filepath.Join(projectDir, ".claude", "hooks")
-	hookPath := filepath.Join(hookDir, "session-start.sh")
+	sessionStartPath := filepath.Join(hookDir, "session-start.sh")
+	promptContextPath := filepath.Join(hookDir, "prompt-context.sh")
 
 	report := sidecar.NewReportEnvelope("mdemg sidecar generate-hooks", stateBefore, stateBefore, sidecar.ExitSuccess)
 
 	if dryRun {
 		report.Result = "dry-run"
-		report.NextActions = []string{fmt.Sprintf("Would write %s", hookPath)}
+		report.NextActions = []string{
+			fmt.Sprintf("Would write %s", sessionStartPath),
+			fmt.Sprintf("Would write %s", promptContextPath),
+			"Would register hooks in .claude/settings.local.json",
+		}
 		if format == "json" {
 			return sidecar.PrintJSON(report)
 		}
@@ -104,30 +114,10 @@ func runSidecarGenerateHooks(format string, dryRun bool) error {
 		fmt.Printf("  Endpoint:   %s\n", endpoint)
 		fmt.Printf("  Space ID:   %s\n", spaceID)
 		fmt.Printf("  Session ID: %s\n", sessionID)
-		fmt.Printf("  Target:     %s\n", hookPath)
+		fmt.Printf("  Targets:    %s\n", sessionStartPath)
+		fmt.Printf("              %s\n", promptContextPath)
 		fmt.Println()
-		fmt.Println("--- Generated script ---")
-		fmt.Print(script)
-		fmt.Println("--- End ---")
 		return nil
-	}
-
-	// Backup existing hook if present
-	if _, statErr := os.Stat(hookPath); statErr == nil {
-		backupDir := filepath.Join(projectDir, ".mdemg", "backups")
-		if mkErr := os.MkdirAll(backupDir, 0755); mkErr == nil {
-			ts := time.Now().Format("20060102T150405")
-			backupPath := filepath.Join(backupDir, fmt.Sprintf("session-start.sh.%s", ts))
-			if data, readErr := os.ReadFile(hookPath); readErr == nil {
-				if wErr := os.WriteFile(backupPath, data, 0644); wErr == nil {
-					report.Changes = append(report.Changes, sidecar.ReportChange{
-						Path:       hookPath,
-						Action:     "backed-up",
-						BackupPath: backupPath,
-					})
-				}
-			}
-		}
 	}
 
 	// Ensure hook directory exists
@@ -135,18 +125,59 @@ func runSidecarGenerateHooks(format string, dryRun bool) error {
 		return fmt.Errorf("create hook directory: %w", mkErr)
 	}
 
-	// Write script
-	if wErr := os.WriteFile(hookPath, []byte(script), 0755); wErr != nil { //nolint:gosec // executable hook script
-		return fmt.Errorf("write hook script: %w", wErr)
+	// Write both hooks, backing up existing ones
+	type hookFile struct {
+		path   string
+		script string
+		name   string
+	}
+	hooks := []hookFile{
+		{sessionStartPath, sessionStartScript, "session-start.sh"},
+		{promptContextPath, promptContextScript, "prompt-context.sh"},
 	}
 
+	backupDir := filepath.Join(projectDir, ".mdemg", "backups")
+	for _, h := range hooks {
+		// Backup existing hook if present
+		if _, statErr := os.Stat(h.path); statErr == nil {
+			if mkErr := os.MkdirAll(backupDir, 0755); mkErr == nil {
+				ts := time.Now().Format("20060102T150405")
+				backupPath := filepath.Join(backupDir, fmt.Sprintf("%s.%s", h.name, ts))
+				if data, readErr := os.ReadFile(h.path); readErr == nil {
+					if wErr := os.WriteFile(backupPath, data, 0644); wErr == nil {
+						report.Changes = append(report.Changes, sidecar.ReportChange{
+							Path:       h.path,
+							Action:     "backed-up",
+							BackupPath: backupPath,
+						})
+					}
+				}
+			}
+		}
+
+		// Write script
+		if wErr := os.WriteFile(h.path, []byte(h.script), 0755); wErr != nil { //nolint:gosec // executable hook script
+			return fmt.Errorf("write %s: %w", h.name, wErr)
+		}
+		report.Changes = append(report.Changes, sidecar.ReportChange{
+			Path:   h.path,
+			Action: "created",
+		})
+	}
+
+	// Register hooks in .claude/settings.local.json
+	settingsPath := filepath.Join(projectDir, ".claude", "settings.local.json")
+	if regErr := mergeClaudeSettings(settingsPath, hookDir); regErr != nil {
+		return fmt.Errorf("register hooks in settings: %w", regErr)
+	}
 	report.Changes = append(report.Changes, sidecar.ReportChange{
-		Path:   hookPath,
-		Action: "created",
+		Path:   settingsPath,
+		Action: "updated",
 	})
+
 	report.NextActions = []string{
-		fmt.Sprintf("Hook written to %s", hookPath),
-		"Verify: bash " + hookPath,
+		"Hooks written and registered in settings.local.json",
+		"Verify: bash " + sessionStartPath,
 	}
 
 	if format == "json" {
@@ -171,6 +202,94 @@ func runSidecarGenerateHooks(format string, dryRun bool) error {
 	}
 
 	return nil
+}
+
+func generatePromptContextScript(endpoint, spaceID, sessionID string) string {
+	return fmt.Sprintf(`#!/usr/bin/env bash
+# MDEMG prompt-context hook (generated by mdemg sidecar generate-hooks)
+# Hook: UserPromptSubmit — recall CMS context + Jiminy guidance for each prompt
+
+set -euo pipefail
+
+MDEMG_URL="${MDEMG_URL:-%s}"
+SPACE_ID="%s"
+SESSION_ID="%s"
+
+# Read hook input from stdin
+INPUT=$(cat)
+
+# Extract the user's prompt text
+USER_PROMPT=$(echo "$INPUT" | grep -o '"user_prompt":"[^"]*"' | sed 's/"user_prompt":"//;s/"$//' 2>/dev/null)
+if [ -z "$USER_PROMPT" ]; then
+  # Fallback: try jq if available
+  USER_PROMPT=$(echo "$INPUT" | jq -r '.user_prompt // empty' 2>/dev/null) || true
+fi
+if [ -z "$USER_PROMPT" ]; then
+  exit 0
+fi
+
+# Skip very short prompts (commands like "y", "ok", etc.)
+if [ ${#USER_PROMPT} -lt 15 ]; then
+  exit 0
+fi
+
+# Check server is up (fast fail)
+if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
+  exit 0
+fi
+
+# Escape prompt for JSON embedding
+ESCAPED_PROMPT=$(echo "$USER_PROMPT" | jq -Rs . 2>/dev/null || printf '%%s' "$USER_PROMPT" | sed 's/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g' | sed 's/^/"/;s/$/"/')
+
+# Recall relevant context from CMS
+RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"query\":${ESCAPED_PROMPT},\"top_k\":5,\"include_themes\":true,\"include_concepts\":true}" \
+  --connect-timeout 3 --max-time 8 2>/dev/null) || exit 0
+
+# Check if there are results
+RESULT_COUNT=$(echo "$RECALL" | jq -r 'if type == "array" then length elif .results then (.results | length) else 0 end' 2>/dev/null || echo "0")
+
+if [ "$RESULT_COUNT" -eq 0 ] 2>/dev/null; then
+  if [ ${#USER_PROMPT} -gt 15 ]; then
+    echo "!! CMS RECALL EMPTY — No relevant memory found for this query."
+    echo "!! Consider: POST /v1/conversation/observe to record this topic."
+  fi
+  exit 0
+fi
+
+# Format relevant context
+echo "═══ CMS RECALL (relevant to this prompt) ═══"
+
+echo "$RECALL" | jq -r '
+  (if type == "array" then . elif .results then .results else [] end)[]? |
+  "  • [\(.type // .obs_type // "memory")] (score: \(.score // "?" | tostring | .[0:4])) \(.content // .summary // "no content" | .[0:200])"
+' 2>/dev/null || true
+
+echo "═══ END CMS RECALL ═══"
+
+# --- Jiminy inner voice guidance ---
+# Always attempts the call. Server returns 503 if disabled — curl fails silently.
+GUIDANCE=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/guide" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"context\":${ESCAPED_PROMPT},\"session_id\":\"${SESSION_ID}\"}" \
+  --connect-timeout 3 --max-time 6 2>/dev/null) || true
+
+if [ -n "$GUIDANCE" ]; then
+  AUGMENTATION=$(echo "$GUIDANCE" | jq -r '.data.prompt_augmentation // empty' 2>/dev/null)
+  if [ -n "$AUGMENTATION" ]; then
+    echo ""
+    echo "$AUGMENTATION"
+  fi
+fi
+
+# --- Reinforce recalled observations via retrieval co-activation ---
+# Fire-and-forget in background — don't slow down prompt delivery.
+curl -sf -X POST "${MDEMG_URL}/v1/memory/retrieve" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"query_text\":${ESCAPED_PROMPT},\"candidate_k\":10,\"top_k\":5,\"hop_depth\":2}" \
+  --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
+`, endpoint, spaceID, sessionID)
 }
 
 func generateSessionStartScript(endpoint, spaceID, sessionID string) string {

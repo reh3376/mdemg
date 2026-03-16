@@ -21,7 +21,8 @@ Commands:
   doctor           Run diagnostics
   attach-agent     Attach an agent adapter
   detach-agent     Detach an agent adapter
-  generate-hooks   Generate project-scoped session-start hook
+  generate-hooks   Generate project-scoped Claude Code hooks
+  quickstart       One-command setup (init + install + up + attach + hooks)
   upgrade          Upgrade sidecar version
   uninstall        Remove sidecar from project`,
 	}
@@ -36,6 +37,7 @@ Commands:
 	cmd.AddCommand(newSidecarAttachAgentCmd())
 	cmd.AddCommand(newSidecarDetachAgentCmd())
 	cmd.AddCommand(newSidecarGenerateHooksCmd())
+	cmd.AddCommand(newSidecarQuickstartCmd())
 	cmd.AddCommand(newSidecarUpgradeCmd())
 	cmd.AddCommand(newSidecarUninstallCmd())
 
