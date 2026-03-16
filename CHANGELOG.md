@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Shareable Knowledge Export/Import (Phase S15)**: Export organization-level CMS knowledge for sharing between MDEMG instances. New `--profile shareable` export profile filters to domain knowledge only (learning, decision, correction, technical_note, insight, preference), excluding volatile/session-specific data. Composable filters: `--obs-types`, `--tags`, `--exclude-volatile`, `--only-pinned`. Import enhancements: `--target-space` remaps space_id, `--consolidate` runs hidden layer pipeline, `--re-embed` regenerates embeddings. Menubar: Knowledge Sharing UI section in Memory tab with export/import buttons, profile picker, and post-import options.
 - **Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure)**:
   - **`mdemg sidecar quickstart`**: One-command onboarding — runs `init → install → up → attach-agent → generate-hooks` sequentially with state-aware skipping and failure reporting. Flags: `--profile`, `--agents`, `--endpoint`, `--dry-run`, `--format json`. New file: `internal/cli/sidecar_quickstart.go`.
   - **`generate-hooks` now produces `prompt-context.sh`**: Previously only generated `session-start.sh`. Now generates both hooks with parameterized endpoint/space_id/session_id from sidecar config. Registers both in `.claude/settings.local.json` via `mergeClaudeSettings()`. The generated `prompt-context.sh` performs CMS recall, Jiminy guidance, and background spreading activation per prompt.

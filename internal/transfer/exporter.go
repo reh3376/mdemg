@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	pb "mdemg/api/transferpb"
@@ -32,6 +33,11 @@ type ExportConfig struct {
 	// Phase 4: incremental sync — export only entities modified after this timestamp (ISO8601)
 	SinceTimestamp string // from ExportRequest.since_timestamp or resolved from since_cursor
 	SinceCursor    string // opaque cursor from prior export; resolved to SinceTimestamp when empty
+	// Shareable knowledge filters
+	ObsTypes        []string // Filter L0 nodes by obs_type (e.g., "learning", "decision")
+	Tags            []string // Filter nodes by tag presence (any match)
+	ExcludeVolatile bool     // Skip volatile/ungraduated observations (stability < 0.8)
+	OnlyPinned      bool     // Only export pinned observations (+ always include L1+)
 }
 
 // DefaultExportConfig returns an ExportConfig with sensible defaults.
@@ -50,11 +56,12 @@ func DefaultExportConfig(spaceID string) ExportConfig {
 
 // ExportProfile names for -profile flag.
 const (
-	ProfileFull     = "full"
-	ProfileCodebase = "codebase"
-	ProfileCMS      = "cms"
-	ProfileLearned  = "learned"
-	ProfileMetadata = "metadata"
+	ProfileFull      = "full"
+	ProfileCodebase  = "codebase"
+	ProfileCMS       = "cms"
+	ProfileLearned   = "learned"
+	ProfileMetadata  = "metadata"
+	ProfileShareable = "shareable"
 )
 
 // ExportConfigForProfile returns an ExportConfig for a named profile.
@@ -86,8 +93,15 @@ func ExportConfigForProfile(spaceID, profile string) (ExportConfig, error) {
 		base.IncludeSymbols = false
 		base.IncludeLearnedEdges = false
 		return base, nil
+	case ProfileShareable:
+		base.IncludeObservations = true
+		base.IncludeSymbols = false
+		base.IncludeLearnedEdges = true
+		base.ExcludeVolatile = true
+		base.ObsTypes = []string{"learning", "decision", "correction", "technical_note", "insight", "preference"}
+		return base, nil
 	default:
-		return ExportConfig{}, fmt.Errorf("unknown profile %q (use: full, codebase, cms, learned, metadata)", profile)
+		return ExportConfig{}, fmt.Errorf("unknown profile %q (use: full, codebase, cms, learned, metadata, shareable)", profile)
 	}
 }
 
@@ -147,8 +161,8 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 		return nil, fmt.Errorf("get schema version: %w", err)
 	}
 
-	// Count totals for metadata (filtered by since when incremental)
-	counts, err := e.countEntities(ctx, cfg.SpaceID, cfg.SinceTimestamp)
+	// Count totals for metadata (filtered by since when incremental + shareable filters)
+	counts, err := e.countEntities(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("count entities: %w", err)
 	}
@@ -326,22 +340,29 @@ func (e *Exporter) getSchemaVersion(ctx context.Context) (int, error) {
 	return int(result.(int64)), nil
 }
 
-func (e *Exporter) countEntities(ctx context.Context, spaceID, since string) (entityCounts, error) {
+func (e *Exporter) countEntities(ctx context.Context, cfg ExportConfig) (entityCounts, error) {
 	sess := e.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
+
+	spaceID := cfg.SpaceID
+	since := cfg.SinceTimestamp
+	filters := BuildNodeFilterClauses(cfg)
 
 	var counts entityCounts
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		params := map[string]any{"spaceId": spaceID, "since": since}
-		// When since != "", filter to entities modified after since (Phase 4 delta)
-		cypher := `
-MATCH (n:MemoryNode {space_id: $spaceId}) WHERE NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)
+		mergeParams(params, filters.Params)
+		nodeWhere := appendFilterWhere(
+			`NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)`,
+			filters.Clauses)
+		cypher := fmt.Sprintf(`
+MATCH (n:MemoryNode {space_id: $spaceId}) WHERE %s
 WITH count(n) AS nodeCount
 OPTIONAL MATCH (o:Observation {space_id: $spaceId}) WHERE ($since = '' OR o.created_at > $since OR o.timestamp > $since)
 WITH nodeCount, count(o) AS obsCount
 OPTIONAL MATCH (s:SymbolNode {space_id: $spaceId}) WHERE ($since = '' OR s.created_at > $since)
 WITH nodeCount, obsCount, count(s) AS symCount
-RETURN nodeCount, obsCount, symCount`
+RETURN nodeCount, obsCount, symCount`, nodeWhere)
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
@@ -364,9 +385,11 @@ RETURN nodeCount, obsCount, symCount`
 	}
 	counts = result.(entityCounts)
 
-	// Count edges separately (more efficient); when since set, only edges with updated_at > since
+	// Count edges separately (more efficient); apply endpoint filters for shareable export
 	edgeParams := map[string]any{"spaceId": spaceID, "since": since}
-	edgeCypher := `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId}) WHERE ($since = '' OR r.updated_at > $since) RETURN count(r) AS edgeCount`
+	mergeParams(edgeParams, filters.Params)
+	endpointWhere := buildEndpointFilterWhere(filters.Clauses)
+	edgeCypher := fmt.Sprintf(`MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId}) WHERE ($since = '' OR r.updated_at > $since)%s RETURN count(r) AS edgeCount`, endpointWhere)
 	edgeResult, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, edgeCypher, edgeParams)
 		if err != nil {
@@ -445,17 +468,24 @@ func (e *Exporter) exportNodes(ctx context.Context, cfg ExportConfig, schemaVers
 
 func (e *Exporter) fetchNodeBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.NodeData, error) {
 	since := cfg.SinceTimestamp
+	filters := BuildNodeFilterClauses(cfg)
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		cypher := `MATCH (n:MemoryNode {space_id: $spaceId})
-WHERE NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)
-RETURN n ORDER BY n.node_id SKIP $skip LIMIT $limit`
+		where := appendFilterWhere(
+			`NOT coalesce(n.is_archived, false) AND ($since = '' OR n.updated_at > $since)`,
+			filters.Clauses)
+		cypher := fmt.Sprintf(`MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE %s
+RETURN n ORDER BY n.node_id SKIP $skip LIMIT $limit`, where)
 
-		res, err := tx.Run(ctx, cypher, map[string]any{
+		params := map[string]any{
 			"spaceId": cfg.SpaceID,
 			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
-		})
+		}
+		mergeParams(params, filters.Params)
+
+		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}
@@ -562,25 +592,31 @@ func (e *Exporter) exportEdges(ctx context.Context, cfg ExportConfig, schemaVers
 
 func (e *Exporter) fetchEdgeBatch(ctx context.Context, sess neo4j.SessionWithContext, cfg ExportConfig, skip int) ([]*pb.EdgeData, error) {
 	since := cfg.SinceTimestamp
+	filters := BuildNodeFilterClauses(cfg)
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		var cypher string
+		// Build endpoint filter (rewrite "n." to "a." and "b." for both endpoints)
+		endpointWhere := buildEndpointFilterWhere(filters.Clauses)
+
+		var relMatch string
 		if cfg.OnlyLearnedEdges {
-			cypher = `MATCH (a:MemoryNode {space_id: $spaceId})-[r:CO_ACTIVATED_WITH]->(b:MemoryNode {space_id: $spaceId})
-WHERE ($since = '' OR r.updated_at > $since)
-RETURN a.node_id AS fromId, b.node_id AS toId, type(r) AS relType, properties(r) AS props
-ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`
+			relMatch = `MATCH (a:MemoryNode {space_id: $spaceId})-[r:CO_ACTIVATED_WITH]->(b:MemoryNode {space_id: $spaceId})`
 		} else {
-			cypher = `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})
-WHERE ($since = '' OR r.updated_at > $since)
-RETURN a.node_id AS fromId, b.node_id AS toId, type(r) AS relType, properties(r) AS props
-ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`
+			relMatch = `MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})`
 		}
-		res, err := tx.Run(ctx, cypher, map[string]any{
+		cypher := fmt.Sprintf(`%s
+WHERE ($since = '' OR r.updated_at > $since)%s
+RETURN a.node_id AS fromId, b.node_id AS toId, type(r) AS relType, properties(r) AS props
+ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`, relMatch, endpointWhere)
+
+		params := map[string]any{
 			"spaceId": cfg.SpaceID,
 			"since":   since,
 			"skip":    skip,
 			"limit":   cfg.ChunkSize,
-		})
+		}
+		mergeParams(params, filters.Params)
+
+		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}
@@ -896,4 +932,80 @@ func getTime(props map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// nodeFilterResult holds generated WHERE clause fragments and params for shareable filters.
+type nodeFilterResult struct {
+	Clauses []string
+	Params  map[string]any
+}
+
+// BuildNodeFilterClauses constructs WHERE clause fragments from ExportConfig filter fields.
+// The returned clauses should be ANDed into existing WHERE conditions.
+// Node alias must be "n". L1+ nodes always pass ObsTypes/OnlyPinned filters.
+func BuildNodeFilterClauses(cfg ExportConfig) nodeFilterResult {
+	r := nodeFilterResult{Params: make(map[string]any)}
+
+	if len(cfg.ObsTypes) > 0 {
+		r.Clauses = append(r.Clauses,
+			`(n.layer >= 1 OR (n.role_type = 'conversation_observation' AND n.obs_type IN $filterObsTypes))`)
+		r.Params["filterObsTypes"] = cfg.ObsTypes
+	}
+
+	if len(cfg.Tags) > 0 {
+		r.Clauses = append(r.Clauses,
+			`ANY(t IN coalesce(n.tags, []) WHERE t IN $filterTags)`)
+		r.Params["filterTags"] = cfg.Tags
+	}
+
+	if cfg.ExcludeVolatile {
+		r.Clauses = append(r.Clauses,
+			`(NOT coalesce(n.volatile, false) OR coalesce(n.stability_score, 0) >= 0.8)`)
+	}
+
+	if cfg.OnlyPinned {
+		r.Clauses = append(r.Clauses,
+			`(n.layer >= 1 OR coalesce(n.pinned, false))`)
+	}
+
+	if cfg.MinLayer > 0 {
+		r.Clauses = append(r.Clauses, `n.layer >= $filterMinLayer`)
+		r.Params["filterMinLayer"] = cfg.MinLayer
+	}
+
+	if cfg.MaxLayer > 0 {
+		r.Clauses = append(r.Clauses, `n.layer <= $filterMaxLayer`)
+		r.Params["filterMaxLayer"] = cfg.MaxLayer
+	}
+
+	return r
+}
+
+// appendFilterWhere appends filter clauses to a base WHERE string using AND.
+func appendFilterWhere(base string, clauses []string) string {
+	if len(clauses) == 0 {
+		return base
+	}
+	return base + " AND " + strings.Join(clauses, " AND ")
+}
+
+// mergeParams copies filter params into a target map.
+func mergeParams(dst map[string]any, src map[string]any) {
+	for k, v := range src {
+		dst[k] = v
+	}
+}
+
+// buildEndpointFilterWhere rewrites node filter clauses for edge queries,
+// replacing "n." with "a." and "b." for both endpoints.
+func buildEndpointFilterWhere(clauses []string) string {
+	if len(clauses) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(clauses)*2)
+	for _, clause := range clauses {
+		parts = append(parts, strings.ReplaceAll(clause, "n.", "a."))
+		parts = append(parts, strings.ReplaceAll(clause, "n.", "b."))
+	}
+	return " AND " + strings.Join(parts, " AND ")
 }

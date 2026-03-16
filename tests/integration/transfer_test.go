@@ -186,6 +186,116 @@ func TestTransferDeltaExport(t *testing.T) {
 	}
 }
 
+// TestTransferShareableRoundTrip exports with the shareable profile and verifies
+// that only graduated, shareable-type observations are included.
+func TestTransferShareableRoundTrip(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-share")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: graduated shareable nodes (learning, decision) + volatile nodes (progress, task)
+	SeedGraduatedNodes(t, driver, spaceID, 5, "learning")
+	SeedGraduatedNodes(t, driver, spaceID, 3, "decision")
+	SeedObservationNodes(t, driver, spaceID, 4, "progress", 1) // volatile, excluded type
+	SeedObservationNodes(t, driver, spaceID, 2, "task", 1)     // volatile, excluded type
+
+	// Export with shareable profile
+	cfg, err := transfer.ExportConfigForProfile(spaceID, transfer.ProfileShareable)
+	if err != nil {
+		t.Fatalf("ExportConfigForProfile: %v", err)
+	}
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	// Verify chunks structure
+	if len(result.Chunks) < 2 {
+		t.Fatalf("expected at least metadata + summary, got %d chunks", len(result.Chunks))
+	}
+
+	// Count exported nodes — should only have graduated learning + decision (8), not progress/task (6)
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			nodeCount += len(chunk.Nodes.Nodes)
+		}
+	}
+	if nodeCount != 8 {
+		t.Errorf("expected 8 shareable nodes (5 learning + 3 decision), got %d", nodeCount)
+	}
+
+	// Verify no excluded obs_types in exported nodes
+	excludedTypes := map[string]bool{"progress": true, "task": true, "blocker": true, "context": true, "error": true}
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes == nil {
+			continue
+		}
+		for _, n := range chunk.Nodes.Nodes {
+			if n.Layer == 0 && excludedTypes[n.ObsType] {
+				t.Errorf("shareable export included excluded obs_type %q (node %s)", n.ObsType, n.NodeId)
+			}
+		}
+	}
+
+	// Verify volatile nodes are excluded
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes == nil {
+			continue
+		}
+		for _, n := range chunk.Nodes.Nodes {
+			if n.Volatile && n.StabilityScore < 0.8 {
+				t.Errorf("shareable export included volatile node %s (stability=%.2f)", n.NodeId, n.StabilityScore)
+			}
+		}
+	}
+
+	// Import into a new space
+	importSpaceID := GenerateTestSpaceID("transfer-share-imp")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, importSpaceID)
+	})
+
+	// Remap space ID
+	for _, chunk := range result.Chunks {
+		chunk.SpaceId = importSpaceID
+		if chunk.Metadata != nil {
+			chunk.Metadata.SpaceId = importSpaceID
+		}
+		if chunk.Nodes != nil {
+			for _, n := range chunk.Nodes.Nodes {
+				n.SpaceId = importSpaceID
+			}
+		}
+		if chunk.Edges != nil {
+			for _, e := range chunk.Edges.Edges {
+				e.SpaceId = importSpaceID
+			}
+		}
+		if chunk.Observations != nil {
+			for _, o := range chunk.Observations.Observations {
+				o.SpaceId = importSpaceID
+			}
+		}
+	}
+
+	imp := transfer.NewImporter(driver, pb.ConflictMode_CONFLICT_SKIP)
+	importResult, err := imp.Import(ctx, result.Chunks)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if importResult.NodesCreated != 8 {
+		t.Errorf("expected 8 nodes imported, got %d created", importResult.NodesCreated)
+	}
+}
+
 // TestTransferExportProfiles runs export with each profile and checks chunk structure.
 // Uses a dedicated test space to avoid timeout on large CMS datasets.
 func TestTransferExportProfiles(t *testing.T) {

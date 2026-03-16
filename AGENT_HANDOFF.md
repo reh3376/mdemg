@@ -126,6 +126,7 @@ WHAT REMAINS TO BE DONE:
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
 7. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
 8. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
+9. DOCUMENTATION: Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
@@ -525,6 +526,7 @@ Phases are organized into **numbered series** to group related work:
 | S12 | Sidecar Upgrade and Uninstall | ✅ | `docs/sidecar/roadmap.md` §S12 |
 | S13 | Embedding Model Migration | ✅ | `docs/sidecar/roadmap.md` §S13 |
 | S14 | Documentation Cleanup — Stub Resolution | ✅ | `docs/sidecar/roadmap.md` §S14 |
+| S15 | Shareable Knowledge Export/Import | ✅ | inline (AGENT_HANDOFF.md) |
 
 ---
 
@@ -578,6 +580,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase S12 (Complete)**: Sidecar Upgrade and Uninstall Commands — `mdemg sidecar upgrade` (version drift, down→install→up cycle), `mdemg sidecar uninstall` (7-phase cleanup, safety backup). Go: `internal/cli/sidecar_upgrade.go`, `internal/cli/sidecar_uninstall.go`. Tests: `internal/cli/sidecar_upgrade_test.go`, `internal/cli/sidecar_uninstall_test.go`. Spec: `docs/sidecar/roadmap.md` §S12.
 - **Phase S14 (Complete)**: Documentation Cleanup — Stub Resolution — removed stale stub references from `maintenance.md`, `faq.md`, `sidecar-acceptance.sh`, `sidecar_lifecycle_test.go`. Added S10-S12, S14 to roadmap. 5 new integration tests + 3 state guard entries.
 - **Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure)**: `mdemg sidecar quickstart` one-command onboarding (init→install→up→attach-agent→generate-hooks with state-aware skipping). `generate-hooks` now produces both `session-start.sh` and `prompt-context.sh` with parameterized endpoint/space_id/session_id, registers both in `.claude/settings.local.json`. `attach-agent` sets `enableAllProjectMcpServers: true` for claude-code adapter (`--no-settings` flag to skip). Go: `internal/cli/sidecar_quickstart.go` (new), `internal/cli/sidecar_generate_hooks.go`, `internal/cli/sidecar_attach.go`, `internal/cli/sidecar.go`. PR #127 closed.
+- **Phase S15 (Complete)**: Shareable Knowledge Export/Import — `--profile shareable` export profile filters CMS to domain knowledge only (learning, decision, correction, technical_note, insight, preference obs_types), excludes volatile/ungraduated nodes. New CLI flags: `--obs-types`, `--tags`, `--exclude-volatile`, `--only-pinned` (export); `--consolidate`, `--re-embed`, `--target-space` (import). `BuildNodeFilterClauses()` generates composable Cypher WHERE fragments applied to node, edge, and count queries. Post-import: optional re-embedding via `embeddings.New()` and consolidation via `hidden.RunNodeCreationPipeline()`. Menubar: Knowledge Sharing section in Memory tab with export/import buttons, profile/space pickers, re-embed/consolidate toggles. Go: `internal/transfer/exporter.go` (ExportConfig fields, ProfileShareable, filter builder), `internal/cli/space.go` (CLI flags, post-import functions). Swift: `StatusView.swift` (KnowledgeSharingSection), `CLIExecutor.swift` (exportSpace/importSpace), `PollingManager.swift` (export/import state). Tests: `internal/transfer/exporter_filter_test.go` (10 unit tests), `tests/integration/transfer_test.go` (TestTransferShareableRoundTrip).
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 
@@ -2717,4 +2720,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-16 — All 105 phases + S0-S14 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed). v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*
+*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import. v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison, cli-reference docs for shareable flags.*
