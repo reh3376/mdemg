@@ -631,6 +631,57 @@ func SeedObservationNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID 
 	return ids
 }
 
+// SeedGraduatedNodes creates non-volatile, graduated MemoryNodes (stability >= 0.9) for testing shareable exports.
+func SeedGraduatedNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID string, count int, obsType string) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("test-grad-%s-%d", obsType, time.Now().UnixNano())
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, $count) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				role_type: 'conversation_observation', obs_type: $obsType,
+				content: 'graduated observation ' + toString(i),
+				volatile: false, stability_score: 0.95, is_archived: false,
+				layer: 0, created_at: datetime() - duration({hours: 2}),
+				updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"count":   count,
+			"prefix":  prefix,
+			"spaceId": spaceID,
+			"obsType": obsType,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed graduated nodes: %v", err)
+	}
+
+	raw := result.([]any)
+	ids := make([]string, len(raw))
+	for i, v := range raw {
+		ids[i] = v.(string)
+	}
+	return ids
+}
+
 // CountNodesByProperty counts MemoryNode nodes matching space_id and a single property filter.
 // Used to verify post-mutation state (e.g., count of is_archived=true nodes).
 func CountNodesByProperty(t *testing.T, driver neo4j.DriverWithContext, spaceID string, prop string, value any) int {

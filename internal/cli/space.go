@@ -25,6 +25,8 @@ import (
 	"mdemg/internal/api"
 	"mdemg/internal/config"
 	"mdemg/internal/devspace"
+	"mdemg/internal/embeddings"
+	"mdemg/internal/hidden"
 	"mdemg/internal/transfer"
 )
 
@@ -53,20 +55,24 @@ Requires NEO4J_URI, NEO4J_USER, NEO4J_PASS for Neo4j operations.`,
 
 // exportConfig holds all flags for the export subcommand.
 type exportConfig struct {
-	spaceID        string
-	output         string
-	profile        string
-	repoDir        string
-	skipGitCheck   bool
-	chunkSize      int
-	noEmbeddings   bool
-	noObservations bool
-	noSymbols      bool
-	noLearnedEdges bool
-	minLayer       int
-	maxLayer       int
-	sinceTimestamp string
-	sinceCursor    string
+	spaceID         string
+	output          string
+	profile         string
+	repoDir         string
+	skipGitCheck    bool
+	chunkSize       int
+	noEmbeddings    bool
+	noObservations  bool
+	noSymbols       bool
+	noLearnedEdges  bool
+	minLayer        int
+	maxLayer        int
+	sinceTimestamp  string
+	sinceCursor     string
+	obsTypes        string // comma-separated obs_type filter
+	tags            string // comma-separated tag filter
+	excludeVolatile bool
+	onlyPinned      bool
 }
 
 func newSpaceExportCmd() *cobra.Command {
@@ -87,7 +93,7 @@ Supports selective export via profiles and filters.`,
 
 	cmd.Flags().StringVar(&cfg.spaceID, "space-id", "", "Space ID to export (or set MDEMG_SPACE_ID)")
 	cmd.Flags().StringVar(&cfg.output, "output", "", "Output .mdemg file path (default: <space-id>.mdemg)")
-	cmd.Flags().StringVar(&cfg.profile, "profile", "full", "Export profile: full | codebase | cms | learned | metadata")
+	cmd.Flags().StringVar(&cfg.profile, "profile", "full", "Export profile: full | codebase | cms | learned | metadata | shareable")
 	cmd.Flags().StringVar(&cfg.repoDir, "repo", "", "Git repo path; if set, export fails unless repo is clean and up to date with origin/main")
 	cmd.Flags().BoolVar(&cfg.skipGitCheck, "skip-git-check", false, "Skip pre-export git check even when -repo is set")
 	cmd.Flags().IntVar(&cfg.chunkSize, "chunk-size", 500, "Nodes per chunk")
@@ -99,6 +105,10 @@ Supports selective export via profiles and filters.`,
 	cmd.Flags().IntVar(&cfg.maxLayer, "max-layer", 0, "Maximum layer to export (0 = all)")
 	cmd.Flags().StringVar(&cfg.sinceTimestamp, "since-timestamp", "", "Phase 4: export only entities updated after this (ISO8601)")
 	cmd.Flags().StringVar(&cfg.sinceCursor, "since-cursor", "", "Phase 4: opaque cursor from prior export next_cursor (used if -since-timestamp empty)")
+	cmd.Flags().StringVar(&cfg.obsTypes, "obs-types", "", "Filter L0 nodes by obs_type (comma-separated, e.g. learning,decision,correction)")
+	cmd.Flags().StringVar(&cfg.tags, "tags", "", "Filter nodes by tag presence (comma-separated, any match)")
+	cmd.Flags().BoolVar(&cfg.excludeVolatile, "exclude-volatile", false, "Skip volatile/ungraduated observations (stability < 0.8)")
+	cmd.Flags().BoolVar(&cfg.onlyPinned, "only-pinned", false, "Only export pinned observations (L1+ always included)")
 
 	return cmd
 }
@@ -157,6 +167,19 @@ func runSpaceExport(ctx context.Context, cfg *exportConfig) error {
 	if exportCfg.SinceTimestamp == "" && exportCfg.SinceCursor != "" {
 		exportCfg.SinceTimestamp = exportCfg.SinceCursor
 	}
+	// Shareable filters compose with profile defaults
+	if cfg.obsTypes != "" {
+		exportCfg.ObsTypes = strings.Split(cfg.obsTypes, ",")
+	}
+	if cfg.tags != "" {
+		exportCfg.Tags = strings.Split(cfg.tags, ",")
+	}
+	if cfg.excludeVolatile {
+		exportCfg.ExcludeVolatile = true
+	}
+	if cfg.onlyPinned {
+		exportCfg.OnlyPinned = true
+	}
 	exportCfg.ProgressFunc = func(phase string, done, total int64) {
 		if total > 0 {
 			fmt.Fprintf(os.Stderr, "  %s: %d/%d\n", phase, done, total)
@@ -186,8 +209,11 @@ func runSpaceExport(ctx context.Context, cfg *exportConfig) error {
 
 // importConfig holds all flags for the import subcommand.
 type importConfig struct {
-	input    string
-	conflict string
+	input       string
+	conflict    string
+	consolidate bool
+	reEmbed     bool
+	targetSpace string
 }
 
 func newSpaceImportCmd() *cobra.Command {
@@ -204,6 +230,9 @@ func newSpaceImportCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&cfg.input, "input", "", "Input .mdemg file path (required)")
 	cmd.Flags().StringVar(&cfg.conflict, "conflict", "skip", "On node collision: skip | overwrite | error")
+	cmd.Flags().BoolVar(&cfg.consolidate, "consolidate", false, "Run hidden layer consolidation after import")
+	cmd.Flags().BoolVar(&cfg.reEmbed, "re-embed", false, "Re-generate embeddings for imported nodes (requires embedding provider)")
+	cmd.Flags().StringVar(&cfg.targetSpace, "target-space", "", "Import into a different space_id (remaps all space_id values)")
 
 	_ = cmd.MarkFlagRequired("input")
 
@@ -226,6 +255,36 @@ func runSpaceImport(ctx context.Context, cfg *importConfig) error {
 	chunks, err := transfer.ReadFile(cfg.input)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)
+	}
+
+	// Remap space_id if --target-space is set
+	if cfg.targetSpace != "" {
+		for _, chunk := range chunks {
+			chunk.SpaceId = cfg.targetSpace
+			if chunk.Metadata != nil {
+				chunk.Metadata.SpaceId = cfg.targetSpace
+			}
+			if chunk.Nodes != nil {
+				for _, n := range chunk.Nodes.Nodes {
+					n.SpaceId = cfg.targetSpace
+				}
+			}
+			if chunk.Edges != nil {
+				for _, e := range chunk.Edges.Edges {
+					e.SpaceId = cfg.targetSpace
+				}
+			}
+			if chunk.Observations != nil {
+				for _, o := range chunk.Observations.Observations {
+					o.SpaceId = cfg.targetSpace
+				}
+			}
+			if chunk.Symbols != nil {
+				for _, s := range chunk.Symbols.Symbols {
+					s.SpaceId = cfg.targetSpace
+				}
+			}
+		}
 	}
 
 	driver, err := newDriver()
@@ -260,6 +319,150 @@ func runSpaceImport(ctx context.Context, cfg *importConfig) error {
 	fmt.Printf("Import complete: nodes created=%d skipped=%d overwritten=%d edges=%d obs=%d symbols=%d (duration %v)\n",
 		result.NodesCreated, result.NodesSkipped, result.NodesOverwritten,
 		result.EdgesCreated, result.ObservationsCreated, result.SymbolsCreated, result.Duration)
+
+	// Determine effective space ID for post-import actions
+	spaceID := cfg.targetSpace
+	if spaceID == "" && len(chunks) > 0 {
+		spaceID = chunks[0].SpaceId
+	}
+
+	// Post-import: re-embed
+	if cfg.reEmbed && spaceID != "" {
+		fmt.Fprintln(os.Stderr, "Re-embedding imported nodes...")
+		if err := reEmbedNodes(ctx, driver, spaceID); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: re-embed failed: %v\n", err)
+		}
+	}
+
+	// Post-import: consolidate
+	if cfg.consolidate && spaceID != "" {
+		fmt.Fprintln(os.Stderr, "Running post-import consolidation...")
+		if err := runPostImportConsolidation(ctx, driver, spaceID); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: consolidation failed: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// runPostImportConsolidation runs the hidden layer pipeline to create L1+ abstractions.
+func runPostImportConsolidation(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) error {
+	appCfg, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	svc := hidden.NewService(appCfg, driver, nil)
+	result, err := svc.RunNodeCreationPipeline(ctx, spaceID, appCfg.EmergenceEnabled)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "Consolidation complete: %d steps, %d nodes created\n",
+		len(result.Steps), result.TotalNodes)
+	return nil
+}
+
+// reEmbedNodes re-generates embeddings for nodes with content but missing embeddings.
+func reEmbedNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) error {
+	appCfg, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	embCfg := embeddings.Config{
+		Provider:       appCfg.EmbeddingProvider,
+		OpenAIAPIKey:   appCfg.OpenAIAPIKey,
+		OpenAIModel:    appCfg.OpenAIModel,
+		OpenAIEndpoint: appCfg.OpenAIEndpoint,
+		OllamaEndpoint: appCfg.OllamaEndpoint,
+		OllamaModel:    appCfg.OllamaModel,
+	}
+	embedder, err := embeddings.New(embCfg)
+	if err != nil {
+		return fmt.Errorf("init embedder: %w", err)
+	}
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	res, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		r, err := tx.Run(ctx, `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.content IS NOT NULL AND n.content <> '' AND n.embedding IS NULL
+RETURN n.node_id AS nodeId, n.content AS content
+LIMIT 1000`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		type nodeContent struct {
+			ID      string
+			Content string
+		}
+		var nodes []nodeContent
+		for r.Next(ctx) {
+			rec := r.Record()
+			nid, _ := rec.Get("nodeId")
+			cnt, _ := rec.Get("content")
+			nodes = append(nodes, nodeContent{ID: nid.(string), Content: cnt.(string)})
+		}
+		return nodes, r.Err()
+	})
+	sess.Close(ctx)
+	if err != nil {
+		return fmt.Errorf("query nodes: %w", err)
+	}
+
+	type nodeContent struct {
+		ID      string
+		Content string
+	}
+	nodes := res.([]nodeContent)
+	if len(nodes) == 0 {
+		fmt.Fprintln(os.Stderr, "No nodes need re-embedding.")
+		return nil
+	}
+
+	// Batch embed
+	const batchSize = 50
+	var totalEmbedded int
+	for i := 0; i < len(nodes); i += batchSize {
+		end := i + batchSize
+		if end > len(nodes) {
+			end = len(nodes)
+		}
+		batch := nodes[i:end]
+
+		texts := make([]string, len(batch))
+		for j, n := range batch {
+			texts[j] = n.Content
+		}
+
+		vecs, err := embedder.EmbedBatch(ctx, texts)
+		if err != nil {
+			return fmt.Errorf("embed batch: %w", err)
+		}
+
+		wSess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		for j, n := range batch {
+			emb64 := make([]float64, len(vecs[j]))
+			for k, v := range vecs[j] {
+				emb64[k] = float64(v)
+			}
+			_, err := wSess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				_, err := tx.Run(ctx, `
+MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+SET n.embedding = $embedding`, map[string]any{
+					"spaceId":   spaceID,
+					"nodeId":    n.ID,
+					"embedding": emb64,
+				})
+				return nil, err
+			})
+			if err != nil {
+				wSess.Close(ctx)
+				return fmt.Errorf("write embedding for %s: %w", n.ID, err)
+			}
+		}
+		wSess.Close(ctx)
+		totalEmbedded += len(batch)
+		fmt.Fprintf(os.Stderr, "  Re-embedded %d/%d nodes\n", totalEmbedded, len(nodes))
+	}
 
 	return nil
 }

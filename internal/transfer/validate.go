@@ -40,7 +40,7 @@ func ValidateImport(ctx context.Context, driver neo4j.DriverWithContext, chunks 
 func GetSpaceInfo(ctx context.Context, driver neo4j.DriverWithContext, spaceID string) (*pb.SpaceInfoResponse, error) {
 	exp := NewExporter(driver)
 
-	counts, err := exp.countEntities(ctx, spaceID, "")
+	counts, err := exp.countEntities(ctx, DefaultExportConfig(spaceID))
 	if err != nil {
 		return nil, fmt.Errorf("count entities: %w", err)
 	}
