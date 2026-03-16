@@ -17,7 +17,7 @@ func (s *Server) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.handleCreateSnapshot(w, r)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "Method not allowed"})
 	}
 }
 
@@ -28,7 +28,7 @@ func (s *Server) handleSnapshotByID(w http.ResponseWriter, r *http.Request) {
 	snapshotID := strings.TrimSuffix(path, "/")
 
 	if snapshotID == "" {
-		http.Error(w, "snapshot_id is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "snapshot_id is required"})
 		return
 	}
 
@@ -38,7 +38,7 @@ func (s *Server) handleSnapshotByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		s.handleDeleteSnapshot(w, r, snapshotID)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "Method not allowed"})
 	}
 }
 
@@ -46,7 +46,7 @@ func (s *Server) handleSnapshotByID(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListSnapshots(w http.ResponseWriter, r *http.Request) {
 	spaceID := r.URL.Query().Get("space_id")
 	if spaceID == "" {
-		http.Error(w, "space_id query parameter is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
 		return
 	}
 
@@ -61,7 +61,7 @@ func (s *Server) handleListSnapshots(w http.ResponseWriter, r *http.Request) {
 
 	snapshots, err := s.snapshotService.ListSnapshots(r.Context(), spaceID, sessionID, limit)
 	if err != nil {
-		http.Error(w, "Failed to list snapshots: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to list snapshots: " + err.Error()})
 		return
 	}
 
@@ -74,24 +74,23 @@ func (s *Server) handleListSnapshots(w http.ResponseWriter, r *http.Request) {
 		response.Snapshots = append(response.Snapshots, snap.ToResponse())
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 // handleCreateSnapshot creates a new snapshot
 func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 	var req conversation.CreateSnapshotRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid request body: " + err.Error()})
 		return
 	}
 
 	if req.SpaceID == "" {
-		http.Error(w, "space_id is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
 		return
 	}
 	if req.SessionID == "" {
-		http.Error(w, "session_id is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id is required"})
 		return
 	}
 
@@ -107,7 +106,7 @@ func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 		case "error":
 			trigger = conversation.TriggerError
 		default:
-			http.Error(w, "Invalid trigger: must be manual, compaction, session_end, or error", http.StatusBadRequest)
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid trigger: must be manual, compaction, session_end, or error"})
 			return
 		}
 	}
@@ -120,39 +119,36 @@ func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.snapshotService.CreateSnapshot(r.Context(), snapshot); err != nil {
-		http.Error(w, "Failed to create snapshot: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to create snapshot: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(snapshot.ToResponse())
+	writeJSON(w, http.StatusCreated, snapshot.ToResponse())
 }
 
 // handleGetSnapshot retrieves a snapshot by ID
 func (s *Server) handleGetSnapshot(w http.ResponseWriter, r *http.Request, snapshotID string) {
 	snapshot, err := s.snapshotService.GetSnapshot(r.Context(), snapshotID)
 	if err != nil {
-		http.Error(w, "Failed to get snapshot: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to get snapshot: " + err.Error()})
 		return
 	}
 	if snapshot == nil {
-		http.Error(w, "Snapshot not found", http.StatusNotFound)
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "Snapshot not found"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(snapshot.ToResponse())
+	writeJSON(w, http.StatusOK, snapshot.ToResponse())
 }
 
 // handleDeleteSnapshot deletes a snapshot
 func (s *Server) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request, snapshotID string) {
 	if err := s.snapshotService.DeleteSnapshot(r.Context(), snapshotID); err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "Snapshot not found", http.StatusNotFound)
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "Snapshot not found"})
 			return
 		}
-		http.Error(w, "Failed to delete snapshot: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to delete snapshot: " + err.Error()})
 		return
 	}
 
@@ -162,13 +158,13 @@ func (s *Server) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request, sn
 // handleLatestSnapshot handles GET /v1/conversation/snapshot/latest
 func (s *Server) handleLatestSnapshot(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "Method not allowed"})
 		return
 	}
 
 	spaceID := r.URL.Query().Get("space_id")
 	if spaceID == "" {
-		http.Error(w, "space_id query parameter is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query parameter is required"})
 		return
 	}
 
@@ -176,22 +172,21 @@ func (s *Server) handleLatestSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	snapshot, err := s.snapshotService.GetLatestSnapshot(r.Context(), spaceID, sessionID)
 	if err != nil {
-		http.Error(w, "Failed to get latest snapshot: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to get latest snapshot: " + err.Error()})
 		return
 	}
 	if snapshot == nil {
-		http.Error(w, "No snapshots found", http.StatusNotFound)
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "No snapshots found"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(snapshot.ToResponse())
+	writeJSON(w, http.StatusOK, snapshot.ToResponse())
 }
 
 // handleCleanupSnapshots handles POST /v1/conversation/snapshot/cleanup
 func (s *Server) handleCleanupSnapshots(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "Method not allowed"})
 		return
 	}
 
@@ -200,23 +195,22 @@ func (s *Server) handleCleanupSnapshots(w http.ResponseWriter, r *http.Request) 
 		RetentionDays int    `json:"retention_days,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid request body: " + err.Error()})
 		return
 	}
 
 	if req.SpaceID == "" {
-		http.Error(w, "space_id is required", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
 		return
 	}
 
 	deleted, err := s.snapshotService.CleanupOldSnapshots(r.Context(), req.SpaceID, req.RetentionDays)
 	if err != nil {
-		http.Error(w, "Failed to cleanup snapshots: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to cleanup snapshots: " + err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"deleted":        deleted,
 		"retention_days": req.RetentionDays,
 	})

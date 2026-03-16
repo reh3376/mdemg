@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-13
+**Date:** 2026-03-15
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -39,7 +39,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-15):
+LAST SESSION (2026-03-15, Session 2):
+- Install Testing Bug Fixes: 3 bugs found during comprehensive install testing (34 test groups, 80+ endpoints, 29 CLI commands)
+  - Bug 1 (HIGH): `space copy` infinite loop — Cypher deduplication failed for copy operations (creates new nodes, no natural termination). Replaced with two-phase approach: collect all source IDs upfront, then batch by explicit ID list. Added `:MemoryNode` label to all 6 MATCH clauses (node copy, edge copy primary, edge copy fallback, cleanup). 14,239 orphaned nodes were created from 10-node source before fix.
+  - Bug 2 (MEDIUM): Full backup "database in use" — `runFullBackup()` attempted `neo4j-admin database dump` which requires exclusive DB access. Replaced with logical export by delegating to `runPartialBackup(ctx, job, record, nil)`. Both full and partial backups now produce portable `.mdemg` files. Restore auto-detects format (`.mdemg` vs legacy `.dump`).
+  - Bug 3 (LOW): Snapshot handlers returned plain text errors — 20+ `http.Error()` calls replaced with `writeJSON()` in all 7 snapshot handlers for consistent JSON error responses.
+  - Files changed: internal/cli/space.go, internal/backup/full.go, internal/api/handlers_snapshot.go
+  - All checks pass: go build, go vet, golangci-lint 0 issues
+
+PREVIOUS SESSION (2026-03-15, Session 1):
 - Menubar Multi-Instance Support + Plugin Path Fix
   - 4 new Swift files: MdemgInstance model, InstanceStore (JSON registry + file watcher), InstanceScanner (auto-discovery), InstanceManagerView
   - 5 modified Swift files: PollingManager (multi-instance state, switchToInstance, background polling), CLIExecutor (workingDirectory), AppDelegate (wiring), StatusView (instance picker), PreferencesView (instance management)
@@ -1336,15 +1344,15 @@ Manages the lifecycle of volatile observations — reinforcement, stability deca
 
 **Supporting artifacts (docs + JSON):** `docs/api/api-spec/uats/specs/backup_trigger.uats.json`, `docs/api/api-spec/uats/specs/backup_restore.uats.json`, `docs/api/api-spec/uats/specs/backup_status.uats.json`
 
-**What it does:** Automated and on-demand backup of the Neo4j database, supporting full database dumps (via Docker exec) and partial space-level exports (via existing `.mdemg` format). Simple ticker scheduler for recurring backups, retention engine for cleanup, restore from full dump.
+**What it does:** Automated and on-demand backup of the Neo4j database. Both full and partial backups use logical export via `transfer.Exporter`, producing portable `.mdemg` files that work with a live database. Full backup delegates to partial with all spaces. Restore auto-detects format (`.mdemg` logical import or legacy `.dump` physical restore). Simple ticker scheduler for recurring backups, retention engine for cleanup.
 
 **All tasks complete:**
 - [x] Backup service core with manifest I/O and job tracking
-- [x] Full database dump via `docker exec neo4j-admin database dump`
+- [x] Full backup via logical export (delegates to partial with all spaces)
 - [x] Partial space backup via `transfer.Exporter` → `.mdemg` file
 - [x] Ticker-based scheduler (full weekly, partial daily — configurable)
 - [x] Retention engine: count + age + storage-based cleanup; `keep_forever` exempt
-- [x] Restore from full dump via `neo4j-admin database load`
+- [x] Restore with format auto-detection (`.mdemg` logical import, legacy `.dump` physical restore)
 - [x] 7 API endpoints (return 503 when disabled; backup is now permanently enabled)
 - [x] Migration: V0013 BackupMeta constraint + index
 - [x] 7 UATS specs, all passing

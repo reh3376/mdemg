@@ -171,7 +171,7 @@ GET /v1/backup/list
 
 ### Full Backup
 
-Runs `neo4j-admin database dump` inside the Docker container, copies the `.dump` file out, computes SHA256, and writes a manifest sidecar. Requires Neo4j running in Docker.
+Performs a logical export of all spaces by delegating to `runPartialBackup()` with nil spaceIDs. Produces a portable `.mdemg` file that works with a live database — no exclusive access or downtime required. Legacy `.dump` files from older versions are still supported for restore.
 
 ### Partial (Space-Level) Backup
 

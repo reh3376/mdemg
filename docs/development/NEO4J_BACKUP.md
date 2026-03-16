@@ -8,7 +8,7 @@ Two backup modes are available:
 
 | Mode | Method | Output | Use Case |
 |------|--------|--------|----------|
-| **Full** | `docker exec neo4j-admin database dump` | `.dump` file | Complete database snapshot, disaster recovery |
+| **Full** | Logical export of all spaces via `transfer.Exporter` | `.mdemg` file | Complete database backup, disaster recovery |
 | **Partial (space-level)** | `transfer.Exporter.Export()` per space | `.mdemg` file | Incremental space exports, selective restore |
 
 Both modes produce a `.manifest.json` sidecar with checksum, node/edge counts, and metadata.
@@ -50,15 +50,15 @@ curl -s -X POST http://localhost:9999/v1/backup/trigger \
 
 When `space_ids` is omitted, all spaces are exported. The protected `mdemg-dev` space is always included regardless.
 
-**Full database dump (requires Neo4j running in Docker):**
+**Full database backup (all spaces):**
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/backup/trigger \
   -H "Content-Type: application/json" \
-  -d '{"type":"full","label":"full-dump"}'
+  -d '{"type":"full","label":"full-backup"}'
 ```
 
-Full backups run `neo4j-admin database dump` inside the Docker container, copy the dump file out, and compute a SHA256 checksum.
+Full backups export all spaces using the same logical export pipeline as partial backups. This works with a live database — no downtime required.
 
 **Mark a backup as permanent:**
 
@@ -110,7 +110,7 @@ Backups marked `keep_forever` cannot be deleted until that flag is removed.
 ### Restore from Backup
 
 ```bash
-# Restore (full dump only)
+# Restore (works with both full and partial backups)
 curl -s -X POST http://localhost:9999/v1/backup/restore \
   -H "Content-Type: application/json" \
   -d '{"backup_id":"<backup_id>","snapshot_before":true}'
@@ -119,7 +119,7 @@ curl -s -X POST http://localhost:9999/v1/backup/restore \
 curl -s http://localhost:9999/v1/backup/restore/status/<restore_id>
 ```
 
-Setting `snapshot_before: true` takes a safety snapshot of the current database before restoring. Restore is only supported for full (`.dump`) backups.
+Setting `snapshot_before: true` takes a safety snapshot of the current database before restoring. Restore auto-detects file format: `.mdemg` (logical import via `transfer.Importer`) or legacy `.dump` (physical restore via `neo4j-admin`).
 
 ## Configuration Reference
 
@@ -179,7 +179,7 @@ BACKUP_RETENTION_MAX_STORAGE_GB=10
 | GET | `/v1/backup/list` | List all backups (optional `?type=` filter) |
 | GET | `/v1/backup/manifest/{id}` | Get full manifest for a backup |
 | DELETE | `/v1/backup/{id}` | Delete a backup |
-| POST | `/v1/backup/restore` | Trigger a restore from a full backup |
+| POST | `/v1/backup/restore` | Trigger a restore from any backup (.mdemg or legacy .dump) |
 | GET | `/v1/backup/restore/status/{id}` | Get restore job status |
 
 All endpoints return 503 when `BACKUP_ENABLED=false`.
@@ -188,7 +188,7 @@ All endpoints return 503 when `BACKUP_ENABLED=false`.
 
 ```
 backups/
-  bk-20260208-030000-full.dump              # Full database dump
+  bk-20260208-030000-full.mdemg             # Full backup (all spaces)
   bk-20260208-030000-full.manifest.json     # Manifest sidecar
   bk-20260208-060000-partial_space.mdemg    # Partial space export
   bk-20260208-060000-partial_space.manifest.json
@@ -202,7 +202,7 @@ The `backups/` directory is gitignored.
 internal/backup/
   types.go       — Config, BackupRecord, BackupManifest, request/response types
   service.go     — Core orchestrator: trigger, list, get, delete, manifest I/O
-  full.go        — Full dump via docker exec neo4j-admin
+  full.go        — Full backup (delegates to partial for logical export), restore logic
   partial.go     — Space-level export via transfer.Exporter
   retention.go   — Count/age/storage-based cleanup engine
   scheduler.go   — Ticker-based automatic backup scheduler
@@ -216,7 +216,7 @@ migrations/
 
 ## Troubleshooting
 
-**Full backup fails with "docker exec" error**: Ensure the Neo4j container is running and the container name matches `BACKUP_NEO4J_CONTAINER`. Verify with `docker ps`.
+**Full backup fails**: Check MDEMG server logs. Full backups use the same logical export pipeline as partial backups and work with a live database. Legacy `.dump` files from older versions are still supported for restore.
 
 **Partial backup is slow**: Large spaces with many nodes produce large `.mdemg` files. Consider backing up specific spaces instead of all.
 

@@ -10,7 +10,7 @@ This guide covers how to back up, restore, export, and import MDEMG memory space
 |------|---------|
 | Export a space | `POST /v1/backup/trigger` with `type: "partial_space"` |
 | Export all spaces | `POST /v1/backup/trigger` with `type: "partial_space"` (no `space_ids`) |
-| Full database backup | `POST /v1/backup/trigger` with `type: "full"` |
+| Full database backup (all spaces) | `POST /v1/backup/trigger` with `type: "full"` |
 | Check backup status | `GET /v1/backup/status/{backup_id}` |
 | List all backups | `GET /v1/backup/list` |
 | Restore from backup | `POST /v1/backup/restore` |
@@ -29,8 +29,6 @@ This guide covers how to back up, restore, export, and import MDEMG memory space
    ```
 
 2. A `backups/` directory in your MDEMG root (created automatically if `BACKUP_STORAGE_DIR=./backups`).
-
-3. For full backups only: Docker running with the Neo4j container accessible.
 
 ---
 
@@ -138,7 +136,7 @@ Embeddings are included by default so the importing instance doesn't need to reg
 
 ## 2. Full Database Backup
 
-Full backups use `neo4j-admin dump` to create a complete database snapshot. This captures everything including indexes and constraints.
+Full backups export **all spaces** using the same logical export pipeline as partial backups. This produces a portable `.mdemg` file that works with a live database — no downtime required.
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/backup/trigger \
@@ -150,29 +148,31 @@ curl -s -X POST http://localhost:9999/v1/backup/trigger \
   }'
 ```
 
-**Important limitations:**
+**Key characteristics:**
 
-- Neo4j Community Edition requires the database to be stopped for `neo4j-admin dump`. If your database is running, this will fail. Use partial backup (space export) instead.
-- Neo4j Enterprise Edition supports online dumps.
-- Full backup produces a `.dump` file (Neo4j native format), not `.mdemg`.
-- Restoring a full backup replaces the entire database.
+- Works with a live, running database — no exclusive access needed
+- Produces a `.mdemg` file (same portable JSON format as partial backups)
+- Includes all spaces (the protected `mdemg-dev` space is always included)
+- Functionally equivalent to a partial backup with no `space_ids` specified
 
 **When to use full backup:**
 
-- Disaster recovery snapshots (stop DB, backup, restart)
+- Disaster recovery snapshots
 - Before major schema migrations
+- Complete database exports for archiving
 
 **When to use partial backup instead:**
 
-- Sharing spaces with dev teams
-- Migrating specific spaces between instances
-- Regular automated backups of a running system
+- Sharing specific spaces with dev teams
+- Migrating selected spaces between instances
 
 ---
 
 ## 3. Restore from Backup
 
-### Restore a partial backup (.mdemg)
+### Restore a backup (.mdemg)
+
+Both full and partial backups produce `.mdemg` files. Restore works the same way for both:
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/backup/restore \
@@ -407,7 +407,6 @@ All endpoints return `503 Service Unavailable` when `BACKUP_ENABLED=false`.
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `backup not enabled` | `BACKUP_ENABLED` not set | Add `BACKUP_ENABLED=true` to `.env` and restart |
-| Full backup fails: "database in use" | Neo4j Community Edition limitation | Use partial backup instead, or stop Neo4j first |
-| Full backup fails: "/backup not found" | Missing dir in container | `docker exec mdemg-neo4j mkdir -p /backup` |
+| Full backup fails | Server or exporter error | Check MDEMG server logs; full backups use logical export (same as partial) and work with a live database |
 | Restore shows 0 nodes created | All nodes already exist | Expected with `CONFLICT_SKIP`; use `CONFLICT_OVERWRITE` to replace |
 | Large export file (>500MB) | Embeddings included by default | Normal — embeddings are ~90% of file size |
