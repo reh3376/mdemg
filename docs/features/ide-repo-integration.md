@@ -42,6 +42,10 @@ This installs embedded hook templates (`prompt-context.sh`/`.ps1`, `session-star
 
 Templates are embedded in the binary via `//go:embed` (`internal/cli/hook_templates/embed.go`).
 
+**Alternative: Sidecar Hook Generation**
+
+If you are using the sidecar workflow, `mdemg sidecar generate-hooks` generates the same hooks with parameterized endpoint and space ID from your sidecar config. `mdemg sidecar quickstart` runs this automatically as part of one-command onboarding. See `docs/sidecar/installation.md` for details.
+
 To temporarily disable the hook without removing it:
 
 ```bash

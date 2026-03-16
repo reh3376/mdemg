@@ -743,6 +743,18 @@ mdemg hooks list                         # Show hook status
 
 See [docs/features/ide-repo-integration.md](ide-repo-integration.md) for full details.
 
+### Sidecar Hook Generation
+
+The sidecar system provides an alternative hook generation path that parameterizes hooks with your sidecar config:
+
+```bash
+mdemg sidecar generate-hooks            # Generate session-start.sh + prompt-context.sh
+mdemg sidecar generate-hooks --force    # Overwrite existing hooks
+mdemg sidecar quickstart                # One-command setup (includes hook generation)
+```
+
+`generate-hooks` writes hooks to `.claude/hooks/` and registers them in `.claude/settings.local.json`. See `docs/sidecar/installation.md` for details.
+
 ---
 
 ## Self-Update

@@ -41,6 +41,7 @@ Operational expectations:
 1. Run `mdemg sidecar doctor --format json` and archive output.
 2. Run `mdemg sidecar status --format json` and compare state transitions.
 3. Validate agent attachment still works (`claude-code`, `codex`).
+4. Verify generated hooks are current (`mdemg sidecar generate-hooks` if endpoint changed).
 
 ## Monthly
 

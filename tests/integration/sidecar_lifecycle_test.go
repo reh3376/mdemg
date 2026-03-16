@@ -532,6 +532,8 @@ func TestSidecar_StateGuards_Matrix(t *testing.T) {
 		{"attach_from_initialized", []string{"attach-agent", "claude-code", "--format", "json"}, "initialized"},
 		{"detach_from_uninitialized", []string{"detach-agent", "claude-code", "--format", "json"}, "uninitialized"},
 		{"detach_from_initialized", []string{"detach-agent", "claude-code", "--format", "json"}, "initialized"},
+		{"generate_hooks_from_uninitialized", []string{"generate-hooks", "--format", "json"}, "uninitialized"},
+		{"generate_hooks_from_initialized", []string{"generate-hooks", "--format", "json"}, "initialized"},
 		{"upgrade_from_uninitialized", []string{"upgrade", "--format", "json"}, "uninitialized"},
 		{"uninstall_from_uninitialized", []string{"uninstall", "--format", "json"}, "uninitialized"},
 		{"uninstall_from_initialized", []string{"uninstall", "--format", "json"}, "initialized"},
@@ -548,6 +550,158 @@ func TestSidecar_StateGuards_Matrix(t *testing.T) {
 			m := parseJSON(t, stdout)
 			assertJSONField(t, m, "exit_code", "2")
 		})
+	}
+}
+
+// --- Quickstart Tests ---
+
+func TestSidecar_Quickstart_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	// Initialize git repo (required by init)
+	gitInit := exec.Command("git", "init", "-q")
+	gitInit.Dir = dir
+	if err := gitInit.Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+
+	stdout, _, exitCode := runSidecarCmd(t, dir, "quickstart", "--dry-run", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("expected exit 0, got %d\nstdout: %s", exitCode, stdout)
+	}
+	m := parseJSON(t, stdout)
+	assertJSONField(t, m, "result", "dry-run")
+	assertJSONField(t, m, "command", "mdemg sidecar quickstart")
+
+	// Should have steps array
+	steps, ok := m["steps"].([]any)
+	if !ok || len(steps) == 0 {
+		t.Fatal("expected non-empty steps array")
+	}
+
+	// All steps should be dry-run status
+	for _, s := range steps {
+		sm, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		if sm["status"] != "dry-run" {
+			t.Errorf("step %q status = %q, want dry-run", sm["name"], sm["status"])
+		}
+	}
+
+	// Dry run should NOT create files
+	if _, err := os.Stat(filepath.Join(dir, ".mdemg", "sidecar.yaml")); err == nil {
+		t.Error("dry-run should not create sidecar.yaml")
+	}
+}
+
+func TestSidecar_Quickstart_SkipsInitialized(t *testing.T) {
+	dir := initTempSidecar(t)
+	stdout, _, exitCode := runSidecarCmd(t, dir, "quickstart", "--dry-run", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("expected exit 0, got %d", exitCode)
+	}
+	m := parseJSON(t, stdout)
+
+	// Init step should be skipped (already initialized)
+	steps, ok := m["steps"].([]any)
+	if !ok || len(steps) == 0 {
+		t.Fatal("expected non-empty steps array")
+	}
+
+	initStep := steps[0].(map[string]any)
+	if initStep["name"] != "init" {
+		t.Errorf("first step name = %q, want init", initStep["name"])
+	}
+	if initStep["status"] != "skipped" {
+		t.Errorf("init step status = %q, want skipped", initStep["status"])
+	}
+}
+
+// --- AttachAgent Settings Tests ---
+
+func TestSidecar_AttachAgent_WritesSettings(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "installed")
+
+	// Run real attach (not dry-run) — it should write settings.local.json
+	stdout, stderr, exitCode := runSidecarCmd(t, dir, "attach-agent", "claude-code", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("attach failed (exit %d):\nstdout: %s\nstderr: %s", exitCode, stdout, stderr)
+	}
+
+	// Check settings.local.json was created with enableAllProjectMcpServers
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("settings.local.json not created: %v", err)
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("parse settings: %v", err)
+	}
+
+	val, ok := settings["enableAllProjectMcpServers"].(bool)
+	if !ok || !val {
+		t.Errorf("enableAllProjectMcpServers = %v, want true", settings["enableAllProjectMcpServers"])
+	}
+}
+
+func TestSidecar_AttachAgent_NoSettings(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "installed")
+
+	// Run with --no-settings flag
+	stdout, stderr, exitCode := runSidecarCmd(t, dir, "attach-agent", "claude-code", "--no-settings", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("attach failed (exit %d):\nstdout: %s\nstderr: %s", exitCode, stdout, stderr)
+	}
+
+	// settings.local.json should NOT have enableAllProjectMcpServers
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		// File doesn't exist — that's OK, --no-settings should skip it
+		return
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return // empty/invalid JSON is acceptable — means settings weren't touched
+	}
+
+	if val, ok := settings["enableAllProjectMcpServers"].(bool); ok && val {
+		t.Error("enableAllProjectMcpServers should not be set with --no-settings")
+	}
+}
+
+// --- GenerateHooks Additional Tests ---
+
+func TestSidecar_GenerateHooks_WritesBothHooks(t *testing.T) {
+	dir := initTempSidecar(t)
+	writeMinimalConfig(t, dir)
+	writeLockState(t, dir, "installed")
+
+	stdout, stderr, exitCode := runSidecarCmd(t, dir, "generate-hooks", "--format", "json")
+	if exitCode != 0 {
+		t.Fatalf("generate-hooks failed (exit %d):\nstdout: %s\nstderr: %s", exitCode, stdout, stderr)
+	}
+
+	// Both hook files should exist
+	for _, hookName := range []string{"session-start.sh", "prompt-context.sh"} {
+		hookPath := filepath.Join(dir, ".claude", "hooks", hookName)
+		if _, err := os.Stat(hookPath); err != nil {
+			t.Errorf("expected %s to exist: %v", hookName, err)
+		}
+	}
+
+	// settings.local.json should exist (hooks registered)
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Errorf("expected settings.local.json to exist: %v", err)
 	}
 }
 

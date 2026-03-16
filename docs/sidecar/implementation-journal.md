@@ -1166,3 +1166,68 @@ Use this template for each session entry:
 - `scripts/sidecar-acceptance.sh`
 - `tests/integration/sidecar_lifecycle_test.go`
 - `AGENT_HANDOFF.md`
+
+---
+
+### Entry 2026-03-16T00:00:00Z
+
+1. Timestamp (UTC): 2026-03-16T00:00:00Z
+2. Phase: PR #127 Gap Closure — Quickstart, Hook Generation, MCP Settings
+3. Related roadmap sections: Section 7 (command surface), Section 7A (command contract matrix), Section 7C (required flags), Section 8A (documentation deliverables)
+4. Work completed:
+   - Created `mdemg sidecar quickstart` command — one-command onboarding (init → install → up → attach-agent → generate-hooks) with state-aware skipping, `--dry-run`, `--format json`
+   - Added `prompt-context.sh` generation to `generate-hooks` — previously only generated `session-start.sh`; now writes both hooks + registers in `.claude/settings.local.json` via `mergeClaudeSettings()`
+   - Added `enableAllProjectMcpServers` auto-enable in `attach-agent claude-code` — ensures MCP server is not silently disabled; added `--no-settings` flag to skip
+   - Registered `quickstart` subcommand in `sidecar.go`
+   - Closed PR #127 (`feat/claude-code-plugin` → `main`) and deleted branch
+   - Updated 13 documentation files to reflect new commands, flags, and behaviors
+5. Assumptions eliminated:
+   - Agent attachment no longer assumes MCP is enabled — `enableAllProjectMcpServers` is set explicitly
+   - Hook generation no longer limited to `session-start.sh` — `prompt-context.sh` is generated alongside
+   - Onboarding no longer requires 5 separate commands — `quickstart` wraps the full sequence
+6. Decisions made:
+   - `quickstart` calls existing `runSidecar*()` functions with `format: "json"` to suppress their text output while producing its own step-by-step report
+   - `enableAllProjectMcpServers` only set for claude-code adapter, not codex
+   - Static baked endpoint in generated hooks (not dynamic resolution) — re-run `generate-hooks` if port changes
+   - PR #127 closed without merge — its gaps addressed through sidecar infrastructure improvements
+7. Open questions: none
+8. Evidence:
+   - `go build ./...` clean, `go vet ./...` clean, `golangci-lint run ./...` 0 issues
+   - Quickstart dry-run tested in `/tmp` directory
+   - PR #127 closed and branch deleted via GitHub CLI
+9. Next actions: commit, push
+
+**Files Created:**
+
+| File | Description |
+|------|-------------|
+| `internal/cli/sidecar_quickstart.go` | One-command sidecar onboarding (init → install → up → attach-agent → generate-hooks) |
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `internal/cli/sidecar_generate_hooks.go` | Added `generatePromptContextScript()`, hook registration in settings via `mergeClaudeSettings()` |
+| `internal/cli/sidecar_attach.go` | Added `ensureProjectMcpEnabled()`, `--no-settings` flag for claude-code |
+| `internal/cli/sidecar.go` | Registered `quickstart` subcommand, updated Long description |
+| `README.md` | Added sidecar quickstart section, updated MCP integration docs |
+| `CONTRIBUTING.md` | Updated hook setup section with `generate-hooks` and `quickstart` |
+| `CHANGELOG.md` | Added PR #127 gap closure entry |
+| `AGENT_HANDOFF.md` | Added 2026-03-16 session context and artifact index entry |
+| `docs/sidecar/roadmap.md` | Fixed `--agent` flag syntax, added `quickstart`/`generate-hooks`/`detach-agent` to command list and contract matrices |
+| `docs/sidecar/installation.md` | Added quickstart option, `--no-settings` flag, `enableAllProjectMcpServers` docs, hook generation step |
+| `docs/sidecar/configuration.md` | Documented `enableAllProjectMcpServers` and `generate-hooks` in Claude Code adapter section |
+| `docs/quickstart.md` | Added sidecar quickstart as quick-path alternative |
+| `docs/features/unified-cli.md` | Added sidecar hook generation section |
+| `docs/features/ide-repo-integration.md` | Added sidecar generate-hooks cross-reference |
+| `docs/sidecar/faq.md` | Added Q14 (quickstart), Q15 (generate-hooks), Q16 (enableAllProjectMcpServers) |
+| `docs/sidecar/troubleshooting.md` | Added TRBL-HOOKS-STALE and TRBL-MCP-DISABLED entries |
+| `docs/sidecar/maintenance.md` | Added hook currency check to weekly cadence |
+| `docs/sidecar/implementation-journal.md` | This entry |
+
+**Documents Accessed:**
+- `internal/cli/sidecar_generate_hooks.go`, `sidecar_attach.go`, `sidecar_quickstart.go`, `sidecar.go`
+- `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `AGENT_HANDOFF.md`
+- `docs/sidecar/roadmap.md`, `installation.md`, `configuration.md`, `faq.md`, `troubleshooting.md`, `maintenance.md`, `implementation-journal.md`
+- `docs/sidecar/schemas/attach-agent-report.schema.json`
+- `docs/quickstart.md`, `docs/features/unified-cli.md`, `docs/features/ide-repo-integration.md`

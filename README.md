@@ -79,6 +79,17 @@ mdemg hooks install         # Auto-ingest on every git commit (optional)
 
 That's it. Your AI agent now has persistent memory.
 
+### One-Command Setup (Sidecar)
+
+For projects using Claude Code, the sidecar quickstart handles everything — config, services, MCP integration, and hooks — in a single command:
+
+```bash
+cd /path/to/your/project
+mdemg sidecar quickstart    # init + install + up + attach-agent + generate-hooks
+```
+
+This creates `.mdemg/sidecar.yaml`, starts Neo4j + MDEMG server, writes `.claude/mcp.json`, generates `session-start.sh` and `prompt-context.sh` hooks, registers them in `settings.local.json`, and enables `enableAllProjectMcpServers`.
+
 See the [Quickstart Guide](docs/quickstart.md) for a detailed walkthrough, or run `mdemg demo` to try it with sample data.
 
 > **Upgrading?** Run `mdemg upgrade` to self-update to the latest release.
@@ -428,9 +439,21 @@ curl -X POST http://localhost:9999/v1/conversation/observe \
 
 Observations are surprise-weighted (novel information persists longer) and form themes via consolidation.
 
-## MCP Integration (Cursor IDE)
+## MCP Integration
 
-MDEMG provides an MCP server for IDE integration. Add to `~/.cursor/mcp.json`:
+MDEMG provides an MCP server for IDE integration.
+
+### Automatic Setup (Claude Code)
+
+```bash
+mdemg sidecar attach-agent claude-code   # Writes .claude/mcp.json + enables MCP in settings
+# Or as part of full setup:
+mdemg sidecar quickstart                 # init + install + up + attach + hooks
+```
+
+### Manual Setup (Cursor IDE)
+
+Add to `~/.cursor/mcp.json`:
 
 ```json
 {

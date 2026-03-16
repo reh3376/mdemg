@@ -141,8 +141,8 @@ mdemg sidecar init --profile studio-remote --agents claude-code,codex
 mdemg sidecar install
 mdemg sidecar up
 mdemg sidecar doctor
-mdemg sidecar attach-agent --agent claude-code
-mdemg sidecar attach-agent --agent codex
+mdemg sidecar attach-agent claude-code
+mdemg sidecar attach-agent codex
 ```
 
 Expected outcomes:
@@ -352,8 +352,11 @@ Validation rules:
 6. `mdemg sidecar status`
 7. `mdemg sidecar doctor`
 8. `mdemg sidecar attach-agent`
-9. `mdemg sidecar upgrade`
-10. `mdemg sidecar uninstall`
+9. `mdemg sidecar detach-agent`
+10. `mdemg sidecar generate-hooks`
+11. `mdemg sidecar quickstart`
+12. `mdemg sidecar upgrade`
+13. `mdemg sidecar uninstall`
 
 Behavioral requirements:
 
@@ -376,7 +379,10 @@ Each command must implement explicit inputs, outputs, side effects, and exit sem
 | `sidecar restart` | none | runtime status | down + up transaction | Yes |
 | `sidecar status` | none | machine/human status | none | Yes |
 | `sidecar doctor` | none | diagnostics report | none (read-only) | Yes |
-| `sidecar attach-agent` | adapter name | adapter change report | merges/writes agent config + backups | Yes (safe repeat) |
+| `sidecar attach-agent` | adapter name | adapter change report | merges/writes agent config + backups, enables `enableAllProjectMcpServers` for claude-code | Yes (safe repeat) |
+| `sidecar detach-agent` | adapter name | detach report | restores agent config from backup | Yes |
+| `sidecar generate-hooks` | none | hook generation report | writes `session-start.sh` + `prompt-context.sh` to `.claude/hooks/`, registers in settings | Yes |
+| `sidecar quickstart` | none (optional: profile, agents, endpoint) | quickstart report with per-step status | runs init → install → up → attach-agent → generate-hooks sequentially | Yes (skips completed steps) |
 | `sidecar upgrade` | installed state | upgrade report | version updates, migrations | Yes (no-op if current) |
 | `sidecar uninstall` | none | uninstall report | detach adapters, stop runtime, remove sidecar artifacts (policy-aware) | Yes |
 
@@ -404,7 +410,10 @@ To keep behavior deterministic, the following command contracts are mandatory:
 | `sidecar restart` | `--dry-run` | restart summary |
 | `sidecar status` | `--format text|json` | status output (machine/human) |
 | `sidecar doctor` | `--format text|json` | diagnostics report (`.mdemg/generated/doctor-report.json`) |
-| `sidecar attach-agent` | `--agent`, `--dry-run`, `--print-only` | adapter report + backup manifest |
+| `sidecar attach-agent` | `--dry-run`, `--print-only`, `--no-settings` | adapter report + backup manifest |
+| `sidecar detach-agent` | `--dry-run` | detach report |
+| `sidecar generate-hooks` | `--format text|json`, `--force` | hook files + settings registration |
+| `sidecar quickstart` | `--profile`, `--agents`, `--endpoint`, `--dry-run`, `--format text|json` | quickstart report with per-step status |
 | `sidecar upgrade` | `--dry-run` | upgrade report |
 | `sidecar uninstall` | `--dry-run`, `--retain-backups` | uninstall report |
 

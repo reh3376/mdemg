@@ -75,6 +75,23 @@ Three options:
 
 See `docs/sidecar/installation.md` Section 2 for details.
 
+## 14. Is there a one-command setup?
+
+Yes. `mdemg sidecar quickstart` runs the full onboarding sequence (init → install → up → attach-agent → generate-hooks) in one command. Each step checks current state and skips if already done. Use `--dry-run` to preview.
+
+```bash
+mdemg sidecar quickstart
+mdemg sidecar quickstart --profile local --agents claude-code --dry-run
+```
+
+## 15. What does `generate-hooks` do?
+
+It generates Claude Code hooks (`session-start.sh` and `prompt-context.sh`) in `.claude/hooks/` with your sidecar's endpoint and space ID baked in, and registers them in `.claude/settings.local.json`. Existing hooks are backed up before overwriting.
+
+## 16. What is `enableAllProjectMcpServers`?
+
+A Claude Code setting that ensures project-level MCP servers (like MDEMG) are not silently disabled. `attach-agent claude-code` sets this automatically in `.claude/settings.local.json`. Use `--no-settings` to skip.
+
 ## 13. How do I upgrade sidecar to a newer version?
 
 Run:

@@ -121,6 +121,10 @@
           "format": "date-time"
         }
       }
+    },
+    "settings_changed": {
+      "type": "boolean",
+      "description": "Whether enableAllProjectMcpServers was set in .claude/settings.local.json (claude-code adapter only)."
     }
   },
   "$defs": {

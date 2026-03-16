@@ -316,7 +316,22 @@ curl http://localhost:9999/v1/memory/ingest/status/<job_id>
 
 ### Setting Up Hooks
 
-Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.json`. Since these are gitignored, new developers must copy them from a team member or recreate them. See `CLAUDE.md` for the full hook specification.
+Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.local.json`. Since these are gitignored, new developers must set them up per-project:
+
+```bash
+# Automatic (recommended) — generates both hooks and registers them in settings
+mdemg sidecar generate-hooks
+
+# Or one-command full setup (includes hooks + MCP + services)
+mdemg sidecar quickstart
+
+# Alternative: install from embedded templates
+mdemg hooks install --type claude
+```
+
+`generate-hooks` creates `session-start.sh` and `prompt-context.sh` with project-scoped endpoint and space_id from sidecar config, and registers both in `.claude/settings.local.json`.
+
+See `CLAUDE.md` for the full hook specification.
 
 ## Submitting Changes
 
