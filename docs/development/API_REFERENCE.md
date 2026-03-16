@@ -29,6 +29,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Neo4j State Monitor](#neo4j-state-monitor-phase-76)
 - [Meta-Cognition & Self-Improvement](#meta-cognition--self-improvement-phase-80)
 - [RSIC Orchestration & Safety](#rsic-orchestration--safety-phases-87-90)
+- [Space Transfer (Export/Import)](#space-transfer-exportimport)
 - [Frontier Detection](#get-v1memoryfrontiers)
 - [Negative Feedback](#post-v1learningnegative-feedback)
 
@@ -3427,6 +3428,133 @@ Execute batch pruning of prunable/orphan spaces. Supports dry-run mode.
 **Environment variable:**
 
 - `SPACE_PRUNE_INTERVAL_HOURS` — Interval in hours (default: 24, 0 = disabled)
+
+---
+
+## Space Transfer (Export/Import)
+
+HTTP API for exporting and importing space data. Supports profile-based filtering and conflict-aware import. Previously CLI-only; these endpoints enable UATS contract testing and programmatic transfer workflows.
+
+### GET /v1/admin/spaces/export/preview
+
+Lightweight estimation of what an export would contain, without transferring data.
+
+**Query Parameters:**
+
+- `space_id` (required): Space to preview
+- `profile` (optional): Export profile — `full`, `metadata`, `shareable`, `codebase`, `cms`, `learned` (default: `full`)
+
+**Response** (`200 OK`):
+
+```json
+{
+  "space_id": "my-project",
+  "profile": "shareable",
+  "estimated_nodes": 42,
+  "estimated_edges": 15,
+  "estimated_observations": 30,
+  "estimated_symbols": 0,
+  "filters_applied": {
+    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference"],
+    "exclude_volatile": true,
+    "only_pinned": false,
+    "min_layer": 0,
+    "max_layer": 0
+  }
+}
+```
+
+**Error Codes:** `400` (missing space_id, invalid profile), `405` (wrong method).
+
+### POST /v1/admin/spaces/export
+
+Export space data with profile-based filtering and optional overrides.
+
+**Request Body:**
+
+```json
+{
+  "space_id": "my-project",
+  "profile": "shareable",
+  "chunk_size": 500,
+  "include_embeddings": true,
+  "obs_types": ["learning", "decision"],
+  "tags": ["important"],
+  "exclude_volatile": true,
+  "only_pinned": false,
+  "min_layer": 0,
+  "max_layer": 0,
+  "no_observations": false,
+  "no_symbols": false,
+  "no_learned_edges": false
+}
+```
+
+Only `space_id` is required. All other fields are optional and override profile defaults.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "space_id": "my-project",
+  "profile": "shareable",
+  "header": {
+    "format": "mdemg-space-transfer",
+    "version": "1.0.0"
+  },
+  "chunks": [ ... ],
+  "summary": {
+    "nodes_exported": 42,
+    "edges_exported": 15,
+    "observations_exported": 30,
+    "symbols_exported": 0,
+    "duration_ms": 142,
+    "next_cursor": "2026-03-16T12:00:00Z"
+  }
+}
+```
+
+The `chunks` array contains protobuf-JSON `SpaceChunk` objects — the same format as `.mdemg` files. The response IS the export data.
+
+**Error Codes:** `400` (missing space_id, invalid profile), `405` (wrong method), `500` (Neo4j/export error).
+
+### POST /v1/admin/spaces/import
+
+Import space data from export chunks with conflict handling.
+
+**Request Body:**
+
+```json
+{
+  "space_id": "target-space",
+  "conflict": "skip",
+  "chunks": [ ... ]
+}
+```
+
+- `space_id` (optional): If provided, remaps all chunk space_ids to this target
+- `conflict` (optional): `skip` (default), `overwrite`, or `error`
+- `chunks` (required): Array of `SpaceChunk` objects from an export response
+
+**Response** (`200 OK`):
+
+```json
+{
+  "space_id": "target-space",
+  "nodes_created": 42,
+  "nodes_skipped": 0,
+  "nodes_overwritten": 0,
+  "edges_created": 15,
+  "edges_skipped": 0,
+  "edges_merged": 0,
+  "observations_created": 30,
+  "symbols_created": 0,
+  "warnings": [],
+  "duration_ms": 87
+}
+```
+
+**Error Codes:** `400` (missing/null chunks, invalid conflict mode), `405` (wrong method), `500` (Neo4j/import error).
 
 ---
 

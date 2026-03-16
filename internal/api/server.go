@@ -1383,6 +1383,11 @@ func (s *Server) Routes() http.Handler {
 	// SSE streaming endpoint for job progress (Phase 48.3.3)
 	mux.HandleFunc("/v1/jobs/", s.handleJobStream)
 
+	// Admin: space transfer (export/import)
+	mux.HandleFunc("/v1/admin/spaces/export/preview", s.handleSpaceExportPreview)
+	mux.HandleFunc("/v1/admin/spaces/export", s.handleSpaceExport)
+	mux.HandleFunc("/v1/admin/spaces/import", s.handleSpaceImport)
+
 	// Admin: space lifecycle management
 	mux.HandleFunc("/v1/admin/spaces/prune", s.handleAdminSpacePrune)
 	mux.HandleFunc("/v1/admin/spaces/", s.handleAdminSpaceUpdate)

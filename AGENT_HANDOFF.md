@@ -32,14 +32,26 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
   104: Active Guardrails, 105: Global Meta-Learning
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1 brew install verified)
 - Quality hardening (gap analysis triage) — COMPLETE
-  - 279 UATS contract test specs, all using canonical assertion format
+  - 282 UATS contract test specs (159 spec files), all using canonical assertion format
   - 148 Go test files with comprehensive coverage
   - golangci-lint: 0 issues
   - Dead code removed (internal/observations/, internal/domain/)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - CI: ALL GREEN (push + pull_request) as of 2026-03-10
 
-LAST SESSION (2026-03-16):
+LAST SESSION (2026-03-16, Session 2):
+- Transfer HTTP API & Testing (S15 Extension):
+  - 3 new HTTP endpoints: POST /v1/admin/spaces/export, POST /v1/admin/spaces/import, GET /v1/admin/spaces/export/preview
+  - New file: internal/api/handlers_transfer.go (3 handlers, 6 request/response structs)
+  - 3 new UATS specs: space_export (4 variants), space_export_preview (3 variants), space_import (2 variants)
+  - Shell acceptance test: scripts/transfer-acceptance.sh (10 phases, 20 steps, all passing)
+  - 8 new integration tests: filter coverage (obs_types, volatile, pinned, tags, layers) + conflict modes + chunk size
+  - 3 new seed helpers: SeedPinnedNodes, SeedTaggedNodes, SeedMultiLayerNodes
+  - Makefile: 4 new test-transfer targets
+  - Fixed: TestTransferShareableRoundTrip constraint violation (memnode_id global uniqueness)
+  - All checks pass: go build, golangci-lint 0 issues, 159 UATS hashes valid, 20/20 acceptance steps
+
+PREVIOUS SESSION (2026-03-16, Session 1):
 - Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure):
   - `mdemg sidecar quickstart` — one-command onboarding (init + install + up + attach-agent + generate-hooks)
   - `generate-hooks` now produces both session-start.sh and prompt-context.sh, registers in settings.local.json
@@ -121,7 +133,7 @@ WHAT REMAINS TO BE DONE:
 2. DOCUMENTATION: ~~Overhaul homebrew-mdemg docs~~ DONE (4 wiki docs + simplified README)
 3. DOCUMENTATION: ~~Installer repo sync (homebrew-mdemg + mdemg-windows)~~ DONE (66 env vars, 4 endpoints, 20 MCP tools, Jiminy guide, code fixes)
 4. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
-5. TESTING: ~5 endpoints still need UATS specs (spaces CRUD, jobs SSE)
+5. TESTING: ~2 endpoints still need UATS specs (jobs SSE — not UATS-testable due to streaming, spaces CRUD partial)
 6. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
 7. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
@@ -581,6 +593,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase S14 (Complete)**: Documentation Cleanup — Stub Resolution — removed stale stub references from `maintenance.md`, `faq.md`, `sidecar-acceptance.sh`, `sidecar_lifecycle_test.go`. Added S10-S12, S14 to roadmap. 5 new integration tests + 3 state guard entries.
 - **Sidecar Quickstart & Hook Enhancements (PR #127 Gap Closure)**: `mdemg sidecar quickstart` one-command onboarding (init→install→up→attach-agent→generate-hooks with state-aware skipping). `generate-hooks` now produces both `session-start.sh` and `prompt-context.sh` with parameterized endpoint/space_id/session_id, registers both in `.claude/settings.local.json`. `attach-agent` sets `enableAllProjectMcpServers: true` for claude-code adapter (`--no-settings` flag to skip). Go: `internal/cli/sidecar_quickstart.go` (new), `internal/cli/sidecar_generate_hooks.go`, `internal/cli/sidecar_attach.go`, `internal/cli/sidecar.go`. PR #127 closed.
 - **Phase S15 (Complete)**: Shareable Knowledge Export/Import — `--profile shareable` export profile filters CMS to domain knowledge only (learning, decision, correction, technical_note, insight, preference obs_types), excludes volatile/ungraduated nodes. New CLI flags: `--obs-types`, `--tags`, `--exclude-volatile`, `--only-pinned` (export); `--consolidate`, `--re-embed`, `--target-space` (import). `BuildNodeFilterClauses()` generates composable Cypher WHERE fragments applied to node, edge, and count queries. Post-import: optional re-embedding via `embeddings.New()` and consolidation via `hidden.RunNodeCreationPipeline()`. Menubar: Knowledge Sharing section in Memory tab with export/import buttons, profile/space pickers, re-embed/consolidate toggles. Go: `internal/transfer/exporter.go` (ExportConfig fields, ProfileShareable, filter builder), `internal/cli/space.go` (CLI flags, post-import functions). Swift: `StatusView.swift` (KnowledgeSharingSection), `CLIExecutor.swift` (exportSpace/importSpace), `PollingManager.swift` (export/import state). Tests: `internal/transfer/exporter_filter_test.go` (10 unit tests), `tests/integration/transfer_test.go` (TestTransferShareableRoundTrip).
+- **Transfer HTTP API & Testing (S15 Extension)**: 3 new HTTP API endpoints for space transfer: `POST /v1/admin/spaces/export` (profile-based export with filter overrides), `POST /v1/admin/spaces/import` (chunked import with skip/overwrite/error conflict modes), `GET /v1/admin/spaces/export/preview` (lightweight entity count estimation). Go: `internal/api/handlers_transfer.go` (3 handlers, 6 request/response structs), `internal/api/server.go` (3 route registrations). UATS: `space_export.uats.json` (4 variants), `space_export_preview.uats.json` (3 variants), `space_import.uats.json` (2 variants). Shell: `scripts/transfer-acceptance.sh` (10-phase E2E, 20 steps). Integration: 8 new tests in `transfer_test.go` (filter obs_types, exclude_volatile, only_pinned, tags, min/max layer, conflict overwrite/error, chunk size control), 3 new seed helpers in `helpers_test.go`. Makefile: `test-transfer`, `test-transfer-unit`, `test-transfer-integration`, `test-transfer-acceptance` targets.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
 
@@ -2720,4 +2733,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import. v0.2.1 released and Homebrew install verified. 279 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison, cli-reference docs for shareable flags.*
+*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import + Transfer HTTP API (3 endpoints, 3 UATS specs, 20-step acceptance test, 8 new integration tests). v0.2.1 released and Homebrew install verified. 282 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison, cli-reference docs for shareable flags.*

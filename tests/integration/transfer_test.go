@@ -263,7 +263,9 @@ func TestTransferShareableRoundTrip(t *testing.T) {
 		CleanupSpaceWithTest(t, driver, importSpaceID)
 	})
 
-	// Remap space ID
+	// Remap space ID and add suffix to node_ids for global uniqueness
+	// (memnode_id constraint requires node_id to be globally unique)
+	idSuffix := "-imp"
 	for _, chunk := range result.Chunks {
 		chunk.SpaceId = importSpaceID
 		if chunk.Metadata != nil {
@@ -272,11 +274,15 @@ func TestTransferShareableRoundTrip(t *testing.T) {
 		if chunk.Nodes != nil {
 			for _, n := range chunk.Nodes.Nodes {
 				n.SpaceId = importSpaceID
+				n.NodeId = n.NodeId + idSuffix
+				n.Path = n.Path + idSuffix
 			}
 		}
 		if chunk.Edges != nil {
 			for _, e := range chunk.Edges.Edges {
 				e.SpaceId = importSpaceID
+				e.FromNodeId = e.FromNodeId + idSuffix
+				e.ToNodeId = e.ToNodeId + idSuffix
 			}
 		}
 		if chunk.Observations != nil {
@@ -293,6 +299,292 @@ func TestTransferShareableRoundTrip(t *testing.T) {
 	}
 	if importResult.NodesCreated != 8 {
 		t.Errorf("expected 8 nodes imported, got %d created", importResult.NodesCreated)
+	}
+}
+
+// TestTransferFilterObsTypes verifies that ObsTypes filter only includes specified obs_types (+ L1+).
+func TestTransferFilterObsTypes(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-obs-filter")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: 5 learning + 3 decision + 4 progress
+	SeedGraduatedNodes(t, driver, spaceID, 5, "learning")
+	SeedGraduatedNodes(t, driver, spaceID, 3, "decision")
+	SeedGraduatedNodes(t, driver, spaceID, 4, "progress")
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.ObsTypes = []string{"learning"}
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			for _, n := range chunk.Nodes.Nodes {
+				nodeCount++
+				if n.Layer == 0 && n.ObsType != "learning" {
+					t.Errorf("obs_type filter: got L0 node with obs_type=%q, want learning", n.ObsType)
+				}
+			}
+		}
+	}
+	if nodeCount != 5 {
+		t.Errorf("expected 5 learning nodes, got %d", nodeCount)
+	}
+}
+
+// TestTransferFilterExcludeVolatile verifies ExcludeVolatile skips volatile low-stability nodes.
+func TestTransferFilterExcludeVolatile(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-volatile")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: 5 graduated (stable) + 4 volatile (unstable)
+	SeedGraduatedNodes(t, driver, spaceID, 5, "learning")
+	SeedObservationNodes(t, driver, spaceID, 4, "learning", 1) // volatile=true, stability=0.1
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.ExcludeVolatile = true
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			for _, n := range chunk.Nodes.Nodes {
+				nodeCount++
+				if n.Volatile && n.StabilityScore < 0.8 {
+					t.Errorf("exclude_volatile: exported volatile node %s (stability=%.2f)", n.NodeId, n.StabilityScore)
+				}
+			}
+		}
+	}
+	if nodeCount != 5 {
+		t.Errorf("expected 5 graduated nodes, got %d", nodeCount)
+	}
+}
+
+// TestTransferFilterOnlyPinned verifies OnlyPinned includes only pinned L0 + all L1+.
+func TestTransferFilterOnlyPinned(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-pinned")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: 3 pinned + 5 unpinned graduated
+	SeedPinnedNodes(t, driver, spaceID, 3, "learning")
+	SeedGraduatedNodes(t, driver, spaceID, 5, "decision") // not pinned
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.OnlyPinned = true
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			nodeCount += len(chunk.Nodes.Nodes)
+		}
+	}
+	if nodeCount != 3 {
+		t.Errorf("expected 3 pinned nodes, got %d", nodeCount)
+	}
+}
+
+// TestTransferFilterTags verifies Tags filter includes only tagged nodes.
+func TestTransferFilterTags(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-tags")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: 3 tagged + 5 untagged
+	SeedTaggedNodes(t, driver, spaceID, 3, "learning", []string{"important", "review"})
+	SeedGraduatedNodes(t, driver, spaceID, 5, "decision") // no tags
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.Tags = []string{"important"}
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			nodeCount += len(chunk.Nodes.Nodes)
+		}
+	}
+	if nodeCount != 3 {
+		t.Errorf("expected 3 tagged nodes, got %d", nodeCount)
+	}
+}
+
+// TestTransferFilterMinMaxLayer verifies MinLayer/MaxLayer filtering.
+func TestTransferFilterMinMaxLayer(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-layers")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed: L0 (3) + L1 (2) + L2 (1)
+	SeedMultiLayerNodes(t, driver, spaceID)
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.MinLayer = 1
+	cfg.MaxLayer = 2
+	cfg.ChunkSize = 100
+
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	var nodeCount int
+	for _, chunk := range result.Chunks {
+		if chunk.Nodes != nil {
+			for _, n := range chunk.Nodes.Nodes {
+				nodeCount++
+				if n.Layer < 1 || n.Layer > 2 {
+					t.Errorf("layer filter: got node at layer %d, want 1-2", n.Layer)
+				}
+			}
+		}
+	}
+	// 2 L1 + 1 L2 = 3
+	if nodeCount != 3 {
+		t.Errorf("expected 3 nodes (L1+L2), got %d", nodeCount)
+	}
+}
+
+// TestTransferImportConflictOverwrite verifies CONFLICT_OVERWRITE re-imports successfully.
+func TestTransferImportConflictOverwrite(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-overwrite")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	SeedGraduatedNodes(t, driver, spaceID, 5, "learning")
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.ChunkSize = 100
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	// Re-import with overwrite
+	imp := transfer.NewImporter(driver, pb.ConflictMode_CONFLICT_OVERWRITE)
+	importResult, err := imp.Import(ctx, result.Chunks)
+	if err != nil {
+		t.Fatalf("Import with OVERWRITE: %v", err)
+	}
+	if importResult.NodesOverwritten != 5 {
+		t.Errorf("expected 5 overwritten nodes, got %d (created=%d, skipped=%d)",
+			importResult.NodesOverwritten, importResult.NodesCreated, importResult.NodesSkipped)
+	}
+}
+
+// TestTransferImportConflictError verifies CONFLICT_ERROR fails on existing nodes.
+func TestTransferImportConflictError(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-conflict-err")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	SeedGraduatedNodes(t, driver, spaceID, 3, "learning")
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.ChunkSize = 100
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	// Re-import with error mode — should fail
+	imp := transfer.NewImporter(driver, pb.ConflictMode_CONFLICT_ERROR)
+	_, err = imp.Import(ctx, result.Chunks)
+	if err == nil {
+		t.Error("expected error on conflict, got nil")
+	}
+}
+
+// TestTransferChunkSizeControl verifies that ChunkSize controls the number of node chunks.
+func TestTransferChunkSizeControl(t *testing.T) {
+	driver := SetupTestNeo4j(t)
+	ctx := context.Background()
+
+	spaceID := GenerateTestSpaceID("transfer-chunksize")
+	t.Cleanup(func() {
+		CleanupSpaceWithTest(t, driver, spaceID)
+	})
+
+	// Seed 10 nodes
+	SeedGraduatedNodes(t, driver, spaceID, 10, "learning")
+
+	cfg := transfer.DefaultExportConfig(spaceID)
+	cfg.ChunkSize = 3
+	ex := transfer.NewExporter(driver)
+	result, err := ex.Export(ctx, cfg)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+
+	// Count node chunks
+	var nodeChunks int
+	for _, chunk := range result.Chunks {
+		if chunk.ChunkType == pb.ChunkType_CHUNK_TYPE_NODES {
+			nodeChunks++
+		}
+	}
+	// 10 nodes / chunk_size 3 = ceil(10/3) = 4 node chunks
+	if nodeChunks != 4 {
+		t.Errorf("expected 4 node chunks (10 nodes / chunk_size 3), got %d", nodeChunks)
 	}
 }
 
