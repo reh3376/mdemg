@@ -595,6 +595,7 @@ func SeedObservationNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID 
 			UNWIND range(1, $count) AS i
 			CREATE (n:MemoryNode {
 				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-' + toString(i),
 				role_type: 'conversation_observation', obs_type: $obsType,
 				content: 'test observation ' + toString(i),
 				volatile: true, stability_score: 0.1, is_archived: false,
@@ -647,6 +648,7 @@ func SeedGraduatedNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID st
 			UNWIND range(1, $count) AS i
 			CREATE (n:MemoryNode {
 				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-' + toString(i),
 				role_type: 'conversation_observation', obs_type: $obsType,
 				content: 'graduated observation ' + toString(i),
 				volatile: false, stability_score: 0.95, is_archived: false,
