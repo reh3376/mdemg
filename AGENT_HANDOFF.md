@@ -8,7 +8,7 @@
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
 <!--
-=== AGENT RESUME CONTEXT (2026-03-10) ===
+=== AGENT RESUME CONTEXT (2026-03-16) ===
 
 WHAT IS MDEMG? (Read VISION.md for full philosophy)
 MDEMG (Multi-Dimensional Emergent Memory Graph) is a cognitive substrate for AI agents —
@@ -26,20 +26,29 @@ NOT information LLMs already possess.
 
 PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - 105 core phases (1-105) — ALL COMPLETE
-- 14 sidecar phases (S0-S14) — ALL COMPLETE
+- 15 sidecar phases (S0-S15) — ALL COMPLETE
 - 5 cognitive gap phases (101-105) — ALL GAPS CLOSED
   101: SME Synthesis, 102: Intent Translation, 103: Dynamic Emergence,
   104: Active Guardrails, 105: Global Meta-Learning
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1 brew install verified)
 - Quality hardening (gap analysis triage) — COMPLETE
-  - 282 UATS contract test specs (159 spec files), all using canonical assertion format
+  - 282 UATS contract test specs (159 spec files, 100% pass rate), all using canonical assertion format
   - 148 Go test files with comprehensive coverage
   - golangci-lint: 0 issues
   - Dead code removed (internal/observations/, internal/domain/)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
-- CI: ALL GREEN (push + pull_request) as of 2026-03-10
+- CI: ALL GREEN (push + pull_request) as of 2026-03-16
 
-LAST SESSION (2026-03-16, Session 2):
+LAST SESSION (2026-03-16, Session 3):
+- Documentation updates for transfer HTTP API:
+  - docs/development/API_REFERENCE.md: TOC entry + 3 endpoint sections (preview, export, import)
+  - packaging/homebrew-mdemg/docs/api-reference.md: TOC + 3 endpoints with Unix curl examples
+  - packaging/mdemg-windows/docs/api-reference.md: TOC + 3 endpoints with Windows curl examples
+  - packaging/homebrew-mdemg/mdemg_beta_testing_mac.md: T5.8 Space Export/Import test section
+  - Both submodules: cli-reference.md shareable export/import flags (from S15)
+  - Committed and pushed: main repo (a927359), homebrew-mdemg (d50111a), mdemg-windows (7ae5d32)
+
+PREVIOUS SESSION (2026-03-16, Session 2):
 - Transfer HTTP API & Testing (S15 Extension):
   - 3 new HTTP endpoints: POST /v1/admin/spaces/export, POST /v1/admin/spaces/import, GET /v1/admin/spaces/export/preview
   - New file: internal/api/handlers_transfer.go (3 handlers, 6 request/response structs)
@@ -138,7 +147,7 @@ WHAT REMAINS TO BE DONE:
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
 7. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
 8. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
-9. DOCUMENTATION: Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags
+9. DOCUMENTATION: ~~Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags~~ DONE (committed in submodules 2026-03-16)
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
@@ -2733,4 +2742,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import + Transfer HTTP API (3 endpoints, 3 UATS specs, 20-step acceptance test, 8 new integration tests). v0.2.1 released and Homebrew install verified. 282 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. Remaining: stale binary cleanup, SSE endpoint (not UATS-testable), scraper/guardrail Neo4j mock tests, ANN benchmark comparison, cli-reference docs for shareable flags.*
+*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import + Transfer HTTP API (3 endpoints, 3 UATS specs, 20-step acceptance test, 8 new integration tests). v0.2.1 released and Homebrew install verified. 282 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. All documentation synced (API reference, CLI reference, beta testing) across main repo and both submodules. Remaining: stale binary cleanup, scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*
