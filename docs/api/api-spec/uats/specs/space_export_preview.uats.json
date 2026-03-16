@@ -1,0 +1,139 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Space Export Preview",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "transfer",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-16",
+    "description": "Validates GET /v1/admin/spaces/export/preview for lightweight export estimation without data transfer.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "admin",
+      "transfer"
+    ],
+    "sha256": "6d655c4f0f7028393f4c9bf9de1942fe1a89aa8b204813002e8028c978eb813c"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/admin/spaces/export/preview",
+    "query": {
+      "space_id": "mdemg-dev",
+      "profile": "shareable"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.profile",
+        "equals": "shareable"
+      },
+      {
+        "path": "$.estimated_nodes",
+        "type": "integer"
+      },
+      {
+        "path": "$.estimated_edges",
+        "type": "integer"
+      },
+      {
+        "path": "$.filters_applied",
+        "type": "object"
+      },
+      {
+        "path": "$.filters_applied.exclude_volatile",
+        "equals": true
+      },
+      {
+        "path": "$.filters_applied.obs_types",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Preview without space_id returns 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/spaces/export/preview",
+        "query": {
+          "space_id": "",
+          "profile": "full"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "full_profile",
+      "description": "Preview with full profile shows no volatile exclusion",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/spaces/export/preview",
+        "query": {
+          "space_id": "mdemg-dev",
+          "profile": "full"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.profile",
+            "equals": "full"
+          },
+          {
+            "path": "$.filters_applied.exclude_volatile",
+            "equals": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_profile",
+      "description": "Preview with invalid profile returns 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/spaces/export/preview",
+        "query": {
+          "space_id": "mdemg-dev",
+          "profile": "nonexistent"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

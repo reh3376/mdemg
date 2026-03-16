@@ -311,6 +311,26 @@ test-sidecar-acceptance: build-cli
 	bash scripts/sidecar-acceptance.sh --binary $(PWD)/bin/mdemg
 
 # ============================================================
+# Transfer Testing Targets
+# ============================================================
+.PHONY: test-transfer test-transfer-unit test-transfer-integration test-transfer-acceptance
+
+test-transfer: test-transfer-unit test-transfer-acceptance
+	@echo "All transfer tests complete"
+
+test-transfer-unit:
+	@echo "Running transfer unit tests..."
+	go test -v ./internal/transfer/... -timeout 60s
+
+test-transfer-integration:
+	@echo "Running transfer integration tests..."
+	go test -v -tags=integration ./tests/integration/... -run "TestTransfer" -timeout 120s
+
+test-transfer-acceptance: build-cli
+	@echo "Running transfer acceptance test..."
+	bash scripts/transfer-acceptance.sh --binary $(PWD)/bin/mdemg --base-url $(BASE_URL)
+
+# ============================================================
 # UDTS Contract Testing Targets
 # ============================================================
 

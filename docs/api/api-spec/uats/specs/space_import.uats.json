@@ -1,0 +1,122 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Space Import",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "transfer",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-16",
+    "description": "Validates POST /v1/admin/spaces/import for importing space data with conflict handling.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "tags": [
+      "admin",
+      "transfer"
+    ],
+    "sha256": "5a378b7b8e278e5b23b57fca1c5a8c608d3db23b58a9573ebc7bda3515fb3f25"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/admin/spaces/import",
+    "body": {
+      "space_id": "test-uats-import-ephemeral",
+      "conflict": "skip",
+      "chunks": []
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.nodes_created",
+        "type": "integer"
+      },
+      {
+        "path": "$.nodes_skipped",
+        "type": "integer"
+      },
+      {
+        "path": "$.edges_created",
+        "type": "integer"
+      },
+      {
+        "path": "$.warnings",
+        "type": "array"
+      },
+      {
+        "path": "$.duration_ms",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_chunks",
+      "description": "Import without chunks field returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/import",
+        "body": {
+          "space_id": "test-import-fail",
+          "conflict": "skip",
+          "chunks": null
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_conflict_mode",
+      "description": "Import with invalid conflict mode returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/import",
+        "body": {
+          "space_id": "test-import-bad",
+          "conflict": "invalid",
+          "chunks": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

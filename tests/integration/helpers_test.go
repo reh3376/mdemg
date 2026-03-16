@@ -734,6 +734,217 @@ func RefreshDistributionCache(t *testing.T, endpoint string, spaceID string) {
 	}
 }
 
+// ─── Transfer Test Helpers ───
+
+// SeedPinnedNodes creates pinned MemoryNodes for testing only_pinned export filter.
+func SeedPinnedNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID string, count int, obsType string) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("test-pinned-%s-%d", obsType, time.Now().UnixNano())
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, $count) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-' + toString(i),
+				role_type: 'conversation_observation', obs_type: $obsType,
+				content: 'pinned observation ' + toString(i),
+				pinned: true, volatile: false, stability_score: 0.95, is_archived: false,
+				layer: 0, created_at: datetime() - duration({hours: 2}),
+				updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"count":   count,
+			"prefix":  prefix,
+			"spaceId": spaceID,
+			"obsType": obsType,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed pinned nodes: %v", err)
+	}
+
+	raw := result.([]any)
+	ids := make([]string, len(raw))
+	for i, v := range raw {
+		ids[i] = v.(string)
+	}
+	return ids
+}
+
+// SeedTaggedNodes creates MemoryNodes with specific tags for testing tag-based export filters.
+func SeedTaggedNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID string, count int, obsType string, tags []string) []string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("test-tagged-%s-%d", obsType, time.Now().UnixNano())
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, $count) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-' + toString(i),
+				role_type: 'conversation_observation', obs_type: $obsType,
+				content: 'tagged observation ' + toString(i),
+				tags: $tags, volatile: false, stability_score: 0.95, is_archived: false,
+				layer: 0, created_at: datetime() - duration({hours: 2}),
+				updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"count":   count,
+			"prefix":  prefix,
+			"spaceId": spaceID,
+			"obsType": obsType,
+			"tags":    tags,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed tagged nodes: %v", err)
+	}
+
+	raw := result.([]any)
+	ids := make([]string, len(raw))
+	for i, v := range raw {
+		ids[i] = v.(string)
+	}
+	return ids
+}
+
+// SeedMultiLayerNodes creates MemoryNodes at L0, L1, and L2 layers for testing layer filters.
+func SeedMultiLayerNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID string) (l0, l1, l2 []string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("test-multilayer-%d", time.Now().UnixNano())
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// L0: 3 observation nodes
+	l0Result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, 3) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-l0-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-l0-' + toString(i),
+				role_type: 'conversation_observation', obs_type: 'learning',
+				content: 'L0 observation ' + toString(i),
+				volatile: false, stability_score: 0.95, is_archived: false,
+				layer: 0, created_at: datetime(), updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"prefix": prefix, "spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed L0 nodes: %v", err)
+	}
+
+	// L1: 2 hidden nodes
+	l1Result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			UNWIND range(1, 2) AS i
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-l1-' + toString(i), space_id: $spaceId,
+				path: $prefix + '-l1-' + toString(i),
+				role_type: 'hidden', content: 'L1 hidden ' + toString(i),
+				is_archived: false, layer: 1,
+				created_at: datetime(), updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"prefix": prefix, "spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed L1 nodes: %v", err)
+	}
+
+	// L2: 1 concept node
+	l2Result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			CREATE (n:MemoryNode {
+				node_id: $prefix + '-l2-1', space_id: $spaceId,
+				path: $prefix + '-l2-1',
+				role_type: 'concept', content: 'L2 concept',
+				is_archived: false, layer: 2,
+				created_at: datetime(), updated_at: datetime()
+			}) RETURN collect(n.node_id) AS nodeIds
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"prefix": prefix, "spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeIds"); ok {
+				return v, nil
+			}
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("failed to seed L2 nodes: %v", err)
+	}
+
+	toStrings := func(raw any) []string {
+		arr := raw.([]any)
+		out := make([]string, len(arr))
+		for i, v := range arr {
+			out[i] = v.(string)
+		}
+		return out
+	}
+
+	return toStrings(l0Result), toStrings(l1Result), toStrings(l2Result)
+}
+
 // GetRSICHistory fetches RSIC cycle history and returns parsed response.
 func GetRSICHistory(t *testing.T, endpoint string, limit int) map[string]any {
 	t.Helper()

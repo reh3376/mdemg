@@ -1,0 +1,183 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Space Export",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "transfer",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-16",
+    "description": "Validates POST /v1/admin/spaces/export for exporting space data with profile-based filtering.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 120000,
+    "tags": [
+      "admin",
+      "transfer"
+    ],
+    "sha256": "86960fab3010ae75b35113b25025b411ea80d726f173b4ee3069290325973130"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/admin/spaces/export",
+    "body": {
+      "space_id": "mdemg-dev",
+      "profile": "metadata"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "type": "string"
+      },
+      {
+        "path": "$.profile",
+        "equals": "metadata"
+      },
+      {
+        "path": "$.header.format",
+        "equals": "mdemg-space-transfer"
+      },
+      {
+        "path": "$.header.version",
+        "equals": "1.0.0"
+      },
+      {
+        "path": "$.chunks",
+        "type": "array"
+      },
+      {
+        "path": "$.summary.nodes_exported",
+        "type": "integer"
+      },
+      {
+        "path": "$.summary.edges_exported",
+        "type": "integer"
+      },
+      {
+        "path": "$.summary.duration_ms",
+        "type": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Export without space_id returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/export",
+        "body": {
+          "space_id": "",
+          "profile": "metadata"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_profile",
+      "description": "Export with unknown profile returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/export",
+        "body": {
+          "space_id": "mdemg-dev",
+          "profile": "nonexistent"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cms_profile",
+      "description": "Export with cms profile (lightweight, no symbols)",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/export",
+        "body": {
+          "space_id": "mdemg-dev",
+          "profile": "cms"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.profile",
+            "equals": "cms"
+          },
+          {
+            "path": "$.chunks",
+            "type": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shareable_profile",
+      "description": "Export with shareable profile",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/spaces/export",
+        "body": {
+          "space_id": "mdemg-dev",
+          "profile": "shareable"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.profile",
+            "equals": "shareable"
+          },
+          {
+            "path": "$.summary.nodes_exported",
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  ]
+}
