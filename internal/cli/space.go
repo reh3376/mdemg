@@ -860,25 +860,51 @@ func runSpaceCopy(ctx context.Context, cfg *copyConfig) error {
 
 	fmt.Printf("Copying space %q (%d nodes) → %q...\n", cfg.from, sourceCount, cfg.to)
 
-	// Step 1: Copy nodes in batches
-	// Uses APOC-free approach: collect node IDs, then clone with new space_id
+	// Step 1: Collect all source node IDs upfront
+	sess = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	result, err = sess.Run(ctx,
+		"MATCH (src:MemoryNode {space_id: $from}) RETURN src.node_id AS nid",
+		map[string]any{"from": cfg.from})
+	if err != nil {
+		sess.Close(ctx)
+		return fmt.Errorf("collect source IDs: %w", err)
+	}
+
+	var sourceIDs []string
+	for result.Next(ctx) {
+		if nid, ok := result.Record().Values[0].(string); ok {
+			sourceIDs = append(sourceIDs, nid)
+		}
+	}
+	sess.Close(ctx)
+
+	if len(sourceIDs) == 0 {
+		return fmt.Errorf("source space %q returned no node IDs", cfg.from)
+	}
+
+	// Step 2: Copy nodes in batches by explicit ID list (deterministic termination)
 	const batchSize = 500
 	var totalCopied int64
 
-	for {
+	for i := 0; i < len(sourceIDs); i += batchSize {
+		end := i + batchSize
+		if end > len(sourceIDs) {
+			end = len(sourceIDs)
+		}
+		batch := sourceIDs[i:end]
+
 		sess = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		result, err = sess.Run(ctx, `
-			MATCH (src {space_id: $from})
-			WHERE NOT EXISTS { MATCH (dup {space_id: $to, node_id: src.node_id + '-copy-' + $to}) }
-			WITH src LIMIT $batch
-			CREATE (dup)
+			MATCH (src:MemoryNode {space_id: $from})
+			WHERE src.node_id IN $ids
+			CREATE (dup:MemoryNode)
 			SET dup = properties(src),
 			    dup.space_id = $to,
 			    dup.node_id = src.node_id + '-copy-' + $to,
 			    dup.created_at = datetime(),
 			    dup._source_node_id = src.node_id
 			RETURN count(*) as copied`,
-			map[string]any{"from": cfg.from, "to": cfg.to, "batch": batchSize})
+			map[string]any{"from": cfg.from, "to": cfg.to, "ids": batch})
 		if err != nil {
 			sess.Close(ctx)
 			return fmt.Errorf("copy nodes batch: %w", err)
@@ -891,20 +917,15 @@ func runSpaceCopy(ctx context.Context, cfg *copyConfig) error {
 		sess.Close(ctx)
 
 		totalCopied += copied
-		if copied > 0 {
-			fmt.Printf("[%s] Copied %d nodes (total: %d/%d)\n", time.Now().Format("15:04:05"), copied, totalCopied, sourceCount)
-		}
-		if copied == 0 {
-			break
-		}
+		fmt.Printf("[%s] Copied %d nodes (total: %d/%d)\n", time.Now().Format("15:04:05"), copied, totalCopied, sourceCount)
 	}
 
 	// Step 2: Copy edges between nodes in the space
 	sess = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	result, err = sess.Run(ctx, `
-		MATCH (src1 {space_id: $from})-[r]->(src2 {space_id: $from})
-		MATCH (dup1 {space_id: $to, _source_node_id: src1.node_id})
-		MATCH (dup2 {space_id: $to, _source_node_id: src2.node_id})
+		MATCH (src1:MemoryNode {space_id: $from})-[r]->(src2:MemoryNode {space_id: $from})
+		MATCH (dup1:MemoryNode {space_id: $to, _source_node_id: src1.node_id})
+		MATCH (dup2:MemoryNode {space_id: $to, _source_node_id: src2.node_id})
 		WITH dup1, dup2, type(r) as relType, properties(r) as relProps
 		CALL (dup1, dup2, relType, relProps) {
 			WITH dup1, dup2, relType, relProps
@@ -932,7 +953,7 @@ func runSpaceCopy(ctx context.Context, cfg *copyConfig) error {
 	// Step 3: Clean up temporary _source_node_id markers
 	sess = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	_, _ = sess.Run(ctx,
-		"MATCH (n {space_id: $to}) WHERE n._source_node_id IS NOT NULL REMOVE n._source_node_id",
+		"MATCH (n:MemoryNode {space_id: $to}) WHERE n._source_node_id IS NOT NULL REMOVE n._source_node_id",
 		map[string]any{"to": cfg.to})
 	sess.Close(ctx)
 
@@ -956,9 +977,9 @@ func copyEdgesFallback(ctx context.Context, driver neo4j.DriverWithContext, from
 	for _, relType := range edgeTypes {
 		sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		cypher := fmt.Sprintf(`
-			MATCH (src1 {space_id: $from})-[r:%s]->(src2 {space_id: $from})
-			MATCH (dup1 {space_id: $to, _source_node_id: src1.node_id})
-			MATCH (dup2 {space_id: $to, _source_node_id: src2.node_id})
+			MATCH (src1:MemoryNode {space_id: $from})-[r:%s]->(src2:MemoryNode {space_id: $from})
+			MATCH (dup1:MemoryNode {space_id: $to, _source_node_id: src1.node_id})
+			MATCH (dup2:MemoryNode {space_id: $to, _source_node_id: src2.node_id})
 			CREATE (dup1)-[nr:%s]->(dup2)
 			SET nr = properties(r)
 			RETURN count(*) as copied`, relType, relType)
