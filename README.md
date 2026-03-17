@@ -53,7 +53,7 @@ The interactive wizard will:
 1. Set a **space ID** (defaults to directory name)
 2. Detect **Neo4j** on localhost:7687
 3. Ask for your **embedding provider** (ollama/openai/disabled)
-4. If OpenAI: prompt for your **API key** (stored in `.env`, never in config)
+4. If you're using OpenAI: prompt for your **API key** (stored in `.env`, never in config)
 5. Create `.mdemg/config.yaml`, `.mdemgignore`, and `.env`
 6. Optionally install a **git post-commit hook** for auto-ingestion
 7. Optionally configure **MCP** for your IDE (Cursor, VS Code, Claude Code)
