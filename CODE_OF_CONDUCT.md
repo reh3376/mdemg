@@ -22,6 +22,7 @@ We’ll argue about ideas, not people.
 - Bring data: benchmarks, logs, minimal repro cases, measurements.
 - If you propose a change, state: **goal**, **tradeoffs**, **alternatives considered**, **risk**.
 - If someone disproves your claim, acknowledge it and update the plan.
+- Own your mistakes, correct them quickly, and document what you've learned
 
 ### Keep discussions actionable
 
