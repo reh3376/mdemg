@@ -23,6 +23,7 @@ We’ll argue about ideas, not people.
 - If you propose a change, state: **goal**, **tradeoffs**, **alternatives considered**, **risk**.
 - If someone disproves your claim, acknowledge it and update the plan.
 - Own your mistakes, correct them quickly, and document what you've learned
+- Assume good faith from others and ask clarifying questions before you escalate the situation
 
 ### Keep discussions actionable
 
