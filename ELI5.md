@@ -61,6 +61,160 @@ When the AI needs to remember something, MDEMG doesn't just do a simple text sea
 - **Vector search**: Converts text into numbers (called embeddings) and finds memories with similar *meaning*, not just matching words. So searching for "how does login work?" would find memories about "authentication flow" even though the words are different.
 - **Graph traversal**: Follows the connections between memories to find related information. "Oh, you're asking about login? Let me also grab what I know about JWT tokens and the user database, since those are connected."
 
+## The Brain Analogy (Why It's Called an "ANN")
+
+MDEMG isn't just a database with some search features bolted on. It's designed to work like a simplified version of how your brain actually processes and stores memories. Here's the comparison:
+
+| Your Brain | MDEMG |
+|------------|-------|
+| Neurons (brain cells) | Memory nodes in the graph |
+| Synapses (connections between neurons) | Edges (links between nodes) |
+| Stronger synapses from repetition | Hebbian learning edges that get stronger with use |
+| Short-term memory → long-term memory | Volatile observations → graduated permanent memories |
+| Forgetting old unused memories | Temporal decay (unused connections weaken over time) |
+| Subconscious pattern recognition | Automatic concept formation (consolidation) |
+| Inner voice ("wait, I've seen this before...") | Jiminy guidance system (see below!) |
+
+In neuroscience, your brain's internal dialogue — that voice in your head that helps you reason, remember, and make decisions — runs on your **biological neural network**. MDEMG is the **artificial neural network** (ANN) equivalent for AI agents. It's not trying to be a full brain, but it copies the parts that matter most for memory:
+
+1. **Store** experiences as they happen
+2. **Connect** related experiences automatically
+3. **Abstract** patterns from raw experience over time
+4. **Recall** the right memories when needed
+5. **Forget** the irrelevant stuff gradually
+
+Without MDEMG, an AI agent can still *react* to what's in front of it — but it can't *reflect* on past experience. It's the difference between a calculator (smart but stateless) and a student (learns and grows over time).
+
+## The Three Key Systems
+
+MDEMG has three systems that work together to make the memory actually *useful*, not just a big pile of stored text. Think of them like three teammates:
+
+### CMS: The Librarian (Conversation Memory System)
+
+**What it does:** CMS is the core memory engine. It captures what happens during conversations, stores it in the graph, and retrieves it when needed.
+
+**How it works — like a really smart librarian:**
+
+Imagine a librarian who doesn't just file books alphabetically, but actually *reads* them, understands what they're about, and knows which books are related to each other.
+
+When you tell the AI "we're using PostgreSQL, not MySQL" — CMS does several things:
+
+1. **Captures** the observation and scores how "surprising" it is (a correction is more surprising than a routine fact, so it gets stored more prominently)
+2. **Embeds** it — converts the text into a list of numbers (a vector) that captures its *meaning*
+3. **Connects** it — creates links to related memories ("PostgreSQL" connects to "database," "backend," etc.)
+4. **Graduates** it — if the observation keeps being relevant, it gets promoted from temporary to permanent
+
+When the AI later needs to remember something, CMS doesn't just do a keyword search. It:
+
+```
+"How does our database work?"
+        ↓
+   Convert question to a vector (numbers that capture meaning)
+        ↓
+   Find memories with similar meaning (vector search)
+        ↓
+   Follow connections to related memories (graph traversal)
+        ↓
+   Spread activation — related memories "light up" too
+        ↓
+   Rank everything by relevance
+        ↓
+   Return the best memories to the AI
+```
+
+**Real-world analogy:** CMS is like your brain's hippocampus — the part responsible for forming and retrieving memories. Without it, every conversation starts from zero.
+
+### RSIC: The Study Buddy (Recursive Self-Improvement Cycle)
+
+**What it does:** RSIC is a feedback loop that helps MDEMG get *better at remembering* over time. It watches what works, what doesn't, and adjusts automatically.
+
+**How it works — like a student studying for exams:**
+
+Think about how you study. You don't just read a textbook once and hope for the best. You:
+1. **Take a practice test** (assess what you know)
+2. **Review your answers** (reflect on what went wrong)
+3. **Make a study plan** (plan what to focus on next)
+4. **Try different approaches** (speculate — "what if I use flashcards?")
+5. **Apply** the new strategy and see if your score improves
+
+RSIC does exactly this, but for the memory system:
+
+| Study Step | RSIC Step | What Happens |
+|------------|-----------|-------------|
+| Take a practice test | **Assess** | Check memory quality — are retrievals accurate? Are there gaps? |
+| Review your answers | **Reflect** | Analyze patterns — "retrieval works great for code, but misses architecture decisions" |
+| Make a study plan | **Plan** | Design a fix — "strengthen edges between decision nodes and code nodes" |
+| Try a different approach | **Speculate** | Test the fix safely — dry-run mode, no actual changes yet |
+| Apply and check | **Execute** | Apply the improvement, with automatic rollback if things get worse |
+
+The safety part is important: RSIC never makes changes it can't undo. It's like having a "save game" before trying a risky strategy — if it fails, you just reload.
+
+**Real-world analogy:** RSIC is like the part of your brain that does metacognition — "thinking about thinking." It's not *what* you remember, it's *how well* you remember, and how to get better at it.
+
+### Jiminy: The Conscience (Inner Voice Guidance)
+
+**What it does:** Named after Jiminy Cricket from Pinocchio (the little cricket who acts as Pinocchio's conscience), Jiminy is a system that proactively warns the AI *before* it makes a mistake.
+
+**The problem Jiminy solves:**
+
+Without Jiminy, MDEMG is *passive* — it only gives you memories when you ask for them. But what if you're about to make a mistake you've made before? What if you're about to break a rule you set last week? You'd have to *know* to ask the right question first.
+
+Jiminy flips this around. Instead of waiting to be asked, it **proactively checks** your current situation against everything it knows and whispers a warning if something looks off.
+
+**How it works — every single time you send a message to the AI:**
+
+```
+You type: "Let's refactor the auth module to use session cookies"
+                    ↓
+        Jiminy activates (runs in the background, < 6 seconds)
+                    ↓
+    ┌───────────────┼───────────────┐───────────────┐
+    ↓               ↓               ↓               ↓
+ Check           Search for      Look for        Find knowledge
+ constraints     past            contradictions  gaps
+ and rules       corrections
+    ↓               ↓               ↓               ↓
+ "There's a      "You were       "This           "We don't have
+  rule: never     corrected       conflicts       much info about
+  use cookies     last week —     with the        cookie security
+  for auth"       use JWT, not    JWT decision    in our graph"
+                  cookies"        from Tuesday"
+    ↓               ↓               ↓               ↓
+    └───────────────┴───────────────┴───────────────┘
+                    ↓
+        Merge, deduplicate, rank by importance
+                    ↓
+        Inject into the AI's context:
+        ═══ JIMINY GUIDANCE ═══
+        CONSTRAINTS:
+          • [must_not] Never use session cookies for auth (use JWT)
+        CORRECTIONS:
+          • You were corrected on this exact topic on March 10
+        ═══ END JIMINY GUIDANCE ═══
+                    ↓
+        AI sees the warning BEFORE responding to you
+```
+
+All four checks run **in parallel** (at the same time) with a 6-second timeout. If any source is slow or fails, the others still work — Jiminy is designed to fail silently rather than block your work.
+
+**Real-world analogy:** Jiminy is literally your conscience. That voice in your head that says "wait, don't touch the hot stove — remember what happened last time?" That's what Jiminy does for AI agents. It's the difference between an AI that repeats mistakes and one that learns from them.
+
+### How They Work Together
+
+Here's a real scenario showing all three systems in action:
+
+1. **You start coding.** CMS resumes your session, restoring memories from yesterday: "We decided to use PostgreSQL. The auth module uses JWT. The frontend is React."
+
+2. **You ask a question.** "How should I add caching?" CMS retrieves relevant memories — past discussions about Redis, performance concerns, architecture decisions — and the AI gives you an informed answer.
+
+3. **You almost make a mistake.** You suggest using a deprecated library. Jiminy catches it: "WARNING: You were corrected about this library on March 5 — use the new one instead." The AI course-corrects before you even know there was a problem.
+
+4. **In the background, RSIC notices** that retrieval for caching-related questions was slow. It runs an assessment, finds that the caching memories aren't well-connected, strengthens the relevant edges, and next time the retrieval is faster and more accurate.
+
+5. **The session ends.** CMS persists everything. Tomorrow, when you come back, all of this is still there — decisions, corrections, improvements, and all.
+
+---
+
 ## The Tech Stack (What It's Built With)
 
 | Technology | What It Does | Why It's Cool |
@@ -89,6 +243,13 @@ Here are some terms from the README translated:
 | "Temporal decay" | Old, unused memories gradually fade — just like how you forget things you haven't thought about in a while |
 | "Space" | A container that keeps one project's memories separate from another's |
 | "Consolidation" | The process of organizing raw memories into higher-level concepts |
+| "CMS" | Conversation Memory System — the core engine that stores and retrieves memories |
+| "RSIC" | Recursive Self-Improvement Cycle — a feedback loop that makes MDEMG better over time |
+| "Jiminy" | An inner-voice system that warns the AI before it repeats mistakes (named after Jiminy Cricket) |
+| "Metacognition" | Thinking about thinking — how RSIC evaluates and improves the memory system itself |
+| "Surprise score" | How unexpected an observation is — corrections and new facts score higher than routine info |
+| "Graduation" | When a temporary observation proves important enough to become a permanent memory |
+| "Volatile" | A temporary observation that hasn't been graduated to permanent status yet |
 | "UATS" | Automated tests that verify the API works correctly (like a spell-checker for code) |
 
 ## Want to Learn More?
