@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-16
+**Date:** 2026-03-18
 **Branch:** `mdemg-dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -37,9 +37,27 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
   - golangci-lint: 0 issues
   - Dead code removed (internal/observations/, internal/domain/)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
+- AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness tracking, AR-3 LLM intelligence)
+  Feature docs: docs/features/rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
 - CI: ALL GREEN (push + pull_request) as of 2026-03-16
 
-LAST SESSION (2026-03-16, Session 3):
+LAST SESSION (2026-03-18):
+- AutoResearch Integration (Phases AR-1, AR-2, AR-3):
+  - AR-1: RSIC feedback loop — post-cycle re-assessment (MetricsAfter), success criteria evaluation,
+    auto-rollback for reversible actions. Files: calibration.go, cycle.go, types_rsic.go
+  - AR-2: Jiminy effectiveness tracking — guidance_id in responses, POST /v1/jiminy/feedback,
+    outcome classification (followed/ignored/contradicted). Files: effectiveness.go (new),
+    service.go, types.go, handlers_jiminy.go
+  - AR-3: LLM-powered intelligence — LLM reflector (llm_reflector.go), LLM constraint classifier
+    (llm_classifier.go), LLM query classifier (query_classifier.go). All follow EmergenceNamer
+    pattern, fail-open, opt-in via config. 12 new config vars.
+  - Testing: 44 new unit tests, 8 integration tests, e2e verified
+  - Bug fix: keyword constraint matching now correctly checks "must not" before "must"
+  - Feature docs: rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
+  - Updated: jiminy-inner-voice.md (feedback endpoint + effectiveness refs)
+  - Plan: /Users/reh3376/.claude/plans/mellow-crunching-hopcroft.md
+
+PREVIOUS SESSION (2026-03-16, Session 3):
 - Documentation updates for transfer HTTP API:
   - docs/development/API_REFERENCE.md: TOC entry + 3 endpoint sections (preview, export, import)
   - packaging/homebrew-mdemg/docs/api-reference.md: TOC + 3 endpoints with Unix curl examples
@@ -213,6 +231,9 @@ It does **NOT** store general knowledge that LLMs already possess.
 | CMS & RSIC Guide | `reh3376/homebrew-mdemg:docs/cms-rsic-guide.md` | CMS + RSIC workflows and practical examples (1,344 lines) |
 | Ingestion Guide | `reh3376/homebrew-mdemg:docs/ingestion-guide.md` | All 8 ingestion methods with setup (1,040 lines) |
 | Jiminy Inner Voice | `docs/features/jiminy-inner-voice.md` | Proactive guidance service — architecture, config, API, hooks |
+| RSIC Feedback Loop | `docs/features/rsic-feedback-loop.md` | Post-cycle re-assessment, criteria evaluation, auto-rollback |
+| Jiminy Effectiveness | `docs/features/jiminy-effectiveness-tracking.md` | Guidance feedback loop — followed/ignored/contradicted tracking |
+| LLM Intelligence | `docs/features/llm-powered-intelligence.md` | LLM reflection, constraint classification, query classification |
 
 ### Technical Invariants (Do NOT Violate)
 
@@ -2713,6 +2734,90 @@ DBSCAN clustering (`internal/hidden/clustering.go`) currently runs on CPU with g
 
 7 pre-unified-CLI binaries remain: `extract-symbols`, `ingest-codebase`, `mcp-server`, `mdemg-ingest`, `mdemg-server`, `reset-db`, `server`. All functionality is now in the unified `bin/mdemg` binary. Deletion requires user confirmation due to pre-bash-check hook matching `reset-db`.
 
+### IN PROGRESS: Linux Distribution & Desktop Application
+
+**Goal:** Extend MDEMG's platform reach to Linux with a dedicated installer and desktop companion app, mirroring the macOS ecosystem (`homebrew-mdemg` + `mdemg-menubar`).
+
+**Status:** Documentation phase complete. Both repos created as submodules.
+
+**Linux Installer — `packaging/mdemg_linux` ([GitHub](https://github.com/reh3376/mdemg_linux)):**
+- 10 files: README.md (648→~680 lines, Linux-adapted), 4 docs (api-reference, cli-reference, cms-rsic-guide, ingestion-guide), beta testing guide (39 tests, 5 tiers), install.sh (curl installer), systemd units (mdemg.service, mdemg-rsic.service, mdemg-rsic.timer), LICENSE, .gitignore
+- Install methods: curl installer, .deb, .rpm, AppImage, manual tarball
+- Supports: Ubuntu 20.04+, Debian 11+, Fedora 36+, RHEL 8+, Arch Linux
+- Linux adaptations: Docker Engine (not Desktop), systemd (not launchd), Linux keyring (not macOS Keychain), `ss` (not `lsof`), SELinux notes for RHEL/Fedora
+
+**Linux Sidebar — `packaging/mdemg-linux-sidebar` ([GitHub](https://github.com/reh3376/mdemg-linux-sidebar)):**
+- 11 files: README.md, Tauri skeleton (tauri.conf.json, Cargo.toml, main.rs), frontend (package.json, index.html), CI/CD (build.yml, release.yml), Makefile, LICENSE, .gitignore
+- Technology: Tauri (Rust backend + web frontend, ~10MB)
+- Features: 7-tab dashboard (same as mdemg-menubar), system tray, multi-instance, auto-discovery, XDG config paths
+- Release artifacts: AppImage + .deb (Tauri native)
+
+**Remaining work:**
+- Enable Linux builds in `.goreleaser.yaml` (currently commented out, requires `zig` for cross-compilation)
+- Build and publish first release artifacts
+- Implement full Tauri sidebar functionality (currently skeleton)
+
+### OPEN: AutoResearch Integration Analysis — RSIC/CMS/Jiminy Enhancement
+
+**Goal:** Deep research analysis of [autoresearch](https://github.com/reh3376/autoresearch.git) to identify concepts, patterns, and techniques that could enhance MDEMG's recursive self-improvement (RSIC), conversation memory (CMS), and inner-voice guidance (Jiminy) capabilities.
+
+**Research scope:**
+
+1. **RSIC Enhancement** — Analyze autoresearch's research loop architecture for patterns applicable to RSIC's 5-phase cycle (assess → reflect → plan → speculate → execute):
+   - Does autoresearch use multi-agent orchestration, iterative refinement, or confidence scoring that could improve RSIC's assess/reflect phases?
+   - Are there search strategies, hypothesis pruning, or evidence weighting techniques that could make RSIC's speculate phase more effective?
+   - How does autoresearch handle research dead-ends and backtracking? Could similar mechanisms improve RSIC's rollback/safety guarantees?
+
+2. **CMS Enhancement** — Analyze autoresearch's knowledge accumulation and retrieval patterns for CMS improvements:
+   - Does autoresearch build persistent knowledge graphs or citation networks that could inform CMS's Hebbian edge strengthening?
+   - Are there retrieval strategies (multi-hop reasoning, evidence chains) that go beyond CMS's current vector+graph recall?
+   - How does autoresearch handle contradictory findings? Could this improve CMS's surprise scoring and correction handling?
+
+3. **Jiminy Enhancement** — Analyze autoresearch's validation and quality-control mechanisms for Jiminy's proactive guidance:
+   - Does autoresearch cross-check findings against prior knowledge or known constraints? Could this pattern enhance Jiminy's contradiction detection?
+   - Are there confidence calibration techniques that could improve Jiminy's guidance relevance scoring?
+   - How does autoresearch surface gaps in knowledge? Could this strengthen Jiminy's frontier detection (knowledge gaps)?
+
+**Deliverable:** Gap analysis document (`docs/development/AUTORESEARCH_INTEGRATION_ANALYSIS.md`) with specific, actionable recommendations ranked by impact and implementation effort. Each recommendation should map to a concrete MDEMG component and proposed change.
+
+### OPEN: Export Alignment & Organizational Governance (Gap Analysis)
+
+**Goal:** Deep research and gap analysis to ensure that knowledge exported from an MDEMG instance for sharing with other instances is relevant, properly aligned with organizational specifications, and meets quality/compliance requirements.
+
+**Problem statement:** The current export system (Phase S15) filters by obs_type, tags, volatility, pinned status, and layer — but these are structural filters, not semantic or policy-based ones. When sharing knowledge across teams, departments, or organizations, additional concerns arise:
+
+1. **Relevance Filtering** — Exported knowledge may include observations that are specific to the source instance's context (local debugging notes, environment-specific config, personal preferences) and irrelevant or misleading for the target instance.
+   - Research: content relevance scoring, domain-specific vs. universal knowledge classification
+   - Potential: LLM-based relevance evaluator that scores each node against a target domain description before export
+   - Potential: "export readiness" score per node (combines graduation status, edge density, recall frequency, specificity)
+
+2. **Organizational Policy Alignment** — Organizations may have specifications about what knowledge can be shared (IP restrictions, compliance rules, data classification levels).
+   - Research: policy-as-code frameworks, attribute-based access control (ABAC) for knowledge graphs
+   - Potential: exportable policy profiles (beyond the current `full/shareable/metadata`) that encode org-specific rules
+   - Potential: pre-export policy validation step — scan all candidate nodes against org policy before export, flag violations
+
+3. **Semantic Quality Assurance** — Exported knowledge should be internally consistent, not contradictory, and not stale.
+   - Research: knowledge graph consistency checking, contradiction detection at export time
+   - Potential: pre-export consolidation pass — run consolidation on export candidates to merge redundant/overlapping nodes
+   - Potential: freshness scoring — exclude nodes whose temporal decay score has fallen below a threshold
+   - Potential: contradiction audit — detect and flag nodes that contradict each other before export
+
+4. **Target Instance Compatibility** — Exported knowledge should be meaningful to the target instance's existing graph.
+   - Research: ontology alignment, schema mapping between knowledge graphs
+   - Potential: export manifest with domain vocabulary/ontology so the target instance can assess compatibility
+   - Potential: "dry-run import" that reports what would merge, conflict, or be orphaned without actually importing
+
+5. **Audit & Provenance** — Track what was shared, when, with whom, and what the source evidence was.
+   - Research: data lineage, provenance graphs, W3C PROV standard
+   - Potential: export receipt (signed manifest with node IDs, timestamps, source instance ID, export policy used)
+   - Potential: provenance edges — imported nodes retain a `SOURCED_FROM` edge pointing to the source instance/space
+
+**Deliverable:** Gap analysis document (`docs/development/EXPORT_GOVERNANCE_GAP_ANALYSIS.md`) with:
+- Current state assessment (what S15 export already handles)
+- Gap inventory (what's missing for org-grade knowledge sharing)
+- Prioritized recommendations (quick wins vs. architectural changes)
+- Proposed phase plan (new sidecar phases if warranted)
+
 ### RESOLVED: v0.2.1 Release Fixes (Homebrew Install Testing)
 
 Discovered and fixed during homebrew install test (all 16 test phases passed):
@@ -2742,4 +2847,4 @@ Discovered and fixed during homebrew install test (all 16 test phases passed):
 
 ---
 
-*Last updated: 2026-03-16 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import + Transfer HTTP API (3 endpoints, 3 UATS specs, 20-step acceptance test, 8 new integration tests). v0.2.1 released and Homebrew install verified. 282 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. All documentation synced (API reference, CLI reference, beta testing) across main repo and both submodules. Remaining: stale binary cleanup, scraper/guardrail Neo4j mock tests, ANN benchmark comparison.*
+*Last updated: 2026-03-18 — All 105 phases + S0-S15 complete + ANN Optimization Suite (10 optimizations) + Sidecar quickstart/hook enhancements (PR #127 gaps closed) + S15 Shareable Knowledge Export/Import + Transfer HTTP API (3 endpoints, 3 UATS specs, 20-step acceptance test, 8 new integration tests). v0.2.1 released and Homebrew install verified. 282 UATS specs (100% pass rate). 148 Go test files. golangci-lint: 0 issues. Phase 100: 10/10 criteria pass. All documentation synced (API reference, CLI reference, beta testing) across main repo and both submodules. Remaining: stale binary cleanup, scraper/guardrail Neo4j mock tests, ANN benchmark comparison. New feature improvement ideas: Linux distribution & desktop app, AutoResearch integration analysis (RSIC/CMS/Jiminy), Export governance & organizational alignment gap analysis.*
