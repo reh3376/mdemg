@@ -574,6 +574,7 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 
 ## Documentation
 
+- [ELI5 (Explain Like I'm 5)](ELI5.md) - Simplified explanation of what MDEMG does and how it works
 - [Quickstart Guide](docs/quickstart.md) - 10-minute setup walkthrough
 - [FAQ](docs/FAQ.md) - Common questions and troubleshooting
 - [CLI Reference](docs/features/unified-cli.md) - All CLI commands
