@@ -333,14 +333,57 @@ mdemg hooks install --type claude
 
 See `CLAUDE.md` for the full hook specification.
 
+## Branch Naming Convention
+
+All collaborator branches must follow the pattern: `<github_handle>_dev<01-09>` with an optional descriptive suffix `_<kebab-description>`.
+
+**Regex:** `^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?_dev0[1-9](_[a-z0-9]+(-[a-z0-9]+)*)?$`
+
+### Category Codes
+
+| Code | Category | Description |
+|------|----------|-------------|
+| `01` | General development | Broad or mixed-scope work spanning multiple concerns |
+| `02` | Feature development | Single feature or capability addition |
+| `03` | Documentation & linting | Docs, comments, lint fixes, formatting |
+| `04` | Bug fixes | Correcting broken behavior |
+| `05` | CI/CD & infrastructure | Build pipeline, GitHub Actions, goreleaser, Docker |
+| `06` | Testing | Test additions, test framework work, benchmarks |
+| `07` | Refactoring & tech debt | Structural improvements without behavior change |
+| `08` | Release & packaging | Version bumps, Homebrew formula, installers, changelogs |
+| `09` | Experimental & prototype | Exploratory work not yet committed to a roadmap |
+
+### Examples
+
+**Valid:**
+- `reh3376_dev01` — general development
+- `reh3376_dev02_teardown-wizard` — feature branch with description
+- `jdoe_dev04_fix-neo4j-timeout` — bug fix with description
+- `alice_dev09` — experimental work
+
+**Invalid:**
+- `feature/my-feature` — does not follow the naming pattern
+- `dev01` — missing github handle
+- `reh3376_dev10` — code must be 01-09
+- `reh3376_dev1` — code must be two digits (01, not 1)
+
+### Rules
+
+- **One branch per category per collaborator** — merge or close your existing branch in a category before starting another in the same category
+- **`main` is always protected** — changes reach it only via PR
+- **Automation exemptions:** `dependabot/*`, `release/*`, and `gh-pages` branches are exempt from this naming convention
+- A GitHub Actions workflow (`.github/workflows/branch-naming.yml`) enforces this convention on push
+
+> **Migration note:** The original development branch `mdemg-dev01` has been renamed to `reh3376_dev01` to comply with this convention.
+
 ## Submitting Changes
 
 ### Pull Request Process
 
-1. Fork the repository and create a feature branch:
+1. Fork the repository and create a branch following the [naming convention](#branch-naming-convention):
 
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b yourgithubhandle_dev02_your-feature
    ```
 
 2. Make your changes following the code style guidelines

@@ -2,7 +2,7 @@ name: Auto PR from Dev Branch
 
 on:
   push:
-    branches: [mdemg-dev01]
+    branches: ['**_dev*']
 
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_URL=$(gh pr list --head mdemg-dev01 --base main --state open --json url --jq '.[0].url // empty')
+          PR_URL=$(gh pr list --head "${{ github.ref_name }}" --base main --state open --json url --jq '.[0].url // empty')
           if [ -n "$PR_URL" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
@@ -42,13 +42,13 @@ jobs:
             echo "body<<PREOF"
             echo "## Summary"
             echo ""
-            echo "Development branch changes from \`mdemg-dev01\`."
+            echo "Development branch changes from \`${{ github.ref_name }}\`."
             echo ""
             echo "### Commits"
             echo "$COMMIT_LOG"
             echo ""
             echo "---"
-            echo "*Auto-generated PR from mdemg-dev01 push*"
+            echo "*Auto-generated PR from ${{ github.ref_name }} push*"
             echo "PREOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -59,7 +59,7 @@ jobs:
           PR_BODY: ${{ steps.body.outputs.body }}
         run: |
           gh pr create \
-            --head mdemg-dev01 \
+            --head "${{ github.ref_name }}" \
             --base main \
-            --title "dev: mdemg-dev01 -> main" \
+            --title "dev: ${{ github.ref_name }} -> main" \
             --body "$PR_BODY"
