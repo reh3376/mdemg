@@ -1326,6 +1326,21 @@ This embeds parameterized hook scripts (`.sh` on Unix, `.ps1` on Windows) into `
 
 `mdemg init` auto-installs Claude Code hooks when a `.claude/` directory is detected (J6c). In `--defaults`/`--quick` mode, hooks are installed non-interactively.
 
+### Instance Teardown (Phase S16)
+
+```bash
+# Preview what would be removed
+mdemg teardown --dry-run
+
+# Teardown with optional data export
+mdemg teardown --export --yes
+
+# Full system removal (binary, plugins, systemd units)
+mdemg teardown --full --yes
+```
+
+Completely removes all MDEMG artifacts from a project (instance scope) or the entire system (full scope). Covers 14 phases: server stop, Docker container/volume removal, Neo4j space deletion, keyring secret removal, hook uninstall, MCP config cleanup, `.mdemg/` backup+removal, sidebar deregistration, and system-level cleanup. Protected spaces (`mdemg-dev`, `mdemg-global`) are skipped unless `--force` is used. See `docs/features/teardown.md` for full details.
+
 ---
 
 ## Skill Registry (Phase 48)
