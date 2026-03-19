@@ -204,6 +204,18 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 
 **Error responses:** 400 (missing required fields), 405 (wrong HTTP method), 503 (Jiminy disabled).
 
+**Note:** The response now includes a `guidance_id` (UUID) in the `data` object for effectiveness tracking. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for the feedback loop.
+
+### `POST /v1/jiminy/feedback`
+
+Record whether guidance was followed, ignored, or contradicted. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for full documentation.
+
+```bash
+curl -s -X POST http://localhost:9999/v1/jiminy/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"guidance_id":"<id>","action_summary":"I validated the input","space_id":"mdemg-dev"}'
+```
+
 ## MCP Tool
 
 **Tool name:** `jiminy_guide`
@@ -223,8 +235,9 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 
 | File | Description |
 |------|-------------|
-| `internal/jiminy/service.go` | Core orchestration — Guide() method with 4-source fan-out |
-| `internal/jiminy/types.go` | GuidanceRequest, GuidanceResponse, GuidanceItem, SourceCounts |
+| `internal/jiminy/service.go` | Core orchestration — Guide() with 4-source fan-out; RecordOutcome() for feedback |
+| `internal/jiminy/types.go` | GuidanceRequest, GuidanceResponse, GuidanceItem, SourceCounts, GuidanceFeedbackRequest |
+| `internal/jiminy/effectiveness.go` | EffectivenessTracker — LRU cache with TTL for guidance tracking |
 | `internal/jiminy/corrections.go` | Vector search for correction observations |
 | `internal/jiminy/contradictions.go` | CONTRADICTS edge queries |
 | `internal/jiminy/frontiers.go` | Vector search for frontier nodes |
@@ -238,6 +251,8 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 | `docs/specs/phase-jiminy-guidance.md` | Complete phase specification |
 | `docs/api/api-spec/uats/specs/jiminy_guide.uats.json` | 4 functional contract test variants |
 | `docs/api/api-spec/uats/specs/jiminy_guide_validation.uats.json` | 5 validation contract test variants |
+| `docs/api/api-spec/uats/specs/jiminy_feedback.uats.json` | 4 feedback contract test variants |
+| `docs/features/jiminy-effectiveness-tracking.md` | Effectiveness tracking feature doc |
 
 ## Dependencies
 

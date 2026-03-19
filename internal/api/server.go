@@ -400,6 +400,22 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	// Initialize consulting service (Agent Consulting API)
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
+
+	// Phase AR-3: Wire LLM-powered constraint classifier if enabled
+	if cfg.ConsultingLLMConstraintsEnabled {
+		constraintClassifier := consulting.NewConstraintClassifier(consulting.ConstraintClassifierConfig{
+			Enabled:   true,
+			Provider:  cfg.ConsultingLLMConstraintsProvider,
+			Model:     cfg.ConsultingLLMConstraintsModel,
+			MaxTokens: 500,
+			TimeoutMs: cfg.EmergenceTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.OpenAIEndpoint,
+			OllamaURL: cfg.OllamaEndpoint,
+		}, cbRegistry)
+		cons.SetConstraintClassifier(constraintClassifier)
+		log.Printf("Consulting LLM constraint classification enabled (provider: %s, model: %s)", cfg.ConsultingLLMConstraintsProvider, cfg.ConsultingLLMConstraintsModel)
+	}
 	log.Printf("Consulting service initialized")
 
 	// Phase Jiminy: Initialize Jiminy Guidance Service
@@ -489,10 +505,27 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	rsicAssessor := ape.NewAssessor(cfg, driver, learnerAdapter, convAdapter)
 	rsicReflector := ape.NewReflector(cfg, driver)
+
 	rsicPlanner := ape.NewPlanner(cfg)
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
+
+	// Phase AR-3: Wire LLM-powered reflector if enabled
+	if cfg.RSICLLMReflectEnabled {
+		llmReflector := ape.NewLLMReflector(ape.LLMReflectorConfig{
+			Enabled:   true,
+			Provider:  cfg.RSICLLMReflectProvider,
+			Model:     cfg.RSICLLMReflectModel,
+			MaxTokens: cfg.EmergenceMaxTokens,
+			TimeoutMs: cfg.EmergenceTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.OpenAIEndpoint,
+			OllamaURL: cfg.OllamaEndpoint,
+		}, cbRegistry, rsicCalibrator)
+		rsicReflector.SetLLMReflector(llmReflector)
+		log.Printf("RSIC LLM reflection enabled (provider: %s, model: %s)", cfg.RSICLLMReflectProvider, cfg.RSICLLMReflectModel)
+	}
 
 	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
 	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, nil)
@@ -535,6 +568,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
 	rsicDispatcher.SetSafetyValidator(safetyValidator)
 	rsicDispatcher.SetSnapshotStore(snapshotStore)
+	rsicCycle.SetSnapshotStore(snapshotStore)
 	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
 
 	// Phase 89: Initialize RSIC persistence store
@@ -1294,6 +1328,7 @@ func (s *Server) Routes() http.Handler {
 
 	// Phase Jiminy: Jiminy Guidance
 	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
+	mux.HandleFunc("/v1/jiminy/feedback", s.handleJiminyFeedback)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)

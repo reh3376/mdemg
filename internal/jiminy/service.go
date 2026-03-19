@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
@@ -25,15 +27,18 @@ type Service struct {
 	driver     neo4j.DriverWithContext
 	consultant ConsultingService
 	embedder   embeddings.Embedder
+	tracker    *EffectivenessTracker // Phase AR-2: guidance effectiveness tracking
 }
 
 // NewService creates a new Jiminy guidance service.
 func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant ConsultingService, embedder embeddings.Embedder) *Service {
+	tracker := NewEffectivenessTracker(1000, cfg.JiminyEffectivenessTTLSec)
 	return &Service{
 		cfg:        cfg,
 		driver:     driver,
 		consultant: consultant,
 		embedder:   embedder,
+		tracker:    tracker,
 	}
 }
 
@@ -302,7 +307,14 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Format prompt augmentation
 	augmentation := FormatPromptAugmentation(filtered, counts, confidence)
 
+	// Phase AR-2: Generate guidance_id and track items for effectiveness feedback
+	guidanceID := uuid.New().String()
+	if s.tracker != nil && len(filtered) > 0 {
+		s.tracker.Track(guidanceID, filtered)
+	}
+
 	return GuidanceResponse{
+		GuidanceID:         guidanceID,
 		Guidance:           filtered,
 		PromptAugmentation: augmentation,
 		Confidence:         confidence,
@@ -389,4 +401,97 @@ func deduplicateItems(items []GuidanceItem) []GuidanceItem {
 		}
 	}
 	return result
+}
+
+// RecordOutcome processes feedback for a prior guidance response.
+// It correlates the action_summary against each guidance item using simple
+// text overlap scoring (embedding-based comparison is deferred to a future enhancement).
+func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest) (*GuidanceFeedbackResponse, error) {
+	if req.GuidanceID == "" {
+		return nil, fmt.Errorf("guidance_id is required")
+	}
+
+	items := s.tracker.Lookup(req.GuidanceID)
+	if items == nil {
+		return &GuidanceFeedbackResponse{
+			GuidanceID: req.GuidanceID,
+			Results:    []GuidanceItemFeedback{},
+			Applied:    false,
+		}, nil
+	}
+
+	actionLower := strings.ToLower(req.ActionSummary)
+	var results []GuidanceItemFeedback
+
+	for _, item := range items {
+		outcome, sim := classifyOutcome(item, actionLower)
+		results = append(results, GuidanceItemFeedback{
+			Type:       item.Type,
+			Content:    item.Content,
+			Outcome:    outcome,
+			Similarity: sim,
+		})
+	}
+
+	return &GuidanceFeedbackResponse{
+		GuidanceID: req.GuidanceID,
+		Results:    results,
+		Applied:    true,
+	}, nil
+}
+
+// classifyOutcome determines whether a guidance item was followed, contradicted, or ignored
+// based on simple text overlap with the action summary.
+func classifyOutcome(item GuidanceItem, actionLower string) (GuidanceOutcome, float64) {
+	contentLower := strings.ToLower(item.Content)
+
+	// Extract significant words (>= 4 chars) from guidance content
+	contentWords := significantWords(contentLower)
+	if len(contentWords) == 0 {
+		return OutcomeUnknown, 0.0
+	}
+
+	// Count how many significant content words appear in the action
+	matches := 0
+	for _, w := range contentWords {
+		if strings.Contains(actionLower, w) {
+			matches++
+		}
+	}
+	similarity := float64(matches) / float64(len(contentWords))
+
+	// Check for negation patterns indicating contradiction
+	negationPatterns := []string{"instead of", "did not", "didn't", "ignored", "skipped", "contrary to"}
+	hasNegation := false
+	for _, neg := range negationPatterns {
+		if strings.Contains(actionLower, neg) {
+			hasNegation = true
+			break
+		}
+	}
+
+	if similarity >= 0.4 && hasNegation {
+		return OutcomeContradicted, similarity
+	}
+	if similarity >= 0.3 {
+		return OutcomeFollowed, similarity
+	}
+	if similarity > 0.0 {
+		return OutcomeIgnored, similarity
+	}
+	return OutcomeUnknown, 0.0
+}
+
+// significantWords extracts words >= 4 chars from text.
+func significantWords(text string) []string {
+	words := strings.Fields(text)
+	var significant []string
+	for _, w := range words {
+		// Strip common punctuation
+		w = strings.Trim(w, ".,;:!?\"'()[]{}")
+		if len(w) >= 4 {
+			significant = append(significant, w)
+		}
+	}
+	return significant
 }

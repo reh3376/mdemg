@@ -34,9 +34,10 @@ type CycleOrchestrator struct {
 	dispatcher *Dispatcher
 	monitor    *Monitor
 	calibrator *Calibrator
-	watchdog   *Watchdog
-	cfg        config.Config
-	policy     *OrchestrationPolicy
+	watchdog       *Watchdog
+	snapshotStore  *SnapshotStore
+	cfg            config.Config
+	policy         *OrchestrationPolicy
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -232,9 +233,17 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		return outcome, nil
 	}
 
+	// Phase AR-1: Post-cycle re-assessment
+	var postReport *SelfAssessmentReport
+	postReport, err = c.assessor.Assess(ctx, spaceID, tier)
+	if err != nil {
+		log.Printf("RSIC %s: post-cycle assessment failed (continuing without): %v", cycleID, err)
+		postReport = nil
+	}
+
 	// Stage 5: Validate + Calibrate
 	reports := c.monitor.CollectReportsForCycle(cycleID)
-	outcome := c.calibrator.Validate(ctx, cycleID, tier, spaceID, tasks, reports, baseline)
+	outcome := c.calibrator.Validate(ctx, cycleID, tier, spaceID, tasks, reports, baseline, postReport)
 	outcome.StartedAt = startedAt
 	outcome.Insights = insights
 	outcome.TriggerSource = meta.TriggerSource
@@ -248,6 +257,27 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	outcome.SafetySummary = c.dispatcher.GetSafetySummary()
 
 	c.calibrator.UpdateCalibration(outcome, tasks, reports)
+
+	// Phase AR-1 R6: Auto-rollback for reversible actions that didn't improve metrics
+	if !outcome.CriteriaMet && c.snapshotStore != nil {
+		for _, task := range tasks {
+			if isReversibleAction(task.ActionType) {
+				snaps := c.snapshotStore.ListSnapshots()
+				for _, snap := range snaps {
+					if snap.CycleID == cycleID && snap.Action == task.ActionType {
+						rbResult, rbErr := c.snapshotStore.Rollback(ctx, snap.SnapshotID)
+						if rbErr != nil {
+							log.Printf("RSIC %s: rollback failed for %s: %v", cycleID, task.ActionType, rbErr)
+						} else if rbResult != nil && rbResult.RolledBack {
+							log.Printf("RSIC %s: rolled back %s (restored %d items)", cycleID, task.ActionType, rbResult.RestoredCount)
+							metrics.Metrics().RSICActionTotal(task.ActionType, "rolled_back").Inc()
+						}
+						break
+					}
+				}
+			}
+		}
+	}
 
 	// Phase 89: Clean up stale dispatcher tasks
 	c.dispatcher.CleanupStaleTasks(10 * time.Minute)
@@ -279,6 +309,21 @@ func (c *CycleOrchestrator) GetCalibration() map[string]float64 {
 // SetOrchestrationPolicy attaches an orchestration policy to the orchestrator.
 func (c *CycleOrchestrator) SetOrchestrationPolicy(p *OrchestrationPolicy) {
 	c.policy = p
+}
+
+// SetSnapshotStore attaches a snapshot store for auto-rollback support.
+func (c *CycleOrchestrator) SetSnapshotStore(ss *SnapshotStore) {
+	c.snapshotStore = ss
+}
+
+// isReversibleAction returns true if the action type can be rolled back.
+func isReversibleAction(actionType string) bool {
+	switch actionType {
+	case "tombstone_stale", "graduate_volatile":
+		return true
+	default:
+		return false
+	}
 }
 
 // GetHistory returns recent cycle outcomes.

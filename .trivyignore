@@ -1,0 +1,3 @@
+# buger/jsonparser DoS vulnerability — indirect dependency from mcp-go, invopop/jsonschema, go-ordered-map.
+# No fix available upstream. Not directly used by MDEMG code.
+GHSA-6g7g-w4f8-9c9x

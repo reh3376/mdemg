@@ -15,7 +15,7 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ### Prerequisites
 
-- **Docker Desktop** — required for Neo4j database
+- **Docker** — required for Neo4j database (Docker Desktop on macOS/Windows, Docker Engine on Linux)
 - **Embedding provider** (choose one):
   - [OpenAI API key](https://platform.openai.com/api-keys) (recommended, requires account)
   - [Ollama](https://ollama.com) (local, free, no API key needed)
@@ -26,6 +26,9 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 # macOS (Homebrew)
 brew tap reh3376/mdemg
 brew install mdemg
+
+# Linux (curl installer)
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg_linux/main/install.sh | bash
 
 # Verify installation
 mdemg version
