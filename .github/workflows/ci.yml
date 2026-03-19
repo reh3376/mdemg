@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, mdemg-dev01]
+    branches: [main, '**_dev*']
   pull_request:
     branches: [main]
 

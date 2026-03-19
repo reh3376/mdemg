@@ -1,0 +1,39 @@
+name: Branch Naming Convention
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - 'dependabot/**'
+      - 'release/**'
+      - gh-pages
+
+jobs:
+  validate-branch-name:
+    name: Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          PATTERN='^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?_dev0[1-9](_[a-z0-9]+(-[a-z0-9]+)*)?$'
+
+          if [[ "$BRANCH_NAME" =~ $PATTERN ]]; then
+            echo "Branch name '$BRANCH_NAME' follows the naming convention."
+          else
+            echo "::error::Branch name '$BRANCH_NAME' does not follow the naming convention."
+            echo ""
+            echo "Expected pattern: <github_handle>_dev<01-09>[_<kebab-description>]"
+            echo ""
+            echo "Examples:"
+            echo "  reh3376_dev01"
+            echo "  jdoe_dev02_add-feature"
+            echo "  alice_dev04_fix-timeout"
+            echo ""
+            echo "Category codes:"
+            echo "  01=general, 02=feature, 03=docs/lint, 04=bugfix,"
+            echo "  05=CI/infra, 06=testing, 07=refactor, 08=release, 09=experimental"
+            echo ""
+            echo "See CONTRIBUTING.md for full details."
+            exit 1
+          fi

@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
 **Date:** 2026-03-18
-**Branch:** `mdemg-dev01`
+**Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 

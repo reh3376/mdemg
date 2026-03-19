@@ -150,26 +150,28 @@ If CMS is unavailable, skills cannot function. This is by design.
 
 ## Git Workflow
 
-### Development Branch: `mdemg-dev01`
+### Branch Naming Convention
 
-- **All development work happens on `mdemg-dev01`** — never commit directly to `main`
-- `main` is branch-protected; changes reach it only via PR
-- On push to `mdemg-dev01`, a GitHub Actions workflow (`.github/workflows/auto-pr.yml`) automatically creates a PR to `main` if one doesn't already exist
-- Subsequent pushes update the existing PR automatically
-- Always verify you are on `mdemg-dev01` before starting work: `git branch --show-current`
+All collaborator branches follow the pattern: `<github_handle>_dev<01-09>` with an optional `_<kebab-description>` suffix. See [CONTRIBUTING.md](CONTRIBUTING.md#branch-naming-convention) for the full category table (01=general through 09=experimental).
+
+- **Never commit directly to `main`** — it is branch-protected; changes reach it only via PR
+- On push to any `*_dev*` branch, `.github/workflows/auto-pr.yml` automatically creates a PR to `main`
+- `.github/workflows/branch-naming.yml` enforces the naming convention on push
+- Automation exemptions: `dependabot/*`, `release/*`, `gh-pages`
+- Always verify your branch before starting work: `git branch --show-current`
 
 ### Commit & Push Flow
 
 ```bash
-# 1. Ensure you're on the dev branch
-git checkout mdemg-dev01
+# 1. Ensure you're on your dev branch
+git checkout reh3376_dev01
 
 # 2. Make changes, stage, commit (conventional commits)
 git add <files>
 git commit -m "feat: description"
 
 # 3. Push — auto-PR is created/updated on GitHub
-git push -u origin mdemg-dev01
+git push -u origin reh3376_dev01
 ```
 
 ---
