@@ -39,8 +39,10 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness tracking, AR-3 LLM intelligence)
   Feature docs: docs/features/rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
-- FSD-2026-001 Gap Closure — COMPLETE (GAP-01 through GAP-20, 18 sub-phases, 33 new files, 8 new endpoints)
-- CI: ALL GREEN (push + pull_request) as of 2026-03-19
+- FSD-2026-001 Gap Closure — COMPLETE (GAP-01 through GAP-20 + F12/F15-F18, 65 files changed, 8 new endpoints)
+  Remaining FSD items: NR-4 (training pipeline), F21 (LLM client dedup), NR-5/FSD-Final (docs + CI + acceptance)
+- CI: Build/Lint/Security/Unit Tests/Integration/Sidecar ALL GREEN as of 2026-03-19
+  UATS: 297 passed, 0 failed (11 skipped as llm_required — expected in CI)
 
 LAST SESSION (2026-03-19):
 - FSD-2026-001 Constraint Lifecycle & Gap Closure (GAP-01 through GAP-20):
@@ -169,7 +171,7 @@ PREVIOUS SESSION (2026-03-12):
 - 2 new UATS specs: frontier_detection, learning_negative_feedback
 
 REPO STATE:
-- Branch: mdemg-dev01 — pushed, auto-PR workflow creates/updates PR to main
+- Branch: reh3376_dev01 — pushed, auto-PR workflow creates/updates PR to main
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
 - CRITICAL: For the mdemg-dev CMS space, ALWAYS use `docker compose up -d neo4j` to preserve CMS data (volume: mdemg_neo4j_data). For fresh projects, `mdemg db start` is safe — it creates project-scoped containers (mdemg-neo4j-{project}) with their own volumes.
@@ -196,6 +198,10 @@ WHAT REMAINS TO BE DONE:
 9. DOCUMENTATION: ~~Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags~~ DONE (committed in submodules 2026-03-16)
 10. DOCUMENTATION: Create `docs/specs/phase-fsd-constraint-lifecycle.md` spec document for FSD-2026-001
 11. DOCUMENTATION: Update homebrew-mdemg docs for 8 new FSD-2026-001 endpoints and 38 new config params
+12. FSD: NR-4 — Python training pipeline (fine-tune cross-encoder from collected JSONL data)
+13. FSD: F21 — LLM client deduplication (extract `internal/llmclient/` package, ~500 lines across 5 packages)
+14. FSD: NR-5 + FSD-Final — Acceptance script (`scripts/fsd-acceptance.sh`), docker-compose sidecar service, Makefile targets
+15. CI: UATS runner counts `llm_required` tag exclusions as "errors" — update runner to treat excluded tags as skips, not errors
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
