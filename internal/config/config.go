@@ -240,7 +240,9 @@ type Config struct {
 	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
-	JiminyFrontierMinSim   float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
+	JiminyFrontierMinSim          float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
+	JiminyEffectivenessEnabled    bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
+	JiminyEffectivenessTTLSec     int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -309,6 +311,21 @@ type Config struct {
 	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
 	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
 	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+
+	// Phase AR-3: LLM-powered RSIC reflection
+	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: false)
+	RSICLLMReflectProvider string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
+	RSICLLMReflectModel    string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
+
+	// Phase AR-3: LLM-powered constraint classification
+	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
+	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
+	ConsultingLLMConstraintsModel    string // CONSULTING_LLM_CONSTRAINTS_MODEL — model for classification (default: from EMERGENCE_MODEL)
+
+	// Phase AR-3: LLM-powered query classification
+	RetrievalLLMClassifyEnabled  bool   // RETRIEVAL_LLM_CLASSIFY_ENABLED — enable LLM query classification (default: false)
+	RetrievalLLMClassifyProvider string // RETRIEVAL_LLM_CLASSIFY_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
+	RetrievalLLMClassifyModel    string // RETRIEVAL_LLM_CLASSIFY_MODEL — model for classification (default: from EMERGENCE_MODEL)
 
 	// Phase 38: UNTS Hash Verification
 	UNTSEnabled  bool   // UNTS_ENABLED — enable hash verification REST API (default: false)
@@ -1524,6 +1541,11 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
+	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 1800)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
@@ -1625,6 +1647,19 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+
+	// Phase AR-3: LLM-powered intelligence
+	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", false)
+	rsicLLMReflectProvider := get("RSIC_LLM_REFLECT_PROVIDER", emergenceProvider)
+	rsicLLMReflectModel := get("RSIC_LLM_REFLECT_MODEL", emergenceModel)
+
+	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
+	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
+	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
+
+	retrievalLLMClassifyEnabled := getBool("RETRIEVAL_LLM_CLASSIFY_ENABLED", false)
+	retrievalLLMClassifyProvider := get("RETRIEVAL_LLM_CLASSIFY_PROVIDER", emergenceProvider)
+	retrievalLLMClassifyModel := get("RETRIEVAL_LLM_CLASSIFY_MODEL", emergenceModel)
 
 	// Phase 38: UNTS Hash Verification
 	untsEnabled := getBool("UNTS_ENABLED", false)
@@ -2403,7 +2438,9 @@ func FromEnv() (Config, error) {
 		JiminyMaxItems:         jiminyMaxItems,
 		JiminyMinConfidence:    jiminyMinConfidence,
 		JiminyIncludeFrontiers: jiminyIncludeFrontiers,
-		JiminyFrontierMinSim:   jiminyFrontierMinSim,
+		JiminyFrontierMinSim:          jiminyFrontierMinSim,
+		JiminyEffectivenessEnabled:    jiminyEffectivenessEnabled,
+		JiminyEffectivenessTTLSec:     jiminyEffectivenessTTLSec,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,
@@ -2504,6 +2541,17 @@ func FromEnv() (Config, error) {
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:  rsicPersistenceEnabled,
 		SpacePruneIntervalHours: spacePruneIntervalHours,
+
+		// Phase AR-3: LLM-powered intelligence
+		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,
+		RSICLLMReflectProvider:           rsicLLMReflectProvider,
+		RSICLLMReflectModel:              rsicLLMReflectModel,
+		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
+		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
+		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
+		RetrievalLLMClassifyEnabled:      retrievalLLMClassifyEnabled,
+		RetrievalLLMClassifyProvider:     retrievalLLMClassifyProvider,
+		RetrievalLLMClassifyModel:        retrievalLLMClassifyModel,
 
 		// Phase 38: UNTS Hash Verification
 		UNTSEnabled:  untsEnabled,

@@ -145,6 +145,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	menubarCmd.GroupID = "config"
 	rootCmd.AddCommand(menubarCmd)
 
+	teardownCmd := newTeardownCmd()
+	teardownCmd.GroupID = "config"
+	rootCmd.AddCommand(teardownCmd)
+
 	// Advanced
 	mcpCmd := newMCPCmd()
 	mcpCmd.GroupID = "advanced"

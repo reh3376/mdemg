@@ -32,6 +32,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Space Transfer (Export/Import)](#space-transfer-exportimport)
 - [Frontier Detection](#get-v1memoryfrontiers)
 - [Negative Feedback](#post-v1learningnegative-feedback)
+- [Jiminy Guidance Service](#jiminy-guidance-service-phase-jiminy)
 
 ---
 
@@ -1257,6 +1258,55 @@ Generate proactive guidance for the current working context.
 
 **Error Codes**: `400` (missing space_id or context), `405` (not POST), `503` (Jiminy not enabled).
 
+**Note**: The response now includes a `guidance_id` field (UUID) in the `data` object for effectiveness tracking. Pass this ID to the feedback endpoint to record whether guidance was followed.
+
+### POST /v1/jiminy/feedback
+
+Record whether an agent followed, ignored, or contradicted Jiminy guidance. This closes the guidance effectiveness feedback loop.
+
+**Request Body**:
+
+```json
+{
+  "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+  "action_summary": "I validated the input before processing it",
+  "space_id": "mdemg-dev"
+}
+```
+
+**Fields**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `guidance_id` | string | Yes | The guidance_id returned from `/v1/jiminy/guide` |
+| `action_summary` | string | No | Description of the action the agent actually took |
+| `space_id` | string | No | Memory space (for context) |
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+    "applied": true,
+    "results": [
+      {
+        "type": "constraint",
+        "content": "[must] Always validate input",
+        "outcome": "followed",
+        "similarity": 0.42
+      }
+    ]
+  }
+}
+```
+
+**Outcome Values**: `followed` (action matches guidance), `ignored` (low similarity to all items), `contradicted` (action opposes guidance with negation detected), `unknown` (no action_summary provided or no tracked items).
+
+**Error Codes**: `400` (missing guidance_id), `405` (not POST), `503` (Jiminy not enabled).
+
+**Config**: `JIMINY_EFFECTIVENESS_ENABLED` (default: true), `JIMINY_EFFECTIVENESS_TTL_SEC` (default: 1800 — guidance tracking expires after 30 minutes).
+
 ### Hook Distribution (J6b-J6e)
 
 Jiminy hooks can be installed into Claude Code projects via the CLI:
@@ -1275,6 +1325,21 @@ mdemg hooks uninstall --type claude
 This embeds parameterized hook scripts (`.sh` on Unix, `.ps1` on Windows) into `.claude/hooks/` and registers them in `.claude/settings.local.json`. Templates use `{{SPACE_ID}}` and `{{MDEMG_URL}}` placeholders substituted at install time. Existing user settings are preserved via `mergeClaudeSettings()` (J6e).
 
 `mdemg init` auto-installs Claude Code hooks when a `.claude/` directory is detected (J6c). In `--defaults`/`--quick` mode, hooks are installed non-interactively.
+
+### Instance Teardown (Phase S16)
+
+```bash
+# Preview what would be removed
+mdemg teardown --dry-run
+
+# Teardown with optional data export
+mdemg teardown --export --yes
+
+# Full system removal (binary, plugins, systemd units)
+mdemg teardown --full --yes
+```
+
+Completely removes all MDEMG artifacts from a project (instance scope) or the entire system (full scope). Covers 14 phases: server stop, Docker container/volume removal, Neo4j space deletion, keyring secret removal, hook uninstall, MCP config cleanup, `.mdemg/` backup+removal, sidebar deregistration, and system-level cleanup. Protected spaces (`mdemg-dev`, `mdemg-global`) are skipped unless `--force` is used. See `docs/features/teardown.md` for full details.
 
 ---
 

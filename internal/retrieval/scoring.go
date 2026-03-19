@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"context"
 	"log"
 	"math"
 	"regexp"
@@ -442,6 +443,80 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 		hints.EdgeTypeStrategy = "hybrid"
 		hints.QueryType = "architecture"
 		return hints
+	}
+
+	return hints
+}
+
+// ComputeRetrievalHintsWithLLM uses the LLM query classifier to determine
+// query types, then applies the most permissive hints for multi-label queries.
+// Falls back to the regex-based ComputeRetrievalHints on LLM failure.
+func ComputeRetrievalHintsWithLLM(ctx context.Context, queryText string, cfg config.Config, classifier *QueryClassifier) RetrievalHints {
+	if classifier == nil {
+		return ComputeRetrievalHints(queryText, cfg)
+	}
+
+	classification, err := classifier.Classify(ctx, queryText)
+	if err != nil || classification == nil {
+		return ComputeRetrievalHints(queryText, cfg)
+	}
+
+	hints := RetrievalHints{
+		SeedN:            50,
+		HopDepth:         cfg.DefaultHopDepth,
+		VectorWeight:     cfg.VectorWeight,
+		BM25Weight:       cfg.BM25Weight,
+		EnableExpansion:  true,
+		EdgeTypeStrategy: cfg.EdgeTypeStrategy,
+		QueryType:        strings.Join(classification.Types, "+"),
+	}
+
+	if cfg.TemporalEnabled {
+		hints.TemporalIntent = ParseTemporalIntent(queryText, time.Now())
+	}
+
+	// Apply the most permissive hints for all classified types
+	for _, t := range classification.Types {
+		switch t {
+		case "symbol_lookup":
+			if hints.VectorWeight < 0.85 {
+				hints.VectorWeight = 0.85
+			}
+			hints.BM25Weight = 0.15
+			hints.EdgeTypeStrategy = "structural_first"
+		case "code":
+			if hints.SeedN < 40 {
+				hints.SeedN = 40
+			}
+			hints.EdgeTypeStrategy = "structural_first"
+		case "relationship":
+			if hints.SeedN < 60 {
+				hints.SeedN = 60
+			}
+			if hints.HopDepth < 2 {
+				hints.HopDepth = 2
+			}
+			if hints.BM25Weight < 0.4 {
+				hints.BM25Weight = 0.4
+			}
+			hints.EdgeTypeStrategy = "hybrid"
+		case "data_flow":
+			if hints.HopDepth < 2 {
+				hints.HopDepth = 2
+			}
+			hints.EdgeTypeStrategy = "hybrid"
+		case "architecture":
+			if hints.SeedN < 60 {
+				hints.SeedN = 60
+			}
+			if hints.HopDepth < 2 {
+				hints.HopDepth = 2
+			}
+			if hints.BM25Weight < 0.45 {
+				hints.BM25Weight = 0.45
+			}
+			hints.EdgeTypeStrategy = "hybrid"
+		}
 	}
 
 	return hints
