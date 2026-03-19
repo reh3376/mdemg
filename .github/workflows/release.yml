@@ -52,7 +52,7 @@ jobs:
           sha256sum "mdemg_${VERSION}_windows_amd64.zip" > windows_checksums.txt
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-binaries
           path: |
@@ -83,7 +83,7 @@ jobs:
         run: make man
 
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-binaries
           path: /tmp/windows-binaries
