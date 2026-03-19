@@ -23,22 +23,46 @@ type ConsultingService interface {
 
 // Service orchestrates all Jiminy guidance sources.
 type Service struct {
-	cfg        config.Config
-	driver     neo4j.DriverWithContext
-	consultant ConsultingService
-	embedder   embeddings.Embedder
-	tracker    *EffectivenessTracker // Phase AR-2: guidance effectiveness tracking
+	cfg               config.Config
+	driver            neo4j.DriverWithContext
+	consultant        ConsultingService
+	embedder          embeddings.Embedder
+	tracker           *EffectivenessTracker  // Phase AR-2: guidance effectiveness tracking
+	persistence       *PersistenceStore      // F3: Neo4j write-through for guidance outcomes
+	confidenceUpdater *ConfidenceUpdater     // F3: Bayesian confidence updates
+	cache             *GuidanceCache         // F10: TTL-based LRU cache for guidance responses
 }
 
 // NewService creates a new Jiminy guidance service.
 func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant ConsultingService, embedder embeddings.Embedder) *Service {
 	tracker := NewEffectivenessTracker(1000, cfg.JiminyEffectivenessTTLSec)
+
+	// F3: Initialize persistence + confidence updater if enabled
+	var persistence *PersistenceStore
+	var confidenceUpdater *ConfidenceUpdater
+	if cfg.JiminyPersistenceEnabled && driver != nil {
+		persistence = NewPersistenceStore(driver, cfg)
+		confidenceUpdater = NewConfidenceUpdater(driver, cfg)
+		log.Printf("jiminy: persistence enabled (boost=%.3f, decay=%.3f, archive=%.2f)",
+			cfg.ConstraintConfidenceBoostPerPos, cfg.ConstraintConfidenceDecayPerNeg, cfg.ConstraintArchiveThreshold)
+	}
+
+	// F10: Initialize guidance cache if enabled
+	var cache *GuidanceCache
+	if cfg.JiminyCacheEnabled {
+		cache = NewGuidanceCache(cfg.JiminyCacheSize, cfg.JiminyCacheTTLSec)
+		log.Printf("jiminy: guidance cache enabled (size=%d, ttl=%ds)", cfg.JiminyCacheSize, cfg.JiminyCacheTTLSec)
+	}
+
 	return &Service{
-		cfg:        cfg,
-		driver:     driver,
-		consultant: consultant,
-		embedder:   embedder,
-		tracker:    tracker,
+		cfg:               cfg,
+		driver:            driver,
+		consultant:        consultant,
+		embedder:          embedder,
+		tracker:           tracker,
+		persistence:       persistence,
+		confidenceUpdater: confidenceUpdater,
+		cache:             cache,
 	}
 }
 
@@ -51,6 +75,13 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 	if req.Context == "" {
 		return GuidanceResponse{}, fmt.Errorf("context is required")
+	}
+
+	// F10: Check cache for fast path
+	if s.cache != nil {
+		if cached, ok := s.cache.Get(req.SpaceID, req.Context); ok {
+			return cached, nil
+		}
 	}
 
 	maxItems := req.MaxItems
@@ -313,7 +344,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		s.tracker.Track(guidanceID, filtered)
 	}
 
-	return GuidanceResponse{
+	resp := GuidanceResponse{
 		GuidanceID:         guidanceID,
 		Guidance:           filtered,
 		PromptAugmentation: augmentation,
@@ -322,7 +353,14 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Warnings:           warnings,
 		SourceCounts:       counts,
 		Debug:              debug,
-	}, nil
+	}
+
+	// F10: Cache the response
+	if s.cache != nil {
+		s.cache.Put(req.SpaceID, req.Context, resp)
+	}
+
+	return resp, nil
 }
 
 // constraintPriority maps constraint types to priorities.
@@ -431,6 +469,19 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			Outcome:    outcome,
 			Similarity: sim,
 		})
+
+		// F3: Persist guidance outcome to Neo4j and update constraint confidence
+		if s.persistence != nil && outcome != OutcomeUnknown {
+			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, sim); err != nil {
+				log.Printf("jiminy: persist outcome error: %v", err)
+			}
+			// Update confidence for constraint-type guidance items
+			if s.confidenceUpdater != nil && item.Type == GuidanceConstraint && len(item.SourceNodes) > 0 {
+				if err := s.confidenceUpdater.UpdateConfidence(ctx, item.SourceNodes[0], outcome); err != nil {
+					log.Printf("jiminy: confidence update error: %v", err)
+				}
+			}
+		}
 	}
 
 	return &GuidanceFeedbackResponse{
@@ -480,6 +531,15 @@ func classifyOutcome(item GuidanceItem, actionLower string) (GuidanceOutcome, fl
 		return OutcomeIgnored, similarity
 	}
 	return OutcomeUnknown, 0.0
+}
+
+// GetConstraintEffectiveness delegates to the persistence store to return
+// per-constraint effectiveness metrics. Returns empty slice if persistence is disabled.
+func (s *Service) GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]ConstraintEffectiveness, error) {
+	if s.persistence == nil {
+		return []ConstraintEffectiveness{}, nil
+	}
+	return s.persistence.GetConstraintEffectiveness(ctx, spaceID)
 }
 
 // significantWords extracts words >= 4 chars from text.

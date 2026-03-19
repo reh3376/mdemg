@@ -1028,6 +1028,11 @@ type GuardrailValidateRequest struct {
 	SpaceID      string   `json:"space_id"      validate:"required"`
 	FilesChanged []string `json:"files_changed" validate:"required"`
 	Diff         string   `json:"diff"          validate:"required"`
+
+	// F20: Agent trust level for authority-level filtering.
+	// Values: "restricted" (all constraints), "standard" (org_policy + team_standard),
+	// "elevated" (org_policy only). Optional; omit for no filtering.
+	AgentTrustLevel string `json:"agent_trust_level,omitempty"`
 }
 
 // GuardrailViolation represents a single constraint violation or warning.

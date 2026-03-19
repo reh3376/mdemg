@@ -2,8 +2,10 @@ package hidden
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,7 +39,9 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			       obs.name AS name,
 			       obs.content AS content,
 			       obs.tags AS tags,
-			       obs.embedding AS embedding
+			       obs.embedding AS embedding,
+			       obs.structured_data AS structuredData,
+			       obs.surprise_score AS surpriseScore
 		`
 		findRes, err := tx.Run(ctx, findCypher, map[string]any{"spaceId": spaceID})
 		if err != nil {
@@ -45,12 +49,14 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 		}
 
 		type constraintObs struct {
-			nodeID    string
-			name      string
-			content   string
-			tags      []string
-			embedding []float64
-			cTypes    []string // extracted constraint types
+			nodeID              string
+			name                string
+			content             string
+			tags                []string
+			embedding           []float64
+			cTypes              []string // extracted constraint types
+			detectionConfidence float64  // max confidence from constraint detection
+			surpriseScore       float64  // observation surprise score
 		}
 
 		var observations []constraintObs
@@ -88,6 +94,29 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 				for _, e := range embSlice {
 					if f, ok := e.(float64); ok {
 						obs.embedding = append(obs.embedding, f)
+					}
+				}
+			}
+
+			// Extract surprise score
+			surpriseRaw, _ := rec.Get("surpriseScore")
+			if s, ok := surpriseRaw.(float64); ok {
+				obs.surpriseScore = s
+			}
+
+			// Extract detection confidence from structured_data
+			structuredRaw, _ := rec.Get("structuredData")
+			if sdStr, ok := structuredRaw.(string); ok && sdStr != "" {
+				var sd map[string]any
+				if json.Unmarshal([]byte(sdStr), &sd) == nil {
+					if constraints, ok := sd["detected_constraints"].([]any); ok {
+						for _, c := range constraints {
+							if cm, ok := c.(map[string]any); ok {
+								if conf, ok := cm["confidence"].(float64); ok && conf > obs.detectionConfidence {
+									obs.detectionConfidence = conf
+								}
+							}
+						}
 					}
 				}
 			}
@@ -164,6 +193,8 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 							layer: 1,
 							confidence: $confidence,
 							tags: $tags,
+							scope: $scope,
+							authority_level: $authLevel,
 							created_at: datetime($now),
 							updated_at: datetime($now),
 							volatile: false,
@@ -177,15 +208,36 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 						embParam = obs.embedding
 					}
 
+					// Compute confidence from detection confidence + surprise signal
+					// Formula: max(0.65, detection_confidence + surprise_score * 0.15), capped at 0.95
+					promotionConfidence := obs.detectionConfidence + obs.surpriseScore*0.15
+					if promotionConfidence < 0.65 {
+						promotionConfidence = 0.65
+					}
+					if promotionConfidence > 0.95 {
+						promotionConfidence = 0.95
+					}
+
+					// F7: Infer scope from constraint content
+					scope := inferConstraintScope(obs.content)
+
+					// F20: Authority level — use config default, fall back to "team_standard"
+					authLevel := s.cfg.ConstraintDefaultAuthority
+					if authLevel == "" {
+						authLevel = "team_standard"
+					}
+
 					params := map[string]any{
 						"spaceId":    spaceID,
 						"nodeId":     constraintNodeID,
 						"name":       cName,
 						"cType":      cType,
 						"content":    obs.content,
-						"confidence": 0.8,
+						"confidence": promotionConfidence,
 						"tags":       []string{"constraint", "constraint:" + cType},
 						"now":        now,
+						"scope":      scope,           // F7: file path scope pattern
+						"authLevel":  authLevel, // F20: authority level from config
 					}
 
 					if len(embParam) > 0 {
@@ -201,6 +253,8 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 								confidence: $confidence,
 								tags: $tags,
 								embedding: $embedding,
+								scope: $scope,
+								authority_level: $authLevel,
 								created_at: datetime($now),
 								updated_at: datetime($now),
 								volatile: false,
@@ -245,6 +299,34 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 	return result.(*ConstraintNodeResult), nil
 }
 
+// inferConstraintScope extracts a file path pattern from constraint text.
+// Returns empty string if no pattern is found (null scope = applies everywhere).
+// Patterns tried in order:
+//
+//	"in internal/api/**"          → internal/api/**
+//	"for *.go files"              → *.go
+//	"under internal/api/"         → internal/api/
+//	explicit file paths like foo/bar.go
+var constraintScopePatterns = []struct {
+	re      *regexp.Regexp
+	capture int
+}{
+	{regexp.MustCompile(`(?i)in\s+([\w/.-]+/\*\*)`), 1},
+	{regexp.MustCompile(`(?i)for\s+([\w*]+\.[\w]+)\s+files`), 1},
+	{regexp.MustCompile(`(?i)(?:under|within)\s+([\w/.-]+/)`), 1},
+	{regexp.MustCompile(`([\w/.-]+\.(?:go|ts|py|js|rs|java))`), 1},
+}
+
+func inferConstraintScope(text string) string {
+	for _, p := range constraintScopePatterns {
+		m := p.re.FindStringSubmatch(text)
+		if len(m) > p.capture && m[p.capture] != "" {
+			return m[p.capture]
+		}
+	}
+	return ""
+}
+
 // extractConstraintLabel gets a short label from content (first sentence, max 120 chars).
 func extractConstraintLabel(content string) string {
 	if content == "" {
@@ -258,4 +340,62 @@ func extractConstraintLabel(content string) string {
 		name = name[:120]
 	}
 	return strings.TrimSpace(name)
+}
+
+// ApplyConstraintDecay reduces confidence for constraints that haven't been surfaced recently.
+// Called during consolidation or on a schedule. Returns the number of constraints decayed.
+// org_policy constraints are excluded from decay (they are permanent policy).
+// A decayRate <= 0 defaults to 0.01 (1% per call).
+func ApplyConstraintDecay(ctx context.Context, driver neo4j.DriverWithContext, spaceID string, decayRate float64) (int, error) {
+	if decayRate <= 0 {
+		decayRate = 0.01
+	}
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Decay constraints not surfaced in the last 7 days.
+		// Excludes org_policy authority-level constraints (permanent) and archived nodes.
+		cypher := `
+		MATCH (n:MemoryNode {space_id: $spaceID})
+		WHERE n.constraint_type IS NOT NULL
+		  AND coalesce(n.is_archived, false) = false
+		  AND coalesce(n.status, 'active') <> 'archived'
+		  AND (n.last_surfaced_at IS NULL OR
+		       datetime(n.last_surfaced_at) < datetime() - duration({days: 7}))
+		  AND coalesce(n.authority_level, 'team_standard') <> 'org_policy'
+		SET n.confidence = CASE
+		      WHEN coalesce(n.confidence, 0.5) - $decayRate < 0.0 THEN 0.0
+		      ELSE coalesce(n.confidence, 0.5) - $decayRate
+		    END
+		RETURN count(n) AS decayed_count`
+
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceID":   spaceID,
+			"decayRate": decayRate,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("constraint decay query: %w", err)
+		}
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("decayed_count"); ok {
+				if n, ok := v.(int64); ok {
+					return int(n), nil
+				}
+			}
+		}
+		if err := res.Err(); err != nil {
+			return 0, fmt.Errorf("constraint decay iterate: %w", err)
+		}
+		return 0, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	decayed := result.(int)
+	if decayed > 0 {
+		log.Printf("F13: Constraint decay applied to %d node(s) in space %s (rate=%.4f)", decayed, spaceID, decayRate)
+	}
+	return decayed, nil
 }

@@ -1,0 +1,103 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Guardrail Events",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "guardrail",
+      "enforcement",
+      "fsd"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-19",
+    "description": "Query the guardrail enforcement event log (FSD-2026-001 GAP-01).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "guardrail",
+      "enforcement",
+      "fsd"
+    ]
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/guardrail/events",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query_params": {
+      "limit": "10"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "events": [],
+      "total": 0
+    }
+  },
+  "assertions": [
+    {
+      "type": "status",
+      "expected": 200
+    },
+    {
+      "type": "json_path",
+      "path": "$.events",
+      "op": "exists"
+    },
+    {
+      "type": "json_path",
+      "path": "$.total",
+      "op": "gte",
+      "expected": 0
+    }
+  ],
+  "variants": [
+    {
+      "name": "default_limit",
+      "description": "GET events without explicit limit",
+      "request": {
+        "method": "GET",
+        "path": "/v1/guardrail/events"
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 200
+        },
+        {
+          "type": "json_path",
+          "path": "$.events",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/guardrail/events",
+        "body": {}
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 405
+        }
+      ]
+    }
+  ]
+}

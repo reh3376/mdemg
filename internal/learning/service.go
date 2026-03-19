@@ -361,6 +361,14 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		wmin, wmax = 0.0, 1.0 // fallback default bounds
 	}
 
+	// Determine direction labels for asymmetric learning (F9)
+	fwdDir := "bidirectional"
+	revDir := "bidirectional"
+	if s.cfg.LearningAsymmetricEnabled {
+		fwdDir = "forward"
+		revDir = "backward"
+	}
+
 	params := map[string]any{
 		"spaceId":        spaceID,
 		"pairs":          pairsToMaps(pairs),
@@ -371,6 +379,8 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		"etaConvMult":    s.cfg.LearningEtaConversationMult,
 		"etaConfigMult":  s.cfg.LearningEtaConfigMult,
 		"etaSameDirMult": s.cfg.LearningEtaSameDirMult,
+		"fwdDir":         fwdDir,
+		"revDir":         revDir,
 	}
 
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -423,10 +433,12 @@ ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=date
               r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
               r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.dim_semantic=pathSim, r.decay_rate=0.001,
               r.surprise_factor=surpriseFactor,
+              r.direction=$fwdDir,
               r.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
               r.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
 ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
-             r.evidence_count=coalesce(r.evidence_count,0)+1, r.version=coalesce(r.version,0)+1
+             r.evidence_count=coalesce(r.evidence_count,0)+1, r.version=coalesce(r.version,0)+1,
+             r.direction=CASE WHEN r.direction IS NULL THEN $fwdDir ELSE r.direction END
 WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult
 WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult,
      coalesce(r.weight,initialWeight) AS w
@@ -443,10 +455,12 @@ ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=d
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
               rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.dim_semantic=pathSim, rr.decay_rate=0.001,
               rr.surprise_factor=surpriseFactor,
+              rr.direction=$revDir,
               rr.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
               rr.obs_type=CASE WHEN obsTypeA <> '' THEN obsTypeA WHEN obsTypeB <> '' THEN obsTypeB ELSE '' END
 ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
-             rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight
+             rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight,
+             rr.direction=CASE WHEN rr.direction IS NULL THEN $revDir ELSE rr.direction END
 RETURN count(*) AS updated;`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {

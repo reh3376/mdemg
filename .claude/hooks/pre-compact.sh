@@ -5,8 +5,18 @@
 set -euo pipefail
 
 MDEMG_URL="${MDEMG_URL:-http://localhost:9999}"
-SPACE_ID="mdemg-dev"
 SESSION_ID="claude-core"
+
+get_space_id() {
+    if [ -n "${MDEMG_SPACE_ID:-}" ]; then
+        echo "$MDEMG_SPACE_ID"
+    elif [ -f ".mdemg/config.yaml" ]; then
+        grep -oP 'space_id:\s*\K\S+' .mdemg/config.yaml 2>/dev/null || echo "mdemg-dev"
+    else
+        echo "mdemg-dev"
+    fi
+}
+SPACE_ID=$(get_space_id)
 
 # Check server is up (fast fail)
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then

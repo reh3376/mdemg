@@ -1,0 +1,66 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Neural Sidecar Health",
+    "base_url": "${NEURAL_SIDECAR_URL}",
+    "version": "v1",
+    "service": "neural-sidecar",
+    "tags": [
+      "neural",
+      "health",
+      "sidecar"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-19",
+    "description": "Health check for neural sidecar — reports loaded models and last inference time (NR-2).",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "neural",
+      "health",
+      "sidecar",
+      "fsd"
+    ]
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/health",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "status": "ok",
+      "models_loaded": [],
+      "last_inference_ms": null
+    }
+  },
+  "assertions": [
+    {
+      "type": "status",
+      "expected": 200
+    },
+    {
+      "type": "json_path",
+      "path": "$.status",
+      "op": "exists"
+    },
+    {
+      "type": "json_path",
+      "path": "$.models_loaded",
+      "op": "exists"
+    }
+  ],
+  "variants": []
+}
