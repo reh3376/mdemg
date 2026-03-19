@@ -32,6 +32,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Space Transfer (Export/Import)](#space-transfer-exportimport)
 - [Frontier Detection](#get-v1memoryfrontiers)
 - [Negative Feedback](#post-v1learningnegative-feedback)
+- [Jiminy Guidance Service](#jiminy-guidance-service-phase-jiminy)
 
 ---
 
@@ -1256,6 +1257,55 @@ Generate proactive guidance for the current working context.
 **Guidance Types**: `constraint`, `correction`, `pattern`, `conflict`, `risk`, `suggestion`, `frontier`.
 
 **Error Codes**: `400` (missing space_id or context), `405` (not POST), `503` (Jiminy not enabled).
+
+**Note**: The response now includes a `guidance_id` field (UUID) in the `data` object for effectiveness tracking. Pass this ID to the feedback endpoint to record whether guidance was followed.
+
+### POST /v1/jiminy/feedback
+
+Record whether an agent followed, ignored, or contradicted Jiminy guidance. This closes the guidance effectiveness feedback loop.
+
+**Request Body**:
+
+```json
+{
+  "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+  "action_summary": "I validated the input before processing it",
+  "space_id": "mdemg-dev"
+}
+```
+
+**Fields**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `guidance_id` | string | Yes | The guidance_id returned from `/v1/jiminy/guide` |
+| `action_summary` | string | No | Description of the action the agent actually took |
+| `space_id` | string | No | Memory space (for context) |
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+    "applied": true,
+    "results": [
+      {
+        "type": "constraint",
+        "content": "[must] Always validate input",
+        "outcome": "followed",
+        "similarity": 0.42
+      }
+    ]
+  }
+}
+```
+
+**Outcome Values**: `followed` (action matches guidance), `ignored` (low similarity to all items), `contradicted` (action opposes guidance with negation detected), `unknown` (no action_summary provided or no tracked items).
+
+**Error Codes**: `400` (missing guidance_id), `405` (not POST), `503` (Jiminy not enabled).
+
+**Config**: `JIMINY_EFFECTIVENESS_ENABLED` (default: true), `JIMINY_EFFECTIVENESS_TTL_SEC` (default: 1800 — guidance tracking expires after 30 minutes).
 
 ### Hook Distribution (J6b-J6e)
 

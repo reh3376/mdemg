@@ -49,14 +49,20 @@ type IntentTranslator interface {
 
 // Service provides the Agent Consulting API.
 type Service struct {
-	cfg              config.Config
-	driver           neo4j.DriverWithContext
-	retriever        Retriever
-	embedder         embeddings.Embedder
-	symbolStore      SymbolLookup
-	conceptFetcher   ConceptFetcher   // Optional: if nil, uses internal fetchRelatedConcepts
-	synthesizer      Synthesizer      // Optional: if nil, LLM synthesis is skipped (Phase 101)
-	intentTranslator IntentTranslator // Optional: if nil, intent translation is skipped (Phase 102)
+	cfg                  config.Config
+	driver               neo4j.DriverWithContext
+	retriever            Retriever
+	embedder             embeddings.Embedder
+	symbolStore          SymbolLookup
+	conceptFetcher       ConceptFetcher       // Optional: if nil, uses internal fetchRelatedConcepts
+	synthesizer          Synthesizer          // Optional: if nil, LLM synthesis is skipped (Phase 101)
+	intentTranslator     IntentTranslator     // Optional: if nil, intent translation is skipped (Phase 102)
+	constraintClassifier *ConstraintClassifier // Optional: if nil, uses keyword-based fallback (Phase AR-3)
+}
+
+// SetConstraintClassifier attaches an optional LLM-powered constraint classifier.
+func (s *Service) SetConstraintClassifier(cc *ConstraintClassifier) {
+	s.constraintClassifier = cc
 }
 
 // NewService creates a new consulting service.
@@ -914,50 +920,47 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Constraint {
 	var constraints []models.Constraint
 
-	// Extract constraints from high-scoring results
-	for _, r := range results {
-		summaryLower := strings.ToLower(r.Summary)
-		nameLower := strings.ToLower(r.Name)
+	// Phase AR-3: Try LLM-powered classification first, fall back to keyword-based
+	useLLM := s.constraintClassifier != nil
 
-		// Look for must/should patterns
-		constraintType := ""
-		if strings.Contains(summaryLower, "must") || strings.Contains(summaryLower, "required") {
-			constraintType = "must"
-		} else if strings.Contains(summaryLower, "must not") || strings.Contains(summaryLower, "forbidden") {
-			constraintType = "must_not"
-		} else if strings.Contains(summaryLower, "should") || strings.Contains(summaryLower, "recommended") {
-			constraintType = "should"
-		} else if strings.Contains(summaryLower, "should not") || strings.Contains(summaryLower, "discouraged") {
-			constraintType = "should_not"
+	for _, r := range results {
+		if r.Score < 0.55 {
+			continue
 		}
 
-		if constraintType != "" && r.Score > 0.6 {
+		var constraintType string
+		var summary string
+
+		if useLLM {
+			classText := r.Summary
+			if classText == "" {
+				classText = r.Name
+			}
+			classification, err := s.constraintClassifier.Classify(ctx, r.NodeID, classText)
+			if err == nil && classification != nil && classification.Type != "none" {
+				constraintType = classification.Type
+				summary = classification.Summary
+			} else if err != nil {
+				// LLM failed — fall back to keyword-based for this node
+				constraintType = s.keywordClassifyConstraint(r)
+			}
+		} else {
+			constraintType = s.keywordClassifyConstraint(r)
+		}
+
+		if constraintType != "" {
+			desc := r.Summary
+			if summary != "" {
+				desc = summary
+			}
 			constraints = append(constraints, models.Constraint{
 				Name:           r.Name,
-				Description:    r.Summary,
+				Description:    desc,
 				ConstraintType: constraintType,
 				Scope:          r.Path,
 				SourceNodes:    []string{r.NodeID},
 				Confidence:     r.Score,
 			})
-		}
-
-		// Look for rule/policy nodes
-		if strings.Contains(nameLower, "rule") || strings.Contains(nameLower, "policy") || strings.Contains(nameLower, "constraint") {
-			if r.Score > 0.55 {
-				ct := "should"
-				if strings.Contains(summaryLower, "must") {
-					ct = "must"
-				}
-				constraints = append(constraints, models.Constraint{
-					Name:           r.Name,
-					Description:    r.Summary,
-					ConstraintType: ct,
-					Scope:          r.Path,
-					SourceNodes:    []string{r.NodeID},
-					Confidence:     r.Score,
-				})
-			}
 		}
 	}
 
@@ -972,6 +975,42 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 	}
 
 	return unique
+}
+
+// keywordClassifyConstraint uses keyword matching to determine constraint type.
+// This is the original rule-based logic, preserved as fallback when LLM is unavailable.
+func (s *Service) keywordClassifyConstraint(r models.RetrieveResult) string {
+	summaryLower := strings.ToLower(r.Summary)
+	nameLower := strings.ToLower(r.Name)
+
+	// Look for must/should patterns
+	constraintType := ""
+	if strings.Contains(summaryLower, "must not") || strings.Contains(summaryLower, "forbidden") {
+		constraintType = "must_not"
+	} else if strings.Contains(summaryLower, "must") || strings.Contains(summaryLower, "required") {
+		constraintType = "must"
+	} else if strings.Contains(summaryLower, "should not") || strings.Contains(summaryLower, "discouraged") {
+		constraintType = "should_not"
+	} else if strings.Contains(summaryLower, "should") || strings.Contains(summaryLower, "recommended") {
+		constraintType = "should"
+	}
+
+	if constraintType != "" && r.Score > 0.6 {
+		return constraintType
+	}
+
+	// Look for rule/policy nodes
+	if strings.Contains(nameLower, "rule") || strings.Contains(nameLower, "policy") || strings.Contains(nameLower, "constraint") {
+		if r.Score > 0.55 {
+			ct := "should"
+			if strings.Contains(summaryLower, "must") {
+				ct = "must"
+			}
+			return ct
+		}
+	}
+
+	return ""
 }
 
 // calculateSuggestConfidence computes confidence for suggest response.

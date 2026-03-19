@@ -282,6 +282,10 @@ type CycleOutcome struct {
 	SafetyVersion  string          `json:"safety_version,omitempty"`
 	SafetySummary  *SafetySummary  `json:"safety_summary,omitempty"`
 	Deltas         []ActionDelta   `json:"deltas,omitempty"`
+
+	// Phase AR-1: Feedback loop — criteria evaluation
+	CriteriaMet    bool              `json:"criteria_met"`
+	CriteriaDetail map[string]string `json:"criteria_detail,omitempty"`
 }
 
 // SafetySummary records safety enforcement results for a cycle.

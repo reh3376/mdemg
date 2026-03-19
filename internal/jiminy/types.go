@@ -29,6 +29,7 @@ type GuidanceRequest struct {
 
 // GuidanceResponse is the output from the Guide() method.
 type GuidanceResponse struct {
+	GuidanceID         string         `json:"guidance_id"` // UUID for feedback correlation (Phase AR-2)
 	Guidance           []GuidanceItem `json:"guidance"`
 	PromptAugmentation string         `json:"prompt_augmentation"`
 	Confidence         float64        `json:"confidence"`
@@ -80,4 +81,36 @@ type frontierMatch struct {
 	Name       string
 	Summary    string
 	Similarity float64
+}
+
+// GuidanceOutcome represents the outcome of a guidance item.
+type GuidanceOutcome string
+
+const (
+	OutcomeFollowed     GuidanceOutcome = "followed"
+	OutcomeIgnored      GuidanceOutcome = "ignored"
+	OutcomeContradicted GuidanceOutcome = "contradicted"
+	OutcomeUnknown      GuidanceOutcome = "unknown"
+)
+
+// GuidanceFeedbackRequest is the input to the feedback endpoint.
+type GuidanceFeedbackRequest struct {
+	GuidanceID    string `json:"guidance_id"`
+	ActionSummary string `json:"action_summary"`
+	SpaceID       string `json:"space_id"`
+}
+
+// GuidanceFeedbackResponse is the output from the feedback endpoint.
+type GuidanceFeedbackResponse struct {
+	GuidanceID string                 `json:"guidance_id"`
+	Results    []GuidanceItemFeedback `json:"results"`
+	Applied    bool                   `json:"applied"`
+}
+
+// GuidanceItemFeedback records the outcome for a single guidance item.
+type GuidanceItemFeedback struct {
+	Type       GuidanceType    `json:"type"`
+	Content    string          `json:"content"`
+	Outcome    GuidanceOutcome `json:"outcome"`
+	Similarity float64         `json:"similarity"`
 }
