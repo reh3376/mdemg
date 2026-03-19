@@ -60,3 +60,38 @@ func (s *Server) handleJiminyGuide(w http.ResponseWriter, r *http.Request) {
 		"data": resp,
 	})
 }
+
+// handleJiminyFeedback handles POST /v1/jiminy/feedback
+func (s *Server) handleJiminyFeedback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled (set JIMINY_ENABLED=true)",
+		})
+		return
+	}
+
+	var req jiminy.GuidanceFeedbackRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	if req.GuidanceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "guidance_id is required"})
+		return
+	}
+
+	resp, err := s.jiminySvc.RecordOutcome(r.Context(), req)
+	if err != nil {
+		writeInternalError(w, err, "jiminy feedback")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": resp,
+	})
+}

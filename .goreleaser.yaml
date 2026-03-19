@@ -57,23 +57,64 @@ builds:
     ldflags:
       - -s -w
 
-  # Linux build requires zig cross-compiler — uncomment when available
-  # - id: mdemg-linux-amd64
-  #   main: ./cmd/mdemg
-  #   binary: mdemg
-  #   env:
-  #     - CGO_ENABLED=1
-  #     - CC=zig cc -target x86_64-linux-gnu
-  #     - CXX=zig c++ -target x86_64-linux-gnu
-  #   goos:
-  #     - linux
-  #   goarch:
-  #     - amd64
-  #   ldflags:
-  #     - -s -w
-  #     - -X mdemg/internal/cli.Version={{.Version}}
-  #     - -X mdemg/internal/cli.Commit={{.ShortCommit}}
-  #     - -X mdemg/internal/cli.BuildDate={{.Date}}
+  # Linux builds via zig cross-compiler (tree-sitter vendors C code, no system deps)
+  - id: mdemg-linux-amd64
+    main: ./cmd/mdemg
+    binary: mdemg
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-linux-gnu
+      - CXX=zig c++ -target x86_64-linux-gnu
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+      - -X mdemg/internal/cli.Version={{.Version}}
+      - -X mdemg/internal/cli.Commit={{.ShortCommit}}
+      - -X mdemg/internal/cli.BuildDate={{.Date}}
+
+  - id: mdemg-linux-arm64
+    main: ./cmd/mdemg
+    binary: mdemg
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-linux-gnu
+      - CXX=zig c++ -target aarch64-linux-gnu
+    goos:
+      - linux
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+      - -X mdemg/internal/cli.Version={{.Version}}
+      - -X mdemg/internal/cli.Commit={{.ShortCommit}}
+      - -X mdemg/internal/cli.BuildDate={{.Date}}
+
+  - id: uxts-module-linux-amd64
+    main: ./plugins/uxts-module
+    binary: uxts-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+
+  - id: uxts-module-linux-arm64
+    main: ./plugins/uxts-module
+    binary: uxts-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
 
 archives:
   - id: default
@@ -86,6 +127,9 @@ archives:
         strip_parent: true
       - src: "plugins/uxts-module/manifest.json"
         dst: plugins/uxts-module
+        strip_parent: true
+      - src: "packaging/mdemg_linux/systemd/*"
+        dst: systemd
         strip_parent: true
 
 checksum:

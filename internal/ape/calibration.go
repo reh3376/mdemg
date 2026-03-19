@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -65,7 +66,7 @@ func (c *Calibrator) Hydrate(_ string) error {
 }
 
 // Validate checks success criteria for dispatched tasks and returns a CycleOutcome.
-func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier, spaceID string, tasks []RSICTaskSpec, reports []RSICProgressReport, metricsBefore map[string]float64) *CycleOutcome {
+func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier, spaceID string, tasks []RSICTaskSpec, reports []RSICProgressReport, metricsBefore map[string]float64, postReport *SelfAssessmentReport) *CycleOutcome {
 	outcome := &CycleOutcome{
 		CycleID:       cycleID,
 		Tier:          tier,
@@ -93,7 +94,63 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 		}
 	}
 
+	// Phase AR-1: Populate MetricsAfter from post-cycle re-assessment
+	if postReport != nil {
+		outcome.MetricsAfter = map[string]float64{
+			"overall_health":      postReport.OverallHealth,
+			"retrieval_quality":   postReport.RetrievalQuality,
+			"memory_health":       postReport.MemoryHealth,
+			"edge_health":         postReport.EdgeHealth,
+			"orphan_ratio":        postReport.OrphanRatio,
+			"correction_rate":     postReport.CorrectionRate,
+			"edge_weight_entropy": postReport.EdgeWeightEntropy,
+		}
+	}
+
+	// Phase AR-1: Evaluate success criteria per task
+	outcome.CriteriaMet = true // assume success unless proven otherwise
+	outcome.CriteriaDetail = make(map[string]string)
+
+	for _, task := range tasks {
+		for _, criterion := range task.SuccessCriteria {
+			beforeVal, hasBefore := metricsBefore[criterion.Metric]
+			afterVal, hasAfter := outcome.MetricsAfter[criterion.Metric]
+			if !hasBefore || !hasAfter {
+				outcome.CriteriaDetail[criterion.Metric] = "missing_data"
+				continue
+			}
+			delta := afterVal - beforeVal
+			met := evaluateCriterion(criterion, delta, afterVal)
+			if !met {
+				outcome.CriteriaMet = false
+				outcome.CriteriaDetail[criterion.Metric] = fmt.Sprintf("not_met: delta=%.4f, threshold=%.4f, op=%s", delta, criterion.Threshold, criterion.Operator)
+			} else {
+				outcome.CriteriaDetail[criterion.Metric] = "met"
+			}
+		}
+	}
+
 	return outcome
+}
+
+// evaluateCriterion checks whether a single criterion is satisfied.
+// For delta-based criteria (operators "gte", "gt", "lte", "lt"), it compares the delta.
+// For absolute criteria (operator "eq"), it compares the afterVal.
+func evaluateCriterion(c Criterion, delta, afterVal float64) bool {
+	switch c.Operator {
+	case "gte":
+		return delta >= c.Threshold
+	case "gt":
+		return delta > c.Threshold
+	case "lte":
+		return delta <= c.Threshold
+	case "lt":
+		return delta < c.Threshold
+	case "eq":
+		return afterVal == c.Threshold
+	default:
+		return true // unknown operator — don't fail
+	}
 }
 
 // UpdateCalibration records per-action-type outcomes for future confidence calculations.
@@ -108,7 +165,7 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 	}
 
 	for _, t := range tasks {
-		success := taskFinal[t.TaskID] == "completed"
+		success := taskFinal[t.TaskID] == "completed" && outcome.CriteriaMet
 		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], ActionOutcome{
 			ActionType: t.ActionType,
 			Success:    success,

@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"log"
 	"sort"
 
 	"mdemg/internal/config"
@@ -11,8 +12,9 @@ import (
 
 // Reflector analyses a SelfAssessmentReport and produces actionable insights.
 type Reflector struct {
-	cfg    config.Config
-	driver neo4j.DriverWithContext
+	cfg          config.Config
+	driver       neo4j.DriverWithContext
+	llmReflector *LLMReflector
 }
 
 // NewReflector creates a Reflector.
@@ -20,8 +22,13 @@ func NewReflector(cfg config.Config, driver neo4j.DriverWithContext) *Reflector 
 	return &Reflector{cfg: cfg, driver: driver}
 }
 
+// SetLLMReflector attaches an optional LLM-powered reflector for deeper analysis.
+func (r *Reflector) SetLLMReflector(lr *LLMReflector) {
+	r.llmReflector = lr
+}
+
 // Reflect examines the assessment report and returns ordered insights.
-func (r *Reflector) Reflect(_ context.Context, report *SelfAssessmentReport) ([]ReflectionInsight, error) {
+func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) ([]ReflectionInsight, error) {
 	var insights []ReflectionInsight
 
 	// 1. Saturation check
@@ -131,12 +138,38 @@ func (r *Reflector) Reflect(_ context.Context, report *SelfAssessmentReport) ([]
 		})
 	}
 
+	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)
+	if r.llmReflector != nil {
+		llmInsights, err := r.llmReflector.Reflect(ctx, report)
+		if err != nil {
+			log.Printf("RSIC LLM reflector failed (using rule-based only): %v", err)
+		} else if len(llmInsights) > 0 {
+			insights = deduplicateInsights(insights, llmInsights)
+		}
+	}
+
 	// Sort by severity DESC
 	sort.Slice(insights, func(i, j int) bool {
 		return severityRank(insights[i].Severity) > severityRank(insights[j].Severity)
 	})
 
 	return insights, nil
+}
+
+// deduplicateInsights merges llmInsights into base, skipping any with a
+// recommended_action already present in base.
+func deduplicateInsights(base, llmInsights []ReflectionInsight) []ReflectionInsight {
+	seen := make(map[string]bool, len(base))
+	for _, i := range base {
+		seen[i.RecommendedAction] = true
+	}
+	for _, li := range llmInsights {
+		if !seen[li.RecommendedAction] {
+			seen[li.RecommendedAction] = true
+			base = append(base, li)
+		}
+	}
+	return base
 }
 
 func severityRank(s InsightSeverity) int {

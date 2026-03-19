@@ -2038,9 +2038,7 @@ func TestDetectConflicts_ContradictionPairs(t *testing.T) {
 func TestFindApplicableConstraints_MustNotPattern(t *testing.T) {
 	s := &Service{}
 
-	// Note: The current implementation checks "must" before "must not",
-	// so "must not" will match as "must". This tests the actual behavior.
-	// To get "must_not", we need "forbidden" keyword.
+	// "must not" is correctly detected before "must" in keyword matching.
 	results := []models.RetrieveResult{
 		{
 			NodeID:  "rule1",
@@ -2055,18 +2053,16 @@ func TestFindApplicableConstraints_MustNotPattern(t *testing.T) {
 	if len(constraints) == 0 {
 		t.Error("findApplicableConstraints() should detect constraint")
 	}
-	// Due to implementation order, "must" is checked before "must not"
-	if len(constraints) > 0 && constraints[0].ConstraintType != "must" {
-		t.Errorf("constraint type = %s, want must (due to keyword order)", constraints[0].ConstraintType)
+	// "must not" is checked before "must", so "must not" correctly classifies as "must_not"
+	if len(constraints) > 0 && constraints[0].ConstraintType != "must_not" {
+		t.Errorf("constraint type = %s, want must_not", constraints[0].ConstraintType)
 	}
 }
 
 func TestFindApplicableConstraints_ShouldNotPattern(t *testing.T) {
 	s := &Service{}
 
-	// Note: The current implementation checks "should" before "should not",
-	// so "should not" will match as "should". This tests the actual behavior.
-	// To get "should_not", we need "discouraged" keyword.
+	// "should not" is correctly detected before "should" in keyword matching.
 	results := []models.RetrieveResult{
 		{
 			NodeID:  "guideline1",
@@ -2081,9 +2077,9 @@ func TestFindApplicableConstraints_ShouldNotPattern(t *testing.T) {
 	if len(constraints) == 0 {
 		t.Error("findApplicableConstraints() should detect constraint")
 	}
-	// Due to implementation order, "should" is checked before "should not"
-	if len(constraints) > 0 && constraints[0].ConstraintType != "should" {
-		t.Errorf("constraint type = %s, want should (due to keyword order)", constraints[0].ConstraintType)
+	// "should not" is checked before "should", so correctly classifies as "should_not"
+	if len(constraints) > 0 && constraints[0].ConstraintType != "should_not" {
+		t.Errorf("constraint type = %s, want should_not", constraints[0].ConstraintType)
 	}
 }
 

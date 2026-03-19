@@ -41,7 +41,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
   Feature docs: docs/features/rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
 - CI: ALL GREEN (push + pull_request) as of 2026-03-16
 
-LAST SESSION (2026-03-18):
+LAST SESSION (2026-03-18, Session 2):
+- Linux Distribution — Binary Builds + Sidebar Application:
+  - Phase 1: Goreleaser Linux builds (zig cross-compilation), install.sh systemd fix, beta docs accuracy
+  - Phase 2: Full Tauri sidebar — Rust backend (types, api_client, cli_executor, server_discovery,
+    instance_store, instance_scanner, 30+ commands), JS frontend (state, api, 7 tabs, utils, Catppuccin UI)
+  - Phase 3: cargo check passes, goreleaser snapshot verified, AGENT_HANDOFF + CHANGELOG updated
+  - Plan: /Users/reh3376/.claude/plans/mellow-crunching-hopcroft.md
+
+PREVIOUS SESSION (2026-03-18, Session 1):
 - AutoResearch Integration (Phases AR-1, AR-2, AR-3):
   - AR-1: RSIC feedback loop — post-cycle re-assessment (MetricsAfter), success criteria evaluation,
     auto-rollback for reversible actions. Files: calibration.go, cycle.go, types_rsic.go
@@ -2734,28 +2742,54 @@ DBSCAN clustering (`internal/hidden/clustering.go`) currently runs on CPU with g
 
 7 pre-unified-CLI binaries remain: `extract-symbols`, `ingest-codebase`, `mcp-server`, `mdemg-ingest`, `mdemg-server`, `reset-db`, `server`. All functionality is now in the unified `bin/mdemg` binary. Deletion requires user confirmation due to pre-bash-check hook matching `reset-db`.
 
-### IN PROGRESS: Linux Distribution & Desktop Application
+### COMPLETE: Linux Distribution & Desktop Application
 
 **Goal:** Extend MDEMG's platform reach to Linux with a dedicated installer and desktop companion app, mirroring the macOS ecosystem (`homebrew-mdemg` + `mdemg-menubar`).
 
-**Status:** Documentation phase complete. Both repos created as submodules.
+**Status:** Implementation complete. Binary builds enabled, installer bugs fixed, sidebar fully implemented.
+
+**Phase 1 — Linux Binary Builds:**
+- `.goreleaser.yaml`: 4 Linux build entries (mdemg + uxts-module, amd64 + arm64) using zig cross-compilation for CGO (tree-sitter C code)
+- `install.sh`: Fixed systemd bug — units now bundled in release tarball (`${tmpdir}/systemd/`) instead of script-relative path, fixing curl-pipe installs
+- Beta docs: Removed phantom .deb/.rpm methods, replaced with accurate available methods (curl installer + manual tarball)
+- Goreleaser snapshot verified: produces `mdemg_*_linux_amd64.tar.gz` + `mdemg_*_linux_arm64.tar.gz` with correct contents
+
+**Phase 2 — Linux Sidebar Application (full implementation):**
+
+**Rust Backend (`src-tauri/src/`):**
+- `types.rs` — 20+ API response structs ported from `MdemgClient.swift`
+- `api_client.rs` — reqwest HTTP client (5s connect / 10s total timeouts)
+- `cli_executor.rs` — mdemg binary discovery + execution, Docker container management
+- `server_discovery.rs` — port/pid discovery, process liveness check, endpoint resolution chain
+- `instance_store.rs` — JSON persistence at `~/.config/mdemg-sidebar/instances.json`
+- `instance_scanner.rs` — auto-discovery scanning `~/*/` for `.mdemg/config.yaml`
+- `commands.rs` — 30+ `#[tauri::command]` functions (health, memory, learning, RSIC, lifecycle, config, discovery, instances)
+- `main.rs` — system tray with health polling, hide-on-close, all commands registered
+
+**JS Frontend (`src/`):**
+- `state.js` — pub/sub reactive state management
+- `api.js` — all `invoke()` wrappers for Rust commands
+- `main.js` — entry point, tab routing, polling (health 10s, stats 30s), instance management
+- 7 tab renderers: `tabs/status.js`, `tabs/memory.js`, `tabs/learning.js`, `tabs/neo4j.js`, `tabs/config.js`, `tabs/logs.js`, `tabs/rsic.js`
+- `utils/formatting.js` — formatNumber, formatUptime, formatBytes, timeAgo, etc.
+- `utils/dom.js` — h(), infoRow(), sectionHeader(), button(), divider(), render()
+- `index.html` — Catppuccin Mocha themed UI with comprehensive CSS
 
 **Linux Installer — `packaging/mdemg_linux` ([GitHub](https://github.com/reh3376/mdemg_linux)):**
-- 10 files: README.md (648→~680 lines, Linux-adapted), 4 docs (api-reference, cli-reference, cms-rsic-guide, ingestion-guide), beta testing guide (39 tests, 5 tiers), install.sh (curl installer), systemd units (mdemg.service, mdemg-rsic.service, mdemg-rsic.timer), LICENSE, .gitignore
-- Install methods: curl installer, .deb, .rpm, AppImage, manual tarball
+- 10 files: README.md, 4 docs, beta testing guide, install.sh (fixed), systemd units, LICENSE, .gitignore
+- Install methods: curl installer (primary), manual tarball
 - Supports: Ubuntu 20.04+, Debian 11+, Fedora 36+, RHEL 8+, Arch Linux
-- Linux adaptations: Docker Engine (not Desktop), systemd (not launchd), Linux keyring (not macOS Keychain), `ss` (not `lsof`), SELinux notes for RHEL/Fedora
 
 **Linux Sidebar — `packaging/mdemg-linux-sidebar` ([GitHub](https://github.com/reh3376/mdemg-linux-sidebar)):**
-- 11 files: README.md, Tauri skeleton (tauri.conf.json, Cargo.toml, main.rs), frontend (package.json, index.html), CI/CD (build.yml, release.yml), Makefile, LICENSE, .gitignore
-- Technology: Tauri (Rust backend + web frontend, ~10MB)
-- Features: 7-tab dashboard (same as mdemg-menubar), system tray, multi-instance, auto-discovery, XDG config paths
+- Technology: Tauri 1.x (Rust backend + vanilla JS frontend, ~10MB)
+- Features: 7-tab dashboard (Status, Memory, Learning, Neo4j, Config, Logs, RSIC), system tray, multi-instance, auto-discovery
+- `cargo check` passes cleanly (0 errors, 0 warnings)
 - Release artifacts: AppImage + .deb (Tauri native)
 
-**Remaining work:**
-- Enable Linux builds in `.goreleaser.yaml` (currently commented out, requires `zig` for cross-compilation)
-- Build and publish first release artifacts
-- Implement full Tauri sidebar functionality (currently skeleton)
+**Remaining (release):**
+- Tag v0.2.15 on mdemg repo → goreleaser produces Linux + macOS + Windows
+- Tag v0.1.0 on mdemg-linux-sidebar → produces AppImage + .deb
+- Linuxbrew support (remove `depends_on :macos` from Formula — after first Linux release)
 
 ### OPEN: AutoResearch Integration Analysis — RSIC/CMS/Jiminy Enhancement
 
