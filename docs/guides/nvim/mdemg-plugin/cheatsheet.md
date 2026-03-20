@@ -48,27 +48,27 @@ Running without a subcommand opens a picker.
 
 ## Keymaps
 
-### Normal Mode (default `<leader>m` prefix)
+### Normal Mode (default `<leader>M` prefix)
 
 | Key | Command | Action |
 |-----|---------|--------|
-| `<leader>mr` | `:MdemgRecall` | Recall memories (opens prompt) |
-| `<leader>ms` | `:MdemgStore` | Store observation (multiline input) |
-| `<leader>mv` | `:MdemgValidate` | Validate buffer changes |
-| `<leader>mg` | `:MdemgGuide` | Get Jiminy guidance |
-| `<leader>mf` | `:MdemgReflect` | Reflect on topic (opens prompt) |
-| `<leader>my` | `:MdemgSymbols` | Search symbols |
-| `<leader>mi` | `:MdemgStatus` | Show status float |
+| `<leader>Mr` | `:MdemgRecall` | Recall memories (opens prompt) |
+| `<leader>Ms` | `:MdemgStore` | Store observation (multiline input) |
+| `<leader>Mv` | `:MdemgValidate` | Validate buffer changes |
+| `<leader>Mg` | `:MdemgGuide` | Get Jiminy guidance |
+| `<leader>Mf` | `:MdemgReflect` | Reflect on topic (opens prompt) |
+| `<leader>My` | `:MdemgSymbols` | Search symbols |
+| `<leader>Mi` | `:MdemgStatus` | Show status float |
 
-> **Note:** If `<leader>m` conflicts with other plugins (e.g., markdown), remap to
-> a different prefix such as `<leader>M`. See [Remap Keymaps](#disable-a-keymap).
+> **Note:** The default keymaps in `mdemg.nvim` use `<leader>m`, but `<leader>M` is
+> recommended to avoid conflicts with markdown plugins. See [Remap Keymaps](#remap-keymaps).
 
 ### Visual Mode
 
 | Key | Action |
 |-----|--------|
-| `<leader>mr` | Recall using selected text as query |
-| `<leader>ms` | Store selected text as observation |
+| `<leader>Mr` | Recall using selected text as query |
+| `<leader>Ms` | Store selected text as observation |
 
 ### Float Window Keymaps
 
