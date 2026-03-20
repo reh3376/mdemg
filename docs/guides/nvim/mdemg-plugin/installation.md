@@ -60,6 +60,9 @@ After saving, restart Neovim. lazy.nvim will clone the repo and load the plugin 
 
 ### rocks.nvim
 
+> **Note:** This section is only for users who use [rocks.nvim](https://github.com/nvim-neorocks/rocks.nvim)
+> as their plugin manager. If you use lazy.nvim or packer, skip this section.
+
 ```vim
 :Rocks install mdemg.nvim
 ```
