@@ -198,6 +198,8 @@ This outputs JSON to stdout in UPTS-compatible format.`,
 							for _, sym := range result.Symbols {
 								log.Printf("[Worker %d] %s: %s (%s) = %s", workerID, relPath, sym.Name, sym.Type, sym.Value)
 							}
+						} else {
+							log.Printf("%s: %d symbols", relPath, len(result.Symbols))
 						}
 
 						if !cfg.dryRun && store != nil {
@@ -226,9 +228,7 @@ This outputs JSON to stdout in UPTS-compatible format.`,
 
 							if err := store.SaveSymbols(ctx, cfg.spaceID, records); err != nil {
 								atomic.AddInt64(&errors, 1)
-								if cfg.verbose {
-									log.Printf("[Worker %d] Failed to store symbols for %s: %v", workerID, relPath, err)
-								}
+								log.Printf("[Worker %d] Failed to store symbols for %s: %v", workerID, relPath, err)
 							}
 						}
 

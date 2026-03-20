@@ -113,9 +113,9 @@ func runDemo(endpoint string) error {
 		fmt.Printf("  Query: %q\n", query)
 
 		body, _ := json.Marshal(map[string]any{
-			"space_id": spaceID,
-			"query":    query,
-			"top_k":    3,
+			"space_id":   spaceID,
+			"query_text": query,
+			"top_k":      3,
 		})
 
 		resp, err := http.Post(endpoint+"/v1/memory/retrieve", "application/json", bytes.NewReader(body))
