@@ -44,6 +44,9 @@ type Config struct {
 	OllamaEndpoint string // default: http://localhost:11434
 	OllamaModel    string // default: qwen3-embedding:4b
 
+	// Dimension control
+	TargetDimensions int // if >0, request MRL truncation to this size (e.g., 3072 for qwen3-embedding:8b)
+
 	// Cache settings
 	CacheEnabled bool // Enable LRU caching of embeddings
 	CacheSize    int  // Maximum number of cached embeddings (ignored if CacheEnabled=false)

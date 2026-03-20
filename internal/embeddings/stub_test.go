@@ -103,8 +103,8 @@ func TestOllama_QwenDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOllama error: %v", err)
 	}
-	if o.Dimensions() != 1536 {
-		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	if o.Dimensions() != 2560 {
+		t.Errorf("Dimensions() = %d, want 2560", o.Dimensions())
 	}
 }
 
@@ -113,8 +113,8 @@ func TestOllama_QwenBaseNameDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOllama error: %v", err)
 	}
-	if o.Dimensions() != 1536 {
-		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	if o.Dimensions() != 2560 {
+		t.Errorf("Dimensions() = %d, want 2560", o.Dimensions())
 	}
 }
 
@@ -126,8 +126,8 @@ func TestOllama_DefaultModelIsQwen(t *testing.T) {
 	if o.model != "qwen3-embedding:4b" {
 		t.Errorf("model = %q, want %q", o.model, "qwen3-embedding:4b")
 	}
-	if o.Dimensions() != 1536 {
-		t.Errorf("Dimensions() = %d, want 1536", o.Dimensions())
+	if o.Dimensions() != 2560 {
+		t.Errorf("Dimensions() = %d, want 2560", o.Dimensions())
 	}
 }
 

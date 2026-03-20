@@ -50,6 +50,7 @@ type Config struct {
 	LLMEndpoint         string // LLM_ENDPOINT — override endpoint for LLM text-generation (default: uses OpenAIEndpoint)
 	OllamaEndpoint      string // default: http://localhost:11434
 	OllamaModel         string // default: qwen3-embedding:4b
+	EmbeddingTargetDims int    // EMBEDDING_TARGET_DIMS — target embedding dimensions for MRL truncation (0 = use model native)
 
 	// Embedding cache settings
 	EmbeddingCacheEnabled bool // Feature toggle (default: true)
@@ -1020,6 +1021,10 @@ func FromEnv() (Config, error) {
 	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "qwen3-embedding:4b")
+	embTargetDims, err := atoi("EMBEDDING_TARGET_DIMS", 0)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Embedding cache settings
 	embCacheEnabled := getBool("EMBEDDING_CACHE_ENABLED", true)
@@ -2486,7 +2491,8 @@ func FromEnv() (Config, error) {
 		OpenAIEndpoint: openaiEndpoint,
 		LLMEndpoint:    llmEndpoint,
 		OllamaEndpoint: ollamaEndpoint,
-		OllamaModel: ollamaModel,
+		OllamaModel:         ollamaModel,
+		EmbeddingTargetDims: embTargetDims,
 		EmbeddingCacheEnabled:     embCacheEnabled,
 		EmbeddingCacheSize:        embCacheSize,
 		QueryCacheEnabled:         queryCacheEnabled,
