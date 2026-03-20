@@ -9,7 +9,10 @@
 
 ## Reporting a Vulnerability
 
-We take security vulnerabilities seriously. If you discover a security issue, please report it responsibly.
+We (no, there is not a mouse in my pocket) take security vulnerabilities seriously. If you discover a security issue, please report it responsibly.
+
+### Security Updates
+- Added prompt injection protections 3/19/26.  Additional info coming soon. 
 
 ### How to Report
 
