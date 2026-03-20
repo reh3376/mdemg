@@ -3,19 +3,18 @@
 package summarize
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"mdemg/internal/llmclient"
 )
 
 // Config holds configuration for the summarize service.
@@ -54,7 +53,7 @@ type CodeElement struct {
 // Service provides LLM-based semantic summary generation.
 type Service struct {
 	config     Config
-	client     *http.Client
+	llm        *llmclient.Client
 	cache      *summaryCache
 	structFn   func(CodeElement) string // Fallback structural summary function
 	mu         sync.Mutex
@@ -169,11 +168,21 @@ func New(cfg Config, structuralFallback func(CodeElement) string) (*Service, err
 		cache = newSummaryCache(cfg.CacheSize)
 	}
 
+	baseURL := cfg.OpenAIEndpoint
+	apiKey := cfg.OpenAIAPIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaEndpoint
+	}
+
 	return &Service{
 		config: cfg,
-		client: &http.Client{
-			Timeout: time.Duration(cfg.TimeoutMs) * time.Millisecond,
-		},
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
 		cache:    cache,
 		structFn: structuralFallback,
 	}, nil
@@ -345,29 +354,6 @@ Code elements to summarize:
 	return sb.String()
 }
 
-// OpenAI API types
-type openAIChatRequest struct {
-	Model     string          `json:"model"`
-	Messages  []openAIMessage `json:"messages"`
-	MaxTokens int             `json:"max_completion_tokens"`
-}
-
-type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type openAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Error *struct {
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
-}
-
 func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]string, error) {
 	prompt := s.buildPrompt(elements)
 
@@ -376,72 +362,21 @@ func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]str
 		maxTokens = 2000 // Reasoning models consume tokens for internal thought
 	}
 
-	reqBody := openAIChatRequest{
-		Model: s.config.Model,
-		Messages: []openAIMessage{
-			{Role: "system", Content: "You are a helpful code analysis assistant. Respond only with valid JSON."},
-			{Role: "user", Content: prompt},
-		},
-		MaxTokens: maxTokens,
+	msgs := []llmclient.Message{
+		{Role: "system", Content: "You are a helpful code analysis assistant. Respond only with valid JSON."},
+		{Role: "user", Content: prompt},
 	}
 
-	body, err := json.Marshal(reqBody)
+	content, err := s.llm.Complete(ctx, msgs, llmclient.CompleteOpts{MaxTokens: maxTokens})
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", s.config.OpenAIEndpoint+"/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.config.OpenAIAPIKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openai api error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	var chatResp openAIChatResponse
-	if err := json.Unmarshal(respBody, &chatResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if chatResp.Error != nil {
-		return nil, fmt.Errorf("openai error: %s", chatResp.Error.Message)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return nil, errors.New("no response from OpenAI")
-	}
-
-	// Parse the JSON array of summaries
-	content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
-
-	// Handle markdown code blocks
-	if strings.HasPrefix(content, "```json") {
-		content = strings.TrimPrefix(content, "```json")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	} else if strings.HasPrefix(content, "```") {
-		content = strings.TrimPrefix(content, "```")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	}
+	// Strip markdown code blocks
+	content = llmclient.StripCodeFence(content)
 
 	var summaries []string
 	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
-		// If JSON parsing fails, try to extract individual summaries
 		if s.config.Debug {
 			log.Printf("[SUMMARIZE] Failed to parse JSON response, content: %s", content)
 		}
@@ -451,75 +386,24 @@ func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]str
 	return summaries, nil
 }
 
-// Ollama API types
-type ollamaGenerateRequest struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	Stream  bool   `json:"stream"`
-	Options struct {
-		NumPredict int `json:"num_predict"`
-	} `json:"options"`
-}
-
-type ollamaGenerateResponse struct {
-	Response string `json:"response"`
-	Done     bool   `json:"done"`
-}
-
 func (s *Service) callOllama(ctx context.Context, elements []CodeElement) ([]string, error) {
 	prompt := s.buildPrompt(elements)
 
-	reqBody := ollamaGenerateRequest{
-		Model:  s.config.Model,
-		Prompt: prompt,
-		Stream: false,
-	}
-	reqBody.Options.NumPredict = s.config.MaxTokens * len(elements)
+	numPredict := s.config.MaxTokens * len(elements)
 
-	body, err := json.Marshal(reqBody)
+	msgs := []llmclient.Message{
+		{Role: "user", Content: prompt},
+	}
+
+	content, err := s.llm.Complete(ctx, msgs, llmclient.CompleteOpts{
+		Options: map[string]any{"num_predict": numPredict},
+	})
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", s.config.OllamaEndpoint+"/api/generate", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ollama api error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	var genResp ollamaGenerateResponse
-	if err := json.Unmarshal(respBody, &genResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	// Parse the JSON array of summaries
-	content := strings.TrimSpace(genResp.Response)
-
-	// Handle markdown code blocks
-	if strings.HasPrefix(content, "```json") {
-		content = strings.TrimPrefix(content, "```json")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	} else if strings.HasPrefix(content, "```") {
-		content = strings.TrimPrefix(content, "```")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	}
+	// Strip markdown code blocks
+	content = llmclient.StripCodeFence(content)
 
 	var summaries []string
 	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
@@ -528,6 +412,10 @@ func (s *Service) callOllama(ctx context.Context, elements []CodeElement) ([]str
 
 	return summaries, nil
 }
+
+// openAIChatResponse is kept for backward compatibility with tests
+// that construct mock responses using this type.
+type openAIChatResponse = llmclient.OpenAIChatResponse
 
 // fallback returns a structural summary when LLM fails.
 func (s *Service) fallback(elem CodeElement) string {

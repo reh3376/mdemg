@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"mdemg/internal/llmclient"
 )
 
 // BenchmarkSingleSummarize benchmarks single file summarization.
@@ -345,14 +347,8 @@ func createMockOpenAIServer(expectedBatchSize int) *httptest.Server {
 		summariesJSON, _ := json.Marshal(summaries)
 
 		resp := openAIChatResponse{
-			Choices: []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			}{
-				{Message: struct {
-					Content string `json:"content"`
-				}{Content: string(summariesJSON)}},
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: string(summariesJSON)}},
 			},
 		}
 		json.NewEncoder(w).Encode(resp)

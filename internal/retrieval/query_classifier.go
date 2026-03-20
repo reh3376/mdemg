@@ -4,20 +4,18 @@
 package retrieval
 
 import (
-	"bytes"
 	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // QueryClassifierConfig holds configuration for the LLM query classifier.
@@ -44,6 +42,7 @@ type QueryClassification struct {
 type QueryClassifier struct {
 	cfg        QueryClassifierConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 
 	cacheMu   sync.Mutex
 	cacheMap  map[string]*list.Element
@@ -58,12 +57,25 @@ type queryClassifyCacheEntry struct {
 
 // NewQueryClassifier creates a new LLM-powered query classifier.
 func NewQueryClassifier(cfg QueryClassifierConfig, cbRegistry *circuitbreaker.Registry) *QueryClassifier {
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
 	return &QueryClassifier{
 		cfg:        cfg,
 		cbRegistry: cbRegistry,
-		cacheMap:   make(map[string]*list.Element, 256),
-		cacheList:  list.New(),
-		cacheCap:   256,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
+		cacheMap:  make(map[string]*list.Element, 256),
+		cacheList: list.New(),
+		cacheCap:  256,
 	}
 }
 
@@ -114,14 +126,42 @@ func (qc *QueryClassifier) Classify(ctx context.Context, query string) (*QueryCl
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
+	msgs := []llmclient.Message{
+		{Role: "system", Content: queryClassifySystemPrompt},
+		{Role: "user", Content: query},
+	}
+
+	maxTokens := qc.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 500
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+	if qc.cfg.Provider == "ollama" {
+		opts.Format = ollamaQuerySchema
+		opts.Options = map[string]any{"temperature": 0.1}
+	}
+
+	cbName := "openai-query-classify"
+	if qc.cfg.Provider == "ollama" {
+		cbName = "ollama-query-classify"
+	}
+
 	var raw string
 	var err error
 
-	switch qc.cfg.Provider {
-	case "ollama":
-		raw, err = qc.callOllama(timeoutCtx, query)
-	default:
-		raw, err = qc.callOpenAI(timeoutCtx, query)
+	if qc.cbRegistry != nil {
+		cb := qc.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			raw, innerErr = qc.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		raw, err = qc.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -181,107 +221,7 @@ func (qc *QueryClassifier) cachePut(hash string, result QueryClassification) {
 	qc.cacheMap[hash] = elem
 }
 
-// --- OpenAI ---
-
-func (qc *QueryClassifier) callOpenAI(ctx context.Context, query string) (string, error) {
-	if qc.cbRegistry != nil {
-		cb := qc.cbRegistry.Get("openai-query-classify")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = qc.doCallOpenAI(ctx, query)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai query-classify circuit breaker open")
-		}
-		return result, err
-	}
-	return qc.doCallOpenAI(ctx, query)
-}
-
-type queryOpenAIRequest struct {
-	Model     string                 `json:"model"`
-	Messages  []queryOpenAIMessage   `json:"messages"`
-	MaxTokens int                    `json:"max_completion_tokens"`
-}
-
-type queryOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type queryOpenAIResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-func (qc *QueryClassifier) doCallOpenAI(ctx context.Context, query string) (string, error) {
-	maxTokens := qc.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 500
-	}
-
-	reqBody := queryOpenAIRequest{
-		Model: qc.cfg.Model,
-		Messages: []queryOpenAIMessage{
-			{Role: "system", Content: queryClassifySystemPrompt},
-			{Role: "user", Content: query},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := qc.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+qc.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp queryOpenAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama ---
-
-type queryOllamaRequest struct {
-	Model   string          `json:"model"`
-	Prompt  string          `json:"prompt"`
-	Stream  bool            `json:"stream"`
-	Format  json.RawMessage `json:"format,omitempty"`
-	Options map[string]any  `json:"options,omitempty"`
-}
-
-type queryOllamaResponse struct {
-	Response string `json:"response"`
-}
-
+// ollamaQuerySchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
 var ollamaQuerySchema = json.RawMessage(`{
 	"type": "object",
 	"properties": {
@@ -290,64 +230,6 @@ var ollamaQuerySchema = json.RawMessage(`{
 	},
 	"required": ["types", "temporal"]
 }`)
-
-func (qc *QueryClassifier) callOllama(ctx context.Context, query string) (string, error) {
-	if qc.cbRegistry != nil {
-		cb := qc.cbRegistry.Get("ollama-query-classify")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = qc.doCallOllama(ctx, query)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama query-classify circuit breaker open")
-		}
-		return result, err
-	}
-	return qc.doCallOllama(ctx, query)
-}
-
-func (qc *QueryClassifier) doCallOllama(ctx context.Context, query string) (string, error) {
-	prompt := queryClassifySystemPrompt + "\n\n" + query
-
-	reqBody := queryOllamaRequest{
-		Model:   qc.cfg.Model,
-		Prompt:  prompt,
-		Stream:  false,
-		Format:  ollamaQuerySchema,
-		Options: map[string]any{"temperature": 0.1},
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := qc.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp queryOllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	return strings.TrimSpace(ollamaResp.Response), nil
-}
 
 // --- Response parsing ---
 
@@ -361,7 +243,7 @@ var validTemporalIntents = map[string]bool{
 }
 
 func (qc *QueryClassifier) parseResponse(raw string) (*QueryClassification, error) {
-	raw = stripQueryCodeFence(raw)
+	raw = llmclient.StripCodeFence(raw)
 	raw = strings.TrimSpace(raw)
 
 	var result QueryClassification
@@ -388,12 +270,3 @@ func (qc *QueryClassifier) parseResponse(raw string) (*QueryClassification, erro
 	return &result, nil
 }
 
-func stripQueryCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if after, ok := strings.CutPrefix(s, "```json"); ok {
-		s = strings.TrimSuffix(after, "```")
-	} else if after, ok := strings.CutPrefix(s, "```"); ok {
-		s = strings.TrimSuffix(after, "```")
-	}
-	return strings.TrimSpace(s)
-}

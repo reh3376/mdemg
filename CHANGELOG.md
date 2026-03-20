@@ -180,6 +180,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Neural re-ranker Python sidecar (NR-2)**: FastAPI with cross-encoder re-ranking + NLI classification
 - **Go neural integration (NR-3)**: HTTP client with circuit breaker for sidecar /rerank endpoint
 - **Training data collection (NR-1)**: Async JSONL logging of (query, candidate, score) tuples
+- **Python neural training pipeline (NR-4)**: `train.py` (fine-tune cross-encoder from collected JSONL data with configurable epochs, batch size, validation split, checkpoint resume), `evaluate.py` (offline evaluation comparing neural vs LLM re-rank scores, top-k reporting), model versioning with timestamped checkpoint directories, CLI entrypoints `mdemg-neural-train` and `mdemg-neural-evaluate`
+- **LLM client deduplication (F21)**: Extracted unified `internal/llmclient/` package (725 lines) consolidating duplicate OpenAI/Ollama HTTP client code spread across 5 packages (`summarize`, `consulting`, `retrieval`, `hidden`, `guardrail`). Single `Client` type with `Complete()` and `CompleteWithUsage()` methods. Ollama returns `tokens=0` (no usage reporting). 16 unit tests in `internal/llmclient/client_test.go`.
 - 8 new API endpoints, 38 new config parameters (all default disabled), 12 new UATS specs
 - 2 Neo4j migrations: V0020 (constraint lifecycle), V0021 (constraint conflicts)
 

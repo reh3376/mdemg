@@ -4,16 +4,14 @@
 package hidden
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // EmergenceNamerConfig holds LLM configuration for the emergence namer.
@@ -57,11 +55,28 @@ var validLabels = map[string]bool{
 type EmergenceNamer struct {
 	cfg        EmergenceNamerConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 }
 
 // NewEmergenceNamer creates a new namer with the given config and optional circuit breaker registry.
 func NewEmergenceNamer(cfg EmergenceNamerConfig, cbRegistry *circuitbreaker.Registry) *EmergenceNamer {
-	return &EmergenceNamer{cfg: cfg, cbRegistry: cbRegistry}
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
+	return &EmergenceNamer{
+		cfg:        cfg,
+		cbRegistry: cbRegistry,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
+	}
 }
 
 const emergenceSystemPrompt = `You are an AI concept discovery engine analyzing a knowledge graph.
@@ -134,14 +149,45 @@ func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, n
 
 	userPrompt := sb.String()
 
+	msgs := []llmclient.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: userPrompt},
+	}
+
+	maxTokens := n.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 500
+	}
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+	if n.cfg.Provider == "ollama" {
+		opts.Format = ollamaEmergenceSchema
+		opts.Options = map[string]any{"temperature": 0.3}
+	}
+
+	cbName := "openai-emergence"
+	if n.cfg.Provider == "ollama" {
+		cbName = "ollama-emergence"
+	}
+
 	var raw string
 	var err error
 
-	switch n.cfg.Provider {
-	case "ollama":
-		raw, err = n.nameWithOllama(timeoutCtx, sysPrompt, userPrompt)
-	default: // "openai" or unset
-		raw, err = n.nameWithOpenAI(timeoutCtx, sysPrompt, userPrompt)
+	if n.cbRegistry != nil {
+		cb := n.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			raw, innerErr = n.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		raw, err = n.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -149,12 +195,12 @@ func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, n
 	}
 
 	// Strip markdown code fences if present (LLMs sometimes wrap JSON)
-	raw = stripCodeFence(raw)
+	raw = llmclient.StripCodeFence(raw)
 	raw = strings.TrimSpace(raw)
 
 	var result EmergenceNamingResult
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return nil, fmt.Errorf("invalid JSON from LLM: %w (raw: %s)", err, truncateForLog(raw, 200))
+		return nil, fmt.Errorf("invalid JSON from LLM: %w (raw: %s)", err, llmclient.TruncateForLog(raw, 200))
 	}
 
 	// Validate proposed_label
@@ -169,131 +215,6 @@ func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, n
 	return &result, nil
 }
 
-// --- OpenAI integration ---
-
-type emergenceOpenAIChatRequest struct {
-	Model     string                   `json:"model"`
-	Messages  []emergenceOpenAIMessage `json:"messages"`
-	MaxTokens int                      `json:"max_completion_tokens"`
-}
-
-type emergenceOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type emergenceOpenAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-func (n *EmergenceNamer) nameWithOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	if n.cbRegistry != nil {
-		cb := n.cbRegistry.Get("openai-emergence")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = n.doNameWithOpenAI(ctx, sysPrompt, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai emergence circuit breaker open")
-		}
-		return result, err
-	}
-	return n.doNameWithOpenAI(ctx, sysPrompt, userPrompt)
-}
-
-func (n *EmergenceNamer) doNameWithOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	maxTokens := n.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 500
-	}
-
-	if maxTokens < 2000 {
-		maxTokens = 2000 // Reasoning models consume tokens for internal thought
-	}
-
-	reqBody := emergenceOpenAIChatRequest{
-		Model: n.cfg.Model,
-		Messages: []emergenceOpenAIMessage{
-			{Role: "system", Content: sysPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := n.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+n.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp emergenceOpenAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama integration ---
-
-type emergenceOllamaGenerateRequest struct {
-	Model   string          `json:"model"`
-	Prompt  string          `json:"prompt"`
-	Stream  bool            `json:"stream"`
-	Format  json.RawMessage `json:"format,omitempty"`
-	Options map[string]any  `json:"options,omitempty"`
-}
-
-type emergenceOllamaGenerateResponse struct {
-	Response string `json:"response"`
-}
-
-func (n *EmergenceNamer) nameWithOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	if n.cbRegistry != nil {
-		cb := n.cbRegistry.Get("ollama-emergence")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = n.doNameWithOllama(ctx, sysPrompt, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama emergence circuit breaker open")
-		}
-		return result, err
-	}
-	return n.doNameWithOllama(ctx, sysPrompt, userPrompt)
-}
-
 // ollamaEmergenceSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
 var ollamaEmergenceSchema = json.RawMessage(`{
 	"type": "object",
@@ -304,67 +225,3 @@ var ollamaEmergenceSchema = json.RawMessage(`{
 	},
 	"required": ["name", "description", "proposed_label"]
 }`)
-
-func (n *EmergenceNamer) doNameWithOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	prompt := sysPrompt + "\n\n" + userPrompt
-
-	reqBody := emergenceOllamaGenerateRequest{
-		Model:   n.cfg.Model,
-		Prompt:  prompt,
-		Stream:  false,
-		Format:  ollamaEmergenceSchema,
-		Options: map[string]any{"temperature": 0.3},
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := n.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp emergenceOllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	return strings.TrimSpace(ollamaResp.Response), nil
-}
-
-// --- Helpers ---
-
-// stripCodeFence removes markdown code fences that LLMs sometimes wrap around JSON.
-func stripCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if after, ok := strings.CutPrefix(s, "```json"); ok {
-		s = strings.TrimSuffix(after, "```")
-	} else if after, ok := strings.CutPrefix(s, "```"); ok {
-		s = strings.TrimSuffix(after, "```")
-	}
-	return strings.TrimSpace(s)
-}
-
-// truncateForLog truncates a string for error log messages.
-func truncateForLog(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
-}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 )
 
@@ -212,29 +213,6 @@ func buildRerankPrompt(query string, candidates []models.RetrieveResult) string 
 	return sb.String()
 }
 
-// OpenAI chat completion request/response structures
-type openAIChatRequest struct {
-	Model     string          `json:"model"`
-	Messages  []openAIMessage `json:"messages"`
-	MaxTokens int             `json:"max_completion_tokens"`
-}
-
-type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type openAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Usage struct {
-		TotalTokens int `json:"total_tokens"`
-	} `json:"usage"`
-}
-
 func (s *Service) rerankWithOpenAI(ctx context.Context, prompt string) ([]float64, int, error) {
 	// Use circuit breaker if available
 	if s.cbRegistry != nil {
@@ -257,67 +235,31 @@ func (s *Service) rerankWithOpenAI(ctx context.Context, prompt string) ([]float6
 
 // doRerankWithOpenAI performs the actual OpenAI rerank API call.
 func (s *Service) doRerankWithOpenAI(ctx context.Context, prompt string) ([]float64, int, error) {
-	reqBody := openAIChatRequest{
-		Model: s.cfg.RerankModel,
-		Messages: []openAIMessage{
-			{Role: "user", Content: prompt},
-		},
+	client := llmclient.New(llmclient.Config{
+		Provider: "openai",
+		Model:    s.cfg.RerankModel,
+		APIKey:   s.cfg.OpenAIAPIKey,
+		BaseURL:  s.cfg.EffectiveLLMEndpoint(),
+	})
+
+	msgs := []llmclient.Message{
+		{Role: "user", Content: prompt},
+	}
+
+	content, tokens, err := client.CompleteWithUsage(ctx, msgs, llmclient.CompleteOpts{
 		MaxTokens: 2000, // Reasoning models consume tokens for internal thought
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
+	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := s.cfg.EffectiveLLMEndpoint() + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return nil, 0, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.cfg.OpenAIAPIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, 0, fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp openAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return nil, 0, fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return nil, 0, fmt.Errorf("no choices in response")
+		return nil, 0, err
 	}
 
 	// Parse the scores from the response
-	content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
 	scores, err := parseScores(content)
 	if err != nil {
-		return nil, chatResp.Usage.TotalTokens, fmt.Errorf("parse scores: %w", err)
+		return nil, tokens, fmt.Errorf("parse scores: %w", err)
 	}
 
-	return scores, chatResp.Usage.TotalTokens, nil
-}
-
-// Ollama completion structures
-type ollamaGenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-type ollamaGenerateResponse struct {
-	Response string `json:"response"`
+	return scores, tokens, nil
 }
 
 func (s *Service) rerankWithOllama(ctx context.Context, prompt string) ([]float64, int, error) {
@@ -342,48 +284,28 @@ func (s *Service) rerankWithOllama(ctx context.Context, prompt string) ([]float6
 
 // doRerankWithOllama performs the actual Ollama rerank API call.
 func (s *Service) doRerankWithOllama(ctx context.Context, prompt string) ([]float64, int, error) {
-	reqBody := ollamaGenerateRequest{
-		Model:  s.cfg.RerankModel,
-		Prompt: prompt,
-		Stream: false,
+	client := llmclient.New(llmclient.Config{
+		Provider: "ollama",
+		Model:    s.cfg.RerankModel,
+		BaseURL:  s.cfg.OllamaEndpoint,
+	})
+
+	msgs := []llmclient.Message{
+		{Role: "user", Content: prompt},
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	content, err := client.Complete(ctx, msgs, llmclient.CompleteOpts{})
 	if err != nil {
-		return nil, 0, fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := s.cfg.OllamaEndpoint + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return nil, 0, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, 0, fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp ollamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return nil, 0, fmt.Errorf("decode response: %w", err)
+		return nil, 0, err
 	}
 
 	// Parse the scores from the response
-	scores, err := parseScores(strings.TrimSpace(ollamaResp.Response))
+	scores, err := parseScores(content)
 	if err != nil {
 		return nil, 0, fmt.Errorf("parse scores: %w", err)
 	}
 
-	return scores, 0, nil // Ollama doesn't report token usage in same way
+	return scores, 0, nil // Ollama doesn't report token usage
 }
 
 // parseScores extracts a float array from LLM response

@@ -4,16 +4,14 @@
 package ape
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // LLMReflectorConfig holds configuration for the LLM reflector.
@@ -34,11 +32,29 @@ type LLMReflector struct {
 	cfg        LLMReflectorConfig
 	cbRegistry *circuitbreaker.Registry
 	calibrator *Calibrator
+	llm        *llmclient.Client
 }
 
 // NewLLMReflector creates a new LLM-powered reflector.
 func NewLLMReflector(cfg LLMReflectorConfig, cbRegistry *circuitbreaker.Registry, calibrator *Calibrator) *LLMReflector {
-	return &LLMReflector{cfg: cfg, cbRegistry: cbRegistry, calibrator: calibrator}
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
+	return &LLMReflector{
+		cfg:        cfg,
+		cbRegistry: cbRegistry,
+		calibrator: calibrator,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
+	}
 }
 
 const llmReflectSystemPrompt = `You are an RSIC (Recursive Self-Improvement Cycle) reflection engine for a knowledge graph memory system.
@@ -84,17 +100,47 @@ func (lr *LLMReflector) Reflect(ctx context.Context, report *SelfAssessmentRepor
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
-	// Build user prompt with assessment + recent history
 	userPrompt := lr.buildUserPrompt(report)
+
+	msgs := []llmclient.Message{
+		{Role: "system", Content: llmReflectSystemPrompt},
+		{Role: "user", Content: userPrompt},
+	}
+
+	maxTokens := lr.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 2000
+	}
+	if maxTokens < 2000 {
+		maxTokens = 2000
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+	if lr.cfg.Provider == "ollama" {
+		opts.Format = ollamaReflectSchema
+		opts.Options = map[string]any{"temperature": 0.3}
+	}
+
+	cbName := "openai-rsic-reflect"
+	if lr.cfg.Provider == "ollama" {
+		cbName = "ollama-rsic-reflect"
+	}
 
 	var raw string
 	var err error
 
-	switch lr.cfg.Provider {
-	case "ollama":
-		raw, err = lr.callOllama(timeoutCtx, userPrompt)
-	default: // "openai" or unset
-		raw, err = lr.callOpenAI(timeoutCtx, userPrompt)
+	if lr.cbRegistry != nil {
+		cb := lr.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			raw, innerErr = lr.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		raw, err = lr.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -148,110 +194,7 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 	return sb.String()
 }
 
-// --- OpenAI integration ---
-
-type llmReflectOpenAIRequest struct {
-	Model     string                    `json:"model"`
-	Messages  []llmReflectOpenAIMessage `json:"messages"`
-	MaxTokens int                       `json:"max_completion_tokens"`
-}
-
-type llmReflectOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type llmReflectOpenAIResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-func (lr *LLMReflector) callOpenAI(ctx context.Context, userPrompt string) (string, error) {
-	if lr.cbRegistry != nil {
-		cb := lr.cbRegistry.Get("openai-rsic-reflect")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = lr.doCallOpenAI(ctx, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai rsic-reflect circuit breaker open")
-		}
-		return result, err
-	}
-	return lr.doCallOpenAI(ctx, userPrompt)
-}
-
-func (lr *LLMReflector) doCallOpenAI(ctx context.Context, userPrompt string) (string, error) {
-	maxTokens := lr.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 2000
-	}
-	if maxTokens < 2000 {
-		maxTokens = 2000
-	}
-
-	reqBody := llmReflectOpenAIRequest{
-		Model: lr.cfg.Model,
-		Messages: []llmReflectOpenAIMessage{
-			{Role: "system", Content: llmReflectSystemPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := lr.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+lr.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp llmReflectOpenAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama integration ---
-
-type llmReflectOllamaRequest struct {
-	Model   string          `json:"model"`
-	Prompt  string          `json:"prompt"`
-	Stream  bool            `json:"stream"`
-	Format  json.RawMessage `json:"format,omitempty"`
-	Options map[string]any  `json:"options,omitempty"`
-}
-
-type llmReflectOllamaResponse struct {
-	Response string `json:"response"`
-}
-
+// ollamaReflectSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
 var ollamaReflectSchema = json.RawMessage(`{
 	"type": "array",
 	"items": {
@@ -266,64 +209,6 @@ var ollamaReflectSchema = json.RawMessage(`{
 		"required": ["pattern_id", "severity", "description", "recommended_action", "reasoning"]
 	}
 }`)
-
-func (lr *LLMReflector) callOllama(ctx context.Context, userPrompt string) (string, error) {
-	if lr.cbRegistry != nil {
-		cb := lr.cbRegistry.Get("ollama-rsic-reflect")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = lr.doCallOllama(ctx, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama rsic-reflect circuit breaker open")
-		}
-		return result, err
-	}
-	return lr.doCallOllama(ctx, userPrompt)
-}
-
-func (lr *LLMReflector) doCallOllama(ctx context.Context, userPrompt string) (string, error) {
-	prompt := llmReflectSystemPrompt + "\n\n" + userPrompt
-
-	reqBody := llmReflectOllamaRequest{
-		Model:   lr.cfg.Model,
-		Prompt:  prompt,
-		Stream:  false,
-		Format:  ollamaReflectSchema,
-		Options: map[string]any{"temperature": 0.3},
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := lr.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp llmReflectOllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	return strings.TrimSpace(ollamaResp.Response), nil
-}
 
 // --- Response parsing ---
 
@@ -347,7 +232,7 @@ var validActions = map[string]bool{
 
 func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {
 	// Strip markdown code fences if present
-	raw = stripLLMCodeFence(raw)
+	raw = llmclient.StripCodeFence(raw)
 	raw = strings.TrimSpace(raw)
 
 	var llmInsights []llmReflectInsight
@@ -377,13 +262,3 @@ func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {
 	return insights, nil
 }
 
-// stripLLMCodeFence removes markdown code fences that LLMs sometimes wrap around JSON.
-func stripLLMCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if after, ok := strings.CutPrefix(s, "```json"); ok {
-		s = strings.TrimSuffix(after, "```")
-	} else if after, ok := strings.CutPrefix(s, "```"); ok {
-		s = strings.TrimSuffix(after, "```")
-	}
-	return strings.TrimSpace(s)
-}

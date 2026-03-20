@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"mdemg/internal/llmclient"
 )
 
 func TestCacheOperations(t *testing.T) {
@@ -140,14 +142,8 @@ func TestOpenAIMock(t *testing.T) {
 
 		// Return mock response
 		resp := openAIChatResponse{
-			Choices: []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			}{
-				{Message: struct {
-					Content string `json:"content"`
-				}{Content: `["UserService manages user data persistence and retrieval, integrating with the database layer."]`}},
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: `["UserService manages user data persistence and retrieval, integrating with the database layer."]`}},
 			},
 		}
 		json.NewEncoder(w).Encode(resp)
@@ -364,14 +360,8 @@ func TestMarkdownCodeBlockParsing(t *testing.T) {
 	// Test that markdown code blocks in response are handled
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := openAIChatResponse{
-			Choices: []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			}{
-				{Message: struct {
-					Content string `json:"content"`
-				}{Content: "```json\n[\"Summary with markdown wrapper\"]\n```"}},
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: "```json\n[\"Summary with markdown wrapper\"]\n```"}},
 			},
 		}
 		json.NewEncoder(w).Encode(resp)
