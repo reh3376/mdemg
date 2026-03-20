@@ -275,7 +275,7 @@ func runSidecarUp(flags sidecarUpFlags) error {
 			"NEO4J_PASS=mdemg-dev",
 			"EMBEDDING_PROVIDER=ollama",
 			"OLLAMA_ENDPOINT=http://localhost:11434",
-			"OLLAMA_MODEL=qwen3-embedding:4b",
+			"OLLAMA_MODEL=qwen3-embedding:8b",
 			"LLM_PROVIDER=ollama",
 			"LLM_MODEL=llama3.2:3b-instruct-fp16",
 		}

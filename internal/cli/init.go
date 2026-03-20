@@ -252,14 +252,28 @@ func runInit(flags initFlags) error {
 	switch opts.EmbeddingProvider {
 	case "ollama":
 		if flags.defaults {
-			opts.EmbeddingModel = "qwen3-embedding:4b"
+			opts.EmbeddingModel = "qwen3-embedding:8b"
 			opts.LLMModel = "llama3.2:3b-instruct-fp16"
 		} else {
-			opts.EmbeddingModel = promptLine("Embedding model [qwen3-embedding:4b]", "qwen3-embedding:4b")
+			fmt.Println()
+			fmt.Println("  MDEMG requires 3072-dimensional embeddings (Neo4j vector index).")
+			fmt.Println("  Recommended: qwen3-embedding:8b (4096 native, truncated to 3072)")
+			fmt.Println("  Note: ~4.9 GB download, requires 8+ GB VRAM.")
+			fmt.Println()
+			opts.EmbeddingModel = promptLine("Embedding model [qwen3-embedding:8b]", "qwen3-embedding:8b")
+
+			if opts.EmbeddingModel != "qwen3-embedding:8b" {
+				validateOllamaEmbeddingModel(opts.EmbeddingModel)
+			}
+
 			opts.LLMModel = promptLine("Naming/LLM model [llama3.2:3b-instruct-fp16]", "llama3.2:3b-instruct-fp16")
 		}
 		opts.EmbeddingEndpoint = "http://localhost:11434"
 		opts.LLMProvider = "ollama"
+
+		if env.ollamaReachable {
+			ensureOllamaModel(opts.EmbeddingModel)
+		}
 	case "openai":
 		if flags.defaults {
 			opts.EmbeddingModel = "text-embedding-3-large"
@@ -1174,6 +1188,70 @@ func registerWithMenubar(cwd, spaceID string, port int) {
 		return
 	}
 	_ = os.Rename(tmpPath, registryPath)
+}
+
+// incompatibleOllamaModels maps Ollama embedding models known to produce fewer than 3072 dimensions.
+var incompatibleOllamaModels = map[string]int{
+	"qwen3-embedding:4b":     2560,
+	"qwen3-embedding":        2560,
+	"qwen3-embedding:0.6b":   1024,
+	"mxbai-embed-large":      1024,
+	"snowflake-arctic-embed":  1024,
+	"snowflake-arctic-embed2": 1024,
+	"nomic-embed-text":       768,
+	"all-minilm":             384,
+	"all-minilm:l6-v2":       384,
+}
+
+// validateOllamaEmbeddingModel warns the user if the selected model produces fewer than 3072 dims.
+func validateOllamaEmbeddingModel(model string) {
+	if dims, ok := incompatibleOllamaModels[model]; ok {
+		fmt.Printf("\n  WARNING: %q produces %d dimensions, but MDEMG requires 3072.\n", model, dims)
+		fmt.Println("  Vector operations (recall, consolidation) will fail.")
+		fmt.Println("  Recommended: qwen3-embedding:8b (4096 native, truncated to 3072)")
+		fmt.Println()
+		answer := promptLine("Continue anyway? (yes/no) [no]", "no")
+		if answer != "yes" {
+			fmt.Println("  Switching to qwen3-embedding:8b")
+		}
+	}
+}
+
+// ensureOllamaModel checks if the model is pulled locally and offers to pull it.
+func ensureOllamaModel(model string) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://localhost:11434/api/tags") //nolint:noctx // init wizard probe
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var tags struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return
+	}
+
+	for _, m := range tags.Models {
+		if m.Name == model || strings.HasPrefix(m.Name, model+":") {
+			return // already pulled
+		}
+	}
+
+	fmt.Printf("\n  Model %q is not pulled locally.\n", model)
+	answer := promptLine("Pull it now? (yes/no) [yes]", "yes")
+	if answer == "yes" {
+		fmt.Printf("  Running: ollama pull %s\n", model)
+		cmd := osExec.Command("ollama", "pull", model) //nolint:gosec // user-selected model name from init wizard
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("  Warning: pull failed: %v\n", err)
+		}
+	}
 }
 
 // FindIgnoreFile searches for .mdemgignore walking up from the given directory.

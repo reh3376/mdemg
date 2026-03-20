@@ -154,7 +154,7 @@ message SpaceMetadata {
     int64 total_edges = 6;
     int64 total_observations = 7;
     int64 total_symbols = 8;
-    int64 embedding_dimensions = 9;         // 1536 for OpenAI and Ollama qwen3-embedding:4b
+    int64 embedding_dimensions = 9;         // 3072 for OpenAI text-embedding-3-large and Ollama qwen3-embedding:8b (truncated)
     map<string, string> labels = 10;        // Arbitrary metadata (e.g., "project": "whk-wms")
     Lineage lineage = 11;                   // Phase 35: space lineage tracking for merges/transfers
 }

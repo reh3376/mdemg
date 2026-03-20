@@ -16,7 +16,7 @@ No. Core features (storage, vector recall, consolidation, CMS) work without an L
 
 ### What embedding providers are supported?
 
-- **Ollama** (recommended) — local, free, default model: `qwen3-embedding:4b` (1536 dimensions)
+- **Ollama** (recommended) — local, free, default model: `qwen3-embedding:8b` (1536 dimensions)
 - **OpenAI** — cloud, requires API key, default model: `text-embedding-3-small` (1536 dimensions)
 
 ## Installation
@@ -69,7 +69,7 @@ Edit `.mdemg/config.yaml` (created by `mdemg init`) or set environment variables
 ```bash
 # Ollama (default)
 EMBEDDING_PROVIDER=ollama
-OLLAMA_MODEL=qwen3-embedding:4b
+OLLAMA_MODEL=qwen3-embedding:8b
 
 # OpenAI
 EMBEDDING_PROVIDER=openai

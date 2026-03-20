@@ -1820,7 +1820,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `OPENAI_MODEL` | string | `"text-embedding-3-large"` | OpenAI embedding model |
 | `OPENAI_ENDPOINT` | string | `"https://api.openai.com/v1"` | OpenAI API endpoint |
 | `OLLAMA_ENDPOINT` | string | `"http://localhost:11434"` | Ollama API endpoint |
-| `OLLAMA_MODEL` | string | `"qwen3-embedding:4b"` | Ollama embedding model |
+| `OLLAMA_MODEL` | string | `"qwen3-embedding:8b"` | Ollama embedding model |
 
 ### Embedding Cache
 

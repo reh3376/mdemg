@@ -166,8 +166,8 @@ func TestOllamaModel_DefaultQwen(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	if cfg.OllamaModel != "qwen3-embedding:4b" {
-		t.Errorf("OllamaModel = %q, want %q", cfg.OllamaModel, "qwen3-embedding:4b")
+	if cfg.OllamaModel != "qwen3-embedding:8b" {
+		t.Errorf("OllamaModel = %q, want %q", cfg.OllamaModel, "qwen3-embedding:8b")
 	}
 }
 

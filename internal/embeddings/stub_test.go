@@ -123,11 +123,98 @@ func TestOllama_DefaultModelIsQwen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewOllama error: %v", err)
 	}
-	if o.model != "qwen3-embedding:4b" {
-		t.Errorf("model = %q, want %q", o.model, "qwen3-embedding:4b")
+	if o.model != "qwen3-embedding:8b" {
+		t.Errorf("model = %q, want %q", o.model, "qwen3-embedding:8b")
 	}
-	if o.Dimensions() != 2560 {
-		t.Errorf("Dimensions() = %d, want 2560", o.Dimensions())
+	if o.Dimensions() != 3072 {
+		t.Errorf("Dimensions() = %d, want 3072", o.Dimensions())
+	}
+}
+
+func TestOllama_8bTargetDimensions(t *testing.T) {
+	o, err := NewOllama(Config{OllamaModel: "qwen3-embedding:8b"})
+	if err != nil {
+		t.Fatalf("NewOllama error: %v", err)
+	}
+	if o.Dimensions() != 3072 {
+		t.Errorf("Dimensions() = %d, want 3072 (truncated from 4096)", o.Dimensions())
+	}
+	if o.targetDimensions != 3072 {
+		t.Errorf("targetDimensions = %d, want 3072", o.targetDimensions)
+	}
+}
+
+func TestOllama_ExplicitTargetDimsOverride(t *testing.T) {
+	o, err := NewOllama(Config{OllamaModel: "qwen3-embedding:8b", TargetDimensions: 2048})
+	if err != nil {
+		t.Fatalf("NewOllama error: %v", err)
+	}
+	if o.Dimensions() != 2048 {
+		t.Errorf("Dimensions() = %d, want 2048", o.Dimensions())
+	}
+	if o.targetDimensions != 2048 {
+		t.Errorf("targetDimensions = %d, want 2048", o.targetDimensions)
+	}
+}
+
+func TestTruncateAndNormalize_Basic(t *testing.T) {
+	input := make([]float32, 4096)
+	for i := range input {
+		input[i] = float32(i + 1)
+	}
+	result := truncateAndNormalize(input, 3072)
+	if len(result) != 3072 {
+		t.Fatalf("len = %d, want 3072", len(result))
+	}
+	// Verify L2 normalization
+	var sumSq float64
+	for _, v := range result {
+		sumSq += float64(v) * float64(v)
+	}
+	norm := math.Sqrt(sumSq)
+	if math.Abs(norm-1.0) > 0.001 {
+		t.Errorf("norm = %f, want ~1.0", norm)
+	}
+}
+
+func TestTruncateAndNormalize_NoOp(t *testing.T) {
+	input := make([]float32, 3072)
+	for i := range input {
+		input[i] = float32(i)
+	}
+	result := truncateAndNormalize(input, 3072)
+	if len(result) != 3072 {
+		t.Fatalf("len = %d, want 3072", len(result))
+	}
+	// Should return original (no truncation needed)
+	if &result[0] != &input[0] {
+		t.Error("expected same slice returned when no truncation needed")
+	}
+}
+
+func TestTruncateAndNormalize_SmallerInput(t *testing.T) {
+	input := make([]float32, 1024)
+	for i := range input {
+		input[i] = 1.0
+	}
+	result := truncateAndNormalize(input, 3072)
+	if len(result) != 1024 {
+		t.Fatalf("len = %d, want 1024 (unchanged)", len(result))
+	}
+}
+
+func TestTruncateAndNormalize_ZeroVector(t *testing.T) {
+	input := make([]float32, 4096) // all zeros
+	result := truncateAndNormalize(input, 3072)
+	if len(result) != 3072 {
+		t.Fatalf("len = %d, want 3072", len(result))
+	}
+	// Zero vector should remain zero (no division by zero)
+	for i, v := range result {
+		if v != 0 {
+			t.Errorf("result[%d] = %f, want 0", i, v)
+			break
+		}
 	}
 }
 

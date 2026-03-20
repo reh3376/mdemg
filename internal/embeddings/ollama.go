@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"os"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
@@ -14,8 +16,9 @@ import (
 )
 
 const (
-	defaultOllamaEndpoint = "http://localhost:11434"
-	defaultOllamaModel    = "qwen3-embedding:4b"
+	defaultOllamaEndpoint    = "http://localhost:11434"
+	defaultOllamaModel       = "qwen3-embedding:8b"
+	targetOllamaDimensions   = 3072
 )
 
 // knownOllamaDimensions maps Ollama embedding model names to their native output dimensions.
@@ -42,6 +45,27 @@ type Ollama struct {
 	cb              *circuitbreaker.Breaker
 }
 
+// truncateAndNormalize truncates an embedding to targetDim dimensions and L2-renormalizes.
+// This implements client-side MRL (Matryoshka Representation Learning) truncation:
+// the first N dimensions of an MRL-trained embedding form a valid lower-dimensional embedding.
+func truncateAndNormalize(embedding []float32, targetDim int) []float32 {
+	if len(embedding) <= targetDim {
+		return embedding
+	}
+	truncated := make([]float32, targetDim)
+	copy(truncated, embedding[:targetDim])
+	var sumSq float64
+	for _, v := range truncated {
+		sumSq += float64(v) * float64(v)
+	}
+	if norm := float32(math.Sqrt(sumSq)); norm > 0 {
+		for i := range truncated {
+			truncated[i] /= norm
+		}
+	}
+	return truncated
+}
+
 // NewOllama creates a new Ollama embedder.
 func NewOllama(cfg Config) (*Ollama, error) {
 	endpoint := cfg.OllamaEndpoint
@@ -53,8 +77,13 @@ func NewOllama(cfg Config) (*Ollama, error) {
 		model = defaultOllamaModel
 	}
 
-	// Look up native dimensions for the model
-	nativeDims := 2560 // default: qwen3-embedding:4b native
+	// Target: explicit EMBEDDING_TARGET_DIMS or hardcoded 3072
+	targetDims := targetOllamaDimensions
+	if cfg.TargetDimensions > 0 {
+		targetDims = cfg.TargetDimensions
+	}
+
+	nativeDims := 4096 // default: qwen3-embedding:8b native
 	if dims, ok := knownOllamaDimensions[model]; ok {
 		nativeDims = dims
 	}
@@ -63,16 +92,17 @@ func NewOllama(cfg Config) (*Ollama, error) {
 		endpoint: endpoint,
 		model:    model,
 		client: &http.Client{
-			Timeout: 60 * time.Second, // Ollama can be slower
+			Timeout: 60 * time.Second,
 		},
-		dimensions: nativeDims,
 	}
 
-	// If a target dimension is configured and the model supports MRL truncation
-	// (native dims > target), request truncation via the /api/embed endpoint.
-	if cfg.TargetDimensions > 0 && nativeDims >= cfg.TargetDimensions {
-		o.targetDimensions = cfg.TargetDimensions
-		o.dimensions = cfg.TargetDimensions
+	if nativeDims >= targetDims {
+		o.targetDimensions = targetDims
+		o.dimensions = targetDims
+	} else {
+		o.dimensions = nativeDims
+		fmt.Fprintf(os.Stderr, "WARNING: Ollama model %q produces %d dims, need %d. Vector ops may fail.\n",
+			model, nativeDims, targetDims)
 	}
 
 	return o, nil
@@ -171,9 +201,8 @@ func (o *Ollama) doEmbedV2(ctx context.Context, text string) ([]float32, error) 
 		result[i] = float32(v)
 	}
 
-	// Update dimensions if different from expected
-	if len(result) != o.dimensions {
-		o.dimensions = len(result)
+	if o.targetDimensions > 0 && len(result) > o.targetDimensions {
+		result = truncateAndNormalize(result, o.targetDimensions)
 	}
 
 	return result, nil
@@ -222,9 +251,8 @@ func (o *Ollama) doEmbedLegacy(ctx context.Context, text string) ([]float32, err
 		result[i] = float32(v)
 	}
 
-	// Update dimensions if different from expected
-	if len(result) != o.dimensions {
-		o.dimensions = len(result)
+	if o.targetDimensions > 0 && len(result) > o.targetDimensions {
+		result = truncateAndNormalize(result, o.targetDimensions)
 	}
 
 	return result, nil

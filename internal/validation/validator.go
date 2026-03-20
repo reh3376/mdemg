@@ -43,7 +43,7 @@ func Validate(v any) error {
 
 // validateEmbeddingDims validates that an embedding slice has valid dimensions.
 // Supported: 384 (all-minilm), 768 (nomic-embed-text), 1024 (mxbai-embed-large/snowflake/qwen3:0.6b),
-// 1536 (OpenAI small), 2560 (qwen3-embedding:4b native), 3072 (OpenAI text-embedding-3-large),
+// 1536 (OpenAI small), 2560 (qwen3-embedding:4b native), 3072 (OpenAI text-embedding-3-large / qwen3-embedding:8b truncated),
 // 4096 (qwen3-embedding:8b native).
 // Returns true for nil slices (let required/omitempty handle nil case).
 func validateEmbeddingDims(fl validator.FieldLevel) bool {

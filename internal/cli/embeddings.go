@@ -63,7 +63,7 @@ Reports provider type, model, endpoint reachability, and embedding dimensions.`,
 				fmt.Println("Or in .mdemg/config.yaml:")
 				fmt.Println("  embedding:")
 				fmt.Println("    provider: ollama")
-				fmt.Println("    model: qwen3-embedding:4b")
+				fmt.Println("    model: qwen3-embedding:8b")
 				return nil
 			}
 
@@ -88,7 +88,7 @@ func checkOllama(cfg embeddings.Config) error {
 	}
 	model := cfg.OllamaModel
 	if model == "" {
-		model = "qwen3-embedding:4b"
+		model = "qwen3-embedding:8b"
 	}
 
 	fmt.Printf("Endpoint: %s\n", endpoint)

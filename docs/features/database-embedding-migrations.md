@@ -101,7 +101,7 @@ Embedding Provider Check
 ========================
 Provider: ollama
 Endpoint: http://localhost:11434
-Model:    qwen3-embedding:4b
+Model:    qwen3-embedding:8b
 
 Connectivity... ok
 Model check... ok

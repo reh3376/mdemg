@@ -108,7 +108,7 @@ server:
   port: 9999
 embedding:
   provider: ollama
-  model: qwen3-embedding:4b
+  model: qwen3-embedding:8b
   endpoint: http://localhost:11434
 retrieval:
   candidate_k: 200

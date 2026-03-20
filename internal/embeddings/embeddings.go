@@ -42,7 +42,7 @@ type Config struct {
 
 	// Ollama settings
 	OllamaEndpoint string // default: http://localhost:11434
-	OllamaModel    string // default: qwen3-embedding:4b
+	OllamaModel    string // default: qwen3-embedding:8b
 
 	// Dimension control
 	TargetDimensions int // if >0, request MRL truncation to this size (e.g., 3072 for qwen3-embedding:8b)
