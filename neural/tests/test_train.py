@@ -188,6 +188,55 @@ def test_model_versioning() -> None:
         assert get_next_version(os.path.join(tmpdir, "nonexistent")) == 1
 
 
+def test_train_from_checkpoint(sample_records: list[dict]) -> None:
+    """Passing from_checkpoint uses that path as the source model instead of base_model."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        data_dir = os.path.join(tmpdir, "data")
+        model_dir = os.path.join(tmpdir, "models")
+        os.makedirs(data_dir)
+
+        records = sample_records * 40  # 120 samples
+        _write_jsonl(os.path.join(data_dir, "train.jsonl"), records)
+
+        mock_model = MagicMock()
+        mock_model.predict.return_value = [0.5] * 12
+
+        mock_evaluator = MagicMock()
+        mock_evaluator.return_value = 0.75
+
+        mock_dataloader = MagicMock()
+        mock_dataloader.__len__ = MagicMock(return_value=7)
+
+        checkpoint_path = "/some/model/v1"
+
+        captured_source: list[str] = []
+
+        original_cross_encoder = MagicMock(return_value=mock_model)
+
+        def capturing_cross_encoder(source, **kwargs):
+            captured_source.append(source)
+            return mock_model
+
+        with patch("sentence_transformers.CrossEncoder", side_effect=capturing_cross_encoder), \
+             patch("sentence_transformers.cross_encoder.evaluation.CECorrelationEvaluator", return_value=mock_evaluator), \
+             patch("torch.utils.data.DataLoader", return_value=mock_dataloader), \
+             patch("sentence_transformers.InputExample", MagicMock(side_effect=lambda texts, label: MagicMock(texts=texts, label=label))):
+            result = train(
+                data_dir=data_dir,
+                model_dir=model_dir,
+                base_model="cross-encoder/ms-marco-MiniLM-L-6-v2",
+                epochs=1,
+                batch_size=16,
+                min_samples=10,
+                from_checkpoint=checkpoint_path,
+            )
+
+        # The checkpoint path — not base_model — must have been passed to CrossEncoder
+        assert captured_source[0] == checkpoint_path
+        assert not result.skipped
+        assert result.version == 1
+
+
 def test_min_samples_skip() -> None:
     """Training is skipped when sample count is below threshold."""
     with tempfile.TemporaryDirectory() as tmpdir:

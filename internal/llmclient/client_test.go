@@ -114,6 +114,34 @@ func TestCompleteWithUsageOpenAI(t *testing.T) {
 	}
 }
 
+func TestCompleteWithUsageOllama(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/generate" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		resp := OllamaGenerateResponse{
+			Response: "ollama usage response",
+			Done:     true,
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	c := New(Config{Provider: "ollama", Model: "llama3", BaseURL: server.URL})
+
+	text, tokens, err := c.CompleteWithUsage(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("CompleteWithUsage failed: %v", err)
+	}
+	if text != "ollama usage response" {
+		t.Errorf("expected 'ollama usage response', got %q", text)
+	}
+	if tokens != 0 {
+		t.Errorf("expected tokens=0 for Ollama (no usage reporting), got %d", tokens)
+	}
+}
+
 func TestCompleteOllama(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/generate" {

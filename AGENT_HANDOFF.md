@@ -39,12 +39,28 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness tracking, AR-3 LLM intelligence)
   Feature docs: docs/features/rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
-- FSD-2026-001 Gap Closure — COMPLETE (GAP-01 through GAP-20 + F12/F15-F18, 65 files changed, 8 new endpoints)
-  Remaining FSD items: NR-4 (training pipeline), F21 (LLM client dedup), NR-5/FSD-Final (docs + CI + acceptance)
-- CI: Build/Lint/Security/Unit Tests/Integration/Sidecar ALL GREEN as of 2026-03-19
+- FSD-2026-001 Gap Closure — COMPLETE (GAP-01 through GAP-20 + F12/F15-F18 + NR-4 + F21, 65 files changed, 8 new endpoints)
+  Remaining FSD items: NR-5/FSD-Final (acceptance script, docker-compose sidecar service, Makefile targets)
+- Debian Native Packaging — COMPLETE (.deb via goreleaser nfpms, APT repo via GitHub Pages, AUR PKGBUILD)
+  apt-mdemg submodule at packaging/apt-mdemg, secrets APT_SIGNING_KEY + APT_REPO_TOKEN configured
+- CI: Build/Lint/Security/Unit Tests/Integration/Sidecar ALL GREEN as of 2026-03-20
   UATS: 297 passed, 0 failed (11 skipped as llm_required — expected in CI)
 
-LAST SESSION (2026-03-19):
+LAST SESSION (2026-03-20):
+- Debian Native Packaging (.deb + APT Repository):
+  - goreleaser nfpms section: .deb generation for linux/amd64 + linux/arm64 with man pages, systemd template units, UxTS plugin manifest
+  - Package scripts: postinst.sh (daemon-reload), prerm.sh (stop service), postrm.sh (cleanup on purge)
+  - apt-publish.yml: CI workflow triggered after Release, builds APT repo structure, GPG signs, pushes to apt-mdemg gh-dev01-pages
+  - apt-mdemg repo: initialized, GitHub Pages enabled on gh-dev01-pages branch (https://reh3376.github.io/apt-mdemg/)
+  - Added as submodule at packaging/apt-mdemg (SUB-REPO 6)
+  - AUR PKGBUILD template at packaging/aur/PKGBUILD for Arch Linux users
+  - GPG signing key generated, APT_SIGNING_KEY + APT_REPO_TOKEN secrets added to mdemg repo
+  - Docker as recommends (not hard dependency), Flatpak rejected (sandbox incompatible with Docker)
+  - mdemg_linux README updated: APT as Method A, curl installer as Method B, tarball as Method C
+  - CLAUDE.md updated with SUB-REPO 6 entry
+  - PR #162 merged, all CI green
+
+PREVIOUS SESSION (2026-03-19):
 - FSD-2026-001 Constraint Lifecycle & Gap Closure (GAP-01 through GAP-20):
   - F1: PreToolUse constraint enforcement hook + GET /v1/guardrail/events endpoint
   - F2a/F2b: Contradiction detection with embedding similarity, heuristic negation, and NLI sidecar path
@@ -193,15 +209,16 @@ WHAT REMAINS TO BE DONE:
 5. TESTING: ~2 endpoints still need UATS specs (jobs SSE — not UATS-testable due to streaming, spaces CRUD partial)
 6. CLEANUP: 7 stale legacy binaries in bin/ (extract-symbols, ingest-codebase, mcp-server,
    mdemg-ingest, mdemg-server, reset-db, server) — deletion blocked by pre-bash-check hook
-7. VISION: VS Code extension, Cursor integration, real-time memory sidebar (Phase 4 partial)
-8. BENCHMARKING: Run ANN optimization benchmark to measure retrieval quality improvement vs baseline (0.783 mean score)
+7. VISION: VS Code extension (Phase VSX-1 through VSX-5, ~20-28 dev-days)
+8. BENCHMARKING: ~~Run ANN optimization benchmark~~ DONE (0.85 mean score, up from 0.783 baseline)
 9. DOCUMENTATION: ~~Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags~~ DONE (committed in submodules 2026-03-16)
 10. DOCUMENTATION: Create `docs/specs/phase-fsd-constraint-lifecycle.md` spec document for FSD-2026-001
 11. DOCUMENTATION: Update homebrew-mdemg docs for 8 new FSD-2026-001 endpoints and 38 new config params
-12. FSD: NR-4 — Python training pipeline (fine-tune cross-encoder from collected JSONL data)
-13. FSD: F21 — LLM client deduplication (extract `internal/llmclient/` package, ~500 lines across 5 packages)
+12. FSD: ~~NR-4~~ DONE — Python training pipeline (train.py, evaluate.py, model versioning, CLI entrypoints in `plugins/uxts-module/`)
+13. FSD: ~~F21~~ DONE — LLM client deduplication (`internal/llmclient/` package, 725 lines of duplication removed across 5 packages)
 14. FSD: NR-5 + FSD-Final — Acceptance script (`scripts/fsd-acceptance.sh`), docker-compose sidecar service, Makefile targets
 15. CI: UATS runner counts `llm_required` tag exclusions as "errors" — update runner to treat excluded tags as skips, not errors
+16. PACKAGING: ~~Debian .deb + APT repository~~ DONE (goreleaser nfpms, apt-mdemg repo, GPG signing, PR #162)
 
 KEY DOCUMENTS (read in order):
 1. VISION.md — Core purpose, architecture philosophy, success metrics
@@ -666,6 +683,7 @@ This index keeps phase plans formalized by linking each phase to the primary doc
 - **Phase S16b (Complete)**: Guided Instance Removal Wizard — multi-step wizard replacing basic teardown buttons in companion apps. Flow: confirm (instance info + dry-run preview) → export decision → export setup (profile picker + file save dialog) → executing (spinner) → result (changes list + backup path). macOS: `TeardownWizardView.swift` (SwiftUI sheet), "Remove Instance..." in OverviewTab, ConfigTab, and instance context menu. Linux: `teardown-wizard.js` (modal overlay), "Remove Instance..." in Config tab, `default_export_path` Rust command. Feature doc: `docs/features/teardown.md`.
 - **Phase D (Validation)**: 2nd codebase benchmark (`docs/archive/benchmarks/plc-gbt/BENCHMARK_SUMMARY.md`, 0.724 avg), scale test 28K nodes (`docs/architecture/benchmarks/SCALE_TEST_RESULTS.md`), 14 architecture docs in `docs/architecture/`.
 - **Space Pruning Framework**: Go: `internal/api/handlers_admin.go` (~420 lines — 3 handlers + `runAutoSpacePrune` shared logic + batch deletion). Modified: `internal/retrieval/service.go` (TapRoot MERGE + `IsPrunableSpace`), `internal/transfer/importer.go`, `internal/models/models.go` (6 structs), `internal/api/server.go` (3 routes + `StartSpacePruneScheduler`/`StopSpacePruneScheduler`), `internal/config/config.go` (`SpacePruneIntervalHours`), `cmd/server/main.go` (scheduler startup). JSON: `docs/api/api-spec/uats/specs/admin_spaces_list.uats.json`, `admin_spaces_update.uats.json`, `admin_spaces_prune.uats.json`. Config: `SPACE_PRUNE_INTERVAL_HOURS` (default 24, 0=disabled). Endpoints: `GET /v1/admin/spaces`, `PATCH /v1/admin/spaces/{id}`, `POST /v1/admin/spaces/prune`. Auto-prune scheduler runs on configurable interval (ticker-based goroutine, follows `StartContextCoolerProcessing` pattern).
+- **Debian Native Packaging (Complete)**: `.deb` package generation via GoReleaser nfpms plugin for linux/amd64 + linux/arm64. Packages include CLI binary (`/usr/bin/mdemg`), man pages (`/usr/share/man/man1/`), systemd template units (`/usr/lib/systemd/system/mdemg@.service`, `mdemg-rsic@.service`, `mdemg-rsic@.timer`), UxTS plugin manifest (`/usr/share/mdemg/plugins/uxts-module/`). Docker listed as `recommends` (not hard dependency). APT repository hosted on GitHub Pages (`reh3376/apt-mdemg` repo, `gh-dev01-pages` branch) with GPG-signed Release files, automated by `apt-publish.yml` workflow triggered after each release. AUR PKGBUILD template for Arch Linux. Flatpak evaluated and rejected (Docker dependency incompatible with sandbox). Config: `.goreleaser.yaml` (nfpms section). Scripts: `packaging/mdemg_linux/scripts/postinst.sh`, `prerm.sh`, `postrm.sh`. CI: `.github/workflows/apt-publish.yml`. Secrets: `APT_SIGNING_KEY` (GPG), `APT_REPO_TOKEN` (PAT). Submodule: `packaging/apt-mdemg`. AUR: `packaging/aur/PKGBUILD`. PR #162.
 - **Phase FSD-2026-001 (Complete)**: FSD-2026-001 Constraint Lifecycle & Gap Closure — 20 gaps from the Functional Spec Document addressed across 18 sub-phases (F1–F20, NR-1–NR-3). Closes GAP-01 through GAP-20 including constraint enforcement hooks, contradiction detection, effectiveness feedback persistence, cross-constraint conflict detection, confidence promotion signals, NLI classification, scope filtering, determinism scoring, Jiminy latency optimization, configurable dimension weights, prompt injection sanitization, and authority-level filtering. Neural sidecar service (Python FastAPI) provides NLI inference and cross-encoder reranking. 33 new files, 8 new API endpoints, 38 new config env vars (all default disabled), 12 new UATS specs, 2 new Neo4j migrations (V0020, V0021). Spec: `docs/specs/phase-fsd-constraint-lifecycle.md`. Go: `internal/jiminy/persistence.go`, `internal/jiminy/confidence_updater.go`, `internal/jiminy/cache.go`, `internal/hidden/constraint_conflicts.go`, `internal/conversation/contradiction.go`, `internal/conversation/nli_client.go`, `internal/conversation/nli_classifier.go`, `internal/metrics/determinism.go`, `internal/retrieval/rerank_neural.go`, `internal/retrieval/rerank_collector.go`, `internal/sanitize/sanitize.go`, `internal/sanitize/sanitize_test.go`, `internal/api/handlers_constraint_metrics.go`, `internal/api/handlers_constraint_conflicts.go`, `internal/api/handlers_constraint_scope.go`, `internal/api/handlers_determinism.go`, `internal/api/handlers_neural.go`. Migrations: `migrations/V0020__constraint_lifecycle.cypher`, `migrations/V0021__constraint_conflicts.cypher`. Python sidecar: `neural/pyproject.toml`, `neural/neural_sidecar/__init__.py`, `neural/neural_sidecar/app.py`, `neural/neural_sidecar/reranker.py`, `neural/neural_sidecar/nli.py`, `neural/neural_sidecar/schemas.py`, `neural/neural_sidecar/config.py`, `neural/neural_sidecar/tests/test_app.py`, `neural/neural_sidecar/tests/test_reranker.py`, `neural/neural_sidecar/tests/test_nli.py`. New endpoints: `GET /v1/guardrail/events`, `GET /v1/constraints/effectiveness`, `POST /v1/constraints/detect-conflicts`, `GET /v1/constraints/conflicts`, `PATCH /v1/constraints/conflicts/{id}/resolve`, `PATCH /v1/constraints/scope/{node_id}`, `GET /v1/metrics/determinism`, `GET /v1/neural/status`. Test results: 171 UATS specs (100% pass rate), 0 lint issues, all Go tests passing.
 
 ---
