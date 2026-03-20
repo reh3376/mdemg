@@ -4,18 +4,15 @@
 package retrieval
 
 import (
-	"bytes"
 	"container/list"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // IntentTranslator rewrites a conversational query into keyword-dense text
@@ -41,6 +38,7 @@ type IntentConfig struct {
 type LLMIntentTranslator struct {
 	cfg        IntentConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 
 	// LRU cache for translated queries (deterministic at temp=0.0)
 	cacheMu   sync.Mutex
@@ -56,12 +54,25 @@ type intentCacheEntry struct {
 
 // NewLLMIntentTranslator creates a new LLM-based intent translator.
 func NewLLMIntentTranslator(cfg IntentConfig, cbRegistry *circuitbreaker.Registry) *LLMIntentTranslator {
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
 	return &LLMIntentTranslator{
 		cfg:        cfg,
 		cbRegistry: cbRegistry,
-		cacheMap:   make(map[string]*list.Element, 256),
-		cacheList:  list.New(),
-		cacheCap:   256,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
+		cacheMap:  make(map[string]*list.Element, 256),
+		cacheList: list.New(),
+		cacheCap:  256,
 	}
 }
 
@@ -116,14 +127,41 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
+	msgs := []llmclient.Message{
+		{Role: "system", Content: intentSystemPrompt},
+		{Role: "user", Content: query},
+	}
+
+	maxTokens := t.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 150
+	}
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+
+	cbName := "openai-intent"
+	if t.cfg.Provider == "ollama" {
+		cbName = "ollama-intent"
+	}
+
 	var translated string
 	var err error
 
-	switch t.cfg.Provider {
-	case "ollama":
-		translated, err = t.translateWithOllama(timeoutCtx, query)
-	default: // "openai" or unset
-		translated, err = t.translateWithOpenAI(timeoutCtx, query)
+	if t.cbRegistry != nil {
+		cb := t.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			translated, innerErr = t.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return query, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		translated, err = t.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -156,171 +194,3 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 	return translated, nil
 }
 
-// --- OpenAI integration ---
-
-// Local copies of request/response types (follows established duplication pattern in rerank.go, synthesis.go)
-type intentOpenAIChatRequest struct {
-	Model     string                `json:"model"`
-	Messages  []intentOpenAIMessage `json:"messages"`
-	MaxTokens int                   `json:"max_completion_tokens"`
-}
-
-type intentOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type intentOpenAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Usage struct {
-		TotalTokens int `json:"total_tokens"`
-	} `json:"usage"`
-}
-
-func (t *LLMIntentTranslator) translateWithOpenAI(ctx context.Context, query string) (string, error) {
-	if t.cbRegistry != nil {
-		cb := t.cbRegistry.Get("openai-intent")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = t.doTranslateWithOpenAI(ctx, query)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai intent circuit breaker open")
-		}
-		return result, err
-	}
-	return t.doTranslateWithOpenAI(ctx, query)
-}
-
-func (t *LLMIntentTranslator) doTranslateWithOpenAI(ctx context.Context, query string) (string, error) {
-	maxTokens := t.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 150
-	}
-
-	if maxTokens < 2000 {
-		maxTokens = 2000 // Reasoning models consume tokens for internal thought
-	}
-
-	reqBody := intentOpenAIChatRequest{
-		Model: t.cfg.Model,
-		Messages: []intentOpenAIMessage{
-			{Role: "system", Content: intentSystemPrompt},
-			{Role: "user", Content: query},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := t.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+t.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp intentOpenAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama integration ---
-
-type intentOllamaGenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-type intentOllamaGenerateResponse struct {
-	Response string `json:"response"`
-}
-
-func (t *LLMIntentTranslator) translateWithOllama(ctx context.Context, query string) (string, error) {
-	if t.cbRegistry != nil {
-		cb := t.cbRegistry.Get("ollama-intent")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = t.doTranslateWithOllama(ctx, query)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama intent circuit breaker open")
-		}
-		return result, err
-	}
-	return t.doTranslateWithOllama(ctx, query)
-}
-
-func (t *LLMIntentTranslator) doTranslateWithOllama(ctx context.Context, query string) (string, error) {
-	// Build prompt with system instructions inlined (Ollama generate API uses single prompt)
-	prompt := intentSystemPrompt + "\n\nUser query:\n" + query
-
-	reqBody := intentOllamaGenerateRequest{
-		Model:  t.cfg.Model,
-		Prompt: prompt,
-		Stream: false,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := t.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp intentOllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	return strings.TrimSpace(ollamaResp.Response), nil
-}

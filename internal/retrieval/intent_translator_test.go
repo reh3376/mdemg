@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"mdemg/internal/llmclient"
 )
 
 func TestLLMIntentTranslator_DisabledReturnsOriginal(t *testing.T) {
@@ -49,25 +51,17 @@ func TestLLMIntentTranslator_EmptyQueryReturnsOriginal(t *testing.T) {
 
 func TestLLMIntentTranslator_OpenAISuccess(t *testing.T) {
 	// Capture the request to verify system+user messages and temperature
-	var capturedReq intentOpenAIChatRequest
+	var capturedReq llmclient.OpenAIChatRequest
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&capturedReq); err != nil {
 			t.Errorf("failed to decode request: %v", err)
 		}
-		resp := intentOpenAIChatResponse{
-			Choices: []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			}{
-				{Message: struct {
-					Content string `json:"content"`
-				}{Content: "Redis session state architecture decision caching"}},
+		resp := llmclient.OpenAIChatResponse{
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: "Redis session state architecture decision caching"}},
 			},
-			Usage: struct {
-				TotalTokens int `json:"total_tokens"`
-			}{TotalTokens: 25},
+			Usage: llmclient.OpenAIUsage{TotalTokens: 25},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -138,7 +132,7 @@ func TestLLMIntentTranslator_OpenAIFailureFallback(t *testing.T) {
 
 func TestLLMIntentTranslator_OllamaSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := intentOllamaGenerateResponse{
+		resp := llmclient.OllamaGenerateResponse{
 			Response: "Ollama keyword dense rewrite output",
 		}
 		w.Header().Set("Content-Type", "application/json")

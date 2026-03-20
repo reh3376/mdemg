@@ -5,19 +5,15 @@
 package consulting
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
-	"mdemg/internal/sanitize"
-
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
+	"mdemg/internal/sanitize"
 )
 
 // Synthesizer defines the interface for LLM-based synthesis of graph evidence.
@@ -60,13 +56,27 @@ type SynthesisConfig struct {
 type LLMSynthesizer struct {
 	cfg        SynthesisConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 }
 
 // NewLLMSynthesizer creates a new LLM-based synthesizer.
 func NewLLMSynthesizer(cfg SynthesisConfig, cbRegistry *circuitbreaker.Registry) *LLMSynthesizer {
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
 	return &LLMSynthesizer{
 		cfg:        cfg,
 		cbRegistry: cbRegistry,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
 	}
 }
 
@@ -91,15 +101,41 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 
 	start := time.Now()
 
+	msgs := []llmclient.Message{
+		{Role: "user", Content: prompt},
+	}
+
+	maxTokens := s.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 2000
+	}
+	if maxTokens < 2000 {
+		maxTokens = 2000 // Reasoning models consume tokens for internal thought
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+
+	cbName := "openai-synthesis"
+	if s.cfg.Provider == "ollama" {
+		cbName = "ollama-synthesis"
+	}
+
 	var narrative string
 	var tokensUsed int
 	var err error
 
-	switch s.cfg.Provider {
-	case "ollama":
-		narrative, tokensUsed, err = s.synthesizeWithOllama(timeoutCtx, prompt)
-	default: // "openai" or unset
-		narrative, tokensUsed, err = s.synthesizeWithOpenAI(timeoutCtx, prompt)
+	if s.cbRegistry != nil {
+		cb := s.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			narrative, tokensUsed, innerErr = s.llm.CompleteWithUsage(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return SynthesisResult{}, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		narrative, tokensUsed, err = s.llm.CompleteWithUsage(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -113,173 +149,6 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 		Provider:   s.cfg.Provider,
 		Model:      s.cfg.Model,
 	}, nil
-}
-
-// --- OpenAI integration ---
-
-// Local copies of request/response types (follows established duplication pattern in rerank.go)
-type synthOpenAIChatRequest struct {
-	Model     string               `json:"model"`
-	Messages  []synthOpenAIMessage `json:"messages"`
-	MaxTokens int                  `json:"max_completion_tokens"`
-}
-
-type synthOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type synthOpenAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Usage struct {
-		TotalTokens int `json:"total_tokens"`
-	} `json:"usage"`
-}
-
-func (s *LLMSynthesizer) synthesizeWithOpenAI(ctx context.Context, prompt string) (string, int, error) {
-	if s.cbRegistry != nil {
-		cb := s.cbRegistry.Get("openai-synthesis")
-		var narrative string
-		var tokens int
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			narrative, tokens, innerErr = s.doSynthesizeWithOpenAI(ctx, prompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", 0, fmt.Errorf("openai synthesis circuit breaker open")
-		}
-		return narrative, tokens, err
-	}
-	return s.doSynthesizeWithOpenAI(ctx, prompt)
-}
-
-func (s *LLMSynthesizer) doSynthesizeWithOpenAI(ctx context.Context, prompt string) (string, int, error) {
-	maxTokens := s.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 2000
-	}
-
-	if maxTokens < 2000 {
-		maxTokens = 2000 // Reasoning models consume tokens for internal thought
-	}
-
-	reqBody := synthOpenAIChatRequest{
-		Model: s.cfg.Model,
-		Messages: []synthOpenAIMessage{
-			{Role: "user", Content: prompt},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", 0, fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := s.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", 0, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", 0, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", 0, fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp synthOpenAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", 0, fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", 0, fmt.Errorf("no choices in response")
-	}
-
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), chatResp.Usage.TotalTokens, nil
-}
-
-// --- Ollama integration ---
-
-type synthOllamaGenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-type synthOllamaGenerateResponse struct {
-	Response string `json:"response"`
-}
-
-func (s *LLMSynthesizer) synthesizeWithOllama(ctx context.Context, prompt string) (string, int, error) {
-	if s.cbRegistry != nil {
-		cb := s.cbRegistry.Get("ollama-synthesis")
-		var narrative string
-		var tokens int
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			narrative, tokens, innerErr = s.doSynthesizeWithOllama(ctx, prompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", 0, fmt.Errorf("ollama synthesis circuit breaker open")
-		}
-		return narrative, tokens, err
-	}
-	return s.doSynthesizeWithOllama(ctx, prompt)
-}
-
-func (s *LLMSynthesizer) doSynthesizeWithOllama(ctx context.Context, prompt string) (string, int, error) {
-	reqBody := synthOllamaGenerateRequest{
-		Model:  s.cfg.Model,
-		Prompt: prompt,
-		Stream: false,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", 0, fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := s.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", 0, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", 0, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", 0, fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp synthOllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", 0, fmt.Errorf("decode response: %w", err)
-	}
-
-	return strings.TrimSpace(ollamaResp.Response), 0, nil // Ollama doesn't report token usage
 }
 
 // --- Prompt construction (THE COGNITIVE CORE) ---

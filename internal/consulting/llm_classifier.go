@@ -4,18 +4,16 @@
 package consulting
 
 import (
-	"bytes"
 	"container/list"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // ConstraintClassifierConfig holds configuration for the LLM constraint classifier.
@@ -42,6 +40,7 @@ type ConstraintClassification struct {
 type ConstraintClassifier struct {
 	cfg        ConstraintClassifierConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 
 	// LRU cache
 	cacheMu   sync.Mutex
@@ -57,12 +56,25 @@ type constraintCacheEntry struct {
 
 // NewConstraintClassifier creates a new LLM-powered constraint classifier.
 func NewConstraintClassifier(cfg ConstraintClassifierConfig, cbRegistry *circuitbreaker.Registry) *ConstraintClassifier {
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
 	return &ConstraintClassifier{
 		cfg:        cfg,
 		cbRegistry: cbRegistry,
-		cacheMap:   make(map[string]*list.Element, 512),
-		cacheList:  list.New(),
-		cacheCap:   512,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
+		cacheMap:  make(map[string]*list.Element, 512),
+		cacheList: list.New(),
+		cacheCap:  512,
 	}
 }
 
@@ -100,14 +112,42 @@ func (cc *ConstraintClassifier) Classify(ctx context.Context, nodeID, text strin
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
+	msgs := []llmclient.Message{
+		{Role: "system", Content: constraintClassifySystemPrompt},
+		{Role: "user", Content: text},
+	}
+
+	maxTokens := cc.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 500
+	}
+
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+	if cc.cfg.Provider == "ollama" {
+		opts.Format = ollamaConstraintSchema
+		opts.Options = map[string]any{"temperature": 0.1}
+	}
+
+	cbName := "openai-constraint-classify"
+	if cc.cfg.Provider == "ollama" {
+		cbName = "ollama-constraint-classify"
+	}
+
 	var raw string
 	var err error
 
-	switch cc.cfg.Provider {
-	case "ollama":
-		raw, err = cc.callOllama(timeoutCtx, text)
-	default:
-		raw, err = cc.callOpenAI(timeoutCtx, text)
+	if cc.cbRegistry != nil {
+		cb := cc.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			raw, innerErr = cc.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		raw, err = cc.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -163,107 +203,7 @@ func (cc *ConstraintClassifier) cachePut(nodeID string, result ConstraintClassif
 	cc.cacheMap[nodeID] = elem
 }
 
-// --- OpenAI ---
-
-func (cc *ConstraintClassifier) callOpenAI(ctx context.Context, text string) (string, error) {
-	if cc.cbRegistry != nil {
-		cb := cc.cbRegistry.Get("openai-constraint-classify")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = cc.doCallOpenAI(ctx, text)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai constraint-classify circuit breaker open")
-		}
-		return result, err
-	}
-	return cc.doCallOpenAI(ctx, text)
-}
-
-type constraintOpenAIRequest struct {
-	Model     string                    `json:"model"`
-	Messages  []constraintOpenAIMessage `json:"messages"`
-	MaxTokens int                       `json:"max_completion_tokens"`
-}
-
-type constraintOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type constraintOpenAIResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-func (cc *ConstraintClassifier) doCallOpenAI(ctx context.Context, text string) (string, error) {
-	maxTokens := cc.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 500
-	}
-
-	reqBody := constraintOpenAIRequest{
-		Model: cc.cfg.Model,
-		Messages: []constraintOpenAIMessage{
-			{Role: "system", Content: constraintClassifySystemPrompt},
-			{Role: "user", Content: text},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := cc.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+cc.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp constraintOpenAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama ---
-
-type constraintOllamaRequest struct {
-	Model   string          `json:"model"`
-	Prompt  string          `json:"prompt"`
-	Stream  bool            `json:"stream"`
-	Format  json.RawMessage `json:"format,omitempty"`
-	Options map[string]any  `json:"options,omitempty"`
-}
-
-type constraintOllamaResponse struct {
-	Response string `json:"response"`
-}
-
+// ollamaConstraintSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
 var ollamaConstraintSchema = json.RawMessage(`{
 	"type": "object",
 	"properties": {
@@ -273,64 +213,6 @@ var ollamaConstraintSchema = json.RawMessage(`{
 	"required": ["type", "summary"]
 }`)
 
-func (cc *ConstraintClassifier) callOllama(ctx context.Context, text string) (string, error) {
-	if cc.cbRegistry != nil {
-		cb := cc.cbRegistry.Get("ollama-constraint-classify")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = cc.doCallOllama(ctx, text)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama constraint-classify circuit breaker open")
-		}
-		return result, err
-	}
-	return cc.doCallOllama(ctx, text)
-}
-
-func (cc *ConstraintClassifier) doCallOllama(ctx context.Context, text string) (string, error) {
-	prompt := constraintClassifySystemPrompt + "\n\n" + text
-
-	reqBody := constraintOllamaRequest{
-		Model:   cc.cfg.Model,
-		Prompt:  prompt,
-		Stream:  false,
-		Format:  ollamaConstraintSchema,
-		Options: map[string]any{"temperature": 0.1},
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := cc.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp constraintOllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	return strings.TrimSpace(ollamaResp.Response), nil
-}
-
 // --- Response parsing ---
 
 var validConstraintTypes = map[string]bool{
@@ -338,7 +220,7 @@ var validConstraintTypes = map[string]bool{
 }
 
 func (cc *ConstraintClassifier) parseResponse(raw string) (*ConstraintClassification, error) {
-	raw = stripConstraintCodeFence(raw)
+	raw = llmclient.StripCodeFence(raw)
 	raw = strings.TrimSpace(raw)
 
 	var result ConstraintClassification
@@ -351,12 +233,3 @@ func (cc *ConstraintClassifier) parseResponse(raw string) (*ConstraintClassifica
 	return &result, nil
 }
 
-func stripConstraintCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if after, ok := strings.CutPrefix(s, "```json"); ok {
-		s = strings.TrimSuffix(after, "```")
-	} else if after, ok := strings.CutPrefix(s, "```"); ok {
-		s = strings.TrimSuffix(after, "```")
-	}
-	return strings.TrimSpace(s)
-}

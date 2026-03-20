@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"mdemg/internal/llmclient"
 )
 
 func TestGeneralizer_StripCodeFence(t *testing.T) {
@@ -18,19 +20,19 @@ func TestGeneralizer_StripCodeFence(t *testing.T) {
 		{"  \n```json\n{\"name\":\"test\"}\n```\n  ", `{"name":"test"}`},
 	}
 	for _, tt := range tests {
-		got := stripCodeFence(tt.input)
+		got := llmclient.StripCodeFence(tt.input)
 		if got != tt.want {
-			t.Errorf("stripCodeFence(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("StripCodeFence(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
 
 func TestGeneralizer_Truncate(t *testing.T) {
-	if got := truncate("short", 10); got != "short" {
-		t.Errorf("truncate short = %q", got)
+	if got := llmclient.TruncateForLog("short", 10); got != "short" {
+		t.Errorf("TruncateForLog short = %q", got)
 	}
-	if got := truncate("a very long string here", 10); got != "a very lon..." {
-		t.Errorf("truncate long = %q", got)
+	if got := llmclient.TruncateForLog("a very long string here", 10); got != "a very lon..." {
+		t.Errorf("TruncateForLog long = %q", got)
 	}
 }
 

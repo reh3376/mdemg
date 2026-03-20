@@ -767,16 +767,6 @@ func TestProgressDetection(t *testing.T) {
 }
 
 func TestNameSanitization(t *testing.T) {
-	r := NewReclassifier(ReclassifierConfig{
-		Enabled:   true,
-		Threshold: 0.25,
-		Provider:  "openai",
-		Model:     "test",
-		MaxTokens: 2000,
-		TimeoutMs: 5000,
-		OpenAIKey: "test-key",
-	}, nil)
-
 	// Simulate LLM response with problematic names containing dashes, dots, slashes, spaces
 	rawSubCats := []SubCategory{
 		{Name: "v2.0_services", Keywords: []string{"service"}, Description: "V2 services"},
@@ -797,7 +787,17 @@ func TestNameSanitization(t *testing.T) {
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer mockServer.Close()
-	r.cfg.OpenAIURL = mockServer.URL
+
+	r := NewReclassifier(ReclassifierConfig{
+		Enabled:   true,
+		Threshold: 0.25,
+		Provider:  "openai",
+		Model:     "test",
+		MaxTokens: 2000,
+		TimeoutMs: 5000,
+		OpenAIKey: "test-key",
+		OpenAIURL: mockServer.URL,
+	}, nil)
 
 	subCats, err := r.proposeSubCategories(context.Background(), "typescript", 100, []string{"Module: something"})
 	if err != nil {

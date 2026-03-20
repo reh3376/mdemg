@@ -5,19 +5,17 @@
 package hidden
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math/rand/v2"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // reclassSep is the separator between parent and child category in taxonomy keys.
@@ -52,6 +50,7 @@ type SubCategory struct {
 type Reclassifier struct {
 	cfg        ReclassifierConfig
 	cbRegistry *circuitbreaker.Registry
+	llm        *llmclient.Client
 
 	// CategoryDescriptions maps final category key → LLM description.
 	// Populated during reclassification, used for edge labeling.
@@ -60,9 +59,22 @@ type Reclassifier struct {
 
 // NewReclassifier creates a new reclassifier with the given config and optional circuit breaker registry.
 func NewReclassifier(cfg ReclassifierConfig, cbRegistry *circuitbreaker.Registry) *Reclassifier {
+	baseURL := cfg.OpenAIURL
+	apiKey := cfg.OpenAIKey
+	if cfg.Provider == "ollama" {
+		baseURL = cfg.OllamaURL
+	}
+
 	return &Reclassifier{
-		cfg:                  cfg,
-		cbRegistry:           cbRegistry,
+		cfg:        cfg,
+		cbRegistry: cbRegistry,
+		llm: llmclient.New(llmclient.Config{
+			Provider:  cfg.Provider,
+			Model:     cfg.Model,
+			APIKey:    apiKey,
+			BaseURL:   baseURL,
+			TimeoutMs: cfg.TimeoutMs,
+		}),
 		CategoryDescriptions: make(map[string]string),
 	}
 }
@@ -350,14 +362,43 @@ func (r *Reclassifier) proposeSubCategories(ctx context.Context, category string
 
 	sysPrompt := buildReclassSystemPrompt(r.cfg.Threshold)
 
+	msgs := []llmclient.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: userPrompt},
+	}
+
+	maxTokens := r.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 2000
+	}
+
+	temp := 0.0
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens, Temperature: &temp}
+	if r.cfg.Provider == "ollama" {
+		opts.Format = ollamaReclassSchema
+		opts.Options = map[string]any{"temperature": 0}
+	}
+
+	cbName := "openai-reclassifier"
+	if r.cfg.Provider == "ollama" {
+		cbName = "ollama-reclassifier"
+	}
+
 	var raw string
 	var err error
 
-	switch r.cfg.Provider {
-	case "ollama":
-		raw, err = r.callOllama(timeoutCtx, sysPrompt, userPrompt)
-	default: // "openai" or unset
-		raw, err = r.callOpenAI(timeoutCtx, sysPrompt, userPrompt)
+	if r.cbRegistry != nil {
+		cb := r.cbRegistry.Get(cbName)
+		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
+			var innerErr error
+			raw, innerErr = r.llm.Complete(ctx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", cbName)
+		}
+	} else {
+		raw, err = r.llm.Complete(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {
@@ -365,12 +406,12 @@ func (r *Reclassifier) proposeSubCategories(ctx context.Context, category string
 	}
 
 	// Strip markdown code fences if present
-	raw = stripCodeFence(raw)
+	raw = llmclient.StripCodeFence(raw)
 	raw = strings.TrimSpace(raw)
 
 	var subCats []SubCategory
 	if err := json.Unmarshal([]byte(raw), &subCats); err != nil {
-		return nil, fmt.Errorf("invalid JSON from LLM: %w (raw: %s)", err, truncateForLog(raw, 200))
+		return nil, fmt.Errorf("invalid JSON from LLM: %w (raw: %s)", err, llmclient.TruncateForLog(raw, 200))
 	}
 
 	// Validate and sanitize
@@ -468,112 +509,6 @@ func resolveMiscName(subCats []SubCategory) string {
 	return "misc"
 }
 
-// --- OpenAI integration ---
-
-type reclassOpenAIChatRequest struct {
-	Model       string                 `json:"model"`
-	Messages    []reclassOpenAIMessage `json:"messages"`
-	MaxTokens   int                    `json:"max_completion_tokens"`
-	Temperature float64                `json:"temperature"`
-}
-
-type reclassOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type reclassOpenAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
-
-func (r *Reclassifier) callOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	if r.cbRegistry != nil {
-		cb := r.cbRegistry.Get("openai-reclassifier")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = r.doCallOpenAI(ctx, sysPrompt, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai reclassifier circuit breaker open")
-		}
-		return result, err
-	}
-	return r.doCallOpenAI(ctx, sysPrompt, userPrompt)
-}
-
-func (r *Reclassifier) doCallOpenAI(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	maxTokens := r.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 2000
-	}
-
-	reqBody := reclassOpenAIChatRequest{
-		Model: r.cfg.Model,
-		Messages: []reclassOpenAIMessage{
-			{Role: "system", Content: sysPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-		MaxTokens:   maxTokens,
-		Temperature: 0,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := r.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+r.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp reclassOpenAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// --- Ollama integration ---
-
-type reclassOllamaGenerateRequest struct {
-	Model   string          `json:"model"`
-	Prompt  string          `json:"prompt"`
-	Stream  bool            `json:"stream"`
-	Format  json.RawMessage `json:"format,omitempty"`
-	Options map[string]any  `json:"options,omitempty"`
-}
-
-type reclassOllamaGenerateResponse struct {
-	Response string `json:"response"`
-}
-
 // ollamaReclassSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
 var ollamaReclassSchema = json.RawMessage(`{
 	"type": "array",
@@ -587,63 +522,3 @@ var ollamaReclassSchema = json.RawMessage(`{
 		"required": ["name", "keywords", "description"]
 	}
 }`)
-
-func (r *Reclassifier) callOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	if r.cbRegistry != nil {
-		cb := r.cbRegistry.Get("ollama-reclassifier")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = r.doCallOllama(ctx, sysPrompt, userPrompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama reclassifier circuit breaker open")
-		}
-		return result, err
-	}
-	return r.doCallOllama(ctx, sysPrompt, userPrompt)
-}
-
-func (r *Reclassifier) doCallOllama(ctx context.Context, sysPrompt, userPrompt string) (string, error) {
-	prompt := sysPrompt + "\n\n" + userPrompt
-
-	reqBody := reclassOllamaGenerateRequest{
-		Model:   r.cfg.Model,
-		Prompt:  prompt,
-		Stream:  false,
-		Format:  ollamaReclassSchema,
-		Options: map[string]any{"temperature": 0},
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := r.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp reclassOllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	return strings.TrimSpace(ollamaResp.Response), nil
-}
