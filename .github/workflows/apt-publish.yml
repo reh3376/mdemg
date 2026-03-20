@@ -67,9 +67,11 @@ jobs:
       - name: Import GPG signing key
         run: |
           echo "${{ secrets.APT_SIGNING_KEY }}" | base64 -d | gpg --batch --import
-          # Trust the key
+          # Trust the key — import-ownertrust requires 40-char fingerprint, not 16-char key ID
+          FINGERPRINT=$(gpg --list-secret-keys --with-fingerprint 2>/dev/null | grep -A1 '^sec' | grep -oE '[A-F0-9 ]{40,}' | tr -d ' ' | head -1)
+          echo "${FINGERPRINT}:6:" | gpg --import-ownertrust
+          # Extract KEY_ID for the export step (gpg --armor --export accepts key ID)
           KEY_ID=$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep sec | head -1 | awk '{print $2}' | cut -d/ -f2)
-          echo "${KEY_ID}:6:" | gpg --import-ownertrust
           echo "key_id=$KEY_ID" >> "$GITHUB_ENV"
 
       - name: Build APT repository structure
