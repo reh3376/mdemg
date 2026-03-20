@@ -16,3 +16,6 @@
 [submodule "packaging/mdemg-linux-sidebar"]
 	path = packaging/mdemg-linux-sidebar
 	url = https://github.com/reh3376/mdemg-linux-sidebar.git
+[submodule "packaging/apt-mdemg"]
+	path = packaging/apt-mdemg
+	url = https://github.com/reh3376/apt-mdemg.git
