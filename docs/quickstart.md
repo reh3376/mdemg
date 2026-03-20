@@ -6,7 +6,7 @@ Get MDEMG running with your project in under 10 minutes.
 
 - **Docker** — for Neo4j database
 - **Embedding provider** (choose one):
-  - [Ollama](https://ollama.com) (local, free, recommended) — install and run `ollama pull qwen3-embedding:4b`
+  - [Ollama](https://ollama.com) (local, free, recommended) — install and run `ollama pull qwen3-embedding:8b`
   - OpenAI API key — set `OPENAI_API_KEY` in your environment
 
 ## Step 1: Install MDEMG
@@ -179,7 +179,7 @@ MDEMG uses a layered configuration system:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `EMBEDDING_PROVIDER` | `ollama` | `ollama` or `openai` |
-| `OLLAMA_MODEL` | `qwen3-embedding:4b` | Ollama embedding model (1536 dims) |
+| `OLLAMA_MODEL` | `qwen3-embedding:8b` | Ollama embedding model (1536 dims) |
 | `OPENAI_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `NEO4J_URI` | `bolt://localhost:7687` | Neo4j connection URI |
 | `PORT` | `9999` | Server port (auto-allocated if busy) |

@@ -168,14 +168,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var emb embeddings.Embedder
 	if cfg.EmbeddingProvider != "" {
 		embCfg := embeddings.Config{
-			Provider:       cfg.EmbeddingProvider,
-			OpenAIAPIKey:   cfg.OpenAIAPIKey,
-			OpenAIModel:    cfg.OpenAIModel,
-			OpenAIEndpoint: cfg.OpenAIEndpoint,
-			OllamaEndpoint: cfg.OllamaEndpoint,
-			OllamaModel:    cfg.OllamaModel,
-			CacheEnabled:   cfg.EmbeddingCacheEnabled,
-			CacheSize:      cfg.EmbeddingCacheSize,
+			Provider:         cfg.EmbeddingProvider,
+			OpenAIAPIKey:     cfg.OpenAIAPIKey,
+			OpenAIModel:      cfg.OpenAIModel,
+			OpenAIEndpoint:   cfg.OpenAIEndpoint,
+			OllamaEndpoint:   cfg.OllamaEndpoint,
+			OllamaModel:      cfg.OllamaModel,
+			TargetDimensions: cfg.EmbeddingTargetDims,
+			CacheEnabled:     cfg.EmbeddingCacheEnabled,
+			CacheSize:        cfg.EmbeddingCacheSize,
 		}
 		var err error
 		emb, err = embeddings.New(embCfg)

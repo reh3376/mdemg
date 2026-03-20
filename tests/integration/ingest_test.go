@@ -388,7 +388,7 @@ func TestIngestGeneratesEmbedding(t *testing.T) {
 	}
 
 	// Verify embedding dimensions - the provider will return its native dimensions:
-	// - Ollama qwen3-embedding:4b: 1536 dimensions
+	// - Ollama qwen3-embedding:8b: 3072 dimensions (truncated from 4096)
 	// - OpenAI text-embedding-3-small: 1536 dimensions
 	// - OpenAI text-embedding-3-large: 3072 dimensions
 	// We accept any recognized provider's dimensions.

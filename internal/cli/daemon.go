@@ -236,22 +236,30 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 		return fmt.Errorf("server exited immediately — check log: %s", logPath)
 	}
 
-	// Poll for port file (up to 10s)
+	// Poll for port file (up to 30s — Neo4j startup + migrations can be slow)
 	var portStr string
-	deadline := time.Now().Add(10 * time.Second)
+	fmt.Print("Waiting for server... ")
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
+		if !isProcessAlive(daemonPID) {
+			fmt.Println("FAILED")
+			_ = removePID(pidPath)
+			return fmt.Errorf("server exited during startup — check log: %s", logPath)
+		}
 		if p, err := readPortFile(); err == nil && p != "" {
 			portStr = p
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 	}
 
 	if portStr != "" {
+		fmt.Println("ok")
 		fmt.Printf("MDEMG server started (pid=%d, port=%s, log=%s)\n", daemonPID, portStr, logPath)
 	} else {
+		fmt.Println("still starting")
 		fmt.Printf("MDEMG server started (pid=%d, log=%s)\n", daemonPID, logPath)
-		fmt.Println("Note: port file not yet available — server may still be starting")
+		fmt.Println("Tip: run 'mdemg status' to check when it's ready")
 	}
 
 	return nil

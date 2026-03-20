@@ -368,12 +368,13 @@ func reEmbedNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID s
 		return fmt.Errorf("load config: %w", err)
 	}
 	embCfg := embeddings.Config{
-		Provider:       appCfg.EmbeddingProvider,
-		OpenAIAPIKey:   appCfg.OpenAIAPIKey,
-		OpenAIModel:    appCfg.OpenAIModel,
-		OpenAIEndpoint: appCfg.OpenAIEndpoint,
-		OllamaEndpoint: appCfg.OllamaEndpoint,
-		OllamaModel:    appCfg.OllamaModel,
+		Provider:         appCfg.EmbeddingProvider,
+		OpenAIAPIKey:     appCfg.OpenAIAPIKey,
+		OpenAIModel:      appCfg.OpenAIModel,
+		OpenAIEndpoint:   appCfg.OpenAIEndpoint,
+		OllamaEndpoint:   appCfg.OllamaEndpoint,
+		OllamaModel:      appCfg.OllamaModel,
+		TargetDimensions: appCfg.EmbeddingTargetDims,
 	}
 	embedder, err := embeddings.New(embCfg)
 	if err != nil {

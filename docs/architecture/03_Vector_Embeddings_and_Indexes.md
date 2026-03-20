@@ -26,7 +26,7 @@ OPTIONS { indexConfig: {
 }};
 ```
 
-**Note:** Default Ollama model `qwen3-embedding:4b` uses `1536` dimensions (same as OpenAI `text-embedding-3-small`).
+**Note:** Default Ollama model `qwen3-embedding:8b` uses `1536` dimensions (same as OpenAI `text-embedding-3-small`).
 
 ## C) Query the vector index
 

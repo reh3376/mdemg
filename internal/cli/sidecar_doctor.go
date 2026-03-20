@@ -526,7 +526,7 @@ func runOllamaModelsCheck(ollamaStatus string) sidecar.DoctorCheck {
 		}
 	}
 
-	requiredModels := []string{"qwen3-embedding:4b", "llama3.2:3b-instruct-fp16"}
+	requiredModels := []string{"qwen3-embedding:8b", "llama3.2:3b-instruct-fp16"}
 
 	client := &http.Client{Timeout: probeTimeout}
 	resp, err := client.Get("http://localhost:11434/api/tags") //nolint:noctx // diagnostic probe

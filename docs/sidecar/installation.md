@@ -63,7 +63,7 @@ Requires Go 1.24+ and CGO-compatible toolchain.
 4. Ollama installed and running (`ollama serve`).
 5. Required Ollama models pulled:
    ```bash
-   ollama pull qwen3-embedding:4b        # embeddings (1536 dimensions)
+   ollama pull qwen3-embedding:8b        # embeddings (1536 dimensions)
    ollama pull llama3.2:3b-instruct-fp16  # text generation (cognitive features)
    ```
 

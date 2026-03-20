@@ -40,12 +40,13 @@ Reports provider type, model, endpoint reachability, and embedding dimensions.`,
 			}
 
 			embCfg := embeddings.Config{
-				Provider:       cfg.EmbeddingProvider,
-				OpenAIAPIKey:   cfg.OpenAIAPIKey,
-				OpenAIModel:    cfg.OpenAIModel,
-				OpenAIEndpoint: cfg.OpenAIEndpoint,
-				OllamaEndpoint: cfg.OllamaEndpoint,
-				OllamaModel:    cfg.OllamaModel,
+				Provider:         cfg.EmbeddingProvider,
+				OpenAIAPIKey:     cfg.OpenAIAPIKey,
+				OpenAIModel:      cfg.OpenAIModel,
+				OpenAIEndpoint:   cfg.OpenAIEndpoint,
+				OllamaEndpoint:   cfg.OllamaEndpoint,
+				OllamaModel:      cfg.OllamaModel,
+				TargetDimensions: cfg.EmbeddingTargetDims,
 			}
 
 			fmt.Println("Embedding Provider Check")
@@ -62,7 +63,7 @@ Reports provider type, model, endpoint reachability, and embedding dimensions.`,
 				fmt.Println("Or in .mdemg/config.yaml:")
 				fmt.Println("  embedding:")
 				fmt.Println("    provider: ollama")
-				fmt.Println("    model: qwen3-embedding:4b")
+				fmt.Println("    model: qwen3-embedding:8b")
 				return nil
 			}
 
@@ -87,7 +88,7 @@ func checkOllama(cfg embeddings.Config) error {
 	}
 	model := cfg.OllamaModel
 	if model == "" {
-		model = "qwen3-embedding:4b"
+		model = "qwen3-embedding:8b"
 	}
 
 	fmt.Printf("Endpoint: %s\n", endpoint)
@@ -148,8 +149,29 @@ func checkOllama(cfg embeddings.Config) error {
 
 	fmt.Println()
 	fmt.Printf("Dimensions: %d\n", len(vec))
+	printDimensionWarning(len(vec))
 	fmt.Println("Status:     working")
 	return nil
+}
+
+// vectorIndexDimensions is the dimension of the Neo4j vector index (set by migration V0018).
+const vectorIndexDimensions = 3072
+
+func printDimensionWarning(actualDims int) {
+	if actualDims != vectorIndexDimensions {
+		fmt.Println()
+		fmt.Printf("WARNING: Dimension mismatch detected!\n")
+		fmt.Printf("  Model produces:      %d dimensions\n", actualDims)
+		fmt.Printf("  Neo4j index expects: %d dimensions\n", vectorIndexDimensions)
+		fmt.Println()
+		fmt.Println("  Vector operations (recall, retrieve, consolidation) will FAIL.")
+		fmt.Println("  Options:")
+		fmt.Println("    1. Use OpenAI text-embedding-3-large (3072 dims)")
+		fmt.Println("    2. Use Ollama qwen3-embedding:8b (4096 native, truncatable to 3072)")
+		fmt.Println("       ollama pull qwen3-embedding:8b")
+		fmt.Println("       Set EMBEDDING_TARGET_DIMS=3072 in your config")
+		fmt.Println("    3. Recreate the vector index at your model's dimension")
+	}
 }
 
 func checkOpenAI(cfg embeddings.Config) error {
@@ -197,6 +219,7 @@ func checkOpenAI(cfg embeddings.Config) error {
 
 	fmt.Println()
 	fmt.Printf("Dimensions: %d\n", len(vec))
+	printDimensionWarning(len(vec))
 	fmt.Println("Status:     working")
 	return nil
 }

@@ -54,14 +54,14 @@ Requires Go 1.24+ and CGO-compatible toolchain.
 
 ## F4: Ollama Must Be Installed Separately
 
-**What happens:** Ollama is the default provider for both embeddings (`qwen3-embedding:4b`) and text generation (`llama3.2:3b-instruct-fp16`). Sidecar does not install or manage Ollama itself. If Ollama is unavailable, `doctor` reports the `ollama.reachable` check as `warn`, not `fail`. If Ollama is running but required models are missing, `doctor` reports `ollama.models` as `warn` with `ollama pull` remediation commands.
+**What happens:** Ollama is the default provider for both embeddings (`qwen3-embedding:8b`) and text generation (`llama3.2:3b-instruct-fp16`). Sidecar does not install or manage Ollama itself. If Ollama is unavailable, `doctor` reports the `ollama.reachable` check as `warn`, not `fail`. If Ollama is running but required models are missing, `doctor` reports `ollama.models` as `warn` with `ollama pull` remediation commands.
 
 **Workaround:** Install Ollama and pull required models manually:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve &
-ollama pull qwen3-embedding:4b
+ollama pull qwen3-embedding:8b
 ollama pull llama3.2:3b-instruct-fp16
 ```
 

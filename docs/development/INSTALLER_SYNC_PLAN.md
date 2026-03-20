@@ -359,7 +359,7 @@ JIMINY_FRONTIER_MIN_SIM=0.5          # Min cosine similarity for frontiers (defa
 
 ### 4.6 Add Ollama Embedding Dimension Warning (MEDIUM)
 
-**Gap**: Neo4j vector indexes are 3072-dimensional (text-embedding-3-large). The default Ollama model `qwen3-embedding:4b` produces 1536 dimensions. If a user switches from OpenAI to Ollama without recreating the index, all vector queries silently fail.
+**Gap**: Neo4j vector indexes are 3072-dimensional (text-embedding-3-large). The default Ollama model `qwen3-embedding:8b` produces 1536 dimensions. If a user switches from OpenAI to Ollama without recreating the index, all vector queries silently fail.
 
 **Fix**: Add a warning box to both READMEs and the CLI reference:
 
