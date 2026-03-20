@@ -577,11 +577,22 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 
 ## Documentation
 
-- [ELI5 (Explain Like I'm 5)](ELI5.md) - Simplified explanation of what MDEMG does and how it works
-- [Quickstart Guide](docs/quickstart.md) - 10-minute setup walkthrough
-- [FAQ](docs/FAQ.md) - Common questions and troubleshooting
-- [CLI Reference](docs/features/unified-cli.md) - All CLI commands
-- [API Reference](docs/development/API_REFERENCE.md) - Full API endpoint documentation
+### User Guides
+
+| Guide | What it covers |
+|-------|---------------|
+| [ELI5 (Explain Like I'm 5)](ELI5.md) | Simplified explanation of what MDEMG does and how it works |
+| [Quickstart Guide](docs/quickstart.md) | 10-minute setup walkthrough |
+| [FAQ](docs/FAQ.md) | Common questions and troubleshooting |
+| [CLI Reference](docs/user/cli-reference.md) | All commands, flags, defaults, examples, environment variables |
+| [API Reference](docs/user/api-reference.md) | Every HTTP endpoint with request/response shapes and curl examples |
+| [CMS & RSIC Guide](docs/user/cms-rsic-guide.md) | Conversation memory, observation types, surprise scoring, self-improvement cycles |
+| [Ingestion Guide](docs/user/ingestion-guide.md) | All 8 ingestion methods — codebase, scraper, Linear, webhooks, file watcher, API |
+
+### Contributor & Architecture Docs
+
+- [CLI Implementation](docs/features/unified-cli.md) - CLI internals and command structure
+- [API Implementation](docs/development/API_REFERENCE.md) - Internal API documentation
 - [Architecture](docs/architecture/01_Architecture.md) - System design and components
 - [Graph Schema](docs/architecture/02_Graph_Schema.md) - Neo4j labels and relationships
 - [Retrieval & Scoring](docs/architecture/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
