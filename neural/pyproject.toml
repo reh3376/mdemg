@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn>=0.34.0",
     "sentence-transformers>=3.0.0",
     "pydantic-settings>=2.0.0",
+    "scipy>=1.11.0",
 ]
 
 [project.optional-dependencies]
@@ -15,7 +16,12 @@ dev = [
     "pytest>=8.0.0",
     "httpx>=0.27.0",
     "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
 ]
+
+[project.scripts]
+mdemg-neural-train = "neural_sidecar.train:main"
+mdemg-neural-evaluate = "neural_sidecar.evaluate:main"
 
 [build-system]
 requires = ["hatchling"]
