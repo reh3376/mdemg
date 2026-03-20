@@ -158,7 +158,6 @@ nfpms:
     contents:
       - src: man/man1/*.1
         dst: /usr/share/man/man1/
-        type: glob
       - src: plugins/uxts-module/manifest.json
         dst: /usr/share/mdemg/plugins/uxts-module/manifest.json
       - src: packaging/mdemg_linux/systemd/mdemg.service
