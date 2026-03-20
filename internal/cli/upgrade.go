@@ -73,6 +73,11 @@ func runUpgrade(dryRun, force bool) error {
 
 	if currentVersion == "dev" {
 		fmt.Println("\nRunning development build — cannot compare versions.")
+		if dryRun {
+			fmt.Printf("\nLatest release: %s\n", release.TagName)
+			fmt.Println("Run without --dry-run and with --force to install.")
+			return nil
+		}
 		if !force {
 			fmt.Println("Use --force to install the latest release anyway.")
 			return nil
@@ -80,9 +85,7 @@ func runUpgrade(dryRun, force bool) error {
 	} else if currentVersion == latestVersion && !force {
 		fmt.Println("\nAlready at the latest version.")
 		return nil
-	}
-
-	if dryRun {
+	} else if dryRun {
 		fmt.Printf("\nUpdate available: %s → %s\n", Version, release.TagName)
 		fmt.Println("Run without --dry-run to install.")
 		return nil
