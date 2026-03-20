@@ -12,12 +12,19 @@ import (
 	"mdemg/internal/config"
 )
 
+// EdgePruner is an optional dependency that prunes excess CO_ACTIVATED_WITH edges per node.
+// It is wired in from the learning service when LearningAutoPruneExcessEnabled is true.
+type EdgePruner interface {
+	PruneExcessEdgesPerNode(ctx context.Context, spaceID string) (int64, error)
+}
+
 // Service handles hidden layer operations including clustering and message passing
 type Service struct {
 	cfg        config.Config
 	driver     neo4j.DriverWithContext
 	pipeline   *Pipeline
 	cbRegistry *circuitbreaker.Registry
+	edgePruner EdgePruner // optional; nil if auto-prune is disabled
 }
 
 // NewService creates a new hidden layer service.
@@ -32,6 +39,12 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, cbRegistry *c
 // This is needed when the registry is initialized after the hidden service.
 func (s *Service) SetCircuitBreakerRegistry(reg *circuitbreaker.Registry) {
 	s.cbRegistry = reg
+}
+
+// SetEdgePruner wires in an EdgePruner to be called at the end of RunConsolidation
+// when LearningAutoPruneExcessEnabled is true.
+func (s *Service) SetEdgePruner(p EdgePruner) {
+	s.edgePruner = p
 }
 
 // newEmergenceNamer constructs an EmergenceNamer from the service config.
@@ -1596,6 +1609,17 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		if sr, ok := postResult.Steps["emergent_l5"]; ok {
 			result.L5NodesCreated = sr.NodesCreated
 			result.L5GroundingEdgesCreated = sr.EdgesCreated
+		}
+	}
+
+	// Step 6: Auto-prune excess edges per node (F18: GAP-18)
+	// Only runs when both the config flag is set and an EdgePruner has been wired in.
+	if s.cfg.LearningAutoPruneExcessEnabled && s.edgePruner != nil {
+		pruned, err := s.edgePruner.PruneExcessEdgesPerNode(ctx, spaceID)
+		if err != nil {
+			fmt.Printf("warning: auto-prune excess edges failed: %v\n", err)
+		} else if pruned > 0 {
+			log.Printf("RunConsolidation: auto-pruned %d excess edges for space %s", pruned, spaceID)
 		}
 	}
 

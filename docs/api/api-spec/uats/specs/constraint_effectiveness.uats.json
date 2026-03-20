@@ -1,0 +1,90 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Constraint Effectiveness Metrics",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": ["constraints", "metrics"]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-19",
+    "description": "Query per-constraint effectiveness metrics (FSD-2026-001 GAP-03).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": ["constraints", "metrics", "fsd"]
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/constraints/effectiveness",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query_params": {
+      "space_id": "test-space"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "constraints": [],
+      "total": 0
+    }
+  },
+  "assertions": [
+    {
+      "type": "status",
+      "expected": 200
+    },
+    {
+      "type": "json_path",
+      "path": "$.constraints",
+      "op": "exists"
+    },
+    {
+      "type": "json_path",
+      "path": "$.total",
+      "op": "gte",
+      "expected": 0
+    }
+  ],
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "GET without space_id returns 400",
+      "request": {
+        "method": "GET",
+        "path": "/v1/constraints/effectiveness"
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 400
+        }
+      ]
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/constraints/effectiveness",
+        "body": {}
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 405
+        }
+      ]
+    }
+  ]
+}

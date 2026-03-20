@@ -1,0 +1,50 @@
+"""Pydantic request/response models for the sidecar API."""
+
+from pydantic import BaseModel, Field
+
+
+# --- Re-rank ---
+
+class RerankRequest(BaseModel):
+    query: str
+    documents: list[str]
+    top_n: int = Field(default=10, ge=1, le=100)
+
+
+class RerankResult(BaseModel):
+    index: int
+    relevance_score: float
+
+
+class RerankResponse(BaseModel):
+    results: list[RerankResult]
+    model: str
+    latency_ms: float
+
+
+# --- NLI ---
+
+class NLIRequest(BaseModel):
+    premise: str
+    hypothesis: str
+
+
+class NLIScores(BaseModel):
+    entailment: float
+    contradiction: float
+    neutral: float
+
+
+class NLIResponse(BaseModel):
+    label: str  # "entailment", "contradiction", or "neutral"
+    scores: NLIScores
+    model: str
+    latency_ms: float
+
+
+# --- Health ---
+
+class HealthResponse(BaseModel):
+    status: str
+    models_loaded: list[str]
+    last_inference_ms: float | None = None

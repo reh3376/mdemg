@@ -41,9 +41,10 @@ func (s *Server) handleGuardrailValidate(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := s.guardrailValidator.Validate(r.Context(), guardrail.ValidateRequest{
-		SpaceID:      req.SpaceID,
-		FilesChanged: req.FilesChanged,
-		Diff:         req.Diff,
+		SpaceID:         req.SpaceID,
+		FilesChanged:    req.FilesChanged,
+		Diff:            req.Diff,
+		AgentTrustLevel: req.AgentTrustLevel, // F20: optional authority-level filtering
 	})
 	if err != nil {
 		writeInternalError(w, err, "guardrail validate")

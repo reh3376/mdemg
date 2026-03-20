@@ -132,6 +132,12 @@ type Server struct {
 	// Phase 9.4: Event dispatch for non-APE modules
 	eventDispatcher *plugins.EventDispatcher
 
+	// FSD-2026-001: Constraint Enforcement Event Log
+	enforcementLog *enforcementEventLog
+
+	// F4: Cross-Constraint Conflict Detection
+	conflictDetector *hidden.ConflictDetector
+
 	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
 	graphMetricsCache struct {
 		sync.Mutex
@@ -198,6 +204,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	// Initialize hidden layer service (circuit breaker wired later after cbRegistry init)
 	hid := hidden.NewService(cfg, driver, nil)
+	// F18: Wire edge pruner so RunConsolidation can auto-prune excess edges when enabled
+	if cfg.LearningAutoPruneExcessEnabled {
+		hid.SetEdgePruner(lea)
+	}
 	if cfg.HiddenLayerEnabled {
 		log.Printf("Hidden layer enabled (eps: %.2f, minSamples: %d, maxHidden: %d)",
 			cfg.HiddenLayerClusterEps, cfg.HiddenLayerMinSamples, cfg.HiddenLayerMaxHidden)
@@ -374,6 +384,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OllamaURL:       cfg.OllamaEndpoint,
 			MaxConstraints:  cfg.GuardrailMaxConstraints,
 			VectorIndexName: cfg.VectorIndexName,
+			// F7: Constraint Scope Filtering
+			ConstraintScopeFilteringEnabled: cfg.ConstraintScopeFilteringEnabled,
+			// F20: Authority Level Filtering
+			ConstraintAuthorityEnabled: cfg.ConstraintAuthorityEnabled,
+			ConstraintDefaultAuthority: cfg.ConstraintDefaultAuthority,
 		}
 		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
 		log.Printf("Active MCP Guardrails enabled (provider: %s, model: %s, maxConstraints: %d)",
@@ -402,8 +417,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	cons := consulting.NewService(cfg, driver, ret, emb, symStore, synth, intentTrans)
 
 	// Phase AR-3: Wire LLM-powered constraint classifier if enabled
+	var sharedConstraintClassifier *consulting.ConstraintClassifier
 	if cfg.ConsultingLLMConstraintsEnabled {
-		constraintClassifier := consulting.NewConstraintClassifier(consulting.ConstraintClassifierConfig{
+		sharedConstraintClassifier = consulting.NewConstraintClassifier(consulting.ConstraintClassifierConfig{
 			Enabled:   true,
 			Provider:  cfg.ConsultingLLMConstraintsProvider,
 			Model:     cfg.ConsultingLLMConstraintsModel,
@@ -413,8 +429,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OpenAIURL: cfg.OpenAIEndpoint,
 			OllamaURL: cfg.OllamaEndpoint,
 		}, cbRegistry)
-		cons.SetConstraintClassifier(constraintClassifier)
+		cons.SetConstraintClassifier(sharedConstraintClassifier)
 		log.Printf("Consulting LLM constraint classification enabled (provider: %s, model: %s)", cfg.ConsultingLLMConstraintsProvider, cfg.ConsultingLLMConstraintsModel)
+	}
+
+	// F6a: Wire LLM classifier gate into conversation service if enabled.
+	// Reuses the same ConstraintClassifier instance (shared LRU cache + circuit breaker).
+	if cfg.ConstraintClassifierGateEnabled && convSvc != nil && sharedConstraintClassifier != nil {
+		convSvc.SetConstraintGateClassifier(&constraintGateAdapter{cc: sharedConstraintClassifier})
+		log.Printf("F6a: Constraint classifier gate enabled for conversation service")
 	}
 	log.Printf("Consulting service initialized")
 
@@ -424,6 +447,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc = jiminy.NewService(cfg, driver, cons, emb)
 		log.Printf("Jiminy guidance enabled (timeout: %dms, maxItems: %d, minConf: %.2f)",
 			cfg.JiminyTimeoutMs, cfg.JiminyMaxItems, cfg.JiminyMinConfidence)
+	}
+
+	// F4: Initialize conflict detector if enabled
+	var conflictDet *hidden.ConflictDetector
+	if cfg.ConstraintConflictDetectionEnabled {
+		conflictDet = hidden.NewConflictDetector(driver, cfg)
+		log.Printf("Constraint conflict detection enabled (simThreshold: %.2f, maxPairs: %d)",
+			cfg.ConstraintConflictSimThreshold, cfg.ConstraintConflictMaxPairs)
 	}
 
 	// Phase 3: Initialize metrics registry
@@ -663,6 +694,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		untsRegistry:            untsReg,
 		untsScanner:             untsScan,
 		eventDispatcher:         plugins.NewEventDispatcher(pluginMgr),
+		enforcementLog:          newEnforcementEventLog(1000),
+		conflictDetector:        conflictDet,
 	}
 }
 
@@ -1322,6 +1355,7 @@ func (s *Server) Routes() http.Handler {
 
 	// Active MCP Guardrails (Phase 104)
 	mux.HandleFunc("/v1/memory/guardrail/validate", s.handleGuardrailValidate)
+	mux.HandleFunc("/v1/guardrail/events", s.handleGuardrailEvents)
 
 	// Global Meta-Learning (Phase 105)
 	mux.HandleFunc("/v1/memory/meta-learn", s.handleMetaLearn)
@@ -1333,6 +1367,19 @@ func (s *Server) Routes() http.Handler {
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)
 	mux.HandleFunc("/v1/constraints/stats", s.handleConstraintStats)
+	mux.HandleFunc("/v1/constraints/effectiveness", s.handleConstraintEffectiveness) // F3: per-constraint effectiveness metrics
+	mux.HandleFunc("/v1/constraints/scope/", s.handleConstraintScopeUpdate)         // F7: PATCH scope override
+
+	// F9: Determinism Score
+	mux.HandleFunc("/v1/metrics/determinism", s.handleDeterminismScore)
+
+	// F4: Cross-Constraint Conflict Detection
+	mux.HandleFunc("/v1/constraints/detect-conflicts", s.handleDetectConstraintConflicts)
+	mux.HandleFunc("/v1/constraints/conflicts", s.handleListConstraintConflicts)
+	mux.HandleFunc("/v1/constraints/conflicts/", s.handleResolveConstraintConflict) // PATCH .../conflicts/{id}/resolve
+
+	// NR-3: Neural sidecar status
+	mux.HandleFunc("/v1/neural/status", s.handleNeuralStatus)
 
 	// CMS Templates (Phase 60)
 	mux.HandleFunc("/v1/conversation/templates", s.handleTemplates)

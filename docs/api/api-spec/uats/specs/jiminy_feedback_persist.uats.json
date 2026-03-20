@@ -1,0 +1,84 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Feedback Persistence",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": ["jiminy", "effectiveness"]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-19",
+    "description": "Verify guidance feedback is persisted and correlates outcomes (FSD-2026-001 GAP-03).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": ["jiminy", "effectiveness", "fsd"]
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/feedback",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "guidance_id": "test-guidance-id",
+      "action_summary": "followed the constraint about error handling",
+      "space_id": "test-space"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "data": {
+        "guidance_id": "test-guidance-id",
+        "results": [],
+        "applied": false
+      }
+    }
+  },
+  "assertions": [
+    {
+      "type": "status",
+      "expected": 200
+    },
+    {
+      "type": "json_path",
+      "path": "$.data.guidance_id",
+      "op": "equals",
+      "expected": "test-guidance-id"
+    },
+    {
+      "type": "json_path",
+      "path": "$.data.results",
+      "op": "exists"
+    }
+  ],
+  "variants": [
+    {
+      "name": "missing_guidance_id",
+      "description": "POST without guidance_id returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/feedback",
+        "body": {
+          "action_summary": "something",
+          "space_id": "test"
+        }
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 400
+        }
+      ]
+    }
+  ]
+}

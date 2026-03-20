@@ -25,6 +25,7 @@ type Service struct {
 	embeddingCache    *NodeEmbeddingCache // Cache for node embeddings (query-aware expansion)
 	cbRegistry        *circuitbreaker.Registry // Circuit breaker registry for external API calls
 	intentTranslator  IntentTranslator // Optional BM25 query rewriter
+	dataCollector     *DataCollector // Neural re-ranker training data collector (NR-1)
 }
 
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
@@ -113,13 +114,21 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 	log.Printf("Query cache initialized: enabled=%v, capacity=%d, ttl=%v", cfg.QueryCacheEnabled, cacheCapacity, cacheTTL)
 	log.Printf("Node embedding cache initialized: enabled=%v, capacity=%d", cfg.QueryAwareExpansionEnabled, embCacheSize)
 
-	return &Service{
+	svc := &Service{
 		cfg:               cfg,
 		driver:            driver,
 		reasoningProvider: &NoOpReasoningProvider{}, // Default: no reasoning modules
 		queryCache:        NewQueryCache(cacheCapacity, cacheTTL),
 		embeddingCache:    NewNodeEmbeddingCache(embCacheSize),
 	}
+
+	// Initialize neural re-ranker training data collector (NR-1)
+	if cfg.NeuralDataCollection {
+		svc.dataCollector = NewDataCollector(true, cfg.NeuralDataDir)
+		log.Printf("Neural data collector initialized: dir=%s", cfg.NeuralDataDir)
+	}
+
+	return svc
 }
 
 // SetReasoningProvider sets the reasoning provider for the service.
@@ -290,8 +299,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	if hopDepth <= 0 {
 		hopDepth = s.cfg.DefaultHopDepth
 	}
-	if hopDepth > 3 {
-		hopDepth = 3 // keep bounded by default
+	// Bound hop depth by MaxHopDepth (configurable, default 3)
+	maxHop := s.cfg.MaxHopDepth
+	if maxHop <= 0 {
+		maxHop = 3
+	}
+	if hopDepth > maxHop {
+		hopDepth = maxHop
 	}
 
 	if len(req.QueryEmbedding) == 0 {
@@ -519,14 +533,19 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		s.cfg.ActivationHop2MinWeight,
 	}
 
+	// F9: Apply direction-aware weight scaling for asymmetric learning edges
+	if s.cfg.LearningAsymmetricEnabled {
+		edges = applyAsymmetricWeights(edges)
+	}
+
 	// Compute attention weights or use default (original behavior)
 	var act map[string]float64
 	if s.cfg.EdgeAttentionEnabled {
 		attention := ComputeEdgeAttention(queryCtx, s.cfg)
-		act = SpreadingActivationWithAttention(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, attention, hopMinWeights)
+		act = SpreadingActivationWithAttention(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, attention, hopMinWeights, DimWeightsFromConfig(s.cfg))
 	} else {
 		// Fallback to original behavior (CO_ACTIVATED_WITH only)
-		act = SpreadingActivation(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, hopMinWeights)
+		act = SpreadingActivation(cands, edges, s.cfg.ActivationSteps, s.cfg.ActivationLambda, hopMinWeights, DimWeightsFromConfig(s.cfg))
 	}
 
 	// 4) Initial ranking (pass query text for path-based boosting)
@@ -933,14 +952,30 @@ ON MATCH SET
 }
 
 type Edge struct {
-	Src string
-	Dst string
-	RelType string
-	Weight float64
-	DimSemantic float64
-	DimTemporal float64
+	Src             string
+	Dst             string
+	RelType         string
+	Weight          float64
+	DimSemantic     float64
+	DimTemporal     float64
 	DimCoactivation float64
-	UpdatedAt time.Time
+	Direction       string // "forward", "backward", or "bidirectional" (F9: asymmetric learning)
+	UpdatedAt       time.Time
+}
+
+// applyAsymmetricWeights scales edge weights based on direction for asymmetric Hebbian learning (F9).
+// - "forward"       → full weight (1.0x)
+// - "backward"      → half weight (0.5x) — reverse edges carry less signal
+// - "bidirectional" → full weight (1.0x, preserves legacy behaviour)
+func applyAsymmetricWeights(edges []Edge) []Edge {
+	out := make([]Edge, len(edges))
+	copy(out, edges)
+	for i := range out {
+		if out[i].Direction == "backward" {
+			out[i].Weight *= 0.5
+		}
+	}
+	return out
 }
 
 // edgeTraversalPack bundles edges and next-hop node IDs from graph traversal.
@@ -1001,11 +1036,12 @@ CALL {
          coalesce(r.dim_semantic,0.0) AS ds,
          coalesce(r.dim_temporal,0.0) AS dt,
          coalesce(r.dim_coactivation,0.0) AS dc,
+         coalesce(r.direction, 'bidirectional') AS dir,
          coalesce(r.updated_at, datetime()) AS upd
   ORDER BY w DESC
   LIMIT $maxNbr
 }
-RETURN s, d, t, w, ds, dt, dc, upd
+RETURN s, d, t, w, ds, dt, dc, dir, upd
 LIMIT $maxTotal`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
@@ -1023,6 +1059,7 @@ LIMIT $maxTotal`
 			ds, _ := rec.Get("ds")
 			dt, _ := rec.Get("dt")
 			dc, _ := rec.Get("dc")
+			dir, _ := rec.Get("dir")
 			upd, _ := rec.Get("upd")
 
 			e := Edge{
@@ -1033,6 +1070,7 @@ LIMIT $maxTotal`
 				DimSemantic:     toFloat64(ds, 0),
 				DimTemporal:     toFloat64(dt, 0),
 				DimCoactivation: toFloat64(dc, 0),
+				Direction:       fmt.Sprint(dir),
 				UpdatedAt:       time.Now(),
 			}
 			edges = append(edges, e)
@@ -1143,11 +1181,12 @@ CALL {
          coalesce(r.dim_semantic,0.0) AS ds,
          coalesce(r.dim_temporal,0.0) AS dt,
          coalesce(r.dim_coactivation,0.0) AS dc,
+         coalesce(r.direction, 'bidirectional') AS dir,
          coalesce(r.updated_at, datetime()) AS upd
   ORDER BY w DESC
   LIMIT $maxNbr
 }
-RETURN s, d, t, w, ds, dt, dc, upd
+RETURN s, d, t, w, ds, dt, dc, dir, upd
 LIMIT $maxTotal`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
@@ -1165,17 +1204,19 @@ LIMIT $maxTotal`
 			ds, _ := rec.Get("ds")
 			dt, _ := rec.Get("dt")
 			dc, _ := rec.Get("dc")
+			dir, _ := rec.Get("dir")
 			upd, _ := rec.Get("upd")
 
 			e := Edge{
-				Src: fmt.Sprint(s),
-				Dst: fmt.Sprint(d),
-				RelType: fmt.Sprint(t),
-				Weight: toFloat64(w, 0),
-				DimSemantic: toFloat64(ds, 0),
-				DimTemporal: toFloat64(dt, 0),
+				Src:             fmt.Sprint(s),
+				Dst:             fmt.Sprint(d),
+				RelType:         fmt.Sprint(t),
+				Weight:          toFloat64(w, 0),
+				DimSemantic:     toFloat64(ds, 0),
+				DimTemporal:     toFloat64(dt, 0),
 				DimCoactivation: toFloat64(dc, 0),
-				UpdatedAt: time.Now(),
+				Direction:       fmt.Sprint(dir),
+				UpdatedAt:       time.Now(),
 			}
 			edges = append(edges, e)
 			if _, ok := seenNext[e.Dst]; !ok {

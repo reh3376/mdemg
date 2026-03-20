@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"mdemg/internal/sanitize"
+
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/models"
 )
@@ -298,12 +300,9 @@ func buildSynthesisPrompt(req SynthesisRequest) string {
 	sb.WriteString("- Surface risks prominently with WARNING prefix\n")
 	sb.WriteString("- Use markdown formatting\n\n")
 
-	// Section 2: Developer context + question
+	// Section 2: Developer context + question (sanitized to prevent prompt injection)
 	sb.WriteString("## Developer Context\n\n")
-	ctx := req.Context
-	if len(ctx) > 3000 {
-		ctx = ctx[:3000] + "..."
-	}
+	ctx := sanitize.SanitizeUserContext(req.Context, 3000)
 	if ctx != "" {
 		sb.WriteString(ctx)
 		sb.WriteString("\n\n")

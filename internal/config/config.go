@@ -525,6 +525,82 @@ type Config struct {
 	// ===== ANN Optimization: Frontier Detection =====
 	FrontierMinEvidence int // FRONTIER_MIN_EVIDENCE — min evidence_count for frontier candidates (default: 3)
 	FrontierMaxOutgoing int // FRONTIER_MAX_OUTGOING — max outgoing edges for frontier candidates (default: 2)
+
+	// ===== FSD-2026-001: Constraint Lifecycle Closure =====
+
+	// F1: Guardrail Enforcement Hook
+	GuardrailHookEnabled   bool // GUARDRAIL_HOOK_ENABLED — enable PreToolUse enforcement hook (default: false)
+	GuardrailHookTimeoutMs int  // GUARDRAIL_HOOK_TIMEOUT_MS — timeout for hook validation in ms (default: 3000)
+
+	// F2a: Contradiction Detection
+	ContradictionEnabled      bool    // CONTRADICTION_ENABLED — enable contradiction detection in surprise scoring (default: true)
+	ContradictionSimThreshold float64 // CONTRADICTION_SIM_THRESHOLD — min similarity for contradiction candidates (default: 0.75)
+	ContradictionMaxCandidates int    // CONTRADICTION_MAX_CANDIDATES — max candidates to check for contradiction (default: 20)
+
+	// F2b: NLI-Enhanced Contradiction Detection
+	ContradictionNLIEnabled bool // CONTRADICTION_NLI_ENABLED — use sidecar NLI for contradiction detection (default: false)
+
+	// F3: Effectiveness Feedback Persistence
+	JiminyPersistenceEnabled          bool    // JIMINY_PERSISTENCE_ENABLED — enable Neo4j write-through for guidance outcomes (default: false)
+	ConstraintConfidenceDecayPerNeg   float64 // CONSTRAINT_CONFIDENCE_DECAY_PER_NEGATIVE — confidence reduction per ignored guidance (default: 0.03)
+	ConstraintConfidenceBoostPerPos   float64 // CONSTRAINT_CONFIDENCE_BOOST_PER_POSITIVE — confidence increase per followed guidance (default: 0.02)
+	ConstraintArchiveThreshold        float64 // CONSTRAINT_ARCHIVE_THRESHOLD — confidence below which constraints auto-archive (default: 0.3)
+
+	// F4: Cross-Constraint Conflict Detection
+	ConstraintConflictDetectionEnabled bool    // CONSTRAINT_CONFLICT_DETECTION_ENABLED — enable pairwise conflict detection (default: false)
+	ConstraintConflictSimThreshold     float64 // CONSTRAINT_CONFLICT_SIM_THRESHOLD — similarity threshold for conflict detection (default: 0.6)
+	ConstraintConflictMaxPairs         int     // CONSTRAINT_CONFLICT_MAX_PAIRS — max constraint pairs to compare (default: 500)
+
+	// F6: Constraint Classifier Gate
+	ConstraintClassifierGateEnabled bool // CONSTRAINT_CLASSIFIER_GATE_ENABLED — enable LLM classifier gate for constraint detection (default: false)
+	ConstraintNLIEnabled            bool // CONSTRAINT_NLI_ENABLED — enable sidecar NLI for constraint classification (default: false)
+
+	// F7: Constraint Scope Filtering
+	ConstraintScopeFilteringEnabled bool // CONSTRAINT_SCOPE_FILTERING_ENABLED — enable scope-based constraint filtering (default: false)
+
+	// F9: Asymmetric Learning + Determinism Score
+	LearningAsymmetricEnabled bool // LEARNING_ASYMMETRIC_ENABLED — enable directional edge weighting (default: false)
+	DeterminismScoringEnabled bool // DETERMINISM_SCORING_ENABLED — enable determinism score computation (default: false)
+
+	// F10: Jiminy Latency Optimization
+	JiminyCacheEnabled    bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
+	JiminyCacheTTLSec     int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
+	JiminyCacheSize       int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
+	JiminyPartialTimeoutMs int // JIMINY_PARTIAL_TIMEOUT_MS — timeout for partial results (default: 2000)
+
+	// F11: Configurable Activation Dimension Weights
+	ActivationDimSemanticWeight     float64 // ACTIVATION_DIM_SEMANTIC_WEIGHT — semantic dimension weight (default: 0.6)
+	ActivationDimTemporalWeight     float64 // ACTIVATION_DIM_TEMPORAL_WEIGHT — temporal dimension weight (default: 0.2)
+	ActivationDimCoactivationWeight float64 // ACTIVATION_DIM_COACTIVATION_WEIGHT — coactivation dimension weight (default: 0.2)
+
+	// F13: Constraint Decay/Expiry
+	ConstraintDecayEnabled     bool    // CONSTRAINT_DECAY_ENABLED — enable time-based constraint confidence decay (default: false)
+	ConstraintDecayRatePerWeek float64 // CONSTRAINT_DECAY_RATE_PER_WEEK — confidence reduction per week for unsurfaced constraints (default: 0.01)
+
+	// F15: Configurable Hop Depth
+	MaxHopDepth int // MAX_HOP_DEPTH — maximum hop depth for architecture queries (default: 3)
+
+	// F18: Edge Limit Enforcement
+	LearningAutoPruneExcessEnabled bool // LEARNING_AUTO_PRUNE_EXCESS_ENABLED — auto-prune excess edges during consolidation (default: false)
+
+	// F20: Authority Levels
+	ConstraintAuthorityEnabled  bool   // CONSTRAINT_AUTHORITY_ENABLED — enable authority-level filtering (default: false)
+	ConstraintDefaultAuthority  string // CONSTRAINT_DEFAULT_AUTHORITY — default authority level for new constraints (default: "team_standard")
+
+	// ===== Neural Re-Ranker =====
+
+	// NR-1: Training Data Collection
+	NeuralDataCollection bool   // NEURAL_DATA_COLLECTION — enable passive training data collection (default: false)
+	NeuralDataDir        string // NEURAL_DATA_DIR — directory for training data JSONL files (default: ".mdemg/neural/training-data")
+
+	// NR-2: Python Sidecar
+	SidecarEnabled bool // SIDECAR_ENABLED — enable Python neural sidecar (default: false)
+
+	// NR-3: Neural Reranker Integration
+	NeuralRerankEnabled   bool   // NEURAL_RERANK_ENABLED — enable neural cross-encoder re-ranking (default: false)
+	NeuralRerankURL       string // NEURAL_RERANK_URL — sidecar service URL (default: "http://localhost:8100")
+	NeuralRerankTimeoutMs int    // NEURAL_RERANK_TIMEOUT_MS — timeout for sidecar re-rank call in ms (default: 1000)
+	NeuralRerankFallback  string // NEURAL_RERANK_FALLBACK — fallback provider if sidecar unavailable (default: from RERANK_PROVIDER)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -2251,6 +2327,133 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("MEMORY_PRESSURE_THRESHOLD_MB must be >= 256")
 	}
 
+	// ===== FSD-2026-001: Constraint Lifecycle Closure =====
+
+	// F1: Guardrail Enforcement Hook
+	guardrailHookEnabled := getBool("GUARDRAIL_HOOK_ENABLED", false)
+	guardrailHookTimeoutMs, err := atoi("GUARDRAIL_HOOK_TIMEOUT_MS", 3000)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F2a: Contradiction Detection
+	contradictionEnabled := getBool("CONTRADICTION_ENABLED", true)
+	contradictionSimThreshold, err := atof("CONTRADICTION_SIM_THRESHOLD", 0.75)
+	if err != nil {
+		return Config{}, err
+	}
+	contradictionMaxCandidates, err := atoi("CONTRADICTION_MAX_CANDIDATES", 20)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F2b: NLI-Enhanced Contradiction
+	contradictionNLIEnabled := getBool("CONTRADICTION_NLI_ENABLED", false)
+
+	// F3: Effectiveness Feedback Persistence
+	jiminyPersistenceEnabled := getBool("JIMINY_PERSISTENCE_ENABLED", false)
+	constraintConfDecayPerNeg, err := atof("CONSTRAINT_CONFIDENCE_DECAY_PER_NEGATIVE", 0.03)
+	if err != nil {
+		return Config{}, err
+	}
+	constraintConfBoostPerPos, err := atof("CONSTRAINT_CONFIDENCE_BOOST_PER_POSITIVE", 0.02)
+	if err != nil {
+		return Config{}, err
+	}
+	constraintArchiveThreshold, err := atof("CONSTRAINT_ARCHIVE_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F4: Cross-Constraint Conflict Detection
+	constraintConflictDetectionEnabled := getBool("CONSTRAINT_CONFLICT_DETECTION_ENABLED", false)
+	constraintConflictSimThreshold, err := atof("CONSTRAINT_CONFLICT_SIM_THRESHOLD", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	constraintConflictMaxPairs, err := atoi("CONSTRAINT_CONFLICT_MAX_PAIRS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F6: Constraint Classifier Gate
+	constraintClassifierGateEnabled := getBool("CONSTRAINT_CLASSIFIER_GATE_ENABLED", false)
+	constraintNLIEnabled := getBool("CONSTRAINT_NLI_ENABLED", false)
+
+	// F7: Constraint Scope Filtering
+	constraintScopeFilteringEnabled := getBool("CONSTRAINT_SCOPE_FILTERING_ENABLED", false)
+
+	// F9: Asymmetric Learning + Determinism Score
+	learningAsymmetricEnabled := getBool("LEARNING_ASYMMETRIC_ENABLED", false)
+	determinismScoringEnabled := getBool("DETERMINISM_SCORING_ENABLED", false)
+
+	// F10: Jiminy Latency Optimization
+	jiminyCacheEnabled := getBool("JIMINY_CACHE_ENABLED", true)
+	jiminyCacheTTLSec, err := atoi("JIMINY_CACHE_TTL_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCacheSize, err := atoi("JIMINY_CACHE_SIZE", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyPartialTimeoutMs, err := atoi("JIMINY_PARTIAL_TIMEOUT_MS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F11: Configurable Activation Dimension Weights
+	activationDimSemanticWeight, err := atof("ACTIVATION_DIM_SEMANTIC_WEIGHT", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	activationDimTemporalWeight, err := atof("ACTIVATION_DIM_TEMPORAL_WEIGHT", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+	activationDimCoactivationWeight, err := atof("ACTIVATION_DIM_COACTIVATION_WEIGHT", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F13: Constraint Decay/Expiry
+	constraintDecayEnabled := getBool("CONSTRAINT_DECAY_ENABLED", false)
+	constraintDecayRatePerWeek, err := atof("CONSTRAINT_DECAY_RATE_PER_WEEK", 0.01)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F15: Configurable Hop Depth
+	maxHopDepth, err := atoi("MAX_HOP_DEPTH", 3)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// F18: Edge Limit Enforcement
+	learningAutoPruneExcessEnabled := getBool("LEARNING_AUTO_PRUNE_EXCESS_ENABLED", false)
+
+	// F20: Authority Levels
+	constraintAuthorityEnabled := getBool("CONSTRAINT_AUTHORITY_ENABLED", false)
+	constraintDefaultAuthority := get("CONSTRAINT_DEFAULT_AUTHORITY", "team_standard")
+
+	// ===== Neural Re-Ranker =====
+
+	// NR-1: Training Data Collection
+	neuralDataCollection := getBool("NEURAL_DATA_COLLECTION", false)
+	neuralDataDir := get("NEURAL_DATA_DIR", ".mdemg/neural/training-data")
+
+	// NR-2: Python Sidecar
+	sidecarEnabled := getBool("SIDECAR_ENABLED", false)
+
+	// NR-3: Neural Reranker Integration
+	neuralRerankEnabled := getBool("NEURAL_RERANK_ENABLED", false)
+	neuralRerankURL := get("NEURAL_RERANK_URL", "http://localhost:8100")
+	neuralRerankTimeoutMs, err := atoi("NEURAL_RERANK_TIMEOUT_MS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	neuralRerankFallback := get("NEURAL_RERANK_FALLBACK", rerankProvider)
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -2668,6 +2871,48 @@ func FromEnv() (Config, error) {
 		LearningNegativeMaxPerRequest: learningNegativeMaxPerRequest,
 		FrontierMinEvidence:           frontierMinEvidence,
 		FrontierMaxOutgoing:           frontierMaxOutgoing,
+
+		// FSD-2026-001: Constraint Lifecycle Closure
+		GuardrailHookEnabled:               guardrailHookEnabled,
+		GuardrailHookTimeoutMs:             guardrailHookTimeoutMs,
+		ContradictionEnabled:               contradictionEnabled,
+		ContradictionSimThreshold:          contradictionSimThreshold,
+		ContradictionMaxCandidates:         contradictionMaxCandidates,
+		ContradictionNLIEnabled:            contradictionNLIEnabled,
+		JiminyPersistenceEnabled:           jiminyPersistenceEnabled,
+		ConstraintConfidenceDecayPerNeg:    constraintConfDecayPerNeg,
+		ConstraintConfidenceBoostPerPos:    constraintConfBoostPerPos,
+		ConstraintArchiveThreshold:         constraintArchiveThreshold,
+		ConstraintConflictDetectionEnabled: constraintConflictDetectionEnabled,
+		ConstraintConflictSimThreshold:     constraintConflictSimThreshold,
+		ConstraintConflictMaxPairs:         constraintConflictMaxPairs,
+		ConstraintClassifierGateEnabled:    constraintClassifierGateEnabled,
+		ConstraintNLIEnabled:               constraintNLIEnabled,
+		ConstraintScopeFilteringEnabled:    constraintScopeFilteringEnabled,
+		LearningAsymmetricEnabled:          learningAsymmetricEnabled,
+		DeterminismScoringEnabled:          determinismScoringEnabled,
+		JiminyCacheEnabled:                 jiminyCacheEnabled,
+		JiminyCacheTTLSec:                  jiminyCacheTTLSec,
+		JiminyCacheSize:                    jiminyCacheSize,
+		JiminyPartialTimeoutMs:             jiminyPartialTimeoutMs,
+		ActivationDimSemanticWeight:        activationDimSemanticWeight,
+		ActivationDimTemporalWeight:        activationDimTemporalWeight,
+		ActivationDimCoactivationWeight:    activationDimCoactivationWeight,
+		ConstraintDecayEnabled:             constraintDecayEnabled,
+		ConstraintDecayRatePerWeek:         constraintDecayRatePerWeek,
+		MaxHopDepth:                        maxHopDepth,
+		LearningAutoPruneExcessEnabled:     learningAutoPruneExcessEnabled,
+		ConstraintAuthorityEnabled:         constraintAuthorityEnabled,
+		ConstraintDefaultAuthority:         constraintDefaultAuthority,
+
+		// Neural Re-Ranker
+		NeuralDataCollection:  neuralDataCollection,
+		NeuralDataDir:         neuralDataDir,
+		SidecarEnabled:        sidecarEnabled,
+		NeuralRerankEnabled:   neuralRerankEnabled,
+		NeuralRerankURL:       neuralRerankURL,
+		NeuralRerankTimeoutMs: neuralRerankTimeoutMs,
+		NeuralRerankFallback:  neuralRerankFallback,
 	}, nil
 }
 

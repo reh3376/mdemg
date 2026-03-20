@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
 )
 
 // Embedder interface for computing embeddings (matches internal/embeddings.Embedder)
@@ -21,6 +22,7 @@ type Embedder interface {
 type SurpriseDetector struct {
 	embedder Embedder
 	driver   neo4j.DriverWithContext
+	cfg      config.Config
 }
 
 // NewSurpriseDetector creates a new surprise detector
@@ -28,6 +30,15 @@ func NewSurpriseDetector(embedder Embedder, driver neo4j.DriverWithContext) *Sur
 	return &SurpriseDetector{
 		embedder: embedder,
 		driver:   driver,
+	}
+}
+
+// NewSurpriseDetectorWithConfig creates a new surprise detector with config.
+func NewSurpriseDetectorWithConfig(embedder Embedder, driver neo4j.DriverWithContext, cfg config.Config) *SurpriseDetector {
+	return &SurpriseDetector{
+		embedder: embedder,
+		driver:   driver,
+		cfg:      cfg,
 	}
 }
 
@@ -212,19 +223,18 @@ func (d *SurpriseDetector) detectCorrection(content string) float64 {
 	return 0.0
 }
 
-// checkContradictions checks if obs contradicts existing knowledge
+// checkContradictions checks if obs contradicts existing knowledge using
+// vector similarity search and negation heuristics (F2a) or NLI sidecar (F2b).
 func (d *SurpriseDetector) checkContradictions(ctx context.Context, obs Observation) (float64, error) {
-	// For Phase 1, implement simple heuristic
-	// Future: Use semantic similarity to find conflicting nodes
-
-	// If no embedding, can't check contradictions
-	if len(obs.Embedding) == 0 {
-		return 0.0, nil
+	checker := NewContradictionChecker(d.embedder, d.driver)
+	cfg := DefaultContradictionConfig()
+	// F2b: wire NLI settings from config if available.
+	if d.cfg.ContradictionNLIEnabled {
+		cfg.NLIEnabled = true
+		cfg.NLISidecarURL = d.cfg.NeuralRerankURL // Sidecar URL shared with neural reranker
+		cfg.NLITimeoutMs = d.cfg.NeuralRerankTimeoutMs
 	}
-
-	// TODO Phase 2: Query for similar observations and check for semantic conflicts
-	// For now, return 0.0 (no contradiction detection in Phase 1)
-	return 0.0, nil
+	return checker.CheckContradictions(ctx, obs, cfg)
 }
 
 // computeEmbeddingNovelty checks embedding distance from known concepts

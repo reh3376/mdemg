@@ -1,0 +1,70 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Constraint Conflict Detection",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": ["constraints", "conflicts"]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-19",
+    "description": "Trigger pairwise constraint conflict detection (FSD-2026-001 GAP-04).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": ["constraints", "conflicts", "fsd"]
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/constraints/detect-conflicts",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "test-space"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "new_conflicts": 0
+    }
+  },
+  "assertions": [
+    {
+      "type": "status",
+      "expected": 200
+    },
+    {
+      "type": "json_path",
+      "path": "$.new_conflicts",
+      "op": "gte",
+      "expected": 0
+    }
+  ],
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "POST without space_id returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/constraints/detect-conflicts",
+        "body": {}
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "expected": 400
+        }
+      ]
+    }
+  ]
+}

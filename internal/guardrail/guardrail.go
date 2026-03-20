@@ -26,6 +26,13 @@ type GuardrailConfig struct {
 	OllamaURL       string
 	MaxConstraints  int
 	VectorIndexName string // Neo4j vector index name (default: memNodeEmbedding)
+
+	// F7: Constraint Scope Filtering
+	ConstraintScopeFilteringEnabled bool // CONSTRAINT_SCOPE_FILTERING_ENABLED
+
+	// F20: Authority Level Filtering
+	ConstraintAuthorityEnabled bool   // CONSTRAINT_AUTHORITY_ENABLED
+	ConstraintDefaultAuthority string // CONSTRAINT_DEFAULT_AUTHORITY (default: "team_standard")
 }
 
 // Validator defines the interface for guardrail validation.
@@ -38,6 +45,11 @@ type ValidateRequest struct {
 	SpaceID      string   `json:"space_id"`
 	FilesChanged []string `json:"files_changed"`
 	Diff         string   `json:"diff"`
+
+	// F20: Agent trust level for authority-level filtering.
+	// Values: "restricted" (all constraints), "standard" (org_policy + team_standard),
+	// "elevated" (org_policy only). Empty string or unrecognized value → no filtering.
+	AgentTrustLevel string `json:"agent_trust_level,omitempty"`
 }
 
 // ValidateResponse represents the guardrail validation result.
@@ -97,7 +109,7 @@ func (g *GuardrailService) Validate(ctx context.Context, req ValidateRequest) (*
 	diffCtx := parseDiff(req.Diff, req.FilesChanged)
 
 	// Step 2: Retrieve relevant constraints
-	constraints, err := g.retrieveConstraints(ctx, req.SpaceID, diffCtx)
+	constraints, err := g.retrieveConstraints(ctx, req.SpaceID, diffCtx, req.AgentTrustLevel)
 	if err != nil {
 		log.Printf("guardrail: constraint retrieval failed (fail-open): %v", err)
 		return &ValidateResponse{

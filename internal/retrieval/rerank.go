@@ -77,6 +77,29 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		scores, tokensUsed, err = s.rerankWithOllama(timeoutCtx, prompt)
 	case "jina":
 		scores, tokensUsed, err = s.rerankWithJina(timeoutCtx, req.Query, req.Candidates[:topN])
+	case "neural":
+		// Neural sidecar re-ranking (NR-3)
+		docTexts := make([]string, topN)
+		for i, c := range req.Candidates[:topN] {
+			var sb strings.Builder
+			sb.WriteString(c.Name)
+			if c.Path != "" {
+				sb.WriteString(" | ")
+				sb.WriteString(c.Path)
+			}
+			if c.Summary != "" {
+				sb.WriteString(" | ")
+				sb.WriteString(c.Summary)
+			}
+			docTexts[i] = sb.String()
+		}
+		var neuralScores []float64
+		neuralScores, err = neuralRerank(timeoutCtx, NeuralRerankConfig{
+			URL:       s.cfg.NeuralRerankURL,
+			TimeoutMs: s.cfg.NeuralRerankTimeoutMs,
+			Fallback:  s.cfg.NeuralRerankFallback,
+		}, req.Query, docTexts, topN, s.cbRegistry)
+		scores = neuralScores
 	default:
 		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, prompt)
 	}
@@ -146,12 +169,19 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		rerankScores = append(rerankScores, scored[i].RerankScore)
 	}
 
-	return &RerankResult{
+	result := &RerankResult{
 		Results:      results,
 		RerankScores: rerankScores,
 		LatencyMs:    float64(time.Since(start).Milliseconds()),
 		TokensUsed:   tokensUsed,
-	}, nil
+	}
+
+	// Collect training data for neural re-ranker (NR-1)
+	if s.dataCollector != nil {
+		s.dataCollector.Collect(req.Query, req.Candidates[:topN], rerankScores, result.LatencyMs)
+	}
+
+	return result, nil
 }
 
 // buildRerankPrompt creates the prompt for the LLM

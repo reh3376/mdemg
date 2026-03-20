@@ -6,10 +6,28 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/ape"
+	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
 	"mdemg/internal/hidden"
 	"mdemg/internal/learning"
 )
+
+// constraintGateAdapter adapts consulting.ConstraintClassifier to conversation.ConstraintGateClassifier.
+// This adapter bridges the consulting and conversation packages without creating a circular import.
+type constraintGateAdapter struct {
+	cc *consulting.ConstraintClassifier
+}
+
+func (a *constraintGateAdapter) Classify(ctx context.Context, nodeID, text string) (*conversation.ConstraintGateResult, error) {
+	result, err := a.cc.Classify(ctx, nodeID, text)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, nil
+	}
+	return &conversation.ConstraintGateResult{Type: result.Type}, nil
+}
 
 // rsicLearningAdapter adapts *learning.Service to ape.LearningStatsProvider.
 type rsicLearningAdapter struct {

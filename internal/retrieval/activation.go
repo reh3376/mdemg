@@ -11,7 +11,11 @@ import (
 // - edges: bounded neighborhood edges
 // - steps: number of propagation steps (typ. 2-5)
 // - lambda: step decay (prevents runaway)
-func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda float64, hopMinWeights []float64) map[string]float64 {
+func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda float64, hopMinWeights []float64, dimWeights ...DimWeights) map[string]float64 {
+	dw := DefaultDimWeights()
+	if len(dimWeights) > 0 {
+		dw = dimWeights[0]
+	}
 	act := map[string]float64{}
 	if steps <= 0 {
 		steps = 2
@@ -96,7 +100,7 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 			// Filter edges by minimum weight for this hop
 			var filteredCount float64
 			for _, e := range ins {
-				if effectiveWeight(e) >= minWeight {
+				if effectiveWeightWithDims(e, dw) >= minWeight {
 					filteredCount++
 				}
 			}
@@ -105,7 +109,7 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 				degreeNorm = 1
 			}
 			for _, e := range ins {
-				w := effectiveWeight(e)
+				w := effectiveWeightWithDims(e, dw)
 				if w < minWeight {
 					continue
 				}
@@ -115,7 +119,7 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 			// inhibitory edges
 			for _, e := range inhib[dst] {
 				srcA := act[e.Src]
-				w := math.Abs(effectiveWeight(e))
+				w := math.Abs(effectiveWeightWithDims(e, dw))
 				acc -= srcA * w
 			}
 			next[dst] = clamp01(acc)
@@ -126,16 +130,42 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 	return act
 }
 
-func effectiveWeight(e Edge) float64 {
+// DimWeights holds the configurable dimension weights for edge effective weight calculation.
+type DimWeights struct {
+	Semantic     float64
+	Temporal     float64
+	Coactivation float64
+}
+
+// DefaultDimWeights returns the default dimension weights (0.6/0.2/0.2).
+func DefaultDimWeights() DimWeights {
+	return DimWeights{Semantic: 0.6, Temporal: 0.2, Coactivation: 0.2}
+}
+
+// DimWeightsFromConfig creates DimWeights from config values.
+func DimWeightsFromConfig(cfg config.Config) DimWeights {
+	dw := DimWeights{
+		Semantic:     cfg.ActivationDimSemanticWeight,
+		Temporal:     cfg.ActivationDimTemporalWeight,
+		Coactivation: cfg.ActivationDimCoactivationWeight,
+	}
+	// Fallback to defaults if all zero (unconfigured)
+	if dw.Semantic == 0 && dw.Temporal == 0 && dw.Coactivation == 0 {
+		return DefaultDimWeights()
+	}
+	return dw
+}
+
+func effectiveWeightWithDims(e Edge, dw DimWeights) float64 {
 	w := e.Weight
 	if w < 0 {
 		w = 0
 	}
 	// Dimension mix; if all dims are 0, treat as semantic=1.0
 	mix := 0.0
-	mix += 0.6 * e.DimSemantic
-	mix += 0.2 * e.DimTemporal
-	mix += 0.2 * e.DimCoactivation
+	mix += dw.Semantic * e.DimSemantic
+	mix += dw.Temporal * e.DimTemporal
+	mix += dw.Coactivation * e.DimCoactivation
 	if mix == 0 {
 		mix = 1.0
 	}
@@ -333,7 +363,11 @@ type WeightedEdge struct {
 // SpreadingActivationWithAttention computes activation with edge-type attention.
 // Unlike SpreadingActivation which only uses CO_ACTIVATED_WITH edges, this
 // includes all edge types with query-aware attention weighting.
-func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int, lambda float64, attention EdgeAttentionWeights, hopMinWeights []float64) map[string]float64 {
+func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int, lambda float64, attention EdgeAttentionWeights, hopMinWeights []float64, dimWeights ...DimWeights) map[string]float64 {
+	dw := DefaultDimWeights()
+	if len(dimWeights) > 0 {
+		dw = dimWeights[0]
+	}
 	act := map[string]float64{}
 	if steps <= 0 {
 		steps = 2
@@ -416,7 +450,7 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 			// Attention-weighted degree normalization (filtered by hop min weight)
 			var totalAttnWeight float64
 			for _, we := range ins {
-				if effectiveWeight(we.Edge) >= minWeight {
+				if effectiveWeightWithDims(we.Edge, dw) >= minWeight {
 					totalAttnWeight += we.AttentionWeight
 				}
 			}
@@ -426,7 +460,7 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 			}
 
 			for _, we := range ins {
-				w := effectiveWeight(we.Edge)
+				w := effectiveWeightWithDims(we.Edge, dw)
 				if w < minWeight {
 					continue
 				}
@@ -438,7 +472,7 @@ func SpreadingActivationWithAttention(cands []Candidate, edges []Edge, steps int
 			// Inhibitory edges (unchanged from original)
 			for _, e := range inhib[dst] {
 				srcA := act[e.Src]
-				w := math.Abs(effectiveWeight(e))
+				w := math.Abs(effectiveWeightWithDims(e, dw))
 				acc -= srcA * w
 			}
 

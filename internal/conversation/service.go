@@ -21,16 +21,30 @@ type LearningService interface {
 	CoactivateSession(ctx context.Context, spaceID, sessionID string) error
 }
 
+// ConstraintGateClassifier is a thin interface for F6a: LLM classifier gate.
+// Implemented by consulting.ConstraintClassifier — defined here to avoid circular imports.
+type ConstraintGateClassifier interface {
+	// Classify returns the constraint classification for the given text.
+	// nodeID is used as a cache key. Returns nil, nil when disabled or uncacheable.
+	Classify(ctx context.Context, nodeID, text string) (*ConstraintGateResult, error)
+}
+
+// ConstraintGateResult holds the classification result used by F6a.
+type ConstraintGateResult struct {
+	Type string // "must", "must_not", "should", "should_not", "none"
+}
+
 // Service handles conversation observation capture and surprise detection
 type Service struct {
-	driver               neo4j.DriverWithContext
-	embedder             Embedder
-	surpriseDetector     *SurpriseDetector
-	learningService      LearningService
-	vectorIndexName      string
-	constraintDetector   *ConstraintDetector
-	constraintDetEnabled bool
-	cfg                  config.Config
+	driver                   neo4j.DriverWithContext
+	embedder                 Embedder
+	surpriseDetector         *SurpriseDetector
+	learningService          LearningService
+	vectorIndexName          string
+	constraintDetector       *ConstraintDetector
+	constraintDetEnabled     bool
+	constraintGateClassifier ConstraintGateClassifier // F6a: optional LLM gate
+	cfg                      config.Config
 }
 
 // NewService creates a new conversation service
@@ -42,7 +56,11 @@ func NewService(driver neo4j.DriverWithContext, embedder Embedder) *Service {
 func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vectorIndexName string, cfg ...config.Config) *Service {
 	var surpriseDet *SurpriseDetector
 	if embedder != nil {
-		surpriseDet = NewSurpriseDetector(embedder, driver)
+		if len(cfg) > 0 {
+			surpriseDet = NewSurpriseDetectorWithConfig(embedder, driver, cfg[0])
+		} else {
+			surpriseDet = NewSurpriseDetector(embedder, driver)
+		}
 	}
 
 	if vectorIndexName == "" {
@@ -72,6 +90,13 @@ func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vec
 // SetLearningService injects the learning service (to avoid circular imports)
 func (s *Service) SetLearningService(learningService LearningService) {
 	s.learningService = learningService
+}
+
+// SetConstraintGateClassifier injects the optional F6a LLM classifier gate.
+// When set and cfg.ConstraintClassifierGateEnabled is true, each regex-detected
+// constraint is confirmed by the LLM before being promoted to a constraint tag.
+func (s *Service) SetConstraintGateClassifier(c ConstraintGateClassifier) {
+	s.constraintGateClassifier = c
 }
 
 // ObserveRequest is the request for capturing an observation
@@ -300,6 +325,24 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	var detectedConstraints []DetectedConstraint
 	if s.constraintDetEnabled && s.constraintDetector != nil {
 		detectedConstraints = s.constraintDetector.Detect(req.Content, obsType)
+
+		// F6a: LLM classifier gate — confirm regex detection before tagging.
+		// If the gate is enabled and the classifier rejects (type == "none"), drop the
+		// detection so the observation is not promoted to a constraint node.
+		if len(detectedConstraints) > 0 &&
+			s.cfg.ConstraintClassifierGateEnabled &&
+			s.constraintGateClassifier != nil {
+
+			classification, classErr := s.constraintGateClassifier.Classify(ctx, nodeID, req.Content)
+			if classErr != nil {
+				log.Printf("[WARN] F6a constraint classifier gate failed (passing through): %v", classErr)
+				// fail-open: keep detectedConstraints as-is
+			} else if classification != nil && classification.Type == "none" {
+				log.Printf("F6a: classifier rejected regex constraint detection for obs %s — skipping promotion", obsID)
+				detectedConstraints = nil
+			}
+		}
+
 		if len(detectedConstraints) > 0 {
 			for _, dc := range detectedConstraints {
 				tags = append(tags, "constraint:"+dc.ConstraintType)

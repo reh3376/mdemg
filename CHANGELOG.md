@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Debian Native Packaging (.deb + APT Repository)**: Native `.deb` package generation via GoReleaser nfpms plugin — no external `fpm` dependency needed. Packages include CLI binary, man pages, systemd template units (`mdemg@.service`, `mdemg-rsic@.service`, `mdemg-rsic@.timer`), and UxTS plugin manifest. Docker listed as `recommends` (not hard dependency) so the package installs cleanly on systems where Docker isn't yet configured. APT repository hosted on GitHub Pages (`apt-mdemg` repo) with GPG-signed Release files, automated by `apt-publish.yml` workflow triggered after each release. Users can install via `sudo apt install mdemg` after adding the repository. Sidebar `.deb` (built by Tauri) also included in the same APT repo. AUR PKGBUILD template provided for Arch Linux users (`packaging/aur/PKGBUILD`). Package scripts handle systemd daemon-reload on install, service stop on remove, and `/usr/share/mdemg` cleanup on purge. Flatpak was evaluated and rejected — MDEMG requires Docker for Neo4j, which conflicts with Flatpak's sandbox model.
 - **Linux Distribution — Binary Builds + Sidebar Application**: Full Linux platform support with binary builds and desktop companion app. **Phase 1 (Binary Builds):** 4 goreleaser Linux build entries (mdemg + uxts-module, amd64 + arm64) using zig cross-compilation for CGO. Fixed `install.sh` systemd bug (units now bundled in release tarball for curl-pipe installs). Updated beta docs to reflect actual available install methods. **Phase 2 (Sidebar App):** Full Tauri 1.x implementation ported from macOS menubar — Rust backend (7 modules: types, api_client, cli_executor, server_discovery, instance_store, instance_scanner, 30+ commands) + vanilla JS frontend (pub/sub state, 7 tab renderers for Status/Memory/Learning/Neo4j/Config/Logs/RSIC, Catppuccin Mocha UI, polling manager, multi-instance support with auto-discovery). `cargo check` passes cleanly. Submodules: `packaging/mdemg_linux` (installer, systemd, docs), `packaging/mdemg-linux-sidebar` (Tauri app). Supports Ubuntu 20.04+, Debian 11+, Fedora 36+, RHEL 8+, Arch Linux.
 - **AutoResearch Integration — Phase AR-1: RSIC Feedback Loop**: Post-cycle re-assessment populates `metrics_after` in `CycleOutcome` by running `Assessor.Assess()` after task execution, enabling before/after metric comparison. Success criteria evaluation checks `RSICTaskSpec.SuccessCriteria` against actual metric deltas — `CriteriaMet` and `CriteriaDetail` fields added to `CycleOutcome`. Auto-rollback for reversible actions (`tombstone_stale`, `graduate_volatile`) that didn't improve metrics via `SnapshotStore.Rollback()`. Prometheus counter `mdemg_rsic_rollbacks_total`. `UpdateCalibration` now only counts tasks as "success" if criteria were met. 8 new unit tests in `calibration_test.go`. Files: `internal/ape/calibration.go`, `internal/ape/cycle.go`, `internal/ape/types_rsic.go`.
 - **AutoResearch Integration — Phase AR-2: Jiminy Guidance Effectiveness Tracking**: `POST /v1/jiminy/feedback` endpoint for correlating agent actions with Jiminy guidance. `GuidanceEffectivenessTracker` with LRU cache (TTL-based expiry, configurable via `JIMINY_EFFECTIVENESS_TTL_SEC`). `Guide()` now returns `guidance_id` (UUID) in response for tracking. Outcome classification via text overlap scoring with negation detection: `followed`, `ignored`, `contradicted`, `unknown`. Config: `JIMINY_EFFECTIVENESS_ENABLED` (default: true), `JIMINY_EFFECTIVENESS_TTL_SEC` (default: 1800). 9 new unit tests. Files: `internal/jiminy/effectiveness.go` (new), `internal/jiminy/service.go`, `internal/jiminy/types.go`, `internal/api/handlers_jiminy.go`.
@@ -159,6 +160,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Standardized symbol field names to UPTS across codebase
 - Reorganized documentation structure
+
+## [FSD-2026-001] — 2026-03-19
+
+### Added
+
+- **Constraint enforcement hook (GAP-01)**: PreToolUse hook blocks/warns on Write/Edit based on guardrail validation
+- **Contradiction detection (GAP-02)**: Embedding similarity + negation heuristics, with optional NLI sidecar enhancement
+- **Effectiveness feedback persistence (GAP-03/08)**: GUIDANCE_OUTCOME edges, Bayesian confidence evolution for constraints
+- **Cross-constraint conflict detection (GAP-04)**: Pairwise conflict scan via embedding similarity + type opposition
+- **Dynamic confidence inheritance (GAP-05)**: Constraints inherit detection confidence instead of hardcoded 0.8
+- **LLM constraint classification gate (GAP-06)**: NLI sidecar confirms/rejects regex detections
+- **Constraint scope filtering (GAP-07)**: File path glob matching limits constraint applicability
+- **Determinism score metric (GAP-09/19)**: D = (informed/total) * compliance * coverage
+- **Jiminy guidance cache (GAP-10)**: LRU + TTL cache for sub-second repeat queries
+- **Configurable dimension weights (GAP-11)**: Semantic/temporal/coactivation weights via config
+- **Prompt injection sanitization (GAP-14)**: Strips injection phrases, role lines, code fences, excessive repetition
+- **Authority level filtering (GAP-20)**: org_policy > team_standard > preference hierarchy
+- **Neural re-ranker Python sidecar (NR-2)**: FastAPI with cross-encoder re-ranking + NLI classification
+- **Go neural integration (NR-3)**: HTTP client with circuit breaker for sidecar /rerank endpoint
+- **Training data collection (NR-1)**: Async JSONL logging of (query, candidate, score) tuples
+- 8 new API endpoints, 38 new config parameters (all default disabled), 12 new UATS specs
+- 2 Neo4j migrations: V0020 (constraint lifecycle), V0021 (constraint conflicts)
+
+### Changed
+
+- `SanitizeUserContext` now appends "..." when truncating
+- Constraint retrieval accepts `trustLevel` parameter for authority-based filtering
+- Activation spreading uses configurable dimension weights instead of hardcoded values
+
+### Technical
+
+- 33 new files, 21 modified files
+- 171 total UATS specs (up from 159)
+- All Go tests passing, 0 lint issues
 
 ## [0.1.0] - 2026-01-15
 
