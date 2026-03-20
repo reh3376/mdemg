@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local man install-man
+.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local man install-man test-fsd test-fsd-unit test-fsd-integration test-fsd-acceptance build-sidecar test-sidecar-python
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -116,6 +116,12 @@ help:
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-setup      - Install dependencies"
 	@echo "  run            - Build and run MDEMG server"
+	@echo "  test-fsd       - Run all FSD-2026-001 tests (unit + integration + acceptance)"
+	@echo "  test-fsd-unit  - Run FSD-related Go unit tests"
+	@echo "  test-fsd-integration - Run FSD integration tests"
+	@echo "  test-fsd-acceptance  - Run FSD E2E acceptance test (requires running server)"
+	@echo "  build-sidecar  - Build the neural sidecar Docker image"
+	@echo "  test-sidecar-python  - Run neural sidecar Python tests via uv"
 # ============================================================
 # Man Page Targets
 # ============================================================
@@ -340,3 +346,39 @@ test-udts:
 	python3 docs/api/api-spec/udts/runners/udts_runner.py \
 		--report /tmp/udts-report.json
 	@echo "Report saved to /tmp/udts-report.json"
+
+# ============================================================
+# FSD-2026-001 Testing Targets
+# ============================================================
+
+# Run all FSD tests
+test-fsd: test-fsd-unit test-fsd-integration test-fsd-acceptance
+	@echo "All FSD tests complete"
+
+# Run FSD-related Go unit tests
+test-fsd-unit:
+	@echo "Running FSD unit tests..."
+	go test -v ./internal/guardrail/... ./internal/jiminy/... \
+		./internal/hidden/... ./internal/conversation/... \
+		./internal/sanitize/... ./internal/metrics/... \
+		./internal/llmclient/... -timeout 120s
+
+# Run FSD integration tests
+test-fsd-integration:
+	@echo "Running FSD integration tests..."
+	go test -v -tags=integration ./tests/integration/... -timeout 120s
+
+# Run FSD E2E acceptance test (requires running server)
+test-fsd-acceptance: build-cli
+	@echo "Running FSD acceptance test..."
+	bash scripts/fsd-acceptance.sh --binary $(PWD)/bin/mdemg --base-url $(BASE_URL)
+
+# Build the neural sidecar Docker image
+build-sidecar:
+	@echo "Building neural sidecar..."
+	docker compose build neural-sidecar
+
+# Run neural sidecar Python tests
+test-sidecar-python:
+	@echo "Running neural sidecar Python tests..."
+	cd neural && uv run python -m pytest tests/ -v

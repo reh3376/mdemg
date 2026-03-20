@@ -39,8 +39,9 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 new config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness tracking, AR-3 LLM intelligence)
   Feature docs: docs/features/rsic-feedback-loop.md, jiminy-effectiveness-tracking.md, llm-powered-intelligence.md
-- FSD-2026-001 Gap Closure — COMPLETE (GAP-01 through GAP-20 + F12/F15-F18 + NR-4 + F21, 65 files changed, 8 new endpoints)
-  Remaining FSD items: NR-5/FSD-Final (acceptance script, docker-compose sidecar service, Makefile targets)
+- FSD-2026-001 Gap Closure — FULLY COMPLETE (GAP-01 through GAP-21 + NR-1 through NR-5 + F21, 70+ files changed, 8 new endpoints)
+  All items closed: enforcement, feedback, conflicts, contradiction, scope, determinism, neural stack, LLM dedup, acceptance tests
+  Spec: docs/specs/phase-fsd-constraint-lifecycle.md | Feature doc: docs/features/neural-training-pipeline.md
 - Debian Native Packaging — COMPLETE (.deb via goreleaser nfpms, APT repo via GitHub Pages, AUR PKGBUILD)
   apt-mdemg submodule at packaging/apt-mdemg, secrets APT_SIGNING_KEY + APT_REPO_TOKEN configured
 - CI: Build/Lint/Security/Unit Tests/Integration/Sidecar ALL GREEN as of 2026-03-20
@@ -212,11 +213,11 @@ WHAT REMAINS TO BE DONE:
 7. VISION: VS Code extension (Phase VSX-1 through VSX-5, ~20-28 dev-days)
 8. BENCHMARKING: ~~Run ANN optimization benchmark~~ DONE (0.85 mean score, up from 0.783 baseline)
 9. DOCUMENTATION: ~~Update homebrew-mdemg + mdemg-windows cli-reference.md for shareable export/import flags~~ DONE (committed in submodules 2026-03-16)
-10. DOCUMENTATION: Create `docs/specs/phase-fsd-constraint-lifecycle.md` spec document for FSD-2026-001
-11. DOCUMENTATION: Update homebrew-mdemg docs for 8 new FSD-2026-001 endpoints and 38 new config params
+10. DOCUMENTATION: ~~Create `docs/specs/phase-fsd-constraint-lifecycle.md` spec document~~ DONE (520 lines, all 21 gaps, architecture diagrams, file inventory)
+11. DOCUMENTATION: ~~Update homebrew-mdemg docs for 8 new FSD endpoints and 38 config params~~ DONE (committed in submodules 2026-03-19)
 12. FSD: ~~NR-4~~ DONE — Python training pipeline (train.py, evaluate.py, model versioning, CLI entrypoints in `plugins/uxts-module/`)
 13. FSD: ~~F21~~ DONE — LLM client deduplication (`internal/llmclient/` package, 725 lines of duplication removed across 5 packages)
-14. FSD: NR-5 + FSD-Final — Acceptance script (`scripts/fsd-acceptance.sh`), docker-compose sidecar service, Makefile targets
+14. FSD: ~~NR-5 + FSD-Final~~ DONE — Acceptance script (`scripts/fsd-acceptance.sh`, 23 steps), docker-compose neural sidecar, Makefile targets (test-fsd, build-sidecar), phase spec doc
 15. CI: UATS runner counts `llm_required` tag exclusions as "errors" — update runner to treat excluded tags as skips, not errors
 16. PACKAGING: ~~Debian .deb + APT repository~~ DONE (goreleaser nfpms, apt-mdemg repo, GPG signing, PR #162)
 
