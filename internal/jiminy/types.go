@@ -3,6 +3,11 @@
 // domain-specific context drawn from MDEMG's curated knowledge graph.
 package jiminy
 
+import (
+	"context"
+	"time"
+)
+
 // GuidanceType categorizes the kind of guidance item.
 type GuidanceType string
 
@@ -14,6 +19,10 @@ const (
 	GuidanceRisk          GuidanceType = "risk"
 	GuidanceSuggestion    GuidanceType = "suggestion"
 	GuidanceFrontier      GuidanceType = "frontier"
+	GuidanceDecision      GuidanceType = "decision"   // J7: from retrieval pipeline
+	GuidanceLearning      GuidanceType = "learning"    // J7: from retrieval pipeline
+	GuidancePreference    GuidanceType = "preference"  // J7: from retrieval pipeline
+	GuidanceConcept       GuidanceType = "concept"     // J7: from retrieval pipeline (L2-L5 nodes)
 )
 
 // GuidanceRequest is the input to the Guide() method.
@@ -29,23 +38,26 @@ type GuidanceRequest struct {
 
 // GuidanceResponse is the output from the Guide() method.
 type GuidanceResponse struct {
-	GuidanceID         string         `json:"guidance_id"` // UUID for feedback correlation (Phase AR-2)
-	Guidance           []GuidanceItem `json:"guidance"`
-	PromptAugmentation string         `json:"prompt_augmentation"`
-	Confidence         float64        `json:"confidence"`
-	Rationale          string         `json:"rationale"`
-	Warnings           []string       `json:"warnings,omitempty"`
-	SourceCounts       SourceCounts   `json:"source_counts"`
-	Debug              map[string]any `json:"debug,omitempty"`
+	GuidanceID            string              `json:"guidance_id"` // UUID for feedback correlation (Phase AR-2)
+	Guidance              []GuidanceItem      `json:"guidance"`
+	PromptAugmentation    string              `json:"prompt_augmentation"`
+	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"` // J8: LLM-synthesized guidance
+	Confidence            float64             `json:"confidence"`
+	Rationale             string              `json:"rationale"`
+	Warnings              []string            `json:"warnings,omitempty"`
+	SourceCounts          SourceCounts        `json:"source_counts"`
+	SessionEscalation     *SessionEscalation  `json:"session_escalation,omitempty"` // J12: escalation state
+	Debug                 map[string]any      `json:"debug,omitempty"`
 }
 
 // GuidanceItem is a single piece of guidance.
 type GuidanceItem struct {
-	Type        GuidanceType `json:"type"`
-	Priority    string       `json:"priority"`    // high, medium, low
-	Content     string       `json:"content"`
-	Confidence  float64      `json:"confidence"`
-	SourceNodes []string     `json:"source_nodes,omitempty"`
+	Type            GuidanceType    `json:"type"`
+	Priority        string          `json:"priority"`    // high, medium, low
+	Content         string          `json:"content"`
+	Confidence      float64         `json:"confidence"`
+	SourceNodes     []string        `json:"source_nodes,omitempty"`
+	EscalationLevel EscalationLevel `json:"escalation_level,omitempty"` // J12: current escalation state
 }
 
 // SourceCounts tracks how many items came from each source.
@@ -55,6 +67,7 @@ type SourceCounts struct {
 	Patterns      int `json:"patterns"`
 	Conflicts     int `json:"conflicts"`
 	Frontiers     int `json:"frontiers"`
+	Retrievals    int `json:"retrievals,omitempty"` // J7: from retrieval pipeline
 }
 
 // correctionMatch represents a correction observation found via vector search.
@@ -87,10 +100,11 @@ type frontierMatch struct {
 type GuidanceOutcome string
 
 const (
-	OutcomeFollowed     GuidanceOutcome = "followed"
-	OutcomeIgnored      GuidanceOutcome = "ignored"
-	OutcomeContradicted GuidanceOutcome = "contradicted"
-	OutcomeUnknown      GuidanceOutcome = "unknown"
+	OutcomeFollowed          GuidanceOutcome = "followed"
+	OutcomePartialCompliance GuidanceOutcome = "partial_compliance" // J14: agent addressed some but not all aspects
+	OutcomeIgnored           GuidanceOutcome = "ignored"
+	OutcomeContradicted      GuidanceOutcome = "contradicted"
+	OutcomeUnknown           GuidanceOutcome = "unknown"
 )
 
 // GuidanceFeedbackRequest is the input to the feedback endpoint.
@@ -113,4 +127,102 @@ type GuidanceItemFeedback struct {
 	Content    string          `json:"content"`
 	Outcome    GuidanceOutcome `json:"outcome"`
 	Similarity float64         `json:"similarity"`
+	Reasoning  string          `json:"reasoning,omitempty"` // J14: LLM classification reasoning
+}
+
+// ClassificationResult holds the result of semantic outcome classification (J14).
+type ClassificationResult struct {
+	Outcome    GuidanceOutcome `json:"outcome"`
+	Confidence float64         `json:"confidence"`
+	Reasoning  string          `json:"reasoning,omitempty"`
+}
+
+// --- J7: RetrievalProvider interface ---
+
+// RetrievalProvider defines the interface for accessing the full retrieval pipeline.
+type RetrievalProvider interface {
+	RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int) ([]RetrievalResult, error)
+}
+
+// RetrievalResult is a simplified view of models.RetrieveResult for Jiminy use.
+type RetrievalResult struct {
+	NodeID  string  `json:"node_id"`
+	Name    string  `json:"name"`
+	Summary string  `json:"summary"`
+	Layer   int     `json:"layer"`
+	Score   float64 `json:"score"`
+	ObsType string  `json:"obs_type,omitempty"` // observation type if L0
+}
+
+// --- J9: Evaluate types ---
+
+// EvaluateRequest is the input to the Evaluate endpoint.
+type EvaluateRequest struct {
+	SpaceID     string `json:"space_id"`
+	AgentOutput string `json:"agent_output"`
+	FilePath    string `json:"file_path,omitempty"`
+	ToolName    string `json:"tool_name,omitempty"`
+	SessionID   string `json:"session_id,omitempty"`
+}
+
+// EvaluateResponse is the output from the Evaluate endpoint.
+type EvaluateResponse struct {
+	EvaluationID string           `json:"evaluation_id"`
+	Status       string           `json:"status"` // "pass", "warning", "concern"
+	Items        []EvaluationItem `json:"items"`
+	Summary      string           `json:"summary"`
+}
+
+// EvaluationItem is a single evaluation finding.
+type EvaluationItem struct {
+	Type        GuidanceType `json:"type"`
+	Content     string       `json:"content"`
+	Severity    string       `json:"severity"` // "low", "medium", "high"
+	SourceNode  string       `json:"source_node,omitempty"`
+	Reasoning   string       `json:"reasoning,omitempty"`   // J13: LLM reasoning for the finding
+	Remediation string       `json:"remediation,omitempty"` // J13: suggested remediation
+}
+
+// --- J10: Jiminy stats for RSIC ---
+
+// JiminyStats holds aggregated guidance metrics for RSIC assessment.
+type JiminyStats struct {
+	TotalGuidanceIssued int     `json:"total_guidance_issued"`
+	TotalFollowed       int     `json:"total_followed"`
+	TotalIgnored        int     `json:"total_ignored"`
+	TotalContradicted   int     `json:"total_contradicted"`
+	FollowRate          float64 `json:"follow_rate"`
+	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
+	SourceDiversity     float64 `json:"source_diversity"` // 0-1, higher = more diverse
+}
+
+// --- J12: Escalation types ---
+
+// EscalationLevel represents the current escalation state for a constraint.
+type EscalationLevel string
+
+const (
+	EscalationInactive  EscalationLevel = ""          // not yet surfaced
+	EscalationSurfaced  EscalationLevel = "surfaced"  // first presentation
+	EscalationWarned    EscalationLevel = "warned"     // ignored once, now warned
+	EscalationEscalated EscalationLevel = "escalated"  // ignored multiple times
+	EscalationBlocked   EscalationLevel = "blocked"    // max escalation
+	EscalationResolved  EscalationLevel = "resolved"   // agent followed guidance
+)
+
+// SessionEscalation summarizes escalation state for a guidance response.
+type SessionEscalation struct {
+	ActiveEscalations int               `json:"active_escalations"`
+	WarnedCount       int               `json:"warned_count"`
+	EscalatedCount    int               `json:"escalated_count"`
+	BlockedCount      int               `json:"blocked_count"`
+	Details           []EscalationEntry `json:"details,omitempty"`
+}
+
+// EscalationEntry tracks the escalation state for a specific constraint in a session.
+type EscalationEntry struct {
+	NodeID        string          `json:"node_id"`
+	Level         EscalationLevel `json:"level"`
+	IgnoreCount   int             `json:"ignore_count"`
+	LastSurfaced  time.Time       `json:"last_surfaced"`
 }

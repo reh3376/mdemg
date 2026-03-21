@@ -22,6 +22,7 @@ type YAMLConfig struct {
 	Learning  LearningYAML  `yaml:"learning,omitempty"`
 	Plugins   PluginsYAML   `yaml:"plugins,omitempty"`
 	Schema    SchemaYAML    `yaml:"schema,omitempty"`
+	Jiminy    JiminyYAML    `yaml:"jiminy"`
 }
 
 // BackupYAML holds periodic backup and retention settings.
@@ -86,6 +87,19 @@ type SchemaYAML struct {
 	Version int `yaml:"version,omitempty"`
 }
 
+// JiminyYAML holds Jiminy inner-voice guidance settings.
+type JiminyYAML struct {
+	Enabled             bool   `yaml:"enabled"`                         // Enable Jiminy guidance (default: true)
+	SynthesisEnabled    bool   `yaml:"synthesis_enabled,omitempty"`     // Enable LLM synthesis (default: true)
+	SynthesisProvider   string `yaml:"synthesis_provider,omitempty"`    // LLM provider for synthesis (inherits llm.provider)
+	SynthesisModel      string `yaml:"synthesis_model,omitempty"`       // LLM model for synthesis (inherits llm.model)
+	EvaluateEnabled     bool   `yaml:"evaluate_enabled,omitempty"`      // Enable agent output evaluation (default: true)
+	EvaluateLLMEnabled  bool   `yaml:"evaluate_llm_enabled,omitempty"`  // Enable LLM Tier 2 evaluation (default: false)
+	EvaluateLLMProvider string `yaml:"evaluate_llm_provider,omitempty"` // LLM provider for evaluation (inherits llm.provider)
+	EvaluateLLMModel    string `yaml:"evaluate_llm_model,omitempty"`    // LLM model for evaluation (inherits llm.model)
+	OutcomeLLMEnabled   bool   `yaml:"outcome_llm_enabled,omitempty"`   // Enable LLM outcome classification (default: false)
+}
+
 // yamlEnvMapping defines the mapping from YAML dot-path to environment variable.
 // The special prefix "PORT:" indicates the value needs int→":PORT" conversion.
 var yamlEnvMapping = []struct {
@@ -125,6 +139,16 @@ var yamlEnvMapping = []struct {
 	{"backup.interval_hours", "BACKUP_PARTIAL_INTERVAL_HOURS", nil},
 	{"backup.retention_count", "BACKUP_RETENTION_FULL_COUNT", nil},
 	{"backup.retention_count", "BACKUP_RETENTION_PARTIAL_COUNT", nil},
+	// Jiminy inner-voice
+	{"jiminy.enabled", "JIMINY_ENABLED", nil},
+	{"jiminy.synthesis_enabled", "JIMINY_SYNTHESIS_ENABLED", nil},
+	{"jiminy.synthesis_provider", "JIMINY_SYNTHESIS_PROVIDER", nil},
+	{"jiminy.synthesis_model", "JIMINY_SYNTHESIS_MODEL", nil},
+	{"jiminy.evaluate_enabled", "JIMINY_EVALUATE_ENABLED", nil},
+	{"jiminy.evaluate_llm_enabled", "JIMINY_EVALUATE_LLM_ENABLED", nil},
+	{"jiminy.evaluate_llm_provider", "JIMINY_EVALUATE_LLM_PROVIDER", nil},
+	{"jiminy.evaluate_llm_model", "JIMINY_EVALUATE_LLM_MODEL", nil},
+	{"jiminy.outcome_llm_enabled", "JIMINY_OUTCOME_LLM_ENABLED", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.
@@ -269,6 +293,25 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 		m["schema.version"] = strconv.Itoa(cfg.Schema.Version)
 	}
 
+	// Jiminy — always emit enabled (explicit false prevents server default from re-enabling)
+	m["jiminy.enabled"] = strconv.FormatBool(cfg.Jiminy.Enabled)
+	if cfg.Jiminy.SynthesisEnabled {
+		m["jiminy.synthesis_enabled"] = "true"
+	}
+	setIfNonEmpty(m, "jiminy.synthesis_provider", cfg.Jiminy.SynthesisProvider)
+	setIfNonEmpty(m, "jiminy.synthesis_model", cfg.Jiminy.SynthesisModel)
+	if cfg.Jiminy.EvaluateEnabled {
+		m["jiminy.evaluate_enabled"] = "true"
+	}
+	if cfg.Jiminy.EvaluateLLMEnabled {
+		m["jiminy.evaluate_llm_enabled"] = "true"
+	}
+	setIfNonEmpty(m, "jiminy.evaluate_llm_provider", cfg.Jiminy.EvaluateLLMProvider)
+	setIfNonEmpty(m, "jiminy.evaluate_llm_model", cfg.Jiminy.EvaluateLLMModel)
+	if cfg.Jiminy.OutcomeLLMEnabled {
+		m["jiminy.outcome_llm_enabled"] = "true"
+	}
+
 	return m
 }
 
@@ -393,6 +436,9 @@ type InitOptions struct {
 	BackupRetention   int
 	PluginsEnabled    bool
 	PluginsDir        string
+	JiminyEnabled     bool
+	JiminyModel       string
+	JiminyProvider    string
 }
 
 // GenerateConfigYAML produces a config.yaml file from wizard answers.
@@ -442,6 +488,19 @@ func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 			Enabled: true,
 			Dir:     opts.PluginsDir,
 		}
+	}
+
+	// Always emit jiminy section when wizard runs (explicit user choice)
+	cfg.Jiminy = JiminyYAML{
+		Enabled: opts.JiminyEnabled,
+	}
+	if opts.JiminyEnabled && opts.JiminyModel != "" {
+		cfg.Jiminy.SynthesisEnabled = true
+		cfg.Jiminy.SynthesisProvider = opts.JiminyProvider
+		cfg.Jiminy.SynthesisModel = opts.JiminyModel
+		cfg.Jiminy.EvaluateEnabled = true
+		cfg.Jiminy.EvaluateLLMProvider = opts.JiminyProvider
+		cfg.Jiminy.EvaluateLLMModel = opts.JiminyModel
 	}
 
 	data, err := yaml.Marshal(cfg)

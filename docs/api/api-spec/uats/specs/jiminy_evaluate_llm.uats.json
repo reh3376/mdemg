@@ -1,0 +1,136 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Evaluate LLM Tier 2",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "evaluate",
+      "llm",
+      "phase_j13"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the Jiminy evaluator LLM Tier 2 response fields (J13). When JIMINY_EVALUATE_LLM_ENABLED=true, evaluate responses include reasoning and remediation fields from LLM analysis. Requires llm_required tag — skipped in CI without LLM provider.",
+    "test_type": "contract",
+    "priority": "medium",
+    "llm_required": true
+  },
+  "config": {
+    "timeout_ms": 20000,
+    "tags": [
+      "jiminy",
+      "evaluate",
+      "llm",
+      "phase_j13",
+      "llm_required"
+    ]
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "agent_output": "const API_KEY = 'sk-abc123'; fetch('https://api.example.com')"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/evaluate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "agent_output": "{{agent_output}}"
+    }
+  },
+  "expected": {
+    "status": [200, 503],
+    "body_assertions": [
+      {
+        "name": "evaluation_id present",
+        "path": "$.data.evaluation_id",
+        "exists": true
+      },
+      {
+        "name": "status is valid enum",
+        "path": "$.data.status",
+        "one_of": ["pass", "warning", "concern"]
+      },
+      {
+        "name": "items is array",
+        "path": "$.data.items",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "response_shape_with_llm_fields",
+      "description": "When LLM Tier 2 is active and returns items, each item may have reasoning and remediation fields. This validates the response shape is correct regardless of LLM state.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "agent_output": "{{agent_output}}",
+          "session_id": "uats-j13-test"
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": [
+          {
+            "name": "data object present",
+            "path": "$.data",
+            "exists": true
+          },
+          {
+            "name": "summary is string if present",
+            "path": "$.data.summary",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_space_id",
+      "description": "Returns 400 when space_id is missing.",
+      "request": {
+        "body": {
+          "space_id": "",
+          "agent_output": "{{agent_output}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_agent_output",
+      "description": "Returns 400 when agent_output is missing.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "agent_output": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ]
+}

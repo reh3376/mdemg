@@ -13,15 +13,21 @@ import (
 
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
 type Assessor struct {
-	cfg     config.Config
-	driver  neo4j.DriverWithContext
-	learner LearningStatsProvider
-	convSvc ConversationStatsProvider
+	cfg             config.Config
+	driver          neo4j.DriverWithContext
+	learner         LearningStatsProvider
+	convSvc         ConversationStatsProvider
+	jiminyProvider  JiminyStatsProvider // J10: guidance stats provider
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
 func NewAssessor(cfg config.Config, driver neo4j.DriverWithContext, learner LearningStatsProvider, convSvc ConversationStatsProvider) *Assessor {
 	return &Assessor{cfg: cfg, driver: driver, learner: learner, convSvc: convSvc}
+}
+
+// SetJiminyProvider attaches a Jiminy stats provider for guidance health assessment (J10).
+func (a *Assessor) SetJiminyProvider(p JiminyStatsProvider) {
+	a.jiminyProvider = p
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -72,11 +78,27 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	report.EdgeHealth = a.scoreEdge(report)
 	report.TaskPerformance = a.scoreTask(report)
 
-	// 6. Weighted overall
-	report.OverallHealth = 0.30*report.RetrievalQuality +
-		0.25*report.MemoryHealth +
-		0.25*report.EdgeHealth +
-		0.20*report.TaskPerformance
+	// 5b. J10: Compute guidance health if Jiminy stats available
+	if a.jiminyProvider != nil {
+		jiminyStats, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
+		if jErr == nil && jiminyStats.TotalGuidanceIssued > 0 {
+			report.GuidanceHealth = a.scoreGuidance(jiminyStats)
+		}
+	}
+
+	// 6. Weighted overall (adjusted weights for 5 dimensions)
+	if report.GuidanceHealth > 0 {
+		report.OverallHealth = 0.25*report.RetrievalQuality +
+			0.25*report.MemoryHealth +
+			0.20*report.EdgeHealth +
+			0.15*report.TaskPerformance +
+			0.15*report.GuidanceHealth
+	} else {
+		report.OverallHealth = 0.30*report.RetrievalQuality +
+			0.25*report.MemoryHealth +
+			0.25*report.EdgeHealth +
+			0.20*report.TaskPerformance
+	}
 
 	report.Confidence = a.computeConfidence(report)
 
@@ -222,6 +244,15 @@ func (a *Assessor) scoreTask(r *SelfAssessmentReport) float64 {
 	}
 	permanentRatio := float64(r.PermanentCount) / float64(total)
 	return clamp(permanentRatio, 0, 1)
+}
+
+// scoreGuidance computes guidance health from Jiminy stats (J10).
+func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
+	// Weighted combination: follow rate (50%), effectiveness (30%), diversity (20%)
+	followScore := clamp(stats.FollowRate, 0, 1)
+	effScore := clamp(stats.ConstraintEffRate, 0, 1)
+	diversityScore := clamp(stats.SourceDiversity, 0, 1)
+	return 0.5*followScore + 0.3*effScore + 0.2*diversityScore
 }
 
 func (a *Assessor) computeConfidence(r *SelfAssessmentReport) float64 {

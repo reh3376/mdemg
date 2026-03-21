@@ -10,9 +10,9 @@ In the internal dialogue analogy: if MDEMG is the ANN equivalent of a human's in
 
 ## How It Works
 
-### 4-Source Parallel Fan-Out Architecture
+### 5-Source Parallel Fan-Out Architecture (J7)
 
-Jiminy orchestrates four independent knowledge sources in parallel, each running as a goroutine with a shared timeout context:
+Jiminy orchestrates five independent knowledge sources in parallel, each running as a goroutine with a shared timeout context:
 
 ```
 User Prompt
@@ -53,10 +53,11 @@ Prompt Augmentation Block (injected before agent sees prompt)
 | **B: Correction Vector Search** | `findRelevantCorrections()` | Past correction observations via semantic similarity | High |
 | **C: Contradiction Checking** | `findContradictions()` | `CONTRADICTS` edges between nodes (conflicting knowledge) | High |
 | **D: Frontier Surfacing** | `findRelevantFrontiers()` | Frontier nodes (`is_frontier=true`) — thin knowledge areas | Low |
+| **E: Full Retrieval Pipeline** (J7) | `retriever.RetrieveForJiminy()` | All 8 obs_types, L0-L5 concepts, Hebbian edges, 14-component scoring | Varies by layer |
 
-**Processing pipeline:** Generate embedding → fan out to 4 sources → lock-protected merge → filter by min confidence → deduplicate by content → sort by priority then confidence → truncate to max items → format prompt augmentation.
+**Processing pipeline:** Generate embedding → fan out to 5 sources → lock-protected merge → filter by min confidence → deduplicate by content → sort by priority then confidence → truncate to max items → apply escalation effects (J12) → LLM synthesis (J8, if enabled) → format prompt augmentation.
 
-**Graceful degradation:** If embeddings fail, vector-based sources (B, C, D) are skipped; consulting (A) still works. Late arrivals past the timeout are dropped silently.
+**Graceful degradation:** If embeddings fail, vector-based sources (B, C, D) are skipped; consulting (A) and retrieval (E) still work. Late arrivals past the timeout are dropped silently. LLM synthesis (J8) falls back to static list formatting on error.
 
 ## What Jiminy Surfaces
 
@@ -67,6 +68,10 @@ Prompt Augmentation Block (injected before agent sees prompt)
 | **Contradictions** | `Result A contradicts known pattern B (evidence: 3 rejections)` | CONTRADICTS edges exist between relevant nodes |
 | **Patterns** | `API handlers follow: method check → parse → validate → service call → writeJSON` | Consulting service finds related patterns |
 | **Frontiers** | `Scraper orchestration: limited knowledge, proceed carefully` | Frontier nodes match context (thin knowledge areas) |
+| **Decisions** (J7) | `Past decision: Use PostgreSQL for transactional data` | Decision observations retrieved via full pipeline |
+| **Learnings** (J7) | `Learning: DBSCAN eps=0.3 works best for concept clustering` | Learning observations from retrieval pipeline |
+| **Preferences** (J7) | `Preference: Use conventional commits for all messages` | User/team preference observations |
+| **Concepts** (J7) | `Concept: Auth middleware pattern (L3, high-level)` | L2-L5 concept nodes from knowledge hierarchy |
 
 ## Injection Format
 
@@ -108,6 +113,45 @@ FRONTIERS:
 | JiminyFrontierMinSim | `0.5` | `JIMINY_FRONTIER_MIN_SIM` | Minimum cosine similarity for frontier nodes |
 
 Additional CMS config: `CMS_JIMINY_BASE_CONFIDENCE` (default: `0.5`) — base confidence for Jiminy rationale.
+
+### J7-J12 Configuration
+
+| Parameter | Default | Env Var | Description |
+|-----------|---------|---------|-------------|
+| JiminyRetrievalEnabled | `true` | `JIMINY_RETRIEVAL_ENABLED` | Enable Source E (full retrieval pipeline) |
+| JiminyRetrievalTopK | `10` | `JIMINY_RETRIEVAL_TOP_K` | Max results from retrieval pipeline |
+| JiminyRetrievalHopDepth | `2` | `JIMINY_RETRIEVAL_HOP_DEPTH` | Graph hop depth for retrieval |
+| JiminySynthesisEnabled | `true` | `JIMINY_SYNTHESIS_ENABLED` | Enable LLM-powered guidance synthesis (J8) |
+| JiminySynthesisProvider | (inherits) | `JIMINY_SYNTHESIS_PROVIDER` | LLM provider for synthesis |
+| JiminySynthesisModel | (inherits) | `JIMINY_SYNTHESIS_MODEL` | LLM model for synthesis |
+| JiminySynthesisMaxTokens | `2000` | `JIMINY_SYNTHESIS_MAX_TOKENS` | Max tokens for synthesis |
+| JiminySynthesisTimeoutMs | `10000` | `JIMINY_SYNTHESIS_TIMEOUT_MS` | Synthesis timeout (ms) |
+| JiminyEvaluateEnabled | `true` | `JIMINY_EVALUATE_ENABLED` | Enable agent output evaluation (J9) |
+| JiminyEvaluateTimeoutMs | `3000` | `JIMINY_EVALUATE_TIMEOUT_MS` | Evaluation timeout (ms) |
+| JiminyEvaluateMaxConstraints | `10` | `JIMINY_EVALUATE_MAX_CONSTRAINTS` | Max constraints to check per evaluation |
+| JiminyOutcomeClassifierEnabled | `true` | `JIMINY_OUTCOME_CLASSIFIER_ENABLED` | Enable semantic outcome classification (J11) |
+| JiminyOutcomeLLMEnabled | `false` | `JIMINY_OUTCOME_LLM_ENABLED` | Enable LLM tier for uncertain classifications |
+| JiminyOutcomeSimilarityHigh | `0.7` | `JIMINY_OUTCOME_SIMILARITY_HIGH` | Cosine similarity threshold for "followed" |
+| JiminyOutcomeSimilarityLow | `0.3` | `JIMINY_OUTCOME_SIMILARITY_LOW` | Cosine similarity threshold for "uncertain" |
+| JiminyEscalationEnabled | `true` | `JIMINY_ESCALATION_ENABLED` | Enable session-aware escalation (J12) |
+| JiminyEscalationWarnAfter | `2` | `JIMINY_ESCALATION_WARN_AFTER` | Ignores before WARNED |
+| JiminyEscalationEscalateAfter | `4` | `JIMINY_ESCALATION_ESCALATE_AFTER` | Ignores before ESCALATED |
+| JiminyEscalationBlockAfter | `6` | `JIMINY_ESCALATION_BLOCK_AFTER` | Ignores before BLOCKED |
+| JiminyEscalationBlockEnabled | `false` | `JIMINY_ESCALATION_BLOCK_ENABLED` | Enable hard blocking at max escalation |
+| JiminyEscalationDecayMinutes | `60` | `JIMINY_ESCALATION_DECAY_MINUTES` | Escalation state decay period |
+
+### J13-J15 Configuration
+
+| Parameter | Default | Env Var | Description |
+|-----------|---------|---------|-------------|
+| JiminyEvaluateLLMEnabled | `false` | `JIMINY_EVALUATE_LLM_ENABLED` | Enable LLM Tier 2 evaluation reasoning (J13) |
+| JiminyEvaluateLLMProvider | (inherits) | `JIMINY_EVALUATE_LLM_PROVIDER` | LLM provider for evaluation |
+| JiminyEvaluateLLMModel | (inherits) | `JIMINY_EVALUATE_LLM_MODEL` | LLM model for evaluation |
+| JiminyEvaluateLLMTimeoutMs | `5000` | `JIMINY_EVALUATE_LLM_TIMEOUT_MS` | LLM request timeout (ms) |
+| JiminyEvaluateLLMMaxTokens | `2000` | `JIMINY_EVALUATE_LLM_MAX_TOKENS` | Max tokens for LLM evaluation |
+| JiminyOutcomeLLMMaxTokens | `100` | `JIMINY_OUTCOME_LLM_MAX_TOKENS` | Max tokens for outcome classification (J14) |
+| JiminyOutcomeCacheSize | `256` | `JIMINY_OUTCOME_CACHE_SIZE` | LRU cache capacity for classifications |
+| JiminySynthesisTemperature | (API default) | `JIMINY_SYNTHESIS_TEMPERATURE` | Optional temperature override (J15) |
 
 ## Hook Integration
 
@@ -206,6 +250,48 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 
 **Note:** The response now includes a `guidance_id` (UUID) in the `data` object for effectiveness tracking. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for the feedback loop.
 
+### `POST /v1/jiminy/evaluate` (J9)
+
+Evaluate agent output (code, actions) against stored constraints and corrections.
+
+```bash
+curl -s -X POST http://localhost:9999/v1/jiminy/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "space_id": "mdemg-dev",
+    "agent_output": "const API_KEY = \"sk-abc123\"",
+    "file_path": "internal/auth/config.go",
+    "tool_name": "Write",
+    "session_id": "claude-core"
+  }'
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `space_id` | Yes | Knowledge space to search |
+| `agent_output` | Yes | Code or action to evaluate |
+| `file_path` | No | File being modified |
+| `tool_name` | No | Tool that produced the output (Write, Edit) |
+| `session_id` | No | Session identifier |
+
+**Response (200 OK):**
+```json
+{
+  "data": {
+    "evaluation_id": "uuid",
+    "status": "warning",
+    "items": [
+      {"type": "constraint", "content": "[must_not] No hardcoded secrets (sim: 0.87)", "severity": "high", "source_node": "node-id"}
+    ],
+    "summary": "Found 1 potential concern(s) in agent output"
+  }
+}
+```
+
+**Status values:** `pass` (no concerns), `warning` (medium severity matches), `concern` (high severity matches).
+
+**Hook integration:** The `post-tool-observe.py` hook automatically calls this endpoint after Write/Edit completions and injects warnings as system-reminders.
+
 ### `POST /v1/jiminy/feedback`
 
 Record whether guidance was followed, ignored, or contradicted. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for full documentation.
@@ -235,17 +321,28 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 
 | File | Description |
 |------|-------------|
-| `internal/jiminy/service.go` | Core orchestration — Guide() with 4-source fan-out; RecordOutcome() for feedback |
-| `internal/jiminy/types.go` | GuidanceRequest, GuidanceResponse, GuidanceItem, SourceCounts, GuidanceFeedbackRequest |
+| `internal/jiminy/service.go` | Core orchestration — Guide() with 5-source fan-out; RecordOutcome() with semantic classification |
+| `internal/jiminy/types.go` | All types: GuidanceRequest/Response, EvaluateRequest/Response, EscalationLevel, RetrievalProvider |
 | `internal/jiminy/effectiveness.go` | EffectivenessTracker — LRU cache with TTL for guidance tracking |
 | `internal/jiminy/corrections.go` | Vector search for correction observations |
 | `internal/jiminy/contradictions.go` | CONTRADICTS edge queries |
 | `internal/jiminy/frontiers.go` | Vector search for frontier nodes |
-| `internal/jiminy/formatter.go` | FormatPromptAugmentation() — injectable text renderer |
-| `internal/jiminy/service_test.go` | 11 unit tests |
-| `internal/api/handlers_jiminy.go` | POST /v1/jiminy/guide handler |
+| `internal/jiminy/formatter.go` | FormatPromptAugmentation() — injectable text renderer (includes J7 types) |
+| `internal/jiminy/retrieval_source.go` | J7: Maps RetrievalResult → GuidanceItem with obs_type/layer classification |
+| `internal/jiminy/synthesizer.go` | J8: LLM-powered guidance synthesis with circuit breaker |
+| `internal/jiminy/guidance_prompt.go` | J8: System/user prompt templates for LLM synthesis |
+| `internal/jiminy/evaluator.go` | J9: Agent output evaluation against constraints/corrections |
+| `internal/jiminy/stats.go` | J10: StatsCollector for RSIC integration (follow rate, effectiveness, diversity) |
+| `internal/jiminy/outcome_classifier.go` | J11: Two-tier semantic outcome classification (embedding + optional LLM) |
+| `internal/jiminy/escalation.go` | J12: Session-aware escalation state machine |
+| `internal/jiminy/service_test.go` | 20 original unit tests |
+| `internal/jiminy/j7_j12_test.go` | 22 unit tests for J7-J12 features |
+| `internal/api/handlers_jiminy.go` | Handlers for guide, feedback, evaluate endpoints |
+| `internal/api/rsic_adapters.go` | Adapter wiring: jiminyRetrievalAdapter, rsicJiminyAdapter |
 | `internal/retrieval/jiminy.go` | JiminyExplanation transparency layer for retrieval pipeline |
-| `internal/config/config.go` | 6 JIMINY_* config fields |
+| `internal/ape/self_assess.go` | J10: GuidanceHealth dimension in RSIC assessment |
+| `internal/ape/self_reflect.go` | J10: Jiminy-specific reflection patterns |
+| `internal/config/config.go` | ~30 JIMINY_* and RSIC_JIMINY_* config fields |
 | `internal/cli/mcp.go` | jiminy_guide MCP tool registration |
 | `.claude/hooks/prompt-context.sh` | Hook that injects Jiminy guidance |
 | `docs/specs/phase-jiminy-guidance.md` | Complete phase specification |
@@ -257,7 +354,10 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 ## Dependencies
 
 - **Consulting Service** (`internal/consulting/`) — Source A uses `Suggest()` for constraints and patterns
-- **Embedding Provider** — Sources B, C, D require embeddings for vector similarity search
-- **Neo4j** — All 4 sources query the graph database
+- **Retrieval Service** (`internal/retrieval/`) — Source E uses full 14-component scoring pipeline (J7)
+- **Embedding Provider** — Sources B, C, D require embeddings for vector similarity search; J11 classifier uses embeddings for semantic comparison
+- **LLM Client** (`internal/llmclient/`) — J8 synthesis and J11 Tier 2 classification (optional)
+- **Neo4j** — All 5 sources query the graph database; J9 evaluator searches constraints/corrections
+- **RSIC** (`internal/ape/`) — J10 bidirectional feedback (GuidanceHealth in assessment, Jiminy-specific reflection patterns)
 - **Consolidation Pipeline** — Frontier nodes and constraint nodes must exist (created during consolidation)
 - **CMS** — Correction observations must be stored via `POST /v1/conversation/correct`

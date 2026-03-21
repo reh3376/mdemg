@@ -245,6 +245,54 @@ type Config struct {
 	JiminyEffectivenessEnabled    bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
 	JiminyEffectivenessTTLSec     int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
 
+	// Jiminy J7: Full-Spectrum Retrieval
+	JiminyRetrievalEnabled bool // JIMINY_RETRIEVAL_ENABLED — use full retrieval pipeline (default: true)
+	JiminyRetrievalTopK    int  // JIMINY_RETRIEVAL_TOP_K — max results from retrieval pipeline (default: 10)
+	JiminyRetrievalHopDepth int // JIMINY_RETRIEVAL_HOP_DEPTH — graph hop depth for retrieval (default: 2)
+
+	// Jiminy J8: LLM Synthesis
+	JiminySynthesisEnabled   bool   // JIMINY_SYNTHESIS_ENABLED — enable LLM guidance synthesis (default: false)
+	JiminySynthesisProvider  string // JIMINY_SYNTHESIS_PROVIDER — LLM provider (default: inherits LLM_PROVIDER)
+	JiminySynthesisModel     string // JIMINY_SYNTHESIS_MODEL — LLM model (default: inherits LLM_MODEL)
+	JiminySynthesisMaxTokens int    // JIMINY_SYNTHESIS_MAX_TOKENS — max tokens for synthesis (default: 1000)
+	JiminySynthesisTimeoutMs int    // JIMINY_SYNTHESIS_TIMEOUT_MS — timeout for LLM synthesis (default: 5000)
+
+	// Jiminy J9: Output Evaluation
+	JiminyEvaluateEnabled        bool // JIMINY_EVALUATE_ENABLED — enable output evaluation endpoint (default: true)
+	JiminyEvaluateTimeoutMs      int  // JIMINY_EVALUATE_TIMEOUT_MS — timeout for evaluation (default: 3000)
+	JiminyEvaluateMaxConstraints int  // JIMINY_EVALUATE_MAX_CONSTRAINTS — max constraints to check (default: 10)
+
+	// Jiminy J13: Evaluator LLM Reasoning
+	JiminyEvaluateLLMEnabled   bool   // JIMINY_EVALUATE_LLM_ENABLED — enable LLM Tier 2 evaluation (default: false)
+	JiminyEvaluateLLMProvider  string // JIMINY_EVALUATE_LLM_PROVIDER — LLM provider (default: inherits LLM_PROVIDER)
+	JiminyEvaluateLLMModel     string // JIMINY_EVALUATE_LLM_MODEL — LLM model (default: inherits LLM_MODEL)
+	JiminyEvaluateLLMTimeoutMs int    // JIMINY_EVALUATE_LLM_TIMEOUT_MS — LLM timeout (default: 5000)
+	JiminyEvaluateLLMMaxTokens int    // JIMINY_EVALUATE_LLM_MAX_TOKENS — max response tokens (default: 2000)
+
+	// Jiminy J11: Semantic Outcome Classification
+	JiminyOutcomeClassifierEnabled bool    // JIMINY_OUTCOME_CLASSIFIER_ENABLED — enable semantic classifier (default: true)
+	JiminyOutcomeLLMEnabled        bool    // JIMINY_OUTCOME_LLM_ENABLED — enable LLM Tier 2 classification (default: false)
+	JiminyOutcomeSimilarityHigh    float64 // JIMINY_OUTCOME_SIMILARITY_HIGH — threshold for "followed" (default: 0.7)
+	JiminyOutcomeSimilarityLow     float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.3)
+	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
+	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
+
+	// Jiminy J15: Synthesis temperature
+	JiminySynthesisTemperature *float64 // JIMINY_SYNTHESIS_TEMPERATURE — LLM temperature (default: nil = API default)
+
+	// Jiminy J12: Session Escalation
+	JiminyEscalationEnabled      bool // JIMINY_ESCALATION_ENABLED — enable session escalation (default: true)
+	JiminyEscalationWarnAfter    int  // JIMINY_ESCALATION_WARN_AFTER — ignores before WARNED (default: 2)
+	JiminyEscalationEscalateAfter int // JIMINY_ESCALATION_ESCALATE_AFTER — ignores before ESCALATED (default: 4)
+	JiminyEscalationBlockAfter   int  // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
+	JiminyEscalationBlockEnabled bool // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
+	JiminyEscalationDecayMinutes int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+
+	// RSIC Jiminy Integration (J10)
+	RSICJiminyFollowRateThreshold           float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
+	RSICJiminyConstraintEffectivenessThreshold float64 // RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD — min effectiveness (default: 0.3)
+	RSICJiminySourceImbalanceThreshold      float64 // RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD — max single source ratio (default: 0.8)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1628,6 +1676,107 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Jiminy J7-J12: Cognitive Guidance System extensions
+	jiminyRetrievalEnabled := getBool("JIMINY_RETRIEVAL_ENABLED", true)
+	jiminyRetrievalTopK, err := atoi("JIMINY_RETRIEVAL_TOP_K", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyRetrievalHopDepth, err := atoi("JIMINY_RETRIEVAL_HOP_DEPTH", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminySynthesisEnabled := getBool("JIMINY_SYNTHESIS_ENABLED", true)   // J15: default changed from false to true
+	jiminySynthesisProvider := get("JIMINY_SYNTHESIS_PROVIDER", llmProvider)
+	jiminySynthesisModel := get("JIMINY_SYNTHESIS_MODEL", llmModel)
+	jiminySynthesisMaxTokens, err := atoi("JIMINY_SYNTHESIS_MAX_TOKENS", 2000)  // J15: default changed from 1000 to 2000
+	if err != nil {
+		return Config{}, err
+	}
+	jiminySynthesisTimeoutMs, err := atoi("JIMINY_SYNTHESIS_TIMEOUT_MS", 10000) // J15: default changed from 5000 to 10000
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEvaluateEnabled := getBool("JIMINY_EVALUATE_ENABLED", true)
+	jiminyEvaluateTimeoutMs, err := atoi("JIMINY_EVALUATE_TIMEOUT_MS", 3000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEvaluateMaxConstraints, err := atoi("JIMINY_EVALUATE_MAX_CONSTRAINTS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	// J13: Evaluator LLM config
+	jiminyEvaluateLLMEnabled := getBool("JIMINY_EVALUATE_LLM_ENABLED", false)
+	jiminyEvaluateLLMProvider := get("JIMINY_EVALUATE_LLM_PROVIDER", llmProvider)
+	jiminyEvaluateLLMModel := get("JIMINY_EVALUATE_LLM_MODEL", llmModel)
+	jiminyEvaluateLLMTimeoutMs, err := atoi("JIMINY_EVALUATE_LLM_TIMEOUT_MS", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEvaluateLLMMaxTokens, err := atoi("JIMINY_EVALUATE_LLM_MAX_TOKENS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyOutcomeClassifierEnabled := getBool("JIMINY_OUTCOME_CLASSIFIER_ENABLED", true)
+	jiminyOutcomeLLMEnabled := getBool("JIMINY_OUTCOME_LLM_ENABLED", false)
+	jiminyOutcomeSimilarityHigh, err := atof("JIMINY_OUTCOME_SIMILARITY_HIGH", 0.7)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyOutcomeSimilarityLow, err := atof("JIMINY_OUTCOME_SIMILARITY_LOW", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	// J14: Outcome classifier LLM config
+	jiminyOutcomeLLMMaxTokens, err := atoi("JIMINY_OUTCOME_LLM_MAX_TOKENS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyOutcomeCacheSize, err := atoi("JIMINY_OUTCOME_CACHE_SIZE", 256)
+	if err != nil {
+		return Config{}, err
+	}
+	// J15: Synthesis temperature
+	var jiminySynthesisTemperature *float64
+	if v := os.Getenv("JIMINY_SYNTHESIS_TEMPERATURE"); v != "" {
+		t, tErr := strconv.ParseFloat(v, 64)
+		if tErr != nil {
+			return Config{}, fmt.Errorf("JIMINY_SYNTHESIS_TEMPERATURE: %w", tErr)
+		}
+		jiminySynthesisTemperature = &t
+	}
+	jiminyEscalationEnabled := getBool("JIMINY_ESCALATION_ENABLED", true)
+	jiminyEscalationWarnAfter, err := atoi("JIMINY_ESCALATION_WARN_AFTER", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEscalationEscalateAfter, err := atoi("JIMINY_ESCALATION_ESCALATE_AFTER", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEscalationBlockAfter, err := atoi("JIMINY_ESCALATION_BLOCK_AFTER", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEscalationBlockEnabled := getBool("JIMINY_ESCALATION_BLOCK_ENABLED", false)
+	jiminyEscalationDecayMinutes, err := atoi("JIMINY_ESCALATION_DECAY_MINUTES", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicJiminyFollowRateThreshold, err := atof("RSIC_JIMINY_FOLLOW_RATE_THRESHOLD", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicJiminyConstraintEffThreshold, err := atof("RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicJiminySourceImbalanceThreshold, err := atof("RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD", 0.8)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -2650,6 +2799,40 @@ func FromEnv() (Config, error) {
 		JiminyFrontierMinSim:          jiminyFrontierMinSim,
 		JiminyEffectivenessEnabled:    jiminyEffectivenessEnabled,
 		JiminyEffectivenessTTLSec:     jiminyEffectivenessTTLSec,
+
+		// Jiminy J7-J12
+		JiminyRetrievalEnabled:          jiminyRetrievalEnabled,
+		JiminyRetrievalTopK:             jiminyRetrievalTopK,
+		JiminyRetrievalHopDepth:         jiminyRetrievalHopDepth,
+		JiminySynthesisEnabled:          jiminySynthesisEnabled,
+		JiminySynthesisProvider:         jiminySynthesisProvider,
+		JiminySynthesisModel:            jiminySynthesisModel,
+		JiminySynthesisMaxTokens:        jiminySynthesisMaxTokens,
+		JiminySynthesisTimeoutMs:        jiminySynthesisTimeoutMs,
+		JiminyEvaluateEnabled:           jiminyEvaluateEnabled,
+		JiminyEvaluateTimeoutMs:         jiminyEvaluateTimeoutMs,
+		JiminyEvaluateMaxConstraints:    jiminyEvaluateMaxConstraints,
+		JiminyEvaluateLLMEnabled:        jiminyEvaluateLLMEnabled,
+		JiminyEvaluateLLMProvider:       jiminyEvaluateLLMProvider,
+		JiminyEvaluateLLMModel:          jiminyEvaluateLLMModel,
+		JiminyEvaluateLLMTimeoutMs:      jiminyEvaluateLLMTimeoutMs,
+		JiminyEvaluateLLMMaxTokens:      jiminyEvaluateLLMMaxTokens,
+		JiminyOutcomeClassifierEnabled:  jiminyOutcomeClassifierEnabled,
+		JiminyOutcomeLLMEnabled:         jiminyOutcomeLLMEnabled,
+		JiminyOutcomeSimilarityHigh:     jiminyOutcomeSimilarityHigh,
+		JiminyOutcomeSimilarityLow:      jiminyOutcomeSimilarityLow,
+		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
+		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
+		JiminySynthesisTemperature:      jiminySynthesisTemperature,
+		JiminyEscalationEnabled:         jiminyEscalationEnabled,
+		JiminyEscalationWarnAfter:       jiminyEscalationWarnAfter,
+		JiminyEscalationEscalateAfter:   jiminyEscalationEscalateAfter,
+		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
+		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
+		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
+		RSICJiminyFollowRateThreshold:           rsicJiminyFollowRateThreshold,
+		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
+		RSICJiminySourceImbalanceThreshold:      rsicJiminySourceImbalanceThreshold,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

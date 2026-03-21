@@ -1,0 +1,72 @@
+package jiminy
+
+// mapRetrievalToGuidance converts retrieval pipeline results into GuidanceItems.
+// Items from L3-L5 layers get high priority (concepts), L1-L2 get medium, L0 gets low.
+// Observation types are mapped to appropriate GuidanceTypes.
+func mapRetrievalToGuidance(results []RetrievalResult) []GuidanceItem {
+	var items []GuidanceItem
+	for _, r := range results {
+		gType := classifyRetrievalItem(r)
+		priority := layerToPriority(r.Layer)
+		content := r.Name
+		if r.Summary != "" {
+			if content != "" {
+				content += ": " + r.Summary
+			} else {
+				content = r.Summary
+			}
+		}
+		if content == "" {
+			continue
+		}
+
+		items = append(items, GuidanceItem{
+			Type:        gType,
+			Priority:    priority,
+			Content:     content,
+			Confidence:  r.Score,
+			SourceNodes: []string{r.NodeID},
+		})
+	}
+	return items
+}
+
+// classifyRetrievalItem maps a RetrievalResult to a GuidanceType based on obs_type and layer.
+func classifyRetrievalItem(r RetrievalResult) GuidanceType {
+	// Higher-layer nodes are concepts
+	if r.Layer >= 2 {
+		return GuidanceConcept
+	}
+
+	// L0 nodes classified by obs_type
+	switch r.ObsType {
+	case "correction":
+		return GuidanceCorrection
+	case "constraint":
+		return GuidanceConstraint
+	case "decision":
+		return GuidanceDecision
+	case "learning", "technical_note", "insight":
+		return GuidanceLearning
+	case "preference":
+		return GuidancePreference
+	case "error":
+		return GuidanceRisk
+	case "progress":
+		return GuidancePattern
+	default:
+		return GuidanceLearning
+	}
+}
+
+// layerToPriority maps concept hierarchy layers to priority levels.
+func layerToPriority(layer int) string {
+	switch {
+	case layer >= 3:
+		return "high"
+	case layer >= 1:
+		return "medium"
+	default:
+		return "low"
+	}
+}

@@ -115,6 +115,7 @@ type SelfAssessmentReport struct {
 	TaskPerformance  float64 `json:"task_performance"`
 	MemoryHealth     float64 `json:"memory_health"`
 	EdgeHealth       float64 `json:"edge_health"`
+	GuidanceHealth   float64 `json:"guidance_health"` // J10: Jiminy guidance effectiveness
 
 	// Derived
 	OverallHealth float64 `json:"overall_health"`
@@ -368,6 +369,22 @@ type VolatileStatsResult struct {
 // HiddenLayerProvider exposes consolidation triggers.
 type HiddenLayerProvider interface {
 	RunFullConversationConsolidation(ctx context.Context, spaceID string) (any, error)
+}
+
+// JiminyStatsProvider exposes guidance metrics for RSIC assessment (J10).
+type JiminyStatsProvider interface {
+	GetGuidanceStats(ctx context.Context, spaceID string) (JiminyStatsResult, error)
+}
+
+// JiminyStatsResult mirrors jiminy.JiminyStats for RSIC use.
+type JiminyStatsResult struct {
+	TotalGuidanceIssued int     `json:"total_guidance_issued"`
+	TotalFollowed       int     `json:"total_followed"`
+	TotalIgnored        int     `json:"total_ignored"`
+	TotalContradicted   int     `json:"total_contradicted"`
+	FollowRate          float64 `json:"follow_rate"`
+	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
+	SourceDiversity     float64 `json:"source_diversity"`
 }
 
 // WatchdogSignalProvider supplies additional monitoring signals for multi-dimensional watchdog.

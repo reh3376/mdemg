@@ -21,6 +21,10 @@ func FormatPromptAugmentation(items []GuidanceItem, counts SourceCounts, confide
 	patterns := filterByType(items, GuidancePattern, GuidanceSuggestion)
 	conflicts := filterByType(items, GuidanceConflict, GuidanceRisk)
 	frontiers := filterByType(items, GuidanceFrontier)
+	decisions := filterByType(items, GuidanceDecision)
+	learnings := filterByType(items, GuidanceLearning)
+	preferences := filterByType(items, GuidancePreference)
+	concepts := filterByType(items, GuidanceConcept)
 
 	if len(constraints) > 0 {
 		sb.WriteString("CONSTRAINTS:\n")
@@ -46,6 +50,34 @@ func FormatPromptAugmentation(items []GuidanceItem, counts SourceCounts, confide
 	if len(conflicts) > 0 {
 		sb.WriteString("CONFLICTS:\n")
 		for _, item := range conflicts {
+			sb.WriteString(fmt.Sprintf("  • %s (conf: %.2f)\n", item.Content, item.Confidence))
+		}
+	}
+
+	if len(decisions) > 0 {
+		sb.WriteString("DECISIONS:\n")
+		for _, item := range decisions {
+			sb.WriteString(fmt.Sprintf("  • %s (conf: %.2f)\n", item.Content, item.Confidence))
+		}
+	}
+
+	if len(learnings) > 0 {
+		sb.WriteString("LEARNINGS:\n")
+		for _, item := range learnings {
+			sb.WriteString(fmt.Sprintf("  • %s (conf: %.2f)\n", item.Content, item.Confidence))
+		}
+	}
+
+	if len(preferences) > 0 {
+		sb.WriteString("PREFERENCES:\n")
+		for _, item := range preferences {
+			sb.WriteString(fmt.Sprintf("  • %s (conf: %.2f)\n", item.Content, item.Confidence))
+		}
+	}
+
+	if len(concepts) > 0 {
+		sb.WriteString("CONCEPTS:\n")
+		for _, item := range concepts {
 			sb.WriteString(fmt.Sprintf("  • %s (conf: %.2f)\n", item.Content, item.Confidence))
 		}
 	}

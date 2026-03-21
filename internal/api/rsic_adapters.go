@@ -9,7 +9,10 @@ import (
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
 	"mdemg/internal/hidden"
+	"mdemg/internal/jiminy"
 	"mdemg/internal/learning"
+	"mdemg/internal/models"
+	"mdemg/internal/retrieval"
 )
 
 // constraintGateAdapter adapts consulting.ConstraintClassifier to conversation.ConstraintGateClassifier.
@@ -161,4 +164,54 @@ func (a *rsicWatchdogSignalAdapter) GetConsolidationAgeSec(ctx context.Context, 
 		return 0, err
 	}
 	return result.(int64), nil
+}
+
+// rsicJiminyAdapter adapts *jiminy.Service to ape.JiminyStatsProvider (J10).
+type rsicJiminyAdapter struct {
+	svc *jiminy.Service
+}
+
+func (a *rsicJiminyAdapter) GetGuidanceStats(ctx context.Context, spaceID string) (ape.JiminyStatsResult, error) {
+	stats, err := a.svc.GetGuidanceStats(ctx, spaceID)
+	if err != nil {
+		return ape.JiminyStatsResult{}, err
+	}
+	return ape.JiminyStatsResult{
+		TotalGuidanceIssued: stats.TotalGuidanceIssued,
+		TotalFollowed:       stats.TotalFollowed,
+		TotalIgnored:        stats.TotalIgnored,
+		TotalContradicted:   stats.TotalContradicted,
+		FollowRate:          stats.FollowRate,
+		ConstraintEffRate:   stats.ConstraintEffRate,
+		SourceDiversity:     stats.SourceDiversity,
+	}, nil
+}
+
+// jiminyRetrievalAdapter adapts *retrieval.Service to jiminy.RetrievalProvider (J7).
+type jiminyRetrievalAdapter struct {
+	retriever *retrieval.Service
+}
+
+func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int) ([]jiminy.RetrievalResult, error) {
+	resp, err := a.retriever.Retrieve(ctx, models.RetrieveRequest{
+		SpaceID:   spaceID,
+		QueryText: queryText,
+		TopK:      topK,
+		HopDepth:  hopDepth,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]jiminy.RetrievalResult, 0, len(resp.Results))
+	for _, r := range resp.Results {
+		results = append(results, jiminy.RetrievalResult{
+			NodeID:  r.NodeID,
+			Name:    r.Name,
+			Summary: r.Summary,
+			Layer:   r.Layer,
+			Score:   r.Score,
+		})
+	}
+	return results, nil
 }

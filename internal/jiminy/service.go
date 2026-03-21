@@ -31,6 +31,12 @@ type Service struct {
 	persistence       *PersistenceStore      // F3: Neo4j write-through for guidance outcomes
 	confidenceUpdater *ConfidenceUpdater     // F3: Bayesian confidence updates
 	cache             *GuidanceCache         // F10: TTL-based LRU cache for guidance responses
+	retriever         RetrievalProvider      // J7: full retrieval pipeline access
+	synthesizer       *GuidanceSynthesizer   // J8: LLM guidance synthesis
+	classifier        *OutcomeClassifier     // J11: semantic outcome classification
+	escalation        *EscalationTracker     // J12: session-aware escalation
+	evaluator         *Evaluator             // J9: agent output evaluation
+	statsCollector    *StatsCollector        // J10: guidance stats for RSIC
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -54,6 +60,52 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		log.Printf("jiminy: guidance cache enabled (size=%d, ttl=%ds)", cfg.JiminyCacheSize, cfg.JiminyCacheTTLSec)
 	}
 
+	// J11/J14: Initialize semantic outcome classifier if enabled
+	var classifier *OutcomeClassifier
+	if cfg.JiminyOutcomeClassifierEnabled && embedder != nil {
+		classifierBaseURL := cfg.OpenAIEndpoint
+		if cfg.JiminySynthesisProvider == "ollama" {
+			classifierBaseURL = cfg.OllamaEndpoint
+		}
+		classifier = NewOutcomeClassifier(embedder, OutcomeClassifierConfig{
+			LLMEnabled:    cfg.JiminyOutcomeLLMEnabled,
+			LLMProvider:   cfg.JiminySynthesisProvider,
+			LLMModel:      cfg.JiminySynthesisModel,
+			LLMAPIKey:     cfg.OpenAIAPIKey,
+			LLMBaseURL:    classifierBaseURL,
+			HighThreshold: cfg.JiminyOutcomeSimilarityHigh,
+			LowThreshold:  cfg.JiminyOutcomeSimilarityLow,
+			MaxTokens:     cfg.JiminyOutcomeLLMMaxTokens,
+			CacheSize:     cfg.JiminyOutcomeCacheSize,
+		})
+		log.Printf("jiminy: semantic outcome classifier enabled (high=%.2f, low=%.2f, llm=%v, cache=%d)",
+			cfg.JiminyOutcomeSimilarityHigh, cfg.JiminyOutcomeSimilarityLow,
+			cfg.JiminyOutcomeLLMEnabled, cfg.JiminyOutcomeCacheSize)
+	}
+
+	// J12: Initialize escalation tracker if enabled
+	var escalation *EscalationTracker
+	if cfg.JiminyEscalationEnabled {
+		escalation = NewEscalationTracker(cfg)
+		log.Printf("jiminy: escalation enabled (warn=%d, escalate=%d, block=%d, blockEnabled=%v)",
+			cfg.JiminyEscalationWarnAfter, cfg.JiminyEscalationEscalateAfter,
+			cfg.JiminyEscalationBlockAfter, cfg.JiminyEscalationBlockEnabled)
+	}
+
+	// J9: Initialize evaluator if enabled
+	var evaluator *Evaluator
+	if cfg.JiminyEvaluateEnabled && driver != nil {
+		evaluator = NewEvaluator(cfg, driver, embedder)
+		log.Printf("jiminy: evaluator enabled (timeout=%dms, maxConstraints=%d)",
+			cfg.JiminyEvaluateTimeoutMs, cfg.JiminyEvaluateMaxConstraints)
+	}
+
+	// J10: Initialize stats collector for RSIC
+	var statsCollector *StatsCollector
+	if driver != nil {
+		statsCollector = NewStatsCollector(driver, cfg)
+	}
+
 	return &Service{
 		cfg:               cfg,
 		driver:            driver,
@@ -63,7 +115,34 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		persistence:       persistence,
 		confidenceUpdater: confidenceUpdater,
 		cache:             cache,
+		classifier:        classifier,
+		escalation:        escalation,
+		evaluator:         evaluator,
+		statsCollector:    statsCollector,
 	}
+}
+
+// SetRetriever sets the retrieval provider for full-spectrum knowledge access (J7).
+func (s *Service) SetRetriever(r RetrievalProvider) {
+	s.retriever = r
+}
+
+// SetSynthesizer sets the LLM guidance synthesizer (J8).
+func (s *Service) SetSynthesizer(syn *GuidanceSynthesizer) {
+	s.synthesizer = syn
+}
+
+// GetEvaluator returns the evaluator for handler wiring (J9).
+func (s *Service) GetEvaluator() *Evaluator {
+	return s.evaluator
+}
+
+// GetGuidanceStats returns aggregated guidance stats for RSIC integration (J10).
+func (s *Service) GetGuidanceStats(ctx context.Context, spaceID string) (JiminyStats, error) {
+	if s.statsCollector == nil {
+		return JiminyStats{}, nil
+	}
+	return s.statsCollector.GetGuidanceStats(ctx, spaceID)
 }
 
 // Guide generates proactive guidance by fanning out to multiple knowledge sources
@@ -276,6 +355,30 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}()
 	}
 
+	// Source E: Full retrieval pipeline (J7)
+	if s.retriever != nil && s.cfg.JiminyRetrievalEnabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Use agent output as additional context if available
+			queryText := req.Context
+			if req.AgentOutput != "" {
+				queryText = req.Context + " " + req.AgentOutput
+			}
+			results, err := s.retriever.RetrieveForJiminy(ctx, req.SpaceID, queryText,
+				s.cfg.JiminyRetrievalTopK, s.cfg.JiminyRetrievalHopDepth)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				debug["retrieval_error"] = err.Error()
+				return
+			}
+			retrievalItems := mapRetrievalToGuidance(results)
+			items = append(items, retrievalItems...)
+			debug["retrieval_found"] = len(retrievalItems)
+		}()
+	}
+
 	wg.Wait()
 
 	// Filter by minimum confidence
@@ -312,6 +415,18 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		warnings = []string{}
 	}
 
+	// J12: Apply escalation effects before final ranking
+	if s.escalation != nil && req.SessionID != "" {
+		for i := range filtered {
+			for _, nodeID := range filtered[i].SourceNodes {
+				level := s.escalation.RecordSurface(req.SessionID, nodeID)
+				if level != EscalationInactive && level != EscalationSurfaced {
+					ApplyEscalation(&filtered[i], level)
+				}
+			}
+		}
+	}
+
 	// Compute source counts
 	counts := SourceCounts{}
 	for _, item := range filtered {
@@ -326,6 +441,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 			counts.Conflicts++
 		case GuidanceFrontier:
 			counts.Frontiers++
+		case GuidanceDecision, GuidanceLearning, GuidancePreference, GuidanceConcept:
+			counts.Retrievals++
 		}
 	}
 
@@ -335,8 +452,23 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Build rationale
 	rationale := buildRationale(counts)
 
-	// Format prompt augmentation
+	// Format prompt augmentation (static fallback)
 	augmentation := FormatPromptAugmentation(filtered, counts, confidence)
+
+	// J8: LLM synthesis — replace static formatting if synthesizer is available
+	var synthesizedNarrative string
+	if s.synthesizer != nil && s.cfg.JiminySynthesisEnabled && len(filtered) > 0 {
+		narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
+		if synthErr != nil {
+			log.Printf("jiminy: synthesis failed (using static formatting): %v", synthErr)
+			debug["synthesis_error"] = synthErr.Error()
+		} else if narrative != "" {
+			synthesizedNarrative = narrative
+			// Use synthesized narrative as the prompt augmentation
+			augmentation = "═══ JIMINY GUIDANCE ═══\n" + narrative + "\n═══ END JIMINY GUIDANCE ═══"
+			debug["synthesis_used"] = true
+		}
+	}
 
 	// Phase AR-2: Generate guidance_id and track items for effectiveness feedback
 	guidanceID := uuid.New().String()
@@ -344,15 +476,23 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		s.tracker.Track(guidanceID, filtered)
 	}
 
+	// J12: Build session escalation summary
+	var sessionEscalation *SessionEscalation
+	if s.escalation != nil && req.SessionID != "" {
+		sessionEscalation = s.escalation.GetSessionEscalation(req.SessionID)
+	}
+
 	resp := GuidanceResponse{
-		GuidanceID:         guidanceID,
-		Guidance:           filtered,
-		PromptAugmentation: augmentation,
-		Confidence:         confidence,
-		Rationale:          rationale,
-		Warnings:           warnings,
-		SourceCounts:       counts,
-		Debug:              debug,
+		GuidanceID:           guidanceID,
+		Guidance:             filtered,
+		PromptAugmentation:   augmentation,
+		SynthesizedNarrative: synthesizedNarrative,
+		Confidence:           confidence,
+		Rationale:            rationale,
+		Warnings:             warnings,
+		SourceCounts:         counts,
+		SessionEscalation:    sessionEscalation,
+		Debug:                debug,
 	}
 
 	// F10: Cache the response
@@ -393,7 +533,7 @@ func computeOverallConfidence(items []GuidanceItem) float64 {
 
 // buildRationale constructs a human-readable summary of guidance sources.
 func buildRationale(counts SourceCounts) string {
-	total := counts.Constraints + counts.Corrections + counts.Patterns + counts.Conflicts + counts.Frontiers
+	total := counts.Constraints + counts.Corrections + counts.Patterns + counts.Conflicts + counts.Frontiers + counts.Retrievals
 	if total == 0 {
 		return "No relevant guidance found for this context"
 	}
@@ -412,6 +552,9 @@ func buildRationale(counts SourceCounts) string {
 	}
 	if counts.Frontiers > 0 {
 		parts = append(parts, fmt.Sprintf("%d frontiers", counts.Frontiers))
+	}
+	if counts.Retrievals > 0 {
+		parts = append(parts, fmt.Sprintf("%d retrievals", counts.Retrievals))
 	}
 	return fmt.Sprintf("Found %d guidance items: %s", total, join(parts, ", "))
 }
@@ -442,8 +585,8 @@ func deduplicateItems(items []GuidanceItem) []GuidanceItem {
 }
 
 // RecordOutcome processes feedback for a prior guidance response.
-// It correlates the action_summary against each guidance item using simple
-// text overlap scoring (embedding-based comparison is deferred to a future enhancement).
+// Uses semantic classifier (J11) if available, otherwise falls back to text overlap.
+// Feeds escalation tracker (J12) for session-aware escalation state updates.
 func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest) (*GuidanceFeedbackResponse, error) {
 	if req.GuidanceID == "" {
 		return nil, fmt.Errorf("guidance_id is required")
@@ -462,17 +605,38 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	var results []GuidanceItemFeedback
 
 	for _, item := range items {
-		outcome, sim := classifyOutcome(item, actionLower)
+		var cr ClassificationResult
+
+		// J14: Use semantic classifier returning ClassificationResult if available
+		if s.classifier != nil {
+			cr = s.classifier.Classify(ctx, item, req.ActionSummary)
+		} else {
+			outcome, sim := classifyOutcome(item, actionLower)
+			cr = ClassificationResult{Outcome: outcome, Confidence: sim}
+		}
+
 		results = append(results, GuidanceItemFeedback{
 			Type:       item.Type,
 			Content:    item.Content,
-			Outcome:    outcome,
-			Similarity: sim,
+			Outcome:    cr.Outcome,
+			Similarity: cr.Confidence,
+			Reasoning:  cr.Reasoning,
 		})
+
+		// Alias for downstream use
+		outcome := cr.Outcome
+
+		// J12: Feed escalation tracker with outcome
+		if s.escalation != nil && len(item.SourceNodes) > 0 {
+			sessionID := req.SpaceID // Use spaceID as session fallback
+			for _, nodeID := range item.SourceNodes {
+				s.escalation.RecordOutcome(sessionID, nodeID, outcome)
+			}
+		}
 
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
 		if s.persistence != nil && outcome != OutcomeUnknown {
-			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, sim); err != nil {
+			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
 				log.Printf("jiminy: persist outcome error: %v", err)
 			}
 			// Update confidence for constraint-type guidance items

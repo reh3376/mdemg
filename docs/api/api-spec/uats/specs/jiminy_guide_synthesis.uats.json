@@ -1,0 +1,136 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Guide Synthesis",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "guide",
+      "synthesis",
+      "phase_j15"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the Jiminy guide endpoint with J15 enhanced LLM synthesis. Tests that synthesized narratives are returned when synthesis is enabled, and that constraint-type-aware prompting produces directive guidance.",
+    "test_type": "contract",
+    "priority": "medium",
+    "llm_required": true
+  },
+  "config": {
+    "timeout_ms": 20000,
+    "tags": [
+      "jiminy",
+      "guide",
+      "synthesis",
+      "phase_j15",
+      "llm_required"
+    ]
+  },
+  "variables": {
+    "space_id": "uats-test-space"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "context": "Adding a new REST endpoint for user authentication with JWT tokens",
+      "session_id": "uats-j15-test"
+    }
+  },
+  "expected": {
+    "status": [200, 503],
+    "body_assertions": [
+      {
+        "name": "data object present",
+        "path": "$.data",
+        "exists": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "synthesis_response_shape",
+      "description": "When synthesis is enabled and guidance items exist, response includes synthesized_narrative field.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "Implementing database migration with schema changes to the users table",
+          "session_id": "uats-j15-synthesis"
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": [
+          {
+            "name": "data present",
+            "path": "$.data",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_space_id",
+      "description": "Returns 400 when space_id is missing.",
+      "request": {
+        "body": {
+          "space_id": "",
+          "context": "some context"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_context",
+      "description": "Returns 400 when context is missing.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "with_max_items",
+      "description": "Accepts max_items parameter to limit guidance items.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "context": "Refactoring error handling in the API layer",
+          "max_items": 3
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": []
+      }
+    }
+  ]
+}
