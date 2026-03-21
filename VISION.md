@@ -369,12 +369,12 @@ The system tries **ALL 5 layers** even if intermediate layers produce no cluster
 - [x] Periodic reflection summaries (RSIC Watchdog — Phase 60b)
 - [x] Agent consulting service API (`POST /v1/memory/consult`)
 
-### Phase 4: IDE Integration (Partial)
+### Phase 4: IDE Integration ✅ COMPLETE
 
 - [x] MCP server for IDE integration (`cmd/mcp-server/`)
-- [ ] VS Code extension
-- [ ] Cursor integration
-- [ ] Real-time memory sidebar
+- ~~VS Code extension~~ — dropped from scope (open source; community can build if needed)
+- ~~Cursor integration~~ — dropped from scope (open source; community can build if needed)
+- [x] Real-time memory sidebar (macOS menubar + Linux sidebar apps)
 
 ### Phase 5: Multi-Agent Coordination ✅ COMPLETE
 
@@ -433,4 +433,4 @@ How we'll know MDEMG is working:
 
 ---
 
-*This document captures the vision as of March 2026. All 6 development phases are complete. Remaining work: IDE extensions (Phase 4 partial — VS Code, Cursor, real-time sidebar) and release infrastructure (Homebrew tap, v0.2.0 tag).*
+*This document captures the vision as of March 2026. All 6 development phases are complete. IDE extensions dropped from scope (open source — community can build). Next focus: J17 agent-to-agent communication protocol for persistent Jiminy-agent dialogue.*

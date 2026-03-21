@@ -41,7 +41,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 WHAT REMAINS TO BE DONE:
 1. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
 2. TESTING: SSE streaming endpoint not UATS-testable (requires SSE client)
-3. VISION: VS Code extension (Phase VSX-1 through VSX-5, ~20-28 dev-days)
+3. VISION: Phase J17 — Agent-to-agent communication protocol (Jiminy ↔ AI coding agent)
 4. CI: UATS runner counts `llm_required` tag exclusions as "errors" — should be "skips"
 5. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
 6. PARTIAL: Phase 45.4 — Obsidian integration (Linear done, Obsidian pending)
@@ -299,6 +299,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 9.4 | Plugin Triggers | ✅ | `internal/api/handlers_filewatcher.go` |
 | Jiminy | Inner Voice | ✅ | `docs/specs/phase-jiminy-guidance.md`, `docs/features/jiminy-inner-voice.md` |
 | J7-J12 | Cognitive Guidance | ✅ | `docs/features/jiminy-inner-voice.md` §J7-J12 |
+| J16 | Full-Context Input | ✅ | Removed input truncation (200K default), fixed cache key collisions, 30s timeouts. Config: `JIMINY_GUIDANCE_CONTEXT_MAX_CHARS`, `JIMINY_GUIDANCE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_ITEM_MAX_CHARS` |
 | J-Init | Init Wizard + Installers | ✅ | `internal/cli/init.go`, `internal/config/yaml_config.go`, `.goreleaser.yaml` |
 | S8 | Distribution Pipeline | ✅ | `docs/sidecar/roadmap.md` §S8 |
 | S9 | Beta + Public | ✅ | `docs/sidecar/roadmap.md` §S9 |
@@ -379,7 +380,7 @@ Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. R
 
 | Item | Effort |
 |------|--------|
-| VS Code Extension (VSX-1 through VSX-5) | 20-28 days |
+| Phase J17: Agent-to-Agent Communication Protocol | TBD (planning) |
 
 ---
 
@@ -491,4 +492,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-21 — All 105 phases + S0-S16 + Phase Jiminy (J1-J15 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. v0.3.1 released. CI all green. Jiminy Init Wizard integrated into `mdemg init` + all 3 platform installers. Remaining: VS Code extension, Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), UATS runner fix, research items, testing gaps.*
+*Last updated: 2026-03-21 — All 105 phases + S0-S16 + Phase Jiminy (J1-J16 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. v0.3.1 released. CI all green. VS Code extension dropped from scope (open source — community can build). Next: J17 agent-to-agent communication protocol. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), UATS runner fix, research items, testing gaps.*

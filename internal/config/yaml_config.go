@@ -97,7 +97,11 @@ type JiminyYAML struct {
 	EvaluateLLMEnabled  bool   `yaml:"evaluate_llm_enabled,omitempty"`  // Enable LLM Tier 2 evaluation (default: false)
 	EvaluateLLMProvider string `yaml:"evaluate_llm_provider,omitempty"` // LLM provider for evaluation (inherits llm.provider)
 	EvaluateLLMModel    string `yaml:"evaluate_llm_model,omitempty"`    // LLM model for evaluation (inherits llm.model)
-	OutcomeLLMEnabled   bool   `yaml:"outcome_llm_enabled,omitempty"`   // Enable LLM outcome classification (default: false)
+	OutcomeLLMEnabled          bool `yaml:"outcome_llm_enabled,omitempty"`            // Enable LLM outcome classification (default: false)
+	GuidanceContextMaxChars    int  `yaml:"guidance_context_max_chars,omitempty"`     // J16: max chars for agent context in guidance (default: 200000)
+	GuidanceOutputMaxChars     int  `yaml:"guidance_output_max_chars,omitempty"`      // J16: max chars for agent output in guidance (default: 200000)
+	EvaluateOutputMaxChars     int  `yaml:"evaluate_output_max_chars,omitempty"`      // J16: max chars for agent output in eval (default: 200000)
+	EvaluateItemMaxChars       int  `yaml:"evaluate_item_max_chars,omitempty"`        // J16: max chars per constraint/correction in eval (default: 0 = unlimited)
 }
 
 // yamlEnvMapping defines the mapping from YAML dot-path to environment variable.
@@ -149,6 +153,10 @@ var yamlEnvMapping = []struct {
 	{"jiminy.evaluate_llm_provider", "JIMINY_EVALUATE_LLM_PROVIDER", nil},
 	{"jiminy.evaluate_llm_model", "JIMINY_EVALUATE_LLM_MODEL", nil},
 	{"jiminy.outcome_llm_enabled", "JIMINY_OUTCOME_LLM_ENABLED", nil},
+	{"jiminy.guidance_context_max_chars", "JIMINY_GUIDANCE_CONTEXT_MAX_CHARS", nil},
+	{"jiminy.guidance_output_max_chars", "JIMINY_GUIDANCE_OUTPUT_MAX_CHARS", nil},
+	{"jiminy.evaluate_output_max_chars", "JIMINY_EVALUATE_OUTPUT_MAX_CHARS", nil},
+	{"jiminy.evaluate_item_max_chars", "JIMINY_EVALUATE_ITEM_MAX_CHARS", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.
@@ -310,6 +318,18 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 	setIfNonEmpty(m, "jiminy.evaluate_llm_model", cfg.Jiminy.EvaluateLLMModel)
 	if cfg.Jiminy.OutcomeLLMEnabled {
 		m["jiminy.outcome_llm_enabled"] = "true"
+	}
+	if cfg.Jiminy.GuidanceContextMaxChars > 0 {
+		m["jiminy.guidance_context_max_chars"] = strconv.Itoa(cfg.Jiminy.GuidanceContextMaxChars)
+	}
+	if cfg.Jiminy.GuidanceOutputMaxChars > 0 {
+		m["jiminy.guidance_output_max_chars"] = strconv.Itoa(cfg.Jiminy.GuidanceOutputMaxChars)
+	}
+	if cfg.Jiminy.EvaluateOutputMaxChars > 0 {
+		m["jiminy.evaluate_output_max_chars"] = strconv.Itoa(cfg.Jiminy.EvaluateOutputMaxChars)
+	}
+	if cfg.Jiminy.EvaluateItemMaxChars > 0 {
+		m["jiminy.evaluate_item_max_chars"] = strconv.Itoa(cfg.Jiminy.EvaluateItemMaxChars)
 	}
 
 	return m

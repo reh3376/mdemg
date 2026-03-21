@@ -350,7 +350,6 @@ This is closely tied to Gap 4 (Database Management) but focuses specifically on 
 - Port discovery via `.mdemg.port` file.
 - Claude Code hooks are gitignored (`.claude/hooks/` in `.gitignore`).
 - No auto-discovery mechanism for IDEs.
-- No VS Code extension.
 - Manual IDE configuration required (copy JSON snippets).
 
 ### Required State
@@ -362,8 +361,6 @@ This is closely tied to Gap 4 (Database Management) but focuses specifically on 
 - MCP server auto-starts with `mdemg serve` (or can run standalone via `mdemg mcp`).
 - `mdemg hooks install --ide claude-code` installs Claude Code hooks (optional).
 - IDE config files template the correct port and binary path.
-- Future: VS Code extension for richer integration.
-
 ### Gap Details
 
 Currently, connecting an IDE to MDEMG requires manually creating config files with the correct port, binary path, and tool configuration. The init command should auto-detect installed IDEs and generate the appropriate config files. The MCP server should be launchable as a subprocess of `mdemg serve` rather than requiring a separate process.

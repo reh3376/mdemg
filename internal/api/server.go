@@ -460,15 +460,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		// J8/J15: Wire LLM synthesizer
 		if cfg.JiminySynthesisEnabled {
 			synCfg := jiminy.SynthesisConfig{
-				Enabled:     true,
-				Provider:    cfg.JiminySynthesisProvider,
-				Model:       cfg.JiminySynthesisModel,
-				MaxTokens:   cfg.JiminySynthesisMaxTokens,
-				TimeoutMs:   cfg.JiminySynthesisTimeoutMs,
-				OpenAIKey:   cfg.OpenAIAPIKey,
-				OpenAIURL:   cfg.OpenAIEndpoint,
-				OllamaURL:   cfg.OllamaEndpoint,
-				Temperature: cfg.JiminySynthesisTemperature,
+				Enabled:        true,
+				Provider:       cfg.JiminySynthesisProvider,
+				Model:          cfg.JiminySynthesisModel,
+				MaxTokens:      cfg.JiminySynthesisMaxTokens,
+				TimeoutMs:      cfg.JiminySynthesisTimeoutMs,
+				OpenAIKey:      cfg.OpenAIAPIKey,
+				OpenAIURL:      cfg.OpenAIEndpoint,
+				OllamaURL:      cfg.OllamaEndpoint,
+				Temperature:    cfg.JiminySynthesisTemperature,
+				ContextMaxChars: cfg.JiminyGuidanceContextMaxChars,
+				OutputMaxChars:  cfg.JiminyGuidanceOutputMaxChars,
 			}
 			jiminySvc.SetSynthesizer(jiminy.NewGuidanceSynthesizer(synCfg, cbRegistry))
 			log.Printf("Jiminy J8/J15: LLM synthesis enabled (provider=%s, model=%s, maxTokens=%d, timeout=%dms)",

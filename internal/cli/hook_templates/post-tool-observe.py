@@ -46,7 +46,7 @@ def evaluate_output(agent_output: str, file_path: str = "", tool_name: str = "")
         return
     payload = {
         "space_id": SPACE_ID,
-        "agent_output": agent_output[:2000],
+        "agent_output": agent_output,
         "session_id": SESSION_ID,
     }
     if file_path:
@@ -60,12 +60,12 @@ def evaluate_output(agent_output: str, file_path: str = "", tool_name: str = "")
                 f"{MDEMG_URL}/v1/jiminy/evaluate",
                 "-H", "Content-Type: application/json",
                 "-d", json.dumps(payload),
-                "--connect-timeout", "2",
-                "--max-time", "3",
+                "--connect-timeout", "3",
+                "--max-time", "35",
             ],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=45,
         )
         if result.returncode == 0 and result.stdout:
             resp = json.loads(result.stdout)

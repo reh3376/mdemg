@@ -237,7 +237,7 @@ type Config struct {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
-	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 6000)
+	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 30000)
 	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
@@ -255,18 +255,18 @@ type Config struct {
 	JiminySynthesisProvider  string // JIMINY_SYNTHESIS_PROVIDER — LLM provider (default: inherits LLM_PROVIDER)
 	JiminySynthesisModel     string // JIMINY_SYNTHESIS_MODEL — LLM model (default: inherits LLM_MODEL)
 	JiminySynthesisMaxTokens int    // JIMINY_SYNTHESIS_MAX_TOKENS — max tokens for synthesis (default: 1000)
-	JiminySynthesisTimeoutMs int    // JIMINY_SYNTHESIS_TIMEOUT_MS — timeout for LLM synthesis (default: 5000)
+	JiminySynthesisTimeoutMs int    // JIMINY_SYNTHESIS_TIMEOUT_MS — timeout for LLM synthesis (default: 30000)
 
 	// Jiminy J9: Output Evaluation
 	JiminyEvaluateEnabled        bool // JIMINY_EVALUATE_ENABLED — enable output evaluation endpoint (default: true)
-	JiminyEvaluateTimeoutMs      int  // JIMINY_EVALUATE_TIMEOUT_MS — timeout for evaluation (default: 3000)
+	JiminyEvaluateTimeoutMs      int  // JIMINY_EVALUATE_TIMEOUT_MS — timeout for evaluation (default: 30000)
 	JiminyEvaluateMaxConstraints int  // JIMINY_EVALUATE_MAX_CONSTRAINTS — max constraints to check (default: 10)
 
 	// Jiminy J13: Evaluator LLM Reasoning
 	JiminyEvaluateLLMEnabled   bool   // JIMINY_EVALUATE_LLM_ENABLED — enable LLM Tier 2 evaluation (default: false)
 	JiminyEvaluateLLMProvider  string // JIMINY_EVALUATE_LLM_PROVIDER — LLM provider (default: inherits LLM_PROVIDER)
 	JiminyEvaluateLLMModel     string // JIMINY_EVALUATE_LLM_MODEL — LLM model (default: inherits LLM_MODEL)
-	JiminyEvaluateLLMTimeoutMs int    // JIMINY_EVALUATE_LLM_TIMEOUT_MS — LLM timeout (default: 5000)
+	JiminyEvaluateLLMTimeoutMs int    // JIMINY_EVALUATE_LLM_TIMEOUT_MS — LLM timeout (default: 30000)
 	JiminyEvaluateLLMMaxTokens int    // JIMINY_EVALUATE_LLM_MAX_TOKENS — max response tokens (default: 2000)
 
 	// Jiminy J11: Semantic Outcome Classification
@@ -279,6 +279,12 @@ type Config struct {
 
 	// Jiminy J15: Synthesis temperature
 	JiminySynthesisTemperature *float64 // JIMINY_SYNTHESIS_TEMPERATURE — LLM temperature (default: nil = API default)
+
+	// Jiminy J16: Input Context Limits (0 = unlimited; default 200000 ≈ 50K tokens, safe for 128K model windows)
+	JiminyGuidanceContextMaxChars int // JIMINY_GUIDANCE_CONTEXT_MAX_CHARS — max chars for agent context in guidance (default: 200000)
+	JiminyGuidanceOutputMaxChars  int // JIMINY_GUIDANCE_OUTPUT_MAX_CHARS — max chars for agent output in guidance (default: 200000)
+	JiminyEvaluateOutputMaxChars  int // JIMINY_EVALUATE_OUTPUT_MAX_CHARS — max chars for agent output in eval (default: 200000)
+	JiminyEvaluateItemMaxChars    int // JIMINY_EVALUATE_ITEM_MAX_CHARS — max chars per constraint/correction in eval (default: 0 = unlimited)
 
 	// Jiminy J12: Session Escalation
 	JiminyEscalationEnabled      bool // JIMINY_ESCALATION_ENABLED — enable session escalation (default: true)
@@ -1653,7 +1659,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	jiminyEnabled := getBool("JIMINY_ENABLED", true)
-	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 6000)
+	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 30000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1693,12 +1699,12 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminySynthesisTimeoutMs, err := atoi("JIMINY_SYNTHESIS_TIMEOUT_MS", 10000) // J15: default changed from 5000 to 10000
+	jiminySynthesisTimeoutMs, err := atoi("JIMINY_SYNTHESIS_TIMEOUT_MS", 30000) // J16: default changed from 10000 to 30000
 	if err != nil {
 		return Config{}, err
 	}
 	jiminyEvaluateEnabled := getBool("JIMINY_EVALUATE_ENABLED", true)
-	jiminyEvaluateTimeoutMs, err := atoi("JIMINY_EVALUATE_TIMEOUT_MS", 3000)
+	jiminyEvaluateTimeoutMs, err := atoi("JIMINY_EVALUATE_TIMEOUT_MS", 30000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1710,7 +1716,7 @@ func FromEnv() (Config, error) {
 	jiminyEvaluateLLMEnabled := getBool("JIMINY_EVALUATE_LLM_ENABLED", false)
 	jiminyEvaluateLLMProvider := get("JIMINY_EVALUATE_LLM_PROVIDER", llmProvider)
 	jiminyEvaluateLLMModel := get("JIMINY_EVALUATE_LLM_MODEL", llmModel)
-	jiminyEvaluateLLMTimeoutMs, err := atoi("JIMINY_EVALUATE_LLM_TIMEOUT_MS", 5000)
+	jiminyEvaluateLLMTimeoutMs, err := atoi("JIMINY_EVALUATE_LLM_TIMEOUT_MS", 30000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1746,6 +1752,24 @@ func FromEnv() (Config, error) {
 		}
 		jiminySynthesisTemperature = &t
 	}
+	// J16: Input context limits (0 = unlimited)
+	jiminyGuidanceContextMaxChars, err := atoi("JIMINY_GUIDANCE_CONTEXT_MAX_CHARS", 200000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyGuidanceOutputMaxChars, err := atoi("JIMINY_GUIDANCE_OUTPUT_MAX_CHARS", 200000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEvaluateOutputMaxChars, err := atoi("JIMINY_EVALUATE_OUTPUT_MAX_CHARS", 200000)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyEvaluateItemMaxChars, err := atoi("JIMINY_EVALUATE_ITEM_MAX_CHARS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+
 	jiminyEscalationEnabled := getBool("JIMINY_ESCALATION_ENABLED", true)
 	jiminyEscalationWarnAfter, err := atoi("JIMINY_ESCALATION_WARN_AFTER", 2)
 	if err != nil {
@@ -2824,6 +2848,10 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
 		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
 		JiminySynthesisTemperature:      jiminySynthesisTemperature,
+		JiminyGuidanceContextMaxChars:   jiminyGuidanceContextMaxChars,
+		JiminyGuidanceOutputMaxChars:    jiminyGuidanceOutputMaxChars,
+		JiminyEvaluateOutputMaxChars:    jiminyEvaluateOutputMaxChars,
+		JiminyEvaluateItemMaxChars:      jiminyEvaluateItemMaxChars,
 		JiminyEscalationEnabled:         jiminyEscalationEnabled,
 		JiminyEscalationWarnAfter:       jiminyEscalationWarnAfter,
 		JiminyEscalationEscalateAfter:   jiminyEscalationEscalateAfter,
