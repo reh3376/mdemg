@@ -10,33 +10,11 @@ import subprocess
 import sys
 import time
 
-MDEMG_URL = os.environ.get("MDEMG_URL", "http://localhost:9999")
+MDEMG_URL = os.environ.get("MDEMG_URL", "{{MDEMG_URL}}")
+SPACE_ID = "{{SPACE_ID}}"
 SESSION_ID = "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
-
-
-def get_space_id() -> str:
-    """Resolve space_id from env var, config file, or default."""
-    # 1. Environment variable
-    space_id = os.environ.get("MDEMG_SPACE_ID")
-    if space_id:
-        return space_id
-    # 2. Config file
-    try:
-        import yaml
-        config_path = os.path.join(os.getcwd(), ".mdemg", "config.yaml")
-        with open(config_path) as f:
-            cfg = yaml.safe_load(f)
-            if cfg and "space_id" in cfg:
-                return cfg["space_id"]
-    except Exception:
-        pass
-    # 3. Default
-    return "mdemg-dev"
-
-
-SPACE_ID = get_space_id()
 
 
 def should_ingest() -> bool:
@@ -102,7 +80,6 @@ def evaluate_output(agent_output: str, file_path: str = "", tool_name: str = "")
                 for item in items[:5]:
                     lines.append(f"  • [{item.get('severity', '?')}] {item.get('content', '')}")
                 lines.append("═══ END JIMINY EVALUATE ═══")
-                # Print as system-reminder so the agent sees it next turn
                 print("<system-reminder>" + "\n".join(lines) + "</system-reminder>")
     except Exception:
         pass  # Fire-and-forget: never block on failure
@@ -167,7 +144,6 @@ def main():
             )
 
         # J9: Evaluate agent output after Write/Edit (code changes)
-        # Use the new_string (Edit) or content (Write) as agent output
         agent_output = tool_input.get("new_string", "") or tool_input.get("content", "")
         if agent_output and file_path:
             evaluate_output(agent_output, file_path=file_path, tool_name=tool_name)
@@ -175,7 +151,6 @@ def main():
     # --- Bash errors → error observation ---
     elif tool_name == "Bash":
         command = tool_input.get("command", "")
-        # Check for error indicators in output
         error_indicators = ["error:", "Error:", "FATAL", "fatal:", "panic:", "FAILED", "command not found"]
         if any(indicator in output_str for indicator in error_indicators):
             observe(
@@ -193,16 +168,14 @@ def main():
                     ["build", "success"],
                 )
 
-        # Phase 80: CMS anomaly detection in API responses
+        # CMS anomaly detection in API responses
         if "curl" in command:
-            # Detect degraded memory state in curl output
             if "X-MDEMG-Memory-State: degraded" in output_str:
                 observe(
                     f"CMS anomaly: Degraded memory state detected in API response. Command: {command[:200]}",
                     "error",
                     ["anomaly", "memory-degraded"],
                 )
-            # Detect empty resume in curl output
             if '"observations": []' in output_str and "resume" in command:
                 observe(
                     f"CMS anomaly: Empty resume detected. Command: {command[:200]}",
@@ -210,7 +183,7 @@ def main():
                     ["anomaly", "empty-resume"],
                 )
 
-    # --- F12: Read/Glob/Grep → lightweight context_signal ---
+    # --- Read/Glob/Grep → lightweight context_signal ---
     elif tool_name == "Read":
         file_path = tool_input.get("file_path", "")
         if file_path:
@@ -239,36 +212,17 @@ def main():
                 ["context-grep", "content-search"],
             )
 
-    # --- Bash: continued from above (re-enter Bash branch for git push) ---
+    # --- Git push → trigger incremental ingest ---
     if tool_name == "Bash":
         command = tool_input.get("command", "")
-        # Git push → trigger incremental ingest + consolidation on mdemg repo
-        # Match: branch name (mdemg-dev01), remote URL, or explicit path
-        # Rate-limited: skip if last ingest was within INGEST_COOLDOWN_SECONDS (5 min)
         if "git push" in command and "mdemg" in command:
             if should_ingest():
                 mark_ingested()
                 observe(
-                    f"Git push detected on mdemg repo. Triggering incremental ingest + consolidation.",
+                    "Git push detected on mdemg repo. Triggering incremental ingest + consolidation.",
                     "progress",
                     ["git-push", "ingest", "consolidation"],
                 )
-                # Fire-and-forget: incremental ingest of mdemg into mdemg-dev
-                try:
-                    subprocess.Popen(
-                        [
-                            "/Users/reh3376/mdemg/bin/ingest-codebase",
-                            "--path", "/Users/reh3376/mdemg",
-                            "--space-id", SPACE_ID,
-                            "--incremental",
-                            "--consolidate",
-                        ],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        cwd="/Users/reh3376/mdemg",
-                    )
-                except Exception:
-                    pass
 
     sys.exit(0)
 

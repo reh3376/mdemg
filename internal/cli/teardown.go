@@ -785,11 +785,15 @@ func teardownSystemArtifacts() []sidecar.ReportChange {
 
 	var changes []sidecar.ReportChange
 
-	// Systemd units
+	// Systemd units — check both /etc/systemd/system (tarball installs) and
+	// /usr/lib/systemd/system (.deb installs)
 	systemdUnits := []string{
 		"/etc/systemd/system/mdemg@.service",
 		"/etc/systemd/system/mdemg-rsic@.service",
 		"/etc/systemd/system/mdemg-rsic@.timer",
+		"/usr/lib/systemd/system/mdemg@.service",
+		"/usr/lib/systemd/system/mdemg-rsic@.service",
+		"/usr/lib/systemd/system/mdemg-rsic@.timer",
 	}
 	reloadSystemd := false
 	for _, unit := range systemdUnits {
@@ -807,6 +811,16 @@ func teardownSystemArtifacts() []sidecar.ReportChange {
 	if reloadSystemd {
 		fmt.Println("Reloading systemd daemon...")
 		_ = runSystemctl("daemon-reload")
+	}
+
+	// Systemd share directory (persisted copies from install.sh)
+	systemdShareDir := "/usr/local/share/mdemg/systemd"
+	if _, err := os.Stat(systemdShareDir); err == nil {
+		if os.Getuid() != 0 {
+			fmt.Printf("Found %s — requires sudo to remove\n", systemdShareDir)
+		} else if err := os.RemoveAll(systemdShareDir); err == nil {
+			changes = append(changes, sidecar.ReportChange{Path: systemdShareDir, Action: "removed"})
+		}
 	}
 
 	// Man pages

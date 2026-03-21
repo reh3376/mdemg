@@ -1114,7 +1114,7 @@ mdemg sidecar uninstall --force
 
 **Synopsis:** `mdemg upgrade [flags]`
 
-Self-update the `mdemg` binary to the latest GitHub release. Downloads the binary for your platform, verifies the SHA256 checksum, and replaces the current executable.
+Self-update the `mdemg` binary to the latest GitHub release. Downloads the binary for your platform, verifies the SHA256 checksum, and replaces the current executable. On Linux, also updates systemd unit files if present in the archive and already installed on the system (both `/etc/systemd/system/` and `/usr/local/share/mdemg/systemd/`), then runs `systemctl daemon-reload`.
 
 > **Note:** If you installed via a package manager, prefer that manager's update mechanism instead: `brew upgrade mdemg` (macOS), `sudo apt update && sudo apt upgrade mdemg` (Debian/Ubuntu), or `scoop update mdemg` (Windows).
 

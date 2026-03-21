@@ -117,9 +117,30 @@ builds:
       - -s -w
 
 archives:
-  - id: default
+  - id: darwin
     formats:
       - tar.gz
+    builds:
+      - mdemg-darwin-arm64
+      - mdemg-darwin-amd64
+      - uxts-module-darwin-arm64
+      - uxts-module-darwin-amd64
+    name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
+    files:
+      - src: "man/man1/*.1"
+        dst: man/man1
+        strip_parent: true
+      - src: "plugins/uxts-module/manifest.json"
+        dst: plugins/uxts-module
+        strip_parent: true
+  - id: linux
+    formats:
+      - tar.gz
+    builds:
+      - mdemg-linux-amd64
+      - mdemg-linux-arm64
+      - uxts-module-linux-amd64
+      - uxts-module-linux-arm64
     name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
     files:
       - src: "man/man1/*.1"

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Unreleased)
+
+- **GitHub Actions Node.js 20 Deprecation**: Pinned `aquasecurity/trivy-action@master` to `@v0.35.0` (eliminates supply chain risk from floating `@master`). Updated `gitleaks/gitleaks-action@v2` to `@v2.3.9` (latest v2 with Node.js 24 support). Deadline for Node.js 20 EOL: June 2, 2026.
+- **Linux Systemd Bugs (6 fixes)**: (1) Split goreleaser archives by platform — systemd files no longer ship in macOS tarballs. (2) `install.sh` now persists systemd units to `/usr/local/share/mdemg/systemd/` alongside `/etc/systemd/system/`. (3) `install.sh` warns when systemd files are missing from archive instead of silently skipping. (4) `mdemg upgrade` now updates systemd unit files on Linux when units are present in the archive and already installed. (5) `mdemg teardown --full` now checks both `/etc/systemd/system/` and `/usr/lib/systemd/system/` for unit cleanup (.deb installs use the latter), plus cleans `/usr/local/share/mdemg/systemd/`. (6) `mdemg.service` ExecStartPre now tries `docker start mdemg-neo4j-dev` before falling back to `mdemg db start`, and uses `Wants=docker.service` instead of `Requires=` (fail-open).
+- **Hook Tracking Inconsistency**: Added `.gitignore` negation patterns for 5 active hooks so they're properly tracked. Deleted orphan `pre-tool-enforce.py` (unregistered in settings, never fired). Extended `embed.go` to include `*.py` templates. Created 3 new canonical hook templates (`pre-bash-check.py`, `pre-compact.sh`, `post-tool-observe.py`). Synced `session-start.sh` template with live hook's degraded-health investigation checklist.
+
 ### Added (Unreleased)
 
 - **Jiminy Init Wizard Integration**: `mdemg init` wizard now prompts for Jiminy inner-voice configuration (enabled by default). Users select a Jiminy-specific LLM model — defaults to `gpt-5.4-nano` (OpenAI) or `qwen3:8b` (Ollama) for cheap/fast JSON classification tasks. `--defaults`/`--quick` modes auto-configure with recommended settings. All 3 platform installers (macOS Homebrew caveats, Windows post-install, Linux post-install) updated to mention Jiminy. J13-J15 config vars added to jiminy-inner-voice.md. Fixed stale J15 defaults in documentation.

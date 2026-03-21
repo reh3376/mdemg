@@ -185,6 +185,24 @@ docs/
 5. **Scoring** → vector (0.55) + activation (0.30) + recency (0.10) + confidence (0.05) - hub penalty (0.08) - redundancy (0.12)
 6. **Caching** → TTL-LRU cache
 
+### Linux Systemd Architecture
+
+Systemd unit files in `packaging/mdemg_linux/systemd/` are installed to two locations:
+- `/etc/systemd/system/` — active units (tarball installs via `install.sh`)
+- `/usr/lib/systemd/system/` — active units (`.deb` installs via nfpms)
+- `/usr/local/share/mdemg/systemd/` — persisted copies for manual reference/fallback
+
+Install/upgrade/teardown flow:
+- `install.sh` → installs to both `SYSTEMD_DIR` and `SHARE_DIR/systemd/`
+- `mdemg upgrade` → updates both locations if units already exist, runs `daemon-reload`
+- `mdemg teardown --full` → checks both `/etc/systemd/system/` and `/usr/lib/systemd/system/`, cleans `SHARE_DIR/systemd/`
+
+`mdemg.service` ExecStartPre tries `docker start mdemg-neo4j-dev` before `mdemg db start` to prefer existing containers. Uses `Wants=docker.service` (fail-open) instead of `Requires=`.
+
+### Hook Tracking
+
+5 active hooks in `.claude/hooks/` are tracked via `.gitignore` negation patterns (`.claude/*` ignores all, then `!.claude/hooks/<name>` re-includes specific hooks). All 5 have canonical templates in `internal/cli/hook_templates/` (embedded via `//go:embed *.sh *.ps1 *.py`).
+
 ---
 
 ## 3. Environment Setup
@@ -407,8 +425,12 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 | Obsidian integration not started | Low | Phase 45.4 — listed in roadmap, no implementation |
 | UATS `llm_required` exclusion counting | Low | Runner counts excluded specs as errors instead of skips |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
+| `docker.go` volume name mismatch | Medium | `mdemg db start` creates `mdemg-neo4j-data` (hyphens) but docker-compose uses `mdemg_neo4j_data` (underscores). Needs migration logic — separate planning required. Workaround: systemd tries `docker start mdemg-neo4j-dev` first. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
 | ~~Linux docs: wrong Ollama model~~ | ~~Medium~~ | ~~FIXED (2026-03-20)~~ — README.md + beta guide recommended `nomic-embed-text` (768d, incompatible). Corrected to `qwen3-embedding:8b` (4096d → MRL truncate to 3072d). PR #172. |
+| ~~Linux systemd 6 bugs~~ | ~~High~~ | ~~FIXED~~ — goreleaser archive split, install.sh persistence, upgrade.go systemd handling, teardown dual-path cleanup, ExecStartPre fix. |
+| ~~Hook tracking inconsistency~~ | ~~Medium~~ | ~~FIXED~~ — `.gitignore` negation patterns for 5 active hooks, 3 new templates, deleted orphan `pre-tool-enforce.py`. |
+| ~~CI Node.js 20 deprecation~~ | ~~Medium~~ | ~~FIXED~~ — Pinned trivy-action@v0.35.0, gitleaks-action@v2.3.9. Deadline: June 2, 2026. |
 
 ---
 
