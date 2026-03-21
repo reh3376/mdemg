@@ -41,7 +41,7 @@ Option C gives us:
 - **Negotiable extensions** for efficiency optimization — the agent can request shorter codes, different verbosity, batching preferences
 - **Agora's three-tier encoding** applied to the core protocol
 - **TLS-style session tickets** for context reset survival
-- **Graceful degradation** — if negotiation fails, core protocol still works in full NL
+- **Graceful degradation** — if negotiation fails, core protocol still works in full natural language (NL)
 
 ---
 
@@ -60,7 +60,7 @@ Option C gives us:
 
 ### 2. Three-Tier Encoding (from Agora)
 
-**Choice**: Coded constraints (Tier 1) > Telegraphic guidance (Tier 2) > Full NL (Tier 3).
+**Choice**: Coded constraints (Tier 1) > Telegraphic guidance (Tier 2) > Full NL fallback (Tier 3).
 
 **Why this specific tiering**:
 
@@ -73,16 +73,16 @@ C:?|test-before-commit|esc:1|src:ghi789
 The `C:!` / `C:?` / `X:!` prefix is all Claude needs to understand severity. The content is a compressed constraint name (not a full English sentence). Source node ID enables traceability. This format is:
 - **Human-readable** (satisfies R7 auditability)
 - **Machine-parseable** (hooks can validate format)
-- **Compact** (~15 tokens vs ~50-100 tokens for NL equivalent)
+- **Compact** (~15 tokens vs ~50-100 tokens for natural language equivalent)
 - **Deterministic** (same constraint always produces same code — cacheable)
 
 **Tier 2 — Telegraphic guidance** (~50-100 tokens, 15% of traffic):
 ```
 Auth middleware rewrite: compliance-driven not tech-debt. Favor compliance over ergonomics. (Node: n1234)
 ```
-Drops articles, pronouns, filler. Still NL but compressed. Used for context-specific guidance where a code wouldn't capture the nuance.
+Drops articles, pronouns, filler. Still natural language but compressed. Used for context-specific guidance where a code wouldn't capture the nuance.
 
-**Tier 3 — Full NL narrative** (current synthesis output, 5% of traffic):
+**Tier 3 — Full natural language narrative** (current synthesis output, 5% of traffic):
 Only for truly novel situations where the LLM synthesizer needs to reason about multiple conflicting constraints. This is what J8/J15 synthesis already produces.
 
 **Why not go more compact?** The research on binary/latent encoding (doc 02) shows that since Claude processes text tokens (not binary), wire-level compression provides no benefit. The compression must be semantic. And going *too* compact (single-character codes with no mnemonic value) would sacrifice auditability and graceful degradation.
@@ -165,16 +165,36 @@ With J17, the escalation count persists in the session ticket. The agent can't "
 
 ## Open Questions for Discussion
 
-1. **Should the session ticket be encrypted or just signed?** Encryption prevents the agent from reading its own state (which might be useful if we want to hide trust scores). Signing alone is simpler and still prevents tampering.
+1. **Should the session ticket be encrypted or just signed?** ~~Encryption prevents the agent from reading its own state (which might be useful if we want to hide trust scores). Signing alone is simpler and still prevents tampering.~~ **RESOLVED**: Signing only, no encryption. Nothing in the AI-to-AI communication is easily exploitable, and transparency is a design goal — both agents should see communication clearly without concern about secondary intent. Signing provides tamper protection, which is all we need.
 
-2. **How should we handle the first session (no prior ticket)?** Options: (a) full NL guidance on first session, (b) bootstrap ticket from CMS observations, (c) start with empty ticket and build up.
+2. **How should we handle the first session (no prior ticket)?** ~~Options: (a) full natural language guidance on first session, (b) bootstrap ticket from CMS observations, (c) start with empty ticket and build up.~~ **RESOLVED**: Option (c) with a compact spec header. Full natural language is unnecessary — any well-trained LLM natively understands structured specification formats (RFC 2119 keywords, key:value notation, markdown hierarchy) because these are heavily represented in training data. The bootstrap sends a ~50 token protocol spec block alongside an empty state ticket:
+   ```
+   J17:INIT|v1
+   CODES: C=constraint X=correction F=frontier D=decision
+   SEV: !=must ?=should ~=info
+   ESC: 0=clear 1=warned 2=escalated 3=blocked
+   FMT: TYPE:SEV|content|esc:N|src:NODE_ID
+   TICKET: signed, opaque, echo back on resume
+   SEQ: monotonic, report last_seq on resume
+   ```
+   This is Agora's Tier 2 (telegraphic) applied to the bootstrap itself. Per "Language Modeling is Compression" (ICLR 2024): send the minimum viable signal, let the LLM reconstruct full meaning. No negotiation round needed — Jiminy starts sending Tier 1 codes immediately.
 
-3. **Should Tier 1 codes be human-designed or LLM-generated?** We could have Jiminy's LLM generate optimal codes from the constraint content, or we could design them by hand. LLM-generated would be more consistent; hand-designed would be more predictable.
+3. **Should Tier 1 codes be human-designed or LLM-generated?** ~~We could have Jiminy's LLM generate optimal codes from the constraint content, or we could design them by hand. LLM-generated would be more consistent; hand-designed would be more predictable.~~ **RESOLVED**: LLM-generated once at constraint creation time, then frozen. When a new constraint enters the CMS graph, Jiminy's LLM generates a compact kebab-case mnemonic code (e.g., `no-force-push-main` from "Never force push to the main branch"). The code is stored as a property on the constraint node in Neo4j and never regenerated. This gives: (1) determinism without rigidity — codes are static DB lookups, not runtime LLM output, surviving model upgrades and provider switches; (2) automatic scaling — no human bottleneck at constraint 301; (3) mnemonic quality — self-documenting codes that an LLM can roughly interpret even without the bootstrap spec (`C:!|test-before-commit` is self-evident); (4) no drift — frozen at creation, immune to model changes; (5) collision prevention — generation prompt includes existing codes as negative examples. This is the URL-slug/npm-package-name pattern: human-readable, machine-parseable, generated once, then immutable.
 
-4. **What's the right ticket TTL?** Too short = frequent re-handshakes. Too long = stale state. Candidates: 1 hour, 4 hours, 24 hours, session-based (until server restart).
+4. **What's the right ticket TTL?** ~~Too short = frequent re-handshakes. Too long = stale state. Candidates: 1 hour, 4 hours, 24 hours, session-based (until server restart).~~ **RESOLVED**: Event-driven renewal with a 4-hour safety-net TTL. Time-based expiration is the wrong primary axis — state accuracy matters more than elapsed time. A 3-hour-old ticket reflecting current reality is fine; a 5-minute-old ticket generated before an escalation event is dangerous. Ticket renewal is cheap (serialize + sign, no LLM call), so renew aggressively on events:
 
-5. **Should we implement LLMLingua-2 compression as a quick win before J17?** The research shows 2-5x NL compression with zero protocol changes. Could ship in days, not weeks.
+   | Trigger | Why |
+   |---------|-----|
+   | Pre-compaction | Primary mechanism — bridge across context amnesia (~every 20-30 min) |
+   | Context reset / new session | Clean slate — full state re-injection needed |
+   | Agent change (new model/instance) | New agent hasn't earned prior trust score |
+   | Escalation state transition | Most dangerous if stale — violation history must persist immediately |
+   | Constraint set mutation | Ticket's active constraint list is stale |
+
+   The 4-hour TTL is a backstop only — in normal operation, event-driven renewal refreshes every 20-30 minutes. The TTL catches the failure case where all event triggers break simultaneously. Defense in depth, like the circuit breaker pattern.
+
+5. **Should we implement LLMLingua-2 compression as a quick win before J17?** ~~The research shows 2-5x natural language compression with zero protocol changes. Could ship in days, not weeks.~~ **RESOLVED**: No. Focus effort on J17 — the full protocol is the high-value target. LLMLingua-2 becomes redundant once Tier 1 coded constraints (5-10x reduction) are in place.
 
 ---
 
-*This document is a recommendation for review. No implementation should begin until the user has reviewed all research documents and provided direction.*
+*All open questions resolved. Ready for J17 development planning.*
