@@ -277,3 +277,87 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestGenerateConfigYAML_JiminyEnabled(t *testing.T) {
+	opts := InitOptions{
+		Neo4jURI:       "bolt://localhost:7687",
+		Neo4jUser:      "neo4j",
+		ServerPort:     9999,
+		LLMProvider:    "openai",
+		LLMModel:       "gpt-5-nano",
+		JiminyEnabled:  true,
+		JiminyProvider: "openai",
+		JiminyModel:    "gpt-5.4-nano",
+	}
+
+	data, err := GenerateConfigYAML(opts)
+	if err != nil {
+		t.Fatalf("GenerateConfigYAML error: %v", err)
+	}
+
+	yamlStr := string(data)
+	if !contains(yamlStr, "enabled: true") {
+		t.Error("generated YAML missing jiminy 'enabled: true'")
+	}
+	if !contains(yamlStr, "synthesis_enabled: true") {
+		t.Error("generated YAML missing 'synthesis_enabled: true'")
+	}
+	if !contains(yamlStr, "synthesis_model: gpt-5.4-nano") {
+		t.Error("generated YAML missing 'synthesis_model: gpt-5.4-nano'")
+	}
+	if !contains(yamlStr, "evaluate_enabled: true") {
+		t.Error("generated YAML missing 'evaluate_enabled: true'")
+	}
+	if !contains(yamlStr, "evaluate_llm_model: gpt-5.4-nano") {
+		t.Error("generated YAML missing 'evaluate_llm_model: gpt-5.4-nano'")
+	}
+}
+
+func TestGenerateConfigYAML_JiminyDeclined(t *testing.T) {
+	opts := InitOptions{
+		Neo4jURI:      "bolt://localhost:7687",
+		Neo4jUser:     "neo4j",
+		ServerPort:    9999,
+		LLMProvider:   "openai",
+		LLMModel:      "gpt-5-nano",
+		JiminyEnabled: false,
+	}
+
+	data, err := GenerateConfigYAML(opts)
+	if err != nil {
+		t.Fatalf("GenerateConfigYAML error: %v", err)
+	}
+
+	yamlStr := string(data)
+	// Must contain jiminy section with explicit false
+	if !contains(yamlStr, "jiminy:") {
+		t.Error("generated YAML missing 'jiminy:' section")
+	}
+	// Must NOT contain synthesis_enabled (since Jiminy is disabled)
+	if contains(yamlStr, "synthesis_enabled") {
+		t.Error("generated YAML should not contain 'synthesis_enabled' when Jiminy declined")
+	}
+}
+
+func TestFlattenYAML_JiminyAlwaysEmitsEnabled(t *testing.T) {
+	// When Jiminy is disabled, flattenYAML must still emit jiminy.enabled=false
+	// so the server default (true) doesn't silently re-enable it.
+	yamlContent := `jiminy:
+  enabled: false
+`
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("JIMINY_ENABLED", "")
+
+	if err := LoadYAMLConfig(configPath); err != nil {
+		t.Fatalf("LoadYAMLConfig error: %v", err)
+	}
+
+	if got := os.Getenv("JIMINY_ENABLED"); got != "false" {
+		t.Errorf("JIMINY_ENABLED = %q, want %q", got, "false")
+	}
+}

@@ -118,6 +118,10 @@ mdemg init --quick --space-id myproject # Full auto-setup with custom space
 mdemg init --neo4j-uri bolt://localhost:7687 --embedding-provider ollama
 ```
 
+The wizard also configures **Jiminy inner-voice guidance** (enabled by default). Users select a Jiminy-specific LLM model for guidance synthesis and constraint evaluation:
+- **OpenAI default:** `gpt-5.4-nano` (cheapest option for small JSON tasks)
+- **Ollama default:** `qwen3:8b` (best local model for structured output)
+
 **See Also:** `mdemg config show`, `mdemg config validate`, `mdemg hooks install`
 
 ---

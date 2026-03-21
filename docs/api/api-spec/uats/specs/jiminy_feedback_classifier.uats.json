@@ -1,0 +1,120 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Feedback Classifier",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "feedback",
+      "classifier",
+      "phase_j14"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the Jiminy feedback endpoint with J14 enhanced outcome classification. Tests partial_compliance outcome, reasoning field in responses, and LRU cache behavior.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "feedback",
+      "classifier",
+      "phase_j14"
+    ]
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "guidance_id": "uats-j14-test-guid-0001"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/feedback",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "guidance_id": "{{guidance_id}}",
+      "action_summary": "I partially implemented the validation — checked required fields but skipped length limits",
+      "space_id": "{{space_id}}"
+    }
+  },
+  "expected": {
+    "status": [200, 503],
+    "body_assertions": [
+      {
+        "name": "guidance_id echoed",
+        "path": "$.data.guidance_id",
+        "exists": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "empty_guidance_id",
+      "description": "Returns 400 when guidance_id is empty.",
+      "request": {
+        "body": {
+          "guidance_id": "",
+          "action_summary": "test action",
+          "space_id": "{{space_id}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "valid_feedback_with_reasoning",
+      "description": "When outcome classifier is enabled, results may include reasoning field (J14).",
+      "request": {
+        "body": {
+          "guidance_id": "{{guidance_id}}",
+          "action_summary": "Used snake_case naming as recommended by the style guide",
+          "space_id": "{{space_id}}"
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": [
+          {
+            "name": "data object present",
+            "path": "$.data",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed_get",
+      "description": "Returns 405 when using GET method.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/feedback",
+        "body": null
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ]
+}

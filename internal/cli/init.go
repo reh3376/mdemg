@@ -295,6 +295,38 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// Jiminy inner-voice guidance
+	if flags.defaults {
+		opts.JiminyEnabled = true
+		opts.JiminyProvider = opts.LLMProvider
+		switch opts.LLMProvider {
+		case "ollama":
+			opts.JiminyModel = "qwen3:8b"
+		default:
+			opts.JiminyModel = "gpt-5.4-nano"
+		}
+	} else {
+		fmt.Println()
+		answer := promptLine("Enable Jiminy inner-voice guidance? (yes/no) [yes]", "yes")
+		opts.JiminyEnabled = (answer == "yes")
+		if opts.JiminyEnabled {
+			opts.JiminyProvider = opts.LLMProvider
+			fmt.Println()
+			fmt.Println("  Jiminy uses a small LLM for guidance synthesis and constraint evaluation.")
+			fmt.Println("  A cheap/fast model is ideal — Jiminy tasks produce small JSON outputs.")
+			fmt.Println()
+			switch opts.LLMProvider {
+			case "ollama":
+				opts.JiminyModel = promptLine("Jiminy LLM model [qwen3:8b]", "qwen3:8b")
+				if env.ollamaReachable {
+					ensureOllamaModel(opts.JiminyModel)
+				}
+			default:
+				opts.JiminyModel = promptLine("Jiminy LLM model [gpt-5.4-nano]", "gpt-5.4-nano")
+			}
+		}
+	}
+
 	// UxTS plugin
 	pluginsDir := detectPluginsDir(cwd)
 	if flags.defaults {

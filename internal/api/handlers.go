@@ -161,6 +161,36 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check 6: Jiminy guidance service
+	if s.jiminySvc != nil {
+		jiminyMsg := "enabled"
+		jiminyStatus := "healthy"
+		if s.cfg.JiminySynthesisEnabled {
+			jiminyMsg += ", synthesis=on"
+			if s.cfg.JiminySynthesisProvider != "" {
+				jiminyMsg += fmt.Sprintf(" (%s/%s)", s.cfg.JiminySynthesisProvider, s.cfg.JiminySynthesisModel)
+			}
+		}
+		if s.cfg.JiminyEvaluateLLMEnabled {
+			jiminyMsg += ", eval-llm=on"
+			if s.cfg.JiminyEvaluateLLMProvider != "" {
+				jiminyMsg += fmt.Sprintf(" (%s/%s)", s.cfg.JiminyEvaluateLLMProvider, s.cfg.JiminyEvaluateLLMModel)
+			}
+		}
+		if s.cfg.JiminyOutcomeLLMEnabled {
+			jiminyMsg += ", outcome-llm=on"
+		}
+		status.Checks["jiminy"] = HealthCheck{
+			Status:  jiminyStatus,
+			Message: jiminyMsg,
+		}
+	} else if s.cfg.JiminyEnabled {
+		status.Checks["jiminy"] = HealthCheck{
+			Status:  "degraded",
+			Message: "enabled but service unavailable",
+		}
+	}
+
 	// Determine overall status
 	if !overallHealthy {
 		status.Status = "not_ready"

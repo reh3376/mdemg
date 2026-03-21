@@ -203,3 +203,7 @@ brews:
       plugdir.install "plugins/uxts-module/manifest.json"
     test: |
       system "#{bin}/mdemg", "version"
+    caveats: |
+      Jiminy inner-voice guidance is configured during 'mdemg init'.
+      Default model: gpt-5.4-nano (OpenAI) or qwen3:8b (Ollama).
+      Run 'mdemg init' in your project directory to get started.

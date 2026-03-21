@@ -105,6 +105,30 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 5 * time.Minute
 
+	case "archive_ineffective_constraints":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/constraints/effectiveness", Purpose: "query constraint effectiveness"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Constraints archived due to low effectiveness", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "constraint_effectiveness_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 5 * time.Minute
+
+	case "review_guidance_effectiveness":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/constraints/effectiveness", Purpose: "review guidance effectiveness"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Guidance effectiveness review", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "guidance_follow_rate_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 5 * time.Minute
+
 	default:
 		spec.Timeout = 5 * time.Minute
 	}
@@ -126,6 +150,10 @@ func descriptionForAction(actionType string) string {
 		return "Archive stale nodes that have been superseded by corrections"
 	case "refresh_stale_edges":
 		return "Refresh stale learning edges by re-computing their weights"
+	case "archive_ineffective_constraints":
+		return "Archive constraints with consistently low effectiveness rates"
+	case "review_guidance_effectiveness":
+		return "Review and optimize guidance effectiveness based on follow rates"
 	default:
 		return "Unknown action type: " + actionType
 	}

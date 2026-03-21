@@ -29,6 +29,7 @@ import (
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
 	"mdemg/internal/jiminy"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/hidden"
 	"mdemg/internal/metalearn"
 	"mdemg/internal/jobs"
@@ -448,6 +449,54 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc = jiminy.NewService(cfg, driver, cons, emb)
 		log.Printf("Jiminy guidance enabled (timeout: %dms, maxItems: %d, minConf: %.2f)",
 			cfg.JiminyTimeoutMs, cfg.JiminyMaxItems, cfg.JiminyMinConfidence)
+
+		// J7: Wire retrieval provider for full-spectrum access
+		if cfg.JiminyRetrievalEnabled && ret != nil {
+			jiminySvc.SetRetriever(&jiminyRetrievalAdapter{retriever: ret})
+			log.Printf("Jiminy J7: retrieval pipeline enabled (topK=%d, hopDepth=%d)",
+				cfg.JiminyRetrievalTopK, cfg.JiminyRetrievalHopDepth)
+		}
+
+		// J8/J15: Wire LLM synthesizer
+		if cfg.JiminySynthesisEnabled {
+			synCfg := jiminy.SynthesisConfig{
+				Enabled:     true,
+				Provider:    cfg.JiminySynthesisProvider,
+				Model:       cfg.JiminySynthesisModel,
+				MaxTokens:   cfg.JiminySynthesisMaxTokens,
+				TimeoutMs:   cfg.JiminySynthesisTimeoutMs,
+				OpenAIKey:   cfg.OpenAIAPIKey,
+				OpenAIURL:   cfg.OpenAIEndpoint,
+				OllamaURL:   cfg.OllamaEndpoint,
+				Temperature: cfg.JiminySynthesisTemperature,
+			}
+			jiminySvc.SetSynthesizer(jiminy.NewGuidanceSynthesizer(synCfg, cbRegistry))
+			log.Printf("Jiminy J8/J15: LLM synthesis enabled (provider=%s, model=%s, maxTokens=%d, timeout=%dms)",
+				cfg.JiminySynthesisProvider, cfg.JiminySynthesisModel,
+				cfg.JiminySynthesisMaxTokens, cfg.JiminySynthesisTimeoutMs)
+		}
+
+		// J13: Wire LLM evaluator
+		if cfg.JiminyEvaluateLLMEnabled {
+			evalBaseURL := cfg.OpenAIEndpoint
+			evalAPIKey := cfg.OpenAIAPIKey
+			if cfg.JiminyEvaluateLLMProvider == "ollama" {
+				evalBaseURL = cfg.OllamaEndpoint
+			}
+			evalLLM := llmclient.New(llmclient.Config{
+				Provider:  cfg.JiminyEvaluateLLMProvider,
+				Model:     cfg.JiminyEvaluateLLMModel,
+				APIKey:    evalAPIKey,
+				BaseURL:   evalBaseURL,
+				TimeoutMs: cfg.JiminyEvaluateLLMTimeoutMs,
+			})
+			evaluator := jiminySvc.GetEvaluator()
+			if evaluator != nil {
+				evaluator.SetLLM(evalLLM, cbRegistry)
+				log.Printf("Jiminy J13: evaluator LLM enabled (provider=%s, model=%s)",
+					cfg.JiminyEvaluateLLMProvider, cfg.JiminyEvaluateLLMModel)
+			}
+		}
 	}
 
 	// F4: Initialize conflict detector if enabled
@@ -536,6 +585,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	hiddenAdapter := &rsicHiddenAdapter{svc: hid}
 
 	rsicAssessor := ape.NewAssessor(cfg, driver, learnerAdapter, convAdapter)
+	// J10: Wire Jiminy stats provider to RSIC assessor
+	if jiminySvc != nil {
+		rsicAssessor.SetJiminyProvider(&rsicJiminyAdapter{svc: jiminySvc})
+	}
 	rsicReflector := ape.NewReflector(cfg, driver)
 
 	rsicPlanner := ape.NewPlanner(cfg)
@@ -1364,6 +1417,7 @@ func (s *Server) Routes() http.Handler {
 	// Phase Jiminy: Jiminy Guidance
 	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
 	mux.HandleFunc("/v1/jiminy/feedback", s.handleJiminyFeedback)
+	mux.HandleFunc("/v1/jiminy/evaluate", s.handleJiminyEvaluate) // J9
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)

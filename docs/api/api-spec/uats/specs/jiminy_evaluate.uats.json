@@ -1,0 +1,126 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Evaluate",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "evaluate",
+      "phase_j9"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the Jiminy agent output evaluation endpoint (J9). Evaluates agent output against stored constraints and corrections.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "evaluate",
+      "phase_j9"
+    ]
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "agent_output": "const API_KEY = 'sk-abc123'; fetch('https://api.example.com')"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/evaluate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "agent_output": "{{agent_output}}"
+    }
+  },
+  "expected": {
+    "status": [200, 503],
+    "body_assertions": []
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Returns 400 when space_id is missing.",
+      "request": {
+        "body": {
+          "space_id": "",
+          "agent_output": "{{agent_output}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_agent_output",
+      "description": "Returns 400 when agent_output is missing.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "agent_output": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed_get",
+      "description": "Returns 405 when using GET method instead of POST.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/evaluate",
+        "body": null
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "with_optional_fields",
+      "description": "Accepts optional file_path, tool_name, and session_id fields.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "agent_output": "{{agent_output}}",
+          "file_path": "internal/api/server.go",
+          "tool_name": "Write",
+          "session_id": "test-session"
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": []
+      }
+    }
+  ]
+}

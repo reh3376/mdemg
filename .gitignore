@@ -38,6 +38,8 @@ bin/
 /mcp-server
 /docs-scraper
 plugins/docs-scraper/docs-scraper
+plugins/uxts-module/uxts-module
+/uxts-module
 *.exe
 *.exe~
 *.dll

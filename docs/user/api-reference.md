@@ -1908,6 +1908,12 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 | `JIMINY_TIMEOUT_MS` | `6000` | Timeout for guidance generation (ms) |
 | `JIMINY_EFFECTIVENESS_ENABLED` | `true` | Enable guidance effectiveness tracking |
 | `JIMINY_EFFECTIVENESS_TTL_SEC` | `1800` | TTL for tracked guidance (seconds) |
+| `JIMINY_SYNTHESIS_ENABLED` | `true` | Enable LLM-powered guidance synthesis (J15). When enabled, guidance items are synthesized into a coherent narrative |
+| `JIMINY_SYNTHESIS_PROVIDER` | inherits `LLM_PROVIDER` | LLM provider for synthesis |
+| `JIMINY_SYNTHESIS_MODEL` | inherits `LLM_MODEL` | LLM model for synthesis |
+| `JIMINY_SYNTHESIS_MAX_TOKENS` | `2000` | Max tokens for synthesis response |
+| `JIMINY_SYNTHESIS_TIMEOUT_MS` | `10000` | Synthesis LLM timeout (ms) |
+| `JIMINY_SYNTHESIS_TEMPERATURE` | API default | Optional temperature override for synthesis |
 
 **Note:** The guide response now includes a `guidance_id` (UUID) in the `data` object for effectiveness tracking.
 
@@ -1945,9 +1951,78 @@ curl -s -X POST http://localhost:9999/v1/jiminy/feedback \
 }
 ```
 
-**Outcome values:** `followed`, `ignored`, `contradicted`, `unknown`
+**Outcome values:** `followed`, `partial_compliance`, `ignored`, `contradicted`, `unknown`
+
+When LLM outcome classification is enabled (`JIMINY_OUTCOME_LLM_ENABLED=true`), responses include a `reasoning` field explaining the classification.
+
+**Related environment variables (J14):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JIMINY_OUTCOME_CLASSIFIER_ENABLED` | `true` | Enable semantic outcome classification |
+| `JIMINY_OUTCOME_LLM_ENABLED` | `false` | Enable LLM Tier 2 classification for uncertain cases |
+| `JIMINY_OUTCOME_LLM_MAX_TOKENS` | `100` | Max tokens for LLM classification response |
+| `JIMINY_OUTCOME_CACHE_SIZE` | `256` | LRU cache capacity for classification results |
 
 **Status Codes:** `200 OK`, `400 Bad Request` (empty guidance_id), `503 Service Unavailable`
+
+### POST /v1/jiminy/evaluate
+
+Evaluate agent output (code, actions) against stored constraints and corrections (J9). Called automatically by the `post-tool-observe.py` hook after Write/Edit completions.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `space_id` | string | Yes | Knowledge space to search |
+| `agent_output` | string | Yes | Code or action to evaluate |
+| `file_path` | string | No | File being modified |
+| `tool_name` | string | No | Tool that produced output (Write, Edit) |
+| `session_id` | string | No | Session identifier |
+
+```bash
+curl -s -X POST http://localhost:9999/v1/jiminy/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"my-project","agent_output":"const KEY = \"hardcoded\""}' | jq .
+```
+
+**Response (200):**
+```json
+{
+  "data": {
+    "evaluation_id": "uuid",
+    "status": "warning",
+    "items": [
+      {"type": "constraint", "content": "[must_not] No hardcoded values (sim: 0.87)", "severity": "high", "source_node": "node-id"}
+    ],
+    "summary": "Found 1 potential concern(s) in agent output"
+  }
+}
+```
+
+**Status values:** `pass` (no concerns), `warning` (medium severity), `concern` (high severity)
+
+**Status Codes:** `200 OK`, `400 Bad Request` (missing space_id or agent_output), `405 Method Not Allowed`, `503 Service Unavailable`
+
+**Related environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JIMINY_EVALUATE_ENABLED` | `true` | Enable/disable output evaluation |
+| `JIMINY_EVALUATE_TIMEOUT_MS` | `3000` | Evaluation timeout (ms) |
+| `JIMINY_EVALUATE_MAX_CONSTRAINTS` | `10` | Max constraints to check per evaluation |
+| `JIMINY_EVALUATE_LLM_ENABLED` | `false` | Enable LLM Tier 2 reasoning (J13). When enabled, vector-matched candidates are re-evaluated by an LLM for actual violation detection |
+| `JIMINY_EVALUATE_LLM_PROVIDER` | inherits `LLM_PROVIDER` | LLM provider for Tier 2 evaluation (`openai` or `ollama`) |
+| `JIMINY_EVALUATE_LLM_MODEL` | inherits `LLM_MODEL` | LLM model for Tier 2 evaluation |
+| `JIMINY_EVALUATE_LLM_TIMEOUT_MS` | `5000` | LLM request timeout for evaluation |
+| `JIMINY_EVALUATE_LLM_MAX_TOKENS` | `2000` | Max response tokens for LLM evaluation |
+
+When LLM Tier 2 is enabled, response items include additional fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `reasoning` | string | LLM explanation of why the output violates (or doesn't violate) the constraint |
+| `remediation` | string | Suggested fix for the violation |
+
+Re-validation rules (J13): `must`/`must_not` violations stay severity `high`. `should`/`should_not` violations are demoted to `medium` warnings. Unknown constraint nodes are demoted to warnings.
 
 ---
 

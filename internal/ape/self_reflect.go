@@ -138,6 +138,19 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		})
 	}
 
+	// 9. J10: Low guidance follow rate
+	if report.GuidanceHealth > 0 && report.GuidanceHealth < 0.5 {
+		insights = append(insights, ReflectionInsight{
+			PatternID:         "low_guidance_follow_rate",
+			Severity:          SeverityMedium,
+			Description:       "Less than 50% of high-priority guidance is being followed — agent may be ignoring constraints",
+			RecommendedAction: "review_guidance_effectiveness",
+			Metric:            "guidance_health",
+			Value:             report.GuidanceHealth,
+			Threshold:         0.5,
+		})
+	}
+
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)
 	if r.llmReflector != nil {
 		llmInsights, err := r.llmReflector.Reflect(ctx, report)
