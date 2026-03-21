@@ -136,7 +136,7 @@ func TestGuidancePromptBuild(t *testing.T) {
 		{Type: GuidanceConstraint, Content: "Must use OAuth2", Confidence: 0.9, SourceNodes: []string{"c1"}},
 		{Type: GuidanceCorrection, Content: "Fixed auth bug", Confidence: 0.8, SourceNodes: []string{"c2"}},
 	}
-	prompt := buildGuidancePrompt(items, "Working on auth", "")
+	prompt := buildGuidancePrompt(items, "Working on auth", "", 200000, 200000)
 	if prompt == "" {
 		t.Error("expected non-empty prompt")
 	}
@@ -149,7 +149,7 @@ func TestGuidancePromptBuild_WithAgentOutput(t *testing.T) {
 	items := []GuidanceItem{
 		{Type: GuidanceConstraint, Content: "No hardcoded values", Confidence: 0.9},
 	}
-	prompt := buildGuidancePrompt(items, "Coding", "hardcoded path = '/var/log'")
+	prompt := buildGuidancePrompt(items, "Coding", "hardcoded path = '/var/log'", 200000, 200000)
 	if prompt == "" {
 		t.Error("expected non-empty prompt with agent output")
 	}

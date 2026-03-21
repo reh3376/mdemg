@@ -139,7 +139,7 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 // llmEvaluate runs the LLM Tier 2 evaluation with cache and circuit breaker.
 func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constraints, corrections []EvaluationItem) ([]EvaluationItem, error) {
 	// Build prompt
-	prompt := buildEvalPrompt(agentOutput, constraints, corrections)
+	prompt := buildEvalPrompt(agentOutput, constraints, corrections, e.cfg.JiminyEvaluateOutputMaxChars, e.cfg.JiminyEvaluateItemMaxChars)
 
 	// Build constraint lookup map for revalidation
 	constraintMap := make(map[string]EvaluationItem)
@@ -278,13 +278,10 @@ func revalidateResults(result *llmEvalResult, constraintMap map[string]Evaluatio
 
 // --- LRU Cache for LLM evaluation results ---
 
-// evalCacheKey builds a cache key from agent output prefix + constraint node ID.
+// evalCacheKey builds a cache key from agent output + constraint node ID.
+// Hashes the full output to avoid collisions on shared prefixes.
 func evalCacheKey(agentOutput, constraintNodeID string) string {
-	prefix := agentOutput
-	if len(prefix) > 200 {
-		prefix = prefix[:200]
-	}
-	h := sha256.Sum256([]byte(prefix + ":" + constraintNodeID))
+	h := sha256.Sum256([]byte(agentOutput + ":" + constraintNodeID))
 	return fmt.Sprintf("%x", h[:16])
 }
 

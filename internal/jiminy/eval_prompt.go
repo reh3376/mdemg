@@ -83,18 +83,18 @@ type llmEvalViolation struct {
 }
 
 // buildEvalPrompt constructs the user prompt for LLM constraint evaluation.
-func buildEvalPrompt(agentOutput string, constraints []EvaluationItem, corrections []EvaluationItem) string {
+func buildEvalPrompt(agentOutput string, constraints, corrections []EvaluationItem, outputMaxChars, itemMaxChars int) string {
 	var sb strings.Builder
 
 	sb.WriteString("## Agent Output\n\n")
-	sb.WriteString(sanitize.SanitizeUserContext(agentOutput, 3000))
+	sb.WriteString(sanitize.SanitizeUserContext(agentOutput, outputMaxChars))
 	sb.WriteString("\n\n")
 
 	if len(constraints) > 0 {
 		sb.WriteString("## Active Constraints\n\n")
 		for i, c := range constraints {
 			sb.WriteString(fmt.Sprintf("%d. [node_id: %s] [type: %s] [severity: %s] %s\n",
-				i+1, c.SourceNode, constraintTypeFromContent(c.Content), c.Severity, truncateForPrompt(c.Content, 500)))
+				i+1, c.SourceNode, constraintTypeFromContent(c.Content), c.Severity, truncateForPrompt(c.Content, itemMaxChars)))
 		}
 		sb.WriteString("\n")
 	}
@@ -103,7 +103,7 @@ func buildEvalPrompt(agentOutput string, constraints []EvaluationItem, correctio
 		sb.WriteString("## Past Corrections\n\n")
 		for i, c := range corrections {
 			sb.WriteString(fmt.Sprintf("%d. [node_id: %s] %s\n",
-				i+1, c.SourceNode, truncateForPrompt(c.Content, 500)))
+				i+1, c.SourceNode, truncateForPrompt(c.Content, itemMaxChars)))
 		}
 		sb.WriteString("\n")
 	}
@@ -127,8 +127,9 @@ func constraintTypeFromContent(content string) string {
 }
 
 // truncateForPrompt truncates text to maxLen, appending "..." if truncated.
+// If maxLen <= 0, no truncation is applied (unlimited).
 func truncateForPrompt(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 0 || len(s) <= maxLen {
 		return s
 	}
 	return s[:maxLen] + "..."

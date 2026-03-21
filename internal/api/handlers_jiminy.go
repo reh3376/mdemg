@@ -137,7 +137,7 @@ func (s *Server) handleJiminyEvaluate(w http.ResponseWriter, r *http.Request) {
 	// Apply evaluate timeout
 	timeoutMs := s.cfg.JiminyEvaluateTimeoutMs
 	if timeoutMs <= 0 {
-		timeoutMs = 3000
+		timeoutMs = 30000
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()

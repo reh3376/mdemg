@@ -255,7 +255,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 **Remaining work:**
 - Release infrastructure: Create `reh3376/homebrew-mdemg` GitHub repo, tag v0.2.0
 - ~10 UATS specs for uncovered endpoints (spaces CRUD, jobs SSE, linear module)
-- IDE extensions: VS Code, Cursor, real-time memory sidebar (Phase 4 partial)
+- Phase J17: Agent-to-agent communication protocol (Jiminy ↔ AI coding agent)
 
 ## Testing
 

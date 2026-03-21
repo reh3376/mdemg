@@ -31,7 +31,7 @@ Output rules:
 - Do NOT invent information not present in the evidence
 - Lead with the most critical constraints and corrections
 - Surface risks prominently with WARNING prefix
-- Be concise and directive — maximum 500 words
+- Be concise and directive — maximum 1500 words
 - Order by urgency: CONSTRAINTS > CORRECTIONS > CONFLICTS > DECISIONS > PATTERNS > CONCEPTS > FRONTIERS
 - Output a short, directive narrative — not a bulleted list`
 
@@ -47,17 +47,17 @@ var ollamaSynthesisSchema = []byte(`{
 }`)
 
 // buildGuidancePrompt constructs the user prompt for LLM synthesis (J15 enriched).
-func buildGuidancePrompt(items []GuidanceItem, context, agentOutput string) string {
+func buildGuidancePrompt(items []GuidanceItem, context, agentOutput string, contextMaxChars, outputMaxChars int) string {
 	var sb strings.Builder
 
 	// Sanitize user context
-	ctx := sanitize.SanitizeUserContext(context, 2000)
+	ctx := sanitize.SanitizeUserContext(context, contextMaxChars)
 	sb.WriteString("## Agent Context\n\n")
 	sb.WriteString(ctx)
 	sb.WriteString("\n\n")
 
 	if agentOutput != "" {
-		sanitized := sanitize.SanitizeUserContext(agentOutput, 1000)
+		sanitized := sanitize.SanitizeUserContext(agentOutput, outputMaxChars)
 		sb.WriteString("## Agent Output (proposed action)\n\n")
 		sb.WriteString(sanitized)
 		sb.WriteString("\n\n")

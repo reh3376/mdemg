@@ -42,13 +42,9 @@ func NewGuidanceCache(capacity int, ttlSeconds int) *GuidanceCache {
 }
 
 // cacheKey generates a normalized key from space_id + context.
-// Uses first 200 chars of context + SHA256 for stable hashing.
+// Hashes the full context to avoid collisions on shared prefixes.
 func cacheKey(spaceID, context string) string {
-	// Normalize: lowercase, trim whitespace, take first 200 chars
 	normalized := strings.ToLower(strings.TrimSpace(context))
-	if len(normalized) > 200 {
-		normalized = normalized[:200]
-	}
 	h := sha256.Sum256([]byte(spaceID + ":" + normalized))
 	return hex.EncodeToString(h[:16]) // 128-bit key
 }

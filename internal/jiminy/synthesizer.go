@@ -20,7 +20,9 @@ type SynthesisConfig struct {
 	OpenAIKey   string
 	OpenAIURL   string
 	OllamaURL   string
-	Temperature *float64 // J15: optional temperature (nil = API default)
+	Temperature    *float64 // J15: optional temperature (nil = API default)
+	ContextMaxChars int     // J16: max chars for agent context (default: 200000, 0 = unlimited)
+	OutputMaxChars  int     // J16: max chars for agent output (default: 200000, 0 = unlimited)
 }
 
 // GuidanceSynthesizer synthesizes guidance items into coherent LLM-generated narratives.
@@ -61,7 +63,7 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 		return "", nil
 	}
 
-	prompt := buildGuidancePrompt(items, agentContext, agentOutput)
+	prompt := buildGuidancePrompt(items, agentContext, agentOutput, gs.cfg.ContextMaxChars, gs.cfg.OutputMaxChars)
 
 	timeoutMs := gs.cfg.TimeoutMs
 	if timeoutMs <= 0 {

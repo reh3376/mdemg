@@ -34,7 +34,7 @@ func TestEvalPromptBuild(t *testing.T) {
 		{Type: GuidanceCorrection, Content: "Prior correction: Fixed auth bug", Severity: "medium", SourceNode: "c3"},
 	}
 
-	prompt := buildEvalPrompt("const token = 'hardcoded'", constraints, corrections)
+	prompt := buildEvalPrompt("const token = 'hardcoded'", constraints, corrections, 200000, 0)
 
 	if !strings.Contains(prompt, "Agent Output") {
 		t.Error("prompt should contain Agent Output section")
@@ -434,7 +434,7 @@ func TestBuildGuidancePrompt_ConceptsSeparated(t *testing.T) {
 		{Type: GuidanceConstraint, Content: "[must] Use OAuth2", Confidence: 0.9, SourceNodes: []string{"c1"}},
 		{Type: GuidanceConcept, Content: "Auth patterns cluster", Confidence: 0.8, SourceNodes: []string{"n1"}},
 	}
-	prompt := buildGuidancePrompt(items, "Working on auth", "")
+	prompt := buildGuidancePrompt(items, "Working on auth", "", 200000, 200000)
 
 	if !strings.Contains(prompt, "ORGANIZATIONAL CONCEPTS") {
 		t.Error("concepts should be in separate section")
@@ -449,7 +449,7 @@ func TestBuildGuidancePrompt_ConstraintSubTypes(t *testing.T) {
 		{Type: GuidanceConstraint, Content: "[must] No hardcoded values", Confidence: 0.95, SourceNodes: []string{"c1"}},
 		{Type: GuidanceConstraint, Content: "[should] Prefer config files", Confidence: 0.7, SourceNodes: []string{"c2"}},
 	}
-	prompt := buildGuidancePrompt(items, "Working on config", "")
+	prompt := buildGuidancePrompt(items, "Working on config", "", 200000, 200000)
 
 	if !strings.Contains(prompt, "[must]") {
 		t.Error("prompt should show [must] sub-type label")
@@ -536,5 +536,25 @@ func TestCleanEvalJSONResponse(t *testing.T) {
 				t.Errorf("cleaned response should contain %q, got: %s", tt.contains, cleaned)
 			}
 		})
+	}
+}
+
+// --- J16: Cache Key Collision Tests ---
+
+func TestCacheKey_FullContextHash(t *testing.T) {
+	base := strings.Repeat("a", 200)
+	k1 := cacheKey("space", base+"SUFFIX_A")
+	k2 := cacheKey("space", base+"SUFFIX_B")
+	if k1 == k2 {
+		t.Error("cache keys should differ for different contexts even with shared 200-char prefix")
+	}
+}
+
+func TestEvalCacheKey_FullOutputHash(t *testing.T) {
+	base := strings.Repeat("x", 200)
+	k1 := evalCacheKey(base+"OUTPUT_A", "c1")
+	k2 := evalCacheKey(base+"OUTPUT_B", "c1")
+	if k1 == k2 {
+		t.Error("eval cache keys should differ for different outputs even with shared prefix")
 	}
 }
