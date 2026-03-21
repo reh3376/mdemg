@@ -74,7 +74,15 @@ coverage.txt
 *~
 
 # AI Assistant configuration (user-specific)
-.claude/
+.claude/*
+# Track MDEMG development hooks (project-level, not user-specific)
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/session-start.sh
+!.claude/hooks/prompt-context.sh
+!.claude/hooks/pre-compact.sh
+!.claude/hooks/pre-bash-check.py
+!.claude/hooks/post-tool-observe.py
 .claude_settings.json
 .cursor/
 

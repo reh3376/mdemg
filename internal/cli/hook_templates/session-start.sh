@@ -112,6 +112,19 @@ Overall: ${OVERALL} | Retrieval: ${RETRIEVAL} | Memory: ${MEMORY} | Edge: ${EDGE
 Learning: ${LEARN_PHASE} | Orphan ratio: ${ORPHAN_RATIO}
 ═══ END RSIC HEALTH ═══
 EOF
+
+  # If health is degraded, show investigation checklist
+  HEALTH_NUM=$(echo "$OVERALL" | grep -oE '^[0-9.]+' || echo "1")
+  if [ "$(echo "$HEALTH_NUM < 0.5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    cat <<'DEGRADED'
+
+!! DEGRADED HEALTH DETECTED !!
+Investigation checklist:
+  1. GET /v1/memory/stats?space_id=<space>
+  2. GET /v1/learning/stats?space_id=<space>
+  3. POST /v1/self-improve/cycle {"space_id":"<space>","tier":"meso"}
+DEGRADED
+  fi
 fi
 
 # Reinforce recalled observations

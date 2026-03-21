@@ -206,6 +206,54 @@ func runUpgrade(dryRun, force bool) error {
 	// Clean up backup
 	_ = os.Remove(backupPath)
 
+	// Linux: update systemd unit files if present in archive and currently installed
+	if runtime.GOOS == "linux" {
+		systemdExtracted := filepath.Join(tmpDir, "systemd")
+		if _, err := os.Stat(systemdExtracted); err == nil {
+			systemdPaths := []string{"/etc/systemd/system", "/usr/lib/systemd/system"}
+			sharePath := "/usr/local/share/mdemg/systemd"
+			units := []struct{ src, dst string }{
+				{"mdemg.service", "mdemg@.service"},
+				{"mdemg-rsic.service", "mdemg-rsic@.service"},
+				{"mdemg-rsic.timer", "mdemg-rsic@.timer"},
+			}
+			updated := false
+			for _, systemdDir := range systemdPaths {
+				// Only update if units already exist in this directory
+				if _, err := os.Stat(filepath.Join(systemdDir, "mdemg@.service")); err != nil {
+					continue
+				}
+				for _, u := range units {
+					srcFile := filepath.Join(systemdExtracted, u.src)
+					if _, err := os.Stat(srcFile); err == nil {
+						if err := copyFile(srcFile, filepath.Join(systemdDir, u.dst)); err == nil {
+							_ = os.Chmod(filepath.Join(systemdDir, u.dst), 0o644) //nolint:gosec // Systemd units must be world-readable
+							updated = true
+						}
+					}
+				}
+			}
+			// Also update the share directory copy
+			if _, err := os.Stat(sharePath); err == nil {
+				for _, u := range units {
+					srcFile := filepath.Join(systemdExtracted, u.src)
+					if _, err := os.Stat(srcFile); err == nil {
+						_ = copyFile(srcFile, filepath.Join(sharePath, u.src))
+						_ = os.Chmod(filepath.Join(sharePath, u.src), 0o644) //nolint:gosec // Systemd units must be world-readable
+					}
+				}
+			}
+			if updated {
+				fmt.Print("Updating systemd units... ")
+				if err := exec.Command("systemctl", "daemon-reload").Run(); err == nil {
+					fmt.Println("ok")
+				} else {
+					fmt.Println("daemon-reload failed (may need sudo)")
+				}
+			}
+		}
+	}
+
 	fmt.Printf("\nUpgraded mdemg to %s\n", release.TagName)
 	return nil
 }
