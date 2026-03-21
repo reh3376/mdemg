@@ -41,7 +41,7 @@ Option C gives us:
 - **Negotiable extensions** for efficiency optimization — the agent can request shorter codes, different verbosity, batching preferences
 - **Agora's three-tier encoding** applied to the core protocol
 - **TLS-style session tickets** for context reset survival
-- **Graceful degradation** — if negotiation fails, core protocol still works in full NL
+- **Graceful degradation** — if negotiation fails, core protocol still works in full natural language (NL)
 
 ---
 
@@ -60,7 +60,7 @@ Option C gives us:
 
 ### 2. Three-Tier Encoding (from Agora)
 
-**Choice**: Coded constraints (Tier 1) > Telegraphic guidance (Tier 2) > Full NL (Tier 3).
+**Choice**: Coded constraints (Tier 1) > Telegraphic guidance (Tier 2) > Full NL fallback (Tier 3).
 
 **Why this specific tiering**:
 
@@ -73,16 +73,16 @@ C:?|test-before-commit|esc:1|src:ghi789
 The `C:!` / `C:?` / `X:!` prefix is all Claude needs to understand severity. The content is a compressed constraint name (not a full English sentence). Source node ID enables traceability. This format is:
 - **Human-readable** (satisfies R7 auditability)
 - **Machine-parseable** (hooks can validate format)
-- **Compact** (~15 tokens vs ~50-100 tokens for NL equivalent)
+- **Compact** (~15 tokens vs ~50-100 tokens for natural language equivalent)
 - **Deterministic** (same constraint always produces same code — cacheable)
 
 **Tier 2 — Telegraphic guidance** (~50-100 tokens, 15% of traffic):
 ```
 Auth middleware rewrite: compliance-driven not tech-debt. Favor compliance over ergonomics. (Node: n1234)
 ```
-Drops articles, pronouns, filler. Still NL but compressed. Used for context-specific guidance where a code wouldn't capture the nuance.
+Drops articles, pronouns, filler. Still natural language but compressed. Used for context-specific guidance where a code wouldn't capture the nuance.
 
-**Tier 3 — Full NL narrative** (current synthesis output, 5% of traffic):
+**Tier 3 — Full natural language narrative** (current synthesis output, 5% of traffic):
 Only for truly novel situations where the LLM synthesizer needs to reason about multiple conflicting constraints. This is what J8/J15 synthesis already produces.
 
 **Why not go more compact?** The research on binary/latent encoding (doc 02) shows that since Claude processes text tokens (not binary), wire-level compression provides no benefit. The compression must be semantic. And going *too* compact (single-character codes with no mnemonic value) would sacrifice auditability and graceful degradation.
@@ -165,15 +165,15 @@ With J17, the escalation count persists in the session ticket. The agent can't "
 
 ## Open Questions for Discussion
 
-1. **Should the session ticket be encrypted or just signed?** Encryption prevents the agent from reading its own state (which might be useful if we want to hide trust scores). Signing alone is simpler and still prevents tampering.
+1. **Should the session ticket be encrypted or just signed?** ~~Encryption prevents the agent from reading its own state (which might be useful if we want to hide trust scores). Signing alone is simpler and still prevents tampering.~~ **RESOLVED**: Signing only, no encryption. Nothing in the AI-to-AI communication is easily exploitable, and transparency is a design goal — both agents should see communication clearly without concern about secondary intent. Signing provides tamper protection, which is all we need.
 
-2. **How should we handle the first session (no prior ticket)?** Options: (a) full NL guidance on first session, (b) bootstrap ticket from CMS observations, (c) start with empty ticket and build up.
+2. **How should we handle the first session (no prior ticket)?** Options: (a) full natural language guidance on first session, (b) bootstrap ticket from CMS observations, (c) start with empty ticket and build up.
 
 3. **Should Tier 1 codes be human-designed or LLM-generated?** We could have Jiminy's LLM generate optimal codes from the constraint content, or we could design them by hand. LLM-generated would be more consistent; hand-designed would be more predictable.
 
 4. **What's the right ticket TTL?** Too short = frequent re-handshakes. Too long = stale state. Candidates: 1 hour, 4 hours, 24 hours, session-based (until server restart).
 
-5. **Should we implement LLMLingua-2 compression as a quick win before J17?** The research shows 2-5x NL compression with zero protocol changes. Could ship in days, not weeks.
+5. **Should we implement LLMLingua-2 compression as a quick win before J17?** The research shows 2-5x natural language compression with zero protocol changes. Could ship in days, not weeks.
 
 ---
 
