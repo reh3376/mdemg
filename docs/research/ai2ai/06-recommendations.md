@@ -1,7 +1,7 @@
 # J17 Design Recommendations
 
 **Date**: 2026-03-21
-**Author**: Claude (Opus 4.6)
+**Authors**: reh3376 & Claude (Opus 4.6)
 **Status**: Draft for review — awaiting user input before planning
 
 ---
