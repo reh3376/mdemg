@@ -18,10 +18,11 @@ type Dispatcher struct {
 	activeTasks map[string]*activeTask
 	reports     map[string][]RSICProgressReport
 
-	learner   LearningStatsProvider
-	convSvc   ConversationStatsProvider
-	hiddenSvc HiddenLayerProvider
-	driver    neo4j.DriverWithContext
+	learner       LearningStatsProvider
+	convSvc       ConversationStatsProvider
+	hiddenSvc     HiddenLayerProvider
+	driver        neo4j.DriverWithContext
+	protoEvolver  ProtocolEvolverProvider // J17: protocol mutation executor
 
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
@@ -59,6 +60,11 @@ func (d *Dispatcher) SetSafetyValidator(sv *SafetyValidator) {
 // SetSnapshotStore attaches a snapshot store to the dispatcher.
 func (d *Dispatcher) SetSnapshotStore(ss *SnapshotStore) {
 	d.snapshotStore = ss
+}
+
+// SetProtocolEvolver attaches a J17 protocol evolver for protocol mutation tasks.
+func (d *Dispatcher) SetProtocolEvolver(pe ProtocolEvolverProvider) {
+	d.protoEvolver = pe
 }
 
 // SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
@@ -219,6 +225,14 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeTombstoneStale(ctx, at.Spec.TargetSpace)
 	case "refresh_stale_edges":
 		deliverables, execErr = d.executeRefreshStaleEdges(ctx, at.Spec.TargetSpace)
+	case "codify_constraint":
+		deliverables, execErr = d.executeCodifyConstraint(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+	case "retire_code":
+		deliverables, execErr = d.executeRetireCode(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+	case "adjust_tier_threshold":
+		deliverables, execErr = d.executeAdjustTierThreshold(ctx, at.Spec.TargetSpace)
+	case "adjust_replay_buffer":
+		deliverables, execErr = d.executeAdjustReplayBuffer(ctx, at.Spec.TargetSpace)
 	default:
 		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -378,6 +392,38 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 		return nil, err
 	}
 	return map[string]any{"refreshed": result}, nil
+}
+
+// ─── J17 Protocol action executors ───
+
+func (d *Dispatcher) executeCodifyConstraint(ctx context.Context, spaceID, rationale string) (map[string]any, error) {
+	if d.protoEvolver == nil {
+		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	// rationale contains the constraint node ID from the reflection insight
+	return d.protoEvolver.CodifyConstraint(ctx, spaceID, rationale)
+}
+
+func (d *Dispatcher) executeRetireCode(ctx context.Context, spaceID, rationale string) (map[string]any, error) {
+	if d.protoEvolver == nil {
+		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	// rationale contains the constraint code to retire
+	return d.protoEvolver.RetireCode(ctx, spaceID, rationale)
+}
+
+func (d *Dispatcher) executeAdjustTierThreshold(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.protoEvolver == nil {
+		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	return d.protoEvolver.AdjustTierThresholds(ctx, spaceID)
+}
+
+func (d *Dispatcher) executeAdjustReplayBuffer(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.protoEvolver == nil {
+		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	return d.protoEvolver.AdjustReplayBuffer(ctx, spaceID)
 }
 
 // CleanupStaleTasks removes completed/failed tasks older than maxAge and caps total entries at 1000.

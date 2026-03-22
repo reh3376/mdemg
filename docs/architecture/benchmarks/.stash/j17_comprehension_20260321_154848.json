@@ -1,0 +1,269 @@
+{
+  "timestamp": "2026-03-21T19:48:48Z",
+  "model": "gpt-5.3",
+  "bootstrap_header": "J17:INIT|v1\nCODES: C=constraint X=correction F=frontier D=decision P=pattern L=learning\nSEV: !=must ?=should ~=info\nESC: 0=clear 1=warned 2=escalated 3=blocked\nFMT: TYPE:SEV|content|esc:N|src:NODE_ID\nTICKET: signed, echo back on resume\nSEQ: monotonic, report last_seq on resume",
+  "trials": [
+    {
+      "constraint_id": "c1",
+      "tier": 1,
+      "encoded_message": "C:!|no-force-push-main|src:node-abc123",
+      "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 9,
+      "tokens_original": 28
+    },
+    {
+      "constraint_id": "c1",
+      "tier": 2,
+      "encoded_message": "C: Never force-push to main branch. destroys shared history and can cause data loss for other collaborators. [no-force-push-main] (src:node-abc123)",
+      "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 36,
+      "tokens_original": 28
+    },
+    {
+      "constraint_id": "c1",
+      "tier": 3,
+      "encoded_message": "- [constraint] Never force-push to the main branch. This destroys shared history and can cause data loss for other collaborators. (conf: 0.90)",
+      "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 35,
+      "tokens_original": 28
+    },
+    {
+      "constraint_id": "c2",
+      "tier": 1,
+      "encoded_message": "C:!|test-before-commit|src:node-def456",
+      "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 9,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c2",
+      "tier": 2,
+      "encoded_message": "C: Always run full test suite before committing changes. No exceptions, even for 'trivial' changes. [test-before-commit] (src:node-def456)",
+      "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 34,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c2",
+      "tier": 3,
+      "encoded_message": "- [constraint] Always run the full test suite before committing changes. No exceptions, even for 'trivial' changes. (conf: 0.90)",
+      "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 32,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c3",
+      "tier": 1,
+      "encoded_message": "X:!|embed-model-gpt5mini|src:node-ghi789",
+      "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 10,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c3",
+      "tier": 2,
+      "encoded_message": "X: default embedding model gpt-5-mini, NOT text-embedding-3-small. not change model name. [embed-model-gpt5mini] (src:node-ghi789)",
+      "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 32,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c3",
+      "tier": 3,
+      "encoded_message": "- [correction] The default embedding model is gpt-5-mini, NOT text-embedding-3-small. Do not change this model name. (conf: 0.90)",
+      "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 32,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c4",
+      "tier": 1,
+      "encoded_message": "C:?|edit-over-create|src:node-jkl012",
+      "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 9,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c4",
+      "tier": 2,
+      "encoded_message": "C: Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. [edit-over-create] (src:node-jkl012)",
+      "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 35,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c4",
+      "tier": 3,
+      "encoded_message": "- [constraint] Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. (conf: 0.90)",
+      "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 32,
+      "tokens_original": 25
+    },
+    {
+      "constraint_id": "c5",
+      "tier": 1,
+      "encoded_message": "F:~|auth-compliance-driven|src:node-mno345",
+      "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 10,
+      "tokens_original": 46
+    },
+    {
+      "constraint_id": "c5",
+      "tier": 2,
+      "encoded_message": "F: auth middleware rewrite driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions favor compliance over ergonomics. [auth-compliance-driven] (src:node-mno345)",
+      "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 54,
+      "tokens_original": 46
+    },
+    {
+      "constraint_id": "c5",
+      "tier": 3,
+      "encoded_message": "- [frontier] The auth middleware rewrite is driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions should favor compliance over ergonomics. (conf: 0.90)",
+      "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 52,
+      "tokens_original": 46
+    },
+    {
+      "constraint_id": "c6",
+      "tier": 1,
+      "encoded_message": "C:!|no-stash-goreleaser|esc:1|src:node-pqr678",
+      "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 11,
+      "tokens_original": 33
+    },
+    {
+      "constraint_id": "c6",
+      "tier": 2,
+      "encoded_message": "C: Never use git stash as workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. [no-stash-goreleaser] (src:node-pqr678)",
+      "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 43,
+      "tokens_original": 33
+    },
+    {
+      "constraint_id": "c6",
+      "tier": 3,
+      "encoded_message": "- [constraint] Never use git stash as a workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. (conf: 0.90)",
+      "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 40,
+      "tokens_original": 33
+    },
+    {
+      "constraint_id": "c7",
+      "tier": 1,
+      "encoded_message": "X:!|no-direct-main-commit|esc:2|src:node-stu901",
+      "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 11,
+      "tokens_original": 40
+    },
+    {
+      "constraint_id": "c7",
+      "tier": 2,
+      "encoded_message": "X: Never commit directly to main branch. All development work happen on dev branches. Main branch-protected and changes reach only via pull request. [no-direct-main-commit] (src:node-stu901)",
+      "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 47,
+      "tokens_original": 40
+    },
+    {
+      "constraint_id": "c7",
+      "tier": 3,
+      "encoded_message": "- [correction] Never commit directly to the main branch. All development work must happen on dev branches. Main is branch-protected and changes reach it only via pull request. (conf: 0.90)",
+      "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 47,
+      "tokens_original": 40
+    },
+    {
+      "constraint_id": "c8",
+      "tier": 2,
+      "encoded_message": "P: When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. orchestrator coordinate, not execute every step directly. (src:node-vwx234)",
+      "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 47,
+      "tokens_original": 44
+    },
+    {
+      "constraint_id": "c8",
+      "tier": 3,
+      "encoded_message": "- [pattern] When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. The orchestrator should coordinate, not execute every step directly. (conf: 0.90)",
+      "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+      "receiver_interpretation": "[ERROR: openai error 404: {\n    \"error\": {\n        \"message\": \"The model `gpt-5.3` does not exist or you do not have access to it.\",\n        \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\": \"model_not_found\"\n    }\n}\n]",
+      "judge_score": 0,
+      "judge_reason": "judge error",
+      "tokens_encoded": 50,
+      "tokens_original": 44
+    }
+  ],
+  "summary": {
+    "total_trials": 23,
+    "avg_score_t1": 0,
+    "avg_score_t2": 0,
+    "avg_score_t3": 0,
+    "avg_compression_t1": 3.2004329004329004,
+    "avg_compression_t2": 0.8018919205725888,
+    "perfect_score_count": 0
+  }
+}

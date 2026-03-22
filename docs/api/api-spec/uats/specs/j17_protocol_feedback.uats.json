@@ -1,0 +1,118 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Protocol Feedback",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "feedback",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-22",
+    "description": "Validates the J17 protocol feedback endpoint that ingests constraint trial results for protocol evolution.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "feedback",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/protocol/feedback",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "trials": [
+        {
+          "constraint_code": "test-code",
+          "tier": 1,
+          "score": 8.5,
+          "interpretation": "test",
+          "sender_intent": "test intent"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "ingested count is number",
+        "path": "$.data.ingested",
+        "type": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "empty_trials",
+      "description": "Request with empty trials array should return 400.",
+      "request": {
+        "body": {
+          "trials": []
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "j17_disabled",
+      "description": "When J17 is disabled, protocol feedback returns 503.",
+      "tags": ["j17_disabled"],
+      "request": {
+        "body": {
+          "trials": [
+            {
+              "constraint_code": "test-code",
+              "tier": 1,
+              "score": 8.5,
+              "interpretation": "test",
+              "sender_intent": "test intent"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

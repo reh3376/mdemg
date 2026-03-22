@@ -116,6 +116,7 @@ type SelfAssessmentReport struct {
 	MemoryHealth     float64 `json:"memory_health"`
 	EdgeHealth       float64 `json:"edge_health"`
 	GuidanceHealth   float64 `json:"guidance_health"` // J10: Jiminy guidance effectiveness
+	ProtocolHealth   float64 `json:"protocol_health"` // J17: protocol encoding effectiveness
 
 	// Derived
 	OverallHealth float64 `json:"overall_health"`
@@ -385,6 +386,32 @@ type JiminyStatsResult struct {
 	FollowRate          float64 `json:"follow_rate"`
 	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
 	SourceDiversity     float64 `json:"source_diversity"`
+}
+
+// ProtocolStatsProvider exposes J17 protocol metrics for RSIC assessment.
+type ProtocolStatsProvider interface {
+	GetProtocolStats(ctx context.Context, spaceID string) (ProtocolStatsResult, error)
+}
+
+// ProtocolStatsResult carries J17 protocol metrics for RSIC assessment.
+type ProtocolStatsResult struct {
+	TierDistribution         [3]float64         `json:"tier_distribution"`
+	CompressionRatio         float64            `json:"compression_ratio"`
+	AvgComprehension         float64            `json:"avg_comprehension"`
+	ReplayFrequencyPerHour   float64            `json:"replay_frequency_per_hour"`
+	TicketRestoreSuccessRate float64            `json:"ticket_restore_success_rate"`
+	CodeCoverage             float64            `json:"code_coverage"`
+	TotalEvents              int64              `json:"total_events"`
+	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
+	CodeComprehension        map[string]float64 `json:"code_comprehension,omitempty"`
+}
+
+// ProtocolEvolverProvider executes protocol mutations proposed by RSIC.
+type ProtocolEvolverProvider interface {
+	CodifyConstraint(ctx context.Context, spaceID string, constraintNodeID string) (map[string]any, error)
+	RetireCode(ctx context.Context, spaceID string, constraintCode string) (map[string]any, error)
+	AdjustTierThresholds(ctx context.Context, spaceID string) (map[string]any, error)
+	AdjustReplayBuffer(ctx context.Context, spaceID string) (map[string]any, error)
 }
 
 // WatchdogSignalProvider supplies additional monitoring signals for multi-dimensional watchdog.

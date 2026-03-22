@@ -32,6 +32,43 @@ func (a *constraintGateAdapter) Classify(ctx context.Context, nodeID, text strin
 	return &conversation.ConstraintGateResult{Type: result.Type}, nil
 }
 
+// loadExistingConstraintCodes queries Neo4j for all existing constraint_code values
+// to populate the code generator's collision avoidance set on startup.
+func loadExistingConstraintCodes(ctx context.Context, driver neo4j.DriverWithContext) []string {
+	if driver == nil {
+		return nil
+	}
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode)
+			WHERE n.constraint_code IS NOT NULL AND n.constraint_code <> ''
+			RETURN DISTINCT n.constraint_code AS code
+		`
+		res, err := tx.Run(ctx, cypher, nil)
+		if err != nil {
+			return nil, err
+		}
+		var codes []string
+		for res.Next(ctx) {
+			record := res.Record()
+			if code, ok := record.Get("code"); ok {
+				if codeStr, ok := code.(string); ok {
+					codes = append(codes, codeStr)
+				}
+			}
+		}
+		return codes, res.Err()
+	})
+	if err != nil {
+		return nil
+	}
+	codes, _ := result.([]string)
+	return codes
+}
+
 // rsicLearningAdapter adapts *learning.Service to ape.LearningStatsProvider.
 type rsicLearningAdapter struct {
 	svc *learning.Service
@@ -184,6 +221,29 @@ func (a *rsicJiminyAdapter) GetGuidanceStats(ctx context.Context, spaceID string
 		FollowRate:          stats.FollowRate,
 		ConstraintEffRate:   stats.ConstraintEffRate,
 		SourceDiversity:     stats.SourceDiversity,
+	}, nil
+}
+
+// rsicProtocolAdapter adapts *jiminy.Service to ape.ProtocolStatsProvider (J17).
+type rsicProtocolAdapter struct {
+	svc *jiminy.Service
+}
+
+func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID string) (ape.ProtocolStatsResult, error) {
+	snapshot := a.svc.GetProtocolMetricsSnapshot()
+	if snapshot == nil {
+		return ape.ProtocolStatsResult{}, nil
+	}
+	return ape.ProtocolStatsResult{
+		TierDistribution:         snapshot.TierDistribution,
+		CompressionRatio:         snapshot.CompressionRatio,
+		AvgComprehension:         snapshot.AvgComprehension,
+		ReplayFrequencyPerHour:   snapshot.ReplayFrequencyPerHour,
+		TicketRestoreSuccessRate: snapshot.TicketRestoreSuccessRate,
+		CodeCoverage:             snapshot.CodeCoverage,
+		TotalEvents:              snapshot.TotalEvents,
+		T2FrequencyByConstraint:  snapshot.T2FrequencyByConstraint,
+		CodeComprehension:        snapshot.CodeComprehension,
 	}, nil
 }
 

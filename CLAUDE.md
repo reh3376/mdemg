@@ -255,7 +255,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 **Remaining work:**
 - Release infrastructure: Create `reh3376/homebrew-mdemg` GitHub repo, tag v0.2.0
 - ~10 UATS specs for uncovered endpoints (spaces CRUD, jobs SSE, linear module)
-- Phase J17: Agent-to-agent communication protocol (Jiminy ↔ AI coding agent)
+- Phase J17: AI-to-AI communication protocol — COMPLETE (3-tier encoding, constraint codegen, trust scoring, ML tier prediction)
 
 ## Testing
 

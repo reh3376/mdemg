@@ -1,16 +1,22 @@
-# J17 Design Recommendations
+# J17 Design Recommendations — Final Draft
 
 **Date**: 2026-03-21
 **Authors**: reh3376 & Claude (Opus 4.6)
-**Status**: Draft for review — awaiting user input before planning
+**Status**: Final draft — all open questions resolved, ready for development planning
 
 ---
 
 ## Executive Summary
 
-After surveying 30+ protocols, 50+ academic papers, and dozens of open source projects, my recommendation is **Option C: Hybrid — Designed Core + Negotiated Extensions**, building primarily on concepts from **Agora Protocol** (tiered encoding), **TLS session tickets** (state persistence), and **SOAR cognitive architecture** (three-layer enforcement).
+After surveying 30+ protocols, 50+ academic papers, and dozens of open source projects, the recommendation is **Option C: Hybrid — Designed Core + Negotiated Extensions**, building primarily on concepts from **Agora Protocol** (tiered encoding), **TLS session tickets** (state persistence), **SOAR cognitive architecture** (three-layer enforcement), and **RSIC** (protocol evolution through self-improvement).
 
-No existing protocol can be adopted as-is. But we don't need to build from scratch either — the building blocks exist and are proven.
+No existing protocol can be adopted as-is. But we don't need to build from scratch — the building blocks exist and are proven.
+
+**Design axioms** (from user review):
+1. **No artificial size constraints** — the protocol's purpose is compact communication; artificial limits add complexity without value
+2. **AI-to-AI first** — human readability is not a design goal; auditability is achieved through logging/tooling, not wire format constraints
+3. **Living protocol** — RSIC-driven evolution of negotiable extensions, not static specification
+4. **Transparency** — both agents see all communication clearly; signing for tamper protection, no encryption
 
 ---
 
@@ -39,6 +45,7 @@ The emergent communication research (doc 03) proves LLMs *can* negotiate shared 
 Option C gives us:
 - **Non-negotiable core** for guardrail enforcement (constraints, escalation, state persistence) — these are SOAR's "compiled production rules" that fire mechanically
 - **Negotiable extensions** for efficiency optimization — the agent can request shorter codes, different verbosity, batching preferences
+- **RSIC-driven evolution** — extensions aren't static; they're measured, evaluated, and improved through the self-improvement cycle
 - **Agora's three-tier encoding** applied to the core protocol
 - **TLS-style session tickets** for context reset survival
 - **Graceful degradation** — if negotiation fails, core protocol still works in full natural language (NL)
@@ -49,12 +56,28 @@ Option C gives us:
 
 ### 1. Session Ticket Architecture (from TLS + JWT)
 
-**Choice**: Compact (~500 byte), signed, opaque state blob issued by Jiminy at pre-compaction and re-injected at session start.
+**Choice**: Compact, signed state blob issued by Jiminy on event triggers and re-injected at session start. No artificial size limit — the ticket carries exactly what's needed to resume, no more, no less.
+
+**Why no size cap**: The ticket contents are inherently bounded (finite constraint set, escalation state enum, sequence counter, trust score float, conversation phase string). The protocol's tiered encoding already ensures compactness. An artificial byte limit adds edge-case complexity (truncation logic, overflow handling) without solving a real problem. The natural constraint is context window capacity, and the ticket is a small fraction of that.
 
 **Why this over alternatives**:
 - **Better than full state replay**: Replay costs too many tokens. A compact ticket carries just enough to resume.
 - **Better than relying on CMS recall alone**: CMS recall is semantic (similarity-based). Session state is exact — you need the precise escalation count, not "something similar to an escalation."
 - **Better than storing state in markdown memory**: Memory files are suggestions; the agent can ignore them. A session ticket processed by Jiminy hooks is mechanical — the agent can't opt out.
+
+**Signing**: HMAC-SHA256 signature for tamper detection. No encryption — transparency is a design goal. Both agents see all communication clearly without concern about secondary intent.
+
+**Renewal**: Event-driven with a 4-hour safety-net TTL. Ticket renewal is cheap (serialize + sign, no LLM call), so renew aggressively:
+
+| Trigger | Why |
+|---------|-----|
+| Pre-compaction | Primary mechanism — bridge across context amnesia (~every 20-30 min) |
+| Context reset / new session | Clean slate — full state re-injection needed |
+| Agent change (new model/instance) | New agent hasn't earned prior trust score |
+| Escalation state transition | Most dangerous if stale — violation history must persist immediately |
+| Constraint set mutation | Ticket's active constraint list is stale |
+
+The 4-hour TTL is a backstop only — catches the failure case where all event triggers break simultaneously.
 
 **Implementation**: The `pre-compact.sh` hook already fires before compaction. It would call a new `POST /v1/jiminy/checkpoint` endpoint that returns a signed ticket. The `session-start.sh` hook would send this ticket back via `POST /v1/jiminy/resume-protocol` to restore state.
 
@@ -70,11 +93,13 @@ C:!|no-force-push-main|esc:0|src:abc123
 X:!|never-stash-for-goreleaser|src:def456
 C:?|test-before-commit|esc:1|src:ghi789
 ```
-The `C:!` / `C:?` / `X:!` prefix is all Claude needs to understand severity. The content is a compressed constraint name (not a full English sentence). Source node ID enables traceability. This format is:
-- **Human-readable** (satisfies R7 auditability)
+The `C:!` / `C:?` / `X:!` prefix encodes type and severity in 3 characters. The content is an LLM-generated mnemonic code (frozen at constraint creation). Source node ID enables traceability. This format is:
 - **Machine-parseable** (hooks can validate format)
 - **Compact** (~15 tokens vs ~50-100 tokens for natural language equivalent)
 - **Deterministic** (same constraint always produces same code — cacheable)
+- **Self-documenting to LLMs** (mnemonic codes like `test-before-commit` are interpretable without a lookup table)
+
+**Code generation**: LLM-generated once at constraint creation time, then frozen as a property on the constraint node in Neo4j. Never regenerated. Generation prompt includes existing codes for collision prevention. This is the URL-slug pattern: machine-parseable, generated once, immutable.
 
 **Tier 2 — Telegraphic guidance** (~50-100 tokens, 15% of traffic):
 ```
@@ -85,7 +110,7 @@ Drops articles, pronouns, filler. Still natural language but compressed. Used fo
 **Tier 3 — Full natural language narrative** (current synthesis output, 5% of traffic):
 Only for truly novel situations where the LLM synthesizer needs to reason about multiple conflicting constraints. This is what J8/J15 synthesis already produces.
 
-**Why not go more compact?** The research on binary/latent encoding (doc 02) shows that since Claude processes text tokens (not binary), wire-level compression provides no benefit. The compression must be semantic. And going *too* compact (single-character codes with no mnemonic value) would sacrifice auditability and graceful degradation.
+**Encoding density**: Since this is AI-to-AI communication, not human-facing, encoding density can be pushed further than traditional protocols. The research on binary/latent encoding (doc 02) shows compression must be semantic (LLMs process text tokens, not binary), but within that constraint, shorter codes and denser formats are preferred. RSIC tracks comprehension accuracy and can recommend further compression when the agent demonstrates reliable interpretation.
 
 ### 3. Monotonic Sequence Counter (from SSE Last-Event-ID)
 
@@ -113,9 +138,9 @@ Only for truly novel situations where the LLM synthesizer needs to reason about 
 
 With J17, the escalation count persists in the session ticket. The agent can't "reset" Jiminy by waiting for compaction. This closes a real enforcement gap.
 
-### 6. Negotiable Extensions (Not Core)
+### 6. RSIC-Driven Protocol Evolution (Negotiable Extensions)
 
-**Choice**: Agent can request (not demand) encoding optimizations.
+**Choice**: Agent can request (not demand) encoding optimizations. RSIC measures effectiveness and drives protocol evolution over time. The protocol learns and improves — it is not static.
 
 **Examples of negotiable extensions**:
 - "I understand your constraint codes. Send Tier 1 only, skip Tier 2/3 unless novel." → Reduces injection size
@@ -125,10 +150,52 @@ With J17, the escalation count persists in the session ticket. The agent can't "
 **What is NOT negotiable**:
 - Constraint types and severity codes
 - Escalation state machine transitions
-- Session ticket format and lifecycle
+- Session ticket lifecycle and signing
 - Sequence numbering
 
+**RSIC integration — the protocol as a learning system**:
+
+RSIC already monitors MDEMG's retrieval quality, memory health, and learning edges. J17 extends this to protocol effectiveness:
+
+| RSIC Function | J17 Application |
+|---------------|-----------------|
+| **Assess** | Track protocol metrics: tier distribution (% T1/T2/T3), compression ratios, agent comprehension accuracy, replay frequency after compaction, extension adoption rates |
+| **Reflect** | Identify patterns: constraints frequently sent as T2 that could be codified to T1; extension requests repeated across sessions; codes that correlate with agent misinterpretation |
+| **Plan** | Propose protocol mutations: new T1 codes for high-frequency guidance, tier threshold adjustments, batching optimizations, encoding density changes |
+| **Dispatch** | Execute approved mutations: generate and freeze new constraint codes, update tier selection logic, adjust compression parameters |
+| **Monitor** | Track outcomes of mutations: did the new code improve comprehension? Did the batching change reduce overhead without losing enforcement? |
+| **Calibration** | Adjust confidence in protocol parameters: which extensions reliably improve efficiency vs. which introduce comprehension risk |
+| **Watchdog** | Detect protocol degradation: comprehension accuracy dropping, tier distribution skewing unexpectedly, replay frequency increasing (suggests ticket renewal triggers are failing) |
+
+**Evolution lifecycle**:
+1. RSIC observes protocol performance across sessions
+2. Identifies optimization opportunities (e.g., "constraint X has been sent as Tier 2 in 47 of the last 50 sessions — candidate for Tier 1 codification")
+3. Proposes mutation (generate T1 code, update tier selection)
+4. Mutation is applied and monitored
+5. If comprehension accuracy holds or improves, mutation becomes permanent
+6. If comprehension degrades, mutation is rolled back
+
+This closes the loop: the protocol doesn't just communicate — it learns to communicate better over time, grounded in measured outcomes rather than assumptions.
+
 **Why allow negotiation at all?** The "Language Modeling is Compression" paper (ICLR 2024) establishes that Claude is an excellent decompressor. If Claude signals it understands the constraint vocabulary, we can send even more compressed codes and rely on Claude to reconstruct the full meaning. This is provably more efficient. But the choice to compress further must be Claude's — Jiminy shouldn't assume.
+
+---
+
+## Bootstrap Protocol (First Session)
+
+When no prior ticket exists, the session-start hook sends a compact protocol spec block (~50 tokens) alongside an empty state ticket:
+
+```
+J17:INIT|v1
+CODES: C=constraint X=correction F=frontier D=decision
+SEV: !=must ?=should ~=info
+ESC: 0=clear 1=warned 2=escalated 3=blocked
+FMT: TYPE:SEV|content|esc:N|src:NODE_ID
+TICKET: signed, echo back on resume
+SEQ: monotonic, report last_seq on resume
+```
+
+Full natural language is unnecessary — any well-trained LLM natively understands structured specification formats (RFC 2119 keywords, key:value notation) because these are heavily represented in training data. Per "Language Modeling is Compression" (ICLR 2024): send the minimum viable signal, let the LLM reconstruct full meaning. No negotiation round needed — Jiminy starts sending Tier 1 codes immediately.
 
 ---
 
@@ -142,6 +209,8 @@ With J17, the escalation count persists in the session ticket. The agent can't "
 | Binary serialization (Protobuf, MessagePack) | LLM processes text tokens, not binary. No benefit. |
 | Full FIPA ACL | Failed in practice. Mental-state semantics are unverifiable. |
 | KV cache sharing (DroidSpeak) | Requires same base model. Different architecture. |
+| LLMLingua-2 compression | Redundant once Tier 1 coded constraints (5-10x reduction) are in place. |
+| Artificial size constraints | Protocol's purpose is already compact communication; limits add edge-case complexity without value. |
 
 ---
 
@@ -149,52 +218,35 @@ With J17, the escalation count persists in the session ticket. The agent can't "
 
 | Component | Complexity | New Files | Modified Files |
 |-----------|-----------|-----------|----------------|
-| Session ticket (checkpoint/resume endpoints) | Medium | 2-3 | 3-4 |
-| Constraint code encoder/decoder | Low | 1-2 | 2-3 |
+| Session ticket (checkpoint/resume endpoints, signing) | Medium | 2-3 | 3-4 |
+| Constraint code generator (LLM-generated, frozen in Neo4j) | Medium | 1-2 | 2-3 |
 | Tier selection logic (which tier for which guidance) | Low | 0 | 2-3 |
 | Sequence counter + event log | Medium | 1-2 | 3-4 |
 | Hook updates (pre-compact checkpoint, session-start resume) | Low | 0 | 2-3 |
-| Trust score persistence | Low | 0 | 2-3 |
+| Trust score + escalation persistence | Low | 0 | 2-3 |
 | Extension negotiation handshake | Medium | 1-2 | 2-3 |
-| Tests | Medium | 2-3 | 2-3 |
-| UATS specs | Low | 3-5 | 0 |
+| RSIC protocol metrics + evolution pipeline | Medium | 2-3 | 3-4 |
+| Bootstrap protocol (init spec block) | Low | 0-1 | 1-2 |
+| Tests | Medium | 3-4 | 3-4 |
+| UATS specs | Low | 4-6 | 0 |
 
-**Total estimate**: ~10-15 new/modified Go files, ~5 UATS specs, ~3 hook updates.
-
----
-
-## Open Questions for Discussion
-
-1. **Should the session ticket be encrypted or just signed?** ~~Encryption prevents the agent from reading its own state (which might be useful if we want to hide trust scores). Signing alone is simpler and still prevents tampering.~~ **RESOLVED**: Signing only, no encryption. Nothing in the AI-to-AI communication is easily exploitable, and transparency is a design goal — both agents should see communication clearly without concern about secondary intent. Signing provides tamper protection, which is all we need.
-
-2. **How should we handle the first session (no prior ticket)?** ~~Options: (a) full natural language guidance on first session, (b) bootstrap ticket from CMS observations, (c) start with empty ticket and build up.~~ **RESOLVED**: Option (c) with a compact spec header. Full natural language is unnecessary — any well-trained LLM natively understands structured specification formats (RFC 2119 keywords, key:value notation, markdown hierarchy) because these are heavily represented in training data. The bootstrap sends a ~50 token protocol spec block alongside an empty state ticket:
-   ```
-   J17:INIT|v1
-   CODES: C=constraint X=correction F=frontier D=decision
-   SEV: !=must ?=should ~=info
-   ESC: 0=clear 1=warned 2=escalated 3=blocked
-   FMT: TYPE:SEV|content|esc:N|src:NODE_ID
-   TICKET: signed, opaque, echo back on resume
-   SEQ: monotonic, report last_seq on resume
-   ```
-   This is Agora's Tier 2 (telegraphic) applied to the bootstrap itself. Per "Language Modeling is Compression" (ICLR 2024): send the minimum viable signal, let the LLM reconstruct full meaning. No negotiation round needed — Jiminy starts sending Tier 1 codes immediately.
-
-3. **Should Tier 1 codes be human-designed or LLM-generated?** ~~We could have Jiminy's LLM generate optimal codes from the constraint content, or we could design them by hand. LLM-generated would be more consistent; hand-designed would be more predictable.~~ **RESOLVED**: LLM-generated once at constraint creation time, then frozen. When a new constraint enters the CMS graph, Jiminy's LLM generates a compact kebab-case mnemonic code (e.g., `no-force-push-main` from "Never force push to the main branch"). The code is stored as a property on the constraint node in Neo4j and never regenerated. This gives: (1) determinism without rigidity — codes are static DB lookups, not runtime LLM output, surviving model upgrades and provider switches; (2) automatic scaling — no human bottleneck at constraint 301; (3) mnemonic quality — self-documenting codes that an LLM can roughly interpret even without the bootstrap spec (`C:!|test-before-commit` is self-evident); (4) no drift — frozen at creation, immune to model changes; (5) collision prevention — generation prompt includes existing codes as negative examples. This is the URL-slug/npm-package-name pattern: human-readable, machine-parseable, generated once, then immutable.
-
-4. **What's the right ticket TTL?** ~~Too short = frequent re-handshakes. Too long = stale state. Candidates: 1 hour, 4 hours, 24 hours, session-based (until server restart).~~ **RESOLVED**: Event-driven renewal with a 4-hour safety-net TTL. Time-based expiration is the wrong primary axis — state accuracy matters more than elapsed time. A 3-hour-old ticket reflecting current reality is fine; a 5-minute-old ticket generated before an escalation event is dangerous. Ticket renewal is cheap (serialize + sign, no LLM call), so renew aggressively on events:
-
-   | Trigger | Why |
-   |---------|-----|
-   | Pre-compaction | Primary mechanism — bridge across context amnesia (~every 20-30 min) |
-   | Context reset / new session | Clean slate — full state re-injection needed |
-   | Agent change (new model/instance) | New agent hasn't earned prior trust score |
-   | Escalation state transition | Most dangerous if stale — violation history must persist immediately |
-   | Constraint set mutation | Ticket's active constraint list is stale |
-
-   The 4-hour TTL is a backstop only — in normal operation, event-driven renewal refreshes every 20-30 minutes. The TTL catches the failure case where all event triggers break simultaneously. Defense in depth, like the circuit breaker pattern.
-
-5. **Should we implement LLMLingua-2 compression as a quick win before J17?** ~~The research shows 2-5x natural language compression with zero protocol changes. Could ship in days, not weeks.~~ **RESOLVED**: No. Focus effort on J17 — the full protocol is the high-value target. LLMLingua-2 becomes redundant once Tier 1 coded constraints (5-10x reduction) are in place.
+**Total estimate**: ~12-18 new/modified Go files, ~6 UATS specs, ~3 hook updates.
 
 ---
 
-*All open questions resolved. Ready for J17 development planning.*
+## Resolved Design Decisions
+
+| # | Question | Resolution |
+|---|----------|------------|
+| Q1 | Encrypted or signed tickets? | **Signed only** (HMAC-SHA256). Transparency is a design goal — no encryption needed. |
+| Q2 | First session bootstrap? | **Compact spec header** (~50 tokens) + empty state ticket. No full NL needed. |
+| Q3 | Human-designed or LLM-generated codes? | **LLM-generated once, frozen in Neo4j.** Scales automatically, deterministic, no drift. |
+| Q4 | Ticket TTL? | **Event-driven renewal** (compaction, reset, escalation, mutation) + **4-hour safety-net TTL**. |
+| Q5 | LLMLingua-2 as quick win? | **No.** Focus on J17 full protocol — LLMLingua-2 becomes redundant. |
+| Q6 | Size constraints on tickets/messages? | **None.** Protocol design ensures compactness; artificial limits add complexity without value. |
+| Q7 | Human readability as design factor? | **No.** AI-to-AI communication — auditability via logging/tooling, not wire format. |
+| Q8 | Static or evolving protocol? | **Evolving.** RSIC tracks effectiveness and drives protocol mutations through measured learning. |
+
+---
+
+*All design decisions resolved. This document is the basis for J17 development planning.*

@@ -1,0 +1,88 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Bootstrap",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-22",
+    "description": "Validates the J17 bootstrap endpoint that returns initial protocol handshake data for new agent sessions.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "space_id": "uats-test-space"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/bootstrap",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query": {
+      "space_id": "{{space_id}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "bootstrap payload is string",
+        "path": "$.data.bootstrap",
+        "type": "string"
+      },
+      {
+        "name": "version is string",
+        "path": "$.data.version",
+        "type": "string"
+      },
+      {
+        "name": "first_session is boolean",
+        "path": "$.data.first_session",
+        "type": "boolean"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "j17_disabled",
+      "description": "When J17 is disabled, bootstrap returns 503.",
+      "tags": ["j17_disabled"],
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

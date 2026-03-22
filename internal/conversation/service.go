@@ -34,6 +34,12 @@ type ConstraintGateResult struct {
 	Type string // "must", "must_not", "should", "should_not", "none"
 }
 
+// ConstraintCodeGen generates mnemonic T1 codes for detected constraints.
+// Implemented by jiminy.ConstraintCodeGenerator — defined here to avoid circular imports.
+type ConstraintCodeGen interface {
+	GenerateCode(ctx context.Context, constraintType, description string) (string, error)
+}
+
 // Service handles conversation observation capture and surprise detection
 type Service struct {
 	driver                   neo4j.DriverWithContext
@@ -44,6 +50,7 @@ type Service struct {
 	constraintDetector       *ConstraintDetector
 	constraintDetEnabled     bool
 	constraintGateClassifier ConstraintGateClassifier // F6a: optional LLM gate
+	codeGenerator            ConstraintCodeGen         // J17-2: optional constraint code generator
 	cfg                      config.Config
 }
 
@@ -97,6 +104,11 @@ func (s *Service) SetLearningService(learningService LearningService) {
 // constraint is confirmed by the LLM before being promoted to a constraint tag.
 func (s *Service) SetConstraintGateClassifier(c ConstraintGateClassifier) {
 	s.constraintGateClassifier = c
+}
+
+// SetCodeGenerator injects the J17-2 constraint code generator.
+func (s *Service) SetCodeGenerator(gen ConstraintCodeGen) {
+	s.codeGenerator = gen
 }
 
 // ObserveRequest is the request for capturing an observation
@@ -377,6 +389,17 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 			}
 			obs.StructuredData["detected_constraints"] = constraintMeta
 			log.Printf("Constraint detection: %d constraint(s) detected in observation %s", len(detectedConstraints), obsID)
+
+			// J17-2: Generate T1 mnemonic code for first detected constraint
+			if s.codeGenerator != nil && len(detectedConstraints) > 0 {
+				code, codeErr := s.codeGenerator.GenerateCode(ctx, detectedConstraints[0].ConstraintType, req.Content)
+				if codeErr != nil {
+					log.Printf("[WARN] J17 codegen failed: %v", codeErr)
+				} else if code != "" {
+					obs.StructuredData["constraint_code"] = code
+					constraintMeta[0]["constraint_code"] = code
+				}
+			}
 		}
 	}
 
@@ -384,6 +407,13 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	err = s.createObservationNode(ctx, nodeID, obs, tags)
 	if err != nil {
 		return nil, fmt.Errorf("create observation node: %w", err)
+	}
+
+	// J17-2: Set constraint_code property on Neo4j node (separate SET for backward compat)
+	if obs.StructuredData != nil {
+		if code, ok := obs.StructuredData["constraint_code"].(string); ok && code != "" {
+			s.setConstraintCode(ctx, nodeID, code)
+		}
 	}
 
 	log.Printf("Created conversation observation %s (node=%s, type=%s, surprise=%.2f)",
@@ -583,6 +613,31 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 	})
 
 	return err
+}
+
+// setConstraintCode sets the constraint_code property on a Neo4j node (J17-2).
+// Runs as a separate SET query to avoid modifying the existing CREATE cypher.
+func (s *Service) setConstraintCode(ctx context.Context, nodeID, code string) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {node_id: $nodeId})
+			SET n.constraint_code = $code
+		`
+		result, err := tx.Run(ctx, cypher, map[string]any{
+			"nodeId": nodeID,
+			"code":   code,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
+	if err != nil {
+		log.Printf("[WARN] J17-2: failed to set constraint_code on node %s: %v", nodeID, err)
+	}
 }
 
 // createRefersToEdges creates REFERS_TO edges from an observation to referenced nodes/symbols.

@@ -350,6 +350,22 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 | `docs/api/api-spec/uats/specs/jiminy_guide_validation.uats.json` | 5 validation contract test variants |
 | `docs/api/api-spec/uats/specs/jiminy_feedback.uats.json` | 4 feedback contract test variants |
 | `docs/features/jiminy-effectiveness-tracking.md` | Effectiveness tracking feature doc |
+| `docs/features/j17-ai2ai-protocol.md` | J17 AI-to-AI communication protocol (3-tier encoding, trust, codegen, ML tier prediction) |
+| `internal/jiminy/codegen.go` | J17-2: LLM-powered constraint code generator |
+| `internal/jiminy/encoder.go` | J17-1: Three-tier protocol encoder (T1/T2/T3) |
+| `internal/jiminy/trust.go` | J17-3: Per-session trust scoring |
+| `internal/jiminy/ticket.go` | J17-3: Signed session tickets for state persistence |
+| `internal/jiminy/protocol.go` | J17-1: Protocol types and constants |
+| `internal/jiminy/sequence.go` | J17-1: Sequence number tracking |
+| `internal/jiminy/protocol_metrics.go` | J17-4: Protocol performance metrics collection |
+| `internal/jiminy/protocol_data_collector.go` | J17-4: JSONL training data collector for ML pipeline |
+| `internal/jiminy/protocol_evolution.go` | J17-4: RSIC-driven protocol evolution engine |
+| `internal/jiminy/nli_comprehension.go` | J17-4: NLI comprehension testing |
+| `internal/jiminy/extensions.go` | J17-4: Extension negotiation for protocol capabilities |
+| `internal/jiminy/tier_predictor.go` | J17-5: Go-side tier predictor (calls neural sidecar) |
+| `internal/api/handlers_j17.go` | J17 HTTP handlers (bootstrap, feedback, learn, metrics) |
+| `neural/neural_sidecar/tier_model.py` | J17-5: ML tier prediction model (CrossEncoder) |
+| `neural/neural_sidecar/train_protocol.py` | J17-5: Training pipeline for tier prediction model |
 
 ## Dependencies
 

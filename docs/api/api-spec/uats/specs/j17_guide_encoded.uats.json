@@ -1,0 +1,82 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Encoded Guidance",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "encoding",
+      "phase_j17",
+      "embedding_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates that Jiminy guide endpoint returns J17 protocol fields (guidance_seq, protocol info) when J17 is enabled.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "encoding",
+      "phase_j17",
+      "embedding_required"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "context_text": "Implementing new authentication flow"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "context": "{{context_text}}",
+      "session_id": "uats-j17-test"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "guidance_seq is number",
+        "path": "$.data.guidance_seq",
+        "type": "number"
+      },
+      {
+        "name": "protocol info present",
+        "path": "$.data.protocol",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "protocol version is string",
+        "path": "$.data.protocol.version",
+        "type": "string"
+      },
+      {
+        "name": "protocol seq is number",
+        "path": "$.data.protocol.seq",
+        "type": "number"
+      }
+    ]
+  }
+}

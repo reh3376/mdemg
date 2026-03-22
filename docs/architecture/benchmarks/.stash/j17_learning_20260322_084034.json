@@ -1,0 +1,1145 @@
+{
+  "timestamp": "2026-03-22T12:40:34Z",
+  "model": "gpt-5.4",
+  "bootstrap_header": "J17:INIT|v1\nCODES: C=constraint X=correction F=frontier D=decision P=pattern L=learning\nSEV: !=must ?=should ~=info\nESC: 0=clear 1=warned 2=escalated 3=blocked\nFMT: TYPE:SEV|content|esc:N|src:NODE_ID\nTICKET: signed, echo back on resume\nSEQ: monotonic, report last_seq on resume",
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-22T12:38:30Z",
+      "trials": [
+        {
+          "constraint_id": "c1",
+          "tier": 1,
+          "encoded_message": "C:!|no-force-push-main|src:node-abc123",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The message communicates a must-follow constraint: do not force-push to the `main` branch.  \nI should avoid any command or workflow that rewrites `main` remotely, such as `git push --force` or `git push --force-with-lease origin main`; if I need to update `main`, I should use a normal push or another safe alternative.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation correctly captures the strict prohibition against force-pushing to `main`, recognizes equivalent history-rewriting commands, and recommends safe alternatives consistent with the intent.",
+          "tokens_encoded": 9,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 2,
+          "encoded_message": "C: Never force-push to main branch. destroys shared history and can cause data loss for other collaborators. [no-force-push-main] (src:node-abc123)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is a constraint: do not ever force-push to the `main` branch, because it can overwrite shared history and cause collaborators to lose work. Concretely, I should avoid commands like `git push --force` or `git push --force-with-lease` targeting `main`, and use a normal push or a safer recovery method instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the prohibition against force-pushing to `main`, correctly explains that it rewrites/overwrites shared history and can harm collaborators, and identifies both `--force` and `--force-with-lease` as commands to avoid.",
+          "tokens_encoded": 36,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never force-push to the main branch. This destroys shared history and can cause data loss for other collaborators. (conf: 0.90)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is a hard constraint: do not force-push to the `main` branch, because it rewrites shared history and can cause collaborators to lose commits or have broken local branches. Concretely, I should avoid any command like `git push --force` or `git push --force-with-lease` targeting `main`, and use a normal push or a safer alternative workflow instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the hard prohibition against force-pushing to `main`, correctly explains the reason as rewriting shared history, and appropriately includes equivalent force variants and safer alternatives.",
+          "tokens_encoded": 35,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 1,
+          "encoded_message": "C:!|test-before-commit|src:node-def456",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The message communicates a must-follow constraint: run or verify tests before making a commit. I should avoid committing untested code and ensure the relevant test suite passes first.",
+          "judge_score": 8,
+          "judge_reason": "It captures the mandatory requirement to test before committing, but it misses the explicit “all tests” and “no exceptions for any change size” details.",
+          "tokens_encoded": 9,
+          "tokens_original": 25,
+          "code": "test-before-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 2,
+          "encoded_message": "C: Always run full test suite before committing changes. No exceptions, even for 'trivial' changes. [test-before-commit] (src:node-def456)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a hard constraint: before making any commit, I must run the project’s full test suite, regardless of how small or trivial the change seems. Concretely, I should not commit code until all full-suite tests have been executed and I’ve verified their results.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that running the full test suite before every commit is mandatory with no exceptions, including for trivial changes, and correctly identifies verifying the results before committing.",
+          "tokens_encoded": 34,
+          "tokens_original": 25,
+          "code": "test-before-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 3,
+          "encoded_message": "- [constraint] Always run the full test suite before committing changes. No exceptions, even for 'trivial' changes. (conf: 0.90)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a hard constraint: before making any commit, you must run the entire test suite, regardless of how small or obvious the change seems. Concretely, do not commit code after only partial tests or no tests; always execute the full test suite first and only proceed with the commit after that.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation precisely captures that running the full test suite before every commit is mandatory with no exceptions, including for small changes, and correctly rules out partial or skipped testing.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "test-before-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 1,
+          "encoded_message": "X:!|embed-model-gpt5mini|src:node-ghi789",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message is a must-level correction telling you to use the embed model `gpt5mini`. Concretely, you should select `gpt5mini` for embedding tasks and avoid using any other embedding model unless a later correction overrides it.",
+          "judge_score": 6,
+          "judge_reason": "It correctly treats the message as a mandatory correction and rejects other embedding models, but it gets the model name wrong (`gpt5mini` instead of `gpt-5-mini`) and misses the explicit prohibition on `text-embedding-3-small`.",
+          "tokens_encoded": 10,
+          "tokens_original": 25,
+          "code": "embed-model-gpt5mini",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 2,
+          "encoded_message": "X: default embedding model gpt-5-mini, NOT text-embedding-3-small. not change model name. [embed-model-gpt5mini] (src:node-ghi789)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message corrects the default embedding model: use `gpt-5-mini` as the embedding model, and explicitly do not use `text-embedding-3-small`. I should keep the model name exactly `gpt-5-mini` in code/configuration and avoid changing or substituting it with any other embedding model name.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the correction that the embedding model must be `gpt-5-mini` and that `text-embedding-3-small` must never be used or substituted.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "embed-model-gpt5mini",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 3,
+          "encoded_message": "- [correction] The default embedding model is gpt-5-mini, NOT text-embedding-3-small. Do not change this model name. (conf: 0.90)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The guidance corrects the expected default embedding model: it must be `gpt-5-mini`, not `text-embedding-3-small`. I should use `gpt-5-mini` anywhere the default embedding model is referenced and avoid changing or substituting that model name.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that `gpt-5-mini` is the required model and `text-embedding-3-small` must not be used, though it slightly narrows the instruction by framing it mainly as the default embedding model reference rather than a blanket prohibition.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "embed-model-gpt5mini",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 1,
+          "encoded_message": "C:?|edit-over-create|src:node-jkl012",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The message says you should prefer modifying existing files or code rather than creating new ones. Concretely, I should first look for the relevant existing implementation and patch it in place, and avoid adding new files/modules unless there’s a clear need that can’t be met by editing what’s already there.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures the intent to prefer modifying existing files and only create new files when clearly necessary, which matches the protocol message precisely.",
+          "tokens_encoded": 9,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 2,
+          "encoded_message": "C: Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. [edit-over-create] (src:node-jkl012)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying existing files rather than adding new files, so the codebase stays lean and changes build on what is already there. Concretely, I should first look for the appropriate existing file to extend or update, and avoid creating a new file unless there is a clear, necessary reason that cannot be handled within the current structure.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation precisely captures the intent to prefer modifying existing files over creating new ones, including the practical caveat that new files should only be added when clearly necessary.",
+          "tokens_encoded": 35,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 3,
+          "encoded_message": "- [constraint] Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. (conf: 0.90)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying files that already exist rather than adding new files, so the codebase stays lean and changes build on current structure. Concretely, I should look for the most appropriate existing file to update first and avoid creating a new file unless there is a clear need that cannot be handled within the current files.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures the instruction to prefer modifying existing files over creating new ones and correctly adds the practical caveat of only creating a new file when clearly necessary.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 1,
+          "encoded_message": "F:~|auth-compliance-driven|src:node-mno345",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The message indicates an informational frontier/guidance signal: your behavior should be driven by authentication and compliance requirements when handling the current task. Concretely, you should verify or preserve auth/compliance constraints before acting, and avoid making changes, exposing data, or performing operations that would bypass authorization or violate policy.",
+          "judge_score": 8,
+          "judge_reason": "The interpretation correctly captures that compliance and authorization constraints take priority and should govern actions, but it misses the specific contrast that the change was motivated by legal compliance rather than tech debt and the explicit trade-off against developer ergonomics.",
+          "tokens_encoded": 10,
+          "tokens_original": 46,
+          "code": "auth-compliance-driven",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 2,
+          "encoded_message": "F: auth middleware rewrite driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions favor compliance over ergonomics. [auth-compliance-driven] (src:node-mno345)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is primarily a legal/compliance effort about how session tokens are stored, so compliance requirements are the governing priority, not developer convenience or general code cleanup. I should make and evaluate scope decisions against the compliance goal, and avoid expanding the rewrite into unrelated ergonomics, refactoring, or technical-debt improvements unless they are required to satisfy those token-storage rules.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that legal/compliance is the primary motivation and should override developer ergonomics or tech-debt cleanup in scope decisions, but it adds a specific focus on session token storage that is narrower than the stated ground truth.",
+          "tokens_encoded": 54,
+          "tokens_original": 46,
+          "code": "auth-compliance-driven",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 3,
+          "encoded_message": "- [frontier] The auth middleware rewrite is driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions should favor compliance over ergonomics. (conf: 0.90)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is primarily a compliance-driven change focused on how session tokens are stored, so legal/compliance requirements take priority over developer convenience or architectural cleanup. I should make scope choices that directly support compliant token storage behavior, and avoid expanding the work into unrelated refactors, ergonomics improvements, or general technical-debt cleanup unless they are required for compliance.",
+          "judge_score": 8,
+          "judge_reason": "It correctly captures that compliance is the primary driver and should outweigh developer ergonomics or tech-debt cleanup in scope decisions, but it adds an unsupported specificity about session token storage that is not stated in the original intent.",
+          "tokens_encoded": 52,
+          "tokens_original": 46,
+          "code": "auth-compliance-driven",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 1,
+          "encoded_message": "C:!|no-stash-goreleaser|esc:1|src:node-pqr678",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The message is imposing a must-follow constraint: do not use `git stash` as part of any Goreleaser-related workflow or fix. I should avoid stashing local changes before running, debugging, or preparing `goreleaser`, and instead use another approach such as committing to a temporary branch or handling files explicitly.",
+          "judge_score": 9,
+          "judge_reason": "It correctly captures the prohibition on using `git stash` to work around Goreleaser’s dirty-state check and the need to use other methods, but it misses the explicit requirement that all changes must be committed first.",
+          "tokens_encoded": 11,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 2,
+          "encoded_message": "C: Never use git stash as workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. [no-stash-goreleaser] (src:node-pqr678)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is a hard constraint: for GoReleaser dirty-state checks, `git stash` must not be used as a workaround; the repository must be clean because changes are actually committed, not temporarily hidden. I should avoid running `git stash` before `goreleaser release`, and instead commit all pending tracked changes first so the working tree is clean before running the release command.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures that `git stash` must not be used to bypass GoReleaser's dirty-state check and that all changes need to be committed so the repo is genuinely clean before release.",
+          "tokens_encoded": 43,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never use git stash as a workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. (conf: 0.90)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is a must-follow constraint: do not use `git stash` to hide uncommitted changes in order to bypass GoReleaser’s dirty-worktree check. Before running `goreleaser release`, I should either commit all pending changes to the repository or avoid running the release until the working tree is clean.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the prohibition on using `git stash` to bypass GoReleaser’s dirty-state check and correctly states that all changes must be committed or the release deferred until the worktree is clean.",
+          "tokens_encoded": 40,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 1,
+          "encoded_message": "X:!|no-direct-main-commit|esc:2|src:node-stu901",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The message is a must-follow correction: do not commit changes directly to the `main` branch, and it is escalated in severity. I should avoid any direct `main` commit and instead make changes on a separate branch and use the normal review/merge process.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that direct commits to `main` are prohibited and that changes must go through a separate branch and PR/review flow, though it adds an unsupported note about escalation severity and does not explicitly mention branch protection.",
+          "tokens_encoded": 11,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 2,
+          "encoded_message": "X: Never commit directly to main branch. All development work happen on dev branches. Main branch-protected and changes reach only via pull request. [no-direct-main-commit] (src:node-stu901)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is a correction/constraint that I must not make commits directly on the `main` branch; `main` is treated as protected, and changes are supposed to reach it only through a pull request from a development branch. Concretely, I should do all coding work on a separate dev/feature branch, avoid any direct commit or push to `main`, and if I need changes merged, prepare them via PR.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that direct commits/pushes to protected `main` are forbidden and that work must be done on a dev/feature branch and merged via PR.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 3,
+          "encoded_message": "- [correction] Never commit directly to the main branch. All development work must happen on dev branches. Main is branch-protected and changes reach it only via pull request. (conf: 0.90)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is a correction-level rule that you must not make commits directly on the `main` branch; all work must be done on a separate development branch, with changes merged to `main` only through a pull request. Concretely, before making changes, ensure you are on or create a dev branch, commit there, and avoid any direct commit or push to `main`.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that direct commits to protected `main` are forbidden and that all changes must go through a development branch and pull request.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 2,
+          "encoded_message": "P: When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. orchestrator coordinate, not execute every step directly. (src:node-vwx234)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern-level recommendation: for MDEMG work, break the job into discrete subtasks and delegate those to sub-agents, while the main orchestrator focuses on coordinating and integrating results rather than doing all execution itself. Concretely, I should use sub-agents for things like searching files, analyzing code, and running tests, and avoid personally performing every low-level step end-to-end when delegation is appropriate.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures that the main agent should act as an orchestrator by delegating concrete subtasks to sub-agents instead of performing all low-level work itself.",
+          "tokens_encoded": 47,
+          "tokens_original": 44,
+          "iteration": 1
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 3,
+          "encoded_message": "- [pattern] When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. The orchestrator should coordinate, not execute every step directly. (conf: 0.90)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern-level recommendation: for MDEMG work, delegate discrete tasks such as file searching, code inspection, and test execution to sub-agents, while keeping the main agent focused on orchestration and synthesis. I should actively use sub-agents for those bounded tasks and avoid handling every operational step directly myself unless there’s a clear reason not to delegate.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures that the main agent should act as an orchestrator and delegate specific bounded tasks to sub-agents instead of doing all operational work itself.",
+          "tokens_encoded": 50,
+          "tokens_original": 44,
+          "iteration": 1
+        }
+      ],
+      "summary": {
+        "total_trials": 23,
+        "avg_score_t1": 8.571428571428571,
+        "avg_score_t2": 9.875,
+        "avg_score_t3": 9.625,
+        "avg_compression_t1": 3.2004329004329004,
+        "avg_compression_t2": 0.8018919205725888,
+        "perfect_score_count": 15
+      },
+      "code_changes": [
+        {
+          "constraint_id": "c5",
+          "old_code": "auth-compliance-driven",
+          "new_code": "compliance-over-dev-ergonomics",
+          "score_before": 8,
+          "reason": "T1 avg score 8.0/10 \u003c 9 threshold; receiver said: \"The message indicates an informational frontier/guidance signal: your behavior should be driven by authentication and compliance requirements when handling the current task. Concretely, you should verify or preserve auth/compliance constraints before acting, and avoid making changes, exposing data, or performing operations that would bypass authorization or violate policy.\" but sender meant: \"The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.\""
+        },
+        {
+          "constraint_id": "c2",
+          "old_code": "test-before-commit",
+          "new_code": "run-all-tests-before-every-commit",
+          "score_before": 8,
+          "reason": "T1 avg score 8.0/10 \u003c 9 threshold; receiver said: \"The message communicates a must-follow constraint: run or verify tests before making a commit. I should avoid committing untested code and ensure the relevant test suite passes first.\" but sender meant: \"Every commit must be preceded by running all tests. There are no exceptions for any change size.\""
+        },
+        {
+          "constraint_id": "c3",
+          "old_code": "embed-model-gpt5mini",
+          "new_code": "use-gpt-5-mini-only",
+          "score_before": 6,
+          "reason": "T1 avg score 6.0/10 \u003c 9 threshold; receiver said: \"The message is a must-level correction telling you to use the embed model `gpt5mini`. Concretely, you should select `gpt5mini` for embedding tasks and avoid using any other embedding model unless a later correction overrides it.\" but sender meant: \"A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.\""
+        }
+      ],
+      "feedback_response": {
+        "data": {
+          "ingested": 21,
+          "metrics_after": {
+            "avg_comprehension": 0.9523809523809524,
+            "avg_tokens_per_guidance": 0,
+            "code_comprehension": {
+              "auth-compliance-driven": 1,
+              "edit-over-create": 1,
+              "embed-model-gpt5mini": 0.6666666666666666,
+              "no-direct-main-commit": 1,
+              "no-force-push-main": 1,
+              "no-stash-goreleaser": 1,
+              "test-before-commit": 1
+            },
+            "code_coverage": 0,
+            "compression_ratio": 0,
+            "replay_frequency_per_hour": 0,
+            "ticket_restore_success_rate": 0,
+            "tier_distribution": [
+              0,
+              0,
+              0
+            ],
+            "total_events": 0,
+            "window_end": "2026-03-22T08:38:30.498147-04:00",
+            "window_start": "2026-03-22T08:37:04.122202-04:00"
+          },
+          "weak_codes": [
+            {
+              "avg_score": 8,
+              "code": "auth-compliance-driven",
+              "failure_reason": "interpretation diverged: \"The message indicates an informational frontier/guidance signal: your behavior should be driven by authentication and compliance requirements when handling the current task. Concretely, you should verify or preserve auth/compliance constraints before acting, and avoid making changes, exposing data, or performing operations that would bypass authorization or violate policy.\"",
+              "tier": 1,
+              "trial_count": 1
+            },
+            {
+              "avg_score": 8,
+              "code": "test-before-commit",
+              "failure_reason": "interpretation diverged: \"The message communicates a must-follow constraint: run or verify tests before making a commit. I should avoid committing untested code and ensure the relevant test suite passes first.\"",
+              "tier": 1,
+              "trial_count": 1
+            },
+            {
+              "avg_score": 6,
+              "code": "embed-model-gpt5mini",
+              "failure_reason": "interpretation diverged: \"The message is a must-level correction telling you to use the embed model `gpt5mini`. Concretely, you should select `gpt5mini` for embedding tasks and avoid using any other embedding model unless a later correction overrides it.\"",
+              "tier": 1,
+              "trial_count": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "iteration": 2,
+      "timestamp": "2026-03-22T12:39:32Z",
+      "trials": [
+        {
+          "constraint_id": "c1",
+          "tier": 1,
+          "encoded_message": "C:!|no-force-push-main|src:node-abc123",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The message communicates a must-follow constraint: do not force-push to the `main` branch.  \nI should avoid any command like `git push --force` or `git push --force-with-lease` targeting `main`, and use a normal push or another safe workflow instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation correctly identifies the strict prohibition against force-pushing to `main`, includes equivalent force variants, and suggests safer alternatives consistent with avoiding shared history rewrites.",
+          "tokens_encoded": 9,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 2,
+          "encoded_message": "C: Never force-push to main branch. destroys shared history and can cause data loss for other collaborators. [no-force-push-main] (src:node-abc123)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is that you must not use `git push --force` or any force-push variant on the `main` branch, because it rewrites shared history and can delete collaborators’ work. Concretely, avoid any force-push to `main`; if you need to update history, use a different branch or a non-destructive approach like a normal push, revert, or a pull request.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the prohibition on force-pushing to `main`, correctly explains that it rewrites shared history, and adds compatible safe alternatives without changing the intent.",
+          "tokens_encoded": 36,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never force-push to the main branch. This destroys shared history and can cause data loss for other collaborators. (conf: 0.90)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is a hard constraint: do not force-push to the `main` branch, because rewriting its history can delete or invalidate other collaborators’ work. I should avoid any command like `git push --force` or `git push --force-with-lease` targeting `main`, and use a normal push or another safe workflow instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the prohibition on force-pushing to `main`, correctly explains that it rewrites shared history and can harm collaborators, and identifies safe alternatives.",
+          "tokens_encoded": 35,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 1,
+          "encoded_message": "C:!|run-all-tests-before-every-commit|src:node-def456",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The message communicates a mandatory constraint: before making any commit, I must run the full test suite. Concretely, I should not create or finalize any commit until all tests have been executed, and I should avoid committing changes without first verifying them with the complete test run.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation correctly captures the mandatory rule that every commit must be preceded by running the full test suite and implies no committing without that verification.",
+          "tokens_encoded": 13,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 2,
+          "encoded_message": "C: Always run full test suite before committing changes. No exceptions, even for 'trivial' changes. [run-all-tests-before-every-commit] (src:node-def456)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a must-follow constraint: before any commit, I need to execute the project’s complete test suite, regardless of how small or trivial the change seems. Concretely, I should not commit code until all full tests have been run, and I must avoid relying on partial, targeted, or skipped testing as a substitute.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation perfectly captures that running the complete test suite before every commit is mandatory with no exceptions, including for trivial changes, and correctly rejects partial testing as sufficient.",
+          "tokens_encoded": 38,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 3,
+          "encoded_message": "- [constraint] Always run the full test suite before committing changes. No exceptions, even for 'trivial' changes. (conf: 0.90)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a must-follow constraint: before making any commit, I need to run the entire test suite, regardless of how small or obvious the change seems. Concretely, I should not commit code until the full test suite has been executed successfully; I must avoid skipping tests or running only a partial subset for “trivial” edits.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures that running the full test suite before every commit is mandatory with no exceptions, including for trivial changes and not just partial tests.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 1,
+          "encoded_message": "X:!|use-gpt-5-mini-only|src:node-ghi789",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message is a must-follow correction: you are required to use only the `gpt-5-mini` model.  \nYou should ensure all further work is done exclusively with `gpt-5-mini` and avoid selecting, calling, or implying use of any other model.",
+          "judge_score": 8,
+          "judge_reason": "It correctly captures the mandatory switch to `gpt-5-mini` and avoidance of other models, but it slightly overgeneralizes by framing this as all further work rather than specifically correcting the prior embedding model error and forbidding `text-embedding-3-small`.",
+          "tokens_encoded": 9,
+          "tokens_original": 25,
+          "code": "use-gpt-5-mini-only",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 2,
+          "encoded_message": "X: default embedding model gpt-5-mini, NOT text-embedding-3-small. not change model name. [use-gpt-5-mini-only] (src:node-ghi789)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message corrects the default embedding model selection: you must use `gpt-5-mini` as the model, not `text-embedding-3-small`, under the guidance tag `use-gpt-5-mini-only`. Concretely, set or keep the model name exactly `gpt-5-mini` wherever the embedding/default model is configured, and do not substitute, rename, or switch it to `text-embedding-3-small`.",
+          "judge_score": 9,
+          "judge_reason": "It correctly captures that the prior model name was wrong and that `gpt-5-mini` must be used instead of `text-embedding-3-small`, with only minor added wording not present in the original message.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "use-gpt-5-mini-only",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 3,
+          "encoded_message": "- [correction] The default embedding model is gpt-5-mini, NOT text-embedding-3-small. Do not change this model name. (conf: 0.90)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The guidance corrects the assumed default embedding model: it must be `gpt-5-mini`, not `text-embedding-3-small`. I should use `gpt-5-mini` wherever the default embedding model is referenced and avoid changing or substituting that model name.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation correctly captures that the prior model name was wrong, identifies `gpt-5-mini` as the required model, and explicitly rejects using `text-embedding-3-small`.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "use-gpt-5-mini-only",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 1,
+          "encoded_message": "C:?|edit-over-create|src:node-jkl012",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The message is advising that, when making changes, you should prefer editing existing files or code paths rather than creating new ones. Concretely, modify the relevant current implementation if possible, and avoid adding new files, modules, or duplicate replacements unless there is a clear need.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the instruction to prefer modifying existing files and avoid creating new files unless clearly necessary.",
+          "tokens_encoded": 9,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 2,
+          "encoded_message": "C: Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. [edit-over-create] (src:node-jkl012)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying files that already exist rather than adding new files, so the codebase stays lean and builds on current structure. I should first look for an appropriate existing file to place the change in, and avoid creating a new file unless there is no reasonable way to implement the work within the current files.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures the instruction to prefer modifying existing files over creating new ones and correctly notes creating a new file only as a last resort.",
+          "tokens_encoded": 35,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 3,
+          "encoded_message": "- [constraint] Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. (conf: 0.90)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying existing files instead of adding new files, so the codebase stays lean and work builds on what is already there. Concretely, I should first look for the appropriate current file to update and avoid creating a new file unless there is a clear, necessary reason existing files cannot accommodate the change.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the intent to prefer modifying existing files over creating new ones and correctly adds the practical condition that new files should be created only when clearly necessary.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 1,
+          "encoded_message": "F:~|compliance-over-dev-ergonomics|src:node-mno345",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that compliance requirements take priority over developer convenience or workflow smoothness. I should choose the compliant/safe option whenever there is a tradeoff, and avoid shortcuts, code, or suggestions that improve ergonomics but would weaken policy adherence or safeguards.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that compliance/legal requirements override developer ergonomics and that choices should favor compliant safeguards, though it does not explicitly mention the original point that the middleware change was motivated by legal compliance rather than tech debt.",
+          "tokens_encoded": 12,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 2,
+          "encoded_message": "F: auth middleware rewrite driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions favor compliance over ergonomics. [compliance-over-dev-ergonomics] (src:node-mno345)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is primarily a legal/compliance project focused on how session tokens are stored, not a general refactor for code quality or developer convenience. I should prioritize implementation choices that satisfy compliance requirements for token storage and avoid widening scope into ergonomic cleanups, API polish, or unrelated technical-debt improvements unless they are required for compliance.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that legal/compliance is the primary driver and should take precedence over developer ergonomics or general refactoring, but it adds a specific focus on session token storage that is narrower than the original intent.",
+          "tokens_encoded": 56,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 3,
+          "encoded_message": "- [frontier] The auth middleware rewrite is driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions should favor compliance over ergonomics. (conf: 0.90)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is primarily a compliance-driven change about how session tokens are stored, not a general refactor for code quality or developer convenience. I should prioritize design and scope choices that satisfy legal/compliance requirements for token storage, and avoid expanding the work into ergonomics or technical-debt improvements unless they directly support compliance.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that the change is compliance-driven and that compliance should take priority over ergonomics or tech-debt work, with only a minor added specificity about token storage not explicit in the original.",
+          "tokens_encoded": 52,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 1,
+          "encoded_message": "C:!|no-stash-goreleaser|esc:1|src:node-pqr678",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The message is a must-follow constraint: do not use `git stash` as part of any GoReleaser-related work or workflow. I should avoid stashing local changes before running, testing, or fixing GoReleaser tasks, and instead use another approach such as committing, creating a patch, or working in a separate branch/worktree.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures the core prohibition against using `git stash` to get around GoReleaser's dirty-state check and the requirement to use committed or otherwise non-stash-based approaches, though it is slightly broader than the original message by discouraging stash in any GoReleaser workflow.",
+          "tokens_encoded": 11,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 2,
+          "encoded_message": "C: Never use git stash as workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. [no-stash-goreleaser] (src:node-pqr678)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is a hard constraint: do not use `git stash` to temporarily hide uncommitted changes in order to satisfy GoReleaser’s “dirty git state” checks. Instead, ensure the repository is actually clean by committing all pending changes before running `goreleaser release`.\n\nSo the specific action is: before invoking GoReleaser, review and commit any modified, staged, or untracked files as appropriate; avoid using `git stash` as a workaround to make the tree appear clean.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the hard constraint against using `git stash` to bypass GoReleaser’s dirty-state check and correctly states that all pending changes must be committed before running the release.",
+          "tokens_encoded": 43,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never use git stash as a workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. (conf: 0.90)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is a constraint: do not use `git stash` to hide uncommitted changes in order to bypass GoReleaser’s dirty-working-tree checks. Before running `goreleaser release`, I should make sure all intended changes are committed, and I should avoid using stash as a workaround.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the prohibition on using `git stash` to evade GoReleaser’s dirty-state checks and the requirement to commit all changes first.",
+          "tokens_encoded": 40,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 1,
+          "encoded_message": "X:!|no-direct-main-commit|esc:2|src:node-stu901",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The message is a high-severity correction stating that you must not commit changes directly to the `main` branch. I should avoid making any direct `main` commits and instead work on a separate branch and use the normal review/merge process.",
+          "judge_score": 9,
+          "judge_reason": "It correctly captures the prohibition on direct commits to main and the need to use a separate branch plus review/merge process, but it omits the explicit detail that branch protection is enabled on main.",
+          "tokens_encoded": 11,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 2,
+          "encoded_message": "X: Never commit directly to main branch. All development work happen on dev branches. Main branch-protected and changes reach only via pull request. [no-direct-main-commit] (src:node-stu901)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is that direct commits to the `main` branch are forbidden; `main` is protected and all changes must be introduced through a pull request from a development branch. I should do my work on a separate dev/feature branch, avoid committing or pushing directly to `main`, and, if changes are needed, submit them via PR.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that direct commits to protected `main` are disallowed and that changes must be made on a development/feature branch and merged via pull request.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 3,
+          "encoded_message": "- [correction] Never commit directly to the main branch. All development work must happen on dev branches. Main is branch-protected and changes reach it only via pull request. (conf: 0.90)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is that direct commits to `main` are not allowed; all work must be done on a separate development branch, with changes merged into `main` only through a pull request. I should avoid committing or pushing anything straight to `main`, and instead create or use a dev branch for any code changes.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation correctly captures that direct commits to main are forbidden, work must happen on a development branch, and changes reach main only via pull requests, which aligns with branch protection on main.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 2,
+          "encoded_message": "P: When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. orchestrator coordinate, not execute every step directly. (src:node-vwx234)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern-level instruction: for MDEMG work, break discrete tasks into sub-agents—especially file discovery, code analysis, and test execution—while keeping the main agent in an orchestration role. I should delegate those concrete subtasks instead of doing each one directly myself, and avoid acting as the sole executor for all steps.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures that the main agent should act as an orchestrator and delegate concrete subtasks to sub-agents rather than executing everything itself.",
+          "tokens_encoded": 47,
+          "tokens_original": 44,
+          "iteration": 2
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 3,
+          "encoded_message": "- [pattern] When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. The orchestrator should coordinate, not execute every step directly. (conf: 0.90)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern-level recommendation: for MDEMG work, delegate discrete, bounded tasks to sub-agents—such as searching files, analyzing code, or running tests—while the main agent stays in an orchestration role. I should therefore spin off sub-agents for those concrete subtasks and avoid doing all investigative and execution steps directly myself unless there’s a good reason not to.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures that the main agent should act as an orchestrator and delegate specific, bounded subtasks to sub-agents instead of doing everything itself.",
+          "tokens_encoded": 50,
+          "tokens_original": 44,
+          "iteration": 2
+        }
+      ],
+      "summary": {
+        "total_trials": 23,
+        "avg_score_t1": 9.285714285714286,
+        "avg_score_t2": 9.75,
+        "avg_score_t3": 9.875,
+        "avg_compression_t1": 3.0084915084915087,
+        "avg_compression_t2": 0.7884140879190596,
+        "perfect_score_count": 16
+      },
+      "code_changes": [
+        {
+          "constraint_id": "c3",
+          "old_code": "use-gpt-5-mini-only",
+          "new_code": "never-use-text-embedding-3-small",
+          "score_before": 8,
+          "reason": "T1 avg score 8.0/10 \u003c 9 threshold; receiver said: \"The message is a must-follow correction: you are required to use only the `gpt-5-mini` model.  \\nYou should ensure all further work is done exclusively with `gpt-5-mini` and avoid selecting, calling, or implying use of any other model.\" but sender meant: \"A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.\""
+        }
+      ],
+      "feedback_response": {
+        "data": {
+          "ingested": 21,
+          "metrics_after": {
+            "avg_comprehension": 0.9666666666666668,
+            "avg_tokens_per_guidance": 0,
+            "code_comprehension": {
+              "auth-compliance-driven": 1,
+              "compliance-over-dev-ergonomics": 1,
+              "edit-over-create": 1,
+              "embed-model-gpt5mini": 0.6666666666666666,
+              "no-direct-main-commit": 1,
+              "no-force-push-main": 1,
+              "no-stash-goreleaser": 1,
+              "run-all-tests-before-every-commit": 1,
+              "test-before-commit": 1,
+              "use-gpt-5-mini-only": 1
+            },
+            "code_coverage": 0,
+            "compression_ratio": 0,
+            "replay_frequency_per_hour": 0,
+            "ticket_restore_success_rate": 0,
+            "tier_distribution": [
+              0,
+              0,
+              0
+            ],
+            "total_events": 0,
+            "window_end": "2026-03-22T08:39:32.066614-04:00",
+            "window_start": "2026-03-22T08:37:04.122202-04:00"
+          },
+          "weak_codes": [
+            {
+              "avg_score": 8,
+              "code": "use-gpt-5-mini-only",
+              "failure_reason": "interpretation diverged: \"The message is a must-follow correction: you are required to use only the `gpt-5-mini` model.  \\nYou should ensure all further work is done exclusively with `gpt-5-mini` and avoid selecting, calling, or implying use of any other model.\"",
+              "tier": 1,
+              "trial_count": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "iteration": 3,
+      "timestamp": "2026-03-22T12:40:32Z",
+      "trials": [
+        {
+          "constraint_id": "c1",
+          "tier": 1,
+          "encoded_message": "C:!|no-force-push-main|src:node-abc123",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The message communicates a mandatory constraint: do not force-push to the `main` branch.  \nI should avoid any command or workflow that rewrites `main` history, such as `git push --force` or `git push --force-with-lease` to `main`, and use a normal push or another branch instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the mandatory prohibition on force-pushing to `main`, correctly generalizes it to other history-rewriting force-push variants, and identifies safer alternatives.",
+          "tokens_encoded": 9,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 2,
+          "encoded_message": "C: Never force-push to main branch. destroys shared history and can cause data loss for other collaborators. [no-force-push-main] (src:node-abc123)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is a constraint: do not ever force-push to the `main` branch, because it rewrites shared history and can cause other collaborators to lose work or have their branches broken. Concretely, I should avoid commands like `git push --force` or `git push --force-with-lease` targeting `main`, and use a normal push or a different recovery strategy instead.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the prohibition on force-pushing to `main`, correctly explains that it rewrites shared history, and appropriately identifies both `--force` and `--force-with-lease` as commands to avoid.",
+          "tokens_encoded": 36,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c1",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never force-push to the main branch. This destroys shared history and can cause data loss for other collaborators. (conf: 0.90)",
+          "sender_intent": "The developer must not use git push --force on the main branch because it rewrites shared history.",
+          "receiver_interpretation": "The guidance is that force-pushing to the `main` branch is prohibited because it rewrites shared history and can cause collaborators to lose work. I should avoid any command like `git push --force` or `git push -f` targeting `main`, and use safe alternatives such as a normal push or pushing changes to a separate branch.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that force-pushing to `main` is forbidden because it rewrites shared history and correctly identifies avoiding `git push --force`/`-f` on `main` and using safer alternatives.",
+          "tokens_encoded": 35,
+          "tokens_original": 28,
+          "code": "no-force-push-main",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 1,
+          "encoded_message": "C:!|run-all-tests-before-every-commit|src:node-def456",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "A must-follow constraint is being communicated: before making any commit, I need to execute the full test suite. Concretely, I should not create or finalize a commit until all tests have been run, and if they fail I should fix the issues or avoid committing.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the mandatory rule that every commit must be preceded by running the full test suite, with no exceptions, and correctly infers not to commit if tests have not been run or are failing.",
+          "tokens_encoded": 13,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 2,
+          "encoded_message": "C: Always run full test suite before committing changes. No exceptions, even for 'trivial' changes. [run-all-tests-before-every-commit] (src:node-def456)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a mandatory constraint: before any commit, I must run the entire test suite, regardless of how small or trivial the change seems. Concretely, I should not commit until all tests have been executed, and I should avoid skipping tests or running only a partial subset.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that running the full test suite before every commit is mandatory with no exceptions, including for trivial changes and without allowing partial or skipped tests.",
+          "tokens_encoded": 38,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c2",
+          "tier": 3,
+          "encoded_message": "- [constraint] Always run the full test suite before committing changes. No exceptions, even for 'trivial' changes. (conf: 0.90)",
+          "sender_intent": "Every commit must be preceded by running all tests. There are no exceptions for any change size.",
+          "receiver_interpretation": "The guidance is a must-follow constraint: before making a commit, I need to run the entire test suite, regardless of how small or obvious the change seems. Concretely, I should not commit any code until the full test suite has been executed and I’ve verified its results.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation perfectly captures the mandatory nature of the rule, the requirement to run all tests before every commit, and that there are no exceptions based on change size.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "run-all-tests-before-every-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 1,
+          "encoded_message": "X:!|never-use-text-embedding-3-small|src:node-ghi789",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message is a mandatory correction: do not use the model/tool `text-embedding-3-small` under any circumstances. I should avoid selecting, calling, or recommending `text-embedding-3-small` and use a different embedding model or approach instead.",
+          "judge_score": 6,
+          "judge_reason": "It correctly captures the prohibition on `text-embedding-3-small`, but misses the critical correction that the specific model to use is `gpt-5-mini`.",
+          "tokens_encoded": 13,
+          "tokens_original": 25,
+          "code": "never-use-text-embedding-3-small",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 2,
+          "encoded_message": "X: default embedding model gpt-5-mini, NOT text-embedding-3-small. not change model name. [never-use-text-embedding-3-small] (src:node-ghi789)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The message corrects the default embeddings configuration: use `gpt-5-mini` as the embedding model, and explicitly do not use `text-embedding-3-small`. I should keep the model name set exactly to `gpt-5-mini` in code/config and avoid changing it to `text-embedding-3-small` or any alias/alternative.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that the prior model name was wrong, the correct embedding model is exactly `gpt-5-mini`, and `text-embedding-3-small` must never be used.",
+          "tokens_encoded": 35,
+          "tokens_original": 25,
+          "code": "never-use-text-embedding-3-small",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c3",
+          "tier": 3,
+          "encoded_message": "- [correction] The default embedding model is gpt-5-mini, NOT text-embedding-3-small. Do not change this model name. (conf: 0.90)",
+          "sender_intent": "A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.",
+          "receiver_interpretation": "The guidance corrects the default embedding model: it must be `gpt-5-mini`, not `text-embedding-3-small`. I should preserve or set the embedding model name to exactly `gpt-5-mini` and avoid changing it to `text-embedding-3-small` or any other model.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that the previously mistaken model name must be corrected to exactly `gpt-5-mini` and that `text-embedding-3-small` must never be used.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "never-use-text-embedding-3-small",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 1,
+          "encoded_message": "C:?|edit-over-create|src:node-jkl012",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The message is guidance that you should prefer modifying existing files or code paths rather than creating new ones. I should first look for the appropriate existing file, function, or module to update, and avoid adding new files/components unless there’s a clear reason the change cannot fit into the current structure.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures the core instruction to prefer modifying existing files and only create new ones when clearly necessary, matching the intent to avoid unnecessary file proliferation.",
+          "tokens_encoded": 9,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 2,
+          "encoded_message": "C: Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. [edit-over-create] (src:node-jkl012)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying existing files rather than adding new files, so the codebase stays smaller and changes build on what’s already there. Concretely, I should look for the appropriate current file to update first, and avoid creating a new file unless there’s a clear need that an existing file cannot reasonably satisfy.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures the preference to modify existing files instead of creating new ones and correctly notes that new files should be created only when clearly necessary.",
+          "tokens_encoded": 35,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c4",
+          "tier": 3,
+          "encoded_message": "- [constraint] Prefer editing existing files over creating new ones to prevent file bloat and build on existing work. (conf: 0.90)",
+          "sender_intent": "When modifying code, use existing files rather than creating new files. This reduces unnecessary file proliferation.",
+          "receiver_interpretation": "The guidance is to favor modifying existing files rather than adding new files, so the codebase stays lean and builds on what is already there. Concretely, I should first look for an appropriate existing file to extend or update, and avoid creating a new file unless there is a clear need that cannot be handled within the current structure.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation accurately captures the intent to prefer modifying existing files over creating new ones and correctly notes that new files should be added only when clearly necessary.",
+          "tokens_encoded": 32,
+          "tokens_original": 25,
+          "code": "edit-over-create",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 1,
+          "encoded_message": "F:~|compliance-over-dev-ergonomics|src:node-mno345",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "It indicates an informational frontier/guidance: prioritize policy and instruction compliance over convenience, style, or developer ergonomics when making choices. I should choose the compliant/safe implementation or response even if it is less elegant or convenient, and avoid optimizing for developer ease in ways that would conflict with rules or constraints.",
+          "judge_score": 8,
+          "judge_reason": "The interpretation correctly captures that compliance should take priority over developer ergonomics, but it generalizes from legal compliance on an auth middleware change to broader policy/instruction compliance and misses the specific motivation/context.",
+          "tokens_encoded": 12,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 2,
+          "encoded_message": "F: auth middleware rewrite driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions favor compliance over ergonomics. [compliance-over-dev-ergonomics] (src:node-mno345)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is being driven by legal/compliance rules about how session tokens are stored, so compliance requirements take priority over developer convenience, API cleanliness, or general refactoring goals. I should make implementation and scope choices that satisfy token-storage compliance first, and avoid proposing ergonomic shortcuts or cleanup-oriented changes that weaken, bypass, or expand beyond those compliance-driven requirements.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that legal/compliance is the driver and should override developer ergonomics or refactoring goals, but it adds a specific token-storage detail not stated in the original intent.",
+          "tokens_encoded": 56,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c5",
+          "tier": 3,
+          "encoded_message": "- [frontier] The auth middleware rewrite is driven by legal/compliance requirements around session token storage, not technical debt cleanup. Scope decisions should favor compliance over ergonomics. (conf: 0.90)",
+          "sender_intent": "The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.",
+          "receiver_interpretation": "The guidance is that the auth middleware rewrite is primarily a compliance-driven change about how session tokens are stored, so legal/compliance requirements take priority over developer convenience or code cleanup goals. I should make scope and implementation choices that satisfy token-storage compliance first, and avoid expanding or optimizing the rewrite for ergonomics, refactoring, or unrelated technical-debt cleanup unless those changes are necessary for compliance.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that the auth middleware change is compliance-driven and that compliance should outweigh developer ergonomics or tech-debt cleanup in scope decisions, with only a minor added specificity about token storage not explicit in the original intent.",
+          "tokens_encoded": 52,
+          "tokens_original": 46,
+          "code": "compliance-over-dev-ergonomics",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 1,
+          "encoded_message": "C:!|no-stash-goreleaser|esc:1|src:node-pqr678",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The message is imposing a must-follow constraint: do not use `git stash` as part of any GoReleaser-related workflow or fix. I should avoid creating, applying, or relying on a stash when working on GoReleaser steps, and instead use another safe approach such as committing, patching, or working on a clean branch/worktree.",
+          "judge_score": 9,
+          "judge_reason": "It correctly captures the core prohibition against using `git stash` to get around GoReleaser dirty-state checks and the need to use committed/clean-state alternatives, though it slightly overgeneralizes the ban to any GoReleaser-related workflow rather than specifically bypassing dirty-state detection.",
+          "tokens_encoded": 11,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 2,
+          "encoded_message": "C: Never use git stash as workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. [no-stash-goreleaser] (src:node-pqr678)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is that `goreleaser` must be run from a clean working tree created by actually committing pending changes, not by temporarily hiding them. I should avoid using `git stash` to bypass dirty-state checks and instead commit all current changes before running `goreleaser release`.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures that `git stash` must not be used to evade `goreleaser`'s dirty-state check and that all changes need to be committed before running the release.",
+          "tokens_encoded": 43,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c6",
+          "tier": 3,
+          "encoded_message": "- [constraint] Never use git stash as a workaround for goreleaser dirty-state checks. Commit all pending changes before running goreleaser release. (conf: 0.90)",
+          "sender_intent": "Do not use git stash to bypass goreleaser's dirty-state detection. All changes must be committed first.",
+          "receiver_interpretation": "The guidance is a hard constraint: do not use `git stash` to hide uncommitted changes in order to satisfy GoReleaser’s dirty-worktree check. Before running `goreleaser release`, I should make sure the working tree is clean by committing all pending changes, and avoid using stash as a workaround.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation exactly captures the hard constraint not to use `git stash` to bypass GoReleaser’s dirty-state check and correctly states that all changes must be committed first so the working tree is clean.",
+          "tokens_encoded": 40,
+          "tokens_original": 33,
+          "code": "no-stash-goreleaser",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 1,
+          "encoded_message": "X:!|no-direct-main-commit|esc:2|src:node-stu901",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "It communicates a must-follow correction: do not commit changes directly to the `main` branch, and the warning level is escalated. I should avoid pushing or committing straight to `main`; instead, I should make changes on a separate branch and use the normal review/merge process.",
+          "judge_score": 9,
+          "judge_reason": "The interpretation correctly captures that direct commits to main are prohibited and that work should go through a separate branch and review/merge process, but it omits the explicit detail that main has branch protection enabled.",
+          "tokens_encoded": 11,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 2,
+          "encoded_message": "X: Never commit directly to main branch. All development work happen on dev branches. Main branch-protected and changes reach only via pull request. [no-direct-main-commit] (src:node-stu901)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is a correction/constraint that the `main` branch is protected: no work should be committed directly to `main`; all changes must be made on a separate development branch and merged through a pull request. I should avoid making any direct commits or pushes to `main`, and instead create/use a dev branch for my changes and route them through PR review before merge.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that direct commits to the protected main branch are forbidden and that work must be done on a dev branch and merged via pull request.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c7",
+          "tier": 3,
+          "encoded_message": "- [correction] Never commit directly to the main branch. All development work must happen on dev branches. Main is branch-protected and changes reach it only via pull request. (conf: 0.90)",
+          "sender_intent": "Direct commits to main are forbidden. Use dev branches and PRs. The main branch has branch protection enabled.",
+          "receiver_interpretation": "The guidance is a correction stating that work must not be committed directly to the `main` branch; all changes must be developed on a separate development branch and merged to `main` only through a pull request. Concretely, I should create or switch to a dev branch before making commits, and avoid any direct commits or pushes to `main`.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that direct commits to main are forbidden, that work must be done on a separate development branch, and that merging to main must occur via a pull request under branch protection.",
+          "tokens_encoded": 47,
+          "tokens_original": 40,
+          "code": "no-direct-main-commit",
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 2,
+          "encoded_message": "P: When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. orchestrator coordinate, not execute every step directly. (src:node-vwx234)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern/instruction to decompose MDEMG work into discrete subtasks and delegate those subtasks to sub-agents, with the main agent acting as the coordinator. I should use sub-agents for things like searching files, analyzing code, and running tests, and avoid doing every operational step directly myself when it can be delegated.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that the main agent should act as an orchestrator by decomposing work into specific subtasks and delegating operational tasks to sub-agents instead of doing everything itself.",
+          "tokens_encoded": 47,
+          "tokens_original": 44,
+          "iteration": 3
+        },
+        {
+          "constraint_id": "c8",
+          "tier": 3,
+          "encoded_message": "- [pattern] When working on MDEMG, use sub-agents for discrete tasks like file searches, code analysis, and test running. The orchestrator should coordinate, not execute every step directly. (conf: 0.90)",
+          "sender_intent": "Delegate specific tasks to sub-agents rather than doing everything in the main context. The main agent is an orchestrator.",
+          "receiver_interpretation": "The guidance is a pattern-level recommendation: for MDEMG work, I should delegate discrete, bounded tasks—like searching files, analyzing code sections, or running tests—to sub-agents, while I remain the coordinator. Concretely, I should avoid doing all investigative and execution steps myself when they can be cleanly partitioned, and instead break the work into sub-tasks and assign them to sub-agents.",
+          "judge_score": 10,
+          "judge_reason": "The interpretation fully captures that the main agent should act as an orchestrator by delegating specific, bounded tasks to sub-agents instead of doing all work in the main context.",
+          "tokens_encoded": 50,
+          "tokens_original": 44,
+          "iteration": 3
+        }
+      ],
+      "summary": {
+        "total_trials": 23,
+        "avg_score_t1": 8.857142857142858,
+        "avg_score_t2": 9.875,
+        "avg_score_t3": 9.875,
+        "avg_compression_t1": 2.8863913863913866,
+        "avg_compression_t2": 0.7800435522047738,
+        "perfect_score_count": 17
+      },
+      "code_changes": [
+        {
+          "constraint_id": "c3",
+          "old_code": "never-use-text-embedding-3-small",
+          "new_code": "use-gpt-5-mini-not-text-embedding-3-small",
+          "score_before": 6,
+          "reason": "T1 avg score 6.0/10 \u003c 9 threshold; receiver said: \"The message is a mandatory correction: do not use the model/tool `text-embedding-3-small` under any circumstances. I should avoid selecting, calling, or recommending `text-embedding-3-small` and use a different embedding model or approach instead.\" but sender meant: \"A previous error was made about the embedding model name. The correct model is gpt-5-mini. Never use text-embedding-3-small.\""
+        },
+        {
+          "constraint_id": "c5",
+          "old_code": "compliance-over-dev-ergonomics",
+          "new_code": "legal-auth-scope-priority",
+          "score_before": 8,
+          "reason": "T1 avg score 8.0/10 \u003c 9 threshold; receiver said: \"It indicates an informational frontier/guidance: prioritize policy and instruction compliance over convenience, style, or developer ergonomics when making choices. I should choose the compliant/safe implementation or response even if it is less elegant or convenient, and avoid optimizing for developer ease in ways that would conflict with rules or constraints.\" but sender meant: \"The auth middleware change is motivated by legal compliance, not tech debt. When making scope trade-offs, compliance wins over developer ergonomics.\""
+        }
+      ],
+      "feedback_response": {
+        "data": {
+          "ingested": 21,
+          "metrics_after": {
+            "avg_comprehension": 0.9393939393939393,
+            "avg_tokens_per_guidance": 0,
+            "code_comprehension": {
+              "auth-compliance-driven": 1,
+              "compliance-over-dev-ergonomics": 1,
+              "edit-over-create": 1,
+              "embed-model-gpt5mini": 0.6666666666666666,
+              "never-use-text-embedding-3-small": 0.6666666666666666,
+              "no-direct-main-commit": 1,
+              "no-force-push-main": 1,
+              "no-stash-goreleaser": 1,
+              "run-all-tests-before-every-commit": 1,
+              "test-before-commit": 1,
+              "use-gpt-5-mini-only": 1
+            },
+            "code_coverage": 0,
+            "compression_ratio": 0,
+            "replay_frequency_per_hour": 0,
+            "ticket_restore_success_rate": 0,
+            "tier_distribution": [
+              0,
+              0,
+              0
+            ],
+            "total_events": 0,
+            "window_end": "2026-03-22T08:40:32.979124-04:00",
+            "window_start": "2026-03-22T08:37:04.122202-04:00"
+          },
+          "weak_codes": [
+            {
+              "avg_score": 6,
+              "code": "never-use-text-embedding-3-small",
+              "failure_reason": "interpretation diverged: \"The message is a mandatory correction: do not use the model/tool `text-embedding-3-small` under any circumstances. I should avoid selecting, calling, or recommending `text-embedding-3-small` and use a different embedding model or approach instead.\"",
+              "tier": 1,
+              "trial_count": 1
+            },
+            {
+              "avg_score": 8,
+              "code": "compliance-over-dev-ergonomics",
+              "failure_reason": "interpretation diverged: \"It indicates an informational frontier/guidance: prioritize policy and instruction compliance over convenience, style, or developer ergonomics when making choices. I should choose the compliant/safe implementation or response even if it is less elegant or convenient, and avoid optimizing for developer ease in ways that would conflict with rules or constraints.\"",
+              "tier": 1,
+              "trial_count": 1
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "final_summary": {
+    "total_trials": 23,
+    "avg_score_t1": 8.857142857142858,
+    "avg_score_t2": 9.875,
+    "avg_score_t3": 9.875,
+    "avg_compression_t1": 2.8863913863913866,
+    "avg_compression_t2": 0.7800435522047738,
+    "perfect_score_count": 17
+  }
+}

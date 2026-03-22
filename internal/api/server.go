@@ -478,6 +478,38 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				cfg.JiminySynthesisMaxTokens, cfg.JiminySynthesisTimeoutMs)
 		}
 
+		// J17-2: Wire constraint code generator
+		if cfg.J17CodegenEnabled && convSvc != nil {
+			codegenAPIKey := cfg.OpenAIAPIKey
+			codegenBaseURL := cfg.OpenAIEndpoint
+			if cfg.J17CodegenProvider == "ollama" {
+				codegenAPIKey = "ollama"
+				codegenBaseURL = cfg.OllamaEndpoint
+			}
+			codegenLLM := llmclient.New(llmclient.Config{
+				Provider:  cfg.J17CodegenProvider,
+				Model:     cfg.J17CodegenModel,
+				APIKey:    codegenAPIKey,
+				BaseURL:   codegenBaseURL,
+				TimeoutMs: 10000,
+			})
+			codegen := jiminy.NewConstraintCodeGenerator(codegenLLM)
+
+			// Populate collision set from existing codes in Neo4j
+			existingCodes := loadExistingConstraintCodes(context.Background(), driver)
+			for _, code := range existingCodes {
+				codegen.RegisterExistingCode(code)
+			}
+			if len(existingCodes) > 0 {
+				log.Printf("J17-2: Loaded %d existing constraint codes for collision avoidance", len(existingCodes))
+			}
+
+			jiminySvc.SetCodeGenerator(codegen)
+			convSvc.SetCodeGenerator(codegen)
+			log.Printf("J17-2: Constraint code generator enabled (provider=%s, model=%s)",
+				cfg.J17CodegenProvider, cfg.J17CodegenModel)
+		}
+
 		// J13: Wire LLM evaluator
 		if cfg.JiminyEvaluateLLMEnabled {
 			evalBaseURL := cfg.OpenAIEndpoint
@@ -591,10 +623,25 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	if jiminySvc != nil {
 		rsicAssessor.SetJiminyProvider(&rsicJiminyAdapter{svc: jiminySvc})
 	}
+	// J17: Wire protocol stats provider to RSIC assessor
+	if jiminySvc != nil && cfg.J17MetricsEnabled {
+		protoAdapter := &rsicProtocolAdapter{svc: jiminySvc}
+		rsicAssessor.SetProtocolProvider(protoAdapter)
+	}
 	rsicReflector := ape.NewReflector(cfg, driver)
+	// J17: Wire protocol stats provider to reflector
+	if jiminySvc != nil && cfg.J17MetricsEnabled {
+		rsicReflector.SetProtocolProvider(&rsicProtocolAdapter{svc: jiminySvc})
+	}
 
 	rsicPlanner := ape.NewPlanner(cfg)
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
+	// J17: Wire protocol evolver to dispatcher
+	if jiminySvc != nil && cfg.J17MetricsEnabled {
+		metricsCollector := jiminySvc.GetProtocolMetricsCollector()
+		evolver := jiminy.NewProtocolEvolver(metricsCollector, nil, nil, nil)
+		rsicDispatcher.SetProtocolEvolver(evolver)
+	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
 
@@ -1420,6 +1467,15 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
 	mux.HandleFunc("/v1/jiminy/feedback", s.handleJiminyFeedback)
 	mux.HandleFunc("/v1/jiminy/evaluate", s.handleJiminyEvaluate) // J9
+
+	// J17: AI-to-AI Communication Protocol
+	mux.HandleFunc("/v1/jiminy/checkpoint", s.handleJ17Checkpoint)
+	mux.HandleFunc("/v1/jiminy/resume-protocol", s.handleJ17ResumeProtocol)
+	mux.HandleFunc("/v1/jiminy/bootstrap", s.handleJ17Bootstrap)
+	mux.HandleFunc("/v1/jiminy/protocol/metrics", s.handleJ17ProtocolMetrics)
+	mux.HandleFunc("/v1/jiminy/protocol/feedback", s.handleJ17ProtocolFeedback)
+	mux.HandleFunc("/v1/jiminy/protocol/learn", s.handleJ17ProtocolLearn)
+	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)
 
 	// Constraint Module (Phase 45.5)
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)

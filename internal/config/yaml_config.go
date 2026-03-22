@@ -102,6 +102,8 @@ type JiminyYAML struct {
 	GuidanceOutputMaxChars     int  `yaml:"guidance_output_max_chars,omitempty"`      // J16: max chars for agent output in guidance (default: 200000)
 	EvaluateOutputMaxChars     int  `yaml:"evaluate_output_max_chars,omitempty"`      // J16: max chars for agent output in eval (default: 200000)
 	EvaluateItemMaxChars       int  `yaml:"evaluate_item_max_chars,omitempty"`        // J16: max chars per constraint/correction in eval (default: 0 = unlimited)
+	J17Enabled                 bool `yaml:"j17_enabled,omitempty"`                    // J17: enable AI-to-AI protocol (default: false)
+	J17TicketTTLHours          int  `yaml:"j17_ticket_ttl_hours,omitempty"`           // J17: session ticket TTL in hours (default: 4)
 }
 
 // yamlEnvMapping defines the mapping from YAML dot-path to environment variable.
@@ -157,6 +159,9 @@ var yamlEnvMapping = []struct {
 	{"jiminy.guidance_output_max_chars", "JIMINY_GUIDANCE_OUTPUT_MAX_CHARS", nil},
 	{"jiminy.evaluate_output_max_chars", "JIMINY_EVALUATE_OUTPUT_MAX_CHARS", nil},
 	{"jiminy.evaluate_item_max_chars", "JIMINY_EVALUATE_ITEM_MAX_CHARS", nil},
+	// J17: AI-to-AI Communication Protocol
+	{"jiminy.j17_enabled", "J17_ENABLED", nil},
+	{"jiminy.j17_ticket_ttl_hours", "J17_TICKET_TTL_HOURS", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.

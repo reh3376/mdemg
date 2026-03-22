@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-20
+**Date:** 2026-03-22
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -28,6 +28,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - 105 core phases (1-105) — ALL COMPLETE
 - 16 sidecar phases (S0-S16) — ALL COMPLETE
 - 5 cognitive gap phases (101-105) — ALL GAPS CLOSED
+- Phase J17: AI-to-AI Communication Protocol — COMPLETE (5 sub-phases, 3-tier encoding, trust scoring, ML tier prediction)
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1+ verified)
 - Quality hardening — COMPLETE (282+ UATS specs, 148 Go test files, 0 lint issues)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 config params)
@@ -35,14 +36,13 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-20
+- CI: ALL GREEN (push + pull_request + release) as of 2026-03-22
 - Latest releases: CLI v0.2.16, menubar v1.6.0, sidebar v0.2.0
 
 WHAT REMAINS TO BE DONE:
 1. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
 2. TESTING: SSE streaming endpoint not UATS-testable (requires SSE client)
-3. VISION: Phase J17 — Agent-to-agent communication protocol (Jiminy ↔ AI coding agent)
-4. CI: UATS runner counts `llm_required` tag exclusions as "errors" — should be "skips"
+3. CI: UATS runner counts `llm_required` tag exclusions as "errors" — should be "skips"
 5. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
 6. PARTIAL: Phase 45.4 — Obsidian integration (Linear done, Obsidian pending)
 7. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
@@ -154,7 +154,7 @@ internal/
   symbols/             # Symbol extraction (tree-sitter)
   transfer/            # Space transfer (export/import)
 neural/                # Python sidecar (FastAPI, cross-encoder, NLI)
-migrations/            # Neo4j Cypher migrations (V0001-V0021)
+migrations/            # Neo4j Cypher migrations (V0001-V0022)
 plugins/               # Plugin binaries (linear, reflection, keyword-booster, uxts)
 packaging/             # Submodules: homebrew-mdemg, mdemg-windows, mdemg_linux, apt-mdemg, mdemg-menubar, mdemg-linux-sidebar
 docs/
@@ -300,6 +300,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | Jiminy | Inner Voice | ✅ | `docs/specs/phase-jiminy-guidance.md`, `docs/features/jiminy-inner-voice.md` |
 | J7-J12 | Cognitive Guidance | ✅ | `docs/features/jiminy-inner-voice.md` §J7-J12 |
 | J16 | Full-Context Input | ✅ | Removed input truncation (200K default), fixed cache key collisions, 30s timeouts. Config: `JIMINY_GUIDANCE_CONTEXT_MAX_CHARS`, `JIMINY_GUIDANCE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_ITEM_MAX_CHARS` |
+| J17 | AI-to-AI Communication Protocol | ✅ | `docs/features/j17-ai2ai-protocol.md` |
 | J-Init | Init Wizard + Installers | ✅ | `internal/cli/init.go`, `internal/config/yaml_config.go`, `.goreleaser.yaml` |
 | S8 | Distribution Pipeline | ✅ | `docs/sidecar/roadmap.md` §S8 |
 | S9 | Beta + Public | ✅ | `docs/sidecar/roadmap.md` §S9 |
@@ -337,6 +338,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 92-100 | 92-100 | Deployable Package |
 | 101-105 | 101-105 | Cognitive Intelligence |
 | S-series | S8-S16 | Sidecar & Distribution |
+| J17 | — | AI-to-AI Communication Protocol |
 | FSD | — | Constraint Lifecycle & Neural Re-Ranker |
 | AR | — | AutoResearch Integration |
 
@@ -375,12 +377,6 @@ Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{spac
 
 **Phase 86 — UVTS Activation** (📋 Spec-only)
 Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. Runner is a stub. Requires functional runner, full spec set, and CI integration to activate. Phases 81-85 are all complete.
-
-### Vision (Largest Remaining)
-
-| Item | Effort |
-|------|--------|
-| Phase J17: Agent-to-Agent Communication Protocol | TBD (planning) |
 
 ---
 
@@ -492,4 +488,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-21 — All 105 phases + S0-S16 + Phase Jiminy (J1-J16 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. v0.3.1 released. CI all green. VS Code extension dropped from scope (open source — community can build). Next: J17 agent-to-agent communication protocol. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), UATS runner fix, research items, testing gaps.*
+*Last updated: 2026-03-22 — All 105 phases + S0-S16 + Phase Jiminy (J1-J17 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. J17 AI-to-AI communication protocol COMPLETE (3-tier encoding, constraint codegen, trust scoring, ML tier prediction, protocol training pipeline). CI all green. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), UATS runner fix, research items, testing gaps.*

@@ -1,0 +1,113 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Protocol Learn",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17",
+      "llm_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-22",
+    "description": "Validates the J17 protocol learn endpoint that evolves constraint codes by generating improved replacements via LLM analysis.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17",
+      "llm_required"
+    ],
+    "sha256": ""
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/protocol/learn",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "constraint_type": "must",
+      "description": "run tests",
+      "old_code": "test-first",
+      "failure_reason": "ambiguous"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "old_code is string",
+        "path": "$.data.old_code",
+        "type": "string"
+      },
+      {
+        "name": "new_code is string",
+        "path": "$.data.new_code",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_fields",
+      "description": "Request with only description (missing constraint_type, old_code, failure_reason) should return 400.",
+      "request": {
+        "body": {
+          "description": "test"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "j17_disabled",
+      "description": "When J17 is disabled, protocol learn returns 503.",
+      "tags": ["j17_disabled"],
+      "request": {
+        "body": {
+          "constraint_type": "must",
+          "description": "run tests",
+          "old_code": "test-first",
+          "failure_reason": "ambiguous"
+        }
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

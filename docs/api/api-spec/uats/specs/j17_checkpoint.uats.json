@@ -1,0 +1,132 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Checkpoint",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the J17 checkpoint endpoint that issues session tickets for state persistence across context resets.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "session_id": "uats-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/checkpoint",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "session_id": "{{session_id}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "ticket present",
+        "path": "$.data.ticket",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "ticket has payload",
+        "path": "$.data.ticket.payload",
+        "exists": true
+      },
+      {
+        "name": "ticket has signature",
+        "path": "$.data.ticket.signature",
+        "type": "string"
+      },
+      {
+        "name": "last_seq is number",
+        "path": "$.data.last_seq",
+        "type": "number"
+      },
+      {
+        "name": "issued_at is string",
+        "path": "$.data.issued_at",
+        "type": "string"
+      },
+      {
+        "name": "expires_at is string",
+        "path": "$.data.expires_at",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Request without required space_id should return 400.",
+      "request": {
+        "body": {
+          "space_id": "",
+          "session_id": "{{session_id}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "j17_disabled",
+      "description": "When J17 is disabled, checkpoint returns 503.",
+      "tags": ["j17_disabled"],
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "session_id": "{{session_id}}"
+        }
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

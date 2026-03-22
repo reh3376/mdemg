@@ -1707,6 +1707,33 @@ mdemg-neural-train --from-checkpoint .mdemg/neural/models/2026-03-19T10-00-00
 
 ---
 
+### `mdemg-neural-train-protocol`
+
+Fine-tune a tier prediction model from J17 protocol JSONL data collected during live usage. The model predicts the optimal encoding tier (T1/T2/T3) for each constraint based on agent context and trust score.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-dir` | string | `.mdemg/neural/protocol-data` | Directory containing protocol JSONL files |
+| `--model-dir` | string | `.mdemg/neural/models/protocol-tier` | Output directory for versioned model checkpoints |
+| `--base-model` | string | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Pre-trained base model to fine-tune |
+| `--epochs` | int | `3` | Number of training epochs |
+| `--batch-size` | int | `16` | Training batch size |
+| `--val-split` | float | `0.1` | Fraction of data for validation |
+| `--min-samples` | int | `500` | Minimum samples required before training starts |
+| `--from-checkpoint` | string | `""` | Resume training from existing model version |
+
+**Usage Examples:**
+```bash
+mdemg-neural-train-protocol                           # Train with defaults (needs 500+ samples)
+mdemg-neural-train-protocol --min-samples 100         # Lower threshold for testing
+mdemg-neural-train-protocol --epochs 5 --batch-size 32
+mdemg-neural-train-protocol --from-checkpoint .mdemg/neural/models/protocol-tier/v1
+```
+
+Training data is collected automatically by the J17 protocol data collector (`internal/jiminy/protocol_data_collector.go`) during normal Jiminy guidance operations when `J17_ENABLED=true`. Each record contains constraint code, tier used, token count, comprehension score, trust score, and agent action outcome.
+
+---
+
 ### `mdemg-neural-evaluate`
 
 Offline evaluation comparing neural cross-encoder scores against baseline LLM re-rank scores.
@@ -2293,6 +2320,16 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `JIMINY_INCLUDE_FRONTIERS` | bool | `true` | Include frontier node suggestions |
 | `JIMINY_FRONTIER_MIN_SIM` | float64 | `0.5` | Min similarity for frontier nodes |
 
+### J17 AI-to-AI Protocol (Phase J17)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `J17_ENABLED` | bool | `false` | Enable J17 protocol endpoints and 3-tier encoding |
+| `J17_CODEGEN_ENABLED` | bool | `false` | Enable LLM-powered constraint code generation |
+| `J17_CODEGEN_PROVIDER` | string | (from `LLM_PROVIDER`) | LLM provider for code generation |
+| `J17_CODEGEN_MODEL` | string | (from `LLM_MODEL`) | LLM model for code generation |
+| `NEURAL_TIER_MODEL` | string | `""` | Path or HuggingFace model name for ML tier prediction (empty = disabled, rule-based fallback) |
+
 ### Dynamic Reclassification
 
 | Variable | Type | Default | Description |
@@ -2657,6 +2694,7 @@ mdemg
     teardown          Remove all MDEMG artifacts from the project
 
   Neural Training (Python sidecar):
-    mdemg-neural-train      Fine-tune cross-encoder re-ranker
-    mdemg-neural-evaluate   Evaluate cross-encoder vs baseline
+    mdemg-neural-train              Fine-tune cross-encoder re-ranker
+    mdemg-neural-train-protocol     Fine-tune J17 tier prediction model
+    mdemg-neural-evaluate           Evaluate cross-encoder vs baseline
 ```
