@@ -80,6 +80,8 @@ mdemg ingest --path .       # Index your codebase into the memory graph
 mdemg hooks install         # Auto-ingest on every git commit (optional)
 ```
 
+> **Performance tip:** Use `--speed fast` for large codebases, `--speed thorough` for pre-benchmark runs. See [Ingest Performance Guide](docs/guides/ingest-performance.md) for details.
+
 That's it. Your AI agent now has persistent memory.
 
 ### One-Command Setup (Sidecar)

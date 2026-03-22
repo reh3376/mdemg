@@ -23,6 +23,12 @@ type YAMLConfig struct {
 	Plugins   PluginsYAML   `yaml:"plugins,omitempty"`
 	Schema    SchemaYAML    `yaml:"schema,omitempty"`
 	Jiminy    JiminyYAML    `yaml:"jiminy"`
+	Ingest    IngestYAML    `yaml:"ingest,omitempty"`
+}
+
+// IngestYAML holds ingestion speed preset settings.
+type IngestYAML struct {
+	Speed string `yaml:"speed,omitempty"` // Speed preset: fast, balanced, thorough
 }
 
 // BackupYAML holds periodic backup and retention settings.
@@ -162,6 +168,8 @@ var yamlEnvMapping = []struct {
 	// J17: AI-to-AI Communication Protocol
 	{"jiminy.j17_enabled", "J17_ENABLED", nil},
 	{"jiminy.j17_ticket_ttl_hours", "J17_TICKET_TTL_HOURS", nil},
+	// Ingest
+	{"ingest.speed", "INGEST_SPEED", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.
@@ -337,6 +345,9 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 		m["jiminy.evaluate_item_max_chars"] = strconv.Itoa(cfg.Jiminy.EvaluateItemMaxChars)
 	}
 
+	// Ingest
+	setIfNonEmpty(m, "ingest.speed", cfg.Ingest.Speed)
+
 	return m
 }
 
@@ -427,6 +438,16 @@ func ValidateConfigFile(path string) []ConfigError {
 	// Validate schema version
 	if cfg.Schema.Version != 0 && cfg.Schema.Version < 1 {
 		errs = append(errs, ConfigError{Field: "schema.version", Message: "must be >= 1", Level: "error"})
+	}
+
+	// Validate ingest speed preset
+	if cfg.Ingest.Speed != "" {
+		switch cfg.Ingest.Speed {
+		case "fast", "balanced", "thorough":
+			// valid
+		default:
+			errs = append(errs, ConfigError{Field: "ingest.speed", Message: "must be 'fast', 'balanced', 'thorough', or empty", Level: "error"})
+		}
 	}
 
 	// Warnings for missing recommended values

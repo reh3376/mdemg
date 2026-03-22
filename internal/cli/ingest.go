@@ -38,6 +38,40 @@ func newIngestCmd() *cobra.Command {
 			if resolved := resolveSpaceID(cmd); resolved != "" {
 				cfg.spaceID = resolved
 			}
+
+			// Resolve speed preset: CLI flag > INGEST_SPEED env > empty (preserve defaults)
+			if cfg.speed == "" {
+				cfg.speed = os.Getenv("INGEST_SPEED")
+			}
+			if cfg.speed != "" {
+				sp, ok := speedPresets[cfg.speed]
+				if !ok {
+					return fmt.Errorf("unknown speed preset: %s (available: fast, balanced, thorough)", cfg.speed)
+				}
+				// Apply speed preset values only for flags not explicitly set by the user
+				if !cmd.Flags().Changed("workers") {
+					cfg.workers = sp.workers
+				}
+				if !cmd.Flags().Changed("batch") {
+					cfg.batchSize = sp.batchSize
+				}
+				if !cmd.Flags().Changed("llm-summary") {
+					cfg.llmSummary = sp.llmSummary
+				}
+				if !cmd.Flags().Changed("llm-summary-batch") {
+					cfg.llmSummaryBatch = sp.llmBatch
+				}
+				if !cmd.Flags().Changed("extract-symbols") {
+					cfg.extractSymbols = sp.symbols
+				}
+				if !cmd.Flags().Changed("consolidate") {
+					cfg.consolidate = sp.consolidate
+				}
+				if !cmd.Flags().Changed("delay") {
+					cfg.delay = sp.delay
+				}
+			}
+
 			return runIngest(cfg)
 		},
 	}
@@ -88,6 +122,7 @@ func newIngestCmd() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.maxElementsPerFile, "max-elements-per-file", 500, "Max elements to extract per file")
 	cmd.Flags().IntVar(&cfg.maxSymbolsPerFile, "max-symbols-per-file", 1000, "Max symbols to extract per file")
 	cmd.Flags().StringVar(&cfg.preset, "preset", "", "Exclusion preset: default, ml_cuda, web_monorepo")
+	cmd.Flags().StringVar(&cfg.speed, "speed", "", "Speed preset: fast, balanced, thorough (default: balanced behavior)")
 
 	// Info flags
 	cmd.Flags().BoolVar(&cfg.listLanguages, "list-languages", false, "List supported languages and exit")
@@ -144,6 +179,7 @@ type ingestConfig struct {
 	maxElementsPerFile int
 	maxSymbolsPerFile  int
 	preset             string
+	speed              string // Speed preset: fast, balanced, thorough
 
 	// Info
 	listLanguages bool
@@ -236,6 +272,25 @@ var presets = map[string]exclusionPreset{
 		},
 		maxFileSize: 1048576, // 1MB
 	},
+}
+
+// speedPreset controls performance-related settings for ingestion.
+// These are orthogonal to exclusion presets (--preset) which control file filtering.
+type speedPreset struct {
+	workers     int
+	batchSize   int
+	llmSummary  bool
+	llmBatch    int
+	symbols     bool
+	consolidate bool
+	delay       int
+}
+
+// speedPresets maps speed preset names to their configurations.
+var speedPresets = map[string]speedPreset{
+	"fast":     {workers: 8, batchSize: 250, llmSummary: false, llmBatch: 0, symbols: false, consolidate: false, delay: 0},
+	"balanced": {workers: 4, batchSize: 100, llmSummary: true, llmBatch: 10, symbols: true, consolidate: true, delay: 50},
+	"thorough": {workers: 8, batchSize: 200, llmSummary: true, llmBatch: 20, symbols: true, consolidate: true, delay: 25},
 }
 
 var concernPatterns = map[string][]string{
@@ -459,6 +514,9 @@ func runIngest(cfg *ingestConfig) error {
 	log.Printf("Symbol extraction: %v", cfg.extractSymbols)
 	log.Printf("Incremental mode: %v", cfg.incremental)
 	log.Printf("LLM summaries: %v", cfg.llmSummary)
+	if cfg.speed != "" {
+		log.Printf("Speed preset: %s", cfg.speed)
+	}
 
 	// Initialize LLM summarize service
 	var summarizeSvc *summarize.Service

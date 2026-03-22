@@ -1,0 +1,56 @@
+# .mdemgignore — controls what `mdemg ingest` skips
+# Syntax: .gitignore-style patterns
+
+# ── Git submodules (separate repos) ──────────────────────────
+packaging/
+
+# ── Python ───────────────────────────────────────────────────
+neural/.venv/
+__pycache__/
+*.pyc
+
+# ── Benchmark stash (large JSON files) ──────────────────────
+docs/architecture/benchmarks/.stash/
+
+# ── Build artifacts & runtime dirs ───────────────────────────
+.mdemg/
+bin/
+dist/
+man/
+private/
+
+# ── Standard exclusions ─────────────────────────────────────
+.git/
+node_modules/
+vendor/
+.env
+.env.*
+
+# ── Binary & large files ────────────────────────────────────
+*.so
+*.dylib
+*.exe
+*.dll
+*.zip
+*.tar.gz
+*.whl
+*.min.js
+*.bundle.js
+*.map
+
+# ── OS files ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE / editor ────────────────────────────────────────────
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# ── Test artifacts ──────────────────────────────────────────
+j17-comprehension-test/
+
+# ── Claude worktrees ────────────────────────────────────────
+.claude/worktrees/
