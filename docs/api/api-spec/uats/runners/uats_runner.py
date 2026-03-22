@@ -1541,6 +1541,11 @@ class Runner:
             if variant.get("skip", False):
                 continue
 
+            # Check variant-level tags against exclude_tags
+            variant_tags = set(variant.get("tags", []))
+            if self.exclude_tags and any(t in variant_tags for t in self.exclude_tags):
+                continue
+
             validator = Validator(loader, client, self.token)
 
             # For sequential mode, inject prev_response fields as variables
