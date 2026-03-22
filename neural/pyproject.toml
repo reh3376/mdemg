@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 mdemg-neural-train = "neural_sidecar.train:main"
+mdemg-neural-train-protocol = "neural_sidecar.train_protocol:main"
 mdemg-neural-evaluate = "neural_sidecar.evaluate:main"
 
 [build-system]

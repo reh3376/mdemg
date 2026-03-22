@@ -1,0 +1,126 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Resume Protocol",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the J17 resume-protocol endpoint that restores Jiminy state from a session ticket after context reset.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "session_id": "uats-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/resume-protocol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "session_id": "{{session_id}}",
+      "ticket": null,
+      "last_seq": 0
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "restored is boolean",
+        "path": "$.data.restored",
+        "type": "boolean"
+      },
+      {
+        "name": "message is string",
+        "path": "$.data.message",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Request without required space_id should return 400.",
+      "request": {
+        "body": {
+          "session_id": "{{session_id}}",
+          "ticket": null,
+          "last_seq": 0
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no_ticket_graceful",
+      "description": "Resume without ticket should return restored=false with graceful message.",
+      "request": {
+        "body": {
+          "space_id": "{{space_id}}",
+          "session_id": "{{session_id}}",
+          "last_seq": 0
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "data wrapper present",
+            "path": "$.data",
+            "type": "object",
+            "exists": true
+          },
+          {
+            "name": "restored is false",
+            "path": "$.data.restored",
+            "type": "boolean",
+            "value": false
+          },
+          {
+            "name": "message is string",
+            "path": "$.data.message",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

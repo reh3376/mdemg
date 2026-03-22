@@ -1,0 +1,93 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Extension Request",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "extensions",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates the J17 extension negotiation endpoint for agent-requested protocol extensions.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "extensions",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "session_id": "uats-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/extension",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "session_id": "{{session_id}}",
+      "extension": "tier_preference",
+      "value": "t1_only"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "granted field present",
+        "path": "$.data.granted",
+        "type": "boolean"
+      },
+      {
+        "name": "extension echoed",
+        "path": "$.data.extension",
+        "type": "string",
+        "value": "tier_preference"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_extension",
+      "description": "Request without extension field should return 400.",
+      "request": {
+        "body": {
+          "session_id": "{{session_id}}",
+          "extension": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

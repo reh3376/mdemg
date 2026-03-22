@@ -675,6 +675,8 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/jiminy/guide` | Get proactive guidance for current context |
+| POST | `/v1/jiminy/feedback` | Record guidance effectiveness (followed/ignored/contradicted) |
+| POST | `/v1/jiminy/evaluate` | Evaluate agent output against constraints |
 
 **Request body:**
 
@@ -690,7 +692,18 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 
 Required fields: `space_id`, `context`. Optional: `file_path`, `agent_output`, `query`, `session_id`, `max_items`.
 
-**Response:** Returns `guidance[]` items (type, priority, content, confidence, source_nodes), `prompt_augmentation` (injectable text block), `confidence`, `rationale`, and `source_counts`. Returns 503 when `JIMINY_ENABLED=false`.
+**Response:** Returns `guidance[]` items (type, priority, content, confidence, source_nodes, constraint_code), `prompt_augmentation` (injectable text block), `confidence`, `rationale`, `source_counts`, `protocol` (J17 version, trust_score, seq), and `guidance_id` (UUID for effectiveness tracking). Returns 503 when `JIMINY_ENABLED=false`.
+
+### J17 AI-to-AI Protocol (Phase J17)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/jiminy/bootstrap` | J17 bootstrap payload for new agent sessions |
+| POST | `/v1/jiminy/protocol/feedback` | Submit comprehension feedback trials for protocol evolution |
+| POST | `/v1/jiminy/protocol/learn` | Request constraint code re-generation (when existing code is ambiguous) |
+| GET | `/v1/jiminy/protocol/metrics` | Protocol performance metrics (tier distribution, comprehension, compression) |
+
+Requires `J17_ENABLED=true`. Protocol endpoints return 503 when disabled. See `docs/features/j17-ai2ai-protocol.md` for the full protocol specification.
 
 ## Reporting Issues
 

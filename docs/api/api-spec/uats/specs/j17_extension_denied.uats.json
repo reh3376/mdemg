@@ -1,0 +1,70 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Extension Denied",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "extensions",
+      "phase_j17"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-21",
+    "description": "Validates that non-negotiable protocol aspects are rejected when requested as extensions.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "extensions",
+      "phase_j17"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "session_id": "uats-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/extension",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "session_id": "{{session_id}}",
+      "extension": "escalation_fsm"
+    }
+  },
+  "expected": {
+    "status": 403,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "not granted",
+        "path": "$.data.granted",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "name": "reason provided",
+        "path": "$.data.reason",
+        "type": "string"
+      }
+    ]
+  }
+}

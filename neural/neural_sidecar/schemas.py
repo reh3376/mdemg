@@ -48,3 +48,18 @@ class HealthResponse(BaseModel):
     status: str
     models_loaded: list[str]
     last_inference_ms: float | None = None
+
+
+# --- Tier Prediction (J17) ---
+
+class TierPredictRequest(BaseModel):
+    constraint_text: str
+    agent_context: str
+    trust_score: float = Field(ge=0.0, le=1.0)
+
+
+class TierPredictResponse(BaseModel):
+    predicted_tier: int   # 1, 2, or 3 (0 = fallback)
+    confidence: float     # 0.0-1.0
+    model: str
+    latency_ms: float

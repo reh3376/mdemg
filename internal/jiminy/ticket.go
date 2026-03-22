@@ -1,0 +1,138 @@
+package jiminy
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log"
+	"sync"
+	"time"
+)
+
+// TicketManager issues, validates, and restores session tickets.
+type TicketManager struct {
+	mu     sync.RWMutex
+	secret []byte
+	ttl    time.Duration
+
+	// Per-session last-issued ticket (for checkpoint retrieval)
+	lastTickets map[string]*SessionTicket // sessionID → ticket
+}
+
+// NewTicketManager creates a new TicketManager.
+// If secret is empty, a random 32-byte key is generated and a warning is logged.
+func NewTicketManager(secret string, ttlHours int) *TicketManager {
+	var key []byte
+	if secret != "" {
+		key = []byte(secret)
+	} else {
+		key = make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			log.Printf("j17: WARN: failed to generate random ticket secret: %v", err)
+			key = []byte("mdemg-j17-default-key-insecure")
+		}
+		log.Printf("j17: WARN: J17_TICKET_SECRET not set, using auto-generated key (not persistent across restarts)")
+	}
+
+	ttl := time.Duration(ttlHours) * time.Hour
+	if ttl <= 0 {
+		ttl = 4 * time.Hour
+	}
+
+	return &TicketManager{
+		secret:      key,
+		ttl:         ttl,
+		lastTickets: make(map[string]*SessionTicket),
+	}
+}
+
+// IssueTicket creates a signed session ticket from the current state.
+func (tm *TicketManager) IssueTicket(payload TicketPayload) (*SessionTicket, error) {
+	payload.Version = J17Version
+	payload.IssuedAt = time.Now()
+	payload.TTL = tm.ttl
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("j17: marshal ticket payload: %w", err)
+	}
+
+	sig := tm.sign(data)
+
+	ticket := &SessionTicket{
+		Payload:   data,
+		Signature: sig,
+	}
+
+	// Store last ticket for this session
+	tm.mu.Lock()
+	tm.lastTickets[payload.SessionID] = ticket
+	tm.mu.Unlock()
+
+	return ticket, nil
+}
+
+// ValidateTicket verifies the HMAC signature and checks TTL.
+// Returns the decoded payload if valid, error otherwise.
+func (tm *TicketManager) ValidateTicket(ticket *SessionTicket) (*TicketPayload, error) {
+	if ticket == nil {
+		return nil, fmt.Errorf("j17: nil ticket")
+	}
+
+	// Verify HMAC signature
+	expected := tm.sign(ticket.Payload)
+	if !hmac.Equal([]byte(expected), []byte(ticket.Signature)) {
+		return nil, fmt.Errorf("j17: invalid ticket signature (tampered)")
+	}
+
+	// Decode payload
+	var payload TicketPayload
+	if err := json.Unmarshal(ticket.Payload, &payload); err != nil {
+		return nil, fmt.Errorf("j17: unmarshal ticket payload: %w", err)
+	}
+
+	// Check TTL
+	if time.Since(payload.IssuedAt) > payload.TTL {
+		return nil, fmt.Errorf("j17: ticket expired (issued %s, ttl %s)", payload.IssuedAt.Format(time.RFC3339), payload.TTL)
+	}
+
+	// Check version
+	if payload.Version != J17Version {
+		return nil, fmt.Errorf("j17: unsupported ticket version %q (expected %q)", payload.Version, J17Version)
+	}
+
+	return &payload, nil
+}
+
+// RestoreFromTicket validates a ticket and restores escalation state.
+// Returns the payload for further processing (e.g., sequence replay).
+func (tm *TicketManager) RestoreFromTicket(ticket *SessionTicket, escalation *EscalationTracker) (*TicketPayload, error) {
+	payload, err := tm.ValidateTicket(ticket)
+	if err != nil {
+		return nil, err
+	}
+
+	// Restore escalation state
+	if escalation != nil && len(payload.EscalationSnapshot) > 0 {
+		escalation.ImportState(payload.SessionID, payload.EscalationSnapshot)
+	}
+
+	return payload, nil
+}
+
+// GetLastTicket returns the most recently issued ticket for a session.
+func (tm *TicketManager) GetLastTicket(sessionID string) *SessionTicket {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	return tm.lastTickets[sessionID]
+}
+
+// sign computes HMAC-SHA256 of data and returns hex-encoded digest.
+func (tm *TicketManager) sign(data []byte) string {
+	mac := hmac.New(sha256.New, tm.secret)
+	mac.Write(data)
+	return hex.EncodeToString(mac.Sum(nil))
+}

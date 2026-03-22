@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sort"
 
@@ -12,9 +13,10 @@ import (
 
 // Reflector analyses a SelfAssessmentReport and produces actionable insights.
 type Reflector struct {
-	cfg          config.Config
-	driver       neo4j.DriverWithContext
-	llmReflector *LLMReflector
+	cfg              config.Config
+	driver           neo4j.DriverWithContext
+	llmReflector     *LLMReflector
+	protocolProvider ProtocolStatsProvider // J17: protocol metrics for reflection
 }
 
 // NewReflector creates a Reflector.
@@ -25,6 +27,11 @@ func NewReflector(cfg config.Config, driver neo4j.DriverWithContext) *Reflector 
 // SetLLMReflector attaches an optional LLM-powered reflector for deeper analysis.
 func (r *Reflector) SetLLMReflector(lr *LLMReflector) {
 	r.llmReflector = lr
+}
+
+// SetProtocolProvider attaches a J17 protocol stats provider for protocol reflection.
+func (r *Reflector) SetProtocolProvider(p ProtocolStatsProvider) {
+	r.protocolProvider = p
 }
 
 // Reflect examines the assessment report and returns ordered insights.
@@ -149,6 +156,83 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 			Value:             report.GuidanceHealth,
 			Threshold:         0.5,
 		})
+	}
+
+	// 10-14. J17: Protocol reflection patterns
+	if report.ProtocolHealth > 0 && r.protocolProvider != nil {
+		protoStats, pErr := r.protocolProvider.GetProtocolStats(ctx, report.SpaceID)
+		if pErr == nil {
+			// 10. Codification opportunity: constraint sent as T2 too often
+			for constraintID, count := range protoStats.T2FrequencyByConstraint {
+				if count > r.cfg.J17CodificationThreshold {
+					insights = append(insights, ReflectionInsight{
+						PatternID:         "j17_codification_opportunity",
+						Severity:          SeverityHigh,
+						Description:       fmt.Sprintf("Constraint %s sent as T2 in %d sessions — candidate for T1 codification", constraintID, count),
+						RecommendedAction: "codify_constraint",
+						Metric:            "t2_frequency",
+						Value:             float64(count),
+						Threshold:         float64(r.cfg.J17CodificationThreshold),
+					})
+					break // one codification per cycle
+				}
+			}
+
+			// 11. Low comprehension: code failing its purpose
+			for code, rate := range protoStats.CodeComprehension {
+				if rate < r.cfg.J17ComprehensionMinThreshold && rate > 0 {
+					insights = append(insights, ReflectionInsight{
+						PatternID:         "j17_low_comprehension",
+						Severity:          SeverityHigh,
+						Description:       fmt.Sprintf("Code '%s' comprehension %.0f%% — below %.0f%% threshold, retire to T2", code, rate*100, r.cfg.J17ComprehensionMinThreshold*100),
+						RecommendedAction: "retire_code",
+						Metric:            "code_comprehension",
+						Value:             rate,
+						Threshold:         r.cfg.J17ComprehensionMinThreshold,
+					})
+					break // one retirement per cycle
+				}
+			}
+
+			// 12. High replay frequency: ticket renewal triggers may be failing
+			if protoStats.ReplayFrequencyPerHour > r.cfg.J17ReplayFrequencyMax {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "j17_high_replay",
+					Severity:          SeverityMedium,
+					Description:       fmt.Sprintf("Event replay frequency %.1f/hr — ticket renewal triggers may be failing", protoStats.ReplayFrequencyPerHour),
+					RecommendedAction: "adjust_replay_buffer",
+					Metric:            "replay_frequency_per_hour",
+					Value:             protoStats.ReplayFrequencyPerHour,
+					Threshold:         r.cfg.J17ReplayFrequencyMax,
+				})
+			}
+
+			// 13. Compression regression: encoding inefficiency
+			if protoStats.CompressionRatio > 0 && protoStats.CompressionRatio < r.cfg.J17CompressionMinRatio {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "j17_compression_regression",
+					Severity:          SeverityMedium,
+					Description:       fmt.Sprintf("Compression ratio %.1fx — below %.1fx target, review tier selection parameters", protoStats.CompressionRatio, r.cfg.J17CompressionMinRatio),
+					RecommendedAction: "adjust_tier_threshold",
+					Metric:            "compression_ratio",
+					Value:             protoStats.CompressionRatio,
+					Threshold:         r.cfg.J17CompressionMinRatio,
+				})
+			}
+
+			// 14. Low code coverage: codegen may be failing
+			if protoStats.CodeCoverage < 0.8 {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "j17_low_code_coverage",
+					Severity:          SeverityLow,
+					Description:       fmt.Sprintf("Only %.0f%% of active constraints have T1 codes — codegen may need attention", protoStats.CodeCoverage*100),
+					RecommendedAction: "codify_constraint",
+					Metric:            "code_coverage",
+					Value:             protoStats.CodeCoverage,
+					Threshold:         0.8,
+				})
+			}
+		}
 	}
 
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)

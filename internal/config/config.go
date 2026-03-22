@@ -299,6 +299,43 @@ type Config struct {
 	RSICJiminyConstraintEffectivenessThreshold float64 // RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD — min effectiveness (default: 0.3)
 	RSICJiminySourceImbalanceThreshold      float64 // RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD — max single source ratio (default: 0.8)
 
+	// J17: AI-to-AI Communication Protocol
+	J17Enabled            bool   // J17_ENABLED — enable J17 protocol for compact communication (default: true)
+	J17TicketSecret       string // J17_TICKET_SECRET — HMAC-SHA256 signing key (auto-generated if empty)
+	J17TicketTTLHours     int    // J17_TICKET_TTL_HOURS — session ticket TTL in hours (default: 4)
+	J17SequenceBufferSize int    // J17_SEQUENCE_BUFFER_SIZE — ring buffer size for event replay (default: 1000)
+	J17ReplayMaxEvents    int    // J17_REPLAY_MAX_EVENTS — max events replayed on resume (default: 50)
+	J17BootstrapEnabled   bool   // J17_BOOTSTRAP_ENABLED — enable bootstrap protocol for new sessions (default: true)
+
+	// J17-2: Three-Tier Encoding
+	J17CodegenEnabled  bool   // J17_CODEGEN_ENABLED — enable constraint code generation (default: inherits J17)
+	J17CodegenProvider string // J17_CODEGEN_PROVIDER — LLM provider for codegen (default: inherits synthesis)
+	J17CodegenModel    string // J17_CODEGEN_MODEL — LLM model for codegen (default: inherits synthesis)
+	J17DefaultTier     int    // J17_DEFAULT_TIER — default encoding tier 1-3 (default: 1)
+
+	// J17-3: Trust Score
+	J17TrustInitial           float64 // J17_TRUST_INITIAL — starting trust score (default: 0.5)
+	J17TrustBoostPerFollow    float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.02)
+	J17TrustDecayPerIgnore    float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.03)
+	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.05)
+	J17TrustHighThreshold     float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.8)
+	J17TrustLowThreshold      float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.4)
+
+	// J17-4: Protocol Metrics + RSIC Evolution
+	J17MetricsEnabled             bool    // J17_METRICS_ENABLED — enable protocol metrics collection (default: inherits J17)
+	J17CodificationThreshold      int     // J17_CODIFICATION_THRESHOLD — T2 send count before RSIC proposes codification (default: 30)
+	J17ComprehensionMinThreshold  float64 // J17_COMPREHENSION_MIN_THRESHOLD — comprehension rate below which code is retired (default: 0.7)
+	J17CompressionMinRatio        float64 // J17_COMPRESSION_MIN_RATIO — compression ratio below which RSIC flags regression (default: 2.0)
+	J17ReplayFrequencyMax         float64 // J17_REPLAY_FREQUENCY_MAX — replays/hour above which RSIC adjusts buffer (default: 5.0)
+	J17NLIComprehensionEnabled    bool    // J17_NLI_COMPREHENSION_ENABLED — use NLI model for comprehension scoring (default: false)
+	J17ProtocolDataCollection     bool    // J17_PROTOCOL_DATA_COLLECTION — enable JSONL protocol training data collection (default: false)
+
+	// J17-5: Extensions + System-Wide Encoding + ML Tier Selection
+	J17ExtensionsEnabled         bool     // J17_EXTENSIONS_ENABLED — enable agent-negotiated extensions (default: inherits J17)
+	J17AllowedExtensions         []string // J17_ALLOWED_EXTENSIONS — comma-separated list of allowed extensions
+	J17MLTierPredictionEnabled   bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
+	J17TierModelMinSamples       int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1801,6 +1838,95 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// J17: AI-to-AI Communication Protocol
+	j17Enabled := getBool("J17_ENABLED", true)
+	j17TicketSecret := get("J17_TICKET_SECRET", "")
+	j17TicketTTLHours, err := atoi("J17_TICKET_TTL_HOURS", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	j17SequenceBufferSize, err := atoi("J17_SEQUENCE_BUFFER_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	j17ReplayMaxEvents, err := atoi("J17_REPLAY_MAX_EVENTS", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	j17BootstrapEnabled := getBool("J17_BOOTSTRAP_ENABLED", true)
+
+	// J17-2: Three-Tier Encoding
+	j17CodegenEnabled := getBool("J17_CODEGEN_ENABLED", j17Enabled)
+	j17CodegenProvider := get("J17_CODEGEN_PROVIDER", jiminySynthesisProvider)
+	j17CodegenModel := get("J17_CODEGEN_MODEL", jiminySynthesisModel)
+	j17DefaultTier, err := atoi("J17_DEFAULT_TIER", 1)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// J17-3: Trust Score
+	j17TrustInitial, err := atof("J17_TRUST_INITIAL", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustBoostPerFollow, err := atof("J17_TRUST_BOOST_PER_FOLLOW", 0.02)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustDecayPerIgnore, err := atof("J17_TRUST_DECAY_PER_IGNORE", 0.03)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustDecayPerContradict, err := atof("J17_TRUST_DECAY_PER_CONTRADICT", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustHighThreshold, err := atof("J17_TRUST_HIGH_THRESHOLD", 0.8)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustLowThreshold, err := atof("J17_TRUST_LOW_THRESHOLD", 0.4)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// J17-4: Protocol Metrics + RSIC Evolution
+	j17MetricsEnabled := getBool("J17_METRICS_ENABLED", j17Enabled)
+	j17CodificationThreshold, err := atoi("J17_CODIFICATION_THRESHOLD", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	j17ComprehensionMinThreshold, err := atof("J17_COMPREHENSION_MIN_THRESHOLD", 0.7)
+	if err != nil {
+		return Config{}, err
+	}
+	j17CompressionMinRatio, err := atof("J17_COMPRESSION_MIN_RATIO", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	j17ReplayFrequencyMax, err := atof("J17_REPLAY_FREQUENCY_MAX", 5.0)
+	if err != nil {
+		return Config{}, err
+	}
+	j17NLIComprehensionEnabled := getBool("J17_NLI_COMPREHENSION_ENABLED", false)
+	j17ProtocolDataCollection := getBool("J17_PROTOCOL_DATA_COLLECTION", false)
+
+	// J17-5: Extensions + System-Wide Encoding + ML Tier Selection
+	j17ExtensionsEnabled := getBool("J17_EXTENSIONS_ENABLED", j17Enabled)
+	j17AllowedExtensionsStr := get("J17_ALLOWED_EXTENSIONS", "tier_preference,abbreviated_ids,batch_mode,density_boost")
+	var j17AllowedExtensions []string
+	for _, ext := range strings.Split(j17AllowedExtensionsStr, ",") {
+		ext = strings.TrimSpace(ext)
+		if ext != "" {
+			j17AllowedExtensions = append(j17AllowedExtensions, ext)
+		}
+	}
+	j17MLTierPredictionEnabled := getBool("J17_ML_TIER_PREDICTION_ENABLED", false)
+	j17TierModelMinSamples, err := atoi("J17_TIER_MODEL_MIN_SAMPLES", 500)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -2861,6 +2987,35 @@ func FromEnv() (Config, error) {
 		RSICJiminyFollowRateThreshold:           rsicJiminyFollowRateThreshold,
 		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
 		RSICJiminySourceImbalanceThreshold:      rsicJiminySourceImbalanceThreshold,
+
+		// J17: AI-to-AI Communication Protocol
+		J17Enabled:            j17Enabled,
+		J17TicketSecret:       j17TicketSecret,
+		J17TicketTTLHours:     j17TicketTTLHours,
+		J17SequenceBufferSize: j17SequenceBufferSize,
+		J17ReplayMaxEvents:    j17ReplayMaxEvents,
+		J17BootstrapEnabled:   j17BootstrapEnabled,
+		J17CodegenEnabled:          j17CodegenEnabled,
+		J17CodegenProvider:         j17CodegenProvider,
+		J17CodegenModel:            j17CodegenModel,
+		J17DefaultTier:             j17DefaultTier,
+		J17TrustInitial:            j17TrustInitial,
+		J17TrustBoostPerFollow:     j17TrustBoostPerFollow,
+		J17TrustDecayPerIgnore:     j17TrustDecayPerIgnore,
+		J17TrustDecayPerContradict: j17TrustDecayPerContradict,
+		J17TrustHighThreshold:      j17TrustHighThreshold,
+		J17TrustLowThreshold:       j17TrustLowThreshold,
+		J17MetricsEnabled:               j17MetricsEnabled,
+		J17CodificationThreshold:        j17CodificationThreshold,
+		J17ComprehensionMinThreshold:     j17ComprehensionMinThreshold,
+		J17CompressionMinRatio:           j17CompressionMinRatio,
+		J17ReplayFrequencyMax:            j17ReplayFrequencyMax,
+		J17NLIComprehensionEnabled:       j17NLIComprehensionEnabled,
+		J17ProtocolDataCollection:        j17ProtocolDataCollection,
+		J17ExtensionsEnabled:             j17ExtensionsEnabled,
+		J17AllowedExtensions:             j17AllowedExtensions,
+		J17MLTierPredictionEnabled:       j17MLTierPredictionEnabled,
+		J17TierModelMinSamples:           j17TierModelMinSamples,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

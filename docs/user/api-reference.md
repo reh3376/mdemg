@@ -25,7 +25,8 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 15. [Guardrail Validation](#guardrail-validation)
 16. [Guardrail Events](#guardrail-events)
 17. [Jiminy Inner-Voice](#jiminy-inner-voice)
-18. [Spaces & Freshness](#spaces--freshness)
+18. [J17 AI-to-AI Protocol](#j17-ai-to-ai-protocol)
+19. [Spaces & Freshness](#spaces--freshness)
 19. [Jobs (SSE)](#jobs-sse)
 20. [Codebase Ingestion API](#codebase-ingestion-api)
 21. [Ingestion Pipeline API](#ingestion-pipeline-api)
@@ -2026,6 +2027,137 @@ Re-validation rules (J13): `must`/`must_not` violations stay severity `high`. `s
 
 ---
 
+### J17 AI-to-AI Protocol
+
+Compact agent-to-agent communication protocol for Jiminy guidance. Requires `J17_ENABLED=true`. Returns 503 when disabled.
+
+#### GET /v1/jiminy/bootstrap
+
+Returns the J17 bootstrap payload for new agent sessions — includes protocol version, encoding guide, active T1 constraint codes, and session ticket.
+
+**Query Parameters:**
+- `space_id` (required)
+- `session_id` (optional)
+
+```bash
+curl -s "http://localhost:9999/v1/jiminy/bootstrap?space_id=my-project"
+```
+
+**Response (200):**
+```json
+{
+  "data": {
+    "bootstrap": "J17v1 BOOT|seq:0|trust:0.50|...",
+    "version": "j17v1",
+    "first_session": true
+  }
+}
+```
+
+**Status Codes:** `200 OK`, `400 Bad Request` (missing space_id), `503 Service Unavailable`
+
+---
+
+#### POST /v1/jiminy/protocol/feedback
+
+Submit comprehension feedback trials for protocol evolution. Each trial records how accurately an agent interpreted a constraint at a given encoding tier.
+
+**Request Body:**
+```json
+{
+  "trials": [
+    {
+      "constraint_code": "no-force-push-main",
+      "tier": 1,
+      "score": 9.5,
+      "interpretation": "Never force push to main branch",
+      "sender_intent": "Prevent destructive git operations on main"
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `trials` | array | yes | Array of feedback trial objects |
+| `trials[].constraint_code` | string | yes | T1 mnemonic code for the constraint |
+| `trials[].tier` | int | yes | Encoding tier used (1, 2, or 3) |
+| `trials[].score` | float | yes | Comprehension score (0.0-10.0) |
+| `trials[].interpretation` | string | no | Agent's interpretation of the constraint |
+| `trials[].sender_intent` | string | no | Original sender's intent |
+
+**Response (200):**
+```json
+{
+  "data": {
+    "ingested": 1
+  }
+}
+```
+
+```bash
+curl -s -X POST http://localhost:9999/v1/jiminy/protocol/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"trials":[{"constraint_code":"no-force-push","tier":1,"score":9.0}]}'
+```
+
+**Status Codes:** `200 OK`, `400 Bad Request` (empty trials array), `503 Service Unavailable`
+
+---
+
+#### POST /v1/jiminy/protocol/learn
+
+Request constraint code re-generation when an existing code is ambiguous or causes comprehension failures. Requires an LLM to be configured.
+
+**Request Body:**
+```json
+{
+  "constraint_type": "must",
+  "description": "always run tests before committing",
+  "old_code": "test-first",
+  "failure_reason": "ambiguous — could mean TDD or pre-commit testing"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `constraint_type` | string | yes | Constraint type (`must`, `must_not`, `should`, `should_not`) |
+| `description` | string | yes | Natural language constraint description |
+| `old_code` | string | yes | Current T1 code being replaced |
+| `failure_reason` | string | no | Why the old code failed comprehension |
+
+**Response (200):**
+```json
+{
+  "data": {
+    "old_code": "test-first",
+    "new_code": "run-tests-before-commit"
+  }
+}
+```
+
+```bash
+curl -s -X POST http://localhost:9999/v1/jiminy/protocol/learn \
+  -H "Content-Type: application/json" \
+  -d '{"constraint_type":"must","description":"run tests before commit","old_code":"test-first","failure_reason":"ambiguous"}'
+```
+
+**Status Codes:** `200 OK`, `400 Bad Request` (missing required fields), `503 Service Unavailable`
+
+---
+
+**J17 environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `J17_ENABLED` | `false` | Enable J17 protocol endpoints and encoding |
+| `J17_CODEGEN_ENABLED` | `false` | Enable LLM-powered constraint code generation |
+| `J17_CODEGEN_PROVIDER` | inherits `LLM_PROVIDER` | LLM provider for code generation (`openai` or `ollama`) |
+| `J17_CODEGEN_MODEL` | inherits `LLM_MODEL` | LLM model for code generation |
+| `NEURAL_TIER_MODEL` | `""` | Path/name of tier prediction model (empty = disabled, rule-based fallback) |
+
+---
+
 ## Spaces & Freshness
 
 ### GET /v1/memory/spaces/{space_id}/freshness
@@ -3386,7 +3518,7 @@ curl -s "http://localhost:9999/v1/metrics/determinism?space_id=demo"
 
 ## Neural Sidecar
 
-Optional Python FastAPI sidecar providing cross-encoder re-ranking and NLI classification. Runs on port 8100 by default.
+Optional Python FastAPI sidecar providing cross-encoder re-ranking, NLI classification, and J17 tier prediction. Runs on port 8100 by default.
 
 ### GET /v1/neural/status
 
@@ -3406,6 +3538,43 @@ Status of the neural sidecar integration from the Go server's perspective.
 
 ```bash
 curl -s http://localhost:9999/v1/neural/status
+```
+
+---
+
+### POST /protocol/predict-tier (Sidecar)
+
+Predict the optimal J17 encoding tier for a constraint. Called by the Go server's tier predictor with fallback to rule-based selection if unavailable.
+
+**Note:** This endpoint runs on the neural sidecar (default port 8100), not the main MDEMG server.
+
+**Request Body:**
+```json
+{
+  "constraint_text": "never force push to main",
+  "agent_context": "implementing git workflow",
+  "trust_score": 0.8
+}
+```
+
+**Response (200):**
+```json
+{
+  "predicted_tier": 1,
+  "confidence": 0.87,
+  "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "latency_ms": 12.3
+}
+```
+
+Returns `predicted_tier: 0` with `confidence: 0.0` when no tier model is loaded (Go uses rule-based fallback).
+
+**Config:** Set `NEURAL_TIER_MODEL` to a model path or HuggingFace model name to enable. Empty = disabled.
+
+```bash
+curl -s -X POST http://localhost:8100/protocol/predict-tier \
+  -H "Content-Type: application/json" \
+  -d '{"constraint_text":"run tests before commit","agent_context":"working on CI","trust_score":0.7}'
 ```
 
 ---

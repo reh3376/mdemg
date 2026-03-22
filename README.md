@@ -240,6 +240,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Neo4j state monitoring**: Single endpoint for consolidated database health, per-space statistics (nodes, edges, layers, health score, staleness), and backup overview
 - **Meta-cognition enforcement**: Server-side anomaly detection (empty-resume, empty-recall), hook circuit breakers with CRITICAL warnings, multi-dimensional watchdog monitoring, Hebbian signal learning for adaptive enforcement
 - **Jiminy Inner Voice**: Proactive guidance service injected into every prompt — surfaces constraints, prior corrections, contradictions, and frontier exploration opportunities from the knowledge graph via 4-source parallel fan-out with 6s timeout
+- **J17 AI-to-AI Communication Protocol**: Three-tier encoding protocol (T1 coded ~15 tokens, T2 telegraphic, T3 full NL) for compact agent-to-agent communication. LLM-generated constraint codes, per-session trust scoring, signed session tickets for state persistence across context resets, RSIC-driven protocol evolution, and ML-powered tier prediction via neural sidecar
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
 ## Architecture
@@ -541,6 +542,7 @@ Exposes all MDEMG metrics in Prometheus format.
 
 | Phase | Name | Status |
 |-------|------|--------|
+| J17 | AI-to-AI Communication Protocol (3-tier encoding, trust scoring, ML tier prediction) | ✅ Complete |
 | 104 | Active MCP Guardrails (constraint validation pipeline, MCP tool) | ✅ Complete |
 | 103/103b | Dynamic Emergence + UETS Model Evaluation (LLM concept naming, 8-model benchmark) | ✅ Complete |
 | 102 | Intent Translation (LLM query rewriting before vector embedding) | ✅ Complete |

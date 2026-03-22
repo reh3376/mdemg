@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 )
 
@@ -37,6 +38,13 @@ type Service struct {
 	escalation        *EscalationTracker     // J12: session-aware escalation
 	evaluator         *Evaluator             // J9: agent output evaluation
 	statsCollector    *StatsCollector        // J10: guidance stats for RSIC
+	ticketManager     *TicketManager         // J17: session ticket management
+	sequenceTracker   *SequenceTracker       // J17: monotonic sequence counter
+	encoder           *ProtocolEncoder       // J17: three-tier encoding
+	codeGenerator     *ConstraintCodeGenerator // J17: constraint code generation
+	trustScorer       *TrustScorer           // J17: per-session trust scoring
+	protocolMetrics   *ProtocolMetricsCollector // J17-4: protocol metrics for RSIC
+	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -106,6 +114,47 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		statsCollector = NewStatsCollector(driver, cfg)
 	}
 
+	// J17: Initialize session ticket manager and sequence tracker if enabled
+	var ticketManager *TicketManager
+	var sequenceTracker *SequenceTracker
+	if cfg.J17Enabled {
+		ticketManager = NewTicketManager(cfg.J17TicketSecret, cfg.J17TicketTTLHours)
+		sequenceTracker = NewSequenceTracker(cfg.J17SequenceBufferSize)
+		log.Printf("jiminy: J17 protocol enabled (ttl=%dh, bufferSize=%d)",
+			cfg.J17TicketTTLHours, cfg.J17SequenceBufferSize)
+	}
+
+	// J17-4: Initialize protocol metrics collector
+	var protocolMetrics *ProtocolMetricsCollector
+	if cfg.J17MetricsEnabled {
+		protocolMetrics = NewProtocolMetricsCollector()
+		log.Printf("jiminy: J17 protocol metrics collection enabled")
+	}
+
+	// J17-5: Initialize extension registry
+	var extensions *ExtensionRegistry
+	if cfg.J17ExtensionsEnabled {
+		extensions = NewExtensionRegistry(cfg.J17AllowedExtensions)
+		log.Printf("jiminy: J17 extensions enabled (%d allowed)", len(cfg.J17AllowedExtensions))
+	}
+
+	// J17: Initialize protocol encoder and trust scorer if enabled
+	var encoder *ProtocolEncoder
+	var trustScorer *TrustScorer
+	if cfg.J17Enabled {
+		encoder = NewProtocolEncoder(cfg.J17DefaultTier)
+		trustScorer = NewTrustScorer(TrustConfig{
+			Initial:            cfg.J17TrustInitial,
+			BoostPerFollow:     cfg.J17TrustBoostPerFollow,
+			DecayPerIgnore:     cfg.J17TrustDecayPerIgnore,
+			DecayPerContradict: cfg.J17TrustDecayPerContradict,
+			HighThreshold:      cfg.J17TrustHighThreshold,
+			LowThreshold:       cfg.J17TrustLowThreshold,
+		})
+		log.Printf("jiminy: J17 trust scoring enabled (initial=%.2f, high=%.2f, low=%.2f)",
+			cfg.J17TrustInitial, cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
+	}
+
 	return &Service{
 		cfg:               cfg,
 		driver:            driver,
@@ -119,6 +168,12 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		escalation:        escalation,
 		evaluator:         evaluator,
 		statsCollector:    statsCollector,
+		ticketManager:     ticketManager,
+		sequenceTracker:   sequenceTracker,
+		encoder:           encoder,
+		trustScorer:       trustScorer,
+		protocolMetrics:   protocolMetrics,
+		extensions:        extensions,
 	}
 }
 
@@ -381,6 +436,31 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	wg.Wait()
 
+	// J17-2: Populate ConstraintCode from Neo4j for constraint guidance items
+	if s.cfg.J17Enabled && s.driver != nil {
+		var constraintSourceNodes []string
+		for _, item := range items {
+			if item.Type == GuidanceConstraint {
+				constraintSourceNodes = append(constraintSourceNodes, item.SourceNodes...)
+			}
+		}
+		if len(constraintSourceNodes) > 0 {
+			codes := s.lookupConstraintCodes(ctx, constraintSourceNodes)
+			if len(codes) > 0 {
+				for i := range items {
+					if items[i].Type == GuidanceConstraint {
+						for _, srcNode := range items[i].SourceNodes {
+							if code, ok := codes[srcNode]; ok {
+								items[i].ConstraintCode = code
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Filter by minimum confidence
 	minConf := s.cfg.JiminyMinConfidence
 	var filtered []GuidanceItem
@@ -452,8 +532,19 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Build rationale
 	rationale := buildRationale(counts)
 
-	// Format prompt augmentation (static fallback)
-	augmentation := FormatPromptAugmentation(filtered, counts, confidence)
+	// Format prompt augmentation
+	var augmentation string
+	if s.encoder != nil && s.cfg.J17Enabled {
+		// J17: Use three-tier encoding with trust-modulated tier selection
+		trustScore := 0.5
+		if s.trustScorer != nil && req.SessionID != "" {
+			trustScore = s.trustScorer.GetScore(req.SessionID)
+		}
+		augmentation = s.encoder.Encode(filtered, counts, confidence, trustScore)
+	} else {
+		// Static fallback (pre-J17)
+		augmentation = FormatPromptAugmentation(filtered, counts, confidence)
+	}
 
 	// J8: LLM synthesis — replace static formatting if synthesizer is available
 	var synthesizedNarrative string
@@ -482,6 +573,40 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		sessionEscalation = s.escalation.GetSessionEscalation(req.SessionID)
 	}
 
+	// J17-4: Record protocol metrics for RSIC learning loop
+	if s.protocolMetrics != nil && s.encoder != nil && s.cfg.J17Enabled {
+		for _, item := range filtered {
+			codes := []string{}
+			if item.ConstraintCode != "" {
+				codes = []string{item.ConstraintCode}
+			}
+			// Estimate token count based on tier
+			tokenEst := 80 // T3 baseline
+			if item.Tier == TierCoded {
+				tokenEst = 15
+			} else if item.Tier == TierTelegraphic {
+				tokenEst = 50
+			}
+			s.protocolMetrics.RecordGuidance(item.Tier, tokenEst, codes)
+		}
+	}
+
+	// J17: Assign sequence number and record event
+	var guidanceSeq int64
+	var protocolInfo *ProtocolInfo
+	if s.sequenceTracker != nil {
+		summary := fmt.Sprintf("%d items (%d constraints, %d corrections)",
+			len(filtered), counts.Constraints, counts.Corrections)
+		guidanceSeq = s.sequenceTracker.RecordGuidance(req.SpaceID, req.SessionID, len(filtered), summary)
+		protocolInfo = &ProtocolInfo{
+			Version: J17Version,
+			Seq:     guidanceSeq,
+		}
+		if s.trustScorer != nil && req.SessionID != "" {
+			protocolInfo.TrustScore = s.trustScorer.GetScore(req.SessionID)
+		}
+	}
+
 	resp := GuidanceResponse{
 		GuidanceID:           guidanceID,
 		Guidance:             filtered,
@@ -492,6 +617,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Warnings:             warnings,
 		SourceCounts:         counts,
 		SessionEscalation:    sessionEscalation,
+		GuidanceSeq:          guidanceSeq,
+		Protocol:             protocolInfo,
 		Debug:                debug,
 	}
 
@@ -634,6 +761,28 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			}
 		}
 
+		// J17: Update trust score based on outcome
+		if s.trustScorer != nil {
+			s.trustScorer.RecordOutcome(req.SpaceID, outcome)
+		}
+
+		// J17-4: Record outcome for protocol metrics and data collection
+		if s.protocolMetrics != nil && item.ConstraintCode != "" {
+			// Map outcome to comprehension score
+			var compScore float64
+			switch outcome {
+			case OutcomeFollowed:
+				compScore = 1.0
+			case OutcomeContradicted:
+				compScore = 1.0 // understood but violated
+			case OutcomeIgnored:
+				compScore = 0.0
+			default:
+				compScore = 0.5
+			}
+			s.protocolMetrics.RecordOutcome(item.ConstraintCode, compScore)
+		}
+
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
 		if s.persistence != nil && outcome != OutcomeUnknown {
 			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
@@ -704,6 +853,335 @@ func (s *Service) GetConstraintEffectiveness(ctx context.Context, spaceID string
 		return []ConstraintEffectiveness{}, nil
 	}
 	return s.persistence.GetConstraintEffectiveness(ctx, spaceID)
+}
+
+// Checkpoint creates a session ticket capturing current Jiminy state.
+// Called by the pre-compact hook before context compaction.
+func (s *Service) Checkpoint(_ context.Context, req CheckpointRequest) (*CheckpointResponse, error) {
+	if s.ticketManager == nil {
+		return nil, fmt.Errorf("j17: protocol not enabled")
+	}
+
+	var lastSeq int64
+	if s.sequenceTracker != nil {
+		lastSeq = s.sequenceTracker.Current()
+	}
+
+	// Build escalation snapshot
+	var escalationSnapshot map[string]EscalationEntry
+	var activeConstraintIDs []string
+	if s.escalation != nil {
+		escalationSnapshot = s.escalation.ExportState(req.SessionID)
+		for nodeID := range escalationSnapshot {
+			activeConstraintIDs = append(activeConstraintIDs, nodeID)
+		}
+	}
+
+	// Get trust score (real value from J17-3 trust scorer)
+	trustScore := 0.5
+	if s.trustScorer != nil {
+		trustScore = s.trustScorer.GetScore(req.SessionID)
+	}
+
+	payload := TicketPayload{
+		SpaceID:             req.SpaceID,
+		SessionID:           req.SessionID,
+		LastSeq:             lastSeq,
+		TrustScore:          trustScore,
+		EscalationSnapshot:  escalationSnapshot,
+		ActiveConstraintIDs: activeConstraintIDs,
+	}
+
+	ticket, err := s.ticketManager.IssueTicket(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CheckpointResponse{
+		Ticket:    ticket,
+		LastSeq:   lastSeq,
+		IssuedAt:  payload.IssuedAt.Format(time.RFC3339),
+		ExpiresAt: payload.IssuedAt.Add(payload.TTL).Format(time.RFC3339),
+	}, nil
+}
+
+// ResumeProtocol restores Jiminy state from a session ticket.
+// Called by the session-start hook after context reset.
+func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (*ResumeProtocolResponse, error) {
+	if s.ticketManager == nil {
+		return &ResumeProtocolResponse{
+			Restored: false,
+			Message:  "j17: protocol not enabled, performing full re-guidance",
+		}, nil
+	}
+
+	if req.Ticket == nil {
+		return &ResumeProtocolResponse{
+			Restored: false,
+			Message:  "j17: no ticket provided, performing full re-guidance",
+		}, nil
+	}
+
+	// Validate and restore from ticket
+	payload, err := s.ticketManager.RestoreFromTicket(req.Ticket, s.escalation)
+	if err != nil {
+		log.Printf("jiminy: J17 ticket restore failed (graceful fallback): %v", err)
+		return &ResumeProtocolResponse{
+			Restored: false,
+			Message:  fmt.Sprintf("j17: ticket invalid (%v), performing full re-guidance", err),
+		}, nil
+	}
+
+	// Restore trust score
+	if s.trustScorer != nil {
+		s.trustScorer.SetScore(payload.SessionID, payload.TrustScore)
+	}
+
+	// Replay missed events
+	var replayedEvents []SequenceEvent
+	if s.sequenceTracker != nil && req.LastSeq > 0 {
+		maxReplay := s.cfg.J17ReplayMaxEvents
+		if maxReplay <= 0 {
+			maxReplay = 50
+		}
+		replayedEvents = s.sequenceTracker.EventsSince(req.LastSeq, maxReplay)
+	}
+
+	return &ResumeProtocolResponse{
+		Restored:        true,
+		TrustScore:      payload.TrustScore,
+		EscalationState: payload.EscalationSnapshot,
+		ReplayedEvents:  replayedEvents,
+		Message: fmt.Sprintf("j17: state restored (seq %d→%d, %d escalations, %d events replayed)",
+			req.LastSeq, payload.LastSeq, len(payload.EscalationSnapshot), len(replayedEvents)),
+	}, nil
+}
+
+// GetSequenceTracker returns the J17 sequence tracker for external wiring.
+func (s *Service) GetSequenceTracker() *SequenceTracker {
+	return s.sequenceTracker
+}
+
+// GetTicketManager returns the J17 ticket manager for external wiring.
+func (s *Service) GetTicketManager() *TicketManager {
+	return s.ticketManager
+}
+
+// SetCodeGenerator sets the J17 constraint code generator.
+func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
+	s.codeGenerator = gen
+}
+
+// GetProtocolMetricsSnapshot returns an immutable snapshot of J17 protocol metrics.
+// Returns nil if metrics collection is not enabled.
+func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
+	if s.protocolMetrics == nil {
+		return nil
+	}
+	return s.protocolMetrics.Snapshot()
+}
+
+// GetProtocolMetricsCollector returns the J17 protocol metrics collector for RSIC wiring.
+func (s *Service) GetProtocolMetricsCollector() *ProtocolMetricsCollector {
+	return s.protocolMetrics
+}
+
+// NegotiateExtension processes an agent's request for a protocol extension.
+func (s *Service) NegotiateExtension(req ExtensionRequest) ExtensionResponse {
+	if s.extensions == nil {
+		return ExtensionResponse{
+			Granted:   false,
+			Extension: req.Extension,
+			Reason:    "extensions not enabled",
+		}
+	}
+	return s.extensions.Negotiate(req)
+}
+
+// ProtocolFeedbackRequest carries comprehension test results back into the learning loop.
+type ProtocolFeedbackRequest struct {
+	Trials []ProtocolFeedbackTrial `json:"trials"`
+}
+
+// ProtocolFeedbackTrial is one trial result from a comprehension test.
+type ProtocolFeedbackTrial struct {
+	ConstraintCode string  `json:"constraint_code"`
+	Tier           int     `json:"tier"`
+	Score          float64 `json:"score"`           // 0-10 comprehension score
+	Interpretation string  `json:"interpretation"`  // receiver's interpretation
+	SenderIntent   string  `json:"sender_intent"`   // ground truth
+}
+
+// ProtocolFeedbackResponse returns aggregated learning results.
+type ProtocolFeedbackResponse struct {
+	Ingested      int                `json:"ingested"`
+	WeakCodes     []WeakCodeReport   `json:"weak_codes,omitempty"`
+	Improvements  []CodeImprovement  `json:"improvements,omitempty"`
+	MetricsAfter  *ProtocolMetrics   `json:"metrics_after,omitempty"`
+}
+
+// WeakCodeReport identifies a code with low comprehension at a specific tier.
+type WeakCodeReport struct {
+	Code          string  `json:"code"`
+	Tier          int     `json:"tier"`
+	AvgScore      float64 `json:"avg_score"`
+	TrialCount    int     `json:"trial_count"`
+	FailureReason string  `json:"failure_reason,omitempty"`
+}
+
+// CodeImprovement records a code regeneration result.
+type CodeImprovement struct {
+	OldCode     string  `json:"old_code"`
+	NewCode     string  `json:"new_code"`
+	Reason      string  `json:"reason"`
+	ScoreBefore float64 `json:"score_before"`
+}
+
+// RecordProtocolFeedback ingests comprehension test results into protocol metrics
+// and identifies codes that need improvement.
+func (s *Service) RecordProtocolFeedback(req ProtocolFeedbackRequest) ProtocolFeedbackResponse {
+	resp := ProtocolFeedbackResponse{}
+
+	// Aggregate scores per code per tier
+	type codeStats struct {
+		scores []float64
+		tier   int
+	}
+	codeScores := make(map[string]*codeStats)
+
+	for _, trial := range req.Trials {
+		// Feed into protocol metrics
+		if s.protocolMetrics != nil && trial.ConstraintCode != "" {
+			// Normalize 0-10 score to 0.0-1.0 comprehension
+			compScore := trial.Score / 10.0
+			s.protocolMetrics.RecordOutcome(trial.ConstraintCode, compScore)
+		}
+		resp.Ingested++
+
+		// Track per-code stats (only for T1 — that's where learning matters)
+		if trial.Tier == TierCoded && trial.ConstraintCode != "" {
+			key := trial.ConstraintCode
+			if _, ok := codeScores[key]; !ok {
+				codeScores[key] = &codeStats{tier: trial.Tier}
+			}
+			codeScores[key].scores = append(codeScores[key].scores, trial.Score)
+		}
+	}
+
+	// Identify weak codes (T1 avg score < 9.0)
+	for code, stats := range codeScores {
+		avg := 0.0
+		for _, s := range stats.scores {
+			avg += s
+		}
+		avg /= float64(len(stats.scores))
+
+		if avg < 9.0 {
+			// Find the trial with lowest score to analyze failure
+			reason := ""
+			for _, trial := range req.Trials {
+				if trial.ConstraintCode == code && trial.Tier == TierCoded {
+					if trial.Score < 9.0 {
+						reason = fmt.Sprintf("interpretation diverged: %q", trial.Interpretation)
+						break
+					}
+				}
+			}
+			resp.WeakCodes = append(resp.WeakCodes, WeakCodeReport{
+				Code:          code,
+				Tier:          TierCoded,
+				AvgScore:      avg,
+				TrialCount:    len(stats.scores),
+				FailureReason: reason,
+			})
+		}
+	}
+
+	// Snapshot metrics after ingestion
+	if s.protocolMetrics != nil {
+		resp.MetricsAfter = s.protocolMetrics.Snapshot()
+	}
+
+	return resp
+}
+
+// RegenerateCode uses the LLM to generate an improved code for a constraint,
+// given context about why the previous code failed.
+func (s *Service) RegenerateCode(ctx context.Context, constraintType, description, oldCode, failureReason string) (string, error) {
+	if s.codeGenerator == nil || s.codeGenerator.client == nil {
+		return "", fmt.Errorf("code generator not available")
+	}
+
+	prompt := fmt.Sprintf(`Generate an improved mnemonic kebab-case code (2-5 words) for this constraint.
+
+Constraint type: %s
+Description: %s
+
+The PREVIOUS code was: %s
+It scored poorly because: %s
+
+Requirements for the new code:
+- Must be more descriptive and unambiguous than the old code
+- Should clearly convey the ACTION that is required or forbidden
+- Must not be confused with other concepts (the old code was ambiguous)
+- 2-5 words, kebab-case, lowercase
+
+Respond with ONLY the new kebab-case code, nothing else.`, constraintType, description, oldCode, failureReason)
+
+	resp, err := s.codeGenerator.client.Complete(ctx, []llmclient.Message{
+		{Role: "user", Content: prompt},
+	}, llmclient.CompleteOpts{})
+	if err != nil {
+		return "", fmt.Errorf("LLM code regeneration failed: %w", err)
+	}
+
+	code := sanitizeCode(resp)
+	if code == "" || code == oldCode {
+		return "", fmt.Errorf("regeneration produced empty or identical code")
+	}
+
+	return code, nil
+}
+
+// lookupConstraintCodes batch-queries Neo4j for constraint_code properties.
+// Returns a map of node_id → constraint_code for all nodes that have one.
+func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) map[string]string {
+	if s.driver == nil || len(nodeIDs) == 0 {
+		return nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode)
+			WHERE n.node_id IN $nodeIds AND n.constraint_code IS NOT NULL AND n.constraint_code <> ''
+			RETURN n.node_id AS id, n.constraint_code AS code
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"nodeIds": nodeIDs})
+		if err != nil {
+			return nil, err
+		}
+		codes := make(map[string]string)
+		for res.Next(ctx) {
+			record := res.Record()
+			id, _ := record.Get("id")
+			code, _ := record.Get("code")
+			if idStr, ok := id.(string); ok {
+				if codeStr, ok := code.(string); ok {
+					codes[idStr] = codeStr
+				}
+			}
+		}
+		return codes, res.Err()
+	})
+	if err != nil {
+		log.Printf("jiminy: lookupConstraintCodes error: %v", err)
+		return nil
+	}
+	codes, _ := result.(map[string]string)
+	return codes
 }
 
 // significantWords extracts words >= 4 chars from text.

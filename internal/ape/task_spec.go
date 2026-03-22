@@ -129,6 +129,54 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 5 * time.Minute
 
+	case "codify_constraint":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/jiminy/protocol/codify", Purpose: "generate and freeze T1 code for constraint"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Constraint code generated and frozen", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "code_coverage_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 2 * time.Minute
+
+	case "retire_code":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/jiminy/protocol/retire", Purpose: "retire T1 code back to T2"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Code retired, constraint reverted to T2", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "avg_comprehension_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 1 * time.Minute
+
+	case "adjust_tier_threshold":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/jiminy/protocol/adjust-tiers", Purpose: "adjust tier selection parameters"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Tier thresholds adjusted", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "compression_ratio_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 1 * time.Minute
+
+	case "adjust_replay_buffer":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/jiminy/protocol/adjust-buffer", Purpose: "adjust replay buffer size"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Replay buffer adjusted", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "replay_frequency_delta", Operator: "lt", Threshold: 0},
+		}
+		spec.Timeout = 1 * time.Minute
+
 	default:
 		spec.Timeout = 5 * time.Minute
 	}
@@ -154,6 +202,14 @@ func descriptionForAction(actionType string) string {
 		return "Archive constraints with consistently low effectiveness rates"
 	case "review_guidance_effectiveness":
 		return "Review and optimize guidance effectiveness based on follow rates"
+	case "codify_constraint":
+		return "Generate T1 mnemonic code for constraint currently sent as T2"
+	case "retire_code":
+		return "Retire T1 code with low comprehension back to T2 telegraphic encoding"
+	case "adjust_tier_threshold":
+		return "Adjust tier selection parameters to improve compression ratio"
+	case "adjust_replay_buffer":
+		return "Adjust replay buffer size to reduce replay frequency"
 	default:
 		return "Unknown action type: " + actionType
 	}

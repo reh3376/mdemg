@@ -13,11 +13,12 @@ import (
 
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
 type Assessor struct {
-	cfg             config.Config
-	driver          neo4j.DriverWithContext
-	learner         LearningStatsProvider
-	convSvc         ConversationStatsProvider
-	jiminyProvider  JiminyStatsProvider // J10: guidance stats provider
+	cfg              config.Config
+	driver           neo4j.DriverWithContext
+	learner          LearningStatsProvider
+	convSvc          ConversationStatsProvider
+	jiminyProvider   JiminyStatsProvider   // J10: guidance stats provider
+	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
@@ -28,6 +29,11 @@ func NewAssessor(cfg config.Config, driver neo4j.DriverWithContext, learner Lear
 // SetJiminyProvider attaches a Jiminy stats provider for guidance health assessment (J10).
 func (a *Assessor) SetJiminyProvider(p JiminyStatsProvider) {
 	a.jiminyProvider = p
+}
+
+// SetProtocolProvider attaches a J17 protocol stats provider for protocol health assessment.
+func (a *Assessor) SetProtocolProvider(p ProtocolStatsProvider) {
+	a.protocolProvider = p
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -86,8 +92,24 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 	}
 
-	// 6. Weighted overall (adjusted weights for 5 dimensions)
-	if report.GuidanceHealth > 0 {
+	// 5c. J17: Compute protocol health if protocol stats available
+	if a.protocolProvider != nil {
+		protoStats, pErr := a.protocolProvider.GetProtocolStats(ctx, spaceID)
+		if pErr == nil && protoStats.TotalEvents > 0 {
+			report.ProtocolHealth = a.scoreProtocol(protoStats)
+		}
+	}
+
+	// 6. Weighted overall (adjusted weights for dimensions present)
+	if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
+		// All 6 dimensions
+		report.OverallHealth = 0.20*report.RetrievalQuality +
+			0.20*report.MemoryHealth +
+			0.15*report.EdgeHealth +
+			0.15*report.TaskPerformance +
+			0.15*report.GuidanceHealth +
+			0.15*report.ProtocolHealth
+	} else if report.GuidanceHealth > 0 {
 		report.OverallHealth = 0.25*report.RetrievalQuality +
 			0.25*report.MemoryHealth +
 			0.20*report.EdgeHealth +
@@ -253,6 +275,26 @@ func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
 	effScore := clamp(stats.ConstraintEffRate, 0, 1)
 	diversityScore := clamp(stats.SourceDiversity, 0, 1)
 	return 0.5*followScore + 0.3*effScore + 0.2*diversityScore
+}
+
+// scoreProtocol computes protocol health from J17 metrics.
+func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) float64 {
+	// 40% comprehension (are codes being understood?)
+	comprehensionScore := clamp(stats.AvgComprehension, 0, 1)
+
+	// 25% compression (ratio of 5.0 = perfect, 1.0 = no compression)
+	compressionScore := clamp((stats.CompressionRatio-1.0)/4.0, 0, 1)
+
+	// 20% coverage (do all constraints have codes?)
+	coverageScore := clamp(stats.CodeCoverage, 0, 1)
+
+	// 15% stability (ticket restores + low replay frequency)
+	replayPenalty := clamp(stats.ReplayFrequencyPerHour/10.0, 0, 1)
+	restoreScore := clamp(stats.TicketRestoreSuccessRate, 0, 1)
+	stabilityScore := 0.5*restoreScore + 0.5*(1.0-replayPenalty)
+
+	return 0.40*comprehensionScore + 0.25*compressionScore +
+		0.20*coverageScore + 0.15*stabilityScore
 }
 
 func (a *Assessor) computeConfidence(r *SelfAssessmentReport) float64 {

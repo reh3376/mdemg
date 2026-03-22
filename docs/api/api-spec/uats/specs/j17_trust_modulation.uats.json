@@ -1,0 +1,77 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Trust Modulation",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "trust",
+      "phase_j17",
+      "embedding_required"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-22",
+    "description": "Validates the J17 trust modulation flow via the guide endpoint, ensuring protocol and guidance_seq fields reflect trust-aware responses.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "trust",
+      "phase_j17",
+      "embedding_required"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "space_id": "uats-test-space",
+    "context_text": "test context",
+    "session_id": "uats-trust-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "context": "{{context_text}}",
+      "session_id": "{{session_id}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "protocol info present",
+        "path": "$.data.protocol",
+        "type": "object"
+      },
+      {
+        "name": "protocol version is string",
+        "path": "$.data.protocol.version",
+        "type": "string"
+      },
+      {
+        "name": "guidance_seq is number",
+        "path": "$.data.guidance_seq",
+        "type": "number"
+      }
+    ]
+  }
+}

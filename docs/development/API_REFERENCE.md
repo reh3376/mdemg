@@ -32,7 +32,7 @@ This document provides a complete reference for all MDEMG HTTP API endpoints.
 - [Space Transfer (Export/Import)](#space-transfer-exportimport)
 - [Frontier Detection](#get-v1memoryfrontiers)
 - [Negative Feedback](#post-v1learningnegative-feedback)
-- [Jiminy Guidance Service](#jiminy-guidance-service-phase-jiminy)
+- [Jiminy Guidance Service](#jiminy-guidance-service-phase-jiminy) (includes J17 AI-to-AI Protocol)
 
 ---
 
@@ -1306,6 +1306,92 @@ Record whether an agent followed, ignored, or contradicted Jiminy guidance. This
 **Error Codes**: `400` (missing guidance_id), `405` (not POST), `503` (Jiminy not enabled).
 
 **Config**: `JIMINY_EFFECTIVENESS_ENABLED` (default: true), `JIMINY_EFFECTIVENESS_TTL_SEC` (default: 1800 — guidance tracking expires after 30 minutes).
+
+### J17 AI-to-AI Protocol Endpoints
+
+Requires `J17_ENABLED=true`. All J17 protocol endpoints return 503 when J17 is disabled.
+
+#### GET /v1/jiminy/bootstrap
+
+Returns the J17 bootstrap payload for initializing a new agent session. Includes protocol version, encoding guide, active constraints with T1 codes, and session ticket if available.
+
+**Query Parameters**: `space_id` (required), `session_id` (optional)
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "bootstrap": "J17v1 BOOT|seq:0|trust:0.50|...",
+    "version": "j17v1",
+    "first_session": true
+  }
+}
+```
+
+**Error Codes**: `400` (missing space_id), `503` (J17 not enabled)
+
+#### POST /v1/jiminy/protocol/feedback
+
+Submit comprehension feedback trials for protocol evolution. Each trial records whether an agent correctly understood a constraint at a given tier.
+
+**Request Body**:
+
+```json
+{
+  "trials": [
+    {
+      "constraint_code": "no-force-push-main",
+      "tier": 1,
+      "score": 9.5,
+      "interpretation": "Never force push to main branch",
+      "sender_intent": "Prevent destructive git operations on main"
+    }
+  ]
+}
+```
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "ingested": 1
+  }
+}
+```
+
+**Error Codes**: `400` (empty trials), `503` (J17 not enabled)
+
+#### POST /v1/jiminy/protocol/learn
+
+Request constraint code re-generation when an existing code is ambiguous or causes comprehension failures.
+
+**Request Body**:
+
+```json
+{
+  "constraint_type": "must",
+  "description": "always run tests before committing",
+  "old_code": "test-first",
+  "failure_reason": "ambiguous — could mean test-first development or pre-commit testing"
+}
+```
+
+**Response** (200):
+
+```json
+{
+  "data": {
+    "old_code": "test-first",
+    "new_code": "run-tests-before-commit"
+  }
+}
+```
+
+**Error Codes**: `400` (missing required fields), `503` (J17 not enabled or LLM unavailable)
+
+**Config**: `J17_ENABLED`, `J17_CODEGEN_ENABLED`, `J17_CODEGEN_PROVIDER`, `J17_CODEGEN_MODEL`.
 
 ### Hook Distribution (J6b-J6e)
 

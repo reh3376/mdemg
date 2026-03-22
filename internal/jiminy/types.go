@@ -47,17 +47,22 @@ type GuidanceResponse struct {
 	Warnings              []string            `json:"warnings,omitempty"`
 	SourceCounts          SourceCounts        `json:"source_counts"`
 	SessionEscalation     *SessionEscalation  `json:"session_escalation,omitempty"` // J12: escalation state
+	GuidanceSeq           int64               `json:"guidance_seq,omitempty"`       // J17: monotonic sequence number
+	Protocol              *ProtocolInfo       `json:"protocol,omitempty"`           // J17: protocol state info
 	Debug                 map[string]any      `json:"debug,omitempty"`
 }
 
 // GuidanceItem is a single piece of guidance.
 type GuidanceItem struct {
-	Type            GuidanceType    `json:"type"`
-	Priority        string          `json:"priority"`    // high, medium, low
-	Content         string          `json:"content"`
-	Confidence      float64         `json:"confidence"`
-	SourceNodes     []string        `json:"source_nodes,omitempty"`
-	EscalationLevel EscalationLevel `json:"escalation_level,omitempty"` // J12: current escalation state
+	Type            GuidanceType      `json:"type"`
+	Priority        string            `json:"priority"`    // high, medium, low
+	Content         string            `json:"content"`
+	Confidence      float64           `json:"confidence"`
+	SourceNodes     []string          `json:"source_nodes,omitempty"`
+	EscalationLevel EscalationLevel   `json:"escalation_level,omitempty"` // J12: current escalation state
+	ConstraintCode  string            `json:"constraint_code,omitempty"`  // J17: mnemonic code for T1 encoding
+	Tier            int               `json:"tier,omitempty"`             // J17: encoding tier used (1=coded, 2=telegraphic, 3=full NL)
+	Annotations     map[string]string `json:"annotations,omitempty"`     // J17: inline annotations for T1 disambiguation (alt:, scope:, ctx:, neg:)
 }
 
 // SourceCounts tracks how many items came from each source.

@@ -229,3 +229,47 @@ func (et *EscalationTracker) Size() int {
 	defer et.mu.Unlock()
 	return len(et.states)
 }
+
+// ExportState exports escalation state for a session as a map of node_id → EscalationEntry.
+// Used by J17 TicketManager to serialize state into a session ticket.
+func (et *EscalationTracker) ExportState(sessionID string) map[string]EscalationEntry {
+	et.mu.Lock()
+	defer et.mu.Unlock()
+
+	result := make(map[string]EscalationEntry)
+	now := time.Now()
+
+	for key, state := range et.states {
+		if key.SessionID != sessionID {
+			continue
+		}
+		// Skip decayed entries
+		if now.Sub(state.LastSurfaced) > et.decayDuration {
+			continue
+		}
+		result[key.NodeID] = EscalationEntry{
+			NodeID:       key.NodeID,
+			Level:        state.Level,
+			IgnoreCount:  state.IgnoreCount,
+			LastSurfaced: state.LastSurfaced,
+		}
+	}
+
+	return result
+}
+
+// ImportState restores escalation state for a session from a ticket snapshot.
+// Used by J17 TicketManager to restore state after a context reset.
+func (et *EscalationTracker) ImportState(sessionID string, states map[string]EscalationEntry) {
+	et.mu.Lock()
+	defer et.mu.Unlock()
+
+	for nodeID, entry := range states {
+		key := escalationKey{SessionID: sessionID, NodeID: nodeID}
+		et.states[key] = &escalationState{
+			Level:        entry.Level,
+			IgnoreCount:  entry.IgnoreCount,
+			LastSurfaced: entry.LastSurfaced,
+		}
+	}
+}
