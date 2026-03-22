@@ -92,6 +92,7 @@
       "description": "Request without required space_id should return 400.",
       "request": {
         "body": {
+          "space_id": "",
           "session_id": "{{session_id}}"
         }
       },

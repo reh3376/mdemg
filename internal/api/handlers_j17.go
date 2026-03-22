@@ -15,8 +15,8 @@ func (s *Server) handleJ17ProtocolMetrics(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -41,8 +41,8 @@ func (s *Server) handleJ17Extension(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -77,8 +77,8 @@ func (s *Server) handleJ17ProtocolFeedback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -105,8 +105,8 @@ func (s *Server) handleJ17ProtocolLearn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -149,8 +149,8 @@ func (s *Server) handleJ17Bootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -171,8 +171,8 @@ func (s *Server) handleJ17Checkpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
@@ -207,8 +207,8 @@ func (s *Server) handleJ17ResumeProtocol(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if s.jiminySvc == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "jiminy service not enabled"})
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}
 
