@@ -127,6 +127,38 @@ DEGRADED
   fi
 fi
 
+# J17: Restore protocol state from saved ticket
+if [ "${J17_ENABLED:-false}" = "true" ]; then
+  J17_TICKET_OBS=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
+    -H "Content-Type: application/json" \
+    -d "{\"space_id\":\"${SPACE_ID}\",\"query\":\"j17-ticket\",\"top_k\":1,\"filter_tags\":[\"j17-ticket\"]}" \
+    --connect-timeout 2 --max-time 5 2>/dev/null || true)
+
+  if [ -n "$J17_TICKET_OBS" ]; then
+    TICKET_CONTENT=$(echo "$J17_TICKET_OBS" | jq -r '.results[0].content // empty' 2>/dev/null || true)
+    if [ -n "$TICKET_CONTENT" ]; then
+      TICKET_JSON=$(echo "$TICKET_CONTENT" | jq -c '.ticket // empty' 2>/dev/null || true)
+      LAST_SEQ=$(echo "$TICKET_CONTENT" | jq -r '.last_seq // 0' 2>/dev/null || echo "0")
+      if [ -n "$TICKET_JSON" ] && [ "$TICKET_JSON" != "null" ]; then
+        J17_RESUME=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/resume-protocol" \
+          -H "Content-Type: application/json" \
+          -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\",\"ticket\":${TICKET_JSON},\"last_seq\":${LAST_SEQ}}" \
+          --connect-timeout 3 --max-time 5 2>/dev/null || true)
+        if [ -n "$J17_RESUME" ]; then
+          J17_RESTORED=$(echo "$J17_RESUME" | jq -r '.data.restored // false' 2>/dev/null || echo "false")
+          J17_MSG=$(echo "$J17_RESUME" | jq -r '.data.message // ""' 2>/dev/null || true)
+          if [ "$J17_RESTORED" = "true" ]; then
+            echo ""
+            echo "═══ J17 PROTOCOL RESTORED ═══"
+            echo "$J17_MSG"
+            echo "═══ END J17 ═══"
+          fi
+        fi
+      fi
+    fi
+  fi
+fi
+
 # Reinforce recalled observations
 if [ "$OBS_COUNT" -gt 0 ] 2>/dev/null; then
   curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \

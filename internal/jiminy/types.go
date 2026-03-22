@@ -117,6 +117,7 @@ type GuidanceFeedbackRequest struct {
 	GuidanceID    string `json:"guidance_id"`
 	ActionSummary string `json:"action_summary"`
 	SpaceID       string `json:"space_id"`
+	SessionID     string `json:"session_id,omitempty"` // J17: per-session trust routing (falls back to SpaceID)
 }
 
 // GuidanceFeedbackResponse is the output from the feedback endpoint.

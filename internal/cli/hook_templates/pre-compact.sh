@@ -68,6 +68,35 @@ curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
   }" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null || true
 
+# J17: Issue session ticket before compaction for state persistence
+if [ "${J17_ENABLED:-false}" = "true" ]; then
+  J17_TICKET=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/checkpoint" \
+    -H "Content-Type: application/json" \
+    -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\"}" \
+    --connect-timeout 2 --max-time 5 2>/dev/null || true)
+
+  if [ -n "$J17_TICKET" ]; then
+    TICKET_JSON=$(echo "$J17_TICKET" | jq -c '.data.ticket // empty' 2>/dev/null || true)
+    LAST_SEQ=$(echo "$J17_TICKET" | jq -r '.data.last_seq // 0' 2>/dev/null || echo "0")
+    if [ -n "$TICKET_JSON" ] && [ "$TICKET_JSON" != "null" ]; then
+      TICKET_CONTENT=$(jq -n --argjson ticket "$TICKET_JSON" --arg last_seq "$LAST_SEQ" \
+        '{ticket: $ticket, last_seq: ($last_seq | tonumber)}' 2>/dev/null || true)
+      if [ -n "$TICKET_CONTENT" ]; then
+        curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"space_id\": \"${SPACE_ID}\",
+            \"session_id\": \"${SESSION_ID}\",
+            \"content\": $(echo "$TICKET_CONTENT" | jq -Rs .),
+            \"obs_type\": \"context\",
+            \"tags\": [\"j17-ticket\", \"auto-save\"]
+          }" \
+          --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null || true
+      fi
+    fi
+  fi
+fi
+
 # Also run consolidation in background — compaction is a natural breakpoint
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/consolidate" \
   -H "Content-Type: application/json" \

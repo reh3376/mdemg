@@ -24,8 +24,34 @@ func TestProtocolEncoder_T1Format(t *testing.T) {
 	if !strings.Contains(result, "C:!|no-force-push-main") {
 		t.Errorf("T1 encoding should contain coded format, got:\n%s", result)
 	}
+	// Default compact level (T1CompactGlossary) drops src: metadata
+	if strings.Contains(result, "src:abc123") {
+		t.Errorf("T1 encoding at default compact level should NOT contain src:, got:\n%s", result)
+	}
+}
+
+func TestProtocolEncoder_T1Format_NoCompact(t *testing.T) {
+	enc := NewProtocolEncoder(TierCoded)
+	enc.SetT1Compact(T1CompactNone)
+
+	items := []GuidanceItem{
+		{
+			Type:           GuidanceConstraint,
+			Priority:       "high",
+			Content:        "Never force push to main",
+			Confidence:     0.95,
+			SourceNodes:    []string{"abc123"},
+			ConstraintCode: "no-force-push-main",
+		},
+	}
+
+	result := enc.Encode(items, SourceCounts{Constraints: 1}, 0.95, 0.9)
+
+	if !strings.Contains(result, "C:!|no-force-push-main") {
+		t.Errorf("T1 encoding should contain coded format, got:\n%s", result)
+	}
 	if !strings.Contains(result, "src:abc123") {
-		t.Errorf("T1 encoding should contain source node, got:\n%s", result)
+		t.Errorf("T1 encoding at compact=0 should contain source node, got:\n%s", result)
 	}
 }
 
