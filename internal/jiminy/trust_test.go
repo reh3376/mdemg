@@ -120,3 +120,59 @@ func TestTrustScorer_SessionIsolation(t *testing.T) {
 		t.Errorf("sess-2 score = %f, want 0.5 (initial)", score2)
 	}
 }
+
+func TestTrustScorer_PerSessionIndependence(t *testing.T) {
+	ts := NewTrustScorer(TrustConfig{
+		Initial:            0.5,
+		BoostPerFollow:     0.1,
+		DecayPerIgnore:     0.1,
+		DecayPerContradict: 0.15,
+	})
+
+	// Boost session-A 3 times
+	ts.RecordOutcome("session-A", OutcomeFollowed)
+	ts.RecordOutcome("session-A", OutcomeFollowed)
+	ts.RecordOutcome("session-A", OutcomeFollowed)
+
+	// Decay session-B once via contradict
+	ts.RecordOutcome("session-B", OutcomeContradicted)
+
+	scoreA := ts.GetScore("session-A")
+	scoreB := ts.GetScore("session-B")
+
+	if scoreA <= 0.5 {
+		t.Errorf("session-A score = %f, want > 0.5 after 3 follows", scoreA)
+	}
+	if scoreB >= 0.5 {
+		t.Errorf("session-B score = %f, want < 0.5 after contradict", scoreB)
+	}
+}
+
+func TestTrustScorer_SetThresholds(t *testing.T) {
+	ts := NewTrustScorer(TrustConfig{
+		Initial:       0.5,
+		HighThreshold: 0.8,
+		LowThreshold:  0.4,
+	})
+
+	// Valid thresholds
+	ts.SetThresholds(0.7, 0.3)
+	if ts.HighThreshold() != 0.7 {
+		t.Errorf("high = %f, want 0.7", ts.HighThreshold())
+	}
+	if ts.LowThreshold() != 0.3 {
+		t.Errorf("low = %f, want 0.3", ts.LowThreshold())
+	}
+
+	// Invalid: low >= high — should not update
+	ts.SetThresholds(0.5, 0.5)
+	if ts.HighThreshold() != 0.7 {
+		t.Errorf("high should remain 0.7 after invalid set, got %f", ts.HighThreshold())
+	}
+
+	// Invalid: high > 1.0
+	ts.SetThresholds(1.1, 0.2)
+	if ts.HighThreshold() != 0.7 {
+		t.Errorf("high should remain 0.7 after out-of-range set, got %f", ts.HighThreshold())
+	}
+}

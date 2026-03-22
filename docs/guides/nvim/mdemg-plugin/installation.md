@@ -140,7 +140,7 @@ require("mdemg").setup()
 require("mdemg").setup({
   -- Connection
   endpoint = "http://localhost:9999",
-  space_id = nil,                         -- auto-resolved from project directory name
+  space_id = nil,                         -- auto-resolved from .mdemg/config.yaml, MDEMG_SPACE_ID env
   timeout = 30,                           -- seconds
 
   -- Keymaps (set any to "" to disable it)

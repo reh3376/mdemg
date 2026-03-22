@@ -638,8 +638,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
 	// J17: Wire protocol evolver to dispatcher
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
-		metricsCollector := jiminySvc.GetProtocolMetricsCollector()
-		evolver := jiminy.NewProtocolEvolver(metricsCollector, nil, nil, nil)
+		evolver := jiminySvc.NewProtocolEvolver()
 		rsicDispatcher.SetProtocolEvolver(evolver)
 	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)

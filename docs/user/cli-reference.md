@@ -511,6 +511,25 @@ Walk a codebase and ingest files into MDEMG with optimized batch processing, con
 | `--max-elements-per-file` | int | `500` | Max elements to extract per file |
 | `--max-symbols-per-file` | int | `1000` | Max symbols to extract per file |
 | `--preset` | string | `""` | Exclusion preset: `default`, `ml_cuda`, `web_monorepo` |
+| `--speed` | string | `""` | Speed preset: `fast`, `balanced`, `thorough` |
+
+#### Speed Presets
+
+The `--speed` flag applies a named preset that tunes multiple flags at once. Individual flag overrides still take precedence (e.g., `--speed fast --llm-summary=true` keeps LLM summaries on).
+
+| Setting | `fast` | `balanced` | `thorough` |
+|---------|--------|------------|------------|
+| `--workers` | `8` | `4` | `2` |
+| `--batch` | `200` | `100` | `50` |
+| `--delay` | `0` | `50` | `100` |
+| `--llm-summary` | `false` | `true` | `true` |
+| `--extract-symbols` | `true` | `true` | `true` |
+| `--consolidate` | `false` | `true` | `true` |
+| `--max-file-size` | `524288` (512KB) | `1048576` (1MB) | `2097152` (2MB) |
+
+- **`fast`** -- Maximizes throughput by disabling LLM summaries and post-ingest consolidation. Best for large codebases or rapid iteration.
+- **`balanced`** -- Default-equivalent settings. Good for most projects.
+- **`thorough`** -- Fewer workers, larger file limit, all enrichment enabled. Best for pre-benchmark or quality-critical runs.
 
 #### Info Flags
 
@@ -527,6 +546,15 @@ mdemg ingest --path . --dry-run --verbose
 mdemg ingest --path . --llm-summary=false --exclude ".git,vendor,dist"
 mdemg ingest --path . --preset ml_cuda --max-file-size 2097152
 mdemg ingest --path . --list-languages
+
+# Fast ingest for large codebases
+mdemg ingest --path . --speed fast
+
+# Thorough ingest with maximum quality
+mdemg ingest --path . --speed thorough
+
+# Fast speed with LLM summaries kept on
+mdemg ingest --path . --speed fast --llm-summary=true
 ```
 
 **See Also:** `mdemg consolidate`, `mdemg extract-symbols`, `mdemg watch`

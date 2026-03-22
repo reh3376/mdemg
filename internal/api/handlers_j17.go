@@ -154,10 +154,24 @@ func (s *Server) handleJ17Bootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Include glossary (DICT section) if space_id is provided and codes exist
+	spaceID := r.URL.Query().Get("space_id")
+	var bootstrap string
+	if spaceID != "" {
+		glossary := s.jiminySvc.GetGlossary(r.Context(), spaceID)
+		if len(glossary) > 0 {
+			bootstrap = jiminy.FormatBootstrapWithGlossary(glossary)
+		} else {
+			bootstrap = jiminy.FormatBootstrap()
+		}
+	} else {
+		bootstrap = jiminy.FormatBootstrap()
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"bootstrap":  jiminy.FormatBootstrap(),
-			"version":    jiminy.J17Version,
+			"bootstrap":    bootstrap,
+			"version":      jiminy.J17Version,
 			"first_session": true,
 		},
 	})

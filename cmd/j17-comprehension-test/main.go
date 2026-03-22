@@ -116,6 +116,7 @@ func main() {
 	baseURL := "https://api.openai.com/v1"
 	maxIterations := 3
 	mdemgURL := mdemgDefault
+	compactLevel := 0
 
 	// Parse CLI args
 	for i, arg := range os.Args[1:] {
@@ -127,6 +128,10 @@ func main() {
 		case "--mdemg-url":
 			if i+2 < len(os.Args) {
 				mdemgURL = os.Args[i+2]
+			}
+		case "--compact":
+			if i+2 < len(os.Args) {
+				fmt.Sscanf(os.Args[i+2], "%d", &compactLevel)
 			}
 		}
 	}
@@ -141,6 +146,10 @@ func main() {
 
 	ctx := context.Background()
 	encoder := jiminy.NewProtocolEncoder(1)
+	if compactLevel > 0 {
+		encoder.SetT1Compact(jiminy.T1CompactLevel(compactLevel))
+		log.Printf("T1 compact level: %d", compactLevel)
+	}
 
 	// Build glossary from test constraints and generate enhanced bootstrap
 	constraints := buildTestConstraints()

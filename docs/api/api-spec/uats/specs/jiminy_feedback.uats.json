@@ -102,6 +102,22 @@
         "status": [400, 503],
         "body_assertions": []
       }
+    },
+    {
+      "name": "with_session_id",
+      "description": "Returns 200 when session_id is provided for per-session trust routing (J17 GAP 3).",
+      "request": {
+        "body": {
+          "guidance_id": "{{guidance_id}}",
+          "action_summary": "I followed the constraint",
+          "space_id": "{{space_id}}",
+          "session_id": "test-session"
+        }
+      },
+      "expected": {
+        "status": [200, 503],
+        "body_assertions": []
+      }
     }
   ]
 }

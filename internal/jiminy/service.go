@@ -728,6 +728,12 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}, nil
 	}
 
+	// J17: Resolve session ID for trust scoring — prefer explicit SessionID, fall back to SpaceID
+	feedbackSessionID := req.SessionID
+	if feedbackSessionID == "" {
+		feedbackSessionID = req.SpaceID
+	}
+
 	actionLower := strings.ToLower(req.ActionSummary)
 	var results []GuidanceItemFeedback
 
@@ -755,15 +761,14 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// J12: Feed escalation tracker with outcome
 		if s.escalation != nil && len(item.SourceNodes) > 0 {
-			sessionID := req.SpaceID // Use spaceID as session fallback
 			for _, nodeID := range item.SourceNodes {
-				s.escalation.RecordOutcome(sessionID, nodeID, outcome)
+				s.escalation.RecordOutcome(feedbackSessionID, nodeID, outcome)
 			}
 		}
 
-		// J17: Update trust score based on outcome
+		// J17: Update trust score based on outcome (per-session, not per-space)
 		if s.trustScorer != nil {
-			s.trustScorer.RecordOutcome(req.SpaceID, outcome)
+			s.trustScorer.RecordOutcome(feedbackSessionID, outcome)
 		}
 
 		// J17-4: Record outcome for protocol metrics and data collection
@@ -986,6 +991,12 @@ func (s *Service) GetProtocolMetricsCollector() *ProtocolMetricsCollector {
 	return s.protocolMetrics
 }
 
+// NewProtocolEvolver creates a fully-wired ProtocolEvolver from service internals.
+func (s *Service) NewProtocolEvolver() *ProtocolEvolver {
+	return NewProtocolEvolver(s.protocolMetrics, s.codeGenerator, s.encoder,
+		s.sequenceTracker, s.driver, s.trustScorer)
+}
+
 // NegotiateExtension processes an agent's request for a protocol extension.
 func (s *Service) NegotiateExtension(req ExtensionRequest) ExtensionResponse {
 	if s.extensions == nil {
@@ -1141,6 +1152,47 @@ Respond with ONLY the new kebab-case code, nothing else.`, constraintType, descr
 	}
 
 	return code, nil
+}
+
+// GetGlossary returns a map of constraint_code → summary for all constraints
+// with assigned codes in the given space. Used by the bootstrap handler.
+func (s *Service) GetGlossary(ctx context.Context, spaceID string) map[string]string {
+	if s.driver == nil || spaceID == "" {
+		return nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode)
+			WHERE n.space_id = $spaceId AND n.constraint_code IS NOT NULL AND n.constraint_code <> ''
+			RETURN n.constraint_code AS code, COALESCE(n.summary, LEFT(n.content, 80)) AS summary
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		glossary := make(map[string]string)
+		for res.Next(ctx) {
+			record := res.Record()
+			code, _ := record.Get("code")
+			summary, _ := record.Get("summary")
+			if codeStr, ok := code.(string); ok {
+				if summaryStr, ok := summary.(string); ok {
+					glossary[codeStr] = summaryStr
+				}
+			}
+		}
+		return glossary, res.Err()
+	})
+	if err != nil {
+		log.Printf("jiminy: GetGlossary error: %v", err)
+		return nil
+	}
+	glossary, _ := result.(map[string]string)
+	return glossary
 }
 
 // lookupConstraintCodes batch-queries Neo4j for constraint_code properties.

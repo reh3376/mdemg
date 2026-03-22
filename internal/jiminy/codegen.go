@@ -83,6 +83,13 @@ func (g *ConstraintCodeGenerator) RegisterExistingCode(code string) {
 	g.existing[code] = true
 }
 
+// UnregisterCode removes a code from the collision avoidance set (used when retiring a code).
+func (g *ConstraintCodeGenerator) UnregisterCode(code string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.existing, code)
+}
+
 // fallbackCode generates a deterministic code from the description hash.
 func (g *ConstraintCodeGenerator) fallbackCode(description string) string {
 	h := sha256.Sum256([]byte(description))

@@ -143,6 +143,24 @@ func (ts *TrustScorer) LowThreshold() float64 {
 	return ts.lowThreshold
 }
 
+// SetThresholds updates the high and low trust thresholds.
+// Validates: high in (0, 1], low in [0, 1), low < high.
+func (ts *TrustScorer) SetThresholds(high, low float64) {
+	if high <= 0 || high > 1.0 {
+		return
+	}
+	if low < 0 || low >= 1.0 {
+		return
+	}
+	if low >= high {
+		return
+	}
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.highThreshold = high
+	ts.lowThreshold = low
+}
+
 // CleanupExpired removes entries older than TTL.
 func (ts *TrustScorer) CleanupExpired() int {
 	ts.mu.Lock()

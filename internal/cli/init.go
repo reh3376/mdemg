@@ -940,6 +940,23 @@ func buildInitialIngestConfig(cwd, spaceID, llmProvider, llmModel string) *inges
 		cfg.llmSummaryBatch = 10
 	}
 
+	// Apply speed preset from env if set (CLI flag not available during init)
+	if speedEnv := os.Getenv("INGEST_SPEED"); speedEnv != "" {
+		if sp, ok := speedPresets[speedEnv]; ok {
+			cfg.workers = sp.workers
+			cfg.batchSize = sp.batchSize
+			cfg.llmSummaryBatch = sp.llmBatch
+			cfg.extractSymbols = sp.symbols
+			cfg.consolidate = sp.consolidate
+			cfg.delay = sp.delay
+			// Only override llmSummary if provider is available
+			if !sp.llmSummary {
+				cfg.llmSummary = false
+			}
+			cfg.speed = speedEnv
+		}
+	}
+
 	return cfg
 }
 

@@ -32,6 +32,7 @@ bin/
 /prune
 /mdemg-server
 /mdemg-mcp
+/j17-comprehension-test
 /space-transfer
 /plugin-scaffold
 /plugin-validate
