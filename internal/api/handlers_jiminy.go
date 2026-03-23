@@ -50,14 +50,16 @@ func (s *Server) handleJiminyReady(w http.ResponseWriter, r *http.Request) {
 
 	// Feature flags
 	features := map[string]bool{
-		"synthesis":          s.cfg.JiminySynthesisEnabled,
-		"evaluate_llm":      s.cfg.JiminyEvaluateLLMEnabled,
-		"outcome_llm":       s.cfg.JiminyOutcomeLLMEnabled,
+		"synthesis":           s.cfg.JiminySynthesisEnabled,
+		"evaluate_llm":       s.cfg.JiminyEvaluateLLMEnabled,
+		"outcome_llm":        s.cfg.JiminyOutcomeLLMEnabled,
 		"outcome_classifier": s.cfg.JiminyOutcomeClassifierEnabled,
-		"escalation":        s.cfg.JiminyEscalationEnabled,
-		"persistence":       s.cfg.JiminyPersistenceEnabled,
-		"cache":             s.cfg.JiminyCacheEnabled,
-		"j17":               s.cfg.J17Enabled,
+		"escalation":         s.cfg.JiminyEscalationEnabled,
+		"persistence":        s.cfg.JiminyPersistenceEnabled,
+		"cache":              s.cfg.JiminyCacheEnabled,
+		"j17":                s.cfg.J17Enabled,
+		"ml_tier_prediction": s.cfg.J17MLTierPredictionEnabled,
+		"nli_comprehension":  s.cfg.J17NLIComprehensionEnabled,
 	}
 
 	// Sub-service availability
@@ -83,6 +85,24 @@ func (s *Server) handleJiminyReady(w http.ResponseWriter, r *http.Request) {
 		services["protocol_metrics"] = "unavailable"
 	}
 
+	// Sidecar health probe
+	if s.cfg.J17SidecarURL == "" {
+		services["sidecar"] = "not_configured"
+	} else {
+		sidecarClient := &http.Client{Timeout: 1 * time.Second}
+		resp, err := sidecarClient.Get(s.cfg.J17SidecarURL + "/health")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				services["sidecar"] = "available"
+			} else {
+				services["sidecar"] = "unavailable"
+			}
+		} else {
+			services["sidecar"] = "unavailable"
+		}
+	}
+
 	// Config
 	config := map[string]any{
 		"timeout_ms":     s.cfg.JiminyTimeoutMs,
@@ -95,6 +115,7 @@ func (s *Server) handleJiminyReady(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.cfg.J17Enabled {
 		config["j17_sidecar_url"] = s.cfg.J17SidecarURL
+		config["sidecar_mode"] = s.cfg.J17SidecarMode
 	}
 
 	result := map[string]any{

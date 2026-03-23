@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -341,6 +342,19 @@ type Config struct {
 	J17TierModelMinSamples       int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
 	J17SidecarURL                string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
 	J17SidecarTimeoutMs          int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 200)
+
+	// J17-NS: Neural Sidecar Promotion (shadow → causal)
+	J17SidecarMode               string  // J17_SIDECAR_MODE — arbitration mode: shadow, compare, canary, active (default: "shadow")
+	J17SidecarCanaryPct          int     // J17_SIDECAR_CANARY_PERCENTAGE — % of eligible requests routed to ML in canary mode (default: 100)
+	J17SidecarConfidenceFloor    float64 // J17_SIDECAR_CONFIDENCE_FLOOR — min ML confidence to use prediction (default: 0.6)
+	J17NLIScoreOfRecord          bool    // J17_NLI_SCORE_OF_RECORD — when true + mode >= canary, NLI becomes comprehension score-of-record (default: false)
+	J17PrecedentProtectedCodes   string  // J17_PRECEDENT_PROTECTED_CODES — comma-separated constraint codes that NEVER use ML tier (default: "")
+	J17PrecedentLogEnabled       bool    // J17_PRECEDENT_LOG_ENABLED — audit log when ML would change a protected constraint's tier (default: true)
+
+	// J17-NS: Sidecar Circuit Breaker
+	J17SidecarCBEnabled          bool    // J17_SIDECAR_CB_ENABLED — enable circuit breaker for sidecar calls (default: true)
+	J17SidecarCBFailureThreshold int     // J17_SIDECAR_CB_FAILURE_THRESHOLD — failures before opening circuit (default: 3)
+	J17SidecarCBTimeoutSec       int     // J17_SIDECAR_CB_TIMEOUT_SEC — seconds before half-open retry (default: 15)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -1952,6 +1966,46 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// J17-NS: Neural Sidecar Promotion
+	j17SidecarMode := get("J17_SIDECAR_MODE", "shadow")
+	// Validate mode
+	switch j17SidecarMode {
+	case "shadow", "compare", "canary", "active":
+		// valid
+	default:
+		return Config{}, fmt.Errorf("J17_SIDECAR_MODE must be one of: shadow, compare, canary, active (got %q)", j17SidecarMode)
+	}
+	j17SidecarCanaryPct, err := atoi("J17_SIDECAR_CANARY_PERCENTAGE", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	j17SidecarConfidenceFloor, err := atof("J17_SIDECAR_CONFIDENCE_FLOOR", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	j17NLIScoreOfRecord := getBool("J17_NLI_SCORE_OF_RECORD", false)
+	j17PrecedentProtectedCodes := get("J17_PRECEDENT_PROTECTED_CODES", "")
+	j17PrecedentLogEnabled := getBool("J17_PRECEDENT_LOG_ENABLED", true)
+
+	// J17-NS: Sidecar Circuit Breaker
+	j17SidecarCBEnabled := getBool("J17_SIDECAR_CB_ENABLED", true)
+	j17SidecarCBFailureThreshold, err := atoi("J17_SIDECAR_CB_FAILURE_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	j17SidecarCBTimeoutSec, err := atoi("J17_SIDECAR_CB_TIMEOUT_SEC", 15)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Startup validation: active mode requires sidecar URL
+	if j17SidecarMode == "active" && j17SidecarURL == "" {
+		return Config{}, errors.New("J17_SIDECAR_MODE=active requires J17_SIDECAR_URL to be set")
+	}
+	if j17SidecarMode != "shadow" && j17SidecarURL == "" {
+		log.Printf("WARN: J17_SIDECAR_MODE=%s but J17_SIDECAR_URL is empty — sidecar calls will fail", j17SidecarMode)
+	}
+
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
 	if err != nil {
@@ -3069,6 +3123,15 @@ func FromEnv() (Config, error) {
 		J17TierModelMinSamples:           j17TierModelMinSamples,
 		J17SidecarURL:                    j17SidecarURL,
 		J17SidecarTimeoutMs:              j17SidecarTimeoutMs,
+		J17SidecarMode:                   j17SidecarMode,
+		J17SidecarCanaryPct:              j17SidecarCanaryPct,
+		J17SidecarConfidenceFloor:        j17SidecarConfidenceFloor,
+		J17NLIScoreOfRecord:              j17NLIScoreOfRecord,
+		J17PrecedentProtectedCodes:       j17PrecedentProtectedCodes,
+		J17PrecedentLogEnabled:           j17PrecedentLogEnabled,
+		J17SidecarCBEnabled:              j17SidecarCBEnabled,
+		J17SidecarCBFailureThreshold:     j17SidecarCBFailureThreshold,
+		J17SidecarCBTimeoutSec:           j17SidecarCBTimeoutSec,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

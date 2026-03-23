@@ -101,6 +101,15 @@ type frontierMatch struct {
 	Similarity float64
 }
 
+// FeedbackDimensions captures multi-dimensional feedback for a guidance item (NS-03).
+// Expands the feedback pipeline from adherence-only to three dimensions.
+type FeedbackDimensions struct {
+	Adherence     GuidanceOutcome `json:"adherence"`
+	Comprehension float64         `json:"comprehension"`
+	Applicability float64         `json:"applicability"`
+	ScoreSource   string          `json:"score_source"` // "heuristic" or "nli"
+}
+
 // GuidanceOutcome represents the outcome of a guidance item.
 type GuidanceOutcome string
 
@@ -129,11 +138,12 @@ type GuidanceFeedbackResponse struct {
 
 // GuidanceItemFeedback records the outcome for a single guidance item.
 type GuidanceItemFeedback struct {
-	Type       GuidanceType    `json:"type"`
-	Content    string          `json:"content"`
-	Outcome    GuidanceOutcome `json:"outcome"`
-	Similarity float64         `json:"similarity"`
-	Reasoning  string          `json:"reasoning,omitempty"` // J14: LLM classification reasoning
+	Type       GuidanceType       `json:"type"`
+	Content    string             `json:"content"`
+	Outcome    GuidanceOutcome    `json:"outcome"`
+	Similarity float64            `json:"similarity"`
+	Reasoning  string             `json:"reasoning,omitempty"`  // J14: LLM classification reasoning
+	Dimensions *FeedbackDimensions `json:"dimensions,omitempty"` // NS-03: multi-dimensional feedback
 }
 
 // ClassificationResult holds the result of semantic outcome classification (J14).

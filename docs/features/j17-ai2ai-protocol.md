@@ -751,7 +751,73 @@ Full research documents:
 
 ---
 
-## 12. Key Implementation Files
+## 12. Cache Policy
+
+J17 sessions bypass the guidance cache when `JIMINY_CACHE_J17_BYPASS=true` (default) and a `SessionID` is present in the request.
+
+**Rationale**: The guidance cache is keyed on `(spaceID, context)`. Without J17 session awareness, two sessions with different trust scores, escalation states, or active constraints could receive identical cached responses. Since J17 trust modulates tier selection and escalation affects content priority, cross-session cache hits would contaminate the control loop with stale or incorrect signals.
+
+**When bypass applies**:
+- `J17_ENABLED=true` AND
+- `JIMINY_CACHE_J17_BYPASS=true` AND
+- Request includes a non-empty `session_id`
+
+**When caching still applies**:
+- Non-J17 sessions (no session ID, or J17 disabled)
+- Explicit opt-in via `JIMINY_CACHE_J17_BYPASS=false` (use only if session-specific encoding is not needed)
+
+**Implementation**: `internal/jiminy/service.go` — the `Guide()` method checks `cfg.JiminyCacheJ17Bypass` and skips both `cache.Get()` and `cache.Put()` when conditions are met.
+
+---
+
+## 13. Deployment Topology
+
+The neural sidecar is designed for **localhost co-deployment** with the MDEMG server process.
+
+```
++------------------+          +-------------------+
+|  MDEMG Server    |  HTTP    |  Neural Sidecar   |
+|  (Go, :9999)     |--------->|  (Python, :8100)  |
+|                  | localhost |                   |
+|  tier_predictor  |          |  /predict-tier    |
+|  nli_scorer      |          |  /nli             |
++------------------+          +-------------------+
+```
+
+### Security Model
+
+| Aspect | Policy | Rationale |
+|--------|--------|-----------|
+| **Transport** | No TLS required | Localhost-only communication; TLS adds latency and complexity without security benefit on loopback |
+| **Authentication** | No auth token | Single-machine deployment; the sidecar is not exposed to the network |
+| **Authorization** | None | The Go caller is the only intended client; all endpoints are read-only (inference) |
+| **Network binding** | Sidecar binds `127.0.0.1:8100` | Never bind `0.0.0.0` in production — exposes ML inference to the network |
+
+### Production Hardening
+
+For multi-machine deployments (not currently supported, but anticipated):
+1. **Network policy**: Restrict sidecar port access to the MDEMG server process only (iptables, k8s NetworkPolicy, or similar)
+2. **TLS**: Add mutual TLS if sidecar is on a different host
+3. **Auth**: Add bearer token validation in sidecar middleware
+4. **Rate limiting**: Add per-client rate limits to prevent inference queue saturation
+
+### Resource Requirements
+
+The sidecar loads ML models into memory at startup:
+- **NLI model** (`cross-encoder/nli-deberta-v3-xsmall`): ~100MB RAM
+- **Tier prediction model** (when trained): ~80MB RAM
+- **Total**: ~200MB RAM, negligible CPU when idle, CPU burst during inference
+
+### Failure Isolation
+
+Sidecar unavailability does not affect MDEMG server functionality:
+- `TierPredictor.PredictTier()` returns `(0, 0)` → rule-based fallback
+- `NLIComprehensionScorer.ScoreComprehension()` returns heuristic score
+- Circuit breaker prevents repeated timeout-induced latency
+
+---
+
+## 14. Key Implementation Files
 
 | File | Purpose |
 |------|---------|
@@ -772,7 +838,7 @@ Full research documents:
 
 ---
 
-## 13. Internal LLM Caller Compression (J17-PC)
+## 15. Internal LLM Caller Compression (J17-PC)
 
 J17's proven compression utilities (`TelegraphicCompress`, `CompactJSON`, `TruncateAtWord`) are applied to the **inputs** of MDEMG's 5 highest-value internal LLM callers. This reduces aggregate token consumption by an estimated 25-35% with zero quality loss, since all compressed sections are pure prose narrative, indented JSON, or redundant instructions.
 
@@ -805,6 +871,81 @@ CompactJSON(v any) string              // Single-line JSON marshaling
 TruncateAtWord(s string, maxLen int)   // Word-boundary truncation + "..."
 CompressSection(s string, maxLen int)  // TelegraphicCompress + TruncateAtWord
 ```
+
+---
+
+## 16. Neural Sidecar Promotion (Shadow to Causal)
+
+The neural sidecar (TierPredictor + NLIComprehensionScorer) follows a four-stage rollout from shadow mode (observe-only) to active mode (ML-driven tier selection). The promotion is governed by the `SidecarArbitrator` — a decision layer between ML predictions and the encoder that controls when and how ML influences actual tier selection.
+
+### Arbitration Modes
+
+| Mode | ML Effect | High-Priority Items | Protected Codes |
+|------|-----------|--------------------|-|
+| **shadow** | None — predictions logged only | Rule-based | Rule-based |
+| **compare** | None — agreement rate tracked | Rule-based | Rule-based |
+| **canary** | Probabilistic routing by `J17_SIDECAR_CANARY_PERCENTAGE` | Always rule-based | Always rule-based |
+| **active** | ML is primary when confidence >= floor | ML (not auto-protected) | Always rule-based |
+
+### Causal Insertion Point
+
+In `Guide()`, the arbitrator runs BEFORE `encoder.Encode()`:
+
+1. For each constraint item, call `tierPredictor.PredictTier()`
+2. Run `arbitrator.ArbitrateTier(item, ruleTier, mlTier, mlConf)`
+3. If source == "ml", pre-assign `item.Tier = chosenTier`
+4. Encoder respects pre-assigned tiers (skips `selectTier()` when `item.Tier` is valid)
+
+### Safety Rails
+
+- **Precedent-protected codes** (`J17_PRECEDENT_PROTECTED_CODES`): constraint codes that NEVER use ML tier in any mode. Violations are audit-logged when `J17_PRECEDENT_LOG_ENABLED=true`.
+- **Confidence floor** (`J17_SIDECAR_CONFIDENCE_FLOOR`): ML predictions below this threshold fall back to rule-based.
+- **Circuit breaker**: Wraps both `PredictTier()` and NLI scorer HTTP calls. On open, returns `(0, 0)` — arbitrator treats as "ML unavailable" and uses rule-based.
+- **High-priority protection** (canary only): Must-level items always use rule-based tier in canary mode.
+
+### Multi-Dimensional Feedback (NS-03)
+
+`RecordOutcome()` now populates `FeedbackDimensions` with three signals:
+
+| Dimension | Source | Fallback |
+|-----------|--------|----------|
+| Adherence | Existing `ClassifyOutcome()` | Always available |
+| Comprehension | NLI scorer (when available) | Heuristic (outcome-based) |
+| Applicability | Outcome-derived (followed=1.0, partial=0.5, ignored/contradicted=0.0) | Always available |
+
+### NLI Score-of-Record (NS-02)
+
+When `J17_NLI_SCORE_OF_RECORD=true` and sidecar mode >= canary, the NLI comprehension score replaces heuristic scoring for protocol metrics. The heuristic score is still recorded in `FeedbackDimensions` for dual-write comparison.
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `J17_SIDECAR_MODE` | `shadow` | Arbitration mode: shadow, compare, canary, active |
+| `J17_SIDECAR_CANARY_PERCENTAGE` | `100` | % of eligible requests routed to ML in canary mode |
+| `J17_SIDECAR_CONFIDENCE_FLOOR` | `0.6` | ML confidence below this falls back to rule-based |
+| `J17_NLI_SCORE_OF_RECORD` | `false` | Use NLI as comprehension score-of-record |
+| `J17_PRECEDENT_PROTECTED_CODES` | `""` | Comma-separated codes that never use ML tier |
+| `J17_PRECEDENT_LOG_ENABLED` | `true` | Audit log for protected code ML attempts |
+| `J17_SIDECAR_CB_ENABLED` | `true` | Enable circuit breaker for sidecar calls |
+| `J17_SIDECAR_CB_FAILURE_THRESHOLD` | `3` | Failures before circuit opens |
+| `J17_SIDECAR_CB_TIMEOUT_SEC` | `15` | Seconds before half-open probe |
+
+### Staged Rollout
+
+See `docs/specs/neural-sidecar-rollout-plan.md` for the full 4-stage rollout plan with entry/exit gates, ramp schedules, and automatic demotion triggers.
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `internal/jiminy/sidecar_arbitrator.go` | Arbitration layer (mode logic, protected codes) |
+| `internal/jiminy/sidecar_arbitrator_test.go` | 20 test cases across all modes |
+| `internal/jiminy/tier_predictor.go` | HTTP client + circuit breaker for sidecar |
+| `internal/jiminy/nli_comprehension.go` | NLI scorer + circuit breaker |
+| `internal/jiminy/protocol_metrics.go` | Sidecar telemetry (agreement/override/latency) |
+| `internal/jiminy/protocol_data_collector.go` | Expanded training records |
+| `internal/config/config.go` | 9 new J17-NS config vars |
 
 ---
 
@@ -847,4 +988,14 @@ CompressSection(s string, maxLen int)  // TelegraphicCompress + TruncateAtWord
 - `internal/guardrail/prompt.go` -- lint fix (WriteString → Fprintf)
 - `.claude/hooks/session-start.sh` -- cold-start bootstrap fallback
 - `.env.example` -- 3 new config variables (JIMINY_CACHE_J17_BYPASS, J17_SIDECAR_URL, J17_SIDECAR_TIMEOUT_MS)
+- `internal/jiminy/sidecar_arbitrator.go` -- NS-01/NS-10: Arbitration layer (shadow/compare/canary/active modes, protected codes)
+- `internal/jiminy/sidecar_arbitrator_test.go` -- 20 test cases for arbitrator
+- `internal/jiminy/types.go` -- NS-03: FeedbackDimensions struct
+- `internal/jiminy/protocol_data_collector.go` -- NS-14: Expanded training record with ML fields
+- `internal/jiminy/protocol_metrics.go` -- NS-07: SidecarMetrics, RecordSidecarCall
+- `internal/config/config.go` -- 9 new J17-NS config vars (sidecar mode, canary, CB, protected codes)
+- `docs/specs/neural-sidecar-contract-v1.md` -- NS-04: Sidecar API contract
+- `docs/specs/neural-sidecar-ml-objectives.md` -- NS-05: ML objective function
+- `docs/specs/neural-sidecar-benchmark-protocol.md` -- NS-13: Benchmark protocol
+- `docs/specs/neural-sidecar-rollout-plan.md` -- NS-15: Staged rollout plan
 - `docs/api/api-spec/uats/specs/j17_metrics.uats.json` -- code_coverage assertion

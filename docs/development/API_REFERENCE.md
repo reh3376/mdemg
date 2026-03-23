@@ -1411,6 +1411,20 @@ Request constraint code re-generation when an existing code is ambiguous or caus
 
 **Config**: `J17_ENABLED`, `J17_CODEGEN_ENABLED`, `J17_CODEGEN_PROVIDER`, `J17_CODEGEN_MODEL`.
 
+**Neural Sidecar Promotion Config** (9 vars):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `J17_SIDECAR_MODE` | `shadow` | Arbitration mode: shadow/compare/canary/active |
+| `J17_SIDECAR_CANARY_PERCENTAGE` | `100` | ML routing % in canary mode |
+| `J17_SIDECAR_CONFIDENCE_FLOOR` | `0.6` | ML confidence floor for tier acceptance |
+| `J17_NLI_SCORE_OF_RECORD` | `false` | NLI replaces heuristic comprehension in canary/active |
+| `J17_PRECEDENT_PROTECTED_CODES` | `""` | Constraint codes immune to ML tier selection |
+| `J17_PRECEDENT_LOG_ENABLED` | `true` | Audit log for protected code ML attempts |
+| `J17_SIDECAR_CB_ENABLED` | `true` | Circuit breaker for sidecar calls |
+| `J17_SIDECAR_CB_FAILURE_THRESHOLD` | `3` | Failures before circuit opens |
+| `J17_SIDECAR_CB_TIMEOUT_SEC` | `15` | Half-open probe delay (seconds) |
+
 ### Hook Distribution (J6b-J6e)
 
 Jiminy hooks can be installed into Claude Code projects via the CLI:

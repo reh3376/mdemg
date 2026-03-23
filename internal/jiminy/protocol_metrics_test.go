@@ -1,6 +1,7 @@
 package jiminy
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -173,5 +174,49 @@ func TestProtocolMetrics_T2FrequencyTracksUncodedByNodeID(t *testing.T) {
 	if snapshot.T2FrequencyByConstraint["node-abc-123"] != 2 {
 		t.Errorf("T2 frequency for uncoded node = %d, want 2",
 			snapshot.T2FrequencyByConstraint["node-abc-123"])
+	}
+}
+
+// NS-07: Sidecar metrics tests
+
+func TestProtocolMetrics_SidecarMetrics(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// Record some sidecar calls
+	c.RecordSidecarCall(15.0, nil, 1, 1, false)            // agreement, no override
+	c.RecordSidecarCall(20.0, nil, 2, 1, true)             // override
+	c.RecordSidecarCall(0, fmt.Errorf("timeout"), 0, 1, false) // error
+
+	snap := c.Snapshot()
+	if snap.Sidecar == nil {
+		t.Fatal("expected sidecar metrics in snapshot")
+	}
+	if snap.Sidecar.Requests != 3 {
+		t.Errorf("requests = %d, want 3", snap.Sidecar.Requests)
+	}
+	if snap.Sidecar.Errors != 1 {
+		t.Errorf("errors = %d, want 1", snap.Sidecar.Errors)
+	}
+	// Agreement: 1 out of 3 (error doesn't set agreement, mismatched tiers don't either)
+	expectedAgreementRate := 1.0 / 3.0
+	if snap.Sidecar.AgreementRate < expectedAgreementRate-0.01 || snap.Sidecar.AgreementRate > expectedAgreementRate+0.01 {
+		t.Errorf("agreement rate = %f, want ~%f", snap.Sidecar.AgreementRate, expectedAgreementRate)
+	}
+	// Override: 1 out of 3
+	expectedOverrideRate := 1.0 / 3.0
+	if snap.Sidecar.OverrideRate < expectedOverrideRate-0.01 || snap.Sidecar.OverrideRate > expectedOverrideRate+0.01 {
+		t.Errorf("override rate = %f, want ~%f", snap.Sidecar.OverrideRate, expectedOverrideRate)
+	}
+	// Avg latency: (15+20+0)/3 ≈ 11.67 ms
+	if snap.Sidecar.AvgLatencyMs < 11.0 || snap.Sidecar.AvgLatencyMs > 12.0 {
+		t.Errorf("avg latency = %f ms, want ~11.67", snap.Sidecar.AvgLatencyMs)
+	}
+}
+
+func TestProtocolMetrics_SidecarMetricsNilWhenNoCalls(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	snap := c.Snapshot()
+	if snap.Sidecar != nil {
+		t.Errorf("expected sidecar metrics to be nil when no calls recorded, got %+v", snap.Sidecar)
 	}
 }

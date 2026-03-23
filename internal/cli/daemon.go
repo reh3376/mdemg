@@ -489,6 +489,22 @@ func runStatus() error {
 		fmt.Println("  Neo4j:     docker not available")
 	}
 
+	// J17 Sidecar status (if configured)
+	if cfgErr == nil && cfg.J17SidecarURL != "" {
+		sidecarClient := &http.Client{Timeout: 1 * time.Second}
+		resp, err := sidecarClient.Get(cfg.J17SidecarURL + "/health")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				fmt.Printf("  Sidecar:   available (%s, mode=%s)\n", cfg.J17SidecarURL, cfg.J17SidecarMode)
+			} else {
+				fmt.Printf("  Sidecar:   unavailable (status %d)\n", resp.StatusCode)
+			}
+		} else {
+			fmt.Printf("  Sidecar:   unreachable (%s)\n", cfg.J17SidecarURL)
+		}
+	}
+
 	return nil
 }
 

@@ -16,6 +16,7 @@ type ProtocolMetrics struct {
 	TicketRestoreSuccessRate float64            `json:"ticket_restore_success_rate"`
 	CodeCoverage             float64            `json:"code_coverage"`
 	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
+	Sidecar                  *SidecarMetrics    `json:"sidecar_metrics,omitempty"` // NS-07
 	WindowStart              time.Time          `json:"window_start"`
 	WindowEnd                time.Time          `json:"window_end"`
 	TotalEvents              int64              `json:"total_events"`
@@ -52,6 +53,14 @@ type ProtocolMetricsCollector struct {
 	constraintTotal    int64
 	constraintWithCode int64
 
+	// NS-07: Sidecar telemetry
+	sidecarRequests   int64
+	sidecarErrors     int64
+	sidecarTimeouts   int64
+	sidecarAgreements int64
+	sidecarOverrides  int64
+	sidecarLatencySum int64 // nanoseconds
+
 	// Window tracking
 	windowStart time.Time
 }
@@ -63,6 +72,37 @@ func NewProtocolMetricsCollector() *ProtocolMetricsCollector {
 		codeTotal:    make(map[string]int),
 		t2Frequency:  make(map[string]int),
 		windowStart:  time.Now(),
+	}
+}
+
+// SidecarMetrics is an immutable snapshot of sidecar telemetry (NS-07).
+type SidecarMetrics struct {
+	Requests      int64   `json:"requests"`
+	Errors        int64   `json:"errors"`
+	Timeouts      int64   `json:"timeouts"`
+	AgreementRate float64 `json:"agreement_rate"`
+	OverrideRate  float64 `json:"override_rate"`
+	AvgLatencyMs  float64 `json:"avg_latency_ms"`
+}
+
+// RecordSidecarCall records a sidecar prediction call for telemetry (NS-07).
+func (c *ProtocolMetricsCollector) RecordSidecarCall(latencyMs float64, err error, mlTier int, ruleTier int, overridden bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.sidecarRequests++
+	c.sidecarLatencySum += int64(latencyMs * 1e6) // convert ms to ns
+
+	if err != nil {
+		c.sidecarErrors++
+		return
+	}
+
+	if mlTier == ruleTier {
+		c.sidecarAgreements++
+	}
+	if overridden {
+		c.sidecarOverrides++
 	}
 }
 
@@ -207,6 +247,23 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		t2Freq[k] = v
 	}
 
+	// NS-07: Compute sidecar metrics
+	var sidecar *SidecarMetrics
+	if c.sidecarRequests > 0 {
+		var agreementRate, overrideRate, avgLatencyMs float64
+		agreementRate = float64(c.sidecarAgreements) / float64(c.sidecarRequests)
+		overrideRate = float64(c.sidecarOverrides) / float64(c.sidecarRequests)
+		avgLatencyMs = float64(c.sidecarLatencySum) / float64(c.sidecarRequests) / 1e6 // ns to ms
+		sidecar = &SidecarMetrics{
+			Requests:      c.sidecarRequests,
+			Errors:        c.sidecarErrors,
+			Timeouts:      c.sidecarTimeouts,
+			AgreementRate: agreementRate,
+			OverrideRate:  overrideRate,
+			AvgLatencyMs:  avgLatencyMs,
+		}
+	}
+
 	return &ProtocolMetrics{
 		TierDistribution:         tierDist,
 		AvgTokensPerGuidance:     avgTokens,
@@ -217,6 +274,7 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		TicketRestoreSuccessRate: ticketRate,
 		CodeCoverage:             codeCoverage,
 		T2FrequencyByConstraint:  t2Freq,
+		Sidecar:                  sidecar,
 		WindowStart:              c.windowStart,
 		WindowEnd:                now,
 		TotalEvents:              c.totalEvents,
@@ -241,5 +299,11 @@ func (c *ProtocolMetricsCollector) Reset() {
 	c.constraintTotal = 0
 	c.constraintWithCode = 0
 	c.t2Frequency = make(map[string]int)
+	c.sidecarRequests = 0
+	c.sidecarErrors = 0
+	c.sidecarTimeouts = 0
+	c.sidecarAgreements = 0
+	c.sidecarOverrides = 0
+	c.sidecarLatencySum = 0
 	c.windowStart = time.Now()
 }
