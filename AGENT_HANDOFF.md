@@ -29,6 +29,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - 16 sidecar phases (S0-S16) — ALL COMPLETE
 - 5 cognitive gap phases (101-105) — ALL GAPS CLOSED
 - Phase J17: AI-to-AI Communication Protocol — COMPLETE (5 sub-phases, 3-tier encoding, trust scoring, ML tier prediction)
+- Phase J17-PC: J17 Prompt Compression — COMPLETE (5 LLM callers optimized, 5 config vars, 14 new tests)
 - Phase RSIC-SK1: Jiminy Guidance Self-Calibration — COMPLETE (3 gap closures, 3 new RSIC actions, pattern #15, SignalLearner wiring)
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1+ verified)
 - Quality hardening — COMPLETE (282+ UATS specs, 148 Go test files, 0 lint issues)
@@ -302,6 +303,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | J7-J12 | Cognitive Guidance | ✅ | `docs/features/jiminy-inner-voice.md` §J7-J12 |
 | J16 | Full-Context Input | ✅ | Removed input truncation (200K default), fixed cache key collisions, 30s timeouts. Config: `JIMINY_GUIDANCE_CONTEXT_MAX_CHARS`, `JIMINY_GUIDANCE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_ITEM_MAX_CHARS` |
 | J17 | AI-to-AI Communication Protocol | ✅ | `docs/features/j17-ai2ai-protocol.md` |
+| J17-PC | J17 Prompt Compression | ✅ | `docs/features/j17-prompt-compression.md` |
 | J-Init | Init Wizard + Installers | ✅ | `internal/cli/init.go`, `internal/config/yaml_config.go`, `.goreleaser.yaml` |
 | S8 | Distribution Pipeline | ✅ | `docs/sidecar/roadmap.md` §S8 |
 | S9 | Beta + Public | ✅ | `docs/sidecar/roadmap.md` §S9 |

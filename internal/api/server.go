@@ -334,14 +334,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var synth consulting.Synthesizer
 	if cfg.SynthesisEnabled {
 		synthCfg := consulting.SynthesisConfig{
-			Enabled:   true,
-			Provider:  cfg.SynthesisProvider,
-			Model:     cfg.SynthesisModel,
-			MaxTokens: cfg.SynthesisMaxTokens,
-			TimeoutMs: cfg.SynthesisTimeoutMs,
-			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.EffectiveLLMEndpoint(),
-			OllamaURL: cfg.OllamaEndpoint,
+			Enabled:         true,
+			Provider:        cfg.SynthesisProvider,
+			Model:           cfg.SynthesisModel,
+			MaxTokens:       cfg.SynthesisMaxTokens,
+			TimeoutMs:       cfg.SynthesisTimeoutMs,
+			OpenAIKey:       cfg.OpenAIAPIKey,
+			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
+			OllamaURL:       cfg.OllamaEndpoint,
+			CompressPrompts: cfg.SynthesisCompress,
 		}
 		synth = consulting.NewLLMSynthesizer(synthCfg, cbRegistry)
 		log.Printf("SME Synthesis enabled (provider: %s, model: %s, maxTokens: %d)",
@@ -391,6 +392,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			// F20: Authority Level Filtering
 			ConstraintAuthorityEnabled: cfg.ConstraintAuthorityEnabled,
 			ConstraintDefaultAuthority: cfg.ConstraintDefaultAuthority,
+			CompressPrompts:            cfg.GuardrailCompress,
 		}
 		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
 		log.Printf("Active MCP Guardrails enabled (provider: %s, model: %s, maxConstraints: %d)",
@@ -647,14 +649,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Phase AR-3: Wire LLM-powered reflector if enabled
 	if cfg.RSICLLMReflectEnabled {
 		llmReflector := ape.NewLLMReflector(ape.LLMReflectorConfig{
-			Enabled:   true,
-			Provider:  cfg.RSICLLMReflectProvider,
-			Model:     cfg.RSICLLMReflectModel,
-			MaxTokens: cfg.EmergenceMaxTokens,
-			TimeoutMs: cfg.EmergenceTimeoutMs,
-			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.OpenAIEndpoint,
-			OllamaURL: cfg.OllamaEndpoint,
+			Enabled:         true,
+			Provider:        cfg.RSICLLMReflectProvider,
+			Model:           cfg.RSICLLMReflectModel,
+			MaxTokens:       cfg.EmergenceMaxTokens,
+			TimeoutMs:       cfg.EmergenceTimeoutMs,
+			OpenAIKey:       cfg.OpenAIAPIKey,
+			OpenAIURL:       cfg.OpenAIEndpoint,
+			OllamaURL:       cfg.OllamaEndpoint,
+			CompressPrompts: cfg.RSICLLMReflectCompress,
 		}, cbRegistry, rsicCalibrator)
 		rsicReflector.SetLLMReflector(llmReflector)
 		log.Printf("RSIC LLM reflection enabled (provider: %s, model: %s)", cfg.RSICLLMReflectProvider, cfg.RSICLLMReflectModel)

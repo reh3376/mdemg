@@ -466,7 +466,7 @@ func TestBuildEvalPrompt_IncludesConstraintDetails(t *testing.T) {
 		Keywords:      []string{},
 	}
 
-	prompt := buildEvalPrompt(diffCtx, constraints)
+	prompt := buildEvalPrompt(diffCtx, constraints, false)
 
 	checks := []struct {
 		label string
@@ -506,7 +506,7 @@ func TestBuildEvalPrompt_TruncatesDiffTo3000(t *testing.T) {
 		{NodeID: "c-999", ConstraintType: "must"},
 	}
 
-	prompt := buildEvalPrompt(diffCtx, constraints)
+	prompt := buildEvalPrompt(diffCtx, constraints, false)
 
 	// The diff section between the ``` fences should be <= 3000 chars + "...".
 	// We verify this by checking that the total prompt length is bounded
@@ -533,7 +533,7 @@ func TestBuildEvalPrompt_MultipleConstraints(t *testing.T) {
 		RemovedLines: []string{},
 	}
 
-	prompt := buildEvalPrompt(diffCtx, constraints)
+	prompt := buildEvalPrompt(diffCtx, constraints, false)
 
 	if !strings.Contains(prompt, "c-A") {
 		t.Error("prompt missing constraint c-A")
@@ -970,5 +970,82 @@ func TestRebuildDiff_OnlyRemoved(t *testing.T) {
 	got := rebuildDiff(ctx)
 	if got != "-removed\n" {
 		t.Errorf("rebuildDiff = %q, want %q", got, "-removed\n")
+	}
+}
+
+// ============================================================
+// buildEvalPrompt compressed mode tests
+// ============================================================
+
+func TestBuildEvalPrompt_Compressed(t *testing.T) {
+	diffCtx := DiffContext{
+		FilePaths:  []string{"main.go"},
+		AddedLines: []string{"fmt.Println(secret)"},
+	}
+	constraints := []constraintMatch{
+		{NodeID: "c-1", Name: "no-secrets", ConstraintType: "must_not", Content: "Never log secrets", Confidence: 0.92},
+	}
+
+	prompt := buildEvalPrompt(diffCtx, constraints, true)
+
+	// Compressed mode uses pipe-separated format with conf:
+	if !strings.Contains(prompt, "|") {
+		t.Error("compressed prompt should use pipe-separated format")
+	}
+	if !strings.Contains(prompt, "conf:") {
+		t.Error("compressed prompt should include 'conf:' confidence label")
+	}
+}
+
+func TestBuildEvalPrompt_Compressed_ShorterOutput(t *testing.T) {
+	diffCtx := DiffContext{
+		FilePaths:     []string{"auth.go", "handler.go"},
+		FunctionNames: []string{"Login", "Validate"},
+		AddedLines:    []string{"password := input", "db.Exec(query)"},
+		RemovedLines:  []string{"// old code"},
+	}
+	constraints := []constraintMatch{
+		{NodeID: "c-1", Name: "no-raw-sql", ConstraintType: "must_not", Content: "Never use raw SQL strings; always use parameterised queries.", Confidence: 0.95},
+		{NodeID: "c-2", Name: "prefer-structured-logs", ConstraintType: "should", Content: "Use structured logging instead of fmt.Println for all log output.", Confidence: 0.7},
+	}
+
+	compressed := buildEvalPrompt(diffCtx, constraints, true)
+	uncompressed := buildEvalPrompt(diffCtx, constraints, false)
+
+	if len(compressed) >= len(uncompressed) {
+		t.Errorf("compressed prompt (%d chars) should be shorter than uncompressed (%d chars)", len(compressed), len(uncompressed))
+	}
+}
+
+func TestBuildEvalPrompt_Compressed_DiffVerbatim(t *testing.T) {
+	diffCtx := DiffContext{
+		AddedLines:   []string{"+password := getInput()"},
+		RemovedLines: []string{"-// placeholder"},
+	}
+	constraints := []constraintMatch{
+		{NodeID: "c-1", ConstraintType: "must", Content: "test constraint", Confidence: 0.8},
+	}
+
+	compressed := buildEvalPrompt(diffCtx, constraints, true)
+	uncompressed := buildEvalPrompt(diffCtx, constraints, false)
+
+	// Extract the diff block from both prompts — should be identical
+	extractDiffBlock := func(prompt string) string {
+		start := strings.Index(prompt, "```diff\n")
+		end := strings.LastIndex(prompt, "\n```")
+		if start < 0 || end < 0 {
+			return ""
+		}
+		return prompt[start : end+4]
+	}
+
+	compressedDiff := extractDiffBlock(compressed)
+	uncompressedDiff := extractDiffBlock(uncompressed)
+
+	if compressedDiff == "" {
+		t.Fatal("compressed prompt should contain a ```diff block")
+	}
+	if compressedDiff != uncompressedDiff {
+		t.Errorf("diff block should be identical in both modes.\ncompressed:   %q\nuncompressed: %q", compressedDiff, uncompressedDiff)
 	}
 }

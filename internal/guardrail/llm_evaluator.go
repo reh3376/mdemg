@@ -60,7 +60,7 @@ type guardrailOllamaGenerateResponse struct {
 
 // evaluateWithLLM dispatches to OpenAI or Ollama for constraint evaluation.
 func (g *GuardrailService) evaluateWithLLM(ctx context.Context, diffCtx DiffContext, constraints []constraintMatch) (*llmEvalResult, error) {
-	prompt := buildEvalPrompt(diffCtx, constraints)
+	prompt := buildEvalPrompt(diffCtx, constraints, g.cfg.CompressPrompts)
 
 	var rawJSON string
 	var err error
@@ -123,10 +123,15 @@ func (g *GuardrailService) doEvaluateWithOpenAI(ctx context.Context, prompt stri
 		maxTokens = 2000 // Reasoning models consume tokens for internal thought
 	}
 
+	sysPrompt := guardrailSystemPrompt
+	if g.cfg.CompressPrompts {
+		sysPrompt = guardrailSystemPromptCompact
+	}
+
 	reqBody := guardrailOpenAIChatRequest{
 		Model: g.cfg.Model,
 		Messages: []guardrailOpenAIMessage{
-			{Role: "system", Content: guardrailSystemPrompt},
+			{Role: "system", Content: sysPrompt},
 			{Role: "user", Content: prompt},
 		},
 		MaxTokens: maxTokens,
@@ -189,7 +194,11 @@ func (g *GuardrailService) evaluateWithOllama(ctx context.Context, prompt string
 
 func (g *GuardrailService) doEvaluateWithOllama(ctx context.Context, prompt string) (string, error) {
 	// Combine system prompt + user prompt for Ollama (no chat endpoint)
-	fullPrompt := guardrailSystemPrompt + "\n\n" + prompt
+	sysPrompt := guardrailSystemPrompt
+	if g.cfg.CompressPrompts {
+		sysPrompt = guardrailSystemPromptCompact
+	}
+	fullPrompt := sysPrompt + "\n\n" + prompt
 
 	reqBody := guardrailOllamaGenerateRequest{
 		Model:  g.cfg.Model,

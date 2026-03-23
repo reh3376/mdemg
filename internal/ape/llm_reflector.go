@@ -11,19 +11,21 @@ import (
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
 )
 
 // LLMReflectorConfig holds configuration for the LLM reflector.
 type LLMReflectorConfig struct {
-	Enabled   bool
-	Provider  string // "openai" or "ollama"
-	Model     string
-	MaxTokens int
-	TimeoutMs int
-	OpenAIKey string
-	OpenAIURL string
-	OllamaURL string
+	Enabled        bool
+	Provider       string // "openai" or "ollama"
+	Model          string
+	MaxTokens      int
+	TimeoutMs      int
+	OpenAIKey      string
+	OpenAIURL      string
+	OllamaURL      string
+	CompressPrompts bool // J17-PC: compress reflection prompts to reduce tokens
 }
 
 // LLMReflector sends assessment data and cycle history to an LLM for pattern detection.
@@ -152,11 +154,16 @@ func (lr *LLMReflector) Reflect(ctx context.Context, report *SelfAssessmentRepor
 
 func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 	var sb strings.Builder
+	compress := lr.cfg.CompressPrompts
 
-	// Current assessment
-	reportJSON, _ := json.MarshalIndent(report, "", "  ")
+	// Current assessment — compact JSON saves ~40% tokens vs indented
 	sb.WriteString("## Current Assessment\n")
-	sb.Write(reportJSON)
+	if compress {
+		sb.WriteString(encoding.CompactJSON(report))
+	} else {
+		reportJSON, _ := json.MarshalIndent(report, "", "  ")
+		sb.Write(reportJSON)
+	}
 	sb.WriteString("\n\n")
 
 	// Recent cycle history (last 5)
@@ -175,7 +182,11 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 					fmt.Fprintf(&sb, "- Metrics after: %v\n", h.MetricsAfter)
 				}
 				if len(h.CriteriaDetail) > 0 {
-					fmt.Fprintf(&sb, "- Criteria detail: %v\n", h.CriteriaDetail)
+					detail := fmt.Sprintf("%v", h.CriteriaDetail)
+					if compress {
+						detail = encoding.TruncateAtWord(detail, 200)
+					}
+					fmt.Fprintf(&sb, "- Criteria detail: %s\n", detail)
 				}
 				sb.WriteString("\n")
 			}

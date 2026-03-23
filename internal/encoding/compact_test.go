@@ -109,3 +109,71 @@ func TestCodedEncoder(t *testing.T) {
 		t.Errorf("Name() = %q, want 'coded'", enc.Name())
 	}
 }
+
+func TestCompactJSON(t *testing.T) {
+	type sample struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	got := CompactJSON(sample{Name: "test", Value: 42})
+	if strings.Contains(got, "\n") {
+		t.Errorf("CompactJSON should produce single-line JSON, got: %s", got)
+	}
+	if got != `{"name":"test","value":42}` {
+		t.Errorf("unexpected JSON: %s", got)
+	}
+
+	// Nil/invalid input
+	got = CompactJSON(make(chan int))
+	if got != "{}" {
+		t.Errorf("expected {} for unmarshalable input, got: %s", got)
+	}
+}
+
+func TestTruncateAtWord(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{"short", "hello", 10, "hello"},
+		{"exact", "hello", 5, "hello"},
+		{"truncate at word", "hello world foo bar", 15, "hello world..."},
+		{"very short max", "hello world", 3, "hel"},
+		{"no spaces", "abcdefghijklmnop", 10, "abcdefg..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateAtWord(tt.input, tt.maxLen)
+			if got != tt.want {
+				t.Errorf("TruncateAtWord(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
+			}
+			if len(got) > tt.maxLen {
+				t.Errorf("result length %d exceeds maxLen %d", len(got), tt.maxLen)
+			}
+		})
+	}
+}
+
+func TestCompressSection(t *testing.T) {
+	input := "This is a very long summary that should be compressed by removing stop words and then truncated to the specified maximum length"
+	result := CompressSection(input, 50)
+
+	if len(result) > 50 {
+		t.Errorf("CompressSection result length %d exceeds maxLen 50", len(result))
+	}
+
+	// Should not contain common stop words
+	if strings.Contains(result, " is ") || strings.Contains(result, " a ") {
+		t.Errorf("CompressSection should remove stop words, got: %s", result)
+	}
+
+	// Short input should pass through unchanged (after telegraphic compression)
+	short := CompressSection("error found", 100)
+	if strings.Contains(short, "...") {
+		t.Errorf("short input should not be truncated, got: %s", short)
+	}
+}

@@ -317,7 +317,7 @@ func TestClassifyPromptBuild(t *testing.T) {
 		Content:     "Must use OAuth2",
 		SourceNodes: []string{"c1"},
 	}
-	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65)
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false)
 
 	if !strings.Contains(prompt, "constraint") {
 		t.Error("prompt should contain guidance type")
@@ -556,5 +556,53 @@ func TestEvalCacheKey_FullOutputHash(t *testing.T) {
 	k2 := evalCacheKey(base+"OUTPUT_B", "c1")
 	if k1 == k2 {
 		t.Error("eval cache keys should differ for different outputs even with shared prefix")
+	}
+}
+
+func TestClassifyPromptBuild_Compressed_NoTaskSection(t *testing.T) {
+	item := GuidanceItem{
+		Type:        GuidanceConstraint,
+		Priority:    "high",
+		Content:     "Must use OAuth2",
+		SourceNodes: []string{"c1"},
+	}
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, true)
+
+	if strings.Contains(prompt, "## Task") {
+		t.Error("compressed prompt should NOT contain '## Task' section")
+	}
+}
+
+func TestClassifyPromptBuild_Compressed_ContentTruncated(t *testing.T) {
+	longContent := strings.Repeat("word ", 100) // ~500 chars
+	item := GuidanceItem{
+		Type:        GuidanceConstraint,
+		Priority:    "high",
+		Content:     longContent,
+		SourceNodes: []string{"c1"},
+	}
+	prompt := buildClassifyPrompt(item, "some action", 0.5, true)
+
+	// The full 500-char content should NOT appear verbatim
+	if strings.Contains(prompt, longContent) {
+		t.Error("compressed prompt should truncate content longer than 300 chars")
+	}
+	// Should contain a truncated version
+	if !strings.Contains(prompt, "...") {
+		t.Error("truncated content should end with '...'")
+	}
+}
+
+func TestClassifyPromptBuild_BackwardCompat(t *testing.T) {
+	item := GuidanceItem{
+		Type:        GuidanceConstraint,
+		Priority:    "high",
+		Content:     "Must use OAuth2",
+		SourceNodes: []string{"c1"},
+	}
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false)
+
+	if !strings.Contains(prompt, "## Task") {
+		t.Error("uncompressed prompt should contain '## Task' section")
 	}
 }
