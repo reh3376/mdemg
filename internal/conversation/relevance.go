@@ -227,6 +227,14 @@ func getTypeImportance(obsType ObservationType) float64 {
 		return 0.75 // Valuable discovery
 	case ObsTypeTask:
 		return 0.8 // Task tracking
+	case ObsTypeConstraint:
+		return 0.9 // Highest priority rules
+	case ObsTypeSelfImprovement:
+		return 0.55 // RSIC cycle data
+	case ObsTypeNote:
+		return 0.5 // Free-form memos
+	case ObsTypeContextSignal:
+		return 0.2 // Background telemetry
 	default:
 		return 0.5 // Unknown type
 	}
@@ -273,7 +281,7 @@ func ClassifyTier(score float64) Tier {
 // TierFromType determines initial tier based on observation type
 func TierFromType(obsType ObservationType) Tier {
 	switch obsType {
-	case ObsTypeCorrection, ObsTypeError, ObsTypeBlocker:
+	case ObsTypeCorrection, ObsTypeError, ObsTypeBlocker, ObsTypeConstraint:
 		return TierCritical
 	case ObsTypeDecision, ObsTypeTask, ObsTypeInsight:
 		return TierImportant

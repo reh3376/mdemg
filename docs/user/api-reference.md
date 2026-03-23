@@ -1233,7 +1233,7 @@ Capture a conversation observation with surprise detection.
   "space_id": "mdemg-dev",             // required
   "session_id": "claude-core",          // required
   "content": "User prefers Go over Python for CLI tools", // required
-  "obs_type": "preference",             // required: decision | learning | preference | correction | error | progress
+  "obs_type": "preference",             // required: decision | learning | preference | correction | error | progress | task | technical_note | insight | context | blocker | context_signal | note | constraint | self_improvement
   "tags": ["language", "cli"],           // optional
   "metadata": {},                        // optional: arbitrary metadata
   "user_id": "user-123",                // optional: multi-user support
@@ -1815,6 +1815,60 @@ curl -s "http://localhost:9999/v1/guardrail/events?space_id=demo"
 Proactive guidance for AI agents -- surfaces constraints, prior corrections, contradictions, and frontier knowledge relevant to the current context. Acts as an "inner voice" that reviews what the agent is about to do and injects domain-specific warnings before mistakes happen.
 
 Jiminy must be explicitly enabled via `JIMINY_ENABLED=true`. When disabled, all endpoints return `503 Service Unavailable`.
+
+### GET /v1/jiminy/healthz
+
+Lightweight liveness check for the Jiminy subsystem. Returns immediately.
+
+**Response (200):**
+```json
+{ "status": "ok", "enabled": true }
+```
+
+**Response (503 — Jiminy disabled):**
+```json
+{ "status": "disabled", "enabled": false }
+```
+
+```bash
+curl -s http://localhost:9999/v1/jiminy/healthz
+```
+
+---
+
+### GET /v1/jiminy/ready
+
+Comprehensive readiness check. Reports feature flags, sub-service availability, and configuration. Append `?stats=true&space_id=<id>` to include guidance effectiveness stats and J17 protocol metrics.
+
+**Response (200):**
+```json
+{
+  "status": "ready",
+  "enabled": true,
+  "features": {
+    "synthesis": true, "evaluate_llm": false, "outcome_llm": false,
+    "outcome_classifier": true, "escalation": true, "persistence": false,
+    "cache": true, "j17": true
+  },
+  "services": {
+    "evaluator": "available", "sequence_tracker": "available",
+    "ticket_manager": "available", "protocol_metrics": "available"
+  },
+  "config": {
+    "timeout_ms": 30000, "max_items": 10, "min_confidence": 0.3
+  }
+}
+```
+
+**Query Parameters:** `stats` (optional, `true` to include stats), `space_id` (optional, defaults to `mdemg-dev`)
+
+**Status Codes:** `200 OK`, `503 Service Unavailable` (Jiminy disabled)
+
+```bash
+curl -s "http://localhost:9999/v1/jiminy/ready?stats=true&space_id=mdemg-dev"
+```
+
+---
 
 ### POST /v1/jiminy/guide
 
@@ -2776,7 +2830,7 @@ Lightweight estimation of what an export would contain, without transferring dat
   "estimated_observations": 30,
   "estimated_symbols": 0,
   "filters_applied": {
-    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference"],
+    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference", "constraint"],
     "exclude_volatile": true,
     "only_pinned": false,
     "min_layer": 0,

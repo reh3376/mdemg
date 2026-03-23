@@ -1474,6 +1474,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/meta-learn", s.handleMetaLearn)
 
 	// Phase Jiminy: Jiminy Guidance
+	mux.HandleFunc("/v1/jiminy/healthz", s.handleJiminyHealthz)
+	mux.HandleFunc("/v1/jiminy/ready", s.handleJiminyReady)
 	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
 	mux.HandleFunc("/v1/jiminy/feedback", s.handleJiminyFeedback)
 	mux.HandleFunc("/v1/jiminy/evaluate", s.handleJiminyEvaluate) // J9

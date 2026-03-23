@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
 )
 
@@ -229,7 +230,7 @@ func TestContextCoolerGraduation(t *testing.T) {
 	defer cleanupTestData(t, ctx, driver)
 
 	svc := NewServiceWithConfig(driver, setupMockEmbedder(), testVectorIndex)
-	cooler := NewContextCooler(driver)
+	cooler := NewContextCooler(driver, config.Config{})
 
 	// Create a volatile observation
 	obs, err := svc.Observe(ctx, ObserveRequest{
@@ -554,7 +555,7 @@ func TestFullConversationFlow(t *testing.T) {
 	defer cleanupTestData(t, ctx, driver)
 
 	svc := NewServiceWithConfig(driver, setupMockEmbedder(), testVectorIndex)
-	cooler := NewContextCooler(driver)
+	cooler := NewContextCooler(driver, config.Config{})
 
 	sessionID := "session-e2e-flow"
 
