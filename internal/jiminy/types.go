@@ -143,6 +143,14 @@ type ClassificationResult struct {
 	Reasoning  string          `json:"reasoning,omitempty"`
 }
 
+// --- RSIC-SK1: SignalLearnerProvider interface ---
+
+// SignalLearnerProvider abstracts ape.SignalLearner for Jiminy to avoid circular imports.
+type SignalLearnerProvider interface {
+	RecordEmission(code string)
+	RecordResponse(code string)
+}
+
 // --- J7: RetrievalProvider interface ---
 
 // RetrievalProvider defines the interface for accessing the full retrieval pipeline.

@@ -402,6 +402,14 @@ type Config struct {
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
 	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
 	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+
+	// RSIC-SK1: Guidance self-calibration
+	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
+	RSICGuidanceMinSurfaces        int     // RSIC_GUIDANCE_MIN_SURFACES — min surfaces before effectiveness is meaningful (default: 3)
+	RSICGuidanceBoostThreshold     float64 // RSIC_GUIDANCE_BOOST_THRESHOLD — effectiveness rate above which confidence is boosted (default: 0.7)
+	RSICGuidanceDecayThreshold     float64 // RSIC_GUIDANCE_DECAY_THRESHOLD — effectiveness rate below which confidence is decayed (default: 0.1)
+	RSICGuidanceDecayMinSurfaces   int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES — min surfaces before decay applies (default: 5)
+
 	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 
 	// Phase AR-3: LLM-powered RSIC reflection
@@ -2023,6 +2031,26 @@ func FromEnv() (Config, error) {
 	}
 	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
 	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
+
+	// RSIC-SK1: Guidance self-calibration
+	rsicGuidanceCalibrationEnabled := getBool("RSIC_GUIDANCE_CALIBRATION_ENABLED", true)
+	rsicGuidanceMinSurfaces, err := atoi("RSIC_GUIDANCE_MIN_SURFACES", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicGuidanceBoostThreshold, err := atof("RSIC_GUIDANCE_BOOST_THRESHOLD", 0.7)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicGuidanceDecayThreshold, err := atof("RSIC_GUIDANCE_DECAY_THRESHOLD", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicGuidanceDecayMinSurfaces, err := atoi("RSIC_GUIDANCE_DECAY_MIN_SURFACES", 5)
+	if err != nil {
+		return Config{}, err
+	}
+
 	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
 	if err != nil {
 		return Config{}, err
@@ -3114,8 +3142,13 @@ func FromEnv() (Config, error) {
 		RSICTriggerCooldownSec:  rsicTriggerCooldownSec,
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
-		RSICPersistenceEnabled:  rsicPersistenceEnabled,
-		SpacePruneIntervalHours: spacePruneIntervalHours,
+		RSICPersistenceEnabled:         rsicPersistenceEnabled,
+		RSICGuidanceCalibrationEnabled: rsicGuidanceCalibrationEnabled,
+		RSICGuidanceMinSurfaces:        rsicGuidanceMinSurfaces,
+		RSICGuidanceBoostThreshold:     rsicGuidanceBoostThreshold,
+		RSICGuidanceDecayThreshold:     rsicGuidanceDecayThreshold,
+		RSICGuidanceDecayMinSurfaces:   rsicGuidanceDecayMinSurfaces,
+		SpacePruneIntervalHours:        spacePruneIntervalHours,
 
 		// Phase AR-3: LLM-powered intelligence
 		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,

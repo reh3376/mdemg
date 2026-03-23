@@ -701,6 +701,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
 	rsicDispatcher.SetSafetyValidator(safetyValidator)
 	rsicDispatcher.SetSnapshotStore(snapshotStore)
+	// RSIC-SK1: Wire guidance calibrator for self-calibrating guidance
+	if jiminySvc != nil {
+		rsicDispatcher.SetGuidanceCalibrator(&rsicGuidanceCalibrationAdapter{svc: jiminySvc})
+	}
 	rsicCycle.SetSnapshotStore(snapshotStore)
 	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
 
@@ -750,6 +754,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
 	log.Printf("Signal learner initialized (decay=%.2f, boost=%.2f)", cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
+	// RSIC-SK1: Wire signal learner to Jiminy for guidance emission/response tracking
+	if jiminySvc != nil {
+		jiminySvc.SetSignalLearner(signalLearner)
+	}
 
 	return &Server{
 		cfg:             cfg,

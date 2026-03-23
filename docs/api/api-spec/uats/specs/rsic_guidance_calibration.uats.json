@@ -1,0 +1,61 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "RSIC-SK1 Guidance Calibration",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "rsic-sk1",
+      "guidance",
+      "calibration"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-23",
+    "description": "Validates RSIC-SK1 guidance self-calibration: cycle endpoint accepts review_guidance_effectiveness, adjust_guidance_confidence, and archive_ineffective_constraints action types without unknown-action errors",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "tags": [
+      "rsic",
+      "rsic-sk1"
+    ],
+    "sha256": ""
+  },
+  "variables": {
+    "test_space": "uats-rsic-sk1-test"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/cycle",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{test_space}}",
+      "tier": "micro"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cycle_id",
+        "type": "string"
+      },
+      {
+        "path": "$.tier",
+        "type": "string"
+      },
+      {
+        "path": "$.space_id",
+        "type": "string"
+      }
+    ]
+  }
+}

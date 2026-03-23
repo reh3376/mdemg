@@ -89,7 +89,7 @@ SET
   n.total_followed    = coalesce(n.total_followed, 0)    + CASE WHEN $outcome = 'followed'     THEN 1 ELSE 0 END,
   n.total_ignored     = coalesce(n.total_ignored, 0)     + CASE WHEN $outcome = 'ignored'      THEN 1 ELSE 0 END,
   n.total_contradicted = coalesce(n.total_contradicted, 0) + CASE WHEN $outcome = 'contradicted' THEN 1 ELSE 0 END,
-  n.status            = CASE WHEN new_confidence < $archiveThreshold THEN 'archived' ELSE coalesce(n.status, 'active') END
+  n.status            = CASE WHEN new_confidence < $archiveThreshold AND n.constraint_type IS NOT NULL THEN 'archived' ELSE coalesce(n.status, 'active') END
 RETURN n.node_id AS node_id, n.confidence AS confidence, n.status AS status`
 
 	sess := u.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})

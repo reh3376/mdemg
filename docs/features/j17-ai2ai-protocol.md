@@ -519,6 +519,18 @@ When reflection detects an anomaly, RSIC dispatches protocol mutations:
 
 All mutations are subject to RSIC's existing auto-rollback mechanism: if `MetricsBefore` vs `MetricsAfter` shows degradation against success criteria, the mutation is reversed.
 
+#### RSIC-SK1: Guidance Self-Calibration
+
+In addition to protocol-specific mutations, RSIC-SK1 adds guidance-level calibration that operates across all guidance types (not just J17 protocol items):
+
+| Action | Trigger | What It Does |
+|--------|---------|-------------|
+| `review_guidance_effectiveness` | GuidanceHealth < 0.5 | Diagnostic: categorizes items by effectiveness |
+| `adjust_guidance_confidence` | GuidanceHealth < 0.7 | Boosts high-performing items, decays chronically ignored ones |
+| `archive_ineffective_constraints` | On demand | Archives constraints below confidence threshold |
+
+The SignalLearner (Hebbian learning) is also wired to Jiminy: every surfaced guidance item records an emission, and followed/partial outcomes record a response. This enables Hebbian strength tracking for individual guidance signals alongside RSIC-internal signals. See `docs/features/rsic-sk1-guidance-calibration.md` for full details.
+
 ### 8.2 Neural Comprehension Scoring (NLI Sidecar)
 
 When the neural sidecar is available, comprehension scoring uses Natural Language Inference rather than heuristics:

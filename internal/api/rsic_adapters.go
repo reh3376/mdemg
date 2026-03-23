@@ -247,6 +247,40 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 	}, nil
 }
 
+// rsicGuidanceCalibrationAdapter adapts *jiminy.Service to ape.GuidanceCalibrationProvider (RSIC-SK1).
+type rsicGuidanceCalibrationAdapter struct {
+	svc *jiminy.Service
+}
+
+func (a *rsicGuidanceCalibrationAdapter) GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]ape.GuidanceEffectivenessItem, error) {
+	items, err := a.svc.GetConstraintEffectiveness(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ape.GuidanceEffectivenessItem, len(items))
+	for i, item := range items {
+		result[i] = ape.GuidanceEffectivenessItem{
+			NodeID:            item.NodeID,
+			Name:              item.Name,
+			Confidence:        item.Confidence,
+			TotalSurfaced:     item.TotalSurfaced,
+			TotalFollowed:     item.TotalFollowed,
+			TotalIgnored:      item.TotalIgnored,
+			TotalContradicted: item.TotalContradicted,
+			EffectivenessRate: item.EffectivenessRate,
+		}
+	}
+	return result, nil
+}
+
+func (a *rsicGuidanceCalibrationAdapter) UpdateNodeConfidence(ctx context.Context, nodeID string, outcome string) error {
+	return a.svc.UpdateNodeConfidence(ctx, nodeID, jiminy.GuidanceOutcome(outcome))
+}
+
+func (a *rsicGuidanceCalibrationAdapter) ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error) {
+	return a.svc.ArchiveStaleConstraints(ctx, spaceID)
+}
+
 // jiminyRetrievalAdapter adapts *retrieval.Service to jiminy.RetrievalProvider (J7).
 type jiminyRetrievalAdapter struct {
 	retriever *retrieval.Service

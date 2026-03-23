@@ -2167,6 +2167,11 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `RSIC_TRIGGER_DEDUPE_SEC` | int | `600` | Dedupe window for identical trigger IDs |
 | `RSIC_WATCHDOG_SPACE_ID` | string | `"mdemg-dev"` | Space monitored by watchdog |
 | `RSIC_PERSISTENCE_ENABLED` | bool | `true` | Enable write-behind persistence |
+| `RSIC_GUIDANCE_CALIBRATION_ENABLED` | bool | `true` | Master switch for guidance self-calibration (RSIC-SK1) |
+| `RSIC_GUIDANCE_MIN_SURFACES` | int | `3` | Min surfaces before effectiveness is meaningful |
+| `RSIC_GUIDANCE_BOOST_THRESHOLD` | float64 | `0.7` | Effectiveness rate above which confidence is boosted |
+| `RSIC_GUIDANCE_DECAY_THRESHOLD` | float64 | `0.1` | Effectiveness rate below which confidence is decayed |
+| `RSIC_GUIDANCE_DECAY_MIN_SURFACES` | int | `5` | Min surfaces before decay applies |
 | `SPACE_PRUNE_INTERVAL_HOURS` | int | `24` | Auto-prune interval (0 = disabled) |
 
 ### Backup & Restore

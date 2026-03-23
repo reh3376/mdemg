@@ -414,6 +414,26 @@ type ProtocolEvolverProvider interface {
 	AdjustReplayBuffer(ctx context.Context, spaceID string) (map[string]any, error)
 }
 
+// GuidanceCalibrationProvider exposes guidance effectiveness and confidence
+// calibration operations for RSIC-SK1 self-calibrating guidance.
+type GuidanceCalibrationProvider interface {
+	GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]GuidanceEffectivenessItem, error)
+	UpdateNodeConfidence(ctx context.Context, nodeID string, outcome string) error
+	ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error)
+}
+
+// GuidanceEffectivenessItem carries per-constraint effectiveness metrics for RSIC calibration.
+type GuidanceEffectivenessItem struct {
+	NodeID            string  `json:"node_id"`
+	Name              string  `json:"name"`
+	Confidence        float64 `json:"confidence"`
+	TotalSurfaced     int     `json:"total_surfaced"`
+	TotalFollowed     int     `json:"total_followed"`
+	TotalIgnored      int     `json:"total_ignored"`
+	TotalContradicted int     `json:"total_contradicted"`
+	EffectivenessRate float64 `json:"effectiveness_rate"`
+}
+
 // WatchdogSignalProvider supplies additional monitoring signals for multi-dimensional watchdog.
 type WatchdogSignalProvider interface {
 	GetSessionHealthScore(sessionID string) float64
