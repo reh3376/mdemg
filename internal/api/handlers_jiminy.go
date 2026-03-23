@@ -8,6 +8,122 @@ import (
 	"mdemg/internal/jiminy"
 )
 
+// handleJiminyHealthz handles GET /v1/jiminy/healthz
+// Lightweight liveness check for the Jiminy guidance subsystem.
+func (s *Server) handleJiminyHealthz(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"status":  "disabled",
+			"enabled": false,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"enabled": true,
+	})
+}
+
+// handleJiminyReady handles GET /v1/jiminy/ready
+// Comprehensive readiness check for the Jiminy guidance subsystem.
+// Reports all feature flags, sub-service availability, config, and optional stats.
+func (s *Server) handleJiminyReady(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"status":  "disabled",
+			"enabled": false,
+			"message": "jiminy guidance is not enabled (set JIMINY_ENABLED=true)",
+		})
+		return
+	}
+
+	// Feature flags
+	features := map[string]bool{
+		"synthesis":          s.cfg.JiminySynthesisEnabled,
+		"evaluate_llm":      s.cfg.JiminyEvaluateLLMEnabled,
+		"outcome_llm":       s.cfg.JiminyOutcomeLLMEnabled,
+		"outcome_classifier": s.cfg.JiminyOutcomeClassifierEnabled,
+		"escalation":        s.cfg.JiminyEscalationEnabled,
+		"persistence":       s.cfg.JiminyPersistenceEnabled,
+		"cache":             s.cfg.JiminyCacheEnabled,
+		"j17":               s.cfg.J17Enabled,
+	}
+
+	// Sub-service availability
+	services := map[string]string{}
+	if s.jiminySvc.GetEvaluator() != nil {
+		services["evaluator"] = "available"
+	} else {
+		services["evaluator"] = "unavailable"
+	}
+	if s.jiminySvc.GetSequenceTracker() != nil {
+		services["sequence_tracker"] = "available"
+	} else {
+		services["sequence_tracker"] = "unavailable"
+	}
+	if s.jiminySvc.GetTicketManager() != nil {
+		services["ticket_manager"] = "available"
+	} else {
+		services["ticket_manager"] = "unavailable"
+	}
+	if s.jiminySvc.GetProtocolMetricsCollector() != nil {
+		services["protocol_metrics"] = "available"
+	} else {
+		services["protocol_metrics"] = "unavailable"
+	}
+
+	// Config
+	config := map[string]any{
+		"timeout_ms":     s.cfg.JiminyTimeoutMs,
+		"max_items":      s.cfg.JiminyMaxItems,
+		"min_confidence": s.cfg.JiminyMinConfidence,
+	}
+	if s.cfg.JiminySynthesisEnabled {
+		config["synthesis_provider"] = s.cfg.JiminySynthesisProvider
+		config["synthesis_model"] = s.cfg.JiminySynthesisModel
+	}
+	if s.cfg.J17Enabled {
+		config["j17_sidecar_url"] = s.cfg.J17SidecarURL
+	}
+
+	result := map[string]any{
+		"status":   "ready",
+		"enabled":  true,
+		"features": features,
+		"services": services,
+		"config":   config,
+	}
+
+	// Optional: include guidance stats if ?stats=true
+	if r.URL.Query().Get("stats") == "true" {
+		spaceID := r.URL.Query().Get("space_id")
+		if spaceID == "" {
+			spaceID = "mdemg-dev"
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if stats, err := s.jiminySvc.GetGuidanceStats(ctx, spaceID); err == nil {
+			result["stats"] = stats
+		}
+		if metrics := s.jiminySvc.GetProtocolMetricsSnapshot(); metrics != nil {
+			result["protocol_metrics"] = metrics
+		}
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 // handleJiminyGuide handles POST /v1/jiminy/guide
 func (s *Server) handleJiminyGuide(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

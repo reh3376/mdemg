@@ -1816,6 +1816,60 @@ Proactive guidance for AI agents -- surfaces constraints, prior corrections, con
 
 Jiminy must be explicitly enabled via `JIMINY_ENABLED=true`. When disabled, all endpoints return `503 Service Unavailable`.
 
+### GET /v1/jiminy/healthz
+
+Lightweight liveness check for the Jiminy subsystem. Returns immediately.
+
+**Response (200):**
+```json
+{ "status": "ok", "enabled": true }
+```
+
+**Response (503 — Jiminy disabled):**
+```json
+{ "status": "disabled", "enabled": false }
+```
+
+```bash
+curl -s http://localhost:9999/v1/jiminy/healthz
+```
+
+---
+
+### GET /v1/jiminy/ready
+
+Comprehensive readiness check. Reports feature flags, sub-service availability, and configuration. Append `?stats=true&space_id=<id>` to include guidance effectiveness stats and J17 protocol metrics.
+
+**Response (200):**
+```json
+{
+  "status": "ready",
+  "enabled": true,
+  "features": {
+    "synthesis": true, "evaluate_llm": false, "outcome_llm": false,
+    "outcome_classifier": true, "escalation": true, "persistence": false,
+    "cache": true, "j17": true
+  },
+  "services": {
+    "evaluator": "available", "sequence_tracker": "available",
+    "ticket_manager": "available", "protocol_metrics": "available"
+  },
+  "config": {
+    "timeout_ms": 30000, "max_items": 10, "min_confidence": 0.3
+  }
+}
+```
+
+**Query Parameters:** `stats` (optional, `true` to include stats), `space_id` (optional, defaults to `mdemg-dev`)
+
+**Status Codes:** `200 OK`, `503 Service Unavailable` (Jiminy disabled)
+
+```bash
+curl -s "http://localhost:9999/v1/jiminy/ready?stats=true&space_id=mdemg-dev"
+```
+
+---
+
 ### POST /v1/jiminy/guide
 
 Generate guidance items for the given context. Fans out to four parallel knowledge sources (constraints, corrections, contradictions, frontiers), merges and ranks results.

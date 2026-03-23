@@ -1197,6 +1197,24 @@ Jiminy is an active inner-voice service that provides proactive, context-aware g
 
 **Configuration**: `JIMINY_ENABLED=true` required. See also `JIMINY_TIMEOUT_MS`, `JIMINY_MAX_ITEMS`, `JIMINY_MIN_CONFIDENCE`, `JIMINY_INCLUDE_FRONTIERS`, `JIMINY_FRONTIER_MIN_SIM`.
 
+### GET /v1/jiminy/healthz
+
+Lightweight liveness check for the Jiminy subsystem.
+
+**Response**: `200 {"status":"ok","enabled":true}` or `503 {"status":"disabled","enabled":false}`
+
+---
+
+### GET /v1/jiminy/ready
+
+Comprehensive readiness check. Reports feature flags (`synthesis`, `evaluate_llm`, `outcome_llm`, `outcome_classifier`, `escalation`, `persistence`, `cache`, `j17`), sub-service availability (`evaluator`, `sequence_tracker`, `ticket_manager`, `protocol_metrics`), and configuration (`timeout_ms`, `max_items`, `min_confidence`).
+
+**Query Parameters**: `stats=true` (include guidance effectiveness stats), `space_id` (for stats, defaults to `mdemg-dev`)
+
+**Response**: `200` with status object, or `503` when disabled.
+
+---
+
 ### POST /v1/jiminy/guide
 
 Generate proactive guidance for the current working context.
