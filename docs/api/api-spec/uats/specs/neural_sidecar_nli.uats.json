@@ -25,7 +25,8 @@
       "nli",
       "sidecar",
       "fsd"
-    ]
+    ],
+    "sha256": "36be1e17488f58318f7be335ef9ad81fa18c5f2fc9783c6a417854411acc4a11"
   },
   "variables": {},
   "request": {

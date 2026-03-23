@@ -91,7 +91,8 @@ Keychain is opportunistic — if unavailable, falls back silently.
 2. Auto-start Neo4j container if stopped (unless `--no-db`)
 3. Resolve binary path, build `serve` args
 4. Open log file (truncated on each start)
-5. `exec.Command` with `SysProcAttr{Setsid: true}` for process detachment
+5. Load `.env` (godotenv) then `.mdemg/config.yaml` (YAML skip-if-set) into parent env — child inherits via `os.Environ()`
+6. `exec.Command` with `SysProcAttr{Setsid: true}` for process detachment
 6. Write PID file, wait 2s for early crash detection
 7. Poll `.mdemg.port` file for port discovery (up to 10s)
 

@@ -29,7 +29,7 @@
       "extensions",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "03779721803c6ec3db8ce4d714fdf64264ae3014450841d88a6fc56b48a80570"
   },
   "variables": {
     "session_id": "uats-test"

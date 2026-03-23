@@ -105,7 +105,7 @@ GET /v1/guardrail/events returns recent events
 ### Effectiveness Feedback Pipeline (F3)
 
 ```
-Jiminy guide returns guidance_id (UUID) with each response
+Jiminy guide returns guidance_id (CUID2) with each response
      │
      ▼ (F10: LRU+TTL cache checked first)
 Agent performs action or ignores guidance

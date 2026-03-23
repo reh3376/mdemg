@@ -28,7 +28,8 @@
       "synthesis",
       "phase_j15",
       "llm_required"
-    ]
+    ],
+    "sha256": "e3f94d3fe9dd21afd2480524088ac079ba931158a860813f442a3cdb341caa0d"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -46,7 +47,10 @@
     }
   },
   "expected": {
-    "status": [200, 503],
+    "status": [
+      200,
+      503
+    ],
     "body_assertions": [
       {
         "name": "data object present",
@@ -67,7 +71,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": [
           {
             "name": "data present",
@@ -128,7 +135,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": []
       }
     }

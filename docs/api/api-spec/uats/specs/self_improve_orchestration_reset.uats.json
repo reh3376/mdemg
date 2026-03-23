@@ -1,0 +1,60 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Self-Improve Orchestration Reset",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "self-improve",
+      "orchestration"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-23",
+    "description": "Validates RSIC orchestration policy reset endpoint returns reset: true.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "rsic"
+    ],
+    "sha256": "78e788a33e79b595e36724f216e901d2f6354e816d15e86be3b06fa39e4f3fe3"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/orchestration/reset",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {}
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.reset",
+        "type": "boolean",
+        "equals": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/self-improve/orchestration/reset"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

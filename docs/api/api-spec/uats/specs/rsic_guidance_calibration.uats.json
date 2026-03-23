@@ -25,7 +25,7 @@
       "rsic",
       "rsic-sk1"
     ],
-    "sha256": ""
+    "sha256": "026c40c41963dfb18d3f522eca56a8757a55e01ff30083ec868eca82ae88a733"
   },
   "variables": {
     "test_space": "uats-rsic-sk1-test"

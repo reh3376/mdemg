@@ -77,17 +77,17 @@ func (e *ProtocolEncoder) Encode(items []GuidanceItem, counts SourceCounts, conf
 	var sb strings.Builder
 	sb.WriteString("═══ JIMINY GUIDANCE ═══\n")
 
-	for _, item := range items {
-		tier := e.selectTier(item, trustScore)
-		item.Tier = tier
+	for i := range items {
+		tier := e.selectTier(items[i], trustScore)
+		items[i].Tier = tier
 
 		switch tier {
 		case TierCoded:
-			sb.WriteString(e.formatT1(item))
+			sb.WriteString(e.formatT1(items[i]))
 		case TierTelegraphic:
-			sb.WriteString(e.formatT2(item))
+			sb.WriteString(e.formatT2(items[i]))
 		default:
-			sb.WriteString(e.formatT3(item))
+			sb.WriteString(e.formatT3(items[i]))
 		}
 		sb.WriteByte('\n')
 	}

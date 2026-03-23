@@ -16,6 +16,8 @@ mdemg start --no-db                 # Don't auto-start Neo4j
 
 The server runs as a detached background process. Logs go to `.mdemg/logs/mdemg.log` and the PID is stored in `.mdemg/mdemg.pid`.
 
+Before forking the daemon child, `mdemg start` loads configuration into the parent process environment so the child inherits the correct values. The loading order matches the documented config priority: `.env` is loaded first (via `godotenv`), then `.mdemg/config.yaml` (which skips any env var already set). This ensures `.env` values take precedence over YAML defaults. The child process inherits the fully resolved environment via `os.Environ()`.
+
 If Docker is available and a Neo4j container exists but is stopped, `mdemg start` will start it automatically. Use `--no-db` to skip this behavior.
 
 ### Stop

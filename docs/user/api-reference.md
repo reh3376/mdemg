@@ -1916,7 +1916,7 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 | `JIMINY_SYNTHESIS_TIMEOUT_MS` | `10000` | Synthesis LLM timeout (ms) |
 | `JIMINY_SYNTHESIS_TEMPERATURE` | API default | Optional temperature override for synthesis |
 
-**Note:** The guide response now includes a `guidance_id` (UUID) in the `data` object for effectiveness tracking.
+**Note:** The guide response now includes a `guidance_id` (CUID2 unique identifier) in the `data` object for effectiveness tracking.
 
 ### POST /v1/jiminy/feedback
 

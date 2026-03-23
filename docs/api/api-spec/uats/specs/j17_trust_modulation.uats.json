@@ -29,7 +29,7 @@
       "phase_j17",
       "embedding_required"
     ],
-    "sha256": ""
+    "sha256": "ce7bd01ff514a055740fa581112785e97bfb2c333b90a46a1faae045190f016e"
   },
   "variables": {
     "space_id": "uats-test-space",

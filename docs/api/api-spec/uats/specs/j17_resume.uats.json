@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "aef450463ddeaad7f87f133b6b48dc7f5e040c19124413669fb1fe7cdf4442fd"
   },
   "variables": {
     "space_id": "uats-test-space",

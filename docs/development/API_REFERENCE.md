@@ -1258,7 +1258,7 @@ Generate proactive guidance for the current working context.
 
 **Error Codes**: `400` (missing space_id or context), `405` (not POST), `503` (Jiminy not enabled).
 
-**Note**: The response now includes a `guidance_id` field (UUID) in the `data` object for effectiveness tracking. Pass this ID to the feedback endpoint to record whether guidance was followed.
+**Note**: The response now includes a `guidance_id` field (CUID2 unique identifier) in the `data` object for effectiveness tracking. Pass this ID to the feedback endpoint to record whether guidance was followed.
 
 ### POST /v1/jiminy/feedback
 
@@ -1268,7 +1268,7 @@ Record whether an agent followed, ignored, or contradicted Jiminy guidance. This
 
 ```json
 {
-  "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+  "guidance_id": "cm5x7k2j10000jn08h1g2i3j4",
   "action_summary": "I validated the input before processing it",
   "space_id": "mdemg-dev"
 }
@@ -1287,7 +1287,7 @@ Record whether an agent followed, ignored, or contradicted Jiminy guidance. This
 ```json
 {
   "data": {
-    "guidance_id": "c6fa606f-6624-4202-8bd3-2a265ba24a44",
+    "guidance_id": "cm5x7k2j10000jn08h1g2i3j4",
     "applied": true,
     "results": [
       {

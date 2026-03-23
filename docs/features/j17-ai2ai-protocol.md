@@ -2,7 +2,7 @@
 
 **Phase**: J17 (5 sub-phases: J17-1 through J17-5)
 **Status**: Complete
-**Date**: 2026-03-22 (updated: gap closure + T1 compression optimization)
+**Date**: 2026-03-23 (updated: control-loop optimization — 7 gap fixes)
 
 ---
 
@@ -473,6 +473,67 @@ New tests: `TestTrustScorer_PerSessionIndependence`, `TestTrustScorer_SetThresho
 
 ---
 
+## 7. Control-Loop Optimization (2026-03-23)
+
+A second round of gap analysis identified 7 issues where the self-improvement loop was operating on incorrect, incomplete, or session-contaminated signals. All 7 were verified against source code and fixed.
+
+**Engineering objective:** Make the RSIC self-improvement loop learn from valid, session-correct, operationally complete signals rather than partial or biased proxies.
+
+### 7.1 Gaps Fixed
+
+| Gap | Severity | Issue | Fix |
+|-----|----------|-------|-----|
+| **Gap 1** | P0 | `CodeCoverage` metric always 0.0 — `Snapshot()` never computed it | Added `constraintTotal`/`constraintWithCode` counters, `RecordConstraintCoverage()`. Coverage = 1.0 when no constraints surfaced (nothing to cover), not 0.0. |
+| **Gap 2** | P0 | `ResumeProtocol()` never called `RecordTicketRestore()` or `RecordReplay()` — stability score permanently 0.5 | Added calls at all 3 failure paths (RecordTicketRestore(false)) and success path (RecordTicketRestore(true) + RecordReplay) |
+| **Gap 3** | P1 | Guidance cache keyed on `(spaceID, context)` — sessions with different trust/escalation state could get cross-contaminated responses | Added `JIMINY_CACHE_J17_BYPASS` (default: true). When J17 enabled + session ID present, cache Get/Put are skipped |
+| **Gap 4** | P1 | Cold-start sessions (no ticket, expired ticket) had zero J17 protocol awareness | Added bootstrap fallback in `session-start.sh`: when warm resume fails, calls `/v1/jiminy/bootstrap` to inject protocol spec |
+| **Gap 5** | P1 | `CodifyConstraint()` generated codes but never persisted to Neo4j; uncoded constraints invisible in T2 frequency | Added Neo4j write block (matching `RetireCode` pattern). Uncoded constraints now tracked by `SourceNodes[0]` as fallback key |
+| **Gap 6** | P2 | ML components (tier predictor, NLI scorer) only usable in production — no shadow/comparison mode | Added shadow-mode instantiation: when `J17_SIDECAR_URL` set, shadow predictions logged with `j17-shadow:` prefix. Zero behavioral effect |
+| **Gap 7** | P3 | Auto-generated `J17_TICKET_SECRET` is silent — not persistent across restarts | Added startup warning: `WARN: J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts` |
+
+### 7.2 Impact on RSIC Health Score
+
+Before this fix, `scoreProtocol()` was computing health from corrupted inputs:
+
+```
+Before: ProtocolHealth = 0.40*comprehension + 0.25*compression + 0.20*0.0(coverage) + 0.15*0.5(stability)
+         = max 0.725 even with perfect comprehension and compression
+
+After:   ProtocolHealth = 0.40*comprehension + 0.25*compression + 0.20*coverage + 0.15*stability
+         = all 4 dimensions now populated from real data
+```
+
+The `j17_low_code_coverage` reflection pattern (fires when coverage < 80%) was triggering unconditionally because coverage was always 0.0. After the fix, it only fires when actual coded constraint coverage is genuinely low.
+
+### 7.3 New Configuration Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache for J17 sessions (prevents cross-session trust/escalation contamination) |
+| `J17_SIDECAR_URL` | `""` (disabled) | Neural sidecar URL for shadow ML predictions (tier + NLI comprehension) |
+| `J17_SIDECAR_TIMEOUT_MS` | `200` | Timeout for sidecar shadow calls in ms |
+
+### 7.4 New Tests (11 total)
+
+| Test | File | Gap |
+|------|------|-----|
+| `TestProtocolMetrics_CodeCoverage_AllCoded` | protocol_metrics_test.go | 1 |
+| `TestProtocolMetrics_CodeCoverage_NoCoded` | protocol_metrics_test.go | 1 |
+| `TestProtocolMetrics_CodeCoverage_Partial` | protocol_metrics_test.go | 1 |
+| `TestProtocolMetrics_CodeCoverage_NoConstraints` | protocol_metrics_test.go | 1 |
+| `TestProtocolMetrics_RecordReplay` | protocol_metrics_test.go | 2 |
+| `TestProtocolMetrics_T2FrequencyTracksUncodedByNodeID` | protocol_metrics_test.go | 5 |
+| `TestCache_J17_Bypass` | service_test.go | 3 |
+| `TestCache_NonJ17_StillCaches` | service_test.go | 3 |
+| `TestGuide_ShadowTierPredictor_NoSidecar` | service_test.go | 6 |
+| `TestRecordOutcome_ShadowNLI_NoSidecar` | service_test.go | 6 |
+
+### 7.5 Lint Fix (Phase 0)
+
+`internal/guardrail/prompt.go` — 7 instances of `sb.WriteString(fmt.Sprintf(...))` replaced with `fmt.Fprintf(&sb, ...)`.
+
+---
+
 ## 8. Continuous Learning Architecture
 
 J17 is not a static protocol. It is designed to improve continuously through three mechanisms operating at different timescales.
@@ -647,7 +708,7 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 | `J17_COMPRESSION_MIN_RATIO` | `2.0` | Compression floor before RSIC flags regression |
 | `J17_REPLAY_FREQUENCY_MAX` | `5.0` | Replays/hr above which RSIC adjusts buffer |
 
-### Data Collection
+### Data Collection & ML
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -655,6 +716,14 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 | `J17_PROTOCOL_DATA_COLLECTION` | `false` | Enable JSONL training data collection |
 | `J17_EXTENSIONS_ENABLED` | `true` | Allow agent extension negotiation |
 | `J17_ALLOWED_EXTENSIONS` | `tier_preference,abbreviated_ids,batch_mode,density_boost` | Permitted extensions |
+| `J17_SIDECAR_URL` | `""` | Neural sidecar URL for shadow ML predictions |
+| `J17_SIDECAR_TIMEOUT_MS` | `200` | Timeout for sidecar shadow calls in ms |
+
+### Cache Session Safety
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache when J17 + session ID active |
 
 ---
 
@@ -771,3 +840,11 @@ CompressSection(s string, maxLen int)  // TelegraphicCompress + TruncateAtWord
 - `.claude/hooks/pre-compact.sh` -- J17_ENABLED gating
 - `.claude/hooks/session-start.sh` -- J17_ENABLED gating
 - `docs/api/api-spec/uats/specs/jiminy_feedback.uats.json` -- with_session_id variant
+- `internal/jiminy/service.go` -- Control-loop optimization: cache bypass, CodeCoverage recording, ResumeProtocol metrics, shadow ML
+- `internal/jiminy/protocol_metrics.go` -- RecordConstraintCoverage, CodeCoverage in Snapshot
+- `internal/jiminy/protocol_evolution.go` -- CodifyConstraint Neo4j persistence
+- `internal/config/config.go` -- JiminyCacheJ17Bypass, J17SidecarURL, J17SidecarTimeoutMs
+- `internal/guardrail/prompt.go` -- lint fix (WriteString → Fprintf)
+- `.claude/hooks/session-start.sh` -- cold-start bootstrap fallback
+- `.env.example` -- 3 new config variables (JIMINY_CACHE_J17_BYPASS, J17_SIDECAR_URL, J17_SIDECAR_TIMEOUT_MS)
+- `docs/api/api-spec/uats/specs/j17_metrics.uats.json` -- code_coverage assertion

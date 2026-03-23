@@ -32,7 +32,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Phase J17-PC: J17 Prompt Compression — COMPLETE (5 LLM callers optimized, 5 config vars, 14 new tests)
 - Phase RSIC-SK1: Jiminy Guidance Self-Calibration — COMPLETE (3 gap closures, 3 new RSIC actions, pattern #15, SignalLearner wiring)
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1+ verified)
-- Quality hardening — COMPLETE (282+ UATS specs, 148 Go test files, 0 lint issues)
+- Quality hardening — COMPLETE (191 UATS specs / 375 total variants, 197 Go test files, 0 lint issues)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness, AR-3 LLM intelligence)
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
@@ -42,16 +42,14 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.2.16, menubar v1.6.0, sidebar v0.2.0
 
 WHAT REMAINS TO BE DONE:
-1. TESTING: Scraper/guardrail Neo4j-dependent methods (require mock infrastructure)
-2. TESTING: SSE streaming endpoint not UATS-testable (requires SSE client)
-3. CI: UATS runner counts `llm_required` tag exclusions as "errors" — should be "skips"
-5. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
-6. PARTIAL: Phase 45.4 — Obsidian integration (Linear done, Obsidian pending)
-7. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
-8. PARTIAL: Phase 86 — UVTS activation (spec-only, runner deferred)
-9. RESEARCH: AutoResearch integration analysis (docs/development/)
-10. RESEARCH: Export governance & org alignment gap analysis (docs/development/)
-11. RESEARCH: DBSCAN GPU acceleration investigation (Metal/AMX for clustering)
+1. TESTING: SSE streaming endpoint not UATS-testable (requires SSE client)
+2. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
+3. PARTIAL: Phase 45.4 — Obsidian integration (Linear done, Obsidian pending)
+4. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
+5. PARTIAL: Phase 86 — UVTS activation (spec-only, runner deferred)
+6. RESEARCH: AutoResearch integration analysis (docs/development/)
+7. RESEARCH: Export governance & org alignment gap analysis (docs/development/)
+8. RESEARCH: DBSCAN GPU acceleration investigation (Metal/AMX for clustering)
 - UxTS governance phases 81-85 COMPLETE (reconciliation, UOBS/UOTS convergence, CI gating, UNTS coverage, auth/perf)
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
 
@@ -302,8 +300,10 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | Jiminy | Inner Voice | ✅ | `docs/specs/phase-jiminy-guidance.md`, `docs/features/jiminy-inner-voice.md` |
 | J7-J12 | Cognitive Guidance | ✅ | `docs/features/jiminy-inner-voice.md` §J7-J12 |
 | J16 | Full-Context Input | ✅ | Removed input truncation (200K default), fixed cache key collisions, 30s timeouts. Config: `JIMINY_GUIDANCE_CONTEXT_MAX_CHARS`, `JIMINY_GUIDANCE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_OUTPUT_MAX_CHARS`, `JIMINY_EVALUATE_ITEM_MAX_CHARS` |
-| J17 | AI-to-AI Communication Protocol | ✅ | `docs/features/j17-ai2ai-protocol.md` |
+| J17 | AI-to-AI Communication Protocol | ✅ | `docs/features/j17-ai2ai-protocol.md` (incl. §7 Control-Loop Optimization — 7 gap fixes, CUIDv2 IDs, control char sanitization, daemon .env fix) |
 | J17-PC | J17 Prompt Compression | ✅ | `docs/features/j17-prompt-compression.md` |
+| RSIC-SK1 | Jiminy Guidance Self-Calibration | ✅ | 3 RSIC executors, reflection pattern #15, SignalLearner wiring, confidence extension to all types |
+| Testing & Quality | Testing & Quality Hardening | ✅ | 5 new UATS specs, UATS runner skipped-count fix, 28 new tests (7 guardrail unit, 16 scraper integration, 5 guardrail integration) |
 | J-Init | Init Wizard + Installers | ✅ | `internal/cli/init.go`, `internal/config/yaml_config.go`, `.goreleaser.yaml` |
 | S8 | Distribution Pipeline | ✅ | `docs/sidecar/roadmap.md` §S8 |
 | S9 | Beta + Public | ✅ | `docs/sidecar/roadmap.md` §S9 |
@@ -364,9 +364,7 @@ Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{spac
 
 | Gap | Effort | Notes |
 |-----|--------|-------|
-| Scraper/guardrail Neo4j mock tests | 2-4 days | Need mock infrastructure for CRUD/session ops |
 | SSE streaming endpoint | 1-2 days | `/v1/jobs/{job_id}/stream` — needs SSE client harness |
-| UATS runner excluded-tag counting | 1-2 hours | `llm_required` exclusions counted as errors, should be skips |
 
 ### Research (No Implementation Yet)
 
@@ -423,7 +421,6 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 | Issue | Severity | Notes |
 |-------|----------|-------|
 | Obsidian integration not started | Low | Phase 45.4 — listed in roadmap, no implementation |
-| UATS `llm_required` exclusion counting | Low | Runner counts excluded specs as errors instead of skips |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | `docker.go` volume name mismatch | Medium | `mdemg db start` creates `mdemg-neo4j-data` (hyphens) but docker-compose uses `mdemg_neo4j_data` (underscores). Needs migration logic — separate planning required. Workaround: systemd tries `docker start mdemg-neo4j-dev` first. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -491,4 +488,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-22 — All 105 phases + S0-S16 + Phase Jiminy (J1-J17 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. J17 AI-to-AI communication protocol COMPLETE (3-tier encoding, constraint codegen, trust scoring, ML tier prediction, protocol training pipeline). CI all green. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), UATS runner fix, research items, testing gaps.*
+*Last updated: 2026-03-23 — All 105 phases + S0-S16 + Phase Jiminy (J1-J17 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. J17 AI-to-AI communication protocol COMPLETE. RSIC-SK1 Jiminy self-calibration COMPLETE. Testing & Quality Hardening COMPLETE (191 UATS specs / 375 variants, 197 Go test files, 28 new tests, UATS runner skipped-count fix). CI all green. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), research items, SSE testing gap.*

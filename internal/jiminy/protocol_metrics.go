@@ -48,6 +48,10 @@ type ProtocolMetricsCollector struct {
 	// T2 frequency per constraint
 	t2Frequency map[string]int
 
+	// Code coverage tracking (Gap 1)
+	constraintTotal    int64
+	constraintWithCode int64
+
 	// Window tracking
 	windowStart time.Time
 }
@@ -123,6 +127,14 @@ func (c *ProtocolMetricsCollector) RecordTicketRestore(success bool) {
 	}
 }
 
+// RecordConstraintCoverage records the total number of constraint items and how many have codes.
+func (c *ProtocolMetricsCollector) RecordConstraintCoverage(total, withCode int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.constraintTotal += int64(total)
+	c.constraintWithCode += int64(withCode)
+}
+
 // Snapshot returns an immutable copy of the current metrics.
 func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 	c.mu.RLock()
@@ -180,6 +192,15 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		ticketRate = float64(c.ticketRestoreOK) / float64(c.ticketRestoreTotal)
 	}
 
+	// Code coverage: fraction of constraint items that have a code assigned
+	// When no constraints were surfaced, coverage = 1.0 (nothing to cover)
+	var codeCoverage float64
+	if c.constraintTotal > 0 {
+		codeCoverage = float64(c.constraintWithCode) / float64(c.constraintTotal)
+	} else {
+		codeCoverage = 1.0
+	}
+
 	// T2 frequency by constraint (copy)
 	t2Freq := make(map[string]int, len(c.t2Frequency))
 	for k, v := range c.t2Frequency {
@@ -194,6 +215,7 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		AvgComprehension:         avgComp,
 		ReplayFrequencyPerHour:   replayFreq,
 		TicketRestoreSuccessRate: ticketRate,
+		CodeCoverage:             codeCoverage,
 		T2FrequencyByConstraint:  t2Freq,
 		WindowStart:              c.windowStart,
 		WindowEnd:                now,
@@ -216,6 +238,8 @@ func (c *ProtocolMetricsCollector) Reset() {
 	c.replayEvents = 0
 	c.ticketRestoreOK = 0
 	c.ticketRestoreTotal = 0
+	c.constraintTotal = 0
+	c.constraintWithCode = 0
 	c.t2Frequency = make(map[string]int)
 	c.windowStart = time.Now()
 }

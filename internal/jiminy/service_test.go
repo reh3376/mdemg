@@ -253,6 +253,180 @@ func TestComputeOverallConfidence_Empty(t *testing.T) {
 	}
 }
 
+// Gap 3: Cache J17 bypass tests
+
+func TestCache_J17_Bypass(t *testing.T) {
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Constraints: []models.Constraint{
+				{Name: "rule1", ConstraintType: "must", Description: "Must do X", Confidence: 0.9, SourceNodes: []string{"c1"}},
+			},
+		},
+	}
+
+	cfg := config.Config{
+		JiminyEnabled:        true,
+		JiminyTimeoutMs:      5000,
+		JiminyMaxItems:       10,
+		JiminyMinConfidence:  0.3,
+		JiminyCacheEnabled:   true,
+		JiminyCacheSize:      100,
+		JiminyCacheTTLSec:    300,
+		JiminyCacheJ17Bypass: true,
+		J17Enabled:           true,
+	}
+
+	s := NewService(cfg, nil, consultant, nil)
+
+	// First call with session ID — should not be cached due to J17 bypass
+	resp1, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID:   "test",
+		Context:   "Same context",
+		SessionID: "session-1",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+	id1 := resp1.GuidanceID
+
+	// Second call with same context but different session — should get fresh response
+	resp2, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID:   "test",
+		Context:   "Same context",
+		SessionID: "session-2",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	// Should get different guidance IDs (not cached)
+	if resp2.GuidanceID == id1 {
+		t.Error("expected different guidance IDs (cache bypass), got same")
+	}
+}
+
+func TestCache_NonJ17_StillCaches(t *testing.T) {
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Constraints: []models.Constraint{
+				{Name: "rule1", ConstraintType: "must", Description: "Must do X", Confidence: 0.9, SourceNodes: []string{"c1"}},
+			},
+		},
+	}
+
+	cfg := config.Config{
+		JiminyEnabled:        true,
+		JiminyTimeoutMs:      5000,
+		JiminyMaxItems:       10,
+		JiminyMinConfidence:  0.3,
+		JiminyCacheEnabled:   true,
+		JiminyCacheSize:      100,
+		JiminyCacheTTLSec:    300,
+		JiminyCacheJ17Bypass: true,
+		J17Enabled:           false, // J17 disabled
+	}
+
+	s := NewService(cfg, nil, consultant, nil)
+
+	// First call without J17 — should be cached
+	resp1, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "Same context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+	id1 := resp1.GuidanceID
+
+	// Second call — should get cached response
+	resp2, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "Same context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	// Should get same guidance ID (from cache)
+	if resp2.GuidanceID != id1 {
+		t.Error("expected same guidance ID (cached), got different")
+	}
+}
+
+// Gap 6: Shadow ML no-panic tests
+
+func TestGuide_ShadowTierPredictor_NoSidecar(t *testing.T) {
+	// Verify no panic when sidecar URL is empty (default)
+	cfg := config.Config{
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     2000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+		J17Enabled:          true,
+		J17SidecarURL:       "", // no sidecar
+	}
+
+	s := NewService(cfg, nil, &mockConsultant{resp: models.SuggestResponse{SpaceID: "test"}}, nil)
+	if s.tierPredictor != nil {
+		t.Error("expected nil tierPredictor when no sidecar URL")
+	}
+
+	// Guide should work fine without the shadow predictor
+	_, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() should not error without sidecar: %v", err)
+	}
+}
+
+func TestRecordOutcome_ShadowNLI_NoSidecar(t *testing.T) {
+	// Verify no panic when NLI scorer is nil
+	cfg := config.Config{
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     2000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+		J17SidecarURL:       "", // no sidecar
+	}
+
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Constraints: []models.Constraint{
+				{Name: "rule1", ConstraintType: "must", Description: "Must do X", Confidence: 0.9, SourceNodes: []string{"c1"}},
+			},
+		},
+	}
+
+	s := NewService(cfg, nil, consultant, nil)
+	if s.nliScorer != nil {
+		t.Error("expected nil nliScorer when no sidecar URL")
+	}
+
+	// Guide to get a guidance ID
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	// RecordOutcome should work fine without NLI scorer
+	_, err = s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "followed the constraint",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() should not error without sidecar: %v", err)
+	}
+}
+
 func TestConstraintPriority(t *testing.T) {
 	tests := []struct {
 		input string

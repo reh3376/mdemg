@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "a34686219aa5aa6a6af759c3d6c0400f2f846fc24bb237db45a35324af84a126"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -72,7 +72,9 @@
     {
       "name": "j17_disabled",
       "description": "When J17 is disabled, bootstrap returns 503.",
-      "tags": ["j17_disabled"],
+      "tags": [
+        "j17_disabled"
+      ],
       "expected": {
         "status": 503,
         "body_assertions": [

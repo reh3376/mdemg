@@ -25,7 +25,8 @@
       "rerank",
       "sidecar",
       "fsd"
-    ]
+    ],
+    "sha256": "ba0349d3262b0d3bdcedb25cd48611efa78da664b5fef6c6f1367dfc445285a1"
   },
   "variables": {},
   "request": {
@@ -112,7 +113,9 @@
         "method": "POST",
         "path": "/rerank",
         "body": {
-          "documents": ["doc1"]
+          "documents": [
+            "doc1"
+          ]
         }
       },
       "assertions": [
@@ -130,7 +133,9 @@
         "path": "/rerank",
         "body": {
           "query": "test",
-          "documents": ["doc1"],
+          "documents": [
+            "doc1"
+          ],
           "top_n": 0
         }
       },

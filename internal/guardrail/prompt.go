@@ -50,20 +50,20 @@ func buildEvalPrompt(diffCtx DiffContext, constraints []constraintMatch, compres
 		content := truncateString(c.Content, contentMaxLen)
 		if compress {
 			// Single-line pipe-separated format
-			sb.WriteString(fmt.Sprintf("[%d] %s | %s", i+1, c.NodeID, c.ConstraintType))
+			fmt.Fprintf(&sb, "[%d] %s | %s", i+1, c.NodeID, c.ConstraintType)
 			if c.Name != "" {
 				sb.WriteString(" | ")
 				sb.WriteString(c.Name)
 			}
-			sb.WriteString(fmt.Sprintf(" | conf:%.2f | %s\n", c.Confidence, content))
+			fmt.Fprintf(&sb, " | conf:%.2f | %s\n", c.Confidence, content)
 		} else {
-			sb.WriteString(fmt.Sprintf("[%d] node_id: %s\n", i+1, c.NodeID))
-			sb.WriteString(fmt.Sprintf("    type: %s\n", c.ConstraintType))
+			fmt.Fprintf(&sb, "[%d] node_id: %s\n", i+1, c.NodeID)
+			fmt.Fprintf(&sb, "    type: %s\n", c.ConstraintType)
 			if c.Name != "" {
-				sb.WriteString(fmt.Sprintf("    name: %s\n", c.Name))
+				fmt.Fprintf(&sb, "    name: %s\n", c.Name)
 			}
-			sb.WriteString(fmt.Sprintf("    confidence: %.2f\n", c.Confidence))
-			sb.WriteString(fmt.Sprintf("    content: %s\n\n", content))
+			fmt.Fprintf(&sb, "    confidence: %.2f\n", c.Confidence)
+			fmt.Fprintf(&sb, "    content: %s\n\n", content)
 		}
 	}
 	if compress {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
@@ -204,12 +205,20 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 		return fmt.Errorf("open log file: %w", err)
 	}
 
+	// Load .env and YAML config into parent environment before forking,
+	// so the daemon child inherits the correct environment variables.
+	// .env is loaded FIRST so YAML skip-if-set logic respects .env values.
+	_ = godotenv.Load()
+	if cfgPath := config.FindConfigFile(); cfgPath != "" {
+		_ = config.LoadYAMLConfig(cfgPath)
+	}
+
 	// Start detached process
 	daemon := osExec.Command(execPath, serveArgs...)
 	daemon.Stdout = logFile
 	daemon.Stderr = logFile
 	setDaemonSysProcAttr(daemon)
-	// Inherit environment
+	// Inherit environment (now includes .env and YAML vars)
 	daemon.Env = os.Environ()
 
 	if err := daemon.Start(); err != nil {

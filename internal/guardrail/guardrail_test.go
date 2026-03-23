@@ -1049,3 +1049,144 @@ func TestBuildEvalPrompt_Compressed_DiffVerbatim(t *testing.T) {
 		t.Errorf("diff block should be identical in both modes.\ncompressed:   %q\nuncompressed: %q", compressedDiff, uncompressedDiff)
 	}
 }
+
+// ============================================================
+// scopeClause tests (pure — no Neo4j)
+// ============================================================
+
+// When ConstraintScopeFilteringEnabled is false, scopeClause must return "".
+func TestScopeClause_Disabled(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintScopeFilteringEnabled: false},
+	}
+	got := svc.scopeClause()
+	if got != "" {
+		t.Errorf("expected empty string when scope filtering disabled, got %q", got)
+	}
+}
+
+// When ConstraintScopeFilteringEnabled is true, the clause must contain the
+// regex match condition used in the Cypher WHERE fragment.
+func TestScopeClause_Enabled(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintScopeFilteringEnabled: true},
+	}
+	got := svc.scopeClause()
+	if got == "" {
+		t.Fatal("expected non-empty scope clause when scope filtering enabled")
+	}
+	if !strings.Contains(got, "$filePath =~ c.scope") {
+		t.Errorf("scope clause missing '$filePath =~ c.scope', got %q", got)
+	}
+}
+
+// ============================================================
+// authorityClause tests (pure — no Neo4j)
+// ============================================================
+
+// When ConstraintAuthorityEnabled is false, authorityClause must return ""
+// for every trust level.
+func TestAuthorityClause_Disabled(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintAuthorityEnabled: false},
+	}
+	for _, level := range []string{"restricted", "standard", "elevated", "", "unknown"} {
+		got := svc.authorityClause(level)
+		if got != "" {
+			t.Errorf("authorityClause(%q) with authority disabled: expected \"\", got %q", level, got)
+		}
+	}
+}
+
+// "standard" trust level must include both org_policy and team_standard.
+func TestAuthorityClause_Standard(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintAuthorityEnabled: true},
+	}
+	got := svc.authorityClause("standard")
+	if got == "" {
+		t.Fatal("expected non-empty clause for standard trust level")
+	}
+	if !strings.Contains(got, "org_policy") {
+		t.Errorf("standard clause missing 'org_policy', got %q", got)
+	}
+	if !strings.Contains(got, "team_standard") {
+		t.Errorf("standard clause missing 'team_standard', got %q", got)
+	}
+}
+
+// "elevated" trust level must filter for org_policy only (equality, not IN list).
+// team_standard may appear as a coalesce default but must NOT appear in the
+// permitted-authority list.
+func TestAuthorityClause_Elevated(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintAuthorityEnabled: true},
+	}
+	got := svc.authorityClause("elevated")
+	if got == "" {
+		t.Fatal("expected non-empty clause for elevated trust level")
+	}
+	if !strings.Contains(got, "org_policy") {
+		t.Errorf("elevated clause missing 'org_policy', got %q", got)
+	}
+	// Elevated uses = 'org_policy' (single equality), not an IN list with team_standard.
+	if strings.Contains(got, "IN [") {
+		t.Errorf("elevated clause must use equality (= 'org_policy'), not an IN list, got %q", got)
+	}
+	if !strings.Contains(got, "= 'org_policy'") {
+		t.Errorf("elevated clause must use equality = 'org_policy', got %q", got)
+	}
+}
+
+// "restricted" trust level (sees all constraints) must return "" even when
+// authority filtering is enabled.
+func TestAuthorityClause_Restricted(t *testing.T) {
+	svc := &GuardrailService{
+		cfg: GuardrailConfig{ConstraintAuthorityEnabled: true},
+	}
+	got := svc.authorityClause("restricted")
+	if got != "" {
+		t.Errorf("restricted trust level should return \"\", got %q", got)
+	}
+}
+
+// ============================================================
+// primaryFilePath tests (pure — no Neo4j)
+// ============================================================
+
+func TestPrimaryFilePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		diffCtx  DiffContext
+		wantPath string
+	}{
+		{
+			name:     "first element returned",
+			diffCtx:  DiffContext{FilePaths: []string{"internal/auth/handler.go", "pkg/config.go"}},
+			wantPath: "internal/auth/handler.go",
+		},
+		{
+			name:     "single element",
+			diffCtx:  DiffContext{FilePaths: []string{"main.go"}},
+			wantPath: "main.go",
+		},
+		{
+			name:     "empty slice returns empty string",
+			diffCtx:  DiffContext{FilePaths: []string{}},
+			wantPath: "",
+		},
+		{
+			name:     "nil slice returns empty string",
+			diffCtx:  DiffContext{FilePaths: nil},
+			wantPath: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := primaryFilePath(tt.diffCtx)
+			if got != tt.wantPath {
+				t.Errorf("primaryFilePath() = %q, want %q", got, tt.wantPath)
+			}
+		})
+	}
+}

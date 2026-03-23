@@ -25,7 +25,8 @@
       "jiminy",
       "feedback",
       "phase_ar2"
-    ]
+    ],
+    "sha256": "ce767319a55347adb657e49d2e9fbcf164036ff81271d61074a58e9ca3306e49"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -56,7 +57,7 @@
   "variants": [
     {
       "name": "valid_feedback",
-      "description": "Returns 200 when guidance_id is provided (even if unknown — graceful handling).",
+      "description": "Returns 200 when guidance_id is provided (even if unknown \u2014 graceful handling).",
       "request": {
         "body": {
           "guidance_id": "{{guidance_id}}",
@@ -65,7 +66,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": []
       }
     },
@@ -99,7 +103,10 @@
         }
       },
       "expected": {
-        "status": [400, 503],
+        "status": [
+          400,
+          503
+        ],
         "body_assertions": []
       }
     },
@@ -115,7 +122,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": []
       }
     }

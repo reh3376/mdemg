@@ -237,6 +237,7 @@ class TestReport:
     passed: int
     failed: int
     errors: int
+    skipped: int = 0
     results: List[SpecResult] = field(default_factory=list)
     
     @property
@@ -255,6 +256,7 @@ class TestReport:
                 "passed": self.passed,
                 "failed": self.failed,
                 "errors": self.errors,
+                "skipped": self.skipped,
                 "pass_rate": round(self.pass_rate, 2)
             },
             "results": [r.to_dict() for r in self.results]
@@ -1413,6 +1415,7 @@ class Reporter:
         print(f"Total Variants: {report.total_variants}")
         print(f"Passed: {self._c(str(report.passed), 'green')}")
         print(f"Failed: {self._c(str(report.failed), 'red')}")
+        print(f"Skipped: {report.skipped}")
         print(f"Errors: {report.errors}")
         print(f"Pass Rate: {report.pass_rate:.1f}%")
     
@@ -1633,6 +1636,7 @@ class Runner:
             passed=passed,
             failed=failed,
             errors=errors,
+            skipped=skipped,
             results=all_results
         )
         

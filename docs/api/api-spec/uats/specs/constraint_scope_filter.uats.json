@@ -5,7 +5,10 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["constraints", "scope"]
+    "tags": [
+      "constraints",
+      "scope"
+    ]
   },
   "metadata": {
     "author": "agent",
@@ -16,7 +19,12 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["constraints", "scope", "fsd"]
+    "tags": [
+      "constraints",
+      "scope",
+      "fsd"
+    ],
+    "sha256": "8aa79b62f7728ace37c396a0562bfd9f79705d996c67a253eae3f46facb361af"
   },
   "variables": {},
   "request": {

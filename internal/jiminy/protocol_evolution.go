@@ -42,6 +42,29 @@ func (pe *ProtocolEvolver) CodifyConstraint(ctx context.Context, spaceID string,
 		return nil, fmt.Errorf("j17: codify constraint: %w", err)
 	}
 
+	// Gap 5: Persist the code to Neo4j (following RetireCode's pattern)
+	if pe.driver != nil {
+		sess := pe.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		defer sess.Close(ctx)
+		_, writeErr := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			cypher := `MATCH (n:MemoryNode)
+				WHERE n.node_id = $nodeId AND n.space_id = $spaceId
+				SET n.constraint_code = $code,
+					n.constraint_code_assigned_at = datetime(),
+					n.constraint_code_assigned_by = "mdemg-codify"
+				RETURN count(n) AS updated`
+			_, runErr := tx.Run(ctx, cypher, map[string]any{
+				"nodeId":  constraintNodeID,
+				"spaceId": spaceID,
+				"code":    code,
+			})
+			return nil, runErr
+		})
+		if writeErr != nil {
+			log.Printf("j17: codify Neo4j write error: %v", writeErr)
+		}
+	}
+
 	log.Printf("j17: codified constraint %s → %s", constraintNodeID, code)
 
 	return map[string]any{

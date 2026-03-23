@@ -6,7 +6,7 @@
 
 Jiminy surfaces constraints, corrections, contradictions, and patterns before the agent acts. But without feedback, there's no way to know whether the guidance was useful. Did the agent follow the constraint? Ignore the correction? Contradict the pattern?
 
-Effectiveness tracking closes this loop. Every `Guide()` call now returns a `guidance_id` (UUID). After the agent acts, the caller sends a feedback request with the `guidance_id` and a summary of what the agent actually did. The system classifies each guidance item's outcome and returns the results.
+Effectiveness tracking closes this loop. Every `Guide()` call now returns a `guidance_id` (CUID2 unique identifier). After the agent acts, the caller sends a feedback request with the `guidance_id` and a summary of what the agent actually did. The system classifies each guidance item's outcome and returns the results.
 
 ## How It Works
 
@@ -66,7 +66,7 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
   -H "Content-Type: application/json" \
   -d '{"space_id":"mdemg-dev","context":"Refactoring auth middleware"}' \
   | jq '.data.guidance_id'
-# "a8463a5e-ca38-4b55-bee1-649d0ab9c4e7"
+# "cm5x7k2j10000jn08h1g2i3j4"
 ```
 
 ### POST /v1/jiminy/feedback (new)
@@ -77,7 +77,7 @@ Send feedback after the agent acts:
 curl -s -X POST http://localhost:9999/v1/jiminy/feedback \
   -H "Content-Type: application/json" \
   -d '{
-    "guidance_id": "a8463a5e-ca38-4b55-bee1-649d0ab9c4e7",
+    "guidance_id": "cm5x7k2j10000jn08h1g2i3j4",
     "action_summary": "I validated the input before processing it",
     "space_id": "mdemg-dev"
   }'
@@ -96,7 +96,7 @@ curl -s -X POST http://localhost:9999/v1/jiminy/feedback \
 ```json
 {
   "data": {
-    "guidance_id": "a8463a5e-ca38-4b55-bee1-649d0ab9c4e7",
+    "guidance_id": "cm5x7k2j10000jn08h1g2i3j4",
     "applied": true,
     "results": [
       {
@@ -138,7 +138,7 @@ When disabled, `Guide()` still works normally but doesn't generate `guidance_id`
 | File | Description |
 |------|-------------|
 | `internal/jiminy/effectiveness.go` | `EffectivenessTracker` — LRU cache with TTL |
-| `internal/jiminy/service.go` | `Guide()` — UUID generation, item tracking; `RecordOutcome()` — feedback processing; `classifyOutcome()` — text overlap scoring |
+| `internal/jiminy/service.go` | `Guide()` — CUID2 ID generation, item tracking; `RecordOutcome()` — feedback processing; `classifyOutcome()` — text overlap scoring |
 | `internal/jiminy/types.go` | `GuidanceOutcome`, `GuidanceFeedbackRequest`, `GuidanceFeedbackResponse`, `GuidanceItemFeedback` |
 | `internal/api/handlers_jiminy.go` | `handleJiminyFeedback()` — HTTP handler |
 | `internal/api/server.go` | Route registration for `/v1/jiminy/feedback` |

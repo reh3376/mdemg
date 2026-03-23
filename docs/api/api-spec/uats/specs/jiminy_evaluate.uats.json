@@ -24,7 +24,8 @@
       "jiminy",
       "evaluate",
       "phase_j9"
-    ]
+    ],
+    "sha256": "775c06b1d04f43976a8b475ffa8d888c477ad687fbbfb188fa87b97eecb96999"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -42,7 +43,10 @@
     }
   },
   "expected": {
-    "status": [200, 503],
+    "status": [
+      200,
+      503
+    ],
     "body_assertions": []
   },
   "variants": [
@@ -118,7 +122,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": []
       }
     }

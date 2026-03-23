@@ -143,6 +143,7 @@ DEGRADED
 fi
 
 # J17: Restore protocol state from saved ticket
+J17_STATE_RESTORED=false
 if [ "${J17_ENABLED:-false}" = "true" ]; then
   J17_TICKET_OBS=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
     -H "Content-Type: application/json" \
@@ -163,12 +164,29 @@ if [ "${J17_ENABLED:-false}" = "true" ]; then
           J17_RESTORED=$(echo "$J17_RESUME" | jq -r '.data.restored // false' 2>/dev/null || echo "false")
           J17_MSG=$(echo "$J17_RESUME" | jq -r '.data.message // ""' 2>/dev/null || true)
           if [ "$J17_RESTORED" = "true" ]; then
+            J17_STATE_RESTORED=true
             echo ""
             echo "═══ J17 PROTOCOL RESTORED ═══"
             echo "$J17_MSG"
             echo "═══ END J17 ═══"
           fi
         fi
+      fi
+    fi
+  fi
+
+  # Gap 4: Cold-start bootstrap fallback — if warm resume failed or no ticket,
+  # fetch bootstrap protocol so the agent knows J17 exists
+  if [ "$J17_STATE_RESTORED" != "true" ]; then
+    J17_BOOTSTRAP=$(curl -sf -X GET "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
+      --connect-timeout 3 --max-time 5 2>/dev/null || true)
+    if [ -n "$J17_BOOTSTRAP" ]; then
+      BOOT_HEADER=$(echo "$J17_BOOTSTRAP" | jq -r '.data.bootstrap // empty' 2>/dev/null || true)
+      if [ -n "$BOOT_HEADER" ]; then
+        echo ""
+        echo "═══ J17 BOOTSTRAP (cold start) ═══"
+        echo "$BOOT_HEADER"
+        echo "═══ END J17 ═══"
       fi
     fi
   fi
