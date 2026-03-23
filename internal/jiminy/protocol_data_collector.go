@@ -22,6 +22,14 @@ type protocolTrainingRecord struct {
 	ComprehensionScore float64 `json:"comprehension_score"`
 	TrustScore         float64 `json:"trust_score"`
 	SessionID          string  `json:"session_id"`
+	// NS-03: Expanded fields for sidecar arbitration training
+	ApplicabilityScore float64 `json:"applicability_score,omitempty"`
+	ScoreSource        string  `json:"score_source,omitempty"`    // "heuristic" or "nli"
+	MLTier             int     `json:"ml_tier,omitempty"`         // ML-predicted tier (0 if unavailable)
+	RuleTier           int     `json:"rule_tier,omitempty"`       // Rule-based tier
+	MLConfidence       float64 `json:"ml_confidence,omitempty"`   // ML prediction confidence
+	TierSource         string  `json:"tier_source,omitempty"`     // "rule", "ml", or "fallback"
+	SidecarMode        string  `json:"sidecar_mode,omitempty"`    // shadow/compare/canary/active
 }
 
 // ProtocolDataCollector writes protocol events to JSONL files for ML training.

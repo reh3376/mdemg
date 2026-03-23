@@ -33,6 +33,48 @@ func (s *Server) handleJ17ProtocolMetrics(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"data": snapshot})
 }
 
+// handleJ17TierEffectiveness returns a tier effectiveness report with optional NLI calibration.
+// GET /v1/jiminy/protocol/tier-effectiveness?space_id=...
+func (s *Server) handleJ17TierEffectiveness(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
+		return
+	}
+
+	snapshot := s.jiminySvc.GetProtocolMetricsSnapshot()
+	if snapshot == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"data": map[string]any{
+				"message": "protocol metrics collection not enabled",
+			},
+		})
+		return
+	}
+
+	report := jiminy.GradeTierEffectiveness(snapshot, s.cfg.J17TierEffectivenessMinSamples, s.cfg.J17TierIneffectiveThreshold)
+
+	result := map[string]any{
+		"overall_tier_comprehension": snapshot.TierComprehension,
+		"tier_outcome_count":         snapshot.TierOutcomeCount,
+	}
+
+	if report != nil {
+		result["code_tier_delta"] = report.CodeTierDelta
+		result["ineffective_tiers"] = report.IneffectiveTiers
+	}
+
+	if calibReport := s.jiminySvc.GetNLICalibrationReport(); calibReport != nil {
+		result["nli_calibration"] = calibReport
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
+}
+
 // handleJ17Extension processes an agent's request for a protocol extension.
 // POST /v1/jiminy/extension
 func (s *Server) handleJ17Extension(w http.ResponseWriter, r *http.Request) {

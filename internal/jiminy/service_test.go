@@ -427,6 +427,139 @@ func TestRecordOutcome_ShadowNLI_NoSidecar(t *testing.T) {
 	}
 }
 
+// NS-03: FeedbackDimensions tests
+
+func TestRecordOutcome_FeedbackDimensions_Heuristic(t *testing.T) {
+	// When NLI scorer is nil, FeedbackDimensions should use heuristic scoring
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Constraints: []models.Constraint{
+				{Name: "rule1", ConstraintType: "must", Description: "Must do X", Confidence: 0.9, SourceNodes: []string{"c1"}},
+			},
+		},
+	}
+
+	cfg := config.Config{
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     5000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+		J17SidecarURL:       "", // no NLI scorer
+	}
+
+	s := NewService(cfg, nil, consultant, nil)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	feedback, err := s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "followed the Must do X constraint exactly",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	// Find the constraint result
+	for _, r := range feedback.Results {
+		if r.Type != GuidanceConstraint {
+			continue
+		}
+		if r.Dimensions == nil {
+			t.Fatal("expected FeedbackDimensions for constraint item, got nil")
+		}
+		if r.Dimensions.ScoreSource != "heuristic" {
+			t.Errorf("expected score_source='heuristic', got %q", r.Dimensions.ScoreSource)
+		}
+		// Adherence should match the outcome
+		if r.Dimensions.Adherence != r.Outcome {
+			t.Errorf("expected dimensions.adherence=%q to match outcome=%q", r.Dimensions.Adherence, r.Outcome)
+		}
+		// Comprehension should be set based on outcome
+		if r.Dimensions.Comprehension < 0 || r.Dimensions.Comprehension > 1 {
+			t.Errorf("comprehension %.2f out of range [0,1]", r.Dimensions.Comprehension)
+		}
+		// Applicability should be set
+		if r.Dimensions.Applicability < 0 || r.Dimensions.Applicability > 1 {
+			t.Errorf("applicability %.2f out of range [0,1]", r.Dimensions.Applicability)
+		}
+	}
+}
+
+func TestRecordOutcome_FeedbackDimensions_NonConstraint_NilDimensions(t *testing.T) {
+	// FeedbackDimensions should be nil for non-constraint items (patterns, suggestions)
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Suggestions: []models.Suggestion{
+				{Type: models.SuggestionContext, Content: "Use structured logging", Confidence: 0.8, SourceNodes: []string{"s1"}},
+			},
+		},
+	}
+
+	cfg := config.Config{
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     5000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+	}
+
+	s := NewService(cfg, nil, consultant, nil)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	feedback, err := s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "used structured logging",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	for _, r := range feedback.Results {
+		if r.Type != GuidanceConstraint && r.Dimensions != nil {
+			t.Errorf("expected nil dimensions for non-constraint type %q, got %+v", r.Type, r.Dimensions)
+		}
+	}
+}
+
+func TestFeedbackDimensions_JSONSerialization(t *testing.T) {
+	dims := FeedbackDimensions{
+		Adherence:     OutcomeFollowed,
+		Comprehension: 0.95,
+		Applicability: 1.0,
+		ScoreSource:   "nli",
+	}
+
+	// Verify struct is well-formed
+	if dims.Adherence != OutcomeFollowed {
+		t.Errorf("adherence = %q, want %q", dims.Adherence, OutcomeFollowed)
+	}
+	if dims.Comprehension != 0.95 {
+		t.Errorf("comprehension = %f, want 0.95", dims.Comprehension)
+	}
+	if dims.Applicability != 1.0 {
+		t.Errorf("applicability = %f, want 1.0", dims.Applicability)
+	}
+	if dims.ScoreSource != "nli" {
+		t.Errorf("score_source = %q, want 'nli'", dims.ScoreSource)
+	}
+}
+
 func TestConstraintPriority(t *testing.T) {
 	tests := []struct {
 		input string

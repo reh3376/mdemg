@@ -148,6 +148,22 @@ func (pe *ProtocolEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 		newLow += 0.03
 	}
 
+	// Comprehension-based adjustment: if T1 comprehension is low on sufficient data,
+	// raise threshold (fewer T1 assignments); if high, slightly lower bar
+	if snapshot.TierComprehension[0] > 0 && snapshot.TierOutcomeCount[0] >= 5 {
+		if snapshot.TierComprehension[0] < 0.6 {
+			newHigh += 0.05 // T1 failing — make T1 harder to reach
+		} else if snapshot.TierComprehension[0] > 0.9 && snapshot.TierOutcomeCount[0] >= 20 {
+			newHigh -= 0.02 // T1 working great, slightly lower bar
+		}
+	}
+	// If T2 comprehension significantly below T3, push more to T3
+	if snapshot.TierComprehension[1] > 0 && snapshot.TierComprehension[2] > 0 {
+		if snapshot.TierComprehension[1] < snapshot.TierComprehension[2]-0.15 {
+			newLow += 0.03
+		}
+	}
+
 	// Clamp: high in [0.3, 0.95], low >= 0.1 and low < high - 0.1
 	if newHigh < 0.3 {
 		newHigh = 0.3
@@ -185,6 +201,9 @@ func (pe *ProtocolEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 		"new_low_threshold":  newLow,
 		"adjustment_reason":  fmt.Sprintf("T1 distribution: %.1f%%", snapshot.TierDistribution[0]*100),
 		"action":             "adjust_tier_threshold",
+		"t1_comprehension":   snapshot.TierComprehension[0],
+		"t2_comprehension":   snapshot.TierComprehension[1],
+		"t3_comprehension":   snapshot.TierComprehension[2],
 	}, nil
 }
 

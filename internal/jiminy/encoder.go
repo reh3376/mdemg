@@ -78,8 +78,13 @@ func (e *ProtocolEncoder) Encode(items []GuidanceItem, counts SourceCounts, conf
 	sb.WriteString("═══ JIMINY GUIDANCE ═══\n")
 
 	for i := range items {
-		tier := e.selectTier(items[i], trustScore)
-		items[i].Tier = tier
+		// NS-01: If tier is pre-assigned by the sidecar arbitrator, use it.
+		// Otherwise, fall back to rule-based tier selection.
+		tier := items[i].Tier
+		if tier < TierCoded || tier > TierFullNL {
+			tier = e.selectTier(items[i], trustScore)
+			items[i].Tier = tier
+		}
 
 		switch tier {
 		case TierCoded:

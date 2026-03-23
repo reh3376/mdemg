@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"mdemg/internal/circuitbreaker"
 )
 
 // NLIComprehensionScorer scores constraint comprehension via the neural sidecar.
@@ -15,6 +17,7 @@ type NLIComprehensionScorer struct {
 	timeoutMs  int
 	enabled    bool
 	client     *http.Client
+	breaker    *circuitbreaker.Breaker
 }
 
 // NewNLIComprehensionScorer creates a new NLI comprehension scorer.
@@ -27,6 +30,11 @@ func NewNLIComprehensionScorer(sidecarURL string, timeoutMs int, enabled bool) *
 			Timeout: time.Duration(timeoutMs) * time.Millisecond,
 		},
 	}
+}
+
+// SetCircuitBreaker sets a circuit breaker to wrap sidecar HTTP calls.
+func (s *NLIComprehensionScorer) SetCircuitBreaker(b *circuitbreaker.Breaker) {
+	s.breaker = b
 }
 
 type nliRequest struct {
@@ -55,8 +63,25 @@ func (s *NLIComprehensionScorer) ScoreComprehension(ctx context.Context,
 		return 0.0
 	}
 
-	result, err := s.classifyNLI(ctx, constraintText, agentActionSummary)
-	if err != nil {
+	var result *nliResponse
+	var callErr error
+
+	callFn := func(ctx context.Context) error {
+		r, err := s.classifyNLI(ctx, constraintText, agentActionSummary)
+		if err != nil {
+			return err
+		}
+		result = r
+		return nil
+	}
+
+	if s.breaker != nil {
+		callErr = s.breaker.Execute(ctx, callFn)
+	} else {
+		callErr = callFn(ctx)
+	}
+
+	if callErr != nil {
 		if followed {
 			return 1.0
 		}

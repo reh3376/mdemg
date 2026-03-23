@@ -34,10 +34,11 @@ type CycleOrchestrator struct {
 	dispatcher *Dispatcher
 	monitor    *Monitor
 	calibrator *Calibrator
-	watchdog       *Watchdog
-	snapshotStore  *SnapshotStore
-	cfg            config.Config
-	policy         *OrchestrationPolicy
+	watchdog         *Watchdog
+	snapshotStore    *SnapshotStore
+	cfg              config.Config
+	policy           *OrchestrationPolicy
+	tierEffProvider  TierEffectivenessProvider // NLI feedback loop: tier effectiveness dataset builder
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -282,6 +283,13 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// Phase 89: Clean up stale dispatcher tasks
 	c.dispatcher.CleanupStaleTasks(10 * time.Minute)
 
+	// NLI feedback loop: generate tier effectiveness dataset at meso/macro cycle boundaries
+	if c.tierEffProvider != nil && (tier == TierMeso || tier == TierMacro) {
+		if ds := c.tierEffProvider.BuildDataset(); ds != nil {
+			log.Printf("RSIC %s: tier effectiveness dataset generated", cycleID)
+		}
+	}
+
 	metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "completed").Inc()
 	metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 
@@ -314,6 +322,11 @@ func (c *CycleOrchestrator) SetOrchestrationPolicy(p *OrchestrationPolicy) {
 // SetSnapshotStore attaches a snapshot store for auto-rollback support.
 func (c *CycleOrchestrator) SetSnapshotStore(ss *SnapshotStore) {
 	c.snapshotStore = ss
+}
+
+// SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
+func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProvider) {
+	c.tierEffProvider = p
 }
 
 // isReversibleAction returns true if the action type can be rolled back.

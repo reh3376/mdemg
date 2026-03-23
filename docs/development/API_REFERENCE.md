@@ -1411,6 +1411,37 @@ Request constraint code re-generation when an existing code is ambiguous or caus
 
 **Config**: `J17_ENABLED`, `J17_CODEGEN_ENABLED`, `J17_CODEGEN_PROVIDER`, `J17_CODEGEN_MODEL`.
 
+**Neural Sidecar Promotion Config** (9 vars):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `J17_SIDECAR_MODE` | `shadow` | Arbitration mode: shadow/compare/canary/active |
+| `J17_SIDECAR_CANARY_PERCENTAGE` | `100` | ML routing % in canary mode |
+| `J17_SIDECAR_CONFIDENCE_FLOOR` | `0.6` | ML confidence floor for tier acceptance |
+| `J17_NLI_SCORE_OF_RECORD` | `false` | NLI replaces heuristic comprehension in canary/active |
+| `J17_PRECEDENT_PROTECTED_CODES` | `""` | Constraint codes immune to ML tier selection |
+| `J17_PRECEDENT_LOG_ENABLED` | `true` | Audit log for protected code ML attempts |
+| `J17_SIDECAR_CB_ENABLED` | `true` | Circuit breaker for sidecar calls |
+| `J17_SIDECAR_CB_FAILURE_THRESHOLD` | `3` | Failures before circuit opens |
+| `J17_SIDECAR_CB_TIMEOUT_SEC` | `15` | Half-open probe delay (seconds) |
+
+#### NLI Feedback Loop
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `J17_NLI_OBSERVATIONAL_ENABLED` | `true` | NLI scores flow to metrics in all modes (not just causal) |
+| `J17_TIER_EFFECTIVENESS_MIN_SAMPLES` | `5` | Min outcomes per tier/code before grading |
+| `J17_TIER_INEFFECTIVE_THRESHOLD` | `0.6` | Comprehension below this = ineffective tier |
+| `J17_TIER_DRIFT_DETECTION_ENABLED` | `true` | Enable `j17_tier_ineffective` RSIC pattern |
+| `J17_NLI_CALIBRATION_WINDOW_SIZE` | `500` | Ring buffer size for NLI/heuristic comparison |
+| `J17_NLI_CALIBRATION_BIAS_THRESHOLD` | `0.15` | Max acceptable NLI-vs-heuristic mean bias |
+
+#### Tier Effectiveness Endpoint
+
+`GET /v1/jiminy/protocol/tier-effectiveness?space_id=<id>`
+
+Returns per-tier comprehension grading, cross-tier delta analysis, ineffective tier detection, and NLI calibration data. Used by RSIC for tier drift detection and protocol adjustment.
+
 ### Hook Distribution (J6b-J6e)
 
 Jiminy hooks can be installed into Claude Code projects via the CLI:

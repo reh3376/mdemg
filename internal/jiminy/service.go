@@ -11,6 +11,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/nrednav/cuid2"
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
@@ -46,8 +47,11 @@ type Service struct {
 	protocolMetrics   *ProtocolMetricsCollector // J17-4: protocol metrics for RSIC
 	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
 	signalLearner     SignalLearnerProvider    // RSIC-SK1: Hebbian signal learner for guidance
-	tierPredictor     *TierPredictor           // Gap 6: shadow-mode ML tier prediction
-	nliScorer         *NLIComprehensionScorer  // Gap 6: shadow-mode NLI comprehension scoring
+	tierPredictor     *TierPredictor           // Gap 6: ML tier prediction
+	nliScorer           *NLIComprehensionScorer  // Gap 6: NLI comprehension scoring
+	arbitrator          *SidecarArbitrator       // NS-01: sidecar mode arbitration
+	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
+	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -159,18 +163,68 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			cfg.J17TrustInitial, cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
 	}
 
-	// Gap 6: Shadow-mode ML components (log only, no behavioral effect)
+	// NS-01: ML components with sidecar arbitration (shadow → causal promotion)
 	var tierPredictor *TierPredictor
 	var nliScorer *NLIComprehensionScorer
+	var arbitrator *SidecarArbitrator
 	if cfg.J17SidecarURL != "" {
 		if cfg.J17MLTierPredictionEnabled {
 			tierPredictor = NewTierPredictor(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
-			log.Printf("jiminy: shadow tier predictor enabled (%s)", cfg.J17SidecarURL)
+			tierPredictor.minConfidence = cfg.J17SidecarConfidenceFloor
+			log.Printf("jiminy: tier predictor enabled (mode=%s, url=%s)", cfg.J17SidecarMode, cfg.J17SidecarURL)
 		}
 		if cfg.J17NLIComprehensionEnabled {
 			nliScorer = NewNLIComprehensionScorer(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
-			log.Printf("jiminy: shadow NLI comprehension scorer enabled (%s)", cfg.J17SidecarURL)
+			log.Printf("jiminy: NLI comprehension scorer enabled (mode=%s, score_of_record=%v)",
+				cfg.J17SidecarMode, cfg.J17NLIScoreOfRecord)
 		}
+		// Create arbitrator regardless of which ML components are enabled
+		arbitrator = NewSidecarArbitrator(
+			cfg.J17SidecarMode,
+			cfg.J17SidecarCanaryPct,
+			cfg.J17SidecarConfidenceFloor,
+			cfg.J17PrecedentProtectedCodes,
+			cfg.J17PrecedentLogEnabled,
+		)
+		log.Printf("jiminy: sidecar arbitrator mode=%s canary_pct=%d confidence_floor=%.2f",
+			cfg.J17SidecarMode, cfg.J17SidecarCanaryPct, cfg.J17SidecarConfidenceFloor)
+	}
+
+	// NS-06: Circuit breaker for sidecar calls (fail-open to rule-based fallback)
+	if cfg.J17SidecarCBEnabled {
+		cbCfg := circuitbreaker.Config{
+			Enabled:          true,
+			FailureThreshold: cfg.J17SidecarCBFailureThreshold,
+			SuccessThreshold: 1,
+			Timeout:          time.Duration(cfg.J17SidecarCBTimeoutSec) * time.Second,
+			MaxConcurrent:    1,
+		}
+		if tierPredictor != nil {
+			tierCB := circuitbreaker.New("sidecar-tier-predictor", cbCfg)
+			tierPredictor.SetCircuitBreaker(tierCB)
+		}
+		if nliScorer != nil {
+			nliCB := circuitbreaker.New("sidecar-nli-scorer", cbCfg)
+			nliScorer.SetCircuitBreaker(nliCB)
+		}
+		log.Printf("jiminy: sidecar circuit breaker enabled (threshold=%d, timeout=%ds)",
+			cfg.J17SidecarCBFailureThreshold, cfg.J17SidecarCBTimeoutSec)
+	}
+
+	// NS-14: Protocol data collector (wired to service for training data)
+	var dataCollector *ProtocolDataCollector
+	if cfg.J17ProtocolDataCollection {
+		dataDir := ".mdemg/neural/protocol-data"
+		dataCollector = NewProtocolDataCollector(dataDir)
+		log.Printf("jiminy: protocol data collection enabled (dir=%s)", dataDir)
+	}
+
+	// NLI feedback loop: calibration tracker for NLI-vs-heuristic bias detection
+	var calibrationTracker *NLICalibrationTracker
+	if nliScorer != nil && cfg.J17NLICalibrationWindowSize > 0 {
+		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
+		log.Printf("jiminy: NLI calibration tracker enabled (window=%d, bias_threshold=%.2f)",
+			cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
 	}
 
 	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
@@ -198,7 +252,10 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		protocolMetrics:   protocolMetrics,
 		extensions:        extensions,
 		tierPredictor:     tierPredictor,
-		nliScorer:         nliScorer,
+		nliScorer:           nliScorer,
+		arbitrator:          arbitrator,
+		dataCollector:       dataCollector,
+		calibrationTracker:  calibrationTracker,
 	}
 }
 
@@ -591,14 +648,68 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Build rationale
 	rationale := buildRationale(counts)
 
+	// NS-01: ML tier prediction + arbitration BEFORE encoding
+	// This allows the arbitrator to pre-assign tiers that the encoder will respect.
+	trustScore := 0.5
+	if s.trustScorer != nil && req.SessionID != "" {
+		trustScore = s.trustScorer.GetScore(req.SessionID)
+	}
+	if s.tierPredictor != nil && s.arbitrator != nil {
+		for i := range filtered {
+			if filtered[i].Type != GuidanceConstraint {
+				continue
+			}
+			pred := s.tierPredictor.PredictTier(ctx, filtered[i].Content, req.Context, trustScore)
+
+			// Get rule-based tier for comparison (encoder.selectTier is the rule-based path)
+			ruleTier := 0
+			if s.encoder != nil {
+				ruleTier = s.encoder.selectTier(filtered[i], trustScore)
+			}
+
+			result := s.arbitrator.ArbitrateTier(filtered[i], ruleTier, pred.Tier, pred.Conf)
+
+			// Log shadow/compare data
+			if pred.Tier > 0 {
+				log.Printf("j17-sidecar: mode=%s ml_tier=%d rule_tier=%d chosen=%d source=%s conf=%.2f agreed=%v code=%s",
+					s.arbitrator.Mode(), pred.Tier, ruleTier, result.ChosenTier, result.Source,
+					pred.Conf, result.Agreed, filtered[i].ConstraintCode)
+			}
+
+			// Pre-assign tier if arbitrator chose ML (encoder will respect it via NS-01 override)
+			if result.Source == "ml" {
+				filtered[i].Tier = result.ChosenTier
+			}
+
+			// Record sidecar metrics (with actual latency and error from HTTP call)
+			if s.protocolMetrics != nil {
+				overridden := result.Source == "ml" && !result.Agreed
+				s.protocolMetrics.RecordSidecarCall(pred.LatencyMs, pred.Err, pred.Tier, ruleTier, overridden)
+			}
+
+			// NS-14: Collect training data
+			if s.dataCollector != nil {
+				s.dataCollector.Collect(protocolTrainingRecord{
+					ConstraintCode:   filtered[i].ConstraintCode,
+					ConstraintNodeID: firstSourceNode(filtered[i]),
+					ConstraintText:   filtered[i].Content,
+					TierUsed:         result.ChosenTier,
+					TrustScore:       trustScore,
+					SessionID:        req.SessionID,
+					MLTier:           pred.Tier,
+					RuleTier:         ruleTier,
+					MLConfidence:     pred.Conf,
+					TierSource:       result.Source,
+					SidecarMode:      s.arbitrator.Mode(),
+				})
+			}
+		}
+	}
+
 	// Format prompt augmentation
 	var augmentation string
 	if s.encoder != nil && s.cfg.J17Enabled {
 		// J17: Use three-tier encoding with trust-modulated tier selection
-		trustScore := 0.5
-		if s.trustScorer != nil && req.SessionID != "" {
-			trustScore = s.trustScorer.GetScore(req.SessionID)
-		}
 		augmentation = s.encoder.Encode(filtered, counts, confidence, trustScore)
 	} else {
 		// Static fallback (pre-J17)
@@ -662,23 +773,6 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 		// Gap 1: Record code coverage so Snapshot().CodeCoverage reflects reality
 		s.protocolMetrics.RecordConstraintCoverage(constraintTotal, constraintWithCode)
-	}
-
-	// Gap 6: Shadow-mode ML tier prediction (log only, no behavioral effect)
-	if s.tierPredictor != nil {
-		trustScore := 0.5
-		if s.trustScorer != nil && req.SessionID != "" {
-			trustScore = s.trustScorer.GetScore(req.SessionID)
-		}
-		for _, item := range filtered {
-			if item.Type == GuidanceConstraint {
-				mlTier, mlConf := s.tierPredictor.PredictTier(ctx, item.Content, req.Context, trustScore)
-				if mlTier > 0 {
-					log.Printf("j17-shadow: tier_predict ml_tier=%d rule_tier=%d ml_conf=%.2f constraint=%s",
-						mlTier, item.Tier, mlConf, item.ConstraintCode)
-				}
-			}
-		}
 	}
 
 	// J17: Assign sequence number and record event
@@ -827,6 +921,12 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	actionLower := strings.ToLower(req.ActionSummary)
 	var results []GuidanceItemFeedback
 
+	// NS-14: Get trust score for training data collection
+	var trustScoreForFeedback float64
+	if s.trustScorer != nil {
+		trustScoreForFeedback = s.trustScorer.GetScore(feedbackSessionID)
+	}
+
 	for _, item := range items {
 		var cr ClassificationResult
 
@@ -862,8 +962,9 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}
 
 		// J17-4: Record outcome for protocol metrics and data collection
-		if s.protocolMetrics != nil && item.ConstraintCode != "" {
-			// Map outcome to comprehension score
+		// NLI feedback loop: when NLI scorer is available, defer recording to the NLI block
+		// to avoid double-counting. When NLI is unavailable, use heuristic scores.
+		if s.protocolMetrics != nil && item.ConstraintCode != "" && s.nliScorer == nil {
 			var compScore float64
 			switch outcome {
 			case OutcomeFollowed:
@@ -875,7 +976,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			default:
 				compScore = 0.5
 			}
-			s.protocolMetrics.RecordOutcome(item.ConstraintCode, compScore)
+			s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, compScore)
 		}
 
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
@@ -897,13 +998,97 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			}
 		}
 
-		// Gap 6: Shadow-mode NLI comprehension scoring (log only, no behavioral effect)
-		if s.nliScorer != nil && item.Type == GuidanceConstraint {
+		// NS-03: Build multi-dimensional feedback (comprehension, applicability, score source)
+		var dims *FeedbackDimensions
+		if item.Type == GuidanceConstraint {
 			followed := outcome == OutcomeFollowed || outcome == OutcomePartialCompliance
-			nliScore := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
-			heuristicScore := cr.Confidence
-			log.Printf("j17-shadow: nli_score nli=%.2f heuristic=%.2f constraint=%s",
-				nliScore, heuristicScore, item.ConstraintCode)
+			var comprehension float64
+			scoreSource := "heuristic"
+
+			if s.nliScorer != nil {
+				nliScore := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
+				log.Printf("j17-sidecar: nli_score nli=%.2f heuristic=%.2f constraint=%s score_of_record=%v",
+					nliScore, cr.Confidence, item.ConstraintCode, s.cfg.J17NLIScoreOfRecord)
+				comprehension = nliScore
+				scoreSource = "nli"
+
+				// NLI feedback loop: Record NLI score to metrics in ALL modes (shadow/compare/canary/active).
+				// NLI is OBSERVATIONAL data — RSIC needs it regardless of arbitration mode.
+				// The heuristic block above is skipped when nliScorer != nil to prevent double-counting.
+				if s.cfg.J17NLIObservationalEnabled && s.protocolMetrics != nil && item.ConstraintCode != "" {
+					s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
+				}
+
+				// NLI calibration: compare NLI with heuristic for bias detection
+				if s.calibrationTracker != nil {
+					var heuristicComp float64
+					switch outcome {
+					case OutcomeFollowed:
+						heuristicComp = 1.0
+					case OutcomePartialCompliance:
+						heuristicComp = 0.7
+					case OutcomeContradicted:
+						heuristicComp = 1.0
+					case OutcomeIgnored:
+						heuristicComp = 0.0
+					default:
+						heuristicComp = 0.5
+					}
+					s.calibrationTracker.Track(nliScore, heuristicComp)
+				}
+			} else {
+				// Heuristic fallback: map outcome to comprehension
+				switch outcome {
+				case OutcomeFollowed:
+					comprehension = 1.0
+				case OutcomePartialCompliance:
+					comprehension = 0.7
+				case OutcomeContradicted:
+					comprehension = 1.0 // understood but violated
+				case OutcomeIgnored:
+					comprehension = 0.0
+				default:
+					comprehension = 0.5
+				}
+			}
+
+			// Applicability: 1.0 if agent acted on it at all (followed or contradicted), 0.0 if ignored
+			var applicability float64
+			switch outcome {
+			case OutcomeFollowed, OutcomePartialCompliance, OutcomeContradicted:
+				applicability = 1.0
+			case OutcomeIgnored:
+				applicability = 0.0
+			default:
+				applicability = 0.5
+			}
+
+			dims = &FeedbackDimensions{
+				Adherence:     outcome,
+				Comprehension: comprehension,
+				Applicability: applicability,
+				ScoreSource:   scoreSource,
+			}
+		}
+
+		// Attach dimensions to the result
+		results[len(results)-1].Dimensions = dims
+
+		// NS-14: Collect outcome training data
+		if s.dataCollector != nil && dims != nil {
+			s.dataCollector.Collect(protocolTrainingRecord{
+				ConstraintCode:     item.ConstraintCode,
+				ConstraintNodeID:   firstSourceNode(item),
+				ConstraintText:     item.Content,
+				TierUsed:           item.Tier,
+				AgentAction:        req.ActionSummary,
+				Outcome:            string(outcome),
+				ComprehensionScore: dims.Comprehension,
+				ApplicabilityScore: dims.Applicability,
+				ScoreSource:        dims.ScoreSource,
+				TrustScore:         trustScoreForFeedback,
+				SessionID:          feedbackSessionID,
+			})
 		}
 	}
 
@@ -1116,6 +1301,27 @@ func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
 // GetProtocolMetricsCollector returns the J17 protocol metrics collector for RSIC wiring.
 func (s *Service) GetProtocolMetricsCollector() *ProtocolMetricsCollector {
 	return s.protocolMetrics
+}
+
+// BuildTierEffectivenessDataset creates a curated tier effectiveness dataset and optionally writes it.
+func (s *Service) BuildTierEffectivenessDataset() *TierEffectivenessDataset {
+	snapshot := s.GetProtocolMetricsSnapshot()
+	if snapshot == nil {
+		return nil
+	}
+	dataset := BuildTierEffectivenessDataset(snapshot, s.cfg.J17TierEffectivenessMinSamples, s.cfg.J17TierIneffectiveThreshold)
+	if dataset != nil && s.dataCollector != nil {
+		s.dataCollector.CollectDataset(dataset)
+	}
+	return dataset
+}
+
+// GetNLICalibrationReport returns the NLI calibration report, or nil if calibration tracking is not active.
+func (s *Service) GetNLICalibrationReport() *NLICalibrationReport {
+	if s.calibrationTracker == nil {
+		return nil
+	}
+	return s.calibrationTracker.Report()
 }
 
 // NewProtocolEvolver creates a fully-wired ProtocolEvolver from service internals.
@@ -1365,6 +1571,14 @@ func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) m
 
 // guidanceSignalCode returns a Hebbian signal code for a guidance item.
 // Uses constraint_code if available, otherwise falls back to the guidance type.
+// firstSourceNode returns the first source node ID from a guidance item, or empty string.
+func firstSourceNode(item GuidanceItem) string {
+	if len(item.SourceNodes) > 0 {
+		return item.SourceNodes[0]
+	}
+	return ""
+}
+
 func guidanceSignalCode(item GuidanceItem) string {
 	if item.ConstraintCode != "" {
 		return "guidance:" + item.ConstraintCode

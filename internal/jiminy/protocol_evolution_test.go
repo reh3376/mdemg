@@ -160,6 +160,107 @@ func TestProtocolEvolver_AdjustTierThresholds_WriteBack(t *testing.T) {
 	}
 }
 
+func TestAdjustTierThresholds_LowT1Comprehension(t *testing.T) {
+	metrics := NewProtocolMetricsCollector()
+	// Record enough T1 outcomes with low comprehension
+	for range 10 {
+		metrics.RecordOutcomeWithTier("code-a", 1, 0.4) // below 0.6
+	}
+	// T1 distribution ~80% so distribution-based adjustment doesn't interfere
+	for range 8 {
+		metrics.RecordGuidance(1, 15, nil)
+	}
+	for range 2 {
+		metrics.RecordGuidance(2, 50, nil)
+	}
+
+	trustScorer := NewTrustScorer(TrustConfig{
+		Initial:       0.5,
+		HighThreshold: 0.8,
+		LowThreshold:  0.4,
+	})
+	evolver := NewProtocolEvolver(metrics, nil, nil, nil, nil, trustScorer)
+	result, err := evolver.AdjustTierThresholds(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("AdjustTierThresholds failed: %v", err)
+	}
+
+	newHigh := result["new_high_threshold"].(float64)
+	// Low T1 comprehension should raise the threshold (make T1 harder to reach)
+	// T1 distribution is 80% (between 70-90% → no distribution adjustment), comp < 0.6 → +0.05
+	if newHigh < 0.84 || newHigh > 0.86 {
+		t.Errorf("new_high_threshold = %.2f, expected ~0.85 (T1 comprehension is low → +0.05)", newHigh)
+	}
+
+	// Comprehension should be in result
+	t1Comp := result["t1_comprehension"].(float64)
+	if t1Comp < 0.39 || t1Comp > 0.41 {
+		t.Errorf("t1_comprehension = %f, want ~0.4", t1Comp)
+	}
+}
+
+func TestAdjustTierThresholds_HighT1Comprehension(t *testing.T) {
+	metrics := NewProtocolMetricsCollector()
+	// Record many T1 outcomes with high comprehension
+	for range 25 {
+		metrics.RecordOutcomeWithTier("code-a", 1, 0.95)
+	}
+	// High T1 distribution (>90%) to trigger the distribution +0.05
+	for range 10 {
+		metrics.RecordGuidance(1, 15, nil)
+	}
+	metrics.RecordGuidance(2, 50, nil) // just one T2
+
+	trustScorer := NewTrustScorer(TrustConfig{
+		Initial:       0.5,
+		HighThreshold: 0.8,
+		LowThreshold:  0.4,
+	})
+	evolver := NewProtocolEvolver(metrics, nil, nil, nil, nil, trustScorer)
+	result, err := evolver.AdjustTierThresholds(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("AdjustTierThresholds failed: %v", err)
+	}
+
+	// High T1 distribution raises +0.05, but high comprehension lowers -0.02
+	// Net: 0.8 + 0.05 - 0.02 = 0.83
+	newHigh := result["new_high_threshold"].(float64)
+	if newHigh < 0.82 || newHigh > 0.84 {
+		t.Errorf("new_high_threshold = %.2f, want ~0.83 (high dist +0.05, high comp -0.02)", newHigh)
+	}
+}
+
+func TestAdjustTierThresholds_T2BelowT3(t *testing.T) {
+	metrics := NewProtocolMetricsCollector()
+	// T2 comprehension < T3 by > 0.15
+	for range 10 {
+		metrics.RecordOutcomeWithTier("code-a", 2, 0.5)
+		metrics.RecordOutcomeWithTier("code-b", 3, 0.9)
+	}
+	for range 5 {
+		metrics.RecordGuidance(2, 50, nil)
+		metrics.RecordGuidance(3, 80, nil)
+	}
+
+	trustScorer := NewTrustScorer(TrustConfig{
+		Initial:       0.5,
+		HighThreshold: 0.8,
+		LowThreshold:  0.4,
+	})
+	evolver := NewProtocolEvolver(metrics, nil, nil, nil, nil, trustScorer)
+	result, err := evolver.AdjustTierThresholds(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("AdjustTierThresholds failed: %v", err)
+	}
+
+	newLow := result["new_low_threshold"].(float64)
+	// T2 < T3 by 0.4 → low threshold should increase by 0.03
+	// Also distribution-based: T1=0% → low -= 0.03, net = 0.4 - 0.03 + 0.03 = 0.4
+	if newLow < 0.35 || newLow > 0.45 {
+		t.Errorf("new_low_threshold = %.2f, expected in range [0.35, 0.45]", newLow)
+	}
+}
+
 func TestCodeGenerator_UnregisterCode(t *testing.T) {
 	codeGen := NewConstraintCodeGenerator(nil)
 
