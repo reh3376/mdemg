@@ -692,7 +692,7 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 
 Required fields: `space_id`, `context`. Optional: `file_path`, `agent_output`, `query`, `session_id`, `max_items`.
 
-**Response:** Returns `guidance[]` items (type, priority, content, confidence, source_nodes, constraint_code), `prompt_augmentation` (injectable text block), `confidence`, `rationale`, `source_counts`, `protocol` (J17 version, trust_score, seq), and `guidance_id` (UUID for effectiveness tracking). Returns 503 when `JIMINY_ENABLED=false`.
+**Response:** Returns `guidance[]` items (type, priority, content, confidence, source_nodes, constraint_code), `prompt_augmentation` (injectable text block), `confidence`, `rationale`, `source_counts`, `protocol` (J17 version, trust_score, seq), and `guidance_id` (CUID2 identifier for effectiveness tracking). Returns 503 when `JIMINY_ENABLED=false`.
 
 ### J17 AI-to-AI Protocol (Phase J17)
 

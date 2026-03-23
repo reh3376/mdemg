@@ -339,6 +339,8 @@ type Config struct {
 	J17AllowedExtensions         []string // J17_ALLOWED_EXTENSIONS — comma-separated list of allowed extensions
 	J17MLTierPredictionEnabled   bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
 	J17TierModelMinSamples       int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
+	J17SidecarURL                string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
+	J17SidecarTimeoutMs          int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 200)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -671,6 +673,7 @@ type Config struct {
 	JiminyCacheEnabled    bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
 	JiminyCacheTTLSec     int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
 	JiminyCacheSize       int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
+	JiminyCacheJ17Bypass  bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
 	JiminyPartialTimeoutMs int // JIMINY_PARTIAL_TIMEOUT_MS — timeout for partial results (default: 2000)
 
 	// F11: Configurable Activation Dimension Weights
@@ -1943,6 +1946,11 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	j17SidecarURL := get("J17_SIDECAR_URL", "")
+	j17SidecarTimeoutMs, err := atoi("J17_SIDECAR_TIMEOUT_MS", 200)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Capability gap detection settings (Task #23)
 	gapLowScoreThreshold, err := atof("GAP_LOW_SCORE_THRESHOLD", 0.5)
@@ -2739,6 +2747,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyCacheJ17Bypass := getBool("JIMINY_CACHE_J17_BYPASS", true)
 	jiminyPartialTimeoutMs, err := atoi("JIMINY_PARTIAL_TIMEOUT_MS", 2000)
 	if err != nil {
 		return Config{}, err
@@ -3058,6 +3067,8 @@ func FromEnv() (Config, error) {
 		J17AllowedExtensions:             j17AllowedExtensions,
 		J17MLTierPredictionEnabled:       j17MLTierPredictionEnabled,
 		J17TierModelMinSamples:           j17TierModelMinSamples,
+		J17SidecarURL:                    j17SidecarURL,
+		J17SidecarTimeoutMs:              j17SidecarTimeoutMs,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,
@@ -3314,6 +3325,7 @@ func FromEnv() (Config, error) {
 		JiminyCacheEnabled:                 jiminyCacheEnabled,
 		JiminyCacheTTLSec:                  jiminyCacheTTLSec,
 		JiminyCacheSize:                    jiminyCacheSize,
+		JiminyCacheJ17Bypass:               jiminyCacheJ17Bypass,
 		JiminyPartialTimeoutMs:             jiminyPartialTimeoutMs,
 		ActivationDimSemanticWeight:        activationDimSemanticWeight,
 		ActivationDimTemporalWeight:        activationDimTemporalWeight,

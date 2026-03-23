@@ -248,7 +248,7 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 
 **Error responses:** 400 (missing required fields), 405 (wrong HTTP method), 503 (Jiminy disabled).
 
-**Note:** The response now includes a `guidance_id` (UUID) in the `data` object for effectiveness tracking. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for the feedback loop.
+**Note:** The response now includes a `guidance_id` (CUID2 unique identifier) in the `data` object for effectiveness tracking. See [Jiminy Effectiveness Tracking](jiminy-effectiveness-tracking.md) for the feedback loop.
 
 ### `POST /v1/jiminy/evaluate` (J9)
 

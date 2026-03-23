@@ -14,7 +14,7 @@
   "metadata": {
     "author": "agent",
     "created": "2026-03-19",
-    "description": "Health check for neural sidecar — reports loaded models and last inference time (NR-2).",
+    "description": "Health check for neural sidecar \u2014 reports loaded models and last inference time (NR-2).",
     "test_type": "contract",
     "priority": "high"
   },
@@ -25,7 +25,8 @@
       "health",
       "sidecar",
       "fsd"
-    ]
+    ],
+    "sha256": "05c70ea25e2fc6faf6501c152ea9665397fb8b2e3303bc3f73ae587fdc78f637"
   },
   "variables": {},
   "request": {

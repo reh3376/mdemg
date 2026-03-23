@@ -1,0 +1,59 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hash Verification File Get",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "unts",
+      "hash-verification"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-23",
+    "description": "Validates GET /v1/hash-verification/files/{path} returns 404 with error for untracked files.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "unts"
+    ],
+    "sha256": "b74ee5fde998c8951998ef5bd8d86d0f6a2cc89f3d69137c2c5cb6126db00e25"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/hash-verification/files/nonexistent/path.json"
+  },
+  "expected": {
+    "status": 404,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string",
+        "equals": "file not tracked"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_not_allowed",
+      "description": "POST should return 405",
+      "request": {
+        "method": "POST",
+        "path": "/v1/hash-verification/files/nonexistent/path.json",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {}
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

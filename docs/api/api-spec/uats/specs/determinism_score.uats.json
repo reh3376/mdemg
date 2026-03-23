@@ -5,7 +5,10 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["metrics", "determinism"]
+    "tags": [
+      "metrics",
+      "determinism"
+    ]
   },
   "metadata": {
     "author": "agent",
@@ -16,7 +19,12 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["metrics", "determinism", "fsd"]
+    "tags": [
+      "metrics",
+      "determinism",
+      "fsd"
+    ],
+    "sha256": "01197d621a576eafb0d1372645a25647caf62e892ea3dc0773ad628a5838aa02"
   },
   "variables": {},
   "request": {

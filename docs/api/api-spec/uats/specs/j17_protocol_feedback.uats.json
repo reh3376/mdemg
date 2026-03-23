@@ -29,7 +29,7 @@
       "feedback",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "f03dedd9b1fbecbfab6253a50c676609f0875615c00b934f5b437c3ce9813a23"
   },
   "variables": {},
   "request": {
@@ -89,7 +89,9 @@
     {
       "name": "j17_disabled",
       "description": "When J17 is disabled, protocol feedback returns 503.",
-      "tags": ["j17_disabled"],
+      "tags": [
+        "j17_disabled"
+      ],
       "request": {
         "body": {
           "trials": [

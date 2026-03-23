@@ -38,7 +38,7 @@ type GuidanceRequest struct {
 
 // GuidanceResponse is the output from the Guide() method.
 type GuidanceResponse struct {
-	GuidanceID            string              `json:"guidance_id"` // UUID for feedback correlation (Phase AR-2)
+	GuidanceID            string              `json:"guidance_id"` // CUID2 identifier for feedback correlation (Phase AR-2)
 	Guidance              []GuidanceItem      `json:"guidance"`
 	PromptAugmentation    string              `json:"prompt_augmentation"`
 	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"` // J8: LLM-synthesized guidance

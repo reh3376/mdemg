@@ -223,7 +223,7 @@ A **cognitive substrate for AI-assisted development** — the ANN equivalent of 
 - Active MCP Guardrails (Phase 104), Global Meta-Learning (Phase 105)
 - Jiminy Inner-Voice Service (Phase Jiminy) — proactive guidance via hooks
 - Unified CLI (`mdemg` binary), project init wizard, database management, secret management
-- 129 UATS contract test specs, 148 Go test files, 0 lint issues
+- 191 UATS contract test specs (375 total variants), 197 Go test files, 0 lint issues
 
 **Key vision document**: `VISION.md` — read this for the full architectural philosophy, success metrics, design principles, and the internal dialogue analogy.
 

@@ -29,7 +29,7 @@
       "phase_j17",
       "llm_required"
     ],
-    "sha256": ""
+    "sha256": "7062e9c070bbf84cd32bc8f4432e46ed966ffdc77240e6ab0fc9b2785f1202dd"
   },
   "variables": {},
   "request": {
@@ -89,7 +89,9 @@
     {
       "name": "j17_disabled",
       "description": "When J17 is disabled, protocol learn returns 503.",
-      "tags": ["j17_disabled"],
+      "tags": [
+        "j17_disabled"
+      ],
       "request": {
         "body": {
           "constraint_type": "must",

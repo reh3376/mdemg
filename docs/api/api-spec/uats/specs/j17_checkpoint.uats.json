@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "0018a5593307c3e4304671cbffe52fc1b01b4bd0781060491eed1797714be674"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -110,7 +110,9 @@
     {
       "name": "j17_disabled",
       "description": "When J17 is disabled, checkpoint returns 503.",
-      "tags": ["j17_disabled"],
+      "tags": [
+        "j17_disabled"
+      ],
       "request": {
         "body": {
           "space_id": "{{space_id}}",

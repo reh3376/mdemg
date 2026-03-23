@@ -111,3 +111,67 @@ func TestProtocolMetricsCollector_EmptySnapshot(t *testing.T) {
 		t.Errorf("empty compression ratio = %f, want 0", snapshot.CompressionRatio)
 	}
 }
+
+// Gap 1: CodeCoverage tests
+
+func TestProtocolMetrics_CodeCoverage_AllCoded(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordConstraintCoverage(5, 5) // 5 constraints, all have codes
+	snapshot := c.Snapshot()
+	if snapshot.CodeCoverage != 1.0 {
+		t.Errorf("CodeCoverage = %f, want 1.0 (all coded)", snapshot.CodeCoverage)
+	}
+}
+
+func TestProtocolMetrics_CodeCoverage_NoCoded(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordConstraintCoverage(5, 0) // 5 constraints, none have codes
+	snapshot := c.Snapshot()
+	if snapshot.CodeCoverage != 0.0 {
+		t.Errorf("CodeCoverage = %f, want 0.0 (no coded)", snapshot.CodeCoverage)
+	}
+}
+
+func TestProtocolMetrics_CodeCoverage_Partial(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordConstraintCoverage(4, 2) // 4 constraints, 2 have codes
+	snapshot := c.Snapshot()
+	if snapshot.CodeCoverage != 0.5 {
+		t.Errorf("CodeCoverage = %f, want 0.5 (partial)", snapshot.CodeCoverage)
+	}
+}
+
+func TestProtocolMetrics_CodeCoverage_NoConstraints(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordConstraintCoverage(0, 0) // no constraints surfaced
+	snapshot := c.Snapshot()
+	// When no constraints were surfaced, coverage should be 1.0 (nothing to cover)
+	if snapshot.CodeCoverage != 1.0 {
+		t.Errorf("CodeCoverage = %f, want 1.0 (no constraints = nothing to cover)", snapshot.CodeCoverage)
+	}
+}
+
+// Gap 2: RecordReplay test
+
+func TestProtocolMetrics_RecordReplay(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordReplay(10)
+	snapshot := c.Snapshot()
+	if snapshot.ReplayFrequencyPerHour <= 0 {
+		t.Errorf("ReplayFrequencyPerHour = %f, want > 0 after recording events", snapshot.ReplayFrequencyPerHour)
+	}
+}
+
+// Gap 5: T2 frequency for uncoded constraints
+
+func TestProtocolMetrics_T2FrequencyTracksUncodedByNodeID(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	// Simulate an uncoded constraint tracked by node ID
+	c.RecordGuidance(2, 50, []string{"node-abc-123"})
+	c.RecordGuidance(2, 50, []string{"node-abc-123"})
+	snapshot := c.Snapshot()
+	if snapshot.T2FrequencyByConstraint["node-abc-123"] != 2 {
+		t.Errorf("T2 frequency for uncoded node = %d, want 2",
+			snapshot.T2FrequencyByConstraint["node-abc-123"])
+	}
+}

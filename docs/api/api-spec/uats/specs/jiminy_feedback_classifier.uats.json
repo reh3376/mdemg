@@ -26,7 +26,8 @@
       "feedback",
       "classifier",
       "phase_j14"
-    ]
+    ],
+    "sha256": "660e5edfa8de38029c980989c2c102c54fc1323482c9ff388add1f8a23fee9ae"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -40,12 +41,15 @@
     },
     "body": {
       "guidance_id": "{{guidance_id}}",
-      "action_summary": "I partially implemented the validation — checked required fields but skipped length limits",
+      "action_summary": "I partially implemented the validation \u2014 checked required fields but skipped length limits",
       "space_id": "{{space_id}}"
     }
   },
   "expected": {
-    "status": [200, 503],
+    "status": [
+      200,
+      503
+    ],
     "body_assertions": [
       {
         "name": "guidance_id echoed",
@@ -87,7 +91,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": [
           {
             "name": "data object present",

@@ -24,7 +24,8 @@
       "guardrail",
       "enforcement",
       "fsd"
-    ]
+    ],
+    "sha256": "52742c4045e1312e7b9c7501298f9c6439b5449b22d059850051e99eeb1ece20"
   },
   "variables": {},
   "request": {

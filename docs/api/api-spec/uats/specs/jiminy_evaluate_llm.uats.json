@@ -15,7 +15,7 @@
   "metadata": {
     "author": "agent",
     "created": "2026-03-21",
-    "description": "Validates the Jiminy evaluator LLM Tier 2 response fields (J13). When JIMINY_EVALUATE_LLM_ENABLED=true, evaluate responses include reasoning and remediation fields from LLM analysis. Requires llm_required tag — skipped in CI without LLM provider.",
+    "description": "Validates the Jiminy evaluator LLM Tier 2 response fields (J13). When JIMINY_EVALUATE_LLM_ENABLED=true, evaluate responses include reasoning and remediation fields from LLM analysis. Requires llm_required tag \u2014 skipped in CI without LLM provider.",
     "test_type": "contract",
     "priority": "medium",
     "llm_required": true
@@ -28,7 +28,8 @@
       "llm",
       "phase_j13",
       "llm_required"
-    ]
+    ],
+    "sha256": "256c25d3e865f830786602c976294e808111135d18c2d8b9c5a90cc38847be49"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -46,7 +47,10 @@
     }
   },
   "expected": {
-    "status": [200, 503],
+    "status": [
+      200,
+      503
+    ],
     "body_assertions": [
       {
         "name": "evaluation_id present",
@@ -56,7 +60,11 @@
       {
         "name": "status is valid enum",
         "path": "$.data.status",
-        "one_of": ["pass", "warning", "concern"]
+        "one_of": [
+          "pass",
+          "warning",
+          "concern"
+        ]
       },
       {
         "name": "items is array",
@@ -77,7 +85,10 @@
         }
       },
       "expected": {
-        "status": [200, 503],
+        "status": [
+          200,
+          503
+        ],
         "body_assertions": [
           {
             "name": "data object present",

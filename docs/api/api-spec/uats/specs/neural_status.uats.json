@@ -5,7 +5,10 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["neural", "observability"]
+    "tags": [
+      "neural",
+      "observability"
+    ]
   },
   "metadata": {
     "author": "agent",
@@ -16,7 +19,11 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["neural", "observability"]
+    "tags": [
+      "neural",
+      "observability"
+    ],
+    "sha256": "0113961ffce8734d020a2cd259cfefd23900409495cf914653f4d997fd2eef5c"
   },
   "variables": {},
   "request": {

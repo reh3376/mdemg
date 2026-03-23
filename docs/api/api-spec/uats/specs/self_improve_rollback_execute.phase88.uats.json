@@ -1,0 +1,90 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Phase 88 - Self-Improve Rollback Execute",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "phase88",
+      "safety",
+      "rollback"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-23",
+    "description": "Validates POST /v1/self-improve/rollback returns 404 with rolled_back:false for nonexistent snapshot.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "rsic",
+      "phase88"
+    ],
+    "sha256": "fc293acf4d9694558623b71afbe6245d6dc1f06396e02650c6b1268d6d16ffba"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/self-improve/rollback",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "snapshot_id": "nonexistent"
+    }
+  },
+  "expected": {
+    "status": 404,
+    "body_assertions": [
+      {
+        "path": "$.rolled_back",
+        "type": "boolean",
+        "equals": false
+      },
+      {
+        "path": "$.error",
+        "type": "string"
+      },
+      {
+        "path": "$.rollback_window_sec",
+        "type": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_snapshot_id",
+      "description": "POST with empty snapshot_id returns 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/self-improve/rollback",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "snapshot_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": []
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "DELETE should return 405",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/self-improve/rollback"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

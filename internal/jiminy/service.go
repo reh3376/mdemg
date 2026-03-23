@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/nrednav/cuid2"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
@@ -46,6 +46,8 @@ type Service struct {
 	protocolMetrics   *ProtocolMetricsCollector // J17-4: protocol metrics for RSIC
 	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
 	signalLearner     SignalLearnerProvider    // RSIC-SK1: Hebbian signal learner for guidance
+	tierPredictor     *TierPredictor           // Gap 6: shadow-mode ML tier prediction
+	nliScorer         *NLIComprehensionScorer  // Gap 6: shadow-mode NLI comprehension scoring
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -157,6 +159,25 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			cfg.J17TrustInitial, cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
 	}
 
+	// Gap 6: Shadow-mode ML components (log only, no behavioral effect)
+	var tierPredictor *TierPredictor
+	var nliScorer *NLIComprehensionScorer
+	if cfg.J17SidecarURL != "" {
+		if cfg.J17MLTierPredictionEnabled {
+			tierPredictor = NewTierPredictor(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
+			log.Printf("jiminy: shadow tier predictor enabled (%s)", cfg.J17SidecarURL)
+		}
+		if cfg.J17NLIComprehensionEnabled {
+			nliScorer = NewNLIComprehensionScorer(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
+			log.Printf("jiminy: shadow NLI comprehension scorer enabled (%s)", cfg.J17SidecarURL)
+		}
+	}
+
+	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
+	if cfg.J17Enabled && cfg.J17TicketSecret == "" {
+		log.Printf("WARN: J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts")
+	}
+
 	return &Service{
 		cfg:               cfg,
 		driver:            driver,
@@ -176,6 +197,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		trustScorer:       trustScorer,
 		protocolMetrics:   protocolMetrics,
 		extensions:        extensions,
+		tierPredictor:     tierPredictor,
+		nliScorer:         nliScorer,
 	}
 }
 
@@ -237,7 +260,9 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	// F10: Check cache for fast path
-	if s.cache != nil {
+	// Gap 3: Bypass cache when J17 is active with a session ID to prevent cross-session contamination
+	cacheBypass := s.cfg.JiminyCacheJ17Bypass && s.cfg.J17Enabled && req.SessionID != ""
+	if s.cache != nil && !cacheBypass {
 		if cached, ok := s.cache.Get(req.SpaceID, req.Context); ok {
 			return cached, nil
 		}
@@ -596,7 +621,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	// Phase AR-2: Generate guidance_id and track items for effectiveness feedback
-	guidanceID := uuid.New().String()
+	guidanceID := cuid2.Generate()
 	if s.tracker != nil && len(filtered) > 0 {
 		s.tracker.Track(guidanceID, filtered)
 	}
@@ -609,10 +634,14 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	// J17-4: Record protocol metrics for RSIC learning loop
 	if s.protocolMetrics != nil && s.encoder != nil && s.cfg.J17Enabled {
+		var constraintTotal, constraintWithCode int
 		for _, item := range filtered {
 			codes := []string{}
 			if item.ConstraintCode != "" {
 				codes = []string{item.ConstraintCode}
+			} else if item.Type == GuidanceConstraint && len(item.SourceNodes) > 0 {
+				// Gap 5: Track uncoded constraints by node ID for T2 frequency visibility
+				codes = []string{item.SourceNodes[0]}
 			}
 			// Estimate token count based on tier
 			tokenEst := 80 // T3 baseline
@@ -622,6 +651,33 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 				tokenEst = 50
 			}
 			s.protocolMetrics.RecordGuidance(item.Tier, tokenEst, codes)
+
+			// Gap 1: Count constraint items and coded constraints
+			if item.Type == GuidanceConstraint {
+				constraintTotal++
+				if item.ConstraintCode != "" {
+					constraintWithCode++
+				}
+			}
+		}
+		// Gap 1: Record code coverage so Snapshot().CodeCoverage reflects reality
+		s.protocolMetrics.RecordConstraintCoverage(constraintTotal, constraintWithCode)
+	}
+
+	// Gap 6: Shadow-mode ML tier prediction (log only, no behavioral effect)
+	if s.tierPredictor != nil {
+		trustScore := 0.5
+		if s.trustScorer != nil && req.SessionID != "" {
+			trustScore = s.trustScorer.GetScore(req.SessionID)
+		}
+		for _, item := range filtered {
+			if item.Type == GuidanceConstraint {
+				mlTier, mlConf := s.tierPredictor.PredictTier(ctx, item.Content, req.Context, trustScore)
+				if mlTier > 0 {
+					log.Printf("j17-shadow: tier_predict ml_tier=%d rule_tier=%d ml_conf=%.2f constraint=%s",
+						mlTier, item.Tier, mlConf, item.ConstraintCode)
+				}
+			}
 		}
 	}
 
@@ -656,8 +712,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Debug:                debug,
 	}
 
-	// F10: Cache the response
-	if s.cache != nil {
+	// F10: Cache the response (Gap 3: skip when J17 session is active)
+	if s.cache != nil && !cacheBypass {
 		s.cache.Put(req.SpaceID, req.Context, resp)
 	}
 
@@ -840,6 +896,15 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				s.signalLearner.RecordResponse(code)
 			}
 		}
+
+		// Gap 6: Shadow-mode NLI comprehension scoring (log only, no behavioral effect)
+		if s.nliScorer != nil && item.Type == GuidanceConstraint {
+			followed := outcome == OutcomeFollowed || outcome == OutcomePartialCompliance
+			nliScore := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
+			heuristicScore := cr.Confidence
+			log.Printf("j17-shadow: nli_score nli=%.2f heuristic=%.2f constraint=%s",
+				nliScore, heuristicScore, item.ConstraintCode)
+		}
 	}
 
 	return &GuidanceFeedbackResponse{
@@ -954,6 +1019,10 @@ func (s *Service) Checkpoint(_ context.Context, req CheckpointRequest) (*Checkpo
 // Called by the session-start hook after context reset.
 func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (*ResumeProtocolResponse, error) {
 	if s.ticketManager == nil {
+		// Gap 2: Record failed restore (no ticket manager)
+		if s.protocolMetrics != nil {
+			s.protocolMetrics.RecordTicketRestore(false)
+		}
 		return &ResumeProtocolResponse{
 			Restored: false,
 			Message:  "j17: protocol not enabled, performing full re-guidance",
@@ -961,6 +1030,10 @@ func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (
 	}
 
 	if req.Ticket == nil {
+		// Gap 2: Record failed restore (no ticket provided)
+		if s.protocolMetrics != nil {
+			s.protocolMetrics.RecordTicketRestore(false)
+		}
 		return &ResumeProtocolResponse{
 			Restored: false,
 			Message:  "j17: no ticket provided, performing full re-guidance",
@@ -971,10 +1044,19 @@ func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (
 	payload, err := s.ticketManager.RestoreFromTicket(req.Ticket, s.escalation)
 	if err != nil {
 		log.Printf("jiminy: J17 ticket restore failed (graceful fallback): %v", err)
+		// Gap 2: Record failed restore (invalid ticket)
+		if s.protocolMetrics != nil {
+			s.protocolMetrics.RecordTicketRestore(false)
+		}
 		return &ResumeProtocolResponse{
 			Restored: false,
 			Message:  fmt.Sprintf("j17: ticket invalid (%v), performing full re-guidance", err),
 		}, nil
+	}
+
+	// Gap 2: Record successful restore
+	if s.protocolMetrics != nil {
+		s.protocolMetrics.RecordTicketRestore(true)
 	}
 
 	// Restore trust score
@@ -990,6 +1072,11 @@ func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (
 			maxReplay = 50
 		}
 		replayedEvents = s.sequenceTracker.EventsSince(req.LastSeq, maxReplay)
+	}
+
+	// Gap 2: Record replay events
+	if s.protocolMetrics != nil && len(replayedEvents) > 0 {
+		s.protocolMetrics.RecordReplay(len(replayedEvents))
 	}
 
 	return &ResumeProtocolResponse{

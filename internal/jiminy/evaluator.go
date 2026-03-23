@@ -8,8 +8,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/nrednav/cuid2"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
@@ -65,7 +65,7 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 		return EvaluateResponse{}, fmt.Errorf("agent_output is required")
 	}
 
-	evalID := uuid.New().String()
+	evalID := cuid2.Generate()
 	var constraintItems []EvaluationItem
 	var correctionItems []EvaluationItem
 

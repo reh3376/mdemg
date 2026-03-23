@@ -1,0 +1,79 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Constraint Conflict Resolve",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "constraints",
+      "conflicts",
+      "fsd"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-23",
+    "description": "Resolve a constraint conflict by ID. Returns 503 when conflict detection is disabled (default config).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "constraints",
+      "conflicts",
+      "fsd"
+    ],
+    "sha256": "cf245ff826b8c01f744fe26b338faed5983f30af2b8110720e73a8236c315c72"
+  },
+  "request": {
+    "method": "PATCH",
+    "path": "/v1/constraints/conflicts/node-a:node-b/resolve",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "resolution_text": "resolved by test"
+    }
+  },
+  "expected": {
+    "status": 503,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "type": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "invalid_id_format",
+      "description": "Conflict ID without colon separator still returns 503 (feature-disabled check precedes path parsing)",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/constraints/conflicts/invalid-no-colon/resolve",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {}
+      },
+      "expected": {
+        "status": 503,
+        "body_assertions": []
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET should return 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/constraints/conflicts/node-a:node-b/resolve"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": []
+      }
+    }
+  ]
+}

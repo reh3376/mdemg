@@ -29,7 +29,7 @@
       "metrics",
       "phase_j17"
     ],
-    "sha256": ""
+    "sha256": "a29ec89a3122b9940d5425c7f937dbd5248058f3f34bf6b815ee9fb481b3fe57"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -52,6 +52,11 @@
         "path": "$.data",
         "type": "object",
         "exists": true
+      },
+      {
+        "name": "code_coverage is a number",
+        "path": "$.data.code_coverage",
+        "type": "number"
       }
     ]
   },
@@ -59,7 +64,9 @@
     {
       "name": "j17_disabled",
       "description": "When Jiminy is disabled, returns 503.",
-      "tags": ["j17_disabled"],
+      "tags": [
+        "j17_disabled"
+      ],
       "expected": {
         "status": 503,
         "body_assertions": [

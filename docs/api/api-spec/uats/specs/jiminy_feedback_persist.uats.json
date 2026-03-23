@@ -5,7 +5,10 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["jiminy", "effectiveness"]
+    "tags": [
+      "jiminy",
+      "effectiveness"
+    ]
   },
   "metadata": {
     "author": "agent",
@@ -16,7 +19,12 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["jiminy", "effectiveness", "fsd"]
+    "tags": [
+      "jiminy",
+      "effectiveness",
+      "fsd"
+    ],
+    "sha256": "762ecf95ea00b915bf3cf13bb314619440a532f0c0df61520cd24da59c496ad9"
   },
   "variables": {},
   "request": {
