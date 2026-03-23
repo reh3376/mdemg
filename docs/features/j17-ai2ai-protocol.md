@@ -703,6 +703,42 @@ Full research documents:
 
 ---
 
+## 13. Internal LLM Caller Compression (J17-PC)
+
+J17's proven compression utilities (`TelegraphicCompress`, `CompactJSON`, `TruncateAtWord`) are applied to the **inputs** of MDEMG's 5 highest-value internal LLM callers. This reduces aggregate token consumption by an estimated 25-35% with zero quality loss, since all compressed sections are pure prose narrative, indented JSON, or redundant instructions.
+
+### Callers Optimized
+
+| Caller | File | Config Variable | Est. Savings |
+|--------|------|----------------|-------------|
+| RSIC LLM Reflector | `internal/ape/llm_reflector.go` | `RSIC_LLM_REFLECT_COMPRESS` | 40-50% |
+| LLM Reranking | `internal/retrieval/rerank.go` | `RERANK_COMPRESS` | 30-40% |
+| SME Synthesis | `internal/consulting/synthesis.go` | `SYNTHESIS_COMPRESS` | 25-35% |
+| Guardrail Evaluation | `internal/guardrail/prompt.go` | `GUARDRAIL_COMPRESS` | 20-30% |
+| Outcome Classification | `internal/jiminy/outcome_classifier.go` | `JIMINY_CLASSIFY_COMPRESS` | 20-30% |
+
+All default to `true`. Set to `false` to revert to uncompressed prompts.
+
+### Compression Strategies
+
+- **Compact JSON**: `json.Marshal` instead of `MarshalIndent` (RSIC reflector)
+- **Summary truncation**: `CompressSection(summary, maxLen)` — telegraphic + word-boundary truncation (synthesis, rerank)
+- **Condensed system prompts**: Separate compact constants (guardrail, classifier)
+- **Redundancy removal**: Removed duplicate Task section (classifier)
+- **Single-line formats**: Pipe-separated constraint/candidate formatting (guardrail, rerank)
+- **Concept capping**: Organizational concepts capped at 10 in compressed mode (synthesis)
+- **Verbatim preservation**: Code diffs are NEVER compressed (guardrail)
+
+### Shared Utilities (`internal/encoding/compact.go`)
+
+```go
+CompactJSON(v any) string              // Single-line JSON marshaling
+TruncateAtWord(s string, maxLen int)   // Word-boundary truncation + "..."
+CompressSection(s string, maxLen int)  // TelegraphicCompress + TruncateAtWord
+```
+
+---
+
 ## Documents Accessed
 
 - `docs/research/ai2ai/06-recommendations.md` -- Design decisions and research basis

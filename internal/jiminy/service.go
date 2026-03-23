@@ -77,15 +77,16 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			classifierBaseURL = cfg.OllamaEndpoint
 		}
 		classifier = NewOutcomeClassifier(embedder, OutcomeClassifierConfig{
-			LLMEnabled:    cfg.JiminyOutcomeLLMEnabled,
-			LLMProvider:   cfg.JiminySynthesisProvider,
-			LLMModel:      cfg.JiminySynthesisModel,
-			LLMAPIKey:     cfg.OpenAIAPIKey,
-			LLMBaseURL:    classifierBaseURL,
-			HighThreshold: cfg.JiminyOutcomeSimilarityHigh,
-			LowThreshold:  cfg.JiminyOutcomeSimilarityLow,
-			MaxTokens:     cfg.JiminyOutcomeLLMMaxTokens,
-			CacheSize:     cfg.JiminyOutcomeCacheSize,
+			LLMEnabled:      cfg.JiminyOutcomeLLMEnabled,
+			LLMProvider:     cfg.JiminySynthesisProvider,
+			LLMModel:        cfg.JiminySynthesisModel,
+			LLMAPIKey:       cfg.OpenAIAPIKey,
+			LLMBaseURL:      classifierBaseURL,
+			HighThreshold:   cfg.JiminyOutcomeSimilarityHigh,
+			LowThreshold:    cfg.JiminyOutcomeSimilarityLow,
+			MaxTokens:       cfg.JiminyOutcomeLLMMaxTokens,
+			CacheSize:       cfg.JiminyOutcomeCacheSize,
+			CompressPrompts: cfg.JiminyClassifyCompress,
 		})
 		log.Printf("jiminy: semantic outcome classifier enabled (high=%.2f, low=%.2f, llm=%v, cache=%d)",
 			cfg.JiminyOutcomeSimilarityHigh, cfg.JiminyOutcomeSimilarityLow,

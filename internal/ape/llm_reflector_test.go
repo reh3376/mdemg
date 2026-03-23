@@ -1,6 +1,7 @@
 package ape
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -129,5 +130,46 @@ func TestDeduplicateInsights(t *testing.T) {
 	}
 	if !actions["trigger_consolidation"] {
 		t.Error("expected 'trigger_consolidation' in merged results")
+	}
+}
+
+func TestBuildUserPrompt_Compressed(t *testing.T) {
+	lr := &LLMReflector{
+		cfg: LLMReflectorConfig{CompressPrompts: true},
+	}
+
+	report := &SelfAssessmentReport{
+		SpaceID:          "test-space",
+		RetrievalQuality: 0.8,
+		MemoryHealth:     0.9,
+	}
+
+	prompt := lr.buildUserPrompt(report)
+
+	// Compressed mode uses CompactJSON (single-line), so no indented JSON
+	if strings.Contains(prompt, "  \"") {
+		t.Error("compressed prompt should NOT contain indented JSON (double-space + quote)")
+	}
+	if !strings.Contains(prompt, "## Current Assessment") {
+		t.Error("prompt should still contain the Current Assessment header")
+	}
+}
+
+func TestBuildUserPrompt_BackwardCompat(t *testing.T) {
+	lr := &LLMReflector{
+		cfg: LLMReflectorConfig{CompressPrompts: false},
+	}
+
+	report := &SelfAssessmentReport{
+		SpaceID:          "test-space",
+		RetrievalQuality: 0.8,
+		MemoryHealth:     0.9,
+	}
+
+	prompt := lr.buildUserPrompt(report)
+
+	// Uncompressed mode uses MarshalIndent, so should contain indented JSON
+	if !strings.Contains(prompt, "  \"") {
+		t.Error("uncompressed prompt should contain indented JSON (double-space + quote)")
 	}
 }

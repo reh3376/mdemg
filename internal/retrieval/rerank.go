@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 )
@@ -64,7 +65,7 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 	start := time.Now()
 
 	// Build the prompt
-	prompt := buildRerankPrompt(req.Query, req.Candidates[:topN])
+	prompt := buildRerankPrompt(req.Query, req.Candidates[:topN], s.cfg.RerankCompress)
 
 	// Call LLM based on provider
 	var scores []float64
@@ -185,30 +186,54 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 	return result, nil
 }
 
-// buildRerankPrompt creates the prompt for the LLM
-func buildRerankPrompt(query string, candidates []models.RetrieveResult) string {
+// buildRerankPrompt creates the prompt for the LLM.
+// When compress is true, uses compact single-line format to reduce tokens.
+func buildRerankPrompt(query string, candidates []models.RetrieveResult, compress bool) string {
 	var sb strings.Builder
 
-	sb.WriteString("You are a relevance judge for a code knowledge base.\n\n")
+	if compress {
+		sb.WriteString("Relevance judge: rate each candidate 0.0-1.0 for answering the query.\n\n")
+	} else {
+		sb.WriteString("You are a relevance judge for a code knowledge base.\n\n")
+	}
 	sb.WriteString("Query: ")
 	sb.WriteString(query)
 	sb.WriteString("\n\n")
-	sb.WriteString("Rate how relevant each candidate is to answering this query.\n")
-	sb.WriteString("Score from 0.0 (irrelevant) to 1.0 (perfectly answers the query).\n")
-	sb.WriteString("Consider: Does this code/document directly help answer the question?\n\n")
+
+	if !compress {
+		sb.WriteString("Rate how relevant each candidate is to answering this query.\n")
+		sb.WriteString("Score from 0.0 (irrelevant) to 1.0 (perfectly answers the query).\n")
+		sb.WriteString("Consider: Does this code/document directly help answer the question?\n\n")
+	}
 	sb.WriteString("Candidates:\n")
 
 	for i, c := range candidates {
-		sb.WriteString(fmt.Sprintf("[%d] %s\n", i, c.Name))
-		sb.WriteString(fmt.Sprintf("    Path: %s\n", c.Path))
-		if c.Summary != "" {
-			sb.WriteString(fmt.Sprintf("    Summary: %s\n", c.Summary))
+		summary := c.Summary
+		if len(summary) > 300 {
+			summary = encoding.TruncateAtWord(summary, 300)
 		}
-		sb.WriteString("\n")
+		if compress {
+			// Single-line pipe-separated format
+			sb.WriteString(fmt.Sprintf("[%d] %s | %s", i, c.Name, c.Path))
+			if summary != "" {
+				sb.WriteString(" | ")
+				sb.WriteString(summary)
+			}
+			sb.WriteString("\n")
+		} else {
+			sb.WriteString(fmt.Sprintf("[%d] %s\n", i, c.Name))
+			sb.WriteString(fmt.Sprintf("    Path: %s\n", c.Path))
+			if summary != "" {
+				sb.WriteString(fmt.Sprintf("    Summary: %s\n", summary))
+			}
+			sb.WriteString("\n")
+		}
 	}
 
 	sb.WriteString("Return ONLY a JSON array of scores in order, like: [0.85, 0.32, 0.71, ...]\n")
-	sb.WriteString("Do not include any other text or explanation.")
+	if !compress {
+		sb.WriteString("Do not include any other text or explanation.")
+	}
 
 	return sb.String()
 }

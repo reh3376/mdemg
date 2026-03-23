@@ -2,6 +2,7 @@ package consulting
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestBuildSynthesisPrompt_IncludesQuestion(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	if !strings.Contains(prompt, "How does authentication work?") {
 		t.Error("prompt should contain the question")
@@ -39,7 +40,7 @@ func TestBuildSynthesisPrompt_IncludesNodeIDs(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	if !strings.Contains(prompt, "node-abc-123") {
 		t.Error("prompt should contain first node ID")
@@ -59,7 +60,7 @@ func TestBuildSynthesisPrompt_TruncatesLongContext(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	// Context should be truncated at 3000 + "..."
 	if strings.Contains(prompt, strings.Repeat("x", 3500)) {
@@ -87,7 +88,7 @@ func TestBuildSynthesisPrompt_CapsResultsAt15(t *testing.T) {
 		Results:  results,
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	// Should include [15] but not [16]
 	if !strings.Contains(prompt, "[15]") {
@@ -109,7 +110,7 @@ func TestBuildSynthesisPrompt_IncludesConcepts(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	if !strings.Contains(prompt, "Auth Pattern") {
 		t.Error("prompt should include concept names")
@@ -135,7 +136,7 @@ func TestBuildSynthesisPrompt_HighlightsRisks(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, false)
 
 	if !strings.Contains(prompt, "WARNING: 2 risk signal(s) detected") {
 		t.Error("prompt should highlight risk count with WARNING prefix")
@@ -180,5 +181,74 @@ func TestLLMSynthesizer_Synthesize_EmptyResults(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no results") {
 		t.Errorf("error should mention no results, got: %v", err)
+	}
+}
+
+func TestBuildSynthesisPrompt_Compressed_SummaryTruncation(t *testing.T) {
+	longSummary := strings.Repeat("detail ", 86) // ~602 chars
+	req := SynthesisRequest{
+		Question: "test?",
+		Results: []models.RetrieveResult{
+			{NodeID: "n1", Name: "file.go", Score: 0.8, Layer: 0, Summary: longSummary},
+		},
+	}
+
+	prompt := buildSynthesisPrompt(req, true)
+
+	// The full 600+ char summary should NOT appear verbatim in compressed output
+	if strings.Contains(prompt, longSummary) {
+		t.Error("compressed prompt should truncate summaries shorter than 600 chars")
+	}
+}
+
+func TestBuildSynthesisPrompt_Compressed_ConceptsCapped(t *testing.T) {
+	concepts := make([]models.RelatedConcept, 15)
+	for i := range concepts {
+		concepts[i] = models.RelatedConcept{
+			NodeID:    fmt.Sprintf("concept-%d", i),
+			Name:      fmt.Sprintf("Concept %d", i),
+			Layer:     3,
+			Relevance: 0.8,
+		}
+	}
+
+	req := SynthesisRequest{
+		Question: "test?",
+		Results: []models.RetrieveResult{
+			{NodeID: "n1", Name: "file.go", Score: 0.8, Layer: 0},
+		},
+		Concepts: concepts,
+	}
+
+	prompt := buildSynthesisPrompt(req, true)
+
+	// Concept 9 (0-indexed) should appear (10th concept)
+	if !strings.Contains(prompt, "concept-9") {
+		t.Error("compressed prompt should include up to 10 concepts")
+	}
+	// Concept 10 (0-indexed, 11th concept) should NOT appear
+	if strings.Contains(prompt, "concept-10") {
+		t.Error("compressed prompt should cap concepts at 10")
+	}
+}
+
+func TestBuildSynthesisPrompt_Compressed_ShorterOutput(t *testing.T) {
+	req := SynthesisRequest{
+		Question: "How does authentication work in this project?",
+		Context:  "Working on the auth module refactoring",
+		Results: []models.RetrieveResult{
+			{NodeID: "n1", Name: "auth.go", Score: 0.9, Layer: 0, Summary: "Authentication handler with OAuth2 support and token validation"},
+			{NodeID: "n2", Name: "config.go", Score: 0.8, Layer: 1, Summary: "Configuration loader for auth settings"},
+		},
+		Concepts: []models.RelatedConcept{
+			{NodeID: "c1", Name: "Auth Pattern", Layer: 3, Relevance: 0.9},
+		},
+	}
+
+	compressed := buildSynthesisPrompt(req, true)
+	uncompressed := buildSynthesisPrompt(req, false)
+
+	if len(compressed) >= len(uncompressed) {
+		t.Errorf("compressed prompt (%d chars) should be shorter than uncompressed (%d chars)", len(compressed), len(uncompressed))
 	}
 }

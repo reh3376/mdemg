@@ -25,24 +25,52 @@ Respond with ONLY valid JSON (no markdown fences, no explanation):
 Each violation/warning object: {"constraint_node_id": "...", "description": "...", "rationale": "..."}
 If no violations and no warnings, respond: {"violations": [], "warnings": []}`
 
+// guardrailSystemPromptCompact is a condensed version of the system prompt
+// used when CompressPrompts is enabled. Same semantics, fewer tokens.
+const guardrailSystemPromptCompact = `Code guardrail evaluator. Check diff against constraints.
+must/must_not: flag ONLY clear violations with direct evidence. should/should_not: warning for deviations.
+When in doubt, do NOT flag. Partial diff — don't assume violations.
+JSON only: {"violations": [...], "warnings": [...]}
+Each: {"constraint_node_id": "...", "description": "...", "rationale": "..."}
+Empty: {"violations": [], "warnings": []}`
+
 // buildEvalPrompt constructs the user prompt for LLM evaluation.
-func buildEvalPrompt(diffCtx DiffContext, constraints []constraintMatch) string {
+// When compress is true, uses single-line pipe-separated constraint format.
+func buildEvalPrompt(diffCtx DiffContext, constraints []constraintMatch, compress bool) string {
 	var sb strings.Builder
+
+	contentMaxLen := 500
+	if compress {
+		contentMaxLen = 400
+	}
 
 	// Section 1: Constraints
 	sb.WriteString("## Active Constraints\n\n")
 	for i, c := range constraints {
-		content := truncateString(c.Content, 500)
-		sb.WriteString(fmt.Sprintf("[%d] node_id: %s\n", i+1, c.NodeID))
-		sb.WriteString(fmt.Sprintf("    type: %s\n", c.ConstraintType))
-		if c.Name != "" {
-			sb.WriteString(fmt.Sprintf("    name: %s\n", c.Name))
+		content := truncateString(c.Content, contentMaxLen)
+		if compress {
+			// Single-line pipe-separated format
+			sb.WriteString(fmt.Sprintf("[%d] %s | %s", i+1, c.NodeID, c.ConstraintType))
+			if c.Name != "" {
+				sb.WriteString(" | ")
+				sb.WriteString(c.Name)
+			}
+			sb.WriteString(fmt.Sprintf(" | conf:%.2f | %s\n", c.Confidence, content))
+		} else {
+			sb.WriteString(fmt.Sprintf("[%d] node_id: %s\n", i+1, c.NodeID))
+			sb.WriteString(fmt.Sprintf("    type: %s\n", c.ConstraintType))
+			if c.Name != "" {
+				sb.WriteString(fmt.Sprintf("    name: %s\n", c.Name))
+			}
+			sb.WriteString(fmt.Sprintf("    confidence: %.2f\n", c.Confidence))
+			sb.WriteString(fmt.Sprintf("    content: %s\n\n", content))
 		}
-		sb.WriteString(fmt.Sprintf("    confidence: %.2f\n", c.Confidence))
-		sb.WriteString(fmt.Sprintf("    content: %s\n\n", content))
+	}
+	if compress {
+		sb.WriteString("\n")
 	}
 
-	// Section 2: Diff
+	// Section 2: Diff (always verbatim — never compressed)
 	sb.WriteString("## Proposed Changes\n\n")
 	if len(diffCtx.FilePaths) > 0 {
 		sb.WriteString("Files: ")

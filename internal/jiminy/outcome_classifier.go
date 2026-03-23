@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"mdemg/internal/embeddings"
+	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
 )
 
@@ -32,6 +33,12 @@ Consider:
 
 Respond with ONLY valid JSON: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 
+// classifySystemPromptCompact is a condensed system prompt for classification
+// used when CompressPrompts is enabled.
+const classifySystemPromptCompact = `Guidance outcome classifier. Classify: followed/partial_compliance/ignored/contradicted.
+must/must_not=strict, should/should_not=flexible. Consider intent not literal text.
+JSON only: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
+
 // ollamaClassifySchema is the JSON schema for Ollama grammar-constrained classification.
 var ollamaClassifySchema = json.RawMessage(`{
 	"type": "object",
@@ -46,12 +53,13 @@ var ollamaClassifySchema = json.RawMessage(`{
 // OutcomeClassifier performs semantic outcome classification using embeddings
 // and optional LLM-based judgment for uncertain cases.
 type OutcomeClassifier struct {
-	embedder      embeddings.Embedder
-	llm           *llmclient.Client // optional, for Tier 2 classification
-	llmEnabled    bool
-	highThreshold float64 // above this similarity = followed (default: 0.7)
-	lowThreshold  float64 // below this similarity = ignored (default: 0.3)
-	maxTokens     int     // J14: max tokens for LLM classification
+	embedder        embeddings.Embedder
+	llm             *llmclient.Client // optional, for Tier 2 classification
+	llmEnabled      bool
+	compressPrompts bool    // J17-PC: compress classification prompts
+	highThreshold   float64 // above this similarity = followed (default: 0.7)
+	lowThreshold    float64 // below this similarity = ignored (default: 0.3)
+	maxTokens       int     // J14: max tokens for LLM classification
 
 	// J14: LRU cache for classification results
 	cacheMu   sync.Mutex
@@ -62,15 +70,16 @@ type OutcomeClassifier struct {
 
 // OutcomeClassifierConfig configures the semantic outcome classifier.
 type OutcomeClassifierConfig struct {
-	LLMEnabled    bool
-	LLMProvider   string
-	LLMModel      string
-	LLMAPIKey     string
-	LLMBaseURL    string
-	HighThreshold float64
-	LowThreshold  float64
-	MaxTokens     int // J14: max tokens (default: 100)
-	CacheSize     int // J14: LRU cache capacity (default: 256)
+	LLMEnabled      bool
+	LLMProvider     string
+	LLMModel        string
+	LLMAPIKey       string
+	LLMBaseURL      string
+	HighThreshold   float64
+	LowThreshold    float64
+	MaxTokens       int  // J14: max tokens (default: 100)
+	CacheSize       int  // J14: LRU cache capacity (default: 256)
+	CompressPrompts bool // J17-PC: compress classification prompts to reduce tokens
 }
 
 // classifyCacheEntry holds a cached classification result.
@@ -82,13 +91,14 @@ type classifyCacheEntry struct {
 // NewOutcomeClassifier creates a new semantic outcome classifier.
 func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierConfig) *OutcomeClassifier {
 	oc := &OutcomeClassifier{
-		embedder:      embedder,
-		llmEnabled:    cfg.LLMEnabled,
-		highThreshold: cfg.HighThreshold,
-		lowThreshold:  cfg.LowThreshold,
-		maxTokens:     cfg.MaxTokens,
-		cacheMap:      make(map[string]*list.Element),
-		cacheList:     list.New(),
+		embedder:        embedder,
+		llmEnabled:      cfg.LLMEnabled,
+		compressPrompts: cfg.CompressPrompts,
+		highThreshold:   cfg.HighThreshold,
+		lowThreshold:    cfg.LowThreshold,
+		maxTokens:       cfg.MaxTokens,
+		cacheMap:        make(map[string]*list.Element),
+		cacheList:       list.New(),
 	}
 
 	if oc.highThreshold <= 0 {
@@ -195,10 +205,15 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		return *cached
 	}
 
-	prompt := buildClassifyPrompt(item, actionSummary, baseSimilarity)
+	prompt := buildClassifyPrompt(item, actionSummary, baseSimilarity, oc.compressPrompts)
+
+	sysPrompt := classifySystemPrompt
+	if oc.compressPrompts {
+		sysPrompt = classifySystemPromptCompact
+	}
 
 	msgs := []llmclient.Message{
-		{Role: "system", Content: classifySystemPrompt},
+		{Role: "system", Content: sysPrompt},
 		{Role: "user", Content: prompt},
 	}
 
@@ -229,24 +244,35 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 }
 
 // buildClassifyPrompt constructs the enriched Tier 2 classification prompt (J14).
-func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity float64) string {
+// When compress is true, removes redundant Task section and truncates content.
+func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity float64, compress bool) string {
 	var sb strings.Builder
+
+	content := item.Content
+	action := actionSummary
+	if compress {
+		content = encoding.TruncateAtWord(content, 300)
+		action = encoding.TruncateAtWord(action, 400)
+	}
 
 	sb.WriteString("## Guidance Item\n")
 	fmt.Fprintf(&sb, "- Type: %s\n", item.Type)
 	fmt.Fprintf(&sb, "- Priority: %s\n", item.Priority)
-	fmt.Fprintf(&sb, "- Content: %s\n", item.Content)
+	fmt.Fprintf(&sb, "- Content: %s\n", content)
 	if len(item.SourceNodes) > 0 {
 		fmt.Fprintf(&sb, "- Source Node: %s\n", item.SourceNodes[0])
 	}
 	fmt.Fprintf(&sb, "- Vector Similarity: %.3f\n\n", similarity)
 
 	sb.WriteString("## Agent Action\n")
-	sb.WriteString(actionSummary)
+	sb.WriteString(action)
 	sb.WriteString("\n\n")
 
-	sb.WriteString("## Task\n")
-	sb.WriteString("Classify this outcome. Respond with JSON: {\"outcome\": \"...\", \"confidence\": 0.0-1.0, \"reasoning\": \"...\"}")
+	// The Task section duplicates the system prompt instructions — omit when compressing
+	if !compress {
+		sb.WriteString("## Task\n")
+		sb.WriteString("Classify this outcome. Respond with JSON: {\"outcome\": \"...\", \"confidence\": 0.0-1.0, \"reasoning\": \"...\"}")
+	}
 
 	return sb.String()
 }

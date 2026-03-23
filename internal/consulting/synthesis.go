@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 	"mdemg/internal/sanitize"
@@ -42,14 +43,15 @@ type SynthesisResult struct {
 
 // SynthesisConfig holds configuration for the LLM synthesizer.
 type SynthesisConfig struct {
-	Enabled   bool
-	Provider  string
-	Model     string
-	MaxTokens int
-	TimeoutMs int
-	OpenAIKey string
-	OpenAIURL string
-	OllamaURL string
+	Enabled         bool
+	Provider        string
+	Model           string
+	MaxTokens       int
+	TimeoutMs       int
+	OpenAIKey       string
+	OpenAIURL       string
+	OllamaURL       string
+	CompressPrompts bool // J17-PC: compress synthesis prompts to reduce tokens
 }
 
 // LLMSynthesizer implements Synthesizer using OpenAI or Ollama.
@@ -90,7 +92,7 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 		return SynthesisResult{}, fmt.Errorf("no results to synthesize")
 	}
 
-	prompt := buildSynthesisPrompt(req)
+	prompt := buildSynthesisPrompt(req, s.cfg.CompressPrompts)
 
 	timeoutMs := s.cfg.TimeoutMs
 	if timeoutMs <= 0 {
@@ -155,19 +157,25 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 
 // buildSynthesisPrompt constructs the system prompt that constrains the LLM
 // to synthesize ONLY from graph evidence, not general knowledge.
-func buildSynthesisPrompt(req SynthesisRequest) string {
+// When compress is true, system framing and output format are condensed.
+func buildSynthesisPrompt(req SynthesisRequest, compress bool) string {
 	var sb strings.Builder
 
 	// Section 1: System framing — constrain LLM to graph evidence only
-	sb.WriteString("You are a Subject Matter Expert for a specific software organization. ")
-	sb.WriteString("You have deep expertise ONLY in the patterns, decisions, constraints, and history ")
-	sb.WriteString("stored in this organization's knowledge graph. ")
-	sb.WriteString("You do NOT have general programming knowledge beyond what is in the graph.\n\n")
-	sb.WriteString("Rules:\n")
-	sb.WriteString("- Cite every claim as (Node: <node_id>)\n")
-	sb.WriteString("- Do NOT invent information not present in the evidence below\n")
-	sb.WriteString("- Surface risks prominently with WARNING prefix\n")
-	sb.WriteString("- Use markdown formatting\n\n")
+	if compress {
+		sb.WriteString("SME for software org. Expertise ONLY from knowledge graph below. ")
+		sb.WriteString("Rules: cite as (Node: <id>), no invented info, WARNING prefix for risks, markdown.\n\n")
+	} else {
+		sb.WriteString("You are a Subject Matter Expert for a specific software organization. ")
+		sb.WriteString("You have deep expertise ONLY in the patterns, decisions, constraints, and history ")
+		sb.WriteString("stored in this organization's knowledge graph. ")
+		sb.WriteString("You do NOT have general programming knowledge beyond what is in the graph.\n\n")
+		sb.WriteString("Rules:\n")
+		sb.WriteString("- Cite every claim as (Node: <node_id>)\n")
+		sb.WriteString("- Do NOT invent information not present in the evidence below\n")
+		sb.WriteString("- Surface risks prominently with WARNING prefix\n")
+		sb.WriteString("- Use markdown formatting\n\n")
+	}
 
 	// Section 2: Developer context + question (sanitized to prevent prompt injection)
 	sb.WriteString("## Developer Context\n\n")
@@ -182,10 +190,16 @@ func buildSynthesisPrompt(req SynthesisRequest) string {
 
 	// Section 3: Retrieved evidence (up to 15 nodes)
 	sb.WriteString("## Retrieved Evidence\n\n")
-	sb.WriteString("These are memory nodes from the organization's knowledge graph:\n\n")
+	if !compress {
+		sb.WriteString("These are memory nodes from the organization's knowledge graph:\n\n")
+	}
 	maxResults := 15
 	if len(req.Results) < maxResults {
 		maxResults = len(req.Results)
+	}
+	summaryMaxLen := 800
+	if compress {
+		summaryMaxLen = 400
 	}
 	for i := 0; i < maxResults; i++ {
 		r := req.Results[i]
@@ -198,8 +212,10 @@ func buildSynthesisPrompt(req SynthesisRequest) string {
 			sb.WriteString(fmt.Sprintf("- **Path**: %s\n", r.Path))
 		}
 		summary := r.Summary
-		if len(summary) > 800 {
-			summary = summary[:800] + "..."
+		if compress && summary != "" {
+			summary = encoding.CompressSection(summary, summaryMaxLen)
+		} else if len(summary) > summaryMaxLen {
+			summary = summary[:summaryMaxLen] + "..."
 		}
 		if summary != "" {
 			sb.WriteString(fmt.Sprintf("- **Summary**: %s\n", summary))
@@ -210,8 +226,16 @@ func buildSynthesisPrompt(req SynthesisRequest) string {
 	// Section 4: Organizational concepts (hidden layer L2+)
 	if len(req.Concepts) > 0 {
 		sb.WriteString("## Organizational Concepts\n\n")
-		sb.WriteString("These are emergent concepts identified by analyzing patterns across many source nodes:\n\n")
-		for _, c := range req.Concepts {
+		if !compress {
+			sb.WriteString("These are emergent concepts identified by analyzing patterns across many source nodes:\n\n")
+		}
+		// Cap concepts at 10 when compressing (currently uncapped)
+		maxConcepts := len(req.Concepts)
+		if compress && maxConcepts > 10 {
+			maxConcepts = 10
+		}
+		for i := 0; i < maxConcepts; i++ {
+			c := req.Concepts[i]
 			sb.WriteString(fmt.Sprintf("- **%s** (Node: %s, Layer: %d, Relevance: %.2f)\n", c.Name, c.NodeID, c.Layer, c.Relevance))
 		}
 		sb.WriteString("\n")
@@ -236,16 +260,20 @@ func buildSynthesisPrompt(req SynthesisRequest) string {
 	}
 
 	// Section 6: Output format
-	sb.WriteString("## Required Output Format\n\n")
-	sb.WriteString("Respond with these sections:\n\n")
-	sb.WriteString("### Direct Answer\n")
-	sb.WriteString("Answer the developer's question using ONLY the evidence above. Cite nodes.\n\n")
-	sb.WriteString("### Key Patterns & Constraints\n")
-	sb.WriteString("Relevant patterns, conventions, and constraints from the graph. Cite nodes.\n\n")
-	sb.WriteString("### Risks & Warnings\n")
-	sb.WriteString("Any risks, deprecated patterns, or known issues. Cite nodes. If none, say \"No risks identified.\"\n\n")
-	sb.WriteString("### Recommended Approach\n")
-	sb.WriteString("Based on the evidence, what approach should the developer take? Cite nodes.\n")
+	if compress {
+		sb.WriteString("## Output: Direct Answer (cite nodes) | Key Patterns | Risks & Warnings | Recommended Approach\n")
+	} else {
+		sb.WriteString("## Required Output Format\n\n")
+		sb.WriteString("Respond with these sections:\n\n")
+		sb.WriteString("### Direct Answer\n")
+		sb.WriteString("Answer the developer's question using ONLY the evidence above. Cite nodes.\n\n")
+		sb.WriteString("### Key Patterns & Constraints\n")
+		sb.WriteString("Relevant patterns, conventions, and constraints from the graph. Cite nodes.\n\n")
+		sb.WriteString("### Risks & Warnings\n")
+		sb.WriteString("Any risks, deprecated patterns, or known issues. Cite nodes. If none, say \"No risks identified.\"\n\n")
+		sb.WriteString("### Recommended Approach\n")
+		sb.WriteString("Based on the evidence, what approach should the developer take? Cite nodes.\n")
+	}
 
 	return sb.String()
 }

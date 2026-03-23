@@ -168,6 +168,7 @@ type Config struct {
 	RerankTopN      int     // Candidates to re-rank (default: 30)
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
+	RerankCompress  bool    // RERANK_COMPRESS — compress rerank candidate prompts (default: true)
 	RerankJinaKey   string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
 	RerankJinaModel string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
 	RerankJinaURL   string  // RERANK_JINA_URL — Jina API base URL (default: https://api.jina.ai/v1)
@@ -187,6 +188,7 @@ type Config struct {
 	SynthesisModel     string // SYNTHESIS_MODEL — model for synthesis (default: gpt-4o-mini)
 	SynthesisMaxTokens int    // SYNTHESIS_MAX_TOKENS — max tokens for synthesis response (default: 2000)
 	SynthesisTimeoutMs int    // SYNTHESIS_TIMEOUT_MS — timeout for synthesis call in ms (default: 30000)
+	SynthesisCompress  bool   // SYNTHESIS_COMPRESS — compress SME synthesis prompts (default: true)
 
 	// Intent Translation settings (Phase 102)
 	IntentEnabled   bool   // INTENT_ENABLED — enable query rewriting before embedding (default: false)
@@ -212,6 +214,7 @@ type Config struct {
 	GuardrailMaxTokens      int    // GUARDRAIL_MAX_TOKENS — max tokens for evaluation response (default: 1000, range 100-4000)
 	GuardrailTimeoutMs      int    // GUARDRAIL_TIMEOUT_MS — timeout for evaluation in ms (default: 5000, min 1000)
 	GuardrailMaxConstraints int    // GUARDRAIL_MAX_CONSTRAINTS — max constraints per evaluation (default: 10, range 1-50)
+	GuardrailCompress       bool   // GUARDRAIL_COMPRESS — compress guardrail eval prompts (default: true)
 
 	// Dynamic Reclassification settings
 	ReclassEnabled       bool    // RECLASS_ENABLED — enable LLM-based reclassification of oversized categories (default: true)
@@ -276,6 +279,7 @@ type Config struct {
 	JiminyOutcomeSimilarityLow     float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.3)
 	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
 	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
+	JiminyClassifyCompress         bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
 
 	// Jiminy J15: Synthesis temperature
 	JiminySynthesisTemperature *float64 // JIMINY_SYNTHESIS_TEMPERATURE — LLM temperature (default: nil = API default)
@@ -416,6 +420,7 @@ type Config struct {
 	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: false)
 	RSICLLMReflectProvider string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
 	RSICLLMReflectModel    string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
+	RSICLLMReflectCompress bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
 
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
@@ -1395,6 +1400,7 @@ func FromEnv() (Config, error) {
 	rerankJinaKey := get("RERANK_JINA_API_KEY", "")
 	rerankJinaModel := get("RERANK_JINA_MODEL", "jina-reranker-v2-base-multilingual")
 	rerankJinaURL := get("RERANK_JINA_URL", "https://api.jina.ai/v1")
+	rerankCompress := getBool("RERANK_COMPRESS", true)
 
 	// Plugin system settings (V0006)
 	pluginsEnabled := getBool("PLUGINS_ENABLED", true)
@@ -1528,6 +1534,7 @@ func FromEnv() (Config, error) {
 	if synthesisTimeoutMs < 1000 {
 		return Config{}, errors.New("SYNTHESIS_TIMEOUT_MS must be >= 1000")
 	}
+	synthesisCompress := getBool("SYNTHESIS_COMPRESS", true)
 
 	// Intent Translation settings (Phase 102)
 	intentEnabled := getBool("INTENT_ENABLED", false)
@@ -1613,6 +1620,7 @@ func FromEnv() (Config, error) {
 	if guardrailMaxConstraints < 1 || guardrailMaxConstraints > 50 {
 		return Config{}, errors.New("GUARDRAIL_MAX_CONSTRAINTS must be in range [1, 50]")
 	}
+	guardrailCompress := getBool("GUARDRAIL_COMPRESS", true)
 
 	// Dynamic Reclassification settings
 	reclassEnabled := getBool("RECLASS_ENABLED", true)
@@ -1788,6 +1796,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyClassifyCompress := getBool("JIMINY_CLASSIFY_COMPRESS", true)
 	// J15: Synthesis temperature
 	var jiminySynthesisTemperature *float64
 	if v := os.Getenv("JIMINY_SYNTHESIS_TEMPERATURE"); v != "" {
@@ -2060,6 +2069,7 @@ func FromEnv() (Config, error) {
 	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", false)
 	rsicLLMReflectProvider := get("RSIC_LLM_REFLECT_PROVIDER", emergenceProvider)
 	rsicLLMReflectModel := get("RSIC_LLM_REFLECT_MODEL", emergenceModel)
+	rsicLLMReflectCompress := getBool("RSIC_LLM_REFLECT_COMPRESS", true)
 
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
@@ -2904,6 +2914,7 @@ func FromEnv() (Config, error) {
 		RerankJinaKey:             rerankJinaKey,
 		RerankJinaModel:           rerankJinaModel,
 		RerankJinaURL:             rerankJinaURL,
+		RerankCompress:            rerankCompress,
 		PluginsEnabled:            pluginsEnabled,
 		PluginsDir:                pluginsDir,
 		PluginSocketDir:           pluginSocketDir,
@@ -2942,6 +2953,7 @@ func FromEnv() (Config, error) {
 		SynthesisModel:     synthesisModel,
 		SynthesisMaxTokens: synthesisMaxTokens,
 		SynthesisTimeoutMs: synthesisTimeoutMs,
+		SynthesisCompress:  synthesisCompress,
 
 		// Phase 102: Intent Translation
 		IntentEnabled:   intentEnabled,
@@ -2967,6 +2979,7 @@ func FromEnv() (Config, error) {
 		GuardrailMaxTokens:      guardrailMaxTokens,
 		GuardrailTimeoutMs:      guardrailTimeoutMs,
 		GuardrailMaxConstraints: guardrailMaxConstraints,
+		GuardrailCompress:       guardrailCompress,
 
 		// Phase Jiminy: Jiminy Guidance
 		JiminyEnabled:          jiminyEnabled,
@@ -3001,6 +3014,7 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeSimilarityLow:      jiminyOutcomeSimilarityLow,
 		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
 		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
+		JiminyClassifyCompress:         jiminyClassifyCompress,
 		JiminySynthesisTemperature:      jiminySynthesisTemperature,
 		JiminyGuidanceContextMaxChars:   jiminyGuidanceContextMaxChars,
 		JiminyGuidanceOutputMaxChars:    jiminyGuidanceOutputMaxChars,
@@ -3154,6 +3168,7 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,
 		RSICLLMReflectProvider:           rsicLLMReflectProvider,
 		RSICLLMReflectModel:              rsicLLMReflectModel,
+		RSICLLMReflectCompress:           rsicLLMReflectCompress,
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,

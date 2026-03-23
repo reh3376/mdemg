@@ -33,6 +33,8 @@ type GuardrailConfig struct {
 	// F20: Authority Level Filtering
 	ConstraintAuthorityEnabled bool   // CONSTRAINT_AUTHORITY_ENABLED
 	ConstraintDefaultAuthority string // CONSTRAINT_DEFAULT_AUTHORITY (default: "team_standard")
+
+	CompressPrompts bool // J17-PC: compress guardrail eval prompts to reduce tokens
 }
 
 // Validator defines the interface for guardrail validation.

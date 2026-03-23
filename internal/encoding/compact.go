@@ -3,6 +3,7 @@
 package encoding
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -96,4 +97,37 @@ func (e *CodedEncoder) Encode(text string) string {
 		return code
 	}
 	return text
+}
+
+// CompactJSON marshals v as compact single-line JSON (no indentation).
+func CompactJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// TruncateAtWord truncates s to at most maxLen characters on a word boundary,
+// appending "..." if truncated.
+func TruncateAtWord(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen < 4 {
+		return s[:maxLen]
+	}
+	// Find the last space before the limit
+	cut := maxLen - 3
+	idx := strings.LastIndex(s[:cut], " ")
+	if idx > 0 {
+		cut = idx
+	}
+	return s[:cut] + "..."
+}
+
+// CompressSection applies telegraphic compression then truncates at maxLen.
+func CompressSection(s string, maxLen int) string {
+	compressed := TelegraphicCompress(s)
+	return TruncateAtWord(compressed, maxLen)
 }
