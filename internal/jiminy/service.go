@@ -48,9 +48,10 @@ type Service struct {
 	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
 	signalLearner     SignalLearnerProvider    // RSIC-SK1: Hebbian signal learner for guidance
 	tierPredictor     *TierPredictor           // Gap 6: ML tier prediction
-	nliScorer         *NLIComprehensionScorer  // Gap 6: NLI comprehension scoring
-	arbitrator        *SidecarArbitrator       // NS-01: sidecar mode arbitration
-	dataCollector     *ProtocolDataCollector   // NS-14: protocol training data collection
+	nliScorer           *NLIComprehensionScorer  // Gap 6: NLI comprehension scoring
+	arbitrator          *SidecarArbitrator       // NS-01: sidecar mode arbitration
+	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
+	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -218,6 +219,14 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		log.Printf("jiminy: protocol data collection enabled (dir=%s)", dataDir)
 	}
 
+	// NLI feedback loop: calibration tracker for NLI-vs-heuristic bias detection
+	var calibrationTracker *NLICalibrationTracker
+	if nliScorer != nil && cfg.J17NLICalibrationWindowSize > 0 {
+		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
+		log.Printf("jiminy: NLI calibration tracker enabled (window=%d, bias_threshold=%.2f)",
+			cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
+	}
+
 	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
 	if cfg.J17Enabled && cfg.J17TicketSecret == "" {
 		log.Printf("WARN: J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts")
@@ -243,9 +252,10 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		protocolMetrics:   protocolMetrics,
 		extensions:        extensions,
 		tierPredictor:     tierPredictor,
-		nliScorer:         nliScorer,
-		arbitrator:        arbitrator,
-		dataCollector:     dataCollector,
+		nliScorer:           nliScorer,
+		arbitrator:          arbitrator,
+		dataCollector:       dataCollector,
+		calibrationTracker:  calibrationTracker,
 	}
 }
 
@@ -952,8 +962,9 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}
 
 		// J17-4: Record outcome for protocol metrics and data collection
-		// NS-02: When NLI is score-of-record AND mode >= canary, use NLI comprehension
-		if s.protocolMetrics != nil && item.ConstraintCode != "" {
+		// NLI feedback loop: when NLI scorer is available, defer recording to the NLI block
+		// to avoid double-counting. When NLI is unavailable, use heuristic scores.
+		if s.protocolMetrics != nil && item.ConstraintCode != "" && s.nliScorer == nil {
 			var compScore float64
 			switch outcome {
 			case OutcomeFollowed:
@@ -965,7 +976,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			default:
 				compScore = 0.5
 			}
-			s.protocolMetrics.RecordOutcome(item.ConstraintCode, compScore)
+			s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, compScore)
 		}
 
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
@@ -1001,11 +1012,29 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				comprehension = nliScore
 				scoreSource = "nli"
 
-				// NS-02: When NLI is score-of-record and arbitrator is causal, use NLI for protocol metrics
-				if s.cfg.J17NLIScoreOfRecord && s.arbitrator != nil && s.arbitrator.IsCausal() {
-					if s.protocolMetrics != nil && item.ConstraintCode != "" {
-						s.protocolMetrics.RecordOutcome(item.ConstraintCode, nliScore)
+				// NLI feedback loop: Record NLI score to metrics in ALL modes (shadow/compare/canary/active).
+				// NLI is OBSERVATIONAL data — RSIC needs it regardless of arbitration mode.
+				// The heuristic block above is skipped when nliScorer != nil to prevent double-counting.
+				if s.cfg.J17NLIObservationalEnabled && s.protocolMetrics != nil && item.ConstraintCode != "" {
+					s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
+				}
+
+				// NLI calibration: compare NLI with heuristic for bias detection
+				if s.calibrationTracker != nil {
+					var heuristicComp float64
+					switch outcome {
+					case OutcomeFollowed:
+						heuristicComp = 1.0
+					case OutcomePartialCompliance:
+						heuristicComp = 0.7
+					case OutcomeContradicted:
+						heuristicComp = 1.0
+					case OutcomeIgnored:
+						heuristicComp = 0.0
+					default:
+						heuristicComp = 0.5
 					}
+					s.calibrationTracker.Track(nliScore, heuristicComp)
 				}
 			} else {
 				// Heuristic fallback: map outcome to comprehension
@@ -1272,6 +1301,27 @@ func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
 // GetProtocolMetricsCollector returns the J17 protocol metrics collector for RSIC wiring.
 func (s *Service) GetProtocolMetricsCollector() *ProtocolMetricsCollector {
 	return s.protocolMetrics
+}
+
+// BuildTierEffectivenessDataset creates a curated tier effectiveness dataset and optionally writes it.
+func (s *Service) BuildTierEffectivenessDataset() *TierEffectivenessDataset {
+	snapshot := s.GetProtocolMetricsSnapshot()
+	if snapshot == nil {
+		return nil
+	}
+	dataset := BuildTierEffectivenessDataset(snapshot, s.cfg.J17TierEffectivenessMinSamples, s.cfg.J17TierIneffectiveThreshold)
+	if dataset != nil && s.dataCollector != nil {
+		s.dataCollector.CollectDataset(dataset)
+	}
+	return dataset
+}
+
+// GetNLICalibrationReport returns the NLI calibration report, or nil if calibration tracking is not active.
+func (s *Service) GetNLICalibrationReport() *NLICalibrationReport {
+	if s.calibrationTracker == nil {
+		return nil
+	}
+	return s.calibrationTracker.Report()
 }
 
 // NewProtocolEvolver creates a fully-wired ProtocolEvolver from service internals.

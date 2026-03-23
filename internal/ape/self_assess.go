@@ -279,8 +279,14 @@ func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
 
 // scoreProtocol computes protocol health from J17 metrics.
 func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) float64 {
-	// 40% comprehension (are codes being understood?)
+	// 35% comprehension (are codes being understood?)
 	comprehensionScore := clamp(stats.AvgComprehension, 0, 1)
+
+	// 5% NLI calibration (is the NLI scorer aligned with heuristic?)
+	calibrationScore := 1.0
+	if stats.NLIBiasAlert {
+		calibrationScore = 0.3
+	}
 
 	// 25% compression (ratio of 5.0 = perfect, 1.0 = no compression)
 	compressionScore := clamp((stats.CompressionRatio-1.0)/4.0, 0, 1)
@@ -293,7 +299,7 @@ func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) float64 {
 	restoreScore := clamp(stats.TicketRestoreSuccessRate, 0, 1)
 	stabilityScore := 0.5*restoreScore + 0.5*(1.0-replayPenalty)
 
-	return 0.40*comprehensionScore + 0.25*compressionScore +
+	return 0.35*comprehensionScore + 0.05*calibrationScore + 0.25*compressionScore +
 		0.20*coverageScore + 0.15*stabilityScore
 }
 

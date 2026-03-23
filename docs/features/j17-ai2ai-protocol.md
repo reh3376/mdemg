@@ -999,3 +999,56 @@ See `docs/specs/neural-sidecar-rollout-plan.md` for the full 4-stage rollout pla
 - `docs/specs/neural-sidecar-benchmark-protocol.md` -- NS-13: Benchmark protocol
 - `docs/specs/neural-sidecar-rollout-plan.md` -- NS-15: Staged rollout plan
 - `docs/api/api-spec/uats/specs/j17_metrics.uats.json` -- code_coverage assertion
+
+## 17. NLI Feedback Loop: Tier Effectiveness
+
+Closes the feedback loop from NLI comprehension scoring back to protocol tier selection via RSIC.
+
+### Problem Solved (6 Gaps)
+
+1. **NLI scores didn't reach protocol metrics in shadow/compare mode** — NLI data was computed but only recorded in causal mode. Fixed: observational recording in all modes.
+2. **No per-tier comprehension tracking** — `RecordOutcome` took no tier parameter. Fixed: `RecordOutcomeWithTier` records per-tier, per-code scores.
+3. **AdjustTierThresholds ignored comprehension** — adjusted on T1 distribution only. Fixed: comprehension-aware threshold adjustment.
+4. **No tier-level drift detection in RSIC** — per-code drift existed but not per-tier. Fixed: `j17_tier_ineffective` pattern (#15).
+5. **No NLI calibration tracking** — no detection of systematic NLI bias. Fixed: ring-buffer calibration tracker, `j17_nli_calibration_drift` pattern (#16).
+6. **No curated RSIC dataset** — only raw JSONL training data. Fixed: `TierEffectivenessDataset` with grading, drift, and recommendations.
+
+### Architecture
+
+```
+NLI Score → RecordOutcomeWithTier → ProtocolMetrics.Snapshot()
+                                         ↓
+                              GradeTierEffectiveness()
+                                         ↓
+                              RSIC Reflect (pattern #15)
+                                         ↓
+                              AdjustTierThresholds (comprehension-aware)
+                                         ↓
+                              BuildTierEffectivenessDataset (meso/macro cycles)
+```
+
+### Config Vars
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `J17_NLI_OBSERVATIONAL_ENABLED` | `true` | NLI scores flow to metrics in all modes |
+| `J17_TIER_EFFECTIVENESS_MIN_SAMPLES` | `5` | Min outcomes per tier/code before grading |
+| `J17_TIER_INEFFECTIVE_THRESHOLD` | `0.6` | Comprehension below this = ineffective |
+| `J17_TIER_DRIFT_DETECTION_ENABLED` | `true` | Enable tier drift RSIC pattern |
+| `J17_NLI_CALIBRATION_WINDOW_SIZE` | `500` | Calibration ring buffer size |
+| `J17_NLI_CALIBRATION_BIAS_THRESHOLD` | `0.15` | Max NLI-vs-heuristic bias |
+
+### Key Files
+
+- `internal/jiminy/protocol_metrics.go` -- RecordOutcomeWithTier, per-tier snapshot fields
+- `internal/jiminy/tier_effectiveness.go` -- GradeTierEffectiveness
+- `internal/jiminy/tier_effectiveness_dataset.go` -- BuildTierEffectivenessDataset, CollectDataset
+- `internal/jiminy/nli_calibration.go` -- NLICalibrationTracker, ring buffer, Report()
+- `internal/jiminy/protocol_evolution.go` -- Comprehension-aware AdjustTierThresholds
+- `internal/jiminy/service.go` -- NLI gate fix (double-counting), BuildTierEffectivenessDataset, GetNLICalibrationReport
+- `internal/ape/self_reflect.go` -- Patterns #15 (tier_ineffective) and #16 (nli_calibration_drift)
+- `internal/ape/self_assess.go` -- NLI calibration weight in scoreProtocol
+- `internal/ape/cycle.go` -- Dataset generation at meso/macro boundaries
+- `internal/api/handlers_j17.go` -- GET /v1/jiminy/protocol/tier-effectiveness
+- `internal/api/rsic_adapters.go` -- Per-tier fields + calibration in protocol adapter
+- `docs/api/api-spec/uats/specs/j17_tier_effectiveness.uats.json` -- Contract test

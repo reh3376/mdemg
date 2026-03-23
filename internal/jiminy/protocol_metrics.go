@@ -17,9 +17,15 @@ type ProtocolMetrics struct {
 	CodeCoverage             float64            `json:"code_coverage"`
 	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
 	Sidecar                  *SidecarMetrics    `json:"sidecar_metrics,omitempty"` // NS-07
-	WindowStart              time.Time          `json:"window_start"`
-	WindowEnd                time.Time          `json:"window_end"`
-	TotalEvents              int64              `json:"total_events"`
+
+	// Per-tier comprehension tracking (NLI feedback loop)
+	TierComprehension     [3]float64                `json:"tier_comprehension"`
+	TierCodeComprehension map[int]map[string]float64 `json:"tier_code_comprehension,omitempty"`
+	TierOutcomeCount      [3]int64                   `json:"tier_outcome_count"`
+
+	WindowStart time.Time `json:"window_start"`
+	WindowEnd   time.Time `json:"window_end"`
+	TotalEvents int64     `json:"total_events"`
 }
 
 // ProtocolMetricsCollector is a thread-safe collector for J17 protocol metrics.
@@ -61,6 +67,11 @@ type ProtocolMetricsCollector struct {
 	sidecarOverrides  int64
 	sidecarLatencySum int64 // nanoseconds
 
+	// Per-tier comprehension tracking (NLI feedback loop)
+	tierCompScoreSum [3]float64            // running sum of comprehension per tier
+	tierCompCount    [3]int64              // count of outcomes per tier
+	tierCodeScores   [3]map[string][]float64 // per-tier, per-code scores
+
 	// Window tracking
 	windowStart time.Time
 }
@@ -71,7 +82,12 @@ func NewProtocolMetricsCollector() *ProtocolMetricsCollector {
 		codeFollowed: make(map[string]int),
 		codeTotal:    make(map[string]int),
 		t2Frequency:  make(map[string]int),
-		windowStart:  time.Now(),
+		tierCodeScores: [3]map[string][]float64{
+			make(map[string][]float64),
+			make(map[string][]float64),
+			make(map[string][]float64),
+		},
+		windowStart: time.Now(),
 	}
 }
 
@@ -147,6 +163,32 @@ func (c *ProtocolMetricsCollector) RecordOutcome(code string, comprehensionScore
 	c.codeTotal[code]++
 	if comprehensionScore >= 0.7 {
 		c.codeFollowed[code]++
+	}
+}
+
+// RecordOutcomeWithTier records a constraint outcome with per-tier tracking.
+// tier must be 1, 2, or 3; out-of-range tiers are silently ignored for tier-specific
+// tracking but the outcome is still recorded via RecordOutcome.
+func (c *ProtocolMetricsCollector) RecordOutcomeWithTier(code string, tier int, comprehensionScore float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Record into existing aggregate tracking (same as RecordOutcome, inlined to avoid double-lock)
+	if code != "" {
+		c.codeTotal[code]++
+		if comprehensionScore >= 0.7 {
+			c.codeFollowed[code]++
+		}
+	}
+
+	// Per-tier tracking
+	if tier >= 1 && tier <= 3 {
+		idx := tier - 1
+		c.tierCompScoreSum[idx] += comprehensionScore
+		c.tierCompCount[idx]++
+		if code != "" {
+			c.tierCodeScores[idx][code] = append(c.tierCodeScores[idx][code], comprehensionScore)
+		}
 	}
 }
 
@@ -247,6 +289,37 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		t2Freq[k] = v
 	}
 
+	// Per-tier comprehension averages
+	var tierComp [3]float64
+	var tierOutcomeCount [3]int64
+	for i := range 3 {
+		tierOutcomeCount[i] = c.tierCompCount[i]
+		if c.tierCompCount[i] > 0 {
+			tierComp[i] = c.tierCompScoreSum[i] / float64(c.tierCompCount[i])
+		}
+	}
+
+	// Per-tier, per-code comprehension averages
+	var tierCodeComp map[int]map[string]float64
+	for i := range 3 {
+		if len(c.tierCodeScores[i]) > 0 {
+			if tierCodeComp == nil {
+				tierCodeComp = make(map[int]map[string]float64)
+			}
+			codeMap := make(map[string]float64, len(c.tierCodeScores[i]))
+			for code, scores := range c.tierCodeScores[i] {
+				if len(scores) > 0 {
+					var sum float64
+					for _, s := range scores {
+						sum += s
+					}
+					codeMap[code] = sum / float64(len(scores))
+				}
+			}
+			tierCodeComp[i+1] = codeMap // tier 1-indexed in the map
+		}
+	}
+
 	// NS-07: Compute sidecar metrics
 	var sidecar *SidecarMetrics
 	if c.sidecarRequests > 0 {
@@ -275,6 +348,9 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		CodeCoverage:             codeCoverage,
 		T2FrequencyByConstraint:  t2Freq,
 		Sidecar:                  sidecar,
+		TierComprehension:        tierComp,
+		TierCodeComprehension:    tierCodeComp,
+		TierOutcomeCount:         tierOutcomeCount,
 		WindowStart:              c.windowStart,
 		WindowEnd:                now,
 		TotalEvents:              c.totalEvents,
@@ -305,5 +381,12 @@ func (c *ProtocolMetricsCollector) Reset() {
 	c.sidecarAgreements = 0
 	c.sidecarOverrides = 0
 	c.sidecarLatencySum = 0
+	c.tierCompScoreSum = [3]float64{}
+	c.tierCompCount = [3]int64{}
+	c.tierCodeScores = [3]map[string][]float64{
+		make(map[string][]float64),
+		make(map[string][]float64),
+		make(map[string][]float64),
+	}
 	c.windowStart = time.Now()
 }

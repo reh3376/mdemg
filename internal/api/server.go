@@ -709,6 +709,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		rsicDispatcher.SetGuidanceCalibrator(&rsicGuidanceCalibrationAdapter{svc: jiminySvc})
 	}
 	rsicCycle.SetSnapshotStore(snapshotStore)
+	// NLI feedback loop: wire tier effectiveness dataset builder
+	if jiminySvc != nil {
+		rsicCycle.SetTierEffectivenessProvider(&rsicTierEffectivenessAdapter{svc: jiminySvc})
+	}
 	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
 
 	// Phase 89: Initialize RSIC persistence store
@@ -1485,6 +1489,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/resume-protocol", s.handleJ17ResumeProtocol)
 	mux.HandleFunc("/v1/jiminy/bootstrap", s.handleJ17Bootstrap)
 	mux.HandleFunc("/v1/jiminy/protocol/metrics", s.handleJ17ProtocolMetrics)
+	mux.HandleFunc("/v1/jiminy/protocol/tier-effectiveness", s.handleJ17TierEffectiveness)
 	mux.HandleFunc("/v1/jiminy/protocol/feedback", s.handleJ17ProtocolFeedback)
 	mux.HandleFunc("/v1/jiminy/protocol/learn", s.handleJ17ProtocolLearn)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)

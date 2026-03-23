@@ -356,6 +356,14 @@ type Config struct {
 	J17SidecarCBFailureThreshold int     // J17_SIDECAR_CB_FAILURE_THRESHOLD — failures before opening circuit (default: 3)
 	J17SidecarCBTimeoutSec       int     // J17_SIDECAR_CB_TIMEOUT_SEC — seconds before half-open retry (default: 15)
 
+	// NLI Feedback Loop: Per-Tier Effectiveness + Calibration
+	J17NLIObservationalEnabled        bool    // J17_NLI_OBSERVATIONAL_ENABLED — NLI scores flow to metrics in all modes (default: true)
+	J17TierEffectivenessMinSamples    int     // J17_TIER_EFFECTIVENESS_MIN_SAMPLES — min outcomes per tier/code before grading (default: 5)
+	J17TierIneffectiveThreshold       float64 // J17_TIER_INEFFECTIVE_THRESHOLD — comprehension below this = ineffective (default: 0.6)
+	J17TierDriftDetectionEnabled      bool    // J17_TIER_DRIFT_DETECTION_ENABLED — enable j17_tier_ineffective RSIC pattern (default: true)
+	J17NLICalibrationWindowSize       int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
+	J17NLICalibrationBiasThreshold    float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias (default: 0.15)
+
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
@@ -1998,6 +2006,26 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// NLI Feedback Loop
+	j17NLIObservationalEnabled := getBool("J17_NLI_OBSERVATIONAL_ENABLED", true)
+	j17TierEffectivenessMinSamples, err := atoi("J17_TIER_EFFECTIVENESS_MIN_SAMPLES", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TierIneffectiveThreshold, err := atof("J17_TIER_INEFFECTIVE_THRESHOLD", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TierDriftDetectionEnabled := getBool("J17_TIER_DRIFT_DETECTION_ENABLED", true)
+	j17NLICalibrationWindowSize, err := atoi("J17_NLI_CALIBRATION_WINDOW_SIZE", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	j17NLICalibrationBiasThreshold, err := atof("J17_NLI_CALIBRATION_BIAS_THRESHOLD", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Startup validation: active mode requires sidecar URL
 	if j17SidecarMode == "active" && j17SidecarURL == "" {
 		return Config{}, errors.New("J17_SIDECAR_MODE=active requires J17_SIDECAR_URL to be set")
@@ -3132,6 +3160,12 @@ func FromEnv() (Config, error) {
 		J17SidecarCBEnabled:              j17SidecarCBEnabled,
 		J17SidecarCBFailureThreshold:     j17SidecarCBFailureThreshold,
 		J17SidecarCBTimeoutSec:           j17SidecarCBTimeoutSec,
+		J17NLIObservationalEnabled:       j17NLIObservationalEnabled,
+		J17TierEffectivenessMinSamples:   j17TierEffectivenessMinSamples,
+		J17TierIneffectiveThreshold:      j17TierIneffectiveThreshold,
+		J17TierDriftDetectionEnabled:     j17TierDriftDetectionEnabled,
+		J17NLICalibrationWindowSize:      j17NLICalibrationWindowSize,
+		J17NLICalibrationBiasThreshold:   j17NLICalibrationBiasThreshold,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

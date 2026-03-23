@@ -234,7 +234,7 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 	if snapshot == nil {
 		return ape.ProtocolStatsResult{}, nil
 	}
-	return ape.ProtocolStatsResult{
+	result := ape.ProtocolStatsResult{
 		TierDistribution:         snapshot.TierDistribution,
 		CompressionRatio:         snapshot.CompressionRatio,
 		AvgComprehension:         snapshot.AvgComprehension,
@@ -244,7 +244,18 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 		TotalEvents:              snapshot.TotalEvents,
 		T2FrequencyByConstraint:  snapshot.T2FrequencyByConstraint,
 		CodeComprehension:        snapshot.CodeComprehension,
-	}, nil
+		TierComprehension:        snapshot.TierComprehension,
+		TierCodeComprehension:    snapshot.TierCodeComprehension,
+		TierOutcomeCount:         snapshot.TierOutcomeCount,
+	}
+
+	// NLI calibration: populate from service if available
+	if calibReport := a.svc.GetNLICalibrationReport(); calibReport != nil {
+		result.NLIMeanBias = calibReport.MeanBias
+		result.NLIBiasAlert = calibReport.BiasAlert
+	}
+
+	return result, nil
 }
 
 // rsicGuidanceCalibrationAdapter adapts *jiminy.Service to ape.GuidanceCalibrationProvider (RSIC-SK1).
@@ -279,6 +290,24 @@ func (a *rsicGuidanceCalibrationAdapter) UpdateNodeConfidence(ctx context.Contex
 
 func (a *rsicGuidanceCalibrationAdapter) ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error) {
 	return a.svc.ArchiveStaleConstraints(ctx, spaceID)
+}
+
+// rsicTierEffectivenessAdapter adapts *jiminy.Service to ape.TierEffectivenessProvider.
+type rsicTierEffectivenessAdapter struct {
+	svc *jiminy.Service
+}
+
+func (a *rsicTierEffectivenessAdapter) BuildDataset() map[string]any {
+	ds := a.svc.BuildTierEffectivenessDataset()
+	if ds == nil {
+		return nil
+	}
+	return map[string]any{
+		"generated_at":   ds.GeneratedAt,
+		"total_outcomes": ds.TotalOutcomes,
+		"code_drift":     len(ds.CodeDrift),
+		"recommendations": len(ds.Recommendations),
+	}
 }
 
 // jiminyRetrievalAdapter adapts *retrieval.Service to jiminy.RetrievalProvider (J7).

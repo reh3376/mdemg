@@ -1,0 +1,86 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "J17 Tier Effectiveness",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "tier_effectiveness",
+      "nli_feedback_loop"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-23",
+    "description": "Validates the J17 tier effectiveness endpoint that returns per-tier comprehension grading and NLI calibration data for RSIC feedback loop.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "tier_effectiveness",
+      "nli_feedback_loop"
+    ]
+  },
+  "variables": {
+    "space_id": "uats-test-space"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/protocol/tier-effectiveness",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query": {
+      "space_id": "{{space_id}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "type": "object",
+        "exists": true
+      },
+      {
+        "name": "overall_tier_comprehension is array",
+        "path": "$.data.overall_tier_comprehension",
+        "type": "array"
+      },
+      {
+        "name": "tier_outcome_count is array",
+        "path": "$.data.tier_outcome_count",
+        "type": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "j17_disabled",
+      "description": "When Jiminy is disabled, returns 503.",
+      "tags": [
+        "j17_disabled"
+      ],
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 
 	"mdemg/internal/config"
@@ -243,6 +244,49 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 					Metric:            "code_coverage",
 					Value:             protoStats.CodeCoverage,
 					Threshold:         0.8,
+				})
+			}
+
+			// 15. Tier ineffectiveness: specific tier degrades comprehension for a code
+			if r.cfg.J17TierDriftDetectionEnabled && len(protoStats.TierCodeComprehension) > 0 {
+				for tier, codemap := range protoStats.TierCodeComprehension {
+					for code, comp := range codemap {
+						if protoStats.TierOutcomeCount[tier-1] < int64(r.cfg.J17TierEffectivenessMinSamples) {
+							continue
+						}
+						if comp < r.cfg.J17TierIneffectiveThreshold {
+							for otherTier, otherMap := range protoStats.TierCodeComprehension {
+								if otherTier == tier {
+									continue
+								}
+								if otherComp, ok := otherMap[code]; ok && otherComp > comp+0.15 {
+									insights = append(insights, ReflectionInsight{
+										PatternID:         "j17_tier_ineffective",
+										Severity:          SeverityHigh,
+										Description:       fmt.Sprintf("Code '%s' at T%d: %.0f%% comprehension vs %.0f%% at T%d", code, tier, comp*100, otherComp*100, otherTier),
+										RecommendedAction: "adjust_tier_threshold",
+										Metric:            "tier_comprehension_delta",
+										Value:             comp,
+										Threshold:         r.cfg.J17TierIneffectiveThreshold,
+									})
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// 16. NLI calibration drift
+			if protoStats.NLIBiasAlert {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "j17_nli_calibration_drift",
+					Severity:          SeverityMedium,
+					Description:       fmt.Sprintf("NLI shows %.0f%% mean bias vs heuristic", protoStats.NLIMeanBias*100),
+					RecommendedAction: "review_nli_calibration",
+					Metric:            "nli_mean_bias",
+					Value:             math.Abs(protoStats.NLIMeanBias),
+					Threshold:         r.cfg.J17NLICalibrationBiasThreshold,
 				})
 			}
 		}

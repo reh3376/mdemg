@@ -395,15 +395,29 @@ type ProtocolStatsProvider interface {
 
 // ProtocolStatsResult carries J17 protocol metrics for RSIC assessment.
 type ProtocolStatsResult struct {
-	TierDistribution         [3]float64         `json:"tier_distribution"`
-	CompressionRatio         float64            `json:"compression_ratio"`
-	AvgComprehension         float64            `json:"avg_comprehension"`
-	ReplayFrequencyPerHour   float64            `json:"replay_frequency_per_hour"`
-	TicketRestoreSuccessRate float64            `json:"ticket_restore_success_rate"`
-	CodeCoverage             float64            `json:"code_coverage"`
-	TotalEvents              int64              `json:"total_events"`
-	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
-	CodeComprehension        map[string]float64 `json:"code_comprehension,omitempty"`
+	TierDistribution         [3]float64                 `json:"tier_distribution"`
+	CompressionRatio         float64                    `json:"compression_ratio"`
+	AvgComprehension         float64                    `json:"avg_comprehension"`
+	ReplayFrequencyPerHour   float64                    `json:"replay_frequency_per_hour"`
+	TicketRestoreSuccessRate float64                    `json:"ticket_restore_success_rate"`
+	CodeCoverage             float64                    `json:"code_coverage"`
+	TotalEvents              int64                      `json:"total_events"`
+	T2FrequencyByConstraint  map[string]int             `json:"t2_frequency_by_constraint,omitempty"`
+	CodeComprehension        map[string]float64         `json:"code_comprehension,omitempty"`
+
+	// Per-tier comprehension (NLI feedback loop)
+	TierComprehension     [3]float64                 `json:"tier_comprehension"`
+	TierCodeComprehension map[int]map[string]float64 `json:"tier_code_comprehension,omitempty"`
+	TierOutcomeCount      [3]int64                   `json:"tier_outcome_count"`
+
+	// NLI calibration (Epic 3)
+	NLIMeanBias  float64 `json:"nli_mean_bias"`
+	NLIBiasAlert bool    `json:"nli_bias_alert"`
+}
+
+// TierEffectivenessProvider builds curated tier effectiveness datasets for RSIC.
+type TierEffectivenessProvider interface {
+	BuildDataset() map[string]any
 }
 
 // ProtocolEvolverProvider executes protocol mutations proposed by RSIC.

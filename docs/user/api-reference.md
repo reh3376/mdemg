@@ -2218,6 +2218,36 @@ curl -s -X POST http://localhost:9999/v1/jiminy/protocol/learn \
 | `J17_SIDECAR_CB_ENABLED` | `true` | Enable circuit breaker for sidecar HTTP calls |
 | `J17_SIDECAR_CB_FAILURE_THRESHOLD` | `3` | Consecutive failures before circuit opens |
 | `J17_SIDECAR_CB_TIMEOUT_SEC` | `15` | Seconds before half-open probe after circuit opens |
+| `J17_NLI_OBSERVATIONAL_ENABLED` | `true` | NLI scores flow to metrics in all sidecar modes |
+| `J17_TIER_EFFECTIVENESS_MIN_SAMPLES` | `5` | Min outcomes per tier/code before grading |
+| `J17_TIER_INEFFECTIVE_THRESHOLD` | `0.6` | Comprehension below this flags tier as ineffective |
+| `J17_TIER_DRIFT_DETECTION_ENABLED` | `true` | Enable tier drift RSIC reflection pattern |
+| `J17_NLI_CALIBRATION_WINDOW_SIZE` | `500` | NLI/heuristic calibration ring buffer size |
+| `J17_NLI_CALIBRATION_BIAS_THRESHOLD` | `0.15` | Max acceptable NLI-vs-heuristic mean bias |
+
+### GET /v1/jiminy/protocol/tier-effectiveness
+
+Returns per-tier comprehension grading, cross-tier delta analysis, and NLI calibration data.
+
+**Query**: `space_id` (string, required)
+
+**Response** (200):
+```json
+{
+  "data": {
+    "overall_tier_comprehension": [0.92, 0.87, 0.95],
+    "tier_outcome_count": [450, 120, 30],
+    "code_tier_delta": [...],
+    "ineffective_tiers": [...],
+    "nli_calibration": {
+      "mean_nli": 0.85,
+      "mean_heuristic": 0.80,
+      "mean_bias": 0.05,
+      "bias_alert": false
+    }
+  }
+}
+```
 
 ---
 
