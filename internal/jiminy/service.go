@@ -45,6 +45,7 @@ type Service struct {
 	trustScorer       *TrustScorer           // J17: per-session trust scoring
 	protocolMetrics   *ProtocolMetricsCollector // J17-4: protocol metrics for RSIC
 	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
+	signalLearner     SignalLearnerProvider    // RSIC-SK1: Hebbian signal learner for guidance
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -175,6 +176,29 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		protocolMetrics:   protocolMetrics,
 		extensions:        extensions,
 	}
+}
+
+// SetSignalLearner sets the Hebbian signal learner for guidance emission/response tracking (RSIC-SK1).
+func (s *Service) SetSignalLearner(sl SignalLearnerProvider) {
+	s.signalLearner = sl
+}
+
+// UpdateNodeConfidence delegates to the confidence updater to apply outcome-based
+// confidence changes to a single node (RSIC-SK1).
+func (s *Service) UpdateNodeConfidence(ctx context.Context, nodeID string, outcome GuidanceOutcome) error {
+	if s.confidenceUpdater == nil {
+		return fmt.Errorf("confidence updater not available")
+	}
+	return s.confidenceUpdater.UpdateConfidence(ctx, nodeID, outcome)
+}
+
+// ArchiveStaleConstraints delegates to the confidence updater to archive constraints
+// whose confidence has fallen below the archive threshold (RSIC-SK1).
+func (s *Service) ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error) {
+	if s.confidenceUpdater == nil {
+		return 0, fmt.Errorf("confidence updater not available")
+	}
+	return s.confidenceUpdater.ArchiveStaleConstraints(ctx, spaceID)
 }
 
 // SetRetriever sets the retrieval provider for full-spectrum knowledge access (J7).
@@ -487,6 +511,15 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		filtered = filtered[:maxItems]
 	}
 
+	// RSIC-SK1: Record signal emissions for each surfaced guidance item
+	if s.signalLearner != nil {
+		for _, item := range filtered {
+			if code := guidanceSignalCode(item); code != "" {
+				s.signalLearner.RecordEmission(code)
+			}
+		}
+	}
+
 	// Ensure non-nil slices for JSON serialization (nil → null, [] → [])
 	if filtered == nil {
 		filtered = []GuidanceItem{}
@@ -793,11 +826,17 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
 				log.Printf("jiminy: persist outcome error: %v", err)
 			}
-			// Update confidence for constraint-type guidance items
-			if s.confidenceUpdater != nil && item.Type == GuidanceConstraint && len(item.SourceNodes) > 0 {
+			// RSIC-SK1: Update confidence for all guidance types with source nodes
+			if s.confidenceUpdater != nil && len(item.SourceNodes) > 0 {
 				if err := s.confidenceUpdater.UpdateConfidence(ctx, item.SourceNodes[0], outcome); err != nil {
 					log.Printf("jiminy: confidence update error: %v", err)
 				}
+			}
+		}
+		// RSIC-SK1: Record signal response for positive outcomes (independent of persistence)
+		if s.signalLearner != nil && (outcome == OutcomeFollowed || outcome == OutcomePartialCompliance) {
+			if code := guidanceSignalCode(item); code != "" {
+				s.signalLearner.RecordResponse(code)
 			}
 		}
 	}
@@ -1234,6 +1273,18 @@ func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) m
 	}
 	codes, _ := result.(map[string]string)
 	return codes
+}
+
+// guidanceSignalCode returns a Hebbian signal code for a guidance item.
+// Uses constraint_code if available, otherwise falls back to the guidance type.
+func guidanceSignalCode(item GuidanceItem) string {
+	if item.ConstraintCode != "" {
+		return "guidance:" + item.ConstraintCode
+	}
+	if item.Type != "" {
+		return "guidance:" + string(item.Type)
+	}
+	return ""
 }
 
 // significantWords extracts words >= 4 chars from text.

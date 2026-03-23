@@ -129,6 +129,21 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 5 * time.Minute
 
+	case "adjust_guidance_confidence":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/constraints/effectiveness", Purpose: "query constraint effectiveness"},
+			{Method: "PATCH", Path: "/v1/memory/nodes/{id}/confidence", Purpose: "update node confidence"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "boosted", Description: "Count of items with confidence boosted", Format: "json", Required: true},
+			{Name: "decayed", Description: "Count of items with confidence decayed", Format: "json", Required: true},
+			{Name: "archived", Description: "Count of stale constraints archived", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "guidance_health_delta", Operator: "gte", Threshold: 0},
+		}
+		spec.Timeout = 5 * time.Minute
+
 	case "codify_constraint":
 		spec.AllowedEndpoints = []EndpointSpec{
 			{Method: "POST", Path: "/v1/jiminy/protocol/codify", Purpose: "generate and freeze T1 code for constraint"},
@@ -202,6 +217,8 @@ func descriptionForAction(actionType string) string {
 		return "Archive constraints with consistently low effectiveness rates"
 	case "review_guidance_effectiveness":
 		return "Review and optimize guidance effectiveness based on follow rates"
+	case "adjust_guidance_confidence":
+		return "Boost high-performing and decay low-performing guidance confidence based on effectiveness"
 	case "codify_constraint":
 		return "Generate T1 mnemonic code for constraint currently sent as T2"
 	case "retire_code":

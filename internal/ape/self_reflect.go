@@ -158,6 +158,19 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		})
 	}
 
+	// 15. RSIC-SK1: Per-constraint confidence calibration
+	if report.GuidanceHealth > 0 && report.GuidanceHealth < 0.7 {
+		insights = append(insights, ReflectionInsight{
+			PatternID:         "guidance_confidence_drift",
+			Severity:          SeverityMedium,
+			Description:       "Guidance health below 70% — per-constraint confidence may need calibration",
+			RecommendedAction: "adjust_guidance_confidence",
+			Metric:            "guidance_health",
+			Value:             report.GuidanceHealth,
+			Threshold:         0.7,
+		})
+	}
+
 	// 10-14. J17: Protocol reflection patterns
 	if report.ProtocolHealth > 0 && r.protocolProvider != nil {
 		protoStats, pErr := r.protocolProvider.GetProtocolStats(ctx, report.SpaceID)

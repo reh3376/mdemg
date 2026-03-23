@@ -22,7 +22,8 @@ type Dispatcher struct {
 	convSvc       ConversationStatsProvider
 	hiddenSvc     HiddenLayerProvider
 	driver        neo4j.DriverWithContext
-	protoEvolver  ProtocolEvolverProvider // J17: protocol mutation executor
+	protoEvolver       ProtocolEvolverProvider       // J17: protocol mutation executor
+	guidanceCalibrator GuidanceCalibrationProvider   // RSIC-SK1: guidance self-calibration
 
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
@@ -65,6 +66,11 @@ func (d *Dispatcher) SetSnapshotStore(ss *SnapshotStore) {
 // SetProtocolEvolver attaches a J17 protocol evolver for protocol mutation tasks.
 func (d *Dispatcher) SetProtocolEvolver(pe ProtocolEvolverProvider) {
 	d.protoEvolver = pe
+}
+
+// SetGuidanceCalibrator attaches an RSIC-SK1 guidance calibration provider.
+func (d *Dispatcher) SetGuidanceCalibrator(gc GuidanceCalibrationProvider) {
+	d.guidanceCalibrator = gc
 }
 
 // SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
@@ -233,6 +239,12 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeAdjustTierThreshold(ctx, at.Spec.TargetSpace)
 	case "adjust_replay_buffer":
 		deliverables, execErr = d.executeAdjustReplayBuffer(ctx, at.Spec.TargetSpace)
+	case "review_guidance_effectiveness":
+		deliverables, execErr = d.executeReviewGuidanceEffectiveness(ctx, at.Spec.TargetSpace)
+	case "adjust_guidance_confidence":
+		deliverables, execErr = d.executeAdjustGuidanceConfidence(ctx, at.Spec.TargetSpace)
+	case "archive_ineffective_constraints":
+		deliverables, execErr = d.executeArchiveIneffectiveConstraints(ctx, at.Spec.TargetSpace)
 	default:
 		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -424,6 +436,83 @@ func (d *Dispatcher) executeAdjustReplayBuffer(ctx context.Context, spaceID stri
 		return nil, fmt.Errorf("protocol evolver not available")
 	}
 	return d.protoEvolver.AdjustReplayBuffer(ctx, spaceID)
+}
+
+// ─── RSIC-SK1: Guidance calibration executors ───
+
+func (d *Dispatcher) executeReviewGuidanceEffectiveness(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.guidanceCalibrator == nil {
+		return nil, fmt.Errorf("guidance calibrator not available")
+	}
+	items, err := d.guidanceCalibrator.GetConstraintEffectiveness(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	var lowCount, highCount, insufficientCount int
+	for _, item := range items {
+		if item.TotalSurfaced < 3 {
+			insufficientCount++
+		} else if item.EffectivenessRate >= 0.7 {
+			highCount++
+		} else {
+			lowCount++
+		}
+	}
+	return map[string]any{
+		"total":        len(items),
+		"low":          lowCount,
+		"high":         highCount,
+		"insufficient": insufficientCount,
+	}, nil
+}
+
+func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.guidanceCalibrator == nil {
+		return nil, fmt.Errorf("guidance calibrator not available")
+	}
+	items, err := d.guidanceCalibrator.GetConstraintEffectiveness(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	var boosted, decayed int
+	for _, item := range items {
+		if item.TotalSurfaced < 3 {
+			continue
+		}
+		if item.EffectivenessRate >= 0.7 {
+			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "followed"); err != nil {
+				log.Printf("RSIC-SK1: boost %s failed: %v", item.NodeID, err)
+			} else {
+				boosted++
+			}
+		} else if item.EffectivenessRate < 0.1 && item.TotalSurfaced >= 5 {
+			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "ignored"); err != nil {
+				log.Printf("RSIC-SK1: decay %s failed: %v", item.NodeID, err)
+			} else {
+				decayed++
+			}
+		}
+	}
+	archived, archErr := d.guidanceCalibrator.ArchiveStaleConstraints(ctx, spaceID)
+	if archErr != nil {
+		log.Printf("RSIC-SK1: archive stale constraints failed: %v", archErr)
+	}
+	return map[string]any{
+		"boosted":  boosted,
+		"decayed":  decayed,
+		"archived": archived,
+	}, nil
+}
+
+func (d *Dispatcher) executeArchiveIneffectiveConstraints(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.guidanceCalibrator == nil {
+		return nil, fmt.Errorf("guidance calibrator not available")
+	}
+	archived, err := d.guidanceCalibrator.ArchiveStaleConstraints(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"archived": archived}, nil
 }
 
 // CleanupStaleTasks removes completed/failed tasks older than maxAge and caps total entries at 1000.
