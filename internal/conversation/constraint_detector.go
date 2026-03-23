@@ -136,6 +136,8 @@ func (d *ConstraintDetector) Detect(content string, obsType ObservationType) []D
 	// Observation type confidence boost
 	boost := 0.0
 	switch obsType {
+	case ObsTypeConstraint:
+		boost = 0.25
 	case ObsTypeDecision:
 		boost = 0.2
 	case ObsTypeCorrection:

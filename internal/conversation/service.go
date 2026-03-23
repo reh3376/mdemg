@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/nrednav/cuid2"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
@@ -192,6 +192,14 @@ func calculateInitialImportance(obsType ObservationType) float64 {
 		return 0.5 // Technical notes are moderate
 	case ObsTypeTask:
 		return 0.7 // Tasks are important for continuity
+	case ObsTypeConstraint:
+		return 0.9 // Constraints are highest priority
+	case ObsTypeSelfImprovement:
+		return 0.45 // RSIC data is moderate
+	case ObsTypeNote:
+		return 0.4 // Notes are low priority
+	case ObsTypeContextSignal:
+		return 0.1 // Telemetry is background noise
 	default:
 		return 0.5 // Default moderate importance
 	}
@@ -199,9 +207,9 @@ func calculateInitialImportance(obsType ObservationType) float64 {
 
 // Observe captures a conversation observation
 func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResponse, error) {
-	// Generate unique IDs
-	obsID := uuid.New().String()
-	nodeID := uuid.New().String()
+	// Generate unique IDs (CUIDv2)
+	obsID := cuid2.Generate()
+	nodeID := cuid2.Generate()
 
 	// Validate observation type
 	obsType := ObservationType(req.ObsType)
@@ -211,17 +219,21 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 
 	// Validate observation type value
 	validTypes := map[ObservationType]bool{
-		ObsTypeDecision:      true,
-		ObsTypeCorrection:    true,
-		ObsTypeLearning:      true,
-		ObsTypePreference:    true,
-		ObsTypeError:         true,
-		ObsTypeTask:          true,
-		ObsTypeTechnicalNote: true,
-		ObsTypeInsight:       true,
-		ObsTypeContext:       true,
-		ObsTypeProgress:      true,
-		ObsTypeBlocker:       true,
+		ObsTypeDecision:        true,
+		ObsTypeCorrection:      true,
+		ObsTypeLearning:        true,
+		ObsTypePreference:      true,
+		ObsTypeError:           true,
+		ObsTypeTask:            true,
+		ObsTypeTechnicalNote:   true,
+		ObsTypeInsight:         true,
+		ObsTypeContext:         true,
+		ObsTypeProgress:        true,
+		ObsTypeBlocker:         true,
+		ObsTypeContextSignal:   true,
+		ObsTypeNote:            true,
+		ObsTypeConstraint:      true,
+		ObsTypeSelfImprovement: true,
 	}
 	if !validTypes[obsType] {
 		return nil, fmt.Errorf("invalid observation type: %s", req.ObsType)
@@ -1267,6 +1279,10 @@ WITH o,
           WHEN 'technical_note' THEN 0.4
           WHEN 'progress'   THEN 0.3
           WHEN 'context'    THEN 0.2
+          WHEN 'constraint' THEN 1.0
+          WHEN 'self_improvement' THEN 0.3
+          WHEN 'note'       THEN 0.3
+          WHEN 'context_signal' THEN 0.1
           ELSE 0.3 END AS typePriority,
      // Co-activation strength: count of learning edges
      count(coact) AS coactCount
@@ -1347,6 +1363,14 @@ func resumeObsTypePriority(obsType ObservationType) float64 {
 		return 0.3
 	case ObsTypeContext:
 		return 0.2
+	case ObsTypeConstraint:
+		return 0.95
+	case ObsTypeSelfImprovement:
+		return 0.35
+	case ObsTypeNote:
+		return 0.3
+	case ObsTypeContextSignal:
+		return 0.1
 	default:
 		return 0.3
 	}

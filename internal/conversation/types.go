@@ -16,7 +16,11 @@ const (
 	ObsTypeInsight       ObservationType = "insight"        // Insights and discoveries
 	ObsTypeContext       ObservationType = "context"        // Context/background information
 	ObsTypeProgress      ObservationType = "progress"       // Progress updates
-	ObsTypeBlocker       ObservationType = "blocker"        // Blockers/issues encountered
+	ObsTypeBlocker         ObservationType = "blocker"          // Blockers/issues encountered
+	ObsTypeContextSignal   ObservationType = "context_signal"   // Lightweight hook-generated telemetry (file reads, searches)
+	ObsTypeNote            ObservationType = "note"             // Free-form user annotation / memo
+	ObsTypeConstraint      ObservationType = "constraint"       // Explicitly recorded constraints ("must", "never", "always")
+	ObsTypeSelfImprovement ObservationType = "self_improvement" // RSIC cycle outcomes, calibration results
 )
 
 // Visibility levels for multi-tenant memory access

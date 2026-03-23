@@ -98,7 +98,7 @@ func ExportConfigForProfile(spaceID, profile string) (ExportConfig, error) {
 		base.IncludeSymbols = false
 		base.IncludeLearnedEdges = true
 		base.ExcludeVolatile = true
-		base.ObsTypes = []string{"learning", "decision", "correction", "technical_note", "insight", "preference"}
+		base.ObsTypes = []string{"learning", "decision", "correction", "technical_note", "insight", "preference", "constraint"}
 		return base, nil
 	default:
 		return ExportConfig{}, fmt.Errorf("unknown profile %q (use: full, codebase, cms, learned, metadata, shareable)", profile)

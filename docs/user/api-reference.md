@@ -1233,7 +1233,7 @@ Capture a conversation observation with surprise detection.
   "space_id": "mdemg-dev",             // required
   "session_id": "claude-core",          // required
   "content": "User prefers Go over Python for CLI tools", // required
-  "obs_type": "preference",             // required: decision | learning | preference | correction | error | progress
+  "obs_type": "preference",             // required: decision | learning | preference | correction | error | progress | task | technical_note | insight | context | blocker | context_signal | note | constraint | self_improvement
   "tags": ["language", "cli"],           // optional
   "metadata": {},                        // optional: arbitrary metadata
   "user_id": "user-123",                // optional: multi-user support
@@ -2776,7 +2776,7 @@ Lightweight estimation of what an export would contain, without transferring dat
   "estimated_observations": 30,
   "estimated_symbols": 0,
   "filters_applied": {
-    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference"],
+    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference", "constraint"],
     "exclude_volatile": true,
     "only_pinned": false,
     "min_layer": 0,

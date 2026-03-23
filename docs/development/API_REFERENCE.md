@@ -852,7 +852,7 @@ Capture a significant observation with auto-surprise scoring.
 
 **Fields**:
 
-- `obs_type`: `decision`, `learning`, `preference`, `error`, `task`, `correction`
+- `obs_type`: `decision`, `learning`, `preference`, `error`, `task`, `correction`, `technical_note`, `insight`, `context`, `progress`, `blocker`, `context_signal`, `note`, `constraint`, `self_improvement`
 - `visibility`: `private` (owner only), `team` (space members), `global` (everyone, default)
 - `refers_to`: Array of node IDs to create REFERS_TO edges
 
@@ -3606,7 +3606,7 @@ Lightweight estimation of what an export would contain, without transferring dat
   "estimated_observations": 30,
   "estimated_symbols": 0,
   "filters_applied": {
-    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference"],
+    "obs_types": ["learning", "decision", "correction", "technical_note", "insight", "preference", "constraint"],
     "exclude_volatile": true,
     "only_pinned": false,
     "min_layer": 0,

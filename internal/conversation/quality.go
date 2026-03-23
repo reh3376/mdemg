@@ -148,6 +148,14 @@ func scoreActionability(content, obsType string) float64 {
 		score += 0.1
 	case "context":
 		score += 0.1
+	case "constraint":
+		score += 0.5
+	case "note":
+		score += 0.1
+	case "context_signal":
+		score += 0.0
+	case "self_improvement":
+		score += 0.15
 	}
 
 	lower := strings.ToLower(content)

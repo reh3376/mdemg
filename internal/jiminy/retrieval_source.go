@@ -46,14 +46,18 @@ func classifyRetrievalItem(r RetrievalResult) GuidanceType {
 		return GuidanceConstraint
 	case "decision":
 		return GuidanceDecision
-	case "learning", "technical_note", "insight":
+	case "learning", "technical_note", "insight", "context":
 		return GuidanceLearning
 	case "preference":
 		return GuidancePreference
-	case "error":
+	case "error", "blocker":
 		return GuidanceRisk
-	case "progress":
+	case "progress", "context_signal", "self_improvement":
 		return GuidancePattern
+	case "note":
+		return GuidanceLearning
+	case "task":
+		return GuidanceDecision
 	default:
 		return GuidanceLearning
 	}

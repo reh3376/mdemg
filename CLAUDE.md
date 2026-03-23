@@ -75,6 +75,16 @@ Capture experiences into the graph as they happen — silently, without announci
 | New learning | Domain terms, project conventions | `learning` |
 | User preference | Coding style, tool preferences | `preference` |
 | Error/blocker | Build failures, unresolved issues | `error` |
+| Task tracking | Current work items, handoffs | `task` |
+| Technical note | API details, implementation notes | `technical_note` |
+| Insight | Discoveries, non-obvious patterns | `insight` |
+| Context | Background info, session continuity | `context` |
+| Progress | Milestone completions, status updates | `progress` |
+| Blocker | Active impediments needing resolution | `blocker` |
+| Constraint rule | "Must", "never", "always" rules | `constraint` |
+| Free-form note | Memos, annotations, reminders | `note` |
+| Hook telemetry | File reads, searches (auto-generated) | `context_signal` |
+| RSIC cycle data | Calibration results, benchmark outcomes | `self_improvement` |
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/observe \

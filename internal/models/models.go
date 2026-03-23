@@ -557,7 +557,7 @@ type ObserveRequest struct {
 	SpaceID   string         `json:"space_id" validate:"required,min=1,max=256"`
 	SessionID string         `json:"session_id" validate:"required,min=1"`
 	Content   string         `json:"content" validate:"required,min=1"`
-	ObsType   string         `json:"obs_type,omitempty"` // decision, learning, preference, etc.
+	ObsType   string         `json:"obs_type,omitempty"` // decision, learning, preference, correction, error, task, technical_note, insight, context, progress, blocker, context_signal, note, constraint, self_improvement
 	Tags      []string       `json:"tags,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
 
@@ -743,7 +743,7 @@ type ResumeResponse struct {
 // ConversationObsResult represents a conversation observation in resume/recall responses
 type ConversationObsResult struct {
 	NodeID        string    `json:"node_id"`
-	ObsType       string    `json:"obs_type"`       // decision, learning, preference, error, task, correction
+	ObsType       string    `json:"obs_type"`       // decision, learning, preference, error, task, correction, technical_note, insight, context, progress, blocker, context_signal, note, constraint, self_improvement
 	Content       string    `json:"content"`
 	Summary       string    `json:"summary"`
 	SessionID     string    `json:"session_id"`

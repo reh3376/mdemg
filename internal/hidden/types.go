@@ -275,7 +275,7 @@ type UpperLayerNode struct {
 type ConversationObservation struct {
 	NodeID        string
 	SpaceID       string
-	ObsType       string    // decision, correction, learning, preference, error, task
+	ObsType       string    // decision, correction, learning, preference, error, task, technical_note, insight, context, progress, blocker, context_signal, note, constraint, self_improvement
 	Content       string    // The observation content
 	Summary       string    // Brief summary of the observation
 	Embedding     []float64 // Semantic embedding

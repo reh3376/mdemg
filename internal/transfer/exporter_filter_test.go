@@ -158,6 +158,7 @@ func TestExportConfigForProfile_Shareable(t *testing.T) {
 	expectedTypes := map[string]bool{
 		"learning": true, "decision": true, "correction": true,
 		"technical_note": true, "insight": true, "preference": true,
+		"constraint": true,
 	}
 	for _, ot := range cfg.ObsTypes {
 		if !expectedTypes[ot] {
