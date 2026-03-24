@@ -25,6 +25,7 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | pilot (setup-only runner) |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active (E1-E5 all enforced) |
+| UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active (11 specs, soft-fail CI) |
 
 ---
 
@@ -149,6 +150,17 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 | **Requires running server** | Yes | No (except prometheus_metrics) |
 | **Examples** | Health probes, dependency checks, tracing headers | Dashboard JSON, alert rule YAML, metric definitions |
 | **Failure mode** | Service behavior deviates from spec | Artifact structure/content invalid |
+
+### UITS — Iterative-Improvement Encoding
+
+- Scope: T1-encoded content comprehension validation via LLM-judged iterative testing.
+- Status: **active** — schema, 11 specs, runner with full parity, soft-fail CI gate.
+- Policy: LLM-dependent, non-deterministic. Convergence requires 3 consecutive runs with mean ≥9.0/10 and 0 WEAK questions (<7.0). Scoring uses versioned profiles (comprehension, compaction, token_efficiency, fidelity weights).
+- References:
+  - `docs/tests/uits/README.md`
+  - `docs/tests/uits/schema/uits.schema.json`
+  - `docs/tests/uits/specs/`
+  - `docs/tests/uits/runners/uits_runner.py`
 
 ### UVTS — Semantic Validation
 

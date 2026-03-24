@@ -48,7 +48,7 @@ WHAT REMAINS TO BE DONE:
 4. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
 5. PARTIAL: Phase 86 — UVTS activation (spec-only, runner deferred)
 6. RESEARCH: AutoResearch integration analysis (docs/development/)
-7. RESEARCH: Export governance & org alignment gap analysis (docs/development/)
+7. RESEARCH: Export governance & org alignment gap analysis (docs/development/) [NOT YET CREATED — planned deliverable]
 8. RESEARCH: DBSCAN GPU acceleration investigation (Metal/AMX for clustering)
 - UxTS governance phases 81-85 COMPLETE (reconciliation, UOBS/UOTS convergence, CI gating, UNTS coverage, auth/perf)
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
@@ -372,7 +372,7 @@ Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{spac
 | Topic | Deliverable |
 |-------|-------------|
 | AutoResearch integration analysis | `docs/development/AUTORESEARCH_INTEGRATION_ANALYSIS.md` |
-| Export governance & org alignment | `docs/development/EXPORT_GOVERNANCE_GAP_ANALYSIS.md` |
+| Export governance & org alignment | `docs/development/EXPORT_GOVERNANCE_GAP_ANALYSIS.md` (not yet created) |
 | DBSCAN GPU acceleration | Metal/AMX investigation for clustering performance |
 
 ### Governance
@@ -399,6 +399,7 @@ Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. R
 | **UVTS** (semantic validation) | Spec-only | `docs/tests/uvts/` | No |
 | **UNTS** (hash verification) | Active | `docs/specs/unts-hash-verification.md` | Partial |
 | **UETS** (emergence eval) | Active | `docs/tests/uets/` | No |
+| **UITS** (iterative-improvement) | Active | `docs/tests/uits/` | Soft-fail |
 
 ### UATS Quick Reference
 
@@ -413,7 +414,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 
 ### Developer Guide
 
-`docs/guides/UXTS_DEVELOPER_GUIDE.md` — authoritative reference for UxTS methodology, spec writing, CI integration, anti-patterns, and all 11 frameworks.
+`docs/guides/UXTS_DEVELOPER_GUIDE.md` — authoritative reference for UxTS methodology, spec writing, CI integration, anti-patterns, and all 12 frameworks.
 
 ---
 

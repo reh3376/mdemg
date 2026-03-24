@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-03-12
+Last updated: 2026-03-24
 
 ---
 
@@ -21,6 +21,7 @@ Last updated: 2026-03-12
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 5 |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
+| UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
 
 ---
 
@@ -39,6 +40,7 @@ Last updated: 2026-03-12
 | UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (5) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
+| UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
 
 ---
 
@@ -56,6 +58,7 @@ Last updated: 2026-03-12
 | UVTS | N/A (spec-only, no functional runner) | All | N/A |
 | USTS | `rate_limiting`, `data_exposure`, `injection` | `authentication` (draft, needs USTS_AUTH_ENABLED), `test_cases` format (draft) | Yes (parity hard-fail for auth, test_cases) |
 | UAMS | N/A (no runner) | All | N/A |
+| UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
 
 ---
 
@@ -93,5 +96,6 @@ Last updated: 2026-03-12
 - `docs/api/api-spec/uots/README.md`
 - `docs/tests/uams/README.md`
 - `docs/research/UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226.md`
+- `docs/tests/uits/README.md`
 - `docs/guides/UXTS_DEVELOPER_GUIDE.md` (comprehensive UxTS methodology guide)
 - `AGENT_HANDOFF.md` (Governance & Testing Frameworks)
