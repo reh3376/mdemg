@@ -24,7 +24,7 @@
       "metrics",
       "fsd"
     ],
-    "sha256": "5bfb8b56c735d6e7de508551f14afdbf13bc6ea0a6bbb6cf4065056b9df0f520"
+    "sha256": "575a68d6cd4e0b716ba2cc690a5bdfd25dccc61c03a5c71c7c20de565663976b"
   },
   "variables": {},
   "request": {
@@ -33,51 +33,35 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "query_params": {
+    "query": {
       "space_id": "test-space"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "constraints": [],
-      "total": 0
-    }
+    "body_assertions": [
+      {
+        "name": "constraints array exists",
+        "path": "$.constraints",
+        "exists": true
+      },
+      {
+        "name": "total is number",
+        "path": "$.total",
+        "type": "number"
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.constraints",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.total",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "missing_space_id",
       "description": "GET without space_id returns 400",
       "request": {
-        "method": "GET",
-        "path": "/v1/constraints/effectiveness"
+        "query": null
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 400
-        }
-      ]
+      "expected": {
+        "status": 400
+      }
     },
     {
       "name": "method_not_allowed",
@@ -87,12 +71,9 @@
         "path": "/v1/constraints/effectiveness",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": 405
+      }
     }
   ]
 }

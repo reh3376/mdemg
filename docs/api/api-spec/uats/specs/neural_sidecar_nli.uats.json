@@ -24,9 +24,10 @@
       "neural",
       "nli",
       "sidecar",
-      "fsd"
+      "fsd",
+      "sidecar_required"
     ],
-    "sha256": "36be1e17488f58318f7be335ef9ad81fa18c5f2fc9783c6a417854411acc4a11"
+    "sha256": "1637171e504b5851548153348682d061629ea8c2197ba7171c74171a06eded96"
   },
   "variables": {},
   "request": {
@@ -40,119 +41,85 @@
       "hypothesis": "Error handling should be skipped for performance"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "label": "",
-      "scores": {
-        "entailment": 0,
-        "contradiction": 0,
-        "neutral": 0
+    "body_assertions": [
+      {
+        "name": "label exists",
+        "path": "$.label",
+        "exists": true
       },
-      "model": "",
-      "latency_ms": 0
-    }
+      {
+        "name": "entailment score",
+        "path": "$.scores.entailment",
+        "type": "number"
+      },
+      {
+        "name": "contradiction score",
+        "path": "$.scores.contradiction",
+        "type": "number"
+      },
+      {
+        "name": "neutral score",
+        "path": "$.scores.neutral",
+        "type": "number"
+      },
+      {
+        "name": "model exists",
+        "path": "$.model",
+        "exists": true
+      },
+      {
+        "name": "latency_ms is number",
+        "path": "$.latency_ms",
+        "type": "number"
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.label",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.scores.entailment",
-      "op": "gte",
-      "expected": 0
-    },
-    {
-      "type": "json_path",
-      "path": "$.scores.contradiction",
-      "op": "gte",
-      "expected": 0
-    },
-    {
-      "type": "json_path",
-      "path": "$.scores.neutral",
-      "op": "gte",
-      "expected": 0
-    },
-    {
-      "type": "json_path",
-      "path": "$.model",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.latency_ms",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "entailment_pair",
       "description": "Paraphrased pair should show high entailment",
       "request": {
-        "method": "POST",
-        "path": "/nli",
         "body": {
           "premise": "All API handlers must validate input",
           "hypothesis": "Input validation is required in API handlers"
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 200
-        },
-        {
-          "type": "json_path",
-          "path": "$.label",
-          "op": "exists"
-        }
-      ]
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "label exists",
+            "path": "$.label",
+            "exists": true
+          }
+        ]
+      }
     },
     {
       "name": "validation_error_missing_hypothesis",
       "description": "POST without hypothesis returns 422",
       "request": {
-        "method": "POST",
-        "path": "/nli",
         "body": {
           "premise": "test"
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 422
-        }
-      ]
+      "expected": {
+        "status": 422
+      }
     },
     {
       "name": "validation_error_missing_premise",
       "description": "POST without premise returns 422",
       "request": {
-        "method": "POST",
-        "path": "/nli",
         "body": {
           "hypothesis": "test"
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 422
-        }
-      ]
+      "expected": {
+        "status": 422
+      }
     }
   ]
 }

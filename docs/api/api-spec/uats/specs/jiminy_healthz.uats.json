@@ -1,0 +1,76 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Healthz",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "health",
+      "liveness"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-24",
+    "description": "Validates Jiminy healthz liveness endpoint \u2014 returns enabled/disabled status",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "health"
+    ],
+    "sha256": "46cb5bd28a0281e1592acea9e628fe5db1f06bd4f17a38e9a34baf4f3c5df582"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/healthz",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "status is string",
+        "path": "$.status",
+        "type": "string"
+      },
+      {
+        "name": "enabled is boolean",
+        "path": "$.enabled",
+        "type": "boolean"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "jiminy_disabled",
+      "description": "When Jiminy is disabled, returns 503 with disabled status.",
+      "tags": [
+        "jiminy_disabled"
+      ],
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "status is disabled",
+            "path": "$.status",
+            "equals": "disabled"
+          },
+          {
+            "name": "enabled is false",
+            "path": "$.enabled",
+            "equals": false
+          }
+        ]
+      }
+    }
+  ]
+}

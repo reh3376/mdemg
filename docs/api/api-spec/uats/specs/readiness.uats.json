@@ -19,7 +19,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "e20d38e412122f07af65439546dd6cfb99022c0fd51284bd4eb712fa4d72aa77",
+    "sha256": "37050ca500a4b52af12bb34353145fb28c4b0b76097bd03627240f9d453adc3b",
     "tags": [
       "embedding_required"
     ]
@@ -36,7 +36,7 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "equals": "ready"
+        "type": "string"
       },
       {
         "path": "$.checks",

@@ -28,7 +28,8 @@
       "protocol",
       "tier_effectiveness",
       "nli_feedback_loop"
-    ]
+    ],
+    "sha256": "424cd91f24cef028641ec035b650eaf972285800da2e21698c1d38b5a4419f3c"
   },
   "variables": {
     "space_id": "uats-test-space"

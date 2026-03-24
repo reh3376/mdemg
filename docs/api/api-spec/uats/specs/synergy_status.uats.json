@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Synergy Status endpoint — reports Claude Code ↔ MDEMG synergy health",
+    "description": "Validates Synergy Status endpoint \u2014 reports Claude Code \u2194 MDEMG synergy health",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": ""
+    "sha256": "cb26c2f0d759a30c99f0de9e600ecbeda7d59111ea729f85ec8bd14e4760079d"
   },
   "variables": {
     "test_space": "demo"
@@ -28,7 +28,7 @@
   "request": {
     "method": "GET",
     "path": "/v1/synergy/status",
-    "query_params": {
+    "query": {
       "space_id": "${test_space}"
     }
   },

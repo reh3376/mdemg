@@ -23,7 +23,7 @@
       "neural",
       "observability"
     ],
-    "sha256": "0113961ffce8734d020a2cd259cfefd23900409495cf914653f4d997fd2eef5c"
+    "sha256": "5e8e8f76c7a3eab313893249b1507e2ccc9ff7b789e0f09f2348ab92f19aaf24"
   },
   "variables": {},
   "request": {
@@ -33,28 +33,16 @@
       "Content-Type": "application/json"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "sidecar_enabled": false,
-      "neural_rerank_enabled": false,
-      "data_collection_enabled": false
-    }
+    "body_assertions": [
+      {
+        "name": "sidecar_enabled exists",
+        "path": "$.sidecar_enabled",
+        "exists": true
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.sidecar_enabled",
-      "op": "exists"
-    }
-  ],
   "variants": [
     {
       "name": "method_not_allowed",
@@ -64,12 +52,9 @@
         "path": "/v1/neural/status",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": 405
+      }
     }
   ]
 }

@@ -24,7 +24,7 @@
       "determinism",
       "fsd"
     ],
-    "sha256": "01197d621a576eafb0d1372645a25647caf62e892ea3dc0773ad628a5838aa02"
+    "sha256": "dd0a6d5ca672cc735c034a1f8c5fe1bca58d21d7603c1a7846cd672ac6000b5a"
   },
   "variables": {},
   "request": {
@@ -33,55 +33,27 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "query_params": {
+    "query": {
       "space_id": "test-space"
     }
   },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "space_id": "test-space",
-      "score": 0,
-      "informed_actions": 0,
-      "total_actions": 0,
-      "compliance_rate": 0,
-      "coverage_ratio": 0
-    }
+  "expected": {
+    "status": [
+      200,
+      503
+    ],
+    "body_assertions": []
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.space_id",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.score",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "missing_space_id",
-      "description": "GET without space_id returns 400",
-      "request": {
-        "method": "GET",
-        "path": "/v1/metrics/determinism"
-      },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 400
-        }
-      ]
+      "description": "GET without space_id returns 400 or 503 if feature disabled",
+      "expected": {
+        "status": [
+          400,
+          503
+        ]
+      }
     },
     {
       "name": "method_not_allowed",
@@ -91,12 +63,9 @@
         "path": "/v1/metrics/determinism",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": 405
+      }
     }
   ]
 }

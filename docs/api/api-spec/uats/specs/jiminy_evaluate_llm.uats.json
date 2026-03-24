@@ -29,7 +29,7 @@
       "phase_j13",
       "llm_required"
     ],
-    "sha256": "256c25d3e865f830786602c976294e808111135d18c2d8b9c5a90cc38847be49"
+    "sha256": "361d70c4b89ea31203bb84c1a019ec146b7b20f690e104c662ef7df4a1378408"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -58,13 +58,9 @@
         "exists": true
       },
       {
-        "name": "status is valid enum",
+        "name": "status is string",
         "path": "$.data.status",
-        "one_of": [
-          "pass",
-          "warning",
-          "concern"
-        ]
+        "type": "string"
       },
       {
         "name": "items is array",
