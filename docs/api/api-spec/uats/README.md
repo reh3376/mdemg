@@ -1,8 +1,8 @@
 # MDEMG API Test Specifications (UATS)
 
 **Version:** 1.2.0
-**Date:** 2026-02-26
-**Specs:** 152 canonical specs + 7 drafts
+**Date:** 2026-03-24
+**Specs:** 195 canonical specs across 25 categories
 
 ---
 
@@ -30,87 +30,29 @@ make test-api
 
 ---
 
-## Endpoint Coverage
+## Endpoint Coverage (195 specs, 25 categories)
 
-### Health (2)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| health | GET | /healthz |
-| readiness | GET | /readyz |
-
-### Core Memory (14)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| retrieve | POST | /v1/memory/retrieve |
-| ingest | POST | /v1/memory/ingest |
-| ingest_batch | POST | /v1/memory/ingest/batch |
-| reflect | POST | /v1/memory/reflect |
-| stats | GET | /v1/memory/stats |
-| nodes | GET/PATCH/DELETE | /v1/memory/nodes/{id} |
-| consolidate | POST | /v1/memory/consolidate |
-| archive_bulk | POST | /v1/memory/archive/bulk |
-| symbols | POST | /v1/memory/symbols |
-| distribution | GET | /v1/memory/distribution |
-| consult | POST | /v1/memory/consult |
-| suggest | POST | /v1/memory/suggest |
-| cache_stats | GET | /v1/memory/cache/stats |
-| query_metrics | GET | /v1/memory/query/metrics |
-
-### Ingest Jobs (4)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| ingest_trigger | POST | /v1/memory/ingest/trigger |
-| ingest_status | GET | /v1/memory/ingest/status/{id} |
-| ingest_cancel | POST | /v1/memory/ingest/cancel/{id} |
-| ingest_jobs | GET | /v1/memory/ingest/jobs |
-
-### Ingest Codebase (4 specs, 31 test cases)
-
-| Spec | Method | Endpoint | Variants |
-|------|--------|----------|----------|
-| ingest_codebase | POST | /v1/memory/ingest-codebase | 18 |
-| ingest_codebase_status | GET | /v1/memory/ingest-codebase/{id} | 4 |
-| ingest_codebase_list | GET | /v1/memory/ingest-codebase | 2 |
-| ingest_codebase_cancel | DELETE | /v1/memory/ingest-codebase/{id} | 3 |
-
-### Learning (5)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| learning_prune | POST | /v1/learning/prune |
-| learning_stats | GET | /v1/learning/stats |
-| learning_freeze | POST | /v1/learning/freeze |
-| learning_unfreeze | POST | /v1/learning/unfreeze |
-| learning_freeze_status | GET | /v1/learning/freeze/status |
-
-### Conversation CMS (7)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| conversation_observe | POST | /v1/conversation/observe |
-| conversation_correct | POST | /v1/conversation/correct |
-| conversation_resume | POST | /v1/conversation/resume |
-| conversation_recall | POST | /v1/conversation/recall |
-| conversation_consolidate | POST | /v1/conversation/consolidate |
-| conversation_volatile_stats | GET | /v1/conversation/volatile/stats |
-| conversation_graduate | POST | /v1/conversation/graduate |
-
-### System (9)
-
-| Spec | Method | Endpoint |
-|------|--------|----------|
-| capability_gaps | GET | /v1/system/capability-gaps |
-| gap_interviews | GET | /v1/system/gap-interviews |
-| pool_metrics | GET | /v1/system/pool-metrics |
-| feedback | POST | /v1/feedback |
-| metrics | GET | /v1/metrics |
-| modules | GET | /v1/modules |
-| plugins | GET | /v1/plugins |
-| ape_status | GET | /v1/ape/status |
-| ape_trigger | POST | /v1/ape/trigger |
+| Category | Specs | Key Endpoints |
+|----------|------:|---------------|
+| Health | 2 | `/healthz`, `/readyz` |
+| Memory (core) | 33 | `/v1/memory/retrieve`, `ingest`, `nodes`, `consolidate`, `cache`, `cleanup` |
+| Conversation CMS | 27 | `/v1/conversation/observe`, `recall`, `resume`, `templates`, `snapshots`, `org-reviews` |
+| Jiminy + J17 | 21 | `/v1/jiminy/guide`, `evaluate`, `feedback`, `healthz`, `ready`, `protocol/*` |
+| System | 21 | `/v1/system/capability-gaps`, `gap-interviews`, `/v1/ape/*`, `/v1/plugins` |
+| RSIC | 18 | `/v1/self-improve/cycle`, `assess`, `health`, `history`, `rollback` |
+| Hash Verification | 9 | `/v1/hash-verification/register`, `verify`, `scan`, `revert` |
+| Constraints | 7 | `/v1/constraints/detect-conflicts`, `conflicts`, `effectiveness`, `scope` |
+| Backup | 7 | `/v1/backup/trigger`, `list`, `restore`, `status` |
+| Learning | 6 | `/v1/learning/stats`, `freeze`, `unfreeze`, `prune` |
+| Admin/Transfer | 6 | `/v1/admin/spaces/*`, `/v1/admin/spaces/export`, `import` |
+| Scraper | 6 | `/v1/scraper/jobs/*` |
+| Neural | 4 | `/v1/neural/status`, sidecar `/health`, `/nli`, `/rerank` |
+| Linear | 4 | `/v1/linear/issues`, `projects`, `comments`, `/v1/webhooks/linear` |
+| Ingest Jobs | 3 | `/v1/memory/ingest/trigger`, `status`, `cancel` |
+| Filewatcher | 3 | `/v1/filewatcher/start`, `status`, `stop` |
+| Guardrail | 2 | `/v1/guardrail/events`, `/v1/memory/guardrail/validate` |
+| Symbols | 2 | `/v1/symbols/relationships` |
+| Other | 14 | Embedding, Metrics, Modules, Skills, Webhooks, etc. |
 
 ---
 
@@ -121,11 +63,12 @@ docs/api/api-spec/uats/
 ├── schema/
 │   └── uats.schema.json
 ├── specs/
-│   └── *.uats.json          # 124 canonical spec files
+│   └── *.uats.json          # 195 canonical spec files
 ├── drafts/
-│   └── *.uats.json          # 7 draft specs (not run in CI)
+│   └── *.uats.json          # Draft specs (not run in CI)
 ├── runners/
-│   └── uats_runner.py       # v1.1.0
+│   └── uats_runner.py       # v1.2.0
+├── HASH_VERIFICATION.md
 └── README.md
 ```
 
@@ -134,11 +77,12 @@ docs/api/api-spec/uats/
 ## Makefile Targets
 
 ```makefile
-# Run all API tests
+# Run all API tests (with standard exclusions)
 test-api:
  python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
   --spec-dir docs/api/api-spec/uats/specs/ \
   --base-url http://localhost:9999 \
+  --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required \
   --report /tmp/api-report.json
 
 # Test single endpoint
@@ -221,11 +165,30 @@ The UATS runner enforces the fields currently used by active specs, including:
 
 - `config.response_time_max_ms`
 - `config.follow_redirects`
+- `config.sha256` — spec integrity hashes (see `HASH_VERIFICATION.md`)
 - `variants[].variables`
 - canonical body assertions using `{ "path", "op", "expected?" }`
-- legacy matcher assertions (`equals`, `regex`, `type`, etc.) for backward compatibility
+- legacy matcher assertions (`equals`, `regex`, `type`, `exists`, etc.) for backward compatibility
+- `--exclude-tag` for skipping specs by `config.tags` or variant-level `tags`
 
-The runner now fails fast when a spec uses schema features that are defined but not implemented in runtime behavior yet (for example: `setup`, `teardown`, `chain`, `request.body_file`, `expected.body_file`, `expected.body_schema`, and OAuth2 auth mode).
+The runner fails fast when a spec uses schema features not yet implemented (`setup`, `teardown`, `chain`, `request.body_file`, `expected.body_file`, `expected.body_schema`, OAuth2 auth mode).
+
+### Variant Merge Behavior
+
+Variants are deep-merged with the base spec. Important: **if a variant overrides `expected` but omits `body_assertions`, the base spec's `body_assertions` are NOT inherited.** This prevents false failures when error variants (405, 400) have different response body shapes than the base 200 response. To explicitly inherit base assertions, include them in the variant's `expected.body_assertions`.
+
+### Exclusion Tags
+
+Tags in `config.tags` or `variants[].tags` can be excluded via `--exclude-tag`:
+
+| Tag | Purpose |
+|-----|---------|
+| `unts` | Hash verification specs (require separate setup) |
+| `llm_required` | Specs requiring live LLM API access |
+| `j17_disabled` | J17 protocol disabled-state variants |
+| `jiminy_disabled` | Jiminy disabled-state variants |
+| `sidecar_required` | Neural sidecar specs (require separate sidecar service) |
+| `constraint_scope_required` | Constraint scope PATCH (requires constraint features enabled) |
 
 ---
 
@@ -263,6 +226,7 @@ jobs:
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
             --base-url http://localhost:9999 \
+            --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required \
             --report api-report.json
       
       - name: Upload report
@@ -279,7 +243,7 @@ jobs:
 
 | Aspect | UPTS (Parsers) | UATS (APIs) |
 |--------|----------------|-------------|
-| Scope | 27 languages | 124 API specs |
+| Scope | 27 languages | 195 API specs |
 | Input | Source files | HTTP requests |
 | Output | Symbols JSON | HTTP responses |
 | Validation | Symbol matching | Status, headers, body |
@@ -341,8 +305,8 @@ Pass Rate: 100.0%
 
 ## Stats
 
-- **Canonical Specs:** 124
-- **Draft Specs:** 7
-- **Categories:** 15+ (Health, Memory, Ingest Jobs, Ingest Codebase, Learning, Conversation, System, Backup, CMS, Self-Improve/RSIC, Hash Verification, Scraper, Admin Spaces, Meta-Learn, Guardrails)
+- **Canonical Specs:** 195
+- **Total Variants:** 372 (including base + variant test cases)
+- **Categories:** 25 (Health, Memory, Conversation CMS, Jiminy/J17, System, RSIC, Hash Verification, Constraints, Backup, Learning, Admin/Transfer, Scraper, Neural, Linear, Ingest, Filewatcher, Guardrail, Symbols, and more)
 - **Most Complex:** ingest_codebase.uats.json (18 variants covering all config options)
-- **Runner Version:** 1.1.0 (fail-fast for unimplemented schema features)
+- **Runner Version:** 1.2.0 (SHA256 integrity hashes, exclude-tag, variant assertion isolation)
