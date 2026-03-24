@@ -59,6 +59,83 @@ func TestReflect_GuidanceConfidenceDrift(t *testing.T) {
 	}
 }
 
+func TestReflect_RecoveryBufferPending_Medium(t *testing.T) {
+	cfg := config.Config{SynergyAssessmentEnabled: true}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:                      "test",
+		SynergyRecoveryBufferEntries: 5,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	found := false
+	for _, insight := range insights {
+		if insight.PatternID == "synergy_recovery_buffer_pending" {
+			found = true
+			if insight.Severity != SeverityMedium {
+				t.Errorf("expected medium severity, got %s", insight.Severity)
+			}
+			if insight.RecommendedAction != "flush_recovery_buffer" {
+				t.Errorf("expected action flush_recovery_buffer, got %s", insight.RecommendedAction)
+			}
+		}
+	}
+	if !found {
+		t.Error("synergy_recovery_buffer_pending pattern not triggered with 5 entries")
+	}
+}
+
+func TestReflect_RecoveryBufferPending_High(t *testing.T) {
+	cfg := config.Config{SynergyAssessmentEnabled: true}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:                      "test",
+		SynergyRecoveryBufferEntries: 25,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	found := false
+	for _, insight := range insights {
+		if insight.PatternID == "synergy_recovery_buffer_pending" {
+			found = true
+			if insight.Severity != SeverityHigh {
+				t.Errorf("expected high severity for >20 entries, got %s", insight.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("synergy_recovery_buffer_pending pattern not triggered with 25 entries")
+	}
+}
+
+func TestReflect_RecoveryBufferEmpty_NoInsight(t *testing.T) {
+	cfg := config.Config{SynergyAssessmentEnabled: true}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:                      "test",
+		SynergyRecoveryBufferEntries: 0,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, insight := range insights {
+		if insight.PatternID == "synergy_recovery_buffer_pending" {
+			t.Error("synergy_recovery_buffer_pending should not trigger with 0 entries")
+		}
+	}
+}
+
 func TestReflect_LowGuidanceFollowRate(t *testing.T) {
 	cfg := config.Config{}
 	r := NewReflector(cfg, nil)

@@ -120,6 +120,31 @@ Scoring factors:
 
 Over a 50-turn session: ~100K tokens saved on CLAUDE.md alone.
 
+### Recovery Buffer (Store-and-Forward)
+
+When Jiminy is down, observations that would normally flow to `mdemg-dev` are buffered in a two-tier store-and-forward system to prevent data loss:
+
+**Tier 1 (CMS space)**: Observations written to `synergy-buffer` space via `/v1/conversation/observe`. Works when the MDEMG server is up but Jiminy is down. Observations get embedded at write time.
+
+**Tier 2 (Local JSONL)**: When the MDEMG server is also unreachable, observations are appended to `.mdemg/synergy-recovery-buffer.jsonl` with FIFO eviction (max 50 entries).
+
+**Auto-flush**: On session start, if Jiminy is healthy, buffered entries are automatically promoted: JSONL → synergy-buffer → mdemg-dev.
+
+**CLI commands**:
+```bash
+mdemg synergy buffer-status [--json]        # Show pending buffer entries
+mdemg synergy flush-buffer [--force] [--dry-run]  # Manual flush
+```
+
+**RSIC Pattern #20** (`synergy_recovery_buffer_pending`): Fires when buffer has pending entries. Medium severity at ≤20 entries, High above 20.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SYNERGY_RECOVERY_BUFFER_SPACE` | `synergy-buffer` | CMS space for buffered observations |
+| `SYNERGY_RECOVERY_BUFFER_PATH` | `.mdemg/synergy-recovery-buffer.jsonl` | Local JSONL fallback |
+| `SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES` | `50` | Max JSONL entries (FIFO eviction) |
+| `SYNERGY_RECOVERY_AUTO_FLUSH` | `true` | Auto-flush on Jiminy recovery |
+
 ## Critical Prerequisite
 
 **Jiminy must be healthy** before any .md pruning. If Jiminy is down after migration, CMS cannot surface the knowledge that was moved out of .md files — catastrophic forgetting risk. Pattern #17 is the loudest signal in the system for this scenario.

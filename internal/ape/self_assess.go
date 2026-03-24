@@ -3,6 +3,8 @@ package ape
 import (
 	"context"
 	"math"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -129,6 +131,10 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyOverflowRate = sm.OverflowRate
 		report.JiminyHealthy = sm.JiminyHealthy
 		report.SynergyHealth = a.scoreSynergy(report)
+
+		// Recovery buffer: count pending entries (CMS space + local JSONL)
+		report.SynergyRecoveryBufferEntries = countBufferSpaceEntries(ctx, a.driver, a.cfg.SynergyRecoveryBufferSpace) +
+			countLocalBufferEntries(a.cfg.SynergyRecoveryBufferPath)
 	}
 
 	// 6. Weighted overall (adjusted weights for dimensions present)
@@ -436,6 +442,62 @@ func clamp(v, lo, hi float64) float64 {
 		return hi
 	}
 	return v
+}
+
+// countBufferSpaceEntries queries Neo4j for observations in the recovery buffer space.
+func countBufferSpaceEntries(ctx context.Context, driver neo4j.DriverWithContext, bufferSpace string) int {
+	if driver == nil || bufferSpace == "" {
+		return 0
+	}
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.role_type = 'conversation_observation'
+			  AND ANY(t IN n.tags WHERE t = 'recovery-buffer')
+			RETURN count(n) AS cnt
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": bufferSpace})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if v, ok := rec.Get("cnt"); ok && v != nil {
+				if count, ok := v.(int64); ok {
+					return int(count), nil
+				}
+			}
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0
+	}
+	if count, ok := result.(int); ok {
+		return count
+	}
+	return 0
+}
+
+// countLocalBufferEntries counts lines in the local JSONL recovery buffer file.
+func countLocalBufferEntries(path string) int {
+	if path == "" {
+		return 0
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func computeEdgeWeightEntropy(stats map[string]any) float64 {

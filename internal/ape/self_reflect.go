@@ -333,8 +333,22 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 			})
 		}
 
-		// 20. Hook injection growth — PLACEHOLDER: needs hook token data in report
-		// TODO: Add when SelfAssessmentReport includes hook token metrics
+		// 20. Recovery buffer has pending entries — Jiminy outage data needs flushing
+		if report.SynergyRecoveryBufferEntries > 0 {
+			severity := SeverityMedium
+			if report.SynergyRecoveryBufferEntries > 20 {
+				severity = SeverityHigh
+			}
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "synergy_recovery_buffer_pending",
+				Severity:          severity,
+				Description:       fmt.Sprintf("Recovery buffer has %d pending entries from Jiminy outage — flush when Jiminy recovers", report.SynergyRecoveryBufferEntries),
+				RecommendedAction: "flush_recovery_buffer",
+				Metric:            "synergy_recovery_buffer_entries",
+				Value:             float64(report.SynergyRecoveryBufferEntries),
+				Threshold:         0,
+			})
+		}
 	}
 
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)

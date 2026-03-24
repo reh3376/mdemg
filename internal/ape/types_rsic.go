@@ -130,6 +130,9 @@ type SelfAssessmentReport struct {
 	SynergyLinesMemory  int     `json:"synergy_lines_memory"`
 	JiminyHealthy       bool    `json:"jiminy_healthy"`
 
+	// Synergy recovery buffer
+	SynergyRecoveryBufferEntries int `json:"synergy_recovery_buffer_entries"`
+
 	// Raw details exposed for reflection
 	LearningPhase        string  `json:"learning_phase"`
 	EdgeCount            int64   `json:"edge_count"`

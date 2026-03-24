@@ -14,6 +14,11 @@ MDEMG_URL = os.environ.get("MDEMG_URL", "http://localhost:9999")
 SESSION_ID = "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
+RECOVERY_BUFFER_SPACE = os.environ.get("SYNERGY_RECOVERY_BUFFER_SPACE", "synergy-buffer")
+RECOVERY_BUFFER_PATH = os.path.join(
+    os.getcwd(), os.environ.get("SYNERGY_RECOVERY_BUFFER_PATH", ".mdemg/synergy-recovery-buffer.jsonl")
+)
+RECOVERY_BUFFER_MAX_ENTRIES = int(os.environ.get("SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES", "50"))
 
 
 def get_space_id() -> str:
@@ -156,20 +161,27 @@ def check_memory_overflow(file_path: str):
     if len(lines) <= threshold:
         return
 
-    # Jiminy health gate — if unhealthy, skip (content stays as safety buffer)
+    # Jiminy health gate — if unhealthy, buffer instead of ingesting to mdemg-dev
+    jiminy_healthy = False
+    server_reachable = False
     try:
         result = subprocess.run(
             ["curl", "-sf", f"{MDEMG_URL}/v1/jiminy/healthz",
              "--connect-timeout", "2", "--max-time", "3"],
             capture_output=True, text=True, timeout=5,
         )
-        if result.returncode != 0:
-            return
-        health = json.loads(result.stdout)
-        if not health.get("enabled") or health.get("status") != "ok":
-            return
+        server_reachable = True
+        if result.returncode == 0:
+            health = json.loads(result.stdout)
+            if health.get("enabled") and health.get("status") == "ok":
+                jiminy_healthy = True
     except Exception:
-        return  # Can't verify Jiminy — don't ingest
+        server_reachable = False
+
+    if not jiminy_healthy:
+        # Buffer the content instead of losing it
+        write_recovery_buffer(file_path, server_reachable)
+        return
 
     # Extract overflow content
     overflow = lines[threshold:]
@@ -197,6 +209,83 @@ def check_memory_overflow(file_path: str):
         f"<system-reminder>MEMORY.md overflow ({len(lines)} lines, threshold: {threshold}). "
         f"{len(overflow)} lines auto-ingested to CMS as '{obs_type}'.</system-reminder>"
     )
+
+
+def write_recovery_buffer(file_path: str, server_reachable: bool):
+    """Buffer MEMORY.md content during Jiminy outage (store-and-forward).
+    Tier 1: Write to synergy-buffer CMS space (if server reachable).
+    Tier 2: Append to local JSONL file (if server also unreachable)."""
+    try:
+        with open(file_path) as f:
+            content = f.read()
+    except Exception:
+        return
+
+    if not content.strip():
+        return
+
+    # Classify obs_type by content heuristics
+    obs_type = "note"
+    if any(kw in content for kw in ["## Phase", "Phase ", "COMPLETE"]):
+        obs_type = "progress"
+    elif any(kw in content for kw in ["NEVER", "ALWAYS", "MUST", "MANDATORY"]):
+        obs_type = "constraint"
+
+    entry = {
+        "space_id": RECOVERY_BUFFER_SPACE,
+        "session_id": SESSION_ID,
+        "content": content[:500],
+        "obs_type": obs_type,
+        "tags": ["recovery-buffer", "synergy", "jiminy-outage"],
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+    if server_reachable:
+        # Tier 1: POST to synergy-buffer space via existing observe endpoint
+        try:
+            subprocess.Popen(
+                [
+                    "curl", "-sf", "-X", "POST",
+                    f"{MDEMG_URL}/v1/conversation/observe",
+                    "-H", "Content-Type: application/json",
+                    "-d", json.dumps(entry),
+                    "--connect-timeout", "2",
+                    "--max-time", "5",
+                    "-o", "/dev/null",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            # Server seemed reachable but POST failed — fall through to Tier 2
+            append_local_buffer(entry)
+    else:
+        # Tier 2: Local JSONL fallback
+        append_local_buffer(entry)
+
+
+def append_local_buffer(entry: dict):
+    """Append an observation entry to the local JSONL recovery buffer with FIFO eviction."""
+    try:
+        os.makedirs(os.path.dirname(RECOVERY_BUFFER_PATH), exist_ok=True)
+
+        # Read existing lines for FIFO enforcement
+        existing_lines = []
+        if os.path.exists(RECOVERY_BUFFER_PATH):
+            with open(RECOVERY_BUFFER_PATH) as f:
+                existing_lines = f.readlines()
+
+        # Append new entry
+        existing_lines.append(json.dumps(entry) + "\n")
+
+        # FIFO eviction: keep only the newest entries
+        if len(existing_lines) > RECOVERY_BUFFER_MAX_ENTRIES:
+            existing_lines = existing_lines[-RECOVERY_BUFFER_MAX_ENTRIES:]
+
+        with open(RECOVERY_BUFFER_PATH, "w") as f:
+            f.writelines(existing_lines)
+    except Exception:
+        pass  # Best-effort: never block on buffer failure
 
 
 def main():

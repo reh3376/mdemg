@@ -747,6 +747,12 @@ type Config struct {
 	SynergyMaxHookTokens       int     // SYNERGY_MAX_HOOK_TOKENS — max per-prompt hook injection tokens (default: 500)
 	SynergyCronInterval        string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
 	SynergyCronEnabled         bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
+
+	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
+	SynergyRecoveryBufferSpace      string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
+	SynergyRecoveryBufferPath       string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
+	SynergyRecoveryBufferMaxEntries int    // SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES — max JSONL entries before FIFO eviction (default: 50)
+	SynergyRecoveryAutoFlush        bool   // SYNERGY_RECOVERY_AUTO_FLUSH — auto-flush buffer on Jiminy recovery at session start (default: true)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -2938,6 +2944,13 @@ func FromEnv() (Config, error) {
 	}
 	synergyCronInterval := get("SYNERGY_CRON_INTERVAL", "4h")
 	synergyCronEnabled := getBool("SYNERGY_CRON_ENABLED", true)
+	synergyRecoveryBufferSpace := get("SYNERGY_RECOVERY_BUFFER_SPACE", "synergy-buffer")
+	synergyRecoveryBufferPath := get("SYNERGY_RECOVERY_BUFFER_PATH", ".mdemg/synergy-recovery-buffer.jsonl")
+	synergyRecoveryBufferMaxEntries, err := atoi("SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyRecoveryAutoFlush := getBool("SYNERGY_RECOVERY_AUTO_FLUSH", true)
 
 	return Config{
 		ListenAddr: listen,
@@ -3509,6 +3522,10 @@ func FromEnv() (Config, error) {
 		SynergyMaxHookTokens:          synergyMaxHookTokens,
 		SynergyCronInterval:           synergyCronInterval,
 		SynergyCronEnabled:            synergyCronEnabled,
+		SynergyRecoveryBufferSpace:      synergyRecoveryBufferSpace,
+		SynergyRecoveryBufferPath:       synergyRecoveryBufferPath,
+		SynergyRecoveryBufferMaxEntries: synergyRecoveryBufferMaxEntries,
+		SynergyRecoveryAutoFlush:        synergyRecoveryAutoFlush,
 	}, nil
 }
 
