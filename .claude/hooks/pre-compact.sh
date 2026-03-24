@@ -68,6 +68,15 @@ if [ -n "$SESSION_HEALTH" ]; then
   fi
 fi
 
+# Synergy: Jiminy health check before compaction
+if [ -f ".mdemg/synergy-migrated.json" ]; then
+  JIMINY_STATUS=$(curl -sf "${MDEMG_URL}/v1/jiminy/healthz" --connect-timeout 1 --max-time 2 2>/dev/null || echo "{}")
+  JIMINY_OK=$(echo "$JIMINY_STATUS" | jq -e '.enabled == true and .status == "ok"' 2>/dev/null || echo "false")
+  if [ "$JIMINY_OK" != "true" ]; then
+    CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Jiminy unhealthy during compaction — post-migration forgetting risk."
+  fi
+fi
+
 # Save the observation
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
   -H "Content-Type: application/json" \

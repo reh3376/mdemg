@@ -429,8 +429,8 @@ Macro (days):     Structural health, cross-space consistency, calibration review
 
 Each stage produces concrete outputs:
 
-- **Assess**: Protocol health score (comprehension, compression, coverage, stability, calibration)
-- **Reflect**: Pattern detection across 16 reflection patterns (low comprehension, tier drift, calibration drift, volatile backlog, etc.)
+- **Assess**: 7-dimension health score (retrieval, memory, edge, task, guidance, protocol, synergy)
+- **Reflect**: Pattern detection across 19 reflection patterns (low comprehension, tier drift, calibration drift, volatile backlog, synergy health, etc.)
 - **Plan**: Prioritized improvement tasks with estimated impact
 - **Execute**: Automated actions (tier threshold adjustment, code retirement, constraint archival) with safety gates
 - **Validate**: Before/after comparison ensuring changes improved rather than degraded quality
@@ -503,6 +503,7 @@ RSIC is protected by dry-run mode, rollback snapshots, confidence thresholds, an
 - [x] J17 AI-to-AI Protocol — 3-tier encoding, session tickets, ML tier prediction, RSIC-driven evolution
 - [x] NLI Comprehension Feedback Loop — per-tier effectiveness grading, calibration tracking, RSIC drift detection
 - [x] ANN Optimization Suite — 10 neural learning techniques, 28 config parameters
+- [x] Synergy Optimization — Claude Code ↔ MDEMG token reduction (~60%), automated overflow interceptor, 7th RSIC dimension
 
 ---
 
@@ -584,6 +585,8 @@ Key insights from 105+ phases of development that shaped the architecture:
 
 7. **12 binaries is a maintenance time bomb.** The unified CLI refactor (Phase 93) was the largest single effort in the project. Every new feature that added a binary was compounding the distribution, documentation, and CI burden. A single entry point with subcommands eliminates an entire category of problems.
 
+8. **The host agent's context budget is your budget.** MDEMG runs inside Claude Code's context window. Every token spent on CLAUDE.md, MEMORY.md, and hook injection is a token unavailable for actual work. Synergy optimization reduced static overhead by ~60% — but more importantly, it automated the monitoring: an overflow interceptor catches MEMORY.md bloat before it compounds, and RSIC's SynergyHealth dimension ensures the system alerts when token overhead creeps back up. Effect the things you can, work with the things you can't.
+
 ---
 
-*This document captures the vision as of March 2026. All 7 development phases are complete. 611 Go files, 227K lines, 149 API endpoints, 2,381 tests. The system that started as a retrieval-oriented memory store has become a self-improving cognitive substrate with proactive guidance, AI-to-AI communication, and reflexive quality improvement.*
+*This document captures the vision as of March 2026. All 7 development phases are complete. 611 Go files, 227K lines, 150 API endpoints, 2,381 tests. The system that started as a retrieval-oriented memory store has become a self-improving cognitive substrate with proactive guidance, AI-to-AI communication, reflexive quality improvement, and automated token-overhead management for its host agent environment.*

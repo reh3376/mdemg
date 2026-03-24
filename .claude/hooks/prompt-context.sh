@@ -106,3 +106,8 @@ if [ -n "$HEALTH_RESP" ]; then
   H_OBS=$(echo "$HEALTH_RESP" | jq -r '.observations_since_resume // "?"' 2>/dev/null || echo "?")
   echo "[Session health: ${H_SCORE} | obs: ${H_OBS}]"
 fi
+
+# Synergy: token count footer for recall + guidance
+RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
+GUIDANCE_TOKENS=$(echo "${GUIDANCE:-}" | wc -c | tr -d ' ')
+echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_TOKENS}]"

@@ -137,6 +137,68 @@ def observe(content: str, obs_type: str, tags: list[str] | None = None):
         pass  # Fire-and-forget: never block on failure
 
 
+def check_memory_overflow(file_path: str):
+    """Synergy: detect MEMORY.md overflow and auto-ingest excess to CMS.
+    Respects Jiminy health gate — if Jiminy is unhealthy, content stays
+    in MEMORY.md as safety buffer."""
+    # Check master switch
+    if os.environ.get("SYNERGY_MEMORY_AUTO_INGEST", "true").lower() != "true":
+        return
+
+    threshold = int(os.environ.get("SYNERGY_MEMORY_LINE_THRESHOLD", "120"))
+
+    try:
+        with open(file_path) as f:
+            lines = f.readlines()
+    except Exception:
+        return
+
+    if len(lines) <= threshold:
+        return
+
+    # Jiminy health gate — if unhealthy, skip (content stays as safety buffer)
+    try:
+        result = subprocess.run(
+            ["curl", "-sf", f"{MDEMG_URL}/v1/jiminy/healthz",
+             "--connect-timeout", "2", "--max-time", "3"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0:
+            return
+        health = json.loads(result.stdout)
+        if not health.get("enabled") or health.get("status") != "ok":
+            return
+    except Exception:
+        return  # Can't verify Jiminy — don't ingest
+
+    # Extract overflow content
+    overflow = lines[threshold:]
+    overflow_text = "".join(overflow).strip()
+    if not overflow_text:
+        return
+
+    # Classify obs_type by content heuristics
+    obs_type = "note"
+    if any(kw in overflow_text for kw in ["## Phase", "Phase ", "COMPLETE"]):
+        obs_type = "progress"
+    elif any(kw in overflow_text for kw in ["NEVER", "ALWAYS", "MUST", "MANDATORY"]):
+        obs_type = "constraint"
+
+    # Ingest to CMS
+    observe(
+        f"[auto-overflow] MEMORY.md exceeded {threshold} lines ({len(lines)} total). "
+        f"Overflow content ({len(overflow)} lines): {overflow_text[:400]}",
+        obs_type,
+        ["auto-overflow", "synergy"],
+    )
+
+    # Notify via system-reminder
+    print(
+        f"<system-reminder>MEMORY.md overflow ({len(lines)} lines, threshold: {threshold}). "
+        f"{len(overflow)} lines auto-ingested to CMS as '{obs_type}'.</system-reminder>"
+    )
+
+
 def main():
     try:
         input_data = json.load(sys.stdin)
@@ -165,6 +227,10 @@ def main():
                 "decision",
                 ["settings", "configuration"],
             )
+
+        # Synergy: MEMORY.md overflow detection + auto-ingestion
+        if file_path.endswith("MEMORY.md") and "memory" in file_path:
+            check_memory_overflow(file_path)
 
         # J9: Evaluate agent output after Write/Edit (code changes)
         # Use the new_string (Edit) or content (Write) as agent output

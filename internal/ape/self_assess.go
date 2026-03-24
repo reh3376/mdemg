@@ -11,6 +11,21 @@ import (
 	"mdemg/internal/retrieval"
 )
 
+// SynergyFileReader provides synergy file metrics for RSIC assessment.
+type SynergyFileReader interface {
+	ReadSynergyMetrics() SynergyMetrics
+}
+
+// SynergyMetrics holds line counts for Claude Code integration files.
+type SynergyMetrics struct {
+	ClaudeMDLines   int
+	MemoryMDLines   int
+	AutoMemoryFiles int
+	AutoMemoryLines int
+	JiminyHealthy   bool
+	OverflowRate    float64
+}
+
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
 type Assessor struct {
 	cfg              config.Config
@@ -19,6 +34,7 @@ type Assessor struct {
 	convSvc          ConversationStatsProvider
 	jiminyProvider   JiminyStatsProvider   // J10: guidance stats provider
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
+	synergyReader    SynergyFileReader     // Synergy: file metrics provider
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
@@ -34,6 +50,11 @@ func (a *Assessor) SetJiminyProvider(p JiminyStatsProvider) {
 // SetProtocolProvider attaches a J17 protocol stats provider for protocol health assessment.
 func (a *Assessor) SetProtocolProvider(p ProtocolStatsProvider) {
 	a.protocolProvider = p
+}
+
+// SetSynergyReader attaches a synergy file metrics provider for synergy health assessment.
+func (a *Assessor) SetSynergyReader(r SynergyFileReader) {
+	a.synergyReader = r
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -100,9 +121,28 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 	}
 
+	// 5d. Synergy: Compute Claude Code ↔ MDEMG synergy health
+	if a.synergyReader != nil && a.cfg.SynergyAssessmentEnabled {
+		sm := a.synergyReader.ReadSynergyMetrics()
+		report.SynergyLinesClaude = sm.ClaudeMDLines
+		report.SynergyLinesMemory = sm.MemoryMDLines
+		report.SynergyOverflowRate = sm.OverflowRate
+		report.JiminyHealthy = sm.JiminyHealthy
+		report.SynergyHealth = a.scoreSynergy(report)
+	}
+
 	// 6. Weighted overall (adjusted weights for dimensions present)
-	if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
-		// All 6 dimensions
+	if report.SynergyHealth > 0 && report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
+		// All 7 dimensions
+		report.OverallHealth = 0.18*report.RetrievalQuality +
+			0.18*report.MemoryHealth +
+			0.13*report.EdgeHealth +
+			0.13*report.TaskPerformance +
+			0.13*report.GuidanceHealth +
+			0.13*report.ProtocolHealth +
+			0.10*report.SynergyHealth
+	} else if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
+		// All 6 dimensions (no synergy)
 		report.OverallHealth = 0.20*report.RetrievalQuality +
 			0.20*report.MemoryHealth +
 			0.15*report.EdgeHealth +
@@ -275,6 +315,38 @@ func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
 	effScore := clamp(stats.ConstraintEffRate, 0, 1)
 	diversityScore := clamp(stats.SourceDiversity, 0, 1)
 	return 0.5*followScore + 0.3*effScore + 0.2*diversityScore
+}
+
+// scoreSynergy computes Claude Code ↔ MDEMG synergy health.
+// Jiminy must be healthy — without it, synergy pruning is dangerous.
+func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) float64 {
+	if !r.JiminyHealthy {
+		return 0.0
+	}
+	score := 1.0
+	// Penalise bloated CLAUDE.md
+	if r.SynergyLinesClaude > a.cfg.SynergyTargetClaudeLines+50 {
+		score -= 0.3
+	} else if r.SynergyLinesClaude > a.cfg.SynergyTargetClaudeLines {
+		score -= 0.1
+	}
+	// Penalise bloated MEMORY.md
+	if r.SynergyLinesMemory > a.cfg.SynergyTargetMemoryLines+60 {
+		score -= 0.3
+	} else if r.SynergyLinesMemory > a.cfg.SynergyTargetMemoryLines {
+		score -= 0.1
+	}
+	// Penalise high overflow rate
+	if r.SynergyOverflowRate > 10 {
+		score -= 0.3
+	} else if r.SynergyOverflowRate > 5 {
+		score -= 0.1
+	}
+	// Penalise high overlap
+	if r.SynergyOverlapScore > 0.5 {
+		score -= 0.2
+	}
+	return clamp(score, 0, 1)
 }
 
 // scoreProtocol computes protocol health from J17 metrics.

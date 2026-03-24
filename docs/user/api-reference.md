@@ -26,31 +26,32 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 16. [Guardrail Events](#guardrail-events)
 17. [Jiminy Inner-Voice](#jiminy-inner-voice)
 18. [J17 AI-to-AI Protocol](#j17-ai-to-ai-protocol)
-19. [Spaces & Freshness](#spaces--freshness)
-19. [Jobs (SSE)](#jobs-sse)
-20. [Codebase Ingestion API](#codebase-ingestion-api)
-21. [Ingestion Pipeline API](#ingestion-pipeline-api)
-22. [Scraper API](#scraper-api)
-23. [Linear Integration API](#linear-integration-api)
-24. [Webhooks](#webhooks)
-25. [File Watcher API](#file-watcher-api)
-26. [Admin](#admin)
-27. [Space Transfer (Export/Import)](#space-transfer-exportimport)
-28. [Self-Improvement (RSIC) API](#self-improvement-rsic-api)
-29. [Backup & Restore](#backup--restore)
-30. [Symbols & Relationships](#symbols--relationships)
-31. [Cleanup](#cleanup)
-32. [Edge Consistency](#edge-consistency)
-33. [Metrics & Monitoring](#metrics--monitoring)
-34. [Determinism Metrics](#determinism-metrics)
-35. [Neural Sidecar](#neural-sidecar)
-36. [Hash Verification (UNTS)](#hash-verification-unts)
-37. [Plugins & Modules](#plugins--modules)
-38. [System](#system)
-39. [MCP Server Tools](#mcp-server-tools)
-40. [Common Status Codes](#common-status-codes)
-41. [Common Headers](#common-headers)
-42. [Protected Spaces](#protected-spaces)
+19. [Synergy Optimization](#synergy-optimization)
+20. [Spaces & Freshness](#spaces--freshness)
+21. [Jobs (SSE)](#jobs-sse)
+22. [Codebase Ingestion API](#codebase-ingestion-api)
+23. [Ingestion Pipeline API](#ingestion-pipeline-api)
+24. [Scraper API](#scraper-api)
+25. [Linear Integration API](#linear-integration-api)
+26. [Webhooks](#webhooks)
+27. [File Watcher API](#file-watcher-api)
+28. [Admin](#admin)
+29. [Space Transfer (Export/Import)](#space-transfer-exportimport)
+30. [Self-Improvement (RSIC) API](#self-improvement-rsic-api)
+31. [Backup & Restore](#backup--restore)
+32. [Symbols & Relationships](#symbols--relationships)
+33. [Cleanup](#cleanup)
+34. [Edge Consistency](#edge-consistency)
+35. [Metrics & Monitoring](#metrics--monitoring)
+36. [Determinism Metrics](#determinism-metrics)
+37. [Neural Sidecar](#neural-sidecar)
+38. [Hash Verification (UNTS)](#hash-verification-unts)
+39. [Plugins & Modules](#plugins--modules)
+40. [System](#system)
+41. [MCP Server Tools](#mcp-server-tools)
+42. [Common Status Codes](#common-status-codes)
+43. [Common Headers](#common-headers)
+44. [Protected Spaces](#protected-spaces)
 43. [Platform-Specific Notes](#platform-specific-notes)
 
 ---
@@ -2248,6 +2249,73 @@ Returns per-tier comprehension grading, cross-tier delta analysis, and NLI calib
   }
 }
 ```
+
+---
+
+## Synergy Optimization
+
+Token overhead monitoring for Claude Code ↔ MDEMG integration. Tracks file sizes, overflow events, migration status, and overall synergy health.
+
+### GET /v1/synergy/status
+
+Returns synergy health metrics: file line counts, overflow events, migration status, and health score.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `space_id` | string | yes | Memory space to check for overflow events |
+
+**Response (200):**
+```json
+{
+  "data": {
+    "jiminy_healthy": true,
+    "claude_md_lines": 124,
+    "memory_md_lines": 40,
+    "auto_memory_files": 3,
+    "auto_memory_lines": 56,
+    "overflow_events_24h": 0,
+    "synergy_health": 1.0,
+    "migration_status": "v1",
+    "migration_date": "2026-03-24T15:22:34Z"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `jiminy_healthy` | bool | Whether Jiminy is enabled and running |
+| `claude_md_lines` | int | Current CLAUDE.md line count |
+| `memory_md_lines` | int | Current MEMORY.md line count |
+| `auto_memory_files` | int | Count of auto-memory `.md` files (excluding MEMORY.md) |
+| `auto_memory_lines` | int | Total lines across auto-memory files |
+| `overflow_events_24h` | int | CMS observations tagged `auto-overflow` in last 24h |
+| `synergy_health` | float | Health score (0.0–1.0). 0.0 if Jiminy unhealthy |
+| `migration_status` | string | Migration version if applied, empty if not |
+| `migration_date` | string | ISO8601 timestamp of migration, empty if not |
+
+**Health Score Penalties:**
+- Jiminy unhealthy → 0.0 (immediate)
+- CLAUDE.md > target+50 → -0.3; > target → -0.1
+- MEMORY.md > target+60 → -0.3; > target → -0.1
+- Overflow events > 10/24h → -0.3; > 5/24h → -0.1
+
+**Status Codes:** `200 OK`, `405 Method Not Allowed` (non-GET)
+
+```bash
+curl -s "http://localhost:9999/v1/synergy/status?space_id=mdemg-dev"
+```
+
+**Configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SYNERGY_TARGET_CLAUDE_LINES` | `150` | Target line count for CLAUDE.md |
+| `SYNERGY_TARGET_MEMORY_LINES` | `120` | Target line count for MEMORY.md |
+| `SYNERGY_CLAUDE_MD_PATH` | auto-detect | Override CLAUDE.md path |
+| `SYNERGY_MEMORY_MD_PATH` | auto-detect | Override MEMORY.md path |
+| `SYNERGY_ASSESSMENT_ENABLED` | `true` | Enable synergy RSIC dimension |
 
 ---
 
