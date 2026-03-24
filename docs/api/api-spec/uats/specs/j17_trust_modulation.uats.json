@@ -29,7 +29,7 @@
       "phase_j17",
       "embedding_required"
     ],
-    "sha256": "ce7bd01ff514a055740fa581112785e97bfb2c333b90a46a1faae045190f016e"
+    "sha256": "2807a2d2d0c319168376dc64e4c7aacb5cc1ee74110be8b231c3f18317e0f5df"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -54,23 +54,26 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "protocol info present",
         "path": "$.data.protocol",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "protocol version is string",
         "path": "$.data.protocol.version",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "guidance_seq is number",
         "path": "$.data.guidance_seq",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

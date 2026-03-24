@@ -23,7 +23,7 @@
       "unts"
     ],
     "sequential": true,
-    "sha256": "d9da6cff76ee71b544285cce9b9f351aa74ae9602742f7ec3361cdef6d20d792"
+    "sha256": "6db53f1112677fceedce684bffa6e6356bf3a99c952e85dd4fcc8046ff5834c9"
   },
   "request": {
     "method": "POST",
@@ -43,8 +43,8 @@
     "body_assertions": [
       {
         "path": "$.path",
-        "type": "string",
-        "value": "test/get-file.txt"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -63,24 +63,28 @@
         "body_assertions": [
           {
             "path": "$.path",
-            "type": "string",
-            "value": "test/get-file.txt"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.framework",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.current_hash",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.status",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.history",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -99,7 +103,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

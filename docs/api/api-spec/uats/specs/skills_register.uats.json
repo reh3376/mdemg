@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "d1ea46e5ee8d7382eb968318173c411bf30d85d4a215873cc5b06585353df089",
+    "sha256": "a5e4420cd47c80b692bf1a8c7b361fc2dd741ed8114e557aeebbef0155ebd122",
     "tags": [
       "embedding_required"
     ]
@@ -55,19 +55,23 @@
     "body_assertions": [
       {
         "path": "$.skill",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.sections_created",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.observation_ids",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

@@ -1,0 +1,103 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "Package Dependency Graph Map",
+    "description": "Tests comprehension of the T1-encoded package dependency graph, covering leaf packages, full dependency lists, and the rationale behind specific dependency edges.",
+    "content_type": "architecture_map",
+    "tags": [
+      "dep",
+      "packages",
+      "dependency-graph",
+      "navigation"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/dep_pkg_graph.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent navigating unfamiliar packages"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Which packages are leaf packages with no dependencies?",
+        "answer": "lng, sym, cfg, mdl, plg, ath",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "What does the api package depend on?",
+        "answer": "ret, hid, lrn, jim, ape, con, cns, grd, lng, sym, emb, cfg, mdl, plg, ath, scr, xfr, mta, llm, unt, bkp, met, gap",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "Why does ret depend on plg?",
+        "answer": "For match-module (MatchIngestionModule) functionality",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q4",
+        "question": "Which package does hid depend on for emergence naming?",
+        "answer": "llm (for emergence-naming)",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q5",
+        "question": "What does grd depend on emb for?",
+        "answer": "Constraint retrieval (embedding-based similarity search for constraints)",
+        "difficulty": "relational"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "a028923f03b937bdb65a89fd268b236ac3f2efcfa31331f5d93229e867efaeff"
+  }
+}

@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "a67b5d99433a7a76ac2a3dfbd6dd375dd2ad691486ac7af3082b6b34d88ab558"
+    "sha256": "452ad90d37f06db30657f0d35d225105ee471772e3c9b9bfacce612a746aaab6"
   },
   "variables": {
     "test_space": "uats-templates-test",
@@ -53,6 +53,35 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "template_id present when updated",
+        "path": "$.template_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "name present when updated",
+        "path": "$.name",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "updated_at present when updated",
+        "path": "$.updated_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

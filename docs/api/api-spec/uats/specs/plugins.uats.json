@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "dd9582cf45c6ae5a3704a8047539adf8d82b72a38ccaccb6afaf8b7d4bb43184"
+    "sha256": "70b9db26976f2d60e4d38c368541d52bc8d8fafe18c48fa68ac2df8df8e792a0"
   },
   "variables": {
     "test_space": "demo"
@@ -34,7 +34,8 @@
     "body_assertions": [
       {
         "path": "$.data.plugins",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

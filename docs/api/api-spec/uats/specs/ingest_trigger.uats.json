@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "9b727ea88862edf51cd43a610698e7a2a49cbfd60472883830969dc42bfe7c4d"
+    "sha256": "b7cb9a40a00bbe1847cda3aaa2ae44d163f75906a37e03e6ad16e2c000bf0c1a"
   },
   "variables": {
     "test_space": "demo"
@@ -44,15 +44,18 @@
     "body_assertions": [
       {
         "path": "$.job_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.message",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

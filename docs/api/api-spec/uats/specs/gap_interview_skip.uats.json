@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "1e16f6b131b077d74eb35b3450521461015e9ba55a017bc3f6580f1df28ec96c"
+    "sha256": "8c33f025941efbb42c4ff584d694fede0157df19384776e9a795f96498d63d17"
   },
   "variables": {},
   "request": {
@@ -38,6 +38,29 @@
       200,
       500,
       503
+    ],
+    "body_assertions": [
+      {
+        "name": "status is skipped when successful",
+        "path": "$.status",
+        "op": "equals",
+        "expected": "skipped",
+        "optional": true
+      },
+      {
+        "name": "prompt_id is string when successful",
+        "path": "$.prompt_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when failed",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

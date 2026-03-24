@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "5b79a17fb41238760aaa7bc4d23b9509f0e6e59bff1b05d39abaffc6f90db218"
+    "sha256": "7c909208dfc379631d53f0b13da7ea111e6c5d623b1a5ff3adf5b8e001e62bcf"
   },
   "variables": {},
   "request": {
@@ -39,6 +39,29 @@
       200,
       404,
       500
+    ],
+    "body_assertions": [
+      {
+        "name": "node_id present when archived",
+        "path": "$.node_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "archived_at present when archived",
+        "path": "$.archived_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when failed",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

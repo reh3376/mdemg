@@ -1,0 +1,104 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "RSIC Self-Improvement Cycle Flow Map",
+    "description": "Tests comprehension of the T1-encoded RSIC cycle architecture map, covering the 5 stages, dispatch action types, tier intervals, safety mechanisms, and health assessment dimensions.",
+    "content_type": "architecture_map",
+    "tags": [
+      "flow",
+      "rsic",
+      "ape",
+      "self-improvement",
+      "safety"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/flow_rsic_cycle.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent working in internal/ape/"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What are the 5 stages of the RSIC cycle?",
+        "answer": "Assess, Reflect, Plan, Dispatch, Calibrate",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "How many action types can Dispatch execute?",
+        "answer": "13 action types",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "What are the three RSIC tiers and their intervals?",
+        "answer": "micro: 30s, meso: 10m, macro: 30m",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q4",
+        "question": "What safety mechanisms does RSIC use?",
+        "answer": "Dry-run, snapshot, rollback, blast-radius limits, protected spaces",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q5",
+        "question": "What are the 7 health dimensions assessed in Stage 1?",
+        "answer": "Retrieval, memory, edge, task, guidance, protocol, synergy",
+        "difficulty": "factual"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "869f2f410d4e6b66966ac5bbbe941cf09aa63559862e53e85c1de9179ee08666"
+  }
+}

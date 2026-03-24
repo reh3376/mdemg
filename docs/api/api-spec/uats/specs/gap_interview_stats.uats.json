@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "db717f8956227fd40163b6f7123c5444902a1d1d967504fa7bc01033c8f23631"
+    "sha256": "4d6a33175656d80f9d59baa43656b777d96ae30f384a46570b02e0f7dc963f6e"
   },
   "variables": {},
   "request": {
@@ -32,6 +32,43 @@
     "status": [
       200,
       503
+    ],
+    "body_assertions": [
+      {
+        "name": "total is number when successful",
+        "path": "$.total",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "pending is number when successful",
+        "path": "$.pending",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "answered is number when successful",
+        "path": "$.answered",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "skipped is number when successful",
+        "path": "$.skipped",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "error field type when service unavailable",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

@@ -24,7 +24,7 @@
       "admin",
       "transfer"
     ],
-    "sha256": "6d655c4f0f7028393f4c9bf9de1942fe1a89aa8b204813002e8028c978eb813c"
+    "sha256": "03cf25aaf9e0b1a1523ffa9f6f2a3b6910f946afb6cc4d28119393da26edaef0"
   },
   "request": {
     "method": "GET",
@@ -39,31 +39,38 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.profile",
-        "equals": "shareable"
+        "op": "equals",
+        "expected": "shareable"
       },
       {
         "path": "$.estimated_nodes",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.estimated_edges",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.filters_applied",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.filters_applied.exclude_volatile",
-        "equals": true
+        "op": "equals",
+        "expected": true
       },
       {
         "path": "$.filters_applied.obs_types",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -84,7 +91,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -105,11 +113,13 @@
         "body_assertions": [
           {
             "path": "$.profile",
-            "equals": "full"
+            "op": "equals",
+            "expected": "full"
           },
           {
             "path": "$.filters_applied.exclude_volatile",
-            "equals": false
+            "op": "equals",
+            "expected": false
           }
         ]
       }
@@ -130,7 +140,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "19ec5975e2325d0c23750dc6a7cb17705f160157b0a7549e68658d05bd3b2e80"
+    "sha256": "3b99694e3c6dd47f3749d4c0904f69968d3cca5607002a8073ed17b860afd1a8"
   },
   "variables": {
     "test_space": "uats-templates-test",
@@ -42,6 +42,14 @@
       204,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "error field type when present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "2b322c7e9912897fb5a43cf7f1b8fc84347f7b0e0ec582aafa82f8707e24384c"
+    "sha256": "cd29665808aeb1ab2b1a5e57d9bc4df64e6978e71ec577919e0a29c3a8c668fd"
   },
   "variables": {
     "test_space": "demo"
@@ -40,23 +40,28 @@
     "body_assertions": [
       {
         "path": "$.data.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.data.hidden_nodes_created",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.data.hidden_nodes_updated",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.data.duration_ms",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.data.enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   }

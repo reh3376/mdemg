@@ -29,7 +29,7 @@
       "phase_j17",
       "llm_required"
     ],
-    "sha256": "7062e9c070bbf84cd32bc8f4432e46ed966ffdc77240e6ab0fc9b2785f1202dd"
+    "sha256": "2e815640f7380f58af3ea76447afafe1dbb8540054a466c998631f1fac9148af"
   },
   "variables": {},
   "request": {
@@ -51,18 +51,20 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "old_code is string",
         "path": "$.data.old_code",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "new_code is string",
         "path": "$.data.new_code",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -81,7 +83,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -106,7 +109,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

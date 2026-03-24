@@ -27,7 +27,7 @@
       "phase105",
       "embedding_required"
     ],
-    "sha256": "2c112631536f3d621b8daa918bae7b4a21b06b6073c6798d41bdbe3dfe4a7864"
+    "sha256": "40406833c8b9bb9ce8af8b82f6e9b3c83ebada5420d604fe4ec618c4452d2a51"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -51,11 +51,13 @@
     "body_assertions": [
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.space_id",
-        "equals": "{{space_id}}"
+        "op": "equals",
+        "expected": "{{space_id}}"
       }
     ]
   }

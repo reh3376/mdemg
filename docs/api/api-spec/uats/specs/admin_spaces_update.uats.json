@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "35d1b2e32b6752e668303a28ed308d2a5d73828f6d3d265c41a5668c11b62e15"
+    "sha256": "341a096563ac64f42e37d9013faa9e717122fc65712a7db6d459c14ffe055ce4"
   },
   "request": {
     "method": "PATCH",
@@ -40,7 +40,8 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "contains": "protected"
+        "op": "contains",
+        "expected": "protected"
       }
     ]
   },
@@ -63,7 +64,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "not found"
+            "op": "contains",
+            "expected": "not found"
           }
         ]
       }

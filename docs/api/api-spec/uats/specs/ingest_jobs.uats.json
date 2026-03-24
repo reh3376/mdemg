@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "d0c06226b6b218d222d3fb7b4a9b8027b31a238e8d2b0d01364e2df4b1b40593"
+    "sha256": "9cc7b399a4e9e23d9f5b3e0503d0c2a2b1cfdd7f96fd94954be58cdbb9d30252"
   },
   "variables": {},
   "request": {
@@ -33,11 +33,13 @@
     "body_assertions": [
       {
         "path": "$.jobs",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },

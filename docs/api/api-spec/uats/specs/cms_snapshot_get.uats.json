@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "13f5bbc9668bd2fe17330ab84fb9c2e934919f541e3fc40eba70159673a34710"
+    "sha256": "df701f2f52d0f139ae62720bc3cc5c813b550c4c697896939d20da363bed1d29"
   },
   "variables": {
     "test_snapshot_id": "uats-snapshot-test-id"
@@ -38,6 +38,35 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "snapshot_id present when found",
+        "path": "$.snapshot_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "space_id present when found",
+        "path": "$.space_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "trigger present when found",
+        "path": "$.trigger",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field present on failure",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

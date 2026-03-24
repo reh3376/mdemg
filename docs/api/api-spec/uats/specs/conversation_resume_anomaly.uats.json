@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "7c6f66eedd2d71b97c1d3c75207b3a872ddda8ffecf7b986f663297b48a9907c",
+    "sha256": "3fc5d8e56143ba5c8eb3277f9ff7a80c8c32ec081c4e9898feb4ff90061c9a9d",
     "tags": [
       "embedding_required"
     ]
@@ -46,15 +46,18 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.observations",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.memory_state",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

@@ -1,0 +1,481 @@
+{
+  "timestamp": "2026-03-24T22:30:10.824700Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T22:29:18.056846Z",
+      "avg_score": 7.67,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP contract)\n- UPTS (parser conformance)\n- USTS (security)\n- UNTS (hash verification)",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly listed all four frameworks and their associated functions without missing any critical details.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "UATS has 195 specs and 224 variants.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly provided the number of specs and variants but omitted the critical fact about the 318 test cases.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its runner status is \"demoted(GAP-04)\" and its CI status is \"NONE,\" as indicated in the map.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies the runner as demoted (GAP-04) and CI status as NONE but misses the critical detail about inline grading missing and potential false passes.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS (GAP-21)",
+          "agent_answer": "The framework with no runner at all is UAMS (auth methods), which has runner:NONE.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies UAMS and the absence of a runner, but adds unclear or extraneous details not present in the ground truth.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The UETS framework is for \"emergence eval\" according to the map.",
+          "judge_score": 5.0,
+          "judge_reason": "The agent mentions the UETS framework related to emergence evaluation but misses the specific focus on concept-naming quality.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The frameworks that use soft-fail CI gating are:\n\n- UBTS (benchmark regression)\n- UOBS (observability runtime)\n- UOTS (observability artifacts)\n- UETS (emergence eval)",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly listed all frameworks using soft-fail CI gating with accurate descriptions and no omissions.",
+          "tokens_t1": 193,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": [
+        {
+          "map_id": "uxts_frameworks",
+          "score_before": 7.67,
+          "weak_questions": [
+            "What is the UETS framework for?"
+          ],
+          "old_t1_tokens": 193,
+          "new_t1_tokens": 199,
+          "new_t1": "UXTS|frameworks|v1  \nUATS|HTTP contract|193 specs,378 variants|runner:active|CI:merge-blocking  \nUPTS|parser conformance|27 specs|runner:active|CI:merge-blocking  \nUDTS|gRPC contract|12 canonical,4 drafts|runner:active|CI:canonical-guard  \nUBTS|benchmark regression|3 specs,3 profiles|runner:active|CI:soft-fail  \nUSTS|security|3 canonical,2 drafts|runner:active|CI:NONE(GAP-31)  \nUAMS|auth methods|4 specs|runner:NONE|CI:NONE(GAP-21)  \nUOBS|observability runtime|3 canonical,1 draft|runner:active|CI:NONE(GAP-31)  \nUOTS|observability artifacts|5 specs|runner:active|CI:NONE(GAP-31)  \nUVTS|semantic validation|1 canonical,1 draft|runner:demoted(GAP-04)|CI:NONE  \nUNTS|hash verification|registry|runner:active|CI:partial(GAP-31)  \nUETS|emergence concept-naming|8 specs|runner:active|CI:NONE(GAP-31)"
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "timestamp": "2026-03-24T22:29:29.521414Z",
+      "avg_score": 5.33,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP contract)\n- UPTS (parser conformance)",
+          "judge_score": 5.0,
+          "judge_reason": "The agent correctly identified two merge-blocking frameworks but missed two others, resulting in a partially correct answer.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "UATS has 193 specs and 378 variants.",
+          "judge_score": 4.0,
+          "judge_reason": "The agent's answer has some correct elements but misses critical facts and provides incorrect numbers for specs and variants.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its runner is demoted (GAP-04), and its CI status is NONE.",
+          "judge_score": 8.0,
+          "judge_reason": "The agent correctly identifies the runner demotion and CI status but misses the critical detail about inline grading causing false passes.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS (GAP-21)",
+          "agent_answer": "The framework UAMS|auth methods|4 specs|runner:NONE|CI:NONE(GAP-21) has no runner at all.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identified UAMS and GAP-21 but added unnecessary details and missed the concise format of the ground truth.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The UETS framework is for \"emergence concept-naming.\"",
+          "judge_score": 4.0,
+          "judge_reason": "The agent mentions \"emergence concept-naming\" but incorrectly attributes it to the UETS framework and misses the focus on evaluating LLM emergence concept-naming quality.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The framework that uses soft-fail CI gating is UBTS (benchmark regression).",
+          "judge_score": 4.0,
+          "judge_reason": "The agent correctly identified UBTS but missed the other three frameworks (UOBS, UOTS, UETS) and provided incomplete information.",
+          "tokens_t1": 199,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": [
+        {
+          "map_id": "uxts_frameworks",
+          "score_before": 5.33,
+          "weak_questions": [
+            "Which frameworks are merge-blocking in CI?",
+            "How many UATS specs and variants exist?",
+            "What is the UETS framework for?",
+            "Which frameworks use soft-fail CI gating?"
+          ],
+          "old_t1_tokens": 199,
+          "new_t1_tokens": 126,
+          "new_t1": "UXTS|frameworks|v1  \nUATS|HTTP|193c,378v|runner:active|CI:merge-block  \nUPTS|parser|27|runner:active|CI:merge-block  \nUDTS|gRPC|12c,4d|runner:active|CI:canonical-guard  \nUBTS|bench|3,3p|runner:active|CI:soft-fail  \nUSTS|security|3c,2d|runner:active|CI:none  \nUAMS|auth|4|runner:none|CI:none  \nUOBS|obs-rt|3c,1d|runner:active|CI:none  \nUOTS|obs-art|5|runner:active|CI:none  \nUVTS|sem-val|1c,1d|runner:demoted|CI:none  \nUNTS|hash|reg|runner:active|CI:partial  \nUETS|emergence|8|runner:active|CI:none-soft-fail"
+        }
+      ]
+    },
+    {
+      "iteration": 3,
+      "timestamp": "2026-03-24T22:29:42.038256Z",
+      "avg_score": 2.67,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP)\n- UPTS (parser)",
+          "judge_score": 5.0,
+          "judge_reason": "The agent correctly identified two merge-blocking frameworks but missed two others, resulting in an incomplete answer.",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "The UATS entry shows: \"UATS|HTTP|193c,378v|runner:active|CI:merge-block\"\n\nThis indicates there are 193 specs (c) and 378 variants (v).\n\n**Answer:**  \nUATS has 193 specs and 378 variants.",
+          "judge_score": 4.0,
+          "judge_reason": "The agent's numbers for specs and variants are incorrect and it omits the number of test cases entirely.",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its CI status is listed as \"none\" in the map.",
+          "judge_score": 1.0,
+          "judge_reason": "The agent's answer is fundamentally wrong and unrelated to the ground truth about Runner's demotion and grading status.",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS (GAP-21)",
+          "agent_answer": "The framework UAMS|auth|4 has no runner at all (runner:none).",
+          "judge_score": 1.0,
+          "judge_reason": "The agent's answer is fundamentally wrong and unrelated to the correct framework UAMS (GAP-21).",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The map indicates that the UETS framework is named \"emergence.\" No further details about its purpose or function are provided.",
+          "judge_score": 3.0,
+          "judge_reason": "The agent's answer is fundamentally wrong as it misinterprets the concept and provides no relevant information about evaluating LLM emergence concept-naming quality.",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The framework that uses soft-fail CI gating is UBTS|bench.",
+          "judge_score": 2.0,
+          "judge_reason": "The agent's answer is mostly incorrect and incomplete, mentioning only UBTS|bench and missing the other key frameworks UBTS, UOBS, UOTS, and UETS.",
+          "tokens_t1": 126,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": [
+        {
+          "map_id": "uxts_frameworks",
+          "score_before": 2.67,
+          "weak_questions": [
+            "Which frameworks are merge-blocking in CI?",
+            "How many UATS specs and variants exist?",
+            "Why is UVTS not CI-gated?",
+            "Which framework has no runner at all?",
+            "What is the UETS framework for?",
+            "Which frameworks use soft-fail CI gating?"
+          ],
+          "old_t1_tokens": 126,
+          "new_t1_tokens": 130,
+          "new_t1": "UXTS|fw-reg|v1  \nUATS|HTTP|193c,378v|runner:active|CI:merge-block  \nUPTS|parser|27|runner:active|CI:merge-block  \nUDTS|gRPC|12c,4d|runner:active|CI:canonical-guard  \nUBTS|bench|3,3p|runner:active|CI:soft-fail  \nUSTS|sec|3c,2d|runner:active|CI:none  \nUAMS|auth|4|runner:none|CI:none  \nUOBS|obs-rt|3c,1d|runner:active|CI:none  \nUOTS|obs-art|5|runner:active|CI:none  \nUVTS|sem-val|1c,1d|runner:demoted|CI:none|demote:grading  \nUNTS|hash|reg|runner:active|CI:partial  \nUETS|emerg|8|runner:active|CI:soft-fail|eval:LLM-naming"
+        }
+      ]
+    },
+    {
+      "iteration": 4,
+      "timestamp": "2026-03-24T22:29:55.364469Z",
+      "avg_score": 3.83,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP)\n- UPTS (parser)",
+          "judge_score": 5.0,
+          "judge_reason": "The agent correctly identified two merge-blocking frameworks but missed two others, resulting in an incomplete answer.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "The UATS entry shows: `UATS|HTTP|193c,378v|runner:active|CI:merge-block`\n\nThis means there are 193 specs (c) and 378 variants (v) for UATS.",
+          "judge_score": 3.0,
+          "judge_reason": "The agent's numbers are fundamentally incorrect compared to the ground truth, showing a misunderstanding of the specs and variants counts.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its CI status is listed as \"none\" in the map. Additionally, its runner is \"demoted\" with a demotion reason of \"grading,\" indicating it is not currently included in CI gating.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies the runner as demoted and not CI-gated but misses the specific runner name (GAP-04) and the detail about missing inline grading causing false passes.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS (GAP-21)",
+          "agent_answer": "The framework with no runner at all is UAMS|auth|4|runner:none|CI:none.",
+          "judge_score": 3.0,
+          "judge_reason": "The agent's answer is fundamentally incorrect and does not match the correct framework name UAMS (GAP-21).",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The UETS framework is for \"emerg\" (emergency).",
+          "judge_score": 1.0,
+          "judge_reason": "The agent's answer is fundamentally incorrect and unrelated to the concept of evaluating LLM emergence concept-naming quality.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The frameworks that use soft-fail CI gating are:\n\n- UBTS|bench  \n- UETS|emerg",
+          "judge_score": 4.0,
+          "judge_reason": "The agent's answer includes only two of the four correct frameworks and adds unclear suffixes, missing critical facts.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": [
+        {
+          "map_id": "uxts_frameworks",
+          "score_before": 3.83,
+          "weak_questions": [
+            "Which frameworks are merge-blocking in CI?",
+            "How many UATS specs and variants exist?",
+            "Which framework has no runner at all?",
+            "What is the UETS framework for?",
+            "Which frameworks use soft-fail CI gating?"
+          ],
+          "old_t1_tokens": 130,
+          "new_t1_tokens": 130,
+          "new_t1": "UXTS|fw-reg|v2  \nUATS|HTTP|193c,378v|runner:active|CI:merge-block  \nUPTS|parser|27|runner:active|CI:merge-block  \nUDTS|gRPC|12c,4d|runner:active|CI:canonical-guard  \nUBTS|bench|3,3p|runner:active|CI:soft-fail  \nUSTS|sec|3c,2d|runner:active|CI:none  \nUAMS|auth|4|runner:none|CI:none  \nUOBS|obs-rt|3c,1d|runner:active|CI:none  \nUOTS|obs-art|5|runner:active|CI:none  \nUVTS|sem-val|1c,1d|runner:demoted|CI:none|demote:grading  \nUNTS|hash|reg|runner:active|CI:partial  \nUETS|emerg|8|runner:active|CI:soft-fail|eval:LLM-naming"
+        }
+      ]
+    },
+    {
+      "iteration": 5,
+      "timestamp": "2026-03-24T22:30:08.647265Z",
+      "avg_score": 3.67,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP)\n- UPTS (parser)",
+          "judge_score": 5.0,
+          "judge_reason": "The agent correctly identified two merge-blocking frameworks but missed two others, resulting in an incomplete answer.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "The UATS entry shows: \"UATS|HTTP|193c,378v|runner:active|CI:merge-block\"\n\nThis indicates there are 193 specs (c) and 378 variants (v) for UATS.",
+          "judge_score": 3.0,
+          "judge_reason": "The agent's numbers for specs and variants are incorrect and misses the test cases entirely, showing a fundamental misunderstanding.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its CI status is listed as \"none\" in the map. Additionally, its runner is \"demoted\" with a demotion reason \"grading,\" which likely contributes to the absence of CI gating.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies the runner as demoted due to grading issues but misses the specific GAP-04 designation and the implication of false passes from missing inline grading.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS (GAP-21)",
+          "agent_answer": "The framework \"UAMS|auth|4\" has no runner at all (runner:none).",
+          "judge_score": 1.0,
+          "judge_reason": "The agent's answer is fundamentally wrong and unrelated to the correct framework \"UAMS (GAP-21)\".",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The UETS framework is for \"emerg\" (emergency).",
+          "judge_score": 1.0,
+          "judge_reason": "The agent's answer is fundamentally incorrect and unrelated to the concept of evaluating LLM emergence concept-naming quality.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The frameworks that use soft-fail CI gating are:\n\n- UBTS (bench)  \n- UETS (emerg)",
+          "judge_score": 5.0,
+          "judge_reason": "The agent correctly identified two frameworks using soft-fail CI gating but missed two critical ones, resulting in an incomplete answer.",
+          "tokens_t1": 130,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": [
+        {
+          "map_id": "uxts_frameworks",
+          "score_before": 3.67,
+          "weak_questions": [
+            "Which frameworks are merge-blocking in CI?",
+            "How many UATS specs and variants exist?",
+            "Which framework has no runner at all?",
+            "What is the UETS framework for?",
+            "Which frameworks use soft-fail CI gating?"
+          ],
+          "old_t1_tokens": 130,
+          "new_t1_tokens": 166,
+          "new_t1": "UXTS|fw-reg|v3  \nUATS|HTTP|193c,378v|runner:active|CI:merge-block|specs:193|vars:378  \nUPTS|parser|27|runner:active|CI:merge-block|specs:27  \nUDTS|gRPC|12c,4d|runner:active|CI:canon-guard|specs:12|drafts:4  \nUBTS|bench|3,3p|runner:active|CI:soft-fail|specs:3|profiles:3  \nUSTS|sec|3c,2d|runner:active|CI:none|specs:3|drafts:2  \nUAMS|auth|4|runner:none|CI:none|specs:4  \nUOBS|obs-rt|3c,1d|runner:active|CI:none|specs:3|drafts:1  \nUOTS|obs-art|5|runner:active|CI:none|specs:5  \nUVTS|sem-val|1c,1d|runner:demoted|CI:none|specs:1|drafts:1|demote:grading  \nUNTS|hash|reg|runner:active|CI:partial|covers:8fw  \nUETS|emerg|8|runner:active|CI:soft-fail|specs:8|eval:LLM-naming"
+        }
+      ]
+    }
+  ]
+}

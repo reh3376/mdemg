@@ -24,7 +24,7 @@
       "admin",
       "transfer"
     ],
-    "sha256": "5a378b7b8e278e5b23b57fca1c5a8c608d3db23b58a9573ebc7bda3515fb3f25"
+    "sha256": "b1ca6568f405dbb6c79420584717bf167eb666b314b6d3588c4f2e52bbe64f10"
   },
   "request": {
     "method": "POST",
@@ -43,27 +43,33 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.nodes_created",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.nodes_skipped",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.edges_created",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.warnings",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.duration_ms",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -88,7 +94,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -113,7 +120,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

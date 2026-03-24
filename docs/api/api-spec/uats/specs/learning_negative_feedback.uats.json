@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "8712ca101282fe90d30e5dac2ef3577b4a64e0f4973e0cd67050099a60cf125e"
+    "sha256": "1b0ee2cf1502b0f22c10ca8bb2e1310e496ea51332e4912242804445b6de9f97"
   },
   "variables": {
     "test_space": "uats-neg-feedback-test"
@@ -46,15 +46,18 @@
     "body_assertions": [
       {
         "path": "$.processed",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.weakened",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.contradicted",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -83,7 +86,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -110,7 +114,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -137,7 +142,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

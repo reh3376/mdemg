@@ -1,0 +1,410 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/reh3376/mdemg/docs/tests/uits/schema/uits.schema.json",
+  "title": "Universal Iterative-Improvement Test Specification (UITS)",
+  "description": "JSON Schema for UITS v1.0.0 — defines the contract for iterative content optimization test suites.",
+  "type": "object",
+  "required": ["uits_version", "metadata", "content", "ground_truth", "thresholds", "optimization"],
+  "additionalProperties": false,
+  "properties": {
+    "uits_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "UITS specification version."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Descriptive metadata for the test specification.",
+      "required": ["name", "description", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name of this test specification."
+        },
+        "description": {
+          "type": "string",
+          "description": "What this specification tests and why."
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["constraint_code", "architecture_map", "prompt_template", "protocol_message"],
+          "description": "Category of content under test."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Optional classification tags.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "author": {
+          "type": "string",
+          "description": "Author or team responsible for this specification."
+        },
+        "created": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO 8601 date this specification was created."
+        },
+        "last_optimized": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO 8601 date of the most recent successful optimization run."
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "description": "Pointers to the content under test.",
+      "required": ["source_file", "encoding_format"],
+      "additionalProperties": false,
+      "properties": {
+        "source_file": {
+          "type": "string",
+          "description": "Path to the T1-encoded (or otherwise encoded) content file."
+        },
+        "human_readable_file": {
+          "type": "string",
+          "description": "Path to the human-readable version of the content."
+        },
+        "encoding_format": {
+          "type": "string",
+          "enum": ["t1_coded", "t1_glossary", "t1_compact", "t2_telegraphic", "custom"],
+          "description": "Encoding format used for the source content."
+        },
+        "injection_context": {
+          "type": "string",
+          "description": "Additional context string to inject alongside the content during evaluation."
+        }
+      }
+    },
+    "ground_truth": {
+      "type": "object",
+      "description": "Ground-truth question/answer pairs used to score content comprehension.",
+      "required": ["questions"],
+      "additionalProperties": false,
+      "properties": {
+        "questions": {
+          "type": "array",
+          "description": "Ordered list of evaluation questions.",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["id", "question", "answer", "difficulty"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for this question within the spec."
+              },
+              "question": {
+                "type": "string",
+                "description": "The evaluation question text."
+              },
+              "answer": {
+                "type": "string",
+                "description": "The authoritative expected answer."
+              },
+              "difficulty": {
+                "type": "string",
+                "enum": ["factual", "relational", "inferential"],
+                "description": "Cognitive difficulty level of the question."
+              },
+              "section_tag": {
+                "type": "string",
+                "description": "Optional tag linking this question to a content section, used for weak-section detection."
+              }
+            }
+          }
+        }
+      }
+    },
+    "scoring_profiles": {
+      "type": "object",
+      "description": "Named scoring profiles defining weights and thresholds for evaluation.",
+      "required": ["active_profile", "profiles"],
+      "additionalProperties": false,
+      "properties": {
+        "active_profile": {
+          "type": "string",
+          "description": "profile_id of the currently active scoring profile."
+        },
+        "profiles": {
+          "type": "array",
+          "description": "All scoring profiles defined for this specification.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["profile_id", "version", "created", "weights", "thresholds"],
+            "additionalProperties": false,
+            "properties": {
+              "profile_id": {
+                "type": "string",
+                "description": "Unique identifier for this scoring profile."
+              },
+              "version": {
+                "type": "string",
+                "description": "Semantic version of this profile (e.g. 1.0.0).",
+                "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+              },
+              "created": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 datetime when this profile was created."
+              },
+              "supersedes": {
+                "type": ["string", "null"],
+                "description": "profile_id of the profile this one replaces, or null if it is the first."
+              },
+              "rationale": {
+                "type": "string",
+                "description": "Human-readable explanation of why this profile was created or changed."
+              },
+              "weights": {
+                "type": "object",
+                "description": "Relative weights for each scoring dimension. All values must be in [0, 1].",
+                "required": ["comprehension", "compaction", "token_efficiency", "fidelity"],
+                "additionalProperties": false,
+                "properties": {
+                  "comprehension": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight applied to comprehension score."
+                  },
+                  "compaction": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight applied to compaction percentage score."
+                  },
+                  "token_efficiency": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight applied to token efficiency score."
+                  },
+                  "fidelity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight applied to fidelity score."
+                  }
+                }
+              },
+              "thresholds": {
+                "type": "object",
+                "description": "Pass/fail thresholds for each scoring dimension.",
+                "required": ["composite_min", "comprehension_min"],
+                "additionalProperties": false,
+                "properties": {
+                  "composite_min": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum acceptable weighted composite score."
+                  },
+                  "comprehension_min": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Minimum acceptable comprehension score (0-10 scale)."
+                  },
+                  "comprehension_floor": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Hard floor below which optimization is considered failed regardless of composite."
+                  },
+                  "token_max": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum allowable token count for the encoded content."
+                  },
+                  "compaction_min_pct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum required compaction percentage relative to the human-readable source."
+                  },
+                  "fidelity_min_pct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum required semantic fidelity percentage."
+                  }
+                }
+              },
+              "difficulty_weights": {
+                "type": "object",
+                "description": "Per-difficulty multipliers applied when computing comprehension score.",
+                "additionalProperties": false,
+                "properties": {
+                  "factual": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight multiplier for factual questions."
+                  },
+                  "relational": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight multiplier for relational questions."
+                  },
+                  "inferential": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Weight multiplier for inferential questions."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Top-level legacy threshold block (required for backward compatibility and schema validation; active thresholds are in scoring_profiles).",
+      "additionalProperties": true
+    },
+    "optimization": {
+      "type": "object",
+      "description": "Configuration for the iterative optimization loop.",
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum number of optimization iterations before the run is considered unconverged."
+        },
+        "convergence_window": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Number of consecutive passing iterations required to declare convergence."
+        },
+        "regeneration_strategy": {
+          "type": "string",
+          "enum": ["llm_rewrite", "section_compress", "code_regenerate", "manual"],
+          "description": "Strategy used to regenerate content between optimization iterations."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier used for LLM-backed regeneration and scoring."
+        }
+      }
+    },
+    "history": {
+      "type": "array",
+      "description": "Ordered log of past optimization runs, newest last.",
+      "items": {
+        "type": "object",
+        "required": ["run_id", "profile_id", "profile_version", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Unique identifier for this run (e.g. UUID or timestamp-slug)."
+          },
+          "profile_id": {
+            "type": "string",
+            "description": "Scoring profile used for this run."
+          },
+          "profile_version": {
+            "type": "string",
+            "description": "Version of the scoring profile used."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 datetime when this run completed."
+          },
+          "iterations": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of optimization iterations executed."
+          },
+          "converged": {
+            "type": "boolean",
+            "description": "Whether the run reached convergence within max_iterations."
+          },
+          "final_scores": {
+            "type": "object",
+            "description": "Aggregate scores from the final iteration of this run.",
+            "additionalProperties": false,
+            "properties": {
+              "composite": {
+                "type": "number",
+                "description": "Weighted composite score."
+              },
+              "comprehension": {
+                "type": "number",
+                "description": "Comprehension score (0-10 scale)."
+              },
+              "compaction_pct": {
+                "type": "number",
+                "description": "Compaction percentage achieved."
+              },
+              "token_count": {
+                "type": "integer",
+                "description": "Token count of the final encoded content."
+              },
+              "fidelity_pct": {
+                "type": "number",
+                "description": "Semantic fidelity percentage achieved."
+              }
+            }
+          },
+          "per_question_scores": {
+            "type": "array",
+            "description": "Individual scores for each ground-truth question.",
+            "items": {
+              "type": "object",
+              "required": ["question_id", "score", "difficulty"],
+              "additionalProperties": false,
+              "properties": {
+                "question_id": {
+                  "type": "string",
+                  "description": "References ground_truth.questions[].id."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "Raw score awarded for this question."
+                },
+                "difficulty": {
+                  "type": "string",
+                  "description": "Difficulty level of the question at time of scoring."
+                }
+              }
+            }
+          },
+          "weak_sections": {
+            "type": "array",
+            "description": "Section tags that fell below threshold in this run.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Optional integration configuration.",
+      "additionalProperties": true,
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "description": "SHA-256 hash of the source_file content, for UNTS hash verification.",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    }
+  }
+}

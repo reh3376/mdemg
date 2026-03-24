@@ -1,0 +1,111 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "UxTS Frameworks Map",
+    "description": "Tests comprehension of the T1-encoded UxTS testing frameworks map, covering CI gating status, spec/variant counts, runner gaps, and framework purposes.",
+    "content_type": "architecture_map",
+    "tags": [
+      "uxts",
+      "testing",
+      "ci",
+      "frameworks",
+      "gating",
+      "specs"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/uxts_frameworks.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent writing specs or configuring CI gates"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Which frameworks are merge-blocking in CI?",
+        "answer": "UATS, UPTS, USTS, UNTS",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "How many UATS specs and variants exist?",
+        "answer": "195 specs, 224 variants, 318 test cases",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "Why is UVTS not CI-gated?",
+        "answer": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q4",
+        "question": "Which framework has no runner at all?",
+        "answer": "UAMS \u2014 the auth methods framework has no runner implementation (tracked as GAP-21)",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q5",
+        "question": "What is the UETS framework for?",
+        "answer": "Evaluating LLM emergence concept-naming quality",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q6",
+        "question": "Which frameworks use soft-fail CI gating?",
+        "answer": "UBTS, UOBS, UOTS, UETS",
+        "difficulty": "factual"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "9f161de64acae2ecb0076dc2830143b9dd104e3334303f97ad7a6a1b6e3ff5f7"
+  }
+}

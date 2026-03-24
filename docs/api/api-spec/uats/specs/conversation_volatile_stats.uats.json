@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "2af5eba579f434a3935f83635ca953f87e4910f738b35bc5d3e7075a9ad7b1b2",
+    "sha256": "4d48b91729891202e4a6e3690ef308c27ba013b85bf00f5093ba30f7aa03f787",
     "tags": [
       "embedding_required"
     ]
@@ -41,27 +41,33 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.volatile_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.permanent_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.avg_volatile_stability",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.min_volatile_stability",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.max_volatile_stability",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

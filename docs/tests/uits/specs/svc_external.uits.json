@@ -1,0 +1,105 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "External Services Map",
+    "description": "Tests comprehension of the T1-encoded external services map, covering server ports, communication protocols, gRPC service definitions, and sidecar integration.",
+    "content_type": "architecture_map",
+    "tags": [
+      "svc",
+      "services",
+      "ports",
+      "grpc",
+      "mcp",
+      "configuration"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/svc_external.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent configuring services or ports"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What port does the MDEMG server listen on?",
+        "answer": "9999",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "What port does the neural sidecar use?",
+        "answer": "8100",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "How does the MCP server communicate?",
+        "answer": "Via stdio (runs as subprocess for IDE integration)",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q4",
+        "question": "What gRPC services are defined for content ingestion?",
+        "answer": "IngestionModule with Matches, Parse, and Sync operations",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q5",
+        "question": "What does the ReasoningModule gRPC service do?",
+        "answer": "Rerank \u2014 re-scores retrieval candidates",
+        "difficulty": "factual"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "dad7fdf1759c5ee06e1f3aa265025df025403def46ab1c1857611dc306df433d"
+  }
+}

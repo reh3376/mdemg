@@ -24,7 +24,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "487b0914f43136efa511aadd6e8488ac518a34d4a9261608beb1c97b03f24b6b"
+    "sha256": "be60b6700546c3e064284ab89e00ec5dc69dea46a040e3ce1d1936e56325b856"
   },
   "variables": {
     "job_id": "nonexistent-job-id"
@@ -41,21 +41,24 @@
     "body_assertions": [
       {
         "name": "status when cancelled",
+        "optional": true,
         "path": "$.status",
-        "equals": "cancelled",
-        "optional": true
+        "op": "equals",
+        "expected": "cancelled"
       },
       {
         "name": "job_id echoed",
+        "optional": true,
         "path": "$.job_id",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "error when not found",
+        "optional": true,
         "path": "$.error",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -71,7 +74,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "not found"
+            "op": "contains",
+            "expected": "not found"
           }
         ]
       }
@@ -99,7 +103,8 @@
         "body_assertions": [
           {
             "path": "$.status",
-            "equals": "cancelled"
+            "op": "equals",
+            "expected": "cancelled"
           }
         ]
       }

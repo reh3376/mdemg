@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-03-24T23:08:47.668799Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T23:08:47.668677Z",
+      "avg_score": 8.83,
+      "trials": [
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 0,
+          "question": "Which frameworks are merge-blocking in CI?",
+          "ground_truth": "UATS, UPTS, USTS, UNTS",
+          "agent_answer": "The frameworks that are merge-blocking in CI are:\n\n- UATS (HTTP contract)\n- UPTS (parser conformance)\n- USTS (security)\n- UNTS (hash verification)",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly listed all four frameworks and provided accurate descriptions for each.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 1,
+          "question": "How many UATS specs and variants exist?",
+          "ground_truth": "195 specs, 224 variants, 318 test cases",
+          "agent_answer": "The map shows that UATS has 195 specs and 224 variants.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identified the number of specs and variants but omitted the critical fact about the 318 test cases.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 2,
+          "question": "Why is UVTS not CI-gated?",
+          "ground_truth": "Runner is demoted (GAP-04) \u2014 functional but inline grading missing, would produce false passes",
+          "agent_answer": "UVTS is not CI-gated because its runner is demoted due to a missing feature: inline grading. This is indicated by \"runner:demoted|reason:GAP-04:inline-grading-missing\" and \"CI:none\" in the map.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identifies the runner is demoted due to missing inline grading and the CI gating status, but slightly over-explains with map details not in the ground truth.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 3,
+          "question": "Which framework has no runner at all?",
+          "ground_truth": "UAMS \u2014 the auth methods framework has no runner implementation (tracked as GAP-21)",
+          "agent_answer": "The framework UAMS (auth methods) has no runner at all, indicated by \"runner:UNBUILT\" and noted as the only framework with no runner implementation (\u2192GAP-21).",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly states that UAMS has no runner implementation and references GAP-21, matching the ground truth fully.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 4,
+          "question": "What is the UETS framework for?",
+          "ground_truth": "Evaluating LLM emergence concept-naming quality",
+          "agent_answer": "The UETS framework is for emergence evaluation of LLM concept-naming quality.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies the UETS framework's purpose related to emergence evaluation of LLM concept-naming quality but does not explicitly mention \"Evaluating LLM emergence concept-naming quality\" as the core task.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "uxts_frameworks",
+          "question_idx": 5,
+          "question": "Which frameworks use soft-fail CI gating?",
+          "ground_truth": "UBTS, UOBS, UOTS, UETS",
+          "agent_answer": "The frameworks that use soft-fail CI gating are:\n\n- UBTS (benchmark regression)\n- UOBS (observability runtime)\n- UOTS (observability artifacts)\n- UETS (emergence eval:LLM concept-naming quality)",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly listed all frameworks using soft-fail CI gating with accurate descriptions and no missing information.",
+          "tokens_t1": 261,
+          "tokens_human": 1495,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": []
+    }
+  ]
+}

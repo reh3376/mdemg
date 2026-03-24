@@ -162,6 +162,37 @@ jobs:
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
             --output /tmp/ubts-results/
 
+      - name: Run UNTS Hash Verification (merge-blocking)
+        run: |
+          python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes \
+            --spec-dir docs/api/api-spec/uats/specs/
+
+      - name: Run USTS Security Tests (merge-blocking)
+        run: |
+          python3 docs/tests/usts/runners/usts_runner.py \
+            --spec "docs/tests/usts/specs/*.usts.json" \
+            --base-url http://localhost:${{ env.MDEMG_PORT }}
+
+      - name: Run UOBS Observability Tests (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/tests/uobs/runners/uobs_runner.py \
+            --spec "docs/tests/uobs/specs/*.uobs.json" \
+            --base-url http://localhost:${{ env.MDEMG_PORT }}
+
+      - name: Run UOTS Observability Artifact Tests (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/api/api-spec/uots/runners/uots_runner.py \
+            --spec-dir docs/api/api-spec/uots/specs/ \
+            --base-url http://localhost:${{ env.MDEMG_PORT }}
+
+      - name: Run UETS Emergence Evaluation (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/tests/uets/runners/uets_runner.py validate-all \
+            --spec-dir docs/tests/uets/specs/
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

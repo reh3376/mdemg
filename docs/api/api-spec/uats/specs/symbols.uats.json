@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "b4e4ae8ba610b8e729c1b587455b869b655a6d435ffcd683a348ffa682923e70"
+    "sha256": "82a6d399e4d65bc2754c579f4f5b0561de879a009de87baf04752cefb2bc58cf"
   },
   "variables": {
     "test_space": "demo"
@@ -38,15 +38,18 @@
     "body_assertions": [
       {
         "path": "$.symbols",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -65,7 +68,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

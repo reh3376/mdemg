@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "701a0d1420adfdad67a3f7a40b6252d83524e1d7f806212ca89b732607d10f6c"
+    "sha256": "0bca075770b19dd373632e8d58d1abacef1f421fe46b5afccae14294dfc68fac"
   },
   "variables": {
     "test_session": "uats-anomaly-session",
@@ -37,23 +37,28 @@
     "body_assertions": [
       {
         "path": "$.session_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.health_score",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.observation_count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.active_anomalies",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

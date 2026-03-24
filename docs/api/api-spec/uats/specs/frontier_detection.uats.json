@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "ccdcf90627a19d1b4da1173601040a3da2fe9e6be9fd3beb01fb76503a29a40e"
+    "sha256": "4d497f61bb88e6f6b0b7f10b37bcfb346a907b706e24f97b14a2e1ba28da6d5a"
   },
   "variables": {
     "test_space": "uats-frontier-test"
@@ -38,11 +38,13 @@
     "body_assertions": [
       {
         "path": "$.frontiers",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -62,7 +64,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

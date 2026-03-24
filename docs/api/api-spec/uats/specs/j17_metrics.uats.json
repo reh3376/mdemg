@@ -29,7 +29,7 @@
       "metrics",
       "phase_j17"
     ],
-    "sha256": "df8c419e3322cbbc37199eb3cc7b41dcaef948b66e317e8fd53522dfcdfcd20c"
+    "sha256": "9d674818808b45941aa739585af851e3249283ea0e4b0d16e08ad1ddb4464049"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -50,13 +50,14 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "code_coverage is a number",
         "path": "$.data.code_coverage",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },
@@ -73,7 +74,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "7c58c51c91cf4d1c95ef0936cc9dab362c1520ba02dc9451664cdd3c7793fcbd"
+    "sha256": "fb6e25e9c8c0bdcfd6653396b559cb27793793ea3080d8d58ac7e323a254f0dc"
   },
   "variables": {
     "test_space": "demo"
@@ -37,19 +37,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.total_constraint_nodes",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.by_type",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.tagged_observation_count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },
@@ -66,7 +70,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

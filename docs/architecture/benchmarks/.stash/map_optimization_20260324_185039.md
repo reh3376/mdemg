@@ -1,0 +1,31 @@
+# Architecture Map Optimization Report
+
+**Date**: 2026-03-24T22:50:39.527977Z  
+**Model**: gpt-4.1-mini (judge/agent), gpt-4.1 (compression)  
+**Iterations**: 1  
+**Threshold**: 9.0/10  
+
+## Learning Progress
+
+| Iteration | Avg Score | Maps Changed |
+|-----------|-----------|-------------|
+| 1 | 7.40 | 0 |
+
+## Per-Map Results
+
+| Map | Type | Tokens | Compaction | Final Score |
+|-----|------|--------|------------|-------------|
+| dist_channels | DIST | 298 | -30% | 7.4 |
+
+## Question-Level Detail (Final Iteration)
+
+
+### dist_channels
+
+| # | Difficulty | Score | Question | Reason |
+|---|-----------|-------|----------|--------|
+| 1 | factual | 10 PASS | How do you install MDEMG on macOS? | The agent provided the exact correct command along with additional helpful context without any errors. |
+| 2 | factual | 7 PASS | What technology is the Linux companion app built with? | The agent correctly identifies Tauri with Rust and JavaScript but omits the Catppuccin theme detail. |
+| 3 | factual | 2 **WEAK** | Which platform companion app is not implemented? | The agent's answer is fundamentally incorrect as it states the platform companion app is not implemented, which contradicts the ground truth naming it as Windows companion (GAP-13). |
+| 4 | relational | 9 PASS | What CI workflow handles cross-compilation releases? | The agent correctly identified the workflow file, trigger, and use of goreleaser, but added extra details about cross-compilation and GitHub Releases not mentioned in the ground truth. |
+| 5 | factual | 9 PASS | What does auto-pr.yml do? | The agent correctly describes the auto-creation of a PR to main on pushes to *_dev* branches but adds unnecessary detail about the workflow file name and trigger type. |

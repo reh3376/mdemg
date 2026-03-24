@@ -24,7 +24,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "3d551032d54ff130f1fd857f97ddf077b7b4774bae718f814dc8b0d5a5f692ef"
+    "sha256": "405bd885419c8869cec6d7edce3ad9fd79e156d4724d9212e7a0aecaf618522d"
   },
   "request": {
     "method": "GET",
@@ -41,8 +41,8 @@
       {
         "name": "jobs array exists",
         "path": "$.jobs",
-        "type": "array",
-        "exists": true
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -60,7 +60,8 @@
         "body_assertions": [
           {
             "path": "$.jobs",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -78,7 +79,8 @@
         "body_assertions": [
           {
             "path": "$.jobs",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }

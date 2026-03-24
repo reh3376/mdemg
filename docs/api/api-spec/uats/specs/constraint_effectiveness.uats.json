@@ -24,7 +24,7 @@
       "metrics",
       "fsd"
     ],
-    "sha256": "575a68d6cd4e0b716ba2cc690a5bdfd25dccc61c03a5c71c7c20de565663976b"
+    "sha256": "aaf90330a165b47e8c6948847078210bb4984df231a4e70b25f7e20e8aa6a82e"
   },
   "variables": {},
   "request": {
@@ -43,12 +43,13 @@
       {
         "name": "constraints array exists",
         "path": "$.constraints",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "total is number",
         "path": "$.total",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },

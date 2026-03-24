@@ -26,7 +26,7 @@
       "feedback",
       "phase_ar2"
     ],
-    "sha256": "ce767319a55347adb657e49d2e9fbcf164036ff81271d61074a58e9ca3306e49"
+    "sha256": "2e8b3dbb323d92bee3c33d70a42a1965172e23287266517951a925cc461e94a9"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -50,14 +50,14 @@
       {
         "name": "error message present",
         "path": "$.error",
-        "exists": true
+        "op": "exists"
       }
     ]
   },
   "variants": [
     {
       "name": "valid_feedback",
-      "description": "Returns 200 when guidance_id is provided (even if unknown \u2014 graceful handling).",
+      "description": "Returns 200 when guidance_id is provided (even if unknown — graceful handling).",
       "request": {
         "body": {
           "guidance_id": "{{guidance_id}}",
@@ -87,7 +87,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

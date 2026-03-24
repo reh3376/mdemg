@@ -14,7 +14,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Jiminy healthz liveness endpoint \u2014 returns enabled/disabled status",
+    "description": "Validates Jiminy healthz liveness endpoint — returns enabled/disabled status",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -24,7 +24,7 @@
       "jiminy",
       "health"
     ],
-    "sha256": "46cb5bd28a0281e1592acea9e628fe5db1f06bd4f17a38e9a34baf4f3c5df582"
+    "sha256": "bb4a988c82200b6555a38ce567e6ecdfed773663db03b369c2c3bca6d452f538"
   },
   "variables": {},
   "request": {
@@ -40,12 +40,14 @@
       {
         "name": "status is string",
         "path": "$.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "enabled is boolean",
         "path": "$.enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   },
@@ -62,12 +64,14 @@
           {
             "name": "status is disabled",
             "path": "$.status",
-            "equals": "disabled"
+            "op": "equals",
+            "expected": "disabled"
           },
           {
             "name": "enabled is false",
             "path": "$.enabled",
-            "equals": false
+            "op": "equals",
+            "expected": false
           }
         ]
       }

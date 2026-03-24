@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "4d72eaccc67cc4eacb4c63fa14d277037b961a3b311e8ed911101fd57b44798f"
+    "sha256": "9d51907e7e89ff688465a6a6d07c65118ecb793c1cff19640259d3bb32538594"
   },
   "variables": {},
   "request": {
@@ -43,19 +43,23 @@
       },
       {
         "path": "$.total_spaces",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.total_orphans",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.space_results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.dry_run",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   },
@@ -86,7 +90,8 @@
           },
           {
             "path": "$.space_results",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -113,11 +118,13 @@
           },
           {
             "path": "$.total_spaces",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           },
           {
             "path": "$.space_results",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -198,7 +205,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -216,7 +224,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

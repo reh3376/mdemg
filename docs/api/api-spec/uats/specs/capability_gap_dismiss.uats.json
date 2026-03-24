@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "ef99d278eb2190cbe130f2cbfde3c8d4007ee845ea80c408d88fba06133eb42c"
+    "sha256": "567a9f177e950f1e0304fb68ba4c563148f3dfaaa3a69f7f399bf1754e34c634"
   },
   "variables": {},
   "request": {
@@ -36,7 +36,8 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },

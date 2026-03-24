@@ -25,7 +25,7 @@
       "rsic",
       "rsic-sk1"
     ],
-    "sha256": "026c40c41963dfb18d3f522eca56a8757a55e01ff30083ec868eca82ae88a733"
+    "sha256": "1bc4fa4775db0e3b180ad7849a44e13643d58d5d1dba06ea72746d261e687bf3"
   },
   "variables": {
     "test_space": "uats-rsic-sk1-test"
@@ -46,15 +46,18 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.tier",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

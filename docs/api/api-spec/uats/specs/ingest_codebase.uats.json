@@ -33,7 +33,7 @@
     "tags": [
       "embedding_required"
     ],
-    "sha256": "f5e39c6d0e2fe031116604f3ccb65036bf2452721087fd31fd5a8a6473d2eadd"
+    "sha256": "b24377d45a4ef459d786002affee9204f0d4d7086b6f4f69361197427d8ed063"
   },
   "variables": {
     "test_space": "uats-ingest-test",
@@ -63,16 +63,17 @@
     },
     "body_assertions": [
       {
+        "capture_as": "job_id",
         "name": "job_id returned",
         "path": "$.job_id",
-        "type": "string",
-        "exists": true,
-        "capture_as": "job_id"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "status is queued or running",
         "path": "$.status",
-        "in": [
+        "op": "one_of",
+        "expected": [
           "queued",
           "running"
         ]
@@ -80,12 +81,14 @@
       {
         "name": "space_id echoed",
         "path": "$.space_id",
-        "equals": "{{test_space}}"
+        "op": "equals",
+        "expected": "{{test_space}}"
       },
       {
         "name": "path echoed",
         "path": "$.path",
-        "equals": "{{test_path}}"
+        "op": "equals",
+        "expected": "{{test_path}}"
       }
     ],
     "response_time": {
@@ -168,12 +171,13 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "type": "string",
-            "exists": true
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.status",
-            "in": [
+            "op": "one_of",
+            "expected": [
               "queued",
               "running"
             ]
@@ -316,7 +320,8 @@
         "body_assertions": [
           {
             "path": "$.status",
-            "in": [
+            "op": "one_of",
+            "expected": [
               "queued",
               "running",
               "completed"
@@ -409,7 +414,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "space_id"
+            "op": "contains",
+            "expected": "space_id"
           }
         ]
       }
@@ -428,7 +434,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "path"
+            "op": "contains",
+            "expected": "path"
           }
         ]
       }
@@ -447,7 +454,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "path"
+            "op": "contains",
+            "expected": "path"
           }
         ]
       }
@@ -472,7 +480,7 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -497,7 +505,7 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -523,7 +531,7 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -548,7 +556,7 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -566,8 +574,8 @@
         "body_assertions": [
           {
             "path": "$.jobs",
-            "type": "array",
-            "exists": true
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }

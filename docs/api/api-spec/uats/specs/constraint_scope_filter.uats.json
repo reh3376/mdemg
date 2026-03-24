@@ -25,7 +25,7 @@
       "fsd",
       "constraint_scope_required"
     ],
-    "sha256": "31ff37761266df2159ee214931519c0c5b8cc424fdfd6c8856d2b08b7468e52d"
+    "sha256": "55e957a4a1d31787486917fb4cd43f8ddbd21e4d8c960b4eb43ceb2e85a9bb48"
   },
   "variables": {},
   "request": {
@@ -42,6 +42,22 @@
     "status": [
       200,
       503
+    ],
+    "body_assertions": [
+      {
+        "name": "status is updated when successful",
+        "path": "$.status",
+        "op": "equals",
+        "expected": "updated",
+        "optional": true
+      },
+      {
+        "name": "error field type when service unavailable",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

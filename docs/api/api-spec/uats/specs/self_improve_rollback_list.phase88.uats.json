@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "fd15ece3dcfb7b1539611469ecb6f4f2fa35966dab4490d3ede13eb0a0542848"
+    "sha256": "84b38f1fdb0954f3dcfe724da0486dc70a943c02fafdac214afaaf17c161ca99"
   },
   "request": {
     "method": "GET",
@@ -35,15 +35,18 @@
     "body_assertions": [
       {
         "path": "$.snapshots",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.rollback_window_sec",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

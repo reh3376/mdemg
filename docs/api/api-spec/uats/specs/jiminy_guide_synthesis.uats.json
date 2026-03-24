@@ -29,7 +29,7 @@
       "phase_j15",
       "llm_required"
     ],
-    "sha256": "e3f94d3fe9dd21afd2480524088ac079ba931158a860813f442a3cdb341caa0d"
+    "sha256": "303c9416cd1c44451886aca689a102e1b946b11ccd59bdbc82c40dbd3e056bb9"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -55,7 +55,7 @@
       {
         "name": "data object present",
         "path": "$.data",
-        "exists": true
+        "op": "exists"
       }
     ]
   },
@@ -79,7 +79,7 @@
           {
             "name": "data present",
             "path": "$.data",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -99,7 +99,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -119,7 +119,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

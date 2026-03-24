@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-03-24T22:47:47.190370Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T22:47:47.190217Z",
+      "avg_score": 8.8,
+      "trials": [
+        {
+          "map_id": "flow_jiminy_guide",
+          "question_idx": 0,
+          "question": "What triggers the Jiminy guide flow?",
+          "ground_truth": "Claude hook .claude/hooks/prompt-context.sh (runs every prompt)",
+          "agent_answer": "The Jiminy guide flow is triggered by the \"claude-hook\" via the script \".claude/hooks/prompt-context.sh\" and runs on every prompt.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identified the hook name, script path, and that it runs on every prompt, but added an unnecessary detail about the \"Jiminy guide flow\" which was not in the ground truth.",
+          "tokens_t1": 204,
+          "tokens_human": 184,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "flow_jiminy_guide",
+          "question_idx": 1,
+          "question": "What is the timeout for the guide orchestration?",
+          "ground_truth": "6 seconds",
+          "agent_answer": "The timeout for the guide orchestration (jim.Guide) is 6 seconds.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly states the timeout is 6 seconds and specifies the context, but the answer is slightly more detailed than the ground truth.",
+          "tokens_t1": 204,
+          "tokens_human": 184,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "flow_jiminy_guide",
+          "question_idx": 2,
+          "question": "What are the three J17 encoding tiers and their approximate token sizes?",
+          "ground_truth": "T1: coded ~15 tokens (80% traffic), T2: telegraphic ~50-100 tokens (15%), T3: full NL ~200+ tokens (5%)",
+          "agent_answer": "The three J17 encoding tiers and their approximate token sizes are:\n\n- T1: coded, approximately 15 tokens, 80% traffic, format: C:!|code|ann:val  \n- T2: telegraphic, approximately 50-100 tokens, 15% traffic, short NL phrases  \n- T3: full-NL, approximately 200+ tokens, 5% traffic, complete explanation and rationale",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly identified all three tiers with accurate token counts, traffic percentages, and descriptions matching the ground truth.",
+          "tokens_t1": 204,
+          "tokens_human": 184,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "flow_jiminy_guide",
+          "question_idx": 3,
+          "question": "What parallel sources does the guide query?",
+          "ground_truth": "Constraints from graph (cns.Suggest), corrections via vector search, CONTRADICTS edges, frontier nodes (knowledge gaps), and per-session trust scoring",
+          "agent_answer": "The guide queries the following parallel sources under jim.Guide orchestration:\n\n- cns.Suggest (active constraints from graph)  \n- neo4j.VectorSearch (corrections similar to current prompt)  \n- neo4j.Query (CONTRADICTS edges)  \n- neo4j.Query (frontier nodes: knowledge-gaps, L3+ low-degree)  \n- jim.Trust (per-session trust scoring)",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identifies all main sources and concepts with minor differences in phrasing but no critical omissions.",
+          "tokens_t1": 204,
+          "tokens_human": 184,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "flow_jiminy_guide",
+          "question_idx": 4,
+          "question": "What does jim.Effectiveness track?",
+          "ground_truth": "Guidance_id for feedback correlation (whether guidance was followed)",
+          "agent_answer": "jim.Effectiveness tracks the guidance_id to GUIDANCE_OUTCOME edges, specifically whether the guidance was followed, ignored, or contradicted.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies the role of guidance_id in tracking outcomes but adds unnecessary detail and misses the concise focus on feedback correlation.",
+          "tokens_t1": 204,
+          "tokens_human": 184,
+          "difficulty": "relational"
+        }
+      ],
+      "map_changes": []
+    }
+  ]
+}

@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "1dbf8b549427b451093b5f4efa07d2942bb164840eb44f41e8237737042f3e29"
+    "sha256": "c28fe4d260455984fbbdfdb2c070cb135a35068da11942e7b2c236b00433665a"
   },
   "variables": {
     "test_space": "uats-orgreview-test"
@@ -42,11 +42,13 @@
     "body_assertions": [
       {
         "path": "$.reviews",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

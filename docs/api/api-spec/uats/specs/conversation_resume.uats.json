@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "dcf5a6ed3a0b525f2d60de8e95011943cbca2d7a66ae0ff7358f74808e297b7e",
+    "sha256": "cd4d902a8764dd12d24be7a17b197f4590a30f076b3fa2ebb3bfb887bdb7fa9e",
     "tags": [
       "embedding_required"
     ]
@@ -45,23 +45,28 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.observations",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.themes",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.emergent_concepts",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.summary",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

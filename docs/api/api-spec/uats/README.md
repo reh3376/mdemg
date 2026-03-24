@@ -303,6 +303,69 @@ Pass Rate: 100.0%
 
 ---
 
+## GAP-29: Schema Dead Surface Area
+
+The `uats.schema.json` defines features that are never used by any active spec and/or trigger hard `PARITY FAILURE` errors in the runner when present. This section documents the current state of each feature.
+
+### Parity-Fail Features (cause hard runner errors)
+
+These schema fields are detected by `_validate_supported_features()` in `uats_runner.py`. If a spec includes any of them, the runner emits `PARITY FAILURE: Runner does not implement these schema features: ...` and the spec is counted as an error, not a test failure.
+
+| Schema Field | Specs Using It | Runner Behavior |
+|---|---|---|
+| `setup` | 0 | PARITY FAILURE — not implemented |
+| `teardown` | 0 | PARITY FAILURE — not implemented |
+| `chain` | 0 | PARITY FAILURE — not implemented |
+| `request.body_file` | 0 | PARITY FAILURE — not implemented |
+| `expected.body_file` | 0 | PARITY FAILURE — not implemented |
+| `expected.body_schema` | 0 | PARITY FAILURE — not implemented |
+| `config.retry_count` | 0 | PARITY FAILURE — not implemented |
+| `config.retry_delay_ms` | 0 | PARITY FAILURE — not implemented |
+| `config.strict_headers` | 0 | PARITY FAILURE — not implemented |
+| `config.strict_body` | 0 | PARITY FAILURE — not implemented |
+| `config.ignore_headers` | 0 | PARITY FAILURE — not implemented |
+| `config.validate_schema` | 0 | PARITY FAILURE — not implemented |
+| `config.validate_values` | 0 | PARITY FAILURE — not implemented |
+| `auth.type == "oauth2"` | 0 | PARITY FAILURE — not implemented |
+| `auth.api_key[in=query]` | 0 | PARITY FAILURE — not implemented |
+| `captures.*.regex` | 0 | PARITY FAILURE — not implemented |
+| `request.sha256` | 0 | PARITY FAILURE — not implemented (distinct from `config.sha256`, which is the spec integrity hash and IS supported) |
+| `expected.response_time.p95_ms` | 0 | PARITY FAILURE — not implemented |
+| `expected.response_time.p99_ms` | 0 | PARITY FAILURE — not implemented |
+| `captures.*.from == "status"` | 0 | PARITY FAILURE — flagged even though the capture loop has partial handling for `status`; the parity guard runs first |
+| `captures.*.from == "response_time"` | 0 | PARITY FAILURE — not implemented |
+
+### Future/Aspirational Features (schema-valid, zero spec usage, no parity guard)
+
+These fields are valid per the schema and do not trigger parity-fail errors (they are silently ignored or passed through). However, no active spec uses them, and their runner support ranges from partial to none.
+
+| Schema Field | Specs Using It | Runner Support | Notes |
+|---|---|---|---|
+| `auth` (any type) | 0 | Partial | `bearer`, `basic`, `api_key[in=header]`, and `custom` are implemented in the HTTP client. `oauth2` triggers parity-fail. No spec currently uses any auth block. |
+| `variables` (top-level) | 1 (`ingest_codebase.uats.json`) | Implemented | `env`, `generator` (uuid, timestamp, etc.) and literal values are resolved. Variant-level `variables` are also implemented. |
+| `captures` | 1 (`ingest_codebase.uats.json`) | Partial | `from: body` and `from: header` are implemented. `from: status` and `from: response_time` trigger parity-fail. `captures.*.regex` triggers parity-fail. |
+| `metadata.requires` | 0 | Not implemented | The `requires` array (ordering/dependency between specs) is parsed but never enforced by the runner. |
+| `metadata.skip` / `metadata.skip_reason` | 0 | Implemented | Spec-level skip is handled; no active spec uses it at the metadata level (variants use `skip` directly). |
+| `Matcher.not_in` (in `expected.headers`) | 0 | Not implemented | The `Matcher` type supports `not_in` in the schema but the runner's `_normalize_assertion` has no mapping for it; would produce `PARITY FAILURE: unsupported assertion operator 'not_in'` at runtime. |
+| `Matcher.starts_with` (in `expected.headers`) | 0 | Not implemented | Same as `not_in` — no `_normalize_assertion` mapping; runtime PARITY FAILURE. |
+| `Matcher.ends_with` (in `expected.headers`) | 0 | Not implemented | Same as `not_in` — no `_normalize_assertion` mapping; runtime PARITY FAILURE. |
+| `expected.status` as range object `{"min": N, "max": N}` | 0 | Implemented | `check_status()` handles integer, array, and range object forms. No spec uses the range form. |
+| `api.version` | Many | Decorative | Read by the runner for display only; has no effect on test logic. |
+| `api.service` | Many | Decorative | Same as `api.version`. |
+| `api.operation_id` | Many | Decorative | Same as `api.version`. |
+| `api.tags` | Many | Decorative | Not the same as `config.tags`. `api.tags` are decorative; only `config.tags` and `variants[].tags` are used for `--exclude-tag` filtering. |
+| `config.sequential` | 0 | Implemented | Sequential mode injects `prev_<field>` variables between variants; no active spec uses it. |
+| `Step` (setup/teardown items): `type: sql` | N/A | Not implemented | `setup`/`teardown` are parity-fail blocked; `sql` step type would not work even if they were permitted. |
+| `Step` (setup/teardown items): `type: command` | N/A | Not implemented | Same as `sql`. |
+
+### Summary
+
+The parity-fail guard in `_validate_supported_features()` protects against accidental use of 20 unimplemented fields. All 20 are currently at zero spec usage, so the guard is a safeguard for future spec authors rather than an active failure source. The three Matcher operators (`not_in`, `starts_with`, `ends_with`) are an additional gap: they are schema-valid and not pre-flight-checked, so a spec using them would produce a runtime PARITY FAILURE on the first affected assertion rather than a fast pre-flight error.
+
+To extend runner support for any of these features, implement the corresponding logic in `docs/api/api-spec/uats/runners/uats_runner.py` and remove the field from the `_validate_supported_features` unsupported list.
+
+---
+
 ## Stats
 
 - **Canonical Specs:** 195

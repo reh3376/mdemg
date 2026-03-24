@@ -1,0 +1,104 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "Jiminy Guide Flow Map",
+    "description": "Tests comprehension of the T1-encoded Jiminy guidance flow, covering trigger mechanism, timeout, encoding tiers, parallel source queries, and effectiveness tracking.",
+    "content_type": "architecture_map",
+    "tags": [
+      "flow",
+      "jiminy",
+      "guidance",
+      "j17",
+      "encoding-tiers"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/flow_jiminy_guide.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent working in internal/jiminy/"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What triggers the Jiminy guide flow?",
+        "answer": "Claude hook .claude/hooks/prompt-context.sh (runs every prompt)",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "What is the timeout for the guide orchestration?",
+        "answer": "6 seconds",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "What are the three J17 encoding tiers and their approximate token sizes?",
+        "answer": "T1: coded ~15 tokens (80% traffic), T2: telegraphic ~50-100 tokens (15%), T3: full NL ~200+ tokens (5%)",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q4",
+        "question": "What parallel sources does the guide query?",
+        "answer": "Constraints from graph (cns.Suggest), corrections via vector search, CONTRADICTS edges, frontier nodes (knowledge gaps), and per-session trust scoring",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q5",
+        "question": "What does jim.Effectiveness track?",
+        "answer": "Guidance_id for feedback correlation (whether guidance was followed)",
+        "difficulty": "relational"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "5d34f6a0a9170be67eaf8994653a9e73cf72d7282c1e08ad7ecaab8708c8ab94"
+  }
+}

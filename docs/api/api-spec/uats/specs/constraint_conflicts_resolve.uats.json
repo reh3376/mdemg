@@ -25,7 +25,7 @@
       "conflicts",
       "fsd"
     ],
-    "sha256": "cf245ff826b8c01f744fe26b338faed5983f30af2b8110720e73a8236c315c72"
+    "sha256": "0d30e29923775ccb99e61194a47f7083b2b7ce5d025b24a25926cfedb21a5490"
   },
   "request": {
     "method": "PATCH",
@@ -42,7 +42,8 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "3778d61efc9b70f04cbe28519edcd8bc5fdd77bd9b3948f9af231faa09327237"
+    "sha256": "9f1f31d4a038fb2ad3406f13f5eb5f2bf905e6c762acca82da1a926f81719358"
   },
   "variables": {
     "job_id": "nonexistent-job-id"
@@ -34,6 +34,28 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "job_id is string when cancelled",
+        "path": "$.job_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "status is cancelled when successful",
+        "path": "$.status",
+        "op": "equals",
+        "expected": "cancelled",
+        "optional": true
+      },
+      {
+        "name": "error field type when not found",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "733d4e73bd9591871235536cba0dfba5d05bc2acc9c723408ee0b2167aaefca1"
+    "sha256": "d5d5406b20ae619de206fc3a38a68a66406af9e650cd36754a726a550613935a"
   },
   "variables": {
     "test_space": "demo"
@@ -37,19 +37,23 @@
     "body_assertions": [
       {
         "path": "$.data.gaps",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.data.summary",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.data.summary.total",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.summary.by_type",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   },
@@ -69,7 +73,8 @@
         "body_assertions": [
           {
             "path": "$.data.gaps",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -95,7 +100,8 @@
         "body_assertions": [
           {
             "path": "$.status",
-            "equals": "recorded"
+            "op": "equals",
+            "expected": "recorded"
           }
         ]
       }
@@ -122,7 +128,8 @@
         "body_assertions": [
           {
             "path": "$.status",
-            "equals": "recorded"
+            "op": "equals",
+            "expected": "recorded"
           }
         ]
       }

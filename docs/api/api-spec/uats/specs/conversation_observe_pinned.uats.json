@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "ca014ed64d39967307461ec17af88de1a02dc92b8e6c8e6e22158350f444f3ca",
+    "sha256": "74b6e3f3eb0d403d8bab1dbc4fa84d6d7c2fa2825ab4478b3684ef2a98bf6a2a",
     "tags": [
       "embedding_required"
     ]
@@ -52,23 +52,28 @@
     "body_assertions": [
       {
         "path": "$.obs_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.node_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.surprise_score",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.surprise_factors",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.summary",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

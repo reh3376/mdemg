@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "64cc8cfeedd4472fe78cb08135e3e59aced9de13a539aa8eda33b6d760a46c54"
+    "sha256": "a62a027e4623902ea815a8e131bdd703b49b7720f6171bc522d906ef21c655ab"
   },
   "variables": {
     "test_space": "uats-orgreview-test",
@@ -46,6 +46,38 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "obs_id present when decided",
+        "path": "$.obs_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "decision is approve or reject when present",
+        "path": "$.decision",
+        "op": "one_of",
+        "expected": [
+          "approve",
+          "reject"
+        ],
+        "optional": true
+      },
+      {
+        "name": "reviewed_at present when decided",
+        "path": "$.reviewed_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

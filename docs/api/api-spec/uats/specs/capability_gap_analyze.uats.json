@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "2ab43c3bb714d0cd2c58def24f731e3241015ca838bbd9c7bba072430c0c0070"
+    "sha256": "00169a04b3a2b8d6845d70bcc553f2603700f0e1eb8e2c398ee1652f96ecddea"
   },
   "variables": {},
   "request": {
@@ -37,7 +37,8 @@
     "body_assertions": [
       {
         "path": "$.gaps_found",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },

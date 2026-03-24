@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "4a48bc991ac6c7324d0adac33bbbbce5c8fc96bd7f16653520d32b3071e82af3",
+    "sha256": "478cbd5f60b869b8a8430e2226314a3df79759b08c57105ca08da786049d3069",
     "tags": [
       "backup_required"
     ]
@@ -41,7 +41,8 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

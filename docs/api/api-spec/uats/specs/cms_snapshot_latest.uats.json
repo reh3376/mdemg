@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "2998f4c01667c5219f477edaa3e0261fba1c58c3ae4e33dfa637bc6953094a7c"
+    "sha256": "7380a977177f50f34de6f426c1087e6116a35ab9cf5e0787159313074eb419f4"
   },
   "variables": {
     "test_space": "uats-snapshot-test"
@@ -41,6 +41,42 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "snapshot_id present when found",
+        "path": "$.snapshot_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "space_id present when found",
+        "path": "$.space_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "session_id present when found",
+        "path": "$.session_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "created_at present when found",
+        "path": "$.created_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field present on not found",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

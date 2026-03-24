@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "3fbe9d7ef17139b9b879a977454eb0156519d1dea414f39577a8c47e553ecabe"
+    "sha256": "922f96ddfae16d95fa4677de21424b2c42c0d5715215a29e8e2eb066ddb0d925"
   },
   "variables": {
     "test_space": "uats-templates-test",
@@ -42,6 +42,42 @@
       200,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "template_id present when found",
+        "path": "$.template_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "space_id present when found",
+        "path": "$.space_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "name present when found",
+        "path": "$.name",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "obs_type present when found",
+        "path": "$.obs_type",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

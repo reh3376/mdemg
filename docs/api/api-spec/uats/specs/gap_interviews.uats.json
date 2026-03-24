@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "16b2b47ca0a48b0567ffdb6b9aec796aa7a01331eadf6db9860de10aa986b3ab"
+    "sha256": "d460315d0e36d48ba0f6a14df4472859fae7ae33771b535c340d3b86417dd511"
   },
   "variables": {
     "test_space": "demo"
@@ -35,11 +35,13 @@
     "body_assertions": [
       {
         "path": "$.stats",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.stats.total",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

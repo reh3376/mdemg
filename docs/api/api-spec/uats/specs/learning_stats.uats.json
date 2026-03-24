@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "e35d5c32caed1f45a585b22397e52e080d4fb3c7f42f1ae9628bbd06698de243"
+    "sha256": "533f5e77f0931f6640e77b5e68367a9e3ee8c9462690f4ffdfff9425ecd869c1"
   },
   "variables": {
     "test_space": "uats-learning-test"
@@ -37,27 +37,33 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.total_edges",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.decay_per_day",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.prune_threshold",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.max_edges_per_node",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.freeze_state",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

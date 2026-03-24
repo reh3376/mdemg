@@ -29,7 +29,7 @@
       "feedback",
       "phase_j17"
     ],
-    "sha256": "f03dedd9b1fbecbfab6253a50c676609f0875615c00b934f5b437c3ce9813a23"
+    "sha256": "8b48e6b08afe9a2d54f44494da31d1027292b218daaa0d09f0fff4ad9dbfada5"
   },
   "variables": {},
   "request": {
@@ -56,13 +56,14 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "ingested count is number",
         "path": "$.data.ingested",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },
@@ -81,7 +82,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -111,7 +113,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

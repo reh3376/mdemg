@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "3e552d752b6c61445a8c8f5bad0d91bac89abf0e292d9965bbccc47f01b6e1de"
+    "sha256": "ea32fa6990756e29e3ab2352b94e95848d51cf7801d3ab36dab6c82a27010689"
   },
   "request": {
     "method": "GET",
@@ -34,7 +34,8 @@
     "body_assertions": [
       {
         "path": "$.calibration",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

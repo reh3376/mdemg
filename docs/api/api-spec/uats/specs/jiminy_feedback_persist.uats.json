@@ -24,7 +24,7 @@
       "effectiveness",
       "fsd"
     ],
-    "sha256": "4f1c16955e5631299f1042c9a7c49327f00f79353b87d520b5feb0aceecf9aad"
+    "sha256": "b343c95b611be0cc0ab4cb8c046f6911c1be19746e72ab0d13d9366482af2072"
   },
   "variables": {},
   "request": {
@@ -45,12 +45,13 @@
       {
         "name": "guidance_id echoed",
         "path": "$.data.guidance_id",
-        "equals": "test-guidance-id"
+        "op": "equals",
+        "expected": "test-guidance-id"
       },
       {
         "name": "results array exists",
         "path": "$.data.results",
-        "exists": true
+        "op": "exists"
       }
     ]
   },

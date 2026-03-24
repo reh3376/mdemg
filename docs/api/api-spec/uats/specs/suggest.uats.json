@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "acb33725442d646a55fcf5e2b84ea6cfbd6117cc8c7c81f22ecabb83211983fe",
+    "sha256": "9b73abce119db62604e580b0d32d0f92729a513f0dd48d7c6886d0e83cb6b6ce",
     "tags": [
       "embedding_required"
     ]
@@ -43,9 +43,10 @@
     "status": 200,
     "body_assertions": [
       {
+        "optional": true,
         "path": "$.suggestions",
-        "type": "array",
-        "optional": true
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "7cd6f4f00f52064f4828726d07518bffc9cfdd2c4ea75c874157b8fe7acde6ab"
+    "sha256": "ea88c758079ca2e44209004d9d94932d6c39c89c38c0ed0e4165a01a986c7637"
   },
   "variables": {
     "test_space": "uats-consolidate-test"
@@ -40,19 +40,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.themes_created",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.concepts_created",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.duration_ms",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

@@ -28,7 +28,7 @@
       "$.stats.duration",
       "$.stats.rate"
     ],
-    "sha256": "15815bff2dd7f296802fd2892f9e328733ddcf3ca2be623108eb8773ea058c43"
+    "sha256": "b84f64bec581cc2a02e9ea1f5bcf7c50db391aa54dcf86bd6dd1c676e81d9e87"
   },
   "variables": {
     "job_id": "nonexistent-job-id"
@@ -45,27 +45,30 @@
     "body_assertions": [
       {
         "name": "job_id returned when found",
+        "optional": true,
         "path": "$.job_id",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "status value when found",
+        "optional": true,
         "path": "$.status",
-        "in": [
+        "op": "one_of",
+        "expected": [
           "queued",
           "running",
           "completed",
           "failed",
           "cancelled"
-        ],
-        "optional": true
+        ]
       },
       {
         "name": "error when not found",
+        "optional": true,
         "path": "$.error",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -80,39 +83,48 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.status",
-            "equals": "completed"
+            "op": "equals",
+            "expected": "completed"
           },
           {
             "path": "$.space_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.path",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.stats",
-            "type": "object"
+            "op": "type_is",
+            "expected": "object"
           },
           {
             "path": "$.stats.files_found",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           },
           {
             "path": "$.stats.files_processed",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           },
           {
             "path": "$.stats.symbols_extracted",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           },
           {
             "path": "$.stats.errors",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }
@@ -127,20 +139,24 @@
         "body_assertions": [
           {
             "path": "$.job_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.status",
-            "equals": "running"
+            "op": "equals",
+            "expected": "running"
           },
           {
             "path": "$.stats.files_processed",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           },
           {
+            "optional": true,
             "path": "$.stats.rate",
-            "type": "number",
-            "optional": true
+            "op": "type_is",
+            "expected": "number"
           }
         ]
       }
@@ -156,7 +172,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "not found"
+            "op": "contains",
+            "expected": "not found"
           }
         ]
       }
@@ -173,7 +190,8 @@
         "body_assertions": [
           {
             "path": "$.jobs",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }

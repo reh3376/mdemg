@@ -48,7 +48,7 @@ UxTS solves three compounding problems that emerge in every non-trivial codebase
 
 The solution is a single repeating pattern — **declarative specs validated by executable runners governed by explicit schemas** — applied uniformly across every concern domain. Each domain gets its own framework with its own schema and runner, but all frameworks share the same structural contract, lifecycle, governance rules, CI integration pattern, and canonical report format.
 
-This guide is the authoritative reference for understanding, adopting, and extending UxTS. It starts from high-level vision and progressively deepens into technical specifics. Every concept is illustrated with real examples from the MDEMG codebase, where 11 UxTS frameworks govern API contracts, parser conformance, benchmarks, security, observability, authentication, hash integrity, gRPC contracts, semantic validation, and LLM emergence quality.
+This guide is the authoritative reference for understanding, adopting, and extending UxTS. It starts from high-level vision and progressively deepens into technical specifics. Every concept is illustrated with real examples from the MDEMG codebase, where 12 UxTS frameworks govern API contracts, parser conformance, benchmarks, security, observability, authentication, hash integrity, gRPC contracts, semantic validation, LLM emergence quality, and iterative-improvement encoding comprehension.
 
 After reading this guide, you will understand: why declarative test specifications outperform imperative test scripts at scale; how the four-layer architecture (schema, specs, runner, CI gate) works; how to write, run, and govern specs; how to create new frameworks; and how to adopt UxTS in an existing codebase.
 
@@ -655,6 +655,7 @@ Framework names follow the pattern `U<X>TS`:
 | E | Emergence quality | UETS |
 | AM | Auth methods | UAMS |
 | N | Hash integrity | UNTS |
+| IT | Iterative-improvement | UITS |
 
 Spec files use the convention `<name>.<framework>.json`. For example: `health.uats.json`, `python.upts.json`, `retrieve_latency.ubts.json`.
 
@@ -683,6 +684,7 @@ The source of truth for this table is `docs/development/UXTS_FRAMEWORK_MATRIX.md
 | **UNTS** | N/A (registry format) | `docs/specs/unts-registry.json` | `internal/unts/` (Go) | No CI gate | active |
 | **USTS** | `docs/tests/usts/schema/usts.schema.json` | `docs/tests/usts/specs/` (3) | `usts_runner.py` | No CI gate | pilot |
 | **UAMS** | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | None | No CI gate | spec-only |
+| **UITS** | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `uits_runner.py` | Soft-fail | active |
 | **UVTS** | `docs/tests/uvts/schema/uvts.schema.json` | `docs/tests/uvts/specs/` (1) | None (stub only) | Canonical guard | spec-only |
 
 ### 6.4 Case Study: The UOBS/UOTS Authority Split

@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "dccf73af5ee0d0178a0961da562d365570425c8bc12474d8873062cc62101f64"
+    "sha256": "04f10d45f332386749950f9c43dae86cdb62e07896ae66cfc9134960b020fca6"
   },
   "request": {
     "method": "POST",
@@ -40,19 +40,23 @@
     "body_assertions": [
       {
         "path": "$.dry_run",
-        "equals": true
+        "op": "equals",
+        "expected": true
       },
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.spaces_pruned",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.total_nodes_deleted",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -75,11 +79,13 @@
         "body_assertions": [
           {
             "path": "$.dry_run",
-            "equals": false
+            "op": "equals",
+            "expected": false
           },
           {
             "path": "$.results",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }

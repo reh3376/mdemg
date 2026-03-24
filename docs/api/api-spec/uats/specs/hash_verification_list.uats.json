@@ -22,7 +22,7 @@
     "tags": [
       "unts"
     ],
-    "sha256": "a3d46a4f5f76863f34b17d3702735045ffb6c772fc78b472ac5c505969f9bb17"
+    "sha256": "7b004c3f1e9e340921cae82b5a1e1f9d4a5c887aa162d720147d87803f25b545"
   },
   "request": {
     "method": "GET",
@@ -33,11 +33,13 @@
     "body_assertions": [
       {
         "path": "$.files",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.total",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -53,11 +55,13 @@
         "body_assertions": [
           {
             "path": "$.files",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           },
           {
             "path": "$.total",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }

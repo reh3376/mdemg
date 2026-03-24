@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "fd4bf24f097aa33875a01c9471bcb8cc04b9f703737043c63e48d2917559db0f"
+    "sha256": "bcebc22c5693801a1dfc7b7cd8c6d2a557efe0d1c72f6fc8efd6b6fa945c186d"
   },
   "variables": {},
   "request": {
@@ -28,7 +28,20 @@
     "path": "/v1/prometheus"
   },
   "expected": {
-    "status": 200
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "response body is not empty",
+        "path": "$",
+        "op": "not_equals",
+        "expected": ""
+      },
+      {
+        "name": "response body exists",
+        "path": "$",
+        "op": "exists"
+      }
+    ]
   },
   "variants": [
     {

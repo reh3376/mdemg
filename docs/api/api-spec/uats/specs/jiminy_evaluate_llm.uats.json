@@ -15,7 +15,7 @@
   "metadata": {
     "author": "agent",
     "created": "2026-03-21",
-    "description": "Validates the Jiminy evaluator LLM Tier 2 response fields (J13). When JIMINY_EVALUATE_LLM_ENABLED=true, evaluate responses include reasoning and remediation fields from LLM analysis. Requires llm_required tag \u2014 skipped in CI without LLM provider.",
+    "description": "Validates the Jiminy evaluator LLM Tier 2 response fields (J13). When JIMINY_EVALUATE_LLM_ENABLED=true, evaluate responses include reasoning and remediation fields from LLM analysis. Requires llm_required tag — skipped in CI without LLM provider.",
     "test_type": "contract",
     "priority": "medium",
     "llm_required": true
@@ -29,7 +29,7 @@
       "phase_j13",
       "llm_required"
     ],
-    "sha256": "361d70c4b89ea31203bb84c1a019ec146b7b20f690e104c662ef7df4a1378408"
+    "sha256": "eb5824251e7526218ec0e474362a6c31c067c620b3b335846d8c3b5d50e0fe5a"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -55,17 +55,19 @@
       {
         "name": "evaluation_id present",
         "path": "$.data.evaluation_id",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "status is string",
         "path": "$.data.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "items is array",
         "path": "$.data.items",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -89,12 +91,13 @@
           {
             "name": "data object present",
             "path": "$.data",
-            "exists": true
+            "op": "exists"
           },
           {
             "name": "summary is string if present",
             "path": "$.data.summary",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -114,7 +117,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -134,7 +137,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "1011ee172d6137ec7bace53250995ba8af7d1b2b354a1a787c375a8a72f5c439"
+    "sha256": "c1c0cd91edc1e34c372ca96616416e4d10968e248e373662fd7cf6e5d6a8b0c3"
   },
   "request": {
     "method": "GET",
@@ -35,43 +35,53 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "equals": "ok"
+        "op": "equals",
+        "expected": "ok"
       },
       {
         "path": "$.active_tasks",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.orchestration",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.orchestration.micro_enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "path": "$.orchestration.meso_period_sessions",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.orchestration.macro_cron",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.orchestration.cooldown_sec",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.orchestration.dedupe_sec",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.orchestration.scheduler.enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "path": "$.orchestration.scheduler.macro_next_run",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

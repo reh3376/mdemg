@@ -23,7 +23,7 @@
     "tags": [
       "embedding_required"
     ],
-    "sha256": "895d6bf1afb457d8aed60309572375eeb5dafbbb7436b31e2389b5f43383a0d2"
+    "sha256": "91e8a38397a91eed79846dd6ca3f31d08ad71c4c9ee341ef3fc93fed4fec13b1"
   },
   "variables": {
     "unique_id": {
@@ -49,20 +49,23 @@
     "body_assertions": [
       {
         "path": "$.node_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string",
-        "contains": "uats-ingest"
+        "op": "contains",
+        "expected": "uats-ingest"
       },
       {
         "path": "$.obs_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.embedding_dims",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -82,7 +85,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -102,7 +106,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -124,11 +129,13 @@
         "body_assertions": [
           {
             "path": "$.node_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.obs_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -150,11 +157,13 @@
         "body_assertions": [
           {
             "path": "$.node_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.obs_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -176,7 +185,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

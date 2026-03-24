@@ -26,7 +26,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "be04782b99ab2faa60cdc1b046dd906e1241083521eac5639a895270f07ea8ce"
+    "sha256": "0cf8c183aa67c60ff1fe6e5f09dbda6bb488b7f9fed50a835288ab930ba618a3"
   },
   "variables": {
     "test_space": "uats-rsic-phase91"
@@ -48,11 +48,13 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.trigger_source",
-        "equals": "manual_api"
+        "op": "equals",
+        "expected": "manual_api"
       }
     ]
   },
@@ -72,11 +74,13 @@
         "body_assertions": [
           {
             "path": "$",
-            "contains": "mdemg_rsic_cycle_total"
+            "op": "contains",
+            "expected": "mdemg_rsic_cycle_total"
           },
           {
             "path": "$",
-            "contains": "mdemg_rsic_cycle_duration_seconds"
+            "op": "contains",
+            "expected": "mdemg_rsic_cycle_duration_seconds"
           }
         ]
       }
@@ -96,7 +100,8 @@
         "body_assertions": [
           {
             "path": "$",
-            "contains": "mdemg_rsic_action_total"
+            "op": "contains",
+            "expected": "mdemg_rsic_action_total"
           }
         ]
       }
@@ -116,7 +121,8 @@
         "body_assertions": [
           {
             "path": "$",
-            "contains": "mdemg_rsic_calibration_confidence"
+            "op": "contains",
+            "expected": "mdemg_rsic_calibration_confidence"
           }
         ]
       }

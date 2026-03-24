@@ -27,7 +27,7 @@
       "phase_jiminy",
       "validation"
     ],
-    "sha256": "04665b3c771c168e543c10caeab9027cec7d1487c88bef41dfc6ab74345f5dfe"
+    "sha256": "d4756340ab4e960024063eab6b125ff485db4e30e065bda350c44e9f16bab769"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -50,7 +50,7 @@
       {
         "name": "error message present",
         "path": "$.error",
-        "exists": true
+        "op": "exists"
       }
     ]
   },
@@ -70,7 +70,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -89,7 +89,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -111,7 +111,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

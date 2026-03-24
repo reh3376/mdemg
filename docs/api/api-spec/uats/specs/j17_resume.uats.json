@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": "aef450463ddeaad7f87f133b6b48dc7f5e040c19124413669fb1fe7cdf4442fd"
+    "sha256": "c1f6fc8865b1dce8399ebc3f570e44157fc026b69e2f5a4b1d855c456293378f"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -52,18 +52,20 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "restored is boolean",
         "path": "$.data.restored",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "name": "message is string",
         "path": "$.data.message",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -85,7 +87,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -106,19 +109,20 @@
           {
             "name": "data wrapper present",
             "path": "$.data",
-            "type": "object",
-            "exists": true
+            "op": "type_is",
+            "expected": "object"
           },
           {
             "name": "restored is false",
             "path": "$.data.restored",
-            "type": "boolean",
-            "value": false
+            "op": "type_is",
+            "expected": "boolean"
           },
           {
             "name": "message is string",
             "path": "$.data.message",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

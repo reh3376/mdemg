@@ -27,7 +27,7 @@
       "phase_jiminy",
       "embedding_required"
     ],
-    "sha256": "efcec3a591e4257615c63da31d389bcf1f3575d04dd60fd1f19d53798e8198bb"
+    "sha256": "19f98c32817fc93166561536286f45be0fc5234ce6d96e39e1d1cb9849c6ec1c"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -51,34 +51,38 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "guidance is array",
         "path": "$.data.guidance",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "name": "prompt_augmentation is string",
         "path": "$.data.prompt_augmentation",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "confidence is number",
         "path": "$.data.confidence",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "name": "source_counts present",
         "path": "$.data.source_counts",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "rationale is string",
         "path": "$.data.rationale",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -100,13 +104,14 @@
           {
             "name": "data wrapper present",
             "path": "$.data",
-            "type": "object",
-            "exists": true
+            "op": "type_is",
+            "expected": "object"
           },
           {
             "name": "guidance is array",
             "path": "$.data.guidance",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -128,13 +133,14 @@
           {
             "name": "data wrapper present",
             "path": "$.data",
-            "type": "object",
-            "exists": true
+            "op": "type_is",
+            "expected": "object"
           },
           {
             "name": "guidance is array",
             "path": "$.data.guidance",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -155,13 +161,14 @@
           {
             "name": "data wrapper present",
             "path": "$.data",
-            "type": "object",
-            "exists": true
+            "op": "type_is",
+            "expected": "object"
           },
           {
             "name": "guidance is array",
             "path": "$.data.guidance",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }

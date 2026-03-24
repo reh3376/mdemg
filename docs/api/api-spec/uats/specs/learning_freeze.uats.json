@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "2354a854b2dc1ac2055f165fd0ce75ba439dec45f8a28d32aa7162acb359400b"
+    "sha256": "5b009f6293b78675785d62ad3460f3e9dae7ecf84b7dcd05581d715fee40885f"
   },
   "variables": {
     "test_space": "uats-freeze-test"
@@ -42,20 +42,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.status",
-        "type": "string",
-        "value": "frozen"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.state",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.message",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "adfde74633072c9506c72393cfcaa2aec1aca231f7f0195d786b3ded5159b036"
+    "sha256": "b3e4f334c771676413c07f03a31e780ea4a44dc05ce0c63964f84f8bfdff7543"
   },
   "variables": {
     "test_space": "uats-prune-test"
@@ -40,19 +40,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.decayed_deleted",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.excess_deleted",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.total_deleted",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

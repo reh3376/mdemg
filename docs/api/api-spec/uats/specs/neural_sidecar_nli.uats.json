@@ -27,7 +27,7 @@
       "fsd",
       "sidecar_required"
     ],
-    "sha256": "1637171e504b5851548153348682d061629ea8c2197ba7171c74171a06eded96"
+    "sha256": "12672faf482ad432a62f70390bdb48935a066decabb098a207a6ef9b60a8dcfd"
   },
   "variables": {},
   "request": {
@@ -47,32 +47,36 @@
       {
         "name": "label exists",
         "path": "$.label",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "entailment score",
         "path": "$.scores.entailment",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "name": "contradiction score",
         "path": "$.scores.contradiction",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "name": "neutral score",
         "path": "$.scores.neutral",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "name": "model exists",
         "path": "$.model",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "latency_ms is number",
         "path": "$.latency_ms",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },
@@ -92,7 +96,7 @@
           {
             "name": "label exists",
             "path": "$.label",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

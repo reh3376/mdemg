@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "47a2bbc790ad50144560713a3e8b676ac396937ad833181620d1c250666fffbc"
+    "sha256": "a9f38665d1c7df4a478e3d924d2d2369f7de8a876e4b7b3a2632b1097062c406"
   },
   "variables": {
     "test_space": "demo"
@@ -32,6 +32,60 @@
   },
   "expected": {
     "status": 200,
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "enabled field exists",
+        "path": "$.enabled",
+        "op": "exists"
+      },
+      {
+        "name": "size is a number",
+        "path": "$.size",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "capacity is a number",
+        "path": "$.capacity",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "capacity is positive",
+        "path": "$.capacity",
+        "op": "greater_than",
+        "expected": 0
+      },
+      {
+        "name": "hits is a number",
+        "path": "$.hits",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "misses is a number",
+        "path": "$.misses",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "hit_rate is a number",
+        "path": "$.hit_rate",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "hit_rate is not negative",
+        "path": "$.hit_rate",
+        "op": "greater_than_or_equal",
+        "expected": 0
+      },
+      {
+        "name": "ttl_sec is a number",
+        "path": "$.ttl_sec",
+        "op": "type_is",
+        "expected": "number"
+      }
+    ]
   }
 }

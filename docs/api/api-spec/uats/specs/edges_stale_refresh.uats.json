@@ -23,7 +23,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "b98dbc27474953bc58f303f7981501eb8586a09a673951e57a7ad22b0e4ff08f"
+    "sha256": "9f46ffd76745b6c1bf099d37e75948c9b68a11bb290e302b58ab18c206fa44ff"
   },
   "variables": {},
   "request": {
@@ -46,7 +46,8 @@
       },
       {
         "path": "$.edges_refreshed",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -64,7 +65,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

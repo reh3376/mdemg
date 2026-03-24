@@ -24,7 +24,7 @@
       "determinism",
       "fsd"
     ],
-    "sha256": "dd0a6d5ca672cc735c034a1f8c5fe1bca58d21d7603c1a7846cd672ac6000b5a"
+    "sha256": "3d1f71ad38dcddf5c07001d3bae2a9b327f3a6c7c35c0fa58541178ace5cf4c5"
   },
   "variables": {},
   "request": {
@@ -41,8 +41,7 @@
     "status": [
       200,
       503
-    ],
-    "body_assertions": []
+    ]
   },
   "variants": [
     {

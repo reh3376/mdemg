@@ -25,7 +25,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "f7bf4aa5909b950c0c931dffea2f6c8651ef698e9bd19d016caf08e7d9599cf0"
+    "sha256": "b99e007fecfc94ff5b0160fb5de4dfb37429aea49371d35389b8ef8ac71427f5"
   },
   "variables": {
     "test_space": "uats-rsic-phase87",
@@ -49,15 +49,18 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.trigger_source",
-        "equals": "manual_api"
+        "op": "equals",
+        "expected": "manual_api"
       },
       {
         "path": "$.idempotency_key",
-        "equals": "{{idempotency_key_fixed}}"
+        "op": "equals",
+        "expected": "{{idempotency_key_fixed}}"
       }
     ]
   },
@@ -77,19 +80,23 @@
         "body_assertions": [
           {
             "path": "$.cycle_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.idempotency_key",
-            "equals": "{{idempotency_key_fixed}}"
+            "op": "equals",
+            "expected": "{{idempotency_key_fixed}}"
           },
           {
             "path": "$.dedupe.is_duplicate",
-            "equals": true
+            "op": "equals",
+            "expected": true
           },
           {
             "path": "$.dedupe.window_sec",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }

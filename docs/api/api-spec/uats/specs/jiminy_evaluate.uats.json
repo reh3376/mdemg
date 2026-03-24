@@ -25,7 +25,7 @@
       "evaluate",
       "phase_j9"
     ],
-    "sha256": "775c06b1d04f43976a8b475ffa8d888c477ad687fbbfb188fa87b97eecb96999"
+    "sha256": "1391399143e64e4f3608e3b38b794b69d080f8c82f0884728612cb072389b892"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -65,7 +65,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -85,7 +85,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -104,7 +104,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

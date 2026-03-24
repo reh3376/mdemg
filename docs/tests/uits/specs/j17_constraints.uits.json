@@ -1,0 +1,92 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "J17 Constraint Codes",
+    "description": "Tests comprehension of T1-encoded J17 constraint codes injected via the Jiminy guidance service, verifying that an agent can decode codes, interpret severity, and extract actionable alternatives.",
+    "content_type": "constraint_code",
+    "tags": [
+      "j17",
+      "constraints",
+      "t1",
+      "guidance",
+      "jiminy"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "cmd/j17-comprehension-test/constraints.json",
+    "encoding_format": "t1_glossary",
+    "injection_context": "Agent receiving J17 Jiminy guidance via .claude/hooks/prompt-context.sh"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What does the constraint code 'no-direct-main-commit' mean and what severity does it carry?",
+        "answer": "Never commit directly to main \u2014 use dev branches and PRs. Severity: ! (must/must_not \u2014 non-negotiable).",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "Given the T1 message 'X:!|use-gpt-5-mini-only', what model must be used and what is explicitly forbidden?",
+        "answer": "Must use gpt-5-mini (alt). Explicitly forbidden: text-embedding-3-small (neg). Type X = correction, severity ! = must.",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "When a constraint arrives with esc:2, what does that mean and what should the agent do?",
+        "answer": "esc:2 = Escalated \u2014 the agent has been warned and ignored this constraint before. The agent must comply immediately; further ignoring triggers esc:3 (blocked).",
+        "difficulty": "relational"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "j17_constraint_default",
+    "profiles": [
+      {
+        "profile_id": "j17_constraint_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Constraint-code profile \u2014 comprehension-heavy because safety-critical codes must be decoded precisely; tight token budget enforces T1 compactness",
+        "weights": {
+          "comprehension": 0.5,
+          "compaction": 0.25,
+          "token_efficiency": 0.15,
+          "fidelity": 0.1
+        },
+        "thresholds": {
+          "composite_min": 0.85,
+          "comprehension_min": 9.5,
+          "comprehension_floor": 8.0,
+          "token_max": 25,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.85,
+    "comprehension_min": 9.5,
+    "comprehension_floor": 8.0,
+    "token_max": 25,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "6570de10042496992ae8007661fefd17820b60c5b1270b659a554147c57b3c40"
+  }
+}

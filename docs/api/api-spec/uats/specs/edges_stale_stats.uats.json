@@ -22,7 +22,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "6d1ee9780fdab6603cc9a44d74244354a0829530a84a94909f87f47ab37a75ce"
+    "sha256": "c173625c438dda1e91e3f563c3233c03a4b9d2eab262e4971483ae2e7ae6ff8a"
   },
   "variables": {},
   "request": {
@@ -34,19 +34,23 @@
     "body_assertions": [
       {
         "path": "$.coactivation_stale",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.associated_stale",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.nodes_with_stale_edges",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.hidden_with_member_changes",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -63,7 +67,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
