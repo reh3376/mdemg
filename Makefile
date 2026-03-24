@@ -166,7 +166,7 @@ test-api:
 	python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
 		--spec-dir docs/api/api-spec/uats/specs/ \
 		--base-url $(BASE_URL) \
-		--exclude-tag unts \
+		--exclude-tag unts,llm_required,j17_disabled,jiminy_disabled \
 		--report /tmp/api-report.json
 	@echo "Report saved to /tmp/api-report.json"
 
