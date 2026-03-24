@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "4da197bfc74fcabc0e3a101785d4a91cabba464ebfe4ab0005caff944a73c735"
+    "sha256": "657f1b470b9fbf2c2a476d9f1da5f4baab679a6758e8c225aa0a50833737ea15"
   },
   "variables": {
     "test_space": "uats-snapshot-test"
@@ -42,11 +42,13 @@
     "body_assertions": [
       {
         "path": "$.deleted",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.retention_days",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

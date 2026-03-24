@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Synergy Status endpoint \u2014 reports Claude Code \u2194 MDEMG synergy health",
+    "description": "Validates Synergy Status endpoint — reports Claude Code ↔ MDEMG synergy health",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "cb26c2f0d759a30c99f0de9e600ecbeda7d59111ea729f85ec8bd14e4760079d"
+    "sha256": "db3c1f06b015dcbd61d1c155b5086a4feb6f50fec37a5e1ec3f55048d8adf64c"
   },
   "variables": {
     "test_space": "demo"
@@ -37,35 +37,43 @@
     "body_assertions": [
       {
         "path": "$.data.jiminy_healthy",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "path": "$.data.claude_md_lines",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.memory_md_lines",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.auto_memory_files",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.auto_memory_lines",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.overflow_events_24h",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.synergy_health",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.migration_status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

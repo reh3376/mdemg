@@ -1,6 +1,13 @@
 # Phase VSX: VS Code Extension + Real-Time Memory Sidebar
 
-**Status**: Planned
+> [!WARNING]
+> **GAP-12 CANCELLED — Superseded by MCP + Claude Code Hooks Strategy**
+>
+> This spec has been cancelled. The IDE integration strategy is now MCP (Model Context Protocol) combined with Claude Code hooks, which provides equivalent functionality without maintaining a custom VS Code extension. This spec is **retained for reference only** and is **not active planned work**.
+>
+> Community contributions are welcome — if you want to build this as a community project, this spec provides a complete blueprint. It will not appear on the core roadmap.
+
+**Status**: Cancelled — Community Contribution Only
 **Date**: 2026-03-10
 **Scope**: VS Code extension only (Cursor extension removed from scope)
 

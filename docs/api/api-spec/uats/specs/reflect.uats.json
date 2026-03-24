@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "1dbeceaef91d4984df06623546d7c256b630d74e6ffc7ea745858357f468cc16",
+    "sha256": "79ba4670408a3c32d3a0571821427c3cdc7639e661cc57a55226b633e586e690",
     "tags": [
       "embedding_required"
     ]
@@ -46,19 +46,23 @@
     "body_assertions": [
       {
         "path": "$.topic",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.core_memories",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.related_concepts",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.graph_context",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

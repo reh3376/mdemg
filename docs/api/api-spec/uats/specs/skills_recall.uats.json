@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "6f367c28022cf2dc9bc900e20fc159efb1dee4e619de7080099b9908950a33a9"
+    "sha256": "c0ebf8f7928f8f55e04349eee4d73465996cb2209896d9870a275efedfb1d59b"
   },
   "variables": {
     "test_space": "uats-skills-recall-test"
@@ -41,19 +41,23 @@
     "body_assertions": [
       {
         "path": "$.skill",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.query",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

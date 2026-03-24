@@ -23,7 +23,7 @@
     "tags": [
       "embedding_required"
     ],
-    "sha256": "b099acc50a76e1be498632832b7c4ab4103f9162f9a40d84de96d5165e3bf1f3"
+    "sha256": "02a650f88c2a730c6086b4674be150e4f08ee688e3d88bacb7e85414593f67b5"
   },
   "variables": {
     "test_space": "demo"
@@ -45,15 +45,18 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "equals": "{{test_space}}"
+        "op": "equals",
+        "expected": "{{test_space}}"
       },
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.has_more",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   },
@@ -73,7 +76,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "equals": "validation_failed"
+            "op": "equals",
+            "expected": "validation_failed"
           }
         ]
       }

@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "319a0db4c7d8f3bf19832337733a95901361bcdea01a9edcb55482f76aa8d034",
+    "sha256": "ed60c0539cf09aa0353eada406622b91f4c280307d5614bfc9755725487983f9",
     "tags": [
       "embedding_required"
     ]
@@ -43,23 +43,28 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.graduated",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.tombstoned",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.remaining_volatile",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.decay_applied",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

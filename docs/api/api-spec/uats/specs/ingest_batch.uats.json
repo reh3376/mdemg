@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "2369dd9e5386d15811d1e2c6ecaf586b52b84ba2e291fe4e38047de63230b0ae"
+    "sha256": "e68c2ff6fbed08d6d79c592ed515cb0cd2c4a03eeb7085d87d2b304a2b782651"
   },
   "variables": {
     "test_space": "uats-batch-{{$timestamp}}"
@@ -57,19 +57,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.total_items",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.success_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -87,7 +91,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

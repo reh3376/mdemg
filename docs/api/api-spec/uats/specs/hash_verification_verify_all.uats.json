@@ -22,7 +22,7 @@
     "tags": [
       "unts"
     ],
-    "sha256": "3b370b4c64815ff91b68d9cb45fda2ccd6ea2bd1a6d9d966aa4888e8d56acfc7"
+    "sha256": "f10ec1e9bf7bbffacb349d5592d4d4407f93032e56c6776230d1b9a7bfef4428"
   },
   "request": {
     "method": "POST",
@@ -37,19 +37,23 @@
     "body_assertions": [
       {
         "path": "$.results",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.total",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.verified",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.mismatched",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "4e60fe1cb1bdf6e9bf30c94ed75f7ac40b03061fc83689acabc7d678b7b73d1f"
+    "sha256": "cae962085afef793e5a39213271d3e511a2a087b205928ecec28c4ef738fbef7"
   },
   "variables": {
     "test_snapshot_id": "uats-snapshot-delete-id"
@@ -38,6 +38,14 @@
       204,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "error field present on not found",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }

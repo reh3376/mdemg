@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "8bdd410e84727736f7a0180b790e05d201f49c0ab071cd2a83cb9b5489bec63e"
+    "sha256": "e444fa4fe562e55709d6112c2a0820149b5e221b1e334a17b400055374c2cdc9"
   },
   "variables": {},
   "request": {
@@ -35,11 +35,13 @@
     "body_assertions": [
       {
         "path": "$.watchers",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

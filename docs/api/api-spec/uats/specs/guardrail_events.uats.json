@@ -25,7 +25,7 @@
       "enforcement",
       "fsd"
     ],
-    "sha256": "1df1c72e2df27b74d490f346ac275f579f82dc65d0e680d1271c505fc542c950"
+    "sha256": "72b46a9c1a838d343797fb7e1f957d03bb25fd957a9f0b2e045addb8a062d6cf"
   },
   "variables": {},
   "request": {
@@ -44,12 +44,13 @@
       {
         "name": "events array exists",
         "path": "$.events",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "total is number",
         "path": "$.total",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },
@@ -67,7 +68,7 @@
           {
             "name": "events array exists",
             "path": "$.events",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

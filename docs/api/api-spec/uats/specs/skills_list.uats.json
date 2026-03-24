@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "055697ce61098f706904748b602e550aa74ea3a885b98459fe0df236a19a1929"
+    "sha256": "16c0e13ea7f67293f5cbc9d21d466a394090f6681032b78b32492b0dd78118cb"
   },
   "variables": {
     "test_space": "uats-skills-test"
@@ -37,15 +37,18 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.skills",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

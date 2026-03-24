@@ -14,7 +14,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Jiminy readiness endpoint \u2014 reports features, services, config, and optional stats",
+    "description": "Validates Jiminy readiness endpoint — reports features, services, config, and optional stats",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -24,7 +24,7 @@
       "jiminy",
       "readiness"
     ],
-    "sha256": "5f0a313cd191ed78e2f8e8df15d8092d2db3cb9402affb008c885ae2c9943647"
+    "sha256": "1c931b79bf1104fc8cbbd90c9826b0c075e429ad5e6a12026fb95f832ffffd3c"
   },
   "variables": {},
   "request": {
@@ -43,30 +43,32 @@
       {
         "name": "status is ready",
         "path": "$.status",
-        "equals": "ready"
+        "op": "equals",
+        "expected": "ready"
       },
       {
         "name": "enabled is true",
         "path": "$.enabled",
-        "equals": true
+        "op": "equals",
+        "expected": true
       },
       {
         "name": "features is object",
         "path": "$.features",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "services is object",
         "path": "$.services",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "config is object",
         "path": "$.config",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   },
@@ -83,12 +85,14 @@
           {
             "name": "status is disabled",
             "path": "$.status",
-            "equals": "disabled"
+            "op": "equals",
+            "expected": "disabled"
           },
           {
             "name": "message contains JIMINY_ENABLED",
             "path": "$.message",
-            "contains": "JIMINY_ENABLED"
+            "op": "contains",
+            "expected": "JIMINY_ENABLED"
           }
         ]
       }

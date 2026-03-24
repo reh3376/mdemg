@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "f2260f4c36a595fd09e65345f0102d60f88d5cd2db219f90c2f3f0ab9b5b6119"
+    "sha256": "27d46218adfc43a8734a757f165fdaabfd787cd48cf1032dec9213642adf9b43"
   },
   "variables": {},
   "request": {
@@ -33,11 +33,13 @@
     "body_assertions": [
       {
         "path": "$.schedules",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -54,11 +56,13 @@
         "body_assertions": [
           {
             "path": "$.schedules",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           },
           {
             "path": "$.count",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }

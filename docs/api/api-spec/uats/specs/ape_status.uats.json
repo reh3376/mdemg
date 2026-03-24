@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "353ff3f5e696def07ac1a07c341c0772385d995934c853c57c0b36078ec96a0d"
+    "sha256": "f3459b2dd57871f52fece00cc3788246accda4451146378bf6e40bc816746b71"
   },
   "variables": {
     "test_space": "demo"
@@ -34,11 +34,13 @@
     "body_assertions": [
       {
         "path": "$.data.enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "path": "$.data.modules",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   }

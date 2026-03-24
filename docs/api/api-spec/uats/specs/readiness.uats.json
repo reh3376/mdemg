@@ -19,7 +19,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "37050ca500a4b52af12bb34353145fb28c4b0b76097bd03627240f9d453adc3b",
+    "sha256": "7db1fce13a5f18ec86dcd5ea70eea057cecd7cd40cd4f584711a17b95e308212",
     "tags": [
       "embedding_required"
     ]
@@ -36,15 +36,18 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.checks",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.version",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

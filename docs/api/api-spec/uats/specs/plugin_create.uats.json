@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "481bf71ff2d80832f990c7e19c789a3236b1272b01895cb630073f92368ecf01"
+    "sha256": "e611f949de750807f7beb1a17f5a7d1ad307e75bf2ce63847e20fc24308453ab"
   },
   "request": {
     "method": "POST",
@@ -40,27 +40,30 @@
     "body_assertions": [
       {
         "path": "$.data.plugin_id",
-        "equals": "test-ingestion-plugin"
+        "op": "equals",
+        "expected": "test-ingestion-plugin"
       },
       {
         "path": "$.data.files_created",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.data.files_created[?(@=='manifest.json')]",
-        "exists": true
+        "op": "exists"
       },
       {
         "path": "$.data.files_created[?(@=='main.go')]",
-        "exists": true
+        "op": "exists"
       },
       {
         "path": "$.data.files_created[?(@=='handler.go')]",
-        "exists": true
+        "op": "exists"
       },
       {
         "path": "$.data.validation.manifest_valid",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   },
@@ -85,11 +88,13 @@
         "body_assertions": [
           {
             "path": "$.data.plugin_id",
-            "equals": "test-reasoning-plugin"
+            "op": "equals",
+            "expected": "test-reasoning-plugin"
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "type": "boolean"
+            "op": "type_is",
+            "expected": "boolean"
           }
         ]
       }
@@ -114,11 +119,13 @@
         "body_assertions": [
           {
             "path": "$.data.plugin_id",
-            "equals": "test-ape-plugin"
+            "op": "equals",
+            "expected": "test-ape-plugin"
           },
           {
             "path": "$.data.validation.manifest_valid",
-            "type": "boolean"
+            "op": "type_is",
+            "expected": "boolean"
           }
         ]
       }
@@ -142,7 +149,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "name"
+            "op": "contains",
+            "expected": "name"
           }
         ]
       }
@@ -166,7 +174,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "type"
+            "op": "contains",
+            "expected": "type"
           }
         ]
       }
@@ -190,7 +199,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "contains": "type"
+            "op": "contains",
+            "expected": "type"
           }
         ]
       }

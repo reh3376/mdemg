@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "ba9c0db9dd02e159fcbe572fd5d75e5352f5aedd89d089ae30f793a70a1f2402"
+    "sha256": "983612e3c24ab3868b870317c4f450b07dab95c7ddcb60e24ca20dad5c550f5f"
   },
   "variables": {
     "test_space": "uats-rsic-test"
@@ -44,27 +44,33 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.tier",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.actions_executed",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.success_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.failed_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

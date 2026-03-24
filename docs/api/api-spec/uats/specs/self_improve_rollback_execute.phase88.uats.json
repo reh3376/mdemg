@@ -25,7 +25,7 @@
       "rsic",
       "phase88"
     ],
-    "sha256": "fc293acf4d9694558623b71afbe6245d6dc1f06396e02650c6b1268d6d16ffba"
+    "sha256": "cd2c224195398a2ae75b832a0d8eefaa4c04d7c472ae0066d01e78a90f5592e4"
   },
   "request": {
     "method": "POST",
@@ -42,16 +42,18 @@
     "body_assertions": [
       {
         "path": "$.rolled_back",
-        "type": "boolean",
-        "equals": false
+        "op": "equals",
+        "expected": false
       },
       {
         "path": "$.error",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.rollback_window_sec",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   },

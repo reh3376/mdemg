@@ -22,7 +22,7 @@
     "tags": [
       "unts"
     ],
-    "sha256": "d674e223282653eb1f331fd3e48374ed65ab4fe99c887753e77f7b132f593e63"
+    "sha256": "cba518fba177d1d2d746aea0e06e65262ad51bf8860dd9c2922c5346e6a2047b"
   },
   "request": {
     "method": "POST",
@@ -33,12 +33,13 @@
     "body_assertions": [
       {
         "path": "$.scanned",
-        "type": "boolean",
-        "value": true
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "path": "$.files_registered",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

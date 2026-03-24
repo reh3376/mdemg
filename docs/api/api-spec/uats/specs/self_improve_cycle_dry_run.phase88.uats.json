@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "eee34dd49ef9e24258399ab64142a03fc738263a0114c608ee9d26c90a0d208d"
+    "sha256": "45a6481f12e8bc1d05c1f02889d0f88c131abfdcd8c9bb29498d0f46fca0275b"
   },
   "variables": {
     "test_space": "uats-rsic-phase88-dryrun",
@@ -50,23 +50,28 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.tier",
-        "equals": "meso"
+        "op": "equals",
+        "expected": "meso"
       },
       {
         "path": "$.dry_run",
-        "equals": true
+        "op": "equals",
+        "expected": true
       },
       {
         "path": "$.safety_version",
-        "equals": "phase88-v1"
+        "op": "equals",
+        "expected": "phase88-v1"
       },
       {
         "path": "$.actions_executed",
-        "equals": 0
+        "op": "equals",
+        "expected": 0
       }
     ]
   }

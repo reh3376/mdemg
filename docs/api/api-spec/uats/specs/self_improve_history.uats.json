@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "6256ce663ee09e8bf1f1b4946742971216249e9ebea380546b5fd9c9824d30d6"
+    "sha256": "1d4b53bd179b4d5915f76d4377e4a93ae45cef496bea2a2666e1da89dfb2637f"
   },
   "request": {
     "method": "GET",
@@ -37,11 +37,13 @@
     "body_assertions": [
       {
         "path": "$.history",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

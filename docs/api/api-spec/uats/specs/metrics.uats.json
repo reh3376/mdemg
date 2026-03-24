@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "745098786bd92ed7be4b206b5fd3a5bea7133b773f110aebbb23a072de8eb7ca"
+    "sha256": "150b9be4eb88f2517eb6cfbb4651f4a88f504d77e77299bff8bc29e5d01b908a"
   },
   "variables": {
     "test_space": "demo"
@@ -37,19 +37,23 @@
     "body_assertions": [
       {
         "path": "$.total_nodes",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.total_edges",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.nodes_by_layer",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.edges_by_type",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

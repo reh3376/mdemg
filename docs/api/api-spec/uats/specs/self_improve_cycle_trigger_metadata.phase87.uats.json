@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "eea844f53ab4d5d5b295cbfcc579b181a8e3f560d6b7e59a533984af5b48d4af"
+    "sha256": "bf02adcf24b189a385cbf2352367ad570c99195418a39d62fc69f664053446fc"
   },
   "variables": {
     "test_space": "uats-rsic-phase87-meta",
@@ -50,31 +50,38 @@
     "body_assertions": [
       {
         "path": "$.cycle_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.tier",
-        "equals": "meso"
+        "op": "equals",
+        "expected": "meso"
       },
       {
         "path": "$.space_id",
-        "equals": "{{test_space}}"
+        "op": "equals",
+        "expected": "{{test_space}}"
       },
       {
         "path": "$.trigger_source",
-        "equals": "manual_api"
+        "op": "equals",
+        "expected": "manual_api"
       },
       {
         "path": "$.trigger_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.triggered_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.policy_version",
-        "equals": "phase87-v1"
+        "op": "equals",
+        "expected": "phase87-v1"
       }
     ]
   }

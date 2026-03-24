@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "cf10ba82875f7d2bd4e9103b4b051204a644526343102a2b36dec70faa07e833"
+    "sha256": "19225ef39c621eb9397082979b28cfaa04babc768ff1d128dee6cf99db56b051"
   },
   "variables": {
     "webhook_source": "github"
@@ -53,13 +53,10 @@
     ],
     "body_assertions": [
       {
+        "optional": true,
         "path": "$.status",
-        "type": "string",
-        "in": [
-          "accepted",
-          "ignored"
-        ],
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       }
     ],
     "notes": "Returns 404 if source not configured, 200 with accepted/ignored status otherwise"

@@ -140,8 +140,36 @@ func ContainerNameForProject(projectDir string) string {
 }
 
 // VolumeNameForProject returns a project-scoped Neo4j volume name.
+//
+// Docker Compose uses underscores to join the project name and service volume
+// name, e.g. "mdemg_neo4j_data" when run from a directory called "mdemg".
+// The legacy CLI path used hyphens ("mdemg-neo4j-data-mdemg").  To avoid
+// silently creating a second empty volume, this function checks whether the
+// docker-compose-style volume already exists and returns it when found.
 func VolumeNameForProject(projectDir string) string {
-	return "mdemg-neo4j-data-" + sanitizeSlug(filepath.Base(projectDir))
+	slug := sanitizeSlug(filepath.Base(projectDir))
+
+	// Docker Compose derives its project name from the directory base name,
+	// lowercased, with non-alphanumeric characters replaced by hyphens —
+	// then joins it to the volume name with an underscore.
+	composeVolume := slug + "_neo4j_data"
+	if dockerVolumeExists(composeVolume) {
+		return composeVolume
+	}
+
+	// Legacy / standalone CLI volume name (hyphen-separated).
+	return "mdemg-neo4j-data-" + slug
+}
+
+// dockerVolumeExists reports whether a Docker volume with the given name
+// exists on the local daemon.  Returns false on any error (Docker not
+// available, volume not found, etc.) so callers can fall back gracefully.
+func dockerVolumeExists(name string) bool {
+	out, err := RunDockerCommand("volume", "inspect", "--format", "{{.Name}}", name)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(out) == name
 }
 
 // sanitizeSlug creates a DNS-safe slug from a name: lowercase, non-alphanumeric

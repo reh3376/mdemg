@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "690fd9e41dde70c7577db5a15a25dda6f16aff41aaeefaa21afcf32c87f4ab51"
+    "sha256": "d8b90f0a9b7418fbd7ddec6b4158aca57e3648bc7ab83e16b2ca2a0b68d0d13c"
   },
   "variables": {
     "test_space": "uats-snapshot-test",
@@ -52,7 +52,8 @@
     "body_assertions": [
       {
         "path": "$.snapshot_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.space_id",
@@ -71,11 +72,13 @@
       },
       {
         "path": "$.context",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.created_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

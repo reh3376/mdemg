@@ -24,7 +24,7 @@
       "conflicts",
       "fsd"
     ],
-    "sha256": "3c1062310830d91cb5e8a9fbda545716c62f92f8553116e4543b8c04c5e1edfe"
+    "sha256": "462e4e2e2e540e3ccd5c5ce7decd95e2c6288e97f00d366ee2c694acce8fb0ad"
   },
   "variables": {},
   "request": {
@@ -42,7 +42,29 @@
       200,
       503
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "new_conflicts count when successful",
+        "path": "$.new_conflicts",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "new_conflicts is not negative",
+        "path": "$.new_conflicts",
+        "op": "greater_than_or_equal",
+        "expected": 0,
+        "optional": true
+      },
+      {
+        "name": "error field type when service unavailable",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   },
   "variants": [
     {

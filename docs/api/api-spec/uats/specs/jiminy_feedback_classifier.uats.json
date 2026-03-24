@@ -27,7 +27,7 @@
       "classifier",
       "phase_j14"
     ],
-    "sha256": "660e5edfa8de38029c980989c2c102c54fc1323482c9ff388add1f8a23fee9ae"
+    "sha256": "7b3ab8e898c800175f4f88fe0eeca6d15594af82b1480e96223da7caf40f2bc8"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -41,7 +41,7 @@
     },
     "body": {
       "guidance_id": "{{guidance_id}}",
-      "action_summary": "I partially implemented the validation \u2014 checked required fields but skipped length limits",
+      "action_summary": "I partially implemented the validation — checked required fields but skipped length limits",
       "space_id": "{{space_id}}"
     }
   },
@@ -54,7 +54,7 @@
       {
         "name": "guidance_id echoed",
         "path": "$.data.guidance_id",
-        "exists": true
+        "op": "exists"
       }
     ]
   },
@@ -75,7 +75,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -99,7 +99,7 @@
           {
             "name": "data object present",
             "path": "$.data",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -118,7 +118,7 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

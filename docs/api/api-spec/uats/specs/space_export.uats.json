@@ -24,7 +24,7 @@
       "admin",
       "transfer"
     ],
-    "sha256": "b1df741f9dc27fa78456f45a005d9e89651acd680328f327bcd0f1aac5910d7e"
+    "sha256": "9e4d77016a9483b5e366f52b7d6ddc9d8d7ec082a45ccf12ec8ec8f2e1ce2de8"
   },
   "request": {
     "method": "POST",
@@ -42,35 +42,43 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.profile",
-        "equals": "metadata"
+        "op": "equals",
+        "expected": "metadata"
       },
       {
         "path": "$.header.format",
-        "equals": "mdemg-space-transfer"
+        "op": "equals",
+        "expected": "mdemg-space-transfer"
       },
       {
         "path": "$.header.version",
-        "equals": "1.0.0"
+        "op": "equals",
+        "expected": "1.0.0"
       },
       {
         "path": "$.chunks",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.summary.nodes_exported",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.summary.edges_exported",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.summary.duration_ms",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -94,7 +102,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -118,7 +127,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -142,11 +152,13 @@
         "body_assertions": [
           {
             "path": "$.profile",
-            "equals": "cms"
+            "op": "equals",
+            "expected": "cms"
           },
           {
             "path": "$.chunks",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -170,11 +182,13 @@
         "body_assertions": [
           {
             "path": "$.profile",
-            "equals": "shareable"
+            "op": "equals",
+            "expected": "shareable"
           },
           {
             "path": "$.summary.nodes_exported",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }

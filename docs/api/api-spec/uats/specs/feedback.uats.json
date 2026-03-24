@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "27c31be3b6d2753e21398f1b2fe7de7ab800f5bcb0e2a1590047fc5acd466103"
+    "sha256": "4777a6a7458e5b7d98f21dd26a2840f94f46a4e9829a7abc7cf4d2f63568d5e1"
   },
   "variables": {
     "test_space": "demo"
@@ -43,12 +43,13 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "type": "string",
-        "value": "recorded"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.message",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

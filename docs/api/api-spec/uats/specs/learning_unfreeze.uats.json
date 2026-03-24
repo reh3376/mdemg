@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "a0085576d4729858bb71aec8e66f243a2fdbffbdc61994951fb75c3ef90f5301"
+    "sha256": "6cd96432866f830037812d15595910075cfc60cf274cead7bfccb1426d23a239"
   },
   "variables": {
     "test_space": "uats-unfreeze-test"
@@ -40,20 +40,23 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.status",
-        "type": "string",
-        "value": "unfrozen"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.state",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.message",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

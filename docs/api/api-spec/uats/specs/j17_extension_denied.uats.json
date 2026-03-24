@@ -29,7 +29,7 @@
       "extensions",
       "phase_j17"
     ],
-    "sha256": "ecb057b7c7770bf80e1f0e880a476c2e5c6cd53fb6cef667c2c240900cfa7f41"
+    "sha256": "9cf499ec6d19f85b3b8d12cfce80bdf24db1955b09d0a7d8712ab8da9719c4b0"
   },
   "variables": {
     "session_id": "uats-test"
@@ -51,19 +51,20 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "not granted",
         "path": "$.data.granted",
-        "type": "boolean",
-        "value": false
+        "op": "type_is",
+        "expected": "boolean"
       },
       {
         "name": "reason provided",
         "path": "$.data.reason",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

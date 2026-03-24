@@ -23,7 +23,7 @@
       "neural",
       "observability"
     ],
-    "sha256": "5e8e8f76c7a3eab313893249b1507e2ccc9ff7b789e0f09f2348ab92f19aaf24"
+    "sha256": "3a51981e9dc65ecd38b00574d22219e1d84db8af567e9772687b7355e2ee0437"
   },
   "variables": {},
   "request": {
@@ -39,7 +39,7 @@
       {
         "name": "sidecar_enabled exists",
         "path": "$.sidecar_enabled",
-        "exists": true
+        "op": "exists"
       }
     ]
   },

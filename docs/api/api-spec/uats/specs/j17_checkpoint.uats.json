@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": "0018a5593307c3e4304671cbffe52fc1b01b4bd0781060491eed1797714be674"
+    "sha256": "1acf97178d87f0fd3f12abc6707290b87428f37251c16bd39249343f5f3ae1b6"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -50,39 +50,43 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "ticket present",
         "path": "$.data.ticket",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "ticket has payload",
         "path": "$.data.ticket.payload",
-        "exists": true
+        "op": "exists"
       },
       {
         "name": "ticket has signature",
         "path": "$.data.ticket.signature",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "last_seq is number",
         "path": "$.data.last_seq",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "name": "issued_at is string",
         "path": "$.data.issued_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "expires_at is string",
         "path": "$.data.expires_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -102,7 +106,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -125,7 +130,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

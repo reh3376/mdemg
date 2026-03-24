@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "997e5e45f09af105fe61136712dcda32054b0b049fb8b100f35166a7f632ce3c"
+    "sha256": "fa1ef5cbb9d22c7d834f25888edb949302d861d2960509f77f7a82f451cac873"
   },
   "variables": {},
   "request": {
@@ -33,6 +33,29 @@
       200,
       404,
       500
+    ],
+    "body_assertions": [
+      {
+        "name": "node_id present when unarchived",
+        "path": "$.node_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "unarchived_at present when unarchived",
+        "path": "$.unarchived_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when failed",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

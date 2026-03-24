@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "3a3e250cd88a1e0307ac9b196ab9276217a6086d10edd8a62a072f3b7be3775b"
+    "sha256": "6680b411f0a4cf5aea86c0c303042552e8dc044a05f9f8201e065acf765609e8"
   },
   "variables": {
     "test_space": "demo"
@@ -35,11 +35,13 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "equals": "confirmation required"
+        "op": "equals",
+        "expected": "confirmation required"
       },
       {
         "path": "$.message",
-        "contains": "confirm=true"
+        "op": "contains",
+        "expected": "confirm=true"
       }
     ]
   },
@@ -56,11 +58,12 @@
         "body_assertions": [
           {
             "path": "$.message",
-            "equals": "All cache entries cleared"
+            "op": "equals",
+            "expected": "All cache entries cleared"
           },
           {
             "path": "$.entries_cleared",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -77,15 +80,17 @@
         "body_assertions": [
           {
             "path": "$.message",
-            "equals": "Cache cleared for space"
+            "op": "equals",
+            "expected": "Cache cleared for space"
           },
           {
             "path": "$.space_id",
-            "equals": "{{test_space}}"
+            "op": "equals",
+            "expected": "{{test_space}}"
           },
           {
             "path": "$.entries_cleared",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

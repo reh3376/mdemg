@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 60000,
-    "sha256": "befbe438efa0c965047380cc4d1142c2547351e6d04d0606120866ba95fafbad"
+    "sha256": "eb64fe71576e2a2d3f07424c36b29847a6b385c816f252d1bc12a370643318c8"
   },
   "variables": {
     "test_space": "demo"
@@ -43,26 +43,28 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string",
-        "equals": "{{test_space}}"
+        "op": "equals",
+        "expected": "{{test_space}}"
       },
       {
         "path": "$.orphans_found",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.orphans_acted",
-        "type": "number",
-        "equals": 0
+        "op": "equals",
+        "expected": 0
       },
       {
         "path": "$.action",
-        "type": "string",
-        "equals": "list"
+        "op": "equals",
+        "expected": "list"
       },
       {
         "path": "$.orphans",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -86,12 +88,13 @@
         "body_assertions": [
           {
             "path": "$.orphans_found",
-            "type": "number"
+            "op": "type_is",
+            "expected": "number"
           },
           {
             "path": "$.action",
-            "type": "string",
-            "equals": "count"
+            "op": "equals",
+            "expected": "count"
           }
         ]
       }
@@ -118,11 +121,13 @@
         "body_assertions": [
           {
             "path": "$.space_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.orphans",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           }
         ]
       }
@@ -148,13 +153,13 @@
         "body_assertions": [
           {
             "path": "$.dry_run",
-            "type": "boolean",
-            "equals": true
+            "op": "equals",
+            "expected": true
           },
           {
             "path": "$.orphans_acted",
-            "type": "number",
-            "equals": 0
+            "op": "equals",
+            "expected": 0
           }
         ]
       }
@@ -180,25 +185,28 @@
         "body_assertions": [
           {
             "path": "$.space_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.schedule_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.interval_hours",
-            "type": "number",
-            "equals": 24
+            "op": "equals",
+            "expected": 24
           },
           {
             "path": "$.status",
-            "type": "string",
-            "equals": "enabled"
+            "op": "equals",
+            "expected": "enabled"
           },
           {
             "path": "$.next_run_at",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
@@ -218,15 +226,18 @@
         "body_assertions": [
           {
             "path": "$.space_id",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           },
           {
             "path": "$.orphan_count",
-            "type": "number"
+            "op": "type_is",
+            "expected": "number"
           },
           {
             "path": "$.archived_count",
-            "type": "number"
+            "op": "type_is",
+            "expected": "number"
           }
         ]
       }
@@ -250,7 +261,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "equals": "validation_failed"
+            "op": "equals",
+            "expected": "validation_failed"
           }
         ]
       }
@@ -274,7 +286,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "equals": "validation_failed"
+            "op": "equals",
+            "expected": "validation_failed"
           }
         ]
       }
@@ -298,8 +311,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string",
-            "contains": "protected"
+            "op": "contains",
+            "expected": "protected"
           }
         ]
       }

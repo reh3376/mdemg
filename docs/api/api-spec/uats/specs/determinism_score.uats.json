@@ -24,7 +24,7 @@
       "determinism",
       "fsd"
     ],
-    "sha256": "dd0a6d5ca672cc735c034a1f8c5fe1bca58d21d7603c1a7846cd672ac6000b5a"
+    "sha256": "38e1ec5175220c1f250274add8e8ce5e7c789d84ca6d6f2816c9e47d8b0bdb29"
   },
   "variables": {},
   "request": {
@@ -42,7 +42,49 @@
       200,
       503
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "response has error or space_id field",
+        "path": "$.space_id",
+        "op": "exists"
+      },
+      {
+        "name": "score is a number",
+        "path": "$.score",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "score is not negative",
+        "path": "$.score",
+        "op": "greater_than_or_equal",
+        "expected": 0
+      },
+      {
+        "name": "total_actions is a number",
+        "path": "$.total_actions",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "informed_actions is a number",
+        "path": "$.informed_actions",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "compliance_rate is a number",
+        "path": "$.compliance_rate",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "coverage_ratio is a number",
+        "path": "$.coverage_ratio",
+        "op": "type_is",
+        "expected": "number"
+      }
+    ]
   },
   "variants": [
     {

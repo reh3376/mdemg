@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "42b0c84fe8b4152bec0cbfa777fe88ab33f3398b3b28344358ca4f4f46a10208"
+    "sha256": "12740c16188733613dda9e1f89a8a7f9fa960b24474136a601765030912f2421"
   },
   "variables": {
     "test_space": "uats-rsic-test"
@@ -44,31 +44,38 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.tier",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.overall_health",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.confidence",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.retrieval_quality",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.memory_health",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.edge_health",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

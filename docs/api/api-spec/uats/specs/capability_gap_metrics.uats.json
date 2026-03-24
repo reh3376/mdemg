@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "cbbfea648fc80435f5be995426862d445ae6f84457184ae5a5249cc9aaf506ca"
+    "sha256": "ab76c6eac556053b585bc6a4eec2ef8c4726b6ef6e1bf8b30b0a604cc1117918"
   },
   "variables": {},
   "request": {
@@ -29,7 +29,51 @@
     "path": "/v1/system/capability-gaps/metrics"
   },
   "expected": {
-    "status": 200
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "total_queries is a number",
+        "path": "$.total_queries",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "low_score_queries is a number",
+        "path": "$.low_score_queries",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "tracked_patterns is a number",
+        "path": "$.tracked_patterns",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "tracked_sources is a number",
+        "path": "$.tracked_sources",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "history_size is a number",
+        "path": "$.history_size",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "low_score_threshold is a number",
+        "path": "$.low_score_threshold",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "low_score_threshold is not negative",
+        "path": "$.low_score_threshold",
+        "op": "greater_than_or_equal",
+        "expected": 0
+      }
+    ]
   },
   "variants": [
     {

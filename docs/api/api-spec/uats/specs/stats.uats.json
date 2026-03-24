@@ -23,7 +23,7 @@
     "tags": [
       "embedding_required"
     ],
-    "sha256": "99976f12ac66c5c657bb131973e0ec0e5c89568cef71c6d11c320665a801fec3"
+    "sha256": "e6810e542363cf90c57566f3a45db742f019bfcbfe6d8ca7c6e3e2344d5d730d"
   },
   "variables": {
     "test_space": "demo"
@@ -40,39 +40,48 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.memory_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.observation_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.embedding_coverage",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.health_score",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.computed_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.learning_activity",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.temporal_distribution",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.connectivity",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

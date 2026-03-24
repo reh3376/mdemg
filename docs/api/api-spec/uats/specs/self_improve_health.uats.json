@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "f15c64a91562ce0103432f37a09a048774761d23cea4bb7d2b5d1da7ca14f838"
+    "sha256": "fd26b5ef91da23a798f986644f4fce081d467574c4de5d019ea0183d1c9cf25e"
   },
   "request": {
     "method": "GET",
@@ -34,12 +34,13 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "type": "string",
-        "value": "ok"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.active_tasks",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

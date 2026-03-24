@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "ab37b92816c19b94c14e91e24c8672400180013f714f6673a12bedb765587374"
+    "sha256": "53242be5119e4dce6a57feef390bb15902a8cea253bbab157de9b52c2cbe24d7"
   },
   "request": {
     "method": "GET",
@@ -41,27 +41,33 @@
     "body_assertions": [
       {
         "path": "$.history",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.filters",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.filters.space_id",
-        "equals": "uats-rsic-phase87"
+        "op": "equals",
+        "expected": "uats-rsic-phase87"
       },
       {
         "path": "$.filters.tier",
-        "equals": "meso"
+        "op": "equals",
+        "expected": "meso"
       },
       {
         "path": "$.filters.trigger_source",
-        "equals": "manual_api"
+        "op": "equals",
+        "expected": "manual_api"
       }
     ]
   }

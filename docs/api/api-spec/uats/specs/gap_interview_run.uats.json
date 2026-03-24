@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 30000,
-    "sha256": "f1ce3c5e2ffa2068e7192c811c6754e7149578f8d64f9bf6507b5f9e51ce51df"
+    "sha256": "96da89a443b23103e9988ae093958f8079fa63d8078a562991fe3356ccf72023"
   },
   "variables": {},
   "request": {
@@ -37,6 +37,36 @@
     "status": [
       200,
       503
+    ],
+    "body_assertions": [
+      {
+        "name": "total_gaps_analyzed is number when successful",
+        "path": "$.total_gaps_analyzed",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "prompts_generated is number when successful",
+        "path": "$.prompts_generated",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "name": "prompts_generated is not negative",
+        "path": "$.prompts_generated",
+        "op": "greater_than_or_equal",
+        "expected": 0,
+        "optional": true
+      },
+      {
+        "name": "error field type when service unavailable",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
     ]
   },
   "variants": [

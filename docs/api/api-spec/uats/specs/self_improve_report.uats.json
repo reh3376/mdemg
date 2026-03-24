@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "8dc668ac9df061eed20821bae08ae1657b19e0bd55278fef813e0173f3d33d28"
+    "sha256": "6abb48cc7160f0ab85b0b68228c354d1b0ac5113e09c0342d1b3a0850cb3e510"
   },
   "request": {
     "method": "GET",
@@ -34,7 +34,8 @@
     "body_assertions": [
       {
         "path": "$.active_tasks",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       }
     ]
   }

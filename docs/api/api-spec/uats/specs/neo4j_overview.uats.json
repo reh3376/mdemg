@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "6f0df1ae9de4f0d21422f670fa0c51fcd1ffa94d13e8e28a727882357901d876"
+    "sha256": "1c62b04dad8e82a6fcd6af0fcf6ec9815c92a14d560b6acfda62bd9063c7b940"
   },
   "request": {
     "method": "GET",
@@ -32,31 +32,38 @@
     "body_assertions": [
       {
         "path": "$.database",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.database.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.database.total_nodes",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.database.total_spaces",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.spaces",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.backups",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.computed_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

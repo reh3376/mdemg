@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "2b844ee0f064ec0b28c98eb5bcc35d8ba8cca905860de7fda23d105c76a4da15"
+    "sha256": "ff6d41bc5e99430602bf73f32042c9905336082bda48e4905158d431bdb044ec"
   },
   "request": {
     "method": "GET",
@@ -34,12 +34,13 @@
     "body_assertions": [
       {
         "path": "$.task_id",
-        "type": "string",
-        "equals": "nonexistent-task-id"
+        "op": "equals",
+        "expected": "nonexistent-task-id"
       },
       {
         "path": "$.reports",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },

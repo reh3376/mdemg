@@ -22,7 +22,7 @@
     "tags": [
       "unts"
     ],
-    "sha256": "b74ee5fde998c8951998ef5bd8d86d0f6a2cc89f3d69137c2c5cb6126db00e25"
+    "sha256": "ad018fe9dc22e668f629dbb2a03d7ef09edb9546353a49ae595ed38c59cdde2b"
   },
   "request": {
     "method": "GET",
@@ -33,8 +33,8 @@
     "body_assertions": [
       {
         "path": "$.error",
-        "type": "string",
-        "equals": "file not tracked"
+        "op": "equals",
+        "expected": "file not tracked"
       }
     ]
   },

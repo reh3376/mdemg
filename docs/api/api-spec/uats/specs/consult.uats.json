@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "67ce0c6dabea68a3f35fd9d2a3bfc5205d7ff7d6d14dbf21ddc4aa9626603751",
+    "sha256": "febebb986d289c1b930d1835d15f7a13e170ff425d242ec10941ee1a44b530fe",
     "tags": [
       "embedding_required"
     ]
@@ -45,15 +45,18 @@
     "body_assertions": [
       {
         "path": "$.space_id",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.rationale",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.confidence",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

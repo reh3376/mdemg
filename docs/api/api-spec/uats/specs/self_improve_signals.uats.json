@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "8e776f20afd592922df35d598d3e2343f107ba82548830ef82513f63b35d8bc3"
+    "sha256": "0f60abfc1c4c23dd7220d99ad43866759d4ac6fdfdbb8de7846c5bd6a82ce49e"
   },
   "request": {
     "method": "GET",
@@ -35,11 +35,13 @@
     "body_assertions": [
       {
         "path": "$.signals",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.enabled",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   }

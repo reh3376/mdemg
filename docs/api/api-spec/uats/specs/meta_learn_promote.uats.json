@@ -25,7 +25,7 @@
       "phase105",
       "llm_required"
     ],
-    "sha256": "733c5d8a6d4bccdeda653a7150c0089375a5699f41f5b6f822c20d65a2d03c8c"
+    "sha256": "76871b3c225d4b25b392a910bf8ebd900a25691fa8f366f9362c838f4f4eb595"
   },
   "variables": {
     "source_space_id": "uats-test-space"
@@ -47,19 +47,23 @@
     "body_assertions": [
       {
         "path": "$.data.status",
-        "equals": "ok"
+        "op": "equals",
+        "expected": "ok"
       },
       {
         "path": "$.data.concepts_evaluated",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.concepts_promoted",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.data.promoted_nodes",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -77,7 +81,7 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -97,11 +101,13 @@
         "body_assertions": [
           {
             "path": "$.data.concepts_evaluated",
-            "equals": 0
+            "op": "equals",
+            "expected": 0
           },
           {
             "path": "$.data.concepts_promoted",
-            "equals": 0
+            "op": "equals",
+            "expected": 0
           }
         ]
       }

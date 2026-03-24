@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "cd9ca010663ef8895ae029e9bd1c08ee09ac6e33d976d630d255a46ff500c03e"
+    "sha256": "1dcaba49be161769e447221dc6889b63ca3175da420f619864570f7f69dd6586"
   },
   "request": {
     "method": "GET",
@@ -34,15 +34,18 @@
     "body_assertions": [
       {
         "path": "$.spaces",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.total",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       },
       {
         "path": "$.prunable_count",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   },
@@ -62,11 +65,13 @@
         "body_assertions": [
           {
             "path": "$.spaces",
-            "type": "array"
+            "op": "type_is",
+            "expected": "array"
           },
           {
             "path": "$.total",
-            "type": "integer"
+            "op": "type_is",
+            "expected": "integer"
           }
         ]
       }

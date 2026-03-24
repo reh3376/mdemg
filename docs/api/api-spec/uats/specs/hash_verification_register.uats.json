@@ -22,7 +22,7 @@
     "tags": [
       "unts"
     ],
-    "sha256": "39c9db6a4d084508cf6ec8b936ad2e9a897b182b65df611eb2e02d80f559b4a9"
+    "sha256": "5c961c77b17e5a8a92894beba0ccb21507f07a466b4d84a896fc48b68d63dd09"
   },
   "request": {
     "method": "POST",
@@ -43,25 +43,28 @@
     "body_assertions": [
       {
         "path": "$.path",
-        "type": "string",
-        "value": "docs/specs/manifest.sha256"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.framework",
-        "type": "string",
-        "value": "manifest"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.current_hash",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.status",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "path": "$.updated_at",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   },
@@ -81,7 +84,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

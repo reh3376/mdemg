@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "df5de87465b6a084fd349779dedde123268d66000804eb454f4c18b4a08ab605"
+    "sha256": "1d01f278be7d0c4f98709b1b8883c532a87397917a4cafc7185918e0f30e4dc7"
   },
   "variables": {
     "test_space": "uats-orgreview-test"
@@ -41,15 +41,18 @@
     "body_assertions": [
       {
         "path": "$.pending",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.approved",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.rejected",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

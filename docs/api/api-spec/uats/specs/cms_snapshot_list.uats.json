@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "0a29aab17cd425d8f055b8a2ec972ffd72673035b7ad41d5196833044c7833af"
+    "sha256": "3690a36cdcb546f8589098a4e98c5e3f7d5adc4c1c6c4bb0332133b8cd4a5578"
   },
   "variables": {
     "test_space": "uats-snapshot-test"
@@ -42,11 +42,13 @@
     "body_assertions": [
       {
         "path": "$.snapshots",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.count",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

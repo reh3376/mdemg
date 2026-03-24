@@ -27,7 +27,7 @@
       "protocol",
       "phase_j17"
     ],
-    "sha256": "a34686219aa5aa6a6af759c3d6c0400f2f846fc24bb237db45a35324af84a126"
+    "sha256": "63a42a9591814ac961dad14e15bca96e8208b753f2ed161c21b51f903daad9ce"
   },
   "variables": {
     "space_id": "uats-test-space"
@@ -48,23 +48,26 @@
       {
         "name": "data wrapper present",
         "path": "$.data",
-        "type": "object",
-        "exists": true
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "name": "bootstrap payload is string",
         "path": "$.data.bootstrap",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "version is string",
         "path": "$.data.version",
-        "type": "string"
+        "op": "type_is",
+        "expected": "string"
       },
       {
         "name": "first_session is boolean",
         "path": "$.data.first_session",
-        "type": "boolean"
+        "op": "type_is",
+        "expected": "boolean"
       }
     ]
   },
@@ -81,7 +84,8 @@
           {
             "name": "error message present",
             "path": "$.error",
-            "type": "string"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }

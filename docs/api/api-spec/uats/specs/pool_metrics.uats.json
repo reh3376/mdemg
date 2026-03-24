@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "f0f816203def11dcf2082e23a0f5440e9fef2ee6fc88204606f4a23fa08be832"
+    "sha256": "7d2dab684d4fe3f566bd7e11b7114a64ef235380b8fe87acbddddcd795a491bc"
   },
   "variables": {
     "test_space": "demo"
@@ -35,15 +35,18 @@
     "body_assertions": [
       {
         "path": "$.connection_pool",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.runtime",
-        "type": "object"
+        "op": "type_is",
+        "expected": "object"
       },
       {
         "path": "$.runtime.goroutines",
-        "type": "integer"
+        "op": "type_is",
+        "expected": "integer"
       }
     ]
   }

@@ -27,7 +27,7 @@
       "phase104",
       "llm_required"
     ],
-    "sha256": "f06a2164bf995c2b958484e566b1f774c0bec3306b54dcfa72ea9917befcd718"
+    "sha256": "a86213ad69e942cff7e37aa0a3a82a03740134be43b6c7558005cc04b1faf6a8"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -52,15 +52,18 @@
     "body_assertions": [
       {
         "path": "$.data.status",
-        "regex": "^(Pass|Warning|Block)$"
+        "op": "matches",
+        "expected": "^(Pass|Warning|Block)$"
       },
       {
         "path": "$.data.violations",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.data.warnings",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       }
     ]
   },
@@ -82,7 +85,7 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -104,7 +107,7 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }
@@ -124,7 +127,7 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "exists": true
+            "op": "exists"
           }
         ]
       }

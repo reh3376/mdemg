@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "cc376cda29135be5124f4d9f70b0a966908edc603ed0a669556b7beb60c8eb59"
+    "sha256": "e8c7303eec4e0f0d7fcdd4d20b8cc03d747d30318d0aa31493869fff3083c0cc"
   },
   "variables": {
     "job_id": "nonexistent-job-id"
@@ -36,14 +36,16 @@
     ],
     "body_assertions": [
       {
+        "optional": true,
         "path": "$.job_id",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       },
       {
+        "optional": true,
         "path": "$.status",
-        "type": "string",
-        "optional": true
+        "op": "type_is",
+        "expected": "string"
       }
     ]
   }

@@ -23,7 +23,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "78e788a33e79b595e36724f216e901d2f6354e816d15e86be3b06fa39e4f3fe3"
+    "sha256": "2149e71c419365452781e065bd7f5d3352d84f16fe7433f35191534cbc6a7c04"
   },
   "request": {
     "method": "POST",
@@ -38,8 +38,8 @@
     "body_assertions": [
       {
         "path": "$.reset",
-        "type": "boolean",
-        "equals": true
+        "op": "equals",
+        "expected": true
       }
     ]
   },

@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "67a6f90f2aa54a221f43e7cd9d914354638d728ce3f37ac07828719bccee4e7c"
+    "sha256": "69b9fd916a617309451370354a0d05c807eab896691b595837acd017833b4f0f"
   },
   "request": {
     "method": "GET",
@@ -35,35 +35,43 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "equals": "ok"
+        "op": "equals",
+        "expected": "ok"
       },
       {
         "path": "$.safety.enforcement_active",
-        "equals": true
+        "op": "equals",
+        "expected": true
       },
       {
         "path": "$.safety.safety_version",
-        "equals": "phase88-v1"
+        "op": "equals",
+        "expected": "phase88-v1"
       },
       {
         "path": "$.safety.bounds.max_nodes_affected",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.safety.bounds.max_edges_affected",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.safety.bounds.protected_spaces",
-        "type": "array"
+        "op": "type_is",
+        "expected": "array"
       },
       {
         "path": "$.safety.rollback.window_sec",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       },
       {
         "path": "$.safety.rollback.snapshots_held",
-        "type": "number"
+        "op": "type_is",
+        "expected": "number"
       }
     ]
   }

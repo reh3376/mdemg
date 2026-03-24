@@ -21,7 +21,7 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "sha256": "edcb2172fd952ac2440d9567bc5c38f9dd332d6c32aa81ebe94b85d0331e847c"
+    "sha256": "db102c8046c9148ef6d151d4cc0a1906d836eb67f5206e6e8302a38f04d14326"
   },
   "variables": {
     "test_space": "uats-orgreview-test",
@@ -45,6 +45,35 @@
       201,
       404
     ],
-    "body_assertions": []
+    "body_assertions": [
+      {
+        "name": "obs_id present when flagged",
+        "path": "$.obs_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "flagged_for_review is boolean when present",
+        "path": "$.flagged_for_review",
+        "op": "type_is",
+        "expected": "boolean",
+        "optional": true
+      },
+      {
+        "name": "review_status present when flagged",
+        "path": "$.review_status",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "name": "error field type when present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      }
+    ]
   }
 }
