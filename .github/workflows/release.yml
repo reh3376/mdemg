@@ -117,3 +117,36 @@ jobs:
               gh release upload "$TAG" /tmp/release-checksums/checksums.txt --clobber
             fi
           fi
+
+      - name: Update Scoop manifest
+        if: env.SCOOP_TAP_TOKEN != ''
+        env:
+          SCOOP_TAP_TOKEN: ${{ secrets.SCOOP_TAP_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          VERSION_NUM="${VERSION#v}"
+          SHA256=$(grep "windows_amd64.zip" /tmp/windows-binaries/windows_checksums.txt | awk '{print $1}')
+          URL="https://github.com/reh3376/mdemg/releases/download/${VERSION}/mdemg_${VERSION_NUM}_windows_amd64.zip"
+
+          cd packaging/mdemg-windows
+
+          # Read existing manifest to preserve description, notes, post_install, etc.
+          python3 -c "
+          import json, sys
+          with open('bucket/mdemg.json') as f:
+              m = json.load(f)
+          m['version'] = '${VERSION_NUM}'
+          m['architecture']['64bit']['url'] = '${URL}'
+          m['architecture']['64bit']['hash'] = '${SHA256}'
+          with open('bucket/mdemg.json', 'w') as f:
+              json.dump(m, f, indent=4)
+              f.write('\n')
+          "
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${SCOOP_TAP_TOKEN}@github.com/reh3376/mdemg-windows.git"
+          git add bucket/mdemg.json
+          git commit -m "chore: bump mdemg to ${VERSION_NUM}"
+          git push origin HEAD:main
