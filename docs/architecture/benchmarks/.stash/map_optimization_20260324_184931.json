@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-03-24T22:49:31.334539Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T22:49:31.334326Z",
+      "avg_score": 7.6,
+      "trials": [
+        {
+          "map_id": "dist_channels",
+          "question_idx": 0,
+          "question": "How do you install MDEMG on macOS?",
+          "ground_truth": "brew install reh3376/mdemg/mdemg",
+          "agent_answer": "To install MDEMG on macOS, use the command:\n\n```bash\nbrew install reh3376/mdemg/mdemg\n```\n\nThis installation method is provided by the submodule: `packaging/homebrew-mdemg`.",
+          "judge_score": 10.0,
+          "judge_reason": "The agent provided the exact correct command along with additional relevant context without any errors.",
+          "tokens_t1": 298,
+          "tokens_human": 229,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "dist_channels",
+          "question_idx": 1,
+          "question": "What technology is the Linux companion app built with?",
+          "ground_truth": "Tauri (Rust + JS) with Catppuccin theme",
+          "agent_answer": "The Linux companion app is built with Tauri using Rust and JavaScript.",
+          "judge_score": 7.0,
+          "judge_reason": "The agent correctly identifies Tauri with Rust and JavaScript but omits the Catppuccin theme detail.",
+          "tokens_t1": 298,
+          "tokens_human": 229,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "dist_channels",
+          "question_idx": 2,
+          "question": "Which platform companion app is not implemented?",
+          "ground_truth": "Windows companion (GAP-13)",
+          "agent_answer": "The windows-companion platform companion app is not implemented.",
+          "judge_score": 3.0,
+          "judge_reason": "The agent's answer is fundamentally incorrect as it states the app is not implemented, which contradicts the ground truth naming the Windows companion (GAP-13) as the correct answer.",
+          "tokens_t1": 298,
+          "tokens_human": 229,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "dist_channels",
+          "question_idx": 3,
+          "question": "What CI workflow handles cross-compilation releases?",
+          "ground_truth": "release.yml triggered by tag push, uses goreleaser",
+          "agent_answer": "The CI workflow that handles cross-compilation releases is **release.yml**, triggered on tag-push, performing goreleaser cross-compile and creating GitHub Releases for all platforms.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identified the workflow file, trigger event, and use of goreleaser, but added extra details about cross-compilation and GitHub Releases not mentioned in the ground truth.",
+          "tokens_t1": 298,
+          "tokens_human": 229,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "dist_channels",
+          "question_idx": 4,
+          "question": "What does auto-pr.yml do?",
+          "ground_truth": "Auto-creates PR to main when pushing to *_dev* branches",
+          "agent_answer": "auto-pr.yml is a CI workflow triggered on push events to any branch matching *_dev* that automatically creates a pull request to the main branch.",
+          "judge_score": 9.0,
+          "judge_reason": "The answer correctly describes the auto-creation of a PR to main on pushes to *_dev* branches, with minor detail about the workflow file name included.",
+          "tokens_t1": 298,
+          "tokens_human": 229,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": []
+    }
+  ]
+}

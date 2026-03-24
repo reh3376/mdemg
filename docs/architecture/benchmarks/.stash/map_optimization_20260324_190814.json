@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-03-24T23:08:14.251057Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T23:08:14.250980Z",
+      "avg_score": 9.0,
+      "trials": [
+        {
+          "map_id": "svc_external",
+          "question_idx": 0,
+          "question": "What port does the MDEMG server listen on?",
+          "ground_truth": "9999",
+          "agent_answer": "The MDEMG server listens on port 9999.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identified the port number and its purpose but added extra context not present in the ground truth.",
+          "tokens_t1": 287,
+          "tokens_human": 204,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "svc_external",
+          "question_idx": 1,
+          "question": "What port does the neural sidecar use?",
+          "ground_truth": "8100",
+          "agent_answer": "The neural sidecar uses port 8100.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identified the port number 8100 but added extra context not present in the ground truth.",
+          "tokens_t1": 287,
+          "tokens_human": 204,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "svc_external",
+          "question_idx": 2,
+          "question": "How does the MCP server communicate?",
+          "ground_truth": "Via stdio (runs as subprocess for IDE integration)",
+          "agent_answer": "The MCP server communicates via stdio as a subprocess using the MCP protocol for IDE integration.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identifies communication via stdio as a subprocess for IDE integration, adding the MCP protocol detail which is accurate but slightly beyond the original concise answer.",
+          "tokens_t1": 287,
+          "tokens_human": 204,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "svc_external",
+          "question_idx": 3,
+          "question": "What gRPC services are defined for content ingestion?",
+          "ground_truth": "IngestionModule with Matches, Parse, and Sync operations",
+          "agent_answer": "The gRPC service defined for content ingestion is **IngestionModule** with operations: Matches, Parse, Sync.",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly identified the IngestionModule and its operations Matches, Parse, and Sync, matching the ground truth perfectly.",
+          "tokens_t1": 287,
+          "tokens_human": 204,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "svc_external",
+          "question_idx": 4,
+          "question": "What does the ReasoningModule gRPC service do?",
+          "ground_truth": "Rerank \u2014 re-scores retrieval candidates",
+          "agent_answer": "The ReasoningModule gRPC service provides the operation \"Rerank\" and its role is to reorder retrieval candidates by semantic relevance score.",
+          "judge_score": 8.0,
+          "judge_reason": "The agent correctly identifies the rerank operation's purpose to reorder retrieval candidates by relevance, but adds unnecessary detail about the gRPC service and semantic relevance score not present in the ground truth.",
+          "tokens_t1": 287,
+          "tokens_human": 204,
+          "difficulty": "factual"
+        }
+      ],
+      "map_changes": []
+    }
+  ]
+}

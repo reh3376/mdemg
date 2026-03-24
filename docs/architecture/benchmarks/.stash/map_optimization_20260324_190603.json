@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-03-24T23:06:03.774339Z",
+  "model": "gpt-4.1-mini",
+  "compress_model": "gpt-4.1",
+  "threshold": 9.0,
+  "token_budget": 250,
+  "maps_tested": 1,
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-03-24T23:06:03.774183Z",
+      "avg_score": 8.8,
+      "trials": [
+        {
+          "map_id": "dep_pkg_graph",
+          "question_idx": 0,
+          "question": "Which packages are leaf packages with no dependencies?",
+          "ground_truth": "lng, sym, cfg, mdl, plg, ath",
+          "agent_answer": "The leaf packages with no dependencies are:\n\n- lng  \n- sym  \n- cfg  \n- mdl  \n- plg  \n- ath",
+          "judge_score": 10.0,
+          "judge_reason": "The agent correctly listed all the leaf packages with no dependencies exactly as in the ground truth.",
+          "tokens_t1": 302,
+          "tokens_human": 146,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "dep_pkg_graph",
+          "question_idx": 1,
+          "question": "What does the api package depend on?",
+          "ground_truth": "ret, hid, lrn, jim, ape, con, cns, grd, lng, sym, emb, cfg, mdl, plg, ath, scr, xfr, mta, llm, unt, bkp, met, gap",
+          "agent_answer": "The api package depends on the following packages:\n\nret, hid, lrn, jim, ape, con, cns, grd, lng, sym, emb, cfg, mdl, plg, ath, scr, xfr, mta, llm, unt, bkp, met, gap",
+          "judge_score": 9.0,
+          "judge_reason": "The agent's answer is accurate and complete except for the missing \"lrn\" package in the list.",
+          "tokens_t1": 302,
+          "tokens_human": 146,
+          "difficulty": "factual"
+        },
+        {
+          "map_id": "dep_pkg_graph",
+          "question_idx": 2,
+          "question": "Why does ret depend on plg?",
+          "ground_truth": "For match-module (MatchIngestionModule) functionality",
+          "agent_answer": "ret depends on plg because retrieval calls MatchIngestionModule() as fallback to dispatch unrecognized file types to the correct plugin module for parsing.",
+          "judge_score": 8.0,
+          "judge_reason": "The answer correctly identifies that MatchIngestionModule is used as a fallback for unrecognized file types, but it lacks explicit mention of its core functionality as a match-module.",
+          "tokens_t1": 302,
+          "tokens_human": 146,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "dep_pkg_graph",
+          "question_idx": 3,
+          "question": "Which package does hid depend on for emergence naming?",
+          "ground_truth": "llm (for emergence-naming)",
+          "agent_answer": "The package **hid** depends on **llm** for emergence naming.",
+          "judge_score": 9.0,
+          "judge_reason": "The agent correctly identifies the dependency of \"hid\" on \"llm\" for emergence naming but adds extra context not present in the ground truth.",
+          "tokens_t1": 302,
+          "tokens_human": 146,
+          "difficulty": "relational"
+        },
+        {
+          "map_id": "dep_pkg_graph",
+          "question_idx": 4,
+          "question": "What does grd depend on emb for?",
+          "ground_truth": "Constraint retrieval (embedding-based similarity search for constraints)",
+          "agent_answer": "grd depends on emb for constraint-retrieval via embedding similarity.",
+          "judge_score": 8.0,
+          "judge_reason": "The agent correctly identifies embedding-based similarity for constraint retrieval but uses unclear abbreviations and lacks clarity compared to the ground truth.",
+          "tokens_t1": 302,
+          "tokens_human": 146,
+          "difficulty": "relational"
+        }
+      ],
+      "map_changes": []
+    }
+  ]
+}

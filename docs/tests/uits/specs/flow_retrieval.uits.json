@@ -1,0 +1,104 @@
+{
+  "uits_version": "1.0.0",
+  "metadata": {
+    "name": "Retrieval Pipeline Flow Map",
+    "description": "Tests comprehension of the T1-encoded retrieval pipeline architecture map, covering scoring weights, embedding dimensions, training data output, routing logic, and graph expansion.",
+    "content_type": "architecture_map",
+    "tags": [
+      "flow",
+      "retrieval",
+      "scoring",
+      "embedding",
+      "graph"
+    ],
+    "author": "reh3376"
+  },
+  "content": {
+    "source_file": "docs/architecture/maps/flow_retrieval.md",
+    "encoding_format": "t1_coded",
+    "injection_context": "Agent working in internal/retrieval/"
+  },
+  "ground_truth": {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What are the retrieval scoring weights?",
+        "answer": "vector:0.55, activation:0.30, recency:0.10, confidence:0.05, hub:-0.08, redundancy:-0.12",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q2",
+        "question": "What is the embedding dimension?",
+        "answer": "3072",
+        "difficulty": "factual"
+      },
+      {
+        "id": "q3",
+        "question": "What training data does the retrieval pipeline produce?",
+        "answer": "(query, candidate, score) JSONL tuples for neural sidecar cross-encoder training",
+        "difficulty": "relational"
+      },
+      {
+        "id": "q4",
+        "question": "If symbol search finds candidates, what triggered it?",
+        "answer": "Query contained #symbol prefix",
+        "difficulty": "inferential"
+      },
+      {
+        "id": "q5",
+        "question": "What is the max graph expansion depth?",
+        "answer": "3",
+        "difficulty": "factual"
+      }
+    ]
+  },
+  "scoring_profiles": {
+    "active_profile": "arch_map_default",
+    "profiles": [
+      {
+        "profile_id": "arch_map_default",
+        "version": "1.0.0",
+        "created": "2026-03-24T00:00:00Z",
+        "supersedes": null,
+        "rationale": "Initial profile \u2014 balanced weights, comprehension-dominant for Jiminy injection use case",
+        "weights": {
+          "comprehension": 0.4,
+          "compaction": 0.25,
+          "token_efficiency": 0.2,
+          "fidelity": 0.15
+        },
+        "thresholds": {
+          "composite_min": 0.8,
+          "comprehension_min": 9.0,
+          "comprehension_floor": 7.0,
+          "token_max": 250,
+          "compaction_min_pct": 30,
+          "fidelity_min_pct": 85
+        },
+        "difficulty_weights": {
+          "factual": 0.3,
+          "relational": 0.4,
+          "inferential": 0.3
+        }
+      }
+    ]
+  },
+  "thresholds": {
+    "composite_min": 0.8,
+    "comprehension_min": 9.0,
+    "comprehension_floor": 7.0,
+    "token_max": 250,
+    "compaction_min_pct": 30,
+    "fidelity_min_pct": 85
+  },
+  "optimization": {
+    "max_iterations": 5,
+    "convergence_window": 2,
+    "regeneration_strategy": "manual",
+    "model": "gpt-4.1-mini"
+  },
+  "history": [],
+  "config": {
+    "sha256": "53124cd5a8a31c56b395bdd3b335084ed3b34d40518b26204ecc1d2cf0487133"
+  }
+}
