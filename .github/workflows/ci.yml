@@ -151,7 +151,7 @@ jobs:
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required
+            --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required,rsic_data_required
 
       - name: Run UBTS Smoke Benchmark (soft-fail)
         continue-on-error: true
