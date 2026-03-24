@@ -100,3 +100,57 @@ func TestCountLines_RealFile(t *testing.T) {
 		t.Errorf("expected 3, got %d", got)
 	}
 }
+
+// ─── Recovery Buffer Tests ───
+
+func TestCountLocalBufferLines_NonExistent(t *testing.T) {
+	got := countLocalBufferLines("/nonexistent/buffer.jsonl")
+	if got != 0 {
+		t.Errorf("expected 0, got %d", got)
+	}
+}
+
+func TestCountLocalBufferLines_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	p := filepath.Join(tmpDir, "buffer.jsonl")
+	if err := os.WriteFile(p, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got := countLocalBufferLines(p)
+	if got != 0 {
+		t.Errorf("expected 0, got %d", got)
+	}
+}
+
+func TestCountLocalBufferLines_WithEntries(t *testing.T) {
+	tmpDir := t.TempDir()
+	p := filepath.Join(tmpDir, "buffer.jsonl")
+	content := `{"content":"entry1","obs_type":"note"}
+{"content":"entry2","obs_type":"constraint"}
+{"content":"entry3","obs_type":"progress"}
+`
+	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got := countLocalBufferLines(p)
+	if got != 3 {
+		t.Errorf("expected 3, got %d", got)
+	}
+}
+
+func TestResolveRecoveryBufferPath_Default(t *testing.T) {
+	t.Setenv("SYNERGY_RECOVERY_BUFFER_PATH", "")
+	got := resolveRecoveryBufferPath()
+	want := filepath.Join(".mdemg", "synergy-recovery-buffer.jsonl")
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveRecoveryBufferPath_EnvOverride(t *testing.T) {
+	t.Setenv("SYNERGY_RECOVERY_BUFFER_PATH", "/custom/path/buffer.jsonl")
+	got := resolveRecoveryBufferPath()
+	if got != "/custom/path/buffer.jsonl" {
+		t.Errorf("expected /custom/path/buffer.jsonl, got %q", got)
+	}
+}

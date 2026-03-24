@@ -59,15 +59,22 @@ func (s *Server) handleSynergyStatus(w http.ResponseWriter, r *http.Request) {
 	synergyHealth := computeSynergyHealth(jiminyHealthy, claudeMDLines, memoryMDLines,
 		overflowEvents24h, s.cfg.SynergyTargetClaudeLines, s.cfg.SynergyTargetMemoryLines)
 
-	// 8. Build response
+	// 8. Count recovery buffer entries
+	bufferSpaceEntries := countRecoveryBufferSpaceEntries(r.Context(), s.driver, s.cfg.SynergyRecoveryBufferSpace)
+	bufferLocalEntries := countRecoveryBufferLocalEntries(s.cfg.SynergyRecoveryBufferPath)
+
+	// 9. Build response
 	data := map[string]any{
-		"jiminy_healthy":     jiminyHealthy,
-		"claude_md_lines":    claudeMDLines,
-		"memory_md_lines":    memoryMDLines,
-		"auto_memory_files":  autoMemoryFiles,
-		"auto_memory_lines":  autoMemoryLines,
-		"overflow_events_24h": overflowEvents24h,
-		"synergy_health":     synergyHealth,
+		"jiminy_healthy":               jiminyHealthy,
+		"claude_md_lines":              claudeMDLines,
+		"memory_md_lines":              memoryMDLines,
+		"auto_memory_files":            autoMemoryFiles,
+		"auto_memory_lines":            autoMemoryLines,
+		"overflow_events_24h":          overflowEvents24h,
+		"synergy_health":               synergyHealth,
+		"recovery_buffer_space_entries": bufferSpaceEntries,
+		"recovery_buffer_local_entries": bufferLocalEntries,
+		"recovery_buffer_total":         bufferSpaceEntries + bufferLocalEntries,
 	}
 	if migrationStatus != "" {
 		data["migration_status"] = migrationStatus
@@ -202,6 +209,62 @@ func readMigrationStatus() (status string, date string) {
 		return "", ""
 	}
 	return info.Version, info.MigratedAt
+}
+
+// countRecoveryBufferSpaceEntries queries Neo4j for observations in the recovery buffer space.
+func countRecoveryBufferSpaceEntries(ctx context.Context, driver neo4j.DriverWithContext, bufferSpace string) int {
+	if driver == nil || bufferSpace == "" {
+		return 0
+	}
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.role_type = 'conversation_observation'
+			  AND ANY(t IN n.tags WHERE t = 'recovery-buffer')
+			RETURN count(n) AS cnt
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": bufferSpace})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			rec := res.Record()
+			if v, ok := rec.Get("cnt"); ok && v != nil {
+				if count, ok := v.(int64); ok {
+					return int(count), nil
+				}
+			}
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0
+	}
+	if count, ok := result.(int); ok {
+		return count
+	}
+	return 0
+}
+
+// countRecoveryBufferLocalEntries counts lines in the local JSONL recovery buffer file.
+func countRecoveryBufferLocalEntries(path string) int {
+	if path == "" {
+		return 0
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 // computeSynergyHealth calculates the synergy health score.

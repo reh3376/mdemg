@@ -35,6 +35,8 @@ archival content to CMS and monitoring for re-bloat.`,
 	cmd.AddCommand(newSynergyStatusCmd())
 	cmd.AddCommand(newSynergyMigrateCmd())
 	cmd.AddCommand(newSynergyCheckCmd())
+	cmd.AddCommand(newSynergyBufferStatusCmd())
+	cmd.AddCommand(newSynergyFlushBufferCmd())
 
 	return cmd
 }
@@ -362,6 +364,14 @@ func runSynergyCheck(spaceID string, autoMode bool) error {
 		}
 	}
 
+	// Check recovery buffer
+	bufferEntries := countLocalBufferLines(resolveRecoveryBufferPath())
+	if bufferEntries > 0 && jiminyHealthy {
+		if !autoMode {
+			fmt.Printf("NOTICE: Recovery buffer has %d pending entries — run: mdemg synergy flush-buffer\n", bufferEntries)
+		}
+	}
+
 	if !autoMode {
 		fmt.Printf("Synergy health: %.2f | Jiminy: %v | CLAUDE.md: %d | MEMORY.md: %d\n",
 			health, jiminyHealthy, claudeLines, memoryLines)
@@ -581,6 +591,312 @@ func toInt(v any) int {
 	default:
 		return 0
 	}
+}
+
+// ─── synergy buffer-status ───
+
+func newSynergyBufferStatusCmd() *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "buffer-status",
+		Short: "Display recovery buffer status (pending entries from Jiminy outages)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			spaceID := resolveSpaceID(cmd)
+			if spaceID == "" {
+				spaceID = "mdemg-dev"
+			}
+			return runSynergyBufferStatus(spaceID, jsonOutput)
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
+	cmd.Flags().String("space-id", "", "Space ID (default: mdemg-dev)")
+
+	return cmd
+}
+
+func runSynergyBufferStatus(spaceID string, jsonOutput bool) error {
+	bufferPath := resolveRecoveryBufferPath()
+	localEntries := countLocalBufferLines(bufferPath)
+	jiminyHealthy := checkJiminyHealth()
+
+	// Try to get CMS buffer space count
+	cmsEntries := 0
+	endpoint := resolveEndpoint()
+	bufferSpace := os.Getenv("SYNERGY_RECOVERY_BUFFER_SPACE")
+	if bufferSpace == "" {
+		bufferSpace = "synergy-buffer"
+	}
+
+	resp, err := http.Get(fmt.Sprintf("%s/v1/synergy/status?space_id=%s", endpoint, spaceID)) //nolint:gosec // G107: localhost API call
+	if err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			var result struct {
+				Data map[string]any `json:"data"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&result) == nil {
+				cmsEntries = toInt(result.Data["recovery_buffer_space_entries"])
+			}
+		}
+	}
+
+	totalEntries := localEntries + cmsEntries
+	autoFlush := os.Getenv("SYNERGY_RECOVERY_AUTO_FLUSH")
+	if autoFlush == "" {
+		autoFlush = "true"
+	}
+
+	data := map[string]any{
+		"buffer_space":        bufferSpace,
+		"buffer_space_entries": cmsEntries,
+		"local_jsonl_path":    bufferPath,
+		"local_jsonl_entries": localEntries,
+		"total_pending":       totalEntries,
+		"jiminy_healthy":      jiminyHealthy,
+		"auto_flush":          autoFlush == "true",
+	}
+
+	if jsonOutput {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(data)
+	}
+
+	fmt.Println("═══ RECOVERY BUFFER STATUS ═══")
+	fmt.Printf("Buffer space:   %s (%d entries)\n", bufferSpace, cmsEntries)
+	fmt.Printf("Local JSONL:    %s (%d entries)\n", bufferPath, localEntries)
+	fmt.Printf("Total pending:  %d\n", totalEntries)
+	jiminyStr := "HEALTHY"
+	if !jiminyHealthy {
+		jiminyStr = "UNHEALTHY"
+	}
+	fmt.Printf("Jiminy:         %s\n", jiminyStr)
+	fmt.Printf("Auto-flush:     %v\n", autoFlush == "true")
+	if totalEntries > 0 && jiminyHealthy {
+		fmt.Println("\nRun: mdemg synergy flush-buffer")
+	}
+	fmt.Println("═══ END ═══")
+	return nil
+}
+
+// ─── synergy flush-buffer ───
+
+func newSynergyFlushBufferCmd() *cobra.Command {
+	var force bool
+	var dryRun bool
+	var batchSize int
+	var delayMs int
+
+	cmd := &cobra.Command{
+		Use:   "flush-buffer",
+		Short: "Flush recovery buffer entries to mdemg-dev",
+		Long: `Promotes buffered observations from Jiminy outages back to the primary
+CMS space (mdemg-dev). Flushes local JSONL → synergy-buffer → mdemg-dev.
+Throttled to avoid overwhelming Jiminy after long outages.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			spaceID := resolveSpaceID(cmd)
+			if spaceID == "" {
+				spaceID = "mdemg-dev"
+			}
+			return runSynergyFlushBuffer(spaceID, force, dryRun, batchSize, delayMs)
+		},
+	}
+
+	cmd.Flags().BoolVar(&force, "force", false, "Skip Jiminy health check (flush even if Jiminy is down)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be flushed without executing")
+	cmd.Flags().IntVar(&batchSize, "batch-size", 10, "Max entries to flush per invocation (0=unlimited)")
+	cmd.Flags().IntVar(&delayMs, "delay-ms", 200, "Delay between entries in milliseconds")
+	cmd.Flags().String("space-id", "", "Space ID (default: mdemg-dev)")
+
+	return cmd
+}
+
+func runSynergyFlushBuffer(spaceID string, force, dryRun bool, batchSize, delayMs int) error {
+	endpoint := resolveEndpoint()
+	bufferPath := resolveRecoveryBufferPath()
+	bufferSpace := os.Getenv("SYNERGY_RECOVERY_BUFFER_SPACE")
+	if bufferSpace == "" {
+		bufferSpace = "synergy-buffer"
+	}
+
+	if !force && !checkJiminyHealth() {
+		return fmt.Errorf("Jiminy is unhealthy — cannot flush to mdemg-dev safely.\nUse --force to override or wait for Jiminy to recover.")
+	}
+
+	flushDelay := time.Duration(delayMs) * time.Millisecond
+	flushed := 0
+	remaining := 0
+	atBatchLimit := func() bool {
+		return batchSize > 0 && flushed >= batchSize
+	}
+
+	// Step 1: Flush local JSONL → synergy-buffer space (throttled)
+	localEntries := countLocalBufferLines(bufferPath)
+	if localEntries > 0 {
+		data, err := os.ReadFile(bufferPath)
+		if err == nil {
+			lines := strings.Split(string(data), "\n")
+			flushedLocal := 0
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				if atBatchLimit() {
+					remaining++
+					continue
+				}
+				if dryRun {
+					fmt.Printf("  [dry-run] Would flush local entry to %s\n", bufferSpace)
+					flushed++
+					continue
+				}
+				var entry map[string]any
+				if err := json.Unmarshal([]byte(line), &entry); err != nil {
+					continue
+				}
+				content, _ := entry["content"].(string)
+				obsType, _ := entry["obs_type"].(string)
+				if obsType == "" {
+					obsType = "note"
+				}
+				if err := observeToCMS(endpoint, bufferSpace, content, obsType,
+					[]string{"recovery-buffer", "synergy", "jiminy-outage"}); err != nil {
+					fmt.Printf("  WARN: Failed to flush local entry: %v\n", err)
+					continue
+				}
+				flushed++
+				flushedLocal++
+				if flushDelay > 0 && !atBatchLimit() {
+					time.Sleep(flushDelay)
+				}
+			}
+			if !dryRun && flushedLocal > 0 {
+				// Keep only unflushed lines
+				var kept []string
+				skipped := 0
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line == "" {
+						continue
+					}
+					skipped++
+					if skipped > flushedLocal {
+						kept = append(kept, line)
+					}
+				}
+				_ = os.WriteFile(bufferPath, []byte(strings.Join(kept, "\n")+"\n"), 0644)
+			}
+		}
+	}
+
+	// Step 2: Promote synergy-buffer space → mdemg-dev (throttled, respects batch limit)
+	if !atBatchLimit() {
+		promoteBudget := 50
+		if batchSize > 0 {
+			promoteBudget = batchSize - flushed
+		}
+		recallPayload := map[string]any{
+			"space_id":    bufferSpace,
+			"query":       "recovery-buffer",
+			"top_k":       promoteBudget,
+			"filter_tags": []string{"recovery-buffer"},
+		}
+		body, err := json.Marshal(recallPayload)
+		if err != nil {
+			return fmt.Errorf("failed to marshal recall payload: %w", err)
+		}
+
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Post( //nolint:gosec // G107: localhost API call
+			fmt.Sprintf("%s/v1/conversation/recall", endpoint),
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err != nil {
+			if flushed > 0 {
+				fmt.Printf("Flushed %d local entries. Server unreachable for CMS buffer promotion.\n", flushed)
+				return nil
+			}
+			return fmt.Errorf("server unreachable: %w", err)
+		}
+		defer resp.Body.Close()
+
+		var recallResult struct {
+			Results []struct {
+				ID      string `json:"id"`
+				Content string `json:"content"`
+				ObsType string `json:"obs_type"`
+			} `json:"results"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&recallResult); err != nil {
+			return fmt.Errorf("failed to decode recall response: %w", err)
+		}
+
+		for _, entry := range recallResult.Results {
+			if atBatchLimit() {
+				remaining++
+				continue
+			}
+			if dryRun {
+				fmt.Printf("  [dry-run] Would promote entry %s to %s\n", entry.ID, spaceID)
+				flushed++
+				continue
+			}
+			obsType := entry.ObsType
+			if obsType == "" {
+				obsType = "note"
+			}
+			if err := observeToCMS(endpoint, spaceID, entry.Content, obsType,
+				[]string{"recovery-buffer", "promoted"}); err != nil {
+				fmt.Printf("  WARN: Failed to promote entry %s: %v\n", entry.ID, err)
+				continue
+			}
+			flushed++
+			if flushDelay > 0 && !atBatchLimit() {
+				time.Sleep(flushDelay)
+			}
+		}
+	}
+
+	if dryRun {
+		fmt.Printf("\n[dry-run] Would flush %d total entries to %s\n", flushed, spaceID)
+	} else {
+		msg := fmt.Sprintf("Flushed %d entries to %s", flushed, spaceID)
+		if remaining > 0 {
+			msg += fmt.Sprintf(" (%d remaining — run again to continue)", remaining)
+		}
+		fmt.Println(msg)
+	}
+	return nil
+}
+
+// ─── Buffer helpers ───
+
+func resolveRecoveryBufferPath() string {
+	if v := os.Getenv("SYNERGY_RECOVERY_BUFFER_PATH"); v != "" {
+		return v
+	}
+	return filepath.Join(".mdemg", "synergy-recovery-buffer.jsonl")
+}
+
+func countLocalBufferLines(path string) int {
+	if path == "" {
+		return 0
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func toFloat(v any) float64 {

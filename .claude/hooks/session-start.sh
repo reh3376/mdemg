@@ -229,6 +229,112 @@ if [ "$SYNERGY_MIGRATED" = "true" ] && [ "$JIMINY_OK" = "false" ]; then
 !! JIMINY UNHEALTHY — .md files pruned, catastrophic forgetting risk!
 Run: mdemg start --auto-migrate
 SYNERGY_WARN
+
+  # Baseline snapshot: buffer MEMORY.md to synergy-buffer space (or local JSONL)
+  RECOVERY_BUFFER_SPACE="${SYNERGY_RECOVERY_BUFFER_SPACE:-synergy-buffer}"
+  RECOVERY_BUFFER_PATH="${SYNERGY_RECOVERY_BUFFER_PATH:-.mdemg/synergy-recovery-buffer.jsonl}"
+  MEMORY_PATH=""
+  for md_path in ~/.claude/projects/*/memory/MEMORY.md; do
+    if [ -f "$md_path" ]; then
+      MEMORY_PATH="$md_path"
+      break
+    fi
+  done
+  if [ -n "$MEMORY_PATH" ]; then
+    MEMORY_CONTENT=$(head -c 500 "$MEMORY_PATH" 2>/dev/null || true)
+    if [ -n "$MEMORY_CONTENT" ]; then
+      BASELINE_PAYLOAD=$(jq -nc --arg sid "$RECOVERY_BUFFER_SPACE" --arg content "$MEMORY_CONTENT" \
+        '{space_id: $sid, session_id: "claude-core", content: $content, obs_type: "constraint", tags: ["recovery-buffer", "baseline-snapshot", "jiminy-outage"]}')
+      # Try Tier 1: CMS buffer space
+      if ! curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
+        -H "Content-Type: application/json" \
+        -d "$BASELINE_PAYLOAD" \
+        --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null; then
+        # Tier 2: Local JSONL fallback
+        mkdir -p "$(dirname "$RECOVERY_BUFFER_PATH")"
+        echo "$BASELINE_PAYLOAD" >> "$RECOVERY_BUFFER_PATH"
+      fi
+    fi
+  fi
+fi
+
+# Recovery buffer auto-flush: when Jiminy is healthy, promote buffered entries
+if [ "$JIMINY_OK" = "true" ]; then
+  RECOVERY_BUFFER_SPACE="${SYNERGY_RECOVERY_BUFFER_SPACE:-synergy-buffer}"
+  RECOVERY_BUFFER_PATH="${SYNERGY_RECOVERY_BUFFER_PATH:-.mdemg/synergy-recovery-buffer.jsonl}"
+  AUTO_FLUSH="${SYNERGY_RECOVERY_AUTO_FLUSH:-true}"
+  FLUSH_COUNT=0
+
+  if [ "$AUTO_FLUSH" = "true" ]; then
+    # Throttle: max entries per session start and delay between each.
+    # Prevents overwhelming Jiminy after a long outage.
+    FLUSH_BATCH_SIZE="${SYNERGY_RECOVERY_FLUSH_BATCH_SIZE:-5}"
+    FLUSH_DELAY_MS="${SYNERGY_RECOVERY_FLUSH_DELAY_MS:-500}"
+    FLUSH_DELAY_SEC=$(echo "scale=3; $FLUSH_DELAY_MS / 1000" | bc -l 2>/dev/null || echo "0.5")
+    REMAINING=0
+
+    # Step 1: Flush local JSONL → synergy-buffer space (throttled)
+    if [ -f "$RECOVERY_BUFFER_PATH" ] && [ -s "$RECOVERY_BUFFER_PATH" ]; then
+      TOTAL_LOCAL=$(wc -l < "$RECOVERY_BUFFER_PATH" | tr -d ' ')
+      LINE_NUM=0
+      FLUSHED_LINES=""
+      while IFS= read -r line; do
+        LINE_NUM=$((LINE_NUM + 1))
+        if [ "$FLUSH_COUNT" -ge "$FLUSH_BATCH_SIZE" ]; then
+          REMAINING=$((TOTAL_LOCAL - LINE_NUM + 1))
+          break
+        fi
+        curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
+          -H "Content-Type: application/json" \
+          -d "$line" \
+          --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null && FLUSH_COUNT=$((FLUSH_COUNT + 1)) || true
+        [ "$FLUSH_DELAY_SEC" != "0" ] && sleep "$FLUSH_DELAY_SEC" 2>/dev/null || true
+      done < "$RECOVERY_BUFFER_PATH"
+      # Remove flushed lines, keep remaining
+      if [ "$FLUSH_COUNT" -gt 0 ]; then
+        tail -n +"$((FLUSH_COUNT + 1))" "$RECOVERY_BUFFER_PATH" > "${RECOVERY_BUFFER_PATH}.tmp" 2>/dev/null
+        mv "${RECOVERY_BUFFER_PATH}.tmp" "$RECOVERY_BUFFER_PATH" 2>/dev/null || true
+      fi
+    fi
+
+    # Step 2: Promote synergy-buffer → mdemg-dev (only if batch budget remains)
+    if [ "$FLUSH_COUNT" -lt "$FLUSH_BATCH_SIZE" ]; then
+      PROMOTE_BUDGET=$((FLUSH_BATCH_SIZE - FLUSH_COUNT))
+      BUFFER_ENTRIES=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
+        -H "Content-Type: application/json" \
+        -d "{\"space_id\":\"${RECOVERY_BUFFER_SPACE}\",\"query\":\"recovery-buffer\",\"top_k\":${PROMOTE_BUDGET},\"filter_tags\":[\"recovery-buffer\"]}" \
+        --connect-timeout 3 --max-time 10 2>/dev/null || echo "{}")
+
+      ENTRY_COUNT=$(echo "$BUFFER_ENTRIES" | jq -r '.results | length // 0' 2>/dev/null || echo "0")
+      if [ "$ENTRY_COUNT" -gt 0 ] 2>/dev/null; then
+        echo "$BUFFER_ENTRIES" | jq -c '.results[]?' 2>/dev/null | while IFS= read -r entry; do
+          CONTENT=$(echo "$entry" | jq -r '.content // empty' 2>/dev/null || true)
+          OBS_TYPE=$(echo "$entry" | jq -r '.obs_type // "note"' 2>/dev/null || echo "note")
+          if [ -n "$CONTENT" ]; then
+            curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -nc --arg c "$CONTENT" --arg t "$OBS_TYPE" \
+                '{space_id: "mdemg-dev", session_id: "claude-core", content: $c, obs_type: $t, tags: ["recovery-buffer", "promoted"]}')" \
+              --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null && FLUSH_COUNT=$((FLUSH_COUNT + 1)) || true
+            [ "$FLUSH_DELAY_SEC" != "0" ] && sleep "$FLUSH_DELAY_SEC" 2>/dev/null || true
+          fi
+        done
+      fi
+    fi
+
+    if [ "$FLUSH_COUNT" -gt 0 ] 2>/dev/null; then
+      echo ""
+      FLUSH_MSG="Flushed ${FLUSH_COUNT} buffered entries to mdemg-dev"
+      if [ "$REMAINING" -gt 0 ] 2>/dev/null; then
+        FLUSH_MSG="${FLUSH_MSG} (${REMAINING} remaining — will continue next session)"
+      fi
+      cat <<EOF
+═══ RECOVERY BUFFER FLUSH ═══
+${FLUSH_MSG}
+═══ END RECOVERY FLUSH ═══
+EOF
+    fi
+  fi
 fi
 
 # --- Self-improvement: reinforce recalled observations via co-activation ---
