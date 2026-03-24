@@ -149,6 +149,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	teardownCmd.GroupID = "config"
 	rootCmd.AddCommand(teardownCmd)
 
+	synergyCmd := newSynergyCmd()
+	synergyCmd.GroupID = "config"
+	rootCmd.AddCommand(synergyCmd)
+
 	// Advanced
 	mcpCmd := newMCPCmd()
 	mcpCmd.GroupID = "advanced"

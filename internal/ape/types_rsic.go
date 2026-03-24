@@ -122,6 +122,14 @@ type SelfAssessmentReport struct {
 	OverallHealth float64 `json:"overall_health"`
 	Confidence    float64 `json:"confidence"`
 
+	// Synergy: Claude Code ↔ MDEMG token optimization health
+	SynergyHealth       float64 `json:"synergy_health"`
+	SynergyOverflowRate float64 `json:"synergy_overflow_rate"`
+	SynergyOverlapScore float64 `json:"synergy_overlap_score"`
+	SynergyLinesClaude  int     `json:"synergy_lines_claude"`
+	SynergyLinesMemory  int     `json:"synergy_lines_memory"`
+	JiminyHealthy       bool    `json:"jiminy_healthy"`
+
 	// Raw details exposed for reflection
 	LearningPhase        string  `json:"learning_phase"`
 	EdgeCount            int64   `json:"edge_count"`

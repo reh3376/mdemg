@@ -192,6 +192,45 @@ if [ "${J17_ENABLED:-false}" = "true" ]; then
   fi
 fi
 
+# --- Synergy: fingerprint + Jiminy health check ---
+SYNERGY_MIGRATED=false
+if [ -f ".mdemg/synergy-migrated.json" ]; then
+  SYNERGY_MIGRATED=true
+fi
+
+JIMINY_OK=false
+JIMINY_HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/jiminy/healthz" --connect-timeout 2 2>/dev/null || echo "{}")
+if echo "$JIMINY_HEALTH_RESP" | jq -e '.enabled == true and .status == "ok"' >/dev/null 2>&1; then
+  JIMINY_OK=true
+fi
+
+# Synergy fingerprint observation (fire-and-forget)
+CLAUDE_MD_LINES=0
+MEMORY_MD_LINES=0
+if [ -f "CLAUDE.md" ]; then
+  CLAUDE_MD_LINES=$(wc -l < "CLAUDE.md" | tr -d ' ')
+fi
+for md_path in ~/.claude/projects/*/memory/MEMORY.md; do
+  if [ -f "$md_path" ]; then
+    MEMORY_MD_LINES=$(wc -l < "$md_path" | tr -d ' ')
+    break
+  fi
+done
+
+curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\",\"content\":\"Synergy fingerprint: CLAUDE.md=${CLAUDE_MD_LINES}L, MEMORY.md=${MEMORY_MD_LINES}L, jiminy=${JIMINY_OK}, migrated=${SYNERGY_MIGRATED}\",\"obs_type\":\"context_signal\",\"tags\":[\"synergy-fingerprint\"]}" \
+  --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
+
+# Critical warning if Jiminy down + migrated
+if [ "$SYNERGY_MIGRATED" = "true" ] && [ "$JIMINY_OK" = "false" ]; then
+  cat <<'SYNERGY_WARN'
+
+!! JIMINY UNHEALTHY — .md files pruned, catastrophic forgetting risk!
+Run: mdemg start --auto-migrate
+SYNERGY_WARN
+fi
+
 # --- Self-improvement: reinforce recalled observations via co-activation ---
 # Each session start that recalls observations should strengthen them.
 # Fire-and-forget: create a session-resume observation that co-activates with

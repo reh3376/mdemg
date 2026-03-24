@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/mathutil"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
@@ -21,6 +22,24 @@ import (
 // invalid - no prediction system should claim 100% confidence as it leaves
 // no room for belief updating with new evidence.
 const MaxConfidence = 0.95
+
+// retrievalScoreMidpoint and retrievalScoreSteepness control sigmoid
+// normalization of composite retrieval scores (unbounded sums) into [0, 1]
+// confidence values. These MUST match the values in internal/jiminy/retrieval_source.go
+// to ensure consistent confidence semantics across the system.
+const (
+	retrievalScoreMidpoint  = 2.0
+	retrievalScoreSteepness = 1.5
+)
+
+// normalizeRetrievalConfidence maps a composite retrieval score to [0, MaxConfidence].
+func normalizeRetrievalConfidence(score float64) float64 {
+	normalized := mathutil.NormalizeScore(score, retrievalScoreMidpoint, retrievalScoreSteepness)
+	if normalized > MaxConfidence {
+		return MaxConfidence
+	}
+	return normalized
+}
 
 // Retriever defines the interface for retrieving memory nodes.
 // This interface allows for mocking in tests.
@@ -338,7 +357,7 @@ func (s *Service) generateSuggestions(ctx context.Context, req models.ConsultReq
 		suggestions = append(suggestions, models.Suggestion{
 			Type:        suggestionType,
 			Content:     content,
-			Confidence:  r.Score, // Use retrieval score as base confidence
+			Confidence:  normalizeRetrievalConfidence(r.Score),
 			SourceNodes: []string{r.NodeID},
 		})
 	}
@@ -731,7 +750,7 @@ func (s *Service) generateProactiveSuggestions(ctx context.Context, req models.S
 		suggestions = append(suggestions, models.Suggestion{
 			Type:        suggType,
 			Content:     content,
-			Confidence:  r.Score,
+			Confidence:  normalizeRetrievalConfidence(r.Score),
 			SourceNodes: []string{r.NodeID},
 		})
 	}
@@ -959,7 +978,7 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 				ConstraintType: constraintType,
 				Scope:          r.Path,
 				SourceNodes:    []string{r.NodeID},
-				Confidence:     r.Score,
+				Confidence:     normalizeRetrievalConfidence(r.Score),
 			})
 		}
 	}

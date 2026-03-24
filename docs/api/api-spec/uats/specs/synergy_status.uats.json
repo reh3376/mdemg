@@ -1,0 +1,72 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Synergy Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "system",
+      "synergy",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-24",
+    "description": "Validates Synergy Status endpoint — reports Claude Code ↔ MDEMG synergy health",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": ""
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/synergy/status",
+    "query_params": {
+      "space_id": "${test_space}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.jiminy_healthy",
+        "type": "boolean"
+      },
+      {
+        "path": "$.data.claude_md_lines",
+        "type": "number"
+      },
+      {
+        "path": "$.data.memory_md_lines",
+        "type": "number"
+      },
+      {
+        "path": "$.data.auto_memory_files",
+        "type": "number"
+      },
+      {
+        "path": "$.data.auto_memory_lines",
+        "type": "number"
+      },
+      {
+        "path": "$.data.overflow_events_24h",
+        "type": "number"
+      },
+      {
+        "path": "$.data.synergy_health",
+        "type": "number"
+      },
+      {
+        "path": "$.data.migration_status",
+        "type": "string"
+      }
+    ]
+  }
+}

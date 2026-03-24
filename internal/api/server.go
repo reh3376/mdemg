@@ -1615,6 +1615,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/hash-verification/revert", s.handleHashVerificationRevert)
 	mux.HandleFunc("/v1/hash-verification/scan", s.handleHashVerificationScan)
 
+	// Synergy: Claude Code ↔ MDEMG token optimization
+	mux.HandleFunc("/v1/synergy/status", s.handleSynergyStatus)
+
 	// Wrap mux with middleware stack
 	// Order (outermost to innermost):
 	// 1. Compression (outermost)

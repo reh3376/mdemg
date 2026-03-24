@@ -1639,12 +1639,12 @@ func TestGenerateSuggestions_ClassifiesCorrectly(t *testing.T) {
 	}
 }
 
-func TestGenerateSuggestions_PreservesScoreAsConfidence(t *testing.T) {
+func TestGenerateSuggestions_NormalizesConfidence(t *testing.T) {
 	s := &Service{}
 	ctx := context.Background()
 
 	results := []models.RetrieveResult{
-		{NodeID: "n1", Name: "test", Summary: "test content", Score: 0.85},
+		{NodeID: "n1", Name: "test", Summary: "test content", Score: 3.5},
 	}
 
 	suggestions, err := s.generateSuggestions(ctx, models.ConsultRequest{Question: "test"}, results)
@@ -1655,8 +1655,14 @@ func TestGenerateSuggestions_PreservesScoreAsConfidence(t *testing.T) {
 		t.Fatalf("generateSuggestions() len = %d, want 1", len(suggestions))
 	}
 
-	if suggestions[0].Confidence != 0.85 {
-		t.Errorf("suggestion confidence = %v, want 0.85", suggestions[0].Confidence)
+	// Confidence must be in [0, MaxConfidence] after sigmoid normalization
+	conf := suggestions[0].Confidence
+	if conf <= 0 || conf > MaxConfidence {
+		t.Errorf("suggestion confidence = %v, want in (0, %.2f]", conf, MaxConfidence)
+	}
+	// A score of 3.5 (above midpoint 2.0) should yield high confidence
+	if conf < 0.5 {
+		t.Errorf("suggestion confidence = %v, want > 0.5 for score 3.5", conf)
 	}
 }
 

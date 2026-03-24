@@ -98,7 +98,7 @@ func (m *mockRetriever) RetrieveForJiminy(_ context.Context, _, _ string, _, _ i
 func TestGuide_WithRetriever(t *testing.T) {
 	retriever := &mockRetriever{
 		results: []RetrievalResult{
-			{NodeID: "r1", Name: "Past Decision", Summary: "Use PostgreSQL", Layer: 0, Score: 0.8, ObsType: "decision"},
+			{NodeID: "r1", Name: "Past Decision", Summary: "Use PostgreSQL", Layer: 0, Score: 3.0, ObsType: "decision"},
 		},
 	}
 	cfg := config.Config{

@@ -731,6 +731,22 @@ type Config struct {
 	NeuralRerankURL       string // NEURAL_RERANK_URL — sidecar service URL (default: "http://localhost:8100")
 	NeuralRerankTimeoutMs int    // NEURAL_RERANK_TIMEOUT_MS — timeout for sidecar re-rank call in ms (default: 1000)
 	NeuralRerankFallback  string // NEURAL_RERANK_FALLBACK — fallback provider if sidecar unavailable (default: from RERANK_PROVIDER)
+
+	// ===== Synergy: Claude Code ↔ MDEMG Token Optimization =====
+
+	SynergyMemoryLineThreshold int     // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
+	SynergyMemoryAutoIngest    bool    // SYNERGY_MEMORY_AUTO_INGEST — master switch for auto-ingestion (default: true)
+	SynergyClaudeMDPath        string  // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
+	SynergyMemoryMDPath        string  // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
+	SynergyAssessmentEnabled   bool    // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
+	SynergyTargetClaudeLines   int     // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
+	SynergyTargetMemoryLines   int     // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
+	SynergyOverlapSampleSize   int     // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
+	SynergyOverlapThreshold    float64 // SYNERGY_OVERLAP_THRESHOLD — similarity threshold for "overlapping" (default: 0.85)
+	SynergyOverflowAlertThreshold int  // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
+	SynergyMaxHookTokens       int     // SYNERGY_MAX_HOOK_TOKENS — max per-prompt hook injection tokens (default: 500)
+	SynergyCronInterval        string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
+	SynergyCronEnabled         bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -2887,6 +2903,42 @@ func FromEnv() (Config, error) {
 	}
 	neuralRerankFallback := get("NEURAL_RERANK_FALLBACK", rerankProvider)
 
+	// ===== Synergy =====
+	synergyMemoryLineThreshold, err := atoi("SYNERGY_MEMORY_LINE_THRESHOLD", 120)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyMemoryAutoIngest := getBool("SYNERGY_MEMORY_AUTO_INGEST", true)
+	synergyClaudeMDPath := get("SYNERGY_CLAUDE_MD_PATH", "")
+	synergyMemoryMDPath := get("SYNERGY_MEMORY_MD_PATH", "")
+	synergyAssessmentEnabled := getBool("SYNERGY_ASSESSMENT_ENABLED", true)
+	synergyTargetClaudeLines, err := atoi("SYNERGY_TARGET_CLAUDE_LINES", 150)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyTargetMemoryLines, err := atoi("SYNERGY_TARGET_MEMORY_LINES", 120)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyOverlapSampleSize, err := atoi("SYNERGY_OVERLAP_SAMPLE_SIZE", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyOverlapThreshold, err := atof("SYNERGY_OVERLAP_THRESHOLD", 0.85)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyOverflowAlertThreshold, err := atoi("SYNERGY_OVERFLOW_ALERT_THRESHOLD", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyMaxHookTokens, err := atoi("SYNERGY_MAX_HOOK_TOKENS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	synergyCronInterval := get("SYNERGY_CRON_INTERVAL", "4h")
+	synergyCronEnabled := getBool("SYNERGY_CRON_ENABLED", true)
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -3442,6 +3494,21 @@ func FromEnv() (Config, error) {
 		NeuralRerankURL:       neuralRerankURL,
 		NeuralRerankTimeoutMs: neuralRerankTimeoutMs,
 		NeuralRerankFallback:  neuralRerankFallback,
+
+		// Synergy
+		SynergyMemoryLineThreshold:    synergyMemoryLineThreshold,
+		SynergyMemoryAutoIngest:       synergyMemoryAutoIngest,
+		SynergyClaudeMDPath:           synergyClaudeMDPath,
+		SynergyMemoryMDPath:           synergyMemoryMDPath,
+		SynergyAssessmentEnabled:      synergyAssessmentEnabled,
+		SynergyTargetClaudeLines:      synergyTargetClaudeLines,
+		SynergyTargetMemoryLines:      synergyTargetMemoryLines,
+		SynergyOverlapSampleSize:      synergyOverlapSampleSize,
+		SynergyOverlapThreshold:       synergyOverlapThreshold,
+		SynergyOverflowAlertThreshold: synergyOverflowAlertThreshold,
+		SynergyMaxHookTokens:          synergyMaxHookTokens,
+		SynergyCronInterval:           synergyCronInterval,
+		SynergyCronEnabled:            synergyCronEnabled,
 	}, nil
 }
 

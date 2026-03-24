@@ -292,6 +292,51 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
+	// 17-20. Synergy monitoring patterns
+	if r.cfg.SynergyAssessmentEnabled {
+		// 17. Jiminy down but synergy migration occurred — catastrophic forgetting risk
+		if !report.JiminyHealthy && (report.SynergyLinesClaude+report.SynergyLinesMemory) > 0 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "synergy_jiminy_unhealthy",
+				Severity:          SeverityCritical,
+				Description:       "Jiminy is down but .md files are pruned — catastrophic forgetting risk. Restore Jiminy immediately.",
+				RecommendedAction: "alert_jiminy_critical",
+				Metric:            "jiminy_healthy",
+				Value:             0,
+				Threshold:         1,
+			})
+		}
+
+		// 18. Memory file bloat — overflow rate exceeds alert threshold
+		if report.SynergyOverflowRate > float64(r.cfg.SynergyOverflowAlertThreshold) {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "memory_file_bloat",
+				Severity:          SeverityMedium,
+				Description:       fmt.Sprintf("Synergy overflow rate %.1f exceeds threshold %d — memory files may be bloating", report.SynergyOverflowRate, r.cfg.SynergyOverflowAlertThreshold),
+				RecommendedAction: "alert_memory_bloat",
+				Metric:            "synergy_overflow_rate",
+				Value:             report.SynergyOverflowRate,
+				Threshold:         float64(r.cfg.SynergyOverflowAlertThreshold),
+			})
+		}
+
+		// 19. Synergy overlap drift — overlap score exceeds 0.4 threshold
+		if report.SynergyOverlapScore > 0.4 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "synergy_overlap_drift",
+				Severity:          SeverityMedium,
+				Description:       fmt.Sprintf("Synergy overlap score %.2f exceeds 0.4 threshold — CMS and .md content are diverging", report.SynergyOverlapScore),
+				RecommendedAction: "alert_synergy_overlap",
+				Metric:            "synergy_overlap_score",
+				Value:             report.SynergyOverlapScore,
+				Threshold:         0.4,
+			})
+		}
+
+		// 20. Hook injection growth — PLACEHOLDER: needs hook token data in report
+		// TODO: Add when SelfAssessmentReport includes hook token metrics
+	}
+
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)
 	if r.llmReflector != nil {
 		llmInsights, err := r.llmReflector.Reflect(ctx, report)
