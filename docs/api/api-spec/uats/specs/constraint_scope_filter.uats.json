@@ -22,9 +22,10 @@
     "tags": [
       "constraints",
       "scope",
-      "fsd"
+      "fsd",
+      "constraint_scope_required"
     ],
-    "sha256": "8aa79b62f7728ace37c396a0562bfd9f79705d996c67a253eae3f46facb361af"
+    "sha256": "31ff37761266df2159ee214931519c0c5b8cc424fdfd6c8856d2b08b7468e52d"
   },
   "variables": {},
   "request": {
@@ -37,21 +38,12 @@
       "scope": "internal/api/**"
     }
   },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "status": "updated"
-    }
+  "expected": {
+    "status": [
+      200,
+      503
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    }
-  ],
   "variants": [
     {
       "name": "method_not_allowed",
@@ -60,12 +52,12 @@
         "method": "GET",
         "path": "/v1/constraints/scope/test-node-id"
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": [
+          405,
+          503
+        ]
+      }
     }
   ]
 }

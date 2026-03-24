@@ -1174,6 +1174,12 @@ class Validator:
         request = self._merge_variant(self.spec.request, variant.get("request") if variant else None)
         expected = self._merge_variant(self.spec.expected, variant.get("expected") if variant else None)
 
+        # If the variant overrides expected but omits body_assertions,
+        # clear inherited base assertions — variant error responses
+        # (405, 400, etc.) have different body shapes than the base 200.
+        if variant and "expected" in variant and "body_assertions" not in variant.get("expected", {}):
+            expected.pop("body_assertions", None)
+
         # Variant-scoped variables override top-level variables.
         if variant and isinstance(variant.get("variables"), dict):
             variant_vars = VariableResolver(variant["variables"])

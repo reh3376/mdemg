@@ -24,9 +24,10 @@
       "neural",
       "health",
       "sidecar",
-      "fsd"
+      "fsd",
+      "sidecar_required"
     ],
-    "sha256": "05c70ea25e2fc6faf6501c152ea9665397fb8b2e3303bc3f73ae587fdc78f637"
+    "sha256": "50a7f343db9c8d118c2f977ea0284581ce998eed7061e31a1ea14e51028c2cbc"
   },
   "variables": {},
   "request": {
@@ -36,32 +37,20 @@
       "Content-Type": "application/json"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "status": "ok",
-      "models_loaded": [],
-      "last_inference_ms": null
-    }
+    "body_assertions": [
+      {
+        "name": "status exists",
+        "path": "$.status",
+        "exists": true
+      },
+      {
+        "name": "models_loaded exists",
+        "path": "$.models_loaded",
+        "exists": true
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.status",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.models_loaded",
-      "op": "exists"
-    }
-  ],
   "variants": []
 }

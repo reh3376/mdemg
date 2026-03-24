@@ -24,7 +24,7 @@
       "effectiveness",
       "fsd"
     ],
-    "sha256": "762ecf95ea00b915bf3cf13bb314619440a532f0c0df61520cd24da59c496ad9"
+    "sha256": "4f1c16955e5631299f1042c9a7c49327f00f79353b87d520b5feb0aceecf9aad"
   },
   "variables": {},
   "request": {
@@ -39,54 +39,35 @@
       "space_id": "test-space"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "data": {
-        "guidance_id": "test-guidance-id",
-        "results": [],
-        "applied": false
+    "body_assertions": [
+      {
+        "name": "guidance_id echoed",
+        "path": "$.data.guidance_id",
+        "equals": "test-guidance-id"
+      },
+      {
+        "name": "results array exists",
+        "path": "$.data.results",
+        "exists": true
       }
-    }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.data.guidance_id",
-      "op": "equals",
-      "expected": "test-guidance-id"
-    },
-    {
-      "type": "json_path",
-      "path": "$.data.results",
-      "op": "exists"
-    }
-  ],
   "variants": [
     {
       "name": "missing_guidance_id",
       "description": "POST without guidance_id returns 400",
       "request": {
-        "method": "POST",
-        "path": "/v1/jiminy/feedback",
         "body": {
+          "guidance_id": "",
           "action_summary": "something",
           "space_id": "test"
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 400
-        }
-      ]
+      "expected": {
+        "status": 400
+      }
     }
   ]
 }

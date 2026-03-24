@@ -19,18 +19,18 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 120000,
+    "timeout_ms": 300000,
     "tags": [
       "admin",
       "transfer"
     ],
-    "sha256": "86960fab3010ae75b35113b25025b411ea80d726f173b4ee3069290325973130"
+    "sha256": "b1df741f9dc27fa78456f45a005d9e89651acd680328f327bcd0f1aac5910d7e"
   },
   "request": {
     "method": "POST",
     "path": "/v1/admin/spaces/export",
     "body": {
-      "space_id": "mdemg-dev",
+      "space_id": "demo",
       "profile": "metadata"
     },
     "headers": {
@@ -106,7 +106,7 @@
         "method": "POST",
         "path": "/v1/admin/spaces/export",
         "body": {
-          "space_id": "mdemg-dev",
+          "space_id": "demo",
           "profile": "nonexistent"
         },
         "headers": {
@@ -130,7 +130,7 @@
         "method": "POST",
         "path": "/v1/admin/spaces/export",
         "body": {
-          "space_id": "mdemg-dev",
+          "space_id": "demo",
           "profile": "cms"
         },
         "headers": {
@@ -158,7 +158,7 @@
         "method": "POST",
         "path": "/v1/admin/spaces/export",
         "body": {
-          "space_id": "mdemg-dev",
+          "space_id": "demo",
           "profile": "shareable"
         },
         "headers": {

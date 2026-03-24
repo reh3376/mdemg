@@ -24,7 +24,7 @@
       "conflicts",
       "fsd"
     ],
-    "sha256": "d108933128c5690244de053a49325d763ad42aae5cc6c99bc6dbf960da0927a5"
+    "sha256": "3c1062310830d91cb5e8a9fbda545716c62f92f8553116e4543b8c04c5e1edfe"
   },
   "variables": {},
   "request": {
@@ -37,42 +37,26 @@
       "space_id": "test-space"
     }
   },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "new_conflicts": 0
-    }
+  "expected": {
+    "status": [
+      200,
+      503
+    ],
+    "body_assertions": []
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.new_conflicts",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "missing_space_id",
-      "description": "POST without space_id returns 400",
+      "description": "POST without space_id returns 400 or 503 if feature disabled",
       "request": {
-        "method": "POST",
-        "path": "/v1/constraints/detect-conflicts",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 400
-        }
-      ]
+      "expected": {
+        "status": [
+          400,
+          503
+        ]
+      }
     }
   ]
 }

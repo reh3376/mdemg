@@ -25,7 +25,7 @@
       "enforcement",
       "fsd"
     ],
-    "sha256": "52742c4045e1312e7b9c7501298f9c6439b5449b22d059850051e99eeb1ece20"
+    "sha256": "1df1c72e2df27b74d490f346ac275f579f82dc65d0e680d1271c505fc542c950"
   },
   "variables": {},
   "request": {
@@ -34,37 +34,25 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "query_params": {
+    "query": {
       "limit": "10"
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "events": [],
-      "total": 0
-    }
+    "body_assertions": [
+      {
+        "name": "events array exists",
+        "path": "$.events",
+        "exists": true
+      },
+      {
+        "name": "total is number",
+        "path": "$.total",
+        "type": "number"
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.events",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.total",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "default_limit",
@@ -73,17 +61,16 @@
         "method": "GET",
         "path": "/v1/guardrail/events"
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 200
-        },
-        {
-          "type": "json_path",
-          "path": "$.events",
-          "op": "exists"
-        }
-      ]
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "events array exists",
+            "path": "$.events",
+            "exists": true
+          }
+        ]
+      }
     },
     {
       "name": "method_not_allowed",
@@ -93,12 +80,9 @@
         "path": "/v1/guardrail/events",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": 405
+      }
     }
   ]
 }

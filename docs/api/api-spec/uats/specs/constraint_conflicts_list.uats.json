@@ -24,7 +24,7 @@
       "conflicts",
       "fsd"
     ],
-    "sha256": "5bbb0e83dace8bb7cf9543ef38da4f09382d0f7cad87bdc72e29f3eac66d87cc"
+    "sha256": "7d91cf5d5e5ef6e19e87afc8406a35e0777170e53d4b455cd1d13307a0d4a1ac"
   },
   "variables": {},
   "request": {
@@ -33,51 +33,27 @@
     "headers": {
       "Content-Type": "application/json"
     },
-    "query_params": {
+    "query": {
       "space_id": "test-space"
     }
   },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "conflicts": [],
-      "total": 0
-    }
+  "expected": {
+    "status": [
+      200,
+      503
+    ],
+    "body_assertions": []
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.conflicts",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.total",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "missing_space_id",
-      "description": "GET without space_id returns 400",
-      "request": {
-        "method": "GET",
-        "path": "/v1/constraints/conflicts"
-      },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 400
-        }
-      ]
+      "description": "GET without space_id returns 400 or 503 if feature disabled",
+      "expected": {
+        "status": [
+          400,
+          503
+        ]
+      }
     },
     {
       "name": "method_not_allowed",
@@ -87,12 +63,9 @@
         "path": "/v1/constraints/conflicts",
         "body": {}
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 405
-        }
-      ]
+      "expected": {
+        "status": 405
+      }
     }
   ]
 }

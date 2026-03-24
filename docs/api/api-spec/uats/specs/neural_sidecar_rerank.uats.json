@@ -24,9 +24,10 @@
       "neural",
       "rerank",
       "sidecar",
-      "fsd"
+      "fsd",
+      "sidecar_required"
     ],
-    "sha256": "ba0349d3262b0d3bdcedb25cd48611efa78da664b5fef6c6f1367dfc445285a1"
+    "sha256": "24853ddd7497b1b4c53f2825a02c1e446cd9c578c67211461247da4fffdc28b9"
   },
   "variables": {},
   "request": {
@@ -45,46 +46,31 @@
       "top_n": 3
     }
   },
-  "response": {
+  "expected": {
     "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "results": [],
-      "model": "",
-      "latency_ms": 0
-    }
+    "body_assertions": [
+      {
+        "name": "results exists",
+        "path": "$.results",
+        "exists": true
+      },
+      {
+        "name": "model exists",
+        "path": "$.model",
+        "exists": true
+      },
+      {
+        "name": "latency_ms is number",
+        "path": "$.latency_ms",
+        "type": "number"
+      }
+    ]
   },
-  "assertions": [
-    {
-      "type": "status",
-      "expected": 200
-    },
-    {
-      "type": "json_path",
-      "path": "$.results",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.model",
-      "op": "exists"
-    },
-    {
-      "type": "json_path",
-      "path": "$.latency_ms",
-      "op": "gte",
-      "expected": 0
-    }
-  ],
   "variants": [
     {
       "name": "top_n_1",
       "description": "Rerank with top_n=1 returns single result",
       "request": {
-        "method": "POST",
-        "path": "/rerank",
         "body": {
           "query": "database migration",
           "documents": [
@@ -94,43 +80,35 @@
           "top_n": 1
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 200
-        },
-        {
-          "type": "json_path",
-          "path": "$.results",
-          "op": "exists"
-        }
-      ]
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "results exists",
+            "path": "$.results",
+            "exists": true
+          }
+        ]
+      }
     },
     {
       "name": "validation_error_missing_query",
       "description": "POST without query returns 422",
       "request": {
-        "method": "POST",
-        "path": "/rerank",
         "body": {
           "documents": [
             "doc1"
           ]
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 422
-        }
-      ]
+      "expected": {
+        "status": 422
+      }
     },
     {
       "name": "validation_error_top_n_zero",
       "description": "POST with top_n=0 returns 422",
       "request": {
-        "method": "POST",
-        "path": "/rerank",
         "body": {
           "query": "test",
           "documents": [
@@ -139,12 +117,9 @@
           "top_n": 0
         }
       },
-      "assertions": [
-        {
-          "type": "status",
-          "expected": 422
-        }
-      ]
+      "expected": {
+        "status": 422
+      }
     }
   ]
 }
