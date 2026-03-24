@@ -14,7 +14,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Jiminy readiness endpoint — reports features, services, config, and optional stats",
+    "description": "Validates Jiminy readiness endpoint \u2014 reports features, services, config, and optional stats",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -23,7 +23,8 @@
     "tags": [
       "jiminy",
       "readiness"
-    ]
+    ],
+    "sha256": "5f0a313cd191ed78e2f8e8df15d8092d2db3cb9402affb008c885ae2c9943647"
   },
   "variables": {},
   "request": {

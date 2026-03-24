@@ -14,7 +14,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-24",
-    "description": "Validates Jiminy healthz liveness endpoint — returns enabled/disabled status",
+    "description": "Validates Jiminy healthz liveness endpoint \u2014 returns enabled/disabled status",
     "test_type": "contract",
     "priority": "medium"
   },
@@ -23,7 +23,8 @@
     "tags": [
       "jiminy",
       "health"
-    ]
+    ],
+    "sha256": "46cb5bd28a0281e1592acea9e628fe5db1f06bd4f17a38e9a34baf4f3c5df582"
   },
   "variables": {},
   "request": {
