@@ -201,6 +201,12 @@ jobs:
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
             --profile quick
 
+      - name: Run UAMS Auth Method Validation (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/tests/uams/runners/uams_runner.py validate-all \
+            --spec-dir docs/tests/uams/specs/
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

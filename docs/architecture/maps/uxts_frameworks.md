@@ -11,7 +11,4 @@ UNTS|hash verification|registry|runner:active|CI:merge-blocking
 UETS|emergence eval:LLM concept-naming quality|8s|runner:active|CI:soft-fail
 UITS|iterative-improvement:T1 encoding comprehension|11s|runner:active|CI:soft-fail
 UVTS|semantic validation|1 canonical,1 draft|runner:active|CI:soft-fail
-UAMS|auth methods|4s|runner:UNBUILT|CI:none→GAP-21:pending
-
-STATUS-EXCEPTIONS:
-  UAMS|runner:UNBUILT|only framework with no runner implementation→GAP-21
+UAMS|auth methods|4s|runner:active|CI:soft-fail
