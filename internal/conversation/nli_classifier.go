@@ -2,7 +2,7 @@ package conversation
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"mdemg/internal/config"
 )
@@ -35,7 +35,7 @@ func (c *NLIConstraintClassifier) IsConstraint(ctx context.Context, text string)
 	premise := "This text describes a requirement, rule, or constraint that must be followed."
 	result, err := classifyNLI(ctx, sidecarURL, premise, text, 1000)
 	if err != nil {
-		log.Printf("nli_classifier: NLI call failed (allowing detection): %v", err)
+		slog.Warn("nli_classifier: NLI call failed, allowing detection", "error", err)
 		return true, 0.0 // Fail-open
 	}
 
@@ -44,7 +44,6 @@ func (c *NLIConstraintClassifier) IsConstraint(ctx context.Context, text string)
 		return true, result.Scores.Entailment
 	}
 
-	log.Printf("nli_classifier: text rejected as non-constraint (entailment=%.2f, contradiction=%.2f)",
-		result.Scores.Entailment, result.Scores.Contradiction)
+	slog.Info("nli_classifier: text rejected as non-constraint", "entailment", result.Scores.Entailment, "contradiction", result.Scores.Contradiction)
 	return false, result.Scores.Entailment
 }

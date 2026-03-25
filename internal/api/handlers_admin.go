@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -304,7 +304,7 @@ func (s *Server) runAutoSpacePrune() (int, int, int) {
 	`, nil)
 	if err != nil {
 		session.Close(ctx)
-		log.Printf("[auto-prune] candidate query failed: %v", err)
+		slog.Error("auto-prune: candidate query failed", "error", err)
 		return 0, 0, 1
 	}
 
@@ -327,13 +327,13 @@ func (s *Server) runAutoSpacePrune() (int, int, int) {
 	for _, spaceID := range candidates {
 		deleted, err := s.pruneSpace(ctx, spaceID, 10000)
 		if err != nil {
-			log.Printf("[auto-prune] space %s failed: %v", spaceID, err)
+			slog.Error("auto-prune: space prune failed", "space_id", spaceID, "error", err)
 			errCount++
 			continue
 		}
 		spacesPruned++
 		totalDeleted += deleted
-		log.Printf("[auto-prune] pruned space %s: %d nodes deleted", spaceID, deleted)
+		slog.Info("auto-prune: pruned space", "space_id", spaceID, "nodes_deleted", deleted)
 	}
 
 	// Invalidate graph metrics cache so Grafana updates immediately
@@ -403,7 +403,7 @@ func (s *Server) pruneSpace(ctx context.Context, spaceID string, batchSize int) 
 		DETACH DELETE s
 	`, map[string]any{"spaceId": spaceID})
 	if err != nil {
-		log.Printf("[admin] prune: failed to delete RSICState for %s: %v", spaceID, err)
+		slog.Error("admin prune: failed to delete RSICState", "space_id", spaceID, "error", err)
 	}
 
 	return totalDeleted, nil

@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync/atomic"
 	"time"
 
@@ -80,8 +80,7 @@ func NewDriver(cfg config.Config) (neo4j.DriverWithContext, error) {
 	}
 
 	// Log pool configuration
-	log.Printf("Neo4j connection pool configured (max=%d, acquire_timeout=%ds)",
-		cfg.Neo4jMaxPoolSize, cfg.Neo4jAcquireTimeoutSec)
+	slog.Info("Neo4j connection pool configured", "max_pool_size", cfg.Neo4jMaxPoolSize, "acquire_timeout_sec", cfg.Neo4jAcquireTimeoutSec)
 
 	return driver, nil
 }

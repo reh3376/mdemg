@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -236,12 +236,12 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 				outcome, err := s.rsicCycle.RunCycle(context.Background(), req.SpaceID, ape.TierMeso, opts)
 				if err != nil {
 					s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMeso)
-					log.Printf("RSIC session-periodic meso cycle failed: %v", err)
+					slog.Error("RSIC session-periodic meso cycle failed", "error", err)
 					return
 				}
 				s.orchestrationPolicy.RecordTrigger(meta, req.SpaceID, ape.TierMeso, outcome.CycleID)
 				s.orchestrationPolicy.CompleteCycle(req.SpaceID, ape.TierMeso)
-				log.Printf("RSIC session-periodic meso cycle complete: %s", outcome.CycleID)
+				slog.Info("RSIC session-periodic meso cycle complete", "cycle_id", outcome.CycleID)
 			}()
 		}
 	}

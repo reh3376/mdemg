@@ -3,7 +3,7 @@ package learning
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -190,11 +190,9 @@ func (s *Service) UpdateEdgeWithRetry(
 	if result.VersionConflicts > 0 {
 		edgeID := srcNodeID + "->" + dstNodeID
 		if result.FinalError == nil {
-			log.Printf("learning: edge update succeeded after %d attempts (conflicts=%d): %s",
-				result.Attempts, result.VersionConflicts, edgeID)
+			slog.Info("learning: edge update succeeded after retries", "attempts", result.Attempts, "conflicts", result.VersionConflicts, "edge", edgeID)
 		} else {
-			log.Printf("learning: edge update failed after %d attempts (conflicts=%d): %s: %v",
-				result.Attempts, result.VersionConflicts, edgeID, result.FinalError)
+			slog.Error("learning: edge update failed after retries", "attempts", result.Attempts, "conflicts", result.VersionConflicts, "edge", edgeID, "error", result.FinalError)
 		}
 	}
 

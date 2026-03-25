@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -78,7 +78,7 @@ func (ss *SnapshotStore) CaptureSnapshot(ctx context.Context, cycleID, action, s
 	// Capture pre-state based on action type
 	preState, err := ss.capturePreState(ctx, action, spaceID)
 	if err != nil {
-		log.Printf("RSIC snapshot: pre-state capture failed for %s: %v (snapshot created without pre-state)", action, err)
+		slog.Warn("RSIC snapshot: pre-state capture failed, snapshot created without pre-state", "action", action, "error", err)
 		snap.Reversible = false
 	} else {
 		snap.PreState = preState
@@ -324,13 +324,13 @@ func (ss *SnapshotStore) applyRollback(ctx context.Context, snap *ActionSnapshot
 		return ss.rollbackGraduate(ctx, snap)
 	case "refresh_stale_edges":
 		// Timestamp-only changes are low-impact; just log
-		log.Printf("RSIC rollback: refresh_stale_edges rollback is a no-op (timestamp-only change)")
+		slog.Info("RSIC rollback: refresh_stale_edges rollback is a no-op", "reason", "timestamp-only change")
 		return 0, nil
 	case "trigger_consolidation":
-		log.Printf("RSIC rollback: trigger_consolidation — constructive action, rollback not applicable")
+		slog.Info("RSIC rollback: trigger_consolidation rollback not applicable", "reason", "constructive action")
 		return 0, fmt.Errorf("consolidation rollback not supported (constructive action creates new items)")
 	case "prune_decayed_edges", "prune_excess_edges":
-		log.Printf("RSIC rollback: %s edge rollback — edges were deleted, cannot fully restore", snap.Action)
+		slog.Warn("RSIC rollback: edge rollback not supported, edges were permanently removed", "action", snap.Action)
 		return 0, fmt.Errorf("edge deletion rollback not supported (edges were permanently removed)")
 	default:
 		return 0, fmt.Errorf("unknown action for rollback: %s", snap.Action)

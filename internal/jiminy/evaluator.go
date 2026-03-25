@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -73,18 +73,18 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 	if e.embedder != nil {
 		embedding, err := e.embedder.Embed(ctx, req.AgentOutput)
 		if err != nil {
-			log.Printf("jiminy evaluator: embedding failed: %v", err)
+			slog.Error("jiminy evaluator: embedding failed", "error", err)
 		} else {
 			cItems, cErr := e.findMatchingConstraints(ctx, req.SpaceID, embedding)
 			if cErr != nil {
-				log.Printf("jiminy evaluator: constraint search failed: %v", cErr)
+				slog.Error("jiminy evaluator: constraint search failed", "error", cErr)
 			} else {
 				constraintItems = append(constraintItems, cItems...)
 			}
 
 			corrItems, corrErr := e.findMatchingCorrections(ctx, req.SpaceID, embedding)
 			if corrErr != nil {
-				log.Printf("jiminy evaluator: correction search failed: %v", corrErr)
+				slog.Error("jiminy evaluator: correction search failed", "error", corrErr)
 			} else {
 				correctionItems = append(correctionItems, corrItems...)
 			}
@@ -97,7 +97,7 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 	if e.cfg.JiminyEvaluateLLMEnabled && e.llm != nil && len(allTier1Items) > 0 {
 		llmItems, llmErr := e.llmEvaluate(ctx, req.AgentOutput, constraintItems, correctionItems)
 		if llmErr != nil {
-			log.Printf("jiminy evaluator: LLM evaluation failed (using Tier 1 only): %v", llmErr)
+			slog.Warn("jiminy evaluator: LLM evaluation failed, using Tier 1 only", "error", llmErr)
 			// Fail-open: use Tier 1 vector-only results
 		} else if llmItems != nil {
 			// Replace Tier 1 with revalidated LLM results
@@ -209,8 +209,8 @@ func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constra
 	// Revalidate: demote should/should_not violations to warnings
 	items := revalidateResults(result, constraintMap)
 
-	log.Printf("jiminy evaluator: LLM Tier 2 returned %d violations, %d warnings",
-		len(result.Violations), len(result.Warnings))
+	slog.Info("jiminy evaluator: LLM Tier 2 completed",
+		"violations", len(result.Violations), "warnings", len(result.Warnings))
 
 	return items, nil
 }

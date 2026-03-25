@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand/v2"
 	"sort"
 	"strings"
@@ -114,9 +114,9 @@ func (r *Reclassifier) ReclassifyOversizedCategories(ctx context.Context, classe
 
 		if len(actionable) == 0 {
 			if len(oversized) > 0 {
-				log.Printf("Reclassifier: terminated after %d iterations — %d categories stuck at threshold", iteration-1, len(oversized))
+				slog.Warn("Reclassifier terminated with stuck categories", "iterations", iteration-1, "stuck_categories", len(oversized))
 			} else if iteration > 1 {
-				log.Printf("Reclassifier: converged after %d iterations", iteration-1)
+				slog.Info("Reclassifier converged", "iterations", iteration-1)
 			}
 			break
 		}
@@ -130,26 +130,26 @@ func (r *Reclassifier) ReclassifyOversizedCategories(ctx context.Context, classe
 			}
 		}
 
-		log.Printf("Reclassifier: iteration %d — %d oversized categories to split", iteration, len(actionable))
+		slog.Info("Reclassifier iteration", "iteration", iteration, "oversized_categories", len(actionable))
 
 		for _, cat := range actionable {
 			nodes := result[cat]
 			summaries := r.sampleSummaries(nodes, r.cfg.MaxSampleSize)
 			if len(summaries) == 0 {
-				log.Printf("Reclassifier: no summaries available for %q, skipping", cat)
+				slog.Warn("Reclassifier no summaries available, skipping", "category", cat)
 				failed[cat] = true
 				continue
 			}
 
 			subCats, err := r.proposeSubCategories(ctx, cat, len(nodes), summaries)
 			if err != nil {
-				log.Printf("Reclassifier: LLM failed for %q: %v — keeping category", cat, err)
+				slog.Error("Reclassifier LLM failed, keeping category", "category", cat, "err", err)
 				failed[cat] = true
 				continue
 			}
 
 			if len(subCats) < 2 {
-				log.Printf("Reclassifier: LLM proposed <2 sub-categories for %q, skipping", cat)
+				slog.Warn("Reclassifier LLM proposed fewer than 2 sub-categories, skipping", "category", cat, "proposed", len(subCats))
 				failed[cat] = true
 				continue
 			}
@@ -171,7 +171,7 @@ func (r *Reclassifier) ReclassifyOversizedCategories(ctx context.Context, classe
 				}
 			}
 			if maxSubFraction >= 0.90 {
-				log.Printf("Reclassifier: dominant sub-category holds %.0f%% of %q — split ineffective, skipping", maxSubFraction*100, cat)
+				slog.Warn("Reclassifier split ineffective, dominant sub-category too large", "category", cat, "dominant_pct", maxSubFraction*100)
 				failed[cat] = true
 				continue
 			}
@@ -194,9 +194,9 @@ func (r *Reclassifier) ReclassifyOversizedCategories(ctx context.Context, classe
 				r.CategoryDescriptions[miscKey] = "Miscellaneous files not matching other sub-categories"
 			}
 
-			log.Printf("Reclassifier: split %q (%d nodes) into %d sub-categories:", cat, len(nodes), len(subMap))
+			slog.Info("Reclassifier split category", "category", cat, "nodes", len(nodes), "sub_categories", len(subMap))
 			for subCat, subNodes := range subMap {
-				log.Printf("  %s: %d nodes", subCat, len(subNodes))
+				slog.Info("Reclassifier sub-category", "sub_category", subCat, "nodes", len(subNodes))
 			}
 		}
 
@@ -210,7 +210,7 @@ func (r *Reclassifier) ReclassifyOversizedCategories(ctx context.Context, classe
 			}
 		}
 		if maxFractionBefore-maxFractionAfter < 0.05 {
-			log.Printf("Reclassifier: insufficient progress (%.1f%% → %.1f%%), stopping", maxFractionBefore*100, maxFractionAfter*100)
+			slog.Warn("Reclassifier insufficient progress, stopping", "before_pct", maxFractionBefore*100, "after_pct", maxFractionAfter*100)
 			break
 		}
 	}
@@ -234,8 +234,7 @@ func (r *Reclassifier) detectOversizedCategories(classes map[string][]BaseNode, 
 		}
 		fraction := float64(len(nodes)) / float64(totalNodes)
 		if fraction >= r.cfg.Threshold {
-			log.Printf("Reclassifier: %q is oversized (%.1f%% of %d total, threshold %.0f%%)",
-				cat, fraction*100, totalNodes, r.cfg.Threshold*100)
+			slog.Info("Reclassifier category oversized", "category", cat, "fraction_pct", fraction*100, "total_nodes", totalNodes, "threshold_pct", r.cfg.Threshold*100)
 			oversized = append(oversized, cat)
 		}
 	}

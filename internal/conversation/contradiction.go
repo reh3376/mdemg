@@ -2,7 +2,7 @@ package conversation
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -103,7 +103,7 @@ func (c *ContradictionChecker) CheckContradictions(ctx context.Context, obs Obse
 			// F2b: Use NLI sidecar for more accurate contradiction detection.
 			nliResult, nliErr := classifyNLI(ctx, cfg.NLISidecarURL, cand.Content, obs.Content, cfg.NLITimeoutMs)
 			if nliErr != nil {
-				log.Printf("[WARN] contradiction NLI call failed, falling back to heuristics: %v", nliErr)
+				slog.Warn("contradiction NLI call failed, falling back to heuristics", "error", nliErr)
 				// Fallback to heuristic on error
 				isContradiction = detectNegation(obs.Content, cand.Content)
 			} else {

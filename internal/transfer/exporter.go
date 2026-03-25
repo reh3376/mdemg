@@ -3,7 +3,7 @@ package transfer
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -107,7 +107,7 @@ func ExportConfigForProfile(spaceID, profile string) (ExportConfig, error) {
 
 // ExportFromRequest builds an ExportConfig from a protobuf ExportRequest.
 func ExportFromRequest(req *pb.ExportRequest) ExportConfig {
-	log.Printf("[DEBUG] ExportFromRequest: SpaceId=%q SinceTimestamp=%q SinceCursor=%q", req.SpaceId, req.SinceTimestamp, req.SinceCursor)
+	slog.Debug("ExportFromRequest", "space_id", req.SpaceId, "since_timestamp", req.SinceTimestamp, "since_cursor", req.SinceCursor)
 	cfg := DefaultExportConfig(req.SpaceId)
 	if req.ChunkSize > 0 {
 		cfg.ChunkSize = int(req.ChunkSize)
@@ -170,7 +170,7 @@ func (e *Exporter) Export(ctx context.Context, cfg ExportConfig) (*ExportResult,
 	// Detect embedding dimensions
 	embDims, err := e.detectEmbeddingDimensions(ctx, cfg.SpaceID)
 	if err != nil {
-		log.Printf("WARN: could not detect embedding dimensions: %v", err)
+		slog.Warn("could not detect embedding dimensions", "error", err)
 	}
 
 	hostname, _ := os.Hostname()
@@ -456,7 +456,7 @@ func (e *Exporter) exportNodes(ctx context.Context, cfg ExportConfig, schemaVers
 		*seq++
 		skip += cfg.ChunkSize
 
-		log.Printf("Exported %d nodes (batch %d)", skip, *seq-1)
+		slog.Info("exported nodes", "count", skip, "batch", *seq-1)
 
 		if len(batch) < cfg.ChunkSize {
 			break

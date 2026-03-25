@@ -1,7 +1,7 @@
 package jiminy
 
 import (
-	"log"
+	"log/slog"
 	"math/rand/v2"
 	"strings"
 )
@@ -73,8 +73,8 @@ func (a *SidecarArbitrator) ArbitrateTier(item GuidanceItem, ruleTier int, mlTie
 	// NS-10: Protected codes NEVER use ML tier regardless of mode
 	if a.isProtected(item.ConstraintCode) {
 		if a.logProtected && mlTier != ruleTier {
-			log.Printf("j17-arbitrator: protected code %q — ML would change tier %d→%d (blocked)",
-				item.ConstraintCode, ruleTier, mlTier)
+			slog.Warn("j17-arbitrator: protected code ML tier change blocked",
+				"code", item.ConstraintCode, "rule_tier", ruleTier, "ml_tier", mlTier)
 		}
 		return ArbitrationResult{ChosenTier: ruleTier, Source: "rule", Agreed: agreed}
 	}

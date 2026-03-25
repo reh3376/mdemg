@@ -3,7 +3,7 @@ package scraper
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"mdemg/internal/jobs"
 )
@@ -49,7 +49,7 @@ func (r *Reviewer) ProcessReview(ctx context.Context, jobID string, decisions []
 		case "approve":
 			nodeID, err := r.ingestContent(ctx, d.ContentID, d.SpaceID, defaultSpaceID)
 			if err != nil {
-				log.Printf("scraper review: ingest failed for %s: %v", d.ContentID, err)
+				slog.Error("scraper review: ingest failed", "content_id", d.ContentID, "error", err)
 				continue
 			}
 			resp.Ingested = append(resp.Ingested, IngestedItem{
@@ -59,7 +59,7 @@ func (r *Reviewer) ProcessReview(ctx context.Context, jobID string, decisions []
 
 		case "reject":
 			if err := r.store.UpdateContentStatus(ctx, d.ContentID, ContentRejected); err != nil {
-				log.Printf("scraper review: reject failed for %s: %v", d.ContentID, err)
+				slog.Error("scraper review: reject failed", "content_id", d.ContentID, "error", err)
 			}
 			resp.Rejected++
 
@@ -75,13 +75,13 @@ func (r *Reviewer) ProcessReview(ctx context.Context, jobID string, decisions []
 			}
 			if d.EditContent != "" {
 				if err := r.store.UpdateScrapedContentContent(ctx, d.ContentID, d.EditContent, tags); err != nil {
-					log.Printf("scraper review: edit failed for %s: %v", d.ContentID, err)
+					slog.Error("scraper review: edit failed", "content_id", d.ContentID, "error", err)
 					continue
 				}
 			}
 			nodeID, err := r.ingestContent(ctx, d.ContentID, d.SpaceID, defaultSpaceID)
 			if err != nil {
-				log.Printf("scraper review: ingest after edit failed for %s: %v", d.ContentID, err)
+				slog.Error("scraper review: ingest after edit failed", "content_id", d.ContentID, "error", err)
 				continue
 			}
 			resp.Ingested = append(resp.Ingested, IngestedItem{
@@ -99,7 +99,7 @@ func (r *Reviewer) ProcessReview(ctx context.Context, jobID string, decisions []
 	// Check if all content is reviewed
 	pending, err := r.store.CountPendingReview(ctx, jobID)
 	if err != nil {
-		log.Printf("scraper review: count pending failed: %v", err)
+		slog.Error("scraper review: count pending failed", "error", err)
 	}
 
 	if pending == 0 {
@@ -143,8 +143,7 @@ func (r *Reviewer) ingestContent(ctx context.Context, contentID, overrideSpaceID
 	parseResult := parser.Parse(sc.Title, sc.Content, sc.URL, baseTags, sc.QualityScore)
 
 	if parseResult.WasChunked {
-		log.Printf("scraper: chunked %q into %d sections (total words: %d)",
-			sc.Title, len(parseResult.Sections), parseResult.TotalWordCount)
+		slog.Info("scraper: chunked content into sections", "title", sc.Title, "sections", len(parseResult.Sections), "total_words", parseResult.TotalWordCount)
 	}
 
 	var firstNodeID string
@@ -203,7 +202,7 @@ func (r *Reviewer) ingestContent(ctx context.Context, contentID, overrideSpaceID
 
 	// Create INGESTED_AS relationship pointing to the first section's node
 	if err := r.store.CreateIngestedAsRelationship(ctx, contentID, firstNodeID); err != nil {
-		log.Printf("scraper: failed to create INGESTED_AS edge: %v", err)
+		slog.Error("scraper: failed to create INGESTED_AS edge", "error", err)
 	}
 
 	sc.IngestedNodeID = firstNodeID

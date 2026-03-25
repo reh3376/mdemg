@@ -3,7 +3,7 @@ package symbols
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,7 +53,7 @@ func NewParser(config ParserConfig) (*Parser, error) {
 	// Initialize query engine for relationship extraction (Phase 75A)
 	qe, err := NewQueryEngine(p.languages)
 	if err != nil {
-		log.Printf("WARN: query engine init failed: %v (relationship extraction disabled)", err)
+		slog.Warn("query engine init failed, relationship extraction disabled", "error", err)
 	}
 	p.queryEngine = qe
 
@@ -1429,7 +1429,7 @@ func (p *Parser) ParseDirectory(ctx context.Context, dir string) ([]*FileSymbols
 		fileSymbols, err := p.ParseFile(ctx, path)
 		if err != nil {
 			parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", relPath, err))
-			log.Printf("Warning: failed to parse %s: %v", relPath, err)
+			slog.Warn("failed to parse file", "path", relPath, "error", err)
 			return nil // Continue with other files
 		}
 

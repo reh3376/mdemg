@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -467,13 +468,13 @@ func runIngest(cfg *ingestConfig) error {
 		_ = config.LoadYAMLConfig(cfgPath)
 	}
 	if err := godotenv.Load(); err != nil {
-		log.Printf("Note: No .env file found, using defaults/flags")
+		slog.Info("no .env file found, using defaults/flags")
 	}
 
 	// Resolve endpoint
 	if cfg.mdemgEndpoint == "" {
 		cfg.mdemgEndpoint = config.ResolveEndpoint("http://localhost:9999")
-		log.Printf("Resolved endpoint: %s", cfg.mdemgEndpoint)
+		slog.Info("resolved endpoint", "endpoint", cfg.mdemgEndpoint)
 	}
 
 	if cfg.codebasePath == "" {
@@ -486,9 +487,9 @@ func runIngest(cfg *ingestConfig) error {
 		var err error
 		ignorePatterns, err = config.ParseIgnoreFile(ignPath)
 		if err != nil {
-			log.Printf("Warning: failed to parse %s: %v", ignPath, err)
+			slog.Warn("failed to parse ignore file", "path", ignPath, "error", err)
 		} else {
-			log.Printf("Loaded %d ignore patterns from %s", len(ignorePatterns), ignPath)
+			slog.Info("loaded ignore patterns", "count", len(ignorePatterns), "path", ignPath)
 		}
 	}
 
@@ -504,7 +505,7 @@ func runIngest(cfg *ingestConfig) error {
 			if cfg.maxFileSize == 1048576 {
 				cfg.maxFileSize = p.maxFileSize
 			}
-			log.Printf("Applied preset: %s", cfg.preset)
+			slog.Info("applied preset", "preset", cfg.preset)
 		} else {
 			return fmt.Errorf("unknown preset: %s (available: default, ml_cuda, web_monorepo)", cfg.preset)
 		}
@@ -513,22 +514,31 @@ func runIngest(cfg *ingestConfig) error {
 		excludeSet[strings.TrimSpace(dir)] = true
 	}
 
-	log.Printf("=== MDEMG Codebase Ingestion ===")
-	log.Printf("Path: %s", cfg.codebasePath)
-	log.Printf("Space ID: %s", cfg.spaceID)
-	log.Printf("Endpoint: %s", cfg.mdemgEndpoint)
-	log.Printf("Batch size: %d, Workers: %d, Timeout: %ds", cfg.batchSize, cfg.workers, cfg.timeout)
-	log.Printf("Excluded dirs: %v", getExcludeDirList(excludeSet))
+	slog.Info("=== MDEMG Codebase Ingestion ===")
+	slog.Info("ingestion config",
+		"path", cfg.codebasePath,
+		"space_id", cfg.spaceID,
+		"endpoint", cfg.mdemgEndpoint,
+		"batch_size", cfg.batchSize,
+		"workers", cfg.workers,
+		"timeout_sec", cfg.timeout,
+	)
+	slog.Info("exclusion config", "excluded_dirs", getExcludeDirList(excludeSet))
 	if len(excludePatterns) > 0 {
-		log.Printf("Excluded patterns: %v", excludePatterns)
+		slog.Info("exclusion patterns", "patterns", excludePatterns)
 	}
-	log.Printf("Max file size: %d bytes", cfg.maxFileSize)
-	log.Printf("Max elements/file: %d, Max symbols/file: %d", cfg.maxElementsPerFile, cfg.maxSymbolsPerFile)
-	log.Printf("Symbol extraction: %v", cfg.extractSymbols)
-	log.Printf("Incremental mode: %v", cfg.incremental)
-	log.Printf("LLM summaries: %v", cfg.llmSummary)
+	slog.Info("performance guards",
+		"max_file_size_bytes", cfg.maxFileSize,
+		"max_elements_per_file", cfg.maxElementsPerFile,
+		"max_symbols_per_file", cfg.maxSymbolsPerFile,
+	)
+	slog.Info("feature flags",
+		"symbol_extraction", cfg.extractSymbols,
+		"incremental_mode", cfg.incremental,
+		"llm_summaries", cfg.llmSummary,
+	)
 	if cfg.speed != "" {
-		log.Printf("Speed preset: %s", cfg.speed)
+		slog.Info("speed preset applied", "speed", cfg.speed)
 	}
 
 	// Initialize LLM summarize service
@@ -541,7 +551,7 @@ func runIngest(cfg *ingestConfig) error {
 		}
 
 		if cfg.llmSummaryProvider == "openai" && apiKey == "" {
-			log.Println("Warning: LLM summaries enabled but OPENAI_API_KEY not set. Using structural fallback.")
+			slog.Warn("LLM summaries enabled but OPENAI_API_KEY not set, using structural fallback")
 		} else {
 			sumCfg := summarize.Config{
 				Enabled:        true,
@@ -564,10 +574,13 @@ func runIngest(cfg *ingestConfig) error {
 			var err error
 			summarizeSvc, err = summarize.New(sumCfg, generateSummaryAdapter)
 			if err != nil {
-				log.Printf("Warning: Failed to initialize LLM summarize service: %v. Using structural fallback.", err)
+				slog.Warn("failed to initialize LLM summarize service, using structural fallback", "error", err)
 			} else {
-				log.Printf("LLM summarize service initialized: provider=%s, model=%s, batch=%d",
-					cfg.llmSummaryProvider, cfg.llmSummaryModel, cfg.llmSummaryBatch)
+				slog.Info("LLM summarize service initialized",
+					"provider", cfg.llmSummaryProvider,
+					"model", cfg.llmSummaryModel,
+					"batch_size", cfg.llmSummaryBatch,
+				)
 			}
 		}
 	}
@@ -575,18 +588,21 @@ func runIngest(cfg *ingestConfig) error {
 	// Handle incremental mode
 	var changedFiles *gitDiffResult
 	if cfg.incremental {
-		log.Printf("Getting changed files since %s...", cfg.sinceCommit)
+		slog.Info("getting changed files", "since_commit", cfg.sinceCommit)
 		var err error
 		changedFiles, err = getGitChangedFiles(cfg.codebasePath, cfg.sinceCommit)
 		if err != nil {
 			return fmt.Errorf("failed to get git diff: %v", err)
 		}
-		log.Printf("Changed files: %d added, %d modified, %d deleted, %d renamed",
-			len(changedFiles.Added), len(changedFiles.Modified),
-			len(changedFiles.Deleted), len(changedFiles.Renamed))
+		slog.Info("changed files detected",
+			"added", len(changedFiles.Added),
+			"modified", len(changedFiles.Modified),
+			"deleted", len(changedFiles.Deleted),
+			"renamed", len(changedFiles.Renamed),
+		)
 
 		if len(changedFiles.Added)+len(changedFiles.Modified) == 0 && len(changedFiles.Deleted) == 0 {
-			log.Println("No changes detected. Exiting.")
+			slog.Info("no changes detected, exiting")
 			return nil
 		}
 	}
@@ -615,33 +631,34 @@ func runIngest(cfg *ingestConfig) error {
 				filtered = append(filtered, elem)
 			}
 		}
-		log.Printf("Filtered from %d to %d elements (changed files only)", len(elements), len(filtered))
+		slog.Info("filtered to changed files only", "before", len(elements), "after", len(filtered))
 		elements = filtered
 	}
 
-	log.Printf("Found %d code elements", len(elements))
+	slog.Info("discovery complete", "element_count", len(elements))
 	emitProgress(cfg, progressEvent{Event: "discovery_complete", Total: len(elements)})
 
 	if diagSummary.Total > 0 {
-		log.Printf("Diagnostics: %d total (info=%d, warning=%d, error=%d)",
-			diagSummary.Total,
-			diagSummary.BySev["info"],
-			diagSummary.BySev["warning"],
-			diagSummary.BySev["error"])
+		slog.Info("diagnostics summary",
+			"total", diagSummary.Total,
+			"info", diagSummary.BySev["info"],
+			"warning", diagSummary.BySev["warning"],
+			"error", diagSummary.BySev["error"],
+		)
 		if cfg.verbose {
 			for code, count := range diagSummary.ByCode {
-				log.Printf("  %s: %d", code, count)
+				slog.Debug("diagnostic detail", "code", code, "count", count)
 			}
 		}
 	}
 
 	if cfg.limitElements > 0 && len(elements) > cfg.limitElements {
-		log.Printf("Limiting to first %d elements (from %d)", cfg.limitElements, len(elements))
+		slog.Info("limiting elements", "limit", cfg.limitElements, "total", len(elements))
 		elements = elements[:cfg.limitElements]
 	}
 
 	if cfg.dryRun {
-		log.Println("Dry run - not ingesting")
+		slog.Info("dry run - not ingesting")
 		printSample(cfg, elements)
 		return nil
 	}
@@ -669,7 +686,7 @@ func runIngest(cfg *ingestConfig) error {
 		batches = append(batches, elements[i:end])
 	}
 
-	log.Printf("Processing %d batches with %d workers", len(batches), cfg.workers)
+	slog.Info("processing batches", "batch_count", len(batches), "workers", cfg.workers)
 
 	batchChan := make(chan []codeElement, len(batches))
 	var wg sync.WaitGroup
@@ -689,8 +706,13 @@ func runIngest(cfg *ingestConfig) error {
 				elapsed := time.Since(stats.StartTime)
 				rate := float64(current) / elapsed.Seconds()
 
-				log.Printf("[Worker %d] Progress: %d/%d (%.1f/s, %d errors)",
-					workerID, current, stats.TotalElements, rate, errCount)
+				slog.Info("worker progress",
+					"worker_id", workerID,
+					"current", current,
+					"total", stats.TotalElements,
+					"rate_per_sec", rate,
+					"errors", errCount,
+				)
 
 				emitProgress(cfg, progressEvent{
 					Event:   "batch_progress",
@@ -712,24 +734,31 @@ func runIngest(cfg *ingestConfig) error {
 	wg.Wait()
 
 	elapsed := time.Since(stats.StartTime)
-	log.Printf("=== Ingestion Complete ===")
-	log.Printf("Total: %d, Ingested: %d, Errors: %d", stats.TotalElements, stats.Ingested, stats.Errors)
-	log.Printf("Symbols: %d", stats.Symbols)
-	log.Printf("Time: %v, Rate: %.1f elements/sec", elapsed, float64(stats.Ingested)/elapsed.Seconds())
+	slog.Info("=== Ingestion Complete ===",
+		"total", stats.TotalElements,
+		"ingested", stats.Ingested,
+		"errors", stats.Errors,
+		"symbols", stats.Symbols,
+		"elapsed", elapsed.String(),
+		"rate_per_sec", float64(stats.Ingested)/elapsed.Seconds(),
+	)
 
 	if summarizeSvc != nil {
 		totalCalls, cacheHits, cacheSize := summarizeSvc.Stats()
-		log.Printf("LLM Summary stats: calls=%d, cache_hits=%d, cache_size=%d",
-			totalCalls, cacheHits, cacheSize)
+		slog.Info("LLM summary stats",
+			"total_calls", totalCalls,
+			"cache_hits", cacheHits,
+			"cache_size", cacheSize,
+		)
 	}
 
 	if cfg.incremental && cfg.archiveDeleted && changedFiles != nil && len(changedFiles.Deleted) > 0 {
-		log.Printf("Archiving %d deleted files...", len(changedFiles.Deleted))
+		slog.Info("archiving deleted files", "count", len(changedFiles.Deleted))
 		archived, err := archiveDeletedNodes(client, cfg.mdemgEndpoint, cfg.spaceID, changedFiles.Deleted)
 		if err != nil {
-			log.Printf("Warning: archive failed: %v", err)
+			slog.Warn("archive failed", "error", err)
 		} else {
-			log.Printf("Archived nodes for %d deleted files", archived)
+			slog.Info("archived deleted file nodes", "count", archived)
 		}
 	}
 
@@ -743,9 +772,9 @@ func runIngest(cfg *ingestConfig) error {
 
 	if cfg.consolidate && stats.Ingested > 0 {
 		emitProgress(cfg, progressEvent{Event: "consolidation_start"})
-		log.Println("Running consolidation...")
+		slog.Info("running consolidation")
 		if err := runConsolidation(client, cfg.mdemgEndpoint, cfg.spaceID); err != nil {
-			log.Printf("Consolidation failed: %v", err)
+			slog.Error("consolidation failed", "error", err)
 		}
 	}
 
@@ -820,7 +849,7 @@ func archiveDeletedNodes(client *http.Client, endpoint, spaceID string, deletedP
 
 		resp, err := client.Post(endpoint+"/v1/memory/archive/bulk", "application/json", bytes.NewReader(body))
 		if err != nil {
-			log.Printf("Warning: failed to archive nodes for %s: %v", path, err)
+			slog.Warn("failed to archive nodes", "path", path, "error", err)
 			continue
 		}
 		resp.Body.Close()
@@ -946,14 +975,14 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 		if info.IsDir() {
 			if excludeSet[info.Name()] {
 				if cfg.verbose {
-					log.Printf("Skipping excluded directory: %s", path)
+					slog.Debug("skipping excluded directory", "path", path)
 				}
 				return filepath.SkipDir
 			}
 			// Check .mdemgignore patterns for directories
 			if len(ignorePatterns) > 0 && relPath != "." && config.MatchesIgnorePatterns(relPath, true, ignorePatterns) {
 				if cfg.verbose {
-					log.Printf("Skipping directory (mdemgignore): %s", path)
+					slog.Debug("skipping directory per mdemgignore", "path", path)
 				}
 				return filepath.SkipDir
 			}
@@ -963,14 +992,14 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 		// Check .mdemgignore patterns for files
 		if len(ignorePatterns) > 0 && config.MatchesIgnorePatterns(relPath, false, ignorePatterns) {
 			if cfg.verbose {
-				log.Printf("Skipping file (mdemgignore): %s", path)
+				slog.Debug("skipping file per mdemgignore", "path", path)
 			}
 			return nil
 		}
 
 		if cfg.maxFileSize > 0 && info.Size() > int64(cfg.maxFileSize) {
 			if cfg.verbose {
-				log.Printf("Skipping oversized file (%d bytes > %d max): %s", info.Size(), cfg.maxFileSize, path)
+				slog.Debug("skipping oversized file", "size_bytes", info.Size(), "max_bytes", cfg.maxFileSize, "path", path)
 			}
 			diagSummary.Add(languages.Diagnostic{
 				Severity: "warning",
@@ -983,7 +1012,7 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 
 		if matchesExcludePattern(info.Name(), excludePatterns) {
 			if cfg.verbose {
-				log.Printf("Skipping file matching exclude pattern: %s", path)
+				slog.Debug("skipping file matching exclude pattern", "path", path)
 			}
 			return nil
 		}
@@ -1007,14 +1036,14 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 			langElements, parseErr := parser.ParseFile(cfg.codebasePath, path, cfg.extractSymbols)
 			if parseErr != nil {
 				if cfg.verbose {
-					log.Printf("Parse error for %s: %v", path, parseErr)
+					slog.Debug("parse error", "path", path, "error", parseErr)
 				}
 				return nil
 			}
 
 			if cfg.maxElementsPerFile > 0 && len(langElements) > cfg.maxElementsPerFile {
 				if cfg.verbose {
-					log.Printf("Capping elements for %s: %d → %d", path, len(langElements), cfg.maxElementsPerFile)
+					slog.Debug("capping elements", "path", path, "found", len(langElements), "max", cfg.maxElementsPerFile)
 				}
 				langElements = langElements[:cfg.maxElementsPerFile]
 			}
@@ -1023,7 +1052,7 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 				for _, d := range elem.Diagnostics {
 					diagSummary.Add(d)
 					if cfg.verbose {
-						log.Printf("  [diag] %s/%s: %s (%s)", d.Severity, d.Code, d.Message, path)
+						slog.Debug("diagnostic", "severity", d.Severity, "code", d.Code, "message", d.Message, "path", path)
 					}
 				}
 			}
@@ -1032,7 +1061,7 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 				converted := convertLanguageElement(elem)
 				if cfg.maxSymbolsPerFile > 0 && len(converted.Symbols) > cfg.maxSymbolsPerFile {
 					if cfg.verbose {
-						log.Printf("Capping symbols for %s: %d → %d", path, len(converted.Symbols), cfg.maxSymbolsPerFile)
+						slog.Debug("capping symbols", "path", path, "found", len(converted.Symbols), "max", cfg.maxSymbolsPerFile)
 					}
 					converted.Symbols = converted.Symbols[:cfg.maxSymbolsPerFile]
 				}
@@ -1067,12 +1096,12 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 			if readErr == nil {
 				pluginElems, matched, matchErr := cfg.plugins.MatchAndParse(context.Background(), path, content)
 				if matchErr != nil && cfg.verbose {
-					log.Printf("Plugin match error for %s: %v", path, matchErr)
+					slog.Debug("plugin match error", "path", path, "error", matchErr)
 				}
 				if matched && len(pluginElems) > 0 {
 					elements = append(elements, pluginElems...)
 					if cfg.verbose {
-						log.Printf("Plugin parsed %d elements from %s", len(pluginElems), path)
+						slog.Debug("plugin parsed elements", "count", len(pluginElems), "path", path)
 					}
 					return nil
 				}
@@ -1081,7 +1110,7 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 
 		// No built-in parser and no plugin match — emit diagnostic and skip.
 		if ext != "" && cfg.verbose {
-			log.Printf("Skipping unrecognized file type (%s): %s", ext, path)
+			slog.Debug("skipping unrecognized file type", "extension", ext, "path", path)
 		}
 		diagSummary.Add(languages.Diagnostic{
 			Severity: "info",
@@ -1509,7 +1538,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 		cancel()
 
 		if cfg.verbose && len(llmSummaries) > 0 {
-			log.Printf("  [llm-summary] Generated %d LLM summaries", len(llmSummaries))
+			slog.Debug("generated LLM summaries", "count", len(llmSummaries))
 		}
 	}
 
@@ -1524,7 +1553,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 			if llmSummaries[i] != structuralSummary {
 				finalSummary = summarize.CombineSummary(structuralSummary, llmSummaries[i])
 				if cfg.verbose {
-					log.Printf("  [llm-summary] %s: %s", elem.Name, llmSummaries[i])
+					slog.Debug("LLM summary applied", "element", elem.Name, "summary", llmSummaries[i])
 				}
 			}
 		}
@@ -1542,7 +1571,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 			item.Symbols = elem.Symbols
 			symbolCount += len(elem.Symbols)
 			if cfg.verbose {
-				log.Printf("  [symbols] %s: %d symbols extracted", elem.Name, len(elem.Symbols))
+				slog.Debug("symbols extracted", "element", elem.Name, "count", len(elem.Symbols))
 			}
 		}
 		items = append(items, item)
@@ -1560,7 +1589,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 
 	for attempt := 0; attempt <= cfg.maxRetries; attempt++ {
 		if attempt > 0 {
-			log.Printf("Retry %d/%d after %dms delay...", attempt, cfg.maxRetries, retryDelayMs)
+			slog.Warn("retrying batch", "attempt", attempt, "max_retries", cfg.maxRetries, "delay_ms", retryDelayMs)
 			time.Sleep(time.Duration(retryDelayMs) * time.Millisecond)
 			retryDelayMs *= 2
 		}
@@ -1569,7 +1598,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 		if err != nil {
 			lastErr = err
 			if cfg.verbose {
-				log.Printf("Batch ingest request failed (attempt %d): %v", attempt+1, err)
+				slog.Error("batch ingest request failed", "attempt", attempt+1, "error", err)
 			}
 			continue
 		}
@@ -1587,7 +1616,7 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 		if resp.StatusCode == http.StatusBadRequest {
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			log.Printf("Batch rejected (non-retryable): status %d: %s", resp.StatusCode, string(bodyBytes))
+			slog.Error("batch rejected (non-retryable)", "status", resp.StatusCode, "body", string(bodyBytes))
 			return 0, len(elements), 0
 		}
 
@@ -1595,11 +1624,11 @@ func ingestBatch(cfg *ingestConfig, client *http.Client, elements []codeElement,
 		resp.Body.Close()
 		lastErr = fmt.Errorf("status %d: %s", resp.StatusCode, string(bodyBytes))
 		if cfg.verbose {
-			log.Printf("Batch ingest failed (attempt %d): %v", attempt+1, lastErr)
+			slog.Error("batch ingest failed", "attempt", attempt+1, "error", lastErr)
 		}
 	}
 
-	log.Printf("Batch failed after %d retries: %v", cfg.maxRetries, lastErr)
+	slog.Error("batch failed after retries", "max_retries", cfg.maxRetries, "error", lastErr)
 	return 0, len(elements), 0
 }
 
@@ -1623,11 +1652,12 @@ func runConsolidation(client *http.Client, endpoint, spaceID string) error {
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	log.Printf("Consolidation: created=%d, updated=%d, concept=%d, duration=%.0fms",
-		result.Data.HiddenNodesCreated,
-		result.Data.HiddenNodesUpdated,
-		result.Data.ConceptNodesUpdated,
-		result.Data.DurationMs)
+	slog.Info("consolidation complete",
+		"hidden_nodes_created", result.Data.HiddenNodesCreated,
+		"hidden_nodes_updated", result.Data.HiddenNodesUpdated,
+		"concept_nodes_updated", result.Data.ConceptNodesUpdated,
+		"duration_ms", result.Data.DurationMs,
+	)
 
 	return nil
 }
@@ -1642,12 +1672,12 @@ func printSample(cfg *ingestConfig, elements []codeElement) {
 		counts[e.Kind]++
 	}
 
-	log.Println("Element breakdown:")
+	slog.Info("element breakdown")
 	for kind, count := range counts {
-		log.Printf("  %s: %d", kind, count)
+		slog.Info("element kind", "kind", kind, "count", count)
 	}
 
-	log.Println("\nSample elements:")
+	slog.Info("sample elements")
 	shown := 0
 	for _, e := range elements {
 		if shown >= 20 && !cfg.verbose {

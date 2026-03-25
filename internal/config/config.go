@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -2061,7 +2061,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("J17_SIDECAR_MODE=active requires J17_SIDECAR_URL to be set")
 	}
 	if j17SidecarMode != "shadow" && j17SidecarURL == "" {
-		log.Printf("WARN: J17_SIDECAR_MODE=%s but J17_SIDECAR_URL is empty — sidecar calls will fail", j17SidecarMode)
+		slog.Warn("J17_SIDECAR_URL is empty, sidecar calls will fail", "j17_sidecar_mode", j17SidecarMode)
 	}
 
 	// Capability gap detection settings (Task #23)

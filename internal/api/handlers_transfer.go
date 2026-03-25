@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -178,7 +178,7 @@ func (s *Server) handleSpaceExport(w http.ResponseWriter, r *http.Request) {
 	for _, chunk := range result.Chunks {
 		b, err := marshaler.Marshal(chunk)
 		if err != nil {
-			log.Printf("[space-export] marshal chunk %d: %v", chunk.Sequence, err)
+			slog.Error("space-export: marshal chunk failed", "sequence", chunk.Sequence, "error", err)
 			writeInternalError(w, err, "space-export-marshal")
 			return
 		}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,7 +73,7 @@ func (m *Manager) Start() error {
 	entries, err := os.ReadDir(m.pluginsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("plugins: directory %s does not exist, no modules to load", m.pluginsDir)
+			slog.Info("plugins: directory does not exist, no modules to load", "dir", m.pluginsDir)
 			return nil
 		}
 		return fmt.Errorf("failed to read plugins dir: %w", err)
@@ -89,7 +89,7 @@ func (m *Manager) Start() error {
 
 		moduleDir := filepath.Join(m.pluginsDir, entry.Name())
 		if err := m.loadModule(moduleDir); err != nil {
-			log.Printf("plugins: failed to load module %s: %v", entry.Name(), err)
+			slog.Error("plugins: failed to load module", "module", entry.Name(), "error", err)
 			// Continue loading other modules
 		}
 	}
@@ -107,7 +107,7 @@ func (m *Manager) Stop() error {
 	var lastErr error
 	for id, inst := range m.modules {
 		if err := m.stopModuleInstance(inst); err != nil {
-			log.Printf("plugins: error stopping module %s: %v", id, err)
+			slog.Error("plugins: error stopping module", "module", id, "error", err)
 			lastErr = err
 		}
 	}
@@ -309,7 +309,7 @@ func (m *Manager) startModuleInstance(inst *moduleInstance, binaryPath string) e
 	info.PID = cmd.Process.Pid
 	info.StartedAt = time.Now()
 
-	log.Printf("plugins: started module %s (pid=%d, socket=%s)", info.Manifest.ID, info.PID, info.SocketPath)
+	slog.Info("plugins: started module", "module", info.Manifest.ID, "pid", info.PID, "socket", info.SocketPath)
 
 	// Wait for socket to become available
 	timeout := time.Duration(info.Manifest.StartupTimeoutMs) * time.Millisecond
@@ -378,7 +378,7 @@ func (m *Manager) startModuleInstance(inst *moduleInstance, binaryPath string) e
 
 	info.State = StateReady
 	info.LastHealthy = time.Now()
-	log.Printf("plugins: module %s ready (version=%s, capabilities=%v)", info.Manifest.ID, resp.ModuleVersion, resp.Capabilities)
+	slog.Info("plugins: module ready", "module", info.Manifest.ID, "version", resp.ModuleVersion, "capabilities", resp.Capabilities)
 
 	// Start health check loop
 	m.startHealthLoop(inst)
@@ -408,7 +408,7 @@ func (m *Manager) stopModuleInstance(inst *moduleInstance) error {
 			Reason:    "server_stop",
 		})
 		if err != nil {
-			log.Printf("plugins: shutdown request failed for %s: %v", info.Manifest.ID, err)
+			slog.Warn("plugins: shutdown request failed", "module", info.Manifest.ID, "error", err)
 		}
 	}
 
@@ -464,7 +464,7 @@ func (m *Manager) checkHealth(inst *moduleInstance) {
 	if err != nil {
 		info.State = StateUnhealthy
 		info.LastError = fmt.Sprintf("health check failed: %v", err)
-		log.Printf("plugins: health check failed for %s: %v", info.Manifest.ID, err)
+		slog.Warn("plugins: health check failed", "module", info.Manifest.ID, "error", err)
 		return
 	}
 
@@ -505,27 +505,26 @@ func (m *Manager) monitorProcess(inst *moduleInstance) {
 	} else {
 		info.LastError = "process exited unexpectedly"
 	}
-	log.Printf("plugins: module %s crashed: %s", info.Manifest.ID, info.LastError)
+	slog.Error("plugins: module crashed", "module", info.Manifest.ID, "error", info.LastError)
 
 	// Attempt restart with backoff
 	if inst.restartCount < maxRestartAttempts {
 		inst.restartCount++
 		backoff := restartBackoffBase * time.Duration(inst.restartCount)
 
-		log.Printf("plugins: restarting module %s in %v (attempt %d/%d)",
-			info.Manifest.ID, backoff, inst.restartCount, maxRestartAttempts)
+		slog.Info("plugins: restarting module", "module", info.Manifest.ID, "backoff", backoff, "attempt", inst.restartCount, "max_attempts", maxRestartAttempts)
 
 		time.Sleep(backoff)
 
 		binaryPath := filepath.Join(m.pluginsDir, info.Manifest.ID, info.Manifest.Binary)
 		if err := m.startModuleInstance(inst, binaryPath); err != nil {
-			log.Printf("plugins: restart failed for %s: %v", info.Manifest.ID, err)
+			slog.Error("plugins: restart failed", "module", info.Manifest.ID, "error", err)
 			info.LastError = fmt.Sprintf("restart failed: %v", err)
 		} else {
 			inst.lastRestartAt = time.Now()
 		}
 	} else {
-		log.Printf("plugins: module %s exceeded max restart attempts, giving up", info.Manifest.ID)
+		slog.Error("plugins: module exceeded max restart attempts, giving up", "module", info.Manifest.ID)
 	}
 }
 
@@ -549,7 +548,7 @@ func (m *Manager) MatchIngestionModule(ctx context.Context, sourceURI, contentTy
 			ContentType: contentType,
 		})
 		if err != nil {
-			log.Printf("plugins: match check failed for %s: %v", mod.Manifest.ID, err)
+			slog.Warn("plugins: match check failed", "module", mod.Manifest.ID, "error", err)
 			continue
 		}
 

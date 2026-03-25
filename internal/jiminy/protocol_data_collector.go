@@ -2,7 +2,7 @@ package jiminy
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -44,7 +44,7 @@ type ProtocolDataCollector struct {
 // NewProtocolDataCollector creates a new protocol data collector.
 func NewProtocolDataCollector(dir string) *ProtocolDataCollector {
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		log.Printf("j17: protocol data collector: failed to create dir %s: %v", dir, err)
+		slog.Error("j17: protocol data collector: failed to create dir", "dir", dir, "error", err)
 	}
 	return &ProtocolDataCollector{
 		dir:         dir,
@@ -65,7 +65,7 @@ func (dc *ProtocolDataCollector) writeRecord(rec protocolTrainingRecord) {
 
 	data, err := json.Marshal(rec)
 	if err != nil {
-		log.Printf("j17: protocol data collector: marshal error: %v", err)
+		slog.Error("j17: protocol data collector: marshal error", "error", err)
 		return
 	}
 	data = append(data, '\n')
@@ -78,7 +78,7 @@ func (dc *ProtocolDataCollector) writeRecord(rec protocolTrainingRecord) {
 		filename := filepath.Join(dc.dir, "protocol-"+time.Now().UTC().Format("20060102-150405")+".jsonl")
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
-			log.Printf("j17: protocol data collector: open error: %v", err)
+			slog.Error("j17: protocol data collector: open error", "error", err)
 			return
 		}
 		dc.file = f
@@ -87,7 +87,7 @@ func (dc *ProtocolDataCollector) writeRecord(rec protocolTrainingRecord) {
 
 	n, err := dc.file.Write(data)
 	if err != nil {
-		log.Printf("j17: protocol data collector: write error: %v", err)
+		slog.Error("j17: protocol data collector: write error", "error", err)
 		return
 	}
 	dc.written += int64(n)

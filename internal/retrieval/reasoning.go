@@ -3,7 +3,7 @@ package retrieval
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	pb "mdemg/api/modulepb"
@@ -73,7 +73,7 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 	// Future: could implement priority/selection logic
 	mod := modules[0]
 	if mod.ReasoningClient == nil {
-		log.Printf("WARN: reasoning module %s has no client", mod.Manifest.ID)
+		slog.Warn("reasoning module has no client", "module_id", mod.Manifest.ID)
 		return &ReasoningResult{Results: req.Candidates}, nil
 	}
 
@@ -105,7 +105,7 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 	// Call the reasoning module
 	resp, err := mod.ReasoningClient.Process(ctx, pbReq)
 	if err != nil {
-		log.Printf("WARN: reasoning module %s failed: %v", mod.Manifest.ID, err)
+		slog.Warn("reasoning module failed", "module_id", mod.Manifest.ID, "error", err)
 		return &ReasoningResult{
 			Results:   req.Candidates, // Return original on error
 			ModuleID:  mod.Manifest.ID,
@@ -114,7 +114,7 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 	}
 
 	if resp.Error != "" {
-		log.Printf("WARN: reasoning module %s returned error: %s", mod.Manifest.ID, resp.Error)
+		slog.Warn("reasoning module returned error", "module_id", mod.Manifest.ID, "error", resp.Error)
 		return &ReasoningResult{
 			Results:   req.Candidates,
 			ModuleID:  mod.Manifest.ID,

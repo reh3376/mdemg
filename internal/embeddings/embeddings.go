@@ -5,7 +5,7 @@ package embeddings
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -95,7 +95,7 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 			if len(text) > 50 {
 				truncated = text[:50] + "..."
 			}
-			log.Printf("[EMBEDDING_CACHE] HIT: %q (size=%d)", truncated, c.cache.Len())
+			slog.Debug("embedding cache hit", "text", truncated, "cache_size", c.cache.Len())
 		}
 		return cached, nil
 	}
@@ -106,7 +106,7 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 		if len(text) > 50 {
 			truncated = text[:50] + "..."
 		}
-		log.Printf("[EMBEDDING_CACHE] MISS: %q (size=%d)", truncated, c.cache.Len())
+		slog.Debug("embedding cache miss", "text", truncated, "cache_size", c.cache.Len())
 	}
 
 	embedding, err := c.embedder.Embed(ctx, text)
@@ -143,13 +143,13 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 	// If all were cached, return immediately
 	if len(misses) == 0 {
 		if c.debug {
-			log.Printf("[EMBEDDING_CACHE] BATCH: all %d texts cached (size=%d)", len(texts), c.cache.Len())
+			slog.Debug("embedding cache batch: all cached", "count", len(texts), "cache_size", c.cache.Len())
 		}
 		return results, nil
 	}
 
 	if c.debug {
-		log.Printf("[EMBEDDING_CACHE] BATCH: %d hits, %d misses out of %d texts (size=%d)", len(texts)-len(misses), len(misses), len(texts), c.cache.Len())
+		slog.Debug("embedding cache batch", "hits", len(texts)-len(misses), "misses", len(misses), "total", len(texts), "cache_size", c.cache.Len())
 	}
 
 	// Build list of texts to embed

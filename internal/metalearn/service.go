@@ -3,7 +3,7 @@ package metalearn
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,7 +81,7 @@ func (s *Service) Promote(ctx context.Context, req models.MetaLearnRequest) (mod
 	for _, cand := range candidates {
 		result, err := s.generalizer.Generalize(ctx, cand.Name, cand.Summary, cand.Description)
 		if err != nil {
-			log.Printf("[metalearn] generalization failed for %s: %v", cand.NodeID, err)
+			slog.Warn("metalearn: generalization failed", "node_id", cand.NodeID, "error", err)
 			continue
 		}
 
@@ -89,14 +89,14 @@ func (s *Service) Promote(ctx context.Context, req models.MetaLearnRequest) (mod
 		embText := result.Name + ": " + result.Description
 		embedding, err := s.embedder.Embed(ctx, embText)
 		if err != nil {
-			log.Printf("[metalearn] embedding failed for %s: %v", cand.NodeID, err)
+			slog.Warn("metalearn: embedding failed", "node_id", cand.NodeID, "error", err)
 			continue
 		}
 
 		// 4. Write to global space + create ORIGINATED_FROM edge
 		globalNodeID, err := s.writePromotedNode(ctx, cand, result, embedding)
 		if err != nil {
-			log.Printf("[metalearn] write failed for %s: %v", cand.NodeID, err)
+			slog.Error("metalearn: write failed", "node_id", cand.NodeID, "error", err)
 			continue
 		}
 

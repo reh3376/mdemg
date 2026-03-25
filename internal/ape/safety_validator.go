@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
@@ -50,7 +50,7 @@ func (sv *SafetyValidator) ValidateAction(ctx context.Context, spec *RSICTaskSpe
 	// Estimate blast radius
 	estimated, err := sv.EstimateBlastRadius(ctx, actionType, spec.TargetSpace)
 	if err != nil {
-		log.Printf("RSIC safety: blast radius estimation failed for %s: %v (allowing with caution)", actionType, err)
+		slog.Warn("RSIC safety: blast radius estimation failed, allowing with caution", "action", actionType, "error", err)
 		// Allow on estimation failure — don't block cycles due to count query errors
 		return SafetyDecision{Allowed: true, Reason: "estimation_error", EstimatedAffected: -1}
 	}

@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -73,7 +73,7 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 		return nil, fmt.Errorf("correction vector search: %w", err)
 	}
 
-	log.Printf("jiminy: found %d relevant corrections (space=%s)", len(matches), spaceID)
+	slog.Info("jiminy: found relevant corrections", "count", len(matches), "space_id", spaceID)
 	return matches, nil
 }
 

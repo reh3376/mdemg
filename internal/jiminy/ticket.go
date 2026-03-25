@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -31,10 +31,10 @@ func NewTicketManager(secret string, ttlHours int) *TicketManager {
 	} else {
 		key = make([]byte, 32)
 		if _, err := rand.Read(key); err != nil {
-			log.Printf("j17: WARN: failed to generate random ticket secret: %v", err)
+			slog.Warn("j17: failed to generate random ticket secret", "error", err)
 			key = []byte("mdemg-j17-default-key-insecure")
 		}
-		log.Printf("j17: WARN: J17_TICKET_SECRET not set, using auto-generated key (not persistent across restarts)")
+		slog.Warn("j17: J17_TICKET_SECRET not set, using auto-generated key (not persistent across restarts)")
 	}
 
 	ttl := time.Duration(ttlHours) * time.Hour

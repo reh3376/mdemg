@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -322,7 +322,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	if req.TranslateIntent && s.intentTranslator != nil && req.QueryText != "" {
 		translated, translateErr := s.intentTranslator.Translate(r.Context(), req.QueryText)
 		if translateErr != nil {
-			log.Printf("intent translation failed (using original): %v", translateErr)
+			slog.Warn("intent translation failed, using original", "error", translateErr)
 		} else if translated != req.QueryText {
 			translatedIntent = translated
 			req.QueryText = translated
@@ -368,7 +368,7 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		}
 		symbolsByNode, err := s.symbolStore.GetSymbolsForMemoryNodes(r.Context(), req.SpaceID, nodeIDs)
 		if err != nil {
-			log.Printf("warning: failed to batch-fetch symbols: %v", err)
+			slog.Warn("failed to batch-fetch symbols", "error", err)
 		} else {
 			for i := range resp.Results {
 				syms := symbolsByNode[resp.Results[i].NodeID]
@@ -489,7 +489,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			emb, err := s.embedder.Embed(r.Context(), textForEmbedding)
 			if err != nil {
 				// Log but don't fail - embedding is optional
-				// log.Printf("WARNING: failed to generate embedding: %v", err)
+				// slog.Warn("failed to generate embedding", "error", err)
 			} else {
 				req.Embedding = emb
 			}
@@ -599,7 +599,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 			}
 			embeddings, err := s.embedder.EmbedBatch(r.Context(), texts)
 			if err != nil {
-				log.Printf("warning: batch ingest embedding failed: %v", err)
+				slog.Warn("batch ingest embedding failed", "error", err)
 			} else {
 				for i, n := range needs {
 					if i < len(embeddings) {
@@ -656,10 +656,10 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(allSymbols) > 0 {
 			if err := s.symbolStore.SaveSymbols(r.Context(), req.SpaceID, allSymbols); err != nil {
-				log.Printf("WARNING: failed to save symbols: %v", err)
+				slog.Warn("failed to save symbols", "error", err)
 				// Non-fatal - continue with response
 			} else {
-				log.Printf("Stored %d symbols for space %s", len(allSymbols), req.SpaceID)
+				slog.Info("stored symbols", "count", len(allSymbols), "space_id", req.SpaceID)
 			}
 		}
 
@@ -698,10 +698,10 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 			if len(allRels) > 0 {
 				resolved, err := s.symbolResolver.Resolve(r.Context(), req.SpaceID, allRels)
 				if err != nil {
-					log.Printf("WARNING: relationship resolution failed: %v", err)
+					slog.Warn("relationship resolution failed", "error", err)
 				} else if len(resolved) > 0 {
 					if err := s.symbolStore.SaveRelationships(r.Context(), req.SpaceID, resolved); err != nil {
-						log.Printf("WARNING: failed to save relationships: %v", err)
+						slog.Warn("failed to save relationships", "error", err)
 					}
 				}
 			}
@@ -711,7 +711,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 	// Update TapRoot freshness after successful batch ingest
 	if resp.SuccessCount > 0 {
 		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "batch-ingest", IsPrunablePrefix(req.SpaceID)); err != nil {
-			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+			slog.Warn("failed to update TapRoot freshness", "space_id", req.SpaceID, "error", err)
 		}
 		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
 			"space_id":    req.SpaceID,
@@ -1353,7 +1353,7 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.retriever.Reflect(r.Context(), req)
 	if err != nil {
-		log.Printf("ERROR [reflect]: %v", err)
+		slog.Error("reflect failed", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "reflect failed"})
 		return
 	}
@@ -1404,7 +1404,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 		// Log non-fatal pipeline step errors
 		for _, stepErr := range pipelineResult.Errors {
-			log.Printf("warning: pipeline step %s failed: %s", stepErr.Step, stepErr.Message)
+			slog.Warn("pipeline step failed", "step", stepErr.Step, "message", stepErr.Message)
 		}
 
 		// Populate dynamic Steps map
@@ -1506,7 +1506,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	// Step 5: Post-clustering pipeline (dynamic edges + L5 emergent nodes)
 	postResult, err := s.hiddenLayer.RunPostClusteringPipeline(r.Context(), req.SpaceID)
 	if err != nil {
-		log.Printf("warning: post-clustering pipeline failed: %v", err)
+		slog.Warn("post-clustering pipeline failed", "error", err)
 	} else {
 		// Merge post-clustering steps into the Steps map
 		if resp.Steps == nil {
@@ -1522,7 +1522,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		}
 		// Log non-fatal step errors
 		for _, stepErr := range postResult.Errors {
-			log.Printf("warning: post-clustering step %s failed: %s", stepErr.Step, stepErr.Message)
+			slog.Warn("post-clustering step failed", "step", stepErr.Step, "message", stepErr.Message)
 		}
 		// Populate flat backward-compat fields
 		if sr, ok := postResult.Steps["dynamic_edges"]; ok {
@@ -1537,7 +1537,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	summariesUpdated, err := s.hiddenLayer.GenerateSummaries(r.Context(), req.SpaceID)
 	if err != nil {
 		// Log but don't fail - summaries are nice-to-have
-		log.Printf("warning: failed to generate summaries: %v", err)
+		slog.Warn("failed to generate summaries", "error", err)
 	}
 	resp.SummariesGenerated = summariesUpdated
 
@@ -1545,16 +1545,16 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	if s.hiddenLayer != nil {
 		enhanced, enhErr := s.hiddenLayer.EnhanceSummariesWithLLM(r.Context(), req.SpaceID)
 		if enhErr != nil {
-			log.Printf("warning: failed to enhance cluster summaries: %v", enhErr)
+			slog.Warn("failed to enhance cluster summaries", "error", enhErr)
 		} else if enhanced > 0 {
-			log.Printf("Enhanced %d cluster summaries with LLM", enhanced)
+			slog.Info("enhanced cluster summaries with LLM", "count", enhanced)
 		}
 	}
 
 	// Step 6: Refresh stale edges (Phase 9.5.3)
 	edgesRefreshed, err := s.retriever.RefreshStaleEdges(r.Context(), req.SpaceID)
 	if err != nil {
-		log.Printf("warning: failed to refresh stale edges: %v", err)
+		slog.Warn("failed to refresh stale edges", "error", err)
 	} else {
 		resp.EdgesRefreshed = edgesRefreshed
 	}
@@ -2063,7 +2063,7 @@ func (s *Server) handleLearningPrune(w http.ResponseWriter, r *http.Request) {
 	}
 
 	totalDeleted := decayedDeleted + excessDeleted
-	log.Printf("Learning edge pruning for %s: decayed=%d, excess=%d, total=%d", spaceID, decayedDeleted, excessDeleted, totalDeleted)
+	slog.Info("learning edge pruning complete", "space_id", spaceID, "decayed", decayedDeleted, "excess", excessDeleted, "total", totalDeleted)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"space_id":        spaceID,
@@ -2595,7 +2595,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 	spaceID, _ := job.Config["space_id"].(string)
 	path, _ := job.Config["path"].(string)
 
-	log.Printf("Ingestion job %s started for space=%s path=%s", job.ID, spaceID, path)
+	slog.Info("ingestion job started", "job_id", job.ID, "space_id", spaceID, "path", path)
 
 	// Build CLI arguments from job config
 	args := buildIngestArgsFromConfig(job.Config, s.cfg.ListenAddr)
@@ -2605,7 +2605,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		job.Fail(fmt.Errorf("failed to create stdout pipe: %w", err))
-		log.Printf("Ingestion job %s failed: %v", job.ID, err)
+		slog.Error("ingestion job failed", "job_id", job.ID, "error", err)
 		return
 	}
 
@@ -2614,7 +2614,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 
 	if err := cmd.Start(); err != nil {
 		job.Fail(fmt.Errorf("failed to start ingest-codebase: %w", err))
-		log.Printf("Ingestion job %s failed to start: %v", job.ID, err)
+		slog.Error("ingestion job failed to start", "job_id", job.ID, "error", err)
 		return
 	}
 
@@ -2649,11 +2649,10 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 				"symbols":  evt.Symbols,
 				"duration": evt.Duration,
 			})
-			log.Printf("Ingestion job %s completed: total=%d ingested=%d errors=%d",
-				job.ID, evt.Total, evt.Ingested, evt.Errors)
+			slog.Info("ingestion job completed", "job_id", job.ID, "total", evt.Total, "ingested", evt.Ingested, "errors", evt.Errors)
 			// Update TapRoot freshness on successful completion
 			if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest", IsPrunablePrefix(spaceID)); err != nil {
-				log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+				slog.Warn("failed to update TapRoot freshness", "space_id", spaceID, "error", err)
 			}
 			s.TriggerAPEEventWithContext("source_changed", map[string]string{
 				"space_id":    spaceID,
@@ -2674,7 +2673,7 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 		snap := job.GetSnapshot()
 		if snap.Status != jobs.StatusCompleted {
 			job.Fail(fmt.Errorf("ingest-codebase exited with error: %w", err))
-			log.Printf("Ingestion job %s failed: %v", job.ID, err)
+			slog.Error("ingestion job failed", "job_id", job.ID, "error", err)
 		}
 		return
 	}
@@ -2687,10 +2686,10 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 			"path":     path,
 			"message":  "completed without progress events",
 		})
-		log.Printf("Ingestion job %s completed (no progress events)", job.ID)
+		slog.Info("ingestion job completed without progress events", "job_id", job.ID)
 		// Update TapRoot freshness on fallback completion
 		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "codebase-ingest", IsPrunablePrefix(spaceID)); err != nil {
-			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+			slog.Warn("failed to update TapRoot freshness", "space_id", spaceID, "error", err)
 		}
 		s.TriggerAPEEventWithContext("ingest_complete", map[string]string{
 			"space_id":    spaceID,
@@ -2997,14 +2996,14 @@ func (s *Server) handleIngestFiles(w http.ResponseWriter, r *http.Request) {
 		_, err := s.hiddenLayer.RunFullConversationConsolidation(ctx, req.SpaceID)
 		cancel()
 		if err != nil {
-			log.Printf("Post-ingest consolidation failed: %v", err)
+			slog.Error("post-ingest consolidation failed", "error", err)
 		}
 	}
 
 	// Update TapRoot freshness after successful file ingest
 	if successCount > 0 {
 		if err := s.retriever.UpdateTapRootFreshness(r.Context(), req.SpaceID, "file-ingest", IsPrunablePrefix(req.SpaceID)); err != nil {
-			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", req.SpaceID, err)
+			slog.Warn("failed to update TapRoot freshness", "space_id", req.SpaceID, "error", err)
 		}
 		s.TriggerAPEEventWithContext("source_changed", map[string]string{
 			"space_id":    req.SpaceID,
@@ -3039,7 +3038,7 @@ func (s *Server) ingestFiles(ctx context.Context, spaceID string, files []string
 		// Read file content
 		content, err := readFileContent(filePath)
 		if err != nil {
-			log.Printf("ingestFiles: failed to read %s: %v", filePath, err)
+			slog.Error("ingestFiles: failed to read file", "path", filePath, "error", err)
 			result.Status = "error"
 			result.Error = "failed to read file"
 			results = append(results, result)
@@ -3068,7 +3067,7 @@ func (s *Server) ingestFiles(ctx context.Context, spaceID string, files []string
 
 		resp, err := s.retriever.IngestObservation(ctx, ingestReq)
 		if err != nil {
-			log.Printf("ingestFiles: ingest failed for %s: %v", filePath, err)
+			slog.Error("ingestFiles: ingest failed", "path", filePath, "error", err)
 			result.Status = "error"
 			result.Error = "internal error during ingestion"
 			results = append(results, result)
@@ -3122,7 +3121,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 
 		content, err := readFileContent(filePath)
 		if err != nil {
-			log.Printf("ingestFilesJob %s: failed to read %s: %v", job.ID, filePath, err)
+			slog.Error("ingestFilesJob: failed to read file", "job_id", job.ID, "path", filePath, "error", err)
 			errorCount++
 			job.UpdateProgress(i+1, "ingesting")
 			continue
@@ -3147,7 +3146,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 
 		_, err = s.retriever.IngestObservation(ctx, ingestReq)
 		if err != nil {
-			log.Printf("ingestFilesJob %s: ingest failed for %s: %v", job.ID, filePath, err)
+			slog.Error("ingestFilesJob: ingest failed", "job_id", job.ID, "path", filePath, "error", err)
 			errorCount++
 		} else {
 			successCount++
@@ -3163,7 +3162,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 		_, err := s.hiddenLayer.RunFullConversationConsolidation(consolidateCtx, spaceID)
 		cancel()
 		if err != nil {
-			log.Printf("Post-ingest consolidation failed for job %s: %v", job.ID, err)
+			slog.Error("post-ingest consolidation failed", "job_id", job.ID, "error", err)
 		}
 	}
 
@@ -3177,7 +3176,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 	// Update TapRoot freshness on successful file ingest job
 	if successCount > 0 {
 		if err := s.retriever.UpdateTapRootFreshness(context.Background(), spaceID, "file-ingest", IsPrunablePrefix(spaceID)); err != nil {
-			log.Printf("Warning: failed to update TapRoot freshness for %s: %v", spaceID, err)
+			slog.Warn("failed to update TapRoot freshness", "space_id", spaceID, "error", err)
 		}
 		s.TriggerAPEEventWithContext("source_changed", map[string]string{
 			"space_id":    spaceID,
@@ -3191,7 +3190,7 @@ func (s *Server) runIngestFilesJob(ctx context.Context, job *jobs.Job) {
 		})
 	}
 
-	log.Printf("Ingest files job %s completed: %d/%d files ingested", job.ID, successCount, len(files))
+	slog.Info("ingest files job completed", "job_id", job.ID, "success", successCount, "total", len(files))
 }
 
 // readFileContent reads the content of a file, returning it as a string.
@@ -3299,7 +3298,7 @@ func (s *Server) handleDistributionStats(w http.ResponseWriter, r *http.Request)
 	// Fetch edge count from Neo4j to update learning phase
 	edgeCount, err := s.fetchLearningEdgeCount(r.Context(), spaceID)
 	if err != nil {
-		log.Printf("WARN: failed to fetch edge count for distribution stats: %v", err)
+		slog.Warn("failed to fetch edge count for distribution stats", "error", err)
 	} else {
 		monitor.UpdateEdgeCount(spaceID, edgeCount)
 	}
@@ -3391,7 +3390,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		dbOverview.Status = "degraded"
-		log.Printf("[neo4j-overview] schema version query failed: %v", err)
+		slog.Error("neo4j-overview: schema version query failed", "error", err)
 	} else {
 		dbOverview.SchemaVersion = schemaVer.(int)
 	}
@@ -3412,7 +3411,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		dbOverview.Status = "degraded"
-		log.Printf("[neo4j-overview] total nodes query failed: %v", err)
+		slog.Error("neo4j-overview: total nodes query failed", "error", err)
 	} else {
 		dbOverview.TotalNodes = totalNodes.(int64)
 	}
@@ -3433,7 +3432,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		dbOverview.Status = "degraded"
-		log.Printf("[neo4j-overview] total edges query failed: %v", err)
+		slog.Error("neo4j-overview: total edges query failed", "error", err)
 	} else {
 		dbOverview.TotalEdges = totalEdges.(int64)
 	}
@@ -3479,7 +3478,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		dbOverview.Status = "degraded"
-		log.Printf("[neo4j-overview] space node counts query failed: %v", err)
+		slog.Error("neo4j-overview: space node counts query failed", "error", err)
 	}
 
 	dbOverview.TotalSpaces = len(spaceData)
@@ -3503,7 +3502,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] space edge counts query failed: %v", err)
+		slog.Error("neo4j-overview: space edge counts query failed", "error", err)
 	}
 
 	// 2b. Learning edges per space (CO_ACTIVATED_WITH only)
@@ -3525,7 +3524,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] learning edge counts query failed: %v", err)
+		slog.Error("neo4j-overview: learning edge counts query failed", "error", err)
 	}
 
 	// 3. Observation counts per space
@@ -3547,7 +3546,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] observation counts query failed: %v", err)
+		slog.Error("neo4j-overview: observation counts query failed", "error", err)
 	}
 
 	// 4. Orphan counts per space (nodes with no edges)
@@ -3569,7 +3568,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] orphan counts query failed: %v", err)
+		slog.Error("neo4j-overview: orphan counts query failed", "error", err)
 	}
 
 	// 5. Last consolidation and ingest timestamps per space
@@ -3606,7 +3605,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] consolidation timestamps query failed: %v", err)
+		slog.Error("neo4j-overview: consolidation timestamps query failed", "error", err)
 	}
 
 	// Ingest timestamps (codebase nodes)
@@ -3645,7 +3644,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 		return nil, res.Err()
 	})
 	if err != nil {
-		log.Printf("[neo4j-overview] ingest timestamps query failed: %v", err)
+		slog.Error("neo4j-overview: ingest timestamps query failed", "error", err)
 	}
 
 	// Build space overview list
@@ -3698,7 +3697,7 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	if s.backupSvc != nil {
 		manifests, err := s.backupSvc.ListBackups("", 0)
 		if err != nil {
-			log.Printf("[neo4j-overview] backup list failed: %v", err)
+			slog.Error("neo4j-overview: backup list failed", "error", err)
 		} else {
 			backupOverview.TotalCount = len(manifests)
 			for i := range manifests {

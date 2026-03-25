@@ -2,7 +2,7 @@ package retrieval
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -82,11 +82,11 @@ func LogConflict(evt ConflictEvent) {
 	// Marshal to JSON for structured logging
 	data, err := json.Marshal(evt)
 	if err != nil {
-		log.Printf("[CONFLICT] error marshaling event: %v", err)
+		slog.Error("conflict: error marshaling event", "error", err)
 		return
 	}
 
-	log.Printf("[CONFLICT] %s", string(data))
+	slog.Info("conflict: event", "data", string(data))
 }
 
 // LogVersionMismatch is a convenience function for version mismatch conflicts.

@@ -6,7 +6,7 @@ package guardrail
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -113,7 +113,7 @@ func (g *GuardrailService) Validate(ctx context.Context, req ValidateRequest) (*
 	// Step 2: Retrieve relevant constraints
 	constraints, err := g.retrieveConstraints(ctx, req.SpaceID, diffCtx, req.AgentTrustLevel)
 	if err != nil {
-		log.Printf("guardrail: constraint retrieval failed (fail-open): %v", err)
+		slog.Warn("guardrail: constraint retrieval failed (fail-open)", "error", err)
 		return &ValidateResponse{
 			Status:     "Pass",
 			Violations: []GuardrailViolation{},
@@ -142,7 +142,7 @@ func (g *GuardrailService) Validate(ctx context.Context, req ValidateRequest) (*
 
 	llmResult, err := g.evaluateWithLLM(evalCtx, diffCtx, constraints)
 	if err != nil {
-		log.Printf("guardrail: LLM evaluation failed (fail-open): %v", err)
+		slog.Warn("guardrail: LLM evaluation failed (fail-open)", "error", err)
 		return &ValidateResponse{
 			Status:     "Pass",
 			Violations: []GuardrailViolation{},

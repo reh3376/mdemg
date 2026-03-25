@@ -3,7 +3,7 @@ package anomaly
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -95,7 +95,7 @@ LIMIT 1`)
 	if err != nil {
 		// Context cancelled (timeout) or other error - log and continue
 		if ctx.Err() == nil {
-			log.Printf("anomaly: duplicate check failed: %v", err)
+			slog.Warn("anomaly: duplicate check failed", "error", err)
 		}
 		return nil
 	}
@@ -165,7 +165,7 @@ RETURN n.updated_at AS updated_at,
 
 	if err != nil {
 		if ctx.Err() == nil {
-			log.Printf("anomaly: stale update check failed: %v", err)
+			slog.Warn("anomaly: stale update check failed", "error", err)
 		}
 		return nil
 	}

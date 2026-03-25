@@ -3,7 +3,7 @@ package unts
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	pb "mdemg/api/untspb"
@@ -169,12 +169,11 @@ func (s *Server) RevertToPreviousHash(ctx context.Context, req *pb.RevertToPrevi
 	}
 
 	// Log audit info
-	log.Printf("[UNTS] Revert: path=%s target_hash=%s by=%s reason=%s",
-		req.Path, targetHash, req.RevertedBy, req.Reason)
+	slog.Info("UNTS revert", "path", req.Path, "target_hash", targetHash, "reverted_by", req.RevertedBy, "reason", req.Reason)
 
 	// Save registry
 	if err := s.registry.Save(); err != nil {
-		log.Printf("[UNTS] Warning: save registry after revert: %v", err)
+		slog.Warn("UNTS save registry after revert failed", "error", err)
 	}
 
 	return &pb.RevertToPreviousHashResponse{
@@ -209,12 +208,11 @@ func (s *Server) UpdateHash(ctx context.Context, req *pb.UpdateHashRequest) (*pb
 	}
 
 	// Log audit info
-	log.Printf("[UNTS] UpdateHash: path=%s source=%s by=%s reason=%s",
-		req.Path, source, req.UpdatedBy, req.Reason)
+	slog.Info("UNTS update hash", "path", req.Path, "source", source, "updated_by", req.UpdatedBy, "reason", req.Reason)
 
 	// Save registry
 	if err := s.registry.Save(); err != nil {
-		log.Printf("[UNTS] Warning: save registry after update: %v", err)
+		slog.Warn("UNTS save registry after update failed", "error", err)
 	}
 
 	return &pb.UpdateHashResponse{
@@ -242,7 +240,7 @@ func (s *Server) VerifyNow(ctx context.Context, req *pb.VerifyNowRequest) (*pb.V
 
 	// Save updated status
 	if err := s.registry.Save(); err != nil {
-		log.Printf("[UNTS] Warning: save registry after verify: %v", err)
+		slog.Warn("UNTS save registry after verify failed", "error", err)
 	}
 
 	pbResults := make([]*pb.FileVerifyResult, len(results))
@@ -299,8 +297,7 @@ func (s *Server) RegisterTrackedFile(ctx context.Context, req *pb.RegisterTracke
 	}
 
 	// Log audit info
-	log.Printf("[UNTS] RegisterTrackedFile: path=%s framework=%s by=%s",
-		req.Path, framework, req.RegisteredBy)
+	slog.Info("UNTS register tracked file", "path", req.Path, "framework", framework, "registered_by", req.RegisteredBy)
 
 	// Save registry
 	if err := s.registry.Save(); err != nil {

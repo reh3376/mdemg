@@ -3,7 +3,7 @@ package guardrail
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -77,7 +77,7 @@ func (g *GuardrailService) retrieveConstraints(ctx context.Context, spaceID stri
 	if g.embedder != nil && diffCtx.Summary != "" {
 		semantic, err := g.semanticSearch(ctx, spaceID, diffCtx.Summary, diffCtx, trustLevel)
 		if err != nil {
-			log.Printf("guardrail: semantic search failed (continuing with keyword): %v", err)
+			slog.Warn("guardrail: semantic search failed, continuing with keyword", "error", err)
 		} else {
 			for _, c := range semantic {
 				if !seen[c.NodeID] {
@@ -93,7 +93,7 @@ func (g *GuardrailService) retrieveConstraints(ctx context.Context, spaceID stri
 	if len(keywords) > 0 {
 		kwResults, err := g.keywordSearch(ctx, spaceID, keywords, diffCtx, trustLevel)
 		if err != nil {
-			log.Printf("guardrail: keyword search failed: %v", err)
+			slog.Warn("guardrail: keyword search failed", "error", err)
 		} else {
 			for _, c := range kwResults {
 				if !seen[c.NodeID] {

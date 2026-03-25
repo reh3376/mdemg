@@ -2,7 +2,7 @@ package scraper
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/embeddings"
@@ -58,7 +58,7 @@ func (d *DedupChecker) CheckSimilar(ctx context.Context, spaceID, content string
 			"threshold": d.threshold,
 		})
 	if err != nil {
-		log.Printf("scraper dedup: vector query failed: %v", err)
+		slog.Warn("scraper dedup: vector query failed", "error", err)
 		return nil, nil // Non-fatal
 	}
 

@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -231,7 +231,7 @@ func (s *Service) SummarizeBatch(ctx context.Context, elements []CodeElement) []
 				s.totalHits++
 				s.mu.Unlock()
 				if s.config.Debug {
-					log.Printf("[SUMMARIZE] Cache HIT: %s (%s)", elem.Name, elem.Kind)
+					slog.Debug("summarize: cache hit", "name", elem.Name, "kind", elem.Kind)
 				}
 			} else {
 				uncached = append(uncached, i)
@@ -249,7 +249,7 @@ func (s *Service) SummarizeBatch(ctx context.Context, elements []CodeElement) []
 	}
 
 	if s.config.Debug {
-		log.Printf("[SUMMARIZE] Processing %d uncached elements (of %d total)", len(uncached), len(elements))
+		slog.Debug("summarize: processing uncached elements", "uncached", len(uncached), "total", len(elements))
 	}
 
 	// Process uncached elements in batches
@@ -269,7 +269,7 @@ func (s *Service) SummarizeBatch(ctx context.Context, elements []CodeElement) []
 		summaries, err := s.callLLM(ctx, batchElements)
 		if err != nil {
 			if s.config.Debug {
-				log.Printf("[SUMMARIZE] LLM call failed: %v, using fallback", err)
+				slog.Warn("summarize: LLM call failed, using fallback", "error", err)
 			}
 			// Use fallback for failed batch
 			for _, idx := range batchIndices {
@@ -378,7 +378,7 @@ func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]str
 	var summaries []string
 	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
 		if s.config.Debug {
-			log.Printf("[SUMMARIZE] Failed to parse JSON response, content: %s", content)
+			slog.Warn("summarize: failed to parse JSON response", "content", content)
 		}
 		return nil, fmt.Errorf("parse summaries: %w", err)
 	}

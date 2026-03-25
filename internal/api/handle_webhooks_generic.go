@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -141,7 +141,7 @@ func (s *Server) handleGenericWebhook(w http.ResponseWriter, r *http.Request) {
 	s.genericWebhookDebouncer.debounce(debounceKey, func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[webhook] %s: panic recovered: %v", source, r)
+				slog.Error("webhook: panic recovered", "source", source, "panic", r)
 			}
 		}()
 		s.processGenericWebhookEvent(payloadCopy, bodyCopy, configCopy)
@@ -477,13 +477,12 @@ func parseBitbucketWebhook(body []byte, r *http.Request, payload *genericWebhook
 
 // processGenericWebhookEvent processes a debounced generic webhook event.
 func (s *Server) processGenericWebhookEvent(payload genericWebhookPayload, rawBody []byte, config WebhookConfig) {
-	log.Printf("[webhook] %s: processing %s %s (entity=%s)",
-		payload.Source, payload.EntityType, payload.Action, payload.EntityID)
+	slog.Info("webhook: processing event", "source", payload.Source, "entity_type", payload.EntityType, "action", payload.Action, "entity_id", payload.EntityID)
 
 	// Determine space ID
 	spaceID := config.SpaceID
 	if spaceID == "" {
-		log.Printf("[webhook] %s: no space ID configured", payload.Source)
+		slog.Warn("webhook: no space ID configured", "source", payload.Source)
 		return
 	}
 
@@ -514,7 +513,7 @@ func (s *Server) processGenericWebhookEvent(payload genericWebhookPayload, rawBo
 	}
 
 	if len(items) == 0 {
-		log.Printf("[webhook] %s: no observations to ingest", payload.Source)
+		slog.Warn("webhook: no observations to ingest", "source", payload.Source)
 		return
 	}
 
@@ -527,16 +526,15 @@ func (s *Server) processGenericWebhookEvent(payload genericWebhookPayload, rawBo
 		Observations: items,
 	})
 	if err != nil {
-		log.Printf("[webhook] %s: batch ingest failed: %v", payload.Source, err)
+		slog.Error("webhook: batch ingest failed", "source", payload.Source, "error", err)
 		return
 	}
 
-	log.Printf("[webhook] %s: ingested %d/%d observations",
-		payload.Source, resp.SuccessCount, resp.TotalItems)
+	slog.Info("webhook: ingested observations", "source", payload.Source, "success_count", resp.SuccessCount, "total_items", resp.TotalItems)
 
 	// Update TapRoot freshness
 	if err := s.retriever.UpdateTapRootFreshness(ctx, spaceID, fmt.Sprintf("%s-webhook", payload.Source), IsPrunablePrefix(spaceID)); err != nil {
-		log.Printf("[webhook] %s: failed to update TapRoot freshness: %v", payload.Source, err)
+		slog.Error("webhook: failed to update TapRoot freshness", "source", payload.Source, "error", err)
 	}
 
 	// Trigger APE events
@@ -578,11 +576,11 @@ func (s *Server) parseWithIngestionModule(payload genericWebhookPayload, rawBody
 	})
 
 	if err != nil {
-		log.Printf("[webhook] %s: module parse failed: %v", payload.Source, err)
+		slog.Error("webhook: module parse failed", "source", payload.Source, "error", err)
 		return nil
 	}
 	if parseResp.Error != "" {
-		log.Printf("[webhook] %s: module parse error: %s", payload.Source, parseResp.Error)
+		slog.Error("webhook: module parse error", "source", payload.Source, "error", parseResp.Error)
 		return nil
 	}
 

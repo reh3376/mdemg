@@ -2,7 +2,7 @@ package plugins
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	pb "mdemg/api/modulepb"
@@ -44,15 +44,14 @@ func (d *EventDispatcher) DispatchEvent(event string, ctx map[string]string) {
 		if !hasSubscription(mod.Manifest.Capabilities.EventSubscriptions, event) {
 			continue
 		}
-		log.Printf("[event-dispatch] CRUD module %s subscribed to %q — no OnEvent RPC yet, skipping",
-			mod.Manifest.ID, event)
+		slog.Info("event-dispatch: CRUD module subscribed but no OnEvent RPC yet, skipping", "module", mod.Manifest.ID, "event", event)
 	}
 }
 
 // dispatchToIngestion calls Parse on an INGESTION module with event metadata.
 func (d *EventDispatcher) dispatchToIngestion(mod *ModuleInfo, event string, eventCtx map[string]string) {
 	if mod.IngestionClient == nil {
-		log.Printf("[event-dispatch] ingestion module %s has no client, skipping", mod.Manifest.ID)
+		slog.Warn("event-dispatch: ingestion module has no client, skipping", "module", mod.Manifest.ID)
 		return
 	}
 
@@ -73,13 +72,11 @@ func (d *EventDispatcher) dispatchToIngestion(mod *ModuleInfo, event string, eve
 
 	resp, err := mod.IngestionClient.Parse(callCtx, req)
 	if err != nil {
-		log.Printf("[event-dispatch] Parse failed for module %s on event %q: %v",
-			mod.Manifest.ID, event, err)
+		slog.Error("event-dispatch: Parse failed", "module", mod.Manifest.ID, "event", event, "error", err)
 		return
 	}
 
-	log.Printf("[event-dispatch] module %s handled event %q: %d observations",
-		mod.Manifest.ID, event, len(resp.GetObservations()))
+	slog.Info("event-dispatch: module handled event", "module", mod.Manifest.ID, "event", event, "observations", len(resp.GetObservations()))
 }
 
 // hasSubscription checks if the subscriptions list contains the given event.

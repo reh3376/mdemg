@@ -2,7 +2,7 @@ package ape
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -65,20 +65,20 @@ func (s *Scheduler) SetCheckInterval(d time.Duration) {
 // Start initializes schedules from APE modules and starts the scheduler loop
 func (s *Scheduler) Start() error {
 	if s.pluginMgr == nil {
-		log.Printf("ape: no plugin manager, scheduler disabled")
+		slog.Info("ape: no plugin manager, scheduler disabled")
 		return nil
 	}
 
 	// Fetch schedules from all APE modules
 	if err := s.refreshSchedules(); err != nil {
-		log.Printf("ape: failed to refresh schedules: %v", err)
+		slog.Error("ape: failed to refresh schedules", "error", err)
 	}
 
 	// Start scheduler loop
 	s.wg.Add(1)
 	go s.schedulerLoop()
 
-	log.Printf("ape: scheduler started with %d modules", len(s.schedules))
+	slog.Info("ape: scheduler started", "module_count", len(s.schedules))
 	return nil
 }
 
@@ -86,7 +86,7 @@ func (s *Scheduler) Start() error {
 func (s *Scheduler) Stop() {
 	s.cancel()
 	s.wg.Wait()
-	log.Printf("ape: scheduler stopped")
+	slog.Info("ape: scheduler stopped")
 }
 
 // TriggerEvent triggers all APE modules subscribed to the given event
@@ -130,7 +130,7 @@ func (s *Scheduler) refreshSchedules() error {
 		cancel()
 
 		if err != nil {
-			log.Printf("ape: failed to get schedule from %s: %v", mod.Manifest.ID, err)
+			slog.Error("ape: failed to get schedule", "module_id", mod.Manifest.ID, "error", err)
 			continue
 		}
 
@@ -147,8 +147,7 @@ func (s *Scheduler) refreshSchedules() error {
 		}
 
 		s.schedules[mod.Manifest.ID] = sched
-		log.Printf("ape: registered module %s (cron=%s, events=%v, minInterval=%v)",
-			mod.Manifest.ID, sched.CronExpression, sched.EventTriggers, sched.MinInterval)
+		slog.Info("ape: registered module", "module_id", mod.Manifest.ID, "cron", sched.CronExpression, "events", sched.EventTriggers, "min_interval", sched.MinInterval)
 	}
 
 	return nil
@@ -215,7 +214,7 @@ func (s *Scheduler) executeModuleWithContext(moduleID, trigger string, eventCtx 
 	s.mu.Lock()
 	if s.runningTask[moduleID] {
 		s.mu.Unlock()
-		log.Printf("ape: skipping %s, already running", moduleID)
+		slog.Info("ape: skipping module, already running", "module_id", moduleID)
 		return
 	}
 	s.runningTask[moduleID] = true
@@ -231,12 +230,12 @@ func (s *Scheduler) executeModuleWithContext(moduleID, trigger string, eventCtx 
 	// Get the module
 	modInfo, ok := s.pluginMgr.GetModule(moduleID)
 	if !ok || modInfo.APEClient == nil {
-		log.Printf("ape: module %s not found or not APE type", moduleID)
+		slog.Warn("ape: module not found or not APE type", "module_id", moduleID)
 		return
 	}
 
 	taskID := uuid.New().String()
-	log.Printf("ape: executing %s (task=%s, trigger=%s)", moduleID, taskID[:8], trigger)
+	slog.Info("ape: executing module", "module_id", moduleID, "task_id", taskID[:8], "trigger", trigger)
 
 	// Merge event context into request context
 	reqCtx := make(map[string]string)
@@ -257,22 +256,19 @@ func (s *Scheduler) executeModuleWithContext(moduleID, trigger string, eventCtx 
 	elapsed := time.Since(start)
 
 	if err != nil {
-		log.Printf("ape: %s failed after %v: %v", moduleID, elapsed, err)
+		slog.Error("ape: module execution failed", "module_id", moduleID, "elapsed", elapsed, "error", err)
 		return
 	}
 
 	if resp.Error != "" {
-		log.Printf("ape: %s completed with error after %v: %s", moduleID, elapsed, resp.Error)
+		slog.Error("ape: module completed with error", "module_id", moduleID, "elapsed", elapsed, "error", resp.Error)
 		return
 	}
 
 	if resp.Stats != nil {
-		log.Printf("ape: %s completed in %v (nodes: +%d/~%d, edges: +%d/~%d)",
-			moduleID, elapsed,
-			resp.Stats.NodesCreated, resp.Stats.NodesUpdated,
-			resp.Stats.EdgesCreated, resp.Stats.EdgesUpdated)
+		slog.Info("ape: module completed", "module_id", moduleID, "elapsed", elapsed, "nodes_created", resp.Stats.NodesCreated, "nodes_updated", resp.Stats.NodesUpdated, "edges_created", resp.Stats.EdgesCreated, "edges_updated", resp.Stats.EdgesUpdated)
 	} else {
-		log.Printf("ape: %s completed in %v: %s", moduleID, elapsed, resp.Message)
+		slog.Info("ape: module completed", "module_id", moduleID, "elapsed", elapsed, "message", resp.Message)
 	}
 }
 

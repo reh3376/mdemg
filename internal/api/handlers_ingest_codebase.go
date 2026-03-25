@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -186,7 +186,7 @@ func (s *Server) handleIngestCodebase(w http.ResponseWriter, r *http.Request) {
 
 	var req IngestCodebaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("ERROR [ingest codebase JSON]: %v", err)
+		slog.Error("ingest codebase: invalid JSON", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
@@ -256,7 +256,7 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 			job.Error = fmt.Sprintf("panic in ingestion job: %v", r)
 			job.EndTime = time.Now()
 			job.mu.Unlock()
-			log.Printf("[ingest-codebase] PANIC in job %s: %v", job.ID, r)
+			slog.Error("ingest-codebase: panic in job", "job_id", job.ID, "panic", r)
 		}
 	}()
 
@@ -280,7 +280,7 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	// Build CLI arguments
 	args := s.buildIngestArgs(req)
 
-	log.Printf("[ingest-codebase] Starting job %s: space=%s path=%s", job.ID, job.SpaceID, job.Path)
+	slog.Info("ingest-codebase: starting job", "job_id", job.ID, "space_id", job.SpaceID, "path", job.Path)
 
 	// Run unified CLI ingest subcommand from current working directory
 	cmd := exec.CommandContext(ctx, "./bin/mdemg", append([]string{"ingest"}, args...)...)
@@ -297,7 +297,7 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	if err != nil {
 		job.Status = "failed"
 		job.Error = fmt.Sprintf("ingestion failed: %v\nOutput: %s", err, string(output))
-		log.Printf("[ingest-codebase] Job %s failed: %v", job.ID, err)
+		slog.Error("ingest-codebase: job failed", "job_id", job.ID, "error", err)
 		return
 	}
 
@@ -306,15 +306,14 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	job.Stats.Duration = duration.Round(time.Second).String()
 	job.Status = "completed"
 
-	log.Printf("[ingest-codebase] Job %s completed: %d files, %d symbols, %d errors",
-		job.ID, job.Stats.FilesProcessed, job.Stats.SymbolsExtracted, job.Stats.Errors)
+	slog.Info("ingest-codebase: job completed", "job_id", job.ID, "files_processed", job.Stats.FilesProcessed, "symbols_extracted", job.Stats.SymbolsExtracted, "errors", job.Stats.Errors)
 
 	// Update TapRoot freshness on completion
 	freshnessCtx, freshnessCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer freshnessCancel()
 	if s.retriever != nil {
 		if err := s.retriever.UpdateTapRootFreshness(freshnessCtx, job.SpaceID, "codebase-ingest", IsPrunablePrefix(job.SpaceID)); err != nil {
-			log.Printf("[ingest-codebase] Warning: failed to update TapRoot freshness for %s: %v", job.SpaceID, err)
+			slog.Warn("ingest-codebase: failed to update TapRoot freshness", "space_id", job.SpaceID, "error", err)
 		}
 	}
 	s.TriggerAPEEventWithContext("source_changed", map[string]string{

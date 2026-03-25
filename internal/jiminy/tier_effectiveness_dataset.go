@@ -2,7 +2,7 @@ package jiminy
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -156,16 +156,16 @@ func (dc *ProtocolDataCollector) writeDataset(dataset *TierEffectivenessDataset)
 
 	data, err := json.MarshalIndent(dataset, "", "  ")
 	if err != nil {
-		log.Printf("j17: tier effectiveness dataset: marshal error: %v", err)
+		slog.Error("j17: tier effectiveness dataset: marshal error", "error", err)
 		return
 	}
 
 	filename := filepath.Join(dc.dir, "tier-effectiveness-"+time.Now().UTC().Format("20060102-150405")+".json")
 	if err := os.WriteFile(filename, data, 0600); err != nil {
-		log.Printf("j17: tier effectiveness dataset: write error: %v", err)
+		slog.Error("j17: tier effectiveness dataset: write error", "error", err)
 		return
 	}
-	log.Printf("j17: tier effectiveness dataset written: %s", filename)
+	slog.Info("j17: tier effectiveness dataset written", "filename", filename)
 }
 
 func letterGrade(comp float64, count int64) string {

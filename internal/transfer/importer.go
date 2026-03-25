@@ -3,7 +3,7 @@ package transfer
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -96,7 +96,7 @@ func (imp *Importer) Import(ctx context.Context, chunks []*pb.SpaceChunk) (*Impo
 				result.NodesCreated += stats.created
 				result.NodesSkipped += stats.skipped
 				result.NodesOverwritten += stats.overwritten
-				log.Printf("Imported node chunk %d: %d created, %d skipped", chunk.Sequence, stats.created, stats.skipped)
+				slog.Info("imported node chunk", "sequence", chunk.Sequence, "created", stats.created, "skipped", stats.skipped)
 			}
 
 		case pb.ChunkType_CHUNK_TYPE_EDGES:
@@ -108,7 +108,7 @@ func (imp *Importer) Import(ctx context.Context, chunks []*pb.SpaceChunk) (*Impo
 				result.EdgesCreated += stats.created
 				result.EdgesSkipped += stats.skipped
 				result.EdgesMerged += stats.merged
-				log.Printf("Imported edge chunk %d: %d created, %d skipped, %d merged", chunk.Sequence, stats.created, stats.skipped, stats.merged)
+				slog.Info("imported edge chunk", "sequence", chunk.Sequence, "created", stats.created, "skipped", stats.skipped, "merged", stats.merged)
 			}
 
 		case pb.ChunkType_CHUNK_TYPE_OBSERVATIONS:
@@ -439,7 +439,7 @@ RETURN 'created' AS action`, ed.RelType)
 
 		if err != nil {
 			// Log warning but continue — missing nodes are expected if partial export
-			log.Printf("WARN: edge %s->%s (%s): %v", ed.FromNodeId, ed.ToNodeId, ed.RelType, err)
+			slog.Warn("edge import failed", "from", ed.FromNodeId, "to", ed.ToNodeId, "rel_type", ed.RelType, "error", err)
 			stats.skipped++
 			continue
 		}
@@ -503,14 +503,14 @@ MERGE (n)-[:HAS_OBSERVATION]->(o)`, map[string]any{
 					"obsId":   od.ObsId,
 				})
 				if err != nil {
-					log.Printf("WARN: could not link observation %s to node %s: %v", od.ObsId, od.ParentNodeId, err)
+					slog.Warn("could not link observation to node", "obs_id", od.ObsId, "parent_node_id", od.ParentNodeId, "error", err)
 				}
 			}
 
 			return nil, nil
 		})
 		if err != nil {
-			log.Printf("WARN: observation %s: %v", od.ObsId, err)
+			slog.Warn("observation import failed", "obs_id", od.ObsId, "error", err)
 			continue
 		}
 		count++
@@ -582,14 +582,14 @@ MERGE (n)-[:HAS_SYMBOL]->(s)`, map[string]any{
 					"symbolId": sd.SymbolId,
 				})
 				if err != nil {
-					log.Printf("WARN: could not link symbol %s to node %s: %v", sd.SymbolId, sd.ParentNodeId, err)
+					slog.Warn("could not link symbol to node", "symbol_id", sd.SymbolId, "parent_node_id", sd.ParentNodeId, "error", err)
 				}
 			}
 
 			return nil, nil
 		})
 		if err != nil {
-			log.Printf("WARN: symbol %s: %v", sd.SymbolId, err)
+			slog.Warn("symbol import failed", "symbol_id", sd.SymbolId, "error", err)
 			continue
 		}
 		count++
