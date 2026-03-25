@@ -19,6 +19,7 @@ import (
 	"mdemg/internal/api"
 	"mdemg/internal/config"
 	"mdemg/internal/db"
+	mlog "mdemg/internal/logging"
 	"mdemg/internal/plugins"
 	"mdemg/migrations"
 )
@@ -28,6 +29,7 @@ func newServeCmd() *cobra.Command {
 	var dbURI string
 	var autoMigrate bool
 	var mcpEnabled bool
+	var logLevel string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -50,7 +52,7 @@ The server will:
 
 See config.FromEnv() for the full list of environment variable options.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(cmd, args, port, dbURI, autoMigrate, mcpEnabled)
+			return runServe(cmd, args, port, dbURI, autoMigrate, mcpEnabled, logLevel)
 		},
 	}
 
@@ -58,15 +60,28 @@ See config.FromEnv() for the full list of environment variable options.`,
 	cmd.Flags().StringVar(&dbURI, "db-uri", "", "Neo4j URI (overrides NEO4J_URI env var)")
 	cmd.Flags().BoolVar(&autoMigrate, "auto-migrate", false, "Apply pending database migrations before starting")
 	cmd.Flags().BoolVar(&mcpEnabled, "mcp", false, "Start MCP server subprocess alongside HTTP server")
+	cmd.Flags().StringVar(&logLevel, "log-level", "", "Log level: debug, info, warn, error (overrides LOG_LEVEL env var)")
 
 	return cmd
 }
 
-func runServe(cmd *cobra.Command, args []string, port int, dbURI string, autoMigrate bool, mcpEnabled bool) error {
+func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrate bool, mcpEnabled bool, logLevel string) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
+
+	// Resolve log level: --log-level flag > --verbose flag > LOG_LEVEL env > "info"
+	effectiveLevel := cfg.LogLevel
+	if logLevel != "" {
+		effectiveLevel = logLevel
+	} else if verbose, _ := cmd.Flags().GetBool("verbose"); verbose {
+		effectiveLevel = "debug"
+	}
+	cfg.LogLevel = effectiveLevel
+
+	// Initialize structured logging — bridges stdlib log through slog
+	mlog.Init(cfg.LogFormat, effectiveLevel, nil)
 
 	// CLI flag overrides
 	if port > 0 {

@@ -114,6 +114,7 @@ type Config struct {
 
 	// Logging settings
 	LogFormat     string // "text" (default) or "json"
+	LogLevel      string // "debug", "info" (default), "warn", "error"
 	LogSkipHealth bool   // Skip logging for /healthz and /readyz endpoints (default: false)
 
 	// Hidden layer settings (V0005)
@@ -1204,6 +1205,13 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("LOG_FORMAT must be 'text' or 'json'")
 	}
 	logSkipHealth := getBool("LOG_SKIP_HEALTH", false)
+	logLevel := get("LOG_LEVEL", "info")
+	switch logLevel {
+	case "debug", "info", "warn", "error":
+		// valid
+	default:
+		return Config{}, errors.New("LOG_LEVEL must be 'debug', 'info', 'warn', or 'error'")
+	}
 
 	// Hidden layer settings (V0005)
 	hiddenEnabled := getBool("HIDDEN_LAYER_ENABLED", true)
@@ -3026,6 +3034,7 @@ func FromEnv() (Config, error) {
 		TemporalStaleRefDays:           temporalStaleRefDays,
 		TemporalStaleRefMaxPen:         temporalStaleRefMaxPen,
 		LogFormat:                 logFormat,
+		LogLevel:                  logLevel,
 		LogSkipHealth:             logSkipHealth,
 		HiddenLayerEnabled:        hiddenEnabled,
 		HiddenLayerClusterEps:     hiddenClusterEps,
