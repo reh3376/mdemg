@@ -667,3 +667,135 @@ func TestUxTSModuleProcessWithCandidates(t *testing.T) {
 		}
 	}
 }
+
+// ============ Generic Module Contract Tests (Ingestion modules) ============
+
+// getIngestionModuleTarget returns the Unix socket for ingestion module UDTS tests.
+// Set UDTS_INGESTION_MODULE_SOCKET (e.g. /tmp/mdemg-plugins/obsidian-module.sock).
+func getIngestionModuleTarget(t *testing.T) string {
+	t.Helper()
+	socketPath := os.Getenv("UDTS_INGESTION_MODULE_SOCKET")
+	if socketPath == "" {
+		t.Skip("UDTS_INGESTION_MODULE_SOCKET not set; start an ingestion module first")
+	}
+	return socketPath
+}
+
+// TestModuleHandshake validates the Handshake RPC contract for any module.
+func TestModuleHandshake(t *testing.T) {
+	socketPath := getIngestionModuleTarget(t)
+	spec := loadSpec(t, "module_handshake.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ModuleLifecycle" || spec.Method != "Handshake" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewModuleLifecycleClient(conn)
+	resp, err := client.Handshake(ctx, &modulepb.HandshakeRequest{
+		MdemgVersion: "1.0.0",
+		SocketPath:   socketPath,
+		Config:       map[string]string{},
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Handshake: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "module_id" && resp.ModuleId == "" {
+		t.Error("expected response to have module_id")
+	}
+	if resp.Ready != true {
+		t.Error("expected ready=true")
+	}
+}
+
+// TestModuleHealthCheck validates the HealthCheck RPC contract for any module.
+func TestModuleHealthCheck(t *testing.T) {
+	socketPath := getIngestionModuleTarget(t)
+	spec := loadSpec(t, "module_healthcheck.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.ModuleLifecycle" || spec.Method != "HealthCheck" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewModuleLifecycleClient(conn)
+	resp, err := client.HealthCheck(ctx, &modulepb.HealthCheckRequest{})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("HealthCheck: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "healthy" && !resp.Healthy {
+		t.Error("expected healthy=true")
+	}
+	if resp.Metrics == nil {
+		t.Error("expected metrics to be non-nil")
+	}
+}
+
+// TestModuleMatches validates the IngestionModule.Matches RPC contract.
+func TestModuleMatches(t *testing.T) {
+	socketPath := getIngestionModuleTarget(t)
+	spec := loadSpec(t, "module_matches.udts.json")
+	verifyProtoHash(t, spec, "mdemg-module.proto")
+	if spec.Service != "mdemg.module.v1.IngestionModule" || spec.Method != "Matches" {
+		t.Fatalf("spec mismatch: %s / %s", spec.Service, spec.Method)
+	}
+
+	timeout := 10 * time.Second
+	if spec.Config.TimeoutMs > 0 {
+		timeout = time.Duration(spec.Config.TimeoutMs) * time.Millisecond
+	}
+
+	conn := dialModule(t, socketPath, timeout)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := modulepb.NewIngestionModuleClient(conn)
+	resp, err := client.Matches(ctx, &modulepb.MatchRequest{
+		SourceUri:   "vault/test-note.md",
+		ContentType: "text/markdown",
+		Metadata:    map[string]string{},
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		if spec.Expected.StatusCode != st.Code().String() {
+			t.Fatalf("Matches: %v (expected status %s)", err, spec.Expected.StatusCode)
+		}
+		return
+	}
+
+	if spec.Expected.HasField == "confidence" && resp.Confidence == 0 {
+		t.Error("expected confidence to be non-zero for markdown content")
+	}
+}
