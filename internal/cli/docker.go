@@ -199,6 +199,54 @@ func sanitizeSlug(name string) string {
 	return slug
 }
 
+// tryMigrateVolume checks for legacy hyphen-named volumes and warns about
+// the naming mismatch between `mdemg db start` (hyphens) and `docker compose`
+// (underscores). If the legacy volume has data and the compose volume doesn't
+// exist, it offers a migration command. If both exist, it warns about duplicate
+// data. Returns the recommended volume name to use.
+func tryMigrateVolume(projectDir string) string {
+	slug := sanitizeSlug(filepath.Base(projectDir))
+	composeVol := slug + "_neo4j_data"
+	legacyVol := "mdemg-neo4j-data-" + slug
+
+	composeExists := dockerVolumeExists(composeVol)
+	legacyExists := dockerVolumeExists(legacyVol)
+
+	switch {
+	case composeExists && legacyExists:
+		fmt.Printf("WARNING: Both volumes exist — data may be split:\n")
+		fmt.Printf("  Compose volume: %s (preferred)\n", composeVol)
+		fmt.Printf("  Legacy volume:  %s\n", legacyVol)
+		fmt.Printf("  To consolidate, stop all containers, then:\n")
+		fmt.Printf("    docker run --rm -v %s:/src -v %s:/dst alpine sh -c 'cp -a /src/. /dst/'\n", legacyVol, composeVol)
+		fmt.Printf("    docker volume rm %s\n", legacyVol)
+		return composeVol
+	case legacyExists && !composeExists:
+		fmt.Printf("NOTE: Migrating to compose-compatible volume name:\n")
+		fmt.Printf("  %s → %s\n", legacyVol, composeVol)
+		// Create the compose volume and copy data
+		if _, err := RunDockerCommand("volume", "create", composeVol); err != nil {
+			fmt.Printf("  Migration failed (volume create): %v\n", err)
+			fmt.Printf("  Using legacy volume: %s\n", legacyVol)
+			return legacyVol
+		}
+		_, cpErr := RunDockerCommand("run", "--rm",
+			"-v", legacyVol+":/src",
+			"-v", composeVol+":/dst",
+			"alpine", "sh", "-c", "cp -a /src/. /dst/")
+		if cpErr != nil {
+			fmt.Printf("  Migration failed (data copy): %v\n", cpErr)
+			fmt.Printf("  Using legacy volume: %s\n", legacyVol)
+			return legacyVol
+		}
+		fmt.Printf("  Data migrated. Legacy volume retained as backup.\n")
+		fmt.Printf("  Remove when verified: docker volume rm %s\n", legacyVol)
+		return composeVol
+	default:
+		return VolumeNameForProject(projectDir)
+	}
+}
+
 // FindFreePort tries the preferred port first, then scans rangeStart..rangeEnd.
 // Returns the first available port or an error if none found.
 func FindFreePort(preferred, rangeStart, rangeEnd int) (int, error) {

@@ -183,6 +183,9 @@ type ingestConfig struct {
 
 	// Info
 	listLanguages bool
+
+	// Plugin bridge (optional, nil for CLI-only ingest)
+	plugins pluginParser
 }
 
 type batchIngestRequest struct {
@@ -227,6 +230,16 @@ type codeElement struct {
 	Tags     []string
 	Concerns []string
 	Symbols  []ingestSymbol
+}
+
+// pluginParser is an optional interface for parsing files via plugin modules.
+// When set on ingestConfig, walkCodebase delegates unrecognized file types to
+// the plugin's MatchAndParse method before skipping them.
+type pluginParser interface {
+	// MatchAndParse attempts to parse a file via registered plugin modules.
+	// Returns parsed elements and true if a module handled the file, or nil
+	// and false if no module matched.
+	MatchAndParse(ctx context.Context, filePath string, content []byte) ([]codeElement, bool, error)
 }
 
 type exclusionPreset struct {
@@ -1046,18 +1059,34 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 			return nil
 		}
 
-		// GAP-01: Surface unrecognized file types instead of silently skipping.
-		// When plugin modules are registered server-side, they can handle these
-		// via MatchIngestionModule(). For now, emit a diagnostic so users know
-		// which files were not parsed.
+		// GAP-01: Delegate unrecognized file types to plugin modules before skipping.
 		ext := filepath.Ext(path)
+
+		if cfg.plugins != nil {
+			content, readErr := os.ReadFile(path) //nolint:gosec // G122: path is from walkCodebase's own WalkDir — same trust boundary as built-in parsers
+			if readErr == nil {
+				pluginElems, matched, matchErr := cfg.plugins.MatchAndParse(context.Background(), path, content)
+				if matchErr != nil && cfg.verbose {
+					log.Printf("Plugin match error for %s: %v", path, matchErr)
+				}
+				if matched && len(pluginElems) > 0 {
+					elements = append(elements, pluginElems...)
+					if cfg.verbose {
+						log.Printf("Plugin parsed %d elements from %s", len(pluginElems), path)
+					}
+					return nil
+				}
+			}
+		}
+
+		// No built-in parser and no plugin match — emit diagnostic and skip.
 		if ext != "" && cfg.verbose {
 			log.Printf("Skipping unrecognized file type (%s): %s", ext, path)
 		}
 		diagSummary.Add(languages.Diagnostic{
 			Severity: "info",
 			Code:     "UNRECOGNIZED_FILE_TYPE",
-			Message:  fmt.Sprintf("No built-in parser for file extension %q; file skipped (plugin modules may handle this via MatchIngestionModule)", ext),
+			Message:  fmt.Sprintf("No built-in parser for file extension %q; file skipped", ext),
 			Context:  map[string]string{"path": path, "extension": ext},
 		})
 		return nil
