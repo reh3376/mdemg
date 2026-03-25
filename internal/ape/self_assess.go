@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"log/slog"
 	"math"
 	"os"
 	"strings"
@@ -36,7 +37,8 @@ type Assessor struct {
 	convSvc          ConversationStatsProvider
 	jiminyProvider   JiminyStatsProvider   // J10: guidance stats provider
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
-	synergyReader    SynergyFileReader     // Synergy: file metrics provider
+	synergyReader     SynergyFileReader     // Synergy: file metrics provider
+	freshnessProvider FreshnessProvider     // Phase 47.2: ingest staleness provider
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
@@ -57,6 +59,11 @@ func (a *Assessor) SetProtocolProvider(p ProtocolStatsProvider) {
 // SetSynergyReader attaches a synergy file metrics provider for synergy health assessment.
 func (a *Assessor) SetSynergyReader(r SynergyFileReader) {
 	a.synergyReader = r
+}
+
+// SetFreshnessProvider attaches an ingest freshness provider for staleness detection (Phase 47.2).
+func (a *Assessor) SetFreshnessProvider(p FreshnessProvider) {
+	a.freshnessProvider = p
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -135,6 +142,16 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		// Recovery buffer: count pending entries (CMS space + local JSONL)
 		report.SynergyRecoveryBufferEntries = countBufferSpaceEntries(ctx, a.driver, a.cfg.SynergyRecoveryBufferSpace) +
 			countLocalBufferEntries(a.cfg.SynergyRecoveryBufferPath)
+	}
+
+	// 5e. Freshness: Count stale spaces for RSIC ingest awareness (Phase 47.2)
+	if a.freshnessProvider != nil && a.cfg.APEIngestSyncEnabled {
+		staleCount, fErr := a.freshnessProvider.GetStaleSpaceCount(ctx, a.cfg.SyncStaleThresholdHours)
+		if fErr != nil {
+			slog.Warn("RSIC assess: freshness query failed", "error", fErr)
+		} else {
+			report.StaleIngestSpaces = staleCount
+		}
 	}
 
 	// 6. Weighted overall (adjusted weights for dimensions present)

@@ -146,6 +146,7 @@ type SelfAssessmentReport struct {
 	AvgEdgeWeight        float64 `json:"avg_edge_weight"`
 	EdgesBelowThreshold  int64   `json:"edges_below_threshold"`
 	EdgeWeightEntropy    float64 `json:"edge_weight_entropy"`
+	StaleIngestSpaces    int     `json:"stale_ingest_spaces"`    // Phase 47.2: count of spaces past staleness threshold
 }
 
 // ───────────── Reflection ─────────────
@@ -464,4 +465,10 @@ type WatchdogSignalProvider interface {
 	GetSessionHealthScore(sessionID string) float64
 	GetObservationRate(spaceID string) float64
 	GetConsolidationAgeSec(ctx context.Context, spaceID string) (int64, error)
+}
+
+// FreshnessProvider supplies ingest staleness data for the RSIC pipeline (Phase 47.2).
+type FreshnessProvider interface {
+	GetStaleSpaceCount(ctx context.Context, thresholdHours int) (int, error)
+	TriggerIngestForStaleSpaces(ctx context.Context, thresholdHours int) (int, error) // returns count re-ingested
 }

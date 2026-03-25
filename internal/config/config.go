@@ -542,6 +542,7 @@ type Config struct {
 	SyncSpaceIDs            []string          // Comma-separated space IDs to monitor (empty = all)
 	SyncStaleThresholdHours int               // Hours before a space is considered stale (default: 24)
 	SyncRepoPathMap         map[string]string // space_id -> repo_path mapping for auto-ingest
+	APEIngestSyncEnabled    bool              // Enable RSIC-driven ingest staleness detection (default: false)
 
 	// ===== Phase 3: Production Readiness =====
 
@@ -2612,6 +2613,7 @@ func FromEnv() (Config, error) {
 	if syncStaleThresholdHours < 1 {
 		return Config{}, errors.New("SYNC_STALE_THRESHOLD_HOURS must be >= 1")
 	}
+	apeIngestSyncEnabled := getBool("APE_INGEST_SYNC_ENABLED", false)
 	var syncSpaceIDs []string
 	if v := get("SYNC_SPACE_IDS", ""); v != "" {
 		for _, s := range strings.Split(v, ",") {
@@ -3282,6 +3284,7 @@ func FromEnv() (Config, error) {
 		SyncSpaceIDs:              syncSpaceIDs,
 		SyncStaleThresholdHours:   syncStaleThresholdHours,
 		SyncRepoPathMap:           syncRepoPathMap,
+		APEIngestSyncEnabled:      apeIngestSyncEnabled,
 
 		// Phase 3: Production Readiness
 		RateLimitEnabled:           rateLimitEnabled,

@@ -192,6 +192,19 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 1 * time.Minute
 
+	case "ingest_stale_spaces":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/memory/freshness", Purpose: "query stale space list"},
+			{Method: "POST", Path: "/v1/ingest", Purpose: "trigger incremental ingest for stale spaces"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Count of spaces re-ingested", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "stale_spaces_delta", Operator: "lte", Threshold: 0},
+		}
+		spec.Timeout = 10 * time.Minute
+
 	default:
 		spec.Timeout = 5 * time.Minute
 	}
@@ -227,6 +240,8 @@ func descriptionForAction(actionType string) string {
 		return "Adjust tier selection parameters to improve compression ratio"
 	case "adjust_replay_buffer":
 		return "Adjust replay buffer size to reduce replay frequency"
+	case "ingest_stale_spaces":
+		return "Re-ingest stale spaces that have not been updated within the staleness threshold"
 	default:
 		return "Unknown action type: " + actionType
 	}
