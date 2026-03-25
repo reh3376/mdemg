@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,157 @@ This is #important and also #important again.
 	}
 	if count != 1 {
 		t.Errorf("tag 'important' should appear once, appeared %d times in %v", count, note.Tags)
+	}
+}
+
+func TestParseNote_YAMLFrontmatter(t *testing.T) {
+	content := `---
+title: Nested YAML Test
+author:
+  name: Jane Doe
+  email: jane@example.com
+priority: 1
+---
+
+# Content
+
+Body here.
+`
+	note := ParseNote(content, "nested.md")
+
+	if note.Title != "Nested YAML Test" {
+		t.Errorf("title: got %q, want %q", note.Title, "Nested YAML Test")
+	}
+	// yaml.v3 should parse nested maps as map[string]interface{}
+	author, ok := note.Frontmatter["author"]
+	if !ok {
+		t.Fatal("expected 'author' in frontmatter")
+	}
+	authorMap, ok := author.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected author to be a map, got %T", author)
+	}
+	if authorMap["name"] != "Jane Doe" {
+		t.Errorf("author.name: got %v, want %q", authorMap["name"], "Jane Doe")
+	}
+	// Numeric value should be parsed
+	if note.Frontmatter["priority"] != 1 {
+		t.Errorf("priority: got %v, want 1", note.Frontmatter["priority"])
+	}
+}
+
+func TestParseNote_MalformedFrontmatter(t *testing.T) {
+	content := `---
+title: Good Title
+bad yaml: [unclosed
+also: fine
+---
+
+Body content.
+`
+	// Should gracefully handle malformed YAML via fallback
+	note := ParseNote(content, "malformed.md")
+	// Fallback should still extract simple key:value pairs
+	if note.Frontmatter["title"] == nil {
+		t.Error("expected title to be extracted even with malformed YAML")
+	}
+}
+
+func TestParseNote_Aliases(t *testing.T) {
+	content := `---
+title: Main Title
+aliases:
+  - Alias One
+  - Alias Two
+  - Alias Three
+---
+
+Content here.
+`
+	note := ParseNote(content, "aliases.md")
+
+	if len(note.Aliases) != 3 {
+		t.Fatalf("expected 3 aliases, got %d: %v", len(note.Aliases), note.Aliases)
+	}
+	expected := []string{"Alias One", "Alias Two", "Alias Three"}
+	for i, exp := range expected {
+		if note.Aliases[i] != exp {
+			t.Errorf("alias[%d]: got %q, want %q", i, note.Aliases[i], exp)
+		}
+	}
+}
+
+func TestParseNote_CleanContent(t *testing.T) {
+	content := `# Test Note
+
+This links to [[Another Page]] and shows [[Page With Alias|display text]].
+Also embeds ![[screenshot.png]] inline.
+`
+	note := ParseNote(content, "clean.md")
+	clean := note.CleanContent()
+
+	if strings.Contains(clean, "[[") {
+		t.Errorf("CleanContent should strip wikilink brackets, got: %s", clean)
+	}
+	if !strings.Contains(clean, "Another Page") {
+		t.Error("CleanContent should keep target name for simple wikilinks")
+	}
+	if !strings.Contains(clean, "display text") {
+		t.Error("CleanContent should use alias for aliased wikilinks")
+	}
+	if !strings.Contains(clean, "screenshot.png") {
+		t.Error("CleanContent should replace embed with filename")
+	}
+}
+
+func TestParseNote_CreatedAt(t *testing.T) {
+	content := `---
+title: Dated Note
+created: "2026-01-15"
+---
+
+Content.
+`
+	note := ParseNote(content, "dated.md")
+	if note.CreatedAt != "2026-01-15" {
+		t.Errorf("CreatedAt: got %q, want %q", note.CreatedAt, "2026-01-15")
+	}
+
+	// Also test the "date" fallback — yaml.v3 parses unquoted dates as time.Time
+	content2 := `---
+date: 2026-02-20
+---
+
+Content.
+`
+	note2 := ParseNote(content2, "dated2.md")
+	if !strings.Contains(note2.CreatedAt, "2026-02-20") {
+		t.Errorf("CreatedAt from date: got %q, want to contain %q", note2.CreatedAt, "2026-02-20")
+	}
+}
+
+func TestFrontmatterStrings(t *testing.T) {
+	content := `---
+title: String Test
+tags:
+  - alpha
+  - beta
+priority: 5
+---
+
+Content.
+`
+	note := ParseNote(content, "fmstrings.md")
+	fms := note.FrontmatterStrings()
+
+	if fms["title"] != "String Test" {
+		t.Errorf("title: got %q, want %q", fms["title"], "String Test")
+	}
+	if fms["tags"] != "alpha, beta" {
+		t.Errorf("tags: got %q, want %q", fms["tags"], "alpha, beta")
+	}
+	if fms["priority"] != "5" {
+		t.Errorf("priority: got %q, want %q", fms["priority"], "5")
 	}
 }
 

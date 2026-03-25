@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -19,23 +19,27 @@ const (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
 
 	if *socketPath == "" {
-		log.Fatal("--socket is required")
+		slog.Error("--socket is required")
+		os.Exit(1)
 	}
 
 	os.Remove(*socketPath)
 
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		slog.Error("failed to listen", "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 	defer os.Remove(*socketPath)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+	slog.Info("obsidian module listening", "socket", *socketPath)
 
 	grpcServer := grpc.NewServer()
 
@@ -48,11 +52,12 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Printf("%s: received shutdown signal", moduleID)
+		slog.Info("received shutdown signal")
 		grpcServer.GracefulStop()
 	}()
 
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }

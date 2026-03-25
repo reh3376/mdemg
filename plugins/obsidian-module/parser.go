@@ -1,18 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ObsidianNote holds the parsed structure of an Obsidian markdown file.
 type ObsidianNote struct {
-	Frontmatter map[string]string // YAML frontmatter key-value pairs
-	Tags        []string          // #tag and #nested/tag references
-	Wikilinks   []Wikilink        // [[page]] and [[page|alias]] references
-	Embeds      []string          // ![[file]] embedded references
-	Title       string            // First H1 heading or filename
-	Content     string            // Full text content (without frontmatter)
+	Frontmatter map[string]interface{} // YAML frontmatter key-value pairs
+	Tags        []string               // #tag and #nested/tag references
+	Aliases     []string               // extracted from frontmatter aliases key
+	Wikilinks   []Wikilink             // [[page]] and [[page|alias]] references
+	Embeds      []string               // ![[file]] embedded references
+	Title       string                 // First H1 heading or filename
+	Content     string                 // Full text content (without frontmatter)
+	CreatedAt   string                 // extracted from frontmatter created or date key
 }
 
 // Wikilink represents an Obsidian wikilink reference.
@@ -39,7 +44,7 @@ var (
 // ParseNote parses an Obsidian markdown file into structured data.
 func ParseNote(content, filename string) ObsidianNote {
 	note := ObsidianNote{
-		Frontmatter: make(map[string]string),
+		Frontmatter: make(map[string]interface{}),
 	}
 
 	body := content
@@ -53,12 +58,49 @@ func ParseNote(content, filename string) ObsidianNote {
 
 	// Extract tags from frontmatter
 	if fmTags, ok := note.Frontmatter["tags"]; ok {
-		for _, t := range splitYAMLList(fmTags) {
-			t = strings.TrimSpace(t)
-			if t != "" {
-				note.Tags = append(note.Tags, t)
+		switch v := fmTags.(type) {
+		case []interface{}:
+			for _, item := range v {
+				t := strings.TrimSpace(fmt.Sprintf("%v", item))
+				if t != "" {
+					note.Tags = append(note.Tags, t)
+				}
+			}
+		case string:
+			for _, t := range splitYAMLList(v) {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					note.Tags = append(note.Tags, t)
+				}
 			}
 		}
+	}
+
+	// Extract aliases from frontmatter
+	if fmAliases, ok := note.Frontmatter["aliases"]; ok {
+		switch v := fmAliases.(type) {
+		case []interface{}:
+			for _, item := range v {
+				a := strings.TrimSpace(fmt.Sprintf("%v", item))
+				if a != "" {
+					note.Aliases = append(note.Aliases, a)
+				}
+			}
+		case string:
+			for _, a := range splitYAMLList(v) {
+				a = strings.TrimSpace(a)
+				if a != "" {
+					note.Aliases = append(note.Aliases, a)
+				}
+			}
+		}
+	}
+
+	// Extract created date from frontmatter
+	if created, ok := note.Frontmatter["created"]; ok {
+		note.CreatedAt = fmt.Sprintf("%v", created)
+	} else if date, ok := note.Frontmatter["date"]; ok {
+		note.CreatedAt = fmt.Sprintf("%v", date)
 	}
 
 	// Extract inline tags from body
@@ -92,8 +134,11 @@ func ParseNote(content, filename string) ObsidianNote {
 	}
 
 	// Extract title: first H1 heading, or frontmatter title, or filename
-	if t, ok := note.Frontmatter["title"]; ok && t != "" {
-		note.Title = t
+	if t, ok := note.Frontmatter["title"]; ok {
+		title := fmt.Sprintf("%v", t)
+		if title != "" {
+			note.Title = title
+		}
 	} else if idx := strings.Index(body, "\n# "); idx >= 0 {
 		end := strings.Index(body[idx+3:], "\n")
 		if end >= 0 {
@@ -117,25 +162,63 @@ func ParseNote(content, filename string) ObsidianNote {
 	return note
 }
 
-// parseFrontmatter does simple YAML key: value parsing (single-level only).
-func parseFrontmatter(raw string, out map[string]string) {
-	for _, line := range strings.Split(raw, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		idx := strings.Index(line, ":")
-		if idx < 0 {
-			continue
-		}
-		key := strings.TrimSpace(line[:idx])
-		val := strings.TrimSpace(line[idx+1:])
-		// Strip surrounding quotes
-		val = strings.Trim(val, "\"'")
-		if key != "" {
-			out[key] = val
+// parseFrontmatter parses YAML frontmatter using yaml.v3 with graceful fallback.
+func parseFrontmatter(raw string, out map[string]interface{}) {
+	if err := yaml.Unmarshal([]byte(raw), &out); err != nil {
+		// Graceful fallback: try simple key:value parsing
+		for _, line := range strings.Split(raw, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			idx := strings.Index(line, ":")
+			if idx < 0 {
+				continue
+			}
+			key := strings.TrimSpace(line[:idx])
+			val := strings.TrimSpace(line[idx+1:])
+			val = strings.Trim(val, "\"'")
+			if key != "" {
+				out[key] = val
+			}
 		}
 	}
+}
+
+// FrontmatterStrings flattens the interface map for proto metadata.
+func (n ObsidianNote) FrontmatterStrings() map[string]string {
+	result := make(map[string]string, len(n.Frontmatter))
+	for k, v := range n.Frontmatter {
+		switch val := v.(type) {
+		case string:
+			result[k] = val
+		case []interface{}:
+			parts := make([]string, 0, len(val))
+			for _, item := range val {
+				parts = append(parts, fmt.Sprintf("%v", item))
+			}
+			result[k] = strings.Join(parts, ", ")
+		default:
+			result[k] = fmt.Sprintf("%v", val)
+		}
+	}
+	return result
+}
+
+// CleanContent strips wikilink syntax for embeddings.
+func (n ObsidianNote) CleanContent() string {
+	result := n.Content
+	// Replace ![[embed]] -> embed
+	result = embedRe.ReplaceAllString(result, "$1")
+	// Replace [[Page|Display]] -> Display, [[Page]] -> Page
+	result = wikilinkRe.ReplaceAllStringFunc(result, func(match string) string {
+		parts := wikilinkRe.FindStringSubmatch(match)
+		if len(parts) > 3 && parts[3] != "" {
+			return parts[3] // Use alias/display text
+		}
+		return parts[1] // Use target name
+	})
+	return result
 }
 
 // splitYAMLList handles both inline [a, b, c] and multi-line YAML list values.
