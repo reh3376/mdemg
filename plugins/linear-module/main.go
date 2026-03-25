@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -33,8 +33,11 @@ const linearAPIEndpoint = "https://api.linear.app/graphql"
 func main() {
 	flag.Parse()
 
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	if *socketPath == "" {
-		log.Fatal("--socket is required")
+		slog.Error("--socket is required")
+		os.Exit(1)
 	}
 
 	// Remove stale socket
@@ -43,7 +46,8 @@ func main() {
 	// Create Unix socket listener
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		slog.Error("failed to listen", "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 
@@ -53,7 +57,7 @@ func main() {
 	// Load workflow engine
 	wfEngine := NewWorkflowEngine()
 	if err := wfEngine.LoadFromFile("workflows.yaml"); err != nil {
-		log.Printf("WARNING: failed to load workflows.yaml: %v (workflow engine disabled)", err)
+		slog.Warn("failed to load workflows.yaml, workflow engine disabled", "error", err)
 	}
 
 	// Register services
@@ -66,7 +70,7 @@ func main() {
 	pb.RegisterIngestionModuleServer(server, module)
 	pb.RegisterCRUDModuleServer(server, module)
 
-	log.Printf("Linear module listening on %s", *socketPath)
+	slog.Info("linear module listening", "socket", *socketPath)
 
 	// Handle shutdown gracefully
 	sigChan := make(chan os.Signal, 1)
@@ -74,13 +78,14 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Println("Shutting down...")
+		slog.Info("shutting down")
 		server.GracefulStop()
 	}()
 
 	// Serve
 	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -103,7 +108,7 @@ type LinearModule struct {
 
 // Handshake implements ModuleLifecycle
 func (m *LinearModule) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("Handshake received: mdemg_version=%s, socket=%s", req.MdemgVersion, req.SocketPath)
+	slog.Info("handshake received", "mdemg_version", req.MdemgVersion, "socket", req.SocketPath)
 
 	m.config = req.Config
 
@@ -115,7 +120,7 @@ func (m *LinearModule) Handshake(ctx context.Context, req *pb.HandshakeRequest) 
 	m.apiKey = os.Getenv(apiKeyEnv)
 
 	if m.apiKey == "" {
-		log.Printf("WARNING: %s not set - Linear API calls will fail", apiKeyEnv)
+		slog.Warn("API key env not set, Linear API calls will fail", "env_var", apiKeyEnv)
 	}
 
 	m.syncCursors = make(map[string]string)
@@ -161,7 +166,7 @@ func (m *LinearModule) HealthCheck(ctx context.Context, req *pb.HealthCheckReque
 
 // Shutdown implements ModuleLifecycle
 func (m *LinearModule) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("Shutdown requested: reason=%s, timeout=%dms", req.Reason, req.TimeoutMs)
+	slog.Info("shutdown requested", "reason", req.Reason, "timeout_ms", req.TimeoutMs)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "goodbye",
@@ -292,30 +297,31 @@ func (m *LinearModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncS
 		m.mu.RUnlock()
 	}
 
+	ctx := stream.Context()
 	var totalProcessed, totalCreated int32
 
 	switch resourceType {
 	case "all":
 		// Sync everything: teams, projects, then issues
 		// For "all", we send all data with HasMore=true until the final batch
-		log.Println("Syncing teams...")
-		p, c, _, err := m.syncTeamsInternal(stream, true) // hasMore=true
+		slog.Info("syncing teams")
+		p, c, _, err := m.syncTeamsInternal(ctx, stream, true) // hasMore=true
 		if err != nil {
 			return err
 		}
 		totalProcessed += p
 		totalCreated += c
 
-		log.Println("Syncing projects...")
-		p, c, _, err = m.syncProjectsInternal(stream, "", true) // hasMore=true
+		slog.Info("syncing projects")
+		p, c, _, err = m.syncProjectsInternal(ctx, stream, "", true) // hasMore=true
 		if err != nil {
 			return err
 		}
 		totalProcessed += p
 		totalCreated += c
 
-		log.Println("Syncing issues...")
-		p, c, newCursor, err := m.syncIssues(stream, teamFilter, cursor)
+		slog.Info("syncing issues")
+		p, c, newCursor, err := m.syncIssues(ctx, stream, teamFilter, cursor)
 		if err != nil {
 			return err
 		}
@@ -324,7 +330,7 @@ func (m *LinearModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncS
 		cursor = newCursor
 
 	case "teams":
-		processed, created, newCursor, err := m.syncTeams(stream)
+		processed, created, newCursor, err := m.syncTeams(ctx, stream)
 		if err != nil {
 			return err
 		}
@@ -333,7 +339,7 @@ func (m *LinearModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncS
 		cursor = newCursor
 
 	case "issues":
-		processed, created, newCursor, err := m.syncIssues(stream, teamFilter, cursor)
+		processed, created, newCursor, err := m.syncIssues(ctx, stream, teamFilter, cursor)
 		if err != nil {
 			return err
 		}
@@ -342,7 +348,7 @@ func (m *LinearModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncS
 		cursor = newCursor
 
 	case "projects":
-		processed, created, newCursor, err := m.syncProjects(stream, cursor)
+		processed, created, newCursor, err := m.syncProjects(ctx, stream, cursor)
 		if err != nil {
 			return err
 		}
@@ -372,7 +378,7 @@ func (m *LinearModule) Sync(req *pb.SyncRequest, stream pb.IngestionModule_SyncS
 }
 
 // syncIssues fetches issues from Linear and streams them as observations
-func (m *LinearModule) syncIssues(stream pb.IngestionModule_SyncServer, teamFilter, cursor string) (int32, int32, string, error) {
+func (m *LinearModule) syncIssues(ctx context.Context, stream pb.IngestionModule_SyncServer, teamFilter, cursor string) (int32, int32, string, error) {
 	var processed, created int32
 	hasMore := true
 
@@ -380,8 +386,10 @@ func (m *LinearModule) syncIssues(stream pb.IngestionModule_SyncServer, teamFilt
 		// Build GraphQL query
 		query := m.buildIssuesQuery(teamFilter, cursor, 50)
 
-		// Execute query
-		result, err := m.executeGraphQL(query)
+		// Execute query with per-batch timeout
+		batchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		result, err := m.executeGraphQL(batchCtx, query)
+		cancel()
 		if err != nil {
 			return processed, created, cursor, fmt.Errorf("GraphQL error: %w", err)
 		}
@@ -392,10 +400,12 @@ func (m *LinearModule) syncIssues(stream pb.IngestionModule_SyncServer, teamFilt
 			return processed, created, cursor, fmt.Errorf("parse error: %w", err)
 		}
 
-		// Convert to observations and stream
+		// Convert to observations and edges, then stream
 		var obs []*pb.Observation
+		var edges []*pb.Edge
 		for _, issue := range issues {
 			obs = append(obs, m.issueToObservation(issue))
+			edges = append(edges, m.issueToEdges(issue)...)
 			processed++
 			created++
 		}
@@ -403,6 +413,7 @@ func (m *LinearModule) syncIssues(stream pb.IngestionModule_SyncServer, teamFilt
 		if len(obs) > 0 {
 			if err := stream.Send(&pb.SyncResponse{
 				Observations: obs,
+				Edges:        edges,
 				Cursor:       nextCursor,
 				HasMore:      more,
 				Stats: &pb.SyncStats{
@@ -425,19 +436,21 @@ func (m *LinearModule) syncIssues(stream pb.IngestionModule_SyncServer, teamFilt
 }
 
 // syncProjects fetches projects from Linear
-func (m *LinearModule) syncProjects(stream pb.IngestionModule_SyncServer, cursor string) (int32, int32, string, error) {
-	return m.syncProjectsInternal(stream, cursor, false)
+func (m *LinearModule) syncProjects(ctx context.Context, stream pb.IngestionModule_SyncServer, cursor string) (int32, int32, string, error) {
+	return m.syncProjectsInternal(ctx, stream, cursor, false)
 }
 
 // syncProjectsInternal fetches projects from Linear with control over hasMore flag
-func (m *LinearModule) syncProjectsInternal(stream pb.IngestionModule_SyncServer, cursor string, forceHasMore bool) (int32, int32, string, error) {
+func (m *LinearModule) syncProjectsInternal(ctx context.Context, stream pb.IngestionModule_SyncServer, cursor string, forceHasMore bool) (int32, int32, string, error) {
 	var processed, created int32
 	hasMorePages := true
 
 	for hasMorePages {
 		query := m.buildProjectsQuery(cursor, 50)
 
-		result, err := m.executeGraphQL(query)
+		batchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		result, err := m.executeGraphQL(batchCtx, query)
+		cancel()
 		if err != nil {
 			return processed, created, cursor, fmt.Errorf("GraphQL error: %w", err)
 		}
@@ -482,12 +495,12 @@ func (m *LinearModule) syncProjectsInternal(stream pb.IngestionModule_SyncServer
 }
 
 // syncTeams fetches all teams from Linear
-func (m *LinearModule) syncTeams(stream pb.IngestionModule_SyncServer) (int32, int32, string, error) {
-	return m.syncTeamsInternal(stream, false)
+func (m *LinearModule) syncTeams(ctx context.Context, stream pb.IngestionModule_SyncServer) (int32, int32, string, error) {
+	return m.syncTeamsInternal(ctx, stream, false)
 }
 
 // syncTeamsInternal fetches all teams from Linear with control over hasMore flag
-func (m *LinearModule) syncTeamsInternal(stream pb.IngestionModule_SyncServer, hasMore bool) (int32, int32, string, error) {
+func (m *LinearModule) syncTeamsInternal(ctx context.Context, stream pb.IngestionModule_SyncServer, hasMore bool) (int32, int32, string, error) {
 	var processed, created int32
 
 	query := map[string]interface{}{
@@ -512,7 +525,9 @@ func (m *LinearModule) syncTeamsInternal(stream pb.IngestionModule_SyncServer, h
 		`,
 	}
 
-	result, err := m.executeGraphQL(query)
+	batchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	result, err := m.executeGraphQL(batchCtx, query)
+	cancel()
 	if err != nil {
 		return processed, created, "", fmt.Errorf("GraphQL error: %w", err)
 	}
@@ -596,6 +611,27 @@ func (m *LinearModule) buildIssuesQuery(teamFilter, cursor string, limit int) ma
 						createdAt
 						updatedAt
 						completedAt
+						parent {
+							id
+							identifier
+							title
+						}
+						children {
+							nodes {
+								id
+								identifier
+								title
+							}
+						}
+						relations {
+							nodes {
+								type
+								relatedIssue {
+									id
+									identifier
+								}
+							}
+						}
 					}
 				}
 			}
@@ -645,13 +681,13 @@ func (m *LinearModule) buildProjectsQuery(cursor string, limit int) map[string]i
 }
 
 // executeGraphQL sends a GraphQL query to Linear
-func (m *LinearModule) executeGraphQL(query map[string]interface{}) (map[string]interface{}, error) {
+func (m *LinearModule) executeGraphQL(ctx context.Context, query map[string]interface{}) (map[string]interface{}, error) {
 	body, err := json.Marshal(query)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", linearAPIEndpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", linearAPIEndpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -720,6 +756,23 @@ type linearIssue struct {
 	CreatedAt   string
 	UpdatedAt   string
 	CompletedAt *string
+	Parent      *struct {
+		ID         string
+		Identifier string
+		Title      string
+	}
+	Children []struct {
+		ID         string
+		Identifier string
+		Title      string
+	}
+	Relations []struct {
+		Type         string
+		RelatedIssue struct {
+			ID         string
+			Identifier string
+		}
+	}
 }
 
 type linearProject struct {
@@ -927,6 +980,60 @@ func (m *LinearModule) parseIssuesResponse(result map[string]interface{}) ([]lin
 			issue.CompletedAt = &completedAt
 		}
 
+		// Parse relationship fields
+		if parent, ok := nodeMap["parent"].(map[string]interface{}); ok && parent != nil {
+			issue.Parent = &struct {
+				ID         string
+				Identifier string
+				Title      string
+			}{
+				ID:         getString(parent, "id"),
+				Identifier: getString(parent, "identifier"),
+				Title:      getString(parent, "title"),
+			}
+		}
+
+		if children, ok := nodeMap["children"].(map[string]interface{}); ok {
+			if childNodes, ok := children["nodes"].([]interface{}); ok {
+				for _, cn := range childNodes {
+					if cnMap, ok := cn.(map[string]interface{}); ok {
+						issue.Children = append(issue.Children, struct {
+							ID         string
+							Identifier string
+							Title      string
+						}{
+							ID:         getString(cnMap, "id"),
+							Identifier: getString(cnMap, "identifier"),
+							Title:      getString(cnMap, "title"),
+						})
+					}
+				}
+			}
+		}
+
+		if relations, ok := nodeMap["relations"].(map[string]interface{}); ok {
+			if relNodes, ok := relations["nodes"].([]interface{}); ok {
+				for _, rn := range relNodes {
+					if rnMap, ok := rn.(map[string]interface{}); ok {
+						rel := struct {
+							Type         string
+							RelatedIssue struct {
+								ID         string
+								Identifier string
+							}
+						}{
+							Type: getString(rnMap, "type"),
+						}
+						if ri, ok := rnMap["relatedIssue"].(map[string]interface{}); ok {
+							rel.RelatedIssue.ID = getString(ri, "id")
+							rel.RelatedIssue.Identifier = getString(ri, "identifier")
+						}
+						issue.Relations = append(issue.Relations, rel)
+					}
+				}
+			}
+		}
+
 		issues = append(issues, issue)
 	}
 
@@ -1073,6 +1180,69 @@ func (m *LinearModule) issueToObservation(issue linearIssue) *pb.Observation {
 	}
 }
 
+// issueToEdges builds graph edges from issue relationships (parent, children, relations).
+func (m *LinearModule) issueToEdges(issue linearIssue) []*pb.Edge {
+	var edges []*pb.Edge
+	nodeID := fmt.Sprintf("linear-issue-%s", issue.ID)
+
+	if issue.Parent != nil {
+		edges = append(edges, &pb.Edge{
+			FromNodeId: nodeID,
+			ToNodeId:   fmt.Sprintf("linear-issue-%s", issue.Parent.ID),
+			RelType:    "PARENT_OF",
+			Weight:     0.9,
+			Properties: map[string]string{
+				"source":    "linear",
+				"parent_id": issue.Parent.Identifier,
+			},
+		})
+	}
+
+	for _, child := range issue.Children {
+		edges = append(edges, &pb.Edge{
+			FromNodeId: fmt.Sprintf("linear-issue-%s", child.ID),
+			ToNodeId:   nodeID,
+			RelType:    "PARENT_OF",
+			Weight:     0.9,
+			Properties: map[string]string{
+				"source":   "linear",
+				"child_id": child.Identifier,
+			},
+		})
+	}
+
+	for _, rel := range issue.Relations {
+		edges = append(edges, &pb.Edge{
+			FromNodeId: nodeID,
+			ToNodeId:   fmt.Sprintf("linear-issue-%s", rel.RelatedIssue.ID),
+			RelType:    mapLinearRelationType(rel.Type),
+			Weight:     0.7,
+			Properties: map[string]string{
+				"source":      "linear",
+				"linear_type": rel.Type,
+			},
+		})
+	}
+
+	return edges
+}
+
+// mapLinearRelationType converts Linear relation types to MDEMG edge types.
+func mapLinearRelationType(linearType string) string {
+	switch linearType {
+	case "blocks":
+		return "BLOCKS"
+	case "is-blocked-by":
+		return "BLOCKED_BY"
+	case "related":
+		return "RELATED_TO"
+	case "duplicate":
+		return "DUPLICATE_OF"
+	default:
+		return "RELATED_TO"
+	}
+}
+
 func (m *LinearModule) projectToObservation(project linearProject) *pb.Observation {
 	var content strings.Builder
 	content.WriteString(fmt.Sprintf("# Project: %s\n\n", project.Name))
@@ -1173,7 +1343,7 @@ func (m *LinearModule) Create(ctx context.Context, req *pb.CRUDCreateRequest) (*
 		return &pb.CRUDCreateResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	result, err := m.executeGraphQL(query)
+	result, err := m.executeGraphQL(ctx, query)
 	if err != nil {
 		return &pb.CRUDCreateResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 	}
@@ -1218,7 +1388,7 @@ func (m *LinearModule) Read(ctx context.Context, req *pb.CRUDReadRequest) (*pb.C
 		return &pb.CRUDReadResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	result, err := m.executeGraphQL(query)
+	result, err := m.executeGraphQL(ctx, query)
 	if err != nil {
 		return &pb.CRUDReadResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 	}
@@ -1270,7 +1440,7 @@ func (m *LinearModule) Update(ctx context.Context, req *pb.CRUDUpdateRequest) (*
 		return &pb.CRUDUpdateResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	result, err := m.executeGraphQL(query)
+	result, err := m.executeGraphQL(ctx, query)
 	if err != nil {
 		return &pb.CRUDUpdateResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 	}
@@ -1313,7 +1483,7 @@ func (m *LinearModule) Delete(ctx context.Context, req *pb.CRUDDeleteRequest) (*
 		return &pb.CRUDDeleteResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	result, err := m.executeGraphQL(query)
+	result, err := m.executeGraphQL(ctx, query)
 	if err != nil {
 		return &pb.CRUDDeleteResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 	}
@@ -1356,7 +1526,7 @@ func (m *LinearModule) List(ctx context.Context, req *pb.CRUDListRequest) (*pb.C
 	switch req.EntityType {
 	case "issue":
 		query := buildIssueListQuery(req.Filters, limit, req.Cursor)
-		result, err := m.executeGraphQL(query)
+		result, err := m.executeGraphQL(ctx, query)
 		if err != nil {
 			return &pb.CRUDListResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 		}
@@ -1364,7 +1534,7 @@ func (m *LinearModule) List(ctx context.Context, req *pb.CRUDListRequest) (*pb.C
 
 	case "project":
 		query := buildProjectListQuery(limit, req.Cursor)
-		result, err := m.executeGraphQL(query)
+		result, err := m.executeGraphQL(ctx, query)
 		if err != nil {
 			return &pb.CRUDListResponse{Success: false, Error: fmt.Sprintf("GraphQL error: %v", err)}, nil
 		}
