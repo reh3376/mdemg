@@ -1514,7 +1514,7 @@ chmod +x plugins/my-plugin/my-plugin
 5. **Monitor module status via API**:
 
    ```bash
-   curl http://localhost:8080/api/v1/modules
+   curl http://localhost:9999/v1/modules
    ```
 
 ---

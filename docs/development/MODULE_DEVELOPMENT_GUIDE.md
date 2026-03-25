@@ -443,7 +443,7 @@ Environment variables for the plugin system:
 List loaded modules:
 
 ```bash
-curl http://localhost:8080/v1/modules | jq
+curl http://localhost:9999/v1/modules | jq
 ```
 
 Response:
