@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -69,7 +69,7 @@ func (rc *ResultClient) StoreDriftResults(framework string, drifted []string, cl
 		framework, len(drifted), joinMax(drifted, 5), clean)
 
 	if err := rc.StoreResult(content, "error"); err != nil {
-		log.Printf("%s: failed to store drift result: %v", moduleID, err)
+		slog.Error("failed to store drift result", "module", moduleID, "error", err)
 	}
 }
 

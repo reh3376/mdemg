@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strconv"
 	"sync"
 	"time"
@@ -55,7 +55,7 @@ func newServer() *server {
 }
 
 func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	// Parse config from manifest
 	if v, ok := req.Config["spec_root"]; ok && v != "" {
@@ -91,11 +91,10 @@ func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.H
 
 	// Build spec index
 	if err := s.specIndex.Load(s.config.specRoot, s.config.frameworks, s.config.enableDrift); err != nil {
-		log.Printf("%s: warning: spec index load: %v", moduleID, err)
+		slog.Warn("spec index load", "module", moduleID, "error", err)
 	}
 
-	log.Printf("%s: loaded %d specs across %d frameworks",
-		moduleID, s.specIndex.TotalSpecs(), s.specIndex.FrameworkCount())
+	slog.Info("loaded specs", "module", moduleID, "total_specs", s.specIndex.TotalSpecs(), "frameworks", s.specIndex.FrameworkCount())
 
 	// Initialize result client
 	s.resultClient = NewResultClient(s.config.mdemgEndpoint, s.config.spaceID)
@@ -137,7 +136,7 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*
 }
 
 func (s *server) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 
 	if s.eventHandler != nil {
 		s.eventHandler.Stop()

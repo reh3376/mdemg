@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,7 +85,7 @@ func (idx *SpecIndex) Load(specRoot, frameworks string, enableDrift bool) error 
 		fw = strings.TrimSpace(fw)
 		def, ok := frameworkDefs[fw]
 		if !ok {
-			log.Printf("%s: unknown framework: %s", moduleID, fw)
+			slog.Warn("unknown framework", "module", moduleID, "framework", fw)
 			continue
 		}
 
@@ -94,14 +94,14 @@ func (idx *SpecIndex) Load(specRoot, frameworks string, enableDrift bool) error 
 
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			log.Printf("%s: glob error for %s: %v", moduleID, fw, err)
+			slog.Error("glob error", "module", moduleID, "framework", fw, "error", err)
 			continue
 		}
 
 		for _, f := range files {
 			entry, err := parseSpecFile(f, fw, def, enableDrift)
 			if err != nil {
-				log.Printf("%s: parse error %s: %v", moduleID, f, err)
+				slog.Error("parse error", "module", moduleID, "file", f, "error", err)
 				continue
 			}
 			idx.entries = append(idx.entries, entry)

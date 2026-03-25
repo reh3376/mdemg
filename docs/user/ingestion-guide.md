@@ -1348,6 +1348,86 @@ The uninstall command only removes hooks with the `# MDEMG` marker comment. Non-
 | File Watcher | File change | Active development, live reload | Sub-second |
 | Direct API | HTTP POST | Custom integrations, scripts, AI agents | Milliseconds |
 | Git Hooks | Post-commit | Incremental updates on every commit | Seconds (background) |
+| Obsidian Vault | Plugin (gRPC) | Obsidian notes with wikilinks and tags | Seconds |
+
+---
+
+## Method 9: Obsidian Vault Ingestion (Plugin)
+
+Ingest an Obsidian vault into MDEMG via the **obsidian-module** plugin. The plugin parses Obsidian-flavored markdown — extracting wikilinks (`[[page]]`), embeds (`![[image.png]]`), inline `#tags`, frontmatter (YAML), aliases, and created-at timestamps. It runs as a gRPC sidecar process communicating over a Unix socket.
+
+### Prerequisites
+
+- The `obsidian-module` binary (included in MDEMG releases)
+- An Obsidian vault directory on disk
+
+### Configuration
+
+Set the vault path via environment variable:
+
+```bash
+export OBSIDIAN_VAULT_PATH=/path/to/my/vault
+```
+
+Or configure in the plugin manifest (`plugins/obsidian-module/manifest.json`):
+
+```json
+{
+  "config": {
+    "vault_path_env": "OBSIDIAN_VAULT_PATH",
+    "exclude_dirs": ".obsidian,.trash,templates",
+    "sync_interval_minutes": "30"
+  }
+}
+```
+
+### Running the Plugin
+
+**Via sidecar quickstart (recommended):**
+
+```bash
+mdemg sidecar quickstart --agents obsidian-module
+```
+
+**Manual start:**
+
+```bash
+# Start the module on a Unix socket
+./plugins/obsidian-module/obsidian-module --socket /tmp/obsidian.sock &
+
+# Or if installed via Homebrew/package manager:
+$(brew --prefix)/share/mdemg/plugins/obsidian-module/obsidian-module --socket /tmp/obsidian.sock &
+```
+
+### What Gets Ingested
+
+For each `.md` file in the vault, the plugin extracts:
+
+| Field | Source | Example |
+|-------|--------|---------|
+| Title | Frontmatter `title:` or first `# heading` or filename | `My Research Note` |
+| Tags | Frontmatter `tags:` + inline `#tag` | `["research", "ml"]` |
+| Wikilinks | `[[page]]` and `[[page|alias]]` syntax | `["page", "other-note"]` |
+| Embeds | `![[file.png]]` syntax | `["file.png"]` |
+| Aliases | Frontmatter `aliases:` | `["alt-name"]` |
+| Created | Frontmatter `created:` | `2026-01-15` |
+| Clean content | Markdown with `[[...]]` syntax stripped | For embedding generation |
+
+### Sync Behavior
+
+The plugin supports streaming sync via the `Sync` gRPC RPC:
+
+- **Batch streaming**: Notes are sent in batches of 50 for efficient processing
+- **Incremental sync**: Pass a cursor timestamp to only sync files modified after that time
+- **Exclusion**: `.obsidian/`, `.trash/`, and configurable directories are skipped
+- **Deduplication**: Node IDs are deterministic (based on vault path + relative file path)
+
+### Vault Resolution Order
+
+The plugin resolves the vault path in this order:
+1. `vault_path` in the Sync request config
+2. `vault_path` from the Handshake config
+3. `OBSIDIAN_VAULT_PATH` environment variable
 
 ## Common Patterns
 

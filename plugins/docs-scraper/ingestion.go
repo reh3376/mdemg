@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -243,7 +243,7 @@ func (h *DocsScraperHandler) Sync(req *pb.SyncRequest, stream pb.IngestionModule
 
 		body, contentType, err := fetcher.Fetch(stream.Context(), url, nil)
 		if err != nil {
-			log.Printf("%s: sync fetch failed for %s: %v", moduleID, url, err)
+			slog.Error("sync fetch failed", "module", moduleID, "url", url, "error", err)
 			processed++
 			continue
 		}
@@ -260,7 +260,7 @@ func (h *DocsScraperHandler) Sync(req *pb.SyncRequest, stream pb.IngestionModule
 
 		extracted, err := extractor.Extract(body, url, profile)
 		if err != nil {
-			log.Printf("%s: sync extract failed for %s: %v", moduleID, url, err)
+			slog.Error("sync extract failed", "module", moduleID, "url", url, "error", err)
 			processed++
 			continue
 		}

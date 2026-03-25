@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,8 +16,7 @@ func (s *server) Process(ctx context.Context, req *pb.ProcessRequest) (*pb.Proce
 	s.requestsHandled++
 	s.mu.Unlock()
 
-	log.Printf("%s: processing %d candidates for query: %s",
-		moduleID, len(req.Candidates), truncate(req.QueryText, 50))
+	slog.Info("processing candidates", "module", moduleID, "count", len(req.Candidates), "query", truncate(req.QueryText, 50))
 
 	if len(req.Candidates) == 0 {
 		return &pb.ProcessResponse{

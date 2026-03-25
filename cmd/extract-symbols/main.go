@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +58,8 @@ type UPTSOutput struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	flag.Parse()
 
 	// Handle positional argument for --json mode
@@ -66,7 +68,8 @@ func main() {
 	}
 
 	if *codebasePath == "" {
-		log.Fatal("--path is required")
+		slog.Error("--path is required")
+		os.Exit(1)
 	}
 
 	// JSON output mode for UPTS testing
@@ -80,11 +83,7 @@ func main() {
 		excludeSet[strings.TrimSpace(dir)] = true
 	}
 
-	log.Printf("=== Symbol Extraction ===")
-	log.Printf("Path: %s", *codebasePath)
-	log.Printf("Space ID: %s", *spaceID)
-	log.Printf("Neo4j: %s", *neo4jURI)
-	log.Printf("Workers: %d", *workers)
+	slog.Info("symbol extraction started", "path", *codebasePath, "space_id", *spaceID, "neo4j_uri", *neo4jURI, "workers", *workers)
 
 	// Initialize symbol service (tree-sitter parser)
 	cfg := symbols.ParserConfig{
@@ -94,7 +93,8 @@ func main() {
 	}
 	svc, err := symbols.NewService(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create symbol service: %v", err)
+		slog.Error("failed to create symbol service", "error", err)
+		os.Exit(1)
 	}
 	defer svc.Close()
 
@@ -106,7 +106,8 @@ func main() {
 	if !*dryRun {
 		driver, err = neo4j.NewDriverWithContext(*neo4jURI, neo4j.BasicAuth(*neo4jUser, *neo4jPass, ""))
 		if err != nil {
-			log.Fatalf("Failed to create Neo4j driver: %v", err)
+			slog.Error("failed to create Neo4j driver", "error", err)
+			os.Exit(1)
 		}
 		defer func() { _ = driver.Close(ctx) }()
 		store = symbols.NewStore(driver)
@@ -134,10 +135,11 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		log.Fatalf("Failed to walk codebase: %v", err)
+		slog.Error("failed to walk codebase", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Found %d files to process", len(files))
+	slog.Info("found files to process", "count", len(files))
 
 	// Process files with worker pool
 	fileChan := make(chan string, len(files))
@@ -158,7 +160,7 @@ func main() {
 				if err != nil {
 					atomic.AddInt64(&errors, 1)
 					if *verbose {
-						log.Printf("[Worker %d] Error parsing %s: %v", workerID, path, err)
+						slog.Error("parse error", "worker", workerID, "path", path, "error", err)
 					}
 					continue
 				}
@@ -175,7 +177,7 @@ func main() {
 
 				if *dryRun || *verbose {
 					for _, sym := range result.Symbols {
-						log.Printf("[Worker %d] %s: %s (%s) = %s", workerID, relPath, sym.Name, sym.Type, sym.Value)
+						slog.Info("symbol found", "worker", workerID, "path", relPath, "name", sym.Name, "type", sym.Type, "value", sym.Value)
 					}
 				}
 
@@ -206,7 +208,7 @@ func main() {
 					if err := store.SaveSymbols(ctx, *spaceID, records); err != nil {
 						atomic.AddInt64(&errors, 1)
 						if *verbose {
-							log.Printf("[Worker %d] Failed to store symbols for %s: %v", workerID, relPath, err)
+							slog.Error("failed to store symbols", "worker", workerID, "path", relPath, "error", err)
 						}
 					}
 				}
@@ -216,8 +218,7 @@ func main() {
 				if current%100 == 0 {
 					elapsed := time.Since(startTime)
 					rate := float64(current) / elapsed.Seconds()
-					log.Printf("Progress: %d files, %d symbols (%.1f files/s)",
-						current, atomic.LoadInt64(&totalSymbols), rate)
+					slog.Info("progress", "files", current, "symbols", atomic.LoadInt64(&totalSymbols), "rate_files_per_sec", rate)
 				}
 			}
 		}(w)
@@ -232,9 +233,7 @@ func main() {
 	wg.Wait()
 
 	elapsed := time.Since(startTime)
-	log.Printf("=== Extraction Complete ===")
-	log.Printf("Files: %d, Symbols: %d, Errors: %d", totalFiles, totalSymbols, errors)
-	log.Printf("Time: %v, Rate: %.1f files/sec", elapsed, float64(totalFiles)/elapsed.Seconds())
+	slog.Info("extraction complete", "files", totalFiles, "symbols", totalSymbols, "errors", errors, "duration", elapsed, "rate_files_per_sec", float64(totalFiles)/elapsed.Seconds())
 }
 
 // uptsTypeMap normalizes parser type names to UPTS canonical names
@@ -290,7 +289,8 @@ func runJSONMode(filePath string) {
 				output := UPTSOutput{Symbols: allSymbols}
 				jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
 				if jsonErr != nil {
-					log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+					slog.Error("failed to marshal JSON", "error", jsonErr)
+				os.Exit(1)
 				}
 				fmt.Println(string(jsonBytes))
 				return
@@ -305,7 +305,8 @@ func runJSONMode(filePath string) {
 	}
 	svc, err := symbols.NewService(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create symbol service: %v", err)
+		slog.Error("failed to create symbol service", "error", err)
+		os.Exit(1)
 	}
 	defer svc.Close()
 
@@ -342,7 +343,8 @@ func runJSONMode(filePath string) {
 				output := UPTSOutput{Symbols: allSymbols}
 				jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
 				if jsonErr != nil {
-					log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+					slog.Error("failed to marshal JSON", "error", jsonErr)
+				os.Exit(1)
 				}
 				fmt.Println(string(jsonBytes))
 				return
@@ -353,7 +355,8 @@ func runJSONMode(filePath string) {
 		fallbackSymbols, handled, fallbackErr := TryFallbackParser(filePath)
 		if handled {
 			if fallbackErr != nil {
-				log.Fatalf("Fallback parser error: %v", fallbackErr)
+				slog.Error("fallback parser error", "error", fallbackErr)
+				os.Exit(1)
 			}
 			// Use fallback symbols
 			output := UPTSOutput{
@@ -374,14 +377,16 @@ func runJSONMode(filePath string) {
 			}
 			jsonBytes, jsonErr := json.MarshalIndent(output, "", "  ")
 			if jsonErr != nil {
-				log.Fatalf("Failed to marshal JSON: %v", jsonErr)
+				slog.Error("failed to marshal JSON", "error", jsonErr)
+				os.Exit(1)
 			}
 			fmt.Println(string(jsonBytes))
 			return
 		}
 		// If fallback didn't handle it and tree-sitter had an error, fail
 		if err != nil {
-			log.Fatalf("Failed to parse file: %v", err)
+			slog.Error("failed to parse file", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -406,7 +411,8 @@ func runJSONMode(filePath string) {
 
 	jsonBytes, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		log.Fatalf("Failed to marshal JSON: %v", err)
+		slog.Error("failed to marshal JSON", "error", err)
+		os.Exit(1)
 	}
 
 	fmt.Println(string(jsonBytes))

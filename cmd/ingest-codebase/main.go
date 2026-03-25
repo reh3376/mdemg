@@ -9,7 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -403,7 +403,7 @@ func archiveDeletedNodes(client *http.Client, endpoint, spaceID string, deletedP
 
 		resp, err := client.Post(endpoint+"/v1/memory/archive/bulk", "application/json", bytes.NewReader(body))
 		if err != nil {
-			log.Printf("Warning: failed to archive nodes for %s: %v", path, err)
+			slog.Warn("failed to archive nodes", "path", path, "error", err)
 			continue
 		}
 		resp.Body.Close()
@@ -436,20 +436,21 @@ func main() {
 	flag.Parse()
 
 	// Log output priority: --log-file > --quiet > --progress-json stderr redirect > default
+	var logWriter io.Writer = os.Stderr
 	if *logFile != "" {
 		f, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			log.Fatalf("Failed to open log file %s: %v", *logFile, err)
+			slog.Error("failed to open log file", "path", *logFile, "error", err)
+			os.Exit(1)
 		}
 		defer f.Close()
-		log.SetOutput(f)
+		logWriter = f
 	} else if *quiet {
-		log.SetOutput(io.Discard)
-	} else if *progressJSON {
-		// When --progress-json is set, ensure log output goes to stderr
-		// so stdout is reserved for structured JSON progress events.
-		log.SetOutput(os.Stderr)
+		logWriter = io.Discard
 	}
+	// When --progress-json is set, logWriter is already os.Stderr (default)
+	// so stdout is reserved for structured JSON progress events.
+	slog.SetDefault(slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	// Handle --list-languages flag
 	if *listLanguages {
@@ -470,17 +471,18 @@ func main() {
 
 	// Load .env file for dynamic configuration
 	if err := godotenv.Load(); err != nil {
-		log.Printf("Note: No .env file found, using defaults/flags")
+		slog.Info("no .env file found, using defaults/flags")
 	}
 
 	// Resolve endpoint via priority chain: --endpoint flag > MDEMG_ENDPOINT env > .mdemg.port > LISTEN_ADDR > default
 	if *mdemgEndpoint == "" {
 		*mdemgEndpoint = config.ResolveEndpoint("http://localhost:9999")
-		log.Printf("Resolved endpoint: %s", *mdemgEndpoint)
+		slog.Info("resolved endpoint", "endpoint", *mdemgEndpoint)
 	}
 
 	if *codebasePath == "" {
-		log.Fatal("--path is required")
+		slog.Error("--path is required")
+		os.Exit(1)
 	}
 
 	// Phase 2.5: Apply preset if specified
@@ -496,9 +498,10 @@ func main() {
 			if *maxFileSize == 1048576 { // default value
 				*maxFileSize = p.maxFileSize
 			}
-			log.Printf("Applied preset: %s", *preset)
+			slog.Info("applied preset", "preset", *preset)
 		} else {
-			log.Fatalf("Unknown preset: %s (available: default, ml_cuda, web_monorepo)", *preset)
+			slog.Error("unknown preset", "preset", *preset, "available", "default, ml_cuda, web_monorepo")
+			os.Exit(1)
 		}
 	}
 	// Merge CLI excludeDirs with preset
@@ -506,20 +509,24 @@ func main() {
 		excludeSet[strings.TrimSpace(dir)] = true
 	}
 
-	log.Printf("=== MDEMG Codebase Ingestion ===")
-	log.Printf("Path: %s", *codebasePath)
-	log.Printf("Space ID: %s", *spaceID)
-	log.Printf("Endpoint: %s", *mdemgEndpoint)
-	log.Printf("Batch size: %d, Workers: %d, Timeout: %ds", *batchSize, *workers, *timeout)
-	log.Printf("Excluded dirs: %v", getExcludeDirList(excludeSet))
+	slog.Info("MDEMG codebase ingestion started",
+		"path", *codebasePath,
+		"space_id", *spaceID,
+		"endpoint", *mdemgEndpoint,
+		"batch_size", *batchSize,
+		"workers", *workers,
+		"timeout_s", *timeout,
+		"excluded_dirs", getExcludeDirList(excludeSet),
+		"max_file_size", *maxFileSize,
+		"max_elements_per_file", *maxElementsPerFile,
+		"max_symbols_per_file", *maxSymbolsPerFile,
+		"extract_symbols", *extractSymbols,
+		"incremental", *incremental,
+		"llm_summaries", *llmSummary,
+	)
 	if len(excludePatterns) > 0 {
-		log.Printf("Excluded patterns: %v", excludePatterns)
+		slog.Info("exclude patterns active", "patterns", excludePatterns)
 	}
-	log.Printf("Max file size: %d bytes", *maxFileSize)
-	log.Printf("Max elements/file: %d, Max symbols/file: %d", *maxElementsPerFile, *maxSymbolsPerFile)
-	log.Printf("Symbol extraction: %v", *extractSymbols)
-	log.Printf("Incremental mode: %v", *incremental)
-	log.Printf("LLM summaries: %v", *llmSummary)
 
 	// Initialize LLM summarize service if enabled
 	if *llmSummary {
@@ -530,7 +537,7 @@ func main() {
 		}
 
 		if *llmSummaryProvider == "openai" && apiKey == "" {
-			log.Println("Warning: LLM summaries enabled but OPENAI_API_KEY not set. Using structural fallback.")
+			slog.Warn("LLM summaries enabled but OPENAI_API_KEY not set, using structural fallback")
 		} else {
 			cfg := summarize.Config{
 				Enabled:        true,
@@ -553,10 +560,9 @@ func main() {
 			var err error
 			summarizeSvc, err = summarize.New(cfg, generateSummaryAdapter)
 			if err != nil {
-				log.Printf("Warning: Failed to initialize LLM summarize service: %v. Using structural fallback.", err)
+				slog.Warn("failed to initialize LLM summarize service, using structural fallback", "error", err)
 			} else {
-				log.Printf("LLM summarize service initialized: provider=%s, model=%s, batch=%d",
-					*llmSummaryProvider, *llmSummaryModel, *llmSummaryBatch)
+				slog.Info("LLM summarize service initialized", "provider", *llmSummaryProvider, "model", *llmSummaryModel, "batch", *llmSummaryBatch)
 			}
 		}
 	}
@@ -564,18 +570,17 @@ func main() {
 	// Handle incremental mode
 	var changedFiles *GitDiffResult
 	if *incremental {
-		log.Printf("Getting changed files since %s...", *sinceCommit)
+		slog.Info("getting changed files", "since_commit", *sinceCommit)
 		var err error
 		changedFiles, err = getGitChangedFiles(*codebasePath, *sinceCommit)
 		if err != nil {
-			log.Fatalf("Failed to get git diff: %v", err)
+			slog.Error("failed to get git diff", "error", err)
+			os.Exit(1)
 		}
-		log.Printf("Changed files: %d added, %d modified, %d deleted, %d renamed",
-			len(changedFiles.Added), len(changedFiles.Modified),
-			len(changedFiles.Deleted), len(changedFiles.Renamed))
+		slog.Info("changed files detected", "added", len(changedFiles.Added), "modified", len(changedFiles.Modified), "deleted", len(changedFiles.Deleted), "renamed", len(changedFiles.Renamed))
 
 		if len(changedFiles.Added)+len(changedFiles.Modified) == 0 && len(changedFiles.Deleted) == 0 {
-			log.Println("No changes detected. Exiting.")
+			slog.Info("no changes detected, exiting")
 			return
 		}
 	}
@@ -586,7 +591,8 @@ func main() {
 	// Collect all code elements
 	elements, err := walkCodebase(*codebasePath, excludeSet, excludePatterns, diagSummary)
 	if err != nil {
-		log.Fatalf("Failed to walk codebase: %v", err)
+		slog.Error("failed to walk codebase", "error", err)
+		os.Exit(1)
 	}
 
 	// Filter to only changed files in incremental mode
@@ -607,35 +613,31 @@ func main() {
 				filtered = append(filtered, elem)
 			}
 		}
-		log.Printf("Filtered from %d to %d elements (changed files only)", len(elements), len(filtered))
+		slog.Info("filtered to changed files only", "original", len(elements), "filtered", len(filtered))
 		elements = filtered
 	}
 
-	log.Printf("Found %d code elements", len(elements))
+	slog.Info("found code elements", "count", len(elements))
 	emitProgress(progressEvent{Event: "discovery_complete", Total: len(elements)})
 
 	// Log diagnostic summary
 	if diagSummary.Total > 0 {
-		log.Printf("Diagnostics: %d total (info=%d, warning=%d, error=%d)",
-			diagSummary.Total,
-			diagSummary.BySev["info"],
-			diagSummary.BySev["warning"],
-			diagSummary.BySev["error"])
+		slog.Info("diagnostics summary", "total", diagSummary.Total, "info", diagSummary.BySev["info"], "warning", diagSummary.BySev["warning"], "error", diagSummary.BySev["error"])
 		if *verbose {
 			for code, count := range diagSummary.ByCode {
-				log.Printf("  %s: %d", code, count)
+				slog.Info("diagnostic code", "code", code, "count", count)
 			}
 		}
 	}
 
 	// Apply limit if specified
 	if *limitElements > 0 && len(elements) > *limitElements {
-		log.Printf("Limiting to first %d elements (from %d)", *limitElements, len(elements))
+		slog.Info("limiting elements", "limit", *limitElements, "total", len(elements))
 		elements = elements[:*limitElements]
 	}
 
 	if *dryRun {
-		log.Println("Dry run - not ingesting")
+		slog.Info("dry run, not ingesting")
 		printSample(elements)
 		return
 	}
@@ -665,7 +667,7 @@ func main() {
 		batches = append(batches, elements[i:end])
 	}
 
-	log.Printf("Processing %d batches with %d workers", len(batches), *workers)
+	slog.Info("processing batches", "batches", len(batches), "workers", *workers)
 
 	// Process batches with worker pool
 	batchChan := make(chan []CodeElement, len(batches))
@@ -687,8 +689,7 @@ func main() {
 				elapsed := time.Since(stats.StartTime)
 				rate := float64(current) / elapsed.Seconds()
 
-				log.Printf("[Worker %d] Progress: %d/%d (%.1f/s, %d errors)",
-					workerID, current, stats.TotalElements, rate, errCount)
+				slog.Info("worker progress", "worker", workerID, "current", current, "total", stats.TotalElements, "rate", rate, "errors", errCount)
 
 				emitProgress(progressEvent{
 					Event:   "batch_progress",
@@ -712,26 +713,22 @@ func main() {
 	wg.Wait()
 
 	elapsed := time.Since(stats.StartTime)
-	log.Printf("=== Ingestion Complete ===")
-	log.Printf("Total: %d, Ingested: %d, Errors: %d", stats.TotalElements, stats.Ingested, stats.Errors)
-	log.Printf("Symbols: %d", stats.Symbols)
-	log.Printf("Time: %v, Rate: %.1f elements/sec", elapsed, float64(stats.Ingested)/elapsed.Seconds())
+	slog.Info("ingestion complete", "total", stats.TotalElements, "ingested", stats.Ingested, "errors", stats.Errors, "symbols", stats.Symbols, "duration", elapsed, "rate_elements_per_sec", float64(stats.Ingested)/elapsed.Seconds())
 
 	// Print LLM summary stats if service was used
 	if summarizeSvc != nil {
 		totalCalls, cacheHits, cacheSize := summarizeSvc.Stats()
-		log.Printf("LLM Summary stats: calls=%d, cache_hits=%d, cache_size=%d",
-			totalCalls, cacheHits, cacheSize)
+		slog.Info("LLM summary stats", "calls", totalCalls, "cache_hits", cacheHits, "cache_size", cacheSize)
 	}
 
 	// Handle deleted files in incremental mode
 	if *incremental && *archiveDeleted && changedFiles != nil && len(changedFiles.Deleted) > 0 {
-		log.Printf("Archiving %d deleted files...", len(changedFiles.Deleted))
+		slog.Info("archiving deleted files", "count", len(changedFiles.Deleted))
 		archived, err := archiveDeletedNodes(client, *mdemgEndpoint, *spaceID, changedFiles.Deleted)
 		if err != nil {
-			log.Printf("Warning: archive failed: %v", err)
+			slog.Warn("archive failed", "error", err)
 		} else {
-			log.Printf("Archived nodes for %d deleted files", archived)
+			slog.Info("archived nodes for deleted files", "archived", archived)
 		}
 	}
 
@@ -747,9 +744,9 @@ func main() {
 	// Run consolidation
 	if *consolidate && stats.Ingested > 0 {
 		emitProgress(progressEvent{Event: "consolidation_start"})
-		log.Println("Running consolidation...")
+		slog.Info("running consolidation")
 		if err := runConsolidation(client); err != nil {
-			log.Printf("Consolidation failed: %v", err)
+			slog.Error("consolidation failed", "error", err)
 		}
 	}
 }
@@ -831,7 +828,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 		if info.IsDir() {
 			if excludeSet[info.Name()] {
 				if *verbose {
-					log.Printf("Skipping excluded directory: %s", path)
+					slog.Info("skipping excluded directory", "path", path)
 				}
 				return filepath.SkipDir
 			}
@@ -841,7 +838,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 		// Phase 2.5: File size early exit
 		if *maxFileSize > 0 && info.Size() > int64(*maxFileSize) {
 			if *verbose {
-				log.Printf("Skipping oversized file (%d bytes > %d max): %s", info.Size(), *maxFileSize, path)
+				slog.Info("skipping oversized file", "size", info.Size(), "max_size", *maxFileSize, "path", path)
 			}
 			diagSummary.Add(languages.Diagnostic{
 				Severity: "warning",
@@ -855,7 +852,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 		// Phase 2.5: Exclude files matching patterns
 		if matchesExcludePattern(info.Name(), excludePatterns) {
 			if *verbose {
-				log.Printf("Skipping file matching exclude pattern: %s", path)
+				slog.Info("skipping file matching exclude pattern", "path", path)
 			}
 			return nil
 		}
@@ -884,7 +881,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 			langElements, parseErr := parser.ParseFile(root, path, *extractSymbols)
 			if parseErr != nil {
 				if *verbose {
-					log.Printf("Parse error for %s: %v", path, parseErr)
+					slog.Error("parse error", "path", path, "error", parseErr)
 				}
 				return nil
 			}
@@ -892,7 +889,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 			// Phase 2.5: Apply per-file element cap
 			if *maxElementsPerFile > 0 && len(langElements) > *maxElementsPerFile {
 				if *verbose {
-					log.Printf("Capping elements for %s: %d → %d", path, len(langElements), *maxElementsPerFile)
+					slog.Info("capping elements", "path", path, "original", len(langElements), "capped", *maxElementsPerFile)
 				}
 				langElements = langElements[:*maxElementsPerFile]
 			}
@@ -902,7 +899,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 				for _, d := range elem.Diagnostics {
 					diagSummary.Add(d)
 					if *verbose {
-						log.Printf("  [diag] %s/%s: %s (%s)", d.Severity, d.Code, d.Message, path)
+						slog.Info("diagnostic", "severity", d.Severity, "code", d.Code, "message", d.Message, "path", path)
 					}
 				}
 			}
@@ -913,7 +910,7 @@ func walkCodebase(root string, excludeSet map[string]bool, excludePatterns []str
 				// Phase 2.5: Apply per-file symbol cap
 				if *maxSymbolsPerFile > 0 && len(converted.Symbols) > *maxSymbolsPerFile {
 					if *verbose {
-						log.Printf("Capping symbols for %s: %d → %d", path, len(converted.Symbols), *maxSymbolsPerFile)
+						slog.Info("capping symbols", "path", path, "original", len(converted.Symbols), "capped", *maxSymbolsPerFile)
 					}
 					converted.Symbols = converted.Symbols[:*maxSymbolsPerFile]
 				}
@@ -1405,7 +1402,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 		cancel()
 
 		if *verbose && len(llmSummaries) > 0 {
-			log.Printf("  [llm-summary] Generated %d LLM summaries", len(llmSummaries))
+			slog.Info("generated LLM summaries", "count", len(llmSummaries))
 		}
 	}
 
@@ -1423,7 +1420,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 			if llmSummaries[i] != structuralSummary {
 				finalSummary = summarize.CombineSummary(structuralSummary, llmSummaries[i])
 				if *verbose {
-					log.Printf("  [llm-summary] %s: %s", elem.Name, llmSummaries[i])
+					slog.Info("LLM summary", "name", elem.Name, "summary", llmSummaries[i])
 				}
 			}
 		}
@@ -1442,7 +1439,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 			item.Symbols = elem.Symbols
 			symbolCount += len(elem.Symbols)
 			if *verbose {
-				log.Printf("  [symbols] %s: %d symbols extracted", elem.Name, len(elem.Symbols))
+				slog.Info("symbols extracted", "name", elem.Name, "count", len(elem.Symbols))
 			}
 		}
 		items = append(items, item)
@@ -1461,7 +1458,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 
 	for attempt := 0; attempt <= *maxRetries; attempt++ {
 		if attempt > 0 {
-			log.Printf("Retry %d/%d after %dms delay...", attempt, *maxRetries, retryDelayMs)
+			slog.Warn("retrying batch ingest", "attempt", attempt, "max_retries", *maxRetries, "delay_ms", retryDelayMs)
 			time.Sleep(time.Duration(retryDelayMs) * time.Millisecond)
 			retryDelayMs *= 2 // Exponential backoff
 		}
@@ -1470,7 +1467,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 		if err != nil {
 			lastErr = err
 			if *verbose {
-				log.Printf("Batch ingest request failed (attempt %d): %v", attempt+1, err)
+				slog.Error("batch ingest request failed", "attempt", attempt+1, "error", err)
 			}
 			continue
 		}
@@ -1489,7 +1486,7 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 		if resp.StatusCode == http.StatusBadRequest {
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			log.Printf("Batch rejected (non-retryable): status %d: %s", resp.StatusCode, string(bodyBytes))
+			slog.Error("batch rejected, non-retryable", "status", resp.StatusCode, "body", string(bodyBytes))
 			return 0, len(elements), 0
 		}
 
@@ -1498,11 +1495,11 @@ func ingestBatch(client *http.Client, elements []CodeElement) (int, int, int) {
 		resp.Body.Close()
 		lastErr = fmt.Errorf("status %d: %s", resp.StatusCode, string(bodyBytes))
 		if *verbose {
-			log.Printf("Batch ingest failed (attempt %d): %v", attempt+1, lastErr)
+			slog.Error("batch ingest failed", "attempt", attempt+1, "error", lastErr)
 		}
 	}
 
-	log.Printf("Batch failed after %d retries: %v", *maxRetries, lastErr)
+	slog.Error("batch failed after retries", "retries", *maxRetries, "error", lastErr)
 	return 0, len(elements), 0
 }
 
@@ -1526,11 +1523,7 @@ func runConsolidation(client *http.Client) error {
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	log.Printf("Consolidation: created=%d, updated=%d, concept=%d, duration=%.0fms",
-		result.Data.HiddenNodesCreated,
-		result.Data.HiddenNodesUpdated,
-		result.Data.ConceptNodesUpdated,
-		result.Data.DurationMs)
+	slog.Info("consolidation complete", "created", result.Data.HiddenNodesCreated, "updated", result.Data.HiddenNodesUpdated, "concept", result.Data.ConceptNodesUpdated, "duration_ms", result.Data.DurationMs)
 
 	return nil
 }
@@ -1545,12 +1538,12 @@ func printSample(elements []CodeElement) {
 		counts[e.Kind]++
 	}
 
-	log.Println("Element breakdown:")
+	slog.Info("element breakdown")
 	for kind, count := range counts {
-		log.Printf("  %s: %d", kind, count)
+		slog.Info("element kind", "kind", kind, "count", count)
 	}
 
-	log.Println("\nSample elements:")
+	slog.Info("sample elements")
 	shown := 0
 	for _, e := range elements {
 		if shown >= 20 && !*verbose {

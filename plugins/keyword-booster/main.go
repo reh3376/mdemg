@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -33,11 +33,14 @@ type server struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
 
 	if *socketPath == "" {
-		log.Fatal("--socket flag is required")
+		slog.Error("missing required flag", "flag", "--socket")
+		os.Exit(1)
 	}
 
 	// Remove stale socket
@@ -46,12 +49,13 @@ func main() {
 	// Create Unix socket listener
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen on socket: %v", err)
+		slog.Error("failed to listen on socket", "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 	defer os.Remove(*socketPath)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+	slog.Info("listening", "module", moduleID, "socket", *socketPath)
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
@@ -69,25 +73,26 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Printf("%s: received shutdown signal", moduleID)
+		slog.Info("received shutdown signal", "module", moduleID)
 		grpcServer.GracefulStop()
 	}()
 
 	// Start serving
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		slog.Error("failed to serve", "error", err)
+		os.Exit(1)
 	}
 }
 
 // Handshake implements ModuleLifecycle.Handshake
 func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	// Parse config
 	if factor, ok := req.Config["boost_factor"]; ok {
 		if f, err := strconv.ParseFloat(factor, 64); err == nil {
 			s.boostFactor = f
-			log.Printf("%s: boost_factor set to %.2f", moduleID, s.boostFactor)
+			slog.Info("config applied", "module", moduleID, "boost_factor", s.boostFactor)
 		}
 	}
 
@@ -121,7 +126,7 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*
 
 // Shutdown implements ModuleLifecycle.Shutdown
 func (s *server) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "shutting down gracefully",
@@ -134,7 +139,7 @@ func (s *server) Process(ctx context.Context, req *pb.ProcessRequest) (*pb.Proce
 	s.requestsHandled++
 	s.mu.Unlock()
 
-	log.Printf("%s: processing %d candidates for query: %s", moduleID, len(req.Candidates), truncate(req.QueryText, 50))
+	slog.Info("processing candidates", "module", moduleID, "count", len(req.Candidates), "query", truncate(req.QueryText, 50))
 
 	if len(req.Candidates) == 0 {
 		return &pb.ProcessResponse{
@@ -144,7 +149,7 @@ func (s *server) Process(ctx context.Context, req *pb.ProcessRequest) (*pb.Proce
 
 	// Extract keywords from query (simple tokenization)
 	keywords := extractKeywords(req.QueryText)
-	log.Printf("%s: extracted keywords: %v", moduleID, keywords)
+	slog.Info("extracted keywords", "module", moduleID, "keywords", keywords)
 
 	// Score each candidate based on keyword matches
 	type scoredCandidate struct {

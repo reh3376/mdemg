@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -97,6 +97,8 @@ const (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		if data, err := os.ReadFile(".env"); err == nil {
@@ -108,7 +110,8 @@ func main() {
 		}
 	}
 	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY not set")
+		slog.Error("OPENAI_API_KEY not set")
+		os.Exit(1)
 	}
 
 	// Configuration
@@ -148,7 +151,7 @@ func main() {
 	encoder := jiminy.NewProtocolEncoder(1)
 	if compactLevel > 0 {
 		encoder.SetT1Compact(jiminy.T1CompactLevel(compactLevel))
-		log.Printf("T1 compact level: %d", compactLevel)
+		slog.Info("T1 compact level set", "level", compactLevel)
 	}
 
 	// Build glossary from test constraints and generate enhanced bootstrap
@@ -160,24 +163,19 @@ func main() {
 	// Check if MDEMG server is available for feedback loop
 	mdemgAvailable := checkMDEMG(mdemgURL)
 	if mdemgAvailable {
-		log.Printf("MDEMG server available at %s — feedback loop ENABLED", mdemgURL)
+		slog.Info("MDEMG server available, feedback loop enabled", "url", mdemgURL)
 	} else {
-		log.Printf("MDEMG server not available at %s — running without feedback loop", mdemgURL)
+		slog.Warn("MDEMG server not available, running without feedback loop", "url", mdemgURL)
 	}
 
 	// Constraints already loaded above for glossary
 
-	log.Printf("=== J17 Protocol Comprehension Learning Loop ===")
-	log.Printf("Model: %s | Max iterations: %d | Threshold: %.0f/10", model, maxIterations, scoreThreshold)
-	log.Printf("Constraints: %d (with codes: %d)", len(constraints), countCoded(constraints))
-	log.Println()
+	slog.Info("J17 protocol comprehension learning loop started", "model", model, "max_iterations", maxIterations, "threshold", scoreThreshold, "constraints", len(constraints), "coded", countCoded(constraints))
 
 	var iterations []iterationLog
 
 	for iter := 1; iter <= maxIterations; iter++ {
-		log.Printf("══════════════════════════════════════")
-		log.Printf("  ITERATION %d / %d", iter, maxIterations)
-		log.Printf("══════════════════════════════════════")
+		slog.Info("starting iteration", "iteration", iter, "max_iterations", maxIterations)
 
 		// Run all trials for this iteration
 		trials := runTrials(ctx, client, encoder, bootstrap, constraints, iter)
@@ -190,8 +188,7 @@ func main() {
 			Summary:   s,
 		}
 
-		log.Printf("\nIteration %d results: T1=%.1f T2=%.1f T3=%.1f (perfect: %d/%d)",
-			iter, s.AvgScoreT1, s.AvgScoreT2, s.AvgScoreT3, s.PerfectScoreCount, s.TotalTrials)
+		slog.Info("iteration results", "iteration", iter, "avg_t1", s.AvgScoreT1, "avg_t2", s.AvgScoreT2, "avg_t3", s.AvgScoreT3, "perfect", s.PerfectScoreCount, "total", s.TotalTrials)
 
 		// Feed results to MDEMG if available
 		if mdemgAvailable {
@@ -202,8 +199,7 @@ func main() {
 		// Check convergence: ALL tiers must average >= 9.5/10
 		converged := s.AvgScoreT1 >= scoreThreshold && s.AvgScoreT2 >= scoreThreshold && s.AvgScoreT3 >= scoreThreshold
 		if converged {
-			log.Printf("\nAll tiers >= %.1f/10 — learning converged! (T1=%.1f T2=%.1f T3=%.1f)",
-				scoreThreshold, s.AvgScoreT1, s.AvgScoreT2, s.AvgScoreT3)
+			slog.Info("learning converged, all tiers above threshold", "threshold", scoreThreshold, "avg_t1", s.AvgScoreT1, "avg_t2", s.AvgScoreT2, "avg_t3", s.AvgScoreT3)
 			iterations = append(iterations, iterLog)
 			break
 		}
@@ -211,21 +207,21 @@ func main() {
 		// Identify weak T1 codes and regenerate
 		weakCodes := findWeakCodes(trials, scoreThreshold)
 		if len(weakCodes) == 0 && s.AvgScoreT1 >= scoreThreshold {
-			log.Printf("\nT1 codes converged at %.1f/10 — checking other tiers", s.AvgScoreT1)
+			slog.Info("T1 codes converged, checking other tiers", "avg_t1", s.AvgScoreT1)
 			if s.AvgScoreT2 < scoreThreshold {
-				log.Printf("  T2 avg %.1f < %.1f — needs improvement (protocol-level fix required)", s.AvgScoreT2, scoreThreshold)
+				slog.Warn("T2 needs improvement", "avg_t2", s.AvgScoreT2, "threshold", scoreThreshold)
 			}
 			if s.AvgScoreT3 < scoreThreshold {
-				log.Printf("  T3 avg %.1f < %.1f — needs improvement", s.AvgScoreT3, scoreThreshold)
+				slog.Warn("T3 needs improvement", "avg_t3", s.AvgScoreT3, "threshold", scoreThreshold)
 			}
 			iterations = append(iterations, iterLog)
 			break
 		}
 
-		log.Printf("\n%d weak code(s) found — regenerating:", len(weakCodes))
+		slog.Info("weak codes found, regenerating", "count", len(weakCodes))
 		var changes []codeChange
 		for _, wc := range weakCodes {
-			log.Printf("  %s (score %.1f): %s", wc.code, wc.avgScore, wc.reason)
+			slog.Info("weak code identified", "code", wc.code, "score", wc.avgScore, "reason", wc.reason)
 
 			// Try to regenerate via MDEMG server first, fall back to direct LLM
 			newCode := ""
@@ -248,7 +244,7 @@ func main() {
 				// Update the constraint for the next iteration
 				for i := range constraints {
 					if constraints[i].ID == wc.constraintID {
-						log.Printf("    %s → %s", constraints[i].Code, newCode)
+						slog.Info("code regenerated", "old_code", constraints[i].Code, "new_code", newCode)
 						constraints[i].Code = newCode
 						break
 					}
@@ -259,10 +255,9 @@ func main() {
 		iterations = append(iterations, iterLog)
 
 		if len(changes) == 0 {
-			log.Printf("\nNo code improvements generated — stopping")
+			slog.Info("no code improvements generated, stopping")
 			break
 		}
-		log.Println()
 	}
 
 	// Final summary
@@ -281,13 +276,13 @@ func main() {
 	ts := time.Now().Format("20060102_150405")
 	outDir := "docs/architecture/benchmarks"
 	if err := os.MkdirAll(outDir, 0755); err != nil {
-		log.Printf("Warning: mkdir: %v", err)
+		slog.Warn("failed to create output dir", "dir", outDir, "error", err)
 	}
 
 	jsonPath := fmt.Sprintf("%s/j17_learning_%s.json", outDir, ts)
 	data, _ := json.MarshalIndent(expLog, "", "  ")
 	if err := os.WriteFile(jsonPath, data, 0644); err != nil {
-		log.Printf("Warning: write json: %v", err)
+		slog.Warn("failed to write JSON log", "path", jsonPath, "error", err)
 	}
 
 	mdPath := fmt.Sprintf("%s/j17_learning_%s.md", outDir, ts)
@@ -349,7 +344,7 @@ func runTrials(ctx context.Context, client *llmclient.Client, encoder *jiminy.Pr
 			originalTokens := estimateTokens(c.Content)
 			encodedTokens := estimateTokens(encoded)
 
-			log.Printf("[%s] Tier %d: %q", c.ID, tier, encoded)
+			slog.Info("trial encoding", "constraint_id", c.ID, "tier", tier, "encoded", encoded)
 
 			interpretation := interpretMessage(ctx, client, bootstrap, encoded, tier)
 			score, reason := judgeComprehension(ctx, client, c.Intent, interpretation)
@@ -368,8 +363,7 @@ func runTrials(ctx context.Context, client *llmclient.Client, encoder *jiminy.Pr
 				Iteration:      iteration,
 			})
 
-			log.Printf("  -> Score: %.1f/10 | Compression: %.1fx | %s",
-				score, float64(originalTokens)/max(float64(encodedTokens), 1), reason)
+			slog.Info("trial result", "score", score, "compression", float64(originalTokens)/max(float64(encodedTokens), 1), "reason", reason)
 		}
 	}
 	return trials
@@ -479,7 +473,7 @@ func postFeedback(baseURL string, trials []trialResult) any {
 	body, _ := json.Marshal(map[string]any{"trials": fbTrials})
 	resp, err := http.Post(baseURL+"/v1/jiminy/protocol/feedback", "application/json", bytes.NewReader(body))
 	if err != nil {
-		log.Printf("  feedback POST failed: %v", err)
+		slog.Error("feedback POST failed", "error", err)
 		return nil
 	}
 	defer resp.Body.Close()
@@ -489,9 +483,9 @@ func postFeedback(baseURL string, trials []trialResult) any {
 	json.Unmarshal(data, &result)
 
 	if resp.StatusCode == 200 {
-		log.Printf("  feedback: ingested %d trials into MDEMG protocol metrics", len(fbTrials))
+		slog.Info("feedback ingested", "trials", len(fbTrials))
 	} else {
-		log.Printf("  feedback: server returned %d: %s", resp.StatusCode, string(data))
+		slog.Error("feedback server error", "status", resp.StatusCode, "body", string(data))
 	}
 	return result
 }
@@ -544,7 +538,7 @@ Respond with ONLY the new kebab-case code, nothing else.`, wc.content, wc.code, 
 		{Role: "user", Content: prompt},
 	}, llmclient.CompleteOpts{MaxTokens: 50})
 	if err != nil {
-		log.Printf("    LLM code regeneration failed: %v", err)
+		slog.Error("LLM code regeneration failed", "error", err)
 		return ""
 	}
 
@@ -585,7 +579,7 @@ Be precise and concrete. Do not restate the protocol spec.`, bootstrap, tierName
 		{Role: "user", Content: prompt},
 	}, llmclient.CompleteOpts{MaxTokens: 300})
 	if err != nil {
-		log.Printf("  LLM interpretation error: %v", err)
+		slog.Error("LLM interpretation error", "error", err)
 		return fmt.Sprintf("[ERROR: %v]", err)
 	}
 	return strings.TrimSpace(resp)
@@ -615,7 +609,7 @@ REASON: <one sentence explanation>`, senderIntent, receiverInterpretation)
 		{Role: "user", Content: prompt},
 	}, llmclient.CompleteOpts{MaxTokens: 100})
 	if err != nil {
-		log.Printf("  LLM judge error: %v", err)
+		slog.Error("LLM judge error", "error", err)
 		return 0, "judge error"
 	}
 
@@ -902,6 +896,6 @@ func writeLearningReport(path string, expLog experimentLog) {
 	}
 
 	if err := os.WriteFile(path, []byte(sb.String()), 0644); err != nil {
-		log.Printf("Warning: could not write report: %v", err)
+		slog.Warn("could not write report", "path", path, "error", err)
 	}
 }

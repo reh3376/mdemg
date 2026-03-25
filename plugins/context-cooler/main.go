@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -113,7 +113,7 @@ func run(cfg Config, stopCh <-chan struct{}) error {
 	defer listener.Close()
 	defer os.Remove(cfg.SocketPath)
 
-	log.Printf("%s: listening on %s", moduleID, cfg.SocketPath)
+	slog.Info("listening", "module", moduleID, "socket", cfg.SocketPath)
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
@@ -131,7 +131,7 @@ func run(cfg Config, stopCh <-chan struct{}) error {
 	// Wait for stop signal or server error
 	select {
 	case <-stopCh:
-		log.Printf("%s: received shutdown signal", moduleID)
+		slog.Info("received shutdown signal", "module", moduleID)
 		grpcServer.GracefulStop()
 		return nil
 	case err := <-done:
@@ -143,11 +143,14 @@ func run(cfg Config, stopCh <-chan struct{}) error {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
 
 	if *socketPath == "" {
-		log.Fatal("--socket flag is required")
+		slog.Error("missing required flag", "flag", "--socket")
+		os.Exit(1)
 	}
 
 	// Get MDEMG endpoint from environment or use default
@@ -173,13 +176,14 @@ func main() {
 	}()
 
 	if err := run(cfg, stopCh); err != nil {
-		log.Fatalf("Error: %v", err)
+		slog.Error("fatal error", "error", err)
+		os.Exit(1)
 	}
 }
 
 // Handshake implements ModuleLifecycle.Handshake
 func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	return &pb.HandshakeResponse{
 		ModuleId:      moduleID,
@@ -220,7 +224,7 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*
 
 // Shutdown implements ModuleLifecycle.Shutdown
 func (s *server) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "shutting down gracefully",
@@ -246,8 +250,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 	execNum := s.executionsTotal
 	s.mu.Unlock()
 
-	log.Printf("%s: executing task %s (trigger=%s, execution #%d)",
-		moduleID, req.TaskId, req.Trigger, execNum)
+	slog.Info("executing task", "module", moduleID, "task_id", req.TaskId, "trigger", req.Trigger, "execution", execNum)
 
 	// Get space_id from context, default to mdemg-dev (Claude's conversation memory)
 	spaceID := req.Context["space_id"]
@@ -258,7 +261,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 	// Call the graduation endpoint
 	summary, err := s.processGraduation(ctx, spaceID)
 	if err != nil {
-		log.Printf("%s: graduation failed for space %s: %v", moduleID, spaceID, err)
+		slog.Error("graduation failed", "module", moduleID, "space_id", spaceID, "error", err)
 		return &pb.ExecuteResponse{
 			Success: false,
 			Error:   fmt.Sprintf("graduation failed: %v", err),
@@ -290,7 +293,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 			summary.Graduated, summary.Tombstoned, summary.RemainingVolatile)
 	}
 
-	log.Printf("%s: task %s completed in %v - %s", moduleID, req.TaskId, time.Since(start), message)
+	slog.Info("task completed", "module", moduleID, "task_id", req.TaskId, "duration", time.Since(start), "message", message)
 
 	return &pb.ExecuteResponse{
 		Success: true,
