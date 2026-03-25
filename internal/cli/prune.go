@@ -679,7 +679,8 @@ MATCH (n:MemoryNode)
 WHERE n.space_id = $spaceId
   AND n.node_id = $nodeId
 SET n.status = 'tombstoned',
-    n.tombstoned_at = datetime()
+    n.tombstoned_at = datetime(),
+    n.pruned_at = datetime()
 RETURN count(*) AS updated`
 
 		params := map[string]any{
@@ -897,7 +898,8 @@ RETURN count(*) AS deleted`
 MATCH (n:MemoryNode {space_id: $spaceId, node_id: $mergedId})
 SET n.status = 'tombstoned',
     n.merged_into = $survivorId,
-    n.tombstoned_at = datetime()
+    n.tombstoned_at = datetime(),
+    n.pruned_at = datetime()
 RETURN count(*) AS tombstoned`
 
 		res, err = tx.Run(ctx, tombstoneCypher, params)

@@ -557,7 +557,65 @@ mdemg ingest --path . --speed thorough
 mdemg ingest --path . --speed fast --llm-summary=true
 ```
 
-**See Also:** `mdemg consolidate`, `mdemg extract-symbols`, `mdemg watch`
+**See Also:** `mdemg consolidate`, `mdemg extract-symbols`, `mdemg watch`, `mdemg ingest-claude-md`
+
+---
+
+### `mdemg ingest-claude-md`
+
+**Synopsis:** `mdemg ingest-claude-md [flags]`
+
+Discover and ingest all Claude Code .md files (CLAUDE.md, MEMORY.md, plans, rules, etc.) with SHA256 content-hash change detection. Skips unchanged files to avoid observation bloat. Designed to be called by hooks (session-start, pre-compact, post-tool-observe).
+
+#### File Discovery
+
+Discovers files from three sources:
+1. **Static in-repo paths**: `CLAUDE.md`, `AGENT_HANDOFF.md`, `VISION.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`
+2. **Home-relative static paths**: `~/.claude/CLAUDE.md`
+3. **Dynamic globs**: auto-memory (`~/.claude/projects/<project-hash>/memory/*.md`), plans (`~/.claude/plans/*.md`), rules (`.claude/rules/**/*.md`), session memory
+
+The project hash is derived from the current working directory (e.g., `/Users/reh3376/mdemg` → `-Users-reh3376-mdemg`).
+
+#### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | auto-resolved | MDEMG space ID |
+| `--force` | bool | `false` | Skip content-hash comparison — re-ingest all files |
+| `--quiet` | bool | `false` | Suppress non-error output |
+| `--dry-run` | bool | `false` | Show what would be ingested without doing it |
+| `--file` | string | `""` | Ingest a single specific file (targeted mode) |
+
+#### Change Detection
+
+For each discovered file:
+1. Compute SHA256 hash, file size, and line count
+2. Call `GET /v1/memory/node/meta` to compare against stored `content_hash`
+3. If hash matches → skip (file unchanged)
+4. If hash differs or node not found → `POST /v1/memory/ingest` with `content_hash`, `file_size`, `line_count`
+
+#### Usage Examples
+
+```bash
+# Discover and ingest all changed claude .md files
+mdemg ingest-claude-md --space-id mdemg-dev
+
+# Force re-ingest everything (used by pre-compact hook)
+mdemg ingest-claude-md --force --space-id mdemg-dev
+
+# Dry run to see what would be ingested
+mdemg ingest-claude-md --dry-run
+
+# Targeted single-file ingest (used by post-tool-observe hook)
+mdemg ingest-claude-md --file ~/.claude/projects/-Users-reh3376-mdemg/memory/MEMORY.md --space-id mdemg-dev
+
+# Quiet mode for hook integration
+mdemg ingest-claude-md --quiet --space-id mdemg-dev
+```
+
+**Output:** `Ingested 3/14 files (11 unchanged, 0 errors)`
+
+**See Also:** `mdemg ingest`, `mdemg consolidate`
 
 ---
 

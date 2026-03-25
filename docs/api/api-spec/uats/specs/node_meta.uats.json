@@ -1,0 +1,53 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Node Meta",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "node",
+      "meta"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-25",
+    "description": "Validates GET /v1/memory/node/meta endpoint for content-hash change detection",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/node/meta",
+    "query_params": {
+      "space_id": "${test_space}",
+      "path": "CLAUDE.md"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.node_id",
+        "op": "exists"
+      },
+      {
+        "path": "$.path",
+        "op": "equals",
+        "expected": "CLAUDE.md"
+      },
+      {
+        "path": "$.status",
+        "op": "exists"
+      }
+    ]
+  }
+}

@@ -112,6 +112,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	ingestCmd.GroupID = "memory"
 	rootCmd.AddCommand(ingestCmd)
 
+	ingestClaudeMDCmd := newIngestClaudeMDCmd()
+	ingestClaudeMDCmd.GroupID = "memory"
+	rootCmd.AddCommand(ingestClaudeMDCmd)
+
 	consolidateCmd := newConsolidateCmd()
 	consolidateCmd.GroupID = "memory"
 	rootCmd.AddCommand(consolidateCmd)

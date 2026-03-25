@@ -118,6 +118,9 @@ type IngestRequest struct {
 	Embedding       []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
 	CanonicalTime   string    `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
 	TimestampFormat string    `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
+	ContentHash     string    `json:"content_hash,omitempty" validate:"omitempty,max=128"`     // SHA256 hash for change detection (skip re-ingest if unchanged)
+	FileSize        int64     `json:"file_size,omitempty"`                                     // File size in bytes
+	LineCount       int       `json:"line_count,omitempty"`                                    // Number of lines in the file
 }
 
 type IngestResponse struct {
@@ -126,6 +129,7 @@ type IngestResponse struct {
 	ObsID         string    `json:"obs_id"`
 	EmbeddingDims int       `json:"embedding_dims,omitempty"` // Dimensions of generated embedding
 	Anomalies     []Anomaly `json:"anomalies,omitempty"`      // Detected anomalies (non-blocking)
+	Skipped       bool      `json:"skipped,omitempty"`        // True if content_hash matched (no new observation created)
 }
 
 // AnomalyType represents the type of anomaly detected during ingest
@@ -248,6 +252,9 @@ type BatchIngestItem struct {
 	Embedding       []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
 	CanonicalTime   string         `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
 	TimestampFormat string         `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
+	ContentHash     string         `json:"content_hash,omitempty" validate:"omitempty,max=128"`     // SHA256 hash for change detection
+	FileSize        int64          `json:"file_size,omitempty"`                                     // File size in bytes
+	LineCount       int            `json:"line_count,omitempty"`                                    // Number of lines
 }
 
 // IngestSymbol represents an extracted code symbol (constant, function, class, etc.)

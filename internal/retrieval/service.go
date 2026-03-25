@@ -1288,6 +1288,9 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 		"embedding":     req.Embedding, // May be nil/empty
 		"canonicalTime": canonicalTimeStr,
 		"prunable":      IsPrunableSpace(req.SpaceID),
+		"contentHash":   req.ContentHash,
+		"fileSize":      req.FileSize,
+		"lineCount":     req.LineCount,
 	}
 
 	// Determine merge key: prefer path if provided, else use node_id
@@ -1298,6 +1301,41 @@ func (s *Service) IngestObservation(ctx context.Context, req models.IngestReques
 		mergeValue = req.Path
 	}
 	params["mergeValue"] = mergeValue
+
+	// Content-hash skip: if hash provided and matches existing node, skip observation creation
+	// Only update last_ingested_at + metadata, avoiding observation bloat for unchanged files
+	if req.ContentHash != "" && mergeKey == "path" {
+		skipResult, skipErr := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			checkCypher := `
+MATCH (n:MemoryNode {space_id:$spaceId, path:$mergeValue})
+WHERE n.content_hash = $contentHash
+SET n.last_ingested_at = datetime(),
+    n.file_size = CASE WHEN $fileSize > 0 THEN $fileSize ELSE n.file_size END,
+    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END
+RETURN n.node_id AS node_id`
+			res, err := tx.Run(ctx, checkCypher, params)
+			if err != nil {
+				return nil, err
+			}
+			if res.Next(ctx) {
+				nid, _ := res.Record().Get("node_id")
+				return nid, nil
+			}
+			return nil, res.Err()
+		})
+		if skipErr == nil && skipResult != nil {
+			existingNodeID, _ := skipResult.(string)
+			if existingNodeID != "" {
+				slog.Debug("ingest: content unchanged, skipping observation", "path", req.Path, "content_hash", req.ContentHash)
+				return models.IngestResponse{
+					SpaceID: req.SpaceID,
+					NodeID:  existingNodeID,
+					Skipped: true,
+				}, nil
+			}
+		}
+		// If skip check failed or no match, fall through to full ingest
+	}
 
 	// Build embedding SET clause (only if embedding provided)
 	// Also flag edges as stale when embedding changes (Phase 9.5.3)
@@ -1345,7 +1383,10 @@ SET n.updated_at=datetime(),
     n.update_count = coalesce(n.update_count,0) + 1,
     n.version = coalesce(n.version, 0) + 1,
     n.last_ingested_at = datetime(),
-    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
+    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END,
+    n.content_hash = CASE WHEN $contentHash IS NOT NULL AND $contentHash <> '' THEN $contentHash ELSE n.content_hash END,
+    n.file_size = CASE WHEN $fileSize > 0 THEN $fileSize ELSE n.file_size END,
+    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END` + embeddingClause + `
 RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		} else {
 			cypher = `
@@ -1383,7 +1424,10 @@ SET n.updated_at=datetime(),
     n.update_count = coalesce(n.update_count,0) + 1,
     n.version = coalesce(n.version, 0) + 1,
     n.last_ingested_at = datetime(),
-    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END` + embeddingClause + `
+    n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END,
+    n.content_hash = CASE WHEN $contentHash IS NOT NULL AND $contentHash <> '' THEN $contentHash ELSE n.content_hash END,
+    n.file_size = CASE WHEN $fileSize > 0 THEN $fileSize ELSE n.file_size END,
+    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END` + embeddingClause + `
 RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		}
 

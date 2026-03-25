@@ -455,6 +455,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 | Issue | Severity | Notes |
 |-------|----------|-------|
 | Obsidian integration v2 in progress | Low | Phase 45.4 — v1 committed (6962c4a: gRPC lifecycle, Matches, Parse, parser tests), v2 enhancements in progress (walker, yaml.v3, full Sync) |
+| ~~Claude .md files not ingested into CMS~~ | ~~High~~ | ~~FIXED (2026-03-25)~~ — `mdemg ingest-claude-md` command with SHA256 content-hash change detection. 15 files tracked (3 in-repo, 6 auto-memory, 6 plans). Hooks: session-start (background), pre-compact (forced), post-tool-observe (on Write/Edit). `GET /v1/memory/node/meta` endpoint for hash comparison. |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -514,6 +515,12 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
   -H "Content-Type: application/json" \
   -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
 
+# === Claude .md File Ingestion ===
+./bin/mdemg ingest-claude-md --space-id mdemg-dev              # Normal (hash skip)
+./bin/mdemg ingest-claude-md --space-id mdemg-dev --force      # Force all
+./bin/mdemg ingest-claude-md --space-id mdemg-dev --dry-run    # Preview
+curl -s "http://localhost:9999/v1/memory/node/meta?space_id=mdemg-dev&path=CLAUDE.md"
+
 # === Proto Regeneration ===
 protoc --go_out=. --go-grpc_out=. api/proto/space-transfer.proto
 protoc --go_out=. --go-grpc_out=. api/proto/devspace.proto
@@ -522,4 +529,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-25 — Gap Analysis Phases 1-3 COMPLETE + Phase 4 in progress. Linear module upgraded: slog migration (U-1), context cancellation (U-2), edge emission for issue relationships (U-3), 5 edge tests. Obsidian module v1 committed (6962c4a), v2 enhancements in progress. GAP-21 UAMS runner + GAP-27 submodule changelogs done. All 12 UxTS frameworks active with CI gates. 195 UATS specs, 213+ Go test files, CI all green. Remaining Phase 4: GAP-02 (Obsidian v2), -26 (tutorial), -13 (Windows), -20 (graph viz), -14 (DBSCAN).*
+*Last updated: 2026-03-25 — Claude .md file ingestion infrastructure COMPLETE: `mdemg ingest-claude-md` CLI with SHA256 content-hash change detection, `GET /v1/memory/node/meta` endpoint, 3 hook integration points (session-start, pre-compact, post-tool-observe), 15 files tracked. Also: `pruned_at` added to tombstoning, dead `bin/ingest-codebase` reference fixed. 196 UATS specs, 213+ Go test files, CI all green.*
