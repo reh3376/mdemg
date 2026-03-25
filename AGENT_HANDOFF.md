@@ -52,7 +52,7 @@ WHAT REMAINS TO BE DONE:
 6. GAP-14: DBSCAN performance profiling + optimization
 
 === Pre-existing partial phases ===
-7. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
+7. ✅ Phase 47.2 — APE INGEST scheduled sync (freshness tracking + RSIC pipeline wired: assess, reflect, plan, dispatch)
 9. TESTING: SSE streaming — accepted limitation (GAP-05: 14 Go unit tests cover streaming; UATS spec documents gap)
 10. RESEARCH: AutoResearch integration analysis (docs/development/)
 

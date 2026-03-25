@@ -351,6 +351,23 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
+	// Phase 47.2: Stale ingest detection
+	if r.cfg.APEIngestSyncEnabled && report.StaleIngestSpaces > 0 {
+		severity := SeverityLow
+		if report.StaleIngestSpaces >= 3 {
+			severity = SeverityMedium
+		}
+		insights = append(insights, ReflectionInsight{
+			PatternID:         "stale_ingest",
+			Severity:          severity,
+			Description:       fmt.Sprintf("%d space(s) past ingest staleness threshold (%dh)", report.StaleIngestSpaces, r.cfg.SyncStaleThresholdHours),
+			RecommendedAction: "ingest_stale_spaces",
+			Metric:            "stale_ingest_spaces",
+			Value:             float64(report.StaleIngestSpaces),
+			Threshold:         0,
+		})
+	}
+
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)
 	if r.llmReflector != nil {
 		llmInsights, err := r.llmReflector.Reflect(ctx, report)

@@ -338,3 +338,44 @@ func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID,
 	}
 	return results, nil
 }
+
+// rsicFreshnessAdapter adapts retrieval.Service to ape.FreshnessProvider (Phase 47.2).
+type rsicFreshnessAdapter struct {
+	retriever *retrieval.Service
+	triggerFn func() // set post-construction to Server.runScheduledSyncCheck
+}
+
+func (a *rsicFreshnessAdapter) GetStaleSpaceCount(ctx context.Context, thresholdHours int) (int, error) {
+	allFreshness, err := a.retriever.GetAllTapRootFreshness(ctx)
+	if err != nil {
+		return 0, err
+	}
+	threshold := time.Duration(thresholdHours) * time.Hour
+	count := 0
+	for _, props := range allFreshness {
+		if lastIngest, ok := props["last_ingest_at"]; ok {
+			var lastTime time.Time
+			switch v := lastIngest.(type) {
+			case time.Time:
+				lastTime = v
+			case string:
+				if parsed, parseErr := time.Parse(time.RFC3339, v); parseErr == nil {
+					lastTime = parsed
+				}
+			}
+			if !lastTime.IsZero() && time.Since(lastTime) < threshold {
+				continue
+			}
+		}
+		count++
+	}
+	return count, nil
+}
+
+func (a *rsicFreshnessAdapter) TriggerIngestForStaleSpaces(ctx context.Context, thresholdHours int) (int, error) {
+	if a.triggerFn != nil {
+		a.triggerFn()
+	}
+	count, err := a.GetStaleSpaceCount(ctx, thresholdHours)
+	return count, err
+}

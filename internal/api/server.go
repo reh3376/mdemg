@@ -627,6 +627,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		evolver := jiminySvc.NewProtocolEvolver()
 		rsicDispatcher.SetProtocolEvolver(evolver)
 	}
+	// Phase 47.2: Wire freshness provider for RSIC ingest staleness detection
+	var freshnessAdapter *rsicFreshnessAdapter
+	if cfg.APEIngestSyncEnabled {
+		freshnessAdapter = &rsicFreshnessAdapter{retriever: ret}
+		rsicAssessor.SetFreshnessProvider(freshnessAdapter)
+		rsicDispatcher.SetFreshnessProvider(freshnessAdapter)
+	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
 
@@ -750,7 +757,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc.SetSignalLearner(signalLearner)
 	}
 
-	return &Server{
+	s := &Server{
 		cfg:             cfg,
 		driver:          driver,
 		retriever:       ret,
@@ -798,6 +805,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		enforcementLog:          newEnforcementEventLog(1000),
 		conflictDetector:        conflictDet,
 	}
+
+	// Phase 47.2: Set trigger callback now that Server is constructed
+	if freshnessAdapter != nil {
+		freshnessAdapter.triggerFn = s.runScheduledSyncCheck
+	}
+
+	return s
 }
 
 // Shutdown gracefully stops background services

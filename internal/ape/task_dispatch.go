@@ -24,6 +24,7 @@ type Dispatcher struct {
 	driver        neo4j.DriverWithContext
 	protoEvolver       ProtocolEvolverProvider       // J17: protocol mutation executor
 	guidanceCalibrator GuidanceCalibrationProvider   // RSIC-SK1: guidance self-calibration
+	freshnessProvider  FreshnessProvider              // Phase 47.2: ingest staleness provider
 
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
@@ -71,6 +72,11 @@ func (d *Dispatcher) SetProtocolEvolver(pe ProtocolEvolverProvider) {
 // SetGuidanceCalibrator attaches an RSIC-SK1 guidance calibration provider.
 func (d *Dispatcher) SetGuidanceCalibrator(gc GuidanceCalibrationProvider) {
 	d.guidanceCalibrator = gc
+}
+
+// SetFreshnessProvider attaches an ingest freshness provider for stale space re-ingestion (Phase 47.2).
+func (d *Dispatcher) SetFreshnessProvider(p FreshnessProvider) {
+	d.freshnessProvider = p
 }
 
 // SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
@@ -245,6 +251,8 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeAdjustGuidanceConfidence(ctx, at.Spec.TargetSpace)
 	case "archive_ineffective_constraints":
 		deliverables, execErr = d.executeArchiveIneffectiveConstraints(ctx, at.Spec.TargetSpace)
+	case "ingest_stale_spaces":
+		deliverables, execErr = d.executeIngestStaleSpaces(ctx, at.Spec.TargetSpace)
 	default:
 		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -513,6 +521,22 @@ func (d *Dispatcher) executeArchiveIneffectiveConstraints(ctx context.Context, s
 		return nil, err
 	}
 	return map[string]any{"archived": archived}, nil
+}
+
+// executeIngestStaleSpaces triggers re-ingestion for spaces past the staleness threshold (Phase 47.2).
+func (d *Dispatcher) executeIngestStaleSpaces(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.freshnessProvider == nil {
+		return nil, fmt.Errorf("freshness provider not configured")
+	}
+	reIngested, err := d.freshnessProvider.TriggerIngestForStaleSpaces(ctx, 24)
+	if err != nil {
+		return nil, fmt.Errorf("ingest stale spaces: %w", err)
+	}
+	return map[string]any{
+		"action":       "ingest_stale_spaces",
+		"re_ingested":  reIngested,
+		"target_space": spaceID,
+	}, nil
 }
 
 // CleanupStaleTasks removes completed/failed tasks older than maxAge and caps total entries at 1000.
