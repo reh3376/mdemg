@@ -321,6 +321,24 @@ def main():
         if file_path.endswith("MEMORY.md") and "memory" in file_path:
             check_memory_overflow(file_path)
 
+        # Auto-ingest tracked claude .md files on modification
+        CLAUDE_MD_PATTERNS = [
+            "MEMORY.md", "CLAUDE.md", "AGENT_HANDOFF.md", "VISION.md",
+            "AGENTS.md", "CLAUDE.local.md",
+            "/memory/", "/plans/", "/rules/",
+        ]
+        if any(p in file_path for p in CLAUDE_MD_PATTERNS):
+            try:
+                subprocess.Popen(
+                    ["./bin/mdemg", "ingest-claude-md", "--quiet",
+                     "--space-id", SPACE_ID, "--file", file_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    cwd="/Users/reh3376/mdemg",
+                )
+            except Exception:
+                pass  # Fire-and-forget
+
         # J9: Evaluate agent output after Write/Edit (code changes)
         # Use the new_string (Edit) or content (Write) as agent output
         agent_output = tool_input.get("new_string", "") or tool_input.get("content", "")
@@ -412,11 +430,12 @@ def main():
                 try:
                     subprocess.Popen(
                         [
-                            "/Users/reh3376/mdemg/bin/ingest-codebase",
-                            "--path", "/Users/reh3376/mdemg",
+                            "/Users/reh3376/mdemg/bin/mdemg",
+                            "ingest",
                             "--space-id", SPACE_ID,
                             "--incremental",
                             "--consolidate",
+                            "/Users/reh3376/mdemg",
                         ],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,

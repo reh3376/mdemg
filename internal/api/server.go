@@ -1389,6 +1389,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
+	mux.HandleFunc("/v1/memory/node/meta", s.handleNodeMeta)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/prometheus", s.handlePrometheusMetrics)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)

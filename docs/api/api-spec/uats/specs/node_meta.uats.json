@@ -1,0 +1,86 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Node Meta",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "node",
+      "meta"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-25",
+    "description": "Validates GET /v1/memory/node/meta endpoint for content-hash change detection",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "e8182060758ce4dea4ca0094e332e2aacc527adb3c4ab2817033b634d0e3ccd0"
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/node/meta",
+    "query": {
+      "space_id": "{{test_space}}",
+      "path": "nonexistent-file.md"
+    }
+  },
+  "expected": {
+    "status": 404,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "op": "equals",
+        "expected": "node not found"
+      },
+      {
+        "path": "$.path",
+        "op": "equals",
+        "expected": "nonexistent-file.md"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_params",
+      "description": "Returns 400 when path param is empty",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/node/meta",
+        "query": {
+          "space_id": "{{test_space}}",
+          "path": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "Returns 405 for POST requests",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/node/meta",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

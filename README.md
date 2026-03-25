@@ -310,6 +310,7 @@ mdemg hooks install  # Auto-ingest on git commit
 | `/v1/memory/ingest/batch` | POST | Store multiple observations |
 | `/v1/memory/consolidate` | POST | Trigger hidden layer creation |
 | `/v1/memory/stats` | GET | Per-space memory statistics |
+| `/v1/memory/node/meta` | GET | Content-hash metadata for a single node (change detection) |
 | `/v1/memory/ingest-codebase` | POST | Background codebase ingestion job |
 | `/v1/memory/symbols` | GET | Query extracted code symbols |
 | `/v1/memory/ingest/files` | POST | Ingest files with background job processing |

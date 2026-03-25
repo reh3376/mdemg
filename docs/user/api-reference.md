@@ -524,6 +524,37 @@ curl -s "http://localhost:9999/v1/memory/stats?space_id=demo"
 
 ---
 
+### GET /v1/memory/node/meta?space_id=X&path=Y
+
+Content-hash metadata for a single memory node. Used by hooks and CLI to detect whether a file has changed before re-ingesting.
+
+**Query Parameters:**
+- `space_id` (required): space identifier
+- `path` (required): file path of the memory node
+
+**Response (200):**
+```json
+{
+  "node_id": "abc123",
+  "path": "CLAUDE.md",
+  "content_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "file_size": 4200,
+  "line_count": 85,
+  "last_ingested_at": "2026-03-25T14:30:00Z",
+  "status": "active"
+}
+```
+
+**Response (404):** Node with the given `space_id` + `path` has never been ingested.
+
+**Status Codes:** `200 OK`, `400 Bad Request`, `404 Not Found`, `500 Internal Server Error`
+
+```bash
+curl -s "http://localhost:9999/v1/memory/node/meta?space_id=mdemg-dev&path=CLAUDE.md"
+```
+
+---
+
 ### GET /v1/memory/distribution?space_id=X
 
 Learning edge distribution statistics including learning phase.

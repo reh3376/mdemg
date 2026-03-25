@@ -89,6 +89,12 @@ curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
   }" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null || true
 
+# Emergency: ingest all claude .md files before compaction wipes context
+# Uses --force to skip hash check — we want latest content persisted regardless
+if [ -x "./bin/mdemg" ]; then
+  ./bin/mdemg ingest-claude-md --force --quiet --space-id "${SPACE_ID}" 2>/dev/null || true
+fi
+
 # J17: Issue session ticket before compaction for state persistence
 if [ "${J17_ENABLED:-false}" = "true" ]; then
   J17_TICKET=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/checkpoint" \

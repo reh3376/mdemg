@@ -106,6 +106,11 @@ fi
 echo ""
 echo "═══ END CMS CONTEXT ═══"
 
+# Ingest claude .md files with content-hash change detection (fire-and-forget)
+if [ -x "./bin/mdemg" ]; then
+  ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" 2>/dev/null &
+fi
+
 # Architecture map staleness check (respects UITS-optimized flag)
 if command -v python3 >/dev/null 2>&1 && [ -f "scripts/generate_arch_maps.py" ]; then
   MAP_CHECK=$(python3 scripts/generate_arch_maps.py --checksum 2>&1) || {
