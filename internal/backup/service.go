@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,7 +32,7 @@ type Service struct {
 func NewService(cfg Config, driver neo4j.DriverWithContext, exporter *transfer.Exporter) *Service {
 	// Ensure storage directory exists.
 	if err := os.MkdirAll(cfg.StorageDir, 0755); err != nil {
-		log.Printf("backup: warning: cannot create storage dir %s: %v", cfg.StorageDir, err)
+		slog.Warn("backup: cannot create storage dir", "dir", cfg.StorageDir, "error", err)
 	}
 	return &Service{cfg: cfg, driver: driver, exporter: exporter}
 }
@@ -78,7 +78,7 @@ func (s *Service) Trigger(ctx context.Context, req TriggerRequest) (string, erro
 			err = s.runPartialBackup(jobCtx, job, record, req.SpaceIDs)
 		}
 		if err != nil {
-			log.Printf("backup: %s failed: %v", backupID, err)
+			slog.Error("backup failed", "backup_id", backupID, "error", err)
 			job.Fail(err)
 		} else {
 			job.Complete(map[string]any{
@@ -87,15 +87,15 @@ func (s *Service) Trigger(ctx context.Context, req TriggerRequest) (string, erro
 				"checksum":  record.Checksum,
 				"size":      record.SizeBytes,
 			})
-			log.Printf("backup: %s completed (%d bytes)", backupID, record.SizeBytes)
+			slog.Info("backup completed", "backup_id", backupID, "size_bytes", record.SizeBytes)
 		}
 
 		// Run retention after backup if configured.
 		if s.cfg.RetentionRunAfter {
 			if res, retErr := s.RunRetention(context.Background()); retErr != nil {
-				log.Printf("backup: retention after %s failed: %v", backupID, retErr)
+				slog.Error("backup: retention failed", "backup_id", backupID, "error", retErr)
 			} else if len(res.Deleted) > 0 {
-				log.Printf("backup: retention cleaned %d backups (freed %d bytes)", len(res.Deleted), res.FreedBytes)
+				slog.Info("backup: retention cleaned backups", "deleted_count", len(res.Deleted), "freed_bytes", res.FreedBytes)
 			}
 		}
 	}()

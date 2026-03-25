@@ -3,7 +3,7 @@ package retrieval
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -61,7 +61,7 @@ func NewDataCollector(enabled bool, dir string) *DataCollector {
 		return dc
 	}
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		log.Printf("[DataCollector] failed to create dir %s: %v", dir, err)
+		slog.Error("DataCollector: failed to create dir", "dir", dir, "error", err)
 	}
 	return dc
 }
@@ -96,7 +96,7 @@ func (dc *DataCollector) Collect(query string, candidates []models.RetrieveResul
 func (dc *DataCollector) writeRecord(rec trainingRecord) {
 	data, err := json.Marshal(rec)
 	if err != nil {
-		log.Printf("[DataCollector] marshal error: %v", err)
+		slog.Error("DataCollector: marshal error", "error", err)
 		return
 	}
 	data = append(data, '\n')
@@ -112,14 +112,14 @@ func (dc *DataCollector) writeRecord(rec trainingRecord) {
 	// Open a new file if none is open.
 	if dc.currentFile == nil {
 		if err := dc.openNewFileLocked(); err != nil {
-			log.Printf("[DataCollector] open file error: %v", err)
+			slog.Error("DataCollector: open file error", "error", err)
 			return
 		}
 	}
 
 	n, err := dc.currentFile.Write(data)
 	if err != nil {
-		log.Printf("[DataCollector] write error: %v", err)
+		slog.Error("DataCollector: write error", "error", err)
 		return
 	}
 	dc.currentSize += int64(n)
@@ -179,7 +179,7 @@ func (dc *DataCollector) PruneOldFiles(maxAge time.Duration) error {
 		if info.ModTime().Before(cutoff) {
 			path := filepath.Join(dc.dir, e.Name())
 			if err := os.Remove(path); err != nil {
-				log.Printf("[DataCollector] prune failed for %s: %v", path, err)
+				slog.Error("DataCollector: prune failed", "path", path, "error", err)
 			}
 		}
 	}

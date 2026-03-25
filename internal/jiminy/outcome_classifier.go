@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"strings"
 	"sync"
@@ -142,14 +142,14 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	// Tier 1: Embedding-based comparison
 	guidanceEmbed, err := oc.embedder.Embed(ctx, item.Content)
 	if err != nil {
-		log.Printf("jiminy classifier: guidance embedding failed: %v", err)
+		slog.Error("jiminy classifier: guidance embedding failed", "error", err)
 		outcome, sim := classifyOutcome(item, strings.ToLower(actionSummary))
 		return ClassificationResult{Outcome: outcome, Confidence: sim}
 	}
 
 	actionEmbed, err := oc.embedder.Embed(ctx, actionSummary)
 	if err != nil {
-		log.Printf("jiminy classifier: action embedding failed: %v", err)
+		slog.Error("jiminy classifier: action embedding failed", "error", err)
 		outcome, sim := classifyOutcome(item, strings.ToLower(actionSummary))
 		return ClassificationResult{Outcome: outcome, Confidence: sim}
 	}
@@ -230,7 +230,7 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 
 	response, _, err := oc.llm.CompleteWithUsage(ctx, msgs, opts)
 	if err != nil {
-		log.Printf("jiminy classifier: LLM classification failed: %v", err)
+		slog.Error("jiminy classifier: LLM classification failed", "error", err)
 		return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
 	}
 
@@ -301,7 +301,7 @@ func parseClassifyResponse(raw string, fallbackConfidence float64) Classificatio
 	}
 
 	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
-		log.Printf("jiminy classifier: failed to parse LLM response: %v", err)
+		slog.Warn("jiminy classifier: failed to parse LLM response", "error", err)
 		return ClassificationResult{Outcome: OutcomeUnknown, Confidence: fallbackConfidence}
 	}
 

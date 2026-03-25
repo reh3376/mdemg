@@ -1,7 +1,7 @@
 package hidden
 
 import (
-	"log"
+	"log/slog"
 	"math"
 	"runtime"
 	"sync"
@@ -43,8 +43,7 @@ func PrecomputeDistanceMatrix(points [][]float64) *DistanceMatrix {
 		numWorkers = 1
 	}
 
-	log.Printf("[DBSCAN] Computing %d×%d distance matrix (%d pairs) with %d workers...",
-		n, n, n*(n-1)/2, numWorkers)
+	slog.Info("DBSCAN computing distance matrix", "rows", n, "cols", n, "pairs", n*(n-1)/2, "workers", numWorkers)
 	start := time.Now()
 
 	var wg sync.WaitGroup
@@ -68,14 +67,14 @@ func PrecomputeDistanceMatrix(points [][]float64) *DistanceMatrix {
 				}
 				done := rowsDone.Add(1)
 				if done%1000 == 0 {
-					log.Printf("[DBSCAN] Distance matrix: %d/%d rows (%.1f%%)", done, n, float64(done)*100/float64(n))
+					slog.Info("DBSCAN distance matrix progress", "done", done, "total", n, "pct", float64(done)*100/float64(n))
 				}
 			}
 		}()
 	}
 	wg.Wait()
 
-	log.Printf("[DBSCAN] Distance matrix complete in %v", time.Since(start))
+	slog.Info("DBSCAN distance matrix complete", "elapsed", time.Since(start))
 	return &DistanceMatrix{N: n, Data: data}
 }
 
@@ -95,7 +94,7 @@ func DBSCANWithMatrix(dm *DistanceMatrix, eps float64, minSamples int) []int {
 	}
 
 	// Build neighbor lists from precomputed distances (parallel)
-	log.Printf("[DBSCAN] Building neighbor lists for eps=%.4f...", eps)
+	slog.Info("DBSCAN building neighbor lists", "eps", eps)
 	nbStart := time.Now()
 	neighbors := make([][]int, n)
 	var wg sync.WaitGroup
@@ -122,7 +121,7 @@ func DBSCANWithMatrix(dm *DistanceMatrix, eps float64, minSamples int) []int {
 		}()
 	}
 	wg.Wait()
-	log.Printf("[DBSCAN] Neighbor lists built in %v", time.Since(nbStart))
+	slog.Info("DBSCAN neighbor lists built", "elapsed", time.Since(nbStart))
 
 	// Standard DBSCAN clustering using precomputed neighbors
 	labels := dbscanCore(n, neighbors, minSamples)
@@ -137,7 +136,7 @@ func DBSCANWithMatrix(dm *DistanceMatrix, eps float64, minSamples int) []int {
 			clusterSet[l] = true
 		}
 	}
-	log.Printf("[DBSCAN] eps=%.4f: %d clusters, %d noise points", eps, len(clusterSet), noiseCount)
+	slog.Info("DBSCAN clustering result", "eps", eps, "clusters", len(clusterSet), "noise_points", noiseCount)
 
 	return labels
 }
@@ -459,7 +458,7 @@ func KMeansCluster(embeddings [][]float64, k int, maxIter int) []int {
 		normed[i] = normalizeForDistance(embeddings[i])
 	}
 
-	log.Printf("[KMeans] Initializing k=%d centroids from %d points (dim=%d)...", k, n, dim)
+	slog.Info("KMeans initializing centroids", "k", k, "points", n, "dim", dim)
 	initStart := time.Now()
 
 	// --- k-means++ initialization with O(n×k) min-distance cache ---
@@ -499,10 +498,10 @@ func KMeansCluster(embeddings [][]float64, k int, maxIter int) []int {
 		copy(centroids[i], normed[bestIdx])
 
 		if i%100 == 0 {
-			log.Printf("[KMeans] Init: %d/%d centroids placed", i, k)
+			slog.Info("KMeans init progress", "placed", i, "total", k)
 		}
 	}
-	log.Printf("[KMeans] Initialization complete in %v", time.Since(initStart))
+	slog.Info("KMeans initialization complete", "elapsed", time.Since(initStart))
 
 	// --- Iterative refinement with parallel assignment ---
 	labels := make([]int, n)
@@ -551,12 +550,12 @@ func KMeansCluster(embeddings [][]float64, k int, maxIter int) []int {
 		wg.Wait()
 
 		if changed == 0 {
-			log.Printf("[KMeans] Converged at iteration %d", iter)
+			slog.Info("KMeans converged", "iteration", iter)
 			break
 		}
 
 		if (iter+1)%10 == 0 {
-			log.Printf("[KMeans] Iteration %d: %d points reassigned", iter+1, changed)
+			slog.Info("KMeans iteration progress", "iteration", iter+1, "reassigned", changed)
 		}
 
 		// Update centroids (sequential — accumulate sums)
@@ -584,7 +583,7 @@ func KMeansCluster(embeddings [][]float64, k int, maxIter int) []int {
 		}
 	}
 
-	log.Printf("[KMeans] Complete in %v (%d iterations)", time.Since(iterStart), maxIter)
+	slog.Info("KMeans complete", "elapsed", time.Since(iterStart), "max_iterations", maxIter)
 	return labels
 }
 

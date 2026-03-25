@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -57,7 +57,7 @@ Respond with ONLY the kebab-case code, nothing else. Examples: no-force-push-mai
 		{Role: "user", Content: prompt},
 	}, llmclient.CompleteOpts{})
 	if err != nil {
-		log.Printf("j17: codegen LLM failed, using fallback: %v", err)
+		slog.Warn("j17: codegen LLM failed, using fallback", "error", err)
 		return g.fallbackCode(description), nil
 	}
 

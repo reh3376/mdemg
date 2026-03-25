@@ -3,7 +3,7 @@ package hidden
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -263,7 +263,7 @@ LIMIT 20`
 		// Call LLM for summary
 		newSummary, sErr := summarizer.Summarize(ctx, memberNames, memberSummaries, c.Layer)
 		if sErr != nil {
-			log.Printf("cluster-summary: LLM failed for %s: %v", c.NodeID, sErr)
+			slog.Warn("cluster-summary: LLM failed", "node_id", c.NodeID, "error", sErr)
 			continue // Fail-open: keep mechanical summary
 		}
 
@@ -340,7 +340,7 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		return 0, nil // Not enough data to cluster
 	}
 
-	log.Printf("CreateHiddenNodes: %d L0 base nodes fetched for re-clustering", len(baseNodes))
+	slog.Info("CreateHiddenNodes: L0 base nodes fetched for re-clustering", "count", len(baseNodes))
 
 	// Step 1b: Detach old GENERALIZES edges from L0→L1 and remove childless L1 nodes
 	detached, err := s.detachBaseNodeHiddenEdges(ctx, spaceID)
@@ -348,7 +348,7 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		return 0, fmt.Errorf("detach old hidden edges: %w", err)
 	}
 	if detached > 0 {
-		log.Printf("CreateHiddenNodes: detached %d old L0→L1 GENERALIZES edges", detached)
+		slog.Info("CreateHiddenNodes: detached old L0→L1 GENERALIZES edges", "count", detached)
 	}
 
 	// Step 2: Filter to nodes with valid embeddings
@@ -369,9 +369,9 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 	// Go code clusters with Go code, docs with docs, config with config —
 	// regardless of embedding density distribution.
 	classes := ClassifyByExtension(validNodes)
-	log.Printf("CreateHiddenNodes: %d valid nodes classified into %d categories", len(validNodes), len(classes))
+	slog.Info("CreateHiddenNodes: nodes classified", "valid_nodes", len(validNodes), "categories", len(classes))
 	for cat, nodes := range classes {
-		log.Printf("  %s: %d nodes", cat, len(nodes))
+		slog.Info("CreateHiddenNodes: category", "category", cat, "nodes", len(nodes))
 	}
 
 	// Dynamic reclassification of oversized categories (iterates until convergence)
@@ -395,7 +395,7 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 
 	for category, classNodes := range classes {
 		if len(classNodes) < s.cfg.HiddenLayerMinSamples {
-			log.Printf("  Skipping %s: %d nodes (below min_samples=%d)", category, len(classNodes), s.cfg.HiddenLayerMinSamples)
+			slog.Info("CreateHiddenNodes: skipping category below min_samples", "category", category, "nodes", len(classNodes), "min_samples", s.cfg.HiddenLayerMinSamples)
 			continue
 		}
 
@@ -408,7 +408,7 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		embeddings := extractEmbeddings(classNodes)
 		labels := KMeansCluster(embeddings, classK, 50)
 		clusters, _ := GroupByCluster(classNodes, labels)
-		log.Printf("  %s: KMeans k=%d → %d clusters from %d nodes", category, classK, len(clusters), len(classNodes))
+		slog.Info("CreateHiddenNodes: KMeans result", "category", category, "k", classK, "clusters", len(clusters), "nodes", len(classNodes))
 
 		for _, members := range clusters {
 			if len(members) < s.cfg.HiddenLayerMinSamples {
@@ -440,13 +440,13 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 				clusterID++
 
 				if created%50 == 0 {
-					log.Printf("Hidden node progress: %d created", created)
+					slog.Info("hidden node progress", "created", created)
 				}
 			}
 		}
 	}
 
-	log.Printf("Hidden node creation complete: %d nodes created", created)
+	slog.Info("hidden node creation complete", "created", created)
 	return created, nil
 }
 
@@ -631,7 +631,7 @@ RETURN count(h) AS removed`, map[string]any{"spaceId": spaceID})
 				cnt, _ := rec.Get("removed")
 				removed := asInt(cnt)
 				if removed > 0 {
-					log.Printf("CreateHiddenNodes: removed %d orphaned HiddenPattern nodes", removed)
+					slog.Info("CreateHiddenNodes: removed orphaned HiddenPattern nodes", "count", removed)
 				}
 				return removed, res.Err()
 			}
@@ -858,7 +858,7 @@ func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, target
 	embeddings := extractEmbeddings(validNodes)
 	labels := KMeansCluster(embeddings, maxHidden, 50)
 	clusters, _ := GroupByCluster(validNodes, labels)
-	log.Printf("L%d KMeans k=%d: %d clusters from %d nodes", targetLayer, maxHidden, len(clusters), len(validNodes))
+	slog.Info("concept KMeans result", "layer", targetLayer, "k", maxHidden, "clusters", len(clusters), "nodes", len(validNodes))
 
 	// Step 4: Get existing concept node count for unique naming
 	existingCount, err := s.countLayerNodes(ctx, spaceID, targetLayer)
@@ -1619,7 +1619,7 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		if err != nil {
 			fmt.Printf("warning: auto-prune excess edges failed: %v\n", err)
 		} else if pruned > 0 {
-			log.Printf("RunConsolidation: auto-pruned %d excess edges for space %s", pruned, spaceID)
+			slog.Info("RunConsolidation: auto-pruned excess edges", "count", pruned, "space_id", spaceID)
 		}
 	}
 
@@ -4098,7 +4098,7 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 	}
 
 	result.ObservationsUsed = len(observations)
-	log.Printf("ClusterConversations: %d clusterable observations (noise pre-filtered)", len(observations))
+	slog.Info("ClusterConversations: clusterable observations", "count", len(observations))
 
 	// Step 2: Detach old GENERALIZES edges from observations to existing themes,
 	// and remove childless themes. This enables full re-clustering every run.
@@ -4107,7 +4107,7 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		return nil, fmt.Errorf("detach old theme edges: %w", err)
 	}
 	if detached > 0 {
-		log.Printf("ClusterConversations: detached %d old observation→theme GENERALIZES edges", detached)
+		slog.Info("ClusterConversations: detached old observation→theme GENERALIZES edges", "count", detached)
 	}
 
 	// Step 3: Filter to observations with embeddings
@@ -4313,7 +4313,7 @@ RETURN count(t) AS removed`, map[string]any{"spaceId": spaceID})
 				cnt, _ := rec.Get("removed")
 				removed := asInt(cnt)
 				if removed > 0 {
-					log.Printf("ClusterConversations: removed %d orphaned themes", removed)
+					slog.Info("ClusterConversations: removed orphaned themes", "count", removed)
 				}
 				return removed, res.Err()
 			}

@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -35,12 +35,12 @@ func (s *Server) handleHashVerificationRegister(w http.ResponseWriter, r *http.R
 	}
 
 	if err := s.untsRegistry.Register(req.Path, req.Framework, req.Hash, req.SourceRef, req.Source); err != nil {
-		log.Printf("[ERROR] hash-verification register: %v", err)
+		slog.Error("hash-verification register failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after register: %v", err)
+		slog.Error("hash-verification save after register failed", "error", err)
 	}
 
 	rec, ok := s.untsRegistry.Get(req.Path)
@@ -128,7 +128,7 @@ func (s *Server) handleHashVerificationVerify(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after verify: %v", err)
+		slog.Error("hash-verification save after verify failed", "error", err)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -160,7 +160,7 @@ func (s *Server) handleHashVerificationVerifyAll(w http.ResponseWriter, r *http.
 
 	results := s.untsRegistry.VerifyAll(req.Framework)
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after verify-all: %v", err)
+		slog.Error("hash-verification save after verify-all failed", "error", err)
 	}
 
 	verified := 0
@@ -219,7 +219,7 @@ func (s *Server) handleHashVerificationUpdate(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after update: %v", err)
+		slog.Error("hash-verification save after update failed", "error", err)
 	}
 
 	rec, ok := s.untsRegistry.Get(req.Path)
@@ -263,7 +263,7 @@ func (s *Server) handleHashVerificationRevert(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after revert: %v", err)
+		slog.Error("hash-verification save after revert failed", "error", err)
 	}
 
 	rec, ok := s.untsRegistry.Get(req.Path)
@@ -286,12 +286,12 @@ func (s *Server) handleHashVerificationScan(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := s.untsScanner.ScanAll(); err != nil {
-		log.Printf("[ERROR] hash-verification scan: %v", err)
+		slog.Error("hash-verification scan failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
-		log.Printf("[ERROR] hash-verification save after scan: %v", err)
+		slog.Error("hash-verification save after scan failed", "error", err)
 	}
 
 	files := s.untsRegistry.List("", "")

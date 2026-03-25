@@ -3,7 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -77,7 +77,7 @@ func (s *Service) RunRetention(_ context.Context) (*RetentionResult, error) {
 	for id := range toDelete {
 		freed, delErr := s.deleteBackupFiles(id)
 		if delErr != nil {
-			log.Printf("backup: retention: failed to delete %s: %v", id, delErr)
+			slog.Error("backup: retention: failed to delete", "backup_id", id, "error", delErr)
 			continue
 		}
 		result.Deleted = append(result.Deleted, id)

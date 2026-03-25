@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"mdemg/internal/circuitbreaker"
@@ -122,6 +122,6 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 		}
 	}
 
-	log.Printf("jiminy: synthesized guidance narrative (%d chars)", len(narrative))
+	slog.Info("jiminy: synthesized guidance narrative", "chars", len(narrative))
 	return narrative, nil
 }

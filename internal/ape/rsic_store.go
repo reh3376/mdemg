@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -68,7 +68,7 @@ func (s *RSICStore) Start(ctx context.Context) {
 				return
 			case <-s.flushTick.C:
 				if err := s.Flush(context.Background()); err != nil {
-					log.Printf("[WARN] RSIC persistence flush failed: %v", err)
+					slog.Warn("RSIC persistence flush failed", "error", err)
 				}
 			}
 		}
@@ -85,7 +85,7 @@ func (s *RSICStore) Stop() {
 	}
 	// Final flush
 	if err := s.Flush(context.Background()); err != nil {
-		log.Printf("[WARN] RSIC persistence final flush failed: %v", err)
+		slog.Warn("RSIC persistence final flush failed", "error", err)
 	}
 }
 
@@ -240,7 +240,7 @@ func (s *RSICStore) Flush(ctx context.Context) error {
 		}
 
 		if err != nil {
-			log.Printf("[WARN] RSIC persistence flush key=%s: %v", key, err)
+			slog.Warn("RSIC persistence flush failed for key", "key", key, "error", err)
 			s.mu.Lock()
 			s.flushErrors++
 			// Re-mark as dirty for retry

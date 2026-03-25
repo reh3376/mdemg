@@ -3,7 +3,7 @@ package symbols
 import (
 	"embed"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	sitter "github.com/smacker/go-tree-sitter"
@@ -84,7 +84,7 @@ func NewQueryEngine(languages map[Language]*sitter.Language) (*QueryEngine, erro
 
 		content, err := queriesFS.ReadFile(qf.file)
 		if err != nil {
-			log.Printf("WARN: query file %s not found, skipping", qf.file)
+			slog.Warn("query file not found, skipping", "file", qf.file)
 			continue
 		}
 

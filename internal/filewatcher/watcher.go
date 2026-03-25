@@ -7,7 +7,7 @@ package filewatcher
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,8 +130,7 @@ func (w *Watcher) Start() error {
 	w.wg.Add(1)
 	go w.eventLoop()
 
-	log.Printf("[filewatcher] watching %s (space=%s, debounce=%dms)",
-		w.config.Path, w.config.SpaceID, w.config.DebounceMs)
+	slog.Info("filewatcher: watching directory", "path", w.config.Path, "space", w.config.SpaceID, "debounce_ms", w.config.DebounceMs)
 
 	return nil
 }
@@ -142,7 +141,7 @@ func (w *Watcher) Stop() {
 	_ = w.watcher.Close()
 	w.debouncer.flush()
 	w.wg.Wait()
-	log.Printf("[filewatcher] stopped watching %s", w.config.Path)
+	slog.Info("filewatcher: stopped watching", "path", w.config.Path)
 }
 
 // eventLoop processes file system events.
@@ -165,7 +164,7 @@ func (w *Watcher) eventLoop() {
 					dirName := filepath.Base(event.Name)
 					if !w.excludeSet[dirName] {
 						if addErr := w.watcher.Add(event.Name); addErr == nil {
-							log.Printf("[filewatcher] watching new dir: %s", event.Name)
+							slog.Info("filewatcher: watching new dir", "path", event.Name)
 						}
 					}
 					continue
@@ -186,7 +185,7 @@ func (w *Watcher) eventLoop() {
 			if !ok {
 				return
 			}
-			log.Printf("[filewatcher] error: %v", err)
+			slog.Error("filewatcher: error", "error", err)
 		}
 	}
 }
@@ -207,7 +206,7 @@ func (w *Watcher) watchRecursive(root string) error {
 		}
 
 		if err := w.watcher.Add(path); err != nil {
-			log.Printf("[filewatcher] failed to watch %s: %v", path, err)
+			slog.Warn("filewatcher: failed to watch directory", "path", path, "error", err)
 			return nil // continue watching other dirs
 		}
 		return nil

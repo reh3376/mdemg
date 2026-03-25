@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -182,7 +182,7 @@ func GetMigrationStatus(ctx context.Context, driver neo4j.DriverWithContext, ava
 		nil)
 	if err != nil {
 		// Migration nodes may not exist yet — not an error
-		log.Printf("note: could not query Migration nodes: %v", err)
+		slog.Info("could not query Migration nodes", "error", err)
 	} else {
 		for result2.Next(ctx) {
 			v, _ := result2.Record().Get("version")
@@ -276,11 +276,11 @@ func RunMigrations(ctx context.Context, driver neo4j.DriverWithContext, fsys fs.
 	}
 
 	for _, mig := range status.Pending {
-		log.Printf("applying migration %s (%d statements)...", mig.Filename, len(mig.Statements))
+		slog.Info("applying migration", "filename", mig.Filename, "statements", len(mig.Statements))
 		if err := ApplyMigration(ctx, driver, mig); err != nil {
 			return 0, err
 		}
-		log.Printf("applied %s (version %d)", mig.Filename, mig.Version)
+		slog.Info("applied migration", "filename", mig.Filename, "version", mig.Version)
 	}
 
 	return len(status.Pending), nil

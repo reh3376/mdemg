@@ -2,7 +2,7 @@ package retrieval
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -49,8 +49,7 @@ func (qt *QueryTimer) End() time.Duration {
 		globalMetrics.SlowQueries.Add(1)
 		// Log slow query with sanitized params (exclude large arrays like embeddings)
 		sanitizedParams := sanitizeParams(qt.params)
-		log.Printf("SLOW QUERY [%s] %dms: %s params=%v",
-			qt.name, duration.Milliseconds(), compactCypher(qt.cypher), sanitizedParams)
+		slog.Warn("slow query detected", "name", qt.name, "duration_ms", duration.Milliseconds(), "cypher", compactCypher(qt.cypher), "params", sanitizedParams)
 	}
 
 	return duration

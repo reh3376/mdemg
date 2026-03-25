@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -182,12 +182,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		var err error
 		emb, err = embeddings.New(embCfg)
 		if err != nil {
-			log.Printf("WARNING: embedding provider %q failed to initialize: %v", cfg.EmbeddingProvider, err)
+			slog.Warn("embedding provider failed to initialize", "provider", cfg.EmbeddingProvider, "error", err)
 		} else {
-			log.Printf("Embedding provider initialized: %s (dimensions: %d)", emb.Name(), emb.Dimensions())
+			slog.Info("embedding provider initialized", "provider", emb.Name(), "dimensions", emb.Dimensions())
 		}
 	} else {
-		log.Printf("No embedding provider configured (set EMBEDDING_PROVIDER=openai or ollama)")
+		slog.Info("no embedding provider configured (set EMBEDDING_PROVIDER=openai or ollama)")
 	}
 
 	// Initialize anomaly detector
@@ -201,7 +201,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 	anom := anomaly.NewService(driver, anomalyCfg)
 	if anomalyCfg.Enabled {
-		log.Printf("Anomaly detection enabled (duplicate threshold: %.2f, timeout: %dms)", anomalyCfg.DuplicateThreshold, anomalyCfg.MaxCheckMs)
+		slog.Info("anomaly detection enabled", "duplicate_threshold", anomalyCfg.DuplicateThreshold, "timeout_ms", anomalyCfg.MaxCheckMs)
 	}
 
 	// Initialize hidden layer service (circuit breaker wired later after cbRegistry init)
@@ -211,22 +211,20 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		hid.SetEdgePruner(lea)
 	}
 	if cfg.HiddenLayerEnabled {
-		log.Printf("Hidden layer enabled (eps: %.2f, minSamples: %d, maxHidden: %d)",
-			cfg.HiddenLayerClusterEps, cfg.HiddenLayerMinSamples, cfg.HiddenLayerMaxHidden)
+		slog.Info("hidden layer enabled", "eps", cfg.HiddenLayerClusterEps, "min_samples", cfg.HiddenLayerMinSamples, "max_hidden", cfg.HiddenLayerMaxHidden)
 	}
 	if cfg.EmergenceEnabled {
-		log.Printf("Dynamic emergence enabled (provider: %s, model: %s, minWeight: %.2f, minCluster: %d)",
-			cfg.EmergenceProvider, cfg.EmergenceModel, cfg.EmergenceMinWeight, cfg.EmergenceMinClusterSize)
+		slog.Info("dynamic emergence enabled", "provider", cfg.EmergenceProvider, "model", cfg.EmergenceModel, "min_weight", cfg.EmergenceMinWeight, "min_cluster_size", cfg.EmergenceMinClusterSize)
 	}
 
 	// Initialize symbol store
 	symStore := symbols.NewStore(driver)
 	symParser, symParserErr := symbols.NewParser(symbols.ParserConfig{})
 	if symParserErr != nil {
-		log.Printf("WARNING: symbol parser init failed (relationship extraction disabled): %v", symParserErr)
+		slog.Warn("symbol parser init failed (relationship extraction disabled)", "error", symParserErr)
 	}
 	symResolver := symbols.NewResolver(driver)
-	log.Printf("Symbol store initialized (parser + resolver for relationship extraction)")
+	slog.Info("symbol store initialized (parser + resolver for relationship extraction)")
 
 	// Initialize gap detector for capability gap detection
 	// Collect registered ingestion sources from plugins
@@ -244,47 +242,46 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		RegisteredSources: registeredSources,
 	}
 	gapDet := gaps.NewGapDetector(driver, gapCfg)
-	log.Printf("Gap detector initialized (threshold: %.2f, minOccurrences: %d)", gapCfg.LowScoreThreshold, gapCfg.MinOccurrences)
+	slog.Info("gap detector initialized", "threshold", gapCfg.LowScoreThreshold, "min_occurrences", gapCfg.MinOccurrences)
 
 	// Initialize gap interviewer for weekly gap interview processing
 	gapInt := gaps.NewGapInterviewer(driver)
-	log.Printf("Gap interviewer initialized")
+	slog.Info("gap interviewer initialized")
 
 	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
 	var convSvc *conversation.Service
 	var ctxCooler *conversation.ContextCooler
 	if emb != nil {
 		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
-		log.Printf("Conversation service initialized (vector index: %s, constraint detection: %v)", cfg.VectorIndexName, cfg.ConstraintDetectionEnabled)
+		slog.Info("conversation service initialized", "vector_index", cfg.VectorIndexName, "constraint_detection", cfg.ConstraintDetectionEnabled)
 
 		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
 		ctxCooler = conversation.NewContextCooler(driver, cfg)
 		lea.SetStabilityReinforcer(ctxCooler)
-		log.Printf("Context Cooler initialized (graduation: %.2f, decay: %.2f, constraint protection: %v)",
-			cfg.CoolerGraduationThreshold, cfg.CoolerStabilityDecayRate, cfg.ConstraintProtectFromDecay)
+		slog.Info("context cooler initialized", "graduation_threshold", cfg.CoolerGraduationThreshold, "decay_rate", cfg.CoolerStabilityDecayRate, "constraint_protection", cfg.ConstraintProtectFromDecay)
 	} else {
-		log.Printf("Conversation service disabled (requires embedder)")
+		slog.Info("conversation service disabled (requires embedder)")
 	}
 
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
 	if pluginMgr != nil {
 		modules := pluginMgr.ListModules()
-		log.Printf("Loaded %d plugin module(s)", len(modules))
+		slog.Info("loaded plugin modules", "count", len(modules))
 		for _, m := range modules {
-			log.Printf("  - %s (%s) [%s]", m.ID, m.Version, m.State)
+			slog.Info("plugin module loaded", "id", m.ID, "version", m.Version, "state", m.State)
 		}
 
 		// Start APE scheduler
 		apeSched = ape.NewScheduler(pluginMgr)
 		if err := apeSched.Start(); err != nil {
-			log.Printf("WARNING: APE scheduler failed to start: %v", err)
+			slog.Warn("APE scheduler failed to start", "error", err)
 		}
 	}
 
 	// Initialize session tracker (CMS enforcement — Phase 3A)
 	sessTracker := conversation.NewSessionTracker(2 * time.Hour)
-	log.Printf("Session tracker initialized (TTL: 2h)")
+	slog.Info("session tracker initialized", "ttl", "2h")
 
 	// Phase 3: Initialize circuit breaker registry
 	cbCfg := circuitbreaker.Config{
@@ -296,8 +293,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 	cbRegistry := circuitbreaker.NewRegistry(cbCfg)
 	if cfg.CircuitBreakerEnabled {
-		log.Printf("Circuit breaker enabled (threshold: %d, timeout: %ds)",
-			cfg.CircuitBreakerThreshold, cfg.CircuitBreakerTimeoutSec)
+		slog.Info("circuit breaker enabled", "threshold", cfg.CircuitBreakerThreshold, "timeout_sec", cfg.CircuitBreakerTimeoutSec)
 	}
 
 	// Wire circuit breaker registry to services that make external API calls
@@ -308,10 +304,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	if emb != nil {
 		if openAIEmb, ok := emb.(*embeddings.OpenAI); ok {
 			openAIEmb.SetCircuitBreaker(cbRegistry.Get("openai-embeddings"))
-			log.Printf("Circuit breaker wired to OpenAI embedder")
+			slog.Info("circuit breaker wired to OpenAI embedder")
 		} else if ollamaEmb, ok := emb.(*embeddings.Ollama); ok {
 			ollamaEmb.SetCircuitBreaker(cbRegistry.Get("ollama-embeddings"))
-			log.Printf("Circuit breaker wired to Ollama embedder")
+			slog.Info("circuit breaker wired to Ollama embedder")
 		}
 
 		// Wrap embedder with rate limiting if enabled (Phase 48.4.3)
@@ -326,7 +322,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				burst = cfg.EmbeddingOllamaBurst
 			}
 			emb = embeddings.NewRateLimitedEmbedder(emb, rps, burst, true)
-			log.Printf("Embedding rate limiting enabled (%.0f rps, burst: %d)", rps, burst)
+			slog.Info("embedding rate limiting enabled", "rps", rps, "burst", burst)
 		}
 	}
 
@@ -345,8 +341,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			CompressPrompts: cfg.SynthesisCompress,
 		}
 		synth = consulting.NewLLMSynthesizer(synthCfg, cbRegistry)
-		log.Printf("SME Synthesis enabled (provider: %s, model: %s, maxTokens: %d)",
-			cfg.SynthesisProvider, cfg.SynthesisModel, cfg.SynthesisMaxTokens)
+		slog.Info("SME synthesis enabled", "provider", cfg.SynthesisProvider, "model", cfg.SynthesisModel, "max_tokens", cfg.SynthesisMaxTokens)
 	}
 
 	// Phase 102: Initialize Intent Translator
@@ -363,14 +358,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OllamaURL: cfg.OllamaEndpoint,
 		}
 		intentTrans = retrieval.NewLLMIntentTranslator(intentCfg, cbRegistry)
-		log.Printf("Intent Translation enabled (provider: %s, model: %s, timeout: %dms)",
-			cfg.IntentProvider, cfg.IntentModel, cfg.IntentTimeoutMs)
+		slog.Info("intent translation enabled", "provider", cfg.IntentProvider, "model", cfg.IntentModel, "timeout_ms", cfg.IntentTimeoutMs)
 	}
 
 	// Wire intent translator to retrieval service for BM25 query rewriting
 	if intentTrans != nil {
 		ret.SetIntentTranslator(intentTrans)
-		log.Printf("Intent translator wired to retrieval service for BM25 rewriting")
+		slog.Info("intent translator wired to retrieval service for BM25 rewriting")
 	}
 
 	// Phase 104: Initialize Guardrail Validator
@@ -395,8 +389,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			CompressPrompts:            cfg.GuardrailCompress,
 		}
 		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
-		log.Printf("Active MCP Guardrails enabled (provider: %s, model: %s, maxConstraints: %d)",
-			cfg.GuardrailProvider, cfg.GuardrailModel, cfg.GuardrailMaxConstraints)
+		slog.Info("active MCP guardrails enabled", "provider", cfg.GuardrailProvider, "model", cfg.GuardrailModel, "max_constraints", cfg.GuardrailMaxConstraints)
 	}
 
 	// Phase 105: Initialize Global Meta-Learning service
@@ -413,8 +406,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OllamaURL: cfg.OllamaEndpoint,
 		}
 		metaLearnSvc = metalearn.NewService(driver, emb, genCfg, cbRegistry, cfg.MetaLearnGlobalSpaceID)
-		log.Printf("Global Meta-Learning enabled (provider: %s, model: %s, globalSpace: %s)",
-			cfg.MetaLearnProvider, cfg.MetaLearnModel, cfg.MetaLearnGlobalSpaceID)
+		slog.Info("global meta-learning enabled", "provider", cfg.MetaLearnProvider, "model", cfg.MetaLearnModel, "global_space", cfg.MetaLearnGlobalSpaceID)
 	}
 
 	// Initialize consulting service (Agent Consulting API)
@@ -434,29 +426,27 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OllamaURL: cfg.OllamaEndpoint,
 		}, cbRegistry)
 		cons.SetConstraintClassifier(sharedConstraintClassifier)
-		log.Printf("Consulting LLM constraint classification enabled (provider: %s, model: %s)", cfg.ConsultingLLMConstraintsProvider, cfg.ConsultingLLMConstraintsModel)
+		slog.Info("consulting LLM constraint classification enabled", "provider", cfg.ConsultingLLMConstraintsProvider, "model", cfg.ConsultingLLMConstraintsModel)
 	}
 
 	// F6a: Wire LLM classifier gate into conversation service if enabled.
 	// Reuses the same ConstraintClassifier instance (shared LRU cache + circuit breaker).
 	if cfg.ConstraintClassifierGateEnabled && convSvc != nil && sharedConstraintClassifier != nil {
 		convSvc.SetConstraintGateClassifier(&constraintGateAdapter{cc: sharedConstraintClassifier})
-		log.Printf("F6a: Constraint classifier gate enabled for conversation service")
+		slog.Info("F6a: constraint classifier gate enabled for conversation service")
 	}
-	log.Printf("Consulting service initialized")
+	slog.Info("consulting service initialized")
 
 	// Phase Jiminy: Initialize Jiminy Guidance Service
 	var jiminySvc *jiminy.Service
 	if cfg.JiminyEnabled {
 		jiminySvc = jiminy.NewService(cfg, driver, cons, emb)
-		log.Printf("Jiminy guidance enabled (timeout: %dms, maxItems: %d, minConf: %.2f)",
-			cfg.JiminyTimeoutMs, cfg.JiminyMaxItems, cfg.JiminyMinConfidence)
+		slog.Info("Jiminy guidance enabled", "timeout_ms", cfg.JiminyTimeoutMs, "max_items", cfg.JiminyMaxItems, "min_confidence", cfg.JiminyMinConfidence)
 
 		// J7: Wire retrieval provider for full-spectrum access
 		if cfg.JiminyRetrievalEnabled && ret != nil {
 			jiminySvc.SetRetriever(&jiminyRetrievalAdapter{retriever: ret})
-			log.Printf("Jiminy J7: retrieval pipeline enabled (topK=%d, hopDepth=%d)",
-				cfg.JiminyRetrievalTopK, cfg.JiminyRetrievalHopDepth)
+			slog.Info("Jiminy J7: retrieval pipeline enabled", "top_k", cfg.JiminyRetrievalTopK, "hop_depth", cfg.JiminyRetrievalHopDepth)
 		}
 
 		// J8/J15: Wire LLM synthesizer
@@ -475,9 +465,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				OutputMaxChars:  cfg.JiminyGuidanceOutputMaxChars,
 			}
 			jiminySvc.SetSynthesizer(jiminy.NewGuidanceSynthesizer(synCfg, cbRegistry))
-			log.Printf("Jiminy J8/J15: LLM synthesis enabled (provider=%s, model=%s, maxTokens=%d, timeout=%dms)",
-				cfg.JiminySynthesisProvider, cfg.JiminySynthesisModel,
-				cfg.JiminySynthesisMaxTokens, cfg.JiminySynthesisTimeoutMs)
+			slog.Info("Jiminy J8/J15: LLM synthesis enabled", "provider", cfg.JiminySynthesisProvider, "model", cfg.JiminySynthesisModel, "max_tokens", cfg.JiminySynthesisMaxTokens, "timeout_ms", cfg.JiminySynthesisTimeoutMs)
 		}
 
 		// J17-2: Wire constraint code generator
@@ -503,13 +491,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				codegen.RegisterExistingCode(code)
 			}
 			if len(existingCodes) > 0 {
-				log.Printf("J17-2: Loaded %d existing constraint codes for collision avoidance", len(existingCodes))
+				slog.Info("J17-2: loaded existing constraint codes for collision avoidance", "count", len(existingCodes))
 			}
 
 			jiminySvc.SetCodeGenerator(codegen)
 			convSvc.SetCodeGenerator(codegen)
-			log.Printf("J17-2: Constraint code generator enabled (provider=%s, model=%s)",
-				cfg.J17CodegenProvider, cfg.J17CodegenModel)
+			slog.Info("J17-2: constraint code generator enabled", "provider", cfg.J17CodegenProvider, "model", cfg.J17CodegenModel)
 		}
 
 		// J13: Wire LLM evaluator
@@ -529,8 +516,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			evaluator := jiminySvc.GetEvaluator()
 			if evaluator != nil {
 				evaluator.SetLLM(evalLLM, cbRegistry)
-				log.Printf("Jiminy J13: evaluator LLM enabled (provider=%s, model=%s)",
-					cfg.JiminyEvaluateLLMProvider, cfg.JiminyEvaluateLLMModel)
+				slog.Info("Jiminy J13: evaluator LLM enabled", "provider", cfg.JiminyEvaluateLLMProvider, "model", cfg.JiminyEvaluateLLMModel)
 			}
 		}
 	}
@@ -539,8 +525,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var conflictDet *hidden.ConflictDetector
 	if cfg.ConstraintConflictDetectionEnabled {
 		conflictDet = hidden.NewConflictDetector(driver, cfg)
-		log.Printf("Constraint conflict detection enabled (simThreshold: %.2f, maxPairs: %d)",
-			cfg.ConstraintConflictSimThreshold, cfg.ConstraintConflictMaxPairs)
+		slog.Info("constraint conflict detection enabled", "sim_threshold", cfg.ConstraintConflictSimThreshold, "max_pairs", cfg.ConstraintConflictMaxPairs)
 	}
 
 	// Phase 3: Initialize metrics registry
@@ -554,13 +539,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	metrics.SetGlobalRegistry(metricsRegistry)
 	if cfg.MetricsEnabled {
 		metrics.InitStandardMetrics()
-		log.Printf("Prometheus metrics enabled (namespace: %s)", cfg.MetricsNamespace)
+		slog.Info("Prometheus metrics enabled", "namespace", cfg.MetricsNamespace)
 	}
 
 	// Phase 48.4.4: Initialize memory pressure monitor
 	memPressure := backpressure.NewMemoryPressure(uint64(cfg.MemoryPressureThresholdMB), cfg.MemoryPressureEnabled)
 	if cfg.MemoryPressureEnabled {
-		log.Printf("Memory pressure monitoring enabled (threshold: %dMB)", cfg.MemoryPressureThresholdMB)
+		slog.Info("memory pressure monitoring enabled", "threshold_mb", cfg.MemoryPressureThresholdMB)
 	}
 
 	// Phase 51: Initialize Web Scraper service
@@ -580,7 +565,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		if convSvc != nil {
 			scraperSvc.SetConversationService(&scraperConvAdapter{svc: convSvc})
 		}
-		log.Printf("Web scraper enabled (space: %s, max_jobs: %d)", cfg.ScraperDefaultSpaceID, cfg.ScraperMaxConcurrentJobs)
+		slog.Info("web scraper enabled", "space", cfg.ScraperDefaultSpaceID, "max_jobs", cfg.ScraperMaxConcurrentJobs)
 	}
 
 	// Phase 70: Initialize Backup service
@@ -604,8 +589,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		backupSvc = backup.NewService(backupCfg, driver, exp)
 		backupSched = backup.NewScheduler(backupSvc)
 		backupSched.Start()
-		log.Printf("Backup enabled (storage: %s, full every %dh, partial every %dh)",
-			backupCfg.StorageDir, backupCfg.FullIntervalHours, backupCfg.PartialIntervalHours)
+		slog.Info("backup enabled", "storage_dir", backupCfg.StorageDir, "full_interval_hours", backupCfg.FullIntervalHours, "partial_interval_hours", backupCfg.PartialIntervalHours)
 	}
 
 	// Phase 60b: Initialize RSIC components
@@ -660,7 +644,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			CompressPrompts: cfg.RSICLLMReflectCompress,
 		}, cbRegistry, rsicCalibrator)
 		rsicReflector.SetLLMReflector(llmReflector)
-		log.Printf("RSIC LLM reflection enabled (provider: %s, model: %s)", cfg.RSICLLMReflectProvider, cfg.RSICLLMReflectModel)
+		slog.Info("RSIC LLM reflection enabled", "provider", cfg.RSICLLMReflectProvider, "model", cfg.RSICLLMReflectModel)
 	}
 
 	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
@@ -671,22 +655,22 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, func(ctx context.Context, spaceID string, meta ape.TriggerMetadata) {
 		opts := &ape.RunCycleOpts{TriggerMeta: &meta}
 		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso, opts); err != nil {
-			log.Printf("[WARN] RSIC watchdog meso cycle failed: %v", err)
+			slog.Warn("RSIC watchdog meso cycle failed", "error", err)
 		}
 		if cfg.ConsolidateOnWatchdogEnabled && hid != nil {
 			if _, err := hid.RunConsolidation(ctx, spaceID); err != nil {
-				log.Printf("RSIC watchdog: consolidation failed: %v", err)
+				slog.Error("RSIC watchdog consolidation failed", "error", err)
 			} else {
-				log.Printf("RSIC watchdog: consolidation triggered alongside meso cycle")
+				slog.Info("RSIC watchdog: consolidation triggered alongside meso cycle")
 			}
 		}
 		// Cleanup stale frozen-space entries
 		if removed := lea.CleanupStaleFreezes(map[string]bool{spaceID: true}); removed > 0 {
-			log.Printf("RSIC watchdog: cleaned up %d stale frozen-space entries", removed)
+			slog.Info("RSIC watchdog: cleaned up stale frozen-space entries", "removed", removed)
 		}
 	})
 	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
-	log.Printf("RSIC initialized (watchdog=%v, micro=%v)", cfg.RSICWatchdogEnabled, cfg.RSICMicroEnabled)
+	slog.Info("RSIC initialized", "watchdog", cfg.RSICWatchdogEnabled, "micro", cfg.RSICMicroEnabled)
 
 	// Phase 80: Wire WatchdogSignalProvider for multi-dimensional monitoring
 	rsicWatchdog.SetSignalProvider(&rsicWatchdogSignalAdapter{
@@ -697,7 +681,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Phase 87: Create orchestration policy
 	orchPolicy := ape.NewOrchestrationPolicy(cfg)
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
-	log.Printf("RSIC orchestration policy initialized (cooldown=%ds, dedupe=%ds)", cfg.RSICTriggerCooldownSec, cfg.RSICTriggerDedupeSec)
+	slog.Info("RSIC orchestration policy initialized", "cooldown_sec", cfg.RSICTriggerCooldownSec, "dedupe_sec", cfg.RSICTriggerDedupeSec)
 
 	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
 	safetyValidator := ape.NewSafetyValidator(driver)
@@ -713,7 +697,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	if jiminySvc != nil {
 		rsicCycle.SetTierEffectivenessProvider(&rsicTierEffectivenessAdapter{svc: jiminySvc})
 	}
-	log.Printf("RSIC safety enforcement initialized (rollback_window=%ds)", cfg.RSICRollbackWindow)
+	slog.Info("RSIC safety enforcement initialized", "rollback_window_sec", cfg.RSICRollbackWindow)
 
 	// Phase 89: Initialize RSIC persistence store
 	var rsicStore *ape.RSICStore
@@ -728,22 +712,22 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 		// Hydrate from persisted state
 		if err := rsicCalibrator.Hydrate(cfg.RSICWatchdogSpaceID); err != nil {
-			log.Printf("[WARN] RSIC calibration hydration failed: %v", err)
+			slog.Warn("RSIC calibration hydration failed", "error", err)
 		}
 		if ws, err := rsicStore.LoadWatchdogState(cfg.RSICWatchdogSpaceID); err == nil && ws != nil {
 			rsicWatchdog.Hydrate(ws)
 		} else if err != nil {
-			log.Printf("[WARN] RSIC watchdog hydration failed: %v", err)
+			slog.Warn("RSIC watchdog hydration failed", "error", err)
 		}
 		if triggers, counters, err := rsicStore.LoadOrchestrationState(); err == nil {
 			orchPolicy.Hydrate(triggers, counters)
 		} else {
-			log.Printf("[WARN] RSIC orchestration hydration failed: %v", err)
+			slog.Warn("RSIC orchestration hydration failed", "error", err)
 		}
 
-		log.Printf("RSIC persistence initialized (flush every 30s)")
+		slog.Info("RSIC persistence initialized", "flush_interval", "30s")
 	} else {
-		log.Printf("RSIC persistence disabled")
+		slog.Info("RSIC persistence disabled")
 	}
 
 	// Phase 38: Initialize UNTS Hash Verification
@@ -752,15 +736,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	if cfg.UNTSEnabled {
 		untsReg = unts.NewRegistry(cfg.UNTSBasePath)
 		if err := untsReg.Load(); err != nil {
-			log.Printf("WARNING: UNTS registry load failed: %v", err)
+			slog.Warn("UNTS registry load failed", "error", err)
 		}
 		untsScan = unts.NewScanner(untsReg, cfg.UNTSBasePath)
-		log.Printf("UNTS hash verification enabled (base: %s)", cfg.UNTSBasePath)
+		slog.Info("UNTS hash verification enabled", "base_path", cfg.UNTSBasePath)
 	}
 
 	// Phase 80: Initialize signal learner
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
-	log.Printf("Signal learner initialized (decay=%.2f, boost=%.2f)", cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
+	slog.Info("signal learner initialized", "decay", cfg.MetaCogSignalDecayRate, "boost", cfg.MetaCogSignalBoostRate)
 	// RSIC-SK1: Wire signal learner to Jiminy for guidance emission/response tracking
 	if jiminySvc != nil {
 		jiminySvc.SetSignalLearner(signalLearner)
@@ -849,13 +833,13 @@ func (s *Server) Shutdown() {
 func (s *Server) StartMacroCronScheduler() {
 	cronExpr := s.cfg.RSICMacroCron
 	if cronExpr == "" {
-		log.Println("RSIC macro cron disabled (RSIC_MACRO_CRON empty)")
+		slog.Info("RSIC macro cron disabled (RSIC_MACRO_CRON empty)")
 		return
 	}
 
 	interval := parseCronInterval(cronExpr)
 	if interval <= 0 {
-		log.Printf("RSIC macro cron: unrecognized expression %q, disabled", cronExpr)
+		slog.Warn("RSIC macro cron: unrecognized expression, disabled", "expression", cronExpr)
 		return
 	}
 
@@ -866,7 +850,7 @@ func (s *Server) StartMacroCronScheduler() {
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		log.Printf("RSIC macro cron scheduler started (interval=%s, next=%s)", interval, s.macroNextRun.Format(time.RFC3339))
+		slog.Info("RSIC macro cron scheduler started", "interval", interval, "next_run", s.macroNextRun.Format(time.RFC3339))
 
 		for {
 			select {
@@ -886,7 +870,7 @@ func (s *Server) StartMacroCronScheduler() {
 				spaceID := "mdemg-dev"
 				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMacroCron, spaceID, ape.TierMacro, "")
 				if !decision.Allowed {
-					log.Printf("RSIC macro cron: skipped for %s — %s", spaceID, decision.Reason)
+					slog.Info("RSIC macro cron: skipped", "space_id", spaceID, "reason", decision.Reason)
 					continue
 				}
 
@@ -895,12 +879,12 @@ func (s *Server) StartMacroCronScheduler() {
 					outcome, err := s.rsicCycle.RunCycle(context.Background(), spaceID, ape.TierMacro, opts)
 					if err != nil {
 						s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
-						log.Printf("RSIC macro cron cycle failed: %v", err)
+						slog.Error("RSIC macro cron cycle failed", "error", err)
 						return
 					}
 					s.orchestrationPolicy.RecordTrigger(decision.Meta, spaceID, ape.TierMacro, outcome.CycleID)
 					s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
-					log.Printf("RSIC macro cron cycle complete: %s", outcome.CycleID)
+					slog.Info("RSIC macro cron cycle complete", "cycle_id", outcome.CycleID)
 				}()
 			}
 		}
@@ -959,44 +943,43 @@ func parseCronInterval(expr string) time.Duration {
 // Called during server startup if FILE_WATCHER_ENABLED=true.
 func (s *Server) StartFileWatchers() {
 	if !s.cfg.FileWatcherEnabled {
-		log.Println("file watcher disabled (FILE_WATCHER_ENABLED=false)")
+		slog.Info("file watcher disabled (FILE_WATCHER_ENABLED=false)")
 		return
 	}
 
 	if s.cfg.FileWatcherConfigs == "" {
-		log.Println("file watcher enabled but no configs (FILE_WATCHER_CONFIGS empty)")
+		slog.Info("file watcher enabled but no configs (FILE_WATCHER_CONFIGS empty)")
 		return
 	}
 
 	configs := filewatcher.ParseConfigs(s.cfg.FileWatcherConfigs)
 	if len(configs) == 0 {
-		log.Println("file watcher: no valid configs found")
+		slog.Info("file watcher: no valid configs found")
 		return
 	}
 
 	for _, cfg := range configs {
 		cfg.OnChange = s.handleFileWatcherChange
 		if err := s.fileWatcherMgr.AddWatcher(cfg); err != nil {
-			log.Printf("file watcher: failed to start watcher for space %s: %v", cfg.SpaceID, err)
+			slog.Error("file watcher: failed to start watcher", "space_id", cfg.SpaceID, "error", err)
 		}
 	}
 
-	log.Printf("file watcher: started %d watchers", len(configs))
+	slog.Info("file watcher: started watchers", "count", len(configs))
 }
 
 // handleFileWatcherChange handles file changes from the file watcher.
 func (s *Server) handleFileWatcherChange(ctx context.Context, spaceID string, files []string) {
-	log.Printf("[filewatcher] %d files changed in space %s", len(files), spaceID)
+	slog.Info("filewatcher: files changed", "count", len(files), "space_id", spaceID)
 
 	// Call the internal file ingest API
 	resp, err := s.ingestFilesInternal(ctx, spaceID, files)
 	if err != nil {
-		log.Printf("[filewatcher] ingest failed for space %s: %v", spaceID, err)
+		slog.Error("filewatcher: ingest failed", "space_id", spaceID, "error", err)
 		return
 	}
 
-	log.Printf("[filewatcher] ingested %d/%d files for space %s",
-		resp.SuccessCount, resp.TotalFiles, spaceID)
+	slog.Info("filewatcher: ingested files", "success_count", resp.SuccessCount, "total_files", resp.TotalFiles, "space_id", spaceID)
 
 	// Trigger APE event
 	s.TriggerAPEEventWithContext("source_changed", map[string]string{
@@ -1059,7 +1042,7 @@ func (s *Server) ingestFilesInternal(ctx context.Context, spaceID string, files 
 // on a regular interval. Default interval is 5 minutes.
 func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Duration) {
 	if s.hiddenSvc == nil {
-		log.Println("periodic consolidation disabled: hidden service not available")
+		slog.Info("periodic consolidation disabled: hidden service not available")
 		return
 	}
 	if interval <= 0 {
@@ -1071,7 +1054,7 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Printf("periodic conversation consolidation started (space=%s, interval=%v)", spaceID, interval)
+		slog.Info("periodic conversation consolidation started", "space_id", spaceID, "interval", interval)
 
 		for {
 			select {
@@ -1080,7 +1063,7 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 				result, err := s.hiddenSvc.RunFullConversationConsolidation(ctx, spaceID)
 				cancel()
 				if err != nil {
-					log.Printf("periodic consolidation error: %v", err)
+					slog.Error("periodic consolidation error", "error", err)
 				} else {
 					themesCreated := 0
 					conceptsCreated := 0
@@ -1093,12 +1076,11 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 						}
 					}
 					if themesCreated > 0 || conceptsCreated > 0 {
-						log.Printf("periodic consolidation: %d themes, %d concepts created",
-							themesCreated, conceptsCreated)
+						slog.Info("periodic consolidation complete", "themes_created", themesCreated, "concepts_created", conceptsCreated)
 					}
 				}
 			case <-s.stopConsolidate:
-				log.Println("periodic consolidation stopped")
+				slog.Info("periodic consolidation stopped")
 				return
 			}
 		}
@@ -1117,7 +1099,7 @@ func (s *Server) StopPeriodicConsolidation() {
 // Context Cooler graduations and decay. Default interval is 10 minutes.
 func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Duration) {
 	if s.contextCooler == nil {
-		log.Println("Context Cooler processing disabled: cooler not available")
+		slog.Info("context cooler processing disabled: cooler not available")
 		return
 	}
 	if interval <= 0 {
@@ -1129,7 +1111,7 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Printf("Context Cooler processing started (space=%s, interval=%v)", spaceID, interval)
+		slog.Info("context cooler processing started", "space_id", spaceID, "interval", interval)
 
 		for {
 			select {
@@ -1139,7 +1121,7 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 				// Step 1: Apply decay to inactive volatile nodes
 				decayed, err := s.contextCooler.ApplyDecay(ctx, spaceID)
 				if err != nil {
-					log.Printf("Context Cooler decay error: %v", err)
+					slog.Error("context cooler decay error", "error", err)
 				}
 
 				// Step 2: Process graduations and tombstones
@@ -1147,13 +1129,12 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 				cancel()
 
 				if err != nil {
-					log.Printf("Context Cooler graduation error: %v", err)
+					slog.Error("context cooler graduation error", "error", err)
 				} else if summary.Graduated > 0 || summary.Tombstoned > 0 || decayed > 0 {
-					log.Printf("Context Cooler: graduated=%d, tombstoned=%d, decayed=%d, remaining_volatile=%d",
-						summary.Graduated, summary.Tombstoned, decayed, summary.RemainingVolatile)
+					slog.Info("context cooler cycle complete", "graduated", summary.Graduated, "tombstoned", summary.Tombstoned, "decayed", decayed, "remaining_volatile", summary.RemainingVolatile)
 				}
 			case <-s.stopCooler:
-				log.Println("Context Cooler processing stopped")
+				slog.Info("context cooler processing stopped")
 				return
 			}
 		}
@@ -1172,23 +1153,23 @@ func (s *Server) StopContextCoolerProcessing() {
 // prunes spaces marked prunable or orphaned (no TapRoot).
 func (s *Server) StartSpacePruneScheduler(interval time.Duration) {
 	if interval <= 0 {
-		log.Println("Space prune scheduler disabled (interval=0)")
+		slog.Info("space prune scheduler disabled (interval=0)")
 		return
 	}
 	s.stopSpacePrune = make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-		log.Printf("Space prune scheduler started (interval=%v)", interval)
+		slog.Info("space prune scheduler started", "interval", interval)
 		for {
 			select {
 			case <-ticker.C:
 				pruned, deleted, errors := s.runAutoSpacePrune()
 				if pruned > 0 || errors > 0 {
-					log.Printf("[auto-prune] pruned=%d spaces, deleted=%d nodes, errors=%d", pruned, deleted, errors)
+					slog.Info("auto-prune complete", "pruned_spaces", pruned, "deleted_nodes", deleted, "errors", errors)
 				}
 			case <-s.stopSpacePrune:
-				log.Println("Space prune scheduler stopped")
+				slog.Info("space prune scheduler stopped")
 				return
 			}
 		}
@@ -1207,7 +1188,7 @@ func (s *Server) StopSpacePruneScheduler() {
 // on a weekly schedule. Default interval is 7 days.
 func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 	if s.gapInterviewer == nil {
-		log.Println("Weekly gap interviews disabled: interviewer not available")
+		slog.Info("weekly gap interviews disabled: interviewer not available")
 		return
 	}
 	if interval <= 0 {
@@ -1219,7 +1200,7 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Printf("Weekly gap interviews started (interval=%v)", interval)
+		slog.Info("weekly gap interviews started", "interval", interval)
 
 		for {
 			select {
@@ -1231,13 +1212,12 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 				cancel()
 
 				if err != nil {
-					log.Printf("Weekly gap interview error: %v", err)
+					slog.Error("weekly gap interview error", "error", err)
 				} else if result.PromptsGenerated > 0 {
-					log.Printf("Weekly gap interview: analyzed=%d gaps, generated=%d prompts, high_priority=%d",
-						result.TotalGapsAnalyzed, result.PromptsGenerated, result.HighPriorityCount)
+					slog.Info("weekly gap interview complete", "gaps_analyzed", result.TotalGapsAnalyzed, "prompts_generated", result.PromptsGenerated, "high_priority", result.HighPriorityCount)
 				}
 			case <-s.stopInterviewer:
-				log.Println("Weekly gap interviews stopped")
+				slog.Info("weekly gap interviews stopped")
 				return
 			}
 		}
@@ -1256,7 +1236,7 @@ func (s *Server) StopWeeklyGapInterviews() {
 // stale spaces and triggers incremental re-ingestion for those with configured repo paths.
 func (s *Server) StartScheduledSync(interval time.Duration) {
 	if interval <= 0 {
-		log.Println("scheduled sync disabled (interval <= 0)")
+		slog.Info("scheduled sync disabled (interval <= 0)")
 		return
 	}
 
@@ -1265,14 +1245,14 @@ func (s *Server) StartScheduledSync(interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Printf("scheduled sync started (interval=%v, threshold=%dh)", interval, s.cfg.SyncStaleThresholdHours)
+		slog.Info("scheduled sync started", "interval", interval, "threshold_hours", s.cfg.SyncStaleThresholdHours)
 
 		for {
 			select {
 			case <-ticker.C:
 				s.runScheduledSyncCheck()
 			case <-s.stopScheduledSync:
-				log.Println("scheduled sync stopped")
+				slog.Info("scheduled sync stopped")
 				return
 			}
 		}
@@ -1309,7 +1289,7 @@ func (s *Server) runScheduledSyncCheck() {
 
 	allFreshness, err := s.retriever.GetAllTapRootFreshness(ctx)
 	if err != nil {
-		log.Printf("scheduled sync: failed to query TapRoot freshness: %v", err)
+		slog.Error("scheduled sync: failed to query TapRoot freshness", "error", err)
 		return
 	}
 
@@ -1354,11 +1334,11 @@ func (s *Server) runScheduledSyncCheck() {
 		// Check if we have a repo path configured for this space
 		repoPath, hasPath := s.cfg.SyncRepoPathMap[spaceID]
 		if !hasPath {
-			log.Printf("scheduled sync: space %s is stale but no repo path configured", spaceID)
+			slog.Warn("scheduled sync: space is stale but no repo path configured", "space_id", spaceID)
 			continue
 		}
 
-		log.Printf("scheduled sync: triggering incremental re-ingest for stale space %s (path=%s)", spaceID, repoPath)
+		slog.Info("scheduled sync: triggering incremental re-ingest for stale space", "space_id", spaceID, "path", repoPath)
 		s.triggerScheduledIngest(spaceID, repoPath)
 	}
 }
@@ -1377,7 +1357,7 @@ func (s *Server) triggerScheduledIngest(spaceID, repoPath string) {
 	job, ctx := queue.CreateJob(jobID, "scheduled-sync", config)
 	go s.runIngestJob(ctx, job)
 
-	log.Printf("scheduled sync: created job %s for space %s", jobID, spaceID)
+	slog.Info("scheduled sync: created job", "job_id", jobID, "space_id", spaceID)
 }
 
 // TriggerAPEEvent triggers APE modules subscribed to the given event
@@ -1644,8 +1624,7 @@ func (s *Server) Routes() http.Handler {
 			SkipEndpoints:     rlSkip,
 		}
 		handler = ratelimit.Middleware(rlCfg)(handler)
-		log.Printf("Rate limiting enabled (%.0f rps, burst: %d, by_ip: %v)",
-			s.cfg.RateLimitRPS, s.cfg.RateLimitBurst, s.cfg.RateLimitByIP)
+		slog.Info("rate limiting enabled", "rps", s.cfg.RateLimitRPS, "burst", s.cfg.RateLimitBurst, "by_ip", s.cfg.RateLimitByIP)
 	}
 
 	// Authentication middleware (Phase 3.2)
@@ -1663,7 +1642,7 @@ func (s *Server) Routes() http.Handler {
 			SkipEndpoints: authSkip,
 		}
 		handler = auth.Middleware(authCfg)(handler)
-		log.Printf("Authentication enabled (mode: %s)", s.cfg.AuthMode)
+		slog.Info("authentication enabled", "mode", s.cfg.AuthMode)
 	}
 
 	// CORS middleware (Phase 3.2)
@@ -1677,7 +1656,7 @@ func (s *Server) Routes() http.Handler {
 			MaxAge:           86400,
 		}
 		handler = CORSMiddleware(corsCfg)(handler)
-		log.Printf("CORS enabled (origins: %v)", s.cfg.CORSAllowedOrigins)
+		slog.Info("CORS enabled", "origins", s.cfg.CORSAllowedOrigins)
 	}
 
 	// Prometheus metrics middleware (Phase 3.3)
@@ -1737,7 +1716,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("[ERROR] writeJSON encoding failed: %v", err)
+		slog.Error("writeJSON encoding failed", "error", err)
 		metrics.Metrics().CMSWriteJSONFails.Inc()
 	}
 }
@@ -1747,7 +1726,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // (stack traces, file paths, database errors) from leaking to clients.
 func sanitizeError(err error, operation string) string {
 	// Log the full error for debugging
-	log.Printf("ERROR [%s]: %v", operation, err)
+	slog.Error("operation failed", "operation", operation, "error", err)
 	// Return generic message to client
 	return "internal error during " + operation
 }
@@ -1764,7 +1743,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
-		log.Printf("ERROR [readJSON]: %v", err)
+		slog.Error("readJSON decode failed", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return false
 	}
@@ -1814,7 +1793,7 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		 ORDER BY sid`,
 		nil)
 	if err != nil {
-		log.Printf("[metrics] neo4j graph query (nodes) failed: %v", err)
+		slog.Error("metrics: neo4j graph query (nodes) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
 	for result.Next(ctx) {
@@ -1836,7 +1815,7 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		 RETURN sid, edges, learning`,
 		nil)
 	if err != nil {
-		log.Printf("[metrics] neo4j graph query (edges) failed: %v", err)
+		slog.Error("metrics: neo4j graph query (edges) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
 	for result2.Next(ctx) {
@@ -1859,7 +1838,7 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		 RETURN sid, orphans`,
 		nil)
 	if err != nil {
-		log.Printf("[metrics] neo4j graph query (orphans) failed: %v", err)
+		slog.Error("metrics: neo4j graph query (orphans) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
 	for result3.Next(ctx) {
@@ -1923,7 +1902,7 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 	out, err := exec.CommandContext(ctx, "docker", "stats", containerName,
 		"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
 	if err != nil {
-		log.Printf("[metrics] docker stats failed: %v", err)
+		slog.Error("metrics: docker stats failed", "error", err)
 		return s.containerStatsCache.data
 	}
 

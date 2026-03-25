@@ -4,7 +4,7 @@ package symbols
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -102,7 +102,7 @@ ON MATCH SET
 		return fmt.Errorf("SaveRelationships: %w", err)
 	}
 
-	log.Printf("saved %d relationships across %d types for space %s", len(rels), len(grouped), spaceID)
+	slog.Info("saved relationships", "count", len(rels), "types", len(grouped), "space_id", spaceID)
 	return nil
 }
 

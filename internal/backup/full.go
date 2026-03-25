@@ -3,7 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,8 +98,7 @@ func (s *Service) restoreFromMdemg(ctx context.Context, job *jobs.Job, path stri
 		return fmt.Errorf("import: %w", err)
 	}
 
-	log.Printf("backup: restore imported %d nodes, %d edges, %d merged",
-		result.NodesCreated, result.EdgesCreated, result.EdgesMerged)
+	slog.Info("backup: restore imported", "nodes_created", result.NodesCreated, "edges_created", result.EdgesCreated, "edges_merged", result.EdgesMerged)
 
 	job.UpdateProgress(2, "done")
 	return nil

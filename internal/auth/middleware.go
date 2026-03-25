@@ -2,8 +2,9 @@ package auth
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
 // Middleware returns HTTP middleware that enforces authentication.
@@ -47,13 +48,13 @@ func Middleware(cfg Config) func(http.Handler) http.Handler {
 			}
 
 			if err != nil {
-				log.Printf("auth failed: %v (path=%s, remote=%s)", err, r.URL.Path, r.RemoteAddr)
+				slog.Warn("auth failed", "error", err, "path", r.URL.Path, "remote", r.RemoteAddr)
 				writeAuthError(w, err)
 				return
 			}
 
 			if principal == nil {
-				log.Printf("auth missing (path=%s, remote=%s)", r.URL.Path, r.RemoteAddr)
+				slog.Warn("auth missing", "path", r.URL.Path, "remote", r.RemoteAddr)
 				writeAuthError(w, errMissingCredentials)
 				return
 			}
@@ -220,7 +221,8 @@ func MiddlewareWithRegistry(cfg Config, registry *Registry) func(http.Handler) h
 	methodCfg := cfg.GetMethodConfig()
 	auth, err := registry.Build(string(cfg.Mode), methodCfg)
 	if err != nil {
-		log.Fatalf("failed to build authenticator: %v", err)
+		slog.Error("failed to build authenticator", "error", err)
+		os.Exit(1)
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -233,13 +235,13 @@ func MiddlewareWithRegistry(cfg Config, registry *Registry) func(http.Handler) h
 
 			principal, err := auth.Authenticate(r)
 			if err != nil {
-				log.Printf("auth failed: %v (path=%s, remote=%s)", err, r.URL.Path, r.RemoteAddr)
+				slog.Warn("auth failed", "error", err, "path", r.URL.Path, "remote", r.RemoteAddr)
 				writeAuthError(w, err)
 				return
 			}
 
 			if principal == nil {
-				log.Printf("auth missing (path=%s, remote=%s)", r.URL.Path, r.RemoteAddr)
+				slog.Warn("auth missing", "path", r.URL.Path, "remote", r.RemoteAddr)
 				writeAuthError(w, errMissingCredentials)
 				return
 			}

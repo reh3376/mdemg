@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,7 +92,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		idempotencyKey = opts.IdempotencyKey
 	}
 
-	log.Printf("RSIC cycle %s started (tier=%s, space=%s, source=%s)", cycleID, tier, spaceID, meta.TriggerSource)
+	slog.Info("RSIC cycle started", "cycle_id", cycleID, "tier", tier, "space_id", spaceID, "source", meta.TriggerSource)
 	metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "started").Inc()
 
 	// Stage 1: Assess
@@ -103,7 +103,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		return nil, fmt.Errorf("assess failed: %w", err)
 	}
 	metrics.Metrics().RSICActionTotal("assess", "completed").Inc()
-	log.Printf("RSIC %s: assess complete (health=%.2f, confidence=%.2f)", cycleID, report.OverallHealth, report.Confidence)
+	slog.Info("RSIC assess complete", "cycle_id", cycleID, "health", report.OverallHealth, "confidence", report.Confidence)
 
 	// Bail early if confidence is too low
 	if report.Confidence < c.cfg.RSICMinConfidence {
@@ -136,7 +136,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		return nil, fmt.Errorf("reflect failed: %w", err)
 	}
 	metrics.Metrics().RSICActionTotal("reflect", "completed").Inc()
-	log.Printf("RSIC %s: reflect complete (%d insights)", cycleID, len(insights))
+	slog.Info("RSIC reflect complete", "cycle_id", cycleID, "insight_count", len(insights))
 
 	if len(insights) == 0 {
 		outcome := &CycleOutcome{
@@ -156,7 +156,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			DryRun:         isDryRun,
 			SafetyVersion:  SafetyVersion,
 		}
-		log.Printf("RSIC %s: no insights — system is healthy", cycleID)
+		slog.Info("RSIC no insights, system is healthy", "cycle_id", cycleID)
 		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "completed").Inc()
 		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		c.calibrator.UpdateCalibration(outcome, nil, nil)
@@ -180,7 +180,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	if err != nil {
 		return nil, fmt.Errorf("plan failed: %w", err)
 	}
-	log.Printf("RSIC %s: plan complete (%d tasks)", cycleID, len(tasks))
+	slog.Info("RSIC plan complete", "cycle_id", cycleID, "task_count", len(tasks))
 
 	// Stamp cycle ID into each task
 	for i := range tasks {
@@ -201,7 +201,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	timeout := c.tierTimeout(tier)
 	completed := c.monitor.WaitForCycle(cycleID, timeout)
 	if !completed {
-		log.Printf("RSIC %s: timed out after %s", cycleID, timeout)
+		slog.Warn("RSIC cycle timed out", "cycle_id", cycleID, "timeout", timeout)
 	}
 
 	// Reset dry-run after dispatch completes
@@ -227,7 +227,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 			IdempotencyKey: idempotencyKey,
 			MetricsBefore:  baseline,
 		}
-		log.Printf("RSIC %s: dry-run complete (%d deltas)", cycleID, len(outcome.Deltas))
+		slog.Info("RSIC dry-run complete", "cycle_id", cycleID, "delta_count", len(outcome.Deltas))
 		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "dry_run").Inc()
 		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 		c.calibrator.UpdateCalibration(outcome, tasks, nil)
@@ -238,7 +238,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	var postReport *SelfAssessmentReport
 	postReport, err = c.assessor.Assess(ctx, spaceID, tier)
 	if err != nil {
-		log.Printf("RSIC %s: post-cycle assessment failed (continuing without): %v", cycleID, err)
+		slog.Warn("RSIC post-cycle assessment failed, continuing without", "cycle_id", cycleID, "error", err)
 		postReport = nil
 	}
 
@@ -268,9 +268,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 					if snap.CycleID == cycleID && snap.Action == task.ActionType {
 						rbResult, rbErr := c.snapshotStore.Rollback(ctx, snap.SnapshotID)
 						if rbErr != nil {
-							log.Printf("RSIC %s: rollback failed for %s: %v", cycleID, task.ActionType, rbErr)
+							slog.Error("RSIC rollback failed", "cycle_id", cycleID, "action", task.ActionType, "error", rbErr)
 						} else if rbResult != nil && rbResult.RolledBack {
-							log.Printf("RSIC %s: rolled back %s (restored %d items)", cycleID, task.ActionType, rbResult.RestoredCount)
+							slog.Info("RSIC rolled back action", "cycle_id", cycleID, "action", task.ActionType, "restored_count", rbResult.RestoredCount)
 							metrics.Metrics().RSICActionTotal(task.ActionType, "rolled_back").Inc()
 						}
 						break
@@ -286,15 +286,14 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	// NLI feedback loop: generate tier effectiveness dataset at meso/macro cycle boundaries
 	if c.tierEffProvider != nil && (tier == TierMeso || tier == TierMacro) {
 		if ds := c.tierEffProvider.BuildDataset(); ds != nil {
-			log.Printf("RSIC %s: tier effectiveness dataset generated", cycleID)
+			slog.Info("RSIC tier effectiveness dataset generated", "cycle_id", cycleID)
 		}
 	}
 
 	metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "completed").Inc()
 	metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
 
-	log.Printf("RSIC %s: cycle complete (executed=%d, success=%d, failed=%d)",
-		cycleID, outcome.ActionsExecuted, outcome.SuccessCount, outcome.FailedCount)
+	slog.Info("RSIC cycle complete", "cycle_id", cycleID, "executed", outcome.ActionsExecuted, "success", outcome.SuccessCount, "failed", outcome.FailedCount)
 
 	// Reset watchdog
 	if c.watchdog != nil {

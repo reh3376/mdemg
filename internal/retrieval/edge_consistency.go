@@ -3,7 +3,7 @@ package retrieval
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -150,8 +150,7 @@ RETURN count(DISTINCT h) AS hidden_affected`
 
 	// Log if significant propagation occurred
 	if result.CoactivationEdgesMarked > 0 || result.AssociatedEdgesMarked > 0 || result.HiddenNodesAffected > 0 {
-		log.Printf("edge_staleness: propagated for node %s: coact=%d, assoc=%d, hidden=%d",
-			nodeID, result.CoactivationEdgesMarked, result.AssociatedEdgesMarked, result.HiddenNodesAffected)
+		slog.Info("edge_staleness: propagated", "node_id", nodeID, "coactivation_edges", result.CoactivationEdgesMarked, "associated_edges", result.AssociatedEdgesMarked, "hidden_nodes", result.HiddenNodesAffected)
 	}
 
 	return result, nil
@@ -236,12 +235,11 @@ LIMIT $batchSize`
 		return nil, res.Err()
 	})
 	if clearErr != nil {
-		log.Printf("warning: failed to clear stale flag on edges without embeddings: %v", clearErr)
+		slog.Warn("failed to clear stale flag on edges without embeddings", "error", clearErr)
 	}
 
 	if result.EdgesRefreshed > 0 {
-		log.Printf("edge_consistency: refreshed %d stale CO_ACTIVATED_WITH edges in space %s",
-			result.EdgesRefreshed, spaceID)
+		slog.Info("edge_consistency: refreshed stale CO_ACTIVATED_WITH edges", "edges_refreshed", result.EdgesRefreshed, "space_id", spaceID)
 	}
 
 	return result, nil
@@ -290,8 +288,7 @@ LIMIT $batchSize`
 
 	refreshed := refreshRes.(int)
 	if refreshed > 0 {
-		log.Printf("edge_consistency: refreshed %d stale ASSOCIATED_WITH edges in space %s",
-			refreshed, spaceID)
+		slog.Info("edge_consistency: refreshed stale ASSOCIATED_WITH edges", "edges_refreshed", refreshed, "space_id", spaceID)
 	}
 
 	return refreshed, nil
@@ -379,7 +376,7 @@ func (s *Service) RefreshAllStaleEdges(ctx context.Context, spaceID string) (int
 	// Clear edges_stale flag on nodes after refresh
 	if total > 0 {
 		if err := s.clearEdgesStaleFlag(ctx, spaceID); err != nil {
-			log.Printf("warning: failed to clear edges_stale flag: %v", err)
+			slog.Warn("failed to clear edges_stale flag", "error", err)
 		}
 		// Invalidate cache after edge refresh
 		s.invalidateSpaceCacheForEdgeConsistency(spaceID)
@@ -423,6 +420,6 @@ RETURN count(n) AS cleared`
 func (s *Service) invalidateSpaceCacheForEdgeConsistency(spaceID string) {
 	invalidated := s.InvalidateSpaceCache(spaceID)
 	if invalidated > 0 {
-		log.Printf("cache: invalidated %d entries for space %s after edge consistency update", invalidated, spaceID)
+		slog.Info("cache: invalidated entries after edge consistency update", "entries", invalidated, "space_id", spaceID)
 	}
 }

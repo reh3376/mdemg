@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -61,11 +61,11 @@ func (pe *ProtocolEvolver) CodifyConstraint(ctx context.Context, spaceID string,
 			return nil, runErr
 		})
 		if writeErr != nil {
-			log.Printf("j17: codify Neo4j write error: %v", writeErr)
+			slog.Error("j17: codify Neo4j write error", "error", writeErr)
 		}
 	}
 
-	log.Printf("j17: codified constraint %s → %s", constraintNodeID, code)
+	slog.Info("j17: codified constraint", "constraint_id", constraintNodeID, "code", code)
 
 	return map[string]any{
 		"constraint_id": constraintNodeID,
@@ -97,7 +97,7 @@ func (pe *ProtocolEvolver) RetireCode(ctx context.Context, spaceID string, const
 			return nil, runErr
 		})
 		if err != nil {
-			log.Printf("j17: retire code Neo4j write error: %v", err)
+			slog.Error("j17: retire code Neo4j write error", "error", err)
 			// Continue — still remove from collision set
 		}
 	}
@@ -107,7 +107,7 @@ func (pe *ProtocolEvolver) RetireCode(ctx context.Context, spaceID string, const
 		pe.codeGen.UnregisterCode(constraintCode)
 	}
 
-	log.Printf("j17: retired code %s back to T2", constraintCode)
+	slog.Info("j17: retired code back to T2", "code", constraintCode)
 
 	return map[string]any{
 		"retired_code":       constraintCode,
@@ -191,8 +191,9 @@ func (pe *ProtocolEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 		pe.encoder.SetTierThresholds(newHigh, newLow)
 	}
 
-	log.Printf("j17: adjusted tier thresholds high %.2f → %.2f, low %.2f → %.2f",
-		oldHigh, newHigh, oldLow, newLow)
+	slog.Info("j17: adjusted tier thresholds",
+		"old_high", oldHigh, "new_high", newHigh,
+		"old_low", oldLow, "new_low", newLow)
 
 	return map[string]any{
 		"old_high_threshold": oldHigh,
@@ -239,8 +240,9 @@ func (pe *ProtocolEvolver) AdjustReplayBuffer(_ context.Context, _ string) (map[
 		pe.seqTracker.Resize(newSize)
 	}
 
-	log.Printf("j17: adjusted replay buffer %d → %d (replay freq: %.1f/hr)",
-		oldSize, newSize, snapshot.ReplayFrequencyPerHour)
+	slog.Info("j17: adjusted replay buffer",
+		"old_size", oldSize, "new_size", newSize,
+		"replay_freq_per_hour", snapshot.ReplayFrequencyPerHour)
 
 	return map[string]any{
 		"old_size":          oldSize,

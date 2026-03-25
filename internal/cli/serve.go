@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -104,7 +104,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			return fmt.Errorf("auto-migrate failed: %w", migrateErr)
 		}
 		if applied > 0 {
-			log.Printf("auto-migrate: applied %d migration(s)", applied)
+			slog.Info("auto-migrate: applied migrations", "count", applied)
 		}
 	}
 
@@ -118,10 +118,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	if cfg.PluginsEnabled {
 		pluginMgr = plugins.NewManager(cfg.PluginsDir, cfg.PluginSocketDir, cfg.MdemgVersion)
 		if err := pluginMgr.Start(); err != nil {
-			log.Printf("warning: failed to start plugin manager: %v", err)
+			slog.Warn("failed to start plugin manager", "error", err)
 			// Continue without plugins - this is not fatal
 		} else {
-			log.Printf("plugin manager started (dir=%s)", cfg.PluginsDir)
+			slog.Info("plugin manager started", "dir", cfg.PluginsDir)
 		}
 	}
 
@@ -169,7 +169,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			},
 		}
 		h.TLSConfig = tlsCfg
-		log.Printf("TLS enabled (cert: %s, key: %s)", cfg.TLSCertFile, cfg.TLSKeyFile)
+		slog.Info("TLS enabled", "cert", cfg.TLSCertFile, "key", cfg.TLSKeyFile)
 	}
 
 	// Dynamic port allocation: try preferred port, then scan range
@@ -182,9 +182,9 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	_, portStr, _ := net.SplitHostPort(listener.Addr().String())
 	portFile, _ := filepath.Abs(cfg.PortFilePath)
 	if err := writePortFile(portFile, portStr); err != nil {
-		log.Printf("warning: failed to write port file %s: %v", portFile, err)
+		slog.Warn("failed to write port file", "path", portFile, "error", err)
 	} else {
-		log.Printf("port file written: %s", portFile)
+		slog.Info("port file written", "path", portFile)
 	}
 
 	// Start MCP subprocess if requested
@@ -200,10 +200,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		mcpCmd.Stdout = os.Stdout
 		mcpCmd.Stderr = os.Stderr
 		if err := mcpCmd.Start(); err != nil {
-			log.Printf("warning: failed to start MCP subprocess: %v", err)
+			slog.Warn("failed to start MCP subprocess", "error", err)
 			mcpCmd = nil
 		} else {
-			log.Printf("MCP server started (pid=%d, endpoint=http://localhost:%s)", mcpCmd.Process.Pid, portStr)
+			slog.Info("MCP server started", "pid", mcpCmd.Process.Pid, "endpoint", "http://localhost:"+portStr)
 		}
 	}
 
@@ -214,20 +214,20 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	go func() {
 		var serveErr error
 		if cfg.TLSEnabled {
-			log.Printf("MDEMG server started on https://localhost:%s", portStr)
+			slog.Info("MDEMG server started", "addr", "https://localhost:"+portStr)
 			serveErr = h.ServeTLS(listener, cfg.TLSCertFile, cfg.TLSKeyFile)
 		} else {
-			log.Printf("MDEMG server started on http://localhost:%s", portStr)
+			slog.Info("MDEMG server started", "addr", "http://localhost:"+portStr)
 			serveErr = h.Serve(listener)
 		}
 		if serveErr != nil && serveErr != http.ErrServerClosed {
-			log.Printf("server error: %v", serveErr)
+			slog.Error("server error", "error", serveErr)
 		}
 	}()
 
 	// Wait for shutdown signal
 	<-shutdown
-	log.Println("shutdown signal received, starting graceful shutdown...")
+	slog.Info("shutdown signal received, starting graceful shutdown")
 
 	// Use configurable graceful shutdown timeout
 	shutdownTimeout := time.Duration(cfg.GracefulShutdownTimeoutSec) * time.Second
@@ -241,26 +241,26 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		defer close(shutdownComplete)
 
 		// Step 1: Stop accepting new connections and drain in-flight requests
-		log.Printf("draining in-flight requests (timeout: %ds)...", cfg.GracefulShutdownTimeoutSec)
+		slog.Info("draining in-flight requests", "timeout_sec", cfg.GracefulShutdownTimeoutSec)
 		if err := h.Shutdown(ctx); err != nil {
-			log.Printf("error shutting down HTTP server: %v", err)
+			slog.Error("error shutting down HTTP server", "error", err)
 		}
 
 		// Step 2: Stop background services
-		log.Println("stopping background services...")
+		slog.Info("stopping background services")
 		srv.Shutdown()
 
 		// Step 3: Stop plugin manager
 		if pluginMgr != nil {
-			log.Println("stopping plugin manager...")
+			slog.Info("stopping plugin manager")
 			if err := pluginMgr.Stop(); err != nil {
-				log.Printf("error stopping plugin manager: %v", err)
+				slog.Error("error stopping plugin manager", "error", err)
 			}
 		}
 
 		// Step 4: Stop MCP subprocess
 		if mcpCmd != nil && mcpCmd.Process != nil {
-			log.Println("stopping MCP subprocess...")
+			slog.Info("stopping MCP subprocess")
 			_ = mcpCmd.Process.Signal(syscall.SIGTERM)
 			done := make(chan error, 1)
 			go func() { done <- mcpCmd.Wait() }()
@@ -278,9 +278,9 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	// Wait for shutdown to complete or timeout
 	select {
 	case <-shutdownComplete:
-		log.Println("graceful shutdown complete")
+		slog.Info("graceful shutdown complete")
 	case <-ctx.Done():
-		log.Println("shutdown timeout exceeded, forcing exit")
+		slog.Warn("shutdown timeout exceeded, forcing exit")
 		os.Exit(1)
 	}
 
@@ -304,8 +304,8 @@ func listenWithFallback(cfg config.Config) (net.Listener, error) {
 		return nil, fmt.Errorf("listen on %s: %w", cfg.ListenAddr, err)
 	}
 
-	log.Printf("preferred address %s in use, scanning range %d-%d",
-		cfg.ListenAddr, cfg.PortRangeStart, cfg.PortRangeEnd)
+	slog.Warn("preferred address in use, scanning range",
+		"addr", cfg.ListenAddr, "range_start", cfg.PortRangeStart, "range_end", cfg.PortRangeEnd)
 
 	for port := cfg.PortRangeStart; port <= cfg.PortRangeEnd; port++ {
 		addr := fmt.Sprintf(":%d", port)

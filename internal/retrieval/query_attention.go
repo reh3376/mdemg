@@ -3,7 +3,7 @@ package retrieval
 import (
 	"container/list"
 	"context"
-	"log"
+	"log/slog"
 	"math"
 	"sort"
 	"sync"
@@ -263,7 +263,7 @@ func ReRankEdgesByAttention(
 	if len(needFetch) > 0 {
 		fetched, err := fetchNodeEmbeddings(ctx, driver, spaceID, needFetch)
 		if err != nil {
-			log.Printf("WARN: Failed to fetch node embeddings for attention: %v", err)
+			slog.Warn("failed to fetch node embeddings for attention", "error", err)
 			// Fall back to original edges without attention re-ranking
 			return edges, nil
 		}

@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -185,7 +185,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		d.safetyMu.Unlock()
 
 		if !decision.Allowed {
-			log.Printf("RSIC safety: %s rejected — %s", actionType, decision.Reason)
+			slog.Warn("RSIC safety: action rejected", "action", actionType, "reason", decision.Reason)
 			d.postReport(taskID, "failed", 100, "safety_rejected",
 				fmt.Sprintf("Rejected by safety validator: %s", decision.Reason), nil, decision.Reason)
 			d.mu.Lock()
@@ -202,10 +202,10 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	if d.snapshotStore != nil {
 		snap, err := d.snapshotStore.CaptureSnapshot(ctx, at.Spec.CycleID, actionType, at.Spec.TargetSpace)
 		if err != nil {
-			log.Printf("RSIC snapshot: capture failed for %s: %v (continuing)", actionType, err)
+			slog.Warn("RSIC snapshot: capture failed, continuing", "action", actionType, "error", err)
 		} else {
 			metrics.Metrics().RSICSnapshotCreated(actionType).Inc()
-			log.Printf("RSIC snapshot: captured %s (%d items, expires %s)", snap.SnapshotID, snap.AffectedCount, snap.ExpiresAt.Format("15:04:05"))
+			slog.Info("RSIC snapshot: captured", "snapshot_id", snap.SnapshotID, "affected_count", snap.AffectedCount, "expires_at", snap.ExpiresAt.Format("15:04:05"))
 			d.safetyMu.Lock()
 			if d.safetySummary != nil {
 				d.safetySummary.SnapshotsCreated++
@@ -256,7 +256,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		at.Status = "failed"
 		d.mu.Unlock()
 		d.postReport(taskID, "failed", 100, "execution_complete", "", nil, execErr.Error())
-		log.Printf("RSIC task %s failed: %v", taskID, execErr)
+		slog.Error("RSIC task failed", "task_id", taskID, "error", execErr)
 		return
 	}
 
@@ -481,13 +481,13 @@ func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceI
 		}
 		if item.EffectivenessRate >= 0.7 {
 			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "followed"); err != nil {
-				log.Printf("RSIC-SK1: boost %s failed: %v", item.NodeID, err)
+				slog.Error("RSIC-SK1: boost failed", "node_id", item.NodeID, "error", err)
 			} else {
 				boosted++
 			}
 		} else if item.EffectivenessRate < 0.1 && item.TotalSurfaced >= 5 {
 			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "ignored"); err != nil {
-				log.Printf("RSIC-SK1: decay %s failed: %v", item.NodeID, err)
+				slog.Error("RSIC-SK1: decay failed", "node_id", item.NodeID, "error", err)
 			} else {
 				decayed++
 			}
@@ -495,7 +495,7 @@ func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceI
 	}
 	archived, archErr := d.guidanceCalibrator.ArchiveStaleConstraints(ctx, spaceID)
 	if archErr != nil {
-		log.Printf("RSIC-SK1: archive stale constraints failed: %v", archErr)
+		slog.Error("RSIC-SK1: archive stale constraints failed", "error", archErr)
 	}
 	return map[string]any{
 		"boosted":  boosted,

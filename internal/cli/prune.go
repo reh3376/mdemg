@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -1039,7 +1039,7 @@ func queryMergeCandidates(ctx context.Context, driver neo4j.DriverWithContext, c
 		similarNodes, err := findSimilarNodes(ctx, driver, cfg, candidate)
 		if err != nil {
 			// Log error but continue with other candidates
-			log.Printf("prune: error finding similar nodes for %s: %v", candidate.NodeID, err)
+			slog.Error("prune: error finding similar nodes", "node_id", candidate.NodeID, "error", err)
 			continue
 		}
 

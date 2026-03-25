@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -46,7 +46,7 @@ func NewWatchdog(cfg config.Config, spaceID string, cycleTrigger func(ctx contex
 // Start begins the watchdog ticker loop.
 func (w *Watchdog) Start() {
 	if !w.cfg.RSICWatchdogEnabled {
-		log.Printf("RSIC watchdog disabled")
+		slog.Info("RSIC watchdog disabled")
 		return
 	}
 
@@ -61,7 +61,7 @@ func (w *Watchdog) Start() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Printf("RSIC watchdog started (check every %s, decay rate %.2f/hr)", interval, w.cfg.RSICWatchdogDecayRate)
+		slog.Info("RSIC watchdog started", "check_interval", interval, "decay_rate_per_hr", w.cfg.RSICWatchdogDecayRate)
 
 		for {
 			select {
@@ -156,11 +156,11 @@ func (w *Watchdog) check() {
 	if w.state.EscalationLevel != prevLevel {
 		switch w.state.EscalationLevel {
 		case EscalationNudge:
-			log.Printf("RSIC watchdog: nudge — decay score %.2f (%.1f hours since last cycle)", w.state.DecayScore, hoursSinceCycle)
+			slog.Info("RSIC watchdog: nudge", "decay_score", w.state.DecayScore, "hours_since_cycle", hoursSinceCycle)
 		case EscalationWarn:
-			log.Printf("RSIC watchdog: WARNING — decay score %.2f (%.1f hours since last cycle)", w.state.DecayScore, hoursSinceCycle)
+			slog.Warn("RSIC watchdog: warning", "decay_score", w.state.DecayScore, "hours_since_cycle", hoursSinceCycle)
 		case EscalationForce:
-			log.Printf("RSIC watchdog: FORCE — auto-triggering meso cycle (decay score %.2f)", w.state.DecayScore)
+			slog.Warn("RSIC watchdog: force, auto-triggering meso cycle", "decay_score", w.state.DecayScore)
 		}
 	}
 
@@ -210,7 +210,7 @@ func (w *Watchdog) check() {
 		// Additional escalation: force cycle if session health is critically low AND decay is moderate
 		if w.state.SessionHealthScore < 0.2 && w.state.DecayScore >= w.cfg.RSICNudgeThreshold && w.cycleTrigger != nil {
 			if prevLevel < EscalationWarn {
-				log.Printf("RSIC watchdog: session health critical (%.2f) — escalating to warn level", w.state.SessionHealthScore)
+				slog.Warn("RSIC watchdog: session health critical, escalating to warn level", "session_health_score", w.state.SessionHealthScore)
 				w.state.EscalationLevel = EscalationWarn
 			}
 		}

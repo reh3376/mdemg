@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -191,7 +191,7 @@ DETACH DELETE n`, map[string]any{
 			}
 		}
 		if actionErr != nil {
-			log.Printf("warning: failed to %s orphan %s: %v", req.Action, orphan.NodeID, actionErr)
+			slog.Warn("failed to act on orphan", "action", req.Action, "node_id", orphan.NodeID, "error", actionErr)
 		}
 	}
 
@@ -251,8 +251,7 @@ func (s *Server) handleScheduleCleanup(w http.ResponseWriter, r *http.Request) {
 	// and be picked up by a background scheduler. For now, we return the schedule
 	// configuration that could be used by an external scheduler or APE module.
 
-	log.Printf("orphan cleanup schedule created: id=%s space=%s interval=%dh action=%s",
-		scheduleID, req.SpaceID, req.IntervalHours, req.Action)
+	slog.Info("orphan cleanup schedule created", "schedule_id", scheduleID, "space_id", req.SpaceID, "interval_hours", req.IntervalHours, "action", req.Action)
 
 	writeJSON(w, http.StatusOK, models.ScheduleCleanupResponse{
 		SpaceID:       req.SpaceID,
@@ -465,7 +464,7 @@ LIMIT $limit`, joinWhereClauses(whereClauses))
 
 		result, err := sess.Run(ctx, scanCypher, params)
 		if err != nil {
-			log.Printf("warning: graph orphan scan failed for space %s: %v", spaceID, err)
+			slog.Warn("graph orphan scan failed", "space_id", spaceID, "error", err)
 			resp.Warnings = append(resp.Warnings, fmt.Sprintf("scan failed for %s: %v", spaceID, err))
 			resp.SpaceResults = append(resp.SpaceResults, spResult)
 			continue
@@ -492,7 +491,7 @@ LIMIT $limit`, joinWhereClauses(whereClauses))
 			})
 		}
 		if err := result.Err(); err != nil {
-			log.Printf("warning: graph orphan scan query error for space %s: %v", spaceID, err)
+			slog.Warn("graph orphan scan query error", "space_id", spaceID, "error", err)
 			resp.Warnings = append(resp.Warnings, fmt.Sprintf("scan query error for %s: %v", spaceID, err))
 		}
 
@@ -507,13 +506,13 @@ LIMIT $limit`, joinWhereClauses(whereClauses))
 				affected := 0
 				if s.hiddenSvc != nil {
 					if _, err := s.hiddenSvc.RunConsolidation(ctx, spaceID); err != nil {
-						log.Printf("warning: consolidation failed for space %s: %v", spaceID, err)
+						slog.Warn("consolidation failed", "space_id", spaceID, "error", err)
 						resp.Warnings = append(resp.Warnings, fmt.Sprintf("consolidation failed for %s: %v", spaceID, err))
 					} else {
 						affected += len(nodes)
 					}
 					if _, err := s.hiddenSvc.RunFullConversationConsolidation(ctx, spaceID); err != nil {
-						log.Printf("warning: conversation consolidation failed for space %s: %v", spaceID, err)
+						slog.Warn("conversation consolidation failed", "space_id", spaceID, "error", err)
 					}
 				} else {
 					resp.Warnings = append(resp.Warnings, "hidden service not available for consolidation")
@@ -542,7 +541,7 @@ RETURN count(n) AS affected`, map[string]any{
 					"spaceId": spaceID,
 				})
 				if err != nil {
-					log.Printf("warning: archive failed for space %s: %v", spaceID, err)
+					slog.Warn("archive failed", "space_id", spaceID, "error", err)
 					resp.Warnings = append(resp.Warnings, fmt.Sprintf("archive failed for %s: %v", spaceID, err))
 				} else if archiveResult.Next(ctx) {
 					if a, ok := archiveResult.Record().Get("affected"); ok {
@@ -568,7 +567,7 @@ RETURN count(*) AS affected`, map[string]any{
 					"spaceId": spaceID,
 				})
 				if err != nil {
-					log.Printf("warning: delete failed for space %s: %v", spaceID, err)
+					slog.Warn("delete failed", "space_id", spaceID, "error", err)
 					resp.Warnings = append(resp.Warnings, fmt.Sprintf("delete failed for %s: %v", spaceID, err))
 				} else if deleteResult.Next(ctx) {
 					if a, ok := deleteResult.Record().Get("affected"); ok {

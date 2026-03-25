@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -42,7 +42,7 @@ func (s *Server) handleNegativeFeedback(w http.ResponseWriter, r *http.Request) 
 
 	result, err := s.learner.ApplyNegativeFeedback(r.Context(), req.SpaceID, req.QueryNodeIDs, req.RejectedNodeIDs)
 	if err != nil {
-		log.Printf("negative feedback error: %v", err)
+		slog.Error("negative feedback failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
@@ -76,7 +76,7 @@ func (s *Server) handleFrontierDetection(w http.ResponseWriter, r *http.Request)
 
 	frontiers, err := s.queryFrontiers(r.Context(), spaceID, limit)
 	if err != nil {
-		log.Printf("frontier detection error: %v", err)
+		slog.Error("frontier detection failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

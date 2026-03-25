@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -64,15 +64,15 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	if cfg.JiminyPersistenceEnabled && driver != nil {
 		persistence = NewPersistenceStore(driver, cfg)
 		confidenceUpdater = NewConfidenceUpdater(driver, cfg)
-		log.Printf("jiminy: persistence enabled (boost=%.3f, decay=%.3f, archive=%.2f)",
-			cfg.ConstraintConfidenceBoostPerPos, cfg.ConstraintConfidenceDecayPerNeg, cfg.ConstraintArchiveThreshold)
+		slog.Info("jiminy: persistence enabled",
+			"boost", cfg.ConstraintConfidenceBoostPerPos, "decay", cfg.ConstraintConfidenceDecayPerNeg, "archive_threshold", cfg.ConstraintArchiveThreshold)
 	}
 
 	// F10: Initialize guidance cache if enabled
 	var cache *GuidanceCache
 	if cfg.JiminyCacheEnabled {
 		cache = NewGuidanceCache(cfg.JiminyCacheSize, cfg.JiminyCacheTTLSec)
-		log.Printf("jiminy: guidance cache enabled (size=%d, ttl=%ds)", cfg.JiminyCacheSize, cfg.JiminyCacheTTLSec)
+		slog.Info("jiminy: guidance cache enabled", "size", cfg.JiminyCacheSize, "ttl_sec", cfg.JiminyCacheTTLSec)
 	}
 
 	// J11/J14: Initialize semantic outcome classifier if enabled
@@ -94,26 +94,25 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			CacheSize:       cfg.JiminyOutcomeCacheSize,
 			CompressPrompts: cfg.JiminyClassifyCompress,
 		})
-		log.Printf("jiminy: semantic outcome classifier enabled (high=%.2f, low=%.2f, llm=%v, cache=%d)",
-			cfg.JiminyOutcomeSimilarityHigh, cfg.JiminyOutcomeSimilarityLow,
-			cfg.JiminyOutcomeLLMEnabled, cfg.JiminyOutcomeCacheSize)
+		slog.Info("jiminy: semantic outcome classifier enabled",
+			"high_threshold", cfg.JiminyOutcomeSimilarityHigh, "low_threshold", cfg.JiminyOutcomeSimilarityLow,
+			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize)
 	}
 
 	// J12: Initialize escalation tracker if enabled
 	var escalation *EscalationTracker
 	if cfg.JiminyEscalationEnabled {
 		escalation = NewEscalationTracker(cfg)
-		log.Printf("jiminy: escalation enabled (warn=%d, escalate=%d, block=%d, blockEnabled=%v)",
-			cfg.JiminyEscalationWarnAfter, cfg.JiminyEscalationEscalateAfter,
-			cfg.JiminyEscalationBlockAfter, cfg.JiminyEscalationBlockEnabled)
+		slog.Info("jiminy: escalation enabled",
+			"warn_after", cfg.JiminyEscalationWarnAfter, "escalate_after", cfg.JiminyEscalationEscalateAfter,
+			"block_after", cfg.JiminyEscalationBlockAfter, "block_enabled", cfg.JiminyEscalationBlockEnabled)
 	}
 
 	// J9: Initialize evaluator if enabled
 	var evaluator *Evaluator
 	if cfg.JiminyEvaluateEnabled && driver != nil {
 		evaluator = NewEvaluator(cfg, driver, embedder)
-		log.Printf("jiminy: evaluator enabled (timeout=%dms, maxConstraints=%d)",
-			cfg.JiminyEvaluateTimeoutMs, cfg.JiminyEvaluateMaxConstraints)
+		slog.Info("jiminy: evaluator enabled", "timeout_ms", cfg.JiminyEvaluateTimeoutMs, "max_constraints", cfg.JiminyEvaluateMaxConstraints)
 	}
 
 	// J10: Initialize stats collector for RSIC
@@ -128,22 +127,21 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	if cfg.J17Enabled {
 		ticketManager = NewTicketManager(cfg.J17TicketSecret, cfg.J17TicketTTLHours)
 		sequenceTracker = NewSequenceTracker(cfg.J17SequenceBufferSize)
-		log.Printf("jiminy: J17 protocol enabled (ttl=%dh, bufferSize=%d)",
-			cfg.J17TicketTTLHours, cfg.J17SequenceBufferSize)
+		slog.Info("jiminy: J17 protocol enabled", "ttl_hours", cfg.J17TicketTTLHours, "buffer_size", cfg.J17SequenceBufferSize)
 	}
 
 	// J17-4: Initialize protocol metrics collector
 	var protocolMetrics *ProtocolMetricsCollector
 	if cfg.J17MetricsEnabled {
 		protocolMetrics = NewProtocolMetricsCollector()
-		log.Printf("jiminy: J17 protocol metrics collection enabled")
+		slog.Info("jiminy: J17 protocol metrics collection enabled")
 	}
 
 	// J17-5: Initialize extension registry
 	var extensions *ExtensionRegistry
 	if cfg.J17ExtensionsEnabled {
 		extensions = NewExtensionRegistry(cfg.J17AllowedExtensions)
-		log.Printf("jiminy: J17 extensions enabled (%d allowed)", len(cfg.J17AllowedExtensions))
+		slog.Info("jiminy: J17 extensions enabled", "allowed_count", len(cfg.J17AllowedExtensions))
 	}
 
 	// J17: Initialize protocol encoder and trust scorer if enabled
@@ -159,8 +157,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			HighThreshold:      cfg.J17TrustHighThreshold,
 			LowThreshold:       cfg.J17TrustLowThreshold,
 		})
-		log.Printf("jiminy: J17 trust scoring enabled (initial=%.2f, high=%.2f, low=%.2f)",
-			cfg.J17TrustInitial, cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
+		slog.Info("jiminy: J17 trust scoring enabled",
+			"initial", cfg.J17TrustInitial, "high_threshold", cfg.J17TrustHighThreshold, "low_threshold", cfg.J17TrustLowThreshold)
 	}
 
 	// NS-01: ML components with sidecar arbitration (shadow → causal promotion)
@@ -171,12 +169,11 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		if cfg.J17MLTierPredictionEnabled {
 			tierPredictor = NewTierPredictor(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
 			tierPredictor.minConfidence = cfg.J17SidecarConfidenceFloor
-			log.Printf("jiminy: tier predictor enabled (mode=%s, url=%s)", cfg.J17SidecarMode, cfg.J17SidecarURL)
+			slog.Info("jiminy: tier predictor enabled", "mode", cfg.J17SidecarMode, "url", cfg.J17SidecarURL)
 		}
 		if cfg.J17NLIComprehensionEnabled {
 			nliScorer = NewNLIComprehensionScorer(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
-			log.Printf("jiminy: NLI comprehension scorer enabled (mode=%s, score_of_record=%v)",
-				cfg.J17SidecarMode, cfg.J17NLIScoreOfRecord)
+			slog.Info("jiminy: NLI comprehension scorer enabled", "mode", cfg.J17SidecarMode, "score_of_record", cfg.J17NLIScoreOfRecord)
 		}
 		// Create arbitrator regardless of which ML components are enabled
 		arbitrator = NewSidecarArbitrator(
@@ -186,8 +183,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			cfg.J17PrecedentProtectedCodes,
 			cfg.J17PrecedentLogEnabled,
 		)
-		log.Printf("jiminy: sidecar arbitrator mode=%s canary_pct=%d confidence_floor=%.2f",
-			cfg.J17SidecarMode, cfg.J17SidecarCanaryPct, cfg.J17SidecarConfidenceFloor)
+		slog.Info("jiminy: sidecar arbitrator configured",
+			"mode", cfg.J17SidecarMode, "canary_pct", cfg.J17SidecarCanaryPct, "confidence_floor", cfg.J17SidecarConfidenceFloor)
 	}
 
 	// NS-06: Circuit breaker for sidecar calls (fail-open to rule-based fallback)
@@ -207,8 +204,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			nliCB := circuitbreaker.New("sidecar-nli-scorer", cbCfg)
 			nliScorer.SetCircuitBreaker(nliCB)
 		}
-		log.Printf("jiminy: sidecar circuit breaker enabled (threshold=%d, timeout=%ds)",
-			cfg.J17SidecarCBFailureThreshold, cfg.J17SidecarCBTimeoutSec)
+		slog.Info("jiminy: sidecar circuit breaker enabled", "threshold", cfg.J17SidecarCBFailureThreshold, "timeout_sec", cfg.J17SidecarCBTimeoutSec)
 	}
 
 	// NS-14: Protocol data collector (wired to service for training data)
@@ -216,20 +212,19 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	if cfg.J17ProtocolDataCollection {
 		dataDir := ".mdemg/neural/protocol-data"
 		dataCollector = NewProtocolDataCollector(dataDir)
-		log.Printf("jiminy: protocol data collection enabled (dir=%s)", dataDir)
+		slog.Info("jiminy: protocol data collection enabled", "dir", dataDir)
 	}
 
 	// NLI feedback loop: calibration tracker for NLI-vs-heuristic bias detection
 	var calibrationTracker *NLICalibrationTracker
 	if nliScorer != nil && cfg.J17NLICalibrationWindowSize > 0 {
 		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
-		log.Printf("jiminy: NLI calibration tracker enabled (window=%d, bias_threshold=%.2f)",
-			cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
+		slog.Info("jiminy: NLI calibration tracker enabled", "window", cfg.J17NLICalibrationWindowSize, "bias_threshold", cfg.J17NLICalibrationBiasThreshold)
 	}
 
 	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
 	if cfg.J17Enabled && cfg.J17TicketSecret == "" {
-		log.Printf("WARN: J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts")
+		slog.Warn("J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts")
 	}
 
 	return &Service{
@@ -348,7 +343,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		var err error
 		queryEmbedding, err = s.embedder.Embed(ctx, contextText)
 		if err != nil {
-			log.Printf("jiminy: embedding failed (continuing without vector search): %v", err)
+			slog.Warn("jiminy: embedding failed, continuing without vector search", "error", err)
 		}
 	}
 
@@ -671,9 +666,10 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 			// Log shadow/compare data
 			if pred.Tier > 0 {
-				log.Printf("j17-sidecar: mode=%s ml_tier=%d rule_tier=%d chosen=%d source=%s conf=%.2f agreed=%v code=%s",
-					s.arbitrator.Mode(), pred.Tier, ruleTier, result.ChosenTier, result.Source,
-					pred.Conf, result.Agreed, filtered[i].ConstraintCode)
+				slog.Info("j17-sidecar: tier arbitration",
+					"mode", s.arbitrator.Mode(), "ml_tier", pred.Tier, "rule_tier", ruleTier,
+					"chosen", result.ChosenTier, "source", result.Source,
+					"conf", pred.Conf, "agreed", result.Agreed, "code", filtered[i].ConstraintCode)
 			}
 
 			// Pre-assign tier if arbitrator chose ML (encoder will respect it via NS-01 override)
@@ -721,7 +717,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	if s.synthesizer != nil && s.cfg.JiminySynthesisEnabled && len(filtered) > 0 {
 		narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
 		if synthErr != nil {
-			log.Printf("jiminy: synthesis failed (using static formatting): %v", synthErr)
+			slog.Warn("jiminy: synthesis failed, using static formatting", "error", synthErr)
 			debug["synthesis_error"] = synthErr.Error()
 		} else if narrative != "" {
 			synthesizedNarrative = narrative
@@ -982,12 +978,12 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
 		if s.persistence != nil && outcome != OutcomeUnknown {
 			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
-				log.Printf("jiminy: persist outcome error: %v", err)
+				slog.Error("jiminy: persist outcome failed", "error", err)
 			}
 			// RSIC-SK1: Update confidence for all guidance types with source nodes
 			if s.confidenceUpdater != nil && len(item.SourceNodes) > 0 {
 				if err := s.confidenceUpdater.UpdateConfidence(ctx, item.SourceNodes[0], outcome); err != nil {
-					log.Printf("jiminy: confidence update error: %v", err)
+					slog.Error("jiminy: confidence update failed", "error", err)
 				}
 			}
 		}
@@ -1007,8 +1003,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 			if s.nliScorer != nil {
 				nliScore := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
-				log.Printf("j17-sidecar: nli_score nli=%.2f heuristic=%.2f constraint=%s score_of_record=%v",
-					nliScore, cr.Confidence, item.ConstraintCode, s.cfg.J17NLIScoreOfRecord)
+				slog.Info("j17-sidecar: NLI score computed",
+					"nli", nliScore, "heuristic", cr.Confidence, "constraint", item.ConstraintCode, "score_of_record", s.cfg.J17NLIScoreOfRecord)
 				comprehension = nliScore
 				scoreSource = "nli"
 
@@ -1228,7 +1224,7 @@ func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (
 	// Validate and restore from ticket
 	payload, err := s.ticketManager.RestoreFromTicket(req.Ticket, s.escalation)
 	if err != nil {
-		log.Printf("jiminy: J17 ticket restore failed (graceful fallback): %v", err)
+		slog.Warn("jiminy: J17 ticket restore failed, graceful fallback", "error", err)
 		// Gap 2: Record failed restore (invalid ticket)
 		if s.protocolMetrics != nil {
 			s.protocolMetrics.RecordTicketRestore(false)
@@ -1521,7 +1517,7 @@ func (s *Service) GetGlossary(ctx context.Context, spaceID string) map[string]st
 		return glossary, res.Err()
 	})
 	if err != nil {
-		log.Printf("jiminy: GetGlossary error: %v", err)
+		slog.Error("jiminy: GetGlossary failed", "error", err)
 		return nil
 	}
 	glossary, _ := result.(map[string]string)
@@ -1562,7 +1558,7 @@ func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) m
 		return codes, res.Err()
 	})
 	if err != nil {
-		log.Printf("jiminy: lookupConstraintCodes error: %v", err)
+		slog.Error("jiminy: lookupConstraintCodes failed", "error", err)
 		return nil
 	}
 	codes, _ := result.(map[string]string)

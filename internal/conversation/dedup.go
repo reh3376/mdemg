@@ -3,7 +3,7 @@ package conversation
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -123,7 +123,7 @@ RETURN n.node_id AS nodeId`
 	})
 
 	if err != nil {
-		log.Printf("WARNING: failed to merge duplicate observation %s: %v", existingNodeID, err)
+		slog.Warn("failed to merge duplicate observation", "node_id", existingNodeID, "error", err)
 	}
 	return err
 }

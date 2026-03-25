@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -624,9 +624,9 @@ func runSpaceServe(ctx context.Context, cfg *serveConfig) error {
 			return fmt.Errorf("devspace catalog: %w", err)
 		}
 		devspacepb.RegisterDevSpaceServer(grpcServer, devspace.NewServer(catalog, devspace.NewBroker()))
-		log.Printf("DevSpace hub enabled (data dir: %s)", cfg.devSpaceDataDir)
+		slog.Info("DevSpace hub enabled", "data_dir", cfg.devSpaceDataDir)
 	}
-	log.Printf("SpaceTransfer gRPC listening on :%d", cfg.port)
+	slog.Info("SpaceTransfer gRPC listening", "port", cfg.port)
 	if err := grpcServer.Serve(lis); err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}

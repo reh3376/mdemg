@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -61,6 +61,6 @@ func (s *Service) findContradictions(ctx context.Context, spaceID string, nodeID
 		return nil, fmt.Errorf("contradiction query: %w", err)
 	}
 
-	log.Printf("jiminy: found %d contradictions near %d nodes (space=%s)", len(matches), len(nodeIDs), spaceID)
+	slog.Info("jiminy: found contradictions", "count", len(matches), "node_count", len(nodeIDs), "space_id", spaceID)
 	return matches, nil
 }

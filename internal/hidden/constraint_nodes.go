@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -268,7 +268,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 						return nil, fmt.Errorf("create constraint node: %w", err)
 					}
 					res.Created++
-					log.Printf("Created constraint node %s (type=%s, name=%s)", constraintNodeID, cType, cName)
+					slog.Info("Created constraint node", "node_id", constraintNodeID, "type", cType, "name", cName)
 				}
 
 				// Step 3: Link observation → constraint via IMPLEMENTS_CONSTRAINT
@@ -395,7 +395,7 @@ func ApplyConstraintDecay(ctx context.Context, driver neo4j.DriverWithContext, s
 	}
 	decayed := result.(int)
 	if decayed > 0 {
-		log.Printf("F13: Constraint decay applied to %d node(s) in space %s (rate=%.4f)", decayed, spaceID, decayRate)
+		slog.Info("F13: Constraint decay applied", "decayed", decayed, "space_id", spaceID, "rate", decayRate)
 	}
 	return decayed, nil
 }

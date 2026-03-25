@@ -1,7 +1,7 @@
 package api
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -32,7 +32,7 @@ func (s *Server) handleBackupTrigger(w http.ResponseWriter, r *http.Request) {
 
 	backupID, err := s.backupSvc.Trigger(r.Context(), req)
 	if err != nil {
-		log.Printf("ERROR [trigger backup]: %v", err)
+		slog.Error("trigger backup failed", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup trigger failed"})
 		return
 	}
@@ -201,7 +201,7 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 
 	restoreID, err := s.backupSvc.Restore(r.Context(), req)
 	if err != nil {
-		log.Printf("ERROR [restore backup]: %v", err)
+		slog.Error("restore backup failed", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup restore failed"})
 		return
 	}

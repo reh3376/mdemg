@@ -3,7 +3,7 @@ package learning
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"sort"
 	"strings"
@@ -596,7 +596,7 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 	for _, nodeID := range obsNodeIDs {
 		// Best-effort reinforcement - don't fail the main operation
 		if err := s.stabilityReinforcer.UpdateStabilityOnReinforcement(ctx, spaceID, nodeID); err != nil {
-			log.Printf("[WARN] stability reinforcement failed for %s: %v", nodeID, err)
+			slog.Warn("stability reinforcement failed", "node_id", nodeID, "error", err)
 			metrics.Metrics().CMSStabilityUpdateFails.Inc()
 		}
 	}

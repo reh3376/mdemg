@@ -2,7 +2,7 @@ package backup
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -40,25 +40,25 @@ func (s *Scheduler) Start() {
 		for {
 			select {
 			case <-fullTicker.C:
-				log.Println("backup: scheduler: triggering full backup")
+				slog.Info("backup: scheduler: triggering full backup")
 				if _, err := s.svc.Trigger(context.Background(), TriggerRequest{
 					Type:  string(BackupTypeFull),
 					Label: "scheduled-full",
 				}); err != nil {
-					log.Printf("backup: scheduler: full backup failed: %v", err)
+					slog.Error("backup: scheduler: full backup failed", "error", err)
 				}
 
 			case <-partialTicker.C:
-				log.Println("backup: scheduler: triggering partial backup")
+				slog.Info("backup: scheduler: triggering partial backup")
 				if _, err := s.svc.Trigger(context.Background(), TriggerRequest{
 					Type:  string(BackupTypePartial),
 					Label: "scheduled-partial",
 				}); err != nil {
-					log.Printf("backup: scheduler: partial backup failed: %v", err)
+					slog.Error("backup: scheduler: partial backup failed", "error", err)
 				}
 
 			case <-s.stopCh:
-				log.Println("backup: scheduler stopped")
+				slog.Info("backup: scheduler stopped")
 				return
 			}
 		}

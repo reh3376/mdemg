@@ -3,7 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"sort"
 
@@ -355,7 +355,7 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 	if r.llmReflector != nil {
 		llmInsights, err := r.llmReflector.Reflect(ctx, report)
 		if err != nil {
-			log.Printf("RSIC LLM reflector failed (using rule-based only): %v", err)
+			slog.Warn("RSIC LLM reflector failed, using rule-based only", "error", err)
 		} else if len(llmInsights) > 0 {
 			insights = deduplicateInsights(insights, llmInsights)
 		}

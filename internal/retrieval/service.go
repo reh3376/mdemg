@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -111,8 +111,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 		embCacheSize = 5000
 	}
 
-	log.Printf("Query cache initialized: enabled=%v, capacity=%d, ttl=%v", cfg.QueryCacheEnabled, cacheCapacity, cacheTTL)
-	log.Printf("Node embedding cache initialized: enabled=%v, capacity=%d", cfg.QueryAwareExpansionEnabled, embCacheSize)
+	slog.Info("query cache initialized", "enabled", cfg.QueryCacheEnabled, "capacity", cacheCapacity, "ttl", cacheTTL)
+	slog.Info("node embedding cache initialized", "enabled", cfg.QueryAwareExpansionEnabled, "capacity", embCacheSize)
 
 	svc := &Service{
 		cfg:               cfg,
@@ -125,7 +125,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 	// Initialize neural re-ranker training data collector (NR-1)
 	if cfg.NeuralDataCollection {
 		svc.dataCollector = NewDataCollector(true, cfg.NeuralDataDir)
-		log.Printf("Neural data collector initialized: dir=%s", cfg.NeuralDataDir)
+		slog.Info("neural data collector initialized", "dir", cfg.NeuralDataDir)
 	}
 
 	return svc
@@ -321,8 +321,9 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		hints.TemporalIntent = BuildExplicitTemporalIntent(req.TemporalAfter, req.TemporalBefore)
 	}
 
-	log.Printf("Query type detected: %s (seedN=%d, hopDepth=%d, vecW=%.2f, bm25W=%.2f, temporal=%s)",
-		hints.QueryType, hints.SeedN, hints.HopDepth, hints.VectorWeight, hints.BM25Weight, hints.TemporalIntent.Mode)
+	slog.Info("query type detected",
+		"type", hints.QueryType, "seed_n", hints.SeedN, "hop_depth", hints.HopDepth,
+		"vec_weight", hints.VectorWeight, "bm25_weight", hints.BM25Weight, "temporal", hints.TemporalIntent.Mode)
 
 	// Override hopDepth with hints if request didn't specify
 	if req.HopDepth <= 0 {
@@ -337,7 +338,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 	// Check query cache (skip for Jiminy-enabled requests and temporal queries)
 	cacheKey := CacheKey(cacheReq)
-	log.Printf("Query cache check: enabled=%v, jiminy=%v, temporal=%v, key=%s", s.cfg.QueryCacheEnabled, req.JiminyEnabled, hints.TemporalIntent.Mode, cacheKey[:16])
+	slog.Info("query cache check", "enabled", s.cfg.QueryCacheEnabled, "jiminy", req.JiminyEnabled, "temporal", hints.TemporalIntent.Mode, "key", cacheKey[:16])
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		if cached, ok := s.queryCache.Get(cacheReq); ok {
@@ -346,10 +347,10 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 				cached.Debug = make(map[string]any)
 			}
 			cached.Debug["cache_hit"] = true
-			log.Printf("Query cache HIT for space=%s query=%q", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))])
+			slog.Info("query cache HIT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))])
 			return cached, nil
 		}
-		log.Printf("Query cache MISS for space=%s", req.SpaceID)
+		slog.Info("query cache MISS", "space", req.SpaceID)
 	}
 
 	// Build file filter from request
@@ -402,7 +403,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	bm25Out := <-bm25Ch
 	if s.cfg.HybridRetrievalEnabled && req.QueryText != "" {
 		if bm25Out.err != nil {
-			log.Printf("WARN: BM25 search failed, using vector-only: %v", bm25Out.err)
+			slog.Warn("BM25 search failed, using vector-only", "error", bm25Out.err)
 			cands = vectorCands
 		} else {
 			bm25Count = len(bm25Out.results)
@@ -418,8 +419,8 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		hints.TemporalIntent.Mode == TemporalModeHard {
 		preFilterCount := len(cands)
 		cands = FilterCandidatesByTime(cands, hints.TemporalIntent.Constraint)
-		log.Printf("Temporal hard filter: %d -> %d candidates (constraint: %s)",
-			preFilterCount, len(cands), hints.TemporalIntent.Constraint.Description)
+		slog.Info("temporal hard filter applied",
+			"before", preFilterCount, "after", len(cands), "constraint", hints.TemporalIntent.Constraint.Description)
 	}
 
 	if len(cands) == 0 {
@@ -447,7 +448,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	effectiveHopDepth := hopDepth
 	if !hints.EnableExpansion {
 		effectiveHopDepth = 0 // Skip expansion entirely for symbol lookups
-		log.Printf("Skipping graph expansion for query type: %s", hints.QueryType)
+		slog.Info("skipping graph expansion for query type", "type", hints.QueryType)
 	}
 
 	for d := 0; d < effectiveHopDepth; d++ {
@@ -490,7 +491,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			)
 			if err != nil {
 				// Log warning but continue with original edges
-				log.Printf("WARN: Query-aware attention re-ranking failed: %v", err)
+				slog.Warn("query-aware attention re-ranking failed", "error", err)
 			}
 
 			// Rebuild nextNodes from re-ranked edges
@@ -584,7 +585,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 
 		reasoningResult, reasoningErr := s.reasoningProvider.Process(ctx, reasoningReq)
 		if reasoningErr != nil {
-			log.Printf("WARN: reasoning module processing failed, using initial results: %v", reasoningErr)
+			slog.Warn("reasoning module processing failed, using initial results", "error", reasoningErr)
 		} else if len(reasoningResult.Results) > 0 {
 			results = reasoningResult.Results
 			reasoningModuleID = reasoningResult.ModuleID
@@ -612,7 +613,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		})
 		if rerankErr != nil {
 			// Log warning but continue with initial results
-			log.Printf("WARN: LLM rerank failed, using initial results: %v", rerankErr)
+			slog.Warn("LLM rerank failed, using initial results", "error", rerankErr)
 		} else {
 			wasReranked = true
 			results = rerankResult.Results
@@ -716,7 +717,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
 		s.queryCache.Put(cacheReq, resp)
-		log.Printf("Query cache PUT for space=%s query=%q (cache size: %d)", req.SpaceID, req.QueryText[:min(50, len(req.QueryText))], s.queryCache.Len())
+		slog.Info("query cache PUT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))], "cache_size", s.queryCache.Len())
 	}
 
 	return resp, nil
@@ -1397,7 +1398,7 @@ RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_coun
 			vc := toInt(version, 1)
 			uc := toInt(updateCount, 0)
 			if uc > 1 {
-				log.Printf("ingest: node %s updated (version=%d, update_count=%d)", nodeID, vc, uc)
+				slog.Info("ingest: node updated", "node_id", nodeID, "version", vc, "update_count", uc)
 			}
 		}
 		return nil, res.Err()
@@ -1411,14 +1412,14 @@ RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_coun
 		similarNodes, findErr := s.FindSimilarNodes(ctx, req.SpaceID, req.Embedding, nodeID, s.cfg.SemanticEdgeTopN)
 		if findErr != nil {
 			// Log warning but don't fail the ingest
-			log.Printf("WARN: FindSimilarNodes failed for node %s: %v", nodeID, findErr)
+			slog.Warn("FindSimilarNodes failed", "node_id", nodeID, "error", findErr)
 		} else {
 			for _, sn := range similarNodes {
 				if sn.Score >= s.cfg.SemanticEdgeMinSimilarity {
 					edgeErr := s.CreateAssociatedWithEdge(ctx, req.SpaceID, nodeID, sn.NodeID, sn.Score)
 					if edgeErr != nil {
 						// Log warning but don't fail the ingest
-						log.Printf("WARN: CreateAssociatedWithEdge failed from %s to %s: %v", nodeID, sn.NodeID, edgeErr)
+						slog.Warn("CreateAssociatedWithEdge failed", "from", nodeID, "to", sn.NodeID, "error", edgeErr)
 					}
 				}
 			}
@@ -1567,7 +1568,7 @@ RETURN n.embedding AS embedding`, map[string]any{
 		})
 		if embErr != nil {
 			embSess.Close(ctx)
-			log.Printf("warning: failed to get embedding for stale node %s: %v", nodeID, embErr)
+			slog.Warn("failed to get embedding for stale node", "node_id", nodeID, "error", embErr)
 			continue
 		}
 
@@ -1596,7 +1597,7 @@ RETURN n.embedding AS embedding`, map[string]any{
 		// Find similar nodes and update edges
 		similarNodes, findErr := s.FindSimilarNodes(ctx, spaceID, embedding, nodeID, s.cfg.SemanticEdgeTopN)
 		if findErr != nil {
-			log.Printf("warning: FindSimilarNodes failed for stale node %s: %v", nodeID, findErr)
+			slog.Warn("FindSimilarNodes failed for stale node", "node_id", nodeID, "error", findErr)
 			continue
 		}
 
@@ -1604,7 +1605,7 @@ RETURN n.embedding AS embedding`, map[string]any{
 			if sn.Score >= s.cfg.SemanticEdgeMinSimilarity {
 				edgeErr := s.CreateAssociatedWithEdge(ctx, spaceID, nodeID, sn.NodeID, sn.Score)
 				if edgeErr != nil {
-					log.Printf("warning: CreateAssociatedWithEdge failed from %s to %s: %v", nodeID, sn.NodeID, edgeErr)
+					slog.Warn("CreateAssociatedWithEdge failed", "from", nodeID, "to", sn.NodeID, "error", edgeErr)
 				}
 			}
 		}
@@ -1618,7 +1619,7 @@ REMOVE n.edges_stale`, map[string]any{
 			"spaceId": spaceID,
 		})
 		if clearErr != nil {
-			log.Printf("warning: failed to clear edges_stale for node %s: %v", nodeID, clearErr)
+			slog.Warn("failed to clear edges_stale for node", "node_id", nodeID, "error", clearErr)
 		}
 
 		// Propagate staleness to parent hidden nodes
@@ -1630,7 +1631,7 @@ SET h.edges_stale = true`, map[string]any{
 			"spaceId": spaceID,
 		})
 		if propErr != nil {
-			log.Printf("warning: failed to propagate edges_stale to parents of %s: %v", nodeID, propErr)
+			slog.Warn("failed to propagate edges_stale to parents", "node_id", nodeID, "error", propErr)
 		}
 		clearSess.Close(ctx)
 
@@ -1741,7 +1742,7 @@ func (s *Service) RetrieveWithConversationContext(ctx context.Context, req model
 	conversationContext, err := s.findRelevantConversationContext(ctx, req.SpaceID, req.QueryEmbedding, 10)
 	if err != nil {
 		// Log warning but continue with unmodified results
-		log.Printf("WARN: failed to find conversation context, returning unmodified results: %v", err)
+		slog.Warn("failed to find conversation context, returning unmodified results", "error", err)
 		return resp, nil
 	}
 
@@ -1847,7 +1848,7 @@ func (s *Service) applyConversationBoost(ctx context.Context, spaceID string, re
 	// Find nodes that are connected to conversation context via edges
 	connectedNodes, err := s.findConversationConnectedNodes(ctx, spaceID, conversationContext)
 	if err != nil {
-		log.Printf("WARN: failed to find conversation-connected nodes: %v", err)
+		slog.Warn("failed to find conversation-connected nodes", "error", err)
 		return resp
 	}
 

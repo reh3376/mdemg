@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -170,7 +170,7 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 					}
 					_, err := s.retriever.BatchIngestObservations(r.Context(), batchReq)
 					if err != nil {
-						log.Printf("batch ingest error: %v", err)
+						slog.Error("batch ingest failed", "error", err)
 						ingestErrors += len(ingestBatch)
 					} else {
 						ingestCount += len(ingestBatch)
@@ -202,7 +202,7 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err := s.retriever.BatchIngestObservations(r.Context(), batchReq)
 		if err != nil {
-			log.Printf("batch ingest error: %v", err)
+			slog.Error("batch ingest failed", "error", err)
 			ingestErrors += len(ingestBatch)
 		} else {
 			ingestCount += len(ingestBatch)

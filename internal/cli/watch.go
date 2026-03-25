@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -88,9 +88,9 @@ func runWatch(cfg *watchConfig) error {
 	extSet := parseCSV(cfg.extensions)
 	excludeSet := parseCSV(cfg.exclude)
 
-	log.Printf("mdemg-watch: space=%s path=%s endpoint=%s debounce=%dms",
-		cfg.spaceID, absPath, ep, cfg.debounceMs)
-	log.Printf("mdemg-watch: extensions=%v exclude=%v", extSet, excludeSet)
+	slog.Info("mdemg-watch: started",
+		"space", cfg.spaceID, "path", absPath, "endpoint", ep, "debounce_ms", cfg.debounceMs)
+	slog.Info("mdemg-watch: filters", "extensions", extSet, "exclude", excludeSet)
 
 	// Create fsnotify watcher
 	watcher, err := fsnotify.NewWatcher()
@@ -116,7 +116,7 @@ func runWatch(cfg *watchConfig) error {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Printf("mdemg-watch: watching for changes (Ctrl+C to stop)")
+	slog.Info("mdemg-watch: watching for changes (Ctrl+C to stop)")
 
 	for {
 		select {
@@ -131,7 +131,7 @@ func runWatch(cfg *watchConfig) error {
 					dirName := filepath.Base(event.Name)
 					if !excludeSet[dirName] {
 						if addErr := watcher.Add(event.Name); addErr == nil {
-							log.Printf("mdemg-watch: watching new dir: %s", event.Name)
+							slog.Info("mdemg-watch: watching new dir", "path", event.Name)
 						}
 					}
 					continue
@@ -152,10 +152,10 @@ func runWatch(cfg *watchConfig) error {
 			if !ok {
 				return nil
 			}
-			log.Printf("mdemg-watch: watcher error: %v", err)
+			slog.Error("mdemg-watch: watcher error", "error", err)
 
 		case <-sigCh:
-			log.Printf("mdemg-watch: shutting down")
+			slog.Info("mdemg-watch: shutting down")
 			deb.flush()
 			return nil
 		}
@@ -231,7 +231,7 @@ func watchRecursive(watcher *fsnotify.Watcher, root string, excludeSet map[strin
 		}
 
 		if err := watcher.Add(path); err != nil {
-			log.Printf("mdemg-watch: failed to watch %s: %v", path, err)
+			slog.Warn("mdemg-watch: failed to watch dir", "path", path, "error", err)
 			return nil // continue watching other dirs
 		}
 		return nil
@@ -249,7 +249,7 @@ func shouldWatch(path string, extSet map[string]bool) bool {
 
 // ingestFiles sends changed files to the MDEMG API for ingestion with retry on transient errors.
 func ingestFiles(endpoint, spaceID string, files []string) {
-	log.Printf("mdemg-watch: ingesting %d file(s)", len(files))
+	slog.Info("mdemg-watch: ingesting files", "count", len(files))
 
 	payload := map[string]any{
 		"space_id": spaceID,
@@ -258,7 +258,7 @@ func ingestFiles(endpoint, spaceID string, files []string) {
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("mdemg-watch: marshal error: %v", err)
+		slog.Error("mdemg-watch: marshal error", "error", err)
 		return
 	}
 
@@ -271,7 +271,7 @@ func ingestFiles(endpoint, spaceID string, files []string) {
 		//nolint:gosec // URL constructed from user-configured endpoint
 		resp, reqErr := http.Post(url, "application/json", bytes.NewReader(body))
 		if reqErr != nil {
-			log.Printf("mdemg-watch: ingest request failed (attempt %d/%d): %v", attempt, maxRetries, reqErr)
+			slog.Error("mdemg-watch: ingest request failed", "attempt", attempt, "max_retries", maxRetries, "error", reqErr)
 			if attempt < maxRetries {
 				time.Sleep(backoff)
 				backoff *= 2
@@ -283,26 +283,26 @@ func ingestFiles(endpoint, spaceID string, files []string) {
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			log.Printf("mdemg-watch: ingest successful (%d)", resp.StatusCode)
+			slog.Info("mdemg-watch: ingest successful", "status", resp.StatusCode)
 			return
 		}
 
 		// 4xx errors are not retryable
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			log.Printf("mdemg-watch: ingest rejected (%d): %s", resp.StatusCode, string(respBody))
+			slog.Error("mdemg-watch: ingest rejected", "status", resp.StatusCode, "body", string(respBody))
 			return
 		}
 
 		// 5xx errors are retryable
-		log.Printf("mdemg-watch: ingest server error (%d, attempt %d/%d): %s",
-			resp.StatusCode, attempt, maxRetries, string(respBody))
+		slog.Error("mdemg-watch: ingest server error",
+			"status", resp.StatusCode, "attempt", attempt, "max_retries", maxRetries, "body", string(respBody))
 		if attempt < maxRetries {
 			time.Sleep(backoff)
 			backoff *= 2
 		}
 	}
 
-	log.Printf("mdemg-watch: ingest failed after %d attempts", maxRetries)
+	slog.Error("mdemg-watch: ingest failed after all attempts", "max_retries", maxRetries)
 }
 
 // parseCSV splits a comma-separated string into a set of trimmed values.

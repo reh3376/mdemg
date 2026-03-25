@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -134,7 +134,7 @@ func (s *Server) handleLinearWebhook(w http.ResponseWriter, r *http.Request) {
 	s.webhookDebouncer.debounce(debounceKey, func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[webhook] linear: panic recovered in processLinearWebhookEvent: %v", r)
+				slog.Error("webhook linear: panic recovered in processLinearWebhookEvent", "panic", r)
 			}
 		}()
 		s.processLinearWebhookEvent(payloadCopy, bodyCopy)
@@ -151,14 +151,14 @@ func (s *Server) handleLinearWebhook(w http.ResponseWriter, r *http.Request) {
 // processLinearWebhookEvent processes a debounced Linear webhook event.
 func (s *Server) processLinearWebhookEvent(payload linearWebhookPayload, rawBody []byte) {
 	if s.pluginMgr == nil {
-		log.Printf("[webhook] linear: plugin manager not available")
+		slog.Warn("webhook linear: plugin manager not available")
 		return
 	}
 
 	// Find Linear module
 	modInfo, ok := s.pluginMgr.GetModule("linear-module")
 	if !ok || modInfo.IngestionClient == nil {
-		log.Printf("[webhook] linear: linear-module not found or not ingestion type")
+		slog.Warn("webhook linear: linear-module not found or not ingestion type")
 		return
 	}
 
@@ -190,23 +190,23 @@ func (s *Server) processLinearWebhookEvent(payload linearWebhookPayload, rawBody
 	})
 
 	if err != nil {
-		log.Printf("[webhook] linear: parse failed: %v", err)
+		slog.Error("webhook linear: parse failed", "error", err)
 		return
 	}
 	if parseResp.Error != "" {
-		log.Printf("[webhook] linear: parse error: %s", parseResp.Error)
+		slog.Error("webhook linear: parse error", "error", parseResp.Error)
 		return
 	}
 
 	if len(parseResp.Observations) == 0 {
-		log.Printf("[webhook] linear: no observations returned from parse")
+		slog.Warn("webhook linear: no observations returned from parse")
 		return
 	}
 
 	// Determine space ID
 	spaceID := s.cfg.LinearWebhookSpaceID
 	if spaceID == "" {
-		log.Printf("[webhook] linear: no space ID configured (LINEAR_WEBHOOK_SPACE_ID)")
+		slog.Warn("webhook linear: no space ID configured (LINEAR_WEBHOOK_SPACE_ID)")
 		return
 	}
 
@@ -241,16 +241,15 @@ func (s *Server) processLinearWebhookEvent(payload linearWebhookPayload, rawBody
 		Observations: items,
 	})
 	if err != nil {
-		log.Printf("[webhook] linear: batch ingest failed: %v", err)
+		slog.Error("webhook linear: batch ingest failed", "error", err)
 		return
 	}
 
-	log.Printf("[webhook] linear: ingested %d/%d observations for %s:%s",
-		resp.SuccessCount, resp.TotalItems, payload.Type, payload.Action)
+	slog.Info("webhook linear: ingested observations", "success_count", resp.SuccessCount, "total_items", resp.TotalItems, "type", payload.Type, "action", payload.Action)
 
 	// Update TapRoot freshness
 	if err := s.retriever.UpdateTapRootFreshness(ingestCtx, spaceID, "linear-webhook", IsPrunablePrefix(spaceID)); err != nil {
-		log.Printf("[webhook] linear: failed to update TapRoot freshness: %v", err)
+		slog.Error("webhook linear: failed to update TapRoot freshness", "error", err)
 	}
 
 	// Trigger APE events

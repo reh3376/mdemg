@@ -2,7 +2,7 @@ package retrieval
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"mdemg/internal/config"
@@ -70,8 +70,7 @@ func (s *Service) IngestWithRetry(ctx context.Context, op optimistic.OperationFu
 	// Log conflict resolution if conflicts occurred
 	if result.VersionConflicts > 0 {
 		if result.FinalError == nil {
-			log.Printf("ingest_retry: succeeded after %d attempts (%d conflicts, %v)",
-				result.Attempts, result.VersionConflicts, result.TotalDuration)
+			slog.Info("ingest_retry: succeeded", "attempts", result.Attempts, "conflicts", result.VersionConflicts, "duration", result.TotalDuration)
 			// Log resolved conflict for metrics
 			LogConflict(ConflictEvent{
 				Type:       ConflictVersionMismatch,
@@ -81,8 +80,7 @@ func (s *Service) IngestWithRetry(ctx context.Context, op optimistic.OperationFu
 				Details:    formatRetryDetails(result),
 			})
 		} else {
-			log.Printf("ingest_retry: failed after %d attempts (%d conflicts, %v): %v",
-				result.Attempts, result.VersionConflicts, result.TotalDuration, result.FinalError)
+			slog.Error("ingest_retry: failed", "attempts", result.Attempts, "conflicts", result.VersionConflicts, "duration", result.TotalDuration, "error", result.FinalError)
 			// Log unresolved conflict for metrics
 			LogConflict(ConflictEvent{
 				Type:       ConflictVersionMismatch,
@@ -213,7 +211,7 @@ func (s *Service) PropagateEdgeStalenessAfterIngest(ctx context.Context, spaceID
 
 	result, err := s.PropagateEdgeStaleness(ctx, spaceID, nodeID)
 	if err != nil {
-		log.Printf("warning: failed to propagate edge staleness for node %s: %v", nodeID, err)
+		slog.Warn("failed to propagate edge staleness", "node_id", nodeID, "error", err)
 		return
 	}
 

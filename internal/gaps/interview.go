@@ -4,7 +4,7 @@ package gaps
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -268,7 +268,7 @@ func (i *GapInterviewer) generateGenericPrompt(gap CapabilityGap) (question, con
 // RunWeeklyInterview executes the weekly gap interview process
 // This is the main APE job entry point
 func (i *GapInterviewer) RunWeeklyInterview(ctx context.Context, cfg InterviewConfig) (*InterviewResult, error) {
-	log.Printf("Gap Interviewer: Starting weekly interview run")
+	slog.Info("Gap Interviewer: starting weekly interview run")
 
 	// Get priority gaps
 	gaps, err := i.GetPriorityGapsForInterview(ctx, cfg)
@@ -276,7 +276,7 @@ func (i *GapInterviewer) RunWeeklyInterview(ctx context.Context, cfg InterviewCo
 		return nil, fmt.Errorf("failed to get priority gaps: %w", err)
 	}
 
-	log.Printf("Gap Interviewer: Found %d gaps requiring attention", len(gaps))
+	slog.Info("Gap Interviewer: found gaps requiring attention", "count", len(gaps))
 
 	// Generate prompts
 	prompts := i.GenerateInterviewPrompts(gaps)
@@ -284,7 +284,7 @@ func (i *GapInterviewer) RunWeeklyInterview(ctx context.Context, cfg InterviewCo
 	// Save prompts to Neo4j for tracking
 	for _, prompt := range prompts {
 		if err := i.SaveInterviewPrompt(ctx, prompt); err != nil {
-			log.Printf("Gap Interviewer: Failed to save prompt %s: %v", prompt.ID, err)
+			slog.Error("Gap Interviewer: failed to save prompt", "prompt_id", prompt.ID, "error", err)
 		}
 	}
 
@@ -305,8 +305,7 @@ func (i *GapInterviewer) RunWeeklyInterview(ctx context.Context, cfg InterviewCo
 		}
 	}
 
-	log.Printf("Gap Interviewer: Generated %d prompts, %d high priority",
-		result.PromptsGenerated, result.HighPriorityCount)
+	slog.Info("Gap Interviewer: generated prompts", "prompts_generated", result.PromptsGenerated, "high_priority", result.HighPriorityCount)
 
 	return result, nil
 }

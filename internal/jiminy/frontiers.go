@@ -3,7 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -81,6 +81,6 @@ func (s *Service) findRelevantFrontiers(ctx context.Context, spaceID string, emb
 		return nil, fmt.Errorf("frontier vector search: %w", err)
 	}
 
-	log.Printf("jiminy: found %d relevant frontiers (space=%s)", len(matches), spaceID)
+	slog.Info("jiminy: found relevant frontiers", "count", len(matches), "space_id", spaceID)
 	return matches, nil
 }

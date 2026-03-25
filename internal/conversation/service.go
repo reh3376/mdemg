@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -250,7 +250,7 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	if s.embedder != nil {
 		embedding, err = s.embedder.Embed(ctx, req.Content)
 		if err != nil {
-			log.Printf("[WARN] embedding generation failed: %v (dedup skipped)", err)
+			slog.Warn("embedding generation failed, dedup skipped", "error", err)
 			embedding = nil
 			if req.Metadata == nil {
 				req.Metadata = make(map[string]any)
@@ -266,14 +266,13 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	if len(embedding) > 0 {
 		dedupResult, dedupErr := CheckDuplicate(ctx, s.driver, req.SpaceID, req.SessionID, embedding, DedupThreshold)
 		if dedupErr != nil {
-			log.Printf("WARNING: dedup check failed: %v", dedupErr)
+			slog.Warn("dedup check failed", "error", dedupErr)
 			// Continue without dedup
 		} else if dedupResult.IsDuplicate {
-			log.Printf("Skipping duplicate observation (similarity=%.3f to node=%s)",
-				dedupResult.Similarity, dedupResult.DuplicateOfID)
+			slog.Info("skipping duplicate observation", "similarity", dedupResult.Similarity, "duplicate_of", dedupResult.DuplicateOfID)
 			// Merge: increment duplicate_count on existing node
 			if mergeErr := MergeDuplicateObservation(ctx, s.driver, dedupResult.DuplicateOfID); mergeErr != nil {
-				log.Printf("[WARN] dedup merge failed for %s: %v", dedupResult.DuplicateOfID, mergeErr)
+				slog.Warn("dedup merge failed", "node_id", dedupResult.DuplicateOfID, "error", mergeErr)
 				metrics.Metrics().CMSDedupMergeFails.Inc()
 			}
 			return &ObserveResponse{
@@ -334,7 +333,7 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	if s.surpriseDetector != nil {
 		surpriseScore, factors, err = s.surpriseDetector.DetectSurprise(ctx, obs)
 		if err != nil {
-			log.Printf("WARNING: failed to compute surprise score: %v", err)
+			slog.Warn("failed to compute surprise score", "error", err)
 			// Continue with default score
 			surpriseScore = 0.0
 		}
@@ -359,10 +358,10 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 
 			classification, classErr := s.constraintGateClassifier.Classify(ctx, nodeID, req.Content)
 			if classErr != nil {
-				log.Printf("[WARN] F6a constraint classifier gate failed (passing through): %v", classErr)
+				slog.Warn("F6a constraint classifier gate failed, passing through", "error", classErr)
 				// fail-open: keep detectedConstraints as-is
 			} else if classification != nil && classification.Type == "none" {
-				log.Printf("F6a: classifier rejected regex constraint detection for obs %s — skipping promotion", obsID)
+				slog.Info("F6a: classifier rejected regex constraint detection, skipping promotion", "obs_id", obsID)
 				detectedConstraints = nil
 			}
 		}
@@ -400,13 +399,13 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 				}
 			}
 			obs.StructuredData["detected_constraints"] = constraintMeta
-			log.Printf("Constraint detection: %d constraint(s) detected in observation %s", len(detectedConstraints), obsID)
+			slog.Info("constraint detection complete", "count", len(detectedConstraints), "obs_id", obsID)
 
 			// J17-2: Generate T1 mnemonic code for first detected constraint
 			if s.codeGenerator != nil && len(detectedConstraints) > 0 {
 				code, codeErr := s.codeGenerator.GenerateCode(ctx, detectedConstraints[0].ConstraintType, req.Content)
 				if codeErr != nil {
-					log.Printf("[WARN] J17 codegen failed: %v", codeErr)
+					slog.Warn("J17 codegen failed", "error", codeErr)
 				} else if code != "" {
 					obs.StructuredData["constraint_code"] = code
 					constraintMeta[0]["constraint_code"] = code
@@ -428,17 +427,17 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
-	log.Printf("Created conversation observation %s (node=%s, type=%s, surprise=%.2f)",
-		obsID, nodeID, obsType, surpriseScore)
+	slog.Info("created conversation observation",
+		"obs_id", obsID, "node_id", nodeID, "type", obsType, "surprise", surpriseScore)
 
 	// Create REFERS_TO edges for cross-module linking
 	if len(req.RefersTo) > 0 {
 		edgesCreated, err := s.createRefersToEdges(ctx, req.SpaceID, nodeID, req.RefersTo)
 		if err != nil {
 			// Log but don't fail - references are an enhancement
-			log.Printf("WARNING: failed to create REFERS_TO edges: %v", err)
+			slog.Warn("failed to create REFERS_TO edges", "error", err)
 		} else if edgesCreated > 0 {
-			log.Printf("Created %d REFERS_TO edges from observation %s", edgesCreated, nodeID)
+			slog.Info("created REFERS_TO edges", "count", edgesCreated, "node_id", nodeID)
 		}
 	}
 
@@ -448,7 +447,7 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		err = s.learningService.CoactivateSession(ctx, req.SpaceID, req.SessionID)
 		if err != nil {
 			// Log but don't fail - coactivation is a learning enhancement, not critical
-			log.Printf("WARNING: failed to coactivate session %s: %v", req.SessionID, err)
+			slog.Warn("failed to coactivate session", "session_id", req.SessionID, "error", err)
 		}
 	}
 
@@ -506,7 +505,7 @@ func (s *Service) Correct(ctx context.Context, req CorrectRequest) (*ObserveResp
 		// Update node with corrected surprise score
 		err = s.updateSurpriseScore(ctx, resp.NodeID, 0.9)
 		if err != nil {
-			log.Printf("WARNING: failed to update surprise score: %v", err)
+			slog.Warn("failed to update surprise score", "error", err)
 		}
 	}
 
@@ -648,7 +647,7 @@ func (s *Service) setConstraintCode(ctx context.Context, nodeID, code string) {
 		return result.Consume(ctx)
 	})
 	if err != nil {
-		log.Printf("[WARN] J17-2: failed to set constraint_code on node %s: %v", nodeID, err)
+		slog.Warn("J17-2: failed to set constraint_code", "node_id", nodeID, "error", err)
 	}
 }
 
@@ -1071,7 +1070,7 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 	// Step 2: Fetch related themes (themes that these observations belong to)
 	themes, err := s.fetchRelatedThemes(ctx, req.SpaceID, req.SessionID)
 	if err != nil {
-		log.Printf("WARNING: failed to fetch related themes: %v", err)
+		slog.Warn("failed to fetch related themes", "error", err)
 	} else {
 		resp.Themes = themes
 		resp.Debug["theme_count"] = len(themes)
@@ -1080,7 +1079,7 @@ func (s *Service) Resume(ctx context.Context, req ResumeRequest) (*ResumeRespons
 	// Step 3: Fetch emergent concepts (higher-level abstractions)
 	concepts, err := s.fetchEmergentConcepts(ctx, req.SpaceID)
 	if err != nil {
-		log.Printf("WARNING: failed to fetch emergent concepts: %v", err)
+		slog.Warn("failed to fetch emergent concepts", "error", err)
 	} else {
 		resp.EmergentConcepts = concepts
 		resp.Debug["concept_count"] = len(concepts)
@@ -1153,7 +1152,7 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 	if req.IncludeThemes {
 		themeResults, err := s.findSimilarThemes(ctx, req.SpaceID, embedding, topK, temporalFilter, temporalParams)
 		if err != nil {
-			log.Printf("WARNING: failed to find similar themes: %v", err)
+			slog.Warn("failed to find similar themes", "error", err)
 		} else {
 			resp.Results = append(resp.Results, themeResults...)
 			resp.Debug["theme_matches"] = len(themeResults)
@@ -1164,7 +1163,7 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 	if req.IncludeConcepts {
 		conceptResults, err := s.findSimilarConcepts(ctx, req.SpaceID, embedding, topK, temporalFilter, temporalParams)
 		if err != nil {
-			log.Printf("WARNING: failed to find similar concepts: %v", err)
+			slog.Warn("failed to find similar concepts", "error", err)
 		} else {
 			resp.Results = append(resp.Results, conceptResults...)
 			resp.Debug["concept_matches"] = len(conceptResults)

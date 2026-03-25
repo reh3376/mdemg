@@ -3,7 +3,7 @@ package conversation
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 
@@ -109,7 +109,7 @@ func (c *ContextCooler) UpdateStabilityOnReinforcement(ctx context.Context, spac
 
 		if result.Next(ctx) {
 			newScore, _ := result.Record().Get("newScore")
-			log.Printf("Context Cooler: reinforced node %s, new stability: %.2f", nodeID, newScore)
+			slog.Info("Context Cooler: reinforced node", "node_id", nodeID, "new_stability", newScore)
 		}
 
 		return nil, result.Err()

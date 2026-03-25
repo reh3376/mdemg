@@ -4,7 +4,7 @@ package symbols
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -152,7 +152,7 @@ func (r *Resolver) Resolve(ctx context.Context, spaceID string, rels []Relations
 
 	resolved = result.([]RelationshipRecord)
 	if unresolved > 0 {
-		log.Printf("resolver: %d resolved, %d unresolved for space %s", len(resolved), unresolved, spaceID)
+		slog.Info("resolver: resolution complete", "resolved", len(resolved), "unresolved", unresolved, "space_id", spaceID)
 	}
 
 	return resolved, nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -85,7 +85,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 		UpdatedAt:     now,
 	}
 	if err := o.store.CreateScrapeJob(ctx, scrapeJob); err != nil {
-		log.Printf("scraper: failed to create job in Neo4j: %v", err)
+		slog.Error("scraper: failed to create job in Neo4j", "error", err)
 		queueJob.Fail(err)
 		return
 	}
@@ -97,7 +97,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 		if err != nil {
 			errMsg = err.Error()
 		}
-		log.Printf("scraper: %s", errMsg)
+		slog.Error("scraper: no plugin available", "error", errMsg)
 		_ = o.store.UpdateScrapeJobStatus(ctx, queueJob.ID, StatusFailed, 0)
 		_ = o.store.SetScrapeJobError(ctx, queueJob.ID, errMsg)
 		queueJob.Fail(fmt.Errorf("%s", errMsg))
@@ -146,7 +146,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 
 		// Check max_pages limit (only relevant when following links)
 		if req.Options.FollowLinks && processed >= req.Options.MaxPages {
-			log.Printf("scraper: job %s reached max_pages limit (%d)", queueJob.ID, req.Options.MaxPages)
+			slog.Info("scraper: job reached max_pages limit", "job_id", queueJob.ID, "max_pages", req.Options.MaxPages)
 			break
 		}
 
@@ -167,7 +167,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 			Metadata:    optMeta,
 		})
 		if err != nil {
-			log.Printf("scraper: Parse failed for %s: %v", entry.url, err)
+			slog.Error("scraper: Parse failed", "url", entry.url, "error", err)
 			_ = o.store.SaveScrapedContent(ctx, &ScrapedContent{
 				ContentID: uuid.New().String(),
 				JobID:     queueJob.ID,
@@ -180,7 +180,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 		}
 
 		if resp.Error != "" {
-			log.Printf("scraper: Parse returned error for %s: %s", entry.url, resp.Error)
+			slog.Warn("scraper: Parse returned error", "url", entry.url, "error", resp.Error)
 		}
 
 		// Process observations and extract discovered links
@@ -216,8 +216,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 	// Update job to awaiting_review
 	_ = o.store.UpdateScrapeJobStatus(ctx, queueJob.ID, StatusAwaitingReview, processed)
 	queueJob.UpdateProgress(processed, "awaiting review")
-	log.Printf("scraper: job %s complete, %d URLs processed (follow_links=%v, max_depth=%d), awaiting review",
-		queueJob.ID, processed, req.Options.FollowLinks, req.Options.MaxDepth)
+	slog.Info("scraper: job complete, awaiting review", "job_id", queueJob.ID, "urls_processed", processed, "follow_links", req.Options.FollowLinks, "max_depth", req.Options.MaxDepth)
 }
 
 // saveObservation converts a plugin observation to ScrapedContent and persists it.
@@ -254,14 +253,14 @@ func (o *Orchestrator) saveObservation(ctx context.Context, jobID, pageURL strin
 	if o.dedup != nil && o.embedder != nil {
 		similar, dedupErr := o.dedup.CheckSimilar(ctx, targetSpaceID, content)
 		if dedupErr != nil {
-			log.Printf("scraper: dedup check failed for %s: %v", pageURL, dedupErr)
+			slog.Warn("scraper: dedup check failed", "url", pageURL, "error", dedupErr)
 		} else {
 			sc.SimilarExisting = similar
 		}
 	}
 
 	if err := o.store.SaveScrapedContent(ctx, sc); err != nil {
-		log.Printf("scraper: failed to save content for %s: %v", pageURL, err)
+		slog.Error("scraper: failed to save content", "url", pageURL, "error", err)
 	}
 }
 

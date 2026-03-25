@@ -3,7 +3,7 @@ package retrieval
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -128,8 +128,7 @@ LIMIT $topK`
 			for i, r := range results {
 				if strings.Contains(strings.ToLower(r.Name), debugTraceTerm) ||
 					strings.Contains(strings.ToLower(r.Path), debugTraceTerm) {
-					log.Printf("[DEBUG BM25] Found '%s' at rank %d: NodeID=%s, Name=%s, Path=%s, Score=%.2f",
-						debugTraceTerm, i+1, r.NodeID, r.Name, r.Path, r.Score)
+					slog.Debug("bm25: found trace term", "term", debugTraceTerm, "rank", i+1, "node_id", r.NodeID, "name", r.Name, "path", r.Path, "score", r.Score)
 				}
 			}
 		}
@@ -205,7 +204,7 @@ type FusedCandidate struct {
 func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, vectorWeight, bm25Weight float64, rrfK int) []FusedCandidate {
 	// Debug: log input counts
 	if debugTraceEnabled {
-		log.Printf("[DEBUG RRF] Input: %d vector results, %d BM25 results", len(vectorResults), len(bm25Results))
+		slog.Debug("rrf: input counts", "vector_results", len(vectorResults), "bm25_results", len(bm25Results))
 	}
 	// Build maps for quick lookup and score accumulation
 	candidateMap := make(map[string]*FusedCandidate)
@@ -275,11 +274,10 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 		for i, f := range fused {
 			if strings.Contains(strings.ToLower(f.Name), debugTraceTerm) ||
 				strings.Contains(strings.ToLower(f.Path), debugTraceTerm) {
-				log.Printf("[DEBUG RRF] Fused '%s' at rank %d: NodeID=%s, Name=%s, RRF=%.4f, VectorRank=%d, BM25Rank=%d",
-					debugTraceTerm, i+1, f.NodeID, f.Name, f.RRFScore, f.VectorRank, f.BM25Rank)
+				slog.Debug("rrf: fused trace term", "term", debugTraceTerm, "rank", i+1, "node_id", f.NodeID, "name", f.Name, "rrf_score", f.RRFScore, "vector_rank", f.VectorRank, "bm25_rank", f.BM25Rank)
 			}
 		}
-		log.Printf("[DEBUG RRF] Output: %d total fused candidates", len(fused))
+		slog.Debug("rrf: output count", "total_fused", len(fused))
 	}
 
 	return fused
@@ -297,7 +295,7 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 	}
 
 	if debugTraceEnabled {
-		log.Printf("[DEBUG ConvertFused] Converting %d fused candidates", len(fused))
+		slog.Debug("convert_fused: converting candidates", "count", len(fused))
 	}
 
 	cands := make([]Candidate, len(fused))
@@ -319,8 +317,7 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 		if debugTraceEnabled {
 			if strings.Contains(strings.ToLower(f.Name), debugTraceTerm) ||
 				strings.Contains(strings.ToLower(f.Path), debugTraceTerm) {
-				log.Printf("[DEBUG ConvertFused] '%s' at position %d: NodeID=%s, Name=%s, VectorSim=%.4f, BM25Score=%.4f",
-					debugTraceTerm, i, f.NodeID, f.Name, f.VectorSim, f.BM25Score)
+				slog.Debug("convert_fused: trace term", "term", debugTraceTerm, "position", i, "node_id", f.NodeID, "name", f.Name, "vector_sim", f.VectorSim, "bm25_score", f.BM25Score)
 			}
 		}
 	}

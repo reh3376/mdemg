@@ -2,7 +2,7 @@ package retrieval
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math"
 	"regexp"
 	"sort"
@@ -701,7 +701,7 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 	now := time.Now()
 
 	if scoringDebugEnabled {
-		log.Printf("[DEBUG Scoring] Processing %d candidates, query='%s', codeQueryDetected=%v", len(cands), queryText, codeQueryDetected)
+		slog.Debug("scoring: processing candidates", "count", len(cands), "query", queryText, "code_query_detected", codeQueryDetected)
 	}
 
 	// Stale reference penalties (Phase 2 Temporal)
@@ -863,14 +863,11 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 		if scoringDebugEnabled {
 			if strings.Contains(strings.ToLower(c.Name), scoringDebugTerm) ||
 				strings.Contains(strings.ToLower(c.Path), scoringDebugTerm) {
-				log.Printf("[DEBUG Scoring] '%s': NodeID=%s, Name=%s, Layer=%d", scoringDebugTerm, c.NodeID, c.Name, c.Layer)
-				log.Printf("[DEBUG Scoring]   Gates: vecW=%.3f, actW=%.3f, l1Boost=%.3f",
-					gates.VectorWeight, gates.ActivationWeight, gates.L1Boost)
-				log.Printf("[DEBUG Scoring]   Components: vec=%.4f, bm25=%.4f, act=%.4f, rec=%.4f, conf=%.4f, pathBoost=%.4f, compBoost=%.4f, l1Boost=%.4f",
-					vecComponent, bm25Component, actComponent, recComponent, confComponent, pb, cb, l1BoostEffect)
-				log.Printf("[DEBUG Scoring]   Penalties: hub=%.4f (degree=%d), redundancy=%.4f (prefixCount=%d)",
-					hubPenComponent, deg[c.NodeID], redPenComponent, prefixCount[prefixOf(c.Path)])
-				log.Printf("[DEBUG Scoring]   Final: %.4f, codeTypeMult=%.2f", s, codeTypeMult)
+				slog.Debug("scoring: candidate trace", "term", scoringDebugTerm, "node_id", c.NodeID, "name", c.Name, "layer", c.Layer)
+				slog.Debug("scoring: gates", "vec_weight", gates.VectorWeight, "act_weight", gates.ActivationWeight, "l1_boost", gates.L1Boost)
+				slog.Debug("scoring: components", "vec", vecComponent, "bm25", bm25Component, "act", actComponent, "rec", recComponent, "conf", confComponent, "path_boost", pb, "comp_boost", cb, "l1_boost", l1BoostEffect)
+				slog.Debug("scoring: penalties", "hub", hubPenComponent, "degree", deg[c.NodeID], "redundancy", redPenComponent, "prefix_count", prefixCount[prefixOf(c.Path)])
+				slog.Debug("scoring: final", "score", s, "code_type_mult", codeTypeMult)
 			}
 		}
 
@@ -898,13 +895,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			if strings.Contains(strings.ToLower(item.Name), scoringDebugTerm) ||
 				strings.Contains(strings.ToLower(item.Path), scoringDebugTerm) {
 				found = true
-				log.Printf("[DEBUG Scoring] '%s' ranked #%d of %d (before truncation to topK=%d): Score=%.4f, Name=%s",
-					scoringDebugTerm, i+1, len(items), topK, item.Score, item.Name)
+				slog.Debug("scoring: term ranked before truncation", "term", scoringDebugTerm, "rank", i+1, "total", len(items), "top_k", topK, "score", item.Score, "name", item.Name)
 				break
 			}
 		}
 		if !found {
-			log.Printf("[DEBUG Scoring] '%s' NOT FOUND in %d scored items", scoringDebugTerm, len(items))
+			slog.Debug("scoring: term not found in scored items", "term", scoringDebugTerm, "total_items", len(items))
 		}
 	}
 
@@ -919,12 +915,12 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 			if strings.Contains(strings.ToLower(item.Name), scoringDebugTerm) ||
 				strings.Contains(strings.ToLower(item.Path), scoringDebugTerm) {
 				found = true
-				log.Printf("[DEBUG Scoring] '%s' SURVIVED truncation at rank #%d", scoringDebugTerm, i+1)
+				slog.Debug("scoring: term survived truncation", "term", scoringDebugTerm, "rank", i+1)
 				break
 			}
 		}
 		if !found {
-			log.Printf("[DEBUG Scoring] '%s' DID NOT survive truncation to topK=%d", scoringDebugTerm, topK)
+			slog.Debug("scoring: term did not survive truncation", "term", scoringDebugTerm, "top_k", topK)
 		}
 	}
 
