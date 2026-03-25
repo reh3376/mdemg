@@ -27,27 +27,55 @@
   "request": {
     "method": "GET",
     "path": "/v1/memory/node/meta",
-    "query_params": {
-      "space_id": "${test_space}",
-      "path": "CLAUDE.md"
+    "query": {
+      "space_id": "{{test_space}}",
+      "path": "nonexistent-file.md"
     }
   },
   "expected": {
-    "status": 200,
+    "status": 404,
     "body_assertions": [
       {
-        "path": "$.node_id",
-        "op": "exists"
+        "path": "$.error",
+        "op": "equals",
+        "expected": "node not found"
       },
       {
         "path": "$.path",
         "op": "equals",
-        "expected": "CLAUDE.md"
-      },
-      {
-        "path": "$.status",
-        "op": "exists"
+        "expected": "nonexistent-file.md"
       }
     ]
-  }
+  },
+  "variants": [
+    {
+      "name": "missing_params",
+      "description": "Returns 400 when required query params are missing",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/node/meta"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "Returns 405 for POST requests",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/node/meta",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
 }
