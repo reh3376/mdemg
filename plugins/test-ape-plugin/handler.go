@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strconv"
 	"sync"
 	"time"
@@ -32,7 +32,7 @@ func NewTestApePluginHandler() *TestApePluginHandler {
 
 // Handshake is called immediately after spawn to verify module is ready.
 func (h *TestApePluginHandler) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	return &pb.HandshakeResponse{
 		ModuleId:      moduleID,
@@ -67,7 +67,7 @@ func (h *TestApePluginHandler) HealthCheck(ctx context.Context, req *pb.HealthCh
 
 // Shutdown is called when MDEMG is stopping or the module is being disabled.
 func (h *TestApePluginHandler) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "goodbye",
@@ -96,8 +96,7 @@ func (h *TestApePluginHandler) Execute(ctx context.Context, req *pb.ExecuteReque
 	execNum := h.executionsTotal
 	h.mu.Unlock()
 
-	log.Printf("%s: executing task %s (trigger=%s, execution #%d)",
-		moduleID, req.TaskId, req.Trigger, execNum)
+	slog.Info("executing task", "module", moduleID, "task_id", req.TaskId, "trigger", req.Trigger, "execution", execNum)
 
 	// TODO: Implement your background task logic here
 	var message string
@@ -123,7 +122,7 @@ func (h *TestApePluginHandler) Execute(ctx context.Context, req *pb.ExecuteReque
 
 	stats.DurationMs = time.Since(start).Milliseconds()
 
-	log.Printf("%s: task %s completed in %v", moduleID, req.TaskId, time.Since(start))
+	slog.Info("task completed", "module", moduleID, "task_id", req.TaskId, "duration", time.Since(start))
 
 	return &pb.ExecuteResponse{
 		Success: true,

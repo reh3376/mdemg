@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"os"
 	"strconv"
@@ -147,6 +147,8 @@ type decayConfig struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	// Print banner first (always shown, even on error)
 	fmt.Println("MDEMG Decay Job")
 	fmt.Println("===============")
@@ -162,18 +164,21 @@ func main() {
 
 	driver, err := newDriver(cfg)
 	if err != nil {
-		log.Fatalf("failed to create neo4j driver: %v", err)
+		slog.Error("failed to create neo4j driver", "error", err)
+		os.Exit(1)
 	}
 	defer func() { _ = driver.Close(ctx) }()
 
 	// Verify connectivity
 	if err := driver.VerifyConnectivity(ctx); err != nil {
-		log.Fatalf("failed to connect to neo4j: %v", err)
+		slog.Error("failed to connect to neo4j", "error", err)
+		os.Exit(1)
 	}
 
 	// Run the decay job
 	if err := runDecayJob(ctx, driver, cfg); err != nil {
-		log.Fatalf("decay job failed: %v", err)
+		slog.Error("decay job failed", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -266,7 +271,7 @@ func runDecayJob(ctx context.Context, driver neo4j.DriverWithContext, cfg decayC
 	if cfg.CautiousWindow > 0 {
 		count, err := countRecentlyReinforced(ctx, driver, cfg)
 		if err != nil {
-			log.Printf("[WARN] could not count recently reinforced edges: %v", err)
+			slog.Warn("could not count recently reinforced edges", "error", err)
 		} else {
 			stats.protectedRecentlyReinforced = count
 		}

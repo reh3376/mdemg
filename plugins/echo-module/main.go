@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -24,10 +24,13 @@ var (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	flag.Parse()
 
 	if *socketPath == "" {
-		log.Fatal("--socket is required")
+		slog.Error("missing required flag", "flag", "--socket")
+		os.Exit(1)
 	}
 
 	// Remove stale socket
@@ -36,7 +39,8 @@ func main() {
 	// Create Unix socket listener
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		slog.Error("failed to listen", "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 
@@ -50,7 +54,7 @@ func main() {
 	pb.RegisterModuleLifecycleServer(server, echoModule)
 	pb.RegisterIngestionModuleServer(server, echoModule)
 
-	log.Printf("Echo module listening on %s", *socketPath)
+	slog.Info("echo module listening", "socket", *socketPath)
 
 	// Handle shutdown gracefully
 	sigChan := make(chan os.Signal, 1)
@@ -58,13 +62,14 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Println("Shutting down...")
+		slog.Info("shutting down")
 		server.GracefulStop()
 	}()
 
 	// Serve
 	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -77,7 +82,7 @@ type EchoModule struct {
 
 // Handshake implements ModuleLifecycle
 func (m *EchoModule) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("Handshake received: mdemg_version=%s, socket=%s", req.MdemgVersion, req.SocketPath)
+	slog.Info("handshake received", "mdemg_version", req.MdemgVersion, "socket", req.SocketPath)
 
 	return &pb.HandshakeResponse{
 		ModuleId:      "echo-module",
@@ -105,7 +110,7 @@ func (m *EchoModule) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest
 
 // Shutdown implements ModuleLifecycle
 func (m *EchoModule) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("Shutdown requested: reason=%s, timeout=%dms", req.Reason, req.TimeoutMs)
+	slog.Info("shutdown requested", "reason", req.Reason, "timeout_ms", req.TimeoutMs)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "goodbye",

@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -32,12 +32,12 @@ func (eh *EventHandler) Start() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	log.Printf("%s: event handler started (polling every 30s)", moduleID)
+	slog.Info("event handler started", "module", moduleID, "poll_interval", "30s")
 
 	for {
 		select {
 		case <-eh.stopCh:
-			log.Printf("%s: event handler stopped", moduleID)
+			slog.Info("event handler stopped", "module", moduleID)
 			return
 		case <-ticker.C:
 			eh.poll()
@@ -74,7 +74,7 @@ func (eh *EventHandler) poll() {
 	// Refresh spec index if observations have changed
 	// (Simple approach: just reload specs periodically)
 	if err := eh.specIndex.Load(eh.config.specRoot, eh.config.frameworks, eh.config.enableDrift); err != nil {
-		log.Printf("%s: spec index refresh error: %v", moduleID, err)
+		slog.Error("spec index refresh error", "module", moduleID, "error", err)
 		return
 	}
 

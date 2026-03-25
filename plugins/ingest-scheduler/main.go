@@ -14,7 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -50,11 +50,14 @@ type server struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
 
 	if *socketPath == "" {
-		log.Fatal("--socket flag is required")
+		slog.Error("missing required flag", "flag", "--socket")
+		os.Exit(1)
 	}
 
 	// Remove stale socket
@@ -63,12 +66,13 @@ func main() {
 	// Create Unix socket listener
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		log.Fatalf("Failed to listen on socket: %v", err)
+		slog.Error("failed to listen on socket", "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 	defer os.Remove(*socketPath)
 
-	log.Printf("%s: listening on %s", moduleID, *socketPath)
+	slog.Info("listening", "module", moduleID, "socket", *socketPath)
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
@@ -89,36 +93,37 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Printf("%s: received shutdown signal", moduleID)
+		slog.Info("received shutdown signal", "module", moduleID)
 		grpcServer.GracefulStop()
 	}()
 
 	// Start serving
 	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		slog.Error("failed to serve", "error", err)
+		os.Exit(1)
 	}
 }
 
 // Handshake implements ModuleLifecycle.Handshake
 func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	// Parse config
 	if cron, ok := req.Config["cron_expression"]; ok && cron != "" {
 		s.cronExpression = cron
-		log.Printf("%s: cron_expression set to %s", moduleID, s.cronExpression)
+		slog.Info("config applied", "module", moduleID, "cron_expression", s.cronExpression)
 	}
 
 	if threshold, ok := req.Config["stale_threshold_hours"]; ok {
 		if t, err := strconv.Atoi(threshold); err == nil {
 			s.staleThresholdHours = t
-			log.Printf("%s: stale_threshold_hours set to %d", moduleID, s.staleThresholdHours)
+			slog.Info("config applied", "module", moduleID, "stale_threshold_hours", s.staleThresholdHours)
 		}
 	}
 
 	if endpoint, ok := req.Config["mdemg_endpoint"]; ok && endpoint != "" {
 		s.mdemgEndpoint = endpoint
-		log.Printf("%s: mdemg_endpoint set to %s", moduleID, s.mdemgEndpoint)
+		slog.Info("config applied", "module", moduleID, "mdemg_endpoint", s.mdemgEndpoint)
 	}
 
 	// Parse space_repo_map (format: "space1=/path1,space2=/path2")
@@ -129,7 +134,7 @@ func (s *server) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.H
 				s.spaceRepoMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 			}
 		}
-		log.Printf("%s: loaded %d space->repo mappings", moduleID, len(s.spaceRepoMap))
+		slog.Info("loaded space-repo mappings", "module", moduleID, "count", len(s.spaceRepoMap))
 	}
 
 	return &pb.HandshakeResponse{
@@ -170,7 +175,7 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*
 
 // Shutdown implements ModuleLifecycle.Shutdown
 func (s *server) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "shutting down gracefully",
@@ -196,8 +201,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 	execNum := s.executionsTotal
 	s.mu.Unlock()
 
-	log.Printf("%s: executing task %s (trigger=%s, execution #%d)",
-		moduleID, req.TaskId, req.Trigger, execNum)
+	slog.Info("executing task", "module", moduleID, "task_id", req.TaskId, "trigger", req.Trigger, "execution", execNum)
 
 	var stats *pb.ExecuteStats
 	var message string
@@ -208,7 +212,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 		// Source changed event - check if specific space needs re-ingest
 		spaceID := req.Context["space_id"]
 		if spaceID != "" {
-			log.Printf("%s: source_changed event for space %s", moduleID, spaceID)
+			slog.Info("source_changed event", "module", moduleID, "space_id", spaceID)
 			if repoPath, ok := s.spaceRepoMap[spaceID]; ok {
 				triggered, err := s.triggerIngest(spaceID, repoPath, true)
 				if err != nil {
@@ -271,7 +275,7 @@ func (s *server) Execute(ctx context.Context, req *pb.ExecuteRequest) (*pb.Execu
 		stats.DurationMs = time.Since(start).Milliseconds()
 	}
 
-	log.Printf("%s: task %s completed in %v: %s", moduleID, req.TaskId, time.Since(start), message)
+	slog.Info("task completed", "module", moduleID, "task_id", req.TaskId, "duration", time.Since(start), "message", message)
 
 	return &pb.ExecuteResponse{
 		Success: ingestErr == "",
@@ -319,10 +323,10 @@ func (s *server) checkAndTriggerStaleSpaces() (staleCount, totalCount int, err e
 				continue
 			}
 
-			log.Printf("%s: space %s is stale, triggering incremental ingest", moduleID, spaceID)
+			slog.Info("space is stale, triggering incremental ingest", "module", moduleID, "space_id", spaceID)
 			triggered, err := s.triggerIngest(spaceID, repoPath, true)
 			if err != nil {
-				log.Printf("%s: failed to trigger ingest for %s: %v", moduleID, spaceID, err)
+				slog.Error("failed to trigger ingest", "module", moduleID, "space_id", spaceID, "error", err)
 			} else if triggered {
 				staleCount++
 			}
@@ -410,6 +414,6 @@ func (s *server) triggerIngest(spaceID, repoPath string, incremental bool) (bool
 		return false, fmt.Errorf("failed to decode trigger response: %w", err)
 	}
 
-	log.Printf("%s: ingest job created: id=%s status=%s", moduleID, result.JobID, result.Status)
+	slog.Info("ingest job created", "module", moduleID, "job_id", result.JobID, "status", result.Status)
 	return true, nil
 }

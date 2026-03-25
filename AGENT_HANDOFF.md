@@ -38,22 +38,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-21/27 done, Linear U-1/U-2/U-3 done, Obsidian v2 in progress)
+- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/21/27 done, claude .md ingestion done)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
 === GAP ANALYSIS Phase 4 (in progress) ===
-1. ✅ GAP-18: slog migration — Linear module migrated (U-1), core done (Wave 2-3)
-2. 🔄 GAP-02: Obsidian vault ingestion — v1 committed (6962c4a), Linear blockers cleared (U-1/U-2/U-3), v2 in progress
+1. ✅ GAP-18: slog migration — ALL waves complete (internal/ + cmd/ + plugins/)
+2. ✅ GAP-02: Obsidian vault ingestion — v2 complete (parser, walker, Sync RPC, CI, release packaging, docs)
 3. GAP-26: Module developer tutorial with working example
 4. GAP-13: Windows desktop companion (Tauri from Linux sidebar)
 5. GAP-20: Graph visualization UI
 6. GAP-14: DBSCAN performance profiling + optimization
 
 === Pre-existing partial phases ===
-7. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
-8. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
+7. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
 9. TESTING: SSE streaming — accepted limitation (GAP-05: 14 Go unit tests cover streaming; UATS spec documents gap)
 10. RESEARCH: AutoResearch integration analysis (docs/development/)
 
@@ -280,7 +279,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 43B | CMS Quality | ✅ | `docs/specs/phase3b-cms-quality.md` |
 | 43C | Multi-Agent CMS | ✅ | `docs/specs/phase3c-multi-agent.md` |
 | 44 | Linear CRUD | ✅ | `docs/specs/phase4-linear-crud.md` — upgraded: slog, context cancellation, edge emission (U-1/U-2/U-3) |
-| 45 | Modular Intelligence | 🔄 | 45.1-45.2 ✅, 45.3 📋 (parser RPC), 45.4 🔄 (Obsidian pending), 45.5 ✅ |
+| 45 | Modular Intelligence | ✅ | 45.1-45.2 ✅, 45.3 cancelled (parser RPC — researched, bad idea), 45.4 ✅ (Obsidian v2), 45.5 ✅ |
 | 46 | Symbol Indexing | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §8 |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
 | 47 | Incremental Updates | 🔄 | 47.1 ✅, 47.2 🔄 (APE INGEST pending), 47.3-47.5 ✅ |
@@ -378,17 +377,14 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
 | Gap | Title | Tier | Effort | Notes |
 |-----|-------|------|--------|-------|
-| GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | Core done (GAP-18 Wave 2-3), Linear module migrated (U-1) |
-| GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | v1 committed (6962c4a), Linear blockers cleared (U-1/U-2/U-3), v2 in progress |
+| GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | ✅ ALL waves complete (internal/ + cmd/ + plugins/) |
+| GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | ✅ v2 complete — parser, walker, Sync RPC, CI gate, release packaging, docs |
 | GAP-26 | Module developer tutorial | 2 | M | Working example needed |
 | GAP-13 | Windows desktop companion | 3 | M | Tauri sidebar provides reusable architecture |
 | GAP-20 | Graph visualization UI | 3 | M-L | Users must use Neo4j Browser directly |
 | GAP-14 | DBSCAN performance profiling | 3 | Research | O(n^2) distance matrix; matters at 50K+ nodes |
 
 ### Partially Complete Phases
-
-**Phase 45.3 — Code Parser RPC Migration** (📋 Planned)
-Extract language parsers from `internal/symbols/` into an RPC sidecar module. Decouples tree-sitter from the main binary.
 
 **Phase 47.2 — APE INGEST Scheduled Sync** (🔄 Half done)
 Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{space_id}/freshness`). APE INGEST action type not yet wired into the RSIC action dispatcher.
@@ -454,7 +450,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
-| Obsidian integration v2 in progress | Low | Phase 45.4 — v1 committed (6962c4a: gRPC lifecycle, Matches, Parse, parser tests), v2 enhancements in progress (walker, yaml.v3, full Sync) |
+| ~~Obsidian integration v2 in progress~~ | ~~Low~~ | ~~COMPLETE (2026-03-25)~~ — Phase 45.4 fully closed: v2 committed (parser+walker+yaml.v3+full Sync, 23 unit tests), CI gate, GoReleaser 4-platform builds, Homebrew+Scoop+.deb packaging, Windows release, ingestion-guide docs. |
 | ~~Claude .md files not ingested into CMS~~ | ~~High~~ | ~~FIXED (2026-03-25)~~ — `mdemg ingest-claude-md` command with SHA256 content-hash change detection. 15 files tracked (3 in-repo, 6 auto-memory, 6 plans). Hooks: session-start (background), pre-compact (forced), post-tool-observe (on Write/Edit). `GET /v1/memory/node/meta` endpoint for hash comparison. |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |

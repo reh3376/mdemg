@@ -15,7 +15,7 @@ import (
 
 const (
 	moduleID      = "obsidian-module"
-	moduleVersion = "1.0.0"
+	moduleVersion = "2.0.0"
 )
 
 func main() {

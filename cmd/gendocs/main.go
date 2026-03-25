@@ -3,7 +3,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra/doc"
@@ -11,12 +11,15 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	root := cli.NewRootCmdForDocs()
 
 	// Generate man pages
 	manDir := "./man/man1"
 	if err := os.MkdirAll(manDir, 0o755); err != nil {
-		log.Fatalf("create man dir: %v", err)
+		slog.Error("failed to create man dir", "error", err)
+		os.Exit(1)
 	}
 
 	header := &doc.GenManHeader{
@@ -26,8 +29,9 @@ func main() {
 	}
 
 	if err := doc.GenManTree(root, header, manDir); err != nil {
-		log.Fatalf("generate man pages: %v", err)
+		slog.Error("failed to generate man pages", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Man pages generated in %s/", manDir)
+	slog.Info("man pages generated", "dir", manDir)
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,7 +36,7 @@ func NewMyPluginHandler() *MyPluginHandler {
 
 // Handshake is called immediately after spawn to verify module is ready.
 func (h *MyPluginHandler) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
+	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
 
 	// Store configuration from manifest
 	h.mu.Lock()
@@ -66,7 +66,7 @@ func (h *MyPluginHandler) HealthCheck(ctx context.Context, req *pb.HealthCheckRe
 
 // Shutdown is called when MDEMG is stopping or the module is being disabled.
 func (h *MyPluginHandler) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
+	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "goodbye",

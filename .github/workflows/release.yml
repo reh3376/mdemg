@@ -39,11 +39,18 @@ jobs:
             -ldflags "-s -w" \
             -o plugins/uxts-module/uxts-module.exe ./plugins/uxts-module/
 
+      - name: Build Obsidian plugin Windows amd64
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
+            -ldflags "-s -w" \
+            -o plugins/obsidian-module/obsidian-module.exe ./plugins/obsidian-module/
+
       - name: Create archive
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
-          Compress-Archive -Path mdemg.exe, plugins/uxts-module/uxts-module.exe, plugins/uxts-module/manifest.json -DestinationPath "mdemg_${version}_windows_amd64.zip"
+          Compress-Archive -Path mdemg.exe, plugins/uxts-module/uxts-module.exe, plugins/uxts-module/manifest.json, plugins/obsidian-module/obsidian-module.exe, plugins/obsidian-module/manifest.json -DestinationPath "mdemg_${version}_windows_amd64.zip"
 
       - name: Generate checksum
         shell: bash

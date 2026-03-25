@@ -116,6 +116,55 @@ builds:
     ldflags:
       - -s -w
 
+  # Obsidian ingestion module (INGESTION plugin for Obsidian vault parsing)
+  - id: obsidian-module-darwin-arm64
+    main: ./plugins/obsidian-module
+    binary: obsidian-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: obsidian-module-darwin-amd64
+    main: ./plugins/obsidian-module
+    binary: obsidian-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+
+  - id: obsidian-module-linux-amd64
+    main: ./plugins/obsidian-module
+    binary: obsidian-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+
+  - id: obsidian-module-linux-arm64
+    main: ./plugins/obsidian-module
+    binary: obsidian-module
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+
 archives:
   - id: darwin
     formats:
@@ -125,6 +174,8 @@ archives:
       - mdemg-darwin-amd64
       - uxts-module-darwin-arm64
       - uxts-module-darwin-amd64
+      - obsidian-module-darwin-arm64
+      - obsidian-module-darwin-amd64
     name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
     files:
       - src: "man/man1/*.1"
@@ -132,6 +183,9 @@ archives:
         strip_parent: true
       - src: "plugins/uxts-module/manifest.json"
         dst: plugins/uxts-module
+        strip_parent: true
+      - src: "plugins/obsidian-module/manifest.json"
+        dst: plugins/obsidian-module
         strip_parent: true
   - id: linux
     formats:
@@ -141,6 +195,8 @@ archives:
       - mdemg-linux-arm64
       - uxts-module-linux-amd64
       - uxts-module-linux-arm64
+      - obsidian-module-linux-amd64
+      - obsidian-module-linux-arm64
     name_template: "mdemg_{{.Version}}_{{.Os}}_{{.Arch}}"
     files:
       - src: "man/man1/*.1"
@@ -148,6 +204,9 @@ archives:
         strip_parent: true
       - src: "plugins/uxts-module/manifest.json"
         dst: plugins/uxts-module
+        strip_parent: true
+      - src: "plugins/obsidian-module/manifest.json"
+        dst: plugins/obsidian-module
         strip_parent: true
       - src: "packaging/mdemg_linux/systemd/*"
         dst: systemd
@@ -181,6 +240,8 @@ nfpms:
         dst: /usr/share/man/man1/
       - src: plugins/uxts-module/manifest.json
         dst: /usr/share/mdemg/plugins/uxts-module/manifest.json
+      - src: plugins/obsidian-module/manifest.json
+        dst: /usr/share/mdemg/plugins/obsidian-module/manifest.json
       - src: packaging/mdemg_linux/systemd/mdemg.service
         dst: /usr/lib/systemd/system/mdemg@.service
       - src: packaging/mdemg_linux/systemd/mdemg-rsic.service
@@ -222,6 +283,10 @@ brews:
       plugdir = share/"mdemg/plugins/uxts-module"
       plugdir.install "uxts-module"
       plugdir.install "plugins/uxts-module/manifest.json"
+      # Obsidian plugin (INGESTION module for Obsidian vault parsing)
+      obsdir = share/"mdemg/plugins/obsidian-module"
+      obsdir.install "obsidian-module"
+      obsdir.install "plugins/obsidian-module/manifest.json"
     test: |
       system "#{bin}/mdemg", "version"
     caveats: |
