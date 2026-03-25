@@ -3,6 +3,8 @@ package cli
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -21,6 +23,17 @@ import (
 	"golang.org/x/term"
 	"mdemg/internal/config"
 )
+
+// generatePassword creates a cryptographically random hex password.
+// GAP-19: Auto-generate Neo4j credentials on init instead of hardcoding.
+func generatePassword(nBytes int) string {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to a static default if crypto/rand fails (should never happen)
+		return "mdemg-dev" //nolint:gosec // G101: fallback only when crypto/rand fails
+	}
+	return hex.EncodeToString(b)
+}
 
 func newInitCmd() *cobra.Command {
 	var (
@@ -459,9 +472,11 @@ func runInit(flags initFlags) error {
 		envLines = strings.Split(strings.TrimSpace(string(data)), "\n")
 	}
 
-	// Add NEO4J_PASS if not already present
+	// Add NEO4J_PASS if not already present — auto-generate a secure password (GAP-19)
 	if !envContains(envLines, "NEO4J_PASS") {
-		envLines = append(envLines, "NEO4J_PASS=mdemg-dev")
+		generatedPass := generatePassword(16) // 32-char hex string
+		envLines = append(envLines, fmt.Sprintf("NEO4J_PASS=%s", generatedPass))
+		fmt.Printf("  Generated Neo4j password (stored in .env)\n")
 	}
 
 	// Add OPENAI_API_KEY if user provided one and not already present
@@ -493,7 +508,7 @@ func runInit(flags initFlags) error {
 	if flags.quick {
 		fmt.Println("Starting Neo4j and server (--quick mode)...")
 		fmt.Println()
-		if err := runDBStart(0, 0, "mdemg-dev"); err != nil {
+		if err := runDBStart(0, 0, os.Getenv("NEO4J_PASS")); err != nil {
 			fmt.Printf("Warning: Neo4j start failed: %v\n", err)
 			fmt.Println("You can start it manually: mdemg db start")
 		}
@@ -524,7 +539,7 @@ func runInit(flags initFlags) error {
 		answer := promptLine("Start Neo4j and server now? (yes/no) [yes]", "yes")
 		if answer == "yes" {
 			fmt.Println()
-			if err := runDBStart(0, 0, "mdemg-dev"); err != nil {
+			if err := runDBStart(0, 0, os.Getenv("NEO4J_PASS")); err != nil {
 				fmt.Printf("Warning: Neo4j start failed: %v\n", err)
 				fmt.Println("You can start it manually: mdemg db start")
 			}

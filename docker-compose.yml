@@ -6,7 +6,7 @@ services:
       - "7474:7474"   # Browser
       - "7687:7687"   # Bolt
     environment:
-      NEO4J_AUTH: "neo4j/testpassword"
+      NEO4J_AUTH: "neo4j/${NEO4J_PASS:-testpassword}"
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_memory_pagecache_size: "12G"
       NEO4J_dbms_memory_heap_initial__size: "6G"
@@ -18,7 +18,7 @@ services:
       - neo4j_data:/data
       - neo4j_logs:/logs
     healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "testpassword", "RETURN 1"]
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASS:-testpassword} 'RETURN 1'"]
       interval: 10s
       timeout: 5s
       retries: 5

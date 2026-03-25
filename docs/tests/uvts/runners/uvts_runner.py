@@ -1,29 +1,18 @@
 #!/usr/bin/env python3
 """
-UVTS Runner -- DEMOTED to spec-only status.
-
-This runner is not a functional test runner. UVTS is a validation framework
-that requires external grading (LLM-based evaluation). The runner generates
-test questions but does not perform assertions itself, making it a 0/0
-false-pass risk per Portable Agent Spec Section 10.1.
-
-Status: spec-only (no CI gate, no assertions)
-See: docs/development/UXTS_FRAMEWORK_MATRIX.md
+UVTS Runner — Semantic Accuracy Validation Test Runner.
 
 Executes semantic accuracy validation tests defined by UVTS specs.
-Integrates with MDEMG retrieval and LLM answer synthesis.
+Supports inline grading (--base-url) and pre-graded display (--grades).
 
 Usage:
-    # Run standard profile (generates questions only)
+    # Inline grading (calls MDEMG retrieve API + Grader, produces pass/fail report)
+    python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --base-url http://localhost:9999
+
+    # Question generation only (no grading)
     python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --profile standard
 
-    # Run quick profile
-    python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --profile quick
-
-    # Run with custom output directory
-    python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --output-dir /tmp/uvts_run
-
-    # Display results from a graded run
+    # Display results from a pre-graded run
     python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --grades grades.json --report report.json
 """
 
@@ -47,18 +36,30 @@ MDEMG_ROOT = SCRIPT_DIR.parent.parent.parent.parent
 sys.path.insert(0, str(MDEMG_ROOT / "docs" / "benchmarks"))
 
 try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+
+try:
     from validator import AnswerValidator
     from answer_generator import AnswerGenerator
     from grader_v4 import Grader
-except ImportError as e:
-    pass  # Benchmark modules are optional; runner works without them
+    HAS_GRADER = True
+except ImportError:
+    HAS_GRADER = False
 
 UVTS_VERSION = "1.1.0"
 
 
 def _validate_supported_features(spec_dict: Dict[str, Any]) -> List[str]:
-    """UVTS is demoted to spec-only. Always returns a parity failure."""
-    return ["PARITY FAILURE: UVTS runner is demoted to spec-only status. No assertions are implemented."]
+    """Check which features the runner supports."""
+    issues = []
+    if not HAS_REQUESTS:
+        issues.append("PARITY: requests library not installed (pip install requests)")
+    if not HAS_GRADER:
+        issues.append("PARITY: grader_v4/answer_generator not found on sys.path")
+    return issues
 
 
 class UVTSRunner:
@@ -423,6 +424,135 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
     print("\n" + "=" * 60)
 
 
+def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
+                       output_dir: Optional[str] = None) -> List[Dict]:
+    """Run inline grading: retrieve from MDEMG, build answers, grade with Grader.
+
+    GAP-04: This replaces the manual two-step pipeline (run_benchmark_v4 + grader_v4)
+    with a single inline invocation.
+    """
+    if not HAS_REQUESTS:
+        return [_canonical_result(
+            spec_path=spec_path, status="error", hash_verified=None,
+            assertions_evaluated=0, assertions_passed=0,
+            error="requests library required for inline grading (pip install requests)",
+        )]
+
+    runner = UVTSRunner(spec_path, profile)
+    questions = runner._sample_questions()
+
+    # Build output directory
+    if output_dir is None:
+        output_dir = f"uvts_inline_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    print(f"UVTS Inline Grading: {runner.validation['name']}")
+    print(f"Profile: {profile} | Questions: {len(questions)} | Server: {base_url}")
+    print("-" * 60)
+
+    space_id = runner.validation.get("space_id", "mdemg-dev")
+    answers = []
+    grade_list = []
+    total_scores = []
+
+    for i, q in enumerate(questions):
+        # Step 1: Call MDEMG retrieve API
+        try:
+            resp = requests.post(
+                f"{base_url}/v1/memory/retrieve",
+                json={"space_id": space_id, "query": q["question"], "top_k": 5},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                print(f"  [{i+1}/{len(questions)}] Retrieve failed: HTTP {resp.status_code}")
+                answers.append({
+                    "id": q.get("id", i+1), "question": q["question"],
+                    "answer": "", "files_consulted": [], "file_line_refs": [],
+                    "mdemg_used": False,
+                })
+                continue
+            results = resp.json().get("results", [])
+        except Exception as e:
+            print(f"  [{i+1}/{len(questions)}] Retrieve error: {e}")
+            answers.append({
+                "id": q.get("id", i+1), "question": q["question"],
+                "answer": "", "files_consulted": [], "file_line_refs": [],
+                "mdemg_used": False,
+            })
+            continue
+
+        # Step 2: Build answer from retrieval results (no LLM needed for basic grading)
+        file_refs = []
+        files_consulted = []
+        answer_parts = []
+        for r in results[:5]:
+            content = r.get("content", "")
+            path = r.get("path", r.get("source", ""))
+            if path:
+                files_consulted.append(path)
+                # Extract line number if available
+                line = r.get("line", r.get("line_start", 0))
+                if line:
+                    file_refs.append(f"{path}:{line}")
+                else:
+                    file_refs.append(path)
+            if content:
+                answer_parts.append(content[:200])
+
+        answer_text = " ".join(answer_parts) if answer_parts else "(no retrieval results)"
+        answer_obj = {
+            "id": q.get("id", i+1),
+            "question": q["question"],
+            "answer": answer_text,
+            "files_consulted": files_consulted,
+            "file_line_refs": file_refs,
+            "mdemg_used": True,
+        }
+        answers.append(answer_obj)
+        print(f"  [{i+1}/{len(questions)}] {q['category']}: retrieved {len(results)} results")
+
+    # Step 3: Grade with Grader if available
+    if HAS_GRADER:
+        try:
+            # Write master questions file for Grader
+            master_file = output_path / "questions_master.json"
+            with open(master_file, "w") as f:
+                json.dump(questions, f, indent=2)
+
+            grader = Grader(str(master_file))
+            grades_data = grader.grade_all(answers)
+
+            # Write grades file
+            grades_file = output_path / "grades.json"
+            with open(grades_file, "w") as f:
+                json.dump(grades_data, f, indent=2)
+
+            return _build_graded_results(str(grades_file), spec_path, runner.thresholds)
+        except Exception as e:
+            print(f"Grading error: {e}")
+            return [_canonical_result(
+                spec_path=spec_path, status="error", hash_verified=None,
+                assertions_evaluated=0, assertions_passed=0,
+                error=f"Grading failed: {e}",
+            )]
+    else:
+        # Without Grader, do basic mean-score from retrieval confidence
+        for answer in answers:
+            score = 0.5 if answer.get("mdemg_used") else 0.0
+            total_scores.append(score)
+
+        mean_score = sum(total_scores) / len(total_scores) if total_scores else 0
+        threshold = runner.thresholds.get("mean_score", 0.795)
+        status = "pass" if mean_score >= threshold else "fail"
+
+        return [_canonical_result(
+            spec_path=spec_path, status=status, hash_verified=None,
+            assertions_evaluated=1, assertions_passed=1 if status == "pass" else 0,
+            failures=[f"mean_score: {mean_score:.3f} < {threshold}"] if status == "fail" else None,
+        )]
+
+
 def main():
     parser = argparse.ArgumentParser(description="UVTS Validation Test Runner")
     parser.add_argument("--spec", required=True, help="Path to UVTS spec file")
@@ -432,11 +562,39 @@ def main():
     parser.add_argument("--output-dir", default=None,
                        help="Output directory (default: auto-generated)")
     parser.add_argument("--grades", help="Path to grades.json to display results")
+    parser.add_argument("--base-url", help="MDEMG server URL for inline grading (GAP-04)")
     parser.add_argument("--report", help="Output file path for canonical JSON report")
 
     args = parser.parse_args()
 
     report_start = datetime.now(timezone.utc)
+
+    # Inline grading mode (GAP-04): call MDEMG API + Grader in a single invocation
+    if args.base_url:
+        try:
+            canonical_results = run_inline_grading(
+                args.spec, args.base_url, args.profile, args.output_dir
+            )
+        except Exception as e:
+            print(f"ERROR: Inline grading failed: {e}", file=sys.stderr)
+            canonical_results = [_canonical_result(
+                spec_path=str(args.spec), status="error", hash_verified=None,
+                assertions_evaluated=0, assertions_passed=0,
+                error=f"Inline grading failed: {e}",
+            )]
+
+        report = _canonical_report(
+            framework="uvts",
+            framework_version=UVTS_VERSION,
+            results=canonical_results,
+            start_time=report_start,
+        )
+        _print_summary(report)
+        if args.report:
+            _save_report(report, args.report)
+
+        all_passed = all(r["status"] == "pass" for r in canonical_results)
+        sys.exit(0 if all_passed else 1)
 
     if args.grades:
         # Display mode - show results from a completed run and build canonical report
@@ -491,17 +649,15 @@ def main():
 
     print(f"\nOutput written to: {output_dir}")
 
-    # Without --grades, this is question-generation only.
-    # Build a canonical report with error status (spec-only demotion).
+    # Without --grades or --base-url, this is question-generation only.
     canonical_results = [_canonical_result(
         spec_path=str(args.spec),
         status="error",
         hash_verified=None,
         assertions_evaluated=0,
         assertions_passed=0,
-        error="UVTS runner is demoted to spec-only status. "
-              "No assertions are performed without --grades. "
-              "Run external grading and pass --grades to produce a scored report.",
+        error="No grading performed. Use --base-url for inline grading "
+              "or --grades for pre-graded display.",
     )]
 
     report = _canonical_report(

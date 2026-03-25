@@ -52,6 +52,11 @@
           "type": "string",
           "format": "date",
           "description": "ISO 8601 date of the most recent successful optimization run."
+        },
+        "optimized": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this content has been UITS-optimized (converged or accepted plateau). When true, automated generators should preserve the existing content rather than overwriting with a freshly generated version."
         }
       }
     },

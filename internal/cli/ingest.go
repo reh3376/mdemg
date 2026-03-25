@@ -1046,6 +1046,20 @@ func walkCodebase(cfg *ingestConfig, excludeSet map[string]bool, excludePatterns
 			return nil
 		}
 
+		// GAP-01: Surface unrecognized file types instead of silently skipping.
+		// When plugin modules are registered server-side, they can handle these
+		// via MatchIngestionModule(). For now, emit a diagnostic so users know
+		// which files were not parsed.
+		ext := filepath.Ext(path)
+		if ext != "" && cfg.verbose {
+			log.Printf("Skipping unrecognized file type (%s): %s", ext, path)
+		}
+		diagSummary.Add(languages.Diagnostic{
+			Severity: "info",
+			Code:     "UNRECOGNIZED_FILE_TYPE",
+			Message:  fmt.Sprintf("No built-in parser for file extension %q; file skipped (plugin modules may handle this via MatchIngestionModule)", ext),
+			Context:  map[string]string{"path": path, "extension": ext},
+		})
 		return nil
 	})
 

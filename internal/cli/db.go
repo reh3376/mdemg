@@ -355,6 +355,15 @@ Examples:
 	return cmd
 }
 
+// neo4jPass returns the Neo4j password from the environment, falling back to the
+// static default for backward compatibility. GAP-19: prefer env-sourced credentials.
+func neo4jPass() string {
+	if p := os.Getenv("NEO4J_PASS"); p != "" {
+		return p
+	}
+	return "mdemg-dev" //nolint:gosec // G101: fallback for dev
+}
+
 // runDBStart is the core logic for starting a Neo4j container.
 // boltPort/httpPort of 0 means "use config or auto-detect".
 func runDBStart(boltPort, httpPort int, password string) error {
@@ -362,7 +371,10 @@ func runDBStart(boltPort, httpPort int, password string) error {
 		return fmt.Errorf("docker is not installed or not in PATH\nInstall Docker: https://docs.docker.com/get-docker/")
 	}
 
-	// Use defaults if not specified
+	// Use defaults if not specified — read from env first, then fall back to static default (GAP-19)
+	if password == "" {
+		password = os.Getenv("NEO4J_PASS")
+	}
 	if password == "" {
 		password = "mdemg-dev" //nolint:gosec // G101: default dev password, not a credential
 	}
@@ -533,7 +545,11 @@ Examples:
 
 	cmd.Flags().IntVar(&boltPort, "port", neo4jDefaultPort, "Bolt protocol port")
 	cmd.Flags().IntVar(&httpPort, "http-port", neo4jDefaultHTTP, "HTTP browser port")
-	cmd.Flags().StringVar(&password, "password", "mdemg-dev", "Neo4j password")
+	defaultPass := os.Getenv("NEO4J_PASS")
+	if defaultPass == "" {
+		defaultPass = "mdemg-dev" //nolint:gosec // G101: fallback for dev
+	}
+	cmd.Flags().StringVar(&password, "password", defaultPass, "Neo4j password")
 
 	return cmd
 }
@@ -701,8 +717,12 @@ Requires the project's Neo4j container to be running (via mdemg db start).`,
 			}
 
 			// exec into container with interactive cypher-shell
+			shellPass := os.Getenv("NEO4J_PASS")
+			if shellPass == "" {
+				shellPass = "mdemg-dev" //nolint:gosec // G101: fallback for dev
+			}
 			shellCmd := exec.Command("docker", "exec", "-it", containerName,
-				"cypher-shell", "-u", "neo4j", "-p", "mdemg-dev")
+				"cypher-shell", "-u", "neo4j", "-p", shellPass)
 			shellCmd.Stdin = os.Stdin
 			shellCmd.Stdout = os.Stdout
 			shellCmd.Stderr = os.Stderr

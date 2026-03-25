@@ -46,6 +46,7 @@ linters:
         - G115         # integer overflow conversion — false positives on safe casts
         - G117         # exported secret fields — config structs intentionally hold secrets
         - G204         # subprocess with variable — intentional exec for docker/git/ingest
+        - G702         # command injection via taint — same as G204 with taint tracking; docker/git calls are safe
         - G301         # directory permissions 0755 — standard for runtime directories
         - G304         # file inclusion via variable — expected for file-serving CLIs
         - G306         # WriteFile permissions >0600 — 0644 is standard for logs/ports

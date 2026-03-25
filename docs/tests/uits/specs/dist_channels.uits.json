@@ -12,7 +12,9 @@
       "release",
       "goreleaser"
     ],
-    "author": "reh3376"
+    "author": "reh3376",
+    "optimized": true,
+    "last_optimized": "2026-03-24"
   },
   "content": {
     "source_file": "docs/architecture/maps/dist_channels.md",

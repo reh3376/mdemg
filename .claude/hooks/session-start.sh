@@ -106,6 +106,15 @@ fi
 echo ""
 echo "═══ END CMS CONTEXT ═══"
 
+# Architecture map staleness check (respects UITS-optimized flag)
+if command -v python3 >/dev/null 2>&1 && [ -f "scripts/generate_arch_maps.py" ]; then
+  MAP_CHECK=$(python3 scripts/generate_arch_maps.py --checksum 2>&1) || {
+    echo ""
+    echo "⚠ Architecture maps stale — run: python3 scripts/generate_arch_maps.py"
+    echo "  ${MAP_CHECK}"
+  }
+fi
+
 # Phase 80: Auto RSIC health display
 RSIC_HEALTH=$(curl -sf -X POST "${MDEMG_URL}/v1/self-improve/assess" \
   -H "Content-Type: application/json" \

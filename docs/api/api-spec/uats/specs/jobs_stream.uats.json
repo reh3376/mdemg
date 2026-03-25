@@ -13,13 +13,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-10",
-    "description": "SSE streaming endpoint for job status updates (tests error cases only \u2014 SSE streams are not UATS-testable)",
+    "description": "SSE streaming endpoint for job status updates. Tests error cases only \u2014 SSE streams are not UATS-testable (GAP-05: accepted limitation; 14 Go unit tests cover streaming logic in internal/api/handlers_test.go).",
     "test_type": "contract",
     "priority": "low"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "a1883449d99018710426fcec0bd1903bce4cfe8da744c710774b2cb54affe7bd"
+    "sha256": "7ab600fe2fc203ba1ae5b10fa2e157a7299aeadbdfd4e36c9a6410951a20bfe0"
   },
   "variables": {},
   "request": {
