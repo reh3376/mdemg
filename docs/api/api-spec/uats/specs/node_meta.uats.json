@@ -51,9 +51,14 @@
     {
       "name": "missing_params",
       "description": "Returns 400 when required query params are missing",
+      "description": "Returns 400 when path param is empty",
       "request": {
         "method": "GET",
-        "path": "/v1/memory/node/meta"
+        "path": "/v1/memory/node/meta",
+        "query": {
+          "space_id": "{{test_space}}",
+          "path": ""
+        }
       },
       "expected": {
         "status": 400,
