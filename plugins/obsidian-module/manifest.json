@@ -1,12 +1,17 @@
 {
   "id": "obsidian-module",
   "name": "Obsidian Vault Ingestion",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "INGESTION",
   "binary": "obsidian-module",
   "capabilities": {
     "ingestion_sources": ["obsidian://"],
     "content_types": ["text/markdown", "application/vnd.obsidian.md"]
+  },
+  "config": {
+    "vault_path_env": "OBSIDIAN_VAULT_PATH",
+    "exclude_dirs": "Templates,.trash,.obsidian",
+    "sync_interval_minutes": "30"
   },
   "health_check_interval_ms": 5000,
   "startup_timeout_ms": 10000
