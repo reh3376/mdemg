@@ -38,7 +38,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/21/26/27 done, claude .md ingestion done)
+- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/20/21/26/27 done, claude .md ingestion done)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
@@ -47,9 +47,9 @@ WHAT REMAINS TO BE DONE:
 1. ✅ GAP-18: slog migration — ALL waves complete (internal/ + cmd/ + plugins/)
 2. ✅ GAP-02: Obsidian vault ingestion — v2 complete (parser, walker, Sync RPC, CI, release packaging, docs)
 3. ✅ GAP-26: Module developer tutorial with working example
-4. GAP-13: Windows desktop companion (Tauri from Linux sidebar)
-5. GAP-20: Graph visualization UI
-6. GAP-14: DBSCAN performance profiling + optimization
+4. ✅ GAP-20: Graph visualization — Grafana topology dashboard (Neo4j data source, 4 panels, UOTS governed)
+5. GAP-13: Windows desktop companion (Tauri from Linux sidebar) — LOW PRIORITY, save for later
+6. GAP-14: DBSCAN performance profiling + optimization — LOW PRIORITY, save for later
 
 === Pre-existing partial phases ===
 7. ✅ Phase 47.2 — APE INGEST scheduled sync (freshness tracking + RSIC pipeline wired: assess, reflect, plan, dispatch)
@@ -380,9 +380,9 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | ✅ ALL waves complete (internal/ + cmd/ + plugins/) |
 | GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | ✅ v2 complete — parser, walker, Sync RPC, CI gate, release packaging, docs |
 | GAP-26 | Module developer tutorial | 2 | M | ✅ Tutorial, echo-module README + Makefile, port fixes |
-| GAP-13 | Windows desktop companion | 3 | M | Tauri sidebar provides reusable architecture |
-| GAP-20 | Graph visualization UI | 3 | M-L | Users must use Neo4j Browser directly |
-| GAP-14 | DBSCAN performance profiling | 3 | Research | O(n^2) distance matrix; matters at 50K+ nodes |
+| GAP-20 | Graph visualization — Grafana dashboard | 2 | S-M | ✅ Neo4j data source plugin, 4-panel topology dashboard, UOTS governed |
+| GAP-13 | Windows desktop companion | 3 | M | LOW PRIORITY — Tauri sidebar provides reusable architecture |
+| GAP-14 | DBSCAN performance profiling | 3 | Research | LOW PRIORITY — O(n^2) distance matrix; matters at 50K+ nodes |
 
 ### Partially Complete Phases
 

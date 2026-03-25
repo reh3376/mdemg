@@ -1,0 +1,40 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Grafana Graph Topology Dashboard",
+    "type": "grafana_dashboard",
+    "tags": ["grafana", "topology", "dashboard"]
+  },
+  "target": {
+    "file": "deploy/docker/grafana/dashboards/mdemg-graph-topology.json"
+  },
+  "expected": {
+    "dashboard": {
+      "uid": "mdemg-graph-topology",
+      "title": "MDEMG Graph Topology",
+      "panel_count_min": 4,
+      "required_panel_titles": [
+        "Layer Topology",
+        "Neighborhood Explorer",
+        "Recent Concept Emergence",
+        "Top Activated Concepts"
+      ],
+      "required_queries": [
+        "MemoryNode",
+        "space_id",
+        "ABSTRACTED_FROM"
+      ],
+      "tags": ["mdemg", "topology"]
+    }
+  },
+  "config": {
+    "timeout_ms": 5000
+  },
+  "metadata": {
+    "author": "claude",
+    "created": "2026-03-25",
+    "description": "Validates the Grafana Graph Topology dashboard JSON structure: correct UID, title, 4 required panels with Neo4j Cypher queries, and dashboard tags.",
+    "status": "active",
+    "tags": ["grafana", "topology", "phase-grafana"]
+  }
+}

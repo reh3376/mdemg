@@ -1,0 +1,303 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "MDEMG Overview",
+      "url": "/d/mdemg-overview",
+      "type": "link"
+    },
+    {
+      "title": "Neo4j Dashboard",
+      "url": "/d/mdemg-neo4j",
+      "type": "link"
+    }
+  ],
+  "panels": [
+    {
+      "title": "Layer Topology",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "title": "Layer Topology",
+      "description": "L1-L5 concept nodes and their relationships. Filter by layer using the $layer variable. Nodes colored by layer depth.",
+      "type": "nodeGraph",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "nodes",
+          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 1 AND n.layer IN [$layer] RETURN elementId(n) AS id, COALESCE(n.name, n.summary, 'unnamed') AS title, 'L' + toString(n.layer) AS subtitle, COALESCE(n.activation, 0.0) AS mainStat, COALESCE(n.confidence, 0.0) AS secondaryStat ORDER BY n.layer DESC, n.activation DESC LIMIT 200"
+        },
+        {
+          "refId": "edges",
+          "query": "MATCH (a:MemoryNode {space_id: '$space_id'})-[r]->(b:MemoryNode {space_id: '$space_id'}) WHERE a.layer >= 1 AND b.layer >= 1 AND a.layer IN [$layer] AND b.layer IN [$layer] AND type(r) IN ['ABSTRACTED_FROM', 'CO_ACTIVATED_WITH', 'GROUNDED_BY', 'RELATED_TO'] RETURN elementId(r) AS id, elementId(a) AS source, elementId(b) AS target, type(r) AS mainStat LIMIT 500"
+        }
+      ],
+      "options": {
+        "nodeGraph": {
+          "layout": "layered"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "subtitle" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "L1": { "text": "L1 Concrete", "color": "blue" } } },
+                  { "type": "value", "options": { "L2": { "text": "L2 Pattern", "color": "green" } } },
+                  { "type": "value", "options": { "L3": { "text": "L3 Domain", "color": "yellow" } } },
+                  { "type": "value", "options": { "L4": { "text": "L4 Abstract", "color": "orange" } } },
+                  { "type": "value", "options": { "L5": { "text": "L5 Emergent", "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Exploration",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "collapsed": false
+    },
+    {
+      "title": "Neighborhood Explorer",
+      "description": "2-hop neighborhood around the selected node ($node_id). Shows all connected nodes and relationship types.",
+      "type": "nodeGraph",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 18 },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "nodes",
+          "query": "MATCH path = (center)-[*1..2]-(neighbor) WHERE elementId(center) = '$node_id' AND neighbor:MemoryNode WITH DISTINCT neighbor RETURN elementId(neighbor) AS id, COALESCE(neighbor.name, neighbor.summary, 'unnamed') AS title, 'L' + toString(neighbor.layer) AS subtitle, COALESCE(neighbor.activation, 0.0) AS mainStat LIMIT 100"
+        },
+        {
+          "refId": "edges",
+          "query": "MATCH (center)-[*1..2]-(neighbor) WHERE elementId(center) = '$node_id' AND neighbor:MemoryNode WITH DISTINCT center, neighbor MATCH (center)-[r]-(neighbor) RETURN elementId(r) AS id, elementId(startNode(r)) AS source, elementId(endNode(r)) AS target, type(r) AS mainStat LIMIT 200"
+        }
+      ],
+      "options": {
+        "nodeGraph": {
+          "layout": "force"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {}
+      }
+    },
+    {
+      "title": "Concept Details",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "collapsed": false
+    },
+    {
+      "title": "Recent Concept Emergence",
+      "description": "L3+ concepts created in the last 24 hours, ordered by creation time. Indicates active emergence activity.",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 3 AND n.created_at IS NOT NULL AND n.created_at >= datetime() - duration('P1D') RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, n.created_at AS Created, size([(n)-[]-() | 1]) AS Edges ORDER BY n.created_at DESC LIMIT 20"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Layer" },
+            "properties": [
+              { "id": "custom.width", "value": 60 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "blue", "value": null },
+                    { "color": "green", "value": 2 },
+                    { "color": "yellow", "value": 3 },
+                    { "color": "orange", "value": 4 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background-solid" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Edges" },
+            "properties": [
+              { "id": "custom.width", "value": 60 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Name" },
+            "properties": [
+              { "id": "custom.width", "value": 280 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Top Activated Concepts",
+      "description": "L2+ concepts ranked by activation score. High activation indicates recently and frequently accessed knowledge.",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 2 AND n.activation > 0 RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, round(n.activation * 1000) / 1000 AS Activation, n.last_activated AS `Last Active`, size([(n)-[]-() | 1]) AS Edges ORDER BY n.activation DESC LIMIT 20"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Layer" },
+            "properties": [
+              { "id": "custom.width", "value": 60 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "blue", "value": null },
+                    { "color": "green", "value": 2 },
+                    { "color": "yellow", "value": 3 },
+                    { "color": "orange", "value": 4 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background-solid" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Activation" },
+            "properties": [
+              { "id": "custom.width", "value": 90 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "blue", "value": null },
+                    { "color": "green", "value": 0.3 },
+                    { "color": "yellow", "value": 0.6 },
+                    { "color": "orange", "value": 0.8 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background-solid" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Name" },
+            "properties": [
+              { "id": "custom.width", "value": 280 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Edges" },
+            "properties": [
+              { "id": "custom.width", "value": 60 }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["mdemg", "topology"],
+  "templating": {
+    "list": [
+      {
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "textbox",
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        },
+        "options": [
+          {
+            "text": "mdemg-dev",
+            "value": "mdemg-dev",
+            "selected": true
+          }
+        ]
+      },
+      {
+        "name": "layer",
+        "label": "Layers",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "1", "value": "1", "selected": false },
+          { "text": "2", "value": "2", "selected": false },
+          { "text": "3", "value": "3", "selected": false },
+          { "text": "4", "value": "4", "selected": false },
+          { "text": "5", "value": "5", "selected": false }
+        ],
+        "query": "1,2,3,4,5"
+      },
+      {
+        "name": "node_id",
+        "label": "Focus Node",
+        "type": "query",
+        "datasource": {
+          "type": "kniepdennis-neo4j-datasource",
+          "uid": "neo4j"
+        },
+        "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 2 RETURN elementId(n) AS __value, COALESCE(n.name, n.summary, 'node-' + elementId(n)) AS __text ORDER BY n.activation DESC LIMIT 50",
+        "refresh": 2,
+        "sort": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Graph Topology",
+  "uid": "mdemg-graph-topology",
+  "version": 1
+}

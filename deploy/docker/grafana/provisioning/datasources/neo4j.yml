@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+  - name: Neo4j
+    uid: neo4j
+    type: kniepdennis-neo4j-datasource
+    access: proxy
+    url: bolt://neo4j:7687
+    editable: false
+    jsonData:
+      database: "neo4j"
+    secureJsonData:
+      password: "testpassword"
+    basicAuth: true
+    basicAuthUser: "neo4j"
