@@ -19,7 +19,8 @@
     "priority": "medium"
   },
   "config": {
-    "timeout_ms": 10000
+    "timeout_ms": 10000,
+    "sha256": "e8182060758ce4dea4ca0094e332e2aacc527adb3c4ab2817033b634d0e3ccd0"
   },
   "variables": {
     "test_space": "mdemg-dev"
@@ -50,7 +51,6 @@
   "variants": [
     {
       "name": "missing_params",
-      "description": "Returns 400 when required query params are missing",
       "description": "Returns 400 when path param is empty",
       "request": {
         "method": "GET",
