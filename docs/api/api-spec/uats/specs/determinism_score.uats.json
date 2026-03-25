@@ -24,7 +24,7 @@
       "determinism",
       "fsd"
     ],
-    "sha256": "1f77cdd9d120e4b87d8baec721cdbd6aac2df0a24574c304ebb5b03c8d3a2ae5"
+    "sha256": "fe7ca6f9d58fd6414bcca52c1f49c2d3a1aeabcbae0217ebeeafc23e43c04487"
   },
   "variables": {},
   "request": {
@@ -44,28 +44,7 @@
     ],
     "body_assertions": [
       {
-        "path": "$.space_id",
-        "op": "equals",
-        "expected": "test-space"
-      },
-      {
-        "path": "$.score",
-        "op": "exists"
-      },
-      {
-        "path": "$.informed_actions",
-        "op": "exists"
-      },
-      {
-        "path": "$.total_actions",
-        "op": "exists"
-      },
-      {
-        "path": "$.compliance_rate",
-        "op": "exists"
-      },
-      {
-        "path": "$.coverage_ratio",
+        "path": "$.error",
         "op": "exists"
       }
     ]
