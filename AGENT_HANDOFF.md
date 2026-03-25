@@ -38,14 +38,14 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4 partial: GAP-21/27 done, 6 items remaining)
+- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-21/27 done, Linear U-1/U-2/U-3 done, Obsidian v2 in progress)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== GAP ANALYSIS Phase 4 (next session) ===
-1. GAP-18: Migrate log.Printf → slog structured logging
-2. GAP-02: Obsidian vault ingestion module (= Phase 45.4)
+=== GAP ANALYSIS Phase 4 (in progress) ===
+1. ✅ GAP-18: slog migration — Linear module migrated (U-1), core done (Wave 2-3)
+2. 🔄 GAP-02: Obsidian vault ingestion — v1 committed (6962c4a), Linear blockers cleared (U-1/U-2/U-3), v2 in progress
 3. GAP-26: Module developer tutorial with working example
 4. GAP-13: Windows desktop companion (Tauri from Linux sidebar)
 5. GAP-20: Graph visualization UI
@@ -279,7 +279,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 43A | CMS Enforcement | ✅ | `docs/specs/phase3a-cms-enforcement.md` |
 | 43B | CMS Quality | ✅ | `docs/specs/phase3b-cms-quality.md` |
 | 43C | Multi-Agent CMS | ✅ | `docs/specs/phase3c-multi-agent.md` |
-| 44 | Linear CRUD | ✅ | `docs/specs/phase4-linear-crud.md` |
+| 44 | Linear CRUD | ✅ | `docs/specs/phase4-linear-crud.md` — upgraded: slog, context cancellation, edge emission (U-1/U-2/U-3) |
 | 45 | Modular Intelligence | 🔄 | 45.1-45.2 ✅, 45.3 📋 (parser RPC), 45.4 🔄 (Obsidian pending), 45.5 ✅ |
 | 46 | Symbol Indexing | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §8 |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
@@ -378,8 +378,8 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
 | Gap | Title | Tier | Effort | Notes |
 |-----|-------|------|--------|-------|
-| GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | JSON middleware exists for HTTP only; `log.Printf` throughout internals |
-| GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | Linear integration provides the pattern |
+| GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | Core done (GAP-18 Wave 2-3), Linear module migrated (U-1) |
+| GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | v1 committed (6962c4a), Linear blockers cleared (U-1/U-2/U-3), v2 in progress |
 | GAP-26 | Module developer tutorial | 2 | M | Working example needed |
 | GAP-13 | Windows desktop companion | 3 | M | Tauri sidebar provides reusable architecture |
 | GAP-20 | Graph visualization UI | 3 | M-L | Users must use Neo4j Browser directly |
@@ -454,7 +454,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
-| Obsidian integration not started | Low | Phase 45.4 — listed in roadmap, no implementation |
+| Obsidian integration v2 in progress | Low | Phase 45.4 — v1 committed (6962c4a: gRPC lifecycle, Matches, Parse, parser tests), v2 enhancements in progress (walker, yaml.v3, full Sync) |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -522,4 +522,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-25 — Gap Analysis Phases 1-3 COMPLETE + Phase 4 partial (GAP-21 UAMS runner, GAP-27 submodule changelogs done). All 12 UxTS frameworks now have active runners and CI gates (merge-blocking or soft-fail). Phase 86 UVTS now active with inline grading. New: pkg/mdemg/ public types (GAP-09), scope-based auth middleware (GAP-16), auto-credentials (GAP-19), architecture map generator (scripts/generate_arch_maps.py) with UITS optimization protection, UETS --no-llm CI fix. 195 UATS specs, 213 Go test files, CI all green. Remaining Phase 4: GAP-18 (slog), -02 (Obsidian), -26 (tutorial), -13 (Windows), -20 (graph viz), -14 (DBSCAN).*
+*Last updated: 2026-03-25 — Gap Analysis Phases 1-3 COMPLETE + Phase 4 in progress. Linear module upgraded: slog migration (U-1), context cancellation (U-2), edge emission for issue relationships (U-3), 5 edge tests. Obsidian module v1 committed (6962c4a), v2 enhancements in progress. GAP-21 UAMS runner + GAP-27 submodule changelogs done. All 12 UxTS frameworks active with CI gates. 195 UATS specs, 213+ Go test files, CI all green. Remaining Phase 4: GAP-02 (Obsidian v2), -26 (tutorial), -13 (Windows), -20 (graph viz), -14 (DBSCAN).*

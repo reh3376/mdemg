@@ -40,6 +40,8 @@ bin/
 /docs-scraper
 plugins/docs-scraper/docs-scraper
 plugins/uxts-module/uxts-module
+plugins/linear-module/linear-module
+plugins/obsidian-module/obsidian-module
 /uxts-module
 *.exe
 *.exe~

@@ -1,8 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -67,7 +68,7 @@ func (w *WorkflowEngine) LoadFromBytes(data []byte) error {
 		return fmt.Errorf("parse workflow YAML: %w", err)
 	}
 	w.Workflows = config.Workflows
-	log.Printf("workflow engine: loaded %d workflow(s)", len(w.Workflows))
+	slog.Info("workflow engine loaded", "workflow_count", len(w.Workflows))
 	return nil
 }
 
@@ -102,7 +103,7 @@ func (w *WorkflowEngine) EvaluateEvent(event, entityType string, fields, previou
 			continue
 		}
 
-		log.Printf("workflow engine: triggered workflow %q for %s %s", wf.Name, event, entityType)
+		slog.Info("workflow engine triggered", "workflow", wf.Name, "event", event, "entity_type", entityType)
 
 		for _, action := range wf.Actions {
 			w.executeAction(action, fields, module)
@@ -143,7 +144,7 @@ func MatchCondition(c Condition, fields, previousFields map[string]string) bool 
 		_, exists := fields[c.Field]
 		return exists
 	default:
-		log.Printf("workflow engine: unknown operator %q", c.Operator)
+		slog.Warn("workflow engine unknown operator", "operator", c.Operator)
 		return false
 	}
 }
@@ -166,66 +167,66 @@ func (w *WorkflowEngine) executeAction(action Action, fields map[string]string, 
 		}
 		query, err := buildCommentCreateMutation(commentFields)
 		if err != nil {
-			log.Printf("workflow engine: add-comment build error: %v", err)
+			slog.Error("workflow engine add-comment build error", "error", err)
 			return
 		}
-		if _, err := module.executeGraphQL(query); err != nil {
-			log.Printf("workflow engine: add-comment error: %v", err)
+		if _, err := module.executeGraphQL(context.Background(), query); err != nil {
+			slog.Error("workflow engine add-comment error", "error", err)
 		}
 
 	case "auto-assign":
 		assigneeID := action.Params["assignee_id"]
 		if assigneeID == "" {
-			log.Printf("workflow engine: auto-assign requires assignee_id param")
+			slog.Warn("workflow engine auto-assign requires assignee_id param")
 			return
 		}
 		updateFields := map[string]string{"assignee_id": assigneeID}
 		query, err := buildIssueUpdateMutation(entityID, updateFields)
 		if err != nil {
-			log.Printf("workflow engine: auto-assign build error: %v", err)
+			slog.Error("workflow engine auto-assign build error", "error", err)
 			return
 		}
-		if _, err := module.executeGraphQL(query); err != nil {
-			log.Printf("workflow engine: auto-assign error: %v", err)
+		if _, err := module.executeGraphQL(context.Background(), query); err != nil {
+			slog.Error("workflow engine auto-assign error", "error", err)
 		}
 
 	case "auto-label":
 		labelIDs := action.Params["label_ids"]
 		if labelIDs == "" {
-			log.Printf("workflow engine: auto-label requires label_ids param")
+			slog.Warn("workflow engine auto-label requires label_ids param")
 			return
 		}
 		updateFields := map[string]string{"label_ids": labelIDs}
 		query, err := buildIssueUpdateMutation(entityID, updateFields)
 		if err != nil {
-			log.Printf("workflow engine: auto-label build error: %v", err)
+			slog.Error("workflow engine auto-label build error", "error", err)
 			return
 		}
-		if _, err := module.executeGraphQL(query); err != nil {
-			log.Printf("workflow engine: auto-label error: %v", err)
+		if _, err := module.executeGraphQL(context.Background(), query); err != nil {
+			slog.Error("workflow engine auto-label error", "error", err)
 		}
 
 	case "auto-transition":
 		stateID := action.Params["state_id"]
 		if stateID == "" {
-			log.Printf("workflow engine: auto-transition requires state_id param")
+			slog.Warn("workflow engine auto-transition requires state_id param")
 			return
 		}
 		updateFields := map[string]string{"state_id": stateID}
 		query, err := buildIssueUpdateMutation(entityID, updateFields)
 		if err != nil {
-			log.Printf("workflow engine: auto-transition build error: %v", err)
+			slog.Error("workflow engine auto-transition build error", "error", err)
 			return
 		}
-		if _, err := module.executeGraphQL(query); err != nil {
-			log.Printf("workflow engine: auto-transition error: %v", err)
+		if _, err := module.executeGraphQL(context.Background(), query); err != nil {
+			slog.Error("workflow engine auto-transition error", "error", err)
 		}
 
 	case "set-field":
 		fieldName := action.Params["field"]
 		fieldValue := interpolateTemplate(action.Params["value"], fields)
 		if fieldName == "" {
-			log.Printf("workflow engine: set-field requires field param")
+			slog.Warn("workflow engine set-field requires field param")
 			return
 		}
 		updateFields := map[string]string{fieldName: fieldValue}
@@ -238,15 +239,15 @@ func (w *WorkflowEngine) executeAction(action Action, fields map[string]string, 
 			query, err = buildIssueUpdateMutation(entityID, updateFields)
 		}
 		if err != nil {
-			log.Printf("workflow engine: set-field build error: %v", err)
+			slog.Error("workflow engine set-field build error", "error", err)
 			return
 		}
-		if _, err := module.executeGraphQL(query); err != nil {
-			log.Printf("workflow engine: set-field error: %v", err)
+		if _, err := module.executeGraphQL(context.Background(), query); err != nil {
+			slog.Error("workflow engine set-field error", "error", err)
 		}
 
 	default:
-		log.Printf("workflow engine: unknown action type %q", action.Type)
+		slog.Warn("workflow engine unknown action type", "action_type", action.Type)
 	}
 }
 
