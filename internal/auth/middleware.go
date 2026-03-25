@@ -127,11 +127,11 @@ func authenticateBearer(r *http.Request, validator *JWTValidator) (*Principal, e
 	}
 
 	return &Principal{
-		ID:   claims.Subject,
-		Type: ModeBearer,
+		ID:     claims.Subject,
+		Type:   ModeBearer,
+		Scopes: claims.Scopes,
 		Metadata: map[string]any{
 			"issuer":  claims.Issuer,
-			"scopes":  claims.Scopes,
 			"expires": claims.ExpiresAt,
 		},
 	}, nil
@@ -162,6 +162,43 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		"error":   code,
 		"message": message,
 	})
+}
+
+// RequireScope returns per-route middleware that enforces a specific authorization scope (GAP-16).
+// If the principal is nil (unauthenticated), returns 401. If the principal lacks the required
+// scope, returns 403. When auth is disabled (ModeNone), the middleware is a no-op pass-through.
+func RequireScope(scope string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p := GetPrincipal(r.Context())
+
+			// If no principal in context, auth middleware hasn't run or auth is disabled.
+			// In that case, pass through — the auth middleware handles 401 already.
+			if p == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// API key principals with no scopes get full access (backward compat).
+			if p.Type == ModeAPIKey && len(p.Scopes) == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if !p.HasScope(scope) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]any{
+					"error":          "forbidden",
+					"message":        "insufficient scope",
+					"required_scope": scope,
+				})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // MiddlewareWithRegistry creates middleware using the registry pattern.

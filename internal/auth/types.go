@@ -19,6 +19,17 @@ const (
 	ModeSAML AuthMode = "saml"
 )
 
+// Authorization scopes (GAP-16). These define the vocabulary for scope-based access control.
+const (
+	ScopeReadMemory   = "read:memory"
+	ScopeWriteMemory  = "write:memory"
+	ScopeDeleteMemory = "delete:memory"
+	ScopeReadSpaces   = "read:spaces"
+	ScopeWriteSpaces  = "write:spaces"
+	ScopeAdminSpaces  = "admin:spaces"
+	ScopeAll          = "*" // Superuser — matches all scopes.
+)
+
 // Config holds authentication configuration.
 type Config struct {
 	// Enabled controls whether authentication is required
@@ -69,8 +80,38 @@ type Principal struct {
 	// Type indicates the authentication method used
 	Type AuthMode
 
+	// Scopes is the set of granted authorization scopes (GAP-16).
+	// Populated from JWT claims or API key configuration.
+	Scopes []string
+
 	// Metadata contains additional claims or info
 	Metadata map[string]any
+}
+
+// HasScope returns true if the principal has the given scope.
+func (p *Principal) HasScope(scope string) bool {
+	if p == nil {
+		return false
+	}
+	for _, s := range p.Scopes {
+		if s == scope || s == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAnyScope returns true if the principal has at least one of the given scopes.
+func (p *Principal) HasAnyScope(scopes ...string) bool {
+	if p == nil {
+		return false
+	}
+	for _, scope := range scopes {
+		if p.HasScope(scope) {
+			return true
+		}
+	}
+	return false
 }
 
 // contextKey is a private type for context keys.

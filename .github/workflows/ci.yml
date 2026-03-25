@@ -193,6 +193,14 @@ jobs:
           python3 docs/tests/uets/runners/uets_runner.py validate-all \
             --spec-dir docs/tests/uets/specs/
 
+      - name: Run UVTS Semantic Validation (soft-fail)
+        continue-on-error: true
+        run: |
+          python3 docs/tests/uvts/runners/uvts_runner.py \
+            --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json \
+            --base-url http://localhost:${{ env.MDEMG_PORT }} \
+            --profile quick
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
