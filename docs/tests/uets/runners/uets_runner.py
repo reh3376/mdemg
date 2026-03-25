@@ -877,6 +877,25 @@ def cmd_validate_all(args: argparse.Namespace) -> int:
                 if not ok:
                     hash_mismatches.append(msg)
 
+        no_llm = getattr(args, "no_llm", False)
+
+        if no_llm:
+            # Structural-only: skip LLM calls, report spec structure + hash status
+            print(f"  [STRUCT] {spec_path.name}: structure OK, {len(clusters)} clusters, hash={'verified' if hash_verified else 'n/a' if hash_verified is None else 'MISMATCH'}")
+            struct_assertions = 4 + len(parity_errors)  # version + model + fixture + expected
+            struct_passed = struct_assertions - len(parity_errors)
+            canonical_results.append(_canonical_result(
+                spec_path=str(spec_path),
+                status="fail" if parity_errors else "pass",
+                duration_ms=0,
+                hash_verified=hash_verified,
+                hash_mismatches=hash_mismatches,
+                assertions_evaluated=struct_assertions,
+                assertions_passed=struct_passed,
+                failures=parity_errors if parity_errors else [],
+            ))
+            continue
+
         model_cfg = spec["model"]
         run_cfg = spec.get("config", {})
         endpoint_override = getattr(args, "endpoint", "") or ""
@@ -1024,6 +1043,8 @@ def main() -> int:
     p_all.add_argument("--spec-dir", required=True, help="Directory containing .uets.json specs")
     p_all.add_argument("--report", help="Output JSON report path")
     p_all.add_argument("--endpoint", help="Override model endpoint URL for all specs")
+    p_all.add_argument("--no-llm", action="store_true",
+                       help="Structural validation only — skip LLM calls (for CI without model endpoints)")
 
     # add-hashes
     p_hash = sub.add_parser("add-hashes", help="Add SHA256 hashes to fixture references")

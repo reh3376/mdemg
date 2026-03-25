@@ -189,9 +189,11 @@ jobs:
 
       - name: Run UETS Emergence Evaluation (soft-fail)
         continue-on-error: true
+        timeout-minutes: 2
         run: |
           python3 docs/tests/uets/runners/uets_runner.py validate-all \
-            --spec-dir docs/tests/uets/specs/
+            --spec-dir docs/tests/uets/specs/ \
+            --no-llm
 
       - name: Run UVTS Semantic Validation (soft-fail)
         continue-on-error: true
