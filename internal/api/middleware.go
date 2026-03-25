@@ -7,9 +7,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -167,33 +166,34 @@ func LoggingMiddleware(next http.Handler, cfg LogConfig) http.Handler {
 			level = "warn"
 		}
 
-		// Log based on format
-		if strings.ToLower(cfg.Format) == "json" {
-			entry := logEntry{
-				Timestamp: start.UTC().Format(time.RFC3339),
-				Level:     level,
-				Method:    r.Method,
-				Path:      r.URL.Path,
-				Status:    wrapped.status,
-				Duration:  duration.Milliseconds(),
-				RequestID: requestID,
-				TraceID:   traceID,
-				UserID:    userID,
-				RemoteIP:  extractClientIP(r),
-				UserAgent: r.UserAgent(),
-			}
-			b, err := json.Marshal(entry)
-			if err == nil {
-				log.Println(string(b))
-			}
-		} else {
-			// Default text format with trace ID
-			logLine := fmt.Sprintf("level=%s method=%s path=%s status=%d duration=%dms request_id=%s trace_id=%s",
-				level, r.Method, r.URL.Path, wrapped.status, duration.Milliseconds(), requestID, traceID)
-			if userID != "" {
-				logLine += fmt.Sprintf(" user_id=%s", userID)
-			}
-			log.Println(logLine)
+		// Build slog attributes for the request
+		attrs := []slog.Attr{
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.Int("status", wrapped.status),
+			slog.Int64("duration_ms", duration.Milliseconds()),
+			slog.String("request_id", requestID),
+			slog.String("trace_id", traceID),
+		}
+		if userID != "" {
+			attrs = append(attrs, slog.String("user_id", userID))
+		}
+		if clientIP := extractClientIP(r); clientIP != "" {
+			attrs = append(attrs, slog.String("remote_ip", clientIP))
+		}
+		if ua := r.UserAgent(); ua != "" {
+			attrs = append(attrs, slog.String("user_agent", ua))
+		}
+
+		// Log at appropriate level based on status code
+		msg := "http request"
+		switch level {
+		case "error":
+			slog.LogAttrs(r.Context(), slog.LevelError, msg, attrs...)
+		case "warn":
+			slog.LogAttrs(r.Context(), slog.LevelWarn, msg, attrs...)
+		default:
+			slog.LogAttrs(r.Context(), slog.LevelInfo, msg, attrs...)
 		}
 	})
 }
