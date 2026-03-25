@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-22
+**Date:** 2026-03-25
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -32,24 +32,41 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Phase J17-PC: J17 Prompt Compression — COMPLETE (5 LLM callers optimized, 5 config vars, 14 new tests)
 - Phase RSIC-SK1: Jiminy Guidance Self-Calibration — COMPLETE (3 gap closures, 3 new RSIC actions, pattern #15, SignalLearner wiring)
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1+ verified)
-- Quality hardening — COMPLETE (191 UATS specs / 375 total variants, 197 Go test files, 0 lint issues)
+- Quality hardening — COMPLETE (195 UATS specs / 224 variants / 318 test cases, 213 Go test files, 0 lint issues)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness, AR-3 LLM intelligence)
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-22
-- Latest releases: CLI v0.2.16, menubar v1.6.0, sidebar v0.2.0
+- Gap Analysis — IN PROGRESS (Phases 1-3 complete, Phase 4 partial: GAP-21/27 done, 6 items remaining)
+- CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
+- Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-1. TESTING: SSE streaming endpoint not UATS-testable (requires SSE client)
-2. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
-3. PARTIAL: Phase 45.4 — Obsidian integration (Linear done, Obsidian pending)
-4. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
-5. PARTIAL: Phase 86 — UVTS activation (spec-only, runner deferred)
-6. RESEARCH: AutoResearch integration analysis (docs/development/)
-7. RESEARCH: Export governance & org alignment gap analysis (docs/development/) [NOT YET CREATED — planned deliverable]
-8. RESEARCH: DBSCAN GPU acceleration investigation (Metal/AMX for clustering)
+=== GAP ANALYSIS Phase 4 (next session) ===
+1. GAP-18: Migrate log.Printf → slog structured logging
+2. GAP-02: Obsidian vault ingestion module (= Phase 45.4)
+3. GAP-26: Module developer tutorial with working example
+4. GAP-13: Windows desktop companion (Tauri from Linux sidebar)
+5. GAP-20: Graph visualization UI
+6. GAP-14: DBSCAN performance profiling + optimization
+
+=== Pre-existing partial phases ===
+7. PARTIAL: Phase 45.3 — Code parser RPC migration (planned, not started)
+8. PARTIAL: Phase 47.2 — APE INGEST scheduled sync (freshness tracking done, action pending)
+9. TESTING: SSE streaming — accepted limitation (GAP-05: 14 Go unit tests cover streaming; UATS spec documents gap)
+10. RESEARCH: AutoResearch integration analysis (docs/development/)
+
+=== Gap Analysis — COMPLETED items (Phases 1-3 + partial Phase 4) ===
+- Phase 1 (Quick Wins): GAP-06/-07/-12/-15/-17/-25 — doc/config fixes
+- Phase 2 (UATS): GAP-28/-29/-30/-31 — canonical grammar migration, CI gating
+- Phase 3 (Core): GAP-01 (parser fallback), -04 (UVTS inline grading), -05 (SSE docs),
+  -09 (pkg/mdemg/ public types), -16 (scope-based auth), -19 (auto-credentials)
+- Phase 4 (partial): GAP-21 (UAMS runner), -27 (submodule changelogs)
+- Infrastructure: Architecture map generator (scripts/generate_arch_maps.py),
+  UITS optimization protection, session-start staleness check
+- CI fixes: gosec G702 exclusion, UETS --no-llm flag for CI
+
 - UxTS governance phases 81-85 COMPLETE (reconciliation, UOBS/UOTS convergence, CI gating, UNTS coverage, auth/perf)
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
 
@@ -153,17 +170,21 @@ internal/
   summarize/           # LLM summary service
   symbols/             # Symbol extraction (tree-sitter)
   transfer/            # Space transfer (export/import)
+pkg/mdemg/             # Public API types for external Go consumers (GAP-09)
 neural/                # Python sidecar (FastAPI, cross-encoder, NLI)
 migrations/            # Neo4j Cypher migrations (V0001-V0022)
 plugins/               # Plugin binaries (linear, reflection, keyword-booster, uxts)
 packaging/             # Submodules: homebrew-mdemg, mdemg-windows, mdemg_linux, apt-mdemg, mdemg-menubar, mdemg-linux-sidebar
+scripts/               # generate_arch_maps.py, verify_sidecar_schemas.py, etc.
 docs/
   user/                # Canonical user-facing docs (4 files)
   features/            # Feature documentation
   specs/               # Phase specifications
+  architecture/maps/   # 10 compact architecture maps for Jiminy context injection
   architecture/        # Architecture docs (00-14 numbered)
   development/         # Dev guides, roadmap, API reference
   api/api-spec/        # UATS + UDTS specs, schemas, runners
+  tests/               # UAMS, UETS, UITS, UOBS, UBTS, USTS, UVTS runners + specs
   benchmarks/          # Benchmark results and scripts
 ```
 
@@ -326,9 +347,10 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 82 | UOBS/UOTS Convergence | ✅ | Authority split defined in FRAMEWORK_GOVERNANCE.md |
 | 83 | CI Gate Expansion | ✅ | UATS/UBTS/UPTS/UDTS/UVTS in CI |
 | 84 | UNTS Full Coverage | ✅ | Scanner covers all 8 frameworks |
-| 85 | Auth/Security/Perf Stabilization | ✅ | USTS+UBTS active, UAMS spec-only |
-| 86 | UVTS Activation | 📋 | Spec-only, runner deferred |
+| 85 | Auth/Security/Perf Stabilization | ✅ | USTS+UBTS active, UAMS runner active (GAP-21) |
+| 86 | UVTS Activation | ✅ | Runner active with inline grading (GAP-04), CI soft-fail |
 | Synergy | Claude Code ↔ MDEMG Optimization | ✅ | `docs/features/synergy-optimization.md` |
+| Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
 
 ### Phase Numbering Convention
 
@@ -350,35 +372,45 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 
 ## 5. Open Work Items
 
+### Gap Analysis Phase 4 — Next Dev Session (2026-03-25)
+
+Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
+
+| Gap | Title | Tier | Effort | Notes |
+|-----|-------|------|--------|-------|
+| GAP-18 | `log.Printf` → `slog` structured logging | 2 | M | JSON middleware exists for HTTP only; `log.Printf` throughout internals |
+| GAP-02 | Obsidian vault ingestion (= Phase 45.4) | 2 | M | Linear integration provides the pattern |
+| GAP-26 | Module developer tutorial | 2 | M | Working example needed |
+| GAP-13 | Windows desktop companion | 3 | M | Tauri sidebar provides reusable architecture |
+| GAP-20 | Graph visualization UI | 3 | M-L | Users must use Neo4j Browser directly |
+| GAP-14 | DBSCAN performance profiling | 3 | Research | O(n^2) distance matrix; matters at 50K+ nodes |
+
 ### Partially Complete Phases
 
 **Phase 45.3 — Code Parser RPC Migration** (📋 Planned)
 Extract language parsers from `internal/symbols/` into an RPC sidecar module. Decouples tree-sitter from the main binary.
 
-**Phase 45.4 — Obsidian Integration** (🔄 Half done)
-Linear integration complete (ingestion + CRUD + webhooks + MCP tools). Obsidian vault ingestion not started.
-
 **Phase 47.2 — APE INGEST Scheduled Sync** (🔄 Half done)
 Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{space_id}/freshness`). APE INGEST action type not yet wired into the RSIC action dispatcher.
-
-### Testing Gaps
-
-| Gap | Effort | Notes |
-|-----|--------|-------|
-| SSE streaming endpoint | 1-2 days | `/v1/jobs/{job_id}/stream` — needs SSE client harness |
 
 ### Research (No Implementation Yet)
 
 | Topic | Deliverable |
 |-------|-------------|
 | AutoResearch integration analysis | `docs/development/AUTORESEARCH_INTEGRATION_ANALYSIS.md` |
-| Export governance & org alignment | `docs/development/EXPORT_GOVERNANCE_GAP_ANALYSIS.md` (not yet created) |
 | DBSCAN GPU acceleration | Metal/AMX investigation for clustering performance |
 
-### Governance
+### New Infrastructure (from Gap Analysis)
 
-**Phase 86 — UVTS Activation** (📋 Spec-only)
-Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. Runner is a stub. Requires functional runner, full spec set, and CI integration to activate. Phases 81-85 are all complete.
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Architecture map generator | `scripts/generate_arch_maps.py` | Generates 10 compact maps for Jiminy context; `--checksum`, `--dry-run`, `--force` modes |
+| UITS optimization protection | `docs/tests/uits/schema/uits.schema.json` | `metadata.optimized: true` prevents generator from overwriting converged maps |
+| Public API types | `pkg/mdemg/types.go` | Importable Go types for external consumers (GAP-09) |
+| Scope-based auth | `internal/auth/types.go`, `middleware.go` | `RequireScope()` middleware, 7 scope constants (GAP-16) |
+| Auto-credentials | `internal/cli/init.go`, `db.go` | `generatePassword()` via crypto/rand, env var fallback (GAP-19) |
+| UAMS runner | `docs/tests/uams/runners/uams_runner.py` | 4 auth specs, 104 assertions (GAP-21) |
+| Submodule changelogs | `packaging/*/CHANGELOG.md` | Keep a Changelog format for all 6 packaging submodules (GAP-27) |
 
 ---
 
@@ -388,17 +420,17 @@ Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. R
 
 | Framework | Status | Location | CI Gated |
 |-----------|--------|----------|----------|
-| **UATS** (HTTP contract) | Active | `docs/api/api-spec/uats/` | ✅ |
-| **UPTS** (parser contract) | Active | `docs/lang-parser/lang-parse-spec/upts/` | ✅ |
-| **UDTS** (gRPC contract) | Active | `docs/api/api-spec/udts/` | ✅ (canonical specs) |
+| **UATS** (HTTP contract) | Active | `docs/api/api-spec/uats/` | ✅ Merge-blocking |
+| **UPTS** (parser contract) | Active | `docs/lang-parser/lang-parse-spec/upts/` | ✅ Merge-blocking |
+| **UDTS** (gRPC contract) | Active | `docs/api/api-spec/udts/` | ✅ Canonical-guard |
 | **UBTS** (benchmark) | Active | `docs/tests/ubts/` | Soft-fail |
-| **USTS** (security) | Pilot | `docs/tests/usts/` | No |
-| **UAMS** (auth methods) | Spec-only | `docs/tests/uams/` | No |
-| **UOBS** (observability — runtime) | Active | `docs/tests/uobs/` | No |
-| **UOTS** (observability — artifacts) | Active | `docs/api/api-spec/uots/` | No |
-| **UVTS** (semantic validation) | Spec-only | `docs/tests/uvts/` | No |
-| **UNTS** (hash verification) | Active | `docs/specs/unts-hash-verification.md` | Partial |
-| **UETS** (emergence eval) | Active | `docs/tests/uets/` | No |
+| **USTS** (security) | Active | `docs/tests/usts/` | ✅ Merge-blocking |
+| **UAMS** (auth methods) | Active | `docs/tests/uams/` | Soft-fail |
+| **UOBS** (observability — runtime) | Active | `docs/tests/uobs/` | Soft-fail |
+| **UOTS** (observability — artifacts) | Active | `docs/api/api-spec/uots/` | Soft-fail |
+| **UVTS** (semantic validation) | Active | `docs/tests/uvts/` | Soft-fail |
+| **UNTS** (hash verification) | Active | `docs/specs/unts-hash-verification.md` | ✅ Merge-blocking |
+| **UETS** (emergence eval) | Active | `docs/tests/uets/` | Soft-fail (`--no-llm` in CI) |
 | **UITS** (iterative-improvement) | Active | `docs/tests/uits/` | Soft-fail |
 
 ### UATS Quick Reference
@@ -407,7 +439,7 @@ Semantic validation framework. Schema + 1 canonical spec + 1 draft spec exist. R
 make test-api BASE_URL=http://localhost:9999                    # Run all specs
 python3 docs/api/api-spec/uats/runners/uats_runner.py add-hashes --spec-dir docs/api/api-spec/uats/specs/
 python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir docs/api/api-spec/uats/specs/
-# CI uses: --exclude-tag unts,llm_required
+# CI uses: --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required
 ```
 
 **Spec format**: top-level `request` + `expected`, variants in `variants[]`, inline operators (`equals`, `contains`, `type`, `exists`), `{{var}}` for spec variables, `${ENV_VAR}` for environment.
@@ -490,4 +522,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-24 — All 105 phases + S0-S16 + Phase Jiminy (J1-J17 + J-Init) + FSD-2026-001 + Debian packaging + UxTS governance (81-85) + Phase 50 complete. Synergy Optimization COMPLETE (CLAUDE.md 348→124, MEMORY.md 220→40, 14→3 auto-memory files, ~60% token reduction, /v1/synergy/status endpoint, 7th RSIC dimension, 13 config vars, migration script). J17 AI-to-AI communication protocol COMPLETE. RSIC-SK1 Jiminy self-calibration COMPLETE. Testing & Quality Hardening COMPLETE (193 UATS specs / 378 variants, 200 Go test files, UATS runner skipped-count fix). CI all green. Remaining: Phase 86 (UVTS), partial phases (45.3, 45.4, 47.2), research items, SSE testing gap.*
+*Last updated: 2026-03-25 — Gap Analysis Phases 1-3 COMPLETE + Phase 4 partial (GAP-21 UAMS runner, GAP-27 submodule changelogs done). All 12 UxTS frameworks now have active runners and CI gates (merge-blocking or soft-fail). Phase 86 UVTS now active with inline grading. New: pkg/mdemg/ public types (GAP-09), scope-based auth middleware (GAP-16), auto-credentials (GAP-19), architecture map generator (scripts/generate_arch_maps.py) with UITS optimization protection, UETS --no-llm CI fix. 195 UATS specs, 213 Go test files, CI all green. Remaining Phase 4: GAP-18 (slog), -02 (Obsidian), -26 (tutorial), -13 (Windows), -20 (graph viz), -14 (DBSCAN).*
