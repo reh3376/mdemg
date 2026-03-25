@@ -399,10 +399,15 @@ func runDBStart(boltPort, httpPort int, password string) error {
 		httpPort = neo4jDefaultHTTP
 	}
 
-	containerName, volumeName, err := resolveProjectContainer()
+	containerName, _, err := resolveProjectContainer()
 	if err != nil {
 		return err
 	}
+
+	// Check for volume name mismatch between legacy CLI and docker compose,
+	// and migrate data if needed (GAP-06).
+	cwd, _ := os.Getwd()
+	volumeName := tryMigrateVolume(cwd)
 
 	state, err := InspectContainer(containerName)
 	if err != nil {

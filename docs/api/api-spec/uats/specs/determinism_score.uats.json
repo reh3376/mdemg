@@ -24,7 +24,7 @@
       "determinism",
       "fsd"
     ],
-    "sha256": "3d1f71ad38dcddf5c07001d3bae2a9b327f3a6c7c35c0fa58541178ace5cf4c5"
+    "sha256": "1f77cdd9d120e4b87d8baec721cdbd6aac2df0a24574c304ebb5b03c8d3a2ae5"
   },
   "variables": {},
   "request": {
@@ -41,16 +41,52 @@
     "status": [
       200,
       503
+    ],
+    "body_assertions": [
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "test-space"
+      },
+      {
+        "path": "$.score",
+        "op": "exists"
+      },
+      {
+        "path": "$.informed_actions",
+        "op": "exists"
+      },
+      {
+        "path": "$.total_actions",
+        "op": "exists"
+      },
+      {
+        "path": "$.compliance_rate",
+        "op": "exists"
+      },
+      {
+        "path": "$.coverage_ratio",
+        "op": "exists"
+      }
     ]
   },
   "variants": [
     {
       "name": "missing_space_id",
       "description": "GET without space_id returns 400 or 503 if feature disabled",
+      "request": {
+        "query": {}
+      },
       "expected": {
         "status": [
           400,
           503
+        ],
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "exists"
+          }
         ]
       }
     },
@@ -63,7 +99,14 @@
         "body": {}
       },
       "expected": {
-        "status": 405
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "equals",
+            "expected": "method not allowed"
+          }
+        ]
       }
     }
   ]

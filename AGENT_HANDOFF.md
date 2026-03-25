@@ -38,7 +38,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
-- Gap Analysis — IN PROGRESS (Phases 1-3 complete, Phase 4 partial: GAP-21/27 done, 6 items remaining)
+- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4 partial: GAP-21/27 done, 6 items remaining)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
@@ -58,7 +58,7 @@ WHAT REMAINS TO BE DONE:
 10. RESEARCH: AutoResearch integration analysis (docs/development/)
 
 === Gap Analysis — COMPLETED items (Phases 1-3 + partial Phase 4) ===
-- Phase 1 (Quick Wins): GAP-06/-07/-12/-15/-17/-25 — doc/config fixes
+- Phase 1 (Quick Wins): GAP-06/-07/-12/-15/-17/-25 — doc/config fixes (+ sprint review remediations: GAP-01 plugin bridge, GAP-06 volume migration, GAP-25 Windows README, GAP-30 UATS assertions)
 - Phase 2 (UATS): GAP-28/-29/-30/-31 — canonical grammar migration, CI gating
 - Phase 3 (Core): GAP-01 (parser fallback), -04 (UVTS inline grading), -05 (SSE docs),
   -09 (pkg/mdemg/ public types), -16 (scope-based auth), -19 (auto-credentials)
@@ -456,7 +456,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 |-------|----------|-------|
 | Obsidian integration not started | Low | Phase 45.4 — listed in roadmap, no implementation |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
-| `docker.go` volume name mismatch | Medium | `mdemg db start` creates `mdemg-neo4j-data` (hyphens) but docker-compose uses `mdemg_neo4j_data` (underscores). Needs migration logic — separate planning required. Workaround: systemd tries `docker start mdemg-neo4j-dev` first. |
+| ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
 | ~~Linux docs: wrong Ollama model~~ | ~~Medium~~ | ~~FIXED (2026-03-20)~~ — README.md + beta guide recommended `nomic-embed-text` (768d, incompatible). Corrected to `qwen3-embedding:8b` (4096d → MRL truncate to 3072d). PR #172. |
 | ~~Linux systemd 6 bugs~~ | ~~High~~ | ~~FIXED~~ — goreleaser archive split, install.sh persistence, upgrade.go systemd handling, teardown dual-path cleanup, ExecStartPre fix. |
