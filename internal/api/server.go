@@ -125,6 +125,7 @@ type Server struct {
 
 	// Phase Jiminy: Jiminy Guidance
 	jiminySvc *jiminy.Service
+	warmStore *jiminy.WarmStore
 
 	// Phase 38: UNTS Hash Verification
 	untsRegistry *unts.Registry
@@ -443,6 +444,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc = jiminy.NewService(cfg, driver, cons, emb)
 		slog.Info("Jiminy guidance enabled", "timeout_ms", cfg.JiminyTimeoutMs, "max_items", cfg.JiminyMaxItems, "min_confidence", cfg.JiminyMinConfidence)
 
+		if cfg.JiminyWarmEnabled {
+			slog.Info("Jiminy warm store enabled", "debounce_sec", cfg.JiminyWarmDebounceSec, "max_age_sec", cfg.JiminyWarmMaxAgeSec)
+		}
+
 		// J7: Wire retrieval provider for full-spectrum access
 		if cfg.JiminyRetrievalEnabled && ret != nil {
 			jiminySvc.SetRetriever(&jiminyRetrievalAdapter{retriever: ret})
@@ -683,6 +688,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicWatchdog.SetSignalProvider(&rsicWatchdogSignalAdapter{
 		sessionTracker: sessTracker,
 		driver:         driver,
+		jiminyEnabled:  cfg.JiminyEnabled,
+		jiminySvc:      jiminySvc,
 	})
 
 	// Phase 87: Create orchestration policy
@@ -797,6 +804,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		intentTranslator:        intentTrans,
 		guardrailValidator:      guardrailVal,
 		jiminySvc:               jiminySvc,
+		warmStore:               jiminy.NewWarmStore(),
 		metaLearnSvc:            metaLearnSvc,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,
@@ -809,6 +817,29 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Phase 47.2: Set trigger callback now that Server is constructed
 	if freshnessAdapter != nil {
 		freshnessAdapter.triggerFn = s.runScheduledSyncCheck
+	}
+
+	// B7: Wire warm store into jiminy service for trust-based invalidation
+	if jiminySvc != nil {
+		jiminySvc.SetWarmStore(s.warmStore)
+	}
+
+	// B3: Bootstrap codification — codify constraints without codes on startup
+	if cfg.J17BootstrapCodification && jiminySvc != nil {
+		go func() {
+			bctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			n, err := jiminySvc.BootstrapCodes(bctx, cfg.J17BootstrapSpaceID)
+			if err != nil {
+				slog.Warn("jiminy: bootstrap codification failed", "error", err)
+			} else if n > 0 {
+				slog.Info("jiminy: bootstrap codification complete", "codified", n)
+				// Clear orphan metrics from pre-bootstrap window
+				if collector := jiminySvc.GetProtocolMetricsCollector(); collector != nil {
+					collector.Reset()
+				}
+			}
+		}()
 	}
 
 	return s
@@ -1485,6 +1516,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/healthz", s.handleJiminyHealthz)
 	mux.HandleFunc("/v1/jiminy/ready", s.handleJiminyReady)
 	mux.HandleFunc("/v1/jiminy/guide", s.handleJiminyGuide)
+	mux.HandleFunc("/v1/jiminy/warm", s.handleJiminyWarm)
+	mux.HandleFunc("/v1/jiminy/latest", s.handleJiminyLatest)
 	mux.HandleFunc("/v1/jiminy/feedback", s.handleJiminyFeedback)
 	mux.HandleFunc("/v1/jiminy/evaluate", s.handleJiminyEvaluate) // J9
 

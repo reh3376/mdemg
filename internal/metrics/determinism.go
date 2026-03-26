@@ -26,7 +26,7 @@ func ComputeDeterminismScore(ctx context.Context, driver neo4j.DriverWithContext
 
 	// Query: Get total observations (proxy for total actions) and guided ones
 	cypher := `
-MATCH (n:MemoryNode {space_id: $spaceID, node_type: 'observation'})
+MATCH (n:MemoryNode {space_id: $spaceID, role_type: 'conversation_observation'})
 WITH count(n) AS total_actions
 OPTIONAL MATCH (g:MemoryNode {space_id: $spaceID})
 WHERE g.constraint_type IS NOT NULL

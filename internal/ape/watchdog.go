@@ -205,6 +205,9 @@ func (w *Watchdog) check() {
 		if w.state.DecayScore >= w.cfg.RSICWarnThreshold {
 			anomalies = append(anomalies, "high-decay-score")
 		}
+		if !w.signalProvider.IsJiminyHealthy(w.ctx) {
+			anomalies = append(anomalies, "jiminy-unhealthy")
+		}
 		w.state.ActiveAnomalies = anomalies
 
 		// Additional escalation: force cycle if session health is critically low AND decay is moderate
