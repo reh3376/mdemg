@@ -56,6 +56,58 @@ if [ -n "$SESSION_HEALTH" ]; then
   fi
 fi
 
+# RSIC health assessment before compaction
+RSIC_ASSESS=$(curl -sf -X POST "${MDEMG_URL}/v1/self-improve/assess" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"{{SPACE_ID}}\",\"tier\":\"micro\"}" \
+  --connect-timeout 2 --max-time 5 2>/dev/null || true)
+if [ -n "$RSIC_ASSESS" ]; then
+  RSIC_OVERALL=$(echo "$RSIC_ASSESS" | jq -r '.overall // 0' 2>/dev/null || echo "0")
+  RSIC_CONFIDENCE=$(echo "$RSIC_ASSESS" | jq -r '.confidence // 0' 2>/dev/null || echo "0")
+  RSIC_RETRIEVAL=$(echo "$RSIC_ASSESS" | jq -r '.retrieval // 0' 2>/dev/null || echo "0")
+  RSIC_MEMORY=$(echo "$RSIC_ASSESS" | jq -r '.memory // 0' 2>/dev/null || echo "0")
+  RSIC_EDGE=$(echo "$RSIC_ASSESS" | jq -r '.edge // 0' 2>/dev/null || echo "0")
+  RSIC_TASK=$(echo "$RSIC_ASSESS" | jq -r '.task // 0' 2>/dev/null || echo "0")
+  RSIC_GUIDANCE=$(echo "$RSIC_ASSESS" | jq -r '.guidance // 0' 2>/dev/null || echo "0")
+  RSIC_PROTOCOL=$(echo "$RSIC_ASSESS" | jq -r '.protocol // 0' 2>/dev/null || echo "0")
+  RSIC_SYNERGY=$(echo "$RSIC_ASSESS" | jq -r '.synergy // 0' 2>/dev/null || echo "0")
+  JIMINY_HEALTHY=$(echo "$RSIC_ASSESS" | jq -r '.jiminy_healthy // false' 2>/dev/null || echo "false")
+
+  CONTEXT_PARTS="${CONTEXT_PARTS} RSIC health: overall=${RSIC_OVERALL} confidence=${RSIC_CONFIDENCE} retrieval=${RSIC_RETRIEVAL} memory=${RSIC_MEMORY} edge=${RSIC_EDGE} task=${RSIC_TASK} guidance=${RSIC_GUIDANCE} protocol=${RSIC_PROTOCOL} synergy=${RSIC_SYNERGY} jiminy_healthy=${JIMINY_HEALTHY}."
+
+  echo "═══ PRE-COMPACT HEALTH ═══"
+  echo "Overall: ${RSIC_OVERALL} | Confidence: ${RSIC_CONFIDENCE}"
+  echo "Retrieval: ${RSIC_RETRIEVAL} | Memory: ${RSIC_MEMORY} | Edge: ${RSIC_EDGE} | Task: ${RSIC_TASK}"
+  echo "Guidance: ${RSIC_GUIDANCE} | Protocol: ${RSIC_PROTOCOL} | Synergy: ${RSIC_SYNERGY}"
+  echo "Jiminy: ${JIMINY_HEALTHY}"
+  echo "═══ END PRE-COMPACT HEALTH ═══"
+
+  # Flag degraded subsystems
+  if [ "$(echo "${RSIC_OVERALL} < 0.5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    echo "WARNING: Overall health degraded (${RSIC_OVERALL} < 0.5)"
+    CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Overall health degraded (${RSIC_OVERALL})."
+  fi
+  if [ "$(echo "${RSIC_GUIDANCE} < 0.4" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    echo "WARNING: Guidance subsystem degraded (${RSIC_GUIDANCE} < 0.4)"
+    CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Guidance degraded (${RSIC_GUIDANCE})."
+  fi
+  if [ "$(echo "${RSIC_PROTOCOL} < 0.4" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    echo "WARNING: Protocol subsystem degraded (${RSIC_PROTOCOL} < 0.4)"
+    CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Protocol degraded (${RSIC_PROTOCOL})."
+  fi
+  if [ "$(echo "${RSIC_SYNERGY} < 0.4" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    echo "WARNING: Synergy subsystem degraded (${RSIC_SYNERGY} < 0.4)"
+    CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Synergy degraded (${RSIC_SYNERGY})."
+  fi
+fi
+
+# Jiminy health check before compaction
+JIMINY_STATUS=$(curl -sf "${MDEMG_URL}/v1/jiminy/healthz" --connect-timeout 1 --max-time 2 2>/dev/null || echo "{}")
+JIMINY_OK=$(echo "$JIMINY_STATUS" | jq -e '.enabled == true and .status == "ok"' 2>/dev/null || echo "false")
+if [ "$JIMINY_OK" != "true" ]; then
+  CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Jiminy unhealthy during compaction — guidance pipeline offline."
+fi
+
 # Save the observation
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
   -H "Content-Type: application/json" \

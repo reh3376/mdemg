@@ -156,6 +156,12 @@ DEGRADED
   fi
 fi
 
+# Pre-warm Jiminy guidance for first prompt (fire-and-forget)
+curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":\"session-start\",\"session_id\":\"claude-core\"}" \
+  --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+
 # J17: Restore protocol state from saved ticket
 J17_STATE_RESTORED=false
 if [ "${J17_ENABLED:-false}" = "true" ]; then

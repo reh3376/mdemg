@@ -60,23 +60,35 @@ echo "$RECALL" | jq -r '
 
 echo "═══ END CMS RECALL ═══"
 
-# --- Jiminy inner voice guidance ---
-# Always attempts the call. Server returns 503 if disabled — curl fails silently.
-# No env var guard needed: the server is the single source of truth.
-GUIDANCE=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/guide" \
-  -H "Content-Type: application/json" \
-  -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | jq -Rs .),\"session_id\":\"claude-core\"}" \
-  --connect-timeout 3 --max-time 35 2>/dev/null) || true
+# --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
+# Reads pre-computed guidance instantly (<100ms) from warm store.
+# Then triggers async warm-up for NEXT prompt with current context.
+GUIDANCE=$(curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
+  --connect-timeout 1 --max-time 2 2>/dev/null) || true
 
 if [ -n "$GUIDANCE" ]; then
+  WARM=$(echo "$GUIDANCE" | jq -r '.warm // false' 2>/dev/null)
   AUGMENTATION=$(echo "$GUIDANCE" | jq -r '.data.prompt_augmentation // empty' 2>/dev/null)
-  if [ -n "$AUGMENTATION" ]; then
+  AGE_MS=$(echo "$GUIDANCE" | jq -r '.age_ms // "?"' 2>/dev/null)
+  if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
     echo ""
     echo "$AUGMENTATION"
+    if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
+      echo "[guidance age: ${AGE_MS}ms — may be stale]"
+    fi
   fi
 fi
 
+# Fire-and-forget: warm guidance for NEXT prompt with current context
+curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
+  -H "Content-Type: application/json" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"claude-core\"}" \
+  --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+
 # --- Reinforce recalled observations via retrieval co-activation ---
+# The retrieve endpoint triggers spreading activation which creates learning
+# edges between co-retrieved nodes, strengthening frequently-accessed memories.
+# Fire-and-forget in background — don't slow down prompt delivery.
 curl -sf -X POST "${MDEMG_URL}/v1/memory/retrieve" \
   -H "Content-Type: application/json" \
   -d "{\"space_id\":\"${SPACE_ID}\",\"query_text\":$(echo "$USER_PROMPT" | jq -Rs .),\"candidate_k\":10,\"top_k\":5,\"hop_depth\":2}" \
@@ -90,3 +102,8 @@ if [ -n "$HEALTH_RESP" ]; then
   H_OBS=$(echo "$HEALTH_RESP" | jq -r '.observations_since_resume // "?"' 2>/dev/null || echo "?")
   echo "[Session health: ${H_SCORE} | obs: ${H_OBS}]"
 fi
+
+# Synergy: token count footer for recall + guidance
+RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
+GUIDANCE_TOKENS=$(echo "${GUIDANCE:-}" | wc -c | tr -d ' ')
+echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_TOKENS}]"
