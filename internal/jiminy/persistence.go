@@ -93,7 +93,7 @@ func (ps *PersistenceStore) GetConstraintEffectiveness(ctx context.Context, spac
 	defer sess.Close(ctx) //nolint:errcheck
 
 	cypher := `
-		MATCH (c:MemoryNode {space_id: $spaceID, node_type: 'constraint'})
+		MATCH (c:MemoryNode {space_id: $spaceID, role_type: 'constraint'})
 		OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-()
 		RETURN
 			c.node_id    AS node_id,

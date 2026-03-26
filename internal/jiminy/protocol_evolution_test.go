@@ -44,11 +44,13 @@ func TestProtocolEvolver_RetireCode(t *testing.T) {
 
 func TestProtocolEvolver_AdjustTierThresholds(t *testing.T) {
 	metrics := NewProtocolMetricsCollector()
-	// Simulate low T1 distribution
-	for range 3 {
+	// Need >= 20 events to pass the insufficient-data guard
+	for range 15 {
 		metrics.RecordGuidance(2, 50, nil)
 	}
-	metrics.RecordGuidance(1, 15, nil)
+	for range 5 {
+		metrics.RecordGuidance(1, 15, nil)
+	}
 
 	evolver := NewProtocolEvolver(metrics, nil, nil, nil, nil, nil)
 
@@ -57,6 +59,32 @@ func TestProtocolEvolver_AdjustTierThresholds(t *testing.T) {
 		t.Fatalf("AdjustTierThresholds failed: %v", err)
 	}
 
+	if result["action"] != "adjust_tier_threshold" {
+		t.Errorf("action = %v, want adjust_tier_threshold", result["action"])
+	}
+	// Should not be skipped since we have >= 20 events
+	if result["skipped"] == true {
+		t.Error("should not be skipped with 20 events")
+	}
+}
+
+func TestProtocolEvolver_AdjustTierThresholds_InsufficientData(t *testing.T) {
+	metrics := NewProtocolMetricsCollector()
+	// Only 5 events — below the 20-event guard
+	for range 5 {
+		metrics.RecordGuidance(2, 50, nil)
+	}
+
+	evolver := NewProtocolEvolver(metrics, nil, nil, nil, nil, nil)
+
+	result, err := evolver.AdjustTierThresholds(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("AdjustTierThresholds failed: %v", err)
+	}
+
+	if result["skipped"] != true {
+		t.Error("should be skipped with insufficient data")
+	}
 	if result["action"] != "adjust_tier_threshold" {
 		t.Errorf("action = %v, want adjust_tier_threshold", result["action"])
 	}
@@ -121,8 +149,8 @@ func TestProtocolEvolver_RetireCode_ClearsCollisionSet(t *testing.T) {
 
 func TestProtocolEvolver_AdjustTierThresholds_WriteBack(t *testing.T) {
 	metrics := NewProtocolMetricsCollector()
-	// Simulate very low T1 usage to trigger threshold decrease
-	for range 10 {
+	// Need >= 20 events to pass the guard
+	for range 25 {
 		metrics.RecordGuidance(3, 80, nil) // all T3
 	}
 
@@ -166,11 +194,11 @@ func TestAdjustTierThresholds_LowT1Comprehension(t *testing.T) {
 	for range 10 {
 		metrics.RecordOutcomeWithTier("code-a", 1, 0.4) // below 0.6
 	}
-	// T1 distribution ~80% so distribution-based adjustment doesn't interfere
-	for range 8 {
+	// Need >= 20 events via RecordGuidance. T1 distribution ~80% so distribution-based adjustment doesn't interfere
+	for range 16 {
 		metrics.RecordGuidance(1, 15, nil)
 	}
-	for range 2 {
+	for range 4 {
 		metrics.RecordGuidance(2, 50, nil)
 	}
 
@@ -205,8 +233,8 @@ func TestAdjustTierThresholds_HighT1Comprehension(t *testing.T) {
 	for range 25 {
 		metrics.RecordOutcomeWithTier("code-a", 1, 0.95)
 	}
-	// High T1 distribution (>90%) to trigger the distribution +0.05
-	for range 10 {
+	// Need >= 20 events via RecordGuidance. High T1 distribution (>90%) to trigger the distribution +0.05
+	for range 19 {
 		metrics.RecordGuidance(1, 15, nil)
 	}
 	metrics.RecordGuidance(2, 50, nil) // just one T2
@@ -237,7 +265,8 @@ func TestAdjustTierThresholds_T2BelowT3(t *testing.T) {
 		metrics.RecordOutcomeWithTier("code-a", 2, 0.5)
 		metrics.RecordOutcomeWithTier("code-b", 3, 0.9)
 	}
-	for range 5 {
+	// Need >= 20 events via RecordGuidance
+	for range 10 {
 		metrics.RecordGuidance(2, 50, nil)
 		metrics.RecordGuidance(3, 80, nil)
 	}

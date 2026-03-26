@@ -165,7 +165,7 @@ type SignalLearnerProvider interface {
 
 // RetrievalProvider defines the interface for accessing the full retrieval pipeline.
 type RetrievalProvider interface {
-	RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int) ([]RetrievalResult, error)
+	RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int, queryEmbedding []float32) ([]RetrievalResult, error)
 }
 
 // RetrievalResult is a simplified view of models.RetrieveResult for Jiminy use.

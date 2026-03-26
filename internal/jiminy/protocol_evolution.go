@@ -49,6 +49,7 @@ func (pe *ProtocolEvolver) CodifyConstraint(ctx context.Context, spaceID string,
 		_, writeErr := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			cypher := `MATCH (n:MemoryNode)
 				WHERE n.node_id = $nodeId AND n.space_id = $spaceId
+				  AND (n.constraint_code IS NULL OR n.constraint_code = '')
 				SET n.constraint_code = $code,
 					n.constraint_code_assigned_at = datetime(),
 					n.constraint_code_assigned_by = "mdemg-codify"
@@ -125,6 +126,16 @@ func (pe *ProtocolEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 	}
 
 	snapshot := pe.metrics.Snapshot()
+
+	// Don't adjust distribution-based thresholds until sufficient data exists
+	if snapshot.TotalEvents < 20 {
+		return map[string]any{
+			"action":       "adjust_tier_threshold",
+			"skipped":      true,
+			"reason":       "insufficient data for distribution-based adjustment",
+			"total_events": snapshot.TotalEvents,
+		}, nil
+	}
 
 	// Read current thresholds from trust scorer or use defaults
 	oldHigh := 0.8

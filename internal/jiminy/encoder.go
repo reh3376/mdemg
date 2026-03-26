@@ -130,8 +130,8 @@ func (e *ProtocolEncoder) selectTier(item GuidanceItem, trustScore float64) int 
 		// High trust + has code → T1 (agent has earned dense encoding)
 		return TierCoded
 	case hasCode && trustScore >= e.tierLowThreshold:
-		// Normal trust + has code → T1
-		return TierCoded
+		// Moderate trust + has code → T2 (must earn T1 via sustained comprehension)
+		return TierTelegraphic
 	case hasCode && trustScore < e.tierLowThreshold:
 		// Low trust + has code → T2 (add telegraphic explanation)
 		return TierTelegraphic

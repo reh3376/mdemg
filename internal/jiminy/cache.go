@@ -41,17 +41,18 @@ func NewGuidanceCache(capacity int, ttlSeconds int) *GuidanceCache {
 	}
 }
 
-// cacheKey generates a normalized key from space_id + context.
+// cacheKey generates a normalized key from space_id + session_id + context.
+// Includes session_id to prevent cross-session contamination.
 // Hashes the full context to avoid collisions on shared prefixes.
-func cacheKey(spaceID, context string) string {
+func cacheKey(spaceID, sessionID, context string) string {
 	normalized := strings.ToLower(strings.TrimSpace(context))
-	h := sha256.Sum256([]byte(spaceID + ":" + normalized))
+	h := sha256.Sum256([]byte(spaceID + ":" + sessionID + ":" + normalized))
 	return hex.EncodeToString(h[:16]) // 128-bit key
 }
 
 // Get retrieves a cached guidance response if available and not expired.
-func (gc *GuidanceCache) Get(spaceID, context string) (GuidanceResponse, bool) {
-	key := cacheKey(spaceID, context)
+func (gc *GuidanceCache) Get(spaceID, sessionID, context string) (GuidanceResponse, bool) {
+	key := cacheKey(spaceID, sessionID, context)
 
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -75,8 +76,8 @@ func (gc *GuidanceCache) Get(spaceID, context string) (GuidanceResponse, bool) {
 }
 
 // Put stores a guidance response in the cache.
-func (gc *GuidanceCache) Put(spaceID, context string, resp GuidanceResponse) {
-	key := cacheKey(spaceID, context)
+func (gc *GuidanceCache) Put(spaceID, sessionID, context string, resp GuidanceResponse) {
+	key := cacheKey(spaceID, sessionID, context)
 
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -118,8 +119,8 @@ func (gc *GuidanceCache) Size() int {
 }
 
 // Invalidate removes a specific entry from the cache.
-func (gc *GuidanceCache) Invalidate(spaceID, context string) {
-	key := cacheKey(spaceID, context)
+func (gc *GuidanceCache) Invalidate(spaceID, sessionID, context string) {
+	key := cacheKey(spaceID, sessionID, context)
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 	if elem, ok := gc.items[key]; ok {

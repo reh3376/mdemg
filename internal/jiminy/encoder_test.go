@@ -114,7 +114,7 @@ func TestProtocolEncoder_TierSelection(t *testing.T) {
 		wantTier   int
 	}{
 		{"high trust + code → T1", true, 0.9, TierCoded},
-		{"normal trust + code → T1", true, 0.5, TierCoded},
+		{"moderate trust + code → T2", true, 0.5, TierTelegraphic},
 		{"low trust + code → T2", true, 0.3, TierTelegraphic},
 		{"high trust + no code → T2", false, 0.9, TierTelegraphic},
 		{"normal trust + no code → T3", false, 0.5, TierFullNL},
