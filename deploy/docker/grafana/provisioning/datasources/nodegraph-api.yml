@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: MDEMG Graph API
+    uid: mdemg-nodegraph
+    type: hamedkarbasi93-nodegraphapi-datasource
+    access: proxy
+    editable: false
+    jsonData:
+      url: "http://host.docker.internal:9999"

@@ -8,27 +8,261 @@
   "id": null,
   "links": [
     {
-      "title": "MDEMG Overview",
-      "url": "/d/mdemg-overview",
-      "type": "link"
-    },
-    {
-      "title": "Neo4j Dashboard",
-      "url": "/d/mdemg-neo4j",
-      "type": "link"
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
     }
   ],
   "panels": [
     {
-      "title": "RSIC Overview",
+      "title": "Cognitive Health",
       "type": "row",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "collapsed": false
     },
     {
+      "title": "Overall Health",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_health_overall{space_id=\"$space_id\"}",
+          "legendFormat": "overall"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Assessment Confidence",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_health_confidence{space_id=\"$space_id\"}",
+          "legendFormat": "confidence"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Health Sub-Scores",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 16, "x": 8, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "mdemg_rsic_health_retrieval{space_id=\"$space_id\"}", "legendFormat": "Retrieval", "refId": "A" },
+        { "expr": "mdemg_rsic_health_memory{space_id=\"$space_id\"}", "legendFormat": "Memory", "refId": "B" },
+        { "expr": "mdemg_rsic_health_edge{space_id=\"$space_id\"}", "legendFormat": "Edge", "refId": "C" },
+        { "expr": "mdemg_rsic_health_task{space_id=\"$space_id\"}", "legendFormat": "Task", "refId": "D" },
+        { "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}", "legendFormat": "Guidance", "refId": "E" },
+        { "expr": "mdemg_rsic_health_protocol{space_id=\"$space_id\"}", "legendFormat": "Protocol", "refId": "F" },
+        { "expr": "mdemg_rsic_health_synergy{space_id=\"$space_id\"}", "legendFormat": "Synergy", "refId": "G" }
+      ],
+      "options": {
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Health Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "mdemg_rsic_health_overall{space_id=\"$space_id\"}", "legendFormat": "Overall", "refId": "A" },
+        { "expr": "mdemg_rsic_health_retrieval{space_id=\"$space_id\"}", "legendFormat": "Retrieval", "refId": "B" },
+        { "expr": "mdemg_rsic_health_memory{space_id=\"$space_id\"}", "legendFormat": "Memory", "refId": "C" },
+        { "expr": "mdemg_rsic_health_edge{space_id=\"$space_id\"}", "legendFormat": "Edge", "refId": "D" },
+        { "expr": "mdemg_rsic_health_task{space_id=\"$space_id\"}", "legendFormat": "Task", "refId": "E" },
+        { "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}", "legendFormat": "Guidance", "refId": "F" },
+        { "expr": "mdemg_rsic_health_protocol{space_id=\"$space_id\"}", "legendFormat": "Protocol", "refId": "G" },
+        { "expr": "mdemg_rsic_health_synergy{space_id=\"$space_id\"}", "legendFormat": "Synergy", "refId": "H" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        }
+      }
+    },
+    {
+      "title": "CLAUDE.md Lines",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_synergy_claude_md_lines{space_id=\"$space_id\"}",
+          "legendFormat": "lines"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 150 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "MEMORY.md Lines",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_synergy_memory_md_lines{space_id=\"$space_id\"}",
+          "legendFormat": "lines"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 120 },
+              { "color": "red", "value": 180 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Synergy Overflow & Buffer",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_synergy_overflow_rate{space_id=\"$space_id\"}",
+          "legendFormat": "Overflow Rate",
+          "refId": "A"
+        },
+        {
+          "expr": "mdemg_rsic_synergy_buffer_entries{space_id=\"$space_id\"}",
+          "legendFormat": "Buffer Entries",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Buffer Entries" },
+            "properties": [
+              { "id": "custom.drawStyle", "value": "bars" },
+              { "id": "custom.fillOpacity", "value": 50 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "RSIC Overview",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false
+    },
+    {
       "title": "Cycle Rate (5m)",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 19 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum(rate(mdemg_rsic_cycle_total{outcome=\"started\"}[5m])) * 60",
@@ -42,6 +276,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "cpm",
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -54,10 +289,11 @@
     {
       "title": "Cycle Success Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 19 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(mdemg_rsic_cycle_total{outcome=\"completed\"}[5m])) / sum(rate(mdemg_rsic_cycle_total{outcome=~\"completed|error|low_confidence\"}[5m])) * 100",
+          "expr": "(sum(rate(mdemg_rsic_cycle_total{outcome=\"completed\"}[5m])) or vector(0)) / (sum(rate(mdemg_rsic_cycle_total{outcome=~\"completed|error|low_confidence\"}[5m])) > 0 or vector(1)) * 100",
           "legendFormat": "%"
         }
       ],
@@ -68,6 +304,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -82,7 +319,8 @@
     {
       "title": "Trigger Rejection Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 19 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum(rate(mdemg_rsic_trigger_rejected_total[5m])) * 60",
@@ -95,6 +333,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -109,10 +348,11 @@
     {
       "title": "Watchdog Escalation Level",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 19 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "max(mdemg_rsic_watchdog_escalation_level)",
+          "expr": "max(mdemg_rsic_watchdog_escalation_level{space_id=~\"$space_id\"})",
           "legendFormat": "level"
         }
       ],
@@ -141,15 +381,16 @@
       }
     },
     {
-      "title": "Cycles",
+      "title": "Cycles (Instance-Wide)",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
       "collapsed": false
     },
     {
       "title": "Cycle Duration p95 by Tier",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le, tier) (rate(mdemg_rsic_cycle_duration_seconds_bucket[5m])))",
@@ -172,7 +413,8 @@
     {
       "title": "Cycles by Source",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (source) (rate(mdemg_rsic_cycle_total{outcome=\"started\"}[5m])) * 60",
@@ -194,7 +436,8 @@
     {
       "title": "Trigger Rejections by Reason",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (reason) (rate(mdemg_rsic_trigger_rejected_total[5m])) * 60",
@@ -216,7 +459,8 @@
     {
       "title": "Cycle Outcomes (1h)",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (outcome) (increase(mdemg_rsic_cycle_total[1h]))",
@@ -233,15 +477,16 @@
       }
     },
     {
-      "title": "Actions",
+      "title": "Actions (Instance-Wide)",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "collapsed": false
     },
     {
       "title": "Action Success Rate",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (action) (increase(mdemg_rsic_action_total{status=\"success\"}[1h]))",
@@ -276,7 +521,8 @@
     {
       "title": "Action Duration p95",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le, action) (rate(mdemg_rsic_action_duration_seconds_bucket[5m])))",
@@ -297,7 +543,8 @@
     {
       "title": "Safety Blocks",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (action, reason) (rate(mdemg_rsic_safety_blocked_total[5m])) * 60",
@@ -319,7 +566,8 @@
     {
       "title": "Calibration Confidence",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "mdemg_rsic_calibration_confidence",
@@ -348,16 +596,17 @@
     {
       "title": "Watchdog",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 },
       "collapsed": false
     },
     {
       "title": "Watchdog Decay Score",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 58 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "mdemg_rsic_watchdog_decay_score",
+          "expr": "mdemg_rsic_watchdog_decay_score{space_id=~\"$space_id\"}",
           "legendFormat": "{{ space_id }}"
         }
       ],
@@ -385,10 +634,11 @@
     {
       "title": "Watchdog Escalation Timeline",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 58 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "mdemg_rsic_watchdog_escalation_level",
+          "expr": "mdemg_rsic_watchdog_escalation_level{space_id=~\"$space_id\"}",
           "legendFormat": "{{ space_id }}"
         }
       ],
@@ -421,7 +671,8 @@
     {
       "title": "Watchdog Force Triggers (1h rate)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "rate(mdemg_rsic_watchdog_force_total[1h]) * 3600",
@@ -434,6 +685,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -448,7 +700,8 @@
     {
       "title": "Snapshots Created",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum by (action) (rate(mdemg_rsic_snapshot_created_total[5m])) * 60",
@@ -472,7 +725,44 @@
   "schemaVersion": 39,
   "tags": ["mdemg", "rsic"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "localhost:9999",
+        "current": {
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "options": [
+          {
+            "text": "localhost:9999",
+            "value": "localhost:9999",
+            "selected": true
+          }
+        ]
+      },
+      {
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(mdemg_rsic_health_overall, space_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        }
+      }
+    ]
   },
   "time": {
     "from": "now-6h",

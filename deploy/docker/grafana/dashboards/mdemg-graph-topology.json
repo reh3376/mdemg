@@ -8,113 +8,123 @@
   "id": null,
   "links": [
     {
-      "title": "MDEMG Overview",
-      "url": "/d/mdemg-overview",
-      "type": "link"
-    },
-    {
-      "title": "Neo4j Dashboard",
-      "url": "/d/mdemg-neo4j",
-      "type": "link"
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
     }
   ],
   "panels": [
     {
+      "title": "Layer & Edge Legend",
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display:flex;gap:32px;flex-wrap:wrap;padding:4px 8px;font-size:12px;line-height:1.8\">\n  <div><strong>Node Layers:</strong>\n    <span style=\"color:#5794F2\">\u25cf</span> L0/L1 Raw/Obs &nbsp;\n    <span style=\"color:#73BF69\">\u25cf</span> L2 Concepts &nbsp;\n    <span style=\"color:#FADE2A\">\u25cf</span> L3 Abstractions &nbsp;\n    <span style=\"color:#FF9830\">\u25cf</span> L4 Meta &nbsp;\n    <span style=\"color:#F2495C\">\u25cf</span> L5 Paradigms\n  </div>\n  <div><strong>Edge Types:</strong>\n    <span style=\"color:#B877D9\">\u2014</span> Structural &nbsp;\n    <span style=\"color:#8AB8FF\">\u2014</span> Learned &nbsp;\n    <span style=\"color:#FF9830\">\u2014</span> Causal &nbsp;\n    <span style=\"color:#FF6EB4\">\u2014</span> Cross-domain &nbsp;\n    <span style=\"color:#8F8F8F\">\u2014</span> Association &nbsp;\n    <span style=\"color:#73BF69\">\u2014</span> Code &nbsp;\n    <span style=\"color:#FADE2A\">\u2014</span> Compositional &nbsp;\n    <span style=\"color:#6ED0E0\">\u2014</span> Provenance &nbsp;\n    <span style=\"color:#F2495C\">\u2014</span> Contrast\n  </div>\n  <div><em>Scroll to zoom \u2022 Drag to pan \u2022 Click node for details</em></div>\n</div>"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
       "title": "Layer Topology",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
       "collapsed": false
     },
     {
       "title": "Layer Topology",
-      "description": "L1-L5 concept nodes and their relationships. Filter by layer using the $layer variable. Nodes colored by layer depth.",
+      "description": "Concept nodes colored by layer with relationship edges. Nodes show real concept names, activation scores, and layer coloring. Click a node for full details.",
       "type": "nodeGraph",
-      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 1 },
+      "gridPos": { "h": 20, "w": 24, "x": 0, "y": 4 },
       "datasource": {
-        "type": "kniepdennis-neo4j-datasource",
-        "uid": "neo4j"
+        "type": "hamedkarbasi93-nodegraphapi-datasource",
+        "uid": "mdemg-nodegraph"
       },
       "targets": [
         {
-          "refId": "nodes",
-          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 1 AND n.layer IN [$layer] RETURN elementId(n) AS id, COALESCE(n.name, n.summary, 'unnamed') AS title, 'L' + toString(n.layer) AS subtitle, COALESCE(n.activation, 0.0) AS mainStat, COALESCE(n.confidence, 0.0) AS secondaryStat ORDER BY n.layer DESC, n.activation DESC LIMIT 200"
-        },
-        {
-          "refId": "edges",
-          "query": "MATCH (a:MemoryNode {space_id: '$space_id'})-[r]->(b:MemoryNode {space_id: '$space_id'}) WHERE a.layer >= 1 AND b.layer >= 1 AND a.layer IN [$layer] AND b.layer IN [$layer] AND type(r) IN ['ABSTRACTED_FROM', 'CO_ACTIVATED_WITH', 'GROUNDED_BY', 'RELATED_TO'] RETURN elementId(r) AS id, elementId(a) AS source, elementId(b) AS target, type(r) AS mainStat LIMIT 500"
+          "refId": "A",
+          "queryText": "space_id=${space_id}&layers=${layers:csv}&focus_nodes=${focus_nodes:csv}&show_hidden=${show_hidden}&limit=150"
         }
       ],
+      "transformations": [],
       "options": {
+        "nodes": {},
+        "edges": {},
         "nodeGraph": {
-          "layout": "layered"
+          "layoutAlgorithm": "layered",
+          "zoomMode": "greedy"
         }
       },
       "fieldConfig": {
         "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "subtitle" },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  { "type": "value", "options": { "L1": { "text": "L1 Concrete", "color": "blue" } } },
-                  { "type": "value", "options": { "L2": { "text": "L2 Pattern", "color": "green" } } },
-                  { "type": "value", "options": { "L3": { "text": "L3 Domain", "color": "yellow" } } },
-                  { "type": "value", "options": { "L4": { "text": "L4 Abstract", "color": "orange" } } },
-                  { "type": "value", "options": { "L5": { "text": "L5 Emergent", "color": "red" } } }
-                ]
-              }
-            ]
-          }
-        ]
+        "overrides": []
       }
     },
     {
       "title": "Exploration",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
-      "collapsed": false
-    },
-    {
-      "title": "Neighborhood Explorer",
-      "description": "2-hop neighborhood around the selected node ($node_id). Shows all connected nodes and relationship types.",
-      "type": "nodeGraph",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 18 },
-      "datasource": {
-        "type": "kniepdennis-neo4j-datasource",
-        "uid": "neo4j"
-      },
-      "targets": [
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "collapsed": true,
+      "panels": [
         {
-          "refId": "nodes",
-          "query": "MATCH path = (center)-[*1..2]-(neighbor) WHERE elementId(center) = '$node_id' AND neighbor:MemoryNode WITH DISTINCT neighbor RETURN elementId(neighbor) AS id, COALESCE(neighbor.name, neighbor.summary, 'unnamed') AS title, 'L' + toString(neighbor.layer) AS subtitle, COALESCE(neighbor.activation, 0.0) AS mainStat LIMIT 100"
+          "title": "How to Explore",
+          "type": "text",
+          "gridPos": { "h": 2, "w": 24, "x": 0, "y": 25 },
+          "options": {
+            "mode": "html",
+            "content": "<div style=\"padding:8px 12px;font-size:13px;color:#aaa\"><strong>Neighborhood Explorer</strong> — Select one or more <em>Focus Node(s)</em> from the variable bar above to explore their connections. Use <em>Edge Types</em> to filter relationship categories and <em>Hop Depth</em> to control traversal distance (1-3 hops). The graph shows all reachable nodes with force-directed layout.</div>"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
         },
         {
-          "refId": "edges",
-          "query": "MATCH (center)-[*1..2]-(neighbor) WHERE elementId(center) = '$node_id' AND neighbor:MemoryNode WITH DISTINCT center, neighbor MATCH (center)-[r]-(neighbor) RETURN elementId(r) AS id, elementId(startNode(r)) AS source, elementId(endNode(r)) AS target, type(r) AS mainStat LIMIT 200"
+          "title": "Neighborhood Explorer",
+          "description": "Multi-hop neighborhood around the selected Focus Node(s). Shows reachable nodes within the configured Hop Depth, filtered by Edge Types, with force-directed layout.",
+          "type": "nodeGraph",
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 27 },
+          "datasource": {
+            "type": "hamedkarbasi93-nodegraphapi-datasource",
+            "uid": "mdemg-nodegraph"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "queryText": "type=neighborhood&space_id=${space_id}&node_id=${focus_nodes:csv}&edge_types=${edge_types:csv}&hop_depth=${hop_depth}&limit=150"
+            }
+          ],
+          "transformations": [],
+          "options": {
+            "nodes": {},
+            "edges": {},
+            "nodeGraph": {
+              "layoutAlgorithm": "force",
+              "zoomMode": "greedy"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
         }
-      ],
-      "options": {
-        "nodeGraph": {
-          "layout": "force"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {}
-      }
+      ]
     },
     {
       "title": "Concept Details",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
       "collapsed": false
     },
     {
       "title": "Recent Concept Emergence",
-      "description": "L3+ concepts created in the last 24 hours, ordered by creation time. Indicates active emergence activity.",
+      "description": "Concepts created in the last 24 hours within selected layers, ordered by creation time.",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
       "datasource": {
         "type": "kniepdennis-neo4j-datasource",
         "uid": "neo4j"
@@ -122,7 +132,8 @@
       "targets": [
         {
           "refId": "A",
-          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 3 AND n.created_at IS NOT NULL AND n.created_at >= datetime() - duration('P1D') RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, n.created_at AS Created, size([(n)-[]-() | 1]) AS Edges ORDER BY n.created_at DESC LIMIT 20"
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] AND n.created_at IS NOT NULL AND n.created_at >= datetime() - duration('P1D') RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, n.created_at AS Created, size([(n)-[]-() | 1]) AS Edges ORDER BY n.created_at DESC LIMIT 20",
+          "Format": "table"
         }
       ],
       "fieldConfig": {
@@ -165,9 +176,9 @@
     },
     {
       "title": "Top Activated Concepts",
-      "description": "L2+ concepts ranked by activation score. High activation indicates recently and frequently accessed knowledge.",
+      "description": "Concepts within selected layers ranked by activation score. High activation indicates recently and frequently accessed knowledge.",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
       "datasource": {
         "type": "kniepdennis-neo4j-datasource",
         "uid": "neo4j"
@@ -175,7 +186,8 @@
       "targets": [
         {
           "refId": "A",
-          "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 2 AND n.activation > 0 RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, round(n.activation * 1000) / 1000 AS Activation, n.last_activated AS `Last Active`, size([(n)-[]-() | 1]) AS Edges ORDER BY n.activation DESC LIMIT 20"
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, round(COALESCE(n.activation, 0.0) * 1000) / 1000 AS Activation, n.last_activated AS `Last Active`, size([(n)-[]-() | 1]) AS Edges ORDER BY n.activation DESC LIMIT 20",
+          "Format": "table"
         }
       ],
       "fieldConfig": {
@@ -242,52 +254,153 @@
   "templating": {
     "list": [
       {
-        "name": "space_id",
-        "label": "Space ID",
-        "type": "textbox",
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "localhost:9999",
         "current": {
-          "text": "mdemg-dev",
-          "value": "mdemg-dev"
+          "text": "localhost:9999",
+          "value": "localhost:9999"
         },
         "options": [
           {
-            "text": "mdemg-dev",
-            "value": "mdemg-dev",
+            "text": "localhost:9999",
+            "value": "localhost:9999",
             "selected": true
           }
         ]
       },
       {
-        "name": "layer",
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "query",
+        "datasource": {
+          "type": "kniepdennis-neo4j-datasource",
+          "uid": "neo4j"
+        },
+        "query": {
+          "cypherQuery": "MATCH (n:MemoryNode) RETURN DISTINCT n.space_id AS __value, n.space_id AS __text ORDER BY n.space_id",
+          "Format": "table"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        }
+      },
+      {
+        "name": "layers",
         "label": "Layers",
         "type": "custom",
         "multi": true,
         "includeAll": true,
+        "allValue": "0,1,2,3,4,5",
+        "query": "0 : L0 (Raw),1 : L1 (Obs),2 : L2 (Concepts),3 : L3 (Abstractions),4 : L4 (Meta),5 : L5 (Paradigms)",
         "current": {
           "text": "All",
           "value": "$__all"
         },
         "options": [
           { "text": "All", "value": "$__all", "selected": true },
-          { "text": "1", "value": "1", "selected": false },
-          { "text": "2", "value": "2", "selected": false },
-          { "text": "3", "value": "3", "selected": false },
-          { "text": "4", "value": "4", "selected": false },
-          { "text": "5", "value": "5", "selected": false }
-        ],
-        "query": "1,2,3,4,5"
+          { "text": "L0 (Raw)", "value": "0", "selected": false },
+          { "text": "L1 (Obs)", "value": "1", "selected": false },
+          { "text": "L2 (Concepts)", "value": "2", "selected": false },
+          { "text": "L3 (Abstractions)", "value": "3", "selected": false },
+          { "text": "L4 (Meta)", "value": "4", "selected": false },
+          { "text": "L5 (Paradigms)", "value": "5", "selected": false }
+        ]
       },
       {
-        "name": "node_id",
-        "label": "Focus Node",
+        "name": "show_hidden",
+        "label": "Show Hidden",
+        "type": "custom",
+        "query": "false,true",
+        "current": {
+          "text": "false",
+          "value": "false"
+        },
+        "options": [
+          { "text": "false", "value": "false", "selected": true },
+          { "text": "true", "value": "true", "selected": false }
+        ]
+      },
+      {
+        "name": "focus_nodes",
+        "label": "Focus Node(s)",
         "type": "query",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "",
         "datasource": {
           "type": "kniepdennis-neo4j-datasource",
           "uid": "neo4j"
         },
-        "query": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer >= 2 RETURN elementId(n) AS __value, COALESCE(n.name, n.summary, 'node-' + elementId(n)) AS __text ORDER BY n.activation DESC LIMIT 50",
+        "query": {
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] RETURN n.node_id AS __value, COALESCE(n.name, n.summary, 'node-' + n.node_id) AS __text ORDER BY n.activation DESC LIMIT 200",
+          "Format": "table"
+        },
         "refresh": 2,
-        "sort": 0
+        "sort": 0,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "edge_types",
+        "label": "Edge Types",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "",
+        "query": "ABSTRACTS_TO,GENERALIZES,GENERALIZES_TO,SPECIALIZES,INSTANTIATES,CO_ACTIVATED_WITH,INFLUENCES,CAUSES,ENABLES,BRIDGES,ANALOGOUS_TO,ASSOCIATED_WITH,TEMPORALLY_ADJACENT,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,DEFINES_SYMBOL,COMPOSES_WITH,THEME_OF,ORIGINATED_FROM,GROUNDED_BY,CONTRASTS_WITH,CONTRADICTS",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "ABSTRACTS_TO", "value": "ABSTRACTS_TO", "selected": false },
+          { "text": "GENERALIZES", "value": "GENERALIZES", "selected": false },
+          { "text": "GENERALIZES_TO", "value": "GENERALIZES_TO", "selected": false },
+          { "text": "SPECIALIZES", "value": "SPECIALIZES", "selected": false },
+          { "text": "INSTANTIATES", "value": "INSTANTIATES", "selected": false },
+          { "text": "CO_ACTIVATED_WITH", "value": "CO_ACTIVATED_WITH", "selected": false },
+          { "text": "INFLUENCES", "value": "INFLUENCES", "selected": false },
+          { "text": "CAUSES", "value": "CAUSES", "selected": false },
+          { "text": "ENABLES", "value": "ENABLES", "selected": false },
+          { "text": "BRIDGES", "value": "BRIDGES", "selected": false },
+          { "text": "ANALOGOUS_TO", "value": "ANALOGOUS_TO", "selected": false },
+          { "text": "ASSOCIATED_WITH", "value": "ASSOCIATED_WITH", "selected": false },
+          { "text": "TEMPORALLY_ADJACENT", "value": "TEMPORALLY_ADJACENT", "selected": false },
+          { "text": "IMPORTS", "value": "IMPORTS", "selected": false },
+          { "text": "CALLS", "value": "CALLS", "selected": false },
+          { "text": "EXTENDS", "value": "EXTENDS", "selected": false },
+          { "text": "IMPLEMENTS", "value": "IMPLEMENTS", "selected": false },
+          { "text": "DEFINES_SYMBOL", "value": "DEFINES_SYMBOL", "selected": false },
+          { "text": "COMPOSES_WITH", "value": "COMPOSES_WITH", "selected": false },
+          { "text": "THEME_OF", "value": "THEME_OF", "selected": false },
+          { "text": "ORIGINATED_FROM", "value": "ORIGINATED_FROM", "selected": false },
+          { "text": "GROUNDED_BY", "value": "GROUNDED_BY", "selected": false },
+          { "text": "CONTRASTS_WITH", "value": "CONTRASTS_WITH", "selected": false },
+          { "text": "CONTRADICTS", "value": "CONTRADICTS", "selected": false }
+        ]
+      },
+      {
+        "name": "hop_depth",
+        "label": "Hop Depth",
+        "type": "custom",
+        "query": "1,2,3",
+        "current": {
+          "text": "1",
+          "value": "1"
+        },
+        "options": [
+          { "text": "1", "value": "1", "selected": true },
+          { "text": "2", "value": "2", "selected": false },
+          { "text": "3", "value": "3", "selected": false }
+        ]
       }
     ]
   },

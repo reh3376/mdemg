@@ -1435,6 +1435,15 @@ func (s *Server) Routes() http.Handler {
 	// Neo4j state monitor
 	mux.HandleFunc("/v1/neo4j/overview", s.handleNeo4jOverview)
 
+	// Grafana Node Graph API endpoints (GAP-20)
+	mux.HandleFunc("/v1/memory/graph/topology", s.handleGraphTopology)
+	mux.HandleFunc("/v1/memory/graph/neighborhood", s.handleGraphNeighborhood)
+
+	// Node Graph API plugin expected endpoints (GAP-20)
+	mux.HandleFunc("/api/graph/data", s.handleNodeGraphData)
+	mux.HandleFunc("/api/graph/fields", s.handleNodeGraphFields)
+	mux.HandleFunc("/api/graph/health", s.handleNodeGraphHealth)
+
 	// Ingestion job management endpoints
 	mux.HandleFunc("/v1/memory/ingest/trigger", s.handleIngestTrigger)
 	mux.HandleFunc("/v1/memory/ingest/status/", s.handleIngestStatus)

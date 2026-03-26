@@ -4,11 +4,10 @@ datasources:
     uid: neo4j
     type: kniepdennis-neo4j-datasource
     access: proxy
-    url: bolt://neo4j:7687
     editable: false
     jsonData:
+      url: "bolt://host.docker.internal:7687"
       database: "neo4j"
+      username: "neo4j"
     secureJsonData:
       password: "testpassword"
-    basicAuth: true
-    basicAuthUser: "neo4j"

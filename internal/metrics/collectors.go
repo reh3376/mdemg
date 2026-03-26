@@ -104,6 +104,23 @@ type StandardMetrics struct {
 
 	// RSIC snapshot
 	RSICSnapshotCreated func(action string) *Counter
+
+	// RSIC health sub-scores (published after each assessment)
+	RSICHealthOverall    func(spaceID string) *Gauge
+	RSICHealthRetrieval  func(spaceID string) *Gauge
+	RSICHealthMemory     func(spaceID string) *Gauge
+	RSICHealthEdge       func(spaceID string) *Gauge
+	RSICHealthTask       func(spaceID string) *Gauge
+	RSICHealthGuidance   func(spaceID string) *Gauge
+	RSICHealthProtocol   func(spaceID string) *Gauge
+	RSICHealthSynergy    func(spaceID string) *Gauge
+	RSICHealthConfidence func(spaceID string) *Gauge
+
+	// RSIC synergy metrics (published after each assessment)
+	RSICSynergyClaudeLines  func(spaceID string) *Gauge
+	RSICSynergyMemoryLines  func(spaceID string) *Gauge
+	RSICSynergyOverflowRate func(spaceID string) *Gauge
+	RSICSynergyBufferEntries func(spaceID string) *Gauge
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -264,6 +281,62 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.RSICSnapshotCreated = func(action string) *Counter {
 		return r.NewCounter("rsic_snapshot_created_total", "RSIC snapshots captured",
 			map[string]string{"action": action})
+	}
+
+	// RSIC health sub-scores
+	m.RSICHealthOverall = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_overall", "Overall cognitive health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthRetrieval = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_retrieval", "Retrieval quality score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthMemory = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_memory", "Memory health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthEdge = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_edge", "Edge health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthTask = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_task", "Task performance score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthGuidance = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_guidance", "Guidance (Jiminy) health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthProtocol = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_protocol", "Protocol (J17) health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthSynergy = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_synergy", "Synergy health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_confidence", "Assessment confidence (0.1-1.0)",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// RSIC synergy metrics
+	m.RSICSynergyClaudeLines = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_synergy_claude_md_lines", "CLAUDE.md line count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICSynergyMemoryLines = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_synergy_memory_md_lines", "MEMORY.md line count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICSynergyOverflowRate = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_synergy_overflow_rate", "CMS overflow events rate",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICSynergyBufferEntries = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_synergy_buffer_entries", "Recovery buffer pending entries",
+			map[string]string{"space_id": spaceID})
 	}
 
 	return m

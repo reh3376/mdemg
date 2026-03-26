@@ -4,14 +4,23 @@
   },
   "editable": true,
   "gnetId": null,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
   "panels": [
     {
       "title": "Request Rate",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum(rate(mdemg_http_requests_total[1m]))",
@@ -23,6 +32,7 @@
       "title": "P95 Latency",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(mdemg_http_request_duration_seconds_bucket[1m])) by (le))",
@@ -51,6 +61,7 @@
       "title": "Error Rate",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "(sum(rate(mdemg_http_requests_total{status=~\"5..\"}[1m])) / sum(rate(mdemg_http_requests_total[1m])) * 100) or vector(0)",
@@ -75,6 +86,7 @@
       "title": "Circuit Breakers",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "count(mdemg_circuit_breaker_state == 1) or vector(0)",
@@ -86,6 +98,7 @@
       "title": "Request Latency Distribution",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum(rate(mdemg_http_request_duration_seconds_bucket[1m])) by (le))",
@@ -110,6 +123,7 @@
       "title": "Requests by Status",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "sum(rate(mdemg_http_requests_total[1m])) by (status)",
@@ -121,6 +135,7 @@
       "title": "Cache Hit Ratios",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "mdemg_cache_hit_ratio",
@@ -139,6 +154,7 @@
       "title": "Retrieval Latency",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(mdemg_retrieval_latency_seconds_bucket[1m])) by (le))",
@@ -155,6 +171,7 @@
       "title": "Rate Limit Rejections",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "rate(mdemg_rate_limit_rejected_total[1m])",
@@ -166,6 +183,7 @@
       "title": "Embedding Latency",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(mdemg_embedding_latency_seconds_bucket[1m])) by (le))",
@@ -179,11 +197,28 @@
       }
     }
   ],
-  "schemaVersion": 30,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": ["mdemg", "overview"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "localhost:9999",
+        "current": {
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "options": [
+          {
+            "text": "localhost:9999",
+            "value": "localhost:9999",
+            "selected": true
+          }
+        ]
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
