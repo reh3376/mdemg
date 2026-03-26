@@ -92,7 +92,7 @@ func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context
 	defer sess.Close(ctx) //nolint:errcheck
 
 	cypher := `
-	MATCH (c:MemoryNode {space_id: $spaceId, node_type: 'constraint'})
+	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
 	OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-()
 	WITH c,
 	     count(r) AS surfaced,

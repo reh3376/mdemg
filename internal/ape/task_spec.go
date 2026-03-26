@@ -156,6 +156,18 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 2 * time.Minute
 
+	case "codify_all_constraints":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/jiminy/protocol/codify", Purpose: "generate and freeze T1 code for each uncoded constraint"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Count of constraints codified during bootstrap", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "code_coverage_delta", Operator: "gt", Threshold: 0},
+		}
+		spec.Timeout = 10 * time.Minute
+
 	case "retire_code":
 		spec.AllowedEndpoints = []EndpointSpec{
 			{Method: "POST", Path: "/v1/jiminy/protocol/retire", Purpose: "retire T1 code back to T2"},
@@ -205,6 +217,67 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		}
 		spec.Timeout = 10 * time.Minute
 
+	case "alert_jiminy_critical":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/healthz", Purpose: "check server health"},
+			{Method: "GET", Path: "/v1/jiminy/healthz", Purpose: "check jiminy subsystem health"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "alert_report", Description: "Jiminy critical alert published", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "alert_published", Operator: "eq", Threshold: 1},
+		}
+		spec.Timeout = 1 * time.Minute
+
+	case "alert_memory_bloat":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/synergy/status", Purpose: "check synergy/memory status"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "alert_report", Description: "Memory bloat assessment", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "alert_published", Operator: "eq", Threshold: 1},
+		}
+		spec.Timeout = 1 * time.Minute
+
+	case "alert_synergy_overlap":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/synergy/status", Purpose: "check synergy overlap status"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "alert_report", Description: "Synergy overlap assessment", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "alert_published", Operator: "eq", Threshold: 1},
+		}
+		spec.Timeout = 1 * time.Minute
+
+	case "flush_recovery_buffer":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "POST", Path: "/v1/synergy/flush-buffer", Purpose: "flush recovery buffer entries"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "execution_report", Description: "Count of buffer entries flushed", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "entries_flushed", Operator: "gte", Threshold: 0},
+		}
+		spec.Timeout = 2 * time.Minute
+
+	case "review_nli_calibration":
+		spec.AllowedEndpoints = []EndpointSpec{
+			{Method: "GET", Path: "/v1/jiminy/protocol/metrics", Purpose: "retrieve NLI calibration metrics"},
+		}
+		spec.Deliverables = []Deliverable{
+			{Name: "calibration_report", Description: "NLI comprehension calibration report", Format: "json", Required: true},
+		}
+		spec.SuccessCriteria = []Criterion{
+			{Metric: "calibration_published", Operator: "eq", Threshold: 1},
+		}
+		spec.Timeout = 2 * time.Minute
+
 	default:
 		spec.Timeout = 5 * time.Minute
 	}
@@ -234,6 +307,8 @@ func descriptionForAction(actionType string) string {
 		return "Boost high-performing and decay low-performing guidance confidence based on effectiveness"
 	case "codify_constraint":
 		return "Generate T1 mnemonic code for constraint currently sent as T2"
+	case "codify_all_constraints":
+		return "Bootstrap codification: generate T1 codes for all uncoded constraints (cold start)"
 	case "retire_code":
 		return "Retire T1 code with low comprehension back to T2 telegraphic encoding"
 	case "adjust_tier_threshold":
@@ -242,6 +317,16 @@ func descriptionForAction(actionType string) string {
 		return "Adjust replay buffer size to reduce replay frequency"
 	case "ingest_stale_spaces":
 		return "Re-ingest stale spaces that have not been updated within the staleness threshold"
+	case "alert_jiminy_critical":
+		return "Publish alert for critical Jiminy guidance pipeline failure"
+	case "alert_memory_bloat":
+		return "Assess and alert on excessive memory/node growth"
+	case "alert_synergy_overlap":
+		return "Assess and alert on synergy layer overlap or redundancy"
+	case "flush_recovery_buffer":
+		return "Flush recovery buffer entries back into the memory pipeline"
+	case "review_nli_calibration":
+		return "Review NLI comprehension calibration metrics and publish report"
 	default:
 		return "Unknown action type: " + actionType
 	}

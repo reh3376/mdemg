@@ -15,6 +15,7 @@ type mockWatchdogSignalProvider struct {
 	obsRatePerHour       float64
 	consolidationAgeSec  int64
 	consolidationAgeErr  error
+	jiminyHealthy        bool
 }
 
 func (m *mockWatchdogSignalProvider) GetSessionHealthScore(sessionID string) float64 {
@@ -30,6 +31,10 @@ func (m *mockWatchdogSignalProvider) GetConsolidationAgeSec(ctx context.Context,
 		return 0, m.consolidationAgeErr
 	}
 	return m.consolidationAgeSec, nil
+}
+
+func (m *mockWatchdogSignalProvider) IsJiminyHealthy(_ context.Context) bool {
+	return m.jiminyHealthy
 }
 
 func TestNewWatchdog(t *testing.T) {
@@ -103,6 +108,7 @@ func TestSetSignalProvider(t *testing.T) {
 		sessionHealthScore:  0.75,
 		obsRatePerHour:      5.0,
 		consolidationAgeSec: 3600,
+		jiminyHealthy:       true,
 	}
 
 	w.SetSignalProvider(mockProvider)
@@ -253,6 +259,7 @@ func TestCheckWithSignalProvider(t *testing.T) {
 		sessionHealthScore:  0.85,
 		obsRatePerHour:      12.5,
 		consolidationAgeSec: 7200, // 2 hours
+		jiminyHealthy:       true,
 	}
 
 	w.SetSignalProvider(mockProvider)
@@ -291,6 +298,7 @@ func TestCheckWithSignalProviderError(t *testing.T) {
 		sessionHealthScore:  0.75,
 		obsRatePerHour:      5.0,
 		consolidationAgeErr: errors.New("database error"),
+		jiminyHealthy:       true,
 	}
 
 	w.SetSignalProvider(mockProvider)
@@ -374,6 +382,7 @@ func TestActiveAnomaliesDetection(t *testing.T) {
 				sessionHealthScore:  tt.sessionHealth,
 				obsRatePerHour:      5.0,
 				consolidationAgeSec: tt.consolidationAgeSec,
+				jiminyHealthy:       true,
 			}
 			w.SetSignalProvider(mockProvider)
 
@@ -480,6 +489,7 @@ func TestAdditionalEscalation(t *testing.T) {
 				sessionHealthScore:  tt.sessionHealth,
 				obsRatePerHour:      5.0,
 				consolidationAgeSec: 3600,
+				jiminyHealthy:       true,
 			}
 			w.SetSignalProvider(mockProvider)
 
@@ -572,6 +582,7 @@ func TestGetState(t *testing.T) {
 		sessionHealthScore:  0.65,
 		obsRatePerHour:      8.5,
 		consolidationAgeSec: 14400, // 4 hours
+		jiminyHealthy:       true,
 	}
 	w.SetSignalProvider(mockProvider)
 

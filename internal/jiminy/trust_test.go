@@ -3,6 +3,7 @@ package jiminy
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func approxEqual(a, b float64) bool {
@@ -145,6 +146,48 @@ func TestTrustScorer_PerSessionIndependence(t *testing.T) {
 	}
 	if scoreB >= 0.5 {
 		t.Errorf("session-B score = %f, want < 0.5 after contradict", scoreB)
+	}
+}
+
+func TestTrustScorer_ConfigurableTTL(t *testing.T) {
+	ts := NewTrustScorer(TrustConfig{
+		Initial:        0.5,
+		BoostPerFollow: 0.1,
+		TTL:            50 * time.Millisecond,
+	})
+
+	ts.RecordOutcome("sess-ttl", OutcomeFollowed)
+	score := ts.GetScore("sess-ttl")
+	if !approxEqual(score, 0.6) {
+		t.Errorf("score before TTL = %f, want 0.6", score)
+	}
+
+	// Wait for TTL to expire
+	time.Sleep(60 * time.Millisecond)
+
+	score = ts.GetScore("sess-ttl")
+	if !approxEqual(score, 0.5) {
+		t.Errorf("score after TTL = %f, want 0.5 (initial)", score)
+	}
+}
+
+func TestTrustScorer_SixFollowsReachHighThreshold(t *testing.T) {
+	ts := NewTrustScorer(TrustConfig{
+		Initial:        0.5,
+		BoostPerFollow: 0.05,
+		HighThreshold:  0.8,
+	})
+
+	for i := 0; i < 6; i++ {
+		ts.RecordOutcome("sess-6", OutcomeFollowed)
+	}
+	score := ts.GetScore("sess-6")
+	// 0.5 + 6*0.05 = 0.80
+	if !approxEqual(score, 0.80) {
+		t.Errorf("score after 6 follows = %f, want 0.80", score)
+	}
+	if score < ts.HighThreshold() {
+		t.Errorf("score %f should be >= high threshold %f", score, ts.HighThreshold())
 	}
 }
 

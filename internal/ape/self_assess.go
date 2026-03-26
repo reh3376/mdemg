@@ -116,20 +116,26 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	report.TaskPerformance = a.scoreTask(report)
 
 	// 5b. J10: Compute guidance health if Jiminy stats available
+	var jiminyStats JiminyStatsResult
 	if a.jiminyProvider != nil {
-		jiminyStats, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
-		if jErr == nil && jiminyStats.TotalGuidanceIssued > 0 {
+		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
+		if jErr == nil && js.TotalGuidanceIssued > 0 {
+			jiminyStats = js
 			report.GuidanceHealth = a.scoreGuidance(jiminyStats)
 		}
 	}
+	a.publishGuidanceMetrics(spaceID, jiminyStats)
 
 	// 5c. J17: Compute protocol health if protocol stats available
+	var protoStats ProtocolStatsResult
 	if a.protocolProvider != nil {
-		protoStats, pErr := a.protocolProvider.GetProtocolStats(ctx, spaceID)
-		if pErr == nil && protoStats.TotalEvents > 0 {
+		ps, pErr := a.protocolProvider.GetProtocolStats(ctx, spaceID)
+		if pErr == nil && ps.TotalEvents > 0 {
+			protoStats = ps
 			report.ProtocolHealth = a.scoreProtocol(protoStats)
 		}
 	}
+	a.publishProtocolMetrics(spaceID, protoStats)
 
 	// 5d. Synergy: Compute Claude Code ↔ MDEMG synergy health
 	if a.synergyReader != nil && a.cfg.SynergyAssessmentEnabled {
@@ -553,4 +559,69 @@ func computeEdgeWeightEntropy(stats map[string]any) float64 {
 	}
 	// Binary entropy: -p*log2(p) - (1-p)*log2(1-p)
 	return -p*math.Log2(p) - (1-p)*math.Log2(1-p)
+}
+
+// publishProtocolMetrics publishes J17 protocol telemetry to Prometheus gauges.
+func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsResult) {
+	m := metrics.Metrics()
+
+	// Tier distribution
+	m.J17TierT1Fraction(spaceID).Set(stats.TierDistribution[0])
+	m.J17TierT2Fraction(spaceID).Set(stats.TierDistribution[1])
+	m.J17TierT3Fraction(spaceID).Set(stats.TierDistribution[2])
+
+	// Core metrics
+	m.J17CompressionRatio(spaceID).Set(stats.CompressionRatio)
+	m.J17AvgComprehension(spaceID).Set(stats.AvgComprehension)
+	m.J17AvgTokensPerGuidance(spaceID).Set(stats.AvgTokensPerGuidance)
+	m.J17ReplayFrequency(spaceID).Set(stats.ReplayFrequencyPerHour)
+	m.J17TicketRestoreRate(spaceID).Set(stats.TicketRestoreSuccessRate)
+	m.J17CodeCoverage(spaceID).Set(stats.CodeCoverage)
+	m.J17EventsTotal(spaceID).Set(float64(stats.TotalEvents))
+
+	// Per-tier comprehension
+	m.J17TierT1Comprehension(spaceID).Set(stats.TierComprehension[0])
+	m.J17TierT2Comprehension(spaceID).Set(stats.TierComprehension[1])
+	m.J17TierT3Comprehension(spaceID).Set(stats.TierComprehension[2])
+
+	// Per-tier outcome counts (sample size context)
+	m.J17TierT1OutcomeCount(spaceID).Set(float64(stats.TierOutcomeCount[0]))
+	m.J17TierT2OutcomeCount(spaceID).Set(float64(stats.TierOutcomeCount[1]))
+	m.J17TierT3OutcomeCount(spaceID).Set(float64(stats.TierOutcomeCount[2]))
+
+	// NLI calibration
+	m.J17NLIMeanBias(spaceID).Set(stats.NLIMeanBias)
+	biasAlertVal := 0.0
+	if stats.NLIBiasAlert {
+		biasAlertVal = 1.0
+	}
+	m.J17NLIBiasAlert(spaceID).Set(biasAlertVal)
+
+	// NLI fallback tracking (degraded-state awareness)
+	if stats.NLIFallbackCount > 0 {
+		m.J17NLIFallbackTotal(spaceID).Set(float64(stats.NLIFallbackCount))
+	}
+
+	// Sidecar (only if active)
+	if stats.Sidecar != nil {
+		m.J17SidecarRequests(spaceID).Set(float64(stats.Sidecar.Requests))
+		m.J17SidecarErrors(spaceID).Set(float64(stats.Sidecar.Errors))
+		m.J17SidecarTimeouts(spaceID).Set(float64(stats.Sidecar.Timeouts))
+		m.J17SidecarAgreementRate(spaceID).Set(stats.Sidecar.AgreementRate)
+		m.J17SidecarOverrideRate(spaceID).Set(stats.Sidecar.OverrideRate)
+		m.J17SidecarLatency(spaceID).Set(stats.Sidecar.AvgLatencyMs)
+	}
+}
+
+// publishGuidanceMetrics publishes Jiminy guidance telemetry to Prometheus gauges.
+func (a *Assessor) publishGuidanceMetrics(spaceID string, stats JiminyStatsResult) {
+	m := metrics.Metrics()
+
+	m.JiminyFollowRate(spaceID).Set(stats.FollowRate)
+	m.JiminyConstraintEffectiveness(spaceID).Set(stats.ConstraintEffRate)
+	m.JiminySourceDiversity(spaceID).Set(stats.SourceDiversity)
+	m.JiminyTotalIssued(spaceID).Set(float64(stats.TotalGuidanceIssued))
+	m.JiminyTotalFollowed(spaceID).Set(float64(stats.TotalFollowed))
+	m.JiminyTotalIgnored(spaceID).Set(float64(stats.TotalIgnored))
+	m.JiminyTotalContradicted(spaceID).Set(float64(stats.TotalContradicted))
 }

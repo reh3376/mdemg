@@ -35,7 +35,10 @@ func TestNLIFlowsToMetricsInShadowMode(t *testing.T) {
 
 	// Simulate what service.go does in the feedback loop:
 	// 1. NLI scorer evaluates comprehension
-	nliScore := nliScorer.ScoreComprehension(context.Background(), "Never force push to main", "I pushed to main with --force", true)
+	nliScore, isFallback := nliScorer.ScoreComprehension(context.Background(), "Never force push to main", "I pushed to main with --force", true)
+	if isFallback {
+		t.Fatal("NLI scorer returned fallback, expected genuine score")
+	}
 	if nliScore <= 0 {
 		t.Fatalf("NLI scorer returned %f, expected > 0", nliScore)
 	}

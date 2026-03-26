@@ -3,6 +3,8 @@ package jiminy
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"mdemg/internal/config"
@@ -253,9 +255,9 @@ func TestComputeOverallConfidence_Empty(t *testing.T) {
 	}
 }
 
-// Gap 3: Cache J17 bypass tests
+// Gap 3: Session-scoped cache tests
 
-func TestCache_J17_Bypass(t *testing.T) {
+func TestCache_SessionScoped_DifferentSessions(t *testing.T) {
 	consultant := &mockConsultant{
 		resp: models.SuggestResponse{
 			SpaceID: "test",
@@ -266,20 +268,19 @@ func TestCache_J17_Bypass(t *testing.T) {
 	}
 
 	cfg := config.Config{
-		JiminyEnabled:        true,
-		JiminyTimeoutMs:      5000,
-		JiminyMaxItems:       10,
-		JiminyMinConfidence:  0.3,
-		JiminyCacheEnabled:   true,
-		JiminyCacheSize:      100,
-		JiminyCacheTTLSec:    300,
-		JiminyCacheJ17Bypass: true,
-		J17Enabled:           true,
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     5000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+		JiminyCacheEnabled:  true,
+		JiminyCacheSize:     100,
+		JiminyCacheTTLSec:   300,
+		J17Enabled:          true,
 	}
 
 	s := NewService(cfg, nil, consultant, nil)
 
-	// First call with session ID — should not be cached due to J17 bypass
+	// First call with session ID — cached under session-1 key
 	resp1, err := s.Guide(context.Background(), GuidanceRequest{
 		SpaceID:   "test",
 		Context:   "Same context",
@@ -290,7 +291,7 @@ func TestCache_J17_Bypass(t *testing.T) {
 	}
 	id1 := resp1.GuidanceID
 
-	// Second call with same context but different session — should get fresh response
+	// Second call with same context but different session — different cache key, fresh response
 	resp2, err := s.Guide(context.Background(), GuidanceRequest{
 		SpaceID:   "test",
 		Context:   "Same context",
@@ -300,13 +301,13 @@ func TestCache_J17_Bypass(t *testing.T) {
 		t.Fatalf("Guide() error = %v", err)
 	}
 
-	// Should get different guidance IDs (not cached)
+	// Should get different guidance IDs (different session = different cache key)
 	if resp2.GuidanceID == id1 {
-		t.Error("expected different guidance IDs (cache bypass), got same")
+		t.Error("expected different guidance IDs (different session keys), got same")
 	}
 }
 
-func TestCache_NonJ17_StillCaches(t *testing.T) {
+func TestCache_SameSession_StillCaches(t *testing.T) {
 	consultant := &mockConsultant{
 		resp: models.SuggestResponse{
 			SpaceID: "test",
@@ -317,39 +318,40 @@ func TestCache_NonJ17_StillCaches(t *testing.T) {
 	}
 
 	cfg := config.Config{
-		JiminyEnabled:        true,
-		JiminyTimeoutMs:      5000,
-		JiminyMaxItems:       10,
-		JiminyMinConfidence:  0.3,
-		JiminyCacheEnabled:   true,
-		JiminyCacheSize:      100,
-		JiminyCacheTTLSec:    300,
-		JiminyCacheJ17Bypass: true,
-		J17Enabled:           false, // J17 disabled
+		JiminyEnabled:       true,
+		JiminyTimeoutMs:     5000,
+		JiminyMaxItems:      10,
+		JiminyMinConfidence: 0.3,
+		JiminyCacheEnabled:  true,
+		JiminyCacheSize:     100,
+		JiminyCacheTTLSec:   300,
+		J17Enabled:          true,
 	}
 
 	s := NewService(cfg, nil, consultant, nil)
 
-	// First call without J17 — should be cached
+	// First call — should be cached under session-scoped key
 	resp1, err := s.Guide(context.Background(), GuidanceRequest{
-		SpaceID: "test",
-		Context: "Same context",
+		SpaceID:   "test",
+		Context:   "Same context",
+		SessionID: "session-1",
 	})
 	if err != nil {
 		t.Fatalf("Guide() error = %v", err)
 	}
 	id1 := resp1.GuidanceID
 
-	// Second call — should get cached response
+	// Second call with same session — should get cached response
 	resp2, err := s.Guide(context.Background(), GuidanceRequest{
-		SpaceID: "test",
-		Context: "Same context",
+		SpaceID:   "test",
+		Context:   "Same context",
+		SessionID: "session-1",
 	})
 	if err != nil {
 		t.Fatalf("Guide() error = %v", err)
 	}
 
-	// Should get same guidance ID (from cache)
+	// Should get same guidance ID (from cache, same session key)
 	if resp2.GuidanceID != id1 {
 		t.Error("expected same guidance ID (cached), got different")
 	}
@@ -590,4 +592,201 @@ func containsStr(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// --- NLI Fallback Service Integration Tests ---
+// These tests verify that when the NLI sidecar is unavailable (returns HTTP 500),
+// the fallback path correctly: uses heuristic comprehension, sets score_source to
+// "nli_fallback", does NOT record to protocolMetrics, and does NOT feed calibration.
+
+// newFallbackTestService creates a Service with an NLI scorer pointing at a failing
+// sidecar (HTTP 500), protocolMetrics enabled, and calibration tracker enabled.
+func newFallbackTestService(t *testing.T, sidecarURL string) *Service {
+	t.Helper()
+	consultant := &mockConsultant{
+		resp: models.SuggestResponse{
+			SpaceID: "test",
+			Constraints: []models.Constraint{
+				{Name: "no-force-push", ConstraintType: "must", Description: "Never force push to main", Confidence: 0.9, SourceNodes: []string{"c1"}},
+			},
+		},
+	}
+
+	cfg := config.Config{
+		JiminyEnabled:                  true,
+		JiminyTimeoutMs:                5000,
+		JiminyMaxItems:                 10,
+		JiminyMinConfidence:            0.3,
+		J17SidecarURL:                  sidecarURL,
+		J17NLIComprehensionEnabled:     true,
+		J17SidecarTimeoutMs:            2000,
+		J17MetricsEnabled:              true,
+		J17NLIObservationalEnabled:     true,
+		J17NLICalibrationWindowSize:    100,
+		J17NLICalibrationBiasThreshold: 0.15,
+	}
+
+	return NewService(cfg, nil, consultant, nil)
+}
+
+func TestNLIFallback_ScoreSourceIsNLIFallback(t *testing.T) {
+	// Sidecar returns HTTP 500 → NLI scorer falls back
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer sidecar.Close()
+
+	s := newFallbackTestService(t, sidecar.URL)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	feedback, err := s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "I followed the no-force-push constraint",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	for _, r := range feedback.Results {
+		if r.Type != GuidanceConstraint {
+			continue
+		}
+		if r.Dimensions == nil {
+			t.Fatal("expected FeedbackDimensions for constraint item, got nil")
+		}
+		if r.Dimensions.ScoreSource != "nli_fallback" {
+			t.Errorf("ScoreSource = %q, want %q", r.Dimensions.ScoreSource, "nli_fallback")
+		}
+	}
+}
+
+func TestNLIFallback_UsesHeuristicComprehension(t *testing.T) {
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer sidecar.Close()
+
+	s := newFallbackTestService(t, sidecar.URL)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	// Action summary must overlap enough significant words from constraint
+	// "Never force push to main" to trigger OutcomeFollowed (>= 50% overlap).
+	feedback, err := s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "I never force push to main, used regular push instead",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	for _, r := range feedback.Results {
+		if r.Type != GuidanceConstraint {
+			continue
+		}
+		if r.Dimensions == nil {
+			t.Fatal("expected FeedbackDimensions, got nil")
+		}
+		// OutcomeFollowed → heuristic comprehension = 1.0, NOT fallback 0.5
+		if r.Dimensions.Comprehension != 1.0 {
+			t.Errorf("Comprehension = %f, want 1.0 (heuristic for followed), not 0.5 (fallback)", r.Dimensions.Comprehension)
+		}
+	}
+}
+
+func TestNLIFallback_DoesNotRecordToProtocolMetrics(t *testing.T) {
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer sidecar.Close()
+
+	s := newFallbackTestService(t, sidecar.URL)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	_, err = s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "followed the constraint",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	// protocolMetrics should NOT have any RecordOutcomeWithTier calls
+	snapshot := s.GetProtocolMetricsSnapshot()
+	if snapshot == nil {
+		t.Fatal("expected non-nil protocol metrics snapshot")
+	}
+	for i := range 3 {
+		if snapshot.TierOutcomeCount[i] != 0 {
+			t.Errorf("TierOutcomeCount[%d] = %d, want 0 (fallback should NOT record to metrics)", i, snapshot.TierOutcomeCount[i])
+		}
+	}
+
+	// But NLI fallback counter SHOULD be incremented
+	collector := s.GetProtocolMetricsCollector()
+	if collector == nil {
+		t.Fatal("expected non-nil protocol metrics collector")
+	}
+	fallbackSnapshot := collector.Snapshot()
+	if fallbackSnapshot.NLIFallbackCount != 1 {
+		t.Errorf("NLIFallbackCount = %d, want 1", fallbackSnapshot.NLIFallbackCount)
+	}
+}
+
+func TestNLIFallback_DoesNotFeedCalibration(t *testing.T) {
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer sidecar.Close()
+
+	s := newFallbackTestService(t, sidecar.URL)
+
+	resp, err := s.Guide(context.Background(), GuidanceRequest{
+		SpaceID: "test",
+		Context: "test context",
+	})
+	if err != nil {
+		t.Fatalf("Guide() error = %v", err)
+	}
+
+	_, err = s.RecordOutcome(context.Background(), GuidanceFeedbackRequest{
+		GuidanceID:    resp.GuidanceID,
+		SpaceID:       "test",
+		ActionSummary: "followed the constraint",
+	})
+	if err != nil {
+		t.Fatalf("RecordOutcome() error = %v", err)
+	}
+
+	// Calibration tracker should have zero entries (fallback skips Track())
+	report := s.GetNLICalibrationReport()
+	if report == nil {
+		t.Fatal("expected non-nil calibration report")
+	}
+	if report.WindowSize != 0 {
+		t.Errorf("calibration WindowSize = %d, want 0 (fallback should NOT feed calibration)", report.WindowSize)
+	}
 }

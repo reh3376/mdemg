@@ -33,7 +33,7 @@ func TestCalibrationFlowsToRSIC(t *testing.T) {
 	// Simulate 20 feedback rounds: NLI score ~0.85, heuristic = 1.0 (OutcomeFollowed)
 	// This creates a systematic negative bias (NLI < heuristic by ~0.15)
 	for range 20 {
-		nliScore := nliScorer.ScoreComprehension(context.Background(),
+		nliScore, _ := nliScorer.ScoreComprehension(context.Background(),
 			"Never force push to main", "I followed the constraint carefully", true)
 		heuristicScore := 1.0 // OutcomeFollowed always maps to 1.0
 		tracker.Track(nliScore, heuristicScore)

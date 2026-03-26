@@ -113,6 +113,40 @@ def evaluate_output(agent_output: str, file_path: str = "", tool_name: str = "")
         pass  # Fire-and-forget: never block on failure
 
 
+_warm_last_triggered = 0.0
+WARM_DEBOUNCE_SEC = 10
+
+
+def warm_guidance(context_hint: str):
+    """Fire-and-forget warm trigger with 10s debounce."""
+    global _warm_last_triggered
+    now = time.time()
+    if now - _warm_last_triggered < WARM_DEBOUNCE_SEC:
+        return
+    _warm_last_triggered = now
+    try:
+        payload = json.dumps({
+            "space_id": SPACE_ID,
+            "context_hint": context_hint[:500],
+            "session_id": SESSION_ID,
+        })
+        subprocess.Popen(
+            [
+                "curl", "-sf", "-X", "POST",
+                f"{MDEMG_URL}/v1/jiminy/warm",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                "--connect-timeout", "1",
+                "--max-time", "2",
+                "-o", "/dev/null",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 def observe(content: str, obs_type: str, tags: list[str] | None = None):
     """Fire-and-forget observation to CMS."""
     payload = {
@@ -339,6 +373,9 @@ def main():
             except Exception:
                 pass  # Fire-and-forget
 
+        # Warm guidance after file edits
+        warm_guidance(f"edited: {file_path}")
+
         # J9: Evaluate agent output after Write/Edit (code changes)
         # Use the new_string (Edit) or content (Write) as agent output
         agent_output = tool_input.get("new_string", "") or tool_input.get("content", "")
@@ -356,6 +393,7 @@ def main():
                 "error",
                 ["bash-error"],
             )
+            warm_guidance(f"bash error: {command[:200]}")
 
         # Successful build/test → progress
         if any(kw in command for kw in ["go build", "go test", "npm run build", "pytest"]):

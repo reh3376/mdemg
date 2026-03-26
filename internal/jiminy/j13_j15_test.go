@@ -543,8 +543,8 @@ func TestCleanEvalJSONResponse(t *testing.T) {
 
 func TestCacheKey_FullContextHash(t *testing.T) {
 	base := strings.Repeat("a", 200)
-	k1 := cacheKey("space", base+"SUFFIX_A")
-	k2 := cacheKey("space", base+"SUFFIX_B")
+	k1 := cacheKey("space", "session1", base+"SUFFIX_A")
+	k2 := cacheKey("space", "session1", base+"SUFFIX_B")
 	if k1 == k2 {
 		t.Error("cache keys should differ for different contexts even with shared 200-char prefix")
 	}

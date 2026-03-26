@@ -46,6 +46,7 @@ class ProtocolTrainingSample:
     comprehension_score: float
     trust_score: float
     session_id: str = ""
+    score_source: str = ""
 
 
 @dataclass
@@ -90,6 +91,10 @@ def load_protocol_jsonl(data_dir: str) -> list[ProtocolTrainingSample]:
                     continue
                 try:
                     obj = json.loads(line)
+                    # Skip NLI fallback records — degraded-state scores corrupt tier training
+                    if obj.get("score_source") == "nli_fallback":
+                        logger.debug("Skipping nli_fallback record at %s:%d", filepath, line_num)
+                        continue
                     sample = ProtocolTrainingSample(
                         timestamp=obj.get("timestamp", ""),
                         constraint_code=obj["constraint_code"],
@@ -101,6 +106,7 @@ def load_protocol_jsonl(data_dir: str) -> list[ProtocolTrainingSample]:
                         comprehension_score=float(obj.get("comprehension_score", 0.0)),
                         trust_score=float(obj.get("trust_score", 0.5)),
                         session_id=obj.get("session_id", ""),
+                        score_source=obj.get("score_source", ""),
                     )
                     samples.append(sample)
                 except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:

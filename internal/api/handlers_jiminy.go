@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"mdemg/internal/jiminy"
+	"mdemg/internal/metrics"
 )
 
 // handleJiminyHealthz handles GET /v1/jiminy/healthz
@@ -232,6 +234,151 @@ func (s *Server) handleJiminyFeedback(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": resp,
+	})
+}
+
+// handleJiminyWarm handles POST /v1/jiminy/warm
+// Fire-and-forget async guidance pre-computation. Returns 202 immediately.
+// The warm store decouples Guide() from the prompt hook timeout.
+func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled",
+		})
+		return
+	}
+
+	if s.warmStore == nil || !s.cfg.JiminyWarmEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy warm store is not enabled (set JIMINY_WARM_ENABLED=true)",
+		})
+		return
+	}
+
+	var req struct {
+		SpaceID     string `json:"space_id"`
+		ContextHint string `json:"context_hint,omitempty"`
+		SessionID   string `json:"session_id,omitempty"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	// Debounce: skip if guidance computed recently
+	ageMs := s.warmStore.Age(req.SpaceID)
+	debounceMs := int64(s.cfg.JiminyWarmDebounceSec) * 1000
+	if ageMs >= 0 && ageMs < debounceMs {
+		if m := metrics.Metrics(); m != nil {
+			m.JiminyWarmDebounced(req.SpaceID).Inc()
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"status":    "debounced",
+			"age_ms":    ageMs,
+			"debounce_ms": debounceMs,
+		})
+		return
+	}
+
+	// Fire-and-forget: run Guide() in background goroutine
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		resp, err := s.jiminySvc.Guide(ctx, jiminy.GuidanceRequest{
+			SpaceID:   req.SpaceID,
+			Context:   req.ContextHint,
+			SessionID: req.SessionID,
+		})
+		computeMs := time.Since(start).Milliseconds()
+
+		if err != nil {
+			slog.Warn("jiminy warm: Guide() failed", "space_id", req.SpaceID, "error", err, "compute_ms", computeMs)
+			if m := metrics.Metrics(); m != nil {
+				m.JiminyWarmErrors(req.SpaceID).Inc()
+			}
+			return
+		}
+
+		s.warmStore.Put(req.SpaceID, resp, req.ContextHint, computeMs)
+		if m := metrics.Metrics(); m != nil {
+			m.JiminyWarmCompleted(req.SpaceID).Inc()
+			m.JiminyGuideCalls(req.SpaceID).Inc()
+			if len(resp.Guidance) == 0 {
+				m.JiminyGuideEmpty(req.SpaceID).Inc()
+			}
+		}
+		slog.Info("jiminy warm: guidance pre-computed", "space_id", req.SpaceID, "items", len(resp.Guidance), "compute_ms", computeMs)
+	}()
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"status": "warming",
+	})
+}
+
+// handleJiminyLatest handles GET /v1/jiminy/latest
+// Instant read of pre-computed guidance from the warm store.
+// Response time: <100ms (no Guide() computation).
+func (s *Server) handleJiminyLatest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled",
+		})
+		return
+	}
+
+	if s.warmStore == nil || !s.cfg.JiminyWarmEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy warm store is not enabled",
+		})
+		return
+	}
+
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id query param is required"})
+		return
+	}
+
+	entry := s.warmStore.Get(spaceID)
+	if entry == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"warm":   false,
+			"status": "no_guidance_available",
+		})
+		return
+	}
+
+	ageMs := time.Since(entry.ComputedAt).Milliseconds()
+	maxAgeMs := int64(s.cfg.JiminyWarmMaxAgeSec) * 1000
+
+	if m := metrics.Metrics(); m != nil {
+		m.JiminyLatestServed(spaceID).Inc()
+		m.JiminyLatestAge(spaceID).Set(float64(ageMs))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"warm":        true,
+		"data":        entry.Response,
+		"age_ms":      ageMs,
+		"compute_ms":  entry.ComputeMs,
+		"context_hint": entry.ContextHint,
+		"stale":       ageMs > maxAgeMs,
 	})
 }
 

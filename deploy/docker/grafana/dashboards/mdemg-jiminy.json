@@ -1,0 +1,405 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "Guidance Health",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "title": "Guidance Health",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}",
+          "legendFormat": "Guidance Health",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Follow Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_follow_rate{space_id=\"$space_id\"}",
+          "legendFormat": "Follow Rate",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Constraint Effectiveness",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_constraint_effectiveness{space_id=\"$space_id\"}",
+          "legendFormat": "Constraint Effectiveness",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Source Diversity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_source_diversity{space_id=\"$space_id\"}",
+          "legendFormat": "Source Diversity",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Health Formula",
+      "type": "text",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "mode": "markdown",
+        "content": "### Guidance Health\n\n| Weight | Factor |\n|--------|--------|\n| **50%** | Follow Rate |\n| **30%** | Effectiveness |\n| **20%** | Source Diversity |"
+      }
+    },
+    {
+      "title": "Guidance Activity",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "panels": []
+    },
+    {
+      "title": "Total Guidance Issued",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_guidance_total{space_id=\"$space_id\"}",
+          "legendFormat": "Total Issued",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {}
+      }
+    },
+    {
+      "title": "Outcome Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_followed_total{space_id=\"$space_id\"}",
+          "legendFormat": "Followed",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "mdemg_jiminy_ignored_total{space_id=\"$space_id\"}",
+          "legendFormat": "Ignored",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "mdemg_jiminy_contradicted_total{space_id=\"$space_id\"}",
+          "legendFormat": "Contradicted",
+          "instant": true,
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Followed" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Ignored" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Contradicted" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Effectiveness Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "panels": []
+    },
+    {
+      "title": "Effectiveness Trends",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_follow_rate{space_id=\"$space_id\"}",
+          "legendFormat": "Follow Rate",
+          "refId": "A"
+        },
+        {
+          "expr": "mdemg_jiminy_constraint_effectiveness{space_id=\"$space_id\"}",
+          "legendFormat": "Constraint Effectiveness",
+          "refId": "B"
+        },
+        {
+          "expr": "mdemg_jiminy_source_diversity{space_id=\"$space_id\"}",
+          "legendFormat": "Source Diversity",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "title": "Outcome Trends",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "mdemg_jiminy_followed_total{space_id=\"$space_id\"}",
+          "legendFormat": "Followed",
+          "refId": "A"
+        },
+        {
+          "expr": "mdemg_jiminy_ignored_total{space_id=\"$space_id\"}",
+          "legendFormat": "Ignored",
+          "refId": "B"
+        },
+        {
+          "expr": "mdemg_jiminy_contradicted_total{space_id=\"$space_id\"}",
+          "legendFormat": "Contradicted",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 80
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Followed" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Ignored" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Contradicted" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Constraint Effectiveness",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "panels": []
+    },
+    {
+      "title": "Per-Constraint Effectiveness",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "kniepdennis-neo4j-datasource", "uid": "neo4j" },
+      "targets": [
+        {
+          "refId": "A",
+          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', node_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Ignored, Contradicted, round(toFloat(Followed) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
+          "Format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {}
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["mdemg", "jiminy"],
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "localhost:9999",
+        "current": { "text": "localhost:9999", "value": "localhost:9999" },
+        "options": [{ "text": "localhost:9999", "value": "localhost:9999", "selected": true }]
+      },
+      {
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(mdemg_jiminy_guidance_total, space_id)",
+        "query": { "query": "label_values(mdemg_jiminy_guidance_total, space_id)", "refId": "StandardVariableQuery" },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Jiminy Guidance",
+  "uid": "mdemg-jiminy",
+  "version": 1
+}

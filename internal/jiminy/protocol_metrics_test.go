@@ -330,3 +330,59 @@ func TestRecordOutcomeWithTier_InvalidTier(t *testing.T) {
 		t.Error("code comprehension should still be tracked for invalid tier values")
 	}
 }
+
+func TestProtocolMetrics_NLIFallbackCount(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	c.RecordNLIFallback()
+	c.RecordNLIFallback()
+	c.RecordNLIFallback()
+
+	// Also record some genuine events for rate calculation
+	c.RecordGuidance(1, 15, nil)
+	c.RecordGuidance(2, 50, nil)
+
+	snap := c.Snapshot()
+	if snap.NLIFallbackCount != 3 {
+		t.Errorf("NLIFallbackCount = %d, want 3", snap.NLIFallbackCount)
+	}
+	// Rate = 3 fallbacks / 2 total events = 1.5 (more fallbacks than events is valid)
+	if snap.NLIFallbackRate == 0 {
+		t.Error("NLIFallbackRate should be > 0")
+	}
+}
+
+func TestProtocolMetrics_NLIFallback_Reset(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	c.RecordNLIFallback()
+	c.RecordNLIFallback()
+
+	snap := c.Snapshot()
+	if snap.NLIFallbackCount != 2 {
+		t.Errorf("before reset: NLIFallbackCount = %d, want 2", snap.NLIFallbackCount)
+	}
+
+	c.Reset()
+
+	snap = c.Snapshot()
+	if snap.NLIFallbackCount != 0 {
+		t.Errorf("after reset: NLIFallbackCount = %d, want 0", snap.NLIFallbackCount)
+	}
+}
+
+func TestProtocolMetrics_CodeOutcomeCount(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	c.RecordOutcomeWithTier("code-a", 1, 0.85)
+	c.RecordOutcomeWithTier("code-a", 1, 0.90)
+	c.RecordOutcomeWithTier("code-b", 2, 0.50)
+
+	snap := c.Snapshot()
+	if snap.CodeOutcomeCount["code-a"] != 2 {
+		t.Errorf("code-a outcome count = %d, want 2", snap.CodeOutcomeCount["code-a"])
+	}
+	if snap.CodeOutcomeCount["code-b"] != 1 {
+		t.Errorf("code-b outcome count = %d, want 1", snap.CodeOutcomeCount["code-b"])
+	}
+}

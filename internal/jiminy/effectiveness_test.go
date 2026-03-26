@@ -106,13 +106,16 @@ func TestClassifyOutcome_Followed(t *testing.T) {
 		Content: "Always use configurable variables for endpoints and paths",
 	}
 
-	outcome, sim := classifyOutcome(item, "used configurable variables for the endpoint path configuration")
+	// Action must share >= 50% significant words with constraint to be classified as Followed.
+	// Significant words (>= 4 chars): always, configurable, variables, endpoints, paths (5 words).
+	// Action contains: always, configurable, variables, endpoints, paths → 5/5 = 1.0
+	outcome, sim := classifyOutcome(item, "always use configurable variables for endpoints and paths in the deployment")
 
 	if outcome != OutcomeFollowed {
 		t.Errorf("expected OutcomeFollowed, got %s", outcome)
 	}
-	if sim < 0.3 {
-		t.Errorf("expected similarity >= 0.3, got %f", sim)
+	if sim < 0.5 {
+		t.Errorf("expected similarity >= 0.5, got %f", sim)
 	}
 }
 

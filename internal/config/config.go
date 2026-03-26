@@ -242,9 +242,14 @@ type Config struct {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
-	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 30000)
+	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 15000)
 	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+
+	// Jiminy Warm Store (event-driven pre-computation)
+	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
+	JiminyWarmDebounceSec int  // JIMINY_WARM_DEBOUNCE_SEC — min seconds between warm computations (default: 10)
+	JiminyWarmMaxAgeSec   int  // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim          float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
 	JiminyEffectivenessEnabled    bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
@@ -321,11 +326,14 @@ type Config struct {
 
 	// J17-3: Trust Score
 	J17TrustInitial           float64 // J17_TRUST_INITIAL — starting trust score (default: 0.5)
-	J17TrustBoostPerFollow    float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.02)
+	J17TrustBoostPerFollow    float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
 	J17TrustDecayPerIgnore    float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.03)
 	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.05)
 	J17TrustHighThreshold     float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.8)
 	J17TrustLowThreshold      float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.4)
+	J17TrustTTLHours          int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
+	J17BootstrapCodification  bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
+	J17BootstrapSpaceID       string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
 
 	// J17-4: Protocol Metrics + RSIC Evolution
 	J17MetricsEnabled             bool    // J17_METRICS_ENABLED — enable protocol metrics collection (default: inherits J17)
@@ -1768,7 +1776,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	jiminyEnabled := getBool("JIMINY_ENABLED", true)
-	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 30000)
+	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 15000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1787,6 +1795,17 @@ func FromEnv() (Config, error) {
 	}
 	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
 	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 1800)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Jiminy Warm Store (event-driven pre-computation)
+	jiminyWarmEnabled := getBool("JIMINY_WARM_ENABLED", true)
+	jiminyWarmDebounceSec, err := atoi("JIMINY_WARM_DEBOUNCE_SEC", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyWarmMaxAgeSec, err := atoi("JIMINY_WARM_MAX_AGE_SEC", 300)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1942,7 +1961,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustBoostPerFollow, err := atof("J17_TRUST_BOOST_PER_FOLLOW", 0.02)
+	j17TrustBoostPerFollow, err := atof("J17_TRUST_BOOST_PER_FOLLOW", 0.05)
 	if err != nil {
 		return Config{}, err
 	}
@@ -1962,6 +1981,12 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	j17TrustTTLHours, err := atoi("J17_TRUST_TTL_HOURS", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	j17BootstrapCodification := getBool("J17_BOOTSTRAP_CODIFICATION", j17Enabled)
+	j17BootstrapSpaceID := get("J17_BOOTSTRAP_SPACE_ID", "mdemg-dev")
 
 	// J17-4: Protocol Metrics + RSIC Evolution
 	j17MetricsEnabled := getBool("J17_METRICS_ENABLED", j17Enabled)
@@ -2815,7 +2840,7 @@ func FromEnv() (Config, error) {
 	contradictionNLIEnabled := getBool("CONTRADICTION_NLI_ENABLED", false)
 
 	// F3: Effectiveness Feedback Persistence
-	jiminyPersistenceEnabled := getBool("JIMINY_PERSISTENCE_ENABLED", false)
+	jiminyPersistenceEnabled := getBool("JIMINY_PERSISTENCE_ENABLED", true)
 	constraintConfDecayPerNeg, err := atof("CONSTRAINT_CONFIDENCE_DECAY_PER_NEGATIVE", 0.03)
 	if err != nil {
 		return Config{}, err
@@ -3157,6 +3182,9 @@ func FromEnv() (Config, error) {
 		JiminyFrontierMinSim:          jiminyFrontierMinSim,
 		JiminyEffectivenessEnabled:    jiminyEffectivenessEnabled,
 		JiminyEffectivenessTTLSec:     jiminyEffectivenessTTLSec,
+		JiminyWarmEnabled:             jiminyWarmEnabled,
+		JiminyWarmDebounceSec:         jiminyWarmDebounceSec,
+		JiminyWarmMaxAgeSec:           jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
 		JiminyRetrievalEnabled:          jiminyRetrievalEnabled,
@@ -3214,6 +3242,9 @@ func FromEnv() (Config, error) {
 		J17TrustDecayPerContradict: j17TrustDecayPerContradict,
 		J17TrustHighThreshold:      j17TrustHighThreshold,
 		J17TrustLowThreshold:       j17TrustLowThreshold,
+		J17TrustTTLHours:           j17TrustTTLHours,
+		J17BootstrapCodification:   j17BootstrapCodification,
+		J17BootstrapSpaceID:       j17BootstrapSpaceID,
 		J17MetricsEnabled:               j17MetricsEnabled,
 		J17CodificationThreshold:        j17CodificationThreshold,
 		J17ComprehensionMinThreshold:     j17ComprehensionMinThreshold,

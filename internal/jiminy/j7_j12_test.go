@@ -91,7 +91,7 @@ type mockRetriever struct {
 	err     error
 }
 
-func (m *mockRetriever) RetrieveForJiminy(_ context.Context, _, _ string, _, _ int) ([]RetrievalResult, error) {
+func (m *mockRetriever) RetrieveForJiminy(_ context.Context, _, _ string, _, _ int, _ []float32) ([]RetrievalResult, error) {
 	return m.results, m.err
 }
 

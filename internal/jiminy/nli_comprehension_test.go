@@ -15,26 +15,26 @@ import (
 func TestNLIComprehensionScorer_DisabledFallback(t *testing.T) {
 	scorer := NewNLIComprehensionScorer("", 100, false)
 
-	// Followed → 1.0
-	score := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", true)
-	if score != 1.0 {
-		t.Errorf("disabled scorer followed = %f, want 1.0", score)
+	// Followed → 0.5 (neutral — cannot confirm comprehension without NLI)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("disabled scorer followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 
 	// Not followed → 0.0
-	score = scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", false)
-	if score != 0.0 {
-		t.Errorf("disabled scorer not followed = %f, want 0.0", score)
+	score, isFallback = scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("disabled scorer not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
 func TestNLIComprehensionScorer_NoSidecarFallback(t *testing.T) {
 	scorer := NewNLIComprehensionScorer("http://localhost:99999", 100, true)
 
-	// Sidecar unreachable → falls back to heuristic
-	score := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", true)
-	if score != 1.0 {
-		t.Errorf("unreachable sidecar followed = %f, want 1.0", score)
+	// Sidecar unreachable → falls back to neutral 0.5
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("unreachable sidecar followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 }
 
@@ -42,9 +42,9 @@ func TestNLIComprehensionScorer_EmptyURL(t *testing.T) {
 	scorer := NewNLIComprehensionScorer("", 100, true)
 
 	// Empty URL → fallback
-	score := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", false)
-	if score != 0.0 {
-		t.Errorf("empty URL not followed = %f, want 0.0", score)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint text", "agent action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("empty URL not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
@@ -75,9 +75,9 @@ func TestNLIComprehensionScorer_HappyPathEntailment(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action summary", true)
-	if math.Abs(score-0.92) > 0.001 {
-		t.Errorf("entailment score = %f, want ~0.92", score)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action summary", true)
+	if math.Abs(score-0.92) > 0.001 || isFallback {
+		t.Errorf("entailment score = %f, isFallback=%v, want ~0.92/false", score, isFallback)
 	}
 }
 
@@ -96,9 +96,9 @@ func TestNLIComprehensionScorer_Contradiction(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
-	if score != 1.0 {
-		t.Errorf("contradiction score = %f, want 1.0", score)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
+	if score != 1.0 || isFallback {
+		t.Errorf("contradiction score = %f, isFallback=%v, want 1.0/false", score, isFallback)
 	}
 }
 
@@ -117,9 +117,9 @@ func TestNLIComprehensionScorer_Neutral(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if score != 0.5 {
-		t.Errorf("neutral score = %f, want 0.5", score)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if score != 0.5 || isFallback {
+		t.Errorf("neutral score = %f, isFallback=%v, want 0.5/false (genuine neutral)", score, isFallback)
 	}
 }
 
@@ -134,16 +134,16 @@ func TestNLIComprehensionScorer_Timeout(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 50, true) // 50ms timeout
 
-	// followed=true → falls back to 1.0
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if score != 1.0 {
-		t.Errorf("timeout followed = %f, want 1.0", score)
+	// followed=true → falls back to neutral 0.5
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("timeout followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 
 	// followed=false → falls back to 0.0
-	score = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
-	if score != 0.0 {
-		t.Errorf("timeout not followed = %f, want 0.0", score)
+	score, isFallback = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("timeout not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
@@ -156,16 +156,16 @@ func TestNLIComprehensionScorer_HTTP500(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 
-	// followed=true → falls back to 1.0
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if score != 1.0 {
-		t.Errorf("HTTP 500 followed = %f, want 1.0", score)
+	// followed=true → falls back to neutral 0.5
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("HTTP 500 followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 
 	// followed=false → falls back to 0.0
-	score = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
-	if score != 0.0 {
-		t.Errorf("HTTP 500 not followed = %f, want 0.0", score)
+	score, isFallback = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("HTTP 500 not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
@@ -196,16 +196,16 @@ func TestNLIComprehensionScorer_CircuitBreakerOpen(t *testing.T) {
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 	scorer.SetCircuitBreaker(cb)
 
-	// followed=true → falls back to 1.0
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if score != 1.0 {
-		t.Errorf("circuit open followed = %f, want 1.0", score)
+	// followed=true → falls back to neutral 0.5
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("circuit open followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 
 	// followed=false → falls back to 0.0
-	score = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
-	if score != 0.0 {
-		t.Errorf("circuit open not followed = %f, want 0.0", score)
+	score, isFallback = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("circuit open not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
@@ -235,9 +235,9 @@ func TestNLIComprehensionScorer_CircuitBreakerWrapsCall(t *testing.T) {
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 	scorer.SetCircuitBreaker(cb)
 
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if math.Abs(score-0.88) > 0.001 {
-		t.Errorf("breaker happy path score = %f, want ~0.88", score)
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if math.Abs(score-0.88) > 0.001 || isFallback {
+		t.Errorf("breaker happy path score = %f, isFallback=%v, want ~0.88/false", score, isFallback)
 	}
 }
 
@@ -275,15 +275,15 @@ func TestNLIComprehensionScorer_MalformedJSON(t *testing.T) {
 
 	scorer := NewNLIComprehensionScorer(srv.URL, 5000, true)
 
-	// Malformed JSON → falls back to heuristic
-	score := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
-	if score != 1.0 {
-		t.Errorf("malformed JSON followed = %f, want 1.0", score)
+	// Malformed JSON → falls back to neutral 0.5
+	score, isFallback := scorer.ScoreComprehension(context.Background(), "constraint", "action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("malformed JSON followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 
-	score = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
-	if score != 0.0 {
-		t.Errorf("malformed JSON not followed = %f, want 0.0", score)
+	score, isFallback = scorer.ScoreComprehension(context.Background(), "constraint", "action", false)
+	if score != 0.0 || !isFallback {
+		t.Errorf("malformed JSON not followed = %f, isFallback=%v, want 0.0/true", score, isFallback)
 	}
 }
 
@@ -301,8 +301,8 @@ func TestNLIComprehensionScorer_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	score := scorer.ScoreComprehension(ctx, "constraint", "action", true)
-	if score != 1.0 {
-		t.Errorf("cancelled context followed = %f, want 1.0", score)
+	score, isFallback := scorer.ScoreComprehension(ctx, "constraint", "action", true)
+	if score != 0.5 || !isFallback {
+		t.Errorf("cancelled context followed = %f, isFallback=%v, want 0.5/true", score, isFallback)
 	}
 }

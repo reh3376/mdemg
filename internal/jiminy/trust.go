@@ -27,12 +27,13 @@ type trustEntry struct {
 
 // TrustConfig holds trust scorer configuration.
 type TrustConfig struct {
-	Initial           float64 // starting trust score (default: 0.5)
-	BoostPerFollow    float64 // trust increase per followed constraint (default: 0.02)
-	DecayPerIgnore    float64 // trust decrease per ignored constraint (default: 0.03)
-	DecayPerContradict float64 // trust decrease per contradicted constraint (default: 0.05)
-	HighThreshold     float64 // above this → agent has earned dense encoding (default: 0.8)
-	LowThreshold      float64 // below this → agent needs more explanation (default: 0.4)
+	Initial           float64       // starting trust score (default: 0.5)
+	BoostPerFollow    float64       // trust increase per followed constraint (default: 0.05)
+	DecayPerIgnore    float64       // trust decrease per ignored constraint (default: 0.03)
+	DecayPerContradict float64      // trust decrease per contradicted constraint (default: 0.05)
+	HighThreshold     float64       // above this → agent has earned dense encoding (default: 0.8)
+	LowThreshold      float64       // below this → agent needs more explanation (default: 0.4)
+	TTL               time.Duration // trust entry expiry (default: 4h)
 }
 
 // NewTrustScorer creates a new trust scorer with the given config.
@@ -56,6 +57,11 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		cfg.LowThreshold = 0.4
 	}
 
+	ttl := 4 * time.Hour
+	if cfg.TTL > 0 {
+		ttl = cfg.TTL
+	}
+
 	return &TrustScorer{
 		scores:             make(map[string]*trustEntry),
 		initial:            cfg.Initial,
@@ -64,7 +70,7 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		decayPerContradict: cfg.DecayPerContradict,
 		highThreshold:      cfg.HighThreshold,
 		lowThreshold:       cfg.LowThreshold,
-		ttl:                4 * time.Hour,
+		ttl:                ttl,
 	}
 }
 
