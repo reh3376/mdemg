@@ -1098,3 +1098,39 @@ type MetaLearnResponse struct {
 	ConceptsPromoted  int               `json:"concepts_promoted"`
 	PromotedNodes     []PromotedConcept `json:"promoted_nodes"`
 }
+
+// GraphVizNode — a node for Grafana Node Graph visualization (GAP-20)
+type GraphVizNode struct {
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	SubTitle      string  `json:"subTitle"`
+	MainStat      string `json:"mainStat"`
+	SecondaryStat string `json:"secondaryStat"`
+	Color         string  `json:"color"`
+	NodeRadius    float64 `json:"nodeRadius,omitempty"`
+	// detail__* fields shown in click context menu
+	DetailRoleType    string `json:"detail__role_type"`
+	DetailObsType     string `json:"detail__obs_type"`
+	DetailTags        string `json:"detail__tags"`
+	DetailStability   string `json:"detail__stability"`
+	DetailSurprise    string `json:"detail__surprise"`
+	DetailCreatedAt   string `json:"detail__created_at"`
+	DetailLastActive  string `json:"detail__last_activated"`
+	DetailEdgeCount   string `json:"detail__edge_count"`
+	DetailStatus      string `json:"detail__status"`
+}
+
+// GraphVizEdge — an edge for Grafana Node Graph visualization (GAP-20)
+type GraphVizEdge struct {
+	ID       string `json:"id"`
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	MainStat string `json:"mainStat"`
+	Color    string `json:"color,omitempty"`
+}
+
+// GraphVizResponse — response format for Grafana Node Graph API plugin (GAP-20)
+type GraphVizResponse struct {
+	Nodes []GraphVizNode `json:"nodes"`
+	Edges []GraphVizEdge `json:"edges"`
+}

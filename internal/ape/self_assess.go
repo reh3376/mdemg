@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 	"mdemg/internal/retrieval"
 )
 
@@ -187,7 +188,29 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 
 	report.Confidence = a.computeConfidence(report)
 
+	// Publish health sub-scores as Prometheus gauges for dashboard trending
+	a.publishHealthMetrics(report)
+
 	return report, nil
+}
+
+// publishHealthMetrics sets Prometheus gauge values from an assessment report.
+func (a *Assessor) publishHealthMetrics(r *SelfAssessmentReport) {
+	m := metrics.Metrics()
+	sid := r.SpaceID
+	m.RSICHealthOverall(sid).Set(r.OverallHealth)
+	m.RSICHealthRetrieval(sid).Set(r.RetrievalQuality)
+	m.RSICHealthMemory(sid).Set(r.MemoryHealth)
+	m.RSICHealthEdge(sid).Set(r.EdgeHealth)
+	m.RSICHealthTask(sid).Set(r.TaskPerformance)
+	m.RSICHealthGuidance(sid).Set(r.GuidanceHealth)
+	m.RSICHealthProtocol(sid).Set(r.ProtocolHealth)
+	m.RSICHealthSynergy(sid).Set(r.SynergyHealth)
+	m.RSICHealthConfidence(sid).Set(r.Confidence)
+	m.RSICSynergyClaudeLines(sid).Set(float64(r.SynergyLinesClaude))
+	m.RSICSynergyMemoryLines(sid).Set(float64(r.SynergyLinesMemory))
+	m.RSICSynergyOverflowRate(sid).Set(r.SynergyOverflowRate)
+	m.RSICSynergyBufferEntries(sid).Set(float64(r.SynergyRecoveryBufferEntries))
 }
 
 // queryGraphMetrics runs Neo4j queries for orphan count, correction rate, consolidation freshness.

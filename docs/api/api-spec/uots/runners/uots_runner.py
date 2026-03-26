@@ -335,7 +335,7 @@ def _extract_panel_queries(panels: List[Any]) -> List[str]:
         for target in targets:
             if not isinstance(target, dict):
                 continue
-            for key in ("expr", "query", "expression"):
+            for key in ("expr", "query", "expression", "cypherQuery"):
                 value = target.get(key)
                 if isinstance(value, str) and value.strip():
                     queries.append(value)

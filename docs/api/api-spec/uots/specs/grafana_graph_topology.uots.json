@@ -22,7 +22,7 @@
       "required_queries": [
         "MemoryNode",
         "space_id",
-        "ABSTRACTED_FROM"
+        "ABSTRACTS_TO"
       ],
       "tags": ["mdemg", "topology"]
     }
