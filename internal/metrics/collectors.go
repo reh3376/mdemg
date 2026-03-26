@@ -117,10 +117,62 @@ type StandardMetrics struct {
 	RSICHealthConfidence func(spaceID string) *Gauge
 
 	// RSIC synergy metrics (published after each assessment)
-	RSICSynergyClaudeLines  func(spaceID string) *Gauge
-	RSICSynergyMemoryLines  func(spaceID string) *Gauge
-	RSICSynergyOverflowRate func(spaceID string) *Gauge
+	RSICSynergyClaudeLines   func(spaceID string) *Gauge
+	RSICSynergyMemoryLines   func(spaceID string) *Gauge
+	RSICSynergyOverflowRate  func(spaceID string) *Gauge
 	RSICSynergyBufferEntries func(spaceID string) *Gauge
+
+	// J17 Protocol metrics (published after each assessment)
+	J17TierT1Fraction      func(spaceID string) *Gauge
+	J17TierT2Fraction      func(spaceID string) *Gauge
+	J17TierT3Fraction      func(spaceID string) *Gauge
+	J17CompressionRatio    func(spaceID string) *Gauge
+	J17AvgComprehension    func(spaceID string) *Gauge
+	J17AvgTokensPerGuidance func(spaceID string) *Gauge
+	J17ReplayFrequency     func(spaceID string) *Gauge
+	J17TicketRestoreRate   func(spaceID string) *Gauge
+	J17CodeCoverage        func(spaceID string) *Gauge
+	J17EventsTotal         func(spaceID string) *Gauge
+	J17TierT1Comprehension func(spaceID string) *Gauge
+	J17TierT2Comprehension func(spaceID string) *Gauge
+	J17TierT3Comprehension func(spaceID string) *Gauge
+
+	// J17 NLI calibration metrics
+	J17NLIMeanBias       func(spaceID string) *Gauge
+	J17NLIBiasAlert      func(spaceID string) *Gauge
+	J17NLIFallbackTotal  func(spaceID string) *Gauge
+
+	// J17 tier outcome counts (sample size context)
+	J17TierT1OutcomeCount func(spaceID string) *Gauge
+	J17TierT2OutcomeCount func(spaceID string) *Gauge
+	J17TierT3OutcomeCount func(spaceID string) *Gauge
+
+	// J17 sidecar metrics
+	J17SidecarRequests      func(spaceID string) *Gauge
+	J17SidecarErrors        func(spaceID string) *Gauge
+	J17SidecarTimeouts      func(spaceID string) *Gauge
+	J17SidecarAgreementRate func(spaceID string) *Gauge
+	J17SidecarOverrideRate  func(spaceID string) *Gauge
+	J17SidecarLatency       func(spaceID string) *Gauge
+
+	// Jiminy guidance metrics (published after each assessment)
+	JiminyFollowRate              func(spaceID string) *Gauge
+	JiminyConstraintEffectiveness func(spaceID string) *Gauge
+	JiminySourceDiversity         func(spaceID string) *Gauge
+	JiminyTotalIssued             func(spaceID string) *Gauge
+	JiminyTotalFollowed           func(spaceID string) *Gauge
+	JiminyTotalIgnored            func(spaceID string) *Gauge
+	JiminyTotalContradicted       func(spaceID string) *Gauge
+
+	// Jiminy Guide + Warm metrics (event-driven pre-computation)
+	JiminyGuideCalls    func(spaceID string) *Counter
+	JiminyGuideEmpty    func(spaceID string) *Counter
+	JiminyGuideTimeout  func(spaceID string) *Counter
+	JiminyWarmCompleted func(spaceID string) *Counter
+	JiminyWarmErrors    func(spaceID string) *Counter
+	JiminyWarmDebounced func(spaceID string) *Counter
+	JiminyLatestAge     func(spaceID string) *Gauge
+	JiminyLatestServed  func(spaceID string) *Counter
 }
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
@@ -336,6 +388,178 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.RSICSynergyBufferEntries = func(spaceID string) *Gauge {
 		return r.NewGauge("rsic_synergy_buffer_entries", "Recovery buffer pending entries",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// J17 Protocol metrics
+	m.J17TierT1Fraction = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t1_fraction", "Fraction of guidance at T1 (coded)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT2Fraction = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t2_fraction", "Fraction of guidance at T2 (telegraphic)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT3Fraction = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t3_fraction", "Fraction of guidance at T3 (full NL)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17CompressionRatio = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_compression_ratio", "Token compression ratio",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17AvgComprehension = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_avg_comprehension", "Average comprehension score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17AvgTokensPerGuidance = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_avg_tokens_per_guidance", "Average tokens per guidance item",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17ReplayFrequency = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_replay_frequency_per_hour", "Replay events per hour",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TicketRestoreRate = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_ticket_restore_success_rate", "Ticket restore success rate (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17CodeCoverage = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_code_coverage", "Fraction of constraints with T1 codes (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17EventsTotal = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_events_total", "Total protocol events in window",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT1Comprehension = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t1_comprehension", "T1 tier comprehension score",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT2Comprehension = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t2_comprehension", "T2 tier comprehension score",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT3Comprehension = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t3_comprehension", "T3 tier comprehension score",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// J17 NLI calibration
+	m.J17NLIMeanBias = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_nli_mean_bias", "NLI calibration mean bias",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17NLIBiasAlert = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_nli_bias_alert", "NLI bias alert state (0=normal, 1=alert)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17NLIFallbackTotal = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_nli_fallback_total", "NLI sidecar fallback events (degraded state)",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// J17 tier outcome counts
+	m.J17TierT1OutcomeCount = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t1_outcome_count", "T1 comprehension event count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT2OutcomeCount = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t2_outcome_count", "T2 comprehension event count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TierT3OutcomeCount = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_tier_t3_outcome_count", "T3 comprehension event count",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// J17 sidecar metrics
+	m.J17SidecarRequests = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_requests", "Sidecar request count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17SidecarErrors = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_errors", "Sidecar error count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17SidecarTimeouts = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_timeouts", "Sidecar timeout count",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17SidecarAgreementRate = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_agreement_rate", "Sidecar agreement rate",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17SidecarOverrideRate = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_override_rate", "Sidecar override rate",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17SidecarLatency = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_sidecar_avg_latency_ms", "Sidecar average latency (ms)",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// Jiminy guidance metrics
+	m.JiminyFollowRate = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_follow_rate", "Guidance follow rate (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyConstraintEffectiveness = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_constraint_effectiveness", "Constraint effectiveness rate (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminySourceDiversity = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_source_diversity", "Source diversity score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyTotalIssued = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_guidance_total", "Total guidance items issued",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyTotalFollowed = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_followed_total", "Guidance items followed",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyTotalIgnored = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_ignored_total", "Guidance items ignored",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyTotalContradicted = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_contradicted_total", "Guidance items contradicted",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// ─── Jiminy Guide + Warm metrics ───
+	m.JiminyGuideCalls = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_guide_calls_total", "Total Guide() invocations",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyGuideEmpty = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_guide_empty_total", "Guide() calls returning zero items",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyGuideTimeout = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_guide_timeout_total", "Guide() calls that timed out",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyWarmCompleted = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_warm_completed_total", "Warm pre-computations completed",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyWarmErrors = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_warm_errors_total", "Warm pre-computations that errored",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyWarmDebounced = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_warm_debounced_total", "Warm requests skipped by debounce",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyLatestAge = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_latest_age_ms", "Age of latest pre-computed guidance in ms",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyLatestServed = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_latest_served_total", "GET /latest requests served",
 			map[string]string{"space_id": spaceID})
 	}
 

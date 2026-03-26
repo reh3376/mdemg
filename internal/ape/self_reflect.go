@@ -194,6 +194,10 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 
 			// 11. Low comprehension: code failing its purpose
 			for code, rate := range protoStats.CodeComprehension {
+				// Guard: don't retire based on insufficient or fallback-dominated data
+				if count, ok := protoStats.CodeOutcomeCount[code]; ok && count < int64(r.cfg.J17TierEffectivenessMinSamples) {
+					continue
+				}
 				if rate < r.cfg.J17ComprehensionMinThreshold && rate > 0 {
 					insights = append(insights, ReflectionInsight{
 						PatternID:         "j17_low_comprehension",
@@ -244,6 +248,19 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 					Metric:            "code_coverage",
 					Value:             protoStats.CodeCoverage,
 					Threshold:         0.8,
+				})
+			}
+
+			// 14b. Cold start: 0% code coverage with active events — bootstrap all constraints
+			if protoStats.CodeCoverage == 0 && protoStats.TotalEvents > 0 {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "j17_cold_start_codification",
+					Severity:          SeverityHigh,
+					Description:       "J17 cold start: 0% code coverage — bootstrap codification needed",
+					RecommendedAction: "codify_all_constraints",
+					Metric:            "code_coverage",
+					Value:             0,
+					Threshold:         0.1,
 				})
 			}
 

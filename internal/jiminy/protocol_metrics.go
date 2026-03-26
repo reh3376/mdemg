@@ -23,6 +23,11 @@ type ProtocolMetrics struct {
 	TierCodeComprehension map[int]map[string]float64 `json:"tier_code_comprehension,omitempty"`
 	TierOutcomeCount      [3]int64                   `json:"tier_outcome_count"`
 
+	// NLI fallback tracking (degraded-state awareness)
+	NLIFallbackCount int64              `json:"nli_fallback_count,omitempty"`
+	NLIFallbackRate  float64            `json:"nli_fallback_rate,omitempty"`
+	CodeOutcomeCount map[string]int64   `json:"code_outcome_count,omitempty"`
+
 	WindowStart time.Time `json:"window_start"`
 	WindowEnd   time.Time `json:"window_end"`
 	TotalEvents int64     `json:"total_events"`
@@ -71,6 +76,9 @@ type ProtocolMetricsCollector struct {
 	tierCompScoreSum [3]float64            // running sum of comprehension per tier
 	tierCompCount    [3]int64              // count of outcomes per tier
 	tierCodeScores   [3]map[string][]float64 // per-tier, per-code scores
+
+	// NLI fallback tracking (degraded-state awareness)
+	nliFallbackCount int64
 
 	// Window tracking
 	windowStart time.Time
@@ -217,6 +225,13 @@ func (c *ProtocolMetricsCollector) RecordConstraintCoverage(total, withCode int)
 	c.constraintWithCode += int64(withCode)
 }
 
+// RecordNLIFallback increments the NLI fallback counter (sidecar unavailable).
+func (c *ProtocolMetricsCollector) RecordNLIFallback() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.nliFallbackCount++
+}
+
 // Snapshot returns an immutable copy of the current metrics.
 func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 	c.mu.RLock()
@@ -337,6 +352,18 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		}
 	}
 
+	// NLI fallback rate
+	var nliFallbackRate float64
+	if c.totalEvents > 0 {
+		nliFallbackRate = float64(c.nliFallbackCount) / float64(c.totalEvents)
+	}
+
+	// Per-code outcome count (for minimum sample guards)
+	codeOutcomeCount := make(map[string]int64, len(c.codeTotal))
+	for code, total := range c.codeTotal {
+		codeOutcomeCount[code] = int64(total)
+	}
+
 	return &ProtocolMetrics{
 		TierDistribution:         tierDist,
 		AvgTokensPerGuidance:     avgTokens,
@@ -351,6 +378,9 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		TierComprehension:        tierComp,
 		TierCodeComprehension:    tierCodeComp,
 		TierOutcomeCount:         tierOutcomeCount,
+		NLIFallbackCount:         c.nliFallbackCount,
+		NLIFallbackRate:          nliFallbackRate,
+		CodeOutcomeCount:         codeOutcomeCount,
 		WindowStart:              c.windowStart,
 		WindowEnd:                now,
 		TotalEvents:              c.totalEvents,
@@ -381,6 +411,7 @@ func (c *ProtocolMetricsCollector) Reset() {
 	c.sidecarAgreements = 0
 	c.sidecarOverrides = 0
 	c.sidecarLatencySum = 0
+	c.nliFallbackCount = 0
 	c.tierCompScoreSum = [3]float64{}
 	c.tierCompCount = [3]int64{}
 	c.tierCodeScores = [3]map[string][]float64{

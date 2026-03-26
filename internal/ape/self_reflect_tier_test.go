@@ -210,3 +210,68 @@ type mockTierProtocolProvider struct {
 func (m *mockTierProtocolProvider) GetProtocolStats(_ context.Context, _ string) (ProtocolStatsResult, error) {
 	return m.stats, nil
 }
+
+func TestReflect_J17LowComprehension_InsufficientSamples(t *testing.T) {
+	cfg := config.Config{
+		J17TierEffectivenessMinSamples: 5,
+		J17ComprehensionMinThreshold:   0.7,
+	}
+	r := NewReflector(cfg, nil)
+	r.SetProtocolProvider(&mockTierProtocolProvider{
+		stats: ProtocolStatsResult{
+			CodeComprehension: map[string]float64{"weak-code": 0.2},
+			CodeOutcomeCount:  map[string]int64{"weak-code": 3}, // < 5 minimum
+		},
+	})
+
+	report := &SelfAssessmentReport{
+		SpaceID:        "test",
+		ProtocolHealth: 0.5,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, insight := range insights {
+		if insight.PatternID == "j17_low_comprehension" {
+			t.Error("Pattern 11 should NOT fire with insufficient samples (3 < 5)")
+		}
+	}
+}
+
+func TestReflect_J17LowComprehension_SufficientSamples(t *testing.T) {
+	cfg := config.Config{
+		J17TierEffectivenessMinSamples: 5,
+		J17ComprehensionMinThreshold:   0.7,
+	}
+	r := NewReflector(cfg, nil)
+	r.SetProtocolProvider(&mockTierProtocolProvider{
+		stats: ProtocolStatsResult{
+			CodeComprehension: map[string]float64{"weak-code": 0.2},
+			CodeOutcomeCount:  map[string]int64{"weak-code": 10}, // >= 5 minimum
+		},
+	})
+
+	report := &SelfAssessmentReport{
+		SpaceID:        "test",
+		ProtocolHealth: 0.5,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	found := false
+	for _, insight := range insights {
+		if insight.PatternID == "j17_low_comprehension" {
+			found = true
+			if insight.RecommendedAction != "retire_code" {
+				t.Errorf("expected action retire_code, got %s", insight.RecommendedAction)
+			}
+		}
+	}
+	if !found {
+		t.Error("Pattern 11 should fire with sufficient samples (10 >= 5) and low comprehension (0.2 < 0.7)")
+	}
+}

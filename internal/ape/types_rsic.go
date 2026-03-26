@@ -3,6 +3,8 @@ package ape
 import (
 	"context"
 	"time"
+
+	"mdemg/internal/jiminy"
 )
 
 // ───────────── Tier ─────────────
@@ -425,6 +427,17 @@ type ProtocolStatsResult struct {
 	// NLI calibration (Epic 3)
 	NLIMeanBias  float64 `json:"nli_mean_bias"`
 	NLIBiasAlert bool    `json:"nli_bias_alert"`
+
+	// NLI fallback tracking (degraded-state awareness)
+	NLIFallbackCount int64              `json:"nli_fallback_count,omitempty"`
+	NLIFallbackRate  float64            `json:"nli_fallback_rate,omitempty"`
+	CodeOutcomeCount map[string]int64   `json:"code_outcome_count,omitempty"`
+
+	// Token efficiency
+	AvgTokensPerGuidance float64 `json:"avg_tokens_per_guidance"`
+
+	// Sidecar metrics (NS-07)
+	Sidecar *jiminy.SidecarMetrics `json:"sidecar,omitempty"`
 }
 
 // TierEffectivenessProvider builds curated tier effectiveness datasets for RSIC.
@@ -465,6 +478,7 @@ type WatchdogSignalProvider interface {
 	GetSessionHealthScore(sessionID string) float64
 	GetObservationRate(spaceID string) float64
 	GetConsolidationAgeSec(ctx context.Context, spaceID string) (int64, error)
+	IsJiminyHealthy(ctx context.Context) bool
 }
 
 // FreshnessProvider supplies ingest staleness data for the RSIC pipeline (Phase 47.2).

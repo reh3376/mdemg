@@ -120,6 +120,8 @@ func (a *rsicHiddenAdapter) RunFullConversationConsolidation(ctx context.Context
 type rsicWatchdogSignalAdapter struct {
 	sessionTracker *conversation.SessionTracker
 	driver         neo4j.DriverWithContext
+	jiminyEnabled  bool
+	jiminySvc      *jiminy.Service
 }
 
 func (a *rsicWatchdogSignalAdapter) GetSessionHealthScore(sessionID string) float64 {
@@ -203,6 +205,10 @@ func (a *rsicWatchdogSignalAdapter) GetConsolidationAgeSec(ctx context.Context, 
 	return result.(int64), nil
 }
 
+func (a *rsicWatchdogSignalAdapter) IsJiminyHealthy(_ context.Context) bool {
+	return a.jiminyEnabled && a.jiminySvc != nil
+}
+
 // rsicJiminyAdapter adapts *jiminy.Service to ape.JiminyStatsProvider (J10).
 type rsicJiminyAdapter struct {
 	svc *jiminy.Service
@@ -247,6 +253,19 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 		TierComprehension:        snapshot.TierComprehension,
 		TierCodeComprehension:    snapshot.TierCodeComprehension,
 		TierOutcomeCount:         snapshot.TierOutcomeCount,
+	}
+
+	// Token efficiency
+	result.AvgTokensPerGuidance = snapshot.AvgTokensPerGuidance
+
+	// NLI fallback tracking (degraded-state awareness)
+	result.NLIFallbackCount = snapshot.NLIFallbackCount
+	result.NLIFallbackRate = snapshot.NLIFallbackRate
+	result.CodeOutcomeCount = snapshot.CodeOutcomeCount
+
+	// Sidecar metrics (NS-07)
+	if snapshot.Sidecar != nil {
+		result.Sidecar = snapshot.Sidecar
 	}
 
 	// NLI calibration: populate from service if available
@@ -315,12 +334,13 @@ type jiminyRetrievalAdapter struct {
 	retriever *retrieval.Service
 }
 
-func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int) ([]jiminy.RetrievalResult, error) {
+func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int, queryEmbedding []float32) ([]jiminy.RetrievalResult, error) {
 	resp, err := a.retriever.Retrieve(ctx, models.RetrieveRequest{
-		SpaceID:   spaceID,
-		QueryText: queryText,
-		TopK:      topK,
-		HopDepth:  hopDepth,
+		SpaceID:        spaceID,
+		QueryText:      queryText,
+		TopK:           topK,
+		HopDepth:       hopDepth,
+		QueryEmbedding: queryEmbedding,
 	})
 	if err != nil {
 		return nil, err
