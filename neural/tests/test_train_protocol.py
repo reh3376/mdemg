@@ -126,6 +126,63 @@ def test_load_protocol_jsonl_empty() -> None:
         assert samples == []
 
 
+def test_load_protocol_jsonl_filters_nli_fallback() -> None:
+    """Records with score_source='nli_fallback' are excluded from training data."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        records = [
+            # Genuine NLI record — should be kept
+            {
+                "constraint_code": "no-force-push",
+                "constraint_text": "never force push to main",
+                "tier_used": 1,
+                "token_count": 12,
+                "comprehension_score": 0.85,
+                "trust_score": 0.6,
+                "score_source": "nli",
+            },
+            # Fallback record — should be filtered out
+            {
+                "constraint_code": "no-force-push",
+                "constraint_text": "never force push to main",
+                "tier_used": 1,
+                "token_count": 12,
+                "comprehension_score": 0.5,
+                "trust_score": 0.6,
+                "score_source": "nli_fallback",
+            },
+            # Heuristic record — should be kept
+            {
+                "constraint_code": "test-first",
+                "constraint_text": "always run tests",
+                "tier_used": 2,
+                "token_count": 45,
+                "comprehension_score": 1.0,
+                "trust_score": 0.8,
+                "score_source": "heuristic",
+            },
+            # No score_source field — should be kept (legacy records)
+            {
+                "constraint_code": "lint-check",
+                "constraint_text": "run linter",
+                "tier_used": 1,
+                "token_count": 10,
+                "comprehension_score": 0.9,
+                "trust_score": 0.5,
+            },
+        ]
+        _write_protocol_jsonl(os.path.join(tmpdir, "protocol.jsonl"), records)
+
+        samples = load_protocol_jsonl(tmpdir)
+
+        assert len(samples) == 3, f"expected 3 samples (1 filtered), got {len(samples)}"
+        codes = [s.constraint_code for s in samples]
+        assert codes == ["no-force-push", "test-first", "lint-check"]
+        # The kept NLI record should have score_source preserved
+        assert samples[0].score_source == "nli"
+        assert samples[1].score_source == "heuristic"
+        assert samples[2].score_source == ""
+
+
 def test_derive_optimal_tiers() -> None:
     """Verify tier selection logic: prefer tier with best comprehension/token ratio."""
     samples = [
