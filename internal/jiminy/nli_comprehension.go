@@ -51,16 +51,17 @@ type nliResponse struct {
 	} `json:"scores"`
 }
 
-// ScoreComprehension returns a comprehension score (0.0-1.0) for a constraint.
-// Falls back to heuristic (followed=1.0, ignored=0.0) if sidecar unavailable.
+// ScoreComprehension returns a comprehension score (0.0-1.0) and a fallback indicator.
+// When isFallback is true, the score is synthetic (sidecar unavailable) and should NOT
+// be recorded into comprehension metrics to prevent degraded-state cascades.
 func (s *NLIComprehensionScorer) ScoreComprehension(ctx context.Context,
-	constraintText string, agentActionSummary string, followed bool) float64 {
+	constraintText string, agentActionSummary string, followed bool) (score float64, isFallback bool) {
 
 	if !s.enabled || s.sidecarURL == "" {
 		if followed {
-			return 1.0
+			return 0.5, true // fallback: cannot confirm comprehension without NLI
 		}
-		return 0.0
+		return 0.0, true
 	}
 
 	var result *nliResponse
@@ -83,18 +84,18 @@ func (s *NLIComprehensionScorer) ScoreComprehension(ctx context.Context,
 
 	if callErr != nil {
 		if followed {
-			return 1.0
+			return 0.5, true // fallback: NLI call failed
 		}
-		return 0.0
+		return 0.0, true
 	}
 
 	switch result.Label {
 	case "entailment":
-		return result.Scores.Entailment
+		return result.Scores.Entailment, false
 	case "contradiction":
-		return 1.0 // understood but violated — comprehension is high
+		return 1.0, false // understood but violated — comprehension is high
 	default: // neutral
-		return 0.5
+		return 0.5, false // genuine neutral, not a fallback
 	}
 }
 

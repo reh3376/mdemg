@@ -52,6 +52,7 @@ type Service struct {
 	arbitrator          *SidecarArbitrator       // NS-01: sidecar mode arbitration
 	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
 	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
+	warmStore           *WarmStore               // B7: WarmStore reference for trust-based invalidation
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -156,6 +157,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			DecayPerContradict: cfg.J17TrustDecayPerContradict,
 			HighThreshold:      cfg.J17TrustHighThreshold,
 			LowThreshold:       cfg.J17TrustLowThreshold,
+			TTL:                time.Duration(cfg.J17TrustTTLHours) * time.Hour,
 		})
 		slog.Info("jiminy: J17 trust scoring enabled",
 			"initial", cfg.J17TrustInitial, "high_threshold", cfg.J17TrustHighThreshold, "low_threshold", cfg.J17TrustLowThreshold)
@@ -311,11 +313,9 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		return GuidanceResponse{}, fmt.Errorf("context is required")
 	}
 
-	// F10: Check cache for fast path
-	// Gap 3: Bypass cache when J17 is active with a session ID to prevent cross-session contamination
-	cacheBypass := s.cfg.JiminyCacheJ17Bypass && s.cfg.J17Enabled && req.SessionID != ""
-	if s.cache != nil && !cacheBypass {
-		if cached, ok := s.cache.Get(req.SpaceID, req.Context); ok {
+	// F10: Check cache for fast path (session-scoped key prevents cross-session contamination)
+	if s.cache != nil {
+		if cached, ok := s.cache.Get(req.SpaceID, req.SessionID, req.Context); ok {
 			return cached, nil
 		}
 	}
@@ -523,7 +523,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 				queryText = req.Context + " " + req.AgentOutput
 			}
 			results, err := s.retriever.RetrieveForJiminy(ctx, req.SpaceID, queryText,
-				s.cfg.JiminyRetrievalTopK, s.cfg.JiminyRetrievalHopDepth)
+				s.cfg.JiminyRetrievalTopK, s.cfg.JiminyRetrievalHopDepth, queryEmbedding)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -802,9 +802,9 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Debug:                debug,
 	}
 
-	// F10: Cache the response (Gap 3: skip when J17 session is active)
-	if s.cache != nil && !cacheBypass {
-		s.cache.Put(req.SpaceID, req.Context, resp)
+	// F10: Cache the response (session-scoped key prevents cross-session contamination)
+	if s.cache != nil {
+		s.cache.Put(req.SpaceID, req.SessionID, req.Context, resp)
 	}
 
 	return resp, nil
@@ -952,11 +952,6 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			}
 		}
 
-		// J17: Update trust score based on outcome (per-session, not per-space)
-		if s.trustScorer != nil {
-			s.trustScorer.RecordOutcome(feedbackSessionID, outcome)
-		}
-
 		// J17-4: Record outcome for protocol metrics and data collection
 		// NLI feedback loop: when NLI scorer is available, defer recording to the NLI block
 		// to avoid double-counting. When NLI is unavailable, use heuristic scores.
@@ -1002,35 +997,66 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			scoreSource := "heuristic"
 
 			if s.nliScorer != nil {
-				nliScore := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
-				slog.Info("j17-sidecar: NLI score computed",
-					"nli", nliScore, "heuristic", cr.Confidence, "constraint", item.ConstraintCode, "score_of_record", s.cfg.J17NLIScoreOfRecord)
-				comprehension = nliScore
-				scoreSource = "nli"
+				nliScore, isFallback := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
 
-				// NLI feedback loop: Record NLI score to metrics in ALL modes (shadow/compare/canary/active).
-				// NLI is OBSERVATIONAL data — RSIC needs it regardless of arbitration mode.
-				// The heuristic block above is skipped when nliScorer != nil to prevent double-counting.
-				if s.cfg.J17NLIObservationalEnabled && s.protocolMetrics != nil && item.ConstraintCode != "" {
-					s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
-				}
+				if isFallback {
+					// NLI unavailable — do NOT record fallback score into comprehension metrics.
+					// Use heuristic comprehension to prevent degraded-state cascades.
+					scoreSource = "nli_fallback"
+					slog.Debug("j17-sidecar: NLI fallback, using heuristic for comprehension",
+						"constraint", item.ConstraintCode, "followed", followed)
 
-				// NLI calibration: compare NLI with heuristic for bias detection
-				if s.calibrationTracker != nil {
-					var heuristicComp float64
+					// Track fallback rate for RSIC awareness
+					if s.protocolMetrics != nil {
+						s.protocolMetrics.RecordNLIFallback()
+					}
+
+					// Heuristic comprehension (same as the else block)
 					switch outcome {
 					case OutcomeFollowed:
-						heuristicComp = 1.0
+						comprehension = 1.0
 					case OutcomePartialCompliance:
-						heuristicComp = 0.7
+						comprehension = 0.7
 					case OutcomeContradicted:
-						heuristicComp = 1.0
+						comprehension = 1.0
 					case OutcomeIgnored:
-						heuristicComp = 0.0
+						comprehension = 0.0
 					default:
-						heuristicComp = 0.5
+						comprehension = 0.5
 					}
-					s.calibrationTracker.Track(nliScore, heuristicComp)
+					// DO NOT record to protocolMetrics.RecordOutcomeWithTier (prevents metric poisoning)
+					// DO NOT feed to calibrationTracker.Track (prevents false bias alarm)
+				} else {
+					// Genuine NLI score — record to all pipelines
+					comprehension = nliScore
+					scoreSource = "nli"
+
+					slog.Info("j17-sidecar: NLI score computed",
+						"nli", nliScore, "heuristic", cr.Confidence, "constraint", item.ConstraintCode, "score_of_record", s.cfg.J17NLIScoreOfRecord)
+
+					// NLI feedback loop: Record NLI score to metrics in ALL modes (shadow/compare/canary/active).
+					// NLI is OBSERVATIONAL data — RSIC needs it regardless of arbitration mode.
+					if s.cfg.J17NLIObservationalEnabled && s.protocolMetrics != nil && item.ConstraintCode != "" {
+						s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
+					}
+
+					// NLI calibration: compare NLI with heuristic for bias detection
+					if s.calibrationTracker != nil {
+						var heuristicComp float64
+						switch outcome {
+						case OutcomeFollowed:
+							heuristicComp = 1.0
+						case OutcomePartialCompliance:
+							heuristicComp = 0.7
+						case OutcomeContradicted:
+							heuristicComp = 1.0
+						case OutcomeIgnored:
+							heuristicComp = 0.0
+						default:
+							heuristicComp = 0.5
+						}
+						s.calibrationTracker.Track(nliScore, heuristicComp)
+					}
 				}
 			} else {
 				// Heuristic fallback: map outcome to comprehension
@@ -1088,6 +1114,47 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}
 	}
 
+	// J17: Aggregate trust update — single update per feedback call, not per item.
+	// Prevents trust burst when multiple items are all "followed" in one call.
+	if s.trustScorer != nil && feedbackSessionID != "" && len(results) > 0 {
+		var followCount, ignoreCount, contradictCount int
+		for _, r := range results {
+			switch r.Outcome {
+			case OutcomeFollowed:
+				followCount++
+			case OutcomeIgnored:
+				ignoreCount++
+			case OutcomeContradicted:
+				contradictCount++
+			}
+		}
+		var aggregateOutcome GuidanceOutcome
+		switch {
+		case contradictCount > 0:
+			aggregateOutcome = OutcomeContradicted // any contradiction dominates
+		case followCount > ignoreCount:
+			aggregateOutcome = OutcomeFollowed
+		case ignoreCount > 0:
+			aggregateOutcome = OutcomeIgnored
+		default:
+			aggregateOutcome = OutcomeUnknown
+		}
+		if aggregateOutcome != OutcomeUnknown {
+			newTrust := s.trustScorer.RecordOutcome(feedbackSessionID, aggregateOutcome)
+
+			// B7: Invalidate WarmStore if trust crossed a tier threshold
+			if s.warmStore != nil {
+				highT := s.trustScorer.HighThreshold()
+				lowT := s.trustScorer.LowThreshold()
+				if (trustScoreForFeedback > highT && newTrust <= highT) ||
+					(trustScoreForFeedback >= lowT && newTrust < lowT) {
+					s.warmStore.Invalidate(req.SpaceID)
+				}
+			}
+			_ = newTrust // used above in threshold check
+		}
+	}
+
 	return &GuidanceFeedbackResponse{
 		GuidanceID: req.GuidanceID,
 		Results:    results,
@@ -1128,7 +1195,7 @@ func classifyOutcome(item GuidanceItem, actionLower string) (GuidanceOutcome, fl
 	if similarity >= 0.4 && hasNegation {
 		return OutcomeContradicted, similarity
 	}
-	if similarity >= 0.3 {
+	if similarity >= 0.5 {
 		return OutcomeFollowed, similarity
 	}
 	if similarity > 0.0 {
@@ -1283,6 +1350,91 @@ func (s *Service) GetTicketManager() *TicketManager {
 // SetCodeGenerator sets the J17 constraint code generator.
 func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
 	s.codeGenerator = gen
+}
+
+// SetWarmStore sets the warm store reference for trust-based invalidation (B7).
+func (s *Service) SetWarmStore(ws *WarmStore) {
+	s.warmStore = ws
+}
+
+// BootstrapCodes codifies all constraints that lack a constraint_code, breaking
+// the cold-start deadlock where no codes → all T3 → no T2 frequency → RSIC never fires.
+func (s *Service) BootstrapCodes(ctx context.Context, spaceID string) (int, error) {
+	if s.codeGenerator == nil || s.driver == nil {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.Run(ctx,
+		`MATCH (n:MemoryNode {space_id: $spaceId})
+		 WHERE n.role_type = 'constraint'
+		   AND (n.constraint_code IS NULL OR n.constraint_code = '')
+		 RETURN n.node_id AS nodeId, n.content AS content`,
+		map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return 0, fmt.Errorf("j17: bootstrap query: %w", err)
+	}
+
+	type uncoded struct {
+		nodeID  string
+		content string
+	}
+	var items []uncoded
+	for result.Next(ctx) {
+		rec := result.Record()
+		nid, _ := rec.Get("nodeId")
+		cont, _ := rec.Get("content")
+		if nid != nil && cont != nil {
+			items = append(items, uncoded{
+				nodeID:  nid.(string),
+				content: cont.(string),
+			})
+		}
+	}
+	if err := result.Err(); err != nil {
+		return 0, fmt.Errorf("j17: bootstrap iterate: %w", err)
+	}
+
+	if len(items) == 0 {
+		return 0, nil
+	}
+
+	codified := 0
+	writeSess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer writeSess.Close(ctx)
+
+	for _, item := range items {
+		code, genErr := s.codeGenerator.GenerateCode(ctx, "constraint", item.content)
+		if genErr != nil {
+			slog.Warn("j17: bootstrap codegen failed", "node_id", item.nodeID, "error", genErr)
+			continue
+		}
+
+		_, writeErr := writeSess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			cypher := `MATCH (n:MemoryNode)
+				WHERE n.node_id = $nodeId AND n.space_id = $spaceId
+				  AND (n.constraint_code IS NULL OR n.constraint_code = '')
+				SET n.constraint_code = $code,
+					n.constraint_code_assigned_at = datetime(),
+					n.constraint_code_assigned_by = "mdemg-bootstrap"
+				RETURN count(n) AS updated`
+			_, runErr := tx.Run(ctx, cypher, map[string]any{
+				"nodeId":  item.nodeID,
+				"spaceId": spaceID,
+				"code":    code,
+			})
+			return nil, runErr
+		})
+		if writeErr != nil {
+			slog.Warn("j17: bootstrap write failed", "node_id", item.nodeID, "error", writeErr)
+			continue
+		}
+		codified++
+	}
+
+	return codified, nil
 }
 
 // GetProtocolMetricsSnapshot returns an immutable snapshot of J17 protocol metrics.
