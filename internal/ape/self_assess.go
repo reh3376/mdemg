@@ -40,6 +40,7 @@ type Assessor struct {
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
 	synergyReader     SynergyFileReader     // Synergy: file metrics provider
 	freshnessProvider FreshnessProvider     // Phase 47.2: ingest staleness provider
+	reportCallback    func(*SelfAssessmentReport) // TSDB Sprint: called after Assess with the report
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
@@ -65,6 +66,12 @@ func (a *Assessor) SetSynergyReader(r SynergyFileReader) {
 // SetFreshnessProvider attaches an ingest freshness provider for staleness detection (Phase 47.2).
 func (a *Assessor) SetFreshnessProvider(p FreshnessProvider) {
 	a.freshnessProvider = p
+}
+
+// SetReportCallback sets a callback invoked after each Assess() with the report.
+// Used by LiveCollectors to cache the latest report for inter-cycle health publishing.
+func (a *Assessor) SetReportCallback(cb func(*SelfAssessmentReport)) {
+	a.reportCallback = cb
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -198,6 +205,11 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 
 	// Publish health sub-scores as Prometheus gauges for dashboard trending
 	a.publishHealthMetrics(report)
+
+	// TSDB Sprint: Cache report for LiveCollectors
+	if a.reportCallback != nil {
+		a.reportCallback(report)
+	}
 
 	return report, nil
 }

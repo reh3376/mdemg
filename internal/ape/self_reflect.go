@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"mdemg/internal/config"
+	"mdemg/internal/tsdb"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -18,6 +19,7 @@ type Reflector struct {
 	driver           neo4j.DriverWithContext
 	llmReflector     *LLMReflector
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics for reflection
+	tsdbClient       *tsdb.Client          // optional: TimescaleDB client for schema drift detection
 }
 
 // NewReflector creates a Reflector.
@@ -33,6 +35,11 @@ func (r *Reflector) SetLLMReflector(lr *LLMReflector) {
 // SetProtocolProvider attaches a J17 protocol stats provider for protocol reflection.
 func (r *Reflector) SetProtocolProvider(p ProtocolStatsProvider) {
 	r.protocolProvider = p
+}
+
+// SetTSDBClient attaches an optional TimescaleDB client for schema drift detection.
+func (r *Reflector) SetTSDBClient(c *tsdb.Client) {
+	r.tsdbClient = c
 }
 
 // Reflect examines the assessment report and returns ordered insights.
@@ -386,6 +393,26 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 			Value:             float64(report.StaleIngestSpaces),
 			Threshold:         0,
 		})
+	}
+
+	// Schema version drift between databases
+	if r.tsdbClient != nil {
+		tsdbVer, err := r.tsdbClient.GetSchemaVersion(ctx)
+		if err != nil {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "schema_drift_tsdb_unreachable",
+				Severity:          SeverityMedium,
+				Description:       fmt.Sprintf("TimescaleDB unreachable during schema check: %v", err),
+				RecommendedAction: "alert_tsdb_health",
+			})
+		} else if tsdbVer < r.cfg.TSDBRequiredSchemaVersion {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "schema_drift_detected",
+				Severity:          SeverityHigh,
+				Description:       fmt.Sprintf("TimescaleDB schema v%d behind required v%d", tsdbVer, r.cfg.TSDBRequiredSchemaVersion),
+				RecommendedAction: "alert_schema_drift",
+			})
+		}
 	}
 
 	// Phase AR-3: Merge LLM reflector insights (fail-open — rule-based results used alone on error)
