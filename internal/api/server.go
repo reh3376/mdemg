@@ -42,6 +42,7 @@ import (
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/transfer"
+	"mdemg/internal/tsdb"
 	"mdemg/internal/unts"
 	"mdemg/internal/validation"
 )
@@ -139,6 +140,13 @@ type Server struct {
 
 	// F4: Cross-Constraint Conflict Detection
 	conflictDetector *hidden.ConflictDetector
+
+	// TSDB Sprint: LiveCollectors for real-time Prometheus gauges
+	liveCollectors *ape.LiveCollectors
+
+	// TSDB Sprint: Historical metric writer
+	tsdbClient *tsdb.Client
+	tsdbWriter *tsdb.MetricWriter
 
 	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
 	graphMetricsCache struct {
@@ -814,6 +822,46 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		conflictDetector:        conflictDet,
 	}
 
+	// TSDB Sprint: Create LiveCollectors for real-time Prometheus gauges
+	if cfg.LiveMetricsEnabled {
+		var jiminyProv ape.JiminyStatsProvider
+		var protoProv ape.ProtocolStatsProvider
+		if jiminySvc != nil {
+			jiminyProv = &rsicJiminyAdapter{svc: jiminySvc}
+		}
+		if jiminySvc != nil && cfg.J17MetricsEnabled {
+			protoProv = &rsicProtocolAdapter{svc: jiminySvc}
+		}
+		s.liveCollectors = ape.NewLiveCollectors(
+			jiminyProv,
+			protoProv,
+			rsicAssessor,
+			cfg.RSICWatchdogSpaceID,
+			time.Duration(cfg.LiveGuidanceRefreshSec)*time.Second,
+		)
+		// Wire Assess() → LiveCollectors report cache bridge
+		rsicAssessor.SetReportCallback(s.liveCollectors.StoreReport)
+		slog.Info("live_collectors: enabled", "guidance_refresh_sec", cfg.LiveGuidanceRefreshSec)
+
+		// Bootstrap: run initial assessment so health gauges are non-zero immediately
+		go func() {
+			time.Sleep(10 * time.Second)
+			if rsicAssessor != nil {
+				slog.Info("rsic: running bootstrap assessment")
+				report, err := rsicAssessor.Assess(context.Background(), cfg.RSICWatchdogSpaceID, ape.TierMeso)
+				if err != nil {
+					slog.Warn("rsic: bootstrap assessment failed", "error", err)
+					return
+				}
+				slog.Info("rsic: bootstrap assessment complete",
+					"overall_health", report.OverallHealth,
+					"protocol_health", report.ProtocolHealth,
+					"guidance_health", report.GuidanceHealth,
+				)
+			}
+		}()
+	}
+
 	// Phase 47.2: Set trigger callback now that Server is constructed
 	if freshnessAdapter != nil {
 		freshnessAdapter.triggerFn = s.runScheduledSyncCheck
@@ -845,6 +893,24 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	return s
 }
 
+// SetTSDBClient attaches an optional TimescaleDB client and creates a MetricWriter.
+// Called from serve.go when TSDB is enabled and connected.
+func (s *Server) SetTSDBClient(client *tsdb.Client) {
+	s.tsdbClient = client
+	if client != nil {
+		s.tsdbWriter = tsdb.NewMetricWriter(
+			client,
+			s.cfg.RSICWatchdogSpaceID,
+			time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+		)
+		// Wire TSDB client into RSIC reflector for schema drift detection
+		if s.rsicCycle != nil {
+			s.rsicCycle.SetTSDBClient(client)
+		}
+		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
+	}
+}
+
 // Shutdown gracefully stops background services
 func (s *Server) Shutdown() {
 	if s.apeScheduler != nil {
@@ -870,6 +936,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.backupScheduler != nil {
 		s.backupScheduler.Stop()
+	}
+	if s.tsdbWriter != nil {
+		s.tsdbWriter.Close()
 	}
 }
 
@@ -1437,6 +1506,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/node/meta", s.handleNodeMeta)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/prometheus", s.handlePrometheusMetrics)
+	mux.HandleFunc("/v1/metrics/trends", s.handleMetricsTrends)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
 	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
 	mux.HandleFunc("/v1/memory/consolidate", s.handleConsolidate)
@@ -2003,8 +2073,8 @@ func parseDockerSize(s string) float64 {
 		"GB":  1000 * 1000 * 1000,
 	}
 	for suffix, mult := range multipliers {
-		if strings.HasSuffix(s, suffix) {
-			val, err := strconv.ParseFloat(strings.TrimSuffix(s, suffix), 64)
+		if trimmed, ok := strings.CutSuffix(s, suffix); ok {
+			val, err := strconv.ParseFloat(trimmed, 64)
 			if err == nil {
 				return val * mult
 			}
@@ -2057,6 +2127,22 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 		// Collect memory metrics (Phase 48.4.4)
 		if s.memoryPressure != nil {
 			m.CollectMemoryMetrics(s.memoryPressure.HeapUsageMB()*1024*1024, s.memoryPressure.RejectedCount())
+		}
+
+		// TSDB Sprint: Collect live RSIC/J17/Jiminy metrics (every scrape)
+		if s.liveCollectors != nil {
+			s.liveCollectors.CollectProtocolMetrics()
+			s.liveCollectors.CollectGuidanceMetrics()
+			s.liveCollectors.CollectHealthMetrics()
+		}
+
+		// TSDB Sprint: Record gauge snapshot to TSDB writer (batched)
+		// The writer's auto-flush ticker handles the actual DB writes at the configured interval.
+		if s.tsdbWriter != nil && s.liveCollectors != nil {
+			gauges := s.liveCollectors.LastGaugeValues()
+			if len(gauges) > 0 {
+				s.tsdbWriter.RecordGaugeSnapshot(gauges, "live", "nominal")
+			}
 		}
 	}
 

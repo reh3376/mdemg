@@ -1,0 +1,81 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Metrics Trends",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "metrics",
+      "tsdb",
+      "trends",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "Validates historical metric trend queries against TimescaleDB",
+    "test_type": "contract",
+    "priority": "medium",
+    "phase": "tsdb-sprint",
+    "requires_tsdb": true
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "cab66ffa26e8ae81a170efb16fbce62b1af3655cd5fb65f6edabc5f52b7b4235"
+  },
+  "variables": {
+    "test_space": "mdemg-dev",
+    "metric": "rsic_health_overall",
+    "trend_from": "{{TREND_FROM}}",
+    "trend_to": "{{TREND_TO}}",
+    "granularity": "daily"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/metrics/trends",
+    "query": {
+      "space_id": "${test_space}",
+      "metric": "${metric}",
+      "from": "${trend_from}",
+      "to": "${trend_to}",
+      "granularity": "${granularity}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$",
+        "op": "type_is",
+        "expected": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "with_data",
+      "description": "When data exists in the time range, response contains metric points",
+      "expected": {
+        "body_assertions": [
+          {
+            "path": "$",
+            "op": "type_is",
+            "expected": "array"
+          },
+          {
+            "path": "$[0].time",
+            "op": "type_is",
+            "expected": "string"
+          },
+          {
+            "path": "$[0].value",
+            "op": "type_is",
+            "expected": "number"
+          }
+        ]
+      }
+    }
+  ]
+}

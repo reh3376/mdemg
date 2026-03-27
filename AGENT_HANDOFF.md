@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-25
+**Date:** 2026-03-27
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -38,11 +38,18 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
+- J17 Feedback Loop Closure — COMPLETE (state file bridge, hook feedback delivery, control char sanitization, bootstrap codification)
+- Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/20/21/26/27 done, claude .md ingestion done)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-25
+- CI: ALL GREEN (push + pull_request + release) as of 2026-03-27
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-03-27) ===
+- ✅ J17 Feedback Loop Closure — State file bridge, hook feedback delivery, control char sanitization, bootstrap codification
+- ✅ Prometheus Observability — Cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules
+- ✅ TSDB Sprint infrastructure — Live collectors, trend analyzer, Grafana dashboards
+
 === GAP ANALYSIS Phase 4 (in progress) ===
 1. ✅ GAP-18: slog migration — ALL waves complete (internal/ + cmd/ + plugins/)
 2. ✅ GAP-02: Obsidian vault ingestion — v2 complete (parser, walker, Sync RPC, CI, release packaging, docs)
@@ -55,6 +62,10 @@ WHAT REMAINS TO BE DONE:
 7. ✅ Phase 47.2 — APE INGEST scheduled sync (freshness tracking + RSIC pipeline wired: assess, reflect, plan, dispatch)
 9. TESTING: SSE streaming — accepted limitation (GAP-05: 14 Go unit tests cover streaming; UATS spec documents gap)
 10. RESEARCH: AutoResearch integration analysis (docs/development/)
+
+=== LIVE VERIFICATION NEEDED ===
+11. J17 feedback loop live test — hooks fire automatically in new sessions; verify state file + feedback delivery + trust progression
+12. Server-side control char fix — guidance responses contain raw U+0000-U+001F in JSON strings; fix at source in writeJSON() or encoder
 
 === Gap Analysis — COMPLETED items (Phases 1-3 + partial Phase 4) ===
 - Phase 1 (Quick Wins): GAP-06/-07/-12/-15/-17/-25 — doc/config fixes (+ sprint review remediations: GAP-01 plugin bridge, GAP-06 volume migration, GAP-25 Windows README, GAP-30 UATS assertions)
@@ -70,7 +81,7 @@ WHAT REMAINS TO BE DONE:
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
 
 REPO STATE:
-- Branch: reh3376_dev01 — pushed, auto-PR workflow creates/updates PR to main
+- Branch: reh3376_dev01 — uncommitted changes from TSDB sprint + J17 feedback loop fix (40+ files)
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
 - CRITICAL: ALWAYS use `docker compose up -d neo4j` to preserve CMS data. Never `mdemg db start` for CMS.
@@ -349,6 +360,8 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 85 | Auth/Security/Perf Stabilization | ✅ | USTS+UBTS active, UAMS runner active (GAP-21) |
 | 86 | UVTS Activation | ✅ | Runner active with inline grading (GAP-04), CI soft-fail |
 | Synergy | Claude Code ↔ MDEMG Optimization | ✅ | `docs/features/synergy-optimization.md` |
+| J17-FL | J17 Feedback Loop Closure | ✅ | `docs/features/j17-feedback-loop-closure.md` — state file bridge, hook feedback, control char fix, bootstrap codification |
+| PROM | Prometheus Observability Monitoring | ✅ | `docs/features/prometheus-observability-monitoring.md` — cache hit metrics, bootstrap assessment, self-monitoring, 4 alert rules |
 | Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
 
 ### Phase Numbering Convention
@@ -366,12 +379,14 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | J17 | — | AI-to-AI Communication Protocol |
 | FSD | — | Constraint Lifecycle & Neural Re-Ranker |
 | AR | — | AutoResearch Integration |
+| J17-FL | — | J17 Feedback Loop Closure |
+| PROM | — | Prometheus Observability Monitoring |
 
 ---
 
 ## 5. Open Work Items
 
-### Gap Analysis Phase 4 — Next Dev Session (2026-03-25)
+### Gap Analysis Phase 4 — Status as of 2026-03-27
 
 Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
@@ -407,6 +422,11 @@ Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{spac
 | Auto-credentials | `internal/cli/init.go`, `db.go` | `generatePassword()` via crypto/rand, env var fallback (GAP-19) |
 | UAMS runner | `docs/tests/uams/runners/uams_runner.py` | 4 auth specs, 104 assertions (GAP-21) |
 | Submodule changelogs | `packaging/*/CHANGELOG.md` | Keep a Changelog format for all 6 packaging submodules (GAP-27) |
+| J17 feedback state file | `~/.mdemg/.jiminy-guidance-state` | Bridges prompt-context.sh (writes guidance_id) and post-tool-observe.py (reads, sends feedback) |
+| Feedback cooldown file | `~/.mdemg/.jiminy-last-feedback` | Touched after each feedback submission; 30s cooldown between submissions |
+| Prometheus alerts | `deploy/docker/prometheus/alerts/observability.yaml` | 4 alert rules: scrape target down, prometheus unhealthy, scrape slowdown, storage high |
+| Cache hit metrics | `internal/jiminy/service.go:recordCacheHitMetrics()` | Records J17 protocol metrics on cached guidance responses |
+| Bootstrap RSIC assessment | `internal/api/server.go` | Goroutine runs Assess() 10s after startup to populate health gauges |
 
 ---
 
@@ -452,6 +472,8 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 |-------|----------|-------|
 | ~~Obsidian integration v2 in progress~~ | ~~Low~~ | ~~COMPLETE (2026-03-25)~~ — Phase 45.4 fully closed: v2 committed (parser+walker+yaml.v3+full Sync, 23 unit tests), CI gate, GoReleaser 4-platform builds, Homebrew+Scoop+.deb packaging, Windows release, ingestion-guide docs. |
 | ~~Claude .md files not ingested into CMS~~ | ~~High~~ | ~~FIXED (2026-03-25)~~ — `mdemg ingest-claude-md` command with SHA256 content-hash change detection. 15 files tracked (3 in-repo, 6 auto-memory, 6 plans). Hooks: session-start (background), pre-compact (forced), post-tool-observe (on Write/Edit). `GET /v1/memory/node/meta` endpoint for hash comparison. |
+| Guidance response control characters | Medium | LLM-generated guidance text contains JSON control chars (U+0000–U+001F). Workaround: `perl` sanitization in hooks. Server-side fix in `writeJSON()` or encoder would eliminate client workaround. |
+| J17 tier graduation — live verification pending | Info | Feedback loop code is implemented and integration-tested but has not yet been verified in a live Claude Code session. Needs session restart to test hooks end-to-end. |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -525,4 +547,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-25 — Claude .md file ingestion infrastructure COMPLETE: `mdemg ingest-claude-md` CLI with SHA256 content-hash change detection, `GET /v1/memory/node/meta` endpoint, 3 hook integration points (session-start, pre-compact, post-tool-observe), 15 files tracked. Also: `pruned_at` added to tombstoning, dead `bin/ingest-codebase` reference fixed. 196 UATS specs, 213+ Go test files, CI all green.*
+*Last updated: 2026-03-27 — J17 feedback loop closure COMPLETE: state file bridge between hooks, automated feedback delivery, control char sanitization, bootstrap codification trigger. Prometheus observability monitoring COMPLETE: cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules. 3 new feature docs, 5 new integration tests, 10 new unit tests. Build clean, lint 0 issues, all integration tests pass.*

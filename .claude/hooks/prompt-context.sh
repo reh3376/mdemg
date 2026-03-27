@@ -76,21 +76,37 @@ echo "═══ END CMS RECALL ═══"
 # --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
 # Reads pre-computed guidance instantly (<100ms) from warm store.
 # Then triggers async warm-up for NEXT prompt with current context.
-GUIDANCE=$(curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
-  --connect-timeout 1 --max-time 2 2>/dev/null) || true
+# NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
+# string values. Shell variable expansion + echo corrupts these bytes, so we write
+# to a temp file and parse with jq directly from the file.
+GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
+curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
+  --connect-timeout 1 --max-time 2 2>/dev/null | \
+  perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
 
-if [ -n "$GUIDANCE" ]; then
-  WARM=$(echo "$GUIDANCE" | jq -r '.warm // false' 2>/dev/null)
-  AUGMENTATION=$(echo "$GUIDANCE" | jq -r '.data.prompt_augmentation // empty' 2>/dev/null)
-  AGE_MS=$(echo "$GUIDANCE" | jq -r '.age_ms // "?"' 2>/dev/null)
+if [ -s "$GUIDANCE_TMP" ]; then
+  WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
+  AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
+
+  # J17: Capture guidance_id for feedback loop closure
+  GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  if [ -n "$GUIDANCE_ID" ] && [ "$WARM" = "true" ]; then
+    mkdir -p ~/.mdemg 2>/dev/null || true
+    printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
+      "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+  fi
+
   if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
     echo ""
-    echo "$AUGMENTATION"
+    printf '%s\n' "$AUGMENTATION"
     if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
       echo "[guidance age: ${AGE_MS}ms — may be stale]"
     fi
   fi
 fi
+GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
+rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 
 # Fire-and-forget: warm guidance for NEXT prompt with current context
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
@@ -118,5 +134,4 @@ fi
 
 # Synergy: token count footer for recall + guidance
 RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
-GUIDANCE_TOKENS=$(echo "${GUIDANCE:-}" | wc -c | tr -d ' ')
-echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_TOKENS}]"
+echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_BYTES:-0}]"

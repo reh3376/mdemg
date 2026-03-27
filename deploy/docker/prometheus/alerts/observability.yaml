@@ -1,0 +1,50 @@
+# MDEMG Observability Alerting Rules
+# Monitors Prometheus health and scrape target availability
+
+groups:
+  - name: mdemg_observability
+    interval: 30s
+    rules:
+      # Any scrape target is down
+      - alert: MDEMGScrapeTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} is down"
+          description: "Prometheus cannot reach {{ $labels.instance }} (job={{ $labels.job }}) for >2m. Check service health."
+
+      # Prometheus blackbox probe failing for self-health
+      - alert: MDEMGPrometheusUnhealthy
+        expr: probe_success{job="service-health", instance=~".*9090.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Prometheus health check failing"
+          description: "Prometheus /-/healthy endpoint is not returning 200. Check Prometheus container logs."
+
+      # Scrape duration increasing (early warning)
+      - alert: MDEMGPrometheusScrapeSlowdown
+        expr: scrape_duration_seconds{job="mdemg-api"} > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "MDEMG API scrape taking >5s"
+          description: "Prometheus scrape of {{ $labels.instance }} is taking {{ $value | printf \"%.1f\" }}s. Possible performance degradation."
+
+      # TSDB storage approaching limits
+      - alert: MDEMGPrometheusStorageHigh
+        expr: (prometheus_tsdb_storage_blocks_bytes / 1e9) > 5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Prometheus storage exceeds 5GB"
+          description: "Prometheus TSDB is using {{ $value | printf \"%.1f\" }}GB. Consider adjusting retention or adding storage."

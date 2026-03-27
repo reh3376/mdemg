@@ -21,6 +21,7 @@ import (
 	"mdemg/internal/db"
 	mlog "mdemg/internal/logging"
 	"mdemg/internal/plugins"
+	"mdemg/internal/tsdb"
 	"mdemg/migrations"
 )
 
@@ -113,6 +114,60 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		return fmt.Errorf("schema version check failed: %w", err)
 	}
 
+	// TimescaleDB initialization (if enabled)
+	var tsdbClient *tsdb.Client
+	if cfg.TSDBEnabled {
+		tsdbCfg := tsdb.Config{
+			Host:     cfg.TSDBHost,
+			Port:     cfg.TSDBPort,
+			User:     cfg.TSDBUser,
+			Password: cfg.TSDBPassword,
+			Database: cfg.TSDBDatabase,
+			SSLMode:  cfg.TSDBSSLMode,
+			MaxConns: int32(cfg.TSDBMaxConns),
+		}
+		tc, tsdbErr := tsdb.NewClient(context.Background(), tsdbCfg)
+		if tsdbErr != nil {
+			if cfg.TSDBOptional {
+				slog.Warn("TimescaleDB unavailable (TSDB_OPTIONAL=true), continuing without TSDB", "error", tsdbErr)
+			} else {
+				return fmt.Errorf("TimescaleDB connection failed: %w", tsdbErr)
+			}
+		} else {
+			tsdbClient = tc
+			defer tsdbClient.Close()
+
+			// Auto-migrate TimescaleDB if requested
+			if autoMigrate {
+				if migrateErr := tsdbClient.Migrate(context.Background()); migrateErr != nil {
+					if cfg.TSDBOptional {
+						slog.Warn("TimescaleDB migration failed (TSDB_OPTIONAL=true)", "error", migrateErr)
+					} else {
+						return fmt.Errorf("tsdb migration: %w", migrateErr)
+					}
+				} else {
+					slog.Info("auto-migrate: TimescaleDB migrations applied")
+				}
+			}
+
+			// Schema version enforcement
+			tsdbVer, verErr := tsdbClient.GetSchemaVersion(context.Background())
+			if verErr != nil {
+				if !cfg.TSDBOptional {
+					return fmt.Errorf("TimescaleDB schema check failed: %w", verErr)
+				}
+				slog.Warn("TimescaleDB schema check failed (TSDB_OPTIONAL=true)", "error", verErr)
+			} else if tsdbVer < cfg.TSDBRequiredSchemaVersion {
+				if !cfg.TSDBOptional {
+					return fmt.Errorf("TimescaleDB schema version %d < required %d — run: mdemg tsdb migrate", tsdbVer, cfg.TSDBRequiredSchemaVersion)
+				}
+				slog.Warn("TimescaleDB schema version behind", "have", tsdbVer, "required", cfg.TSDBRequiredSchemaVersion)
+			} else {
+				slog.Info("TimescaleDB ready", "schema_version", tsdbVer)
+			}
+		}
+	}
+
 	// Initialize Plugin Manager if enabled
 	var pluginMgr *plugins.Manager
 	if cfg.PluginsEnabled {
@@ -126,6 +181,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	}
 
 	srv := api.NewServer(cfg, driver, pluginMgr)
+
+	// Wire TimescaleDB client if available
+	if tsdbClient != nil {
+		srv.SetTSDBClient(tsdbClient)
+	}
 
 	// Start periodic conversation memory consolidation (every 5 minutes)
 	srv.StartPeriodicConsolidation("mdemg-dev", 5*time.Minute)

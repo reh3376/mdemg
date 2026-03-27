@@ -317,6 +317,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// F10: Check cache for fast path (session-scoped key prevents cross-session contamination)
 	if s.cache != nil {
 		if cached, ok := s.cache.Get(req.SpaceID, req.SessionID, req.Context); ok {
+			s.recordCacheHitMetrics(cached)
 			return cached, nil
 		}
 	}
@@ -810,6 +811,42 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	return resp, nil
+}
+
+// recordCacheHitMetrics records J17 protocol metrics for a cache-hit guidance response,
+// ensuring TotalEvents is incremented even when the full Guide path is skipped.
+func (s *Service) recordCacheHitMetrics(resp GuidanceResponse) {
+	if s.protocolMetrics == nil || s.encoder == nil || !s.cfg.J17Enabled {
+		return
+	}
+	var constraintTotal, constraintWithCode int
+	for _, item := range resp.Guidance {
+		codes := []string{}
+		if item.ConstraintCode != "" {
+			codes = []string{item.ConstraintCode}
+		} else if item.Type == GuidanceConstraint && len(item.SourceNodes) > 0 {
+			// Gap 5: Track uncoded constraints by node ID for T2 frequency visibility
+			codes = []string{item.SourceNodes[0]}
+		}
+		// Estimate token count based on tier
+		tokenEst := 80 // T3 baseline
+		if item.Tier == TierCoded {
+			tokenEst = 15
+		} else if item.Tier == TierTelegraphic {
+			tokenEst = 50
+		}
+		s.protocolMetrics.RecordGuidance(item.Tier, tokenEst, codes)
+
+		// Gap 1: Count constraint items and coded constraints
+		if item.Type == GuidanceConstraint {
+			constraintTotal++
+			if item.ConstraintCode != "" {
+				constraintWithCode++
+			}
+		}
+	}
+	// Gap 1: Record code coverage so Snapshot().CodeCoverage reflects reality
+	s.protocolMetrics.RecordConstraintCoverage(constraintTotal, constraintWithCode)
 }
 
 // constraintPriority maps constraint types to priorities.

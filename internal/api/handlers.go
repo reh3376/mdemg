@@ -17,11 +17,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
+	"mdemg/internal/ape"
 	"mdemg/internal/db"
 	"mdemg/internal/jobs"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
+	"mdemg/internal/tsdb"
 )
 
 // ProtectedSpaces contains space IDs that cannot be deleted.
@@ -189,6 +191,39 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 			Status:  "degraded",
 			Message: "enabled but service unavailable",
 		}
+	}
+
+	// Check 7: TimescaleDB schema version (if enabled)
+	if s.tsdbClient != nil {
+		tsdbStart := time.Now()
+		tsdbVer, tsdbErr := s.tsdbClient.GetSchemaVersion(ctx)
+		if tsdbErr != nil {
+			status.Checks["timescaledb"] = HealthCheck{
+				Status:  "unhealthy",
+				Message: fmt.Sprintf("connection failed: %v", tsdbErr),
+				Latency: time.Since(tsdbStart).String(),
+			}
+			overallHealthy = false
+		} else if tsdbVer < s.cfg.TSDBRequiredSchemaVersion {
+			status.Checks["timescaledb"] = HealthCheck{
+				Status:  "unhealthy",
+				Message: fmt.Sprintf("schema version %d < required %d — run: mdemg tsdb migrate", tsdbVer, s.cfg.TSDBRequiredSchemaVersion),
+				Latency: time.Since(tsdbStart).String(),
+			}
+			overallHealthy = false
+		} else {
+			status.Checks["timescaledb"] = HealthCheck{
+				Status:  "healthy",
+				Message: fmt.Sprintf("schema version %d", tsdbVer),
+				Latency: time.Since(tsdbStart).String(),
+			}
+		}
+	} else if s.cfg.TSDBEnabled {
+		status.Checks["timescaledb"] = HealthCheck{
+			Status:  "unhealthy",
+			Message: "TSDB_ENABLED=true but client not initialized — check connection config",
+		}
+		overallHealthy = false
 	}
 
 	// Determine overall status
@@ -3724,4 +3759,98 @@ func (s *Server) handleNeo4jOverview(w http.ResponseWriter, r *http.Request) {
 	resp.Backups = backupOverview
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleMetricsTrends serves historical metric trend data from TimescaleDB.
+// GET /v1/metrics/trends?space_id=X&metric=Y&from=Z&to=W&granularity=daily
+func (s *Server) handleMetricsTrends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	if s.tsdbClient == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "TimescaleDB not available"})
+		return
+	}
+
+	q := r.URL.Query()
+	spaceID := q.Get("space_id")
+	metric := q.Get("metric")
+	fromStr := q.Get("from")
+	toStr := q.Get("to")
+	granularity := q.Get("granularity")
+
+	if spaceID == "" || metric == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "space_id and metric are required"})
+		return
+	}
+
+	now := time.Now()
+	from := now.AddDate(0, 0, -30) // default: last 30 days
+	to := now
+
+	if fromStr != "" {
+		parsed, err := time.Parse(time.RFC3339, fromStr)
+		if err != nil {
+			// Try date-only format
+			parsed, err = time.Parse("2006-01-02", fromStr)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid 'from' timestamp (use RFC3339 or YYYY-MM-DD)"})
+				return
+			}
+		}
+		from = parsed
+	}
+	if toStr != "" {
+		parsed, err := time.Parse(time.RFC3339, toStr)
+		if err != nil {
+			parsed, err = time.Parse("2006-01-02", toStr)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid 'to' timestamp (use RFC3339 or YYYY-MM-DD)"})
+				return
+			}
+		}
+		to = parsed
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	analyzer := ape.NewTrendAnalyzer(s.tsdbClient)
+	points, err := analyzer.Query(ctx, tsdb.MetricQuery{
+		SpaceID:     spaceID,
+		MetricName:  metric,
+		From:        from,
+		To:          to,
+		Granularity: granularity,
+	})
+	if err != nil {
+		slog.Error("metrics/trends query failed", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "query failed"})
+		return
+	}
+
+	// Return as array (empty array if no data — matches UATS spec)
+	type trendPoint struct {
+		Time       string  `json:"time"`
+		Value      float64 `json:"value"`
+		MinValue   float64 `json:"min_value,omitempty"`
+		MaxValue   float64 `json:"max_value,omitempty"`
+		Count      int64   `json:"count,omitempty"`
+		QualityTag string  `json:"quality_tag,omitempty"`
+	}
+	result := make([]trendPoint, 0, len(points))
+	for _, p := range points {
+		result = append(result, trendPoint{
+			Time:       p.Time.Format(time.RFC3339),
+			Value:      p.Value,
+			MinValue:   p.MinValue,
+			MaxValue:   p.MaxValue,
+			Count:      p.Count,
+			QualityTag: p.QualityTag,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }

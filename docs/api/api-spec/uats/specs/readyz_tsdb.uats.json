@@ -1,0 +1,86 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Readyz TSDB Check",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "health",
+      "tsdb",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "Validates that /readyz reports TimescaleDB schema version when TSDB is enabled",
+    "test_type": "contract",
+    "priority": "high",
+    "phase": "tsdb-sprint",
+    "requires_tsdb": true
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "c47da3fc99979f911e268ef37080eecbf7757b55ab798d34a0a102dcbd6f2ba5"
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/readyz"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "one_of",
+        "expected": [
+          "ready",
+          "degraded"
+        ]
+      },
+      {
+        "path": "$.checks.timescaledb",
+        "op": "exists",
+        "expected": true
+      },
+      {
+        "path": "$.checks.timescaledb.status",
+        "op": "one_of",
+        "expected": [
+          "healthy",
+          "degraded",
+          "unhealthy"
+        ]
+      },
+      {
+        "path": "$.checks.timescaledb.message",
+        "op": "type_is",
+        "expected": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "tsdb_healthy",
+      "description": "When TSDB is migrated and connected, check reports healthy",
+      "expected": {
+        "body_assertions": [
+          {
+            "path": "$.checks.timescaledb.status",
+            "op": "equals",
+            "expected": "healthy"
+          },
+          {
+            "path": "$.checks.timescaledb.message",
+            "op": "contains",
+            "expected": "schema version"
+          }
+        ]
+      }
+    }
+  ]
+}

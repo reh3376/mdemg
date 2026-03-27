@@ -763,6 +763,26 @@ type Config struct {
 	SynergyRecoveryBufferPath       string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
 	SynergyRecoveryBufferMaxEntries int    // SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES — max JSONL entries before FIFO eviction (default: 50)
 	SynergyRecoveryAutoFlush        bool   // SYNERGY_RECOVERY_AUTO_FLUSH — auto-flush buffer on Jiminy recovery at session start (default: true)
+
+	// ===== TimescaleDB (Historical Metrics + FT Data) =====
+
+	TSDBEnabled               bool   // TSDB_ENABLED — enable TimescaleDB metric storage (default: false)
+	TSDBHost                  string // TSDB_HOST — TimescaleDB host (default: "localhost")
+	TSDBPort                  int    // TSDB_PORT — TimescaleDB port (default: 5432)
+	TSDBUser                  string // TSDB_USER — TimescaleDB user (default: "mdemg")
+	TSDBPassword              string // TSDB_PASSWORD — TimescaleDB password (default: "mdemg_metrics")
+	TSDBDatabase              string // TSDB_DATABASE — TimescaleDB database (default: "mdemg_metrics")
+	TSDBSSLMode               string // TSDB_SSL_MODE — SSL mode for TimescaleDB (default: "disable")
+	TSDBMaxConns              int    // TSDB_MAX_CONNS — max connection pool size (default: 10)
+	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
+	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
+	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 2)
+	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
+
+	// Live Metrics (Prometheus collect-on-scrape)
+	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on Prometheus scrape (default: true)
+	LiveGuidanceRefreshSec      int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -772,6 +792,38 @@ func (c Config) EffectiveLLMEndpoint() string {
 		return c.LLMEndpoint
 	}
 	return c.OpenAIEndpoint
+}
+
+// TSDBConfig returns a tsdb.Config derived from the main config.
+// NOTE: This returns a struct compatible with internal/tsdb.Config but defined here
+// to avoid a circular import. The caller constructs tsdb.Config from these values.
+type TSDBConnConfig struct {
+	Host                string
+	Port                int
+	User                string
+	Password            string
+	Database            string
+	SSLMode             string
+	MaxConns            int
+	FlushIntervalSec    int
+	RawRetentionDays    int
+	HourlyRetentionDays int
+}
+
+// GetTSDBConnConfig returns TimescaleDB connection settings.
+func (c Config) GetTSDBConnConfig() TSDBConnConfig {
+	return TSDBConnConfig{
+		Host:                c.TSDBHost,
+		Port:                c.TSDBPort,
+		User:                c.TSDBUser,
+		Password:            c.TSDBPassword,
+		Database:            c.TSDBDatabase,
+		SSLMode:             c.TSDBSSLMode,
+		MaxConns:            c.TSDBMaxConns,
+		FlushIntervalSec:    c.TSDBFlushIntervalSec,
+		RawRetentionDays:    c.TSDBRawRetentionDays,
+		HourlyRetentionDays: c.TSDBHourlyRetentionDays,
+	}
 }
 
 func FromEnv() (Config, error) {
@@ -2987,6 +3039,46 @@ func FromEnv() (Config, error) {
 	}
 	synergyRecoveryAutoFlush := getBool("SYNERGY_RECOVERY_AUTO_FLUSH", true)
 
+	// TimescaleDB settings
+	tsdbEnabled := getBool("TSDB_ENABLED", false)
+	tsdbHost := get("TSDB_HOST", "localhost")
+	tsdbPort, err := atoi("TSDB_PORT", 5432)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbUser := get("TSDB_USER", "mdemg")
+	tsdbPassword := get("TSDB_PASSWORD", "mdemg_metrics")
+	tsdbDatabase := get("TSDB_DATABASE", "mdemg_metrics")
+	tsdbSSLMode := get("TSDB_SSL_MODE", "disable")
+	tsdbMaxConns, err := atoi("TSDB_MAX_CONNS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbFlushIntervalSec, err := atoi("TSDB_FLUSH_INTERVAL_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbRawRetentionDays, err := atoi("TSDB_RAW_RETENTION_DAYS", 90)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbHourlyRetentionDays, err := atoi("TSDB_HOURLY_RETENTION_DAYS", 365)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbOptional := getBool("TSDB_OPTIONAL", true)
+
+	// Live Metrics settings
+	liveMetricsEnabled := getBool("LIVE_METRICS_ENABLED", true)
+	liveGuidanceRefreshSec, err := atoi("LIVE_GUIDANCE_REFRESH_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -3569,6 +3661,25 @@ func FromEnv() (Config, error) {
 		SynergyRecoveryBufferPath:       synergyRecoveryBufferPath,
 		SynergyRecoveryBufferMaxEntries: synergyRecoveryBufferMaxEntries,
 		SynergyRecoveryAutoFlush:        synergyRecoveryAutoFlush,
+
+		// TimescaleDB
+		TSDBEnabled:               tsdbEnabled,
+		TSDBHost:                  tsdbHost,
+		TSDBPort:                  tsdbPort,
+		TSDBUser:                  tsdbUser,
+		TSDBPassword:              tsdbPassword,
+		TSDBDatabase:              tsdbDatabase,
+		TSDBSSLMode:               tsdbSSLMode,
+		TSDBMaxConns:              tsdbMaxConns,
+		TSDBFlushIntervalSec:      tsdbFlushIntervalSec,
+		TSDBRawRetentionDays:      tsdbRawRetentionDays,
+		TSDBHourlyRetentionDays:   tsdbHourlyRetentionDays,
+		TSDBRequiredSchemaVersion: tsdbRequiredSchemaVersion,
+		TSDBOptional:              tsdbOptional,
+
+		// Live Metrics
+		LiveMetricsEnabled:     liveMetricsEnabled,
+		LiveGuidanceRefreshSec: liveGuidanceRefreshSec,
 	}, nil
 }
 

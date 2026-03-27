@@ -436,6 +436,47 @@
           "min": 0
         }
       }
+    },
+    {
+      "title": "Historical Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "panels": []
+    },
+    {
+      "title": "Graph Growth Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT bucket AS time, avg_value AS value FROM metrics_hourly WHERE metric_name = 'rsic_health_overall' AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "mean", "min", "max"]
+        }
+      }
     }
   ],
   "schemaVersion": 30,

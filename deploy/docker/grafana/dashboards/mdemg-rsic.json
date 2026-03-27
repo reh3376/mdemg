@@ -719,6 +719,47 @@
           }
         }
       }
+    },
+    {
+      "title": "Historical Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 74 },
+      "panels": []
+    },
+    {
+      "title": "RSIC Health Dimensions Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 75 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('rsic_health_overall','rsic_health_retrieval','rsic_health_memory','rsic_health_edge','rsic_health_task','rsic_health_guidance','rsic_health_protocol','rsic_health_synergy') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "mean", "min", "max"]
+        }
+      }
     }
   ],
   "refresh": "30s",
@@ -752,7 +793,7 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(mdemg_rsic_health_overall, space_id)",
+          "query": "label_values(mdemg_rsic_health_overall{space_id!~\"test-.*\"}, space_id)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,

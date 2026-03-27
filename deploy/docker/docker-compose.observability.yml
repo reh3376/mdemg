@@ -43,6 +43,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/dashboards/mdemg-overview.json"
       GF_INSTALL_PLUGINS: "kniepdennis-neo4j-datasource,hamedkarbasi93-nodegraphapi-datasource"
+      TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -52,7 +53,26 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - prometheus
+      - timescaledb
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    restart: unless-stopped
+    ports:
+      - "${TSDB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: mdemg
+      POSTGRES_PASSWORD: ${TSDB_PASSWORD:-mdemg_metrics}
+      POSTGRES_DB: mdemg_metrics
+    volumes:
+      - tsdb_data:/home/postgres/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdemg -d mdemg_metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   prometheus-data:
   grafana-data:
+  tsdb_data:

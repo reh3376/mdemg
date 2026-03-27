@@ -367,6 +367,47 @@
       "fieldConfig": {
         "defaults": {}
       }
+    },
+    {
+      "title": "Historical Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "panels": []
+    },
+    {
+      "title": "Guidance Follow Rate Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('jiminy_follow_rate','jiminy_constraint_effectiveness','jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "mean", "min", "max"]
+        }
+      }
     }
   ],
   "schemaVersion": 39,
@@ -387,8 +428,8 @@
         "label": "Space ID",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(mdemg_jiminy_guidance_total, space_id)",
-        "query": { "query": "label_values(mdemg_jiminy_guidance_total, space_id)", "refId": "StandardVariableQuery" },
+        "definition": "label_values(mdemg_jiminy_guidance_total{space_id!~\"test-.*\"}, space_id)",
+        "query": { "query": "label_values(mdemg_jiminy_guidance_total{space_id!~\"test-.*\"}, space_id)", "refId": "StandardVariableQuery" },
         "refresh": 2,
         "sort": 1,
         "includeAll": false,

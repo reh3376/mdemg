@@ -10,6 +10,7 @@ import (
 
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
+	"mdemg/internal/tsdb"
 )
 
 // RunCycleOpts carries optional parameters for RunCycle.
@@ -321,6 +322,13 @@ func (c *CycleOrchestrator) SetOrchestrationPolicy(p *OrchestrationPolicy) {
 // SetSnapshotStore attaches a snapshot store for auto-rollback support.
 func (c *CycleOrchestrator) SetSnapshotStore(ss *SnapshotStore) {
 	c.snapshotStore = ss
+}
+
+// SetTSDBClient passes a TimescaleDB client to the reflector for schema drift detection.
+func (c *CycleOrchestrator) SetTSDBClient(client *tsdb.Client) {
+	if c.reflector != nil {
+		c.reflector.SetTSDBClient(client)
+	}
 }
 
 // SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
