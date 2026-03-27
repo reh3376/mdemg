@@ -23,7 +23,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": ""
+    "sha256": "cab66ffa26e8ae81a170efb16fbce62b1af3655cd5fb65f6edabc5f52b7b4235"
   },
   "variables": {
     "test_space": "mdemg-dev",
