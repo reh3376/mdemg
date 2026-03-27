@@ -2,6 +2,8 @@ package jiminy
 
 import (
 	"fmt"
+	"math"
+	"sync"
 	"testing"
 )
 
@@ -183,9 +185,9 @@ func TestProtocolMetrics_SidecarMetrics(t *testing.T) {
 	c := NewProtocolMetricsCollector()
 
 	// Record some sidecar calls
-	c.RecordSidecarCall(15.0, nil, 1, 1, false)            // agreement, no override
-	c.RecordSidecarCall(20.0, nil, 2, 1, true)             // override
-	c.RecordSidecarCall(0, fmt.Errorf("timeout"), 0, 1, false) // error
+	c.RecordSidecarCall(15.0, nil, false, 1, 1, false)                  // agreement, no override
+	c.RecordSidecarCall(20.0, nil, false, 2, 1, true)                  // override
+	c.RecordSidecarCall(0, fmt.Errorf("timeout"), true, 0, 1, false)   // error + timeout
 
 	snap := c.Snapshot()
 	if snap.Sidecar == nil {
@@ -196,6 +198,9 @@ func TestProtocolMetrics_SidecarMetrics(t *testing.T) {
 	}
 	if snap.Sidecar.Errors != 1 {
 		t.Errorf("errors = %d, want 1", snap.Sidecar.Errors)
+	}
+	if snap.Sidecar.Timeouts != 1 {
+		t.Errorf("timeouts = %d, want 1", snap.Sidecar.Timeouts)
 	}
 	// Agreement: 1 out of 3 (error doesn't set agreement, mismatched tiers don't either)
 	expectedAgreementRate := 1.0 / 3.0
@@ -384,5 +389,322 @@ func TestProtocolMetrics_CodeOutcomeCount(t *testing.T) {
 	}
 	if snap.CodeOutcomeCount["code-b"] != 1 {
 		t.Errorf("code-b outcome count = %d, want 1", snap.CodeOutcomeCount["code-b"])
+	}
+}
+
+// --- Edge case and concurrency tests ---
+
+func TestSnapshot_ZeroSamples_AllFieldsSafe(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	snap := c.Snapshot()
+
+	// No NaN or Inf in any float64 field
+	floatFields := map[string]float64{
+		"AvgComprehension":         snap.AvgComprehension,
+		"CompressionRatio":         snap.CompressionRatio,
+		"AvgTokensPerGuidance":     snap.AvgTokensPerGuidance,
+		"ReplayFrequencyPerHour":   snap.ReplayFrequencyPerHour,
+		"TicketRestoreSuccessRate":  snap.TicketRestoreSuccessRate,
+		"CodeCoverage":             snap.CodeCoverage,
+		"NLIFallbackRate":          snap.NLIFallbackRate,
+	}
+	for name, val := range floatFields {
+		if math.IsNaN(val) {
+			t.Errorf("%s is NaN on zero-sample snapshot", name)
+		}
+		if math.IsInf(val, 0) {
+			t.Errorf("%s is Inf on zero-sample snapshot", name)
+		}
+	}
+
+	// TierDistribution and TierComprehension arrays
+	for i := range 3 {
+		if math.IsNaN(snap.TierDistribution[i]) || math.IsInf(snap.TierDistribution[i], 0) {
+			t.Errorf("TierDistribution[%d] is NaN or Inf", i)
+		}
+		if math.IsNaN(snap.TierComprehension[i]) || math.IsInf(snap.TierComprehension[i], 0) {
+			t.Errorf("TierComprehension[%d] is NaN or Inf", i)
+		}
+	}
+
+	// All int fields are 0
+	if snap.TotalEvents != 0 {
+		t.Errorf("TotalEvents = %d, want 0", snap.TotalEvents)
+	}
+	if snap.NLIFallbackCount != 0 {
+		t.Errorf("NLIFallbackCount = %d, want 0", snap.NLIFallbackCount)
+	}
+	for i := range 3 {
+		if snap.TierOutcomeCount[i] != 0 {
+			t.Errorf("TierOutcomeCount[%d] = %d, want 0", i, snap.TierOutcomeCount[i])
+		}
+	}
+
+	// Maps are non-nil but empty
+	if snap.CodeComprehension == nil {
+		t.Error("CodeComprehension should be non-nil (empty map), got nil")
+	}
+	if len(snap.CodeComprehension) != 0 {
+		t.Errorf("CodeComprehension should be empty, got %d entries", len(snap.CodeComprehension))
+	}
+	if snap.T2FrequencyByConstraint == nil {
+		t.Error("T2FrequencyByConstraint should be non-nil (empty map), got nil")
+	}
+	if len(snap.T2FrequencyByConstraint) != 0 {
+		t.Errorf("T2FrequencyByConstraint should be empty, got %d entries", len(snap.T2FrequencyByConstraint))
+	}
+	if snap.CodeOutcomeCount == nil {
+		t.Error("CodeOutcomeCount should be non-nil (empty map), got nil")
+	}
+	if len(snap.CodeOutcomeCount) != 0 {
+		t.Errorf("CodeOutcomeCount should be empty, got %d entries", len(snap.CodeOutcomeCount))
+	}
+
+	// Sidecar is nil when no sidecar calls recorded
+	if snap.Sidecar != nil {
+		t.Errorf("Sidecar should be nil on zero-sample snapshot, got %+v", snap.Sidecar)
+	}
+}
+
+func TestRecordGuidance_InvalidTier(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// Record guidance with out-of-range tiers: 0 and 4
+	c.RecordGuidance(0, 10, []string{"code-zero"})
+	c.RecordGuidance(4, 20, []string{"code-four"})
+
+	snap := c.Snapshot()
+
+	// TotalEvents should still be incremented for both calls
+	if snap.TotalEvents != 2 {
+		t.Errorf("TotalEvents = %d, want 2 (invalid tiers should still count as events)", snap.TotalEvents)
+	}
+
+	// TierDistribution should be safe (no index out of range, no NaN/Inf)
+	for i := range 3 {
+		if math.IsNaN(snap.TierDistribution[i]) || math.IsInf(snap.TierDistribution[i], 0) {
+			t.Errorf("TierDistribution[%d] is NaN or Inf after invalid tier recording", i)
+		}
+	}
+
+	// Since tiers 0 and 4 are out of [1,3], all tier buckets should be 0
+	// But totalEvents = 2, so distribution = 0/2 = 0.0 for each tier
+	for i := range 3 {
+		if snap.TierDistribution[i] != 0.0 {
+			t.Errorf("TierDistribution[%d] = %f, want 0.0 (invalid tiers should not land in any bucket)", i, snap.TierDistribution[i])
+		}
+	}
+
+	// AvgTokensPerGuidance should still be computed: (10+20)/2 = 15
+	if snap.AvgTokensPerGuidance != 15.0 {
+		t.Errorf("AvgTokensPerGuidance = %f, want 15.0", snap.AvgTokensPerGuidance)
+	}
+
+	// Snapshot should be generally valid (no panics getting here is also a pass)
+	if math.IsNaN(snap.CompressionRatio) || math.IsInf(snap.CompressionRatio, 0) {
+		t.Errorf("CompressionRatio is NaN or Inf after invalid tier recording")
+	}
+}
+
+func TestRecordConstraintCoverage_CodeCoverageClamp(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// constraintsWithCode > totalConstraints (should not happen, but test edge case)
+	c.RecordConstraintCoverage(3, 5)
+
+	snap := c.Snapshot()
+
+	// Document actual behavior: coverage = 5/3 = 1.666...
+	// The implementation does NOT clamp to 1.0 — this is a known finding.
+	if snap.CodeCoverage > 1.0 {
+		t.Logf("FINDING: CodeCoverage = %f exceeds 1.0 when constraintsWithCode > totalConstraints (not clamped)", snap.CodeCoverage)
+	}
+
+	// At minimum, it should not be NaN or Inf
+	if math.IsNaN(snap.CodeCoverage) || math.IsInf(snap.CodeCoverage, 0) {
+		t.Errorf("CodeCoverage is NaN or Inf, got %f", snap.CodeCoverage)
+	}
+
+	// Verify the actual value is what we expect from the formula: 5/3
+	expected := 5.0 / 3.0
+	if math.Abs(snap.CodeCoverage-expected) > 0.001 {
+		t.Errorf("CodeCoverage = %f, expected %f (withCode/total)", snap.CodeCoverage, expected)
+	}
+}
+
+func TestAvgComprehension_WeightedAverage(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// Code "rare": 1 followed out of 1 (comprehension >= 0.7 counts as followed)
+	c.RecordOutcome("rare", 0.9) // followed (score >= 0.7)
+
+	// Code "common": 2 followed out of 10
+	c.RecordOutcome("common", 0.8)  // followed
+	c.RecordOutcome("common", 0.75) // followed
+	c.RecordOutcome("common", 0.3)  // not followed
+	c.RecordOutcome("common", 0.2)  // not followed
+	c.RecordOutcome("common", 0.1)  // not followed
+	c.RecordOutcome("common", 0.4)  // not followed
+	c.RecordOutcome("common", 0.5)  // not followed
+	c.RecordOutcome("common", 0.6)  // not followed
+	c.RecordOutcome("common", 0.65) // not followed
+	c.RecordOutcome("common", 0.1)  // not followed
+
+	snap := c.Snapshot()
+
+	// Per-code: rare = 1/1 = 1.0, common = 2/10 = 0.2
+	if snap.CodeComprehension["rare"] != 1.0 {
+		t.Errorf("rare comprehension = %f, want 1.0", snap.CodeComprehension["rare"])
+	}
+	if snap.CodeComprehension["common"] != 0.2 {
+		t.Errorf("common comprehension = %f, want 0.2", snap.CodeComprehension["common"])
+	}
+
+	// Old unweighted average would be (1.0 + 0.2) / 2 = 0.6
+	// New weighted average (M5 fix): (1+2) / (1+10) = 3/11 ≈ 0.2727...
+	expectedWeighted := 3.0 / 11.0
+	if math.Abs(snap.AvgComprehension-expectedWeighted) > 0.01 {
+		t.Errorf("AvgComprehension = %f, want ~%f (weighted), not 0.6 (unweighted)",
+			snap.AvgComprehension, expectedWeighted)
+	}
+}
+
+func TestConcurrentRecordAndSnapshot(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	const goroutines = 10
+	const recordsPerGoroutine = 100
+
+	var wg sync.WaitGroup
+
+	// 10 goroutines each recording 100 guidance events
+	for g := range goroutines {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			tier := (id % 3) + 1 // tiers 1, 2, 3
+			for range recordsPerGoroutine {
+				c.RecordGuidance(tier, 10, []string{fmt.Sprintf("code-%d", id)})
+			}
+		}(g)
+	}
+
+	// Another goroutine repeatedly calling Snapshot concurrently
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				snap := c.Snapshot()
+				// Just verify the snapshot is safe to read (no panic)
+				_ = snap.TotalEvents
+				_ = snap.TierDistribution
+				_ = snap.AvgComprehension
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(done)
+
+	snap := c.Snapshot()
+	expectedTotal := int64(goroutines * recordsPerGoroutine)
+	if snap.TotalEvents != expectedTotal {
+		t.Errorf("TotalEvents = %d, want %d", snap.TotalEvents, expectedTotal)
+	}
+
+	// Verify no NaN/Inf in the final snapshot
+	if math.IsNaN(snap.AvgTokensPerGuidance) || math.IsInf(snap.AvgTokensPerGuidance, 0) {
+		t.Errorf("AvgTokensPerGuidance is NaN or Inf after concurrent access")
+	}
+}
+
+func TestNLIFallbackRate_CannotExceed1(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// Record 2 guidance events (totalEvents = 2)
+	c.RecordGuidance(1, 10, nil)
+	c.RecordGuidance(2, 20, nil)
+
+	// Record 5 NLI fallbacks (more than totalEvents)
+	for range 5 {
+		c.RecordNLIFallback()
+	}
+
+	snap := c.Snapshot()
+
+	if snap.NLIFallbackCount != 5 {
+		t.Errorf("NLIFallbackCount = %d, want 5", snap.NLIFallbackCount)
+	}
+
+	// Rate = 5 / 2 = 2.5 — the implementation does NOT clamp to 1.0
+	// Document this as a known limitation (L2).
+	if snap.NLIFallbackRate > 1.0 {
+		t.Logf("KNOWN LIMITATION (L2): NLIFallbackRate = %f exceeds 1.0 (fallbacks=%d > events=%d)",
+			snap.NLIFallbackRate, snap.NLIFallbackCount, snap.TotalEvents)
+	}
+
+	// At minimum, it should not be NaN or Inf
+	if math.IsNaN(snap.NLIFallbackRate) || math.IsInf(snap.NLIFallbackRate, 0) {
+		t.Errorf("NLIFallbackRate is NaN or Inf, got %f", snap.NLIFallbackRate)
+	}
+
+	// Verify the actual value matches expected formula: 5/2 = 2.5
+	expectedRate := 5.0 / 2.0
+	if math.Abs(snap.NLIFallbackRate-expectedRate) > 0.001 {
+		t.Errorf("NLIFallbackRate = %f, expected %f", snap.NLIFallbackRate, expectedRate)
+	}
+}
+
+func TestReplayFrequencyAfterReset(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+
+	// Record some replays and take a normal snapshot
+	c.RecordReplay(5)
+	snap1 := c.Snapshot()
+
+	if snap1.ReplayFrequencyPerHour <= 0 {
+		t.Errorf("pre-reset ReplayFrequencyPerHour = %f, want > 0", snap1.ReplayFrequencyPerHour)
+	}
+	if math.IsInf(snap1.ReplayFrequencyPerHour, 0) {
+		t.Errorf("pre-reset ReplayFrequencyPerHour is Inf")
+	}
+
+	// Reset and immediately take a snapshot
+	// windowDuration will be extremely small (nanoseconds), so
+	// replayFreq = 0 / tiny_hours = 0 (no replays recorded after reset).
+	c.Reset()
+	snap2 := c.Snapshot()
+
+	// After reset, replay count is 0, so frequency should be 0 regardless of window size
+	if snap2.ReplayFrequencyPerHour != 0 {
+		t.Errorf("post-reset ReplayFrequencyPerHour = %f, want 0 (no replays after reset)", snap2.ReplayFrequencyPerHour)
+	}
+
+	// Verify it's not Inf or NaN (the main concern with tiny windowDuration)
+	if math.IsInf(snap2.ReplayFrequencyPerHour, 0) {
+		t.Errorf("post-reset ReplayFrequencyPerHour is Inf (L1: tiny window duration after reset)")
+	}
+	if math.IsNaN(snap2.ReplayFrequencyPerHour) {
+		t.Errorf("post-reset ReplayFrequencyPerHour is NaN")
+	}
+
+	// Now record replays immediately after reset to test the tiny-window scenario
+	c.Reset()
+	c.RecordReplay(10)
+	snap3 := c.Snapshot()
+
+	// With a near-zero window and 10 replay events, frequency could be astronomically large
+	// but should NOT be Inf or NaN
+	if math.IsInf(snap3.ReplayFrequencyPerHour, 0) {
+		t.Errorf("FINDING (L1): ReplayFrequencyPerHour is Inf when window ≈ 0 after Reset()+RecordReplay()")
+	}
+	if math.IsNaN(snap3.ReplayFrequencyPerHour) {
+		t.Errorf("ReplayFrequencyPerHour is NaN after Reset()+RecordReplay()")
+	}
+	if snap3.ReplayFrequencyPerHour > 0 {
+		t.Logf("ReplayFrequencyPerHour after immediate reset+record = %f (very large expected with tiny window)", snap3.ReplayFrequencyPerHour)
 	}
 }

@@ -198,7 +198,7 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 				if count, ok := protoStats.CodeOutcomeCount[code]; ok && count < int64(r.cfg.J17TierEffectivenessMinSamples) {
 					continue
 				}
-				if rate < r.cfg.J17ComprehensionMinThreshold && rate > 0 {
+				if rate < r.cfg.J17ComprehensionMinThreshold {
 					insights = append(insights, ReflectionInsight{
 						PatternID:         "j17_low_comprehension",
 						Severity:          SeverityHigh,
@@ -267,6 +267,9 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 			// 15. Tier ineffectiveness: specific tier degrades comprehension for a code
 			if r.cfg.J17TierDriftDetectionEnabled && len(protoStats.TierCodeComprehension) > 0 {
 				for tier, codemap := range protoStats.TierCodeComprehension {
+					if tier < 1 || tier > 3 {
+						continue
+					}
 					for code, comp := range codemap {
 						if protoStats.TierOutcomeCount[tier-1] < int64(r.cfg.J17TierEffectivenessMinSamples) {
 							continue

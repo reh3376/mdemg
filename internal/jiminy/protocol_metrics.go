@@ -110,7 +110,8 @@ type SidecarMetrics struct {
 }
 
 // RecordSidecarCall records a sidecar prediction call for telemetry (NS-07).
-func (c *ProtocolMetricsCollector) RecordSidecarCall(latencyMs float64, err error, mlTier int, ruleTier int, overridden bool) {
+// isTimeout should be true when the error was caused by a context deadline or timeout.
+func (c *ProtocolMetricsCollector) RecordSidecarCall(latencyMs float64, err error, isTimeout bool, mlTier int, ruleTier int, overridden bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -119,6 +120,9 @@ func (c *ProtocolMetricsCollector) RecordSidecarCall(latencyMs float64, err erro
 
 	if err != nil {
 		c.sidecarErrors++
+		if isTimeout {
+			c.sidecarTimeouts++
+		}
 		return
 	}
 
@@ -260,21 +264,20 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		compressionRatio = float64(c.totalNLEquivTokens) / float64(c.totalTokens)
 	}
 
-	// Per-code comprehension
+	// Per-code comprehension (weighted by sample count)
 	codeComp := make(map[string]float64, len(c.codeTotal))
-	var totalComp float64
-	var compCount int
+	var totalFollowed, totalSamples int
 	for code, total := range c.codeTotal {
 		if total > 0 {
 			rate := float64(c.codeFollowed[code]) / float64(total)
 			codeComp[code] = rate
-			totalComp += rate
-			compCount++
+			totalFollowed += c.codeFollowed[code]
+			totalSamples += total
 		}
 	}
 	var avgComp float64
-	if compCount > 0 {
-		avgComp = totalComp / float64(compCount)
+	if totalSamples > 0 {
+		avgComp = float64(totalFollowed) / float64(totalSamples)
 	}
 
 	// Replay frequency per hour

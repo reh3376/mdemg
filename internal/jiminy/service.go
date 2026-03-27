@@ -2,6 +2,7 @@ package jiminy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -680,7 +681,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 			// Record sidecar metrics (with actual latency and error from HTTP call)
 			if s.protocolMetrics != nil {
 				overridden := result.Source == "ml" && !result.Agreed
-				s.protocolMetrics.RecordSidecarCall(pred.LatencyMs, pred.Err, pred.Tier, ruleTier, overridden)
+				isTimeout := pred.Err != nil && errors.Is(pred.Err, context.DeadlineExceeded)
+				s.protocolMetrics.RecordSidecarCall(pred.LatencyMs, pred.Err, isTimeout, pred.Tier, ruleTier, overridden)
 			}
 
 			// NS-14: Collect training data
@@ -960,6 +962,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			switch outcome {
 			case OutcomeFollowed:
 				compScore = 1.0
+			case OutcomePartialCompliance:
+				compScore = 0.7
 			case OutcomeContradicted:
 				compScore = 1.0 // understood but violated
 			case OutcomeIgnored:
