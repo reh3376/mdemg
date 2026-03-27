@@ -1,0 +1,215 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Fine-Tuning Pipeline",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "LLM Interaction Collection Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'llm_interaction_rate'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Model Version Timeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'model_version'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Benchmark Scores",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'benchmark_score'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Training Cycle History",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'training_cycle'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {}
+      }
+    },
+    {
+      "id": 6,
+      "title": "Exogenous Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'exogenous_ratio'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Entropy Health",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- TODO: Replace with actual query\n-- SELECT bucket AS time, avg_value AS value\n-- FROM metrics_hourly\n-- WHERE metric_name = 'entropy_health'\n--   AND space_id = '$space_id'\n--   AND $__timeFilter(bucket)\n-- ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["mdemg", "fine-tuning", "tsdb"],
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "custom",
+        "query": "mdemg-dev",
+        "current": { "text": "mdemg-dev", "value": "mdemg-dev" },
+        "options": [
+          { "text": "mdemg-dev", "value": "mdemg-dev", "selected": true }
+        ]
+      }
+    ]
+  },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Fine-Tuning Pipeline",
+  "uid": "mdemg-ft-training",
+  "version": 1
+}

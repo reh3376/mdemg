@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: TimescaleDB
+    uid: timescaledb
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: mdemg_metrics
+    user: mdemg
+    secureJsonData:
+      password: $TSDB_PASSWORD
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: true
+    isDefault: false
+    editable: true
