@@ -9,11 +9,27 @@ import (
 	"testing"
 )
 
+// skipIfTSDBUnavailable probes the trends endpoint and skips the test if
+// TimescaleDB is not available (503).
+func skipIfTSDBUnavailable(t *testing.T, client *http.Client, endpoint string) {
+	t.Helper()
+	resp, err := client.Get(endpoint + "/v1/metrics/trends?space_id=probe&metric=probe&from=2020-01-01&to=2020-01-02")
+	if err != nil {
+		t.Skipf("trends probe failed: %v", err)
+	}
+	defer resp.Body.Close()
+	io.ReadAll(resp.Body) //nolint:errcheck
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		t.Skip("TimescaleDB not available; skipping trends test")
+	}
+}
+
 func TestTrends_Endpoint_ReturnsArray(t *testing.T) {
 	RequireServiceReady(t)
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
+	skipIfTSDBUnavailable(t, client, cfg.MDEMGEndpoint)
 
 	url := cfg.MDEMGEndpoint + "/v1/metrics/trends?space_id=test-trends&metric=rsic_health_overall&from=2020-01-01&to=2020-01-02"
 	resp, err := client.Get(url)
@@ -43,6 +59,7 @@ func TestTrends_Endpoint_MissingSpaceID(t *testing.T) {
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
+	skipIfTSDBUnavailable(t, client, cfg.MDEMGEndpoint)
 
 	url := cfg.MDEMGEndpoint + "/v1/metrics/trends?metric=foo"
 	resp, err := client.Get(url)
@@ -61,6 +78,7 @@ func TestTrends_Endpoint_MissingMetric(t *testing.T) {
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
+	skipIfTSDBUnavailable(t, client, cfg.MDEMGEndpoint)
 
 	url := cfg.MDEMGEndpoint + "/v1/metrics/trends?space_id=x"
 	resp, err := client.Get(url)
@@ -79,6 +97,7 @@ func TestTrends_Endpoint_InvalidDate(t *testing.T) {
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
+	skipIfTSDBUnavailable(t, client, cfg.MDEMGEndpoint)
 
 	url := cfg.MDEMGEndpoint + "/v1/metrics/trends?space_id=x&metric=y&from=bad"
 	resp, err := client.Get(url)
