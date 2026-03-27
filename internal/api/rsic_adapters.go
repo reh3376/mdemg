@@ -235,6 +235,10 @@ type rsicProtocolAdapter struct {
 	svc *jiminy.Service
 }
 
+// GetProtocolStats returns global protocol metrics. The spaceID parameter is
+// accepted for interface compliance but not used — ProtocolMetricsCollector
+// is not space-partitioned. In single-space deployments (current), this is
+// correct. Multi-space support requires partitioning the collector.
 func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID string) (ape.ProtocolStatsResult, error) {
 	snapshot := a.svc.GetProtocolMetricsSnapshot()
 	if snapshot == nil {

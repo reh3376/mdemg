@@ -116,15 +116,15 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	report.TaskPerformance = a.scoreTask(report)
 
 	// 5b. J10: Compute guidance health if Jiminy stats available
-	var jiminyStats JiminyStatsResult
 	if a.jiminyProvider != nil {
 		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
 		if jErr == nil && js.TotalGuidanceIssued > 0 {
-			jiminyStats = js
-			report.GuidanceHealth = a.scoreGuidance(jiminyStats)
+			report.GuidanceHealth = a.scoreGuidance(js)
+			a.publishGuidanceMetrics(spaceID, js)
+		} else if jErr != nil {
+			slog.Warn("rsic: guidance stats unavailable, retaining previous metrics", "error", jErr)
 		}
 	}
-	a.publishGuidanceMetrics(spaceID, jiminyStats)
 
 	// 5c. J17: Compute protocol health if protocol stats available
 	var protoStats ProtocolStatsResult
@@ -133,9 +133,11 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		if pErr == nil && ps.TotalEvents > 0 {
 			protoStats = ps
 			report.ProtocolHealth = a.scoreProtocol(protoStats)
+			a.publishProtocolMetrics(spaceID, protoStats)
+		} else if pErr != nil {
+			slog.Warn("rsic: protocol stats unavailable, retaining previous metrics", "error", pErr)
 		}
 	}
-	a.publishProtocolMetrics(spaceID, protoStats)
 
 	// 5d. Synergy: Compute Claude Code ↔ MDEMG synergy health
 	if a.synergyReader != nil && a.cfg.SynergyAssessmentEnabled {
@@ -170,7 +172,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 			0.13*report.TaskPerformance +
 			0.13*report.GuidanceHealth +
 			0.13*report.ProtocolHealth +
-			0.10*report.SynergyHealth
+			0.12*report.SynergyHealth
 	} else if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
 		// All 6 dimensions (no synergy)
 		report.OverallHealth = 0.20*report.RetrievalQuality +
@@ -597,12 +599,10 @@ func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsRes
 	}
 	m.J17NLIBiasAlert(spaceID).Set(biasAlertVal)
 
-	// NLI fallback tracking (degraded-state awareness)
-	if stats.NLIFallbackCount > 0 {
-		m.J17NLIFallbackTotal(spaceID).Set(float64(stats.NLIFallbackCount))
-	}
+	// NLI fallback tracking (degraded-state awareness) — always set to avoid stale non-zero values
+	m.J17NLIFallbackTotal(spaceID).Set(float64(stats.NLIFallbackCount))
 
-	// Sidecar (only if active)
+	// Sidecar metrics — always set to clear stale values when sidecar is inactive
 	if stats.Sidecar != nil {
 		m.J17SidecarRequests(spaceID).Set(float64(stats.Sidecar.Requests))
 		m.J17SidecarErrors(spaceID).Set(float64(stats.Sidecar.Errors))
@@ -610,6 +610,13 @@ func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsRes
 		m.J17SidecarAgreementRate(spaceID).Set(stats.Sidecar.AgreementRate)
 		m.J17SidecarOverrideRate(spaceID).Set(stats.Sidecar.OverrideRate)
 		m.J17SidecarLatency(spaceID).Set(stats.Sidecar.AvgLatencyMs)
+	} else {
+		m.J17SidecarRequests(spaceID).Set(0)
+		m.J17SidecarErrors(spaceID).Set(0)
+		m.J17SidecarTimeouts(spaceID).Set(0)
+		m.J17SidecarAgreementRate(spaceID).Set(0)
+		m.J17SidecarOverrideRate(spaceID).Set(0)
+		m.J17SidecarLatency(spaceID).Set(0)
 	}
 }
 
