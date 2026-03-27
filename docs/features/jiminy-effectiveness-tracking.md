@@ -120,9 +120,38 @@ If the `guidance_id` is unknown (expired or never tracked), the response returns
 
 **Error responses:** `400` (empty guidance_id), `405` (wrong HTTP method), `503` (Jiminy not enabled).
 
-### Hook Integration
+### Hook Integration (Implemented)
 
-The `prompt-context.sh` hook can be extended to store the `guidance_id` from the guide response and fire a feedback request after the agent responds. This is fire-and-forget — the feedback call uses `|| true` so it never blocks the agent.
+The feedback loop is fully automated via two Claude Code hooks:
+
+**1. Capture (`prompt-context.sh`)** — On each user prompt, the hook calls `GET /v1/jiminy/latest` to retrieve warm guidance. It extracts `.data.guidance_id` and writes a state file:
+
+```bash
+# State file: ~/.mdemg/.jiminy-guidance-state
+{"guidance_id":"o9vwef0lmljw13f7zgl0qa96","space_id":"mdemg-dev","session_id":"claude-core","ts":1774618498}
+```
+
+The guidance response is written to a temp file and parsed with `jq` directly (not via shell variable) because responses contain control characters that corrupt shell variable expansion. A `perl` filter strips U+0000–U+001F before writing.
+
+**2. Feedback (`post-tool-observe.py`)** — After each Write, Edit, or Bash tool execution, the hook:
+
+1. Reads `~/.mdemg/.jiminy-guidance-state`
+2. Validates the state is fresh (< 30 minutes, matching EffectivenessTracker TTL)
+3. Checks cooldown (30 seconds between submissions to avoid flooding)
+4. Builds a concise action summary from the tool's input/output
+5. Fires `POST /v1/jiminy/feedback` with the `guidance_id` and action summary (fire-and-forget via `subprocess.Popen`)
+
+**Action summary format** by tool type:
+
+| Tool | Summary |
+|------|---------|
+| Write | `"Wrote file: {path}"` |
+| Edit | `"Edited {path}: replaced '{old[:80]}' with '{new[:80]}'"` |
+| Bash | `"Ran: {cmd[:200]}\nOutput: {out[:200]}"` |
+
+This closes the loop documented in the flow diagram above — `Guide()` → agent acts → `Feedback` → outcome classification → trust update.
+
+See `docs/features/j17-feedback-loop-closure.md` for the full implementation story.
 
 ## Configuration
 
