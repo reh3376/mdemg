@@ -95,7 +95,7 @@ type SchemaYAML struct {
 
 // JiminyYAML holds Jiminy inner-voice guidance settings.
 type JiminyYAML struct {
-	Enabled             bool   `yaml:"enabled"`                         // Enable Jiminy guidance (default: true)
+	Enabled             *bool  `yaml:"enabled,omitempty"`               // Enable Jiminy guidance (default: true; nil = defer to env/default)
 	SynthesisEnabled    bool   `yaml:"synthesis_enabled,omitempty"`     // Enable LLM synthesis (default: true)
 	SynthesisProvider   string `yaml:"synthesis_provider,omitempty"`    // LLM provider for synthesis (inherits llm.provider)
 	SynthesisModel      string `yaml:"synthesis_model,omitempty"`       // LLM model for synthesis (inherits llm.model)
@@ -314,8 +314,10 @@ func flattenYAML(cfg YAMLConfig) map[string]string {
 		m["schema.version"] = strconv.Itoa(cfg.Schema.Version)
 	}
 
-	// Jiminy — always emit enabled (explicit false prevents server default from re-enabling)
-	m["jiminy.enabled"] = strconv.FormatBool(cfg.Jiminy.Enabled)
+	// Jiminy — only emit enabled when explicitly set in YAML (nil = absent, not false)
+	if cfg.Jiminy.Enabled != nil {
+		m["jiminy.enabled"] = strconv.FormatBool(*cfg.Jiminy.Enabled)
+	}
 	if cfg.Jiminy.SynthesisEnabled {
 		m["jiminy.synthesis_enabled"] = "true"
 	}
@@ -537,8 +539,9 @@ func GenerateConfigYAML(opts InitOptions) ([]byte, error) {
 	}
 
 	// Always emit jiminy section when wizard runs (explicit user choice)
+	jiminyEnabled := opts.JiminyEnabled
 	cfg.Jiminy = JiminyYAML{
-		Enabled: opts.JiminyEnabled,
+		Enabled: &jiminyEnabled,
 	}
 	if opts.JiminyEnabled && opts.JiminyModel != "" {
 		cfg.Jiminy.SynthesisEnabled = true

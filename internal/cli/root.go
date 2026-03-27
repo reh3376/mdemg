@@ -107,6 +107,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	dbCmd.GroupID = "database"
 	rootCmd.AddCommand(dbCmd)
 
+	tsdbCmd := newTSDBCmd()
+	tsdbCmd.GroupID = "database"
+	rootCmd.AddCommand(tsdbCmd)
+
 	// Memory & Ingestion
 	ingestCmd := newIngestCmd()
 	ingestCmd.GroupID = "memory"

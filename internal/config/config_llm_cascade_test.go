@@ -361,3 +361,25 @@ func TestFlattenYAML_JiminyAlwaysEmitsEnabled(t *testing.T) {
 		t.Errorf("JIMINY_ENABLED = %q, want %q", got, "false")
 	}
 }
+
+func TestFlattenYAML_JiminyAbsentDoesNotOverride(t *testing.T) {
+	// When YAML has no jiminy section, JIMINY_ENABLED must NOT be set,
+	// allowing the .env or default (true) to take effect.
+	yamlContent := `space_id: test-space
+`
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("JIMINY_ENABLED", "")
+
+	if err := LoadYAMLConfig(configPath); err != nil {
+		t.Fatalf("LoadYAMLConfig error: %v", err)
+	}
+
+	if got := os.Getenv("JIMINY_ENABLED"); got != "" {
+		t.Errorf("JIMINY_ENABLED = %q, want empty (not set by YAML)", got)
+	}
+}
