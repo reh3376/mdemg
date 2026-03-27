@@ -162,6 +162,23 @@ curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
   -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":\"session-start\",\"session_id\":\"claude-core\"}" \
   --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
 
+# J17: Bootstrap codification if 0% code coverage
+if [ "${J17_ENABLED:-false}" = "true" ]; then
+  PROTO_METRICS=$(curl -sf "${MDEMG_URL}/v1/jiminy/protocol/metrics" \
+    --connect-timeout 2 --max-time 3 2>/dev/null || true)
+  if [ -n "$PROTO_METRICS" ]; then
+    CODE_COV=$(echo "$PROTO_METRICS" | jq -r '.data.code_coverage // -1' 2>/dev/null || echo "-1")
+    TOTAL_EVT=$(echo "$PROTO_METRICS" | jq -r '.data.total_events // 0' 2>/dev/null || echo "0")
+    if [ "$CODE_COV" = "0" ] && [ "$TOTAL_EVT" -gt "0" ] 2>/dev/null; then
+      echo "J17: 0% code coverage — triggering bootstrap codification"
+      curl -sf -X POST "${MDEMG_URL}/v1/self-improve/cycle" \
+        -H "Content-Type: application/json" \
+        -d "{\"space_id\":\"${SPACE_ID}\",\"tier\":\"meso\",\"trigger_source\":\"j17-cold-start-bootstrap\"}" \
+        --connect-timeout 5 --max-time 60 -o /dev/null 2>/dev/null &
+    fi
+  fi
+fi
+
 # J17: Restore protocol state from saved ticket
 J17_STATE_RESTORED=false
 if [ "${J17_ENABLED:-false}" = "true" ]; then

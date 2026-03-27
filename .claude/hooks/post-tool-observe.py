@@ -20,6 +20,12 @@ RECOVERY_BUFFER_PATH = os.path.join(
 )
 RECOVERY_BUFFER_MAX_ENTRIES = int(os.environ.get("SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES", "50"))
 
+# J17: Feedback loop closure — correlate guidance with agent actions
+JIMINY_STATE_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-guidance-state")
+FEEDBACK_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-last-feedback")
+FEEDBACK_COOLDOWN_SEC = 30
+FEEDBACK_STATE_MAX_AGE = 1800  # 30 min, matching EffectivenessTracker TTL
+
 
 def get_space_id() -> str:
     """Resolve space_id from env var, config file, or default."""
@@ -143,6 +149,94 @@ def warm_guidance(context_hint: str):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+    except Exception:
+        pass
+
+
+def _feedback_cooled_down() -> bool:
+    """Return True if at least FEEDBACK_COOLDOWN_SEC since last feedback."""
+    try:
+        if os.path.exists(FEEDBACK_COOLDOWN_FILE):
+            mtime = os.path.getmtime(FEEDBACK_COOLDOWN_FILE)
+            if time.time() - mtime < FEEDBACK_COOLDOWN_SEC:
+                return False
+    except Exception:
+        pass
+    return True
+
+
+def _mark_feedback_sent():
+    """Touch the cooldown file to record feedback was sent."""
+    try:
+        os.makedirs(os.path.dirname(FEEDBACK_COOLDOWN_FILE), exist_ok=True)
+        with open(FEEDBACK_COOLDOWN_FILE, "w") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
+
+def _build_action_summary(tool_name: str, tool_input: dict, tool_output: str) -> str:
+    """Build a concise action summary for Jiminy feedback classification."""
+    if tool_name == "Write":
+        return f"Wrote file: {tool_input.get('file_path', 'unknown')}"
+    elif tool_name == "Edit":
+        fp = tool_input.get("file_path", "unknown")
+        old = tool_input.get("old_string", "")[:80]
+        new = tool_input.get("new_string", "")[:80]
+        return f"Edited {fp}: replaced '{old}' with '{new}'"
+    elif tool_name == "Bash":
+        cmd = tool_input.get("command", "")[:200]
+        out = (tool_output or "")[:200]
+        return f"Ran: {cmd}\nOutput: {out}"
+    return ""
+
+
+def send_jiminy_feedback(tool_name: str, tool_input: dict, tool_output: str):
+    """Read guidance_id from state file and POST feedback to close the J17 loop."""
+    if not _feedback_cooled_down():
+        return
+
+    try:
+        with open(JIMINY_STATE_FILE) as f:
+            state = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return
+
+    guidance_id = state.get("guidance_id", "")
+    if not guidance_id:
+        return
+
+    # Respect the 30-minute TTL of the EffectivenessTracker
+    state_ts = state.get("ts", 0)
+    if time.time() - state_ts > FEEDBACK_STATE_MAX_AGE:
+        return
+
+    action_summary = _build_action_summary(tool_name, tool_input, tool_output)
+    if not action_summary:
+        return
+
+    payload = json.dumps({
+        "guidance_id": guidance_id,
+        "action_summary": action_summary[:500],
+        "space_id": state.get("space_id", SPACE_ID),
+        "session_id": state.get("session_id", SESSION_ID),
+    })
+
+    try:
+        subprocess.Popen(
+            [
+                "curl", "-sf", "-X", "POST",
+                f"{MDEMG_URL}/v1/jiminy/feedback",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                "--connect-timeout", "3",
+                "--max-time", "5",
+                "-o", "/dev/null",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _mark_feedback_sent()
     except Exception:
         pass
 
@@ -481,6 +575,10 @@ def main():
                     )
                 except Exception:
                     pass
+
+    # J17: Close the feedback loop — correlate guidance with agent action
+    if tool_name in ("Write", "Edit", "Bash"):
+        send_jiminy_feedback(tool_name, tool_input, output_str)
 
     sys.exit(0)
 
