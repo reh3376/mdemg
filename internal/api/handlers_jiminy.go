@@ -364,6 +364,11 @@ func (s *Server) handleJiminyLatest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Re-register in effectiveness tracker so late feedback can still correlate
+	if s.jiminySvc != nil && entry.Response.GuidanceID != "" {
+		s.jiminySvc.RefreshTrackedGuidance(entry.Response.GuidanceID, entry.Response.Guidance)
+	}
+
 	ageMs := time.Since(entry.ComputedAt).Milliseconds()
 	maxAgeMs := int64(s.cfg.JiminyWarmMaxAgeSec) * 1000
 
@@ -434,5 +439,35 @@ func (s *Server) handleJiminyEvaluate(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": resp,
+	})
+}
+
+// handleJiminyProtocolStatus handles GET /v1/jiminy/protocol/status (B4)
+// Returns the current J17 protocol status for a session: trust score, tier,
+// feedback count, and enabled state.
+func (s *Server) handleJiminyProtocolStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled (set JIMINY_ENABLED=true)",
+		})
+		return
+	}
+
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "session_id query parameter is required",
+		})
+		return
+	}
+
+	status := s.jiminySvc.GetProtocolStatus(sessionID)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": status,
 	})
 }

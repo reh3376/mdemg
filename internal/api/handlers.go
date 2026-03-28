@@ -226,6 +226,36 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 		overallHealthy = false
 	}
 
+	// Check 8: Neural sidecar (J17 protocol dependency)
+	if s.cfg.JiminyEnabled && s.cfg.J17SidecarURL != "" {
+		scStart := time.Now()
+		scClient := &http.Client{Timeout: 2 * time.Second}
+		scResp, scErr := scClient.Get(s.cfg.J17SidecarURL + "/health")
+		scLatency := time.Since(scStart).String()
+		if scErr != nil {
+			status.Checks["neural_sidecar"] = HealthCheck{
+				Status:  "degraded",
+				Message: fmt.Sprintf("unreachable: %v", scErr),
+				Latency: scLatency,
+			}
+		} else {
+			scResp.Body.Close()
+			if scResp.StatusCode == http.StatusOK {
+				status.Checks["neural_sidecar"] = HealthCheck{
+					Status:  "healthy",
+					Message: "J17 sidecar available",
+					Latency: scLatency,
+				}
+			} else {
+				status.Checks["neural_sidecar"] = HealthCheck{
+					Status:  "degraded",
+					Message: fmt.Sprintf("status %d", scResp.StatusCode),
+					Latency: scLatency,
+				}
+			}
+		}
+	}
+
 	// Determine overall status
 	if !overallHealthy {
 		status.Status = "not_ready"

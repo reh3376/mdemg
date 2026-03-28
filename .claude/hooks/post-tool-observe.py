@@ -24,7 +24,7 @@ RECOVERY_BUFFER_MAX_ENTRIES = int(os.environ.get("SYNERGY_RECOVERY_BUFFER_MAX_EN
 JIMINY_STATE_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-guidance-state")
 FEEDBACK_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-last-feedback")
 FEEDBACK_COOLDOWN_SEC = 30
-FEEDBACK_STATE_MAX_AGE = 1800  # 30 min, matching EffectivenessTracker TTL
+FEEDBACK_STATE_MAX_AGE = 7200  # 2 hours, matching EffectivenessTracker TTL
 
 
 def get_space_id() -> str:

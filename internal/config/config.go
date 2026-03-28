@@ -585,8 +585,8 @@ type Config struct {
 	TLSCertFile string // Path to TLS certificate file
 	TLSKeyFile  string // Path to TLS key file
 
-	// Prometheus metrics settings (Phase 3.3)
-	MetricsEnabled   bool   // Feature toggle for Prometheus metrics (default: true)
+	// Metrics settings (Phase 3.3)
+	MetricsEnabled   bool   // Feature toggle for metrics collection (default: true)
 	MetricsNamespace string // Metrics namespace prefix (default: "mdemg")
 
 	// Graceful shutdown settings (Phase 3.4)
@@ -777,11 +777,11 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 2)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 3)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 
-	// Live Metrics (Prometheus collect-on-scrape)
-	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on Prometheus scrape (default: true)
+	// Live Metrics (collect-on-request)
+	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
 	LiveGuidanceRefreshSec      int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
 }
 
@@ -1846,7 +1846,7 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
-	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 1800)
+	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 7200)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2033,7 +2033,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustTTLHours, err := atoi("J17_TRUST_TTL_HOURS", 4)
+	j17TrustTTLHours, err := atoi("J17_TRUST_TTL_HOURS", 168)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2813,7 +2813,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("TLS_CERT_FILE and TLS_KEY_FILE are required when TLS_ENABLED=true")
 	}
 
-	// Prometheus metrics settings
+	// Metrics settings
 	metricsEnabled := getBool("METRICS_ENABLED", true)
 	metricsNamespace := get("METRICS_NAMESPACE", "mdemg")
 
@@ -3066,7 +3066,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 2)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 4)
 	if err != nil {
 		return Config{}, err
 	}

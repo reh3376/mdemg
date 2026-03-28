@@ -176,6 +176,50 @@ func TestJ17_FeedbackUpdatesMetrics(t *testing.T) {
 	} else {
 		t.Logf("total_events = %g (OK)", totalEvents)
 	}
+
+	// --- Step 6 (B4): GET /v1/jiminy/protocol/status ---
+	statusResp, err := client.Get(cfg.MDEMGEndpoint + "/v1/jiminy/protocol/status?session_id=claude-core")
+	if err != nil {
+		t.Fatalf("GET /v1/jiminy/protocol/status failed: %v", err)
+	}
+	defer statusResp.Body.Close()
+
+	if statusResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(statusResp.Body)
+		t.Fatalf("GET /v1/jiminy/protocol/status: expected 200, got %d; body: %s", statusResp.StatusCode, body)
+	}
+
+	var statusBody struct {
+		Data struct {
+			SessionID     string  `json:"session_id"`
+			TrustScore    float64 `json:"trust_score"`
+			Tier          string  `json:"tier"`
+			FeedbackCount int     `json:"feedback_count"`
+			Enabled       bool    `json:"enabled"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(statusResp.Body).Decode(&statusBody); err != nil {
+		t.Fatalf("failed to decode protocol status response: %v", err)
+	}
+
+	if statusBody.Data.SessionID != "claude-core" {
+		t.Errorf("expected session_id=claude-core, got %q", statusBody.Data.SessionID)
+	}
+	if statusBody.Data.TrustScore < 0 || statusBody.Data.TrustScore > 1 {
+		t.Errorf("trust_score out of range [0,1]: %f", statusBody.Data.TrustScore)
+	}
+	validTiers := map[string]bool{"T1": true, "T2": true, "T3": true}
+	if !validTiers[statusBody.Data.Tier] {
+		t.Errorf("unexpected tier %q, expected T1/T2/T3", statusBody.Data.Tier)
+	}
+	if !statusBody.Data.Enabled {
+		t.Error("expected enabled=true when Jiminy is available")
+	}
+	if statusBody.Data.FeedbackCount <= 0 {
+		t.Logf("note: feedback_count=%d (may be 0 if per-session tracking is session-scoped)", statusBody.Data.FeedbackCount)
+	} else {
+		t.Logf("feedback_count=%d, trust_score=%.3f, tier=%s (OK)", statusBody.Data.FeedbackCount, statusBody.Data.TrustScore, statusBody.Data.Tier)
+	}
 }
 
 // TestJ17_FeedbackEndpointReturnsOK verifies that the feedback endpoint accepts
@@ -248,42 +292,42 @@ func TestJ17_FeedbackEndpointReturnsOK(t *testing.T) {
 
 // TestJ17_PrometheusHasJ17Metrics verifies that the Prometheus scrape endpoint
 // exposes the two core J17 metrics: j17_total_events and j17_compression_ratio.
-func TestJ17_PrometheusHasJ17Metrics(t *testing.T) {
+func TestJ17_SnapshotHasJ17Metrics(t *testing.T) {
 	RequireServiceReady(t)
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
 
-	// --- GET /v1/prometheus ---
-	resp, err := client.Get(cfg.MDEMGEndpoint + "/v1/prometheus")
+	// --- GET /v1/metrics/snapshot ---
+	resp, err := client.Get(cfg.MDEMGEndpoint + "/v1/metrics/snapshot")
 	if err != nil {
-		t.Fatalf("GET /v1/prometheus failed: %v", err)
+		t.Fatalf("GET /v1/metrics/snapshot failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /v1/prometheus, got %d", resp.StatusCode)
+		t.Fatalf("expected 200 from /v1/metrics/snapshot, got %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("failed to read /v1/prometheus body: %v", err)
+		t.Fatalf("failed to read /v1/metrics/snapshot body: %v", err)
 	}
 	body := string(bodyBytes)
 
 	// --- Assert j17_events_total metric name is present ---
 	// The APE live-collector always registers j17_* gauges when RSIC is wired up;
-	// the metric appears in Prometheus output with the "mdemg_" project prefix.
+	// the metric appears in the JSON snapshot with the "mdemg_" project prefix.
 	if !strings.Contains(body, "j17_events_total") {
-		t.Errorf("/v1/prometheus body does not contain 'j17_events_total'; got:\n%s", body)
+		t.Errorf("/v1/metrics/snapshot body does not contain 'j17_events_total'; got:\n%s", body)
 	} else {
-		t.Log("j17_events_total metric found in /v1/prometheus output")
+		t.Log("j17_events_total metric found in /v1/metrics/snapshot output")
 	}
 
 	// --- Assert j17_compression_ratio metric name is present ---
 	if !strings.Contains(body, "j17_compression_ratio") {
-		t.Errorf("/v1/prometheus body does not contain 'j17_compression_ratio'; got:\n%s", body)
+		t.Errorf("/v1/metrics/snapshot body does not contain 'j17_compression_ratio'; got:\n%s", body)
 	} else {
-		t.Log("j17_compression_ratio metric found in /v1/prometheus output")
+		t.Log("j17_compression_ratio metric found in /v1/metrics/snapshot output")
 	}
 }

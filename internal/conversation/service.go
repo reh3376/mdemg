@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
+	"mdemg/internal/sanitize"
 )
 
 // LearningService defines the interface for the learning service
@@ -1953,17 +1954,6 @@ func sortAndLimitRecallResults(results *[]RecallResult, topK int) {
 	}
 }
 
-// stripControlChars removes JSON-invalid control characters (U+0000-U+001F)
-// except tab (U+0009), newline (U+000A), and carriage return (U+000D).
-func stripControlChars(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' {
-			return -1 // drop
-		}
-		return r
-	}, s)
-}
-
 // Helper functions for extracting values from Neo4j records
 func asString(rec *neo4j.Record, key string) string {
 	if rec == nil {
@@ -1974,9 +1964,9 @@ func asString(rec *neo4j.Record, key string) string {
 		return ""
 	}
 	if s, ok := val.(string); ok {
-		return stripControlChars(s)
+		return sanitize.StripControlChars(s)
 	}
-	return stripControlChars(fmt.Sprintf("%v", val))
+	return sanitize.StripControlChars(fmt.Sprintf("%v", val))
 }
 
 func asFloat64(rec *neo4j.Record, key string) float64 {
@@ -2053,14 +2043,14 @@ func asStringSlice(rec *neo4j.Record, key string) []string {
 	case []string:
 		result := make([]string, len(v))
 		for i, s := range v {
-			result[i] = stripControlChars(s)
+			result[i] = sanitize.StripControlChars(s)
 		}
 		return result
 	case []any:
 		result := make([]string, 0, len(v))
 		for _, item := range v {
 			if s, ok := item.(string); ok {
-				result = append(result, stripControlChars(s))
+				result = append(result, sanitize.StripControlChars(s))
 			}
 		}
 		return result

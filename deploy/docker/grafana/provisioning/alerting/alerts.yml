@@ -1,0 +1,960 @@
+# MDEMG Grafana Unified Alerting Rules
+# Migrated from Prometheus alerting rules (A4 — Sprint Plan)
+#
+# Original files:
+#   - deploy/docker/prometheus/alerts/latency_slo.yaml (7 rules → 6 migrated, 1 replaced by health probes)
+#   - deploy/docker/prometheus/alerts/neo4j_graph.yaml (7 rules → 7 migrated)
+#   - deploy/docker/prometheus/alerts/rsic.yaml (8 rules → 8 migrated)
+#   - deploy/docker/prometheus/alerts/observability.yaml (4 rules → DELETED, self-referential)
+#
+# Deleted (self-referential — monitor Prometheus itself, no TSDB equivalent):
+#   - MDEMGScrapeTargetDown (up == 0)
+#   - MDEMGPrometheusUnhealthy (probe_success)
+#   - MDEMGPrometheusScrapeSlowdown (scrape_duration_seconds)
+#   - MDEMGPrometheusStorageHigh (prometheus_tsdb_storage_blocks_bytes)
+#
+# Replaced by health probes (A7):
+#   - MDEMGHealthCheckFailing (up{job="mdemg-api"} → native Go health prober)
+#
+# Total: 22 rules migrated (21 SQL-based + 1 health probe replacement)
+
+apiVersion: 1
+
+groups:
+  # ── Latency SLO Rules ──────────────────────────────────────────────────
+  - orgId: 1
+    name: mdemg_slo
+    folder: MDEMG Alerts
+    interval: 30s
+    rules:
+      - uid: mdemg-high-p95-latency
+        title: "MDEMG P95 Latency Exceeds SLO"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_http_request_duration_seconds_p95'
+                  AND metric_type = 'gauge'
+                  AND labels->>'path' = '/v1/memory/retrieve'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.250]
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "MDEMG P95 latency exceeds SLO (>250ms)"
+
+      - uid: mdemg-critical-p99-latency
+        title: "MDEMG P99 Latency Critical"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_http_request_duration_seconds_p99'
+                  AND metric_type = 'gauge'
+                  AND labels->>'path' = '/v1/memory/retrieve'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.500]
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "MDEMG P99 latency critical (>500ms)"
+
+      - uid: mdemg-high-error-rate
+        title: "MDEMG Error Rate Exceeds SLO"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time_bucket('1m', time) AS time,
+                  CASE WHEN SUM(value) > 0 THEN
+                    SUM(CASE WHEN labels->>'status' ~ '^5' THEN value ELSE 0 END)
+                    / SUM(value) * 100
+                  ELSE 0 END AS error_pct
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_http_requests_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                GROUP BY 1 ORDER BY 1
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.1]
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "MDEMG error rate exceeds 0.1% SLO"
+
+      - uid: mdemg-circuit-breaker-open
+        title: "MDEMG Circuit Breaker Open"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'service' AS service
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_circuit_breaker_state'
+                  AND metric_type = 'gauge'
+                  AND value = 1
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: count
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Circuit breaker open"
+
+      - uid: mdemg-rate-limiting-active
+        title: "MDEMG High Rate Limit Rejections"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time_bucket('1m', time) AS time,
+                  SUM(value) / 60.0 AS rate_per_sec
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rate_limit_rejected_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                GROUP BY 1 ORDER BY 1
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+        for: 2m
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "High rate limit rejections"
+
+      - uid: mdemg-low-cache-hit-ratio
+        title: "MDEMG Low Query Cache Hit Ratio"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_cache_hit_ratio'
+                  AND metric_type = 'gauge'
+                  AND labels->>'cache' = 'query'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.5]
+        for: 10m
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "Query cache hit ratio below 0.5"
+
+  # ── Neo4j Graph Health Rules ───────────────────────────────────────────
+  - orgId: 1
+    name: mdemg_neo4j_graph
+    folder: MDEMG Alerts
+    interval: 60s
+    rules:
+      - uid: mdemg-low-graph-health
+        title: "MDEMG Low Graph Health Score"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'space_id' AS space_id
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_neo4j_graph_health_score'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.5]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Graph health score below 0.5"
+
+      - uid: mdemg-high-orphan-count
+        title: "MDEMG High Orphan Count"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'space_id' AS space_id
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_neo4j_graph_orphans'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [50]
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High orphan count — consider graph-orphan cleanup"
+
+      - uid: mdemg-high-orphan-ratio
+        title: "MDEMG High Orphan Ratio"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                WITH latest AS (
+                  SELECT DISTINCT ON (labels->>'space_id')
+                    labels->>'space_id' AS space_id,
+                    value AS orphans
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_neo4j_graph_orphans'
+                    AND metric_type = 'gauge'
+                    AND time > now() - interval '15 minutes'
+                  ORDER BY labels->>'space_id', time DESC
+                ),
+                nodes AS (
+                  SELECT DISTINCT ON (labels->>'space_id')
+                    labels->>'space_id' AS space_id,
+                    value AS total_nodes
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+                    AND metric_type = 'gauge'
+                    AND time > now() - interval '15 minutes'
+                  ORDER BY labels->>'space_id', time DESC
+                )
+                SELECT now() AS time,
+                  CASE WHEN n.total_nodes > 0 THEN l.orphans / n.total_nodes ELSE 0 END AS ratio
+                FROM latest l JOIN nodes n ON l.space_id = n.space_id
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.10]
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Orphan ratio exceeds 10%"
+
+      - uid: mdemg-neo4j-high-memory
+        title: "MDEMG Neo4j High Memory Usage"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_neo4j_container_mem_percent'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Neo4j container memory usage >80%"
+
+      - uid: mdemg-neo4j-high-cpu
+        title: "MDEMG Neo4j High CPU Usage"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_neo4j_container_cpu_percent'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Neo4j container CPU usage >80%"
+
+      - uid: mdemg-neo4j-pool-exhausted
+        title: "MDEMG Neo4j Connection Pool Exhausted"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value FROM metric_samples
+                WHERE metric_name = 'mdemg_neo4j_pool_waiting_requests'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Neo4j connection pool exhaustion — requests waiting"
+
+      - uid: mdemg-graph-node-drop
+        title: "MDEMG Significant Node Count Drop"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                WITH current_val AS (
+                  SELECT DISTINCT ON (labels->>'space_id')
+                    labels->>'space_id' AS space_id, value
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+                    AND metric_type = 'gauge'
+                    AND time > now() - interval '5 minutes'
+                  ORDER BY labels->>'space_id', time DESC
+                ),
+                old_val AS (
+                  SELECT DISTINCT ON (labels->>'space_id')
+                    labels->>'space_id' AS space_id, value
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+                    AND metric_type = 'gauge'
+                    AND time BETWEEN now() - interval '65 minutes' AND now() - interval '55 minutes'
+                  ORDER BY labels->>'space_id', time DESC
+                )
+                SELECT now() AS time, o.value - c.value AS drop_count
+                FROM old_val o JOIN current_val c ON o.space_id = c.space_id
+                WHERE o.value - c.value > 0
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: max
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [100]
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Significant graph node count drop (>100 in 1 hour)"
+
+  # ── RSIC Rules ─────────────────────────────────────────────────────────
+  - orgId: 1
+    name: mdemg_rsic
+    folder: MDEMG Alerts
+    interval: 60s
+    rules:
+      - uid: mdemg-rsic-high-failure-rate
+        title: "RSIC Cycle Failure Rate >25%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                WITH started AS (
+                  SELECT SUM(value) AS total FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_cycle_total'
+                    AND metric_type = 'counter'
+                    AND labels->>'outcome' = 'started'
+                    AND time > now() - interval '10 minutes'
+                ),
+                failed AS (
+                  SELECT SUM(value) AS total FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_cycle_total'
+                    AND metric_type = 'counter'
+                    AND labels->>'outcome' IN ('error', 'low_confidence')
+                    AND time > now() - interval '10 minutes'
+                )
+                SELECT now() AS time,
+                  CASE WHEN s.total > 0 THEN f.total / s.total ELSE 0 END AS failure_rate
+                FROM started s, failed f
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.25]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC cycle failure rate exceeds 25%"
+
+      - uid: mdemg-rsic-repeated-force-triggers
+        title: "RSIC Watchdog Repeatedly Force-Triggering"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time_bucket('1h', time) AS time,
+                  SUM(value) AS force_count
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rsic_watchdog_force_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                GROUP BY 1 ORDER BY 1
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        for: 30m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "RSIC watchdog repeatedly force-triggering cycles"
+
+      - uid: mdemg-rsic-high-rejection-rate
+        title: "RSIC Trigger Rejection Rate >50%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                WITH rejected AS (
+                  SELECT SUM(value) AS total FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_trigger_rejected_total'
+                    AND metric_type = 'counter'
+                    AND time > now() - interval '15 minutes'
+                ),
+                started AS (
+                  SELECT SUM(value) AS total FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_cycle_total'
+                    AND metric_type = 'counter'
+                    AND labels->>'outcome' = 'started'
+                    AND time > now() - interval '15 minutes'
+                )
+                SELECT now() AS time,
+                  CASE WHEN COALESCE(r.total, 0) + COALESCE(s.total, 0) > 0
+                    THEN COALESCE(r.total, 0) / (COALESCE(r.total, 0) + COALESCE(s.total, 0))
+                    ELSE 0
+                  END AS rejection_rate
+                FROM rejected r, started s
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC trigger rejection rate exceeds 50%"
+
+      - uid: mdemg-rsic-action-failure-spike
+        title: "RSIC Action Failure Spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                WITH failed AS (
+                  SELECT labels->>'action' AS action, SUM(value) AS total
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_action_total'
+                    AND metric_type = 'counter'
+                    AND labels->>'status' = 'failed'
+                    AND time > now() - interval '10 minutes'
+                  GROUP BY 1
+                ),
+                dispatched AS (
+                  SELECT labels->>'action' AS action, SUM(value) AS total
+                  FROM metric_samples
+                  WHERE metric_name = 'mdemg_rsic_action_total'
+                    AND metric_type = 'counter'
+                    AND labels->>'status' = 'dispatched'
+                    AND time > now() - interval '10 minutes'
+                  GROUP BY 1
+                )
+                SELECT now() AS time,
+                  CASE WHEN d.total > 0 THEN f.total / d.total ELSE 0 END AS failure_rate
+                FROM failed f JOIN dispatched d ON f.action = d.action
+                WHERE d.total > 0 AND f.total / d.total > 0.5
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: max
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC action failure rate exceeds 50%"
+
+      - uid: mdemg-rsic-safety-rejection-spike
+        title: "RSIC Safety Blocking Actions"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time_bucket('1m', time) AS time,
+                  SUM(value) AS blocked_per_min
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rsic_safety_blocked_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                GROUP BY 1 ORDER BY 1
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.1]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC safety validator blocking actions at elevated rate"
+
+      - uid: mdemg-rsic-low-confidence
+        title: "RSIC Calibration Confidence Low"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'action' AS action
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rsic_calibration_confidence'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.3]
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC calibration confidence below 0.3"
+
+      - uid: mdemg-rsic-high-decay-score
+        title: "RSIC Watchdog Decay Score High"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'space_id' AS space_id
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rsic_watchdog_decay_score'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [8.0]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC watchdog decay score high — system not cycling"
+
+      - uid: mdemg-rsic-cycle-duration-spike
+        title: "RSIC Cycle P95 Duration >5min"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value, labels->>'tier' AS tier
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_rsic_cycle_duration_seconds_p95'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [300]
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RSIC cycle P95 duration exceeds 5 minutes"

@@ -1,0 +1,24 @@
+{
+  "spec_version": "1.0.0",
+  "name": "tsdb_schema_v3",
+  "description": "Validates TSDB schema migration 003 adds metric_type column",
+  "framework": "UOTS",
+  "type": "schema",
+  "merge_blocking": false,
+  "validation": {
+    "type": "sql_check",
+    "checks": [
+      {
+        "description": "metric_samples table has metric_type column",
+        "query": "SELECT column_name FROM information_schema.columns WHERE table_name = 'metric_samples' AND column_name = 'metric_type'",
+        "expected_rows_minimum": 1
+      },
+      {
+        "description": "schema_version is 3",
+        "query": "SELECT value FROM tsdb_schema_meta WHERE key = 'schema_version'",
+        "expected_value": "3"
+      }
+    ]
+  },
+  "tags": ["tsdb", "schema", "migration", "A0"]
+}

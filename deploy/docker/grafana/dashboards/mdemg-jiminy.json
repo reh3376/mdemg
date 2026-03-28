@@ -10,7 +10,9 @@
     {
       "title": "Dashboards",
       "type": "dashboards",
-      "tags": ["mdemg"],
+      "tags": [
+        "mdemg"
+      ],
       "icon": "external link",
       "asDropdown": true
     }
@@ -20,19 +22,32 @@
       "title": "Guidance Health",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "panels": []
     },
     {
       "title": "Guidance Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}",
-          "legendFormat": "Guidance Health",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -48,9 +63,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -59,13 +83,21 @@
     {
       "title": "Follow Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_follow_rate{space_id=\"$space_id\"}",
-          "legendFormat": "Follow Rate",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -81,9 +113,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -92,13 +133,21 @@
     {
       "title": "Constraint Effectiveness",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_constraint_effectiveness{space_id=\"$space_id\"}",
-          "legendFormat": "Constraint Effectiveness",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_constraint_effectiveness' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -114,9 +163,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -125,13 +183,21 @@
     {
       "title": "Source Diversity",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_source_diversity{space_id=\"$space_id\"}",
-          "legendFormat": "Source Diversity",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_source_diversity' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
@@ -147,9 +213,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -158,8 +233,16 @@
     {
       "title": "Health Formula",
       "type": "text",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "options": {
         "mode": "markdown",
         "content": "### Guidance Health\n\n| Weight | Factor |\n|--------|--------|\n| **50%** | Follow Rate |\n| **30%** | Effectiveness |\n| **20%** | Source Diversity |"
@@ -169,54 +252,76 @@
       "title": "Guidance Activity",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "panels": []
     },
     {
       "title": "Total Guidance Issued",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_guidance_total{space_id=\"$space_id\"}",
-          "legendFormat": "Total Issued",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "fieldConfig": {
-        "defaults": {}
+        "defaults": {
+          "displayName": "Guidance Issued"
+        }
       }
     },
     {
       "title": "Outcome Distribution",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_followed_total{space_id=\"$space_id\"}",
-          "legendFormat": "Followed",
-          "instant": true,
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_ignored_total{space_id=\"$space_id\"}",
-          "legendFormat": "Ignored",
-          "instant": true,
-          "refId": "B"
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_contradicted_total{space_id=\"$space_id\"}",
-          "legendFormat": "Contradicted",
-          "instant": true,
-          "refId": "C"
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
         "pieType": "donut",
         "reduceOptions": {
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         },
         "legend": {
           "displayMode": "table",
@@ -227,21 +332,60 @@
         "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Followed" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Followed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Ignored" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Ignored"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Contradicted" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Contradicted"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
@@ -251,36 +395,51 @@
       "title": "Effectiveness Trends",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "panels": []
     },
     {
       "title": "Effectiveness Trends",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_follow_rate{space_id=\"$space_id\"}",
-          "legendFormat": "Follow Rate",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_constraint_effectiveness{space_id=\"$space_id\"}",
-          "legendFormat": "Constraint Effectiveness",
-          "refId": "B"
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_constraint_effectiveness' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_source_diversity{space_id=\"$space_id\"}",
-          "legendFormat": "Source Diversity",
-          "refId": "C"
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_source_diversity' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         }
       },
       "fieldConfig": {
@@ -288,29 +447,75 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Follow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Effectiveness"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Diversity"
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "title": "Outcome Trends",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_jiminy_followed_total{space_id=\"$space_id\"}",
-          "legendFormat": "Followed",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_ignored_total{space_id=\"$space_id\"}",
-          "legendFormat": "Ignored",
-          "refId": "B"
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_jiminy_contradicted_total{space_id=\"$space_id\"}",
-          "legendFormat": "Contradicted",
-          "refId": "C"
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "fieldConfig": {
@@ -325,21 +530,60 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Followed" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Followed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Ignored" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Ignored"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Contradicted" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Contradicted"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
@@ -349,14 +593,27 @@
       "title": "Constraint Effectiveness",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "panels": []
     },
     {
       "title": "Per-Constraint Effectiveness",
       "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
-      "datasource": { "type": "kniepdennis-neo4j-datasource", "uid": "neo4j" },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
       "targets": [
         {
           "refId": "A",
@@ -372,18 +629,31 @@
       "title": "Historical Trends",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
       "panels": []
     },
     {
       "title": "Guidance Follow Rate Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('jiminy_follow_rate','jiminy_constraint_effectiveness','jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_jiminy_follow_rate','mdemg_jiminy_constraint_effectiveness','mdemg_jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
           "format": "time_series"
         }
       ],
@@ -399,19 +669,65 @@
             "pointSize": 5,
             "showPoints": "auto"
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_follow_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Follow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_constraint_effectiveness"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Constraint Effectiveness"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_source_diversity"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Diversity"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull", "mean", "min", "max"]
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
         }
       }
     }
   ],
   "schemaVersion": 39,
-  "tags": ["mdemg", "jiminy"],
+  "tags": [
+    "mdemg",
+    "jiminy"
+  ],
   "refresh": "30s",
   "templating": {
     "list": [
@@ -420,24 +736,42 @@
         "label": "Instance",
         "type": "custom",
         "query": "localhost:9999",
-        "current": { "text": "localhost:9999", "value": "localhost:9999" },
-        "options": [{ "text": "localhost:9999", "value": "localhost:9999", "selected": true }]
+        "current": {
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "options": [
+          {
+            "text": "localhost:9999",
+            "value": "localhost:9999",
+            "selected": true
+          }
+        ]
       },
       {
         "name": "space_id",
         "label": "Space ID",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(mdemg_jiminy_guidance_total{space_id!~\"test-.*\"}, space_id)",
-        "query": { "query": "label_values(mdemg_jiminy_guidance_total{space_id!~\"test-.*\"}, space_id)", "refId": "StandardVariableQuery" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "query": "SELECT DISTINCT space_id AS __value, space_id AS __text FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND space_id !~ 'test-.*' ORDER BY 1",
         "refresh": 2,
         "sort": 1,
         "includeAll": false,
-        "multi": false
+        "multi": false,
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        }
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "MDEMG Jiminy Guidance",

@@ -40,6 +40,7 @@ type Assessor struct {
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
 	synergyReader     SynergyFileReader     // Synergy: file metrics provider
 	freshnessProvider FreshnessProvider     // Phase 47.2: ingest staleness provider
+	sidecarChecker    func(context.Context) bool  // Sidecar health checker (nil = not configured)
 	reportCallback    func(*SelfAssessmentReport) // TSDB Sprint: called after Assess with the report
 }
 
@@ -66,6 +67,11 @@ func (a *Assessor) SetSynergyReader(r SynergyFileReader) {
 // SetFreshnessProvider attaches an ingest freshness provider for staleness detection (Phase 47.2).
 func (a *Assessor) SetFreshnessProvider(p FreshnessProvider) {
 	a.freshnessProvider = p
+}
+
+// SetSidecarChecker attaches a sidecar health checker for assessment.
+func (a *Assessor) SetSidecarChecker(fn func(context.Context) bool) {
+	a.sidecarChecker = fn
 }
 
 // SetReportCallback sets a callback invoked after each Assess() with the report.
@@ -158,6 +164,13 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		// Recovery buffer: count pending entries (CMS space + local JSONL)
 		report.SynergyRecoveryBufferEntries = countBufferSpaceEntries(ctx, a.driver, a.cfg.SynergyRecoveryBufferSpace) +
 			countLocalBufferEntries(a.cfg.SynergyRecoveryBufferPath)
+	}
+
+	// 5d-sidecar: Check neural sidecar health
+	if a.sidecarChecker != nil {
+		report.SidecarHealthy = a.sidecarChecker(ctx)
+	} else {
+		report.SidecarHealthy = true // not configured = not required
 	}
 
 	// 5e. Freshness: Count stale spaces for RSIC ingest awareness (Phase 47.2)

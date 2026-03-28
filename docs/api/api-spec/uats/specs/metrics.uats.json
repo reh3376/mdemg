@@ -1,7 +1,7 @@
 {
   "uats_version": "1.0.0",
   "api": {
-    "name": "Prometheus Metrics",
+    "name": "Graph Metrics",
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-01-29",
-    "description": "Validates Prometheus Metrics endpoint",
+    "description": "Validates Graph Metrics endpoint",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "150b9be4eb88f2517eb6cfbb4651f4a88f504d77e77299bff8bc29e5d01b908a"
+    "sha256": "71dfa75197e5705ebd8d41fc6bc7ffd5b71c1efc3501e4117b9017b813e780e5"
   },
   "variables": {
     "test_space": "demo"

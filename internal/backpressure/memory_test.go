@@ -102,7 +102,7 @@ func TestMemoryPressure_Middleware_HealthBypass(t *testing.T) {
 	}))
 
 	// Test health endpoints bypass
-	healthPaths := []string{"/healthz", "/readyz", "/v1/prometheus"}
+	healthPaths := []string{"/healthz", "/readyz", "/v1/metrics/snapshot"}
 	for _, path := range healthPaths {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rr := httptest.NewRecorder()

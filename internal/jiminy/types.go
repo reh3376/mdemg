@@ -123,10 +123,11 @@ const (
 
 // GuidanceFeedbackRequest is the input to the feedback endpoint.
 type GuidanceFeedbackRequest struct {
-	GuidanceID    string `json:"guidance_id"`
-	ActionSummary string `json:"action_summary"`
-	SpaceID       string `json:"space_id"`
-	SessionID     string `json:"session_id,omitempty"` // J17: per-session trust routing (falls back to SpaceID)
+	GuidanceID    string          `json:"guidance_id"`
+	ActionSummary string          `json:"action_summary"`
+	SpaceID       string          `json:"space_id"`
+	SessionID     string          `json:"session_id,omitempty"`  // J17: per-session trust routing (falls back to SpaceID)
+	Outcome       GuidanceOutcome `json:"outcome,omitempty"`     // B4: explicit outcome bypasses heuristic classification
 }
 
 // GuidanceFeedbackResponse is the output from the feedback endpoint.

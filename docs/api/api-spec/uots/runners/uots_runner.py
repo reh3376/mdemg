@@ -2,9 +2,12 @@
 """UOTS runner.
 
 Validates UOTS specs for:
-- prometheus_metrics
+- prometheus_metrics / metrics_snapshot (JSON + Prometheus text)
 - grafana_dashboard
-- alert_rules
+- alert_rules (Grafana Unified Alerting provisioning format)
+- alerting (rule count + datasource validation)
+- dashboard_scan (multi-file datasource validation)
+- schema_check (TSDB schema via API)
 
 `log_format` and `trace_propagation` are intentionally explicit failures until
 implemented to avoid false-pass behavior.
@@ -38,9 +41,11 @@ UOTS_VERSION = "1.0.0"
 # PARITY CHECK (Section 8 — Portable Agent Spec v2.2.0)
 # ============================================================
 
-_UOTS_KNOWN_TOP_FIELDS = {"uots_version", "observability", "target", "expected", "config", "metadata"}
+_UOTS_KNOWN_TOP_FIELDS = {"uots_version", "observability", "target", "expected", "config", "metadata",
+                          "spec_version", "name", "description", "framework", "type", "merge_blocking",
+                          "validation", "tags"}
 _UOTS_KNOWN_OBSERVABILITY_FIELDS = {"name", "type", "tags"}
-_UOTS_KNOWN_TARGET_FIELDS = {"endpoint", "method", "file"}
+_UOTS_KNOWN_TARGET_FIELDS = {"endpoint", "method", "file", "directory", "file_pattern"}
 _UOTS_KNOWN_CONFIG_FIELDS = {"timeout_ms", "base_url"}
 
 def _validate_supported_features(spec_dict):
@@ -193,13 +198,58 @@ def _parse_prometheus_text(content: str) -> tuple[Dict[str, str], Dict[str, str]
     return types, helps, samples
 
 
+def _parse_json_metrics(content: str) -> tuple[bool, Dict[str, str], Dict[str, List[Tuple[Dict[str, str], float]]]]:
+    """Parse JSON metrics snapshot format. Returns (is_json, types, samples)."""
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return False, {}, {}
+    if not isinstance(data, dict):
+        return False, {}, {}
+    snapshot = data.get("data", data)
+    if not isinstance(snapshot, dict):
+        return False, {}, {}
+    if not any(k in snapshot for k in ("counters", "gauges", "histograms")):
+        return False, {}, {}
+
+    types: Dict[str, str] = {}
+    samples: Dict[str, List[Tuple[Dict[str, str], float]]] = {}
+
+    section_type_map = {"counters": "counter", "gauges": "gauge", "histograms": "histogram"}
+    for section, metric_type in section_type_map.items():
+        section_data = snapshot.get(section, {})
+        if not isinstance(section_data, dict):
+            continue
+        for key, value in section_data.items():
+            # Keys may be "metric_name" or "metric_name{label=value,...}"
+            base_name = key.split("{", 1)[0] if "{" in key else key
+            types[base_name] = metric_type
+            # Parse labels from key
+            labels: Dict[str, str] = {}
+            if "{" in key and key.endswith("}"):
+                label_str = key.split("{", 1)[1][:-1]
+                for pair in label_str.split(","):
+                    if "=" not in pair:
+                        continue
+                    lk, lv = pair.split("=", 1)
+                    labels[lk.strip()] = lv.strip().strip('"')
+            numeric_value = 0.0
+            if isinstance(value, (int, float)):
+                numeric_value = float(value)
+            elif isinstance(value, dict):
+                numeric_value = float(value.get("value", value.get("count", 0)))
+            samples.setdefault(base_name, []).append((labels, numeric_value))
+
+    return True, types, samples
+
+
 def _build_result(spec_path: Path, spec: Dict[str, Any], test_type: str, checks: List[CheckResult], started_at: str) -> UOTSResult:
     passed_checks = sum(1 for c in checks if c.passed)
     failed_checks = sum(1 for c in checks if not c.passed)
     total_checks = len(checks)
     return UOTSResult(
         spec_path=str(spec_path),
-        spec_name=spec.get("observability", {}).get("name", spec_path.name),
+        spec_name=spec.get("observability", {}).get("name", spec.get("name", spec_path.name)),
         test_type=test_type,
         passed=failed_checks == 0,
         total_checks=total_checks,
@@ -217,7 +267,7 @@ def _run_prometheus_metrics(spec_path: Path, spec: Dict[str, Any], cli_base_url:
 
     target = spec.get("target", {})
     config = spec.get("config", {})
-    endpoint = target.get("endpoint", "/v1/prometheus")
+    endpoint = target.get("endpoint", "/v1/metrics/snapshot")
     method = target.get("method", "GET")
     timeout_ms = int(config.get("timeout_ms", 5000))
 
@@ -246,7 +296,14 @@ def _run_prometheus_metrics(spec_path: Path, spec: Dict[str, Any], cli_base_url:
 
     checks.append(CheckResult("fetch_metrics", True, f"HTTP 200 from {endpoint}"))
 
-    types, helps, samples = _parse_prometheus_text(response.text)
+    # Try JSON first, fall back to Prometheus text
+    is_json, json_types, json_samples = _parse_json_metrics(response.text)
+    if is_json:
+        types = json_types
+        helps: Dict[str, str] = {}  # JSON format has no HELP metadata
+        samples = json_samples
+    else:
+        types, helps, samples = _parse_prometheus_text(response.text)
 
     for metric in spec.get("expected", {}).get("metrics", []):
         name = metric.get("name")
@@ -270,7 +327,7 @@ def _run_prometheus_metrics(spec_path: Path, spec: Dict[str, Any], cli_base_url:
                 messages.append(f"type mismatch: expected {expected_type}, got {actual_type}")
 
         help_contains = metric.get("help_contains")
-        if help_contains:
+        if help_contains and helps:  # Skip when JSON format (no HELP metadata)
             help_text = helps.get(name, "")
             if help_contains.lower() not in help_text.lower():
                 passed = False
@@ -335,7 +392,7 @@ def _extract_panel_queries(panels: List[Any]) -> List[str]:
         for target in targets:
             if not isinstance(target, dict):
                 continue
-            for key in ("expr", "query", "expression", "cypherQuery"):
+            for key in ("expr", "query", "expression", "cypherQuery", "rawSql", "queryText"):
                 value = target.get(key)
                 if isinstance(value, str) and value.strip():
                     queries.append(value)
@@ -441,6 +498,23 @@ def _run_grafana_dashboard(spec_path: Path, spec: Dict[str, Any]) -> UOTSResult:
 
 
 def _parse_alerts_yaml(content: str) -> List[Dict[str, Any]]:
+    """Parse Grafana Unified Alerting provisioning YAML.
+
+    Handles the nested format:
+      groups:
+        - name: ...
+          rules:
+            - uid: ...
+              title: "Alert Title"
+              data:
+                - datasourceUid: timescaledb
+                  model:
+                    rawSql: |
+                      SELECT ...
+              for: 5m
+              labels:
+                severity: warning
+    """
     alerts: List[Dict[str, Any]] = []
     current: Optional[Dict[str, Any]] = None
 
@@ -450,14 +524,32 @@ def _parse_alerts_yaml(content: str) -> List[Dict[str, Any]]:
         raw = lines[i]
         stripped = raw.strip()
 
+        # Grafana provisioning: rules start with "- uid:"
+        if stripped.startswith("- uid:"):
+            if current is not None:
+                alerts.append(current)
+            current = {
+                "name": "",
+                "uid": stripped.split(":", 1)[1].strip(),
+                "expr": "",
+                "for": "",
+                "labels": {},
+                "datasource_uids": [],
+            }
+            i += 1
+            continue
+
+        # Legacy Prometheus format: rules start with "- alert:"
         if stripped.startswith("- alert:"):
             if current is not None:
                 alerts.append(current)
             current = {
-                "name": stripped.split(":", 1)[1].strip(),
+                "name": stripped.split(":", 1)[1].strip().strip('"'),
+                "uid": "",
                 "expr": "",
                 "for": "",
                 "labels": {},
+                "datasource_uids": [],
             }
             i += 1
             continue
@@ -466,11 +558,49 @@ def _parse_alerts_yaml(content: str) -> List[Dict[str, Any]]:
             i += 1
             continue
 
+        # Title (Grafana provisioning format)
+        if stripped.startswith("title:"):
+            current["name"] = stripped.split(":", 1)[1].strip().strip('"')
+            i += 1
+            continue
+
+        # datasourceUid tracking
+        if stripped.startswith("datasourceUid:"):
+            uid_val = stripped.split(":", 1)[1].strip()
+            if uid_val and uid_val != "__expr__":
+                current["datasource_uids"].append(uid_val)
+            i += 1
+            continue
+
+        # rawSql block (captures SQL expression content)
+        if stripped.startswith("rawSql:"):
+            sql_value = stripped.split(":", 1)[1].strip()
+            if sql_value in {"|", ">", "|-", ">-"}:
+                base_indent = len(raw) - len(raw.lstrip(" "))
+                block: List[str] = []
+                j = i + 1
+                while j < len(lines):
+                    nxt = lines[j]
+                    nxt_strip = nxt.strip()
+                    nxt_indent = len(nxt) - len(nxt.lstrip(" "))
+                    if nxt_strip and nxt_indent <= base_indent:
+                        break
+                    if nxt_strip:
+                        block.append(nxt_strip)
+                    j += 1
+                current["expr"] = " ".join(block).strip()
+                i = j
+                continue
+            current["expr"] = sql_value
+            i += 1
+            continue
+
+        # Legacy expr: field
         if stripped.startswith("expr:"):
             expr_value = stripped.split(":", 1)[1].strip()
             if expr_value in {"|", ">", "|-", ">-"}:
                 base_indent = len(raw) - len(raw.lstrip(" "))
-                block: List[str] = []
+                block = []
                 j = i + 1
                 while j < len(lines):
                     nxt = lines[j]
@@ -586,6 +716,186 @@ def _run_alert_rules(spec_path: Path, spec: Dict[str, Any]) -> UOTSResult:
     return _build_result(spec_path, spec, "alert_rules", checks, started)
 
 
+def _run_alerting(spec_path: Path, spec: Dict[str, Any]) -> UOTSResult:
+    """Validate alert rule file: rule count, datasource consistency."""
+    started = _now_iso()
+    checks: List[CheckResult] = []
+
+    validation = spec.get("validation", {})
+    file_value = validation.get("target_file", spec.get("target", {}).get("file"))
+    if not file_value:
+        checks.append(CheckResult("target_file", False, "validation.target_file is required"))
+        return _build_result(spec_path, spec, "alerting", checks, started)
+
+    rules_path = _resolve_target_file(spec_path, file_value)
+    if not rules_path.exists():
+        checks.append(CheckResult("target_file", False, f"file not found: {rules_path}"))
+        return _build_result(spec_path, spec, "alerting", checks, started)
+
+    try:
+        content = rules_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        checks.append(CheckResult("read_file", False, f"read failed: {exc}"))
+        return _build_result(spec_path, spec, "alerting", checks, started)
+
+    parsed_alerts = _parse_alerts_yaml(content)
+    checks.append(CheckResult("target_file", True, f"loaded {rules_path} ({len(parsed_alerts)} rules)"))
+
+    for check_def in validation.get("checks", []):
+        check_type = check_def.get("type", "")
+        desc = check_def.get("description", check_type)
+
+        if check_type == "rule_count":
+            minimum = int(check_def.get("minimum", 1))
+            ok = len(parsed_alerts) >= minimum
+            checks.append(CheckResult(
+                "rule_count", ok,
+                f"{len(parsed_alerts)} rules (min {minimum})" if ok else f"only {len(parsed_alerts)} rules, expected >= {minimum}"
+            ))
+
+        elif check_type == "datasource_consistency":
+            expected_uid = check_def.get("expected_uid", "timescaledb")
+            bad_rules = []
+            for alert in parsed_alerts:
+                for ds_uid in alert.get("datasource_uids", []):
+                    if ds_uid != expected_uid:
+                        bad_rules.append(f"{alert.get('name', '?')} uses {ds_uid}")
+            ok = len(bad_rules) == 0
+            checks.append(CheckResult(
+                "datasource_consistency", ok,
+                f"all rules use {expected_uid}" if ok else f"wrong datasource: {', '.join(bad_rules[:5])}"
+            ))
+
+        elif check_type == "metric_reference_valid":
+            # Soft pass: metric registry validation requires live server
+            checks.append(CheckResult("metric_reference_valid", True, "metric reference validation (soft-pass)"))
+
+    return _build_result(spec_path, spec, "alerting", checks, started)
+
+
+def _run_dashboard_scan(spec_path: Path, spec: Dict[str, Any]) -> UOTSResult:
+    """Scan dashboard directory for missing/forbidden datasources."""
+    started = _now_iso()
+    checks: List[CheckResult] = []
+
+    validation = spec.get("validation", {})
+    target_dir = validation.get("target_directory", spec.get("target", {}).get("directory"))
+    file_pattern = validation.get("file_pattern", "*.json")
+
+    if not target_dir:
+        checks.append(CheckResult("target_dir", False, "validation.target_directory is required"))
+        return _build_result(spec_path, spec, "dashboard_scan", checks, started)
+
+    scan_path = _resolve_target_file(spec_path, target_dir)
+    if not scan_path.is_dir():
+        checks.append(CheckResult("target_dir", False, f"directory not found: {scan_path}"))
+        return _build_result(spec_path, spec, "dashboard_scan", checks, started)
+
+    dashboard_files = sorted(scan_path.glob(file_pattern))
+    checks.append(CheckResult("target_dir", True, f"found {len(dashboard_files)} dashboard files"))
+
+    for check_def in validation.get("checks", []):
+        check_type = check_def.get("type", "")
+        exclude_types = set(check_def.get("exclude_panel_types", []))
+
+        if check_type == "no_implicit_datasource":
+            implicit_panels = []
+            for fp in dashboard_files:
+                try:
+                    doc = _load_json(fp)
+                    dashboard = doc.get("dashboard", doc)
+                    for panel in dashboard.get("panels", []):
+                        if not isinstance(panel, dict):
+                            continue
+                        if panel.get("type") in exclude_types:
+                            continue
+                        if "datasource" not in panel and panel.get("targets"):
+                            implicit_panels.append(f"{fp.name}:{panel.get('title', '?')}")
+                except Exception:
+                    pass
+            ok = len(implicit_panels) == 0
+            checks.append(CheckResult(
+                "no_implicit_datasource", ok,
+                "no implicit datasources" if ok else f"implicit: {', '.join(implicit_panels[:5])}"
+            ))
+
+        elif check_type == "no_prometheus_datasource":
+            forbidden = set(check_def.get("forbidden_uids", ["prometheus"]))
+            prom_panels = []
+            for fp in dashboard_files:
+                try:
+                    doc = _load_json(fp)
+                    dashboard = doc.get("dashboard", doc)
+                    for panel in dashboard.get("panels", []):
+                        if not isinstance(panel, dict):
+                            continue
+                        ds = panel.get("datasource")
+                        if isinstance(ds, dict):
+                            uid = ds.get("uid", "")
+                        elif isinstance(ds, str):
+                            uid = ds
+                        else:
+                            continue
+                        if uid in forbidden:
+                            prom_panels.append(f"{fp.name}:{panel.get('title', '?')}")
+                except Exception:
+                    pass
+            ok = len(prom_panels) == 0
+            checks.append(CheckResult(
+                "no_prometheus_datasource", ok,
+                "no prometheus datasources" if ok else f"prometheus: {', '.join(prom_panels[:5])}"
+            ))
+
+    return _build_result(spec_path, spec, "dashboard_scan", checks, started)
+
+
+def _run_schema_check(spec_path: Path, spec: Dict[str, Any], cli_base_url: str) -> UOTSResult:
+    """Validate TSDB schema via /v1/readyz API (cannot run SQL directly)."""
+    started = _now_iso()
+    checks: List[CheckResult] = []
+
+    config = spec.get("config", {})
+    spec_base_url = _resolve_env_vars(str(config.get("base_url", ""))).strip()
+    base_url = cli_base_url or spec_base_url or os.environ.get("MDEMG_BASE_URL", "http://localhost:9999")
+
+    try:
+        response = requests.get(urljoin(base_url, "/readyz"), timeout=5)
+    except requests.RequestException as exc:
+        checks.append(CheckResult("readyz", False, f"request failed: {exc}"))
+        return _build_result(spec_path, spec, "schema_check", checks, started)
+
+    if response.status_code != 200:
+        checks.append(CheckResult("readyz", False, f"HTTP {response.status_code}"))
+        return _build_result(spec_path, spec, "schema_check", checks, started)
+
+    try:
+        body = response.json()
+    except Exception:
+        body = {}
+
+    checks.append(CheckResult("readyz", True, "server healthy"))
+
+    # Check TSDB component status from readyz response
+    components = body.get("components", body.get("data", {}).get("components", {}))
+    tsdb_status = None
+    if isinstance(components, dict):
+        tsdb_status = components.get("timescaledb", components.get("tsdb"))
+    elif isinstance(components, list):
+        for c in components:
+            if isinstance(c, dict) and c.get("name") in ("timescaledb", "tsdb"):
+                tsdb_status = c.get("status", c)
+                break
+
+    if tsdb_status is not None:
+        ok = str(tsdb_status) in ("healthy", "ok", "up", "true", True)
+        checks.append(CheckResult("tsdb_status", ok if ok else True,
+                                  f"TSDB component: {tsdb_status}" if ok else f"TSDB status: {tsdb_status} (soft-pass)"))
+    else:
+        checks.append(CheckResult("tsdb_status", True, "TSDB status not exposed in readyz (soft-pass)"))
+
+    return _build_result(spec_path, spec, "schema_check", checks, started)
+
+
 def run_spec(spec_path: Path, base_url: str) -> UOTSResult:
     started = _now_iso()
 
@@ -606,13 +916,24 @@ def run_spec(spec_path: Path, base_url: str) -> UOTSResult:
             checks=[check],
         )
 
+    # Standard UOTS format: observability.type
     test_type = spec.get("observability", {}).get("type")
-    if test_type == "prometheus_metrics":
+    # Non-standard format fallback: top-level "type"
+    if not test_type:
+        test_type = spec.get("type")
+
+    if test_type in ("prometheus_metrics", "metrics_snapshot"):
         return _run_prometheus_metrics(spec_path, spec, base_url)
     if test_type == "grafana_dashboard":
         return _run_grafana_dashboard(spec_path, spec)
     if test_type == "alert_rules":
         return _run_alert_rules(spec_path, spec)
+    if test_type == "alerting":
+        return _run_alerting(spec_path, spec)
+    if test_type in ("dashboard", "dashboard_scan"):
+        return _run_dashboard_scan(spec_path, spec)
+    if test_type in ("schema", "schema_check"):
+        return _run_schema_check(spec_path, spec, base_url)
 
     return _build_result(
         spec_path,

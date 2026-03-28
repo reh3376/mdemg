@@ -1,6 +1,7 @@
 package api
 
 import (
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"math"
@@ -12,6 +13,15 @@ import (
 
 	"mdemg/internal/models"
 )
+
+//go:embed static/topology3d.html
+var topology3dHTML []byte
+
+// handleVizTopology serves the 3D topology viewer.
+func (s *Server) handleVizTopology(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(topology3dHTML) //nolint:errcheck
+}
 
 // Default edge types for topology visualization.
 var defaultVizEdgeTypes = []string{
@@ -202,7 +212,6 @@ func buildNode(rec *neo4j.Record) (models.GraphVizNode, bool) {
 		return models.GraphVizNode{}, false
 	}
 	layer := safeInt(mustGet(rec, "layer"))
-	activation := safeFloat(mustGet(rec, "activation"))
 	confidence := safeFloat(mustGet(rec, "confidence"))
 	edgeCount := safeInt(mustGet(rec, "edge_count"))
 	roleType := safeString(mustGet(rec, "role_type"))
@@ -216,7 +225,7 @@ func buildNode(rec *neo4j.Record) (models.GraphVizNode, bool) {
 		ID:               nodeID,
 		Title:            safeString(mustGet(rec, "title")),
 		SubTitle:         subtitle,
-		MainStat:         fmt.Sprintf("A:%.2f", activation),
+		MainStat:         fmt.Sprintf("%d edges", edgeCount),
 		SecondaryStat:    fmt.Sprintf("C:%.2f", confidence),
 		Color:            layerColor(layer),
 		DetailRoleType:   roleType,
@@ -236,7 +245,6 @@ const enrichedNodeReturn = `
 	RETURN n.node_id AS id,
 	       COALESCE(n.name, n.summary, 'unnamed') AS title,
 	       n.layer AS layer,
-	       COALESCE(n.activation, 0.0) AS activation,
 	       COALESCE(n.confidence, 0.0) AS confidence,
 	       COALESCE(n.role_type, 'unknown') AS role_type,
 	       COALESCE(n.obs_type, '') AS obs_type,
@@ -249,7 +257,7 @@ const enrichedNodeReturn = `
 	       COALESCE(n.status, 'active') AS status`
 
 // handleGraphTopology returns graph nodes and edges in Grafana Node Graph format.
-// GET /v1/memory/graph/topology?space_id=xxx&layers=2,3,4,5&limit=150
+// GET /v1/memory/graph/topology?space_id=xxx&layers=2,3,4,5&page=1&page_size=500
 func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
@@ -266,10 +274,22 @@ func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 	focusNodes := parseFocusNodes(r)
 	showHidden := r.URL.Query().Get("show_hidden") == "true"
 
-	limit := 150
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 500 {
-			limit = parsed
+	pageSize := 500
+	if v := r.URL.Query().Get("page_size"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 5000 {
+			pageSize = parsed
+		}
+	}
+	page := 1
+	if v := r.URL.Query().Get("page"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	// Backward compat: treat limit= as page_size when page= is absent.
+	if r.URL.Query().Get("limit") != "" && r.URL.Query().Get("page") == "" {
+		if parsed, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && parsed > 0 && parsed <= 5000 {
+			pageSize = parsed
 		}
 	}
 
@@ -277,15 +297,48 @@ func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Query nodes
-	nodeMap := make(map[string]models.GraphVizNode)
+	// Count total matching nodes for pagination metadata.
+	var totalNodes int
+	countParams := map[string]any{
+		"spaceId":    spaceID,
+		"layers":     layers,
+		"showHidden": showHidden,
+	}
 	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, cErr := tx.Run(ctx, `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.layer IN $layers
+			  AND ($showHidden OR coalesce(n.status, 'active') <> 'hidden')
+			RETURN count(n) AS total`, countParams)
+		if cErr != nil {
+			return nil, cErr
+		}
+		if res.Next(ctx) {
+			totalNodes = int(res.Record().Values[0].(int64))
+		}
+		return nil, res.Err()
+	})
+	if err != nil {
+		slog.Error("graph-topology: count query failed", "error", err)
+		writeInternalError(w, err, "graph topology count")
+		return
+	}
+
+	totalPages := max((totalNodes+pageSize-1)/pageSize, 1)
+	if page > totalPages {
+		page = totalPages
+	}
+
+	// Query nodes for the requested page.
+	nodeMap := make(map[string]models.GraphVizNode)
+	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		var cypher string
 		params := map[string]any{
 			"spaceId":    spaceID,
 			"layers":     layers,
 			"showHidden": showHidden,
-			"limit":      int64(limit),
+			"skip":       int64((page - 1) * pageSize),
+			"limit":      int64(pageSize),
 		}
 
 		if len(focusNodes) > 0 {
@@ -299,23 +352,39 @@ func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 				WITH collect(DISTINCT center) + collect(DISTINCT neighbor) AS all_nodes
 				UNWIND all_nodes AS n
 				WITH DISTINCT n` + enrichedNodeReturn + `
-				ORDER BY n.activation DESC
-				LIMIT $limit`
+				ORDER BY edge_count DESC
+				SKIP $skip LIMIT $limit`
 			params["focusNodes"] = focusNodes
 		} else {
-			// Full topology mode
+			// Full topology mode — layer-balanced selection.
+			// Pick top nodes from each layer proportionally so cross-layer edges
+			// are visible (pure edge_count sort concentrates on L0 only).
 			cypher = `
 				MATCH (n:MemoryNode {space_id: $spaceId})
 				WHERE n.layer IN $layers
-				  AND ($showHidden OR coalesce(n.status, 'active') <> 'hidden')` +
-				enrichedNodeReturn + `
-				ORDER BY n.activation DESC
-				LIMIT $limit`
+				  AND ($showHidden OR coalesce(n.status, 'active') <> 'hidden')
+				WITH n.layer AS lyr, count(n) AS lyrCount
+				WITH lyr, lyrCount,
+				     toInteger(ceil(toFloat(lyrCount) / $totalMatching * $limit)) AS quota
+				ORDER BY lyr
+				WITH collect({layer: lyr, quota: quota}) AS quotas
+				UNWIND quotas AS q
+				MATCH (n:MemoryNode {space_id: $spaceId})
+				WHERE n.layer = q.layer
+				  AND ($showHidden OR coalesce(n.status, 'active') <> 'hidden')
+				WITH n, q.quota AS quota
+				ORDER BY size([(n)-[]-() | 1]) DESC
+				WITH n, quota
+				WITH n.layer AS lyr, collect(n) AS layerNodes, quota
+				WITH lyr, layerNodes[toInteger($skip * quota / $limit)..toInteger($skip * quota / $limit) + quota] AS pageNodes
+				UNWIND pageNodes AS n` + enrichedNodeReturn + `
+				ORDER BY edge_count DESC`
+			params["totalMatching"] = int64(totalNodes)
 		}
 
-		res, err := tx.Run(ctx, cypher, params)
-		if err != nil {
-			return nil, err
+		res, qErr := tx.Run(ctx, cypher, params)
+		if qErr != nil {
+			return nil, qErr
 		}
 		for res.Next(ctx) {
 			if node, ok := buildNode(res.Record()); ok {
@@ -330,55 +399,47 @@ func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Query edges between those nodes
-	edges := make([]models.GraphVizEdge, 0)
-	_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, `
-			MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})
-			WHERE a.layer IN $layers AND b.layer IN $layers
-			  AND type(r) IN $edgeTypes
-			RETURN a.node_id AS source, b.node_id AS target,
-			       type(r) AS relType, elementId(r) AS rid
-			LIMIT $edgeLimit`,
-			map[string]any{
-				"spaceId":   spaceID,
-				"layers":    layers,
-				"edgeTypes": defaultVizEdgeTypes,
-				"edgeLimit": int64(limit * 8),
-			})
-		if err != nil {
-			return nil, err
-		}
-		for res.Next(ctx) {
-			rec := res.Record()
-			src, _ := rec.Get("source")
-			tgt, _ := rec.Get("target")
-			rel, _ := rec.Get("relType")
-			rid, _ := rec.Get("rid")
+	// Collect node IDs for the edge query (only edges between displayed nodes).
+	collectedIDs := make([]string, 0, len(nodeMap))
+	for id := range nodeMap {
+		collectedIDs = append(collectedIDs, id)
+	}
 
-			sourceID := safeString(src)
-			targetID := safeString(tgt)
-			if _, ok := nodeMap[sourceID]; !ok {
-				continue
+	edges := make([]models.GraphVizEdge, 0)
+	if len(collectedIDs) > 0 {
+		_, err = sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, eErr := tx.Run(ctx, `
+				MATCH (a:MemoryNode {space_id: $spaceId})-[r]->(b:MemoryNode {space_id: $spaceId})
+				WHERE a.node_id IN $nodeIds AND b.node_id IN $nodeIds
+				  AND type(r) IN $edgeTypes
+				RETURN a.node_id AS source, b.node_id AS target,
+				       type(r) AS relType, elementId(r) AS rid`,
+				map[string]any{
+					"spaceId":   spaceID,
+					"nodeIds":   collectedIDs,
+					"edgeTypes": defaultVizEdgeTypes,
+				})
+			if eErr != nil {
+				return nil, eErr
 			}
-			if _, ok := nodeMap[targetID]; !ok {
-				continue
+			for res.Next(ctx) {
+				rec := res.Record()
+				relType := safeString(mustGet(rec, "relType"))
+				edges = append(edges, models.GraphVizEdge{
+					ID:       safeString(mustGet(rec, "rid")),
+					Source:   safeString(mustGet(rec, "source")),
+					Target:   safeString(mustGet(rec, "target")),
+					MainStat: relType,
+					Color:    edgeColor(relType),
+				})
 			}
-			relType := safeString(rel)
-			edges = append(edges, models.GraphVizEdge{
-				ID:       safeString(rid),
-				Source:   sourceID,
-				Target:   targetID,
-				MainStat: relType,
-				Color:    edgeColor(relType),
-			})
+			return nil, res.Err()
+		})
+		if err != nil {
+			slog.Error("graph-topology: edge query failed", "error", err)
+			writeInternalError(w, err, "graph topology edges")
+			return
 		}
-		return nil, res.Err()
-	})
-	if err != nil {
-		slog.Error("graph-topology: edge query failed", "error", err)
-		writeInternalError(w, err, "graph topology edges")
-		return
 	}
 
 	// Compute uniform radius based on node count and apply to all nodes.
@@ -390,13 +451,17 @@ func (s *Server) handleGraphTopology(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, models.GraphVizResponse{
-		Nodes: nodes,
-		Edges: edges,
+		Nodes:      nodes,
+		Edges:      edges,
+		TotalNodes: totalNodes,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
 	})
 }
 
 // handleGraphNeighborhood returns the N-hop neighborhood around one or more nodes.
-// GET /v1/memory/graph/neighborhood?space_id=xxx&node_id=yyy,zzz&hop_depth=2&edge_types=ABSTRACTS_TO,CO_ACTIVATED_WITH&limit=150
+// GET /v1/memory/graph/neighborhood?space_id=xxx&node_id=yyy,zzz&hop_depth=2&edge_types=ABSTRACTS_TO,CO_ACTIVATED_WITH&page_size=500
 func (s *Server) handleGraphNeighborhood(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
@@ -409,30 +474,38 @@ func (s *Server) handleGraphNeighborhood(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Accept comma-separated node_ids
+	// Accept comma-separated node_ids. Return empty graph when none selected
+	// (Grafana sends empty string when focus_nodes variable has no selection).
 	nodeIDParam := r.URL.Query().Get("node_id")
-	if nodeIDParam == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "node_id is required"})
-		return
-	}
 	var nodeIDs []string
-	for s := range strings.SplitSeq(nodeIDParam, ",") {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			nodeIDs = append(nodeIDs, s)
+	if nodeIDParam != "" {
+		for s := range strings.SplitSeq(nodeIDParam, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				nodeIDs = append(nodeIDs, s)
+			}
 		}
 	}
 	if len(nodeIDs) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "node_id is required"})
+		writeJSON(w, http.StatusOK, models.GraphVizResponse{
+			Nodes: []models.GraphVizNode{}, Edges: []models.GraphVizEdge{},
+			TotalNodes: 0, Page: 1, PageSize: 0, TotalPages: 0,
+		})
 		return
 	}
 
 	hopDepth := parseHopDepth(r)
 	edgeTypes := parseEdgeTypes(r)
 
-	limit := 150
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 500 {
+	limit := 500
+	if v := r.URL.Query().Get("page_size"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 5000 {
+			limit = parsed
+		}
+	}
+	// Backward compat
+	if r.URL.Query().Get("limit") != "" && r.URL.Query().Get("page_size") == "" {
+		if parsed, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && parsed > 0 && parsed <= 5000 {
 			limit = parsed
 		}
 	}
@@ -526,9 +599,14 @@ func (s *Server) handleGraphNeighborhood(w http.ResponseWriter, r *http.Request)
 		nodes = append(nodes, n)
 	}
 
+	nodeCount := len(nodes)
 	writeJSON(w, http.StatusOK, models.GraphVizResponse{
-		Nodes: nodes,
-		Edges: edges,
+		Nodes:      nodes,
+		Edges:      edges,
+		TotalNodes: nodeCount,
+		Page:       1,
+		PageSize:   nodeCount,
+		TotalPages: 1,
 	})
 }
 
@@ -568,7 +646,7 @@ func (s *Server) handleNodeGraphFields(w http.ResponseWriter, r *http.Request) {
 			{"field_name": "id", "type": "string"},
 			{"field_name": "title", "type": "string"},
 			{"field_name": "subTitle", "type": "string"},
-			{"field_name": "mainStat", "type": "string", "displayName": "Activation"},
+			{"field_name": "mainStat", "type": "string", "displayName": "Edges"},
 			{"field_name": "secondaryStat", "type": "string", "displayName": "Confidence"},
 			{"field_name": "color", "type": "string"},
 			{"field_name": "nodeRadius", "type": "number"},

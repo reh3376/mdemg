@@ -148,6 +148,51 @@ func TestClassifyOutcome_Unknown(t *testing.T) {
 	}
 }
 
+func TestEffectivenessTracker_ReRegistrationResetsTTL(t *testing.T) {
+	// 2-second TTL
+	tracker := NewEffectivenessTracker(100, 2)
+
+	items := []GuidanceItem{
+		{Type: GuidanceConstraint, Content: "use structured logging", Confidence: 0.9},
+	}
+
+	tracker.Track("guid-reregister", items)
+
+	// Sleep 1.5s — more than half the TTL has elapsed
+	time.Sleep(1500 * time.Millisecond)
+
+	// Re-track the same guidance_id (re-registration resets createdAt)
+	tracker.Track("guid-reregister", items)
+
+	// Sleep 1s — total ~2.5s since original track, but only ~1s since re-registration
+	time.Sleep(1 * time.Second)
+
+	// Should still be found because re-registration reset the TTL
+	got := tracker.Lookup("guid-reregister")
+	if got == nil {
+		t.Fatal("expected items after re-registration, got nil (TTL was not reset)")
+	}
+	if len(got) != 1 || got[0].Content != "use structured logging" {
+		t.Errorf("unexpected items: %v", got)
+	}
+
+	// Sleep 1.5s more — now past the re-registration's 2s TTL
+	time.Sleep(1500 * time.Millisecond)
+
+	if tracker.Lookup("guid-reregister") != nil {
+		t.Error("expected nil after re-registration TTL expiry")
+	}
+}
+
+func TestEffectivenessTracker_DefaultTTL7200(t *testing.T) {
+	tracker := NewEffectivenessTracker(100, 0)
+
+	expected := 7200 * time.Second
+	if tracker.ttl != expected {
+		t.Errorf("expected default ttl=%v, got %v", expected, tracker.ttl)
+	}
+}
+
 func TestSignificantWords(t *testing.T) {
 	words := significantWords("use config files for all paths (required)")
 	// "use" (3) and "for" (3) and "all" (3) should be excluded (< 4 chars)

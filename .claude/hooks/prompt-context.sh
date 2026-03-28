@@ -91,10 +91,12 @@ if [ -s "$GUIDANCE_TMP" ]; then
 
   # J17: Capture guidance_id for feedback loop closure
   GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
-  if [ -n "$GUIDANCE_ID" ] && [ "$WARM" = "true" ]; then
+  if [ -n "$GUIDANCE_ID" ]; then
     mkdir -p ~/.mdemg 2>/dev/null || true
     printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
       "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+  else
+    rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
   fi
 
   if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then

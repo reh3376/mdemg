@@ -1,0 +1,96 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Guide Sanitized",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "sanitization",
+      "b1"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-27",
+    "description": "Validates that the Jiminy guidance endpoint returns sanitized output with no control characters (U+0000-U+001F except tab/newline/CR) in guidance text. Ensures response shape is correct and guidance text fields are strings without null bytes.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 30000,
+    "tags": [
+      "jiminy",
+      "sanitization",
+      "b1"
+    ],
+    "sha256": "65fc2fcbbfc193bd28d5ce69acee4361c497e47d5da25919fc7199e3798e21e6"
+  },
+  "variables": {
+    "space_id": "mdemg-dev",
+    "context_text": "sanitization test",
+    "query_text": "test",
+    "session_id": "uats-sanitize"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/guide",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "{{space_id}}",
+      "context": "{{context_text}}",
+      "query": "{{query_text}}",
+      "session_id": "{{session_id}}"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data wrapper present",
+        "path": "$.data",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "name": "guidance exists and is array",
+        "path": "$.data.guidance",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "name": "prompt_augmentation is string",
+        "path": "$.data.prompt_augmentation",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "name": "prompt_augmentation contains no null bytes",
+        "path": "$.data.prompt_augmentation",
+        "op": "not_contains",
+        "expected": "\u0000"
+      },
+      {
+        "name": "rationale is string",
+        "path": "$.data.rationale",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "name": "rationale contains no null bytes",
+        "path": "$.data.rationale",
+        "op": "not_contains",
+        "expected": "\u0000"
+      },
+      {
+        "name": "confidence is number",
+        "path": "$.data.confidence",
+        "op": "type_is",
+        "expected": "number"
+      }
+    ]
+  }
+}

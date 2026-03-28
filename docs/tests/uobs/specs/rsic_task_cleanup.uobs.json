@@ -1,0 +1,24 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "rsic_task_cleanup",
+    "description": "Validates that RSIC metrics are present, ensuring task cleanup and bounded growth",
+    "type": "metrics"
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_rsic_cycle_total",
+        "type": "counter",
+        "description": "Total RSIC cycles executed"
+      },
+      {
+        "name": "mdemg_rsic_health_confidence",
+        "type": "gauge",
+        "description": "RSIC health confidence sub-score"
+      }
+    ],
+    "format_validation": true
+  }
+}

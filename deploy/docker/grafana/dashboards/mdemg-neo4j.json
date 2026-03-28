@@ -8,70 +8,108 @@
   "id": null,
   "links": [
     {
-      "title": "MDEMG Overview",
-      "url": "/d/mdemg-overview",
-      "type": "link"
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "mdemg"
+      ],
+      "icon": "external link",
+      "asDropdown": true
     }
   ],
   "panels": [
     {
       "title": "Total Nodes",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_total_nodes",
-          "legendFormat": "nodes"
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) RETURN count(n) AS value",
+          "Format": "table"
         }
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "none"
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "blue", "value": null }
+              {
+                "color": "blue",
+                "value": null
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
       }
     },
     {
       "title": "Total Edges",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_total_edges",
-          "legendFormat": "edges"
+          "refId": "A",
+          "cypherQuery": "MATCH (:MemoryNode {space_id: '$space_id'})-[r]-(:MemoryNode) RETURN count(r) AS value",
+          "Format": "table"
         }
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "none"
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "purple", "value": null }
+              {
+                "color": "purple",
+                "value": null
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
       }
     },
     {
       "title": "Total Spaces",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_total_spaces",
-          "legendFormat": "spaces"
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode) RETURN count(DISTINCT n.space_id) AS value",
+          "Format": "table"
         }
       ],
       "options": {
@@ -80,23 +118,37 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
       }
     },
     {
       "title": "Neo4j Pool Active",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_pool_active_connections",
-          "legendFormat": "active"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_active_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -105,25 +157,45 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 20 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
-      "title": "Heap Memory",
+      "title": "Neo4j Memory",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "mdemg_memory_heap_bytes",
-          "legendFormat": "heap"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_container_mem_used_bytes' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -132,26 +204,46 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "decbytes",
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 536870912 },
-              { "color": "red", "value": 1073741824 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 536870912
+              },
+              {
+                "color": "red",
+                "value": 1073741824
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
       "title": "Open Circuits",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
       "targets": [
         {
-          "expr": "count(mdemg_circuit_breaker_state == 1) or vector(0)",
-          "legendFormat": "open"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(COUNT(*) FILTER (WHERE value = 1), 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_circuit_breaker_state' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -160,109 +252,145 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
       "title": "Neo4j Container CPU Usage",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 4 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_container_cpu_percent",
-          "legendFormat": "CPU %"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_container_cpu_percent' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
+          "displayName": "CPU %",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 60 },
-              { "color": "red", "value": 85 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
       "title": "Neo4j Container Memory Usage",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 4 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_container_mem_used_bytes",
-          "legendFormat": "used"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_container_mem_used_bytes' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_neo4j_container_mem_limit_bytes",
-          "legendFormat": "limit"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_container_mem_limit_bytes' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "min": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Used"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Limit"
+              }
+            ]
+          }
+        ]
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
       "title": "Space Overview",
       "description": "Per-space graph stats: nodes, edges, observations, orphans, learning edges, health score",
       "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 11 },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_nodes",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "A"
-        },
-        {
-          "expr": "mdemg_neo4j_graph_edges",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "B"
-        },
-        {
-          "expr": "mdemg_neo4j_graph_observations",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "C"
-        },
-        {
-          "expr": "mdemg_neo4j_graph_orphans",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "D"
-        },
-        {
-          "expr": "mdemg_neo4j_graph_learning_edges",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "E"
-        },
-        {
-          "expr": "mdemg_neo4j_graph_health_score",
-          "legendFormat": "{{space_id}}",
-          "instant": true,
-          "format": "table",
-          "refId": "F"
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode)\nWITH n.space_id AS space_id, count(n) AS nodes\nOPTIONAL MATCH (n2:MemoryNode {space_id: space_id})-[r]-()\nWITH space_id, nodes, count(DISTINCT r) AS edges\nOPTIONAL MATCH (orphan:MemoryNode {space_id: space_id})\nWHERE NOT (orphan)-[]-()\nWITH space_id, nodes, edges, count(orphan) AS orphans\nRETURN space_id AS Space,\n       nodes AS Nodes,\n       edges AS Edges,\n       orphans AS Orphans,\n       CASE WHEN nodes > 0 THEN round(toFloat(orphans) / nodes * 100) ELSE 0 END AS `Orphan %`\nORDER BY nodes DESC",
+          "Format": "table"
         }
       ],
       "transformations": [
@@ -275,86 +403,27 @@
       ],
       "fieldConfig": {
         "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "space_id" },
-            "properties": [
-              { "id": "displayName", "value": "Space" },
-              { "id": "custom.width", "value": 180 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #A" },
-            "properties": [
-              { "id": "displayName", "value": "Nodes" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #B" },
-            "properties": [
-              { "id": "displayName", "value": "Edges" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #C" },
-            "properties": [
-              { "id": "displayName", "value": "Observations" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #D" },
-            "properties": [
-              { "id": "displayName", "value": "Orphans" },
-              { "id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 10 },
-                  { "color": "red", "value": 50 }
-                ]
-              }},
-              { "id": "custom.displayMode", "value": "color-background-solid" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #E" },
-            "properties": [
-              { "id": "displayName", "value": "Learning Edges" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Value #F" },
-            "properties": [
-              { "id": "displayName", "value": "Health" },
-              { "id": "unit", "value": "percentunit" },
-              { "id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "red", "value": null },
-                  { "color": "yellow", "value": 0.5 },
-                  { "color": "green", "value": 0.8 }
-                ]
-              }},
-              { "id": "custom.displayMode", "value": "color-background-solid" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Time" },
-            "properties": [
-              { "id": "custom.hidden", "value": true }
-            ]
-          }
-        ]
+        "overrides": []
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
       }
     },
     {
       "title": "Health Score Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 21 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_health_score and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
-          "legendFormat": "{{space_id}}"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -362,78 +431,200 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
+          "displayName": "Health Score",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.5 },
-              { "color": "green", "value": 0.8 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
             ]
           }
         }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
-      "title": "Orphans Per Space Over Time",
-      "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 21 },
+      "title": "Orphan Nodes",
+      "type": "stat",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_orphans and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
-          "legendFormat": "{{space_id}}"
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE NOT (n)-[]-() RETURN count(n) AS value",
+          "Format": "table"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "min": 0,
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
             ]
           }
+        },
+        "overrides": []
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
         }
       }
     },
     {
       "title": "Neo4j Connection Pool",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 28 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_pool_active_connections",
-          "legendFormat": "active"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_active_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_neo4j_pool_idle_connections",
-          "legendFormat": "idle"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_idle_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         },
         {
-          "expr": "mdemg_neo4j_pool_waiting_requests",
-          "legendFormat": "waiting"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_waiting_requests' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "min": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Active"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Idle"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Waiting"
+              }
+            ]
+          }
+        ]
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
       }
     },
     {
-      "title": "Learning Edges Over Time",
-      "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 28 },
+      "title": "Hebbian Co-Activation Edges",
+      "type": "stat",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
       "targets": [
         {
-          "expr": "mdemg_neo4j_graph_learning_edges and on(space_id) (mdemg_neo4j_graph_nodes @ end())",
-          "legendFormat": "{{space_id}}"
+          "refId": "A",
+          "cypherQuery": "MATCH (:MemoryNode {space_id: '$space_id'})-[r:CO_ACTIVATED_WITH]-(:MemoryNode) RETURN count(r) AS value",
+          "Format": "table"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "min": 0
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
         }
       }
     },
@@ -441,26 +632,38 @@
       "title": "Historical Trends",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
       "panels": []
     },
     {
       "title": "Graph Growth Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, avg_value AS value FROM metrics_hourly WHERE metric_name = 'rsic_health_overall' AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_neo4j_graph_total_nodes','mdemg_neo4j_graph_total_edges') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
           "format": "time_series"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "short",
           "min": 0,
-          "max": 1,
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -468,30 +671,110 @@
             "pointSize": 5,
             "showPoints": "auto"
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_neo4j_graph_total_nodes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total Nodes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_neo4j_graph_total_edges"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total Edges"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull", "mean", "min", "max"]
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
         }
       }
     }
   ],
-  "schemaVersion": 30,
+  "schemaVersion": 39,
   "style": "dark",
-  "tags": ["mdemg", "neo4j", "graph"],
+  "tags": [
+    "mdemg",
+    "neo4j",
+    "graph"
+  ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "custom",
+        "query": "localhost:9999",
+        "current": {
+          "text": "localhost:9999",
+          "value": "localhost:9999",
+          "selected": true
+        },
+        "options": [
+          {
+            "text": "localhost:9999",
+            "value": "localhost:9999",
+            "selected": true
+          }
+        ],
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "skipUrlSync": false
+      },
+      {
+        "name": "space_id",
+        "label": "Space ID",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' ORDER BY 1",
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "MDEMG Neo4j Graph",
   "uid": "mdemg-neo4j",
-  "version": 1
+  "version": 1,
+  "refresh": "30s"
 }

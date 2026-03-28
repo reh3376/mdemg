@@ -8,6 +8,7 @@ import (
 
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/sanitize"
 )
 
 // SynthesisConfig holds configuration for the Jiminy LLM synthesizer.
@@ -123,5 +124,5 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 	}
 
 	slog.Info("jiminy: synthesized guidance narrative", "chars", len(narrative))
-	return narrative, nil
+	return sanitize.StripControlChars(narrative), nil
 }

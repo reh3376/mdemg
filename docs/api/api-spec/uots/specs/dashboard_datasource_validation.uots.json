@@ -1,0 +1,26 @@
+{
+  "spec_version": "1.0.0",
+  "name": "dashboard_datasource_validation",
+  "description": "Validates no Grafana dashboard panel has a missing or Prometheus datasource",
+  "framework": "UOTS",
+  "type": "dashboard",
+  "merge_blocking": false,
+  "validation": {
+    "type": "file_scan",
+    "target_directory": "deploy/docker/grafana/dashboards",
+    "file_pattern": "*.json",
+    "checks": [
+      {
+        "type": "no_implicit_datasource",
+        "description": "No data panel should have an implicit (missing) datasource key",
+        "exclude_panel_types": ["row", "text"]
+      },
+      {
+        "type": "no_prometheus_datasource",
+        "description": "No panel should reference the prometheus datasource uid",
+        "forbidden_uids": ["prometheus"]
+      }
+    ]
+  },
+  "tags": ["dashboard", "grafana", "observability", "A3"]
+}

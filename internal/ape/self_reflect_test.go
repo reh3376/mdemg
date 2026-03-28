@@ -167,3 +167,84 @@ func TestReflect_LowGuidanceFollowRate(t *testing.T) {
 		t.Error("expected guidance_confidence_drift pattern to trigger")
 	}
 }
+
+func TestReflect_SidecarUnhealthy_JiminyActive(t *testing.T) {
+	cfg := config.Config{}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:        "test",
+		JiminyHealthy:  true,
+		SidecarHealthy: false,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var found bool
+	for _, insight := range insights {
+		if insight.PatternID == "sidecar_unhealthy" {
+			found = true
+			if insight.Severity != SeverityHigh {
+				t.Errorf("expected HIGH severity, got %s", insight.Severity)
+			}
+			if insight.RecommendedAction != "alert_sidecar_down" {
+				t.Errorf("expected alert_sidecar_down action, got %s", insight.RecommendedAction)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected sidecar_unhealthy pattern to trigger")
+	}
+}
+
+func TestReflect_SidecarUnhealthy_WithActiveProtocol(t *testing.T) {
+	cfg := config.Config{}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:        "test",
+		JiminyHealthy:  true,
+		SidecarHealthy: false,
+		ProtocolHealth: 0.6, // active J17 traffic
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var found bool
+	for _, insight := range insights {
+		if insight.PatternID == "sidecar_unhealthy" {
+			found = true
+			if insight.Severity != SeverityCritical {
+				t.Errorf("expected CRITICAL severity with active protocol, got %s", insight.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected sidecar_unhealthy pattern to trigger")
+	}
+}
+
+func TestReflect_SidecarHealthy_NoPattern(t *testing.T) {
+	cfg := config.Config{}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID:        "test",
+		JiminyHealthy:  true,
+		SidecarHealthy: true,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, insight := range insights {
+		if insight.PatternID == "sidecar_unhealthy" {
+			t.Error("sidecar_unhealthy should not trigger when sidecar is healthy")
+		}
+	}
+}

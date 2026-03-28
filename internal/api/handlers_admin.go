@@ -336,14 +336,6 @@ func (s *Server) runAutoSpacePrune() (int, int, int) {
 		slog.Info("auto-prune: pruned space", "space_id", spaceID, "nodes_deleted", deleted)
 	}
 
-	// Invalidate graph metrics cache so Grafana updates immediately
-	if spacesPruned > 0 {
-		s.graphMetricsCache.Lock()
-		s.graphMetricsCache.data = nil
-		s.graphMetricsCache.updated = time.Time{}
-		s.graphMetricsCache.Unlock()
-	}
-
 	return spacesPruned, totalDeleted, errCount
 }
 

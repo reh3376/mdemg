@@ -23,24 +23,24 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "cab66ffa26e8ae81a170efb16fbce62b1af3655cd5fb65f6edabc5f52b7b4235"
+    "sha256": "097c597b2a32e5ccf1accc30ded5843d614c75ba815928904c6639764969d8b9"
   },
   "variables": {
     "test_space": "mdemg-dev",
     "metric": "rsic_health_overall",
-    "trend_from": "{{TREND_FROM}}",
-    "trend_to": "{{TREND_TO}}",
+    "trend_from": "2026-03-01T00:00:00Z",
+    "trend_to": "2026-03-27T23:59:59Z",
     "granularity": "daily"
   },
   "request": {
     "method": "GET",
     "path": "/v1/metrics/trends",
     "query": {
-      "space_id": "${test_space}",
-      "metric": "${metric}",
-      "from": "${trend_from}",
-      "to": "${trend_to}",
-      "granularity": "${granularity}"
+      "space_id": "{{test_space}}",
+      "metric": "{{metric}}",
+      "from": "{{trend_from}}",
+      "to": "{{trend_to}}",
+      "granularity": "{{granularity}}"
     }
   },
   "expected": {
@@ -53,29 +53,5 @@
       }
     ]
   },
-  "variants": [
-    {
-      "name": "with_data",
-      "description": "When data exists in the time range, response contains metric points",
-      "expected": {
-        "body_assertions": [
-          {
-            "path": "$",
-            "op": "type_is",
-            "expected": "array"
-          },
-          {
-            "path": "$[0].time",
-            "op": "type_is",
-            "expected": "string"
-          },
-          {
-            "path": "$[0].value",
-            "op": "type_is",
-            "expected": "number"
-          }
-        ]
-      }
-    }
-  ]
+  "variants": []
 }

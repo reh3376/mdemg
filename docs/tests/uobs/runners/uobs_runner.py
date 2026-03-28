@@ -150,7 +150,16 @@ _PROM_LINE_RE = re.compile(
 
 
 def validate_prometheus_format(content: str) -> tuple[bool, str]:
-    """Validate Prometheus exposition format."""
+    """Validate Prometheus exposition format or JSON snapshot format."""
+    # Accept JSON snapshot format from /v1/metrics/snapshot
+    try:
+        data = json.loads(content)
+        if isinstance(data, dict) and ("data" in data or "counters" in data or "gauges" in data):
+            return True, "Valid JSON metrics snapshot format"
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Validate Prometheus text format
     lines = content.strip().split("\n")
     errors = []
 
@@ -168,13 +177,40 @@ def validate_prometheus_format(content: str) -> tuple[bool, str]:
 
 
 def check_metric_exists(content: str, metric_name: str, metric_type: Optional[str] = None) -> tuple[bool, str]:
-    """Check if a metric exists in Prometheus output."""
-    # Check for TYPE declaration
+    """Check if a metric exists in Prometheus text or JSON snapshot output."""
+    # Try JSON snapshot format first (from /v1/metrics/snapshot)
+    try:
+        data = json.loads(content)
+        snapshot = data.get("data", data)
+        # Search across all sections: counters, gauges, histograms
+        # Keys may include labels like "metric_name{label=...}", so use prefix match
+        for section in ("counters", "gauges", "histograms"):
+            section_data = snapshot.get(section, {})
+            # Exact match first
+            if metric_name in section_data:
+                if metric_type:
+                    section_type_map = {"counters": "counter", "gauges": "gauge", "histograms": "histogram"}
+                    expected_section = section_type_map.get(section, section)
+                    if metric_type != expected_section:
+                        return False, f"Metric {metric_name} exists in {section} but expected type {metric_type}"
+                return True, f"Metric {metric_name} present"
+            # Prefix match for labeled metrics (e.g., "metric{label=value}")
+            prefix = metric_name + "{"
+            if any(k.startswith(prefix) or k == metric_name for k in section_data):
+                if metric_type:
+                    section_type_map = {"counters": "counter", "gauges": "gauge", "histograms": "histogram"}
+                    expected_section = section_type_map.get(section, section)
+                    if metric_type != expected_section:
+                        return False, f"Metric {metric_name} exists in {section} but expected type {metric_type}"
+                return True, f"Metric {metric_name} present"
+        return False, f"Metric {metric_name} not found"
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Fall back to Prometheus text format
     type_pattern = f"# TYPE {metric_name}"
     has_type = type_pattern in content
 
-    # Check for actual metric values
-    # For histograms/summaries, also check for _bucket, _sum, _count suffixes
     metric_patterns = [f"^{metric_name}(\\{{|\\s)"]
     if metric_type in ("histogram", "summary"):
         metric_patterns.extend([
@@ -203,7 +239,7 @@ def check_metric_exists(content: str, metric_name: str, metric_type: Optional[st
 def run_metrics_test(spec: Dict[str, Any], base_url: str) -> ObservabilityTestResult:
     """Run Prometheus metrics validation."""
     metrics_config = spec.get("metrics", {})
-    endpoint = metrics_config.get("endpoint", "/v1/prometheus")
+    endpoint = metrics_config.get("endpoint", "/v1/metrics/snapshot")
     required_metrics = metrics_config.get("required_metrics", [])
 
     result = ObservabilityTestResult(

@@ -33,7 +33,7 @@ func NewEffectivenessTracker(capacity int, ttlSeconds int) *EffectivenessTracker
 		capacity = 1000
 	}
 	if ttlSeconds <= 0 {
-		ttlSeconds = 1800 // 30 minutes
+		ttlSeconds = 7200 // 2 hours
 	}
 	return &EffectivenessTracker{
 		cache:    make(map[string]*list.Element, capacity),

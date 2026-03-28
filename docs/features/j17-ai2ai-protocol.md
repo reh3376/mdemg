@@ -2,7 +2,7 @@
 
 **Phase**: J17 (5 sub-phases: J17-1 through J17-5)
 **Status**: Complete
-**Date**: 2026-03-23 (updated: control-loop optimization — 7 gap fixes)
+**Date**: 2026-03-28 (updated: trust persistence, code matching, cache bypass, threshold sync)
 
 ---
 
@@ -108,7 +108,7 @@ Reserved for novel multi-constraint conflicts or first-time exposure to complex 
 
 #### Tier Selection Algorithm
 
-Trust score modulates tier selection dynamically:
+Trust score modulates tier selection dynamically. "Has Code?" means a constraint code was matched to the guidance item via content similarity (see section 2.4). Encoder tier thresholds are synced from config at construction via `SetTierThresholds()`, ensuring they always reflect the current `J17_TRUST_HIGH_THRESHOLD` and `J17_TRUST_LOW_THRESHOLD` values.
 
 | Trust Score | Has Code? | Selected Tier | Rationale |
 |-------------|-----------|---------------|-----------|
@@ -152,6 +152,14 @@ T1 codes are LLM-generated mnemonic strings in kebab-case:
 3. **Freeze**: Code stored as `constraint_code` property on the Neo4j constraint node -- never regenerated unless comprehension drops below threshold
 4. **Fallback**: If LLM unavailable, deterministic hash: `auto-<sha256[:6]>`
 
+### 2.4 Code Matching
+
+Constraint codes are matched to guidance items by **content similarity**, not by node ID. This is necessary because guidance source nodes (from vector search, `n_*` prefix IDs) and constraint nodes (from conversation observations, UUID prefix IDs) are different populations in the graph -- a node-ID-based lookup would never find a match.
+
+**Matching algorithm**: All constraint codes for the space are loaded, then each code's definition is compared against guidance item content using significant word overlap (minimum 3 words after stopword removal). This approach applies to **all guidance types** -- corrections, patterns, and constraints -- not just constraint-type items.
+
+When a match is found, the code is attached to the guidance item, enabling T1 encoding. When no match is found, the item falls through to T2 or T3 encoding based on trust score.
+
 ---
 
 ## 3. State Persistence
@@ -169,7 +177,7 @@ TicketPayload {
     escalation_snapshot:   map[constraint_node_id -> {Level, IgnoreCount}]
     active_constraint_ids: Currently surfaced constraints
     conversation_phase:    Protocol state identifier
-    issued_at, ttl:        Lifecycle metadata (default 4-hour TTL)
+    issued_at, ttl:        Lifecycle metadata (default 168-hour / 7-day TTL)
 }
 ```
 
@@ -206,7 +214,9 @@ Before J17, compaction reset all escalation state -- an agent could ignore a con
 
 ### 3.4 Trust Score Persistence
 
-Per-session trust score (0.0-1.0) modulates encoding density and persists in the ticket:
+Per-session trust score (0.0-1.0) modulates encoding density. Trust is persisted to Neo4j via `TrustStore` (write-behind pattern with a 30-second flush cycle), so trust survives server restarts. Trust also travels in the session ticket for cross-compaction continuity.
+
+`TrustStore` follows the same pattern as `RSICStore`: dirty-mark on mutation, periodic background flush, and hydrate-on-startup. Implementation: `internal/jiminy/trust_store.go`.
 
 | Event | Trust Delta | Default Value |
 |-------|-------------|---------------|
@@ -509,7 +519,7 @@ The `j17_low_code_coverage` reflection pattern (fires when coverage < 80%) was t
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache for J17 sessions (prevents cross-session trust/escalation contamination) |
+| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache for both Get and Put (ensures tier assignments always reflect current trust) |
 | `J17_SIDECAR_URL` | `""` (disabled) | Neural sidecar URL for shadow ML predictions (tier + NLI comprehension) |
 | `J17_SIDECAR_TIMEOUT_MS` | `200` | Timeout for sidecar shadow calls in ms |
 
@@ -683,7 +693,7 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 | `J17_ENABLED` | `true` | Enable J17 protocol |
 | `J17_DEFAULT_TIER` | `1` | Default encoding tier |
 | `J17_TICKET_SECRET` | auto-gen | HMAC signing key (auto-generates if unset) |
-| `J17_TICKET_TTL_HOURS` | `4` | Session ticket time-to-live |
+| `J17_TICKET_TTL_HOURS` | `168` | Session ticket time-to-live (7 days; trust is persisted to Neo4j so longer TTL is safe) |
 | `J17_SEQUENCE_BUFFER_SIZE` | `1000` | Ring buffer size for event replay |
 | `J17_BOOTSTRAP_ENABLED` | `true` | Send bootstrap header on first session |
 
@@ -723,7 +733,7 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache when J17 + session ID active |
+| `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache (Get + Put) to ensure tier assignments reflect current trust |
 
 ---
 
@@ -753,20 +763,17 @@ Full research documents:
 
 ## 12. Cache Policy
 
-J17 sessions bypass the guidance cache when `JIMINY_CACHE_J17_BYPASS=true` (default) and a `SessionID` is present in the request.
+J17 sessions bypass the guidance cache when `JIMINY_CACHE_J17_BYPASS=true` (default). Both `cache.Get()` and `cache.Put()` are skipped, ensuring that tier assignments always reflect current trust and escalation state rather than stale cached responses.
 
 **Rationale**: The guidance cache is keyed on `(spaceID, context)`. Without J17 session awareness, two sessions with different trust scores, escalation states, or active constraints could receive identical cached responses. Since J17 trust modulates tier selection and escalation affects content priority, cross-session cache hits would contaminate the control loop with stale or incorrect signals.
 
 **When bypass applies**:
-- `J17_ENABLED=true` AND
-- `JIMINY_CACHE_J17_BYPASS=true` AND
-- Request includes a non-empty `session_id`
+- `JIMINY_CACHE_J17_BYPASS=true` (default)
 
 **When caching still applies**:
-- Non-J17 sessions (no session ID, or J17 disabled)
 - Explicit opt-in via `JIMINY_CACHE_J17_BYPASS=false` (use only if session-specific encoding is not needed)
 
-**Implementation**: `internal/jiminy/service.go` — the `Guide()` method checks `cfg.JiminyCacheJ17Bypass` and skips both `cache.Get()` and `cache.Put()` when conditions are met.
+**Implementation**: `internal/jiminy/service.go` — the `Guide()` method checks `cfg.JiminyCacheJ17Bypass` and skips both `cache.Get()` and `cache.Put()` when the bypass flag is true.
 
 ---
 
@@ -821,11 +828,12 @@ Sidecar unavailability does not affect MDEMG server functionality:
 
 | File | Purpose |
 |------|---------|
-| `internal/jiminy/encoder.go` | Three-tier encoder, bootstrap, glossary, annotations |
+| `internal/jiminy/encoder.go` | Three-tier encoder, bootstrap, glossary, annotations. Tier thresholds synced from config at construction via `SetTierThresholds()` |
 | `internal/jiminy/protocol.go` | Core types: SessionTicket, TicketPayload, ProtocolState |
 | `internal/jiminy/ticket.go` | TicketManager: issue/validate/restore with HMAC |
 | `internal/jiminy/sequence.go` | SequenceTracker: atomic counter + ring buffer replay |
 | `internal/jiminy/trust.go` | TrustScorer: per-session trust modulation |
+| `internal/jiminy/trust_store.go` | TrustStore: write-behind Neo4j persistence for trust state (30s flush cycle) |
 | `internal/jiminy/codegen.go` | ConstraintCodeGenerator: LLM-based code generation |
 | `internal/jiminy/escalation.go` | EscalationTracker: 5-level FSM with persistence |
 | `internal/jiminy/protocol_metrics.go` | ProtocolMetricsCollector: tier/comprehension/compression tracking |
@@ -964,6 +972,7 @@ See `docs/specs/neural-sidecar-rollout-plan.md` for the full 4-stage rollout pla
 - `internal/jiminy/sequence.go` -- Sequence tracking + replay + Resize/BufferSize
 - `internal/jiminy/sequence_test.go` -- Sequence resize tests (new)
 - `internal/jiminy/trust.go` -- Trust scoring + SetThresholds
+- `internal/jiminy/trust_store.go` -- Write-behind Neo4j persistence for trust state
 - `internal/jiminy/trust_test.go` -- Per-session independence + SetThresholds tests
 - `internal/jiminy/codegen.go` -- Code generation + UnregisterCode
 - `internal/jiminy/protocol_metrics.go` -- Metrics collection

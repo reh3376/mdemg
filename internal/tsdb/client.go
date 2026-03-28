@@ -49,12 +49,16 @@ func (c *Client) WriteBatch(ctx context.Context, samples []MetricSample) error {
 
 	rows := make([][]any, len(samples))
 	for i, s := range samples {
-		rows[i] = []any{s.Time, s.SpaceID, s.MetricName, s.Value, s.Source, s.QualityTag, s.Labels}
+		metricType := s.MetricType
+		if metricType == "" {
+			metricType = "gauge"
+		}
+		rows[i] = []any{s.Time, s.SpaceID, s.MetricName, s.Value, s.Source, s.QualityTag, s.Labels, metricType}
 	}
 
 	_, err := c.pool.CopyFrom(ctx,
 		pgx.Identifier{"metric_samples"},
-		[]string{"time", "space_id", "metric_name", "value", "source", "quality_tag", "labels"},
+		[]string{"time", "space_id", "metric_name", "value", "source", "quality_tag", "labels", "metric_type"},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {

@@ -1,0 +1,29 @@
+{
+  "spec_version": "1.0.0",
+  "name": "alert_rules_grafana",
+  "description": "Validates Grafana unified alerting rules exist and reference valid metric names",
+  "framework": "UOTS",
+  "type": "alerting",
+  "merge_blocking": false,
+  "validation": {
+    "type": "file_content",
+    "target_file": "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+    "checks": [
+      {
+        "type": "rule_count",
+        "minimum": 20,
+        "description": "At least 20 alert rules should be defined (migrated from Prometheus)"
+      },
+      {
+        "type": "datasource_consistency",
+        "expected_uid": "timescaledb",
+        "description": "All alert rules should reference the timescaledb datasource"
+      },
+      {
+        "type": "metric_reference_valid",
+        "description": "All metric names in SQL queries should exist in the metric registry"
+      }
+    ]
+  },
+  "tags": ["alerting", "grafana", "observability", "A4"]
+}

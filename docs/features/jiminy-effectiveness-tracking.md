@@ -50,10 +50,13 @@ The overlap score is calculated from significant words (4+ characters) shared be
 The tracker is an in-memory LRU cache with TTL expiry:
 
 - **Capacity**: 1000 entries (configurable)
-- **TTL**: 30 minutes by default (guidance older than this is expired)
+- **TTL**: 2 hours by default (guidance older than this is expired)
 - **Thread-safe**: `sync.Mutex` protects all operations
 - **LRU eviction**: When at capacity, oldest entries are evicted first
 - **Automatic cleanup**: `CleanupExpired()` removes all expired entries
+- **Re-registration on cache hits**: When a cached guidance response is served (cache hit in `Guide()`), the tracker re-registers the `guidance_id` so that feedback can still correlate even though no new tracker entry was created
+- **Re-registration on `/v1/jiminy/latest` reads**: When the warm store serves guidance via the latest endpoint, the tracker re-registers the `guidance_id` to extend its TTL window
+- **Warning log on expired feedback**: When `RecordOutcome()` receives a `guidance_id` that has already expired or was never tracked, a warning-level log is emitted (e.g., `"jiminy: feedback dropped, guidance_id expired"`) before returning `applied: false`
 
 ## API Endpoints
 
@@ -136,7 +139,7 @@ The guidance response is written to a temp file and parsed with `jq` directly (n
 **2. Feedback (`post-tool-observe.py`)** — After each Write, Edit, or Bash tool execution, the hook:
 
 1. Reads `~/.mdemg/.jiminy-guidance-state`
-2. Validates the state is fresh (< 30 minutes, matching EffectivenessTracker TTL)
+2. Validates the state is fresh (< 2 hours / `FEEDBACK_STATE_MAX_AGE = 7200`, matching EffectivenessTracker TTL)
 3. Checks cooldown (30 seconds between submissions to avoid flooding)
 4. Builds a concise action summary from the tool's input/output
 5. Fires `POST /v1/jiminy/feedback` with the `guidance_id` and action summary (fire-and-forget via `subprocess.Popen`)
@@ -158,7 +161,7 @@ See `docs/features/j17-feedback-loop-closure.md` for the full implementation sto
 | Parameter | Default | Env Var | Description |
 |-----------|---------|---------|-------------|
 | JiminyEffectivenessEnabled | `true` | `JIMINY_EFFECTIVENESS_ENABLED` | Enable/disable effectiveness tracking |
-| JiminyEffectivenessTTLSec | `1800` | `JIMINY_EFFECTIVENESS_TTL_SEC` | TTL for tracked guidance (seconds) |
+| JiminyEffectivenessTTLSec | `7200` | `JIMINY_EFFECTIVENESS_TTL_SEC` | TTL for tracked guidance (seconds) |
 
 When disabled, `Guide()` still works normally but doesn't generate `guidance_id` or track items.
 

@@ -47,7 +47,7 @@ The entire server-side pipeline was already correct:
 prompt-context.sh                              post-tool-observe.py
 GET /v1/jiminy/latest                          (tool completes)
   → perl sanitize control chars                → read ~/.mdemg/.jiminy-guidance-state
-  → write to temp file                         → validate age < 30 min
+  → write to temp file                         → validate age < 2 hours
   → jq extract .data.guidance_id               → check cooldown (30s)
   → write state file                           → build action_summary
                                                → POST /v1/jiminy/feedback (fire-and-forget)
@@ -74,7 +74,7 @@ GET /v1/jiminy/latest                          (tool completes)
 }
 ```
 
-Written by `prompt-context.sh` when `warm=true` and a valid `guidance_id` is present. Read by `post-tool-observe.py` before sending feedback. The `ts` field enables age validation — state older than 30 minutes (matching `EffectivenessTracker` TTL) is discarded.
+Written by `prompt-context.sh` whenever a valid `guidance_id` is present (the previous `warm=true` gate was removed — any non-empty guidance_id is now captured). When no guidance_id is present, stale state files are cleared to prevent feedback from correlating with expired guidance. Read by `post-tool-observe.py` before sending feedback. The `ts` field enables age validation — state older than 2 hours (matching `EffectivenessTracker` TTL) is discarded.
 
 ### Cooldown File
 
@@ -106,7 +106,6 @@ curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
   perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP"
 
 # Parse directly from file — no shell variable corruption
-WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP")
 GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP")
 ```
 
@@ -126,12 +125,14 @@ Even after that fix, RSIC needs to actually run a cycle to detect the codificati
 
 `session-start.sh` now checks protocol metrics on startup and triggers a codification cycle when:
 
-- `J17_ENABLED=true`
+- J17 is enabled (detected by querying `/v1/jiminy/ready` for `features.j17 == true`)
 - `code_coverage == 0` (no constraint codes exist)
 - `total_events > 0` (the protocol has recorded events)
 
 ```bash
-if [ "${J17_ENABLED:-false}" = "true" ]; then
+J17_ON=$(curl -sf "${MDEMG_URL}/v1/jiminy/ready" --connect-timeout 1 --max-time 2 \
+  | jq -r '.features.j17 // false')
+if [ "$J17_ON" = "true" ]; then
   PROTO_METRICS=$(curl -sf "${MDEMG_URL}/v1/jiminy/protocol/metrics" ...)
   CODE_COV=$(echo "$PROTO_METRICS" | jq -r '.data.code_coverage // -1')
   TOTAL_EVT=$(echo "$PROTO_METRICS" | jq -r '.data.total_events // 0')
@@ -141,6 +142,8 @@ if [ "${J17_ENABLED:-false}" = "true" ]; then
   fi
 fi
 ```
+
+> **Note:** Shell hooks (`session-start.sh`, `pre-compact.sh`) previously gated J17 logic on `${J17_ENABLED:-false}`, but this env var was never set because hooks don't source `.env`. The `/v1/jiminy/ready` endpoint provides a reliable runtime check.
 
 This is **self-disabling**: once codes are generated, `code_coverage > 0` and the condition no longer matches.
 
@@ -160,7 +163,7 @@ With the feedback loop closed, tier graduation follows this progression:
 
 **Math**: `(0.8 - 0.5) / 0.05 = 6` consecutive positive feedbacks to reach T1 trust threshold.
 
-Trust is per-session and in-memory (4-hour TTL), so graduation happens within a session, not across sessions. The signed session ticket mechanism (`ticket.go`) persists trust across context compactions within a session.
+Trust is per-session and in-memory (4-hour TTL), so graduation happens within a session, not across sessions. The signed session ticket mechanism (`ticket.go`) persists trust across context compactions within a session. Additionally, trust now persists durably to Neo4j via `TrustStore`, so the ticket-based checkpoint/resume is supplemented by durable persistence — trust can survive full session restarts, not just compactions.
 
 ---
 
@@ -173,15 +176,15 @@ No new configuration variables. The fix uses existing config:
 | `J17_TRUST_INITIAL` | 0.5 | Trust starting point |
 | `J17_TRUST_BOOST_PER_FOLLOW` | 0.05 | Per-feedback trust increase |
 | `J17_TRUST_HIGH_THRESHOLD` | 0.8 | T1 eligibility threshold |
-| `JIMINY_EFFECTIVENESS_TTL_SEC` | 1800 | State file max age (30 min) |
-| `J17_ENABLED` | true/false | Bootstrap codification gate |
+| `JIMINY_EFFECTIVENESS_TTL_SEC` | 7200 | State file max age (2 hours) |
+| `GET /v1/jiminy/ready` | `features.j17` | Bootstrap codification gate (replaces `J17_ENABLED` env var) |
 
 New constants in `post-tool-observe.py`:
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
 | `FEEDBACK_COOLDOWN_SEC` | 30 | Minimum seconds between feedback submissions |
-| `FEEDBACK_STATE_MAX_AGE` | 1800 | Maximum age of state file before discard |
+| `FEEDBACK_STATE_MAX_AGE` | 7200 | Maximum age of state file before discard (2 hours) |
 
 ---
 
@@ -201,8 +204,9 @@ New constants in `post-tool-observe.py`:
 ## 8. Dependencies
 
 - **Jiminy Service (Phase Jiminy)** — `Guide()` provides guidance items; `RecordOutcome()` processes feedback
-- **EffectivenessTracker (Phase AR-2)** — LRU cache correlating guidance_id to items (30-min TTL)
+- **EffectivenessTracker (Phase AR-2)** — LRU cache correlating guidance_id to items (2-hour TTL)
 - **TrustScorer (Phase J17-3)** — Per-session trust scoring updated by feedback outcomes
+- **TrustStore (Neo4j)** — Durable trust persistence supplementing ticket-based checkpoint/resume
 - **RSIC (Phase 60b)** — Codification cycle triggered by bootstrap logic
 - **Protocol Metrics (Phase J17-4)** — `RecordGuidance()` and `RecordConstraintCoverage()` for protocol health scoring
 

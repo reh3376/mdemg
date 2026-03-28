@@ -1131,6 +1131,10 @@ type GraphVizEdge struct {
 
 // GraphVizResponse — response format for Grafana Node Graph API plugin (GAP-20)
 type GraphVizResponse struct {
-	Nodes []GraphVizNode `json:"nodes"`
-	Edges []GraphVizEdge `json:"edges"`
+	Nodes      []GraphVizNode `json:"nodes"`
+	Edges      []GraphVizEdge `json:"edges"`
+	TotalNodes int            `json:"total_nodes"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+	TotalPages int            `json:"total_pages"`
 }

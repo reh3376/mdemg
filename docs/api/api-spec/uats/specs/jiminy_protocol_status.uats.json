@@ -1,0 +1,143 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Protocol Status",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "j17",
+      "protocol",
+      "trust"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "B4: Validates J17 protocol status endpoint \u2014 returns trust score, tier, feedback count, and enabled state for a session",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "j17",
+      "trust"
+    ],
+    "sha256": "f8708b8b9987b4fee132bb3a1c4533a3d2b049d92a259e081fe276f58eb219bd"
+  },
+  "variables": {
+    "session_id": "uats-protocol-status"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/protocol/status?session_id=uats-protocol-status",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "data.session_id matches request",
+        "path": "$.data.session_id",
+        "op": "equals",
+        "expected": "uats-protocol-status"
+      },
+      {
+        "name": "data.trust_score is number",
+        "path": "$.data.trust_score",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "data.trust_score in valid range",
+        "path": "$.data.trust_score",
+        "op": "range",
+        "expected": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "name": "data.tier is string",
+        "path": "$.data.tier",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "name": "data.tier is valid",
+        "path": "$.data.tier",
+        "op": "one_of",
+        "expected": [
+          "T1",
+          "T2",
+          "T3"
+        ]
+      },
+      {
+        "name": "data.feedback_count is number",
+        "path": "$.data.feedback_count",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "data.enabled is boolean",
+        "path": "$.data.enabled",
+        "op": "type_is",
+        "expected": "boolean"
+      },
+      {
+        "name": "data.enabled is true",
+        "path": "$.data.enabled",
+        "op": "equals",
+        "expected": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_session_id",
+      "description": "Returns 400 when session_id query parameter is missing",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/protocol/status",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jiminy_disabled",
+      "description": "When Jiminy is disabled, returns 503",
+      "tags": [
+        "jiminy_disabled"
+      ],
+      "expected": {
+        "status": 503,
+        "body_assertions": [
+          {
+            "name": "error message present",
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

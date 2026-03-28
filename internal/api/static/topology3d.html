@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MDEMG Graph Topology — 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111217; color: #ccc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+  #graph { width: 100vw; height: 100vh; }
+  #controls {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    background: rgba(22,24,29,0.92); border: 1px solid #333; border-radius: 6px;
+    padding: 10px 14px; font-size: 12px; max-width: 320px;
+  }
+  #controls label { display: block; margin: 6px 0 2px; color: #aaa; }
+  #controls select, #controls input { background: #1e2028; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 3px 6px; font-size: 12px; width: 100%; }
+  #controls button { margin-top: 8px; padding: 5px 14px; background: #5794F2; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+  #controls button:hover { background: #6BA4FF; }
+  #legend { position: fixed; bottom: 12px; left: 12px; z-index: 10; background: rgba(22,24,29,0.92); border: 1px solid #333; border-radius: 6px; padding: 8px 12px; font-size: 11px; }
+  #legend span { margin-right: 10px; }
+  #info { position: fixed; top: 12px; right: 12px; z-index: 10; background: rgba(22,24,29,0.92); border: 1px solid #333; border-radius: 6px; padding: 8px 12px; font-size: 11px; min-width: 180px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="controls">
+  <strong style="color:#fff">MDEMG 3D Topology</strong>
+  <label>Space ID</label>
+  <input id="spaceId" value="mdemg-dev">
+  <label>Page Size</label>
+  <select id="pageSize">
+    <option value="100">100</option>
+    <option value="250">250</option>
+    <option value="500" selected>500</option>
+    <option value="1000">1000</option>
+  </select>
+  <label>Page</label>
+  <input id="page" type="number" value="1" min="1">
+  <label>Layers</label>
+  <input id="layers" value="0,1,2,3,4,5">
+  <button onclick="loadGraph()">Load</button>
+</div>
+<div id="legend">
+  <span><span class="dot" style="background:#5794F2"></span>L0/L1</span>
+  <span><span class="dot" style="background:#73BF69"></span>L2</span>
+  <span><span class="dot" style="background:#FADE2A"></span>L3</span>
+  <span><span class="dot" style="background:#FF9830"></span>L4</span>
+  <span><span class="dot" style="background:#F2495C"></span>L5</span>
+  <span style="color:#666">| Scroll=zoom, Drag=rotate, Click=inspect</span>
+</div>
+<div id="info">Loading...</div>
+<div id="graph"></div>
+
+<script src="https://unpkg.com/3d-force-graph@1"></script>
+<script>
+const LAYER_COLORS = {
+  0: '#5794F2', 1: '#5794F2', 2: '#73BF69',
+  3: '#FADE2A', 4: '#FF9830', 5: '#F2495C'
+};
+const LAYER_Y = { 0: 0, 1: 150, 2: 300, 3: 450, 4: 600, 5: 750 };
+const EDGE_COLORS = {
+  'ABSTRACTS_TO': '#B877D9', 'GENERALIZES': '#B877D9', 'GENERALIZES_TO': '#B877D9',
+  'SPECIALIZES': '#B877D9', 'INSTANTIATES': '#B877D9',
+  'CO_ACTIVATED_WITH': '#8AB8FF',
+  'INFLUENCES': '#FF9830', 'CAUSES': '#FF9830', 'ENABLES': '#FF9830',
+  'BRIDGES': '#FF6EB4', 'ANALOGOUS_TO': '#FF6EB4',
+  'ASSOCIATED_WITH': '#555', 'TEMPORALLY_ADJACENT': '#555',
+  'IMPORTS': '#73BF69', 'CALLS': '#73BF69', 'EXTENDS': '#73BF69',
+  'IMPLEMENTS': '#73BF69', 'DEFINES_SYMBOL': '#73BF69',
+  'COMPOSES_WITH': '#FADE2A', 'THEME_OF': '#FADE2A',
+  'ORIGINATED_FROM': '#6ED0E0', 'GROUNDED_BY': '#6ED0E0',
+  'CONTRASTS_WITH': '#F2495C', 'CONTRADICTS': '#F2495C'
+};
+
+// Determine API base from URL params or current origin
+const params = new URLSearchParams(window.location.search);
+const apiBase = params.get('api') || window.location.origin;
+
+// Pre-fill controls from URL params
+if (params.get('space_id')) document.getElementById('spaceId').value = params.get('space_id');
+if (params.get('page_size')) document.getElementById('pageSize').value = params.get('page_size');
+if (params.get('page')) document.getElementById('page').value = params.get('page');
+if (params.get('layers')) document.getElementById('layers').value = params.get('layers');
+
+const graph = ForceGraph3D()(document.getElementById('graph'))
+  .backgroundColor('#111217')
+  .nodeLabel(n => `<div style="background:#1e2028;padding:6px 10px;border-radius:4px;border:1px solid #444;font-size:12px;max-width:300px">
+    <strong>${n.name}</strong><br>
+    Layer ${n.layer} &middot; ${n.edges} edges &middot; C:${n.confidence}<br>
+    <span style="color:#888">${n.subtitle}</span>
+  </div>`)
+  .nodeColor(n => LAYER_COLORS[n.layer] || '#888')
+  .nodeVal(n => Math.max(2, Math.sqrt(n.edges)))
+  .nodeOpacity(0.9)
+  .linkColor(l => EDGE_COLORS[l.relType] || '#444')
+  .linkOpacity(0.4)
+  .linkWidth(0.3)
+  .linkDirectionalArrowLength(2)
+  .linkDirectionalArrowRelPos(1)
+  .onNodeClick(n => {
+    document.getElementById('info').innerHTML =
+      `<strong style="color:#fff">${n.name}</strong><br>
+       Layer: ${n.layer}<br>
+       Edges: ${n.edges}<br>
+       Confidence: ${n.confidence}<br>
+       Status: ${n.status}<br>
+       Role: ${n.role}<br>
+       <span style="color:#666">${n.id}</span>`;
+  });
+
+function loadGraph() {
+  const spaceId = document.getElementById('spaceId').value;
+  const pageSize = document.getElementById('pageSize').value;
+  const page = document.getElementById('page').value;
+  const layers = document.getElementById('layers').value;
+  const infoEl = document.getElementById('info');
+  infoEl.innerHTML = 'Loading...';
+
+  const url = `${apiBase}/v1/memory/graph/topology?space_id=${encodeURIComponent(spaceId)}&layers=${layers}&page=${page}&page_size=${pageSize}`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const nodeSet = new Set(data.nodes.map(n => n.id));
+
+      // Parse layer from subtitle "L3 · concept · ..."
+      const nodes = data.nodes.map(n => {
+        const layerMatch = (n.subTitle || '').match(/^L(\d)/);
+        const layer = layerMatch ? parseInt(layerMatch[1]) : 0;
+        const edgeMatch = (n.mainStat || '').match(/(\d+)/);
+        const edges = edgeMatch ? parseInt(edgeMatch[1]) : 0;
+        return {
+          id: n.id,
+          name: n.title || n.id,
+          layer: layer,
+          edges: edges,
+          confidence: n.secondaryStat || '',
+          subtitle: n.subTitle || '',
+          status: n.detail__status || '',
+          role: n.detail__role_type || '',
+          // Fix Y position by layer for 3D layer separation
+          fy: LAYER_Y[layer] || 0
+        };
+      });
+
+      const links = data.edges
+        .filter(e => nodeSet.has(e.source) && nodeSet.has(e.target))
+        .map(e => ({
+          source: e.source,
+          target: e.target,
+          relType: e.mainStat || ''
+        }));
+
+      // Count cross-layer edges
+      const crossLayer = links.filter(l => {
+        const sn = nodes.find(n => n.id === l.source);
+        const tn = nodes.find(n => n.id === l.target);
+        return sn && tn && sn.layer !== tn.layer;
+      }).length;
+
+      infoEl.innerHTML =
+        `<strong style="color:#fff">Page ${data.page} / ${data.total_pages}</strong><br>
+         Nodes: ${nodes.length}<br>
+         Edges: ${links.length}<br>
+         Cross-layer: ${crossLayer}<br>
+         Total in graph: ${data.total_nodes}`;
+
+      graph.graphData({ nodes, links });
+
+      // Position camera to see layers stacked
+      setTimeout(() => {
+        graph.cameraPosition({ x: 0, y: 400, z: 800 }, { x: 0, y: 350, z: 0 }, 1000);
+      }, 500);
+    })
+    .catch(err => {
+      infoEl.innerHTML = `<span style="color:#F2495C">Error: ${err.message}</span>`;
+    });
+}
+
+// Load on startup
+loadGraph();
+</script>
+</body>
+</html>

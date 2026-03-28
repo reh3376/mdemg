@@ -17,6 +17,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
+	"mdemg/internal/sanitize"
 )
 
 // ConsultingService defines the interface for the consulting.Service.Suggest() method.
@@ -54,6 +55,17 @@ type Service struct {
 	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
 	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
 	warmStore           *WarmStore               // B7: WarmStore reference for trust-based invalidation
+	trustStore          *TrustStore              // J17: write-behind trust persistence to Neo4j
+
+	// B4: Per-session feedback tracking for protocol status endpoint
+	feedbackMu     sync.RWMutex
+	feedbackCounts map[string]*sessionFeedback // sessionID → feedback stats
+}
+
+// sessionFeedback tracks per-session feedback statistics for the protocol status endpoint.
+type sessionFeedback struct {
+	Count      int
+	LastFeedAt time.Time
 }
 
 // NewService creates a new Jiminy guidance service.
@@ -151,6 +163,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	var trustScorer *TrustScorer
 	if cfg.J17Enabled {
 		encoder = NewProtocolEncoder(cfg.J17DefaultTier)
+		encoder.SetTierThresholds(cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
 		trustScorer = NewTrustScorer(TrustConfig{
 			Initial:            cfg.J17TrustInitial,
 			BoostPerFollow:     cfg.J17TrustBoostPerFollow,
@@ -161,7 +174,16 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			TTL:                time.Duration(cfg.J17TrustTTLHours) * time.Hour,
 		})
 		slog.Info("jiminy: J17 trust scoring enabled",
-			"initial", cfg.J17TrustInitial, "high_threshold", cfg.J17TrustHighThreshold, "low_threshold", cfg.J17TrustLowThreshold)
+			"initial", cfg.J17TrustInitial, "high_threshold", cfg.J17TrustHighThreshold, "low_threshold", cfg.J17TrustLowThreshold,
+			"ttl_hours", cfg.J17TrustTTLHours)
+	}
+
+	// J17: Trust persistence store
+	var trustStore *TrustStore
+	if cfg.J17Enabled && driver != nil && trustScorer != nil {
+		trustStore = NewTrustStore(driver)
+		trustScorer.SetOnDirty(trustStore.MarkDirty)
+		slog.Info("jiminy: J17 trust persistence enabled")
 	}
 
 	// NS-01: ML components with sidecar arbitration (shadow → causal promotion)
@@ -254,12 +276,115 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		arbitrator:          arbitrator,
 		dataCollector:       dataCollector,
 		calibrationTracker:  calibrationTracker,
+		trustStore:          trustStore,
+		feedbackCounts:      make(map[string]*sessionFeedback),
 	}
 }
 
 // SetSignalLearner sets the Hebbian signal learner for guidance emission/response tracking (RSIC-SK1).
 func (s *Service) SetSignalLearner(sl SignalLearnerProvider) {
 	s.signalLearner = sl
+}
+
+// StartTrustPersistence begins the background trust flush loop.
+// Must be called after NewService from server.go to provide context.
+func (s *Service) StartTrustPersistence(ctx context.Context) {
+	if s.trustStore == nil {
+		return
+	}
+	s.trustStore.Start(ctx)
+
+	// Background flush goroutine — reads trust scores and feedback counts, writes to Neo4j
+	go func() { //nolint:gosec // flush uses Background() intentionally
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				// Final flush
+				_ = s.FlushTrust(context.Background())
+				return
+			case <-ticker.C:
+				if err := s.FlushTrust(context.Background()); err != nil {
+					slog.Warn("j17: trust persistence flush failed", "error", err)
+				}
+			}
+		}
+	}()
+}
+
+// FlushTrust writes all dirty trust + feedback state to Neo4j.
+func (s *Service) FlushTrust(ctx context.Context) error {
+	if s.trustStore == nil || s.trustScorer == nil {
+		return nil
+	}
+
+	dirtyIDs := s.trustStore.DrainDirty()
+	if len(dirtyIDs) == 0 {
+		return nil
+	}
+
+	snapshots := make([]TrustSnapshot, 0, len(dirtyIDs))
+	for _, sessionID := range dirtyIDs {
+		score := s.trustScorer.GetScore(sessionID)
+		snap := TrustSnapshot{
+			SessionID:  sessionID,
+			Score:      score,
+			LastUpdate: time.Now(),
+		}
+
+		// Include feedback counts
+		s.feedbackMu.RLock()
+		if sf := s.feedbackCounts[sessionID]; sf != nil {
+			snap.FeedbackCount = sf.Count
+			snap.LastFeedAt = sf.LastFeedAt
+		}
+		s.feedbackMu.RUnlock()
+
+		snapshots = append(snapshots, snap)
+	}
+
+	return s.trustStore.FlushSnapshots(ctx, snapshots)
+}
+
+// HydrateTrust loads persisted trust scores and feedback counts from Neo4j.
+func (s *Service) HydrateTrust(ctx context.Context) error {
+	if s.trustStore == nil || s.trustScorer == nil {
+		return nil
+	}
+
+	snapshots, err := s.trustStore.LoadAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	hydrated := 0
+	for sessionID, snap := range snapshots {
+		s.trustScorer.SetScore(sessionID, snap.Score)
+		if snap.FeedbackCount > 0 {
+			s.feedbackMu.Lock()
+			s.feedbackCounts[sessionID] = &sessionFeedback{
+				Count:      snap.FeedbackCount,
+				LastFeedAt: snap.LastFeedAt,
+			}
+			s.feedbackMu.Unlock()
+		}
+		hydrated++
+	}
+
+	if hydrated > 0 {
+		slog.Info("j17: trust + feedback state hydrated from Neo4j", "sessions", hydrated)
+	}
+	return nil
+}
+
+// RefreshTrackedGuidance re-registers guidance items in the EffectivenessTracker,
+// resetting their TTL. Called on warm store reads and cache hits to prevent
+// tracker entries from expiring while guidance_ids are still in active use.
+func (s *Service) RefreshTrackedGuidance(guidanceID string, items []GuidanceItem) {
+	if s.tracker != nil && guidanceID != "" && len(items) > 0 {
+		s.tracker.Track(guidanceID, items)
+	}
 }
 
 // UpdateNodeConfidence delegates to the confidence updater to apply outcome-based
@@ -315,9 +440,16 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	// F10: Check cache for fast path (session-scoped key prevents cross-session contamination)
-	if s.cache != nil {
+	// Skip cache when J17 bypass is enabled — cached responses have pre-computed tier
+	// assignments that become stale when trust evolves via feedback.
+	cacheBypass := s.cfg.J17Enabled && s.cfg.JiminyCacheJ17Bypass
+	if s.cache != nil && !cacheBypass {
 		if cached, ok := s.cache.Get(req.SpaceID, req.SessionID, req.Context); ok {
 			s.recordCacheHitMetrics(cached)
+			// Re-register in tracker so feedback can still correlate after cache hit
+			if s.tracker != nil && cached.GuidanceID != "" {
+				s.tracker.Track(cached.GuidanceID, cached.Guidance)
+			}
 			return cached, nil
 		}
 	}
@@ -540,27 +672,17 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	wg.Wait()
 
-	// J17-2: Populate ConstraintCode from Neo4j for constraint guidance items
-	if s.cfg.J17Enabled && s.driver != nil {
-		var constraintSourceNodes []string
-		for _, item := range items {
-			if item.Type == GuidanceConstraint {
-				constraintSourceNodes = append(constraintSourceNodes, item.SourceNodes...)
-			}
-		}
-		if len(constraintSourceNodes) > 0 {
-			codes := s.lookupConstraintCodes(ctx, constraintSourceNodes)
-			if len(codes) > 0 {
-				for i := range items {
-					if items[i].Type == GuidanceConstraint {
-						for _, srcNode := range items[i].SourceNodes {
-							if code, ok := codes[srcNode]; ok {
-								items[i].ConstraintCode = code
-								break
-							}
-						}
-					}
-				}
+	// J17-2: Populate ConstraintCode from Neo4j for all guidance items.
+	// Constraint codes live on Constraint nodes (promoted from ConversationObs),
+	// while guidance source nodes come from vector search (file-ingested nodes).
+	// These are different populations, so we match by content similarity.
+	// Codes are applied to ALL guidance types (constraints, corrections, patterns)
+	// since any item may correspond to a codified constraint.
+	if s.cfg.J17Enabled && s.driver != nil && len(items) > 0 {
+		constraints := s.loadSpaceConstraintCodes(ctx, req.SpaceID)
+		if len(constraints) > 0 {
+			for i := range items {
+				items[i].ConstraintCode = matchConstraintCode(items[i], constraints)
 			}
 		}
 	}
@@ -725,7 +847,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		} else if narrative != "" {
 			synthesizedNarrative = narrative
 			// Use synthesized narrative as the prompt augmentation
-			augmentation = "═══ JIMINY GUIDANCE ═══\n" + narrative + "\n═══ END JIMINY GUIDANCE ═══"
+			augmentation = "═══ JIMINY GUIDANCE ═══\n" + sanitize.StripControlChars(narrative) + "\n═══ END JIMINY GUIDANCE ═══"
 			debug["synthesis_used"] = true
 		}
 	}
@@ -806,7 +928,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	// F10: Cache the response (session-scoped key prevents cross-session contamination)
-	if s.cache != nil {
+	// Skip cache put when J17 bypass is enabled (tiers are trust-dependent, cache would stale)
+	if s.cache != nil && !cacheBypass {
 		s.cache.Put(req.SpaceID, req.SessionID, req.Context, resp)
 	}
 
@@ -940,6 +1063,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 	items := s.tracker.Lookup(req.GuidanceID)
 	if items == nil {
+		slog.Warn("jiminy: feedback dropped — guidance_id expired from tracker",
+			"guidance_id", req.GuidanceID, "session_id", req.SessionID)
 		return &GuidanceFeedbackResponse{
 			GuidanceID: req.GuidanceID,
 			Results:    []GuidanceItemFeedback{},
@@ -965,8 +1090,11 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	for _, item := range items {
 		var cr ClassificationResult
 
-		// J14: Use semantic classifier returning ClassificationResult if available
-		if s.classifier != nil {
+		// B4: Honor explicit outcome from caller, bypassing heuristic/classifier
+		if req.Outcome != "" {
+			cr = ClassificationResult{Outcome: req.Outcome, Confidence: 1.0}
+		} else if s.classifier != nil {
+			// J14: Use semantic classifier returning ClassificationResult if available
 			cr = s.classifier.Classify(ctx, item, req.ActionSummary)
 		} else {
 			outcome, sim := classifyOutcome(item, actionLower)
@@ -1193,6 +1321,24 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				}
 			}
 			_ = newTrust // used above in threshold check
+		}
+	}
+
+	// B4: Track per-session feedback count and timestamp for protocol status
+	if feedbackSessionID != "" {
+		s.feedbackMu.Lock()
+		sf := s.feedbackCounts[feedbackSessionID]
+		if sf == nil {
+			sf = &sessionFeedback{}
+			s.feedbackCounts[feedbackSessionID] = sf
+		}
+		sf.Count++
+		sf.LastFeedAt = time.Now()
+		s.feedbackMu.Unlock()
+
+		// Mark dirty for trust persistence (feedbackCounts changed)
+		if s.trustStore != nil {
+			s.trustStore.MarkDirty(feedbackSessionID)
 		}
 	}
 
@@ -1492,6 +1638,74 @@ func (s *Service) GetProtocolMetricsCollector() *ProtocolMetricsCollector {
 	return s.protocolMetrics
 }
 
+// ProtocolStatus holds the current J17 protocol state for a session (B4).
+type ProtocolStatus struct {
+	SessionID      string     `json:"session_id"`
+	TrustScore     float64    `json:"trust_score"`
+	Tier           string     `json:"tier"`
+	FeedbackCount  int        `json:"feedback_count"`
+	LastFeedbackAt *time.Time `json:"last_feedback_at,omitempty"`
+	Enabled        bool       `json:"enabled"`
+}
+
+// GetProtocolStatus returns the current J17 protocol status for a session (B4).
+func (s *Service) GetProtocolStatus(sessionID string) ProtocolStatus {
+	status := ProtocolStatus{
+		SessionID: sessionID,
+		Enabled:   s.cfg.JiminyEnabled,
+	}
+
+	// Read current trust score
+	var trustScore float64
+	if s.trustScorer != nil {
+		trustScore = s.trustScorer.GetScore(sessionID)
+		status.TrustScore = trustScore
+	} else {
+		// Default initial trust when scorer is not configured
+		trustScore = 0.5
+		status.TrustScore = trustScore
+	}
+
+	// Determine current tier label using the same thresholds as selectTier.
+	// selectTier also considers whether an item has a constraint code, but for
+	// the status endpoint we report the dominant tier the session would receive.
+	if s.encoder != nil {
+		high, low := s.encoder.GetTierThresholds()
+		switch {
+		case trustScore > high:
+			status.Tier = "T1"
+		case trustScore >= low:
+			status.Tier = "T2"
+		default:
+			status.Tier = "T3"
+		}
+	} else if s.trustScorer != nil {
+		high := s.trustScorer.HighThreshold()
+		low := s.trustScorer.LowThreshold()
+		switch {
+		case trustScore > high:
+			status.Tier = "T1"
+		case trustScore >= low:
+			status.Tier = "T2"
+		default:
+			status.Tier = "T3"
+		}
+	} else {
+		status.Tier = "T2" // default mid-tier when no trust/encoder configured
+	}
+
+	// Read per-session feedback stats
+	s.feedbackMu.RLock()
+	if sf := s.feedbackCounts[sessionID]; sf != nil {
+		status.FeedbackCount = sf.Count
+		ts := sf.LastFeedAt
+		status.LastFeedbackAt = &ts
+	}
+	s.feedbackMu.RUnlock()
+
+	return status
+}
+
 // BuildTierEffectivenessDataset creates a curated tier effectiveness dataset and optionally writes it.
 func (s *Service) BuildTierEffectivenessDataset() *TierEffectivenessDataset {
 	snapshot := s.GetProtocolMetricsSnapshot()
@@ -1719,8 +1933,16 @@ func (s *Service) GetGlossary(ctx context.Context, spaceID string) map[string]st
 
 // lookupConstraintCodes batch-queries Neo4j for constraint_code properties.
 // Returns a map of node_id → constraint_code for all nodes that have one.
-func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) map[string]string {
-	if s.driver == nil || len(nodeIDs) == 0 {
+// constraintCodeEntry holds a constraint code and its content for matching.
+type constraintCodeEntry struct {
+	Code    string
+	Content string
+	Words   map[string]bool // significant words for matching
+}
+
+// loadSpaceConstraintCodes loads all constraint codes for a space from Neo4j.
+func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) []constraintCodeEntry {
+	if s.driver == nil {
 		return nil
 	}
 
@@ -1728,34 +1950,87 @@ func (s *Service) lookupConstraintCodes(ctx context.Context, nodeIDs []string) m
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		cypher := `
-			MATCH (n:MemoryNode)
-			WHERE n.node_id IN $nodeIds AND n.constraint_code IS NOT NULL AND n.constraint_code <> ''
-			RETURN n.node_id AS id, n.constraint_code AS code
-		`
-		res, err := tx.Run(ctx, cypher, map[string]any{"nodeIds": nodeIDs})
+		res, err := tx.Run(ctx, `
+			MATCH (c:MemoryNode:Constraint)
+			WHERE c.space_id = $spaceId
+			  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+			RETURN c.constraint_code AS code, c.content AS content
+		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
 			return nil, err
 		}
-		codes := make(map[string]string)
+		var entries []constraintCodeEntry
 		for res.Next(ctx) {
 			record := res.Record()
-			id, _ := record.Get("id")
-			code, _ := record.Get("code")
-			if idStr, ok := id.(string); ok {
-				if codeStr, ok := code.(string); ok {
-					codes[idStr] = codeStr
-				}
+			codeVal, _ := record.Get("code")
+			contentVal, _ := record.Get("content")
+			code, _ := codeVal.(string)
+			content, _ := contentVal.(string)
+			if code == "" {
+				continue
 			}
+			entry := constraintCodeEntry{
+				Code:    code,
+				Content: content,
+				Words:   significantWordSet(content),
+			}
+			entries = append(entries, entry)
 		}
-		return codes, res.Err()
+		return entries, res.Err()
 	})
 	if err != nil {
-		slog.Error("jiminy: lookupConstraintCodes failed", "error", err)
+		slog.Error("jiminy: loadSpaceConstraintCodes failed", "error", err)
 		return nil
 	}
-	codes, _ := result.(map[string]string)
-	return codes
+	entries, _ := result.([]constraintCodeEntry)
+	return entries
+}
+
+// matchConstraintCode finds the best constraint code for a guidance item by keyword overlap.
+// Returns the code and match score; empty string if no match meets the minimum threshold.
+func matchConstraintCode(item GuidanceItem, constraints []constraintCodeEntry) string {
+	if len(constraints) == 0 {
+		return ""
+	}
+	itemWords := significantWordSet(item.Content)
+	if len(itemWords) == 0 {
+		return ""
+	}
+
+	bestCode := ""
+	bestScore := 0
+
+	for _, c := range constraints {
+		if len(c.Words) == 0 {
+			continue
+		}
+		overlap := 0
+		for w := range itemWords {
+			if c.Words[w] {
+				overlap++
+			}
+		}
+		if overlap > bestScore {
+			bestScore = overlap
+			bestCode = c.Code
+		}
+	}
+
+	// Require at least 3 word overlap to avoid spurious matches
+	if bestScore < 3 {
+		return ""
+	}
+	return bestCode
+}
+
+// significantWordSet extracts unique lowercase words >= 4 chars from text.
+func significantWordSet(text string) map[string]bool {
+	words := significantWords(text)
+	set := make(map[string]bool, len(words))
+	for _, w := range words {
+		set[w] = true
+	}
+	return set
 }
 
 // guidanceSignalCode returns a Hebbian signal code for a guidance item.

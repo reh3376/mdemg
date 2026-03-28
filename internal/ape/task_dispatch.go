@@ -33,6 +33,10 @@ type Dispatcher struct {
 	safetySummary   *SafetySummary
 	deltas          []ActionDelta
 	safetyMu        sync.Mutex
+
+	// B2: Background cleanup goroutine lifecycle
+	stopCleanup chan struct{}
+	cleanupDone chan struct{}
 }
 
 type activeTask struct {
@@ -265,6 +269,8 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeFlushRecoveryBuffer(ctx, at.Spec.TargetSpace)
 	case "review_nli_calibration":
 		deliverables, execErr = d.executeReviewNLICalibration(ctx, at.Spec.TargetSpace)
+	case "alert_sidecar_down":
+		deliverables, execErr = d.executeAlertSidecarDown(ctx, at.Spec.TargetSpace)
 	default:
 		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -615,6 +621,19 @@ func (d *Dispatcher) executeAlertJiminyCritical(_ context.Context, spaceID strin
 	}, nil
 }
 
+func (d *Dispatcher) executeAlertSidecarDown(_ context.Context, spaceID string) (map[string]any, error) {
+	slog.Error("RSIC alert: Neural sidecar is down — J17 protocol degraded", "space_id", spaceID)
+	if m := metrics.Metrics(); m != nil {
+		m.RSICActionTotal("alert_sidecar_down", "success").Inc()
+	}
+	return map[string]any{
+		"alert":    "sidecar_down",
+		"space_id": spaceID,
+		"severity": "high",
+		"message":  "Neural sidecar is down — J17 protocol running in T3 fallback mode, no ML tier prediction or NLI scoring",
+	}, nil
+}
+
 func (d *Dispatcher) executeAlertMemoryBloat(ctx context.Context, spaceID string) (map[string]any, error) {
 	// Query total node count to assess bloat
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
@@ -743,6 +762,40 @@ func (d *Dispatcher) CleanupStaleTasks(maxAge time.Duration) int {
 		}
 	}
 	return removed
+}
+
+// StartBackgroundCleanup launches a goroutine that periodically cleans up
+// stale tasks from the activeTasks map. This prevents stale entry accumulation
+// between RSIC cycles (which may be infrequent for macro cycles).
+func (d *Dispatcher) StartBackgroundCleanup(interval, maxAge time.Duration) {
+	d.stopCleanup = make(chan struct{})
+	d.cleanupDone = make(chan struct{})
+	go func() {
+		defer close(d.cleanupDone)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				removed := d.CleanupStaleTasks(maxAge)
+				if removed > 0 {
+					slog.Info("rsic: background cleanup removed stale tasks", "removed", removed)
+				}
+			case <-d.stopCleanup:
+				return
+			}
+		}
+	}()
+	slog.Info("rsic: background task cleanup started", "interval", interval, "maxAge", maxAge)
+}
+
+// StopBackgroundCleanup stops the background cleanup goroutine and waits for it to finish.
+func (d *Dispatcher) StopBackgroundCleanup() {
+	if d.stopCleanup != nil {
+		close(d.stopCleanup)
+		<-d.cleanupDone
+		slog.Info("rsic: background task cleanup stopped")
+	}
 }
 
 // ─── Report posting ───

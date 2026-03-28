@@ -1,0 +1,53 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "metrics_snapshot_security",
+    "description": "Verifies that /v1/metrics/snapshot does not leak sensitive data in metric labels or values",
+    "category": "data_exposure",
+    "severity": "high",
+    "endpoint": "/v1/metrics/snapshot",
+    "method": "GET"
+  },
+  "requests": [
+    {
+      "name": "metrics_snapshot_label_check",
+      "description": "Check metric snapshot response for sensitive data in label keys and values",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  ],
+  "assertions": {
+    "body_not_contains": [
+      "api_key",
+      "password",
+      "secret",
+      "OPENAI_API_KEY",
+      "NEO4J_PASSWORD",
+      "credential",
+      "auth_token",
+      "bearer",
+      "neo4j://",
+      "bolt://",
+      "/Users/",
+      "/home/",
+      "stack trace",
+      "goroutine",
+      ".go:",
+      "panic:",
+      "runtime error"
+    ],
+    "headers_not_present": [
+      "X-Powered-By",
+      "Server"
+    ]
+  },
+  "metadata": {
+    "owasp": ["A01:2021-Broken Access Control", "A02:2021-Cryptographic Failures"],
+    "cwe": ["CWE-200", "CWE-209"],
+    "tags": [
+      "metrics",
+      "security"
+    ]
+  }
+}

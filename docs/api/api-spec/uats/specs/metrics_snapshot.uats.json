@@ -1,0 +1,77 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Metrics Snapshot",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "metrics",
+      "snapshot",
+      "tsdb"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "Validates GET /v1/metrics/snapshot returns a complete metrics snapshot with counters, gauges, histograms, and writer health",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "6e895b22867cda9b8437a351f6194374c1efd58ff81acc7856db2dc367c5aa3c"
+  },
+  "variables": {},
+  "request": {
+    "method": "GET",
+    "path": "/v1/metrics/snapshot"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "timestamp present",
+        "path": "$.data.timestamp",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "name": "counters present",
+        "path": "$.data.counters",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "name": "gauges present",
+        "path": "$.data.gauges",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "name": "histograms present",
+        "path": "$.data.histograms",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "name": "writer_health present",
+        "path": "$.data.writer_health",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "name": "writer_health.consecutive_failures present",
+        "path": "$.data.writer_health.consecutive_failures",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "name": "writer_health.buffer_size present",
+        "path": "$.data.writer_health.buffer_size",
+        "op": "type_is",
+        "expected": "number"
+      }
+    ]
+  }
+}
