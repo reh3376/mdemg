@@ -1,56 +1,49 @@
 {
   "uots_version": "1.0.0",
   "observability": {
-    "name": "Neo4j Graph Alert Rules",
+    "name": "Neo4j Graph Alert Rules (Grafana Unified)",
     "type": "alert_rules",
-    "tags": ["prometheus", "alerts", "neo4j"]
+    "tags": ["grafana", "alerts", "neo4j"]
   },
   "target": {
-    "file": "deploy/docker/prometheus/alerts/neo4j_graph.yaml"
+    "file": "deploy/docker/grafana/provisioning/alerting/alerts.yml"
   },
   "expected": {
     "alerts": [
       {
-        "name": "MDEMGLowGraphHealth",
+        "name": "MDEMG Low Graph Health Score",
         "severity": "warning",
-        "expr_contains": "mdemg_neo4j_graph_health_score",
-        "for_duration": "10m"
+        "expr_contains": "neo4j_graph_health_score"
       },
       {
-        "name": "MDEMGHighOrphanCount",
+        "name": "MDEMG High Orphan Count",
         "severity": "warning",
-        "expr_contains": "mdemg_neo4j_graph_orphans",
-        "for_duration": "15m"
+        "expr_contains": "neo4j_graph_orphans"
       },
       {
-        "name": "MDEMGHighOrphanRatio",
+        "name": "MDEMG High Orphan Ratio",
         "severity": "warning",
-        "expr_contains": "mdemg_neo4j_graph_orphans",
-        "for_duration": "15m"
+        "expr_contains": "neo4j_graph_orphans"
       },
       {
-        "name": "MDEMGNeo4jHighMemory",
+        "name": "MDEMG Neo4j High Memory Usage",
         "severity": "warning",
-        "expr_contains": "mdemg_neo4j_container_mem_percent",
-        "for_duration": "5m"
+        "expr_contains": "neo4j_container_mem"
       },
       {
-        "name": "MDEMGNeo4jHighCPU",
+        "name": "MDEMG Neo4j High CPU Usage",
         "severity": "warning",
-        "expr_contains": "mdemg_neo4j_container_cpu_percent",
-        "for_duration": "5m"
+        "expr_contains": "neo4j_container_cpu_percent"
       },
       {
-        "name": "MDEMGNeo4jPoolExhausted",
+        "name": "MDEMG Neo4j Connection Pool Exhausted",
         "severity": "critical",
-        "expr_contains": "mdemg_neo4j_pool_waiting_requests",
-        "for_duration": "2m"
+        "expr_contains": "neo4j_pool_waiting_requests"
       },
       {
-        "name": "MDEMGGraphNodeDrop",
+        "name": "MDEMG Significant Node Count Drop",
         "severity": "critical",
-        "expr_contains": "mdemg_neo4j_graph_nodes",
-        "for_duration": "5m"
+        "expr_contains": "neo4j_graph_nodes"
       }
     ]
   },
@@ -60,8 +53,9 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "description": "Validates Neo4j graph health Prometheus alert rules: correct alert names, severity levels, PromQL expressions, and 'for' durations. Covers graph health, orphans, container resources, pool exhaustion, and data loss detection.",
+    "updated": "2026-03-27",
+    "description": "Validates Neo4j graph health alert rules in Grafana Unified Alerting: correct alert titles, severity levels, SQL expressions.",
     "status": "active",
-    "tags": ["prometheus", "alerts", "neo4j", "phase-grafana"]
+    "tags": ["grafana", "alerts", "neo4j", "phase-grafana"]
   }
 }

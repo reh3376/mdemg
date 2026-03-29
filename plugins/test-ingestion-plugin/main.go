@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log/slog"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -19,14 +19,11 @@ const (
 )
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
-
 	socketPath := flag.String("socket", "", "Unix socket path")
 	flag.Parse()
 
 	if *socketPath == "" {
-		slog.Error("missing required flag", "flag", "--socket")
-		os.Exit(1)
+		log.Fatal("--socket is required")
 	}
 
 	// Remove stale socket
@@ -35,13 +32,12 @@ func main() {
 	// Create Unix socket listener
 	listener, err := net.Listen("unix", *socketPath)
 	if err != nil {
-		slog.Error("failed to listen", "error", err)
-		os.Exit(1)
+		log.Fatalf("Failed to listen: %v", err)
 	}
 	defer listener.Close()
 	defer os.Remove(*socketPath)
 
-	slog.Info("listening", "module", moduleID, "socket", *socketPath)
+	log.Printf("%s: listening on %s", moduleID, *socketPath)
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
@@ -57,13 +53,12 @@ func main() {
 
 	go func() {
 		<-sigChan
-		slog.Info("received shutdown signal", "module", moduleID)
+		log.Printf("%s: received shutdown signal", moduleID)
 		grpcServer.GracefulStop()
 	}()
 
 	// Start serving
 	if err := grpcServer.Serve(listener); err != nil {
-		slog.Error("failed to serve", "error", err)
-		os.Exit(1)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }

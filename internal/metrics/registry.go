@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -200,7 +199,7 @@ func (r *Registry) NewHistogram(name, help string, labels map[string]string) *Hi
 
 // Observe records a value in the histogram.
 // Increments the first bucket where v <= bound.
-// The Render function accumulates to produce proper cumulative histogram.
+// Snapshot() accumulates to produce proper cumulative counts.
 func (h *Histogram) Observe(v float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -212,7 +211,7 @@ func (h *Histogram) Observe(v float64) {
 	for i, bound := range h.buckets {
 		if v <= bound {
 			h.bucketCounts[i]++
-			return // Only increment one bucket; Render accumulates
+			return // Only increment one bucket; Snapshot accumulates
 		}
 	}
 	// Value exceeds all defined buckets; it will only appear in +Inf
@@ -237,53 +236,6 @@ func (h *Histogram) Snapshot() (buckets map[float64]int64, sum float64, count in
 	return buckets, h.sum, h.count
 }
 
-// Render outputs all metrics in Prometheus exposition format.
-func (r *Registry) Render() string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	var sb strings.Builder
-
-	// Render counters
-	for _, c := range r.counters {
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", c.name, c.help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s counter\n", c.name))
-		sb.WriteString(fmt.Sprintf("%s%s %d\n", c.name, formatLabels(c.labels), c.Value()))
-	}
-
-	// Render gauges
-	for _, g := range r.gauges {
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", g.name, g.help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s gauge\n", g.name))
-		sb.WriteString(fmt.Sprintf("%s%s %.3f\n", g.name, formatLabels(g.labels), g.Value()))
-	}
-
-	// Render histograms
-	for _, h := range r.hists {
-		sb.WriteString(fmt.Sprintf("# HELP %s %s\n", h.name, h.help))
-		sb.WriteString(fmt.Sprintf("# TYPE %s histogram\n", h.name))
-
-		h.mu.Lock()
-		cumulative := int64(0)
-		for i, bound := range h.buckets {
-			cumulative += h.bucketCounts[i]
-			labels := copyLabels(h.labels)
-			labels["le"] = fmt.Sprintf("%.3f", bound)
-			sb.WriteString(fmt.Sprintf("%s_bucket%s %d\n", h.name, formatLabels(labels), cumulative))
-		}
-		// +Inf bucket
-		labels := copyLabels(h.labels)
-		labels["le"] = "+Inf"
-		sb.WriteString(fmt.Sprintf("%s_bucket%s %d\n", h.name, formatLabels(labels), h.count))
-
-		sb.WriteString(fmt.Sprintf("%s_sum%s %.3f\n", h.name, formatLabels(h.labels), h.sum))
-		sb.WriteString(fmt.Sprintf("%s_count%s %d\n", h.name, formatLabels(h.labels), h.count))
-		h.mu.Unlock()
-	}
-
-	return sb.String()
-}
-
 // makeKey creates a unique key for a metric with labels.
 func makeKey(name string, labels map[string]string) string {
 	if len(labels) == 0 {
@@ -303,30 +255,4 @@ func makeKey(name string, labels map[string]string) string {
 		sb.WriteString(labels[k])
 	}
 	return sb.String()
-}
-
-// formatLabels formats labels for Prometheus output.
-func formatLabels(labels map[string]string) string {
-	if len(labels) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(labels))
-	for k := range labels {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var parts []string
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf(`%s="%s"`, k, labels[k]))
-	}
-	return "{" + strings.Join(parts, ",") + "}"
-}
-
-// copyLabels creates a copy of a labels map.
-func copyLabels(labels map[string]string) map[string]string {
-	result := make(map[string]string, len(labels)+1)
-	for k, v := range labels {
-		result[k] = v
-	}
-	return result
 }

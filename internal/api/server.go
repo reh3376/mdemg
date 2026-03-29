@@ -77,6 +77,7 @@ type Server struct {
 	// Phase 3: Production readiness components
 	cbRegistry     *circuitbreaker.Registry
 	metricsRegistry *metrics.Registry
+	metricsRecorder *metrics.MetricsRecorder
 
 	// Phase 48.4: Connection pooling components
 	memoryPressure *backpressure.MemoryPressure
@@ -627,6 +628,18 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		protoAdapter := &rsicProtocolAdapter{svc: jiminySvc}
 		rsicAssessor.SetProtocolProvider(protoAdapter)
 	}
+	// Sidecar health: Wire checker to assessor for RSIC sidecar awareness
+	if cfg.J17SidecarURL != "" {
+		rsicAssessor.SetSidecarChecker(func(_ context.Context) bool {
+			client := &http.Client{Timeout: 2 * time.Second}
+			resp, err := client.Get(cfg.J17SidecarURL + "/health")
+			if err != nil {
+				return false
+			}
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusOK
+		})
+	}
 	rsicReflector := ape.NewReflector(cfg, driver)
 	// J17: Wire protocol stats provider to reflector
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
@@ -698,6 +711,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		driver:         driver,
 		jiminyEnabled:  cfg.JiminyEnabled,
 		jiminySvc:      jiminySvc,
+		sidecarURL:     cfg.J17SidecarURL,
 	})
 
 	// Phase 87: Create orchestration policy
@@ -797,6 +811,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		fileWatcherMgr:          filewatcher.NewManager(),
 		cbRegistry:              cbRegistry,
 		metricsRegistry:         metricsRegistry,
+		metricsRecorder:         metrics.NewMetricsRecorder(metricsRegistry, nil, cfg.RSICWatchdogSpaceID),
 		memoryPressure:          memPressure,
 		templateService:         conversation.NewTemplateService(driver),
 		snapshotService:         conversation.NewSnapshotService(driver),
@@ -872,6 +887,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc.SetWarmStore(s.warmStore)
 	}
 
+	// J17: Hydrate trust scores from Neo4j and start persistence flush loop
+	if jiminySvc != nil {
+		if err := jiminySvc.HydrateTrust(context.Background()); err != nil {
+			slog.Warn("j17: trust hydration failed", "error", err)
+		}
+		jiminySvc.StartTrustPersistence(context.Background())
+	}
+
 	// B3: Bootstrap codification — codify constraints without codes on startup
 	if cfg.J17BootstrapCodification && jiminySvc != nil {
 		go func() {
@@ -903,6 +926,21 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			s.cfg.RSICWatchdogSpaceID,
 			time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
 		)
+		// Wire writer into MetricsRecorder for periodic flushing
+		if s.metricsRecorder != nil {
+			s.metricsRecorder.SetWriter(s.tsdbWriter)
+			// Pre-flush hook: refresh live protocol/sidecar/guidance gauge values
+			// before each TSDB write so dashboards show current data
+			if s.liveCollectors != nil {
+				lc := s.liveCollectors
+				s.metricsRecorder.SetPreFlushHook(func() {
+					lc.CollectProtocolMetrics()
+					lc.CollectGuidanceMetrics()
+					lc.CollectHealthMetrics()
+				})
+			}
+			s.metricsRecorder.Start(time.Duration(s.cfg.TSDBFlushIntervalSec) * time.Second)
+		}
 		// Wire TSDB client into RSIC reflector for schema drift detection
 		if s.rsicCycle != nil {
 			s.rsicCycle.SetTSDBClient(client)
@@ -936,6 +974,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.backupScheduler != nil {
 		s.backupScheduler.Stop()
+	}
+	if s.metricsRecorder != nil {
+		s.metricsRecorder.Stop()
 	}
 	if s.tsdbWriter != nil {
 		s.tsdbWriter.Close()
@@ -1505,6 +1546,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/memory/node/meta", s.handleNodeMeta)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
+	mux.HandleFunc("/v1/metrics/snapshot", s.handleMetricsSnapshot)
 	mux.HandleFunc("/v1/prometheus", s.handlePrometheusMetrics)
 	mux.HandleFunc("/v1/metrics/trends", s.handleMetricsTrends)
 	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
@@ -1544,6 +1586,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/graph/data", s.handleNodeGraphData)
 	mux.HandleFunc("/api/graph/fields", s.handleNodeGraphFields)
 	mux.HandleFunc("/api/graph/health", s.handleNodeGraphHealth)
+
+	// 3D topology viewer
+	mux.HandleFunc("/viz/topology", s.handleVizTopology)
 
 	// Ingestion job management endpoints
 	mux.HandleFunc("/v1/memory/ingest/trigger", s.handleIngestTrigger)
@@ -1599,6 +1644,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/protocol/tier-effectiveness", s.handleJ17TierEffectiveness)
 	mux.HandleFunc("/v1/jiminy/protocol/feedback", s.handleJ17ProtocolFeedback)
 	mux.HandleFunc("/v1/jiminy/protocol/learn", s.handleJ17ProtocolLearn)
+	mux.HandleFunc("/v1/jiminy/protocol/status", s.handleJiminyProtocolStatus)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)
 
 	// Constraint Module (Phase 45.5)
@@ -2146,7 +2192,28 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	metrics.MetricsHandler(s.metricsRegistry)(w, r)
+	writeJSON(w, http.StatusGone, map[string]string{"error": "prometheus endpoint removed, use /v1/metrics/snapshot"})
+}
+
+
+// handleMetricsSnapshot serves a JSON snapshot of all registered metrics.
+func (s *Server) handleMetricsSnapshot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if s.metricsRecorder == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "metrics recorder not initialized"})
+		return
+	}
+	// Refresh live gauge values before snapshot (same as pre-flush hook)
+	if s.liveCollectors != nil {
+		s.liveCollectors.CollectProtocolMetrics()
+		s.liveCollectors.CollectGuidanceMetrics()
+		s.liveCollectors.CollectHealthMetrics()
+	}
+	snap := s.metricsRecorder.SnapshotAll()
+	writeJSON(w, http.StatusOK, map[string]any{"data": snap})
 }
 
 // CircuitBreaker returns the circuit breaker for a given service name.

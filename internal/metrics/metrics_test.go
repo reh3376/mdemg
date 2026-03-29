@@ -120,40 +120,51 @@ func TestHistogram_ObserveDuration(t *testing.T) {
 	}
 }
 
-func TestRegistry_Render(t *testing.T) {
+func TestRegistry_SnapshotAll(t *testing.T) {
 	r := NewRegistry(DefaultConfig())
 
 	r.NewCounter("http_requests_total", "Total HTTP requests", map[string]string{"method": "GET"}).Add(100)
 	r.NewGauge("active_connections", "Active connections", nil).Set(42)
 	r.NewHistogram("request_latency_seconds", "Request latency", nil).Observe(0.1)
 
-	output := r.Render()
+	// Use MetricsRecorder.SnapshotAll to verify metrics are registered
+	mr := NewMetricsRecorder(r, nil, "test")
+	snap := mr.SnapshotAll()
 
-	// Check counter output
-	if !strings.Contains(output, "# TYPE mdemg_http_requests_total counter") {
-		t.Error("missing counter TYPE")
+	// Check counter
+	found := false
+	for k, v := range snap.Counters {
+		if strings.Contains(k, "http_requests_total") && v == 100 {
+			found = true
+			break
+		}
 	}
-	if !strings.Contains(output, `mdemg_http_requests_total{method="GET"} 100`) {
-		t.Error("missing counter value")
-	}
-
-	// Check gauge output
-	if !strings.Contains(output, "# TYPE mdemg_active_connections gauge") {
-		t.Error("missing gauge TYPE")
-	}
-	if !strings.Contains(output, "mdemg_active_connections 42.") {
-		t.Error("missing gauge value")
+	if !found {
+		t.Error("missing counter value in snapshot")
 	}
 
-	// Check histogram output
-	if !strings.Contains(output, "# TYPE mdemg_request_latency_seconds histogram") {
-		t.Error("missing histogram TYPE")
+	// Check gauge
+	found = false
+	for k, v := range snap.Gauges {
+		if strings.Contains(k, "active_connections") && v == 42 {
+			found = true
+			break
+		}
 	}
-	if !strings.Contains(output, "mdemg_request_latency_seconds_bucket") {
-		t.Error("missing histogram buckets")
+	if !found {
+		t.Error("missing gauge value in snapshot")
 	}
-	if !strings.Contains(output, "mdemg_request_latency_seconds_count 1") {
-		t.Error("missing histogram count")
+
+	// Check histogram
+	found = false
+	for k, h := range snap.Histograms {
+		if strings.Contains(k, "request_latency_seconds") && h.Count == 1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("missing histogram in snapshot")
 	}
 }
 
@@ -173,41 +184,33 @@ func TestHTTPMiddleware(t *testing.T) {
 		t.Errorf("status = %d, want 200", rec.Code)
 	}
 
-	// Check that metrics were recorded
-	output := r.Render()
-	if !strings.Contains(output, "mdemg_http_requests_total") {
+	// Check that metrics were recorded via snapshot
+	mr := NewMetricsRecorder(r, nil, "test")
+	snap := mr.SnapshotAll()
+
+	foundCounter := false
+	for k := range snap.Counters {
+		if strings.Contains(k, "http_requests_total") {
+			foundCounter = true
+			break
+		}
+	}
+	if !foundCounter {
 		t.Error("HTTP request counter not recorded")
 	}
-	if !strings.Contains(output, "mdemg_http_request_duration_seconds") {
+
+	foundHist := false
+	for k := range snap.Histograms {
+		if strings.Contains(k, "http_request_duration_seconds") {
+			foundHist = true
+			break
+		}
+	}
+	if !foundHist {
 		t.Error("HTTP request duration not recorded")
 	}
 }
 
-func TestMetricsHandler(t *testing.T) {
-	r := NewRegistry(DefaultConfig())
-	r.NewCounter("test_metric", "Test metric", nil).Inc()
-
-	handler := MetricsHandler(r)
-
-	req := httptest.NewRequest("GET", "/metrics", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rec.Code)
-	}
-
-	contentType := rec.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "text/plain") {
-		t.Errorf("Content-Type = %s, want text/plain", contentType)
-	}
-
-	body := rec.Body.String()
-	if !strings.Contains(body, "mdemg_test_metric 1") {
-		t.Errorf("body doesn't contain expected metric: %s", body)
-	}
-}
 
 func TestStandardMetrics(t *testing.T) {
 	r := NewRegistry(DefaultConfig())
@@ -346,19 +349,6 @@ func TestGlobalRegistry(t *testing.T) {
 	}
 }
 
-func TestMetricsHandler_NilRegistry(t *testing.T) {
-	// MetricsHandler with nil should use global registry
-	handler := MetricsHandler(nil)
-
-	req := httptest.NewRequest("GET", "/metrics", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rec.Code)
-	}
-}
 
 func TestHTTPMiddleware_Write(t *testing.T) {
 	r := NewRegistry(DefaultConfig())

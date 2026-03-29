@@ -149,6 +149,7 @@ type SelfAssessmentReport struct {
 	EdgesBelowThreshold  int64   `json:"edges_below_threshold"`
 	EdgeWeightEntropy    float64 `json:"edge_weight_entropy"`
 	StaleIngestSpaces    int     `json:"stale_ingest_spaces"`    // Phase 47.2: count of spaces past staleness threshold
+	SidecarHealthy       bool    `json:"sidecar_healthy"`        // Sidecar health: neural sidecar reachable
 }
 
 // ───────────── Reflection ─────────────
@@ -479,6 +480,7 @@ type WatchdogSignalProvider interface {
 	GetObservationRate(spaceID string) float64
 	GetConsolidationAgeSec(ctx context.Context, spaceID string) (int64, error)
 	IsJiminyHealthy(ctx context.Context) bool
+	IsSidecarHealthy(ctx context.Context) bool
 }
 
 // FreshnessProvider supplies ingest staleness data for the RSIC pipeline (Phase 47.2).

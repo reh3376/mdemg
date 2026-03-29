@@ -18,6 +18,8 @@ type TrustScorer struct {
 	highThreshold     float64
 	lowThreshold      float64
 	ttl               time.Duration
+
+	onDirty func(string) // called after score changes with sessionID
 }
 
 type trustEntry struct {
@@ -57,7 +59,7 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		cfg.LowThreshold = 0.4
 	}
 
-	ttl := 4 * time.Hour
+	ttl := 168 * time.Hour // 7 days — trust persisted to Neo4j, TTL is cleanup threshold
 	if cfg.TTL > 0 {
 		ttl = cfg.TTL
 	}
@@ -72,6 +74,25 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		lowThreshold:       cfg.LowThreshold,
 		ttl:                ttl,
 	}
+}
+
+// SetOnDirty sets a callback invoked after any trust score change.
+// The callback receives the sessionID whose score was updated.
+func (ts *TrustScorer) SetOnDirty(fn func(string)) {
+	ts.onDirty = fn
+}
+
+// GetAllEntries returns a snapshot of all non-expired trust entries for persistence.
+func (ts *TrustScorer) GetAllEntries() map[string]trustEntry {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	result := make(map[string]trustEntry, len(ts.scores))
+	for id, entry := range ts.scores {
+		if time.Since(entry.LastUpdate) <= ts.ttl {
+			result[id] = *entry
+		}
+	}
+	return result
 }
 
 // GetScore returns the current trust score for a session.
@@ -90,7 +111,6 @@ func (ts *TrustScorer) GetScore(sessionID string) float64 {
 // RecordOutcome updates the trust score based on an outcome.
 func (ts *TrustScorer) RecordOutcome(sessionID string, outcome GuidanceOutcome) float64 {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
 
 	entry, ok := ts.scores[sessionID]
 	if !ok || time.Since(entry.LastUpdate) > ts.ttl {
@@ -118,13 +138,19 @@ func (ts *TrustScorer) RecordOutcome(sessionID string, outcome GuidanceOutcome) 
 	}
 	entry.LastUpdate = time.Now()
 
-	return entry.Score
+	score := entry.Score
+	ts.mu.Unlock()
+
+	if ts.onDirty != nil {
+		ts.onDirty(sessionID)
+	}
+
+	return score
 }
 
-// SetScore sets the trust score for a session (used for ticket restore).
+// SetScore sets the trust score for a session (used for ticket restore and hydration).
 func (ts *TrustScorer) SetScore(sessionID string, score float64) {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
 
 	if score > 1.0 {
 		score = 1.0
@@ -136,6 +162,11 @@ func (ts *TrustScorer) SetScore(sessionID string, score float64) {
 	ts.scores[sessionID] = &trustEntry{
 		Score:      score,
 		LastUpdate: time.Now(),
+	}
+	ts.mu.Unlock()
+
+	if ts.onDirty != nil {
+		ts.onDirty(sessionID)
 	}
 }
 

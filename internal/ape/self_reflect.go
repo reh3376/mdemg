@@ -378,6 +378,25 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
+	// 21. Sidecar down while Jiminy enabled — J17 protocol degraded
+	if report.JiminyHealthy && !report.SidecarHealthy {
+		severity := SeverityHigh
+		desc := "Neural sidecar is down — J17 protocol running in fallback mode (100% T3, no ML tier prediction, no NLI scoring)."
+		if report.ProtocolHealth > 0 {
+			severity = SeverityCritical
+			desc = "Neural sidecar is down with active J17 traffic — all events using T3 fallback. Restart sidecar immediately."
+		}
+		insights = append(insights, ReflectionInsight{
+			PatternID:         "sidecar_unhealthy",
+			Severity:          severity,
+			Description:       desc,
+			RecommendedAction: "alert_sidecar_down",
+			Metric:            "sidecar_healthy",
+			Value:             0,
+			Threshold:         1,
+		})
+	}
+
 	// Phase 47.2: Stale ingest detection
 	if r.cfg.APEIngestSyncEnabled && report.StaleIngestSpaces > 0 {
 		severity := SeverityLow

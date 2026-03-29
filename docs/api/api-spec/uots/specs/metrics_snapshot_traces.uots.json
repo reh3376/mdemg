@@ -1,0 +1,75 @@
+{
+  "uots_version": "1.0.0",
+  "observability": {
+    "name": "Metrics Snapshot Naming and Value Validation",
+    "type": "prometheus_metrics",
+    "tags": ["metrics", "traces", "snapshot"]
+  },
+  "target": {
+    "endpoint": "/v1/metrics/snapshot",
+    "method": "GET"
+  },
+  "expected": {
+    "metrics": [
+      {
+        "name": "mdemg_http_requests_total",
+        "type": "counter",
+        "section": "counters",
+        "help_contains": "request",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_retrieval_cache_hits_total",
+        "type": "counter",
+        "section": "counters",
+        "help_contains": "cache",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_circuit_breaker_state",
+        "type": "gauge",
+        "section": "gauges",
+        "help_contains": "circuit",
+        "value_range": { "min": 0, "max": 2 }
+      },
+      {
+        "name": "mdemg_cache_hit_ratio",
+        "type": "gauge",
+        "section": "gauges",
+        "help_contains": "cache",
+        "value_range": { "min": 0, "max": 1 }
+      },
+      {
+        "name": "mdemg_http_request_duration_seconds",
+        "type": "histogram",
+        "section": "histograms",
+        "help_contains": "duration",
+        "value_range": { "min": 0 }
+      },
+      {
+        "name": "mdemg_retrieval_latency_seconds",
+        "type": "histogram",
+        "section": "histograms",
+        "help_contains": "latency",
+        "value_range": { "min": 0 }
+      }
+    ],
+    "naming_conventions": {
+      "prefix": "mdemg_",
+      "counter_suffix": "_total",
+      "histogram_unit_suffix": "_seconds",
+      "no_camel_case": true
+    }
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "base_url": "${MDEMG_BASE_URL}"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "Validates that /v1/metrics/snapshot returns metrics with correct naming conventions (mdemg_ prefix, _total suffix for counters, _seconds for histograms) and that values fall within expected ranges.",
+    "status": "active",
+    "tags": ["metrics", "traces", "snapshot"]
+  }
+}

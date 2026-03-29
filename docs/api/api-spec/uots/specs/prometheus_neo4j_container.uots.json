@@ -2,11 +2,11 @@
   "uots_version": "1.0.0",
   "observability": {
     "name": "Neo4j Container Resource Metrics",
-    "type": "prometheus_metrics",
+    "type": "metrics_snapshot",
     "tags": ["neo4j", "container", "docker", "resources"]
   },
   "target": {
-    "endpoint": "/v1/prometheus",
+    "endpoint": "/v1/metrics/snapshot",
     "method": "GET"
   },
   "expected": {
@@ -44,7 +44,7 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "description": "Validates Neo4j container resource metrics collected via docker stats. Exposes CPU percent, memory used/limit/percent for the Neo4j container through the MDEMG Prometheus endpoint.",
+    "description": "Validates Neo4j container resource metrics collected via docker stats. Exposes CPU percent, memory used/limit/percent for the Neo4j container through the MDEMG metrics snapshot endpoint.",
     "status": "active",
     "tags": ["neo4j", "container", "docker", "phase-grafana"]
   }

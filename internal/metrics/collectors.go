@@ -175,6 +175,11 @@ type StandardMetrics struct {
 	JiminyLatestServed  func(spaceID string) *Counter
 }
 
+// Registry returns the underlying metric registry.
+func (m *StandardMetrics) Registry() *Registry {
+	return m.registry
+}
+
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
 func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m := &StandardMetrics{registry: r}

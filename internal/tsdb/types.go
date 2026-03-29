@@ -13,6 +13,7 @@ type MetricSample struct {
 	Value      float64
 	Source     string            // "assess", "meso", "macro", "live"
 	QualityTag string            // "nominal", "cached_health", "degraded_nli", "partial", "bootstrap"
+	MetricType string            // "gauge", "counter", "histogram_bucket", "histogram_sum", "histogram_count"
 	Labels     map[string]string // optional additional labels
 }
 

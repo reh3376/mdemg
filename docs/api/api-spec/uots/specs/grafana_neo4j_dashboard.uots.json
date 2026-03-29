@@ -41,6 +41,7 @@
         "mdemg_neo4j_container_cpu_percent",
         "mdemg_neo4j_container_mem_used_bytes"
       ],
+      "required_template_vars": ["instance", "space_id"],
       "tags": ["mdemg", "neo4j", "graph"]
     }
   },
@@ -50,7 +51,8 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels with correct titles, required PromQL queries for all Neo4j graph and container metrics, and dashboard tags.",
+    "updated": "2026-03-27",
+    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels with rawSql queries for all Neo4j graph and container metrics.",
     "status": "active",
     "tags": ["grafana", "neo4j", "phase-grafana"]
   }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log/slog"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,13 +35,13 @@ func NewTestReasoningPluginHandler() *TestReasoningPluginHandler {
 
 // Handshake is called immediately after spawn to verify module is ready.
 func (h *TestReasoningPluginHandler) Handshake(ctx context.Context, req *pb.HandshakeRequest) (*pb.HandshakeResponse, error) {
-	slog.Info("handshake received", "module", moduleID, "mdemg_version", req.MdemgVersion)
+	log.Printf("%s: handshake from MDEMG %s", moduleID, req.MdemgVersion)
 
 	// Parse configuration
 	if factor, ok := req.Config["boost_factor"]; ok {
 		if f, err := strconv.ParseFloat(factor, 64); err == nil {
 			h.boostFactor = f
-			slog.Info("config applied", "module", moduleID, "boost_factor", h.boostFactor)
+			log.Printf("%s: boost_factor set to %.2f", moduleID, h.boostFactor)
 		}
 	}
 
@@ -73,7 +73,7 @@ func (h *TestReasoningPluginHandler) HealthCheck(ctx context.Context, req *pb.He
 
 // Shutdown is called when MDEMG is stopping or the module is being disabled.
 func (h *TestReasoningPluginHandler) Shutdown(ctx context.Context, req *pb.ShutdownRequest) (*pb.ShutdownResponse, error) {
-	slog.Info("shutdown requested", "module", moduleID, "reason", req.Reason)
+	log.Printf("%s: shutdown requested (reason: %s)", moduleID, req.Reason)
 	return &pb.ShutdownResponse{
 		Success: true,
 		Message: "goodbye",
@@ -92,7 +92,8 @@ func (h *TestReasoningPluginHandler) Process(ctx context.Context, req *pb.Proces
 		return &pb.ProcessResponse{Results: req.Candidates}, nil
 	}
 
-	slog.Info("processing candidates", "module", moduleID, "count", len(req.Candidates), "query", truncate(req.QueryText, 50))
+	log.Printf("%s: processing %d candidates for: %s",
+		moduleID, len(req.Candidates), truncate(req.QueryText, 50))
 
 	// TODO: Implement your re-ranking/filtering logic here
 	// Example: Simple keyword-based boosting

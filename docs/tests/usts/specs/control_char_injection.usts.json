@@ -1,0 +1,92 @@
+{
+  "usts_version": "1.0.0",
+  "test": {
+    "name": "control_char_injection",
+    "description": "Tests that payloads with control characters (U+0000-U+001F) in space_id or content fields are handled safely without crashing or leaking internal state",
+    "category": "injection",
+    "severity": "high",
+    "endpoint": "/v1/conversation/observe",
+    "method": "POST"
+  },
+  "requests": [
+    {
+      "name": "null_byte_in_space_id",
+      "description": "Attempt injection via null byte (U+0000) in space_id — server must reject or sanitize",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-API-Key": "{{valid_api_key}}"
+      },
+      "payload": {
+        "space_id": "test\u0000injected",
+        "session_id": "usts-control-char",
+        "content": "normal observation",
+        "obs_type": "note"
+      }
+    },
+    {
+      "name": "bell_char_in_space_id",
+      "description": "Attempt injection via BEL character (U+0007) in space_id",
+      "payload": {
+        "space_id": "test\u0007bell",
+        "session_id": "usts-control-char",
+        "content": "normal observation",
+        "obs_type": "note"
+      }
+    },
+    {
+      "name": "null_byte_in_content",
+      "description": "Attempt injection via null byte (U+0000) in content field",
+      "payload": {
+        "space_id": "test",
+        "session_id": "usts-control-char",
+        "content": "before\u0000after",
+        "obs_type": "note"
+      }
+    },
+    {
+      "name": "escape_char_in_content",
+      "description": "Attempt injection via ESC character (U+001B) in content field",
+      "payload": {
+        "space_id": "test",
+        "session_id": "usts-control-char",
+        "content": "normal\u001b[31mred\u001b[0m",
+        "obs_type": "note"
+      }
+    },
+    {
+      "name": "mixed_control_chars_in_space_id",
+      "description": "Attempt injection via multiple control characters in space_id",
+      "payload": {
+        "space_id": "\u0001\u0002\u0003\u0004\u0005",
+        "session_id": "usts-control-char",
+        "content": "normal observation",
+        "obs_type": "note"
+      }
+    },
+    {
+      "name": "form_feed_in_content",
+      "description": "Attempt injection via form feed (U+000C) in content",
+      "payload": {
+        "space_id": "test",
+        "session_id": "usts-control-char",
+        "content": "line1\u000cline2",
+        "obs_type": "note"
+      }
+    }
+  ],
+  "assertions": {
+    "body_not_contains": [
+      "\u0000",
+      "panic:",
+      "runtime error",
+      "goroutine",
+      "stack trace",
+      "Neo4jError",
+      "DatabaseError"
+    ]
+  },
+  "metadata": {
+    "owasp": ["A03:2021-Injection"],
+    "cwe": ["CWE-74", "CWE-20"]
+  }
+}

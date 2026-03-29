@@ -1,0 +1,29 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "jiminy_protocol_metrics",
+    "description": "Validates Jiminy protocol metrics are present in metrics snapshot",
+    "type": "metrics"
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_j17_events_total",
+        "type": "gauge",
+        "description": "J17 events total gauge should be present after feedback"
+      },
+      {
+        "name": "mdemg_j17_avg_comprehension",
+        "type": "gauge",
+        "description": "J17 average comprehension gauge should be present"
+      },
+      {
+        "name": "mdemg_j17_compression_ratio",
+        "type": "gauge",
+        "description": "J17 compression ratio gauge should be present"
+      }
+    ],
+    "format_validation": true
+  }
+}

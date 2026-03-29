@@ -26,22 +26,32 @@
 ## Architecture Overview
 
 ```
-docker-compose.observability.yml
-├── prometheus       (scrapes MDEMG /v1/prometheus endpoint)
+docker-compose.prod.yml
+├── timescaledb      (metrics storage, TimescaleDB 2.25.1 on PostgreSQL 16)
 ├── grafana          (visualization, port 3000)
 │   ├── provisioning/datasources/   (auto-configured on startup)
-│   │   ├── prometheus.yml
+│   │   ├── timescaledb.yml
 │   │   ├── neo4j.yml
 │   │   └── nodegraph-api.yml
 │   ├── provisioning/dashboards/
 │   │   └── dashboards.yml          (tells Grafana where to find JSON files)
+│   ├── provisioning/alerting/
+│   │   └── alerts.yml              (22 alert rules across 3 groups)
 │   └── dashboards/
 │       ├── mdemg-overview.json      (home dashboard)
 │       ├── mdemg-graph-topology.json
 │       ├── mdemg-rsic.json
-│       └── mdemg-neo4j.json
-└── (MDEMG server on host:9999, Neo4j on host:7687)
+│       ├── mdemg-neo4j.json
+│       ├── mdemg-j17.json
+│       ├── mdemg-jiminy.json
+│       └── mdemg-ft-training.json
+├── neo4j            (graph database, port 7687)
+└── mdemg            (server on port 8080/9999)
 ```
+
+**Datasource**: TimescaleDB (PostgreSQL with time-series extensions). Panels use raw SQL against `metric_samples`, `llm_interactions`, `ft_benchmarks`, `ft_training_cycles`, `ft_model_versions` tables. Continuous aggregates `metrics_hourly` and `metrics_daily` provide pre-aggregated rollups.
+
+**MetricsRecorder**: The `internal/metrics/recorder.go` `MetricsRecorder` periodically flushes collected metrics to TimescaleDB via `FlushToTSDB()`. The recorder must be wired to a writer via `SetWriter()` and started via `Start()` in `server.go`'s `SetTSDBClient()` method.
 
 **Grafana image**: `grafana/grafana:10.2.2`
 
@@ -79,24 +89,29 @@ environment:
 
 Datasources are provisioned from YAML files mounted at `/etc/grafana/provisioning/datasources/` (read-only). Grafana reads these on startup and creates/updates the datasources automatically.
 
-### Prometheus (`prometheus.yml`)
+### TimescaleDB (`timescaledb.yml`)
 
 ```yaml
 apiVersion: 1
 datasources:
-  - name: Prometheus
-    uid: prometheus          # <-- CRITICAL: explicit UID for dashboard portability
-    type: prometheus
+  - name: TimescaleDB
+    uid: timescaledb          # <-- CRITICAL: explicit UID for dashboard portability
+    type: postgres
     access: proxy
-    url: http://prometheus:9090
+    url: timescaledb:5432
     isDefault: true
     editable: false
     jsonData:
-      timeInterval: "15s"
-      httpMethod: POST
-      manageAlerts: true
-      prometheusType: Prometheus
-      prometheusVersion: "2.48.0"
+      database: mdemg_metrics
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: true
+    secureJsonData:
+      user: mdemg
+      password: ${TSDB_PASSWORD}
 ```
 
 ### Neo4j (`neo4j.yml`)
@@ -251,9 +266,9 @@ For multi-value custom variables (e.g., edge types):
 }
 ```
 
-### Pattern 2: Prometheus Query Variable
+### Pattern 2: TimescaleDB Query Variable
 
-Dynamically populates from Prometheus label values:
+Dynamically populates from TSDB SQL:
 
 ```json
 {
@@ -261,13 +276,10 @@ Dynamically populates from Prometheus label values:
   "label": "Space ID",
   "type": "query",
   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
+    "type": "postgres",
+    "uid": "timescaledb"
   },
-  "query": {
-    "query": "label_values(mdemg_rsic_health_overall, space_id)",
-    "refId": "StandardVariableQuery"
-  },
+  "query": "SELECT DISTINCT space_id FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND space_id NOT SIMILAR TO 'test-.*' ORDER BY space_id",
   "refresh": 2,
   "sort": 1,
   "current": {
@@ -280,7 +292,8 @@ Dynamically populates from Prometheus label values:
 **Key fields**:
 - `refresh: 2` — refresh on time range change (1 = on dashboard load, 2 = on time range change)
 - `sort: 1` — alphabetical ascending
-- The `query` field must be wrapped in `{ "query": "...", "refId": "StandardVariableQuery" }` for Grafana 10.x Prometheus datasource
+- `current` block **must** be present with a default value — without it, queries using `$space_id` return nothing on first load
+- SQL query is a plain string (not wrapped in an object like the old Prometheus pattern)
 
 ### Pattern 3: Neo4j Cypher Query Variable
 
@@ -573,7 +586,7 @@ Without this, panels rely on the "default datasource" fallback. This works when 
 
 | Datasource | Reference |
 |------------|-----------|
-| Prometheus | `{ "type": "prometheus", "uid": "prometheus" }` |
+| TimescaleDB | `{ "type": "postgres", "uid": "timescaledb" }` |
 | Neo4j | `{ "type": "kniepdennis-neo4j-datasource", "uid": "neo4j" }` |
 | Node Graph API | `{ "type": "hamedkarbasi93-nodegraphapi-datasource", "uid": "mdemg-nodegraph" }` |
 
@@ -626,36 +639,40 @@ When inserting a new row at the top, shift all existing panel `y` values down by
 
 ## Issues Encountered and Solutions
 
-### Issue 1: Dashboard Panels Show "No Data" Despite Working Prometheus Endpoint
+### Issue 1: Dashboard Panels Show "No Data" Despite Metrics Flowing
 
-**Symptom**: Panels display "No data" even though `curl http://localhost:9999/v1/prometheus | grep metric_name` shows the metric exists.
+**Symptom**: Panels display "No data" even though `SELECT count(*) FROM metric_samples` returns rows.
 
-**Root cause**: MDEMG uses a custom Prometheus exposition format (not `prometheus/client_golang`). The custom implementation stores values as `int64` milli-units internally but outputs standard Prometheus text format. If a metric is registered but never `.Set()`, it won't appear in the scrape output.
+**Root causes**:
+1. **MetricsRecorder not wired**: `SetWriter()` and `Start()` must be called on the recorder in `SetTSDBClient()`. Without this, `FlushToTSDB()` exits immediately on nil writer check.
+2. **Volume name mismatch**: Docker Compose creates volumes as `{project}_{name}`. Using `tsdb-data` (hyphenated) creates `docker_tsdb-data`, not `docker_tsdb_data`. Always use underscores: `tsdb_data`.
+3. **space_id variable empty**: If the template variable has no `current` block, queries using `$space_id` interpolate to empty string and return nothing.
 
-**Solution**: Ensure metrics are published before expecting them in Grafana. For RSIC health metrics, trigger an assessment first:
+**Solution**: Check the data pipeline end-to-end:
 ```bash
-curl -X POST 'http://localhost:9999/v1/self-improve/assess?space_id=mdemg-dev&tier=micro'
-curl -s http://localhost:9999/v1/prometheus | grep rsic_health
+# 1. Verify TSDB has data
+PGPASSWORD=mdemg_metrics psql -h localhost -p 5433 -U mdemg -d mdemg_metrics -c "SELECT count(*) FROM metric_samples;"
+# 2. Verify metrics are being flushed (check server logs)
+docker logs docker-mdemg-1 2>&1 | grep "flushed.*metric"
+# 3. Verify the correct volume is mounted
+docker volume ls | grep tsdb
 ```
 
 ### Issue 2: Template Variable Dropdown Shows Empty
 
-**Symptom**: A Prometheus query variable like `label_values(metric, label)` shows no options.
+**Symptom**: A TimescaleDB query variable shows no options.
 
 **Root causes**:
-1. The metric hasn't been published yet (gauge never `.Set()`)
+1. No data in `metric_samples` for the queried metric name
 2. The `datasource` field in the variable definition doesn't match the provisioned UID
-3. The `query` field format is wrong for the Grafana version
+3. Missing `current` block — ALWAYS include a default
 
-**Solution**: For Grafana 10.x with Prometheus, the query must be wrapped:
+**Solution**: For TimescaleDB, the query is a plain SQL string:
 ```json
-"query": {
-  "query": "label_values(mdemg_rsic_health_overall, space_id)",
-  "refId": "StandardVariableQuery"
-}
+"query": "SELECT DISTINCT space_id FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' ORDER BY space_id"
 ```
 
-For Neo4j, the query is a plain string:
+For Neo4j, the query is also a plain string:
 ```json
 "query": "MATCH (n:MemoryNode) RETURN DISTINCT n.space_id AS __value, n.space_id AS __text"
 ```
@@ -804,6 +821,64 @@ python3 -c "import json; json.load(open('deploy/docker/grafana/dashboards/mdemg-
 
 ---
 
+## Graceful Degradation: No-Data Handling
+
+Every stat panel **must** handle the no-data case gracefully. Without explicit configuration, stat panels show a bare "No data" message which is confusing for operators.
+
+### noValue Property
+
+Add `"noValue"` to `fieldConfig.defaults`:
+
+| Panel Type | noValue Setting | Example |
+|------------|----------------|---------|
+| Rate/count stats (Request Rate, Error Rate) | `"N/A"` | Overview, Neo4j stat panels |
+| State indicators (Watchdog, Circuit Breaker) | `"Awaiting Data"` | RSIC Watchdog Escalation |
+| FT pipeline panels | `"Not yet collected"` | FT Training panels |
+| Numeric stats (counts, totals) | `"N/A"` | Neo4j Total Nodes/Edges |
+
+### Special Value Mapping for Null/NaN
+
+For state indicator panels where color carries meaning (e.g., green = healthy), add a `null+nan` special mapping to prevent misleading coloring when there's no data:
+
+```json
+"mappings": [
+  {
+    "type": "special",
+    "options": {
+      "match": "null+nan",
+      "result": {
+        "text": "Awaiting Data",
+        "color": "text"
+      }
+    }
+  },
+  { "type": "value", "options": { "0": { "text": "Nominal", "color": "green" } } },
+  { "type": "value", "options": { "1": { "text": "Nudge", "color": "yellow" } } }
+]
+```
+
+The `"color": "text"` uses Grafana's neutral text color, avoiding false green/red signals.
+
+### TSDB Volume Naming Convention
+
+**Always use underscores, never hyphens** in Docker Compose volume names:
+
+```yaml
+# CORRECT
+volumes:
+  tsdb_data:
+  neo4j_data:
+
+# WRONG — creates different Docker volume name
+volumes:
+  tsdb-data:
+  neo4j-data:
+```
+
+Docker Compose prefixes volumes with the project name using underscores: `docker_tsdb_data`. A hyphenated name creates `docker_tsdb-data` — a completely different volume. This caused a critical data loss bug where the container mounted an empty volume while 3.5M rows of data lived in the original.
+
+---
+
 ## Quick Reference
 
 ### Creating a New Dashboard
@@ -823,10 +898,14 @@ python3 -c "import json; json.load(open('deploy/docker/grafana/dashboards/mdemg-
 - [ ] `schemaVersion: 39`
 - [ ] `graphTooltip: 1`
 - [ ] `tags` includes `"mdemg"`
-- [ ] Instance template variable present
+- [ ] Instance and Space ID template variables present
+- [ ] Space ID variable has `"current": {"text": "mdemg-dev", "value": "mdemg-dev"}`
 - [ ] Dashboard dropdown link present
 - [ ] All panels have explicit `datasource` with UID
+- [ ] All stat panels have `"noValue"` in `fieldConfig.defaults`
+- [ ] State indicator panels have `null+nan` special value mapping
 - [ ] JSON validates without errors
+- [ ] Playwright e2e tests pass: `pytest tests/e2e/grafana/ -v --browser chromium`
 
 ### Metric Scoping Reference (RSIC Example)
 

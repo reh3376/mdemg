@@ -10,7 +10,9 @@
     {
       "title": "Dashboards",
       "type": "dashboards",
-      "tags": ["mdemg"],
+      "tags": [
+        "mdemg"
+      ],
       "icon": "external link",
       "asDropdown": true
     }
@@ -20,18 +22,32 @@
       "title": "Protocol Health",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "panels": []
     },
     {
       "title": "Protocol Health Score",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_health_protocol{space_id=\"$space_id\"}",
-          "legendFormat": "health"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_protocol' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -47,9 +63,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -58,12 +83,21 @@
     {
       "title": "Compression Ratio",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_compression_ratio{space_id=\"$space_id\"}",
-          "legendFormat": "ratio"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_compression_ratio' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -77,9 +111,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "green", "value": 5 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 5
+              }
             ]
           }
         }
@@ -88,12 +131,21 @@
     {
       "title": "Code Coverage",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_code_coverage{space_id=\"$space_id\"}",
-          "legendFormat": "coverage"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_code_coverage' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -109,9 +161,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -120,12 +181,21 @@
     {
       "title": "Avg Comprehension",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_avg_comprehension{space_id=\"$space_id\"}",
-          "legendFormat": "comprehension"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_avg_comprehension' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -141,9 +211,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -152,8 +231,16 @@
     {
       "title": "Health Formula",
       "type": "text",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "options": {
         "mode": "markdown",
         "content": "### Protocol Health\n\n| Weight | Factor |\n|--------|--------|\n| **35%** | Comprehension |\n| **25%** | Compression |\n| **20%** | Code Coverage |\n| **15%** | Stability |\n| **5%** | NLI Calibration |"
@@ -163,35 +250,50 @@
       "title": "Tier Distribution",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "panels": []
     },
     {
       "title": "Tier Distribution",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_tier_t1_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T1 (Coded)",
-          "instant": true
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t1_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_j17_tier_t2_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T2 (Telegraphic)",
-          "instant": true
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t2_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         },
         {
-          "expr": "mdemg_j17_tier_t3_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T3 (Full NL)",
-          "instant": true
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t3_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "C"
         }
       ],
       "options": {
         "pieType": "donut",
         "reduceOptions": {
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         },
         "legend": {
           "displayMode": "table",
@@ -201,31 +303,103 @@
       "fieldConfig": {
         "defaults": {
           "noValue": "N/A"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T1 (Coded)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T2 (Telegraphic)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T3 (Natural)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "title": "Tier Comprehension",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_tier_t1_comprehension{space_id=\"$space_id\"}",
-          "legendFormat": "T1"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t1_comprehension' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_j17_tier_t2_comprehension{space_id=\"$space_id\"}",
-          "legendFormat": "T2"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t2_comprehension' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         },
         {
-          "expr": "mdemg_j17_tier_t3_comprehension{space_id=\"$space_id\"}",
-          "legendFormat": "T3"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t3_comprehension' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "C"
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true
@@ -239,31 +413,89 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T1"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T2"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T3"
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "title": "Tier Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_tier_t1_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T1 (Coded)"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t1_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_j17_tier_t2_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T2 (Telegraphic)"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t2_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         },
         {
-          "expr": "mdemg_j17_tier_t3_fraction{space_id=\"$space_id\"}",
-          "legendFormat": "T3 (Full NL)"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_tier_t3_fraction' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
@@ -276,29 +508,82 @@
             },
             "fillOpacity": 30
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T1"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T2"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T3"
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "title": "Token Efficiency",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "panels": []
     },
     {
       "title": "Compression Ratio Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_compression_ratio{space_id=\"$space_id\"}",
-          "legendFormat": "Compression Ratio"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_compression_ratio' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "Compression Ratio",
           "noValue": "N/A",
           "custom": {
             "thresholdsStyle": {
@@ -308,8 +593,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           }
         }
@@ -318,16 +609,26 @@
     {
       "title": "Tokens & Replay",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_avg_tokens_per_guidance{space_id=\"$space_id\"}",
-          "legendFormat": "Avg Tokens/Guidance"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_avg_tokens_per_guidance' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         },
         {
-          "expr": "mdemg_j17_replay_frequency_per_hour{space_id=\"$space_id\"}",
-          "legendFormat": "Replays/Hour"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_replay_frequency_per_hour' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
         }
       ],
       "fieldConfig": {
@@ -337,10 +638,26 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Replays/Hour"
+              "id": "byFrameRefID",
+              "options": "A"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Avg Tokens"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Replays/Hour"
+              },
               {
                 "id": "custom.axisPlacement",
                 "value": "right"
@@ -354,18 +671,32 @@
       "title": "Session Resilience + NLI",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "panels": []
     },
     {
       "title": "Ticket Restore Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_ticket_restore_success_rate{space_id=\"$space_id\"}",
-          "legendFormat": "restore rate"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_ticket_restore_success_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -381,9 +712,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.5 },
-              { "color": "green", "value": 0.8 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
             ]
           }
         }
@@ -392,12 +732,21 @@
     {
       "title": "Total Events",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_events_total{space_id=\"$space_id\"}",
-          "legendFormat": "events"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_events_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -411,7 +760,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           }
         }
@@ -420,12 +772,21 @@
     {
       "title": "NLI Mean Bias",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_nli_mean_bias{space_id=\"$space_id\"}",
-          "legendFormat": "bias"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_mean_bias' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -439,9 +800,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.02 },
-              { "color": "red", "value": 0.05 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.02
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
             ]
           }
         }
@@ -450,12 +820,21 @@
     {
       "title": "NLI Bias Alert",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_j17_nli_bias_alert{space_id=\"$space_id\"}",
-          "legendFormat": "alert"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_bias_alert' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -483,7 +862,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           }
         }
@@ -493,21 +875,36 @@
       "title": "Sidecar",
       "type": "row",
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
       "panels": [
         {
           "title": "Sidecar Requests",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 29 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 29
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
           "targets": [
             {
-              "expr": "mdemg_j17_sidecar_requests{space_id=\"$space_id\"}",
-              "legendFormat": "requests"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_requests' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
+              "displayName": "Sidecar Requests",
               "noValue": "N/A"
             }
           }
@@ -515,16 +912,26 @@
         {
           "title": "Errors & Timeouts",
           "type": "stat",
-          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 29 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 29
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
           "targets": [
             {
-              "expr": "mdemg_j17_sidecar_errors{space_id=\"$space_id\"}",
-              "legendFormat": "errors"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_errors' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
             },
             {
-              "expr": "mdemg_j17_sidecar_timeouts{space_id=\"$space_id\"}",
-              "legendFormat": "timeouts"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_timeouts' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "B"
             }
           ],
           "options": {
@@ -537,47 +944,122 @@
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  { "color": "green", "value": null }
+                  {
+                    "color": "green",
+                    "value": null
+                  }
                 ]
               }
-            }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Errors"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Timeouts"
+                  }
+                ]
+              }
+            ]
           }
         },
         {
           "title": "Agreement vs Override",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 29 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 29
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
           "targets": [
             {
-              "expr": "mdemg_j17_sidecar_agreement_rate{space_id=\"$space_id\"}",
-              "legendFormat": "agreement"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_agreement_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
             },
             {
-              "expr": "mdemg_j17_sidecar_override_rate{space_id=\"$space_id\"}",
-              "legendFormat": "override"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_override_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "B"
             }
           ],
           "fieldConfig": {
             "defaults": {
               "unit": "percentunit",
               "noValue": "N/A"
-            }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Agreement"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Override"
+                  }
+                ]
+              }
+            ]
           }
         },
         {
           "title": "Latency",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 29 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 29
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
           "targets": [
             {
-              "expr": "mdemg_j17_sidecar_avg_latency_ms{space_id=\"$space_id\"}",
-              "legendFormat": "latency"
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_sidecar_avg_latency_ms' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
+              "displayName": "Avg Latency",
               "unit": "ms",
               "noValue": "N/A"
             }
@@ -589,18 +1071,31 @@
       "title": "Historical Trends",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
       "panels": []
     },
     {
       "title": "Protocol Metrics Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('j17_compression_ratio','j17_avg_comprehension','j17_code_coverage','j17_tier1_distribution','j17_tier2_distribution','j17_tier3_distribution') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_j17_compression_ratio','mdemg_j17_avg_comprehension','mdemg_j17_code_coverage','mdemg_j17_tier_t1_fraction','mdemg_j17_tier_t2_fraction','mdemg_j17_tier_t3_fraction') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
           "format": "time_series"
         }
       ],
@@ -616,19 +1111,101 @@
             "pointSize": 5,
             "showPoints": "auto"
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_compression_ratio"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Compression Ratio"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_avg_comprehension"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Avg Comprehension"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_code_coverage"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Code Coverage"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_tier_t1_fraction"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T1 Fraction"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_tier_t2_fraction"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T2 Fraction"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_j17_tier_t3_fraction"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "T3 Fraction"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull", "mean", "min", "max"]
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
         }
       }
     }
   ],
   "schemaVersion": 39,
-  "tags": ["mdemg", "j17"],
+  "tags": [
+    "mdemg",
+    "j17"
+  ],
   "refresh": "30s",
   "templating": {
     "list": [
@@ -637,29 +1214,42 @@
         "label": "Instance",
         "type": "custom",
         "query": "localhost:9999",
-        "current": { "text": "localhost:9999", "value": "localhost:9999" },
+        "current": {
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
         "options": [
-          { "text": "localhost:9999", "value": "localhost:9999", "selected": true }
+          {
+            "text": "localhost:9999",
+            "value": "localhost:9999",
+            "selected": true
+          }
         ]
       },
       {
         "name": "space_id",
         "label": "Space ID",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "definition": "label_values(mdemg_j17_compression_ratio{space_id!~\"test-.*\"}, space_id)",
-        "query": {
-          "query": "label_values(mdemg_j17_compression_ratio{space_id!~\"test-.*\"}, space_id)",
-          "refId": "StandardVariableQuery"
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
         },
+        "query": "SELECT DISTINCT space_id AS __value, space_id AS __text FROM metric_samples WHERE metric_name = 'mdemg_j17_compression_ratio' AND space_id !~ 'test-.*' ORDER BY 1",
         "refresh": 2,
         "sort": 1,
         "includeAll": false,
-        "multi": false
+        "multi": false,
+        "current": {
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        }
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "MDEMG J17 Protocol",

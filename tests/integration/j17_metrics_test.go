@@ -12,14 +12,14 @@ import (
 )
 
 // TestJ17_GuidanceThenMetrics POSTs a minimal guidance request and then
-// verifies that j17_total_events is present (and > 0) in the Prometheus
-// scrape output.
+// verifies that j17_total_events is present (and > 0) in the metrics
+// snapshot output.
 //
 // The test is intentionally lenient: Jiminy may be disabled in CI (no
 // JIMINY_ENABLED=true), in which case the guide call is skipped and we only
-// assert that the metric NAME appears in /v1/prometheus.  Even without a
+// assert that the metric NAME appears in /v1/metrics/snapshot.  Even without a
 // guidance call the APE live-collector emits j17_* gauges (potentially at 0),
-// so the metric line must always be present when metrics are enabled.
+// so the metric key must always be present when metrics are enabled.
 func TestJ17_GuidanceThenMetrics(t *testing.T) {
 	RequireServiceReady(t)
 
@@ -71,20 +71,20 @@ func TestJ17_GuidanceThenMetrics(t *testing.T) {
 		t.Log("Jiminy not available (disabled or not configured); skipping guide call")
 	}
 
-	// --- Step 2: scrape /v1/prometheus ---
-	promResp, err := client.Get(cfg.MDEMGEndpoint + "/v1/prometheus")
+	// --- Step 2: fetch /v1/metrics/snapshot ---
+	promResp, err := client.Get(cfg.MDEMGEndpoint + "/v1/metrics/snapshot")
 	if err != nil {
-		t.Fatalf("GET /v1/prometheus failed: %v", err)
+		t.Fatalf("GET /v1/metrics/snapshot failed: %v", err)
 	}
 	defer promResp.Body.Close()
 
 	if promResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /v1/prometheus, got %d", promResp.StatusCode)
+		t.Fatalf("expected 200 from /v1/metrics/snapshot, got %d", promResp.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(promResp.Body)
 	if err != nil {
-		t.Fatalf("failed to read /v1/prometheus body: %v", err)
+		t.Fatalf("failed to read /v1/metrics/snapshot body: %v", err)
 	}
 	body := string(bodyBytes)
 
@@ -92,7 +92,7 @@ func TestJ17_GuidanceThenMetrics(t *testing.T) {
 	// The APE live-collector always registers j17_ gauges when RSIC is wired up,
 	// so this metric name should appear even when its value is 0.
 	if !strings.Contains(body, "j17_events_total") {
-		t.Errorf("/v1/prometheus body does not contain 'j17_events_total'; got:\n%s", body)
+		t.Errorf("/v1/metrics/snapshot body does not contain 'j17_events_total'; got:\n%s", body)
 	}
 
 	// If Jiminy was available and we sent a guide request, the counter should
@@ -103,35 +103,35 @@ func TestJ17_GuidanceThenMetrics(t *testing.T) {
 	}
 }
 
-// TestJ17_PrometheusScrapeable verifies that /v1/prometheus returns 200 and
+// TestMetricsSnapshotReachable verifies that /v1/metrics/snapshot returns 200 and
 // that the body contains the expected "mdemg_" metrics prefix used by this
 // project's custom metrics registry.
-func TestJ17_PrometheusScrapeable(t *testing.T) {
+func TestMetricsSnapshotReachable(t *testing.T) {
 	RequireServiceReady(t)
 
 	cfg := GetTestConfig()
 	client := NewTestHTTPClient()
 
-	// --- GET /v1/prometheus ---
-	resp, err := client.Get(cfg.MDEMGEndpoint + "/v1/prometheus")
+	// --- GET /v1/metrics/snapshot ---
+	resp, err := client.Get(cfg.MDEMGEndpoint + "/v1/metrics/snapshot")
 	if err != nil {
-		t.Fatalf("GET /v1/prometheus failed: %v", err)
+		t.Fatalf("GET /v1/metrics/snapshot failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// --- Assert 200 OK ---
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /v1/prometheus, got %d", resp.StatusCode)
+		t.Fatalf("expected 200 from /v1/metrics/snapshot, got %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("failed to read /v1/prometheus body: %v", err)
+		t.Fatalf("failed to read /v1/metrics/snapshot body: %v", err)
 	}
 	body := string(bodyBytes)
 
 	// --- Assert body contains "mdemg_" metrics prefix ---
 	if !strings.Contains(body, "mdemg_") {
-		t.Errorf("/v1/prometheus body does not contain 'mdemg_' prefix; body:\n%s", body)
+		t.Errorf("/v1/metrics/snapshot body does not contain 'mdemg_' prefix; body:\n%s", body)
 	}
 }

@@ -2,11 +2,11 @@
   "uobs_version": "1.0.0",
   "test": {
     "name": "prometheus_metrics",
-    "description": "Validates Prometheus metrics endpoint and required metrics",
+    "description": "Validates metrics snapshot endpoint and required metrics",
     "type": "metrics"
   },
   "metrics": {
-    "endpoint": "/v1/prometheus",
+    "endpoint": "/v1/metrics/snapshot",
     "required_metrics": [
       {
         "name": "mdemg_http_requests_total",

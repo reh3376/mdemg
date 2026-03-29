@@ -58,14 +58,3 @@ func (w *statusResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// MetricsHandler returns an HTTP handler that serves Prometheus metrics.
-func MetricsHandler(registry *Registry) http.HandlerFunc {
-	if registry == nil {
-		registry = globalRegistry
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		w.Write([]byte(registry.Render()))
-	}
-}

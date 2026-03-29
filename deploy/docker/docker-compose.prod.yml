@@ -45,6 +45,10 @@ services:
       METRICS_ENABLED: "true"
       METRICS_NAMESPACE: "mdemg"
 
+      # Neural sidecar (J17 protocol)
+      J17_SIDECAR_URL: "http://neural-sidecar:8000"
+      J17_SIDECAR_MODE: "${J17_SIDECAR_MODE:-shadow}"
+
       # Graceful shutdown
       GRACEFUL_SHUTDOWN_TIMEOUT: "30"
     healthcheck:
@@ -55,6 +59,10 @@ services:
       start_period: 10s
     depends_on:
       neo4j:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      neural-sidecar:
         condition: service_healthy
     networks:
       - mdemg-net
@@ -97,24 +105,51 @@ services:
           cpus: "4"
           memory: 4G
 
-  prometheus:
-    image: prom/prometheus:v2.48.0
+  timescaledb:
+    image: timescale/timescaledb:2.25.1-pg16
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "${TSDB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: mdemg_metrics
+      POSTGRES_USER: mdemg
+      POSTGRES_PASSWORD: ${TSDB_PASSWORD:-mdemg_metrics}
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerts:/etc/prometheus/alerts:ro
-      - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.enable-lifecycle"
+      - tsdb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdemg -d mdemg_metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mdemg-net
-    depends_on:
-      - mdemg
+
+  neural-sidecar:
+    build:
+      context: ../..
+      dockerfile: neural/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${SIDECAR_PORT:-8100}:8000"
+    environment:
+      NEURAL_RERANK_MODEL: ${NEURAL_RERANK_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+      NEURAL_NLI_MODEL: ${NEURAL_NLI_MODEL:-cross-encoder/nli-MiniLM2-L6-H768}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - mdemg-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   grafana:
     image: grafana/grafana:10.2.2
@@ -125,20 +160,23 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/dashboards/mdemg-overview.json"
+      GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+      TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
     networks:
       - mdemg-net
     depends_on:
-      - prometheus
+      - timescaledb
 
 volumes:
   neo4j-data:
   neo4j-logs:
-  prometheus-data:
+  tsdb_data:
   grafana-data:
 
 networks:

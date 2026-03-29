@@ -162,8 +162,17 @@ curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
   -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":\"session-start\",\"session_id\":\"claude-core\"}" \
   --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
 
+# J17: Detect whether J17 is enabled via server healthz (env var may not be in shell)
+J17_ENABLED="${J17_ENABLED:-false}"
+if [ "$J17_ENABLED" != "true" ]; then
+  J17_CHECK=$(curl -sf "${MDEMG_URL}/v1/jiminy/ready" --connect-timeout 2 --max-time 3 2>/dev/null || true)
+  if [ -n "$J17_CHECK" ] && echo "$J17_CHECK" | jq -e '.features.j17 == true' >/dev/null 2>&1; then
+    J17_ENABLED="true"
+  fi
+fi
+
 # J17: Bootstrap codification if 0% code coverage
-if [ "${J17_ENABLED:-false}" = "true" ]; then
+if [ "$J17_ENABLED" = "true" ]; then
   PROTO_METRICS=$(curl -sf "${MDEMG_URL}/v1/jiminy/protocol/metrics" \
     --connect-timeout 2 --max-time 3 2>/dev/null || true)
   if [ -n "$PROTO_METRICS" ]; then
@@ -181,7 +190,7 @@ fi
 
 # J17: Restore protocol state from saved ticket
 J17_STATE_RESTORED=false
-if [ "${J17_ENABLED:-false}" = "true" ]; then
+if [ "$J17_ENABLED" = "true" ]; then
   J17_TICKET_OBS=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
     -H "Content-Type: application/json" \
     -d "{\"space_id\":\"${SPACE_ID}\",\"query\":\"j17-ticket\",\"top_k\":1,\"filter_tags\":[\"j17-ticket\"]}" \

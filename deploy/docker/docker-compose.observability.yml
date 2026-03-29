@@ -5,34 +5,6 @@
 version: "3.8"
 
 services:
-  blackbox:
-    image: prom/blackbox-exporter:v0.24.0
-    restart: unless-stopped
-    ports:
-      - "9115:9115"
-    command:
-      - "--config.file=/etc/blackbox/blackbox.yml"
-    volumes:
-      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
-
-  prometheus:
-    image: prom/prometheus:v2.48.0
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerts:/etc/prometheus/alerts:ro
-      - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.enable-lifecycle"
-      - "--web.enable-admin-api"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
   grafana:
     image: grafana/grafana:10.2.2
     restart: unless-stopped
@@ -48,11 +20,11 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - prometheus
       - timescaledb
 
   timescaledb:
@@ -73,6 +45,5 @@ services:
       retries: 5
 
 volumes:
-  prometheus-data:
   grafana-data:
   tsdb_data:

@@ -2,11 +2,11 @@
   "uots_version": "1.0.0",
   "observability": {
     "name": "Neo4j Connection Pool Metrics",
-    "type": "prometheus_metrics",
+    "type": "metrics_snapshot",
     "tags": ["neo4j", "pool", "connections"]
   },
   "target": {
-    "endpoint": "/v1/prometheus",
+    "endpoint": "/v1/metrics/snapshot",
     "method": "GET"
   },
   "expected": {
@@ -62,7 +62,7 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "description": "Validates that Neo4j connection pool metrics are exposed via the Prometheus endpoint. These metrics track connection lifecycle and pool utilization.",
+    "description": "Validates that Neo4j connection pool metrics are exposed via the metrics snapshot endpoint. These metrics track connection lifecycle and pool utilization.",
     "status": "active",
     "tags": ["neo4j", "pool", "phase-48"]
   }

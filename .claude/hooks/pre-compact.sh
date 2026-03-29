@@ -138,8 +138,17 @@ if [ -x "./bin/mdemg" ]; then
   ./bin/mdemg ingest-claude-md --force --quiet --space-id "${SPACE_ID}" 2>/dev/null || true
 fi
 
+# J17: Detect whether J17 is enabled via server healthz (env var may not be in shell)
+J17_ENABLED="${J17_ENABLED:-false}"
+if [ "$J17_ENABLED" != "true" ]; then
+  J17_CHECK=$(curl -sf "${MDEMG_URL}/v1/jiminy/ready" --connect-timeout 2 --max-time 3 2>/dev/null || true)
+  if [ -n "$J17_CHECK" ] && echo "$J17_CHECK" | jq -e '.features.j17 == true' >/dev/null 2>&1; then
+    J17_ENABLED="true"
+  fi
+fi
+
 # J17: Issue session ticket before compaction for state persistence
-if [ "${J17_ENABLED:-false}" = "true" ]; then
+if [ "$J17_ENABLED" = "true" ]; then
   J17_TICKET=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/checkpoint" \
     -H "Content-Type: application/json" \
     -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\"}" \

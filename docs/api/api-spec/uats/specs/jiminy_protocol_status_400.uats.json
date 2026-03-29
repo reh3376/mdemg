@@ -1,0 +1,49 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Protocol Status 400",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "protocol",
+      "validation",
+      "B4"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "GET /v1/jiminy/protocol/status without session_id returns 400",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "jiminy",
+      "protocol",
+      "validation"
+    ],
+    "sha256": "877015ae426af79a85c95c47d2c41e45f5cc35e4c65f4ed0edc5977f9c6c86ad"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/protocol/status",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 400,
+    "body_assertions": [
+      {
+        "name": "error message present",
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string"
+      }
+    ]
+  }
+}

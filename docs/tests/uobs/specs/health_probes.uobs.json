@@ -1,0 +1,26 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "health_probes",
+    "description": "Validates health probe metrics are present in metrics snapshot after prober runs",
+    "type": "metrics"
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_probe_up",
+        "section": "gauges",
+        "path": "$.data.gauges",
+        "description": "Health probe status gauge should exist for each target"
+      },
+      {
+        "name": "mdemg_probe_latency_ms",
+        "section": "gauges",
+        "path": "$.data.gauges",
+        "description": "Health probe latency gauge should exist for each target"
+      }
+    ],
+    "format_validation": true
+  }
+}

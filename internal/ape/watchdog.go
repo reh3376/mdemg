@@ -208,6 +208,9 @@ func (w *Watchdog) check() {
 		if !w.signalProvider.IsJiminyHealthy(w.ctx) {
 			anomalies = append(anomalies, "jiminy-unhealthy")
 		}
+		if !w.signalProvider.IsSidecarHealthy(w.ctx) {
+			anomalies = append(anomalies, "sidecar-unhealthy")
+		}
 		w.state.ActiveAnomalies = anomalies
 
 		// Additional escalation: force cycle if session health is critically low AND decay is moderate

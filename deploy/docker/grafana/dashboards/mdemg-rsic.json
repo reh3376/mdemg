@@ -10,7 +10,9 @@
     {
       "title": "Dashboards",
       "type": "dashboards",
-      "tags": ["mdemg"],
+      "tags": [
+        "mdemg"
+      ],
       "icon": "external link",
       "asDropdown": true
     }
@@ -19,18 +21,32 @@
     {
       "title": "Cognitive Health",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false
     },
     {
       "title": "Overall Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_health_overall{space_id=\"$space_id\"}",
-          "legendFormat": "overall"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -46,9 +62,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -57,12 +82,21 @@
     {
       "title": "Assessment Confidence",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_health_confidence{space_id=\"$space_id\"}",
-          "legendFormat": "confidence"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -78,9 +112,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.3 },
-              { "color": "green", "value": 0.6 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.3
+              },
+              {
+                "color": "green",
+                "value": 0.6
+              }
             ]
           }
         }
@@ -89,16 +132,52 @@
     {
       "title": "Health Sub-Scores",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 16, "x": 8, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 16,
+        "x": 8,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
-        { "expr": "mdemg_rsic_health_retrieval{space_id=\"$space_id\"}", "legendFormat": "Retrieval", "refId": "A" },
-        { "expr": "mdemg_rsic_health_memory{space_id=\"$space_id\"}", "legendFormat": "Memory", "refId": "B" },
-        { "expr": "mdemg_rsic_health_edge{space_id=\"$space_id\"}", "legendFormat": "Edge", "refId": "C" },
-        { "expr": "mdemg_rsic_health_task{space_id=\"$space_id\"}", "legendFormat": "Task", "refId": "D" },
-        { "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}", "legendFormat": "Guidance", "refId": "E" },
-        { "expr": "mdemg_rsic_health_protocol{space_id=\"$space_id\"}", "legendFormat": "Protocol", "refId": "F" },
-        { "expr": "mdemg_rsic_health_synergy{space_id=\"$space_id\"}", "legendFormat": "Synergy", "refId": "G" }
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_retrieval' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_memory' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_edge' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_task' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "E",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "F",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_protocol' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "G",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_synergy' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
       ],
       "options": {
         "showThresholdLabels": false,
@@ -112,28 +191,163 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.4 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Retrieval"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Memory"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Edge"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Task"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "E"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Guidance"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Protocol"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "G"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Synergy"
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "title": "Health Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
-        { "expr": "mdemg_rsic_health_overall{space_id=\"$space_id\"}", "legendFormat": "Overall", "refId": "A" },
-        { "expr": "mdemg_rsic_health_retrieval{space_id=\"$space_id\"}", "legendFormat": "Retrieval", "refId": "B" },
-        { "expr": "mdemg_rsic_health_memory{space_id=\"$space_id\"}", "legendFormat": "Memory", "refId": "C" },
-        { "expr": "mdemg_rsic_health_edge{space_id=\"$space_id\"}", "legendFormat": "Edge", "refId": "D" },
-        { "expr": "mdemg_rsic_health_task{space_id=\"$space_id\"}", "legendFormat": "Task", "refId": "E" },
-        { "expr": "mdemg_rsic_health_guidance{space_id=\"$space_id\"}", "legendFormat": "Guidance", "refId": "F" },
-        { "expr": "mdemg_rsic_health_protocol{space_id=\"$space_id\"}", "legendFormat": "Protocol", "refId": "G" },
-        { "expr": "mdemg_rsic_health_synergy{space_id=\"$space_id\"}", "legendFormat": "Synergy", "refId": "H" }
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_retrieval' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_memory' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_edge' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "E",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_task' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "F",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "G",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_protocol' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "H",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_synergy' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
       ],
       "fieldConfig": {
         "defaults": {
@@ -147,25 +361,134 @@
             "pointSize": 5,
             "showPoints": "auto"
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Overall"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Retrieval"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Memory"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Edge"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "E"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Task"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Guidance"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "G"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Protocol"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "H"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Synergy"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         }
       }
     },
     {
       "title": "CLAUDE.md Lines",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 5
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_synergy_claude_md_lines{space_id=\"$space_id\"}",
-          "legendFormat": "lines"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_synergy_claude_md_lines' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -178,9 +501,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 150 },
-              { "color": "red", "value": 200 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 150
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
             ]
           }
         }
@@ -189,12 +521,21 @@
     {
       "title": "MEMORY.md Lines",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 5
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_synergy_memory_md_lines{space_id=\"$space_id\"}",
-          "legendFormat": "lines"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_synergy_memory_md_lines' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -207,9 +548,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 120 },
-              { "color": "red", "value": 180 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 180
+              }
             ]
           }
         }
@@ -218,18 +568,26 @@
     {
       "title": "Synergy Overflow & Buffer",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 9 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_synergy_overflow_rate{space_id=\"$space_id\"}",
-          "legendFormat": "Overflow Rate",
-          "refId": "A"
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_synergy_overflow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         },
         {
-          "expr": "mdemg_rsic_synergy_buffer_entries{space_id=\"$space_id\"}",
-          "legendFormat": "Buffer Entries",
-          "refId": "B"
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_synergy_buffer_entries' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
         }
       ],
       "fieldConfig": {
@@ -243,10 +601,35 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Buffer Entries" },
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
             "properties": [
-              { "id": "custom.drawStyle", "value": "bars" },
-              { "id": "custom.fillOpacity", "value": 50 }
+              {
+                "id": "displayName",
+                "value": "Overflow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Buffer Entries"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 50
+              }
             ]
           }
         ]
@@ -255,18 +638,32 @@
     {
       "title": "RSIC Overview",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
       "collapsed": false
     },
     {
       "title": "Cycle Rate (5m)",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 19 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 19
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum(rate(mdemg_rsic_cycle_total{outcome=\"started\"}[5m])) * 60",
-          "legendFormat": "cycles/min"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND labels->>'outcome' = 'started' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -280,7 +677,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "blue", "value": null }
+              {
+                "color": "blue",
+                "value": null
+              }
             ]
           }
         }
@@ -289,12 +689,21 @@
     {
       "title": "Cycle Success Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 19 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 19
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "(sum(rate(mdemg_rsic_cycle_total{outcome=\"completed\"}[5m])) or vector(0)) / (sum(rate(mdemg_rsic_cycle_total{outcome=~\"completed|error|low_confidence\"}[5m])) > 0 or vector(1)) * 100",
-          "legendFormat": "%"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(SUM(CASE WHEN 1=1 AND labels->>'outcome' = 'completed' THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN 1=1 AND labels->>'outcome' IN ('completed', 'error', 'low_confidence') THEN value ELSE 0 END), 0) * 100, 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -308,9 +717,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 80 },
-              { "color": "green", "value": 95 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
             ]
           }
         }
@@ -319,12 +737,21 @@
     {
       "title": "Trigger Rejection Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 19 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 19
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum(rate(mdemg_rsic_trigger_rejected_total[5m])) * 60",
-          "legendFormat": "rejections/min"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_trigger_rejected_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -337,9 +764,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           }
         }
@@ -348,12 +784,21 @@
     {
       "title": "Watchdog Escalation Level",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 19 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 19
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "max(mdemg_rsic_watchdog_escalation_level{space_id=~\"$space_id\"})",
-          "legendFormat": "level"
+          "rawSql": "SELECT time, MAX(value) AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_watchdog_escalation_level' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY time ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -362,19 +807,74 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "Awaiting Data",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "Nominal", "color": "green" } } },
-            { "type": "value", "options": { "1": { "text": "Nudge", "color": "yellow" } } },
-            { "type": "value", "options": { "2": { "text": "Warn", "color": "orange" } } },
-            { "type": "value", "options": { "3": { "text": "Force", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Nominal",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Nudge",
+                  "color": "yellow"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "Warn",
+                  "color": "orange"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "3": {
+                  "text": "Force",
+                  "color": "red"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Awaiting Data",
+                  "color": "text"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "orange", "value": 2 },
-              { "color": "red", "value": 3 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
             ]
           }
         }
@@ -383,18 +883,32 @@
     {
       "title": "Cycles (Instance-Wide)",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "collapsed": false
     },
     {
       "title": "Cycle Duration p95 by Tier",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, tier) (rate(mdemg_rsic_cycle_duration_seconds_bucket[5m])))",
-          "legendFormat": "{{ tier }} p95"
+          "rawSql": "SELECT time, labels->>'tier' AS tier, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_duration_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY time, labels->>'tier', value ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -413,12 +927,21 @@
     {
       "title": "Cycles by Source",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (source) (rate(mdemg_rsic_cycle_total{outcome=\"started\"}[5m])) * 60",
-          "legendFormat": "{{ source }}"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, labels->>'source' AS source, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND labels->>'outcome' = 'started' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'source' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -428,7 +951,9 @@
             "drawStyle": "bars",
             "lineWidth": 1,
             "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       }
@@ -436,12 +961,21 @@
     {
       "title": "Trigger Rejections by Reason",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (reason) (rate(mdemg_rsic_trigger_rejected_total[5m])) * 60",
-          "legendFormat": "{{ reason }}"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, labels->>'reason' AS reason, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_trigger_rejected_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'reason' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -451,7 +985,9 @@
             "drawStyle": "bars",
             "lineWidth": 1,
             "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       }
@@ -459,19 +995,31 @@
     {
       "title": "Cycle Outcomes (1h)",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (outcome) (increase(mdemg_rsic_cycle_total[1h]))",
-          "legendFormat": "{{ outcome }}"
+          "rawSql": "SELECT time_bucket('1h', time) AS time, labels->>'outcome' AS outcome, SUM(value) AS total FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'outcome' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "values": ["value", "percent"]
+          "values": [
+            "value",
+            "percent"
+          ]
         },
         "pieType": "donut"
       }
@@ -479,28 +1027,37 @@
     {
       "title": "Actions (Instance-Wide)",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
       "collapsed": false
     },
     {
       "title": "Action Success Rate",
       "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (action) (increase(mdemg_rsic_action_total{status=\"success\"}[1h]))",
-          "legendFormat": "{{ action }}",
-          "instant": true,
-          "format": "table",
-          "refId": "success"
+          "format": "time_series",
+          "refId": "success",
+          "rawSql": "SELECT time_bucket('1h', time) AS time, labels->>'action' AS action, SUM(value) AS total FROM metric_samples WHERE metric_name = 'mdemg_rsic_action_total' AND metric_type = 'counter' AND labels->>'status' = 'success' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action' ORDER BY 1"
         },
         {
-          "expr": "sum by (action) (increase(mdemg_rsic_action_total{status=\"failed\"}[1h]))",
-          "legendFormat": "{{ action }}",
-          "instant": true,
-          "format": "table",
-          "refId": "failed"
+          "format": "time_series",
+          "refId": "failed",
+          "rawSql": "SELECT time_bucket('1h', time) AS time, labels->>'action' AS action, SUM(value) AS total FROM metric_samples WHERE metric_name = 'mdemg_rsic_action_total' AND metric_type = 'counter' AND labels->>'status' = 'failed' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action' ORDER BY 1"
         }
       ],
       "transformations": [
@@ -521,12 +1078,21 @@
     {
       "title": "Action Duration p95",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, action) (rate(mdemg_rsic_action_duration_seconds_bucket[5m])))",
-          "legendFormat": "{{ action }} p95"
+          "rawSql": "SELECT time, labels->>'action' AS action, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_action_duration_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY time, labels->>'action', value ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -543,12 +1109,21 @@
     {
       "title": "Safety Blocks",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (action, reason) (rate(mdemg_rsic_safety_blocked_total[5m])) * 60",
-          "legendFormat": "{{ action }} ({{ reason }})"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, labels->>'action' AS action, labels->>'reason' AS reason, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_safety_blocked_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action', labels->>'reason' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -558,7 +1133,9 @@
             "drawStyle": "bars",
             "lineWidth": 1,
             "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       }
@@ -566,12 +1143,21 @@
     {
       "title": "Calibration Confidence",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_calibration_confidence",
-          "legendFormat": "{{ action }}"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_calibration_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -580,14 +1166,24 @@
       },
       "fieldConfig": {
         "defaults": {
+          "displayName": "Calibration",
           "min": 0,
           "max": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.3 },
-              { "color": "green", "value": 0.7 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.3
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
             ]
           }
         }
@@ -596,36 +1192,65 @@
     {
       "title": "Watchdog",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
       "collapsed": false
     },
     {
       "title": "Watchdog Decay Score",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 58 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 58
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_watchdog_decay_score{space_id=~\"$space_id\"}",
-          "legendFormat": "{{ space_id }}"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_watchdog_decay_score' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "Decay Score",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 20,
             "gradientMode": "scheme",
-            "thresholdsStyle": { "mode": "line" }
+            "thresholdsStyle": {
+              "mode": "line"
+            }
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 4 },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 8 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 4
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 8
+              }
             ]
           }
         }
@@ -634,35 +1259,87 @@
     {
       "title": "Watchdog Escalation Timeline",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 58 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 58
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "mdemg_rsic_watchdog_escalation_level{space_id=~\"$space_id\"}",
-          "legendFormat": "{{ space_id }}"
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_watchdog_escalation_level' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "displayName": "Escalation Level",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
             "fillOpacity": 30,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "Nominal" } } },
-            { "type": "value", "options": { "1": { "text": "Nudge" } } },
-            { "type": "value", "options": { "2": { "text": "Warn" } } },
-            { "type": "value", "options": { "3": { "text": "Force" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Nominal"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Nudge"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "Warn"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "3": {
+                  "text": "Force"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "orange", "value": 2 },
-              { "color": "red", "value": 3 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
             ]
           }
         }
@@ -671,12 +1348,21 @@
     {
       "title": "Watchdog Force Triggers (1h rate)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 66
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "rate(mdemg_rsic_watchdog_force_total[1h]) * 3600",
-          "legendFormat": "force/hr"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 3600 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_watchdog_force_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "options": {
@@ -689,9 +1375,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.5 },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         }
@@ -700,12 +1395,21 @@
     {
       "title": "Snapshots Created",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 66
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
-          "expr": "sum by (action) (rate(mdemg_rsic_snapshot_created_total[5m])) * 60",
-          "legendFormat": "{{ action }}"
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, labels->>'action' AS action, (SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval)) * 60 AS rate FROM metric_samples WHERE metric_name = 'mdemg_rsic_snapshot_created_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -715,7 +1419,9 @@
             "drawStyle": "bars",
             "lineWidth": 1,
             "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       }
@@ -724,18 +1430,31 @@
       "title": "Historical Trends",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 74 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 74
+      },
       "panels": []
     },
     {
       "title": "RSIC Health Dimensions Trend",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 75 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 75
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('rsic_health_overall','rsic_health_retrieval','rsic_health_memory','rsic_health_edge','rsic_health_task','rsic_health_guidance','rsic_health_protocol','rsic_health_synergy') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_rsic_health_overall','mdemg_rsic_health_retrieval','mdemg_rsic_health_memory','mdemg_rsic_health_edge','mdemg_rsic_health_task','mdemg_rsic_health_guidance','mdemg_rsic_health_protocol','mdemg_rsic_health_synergy') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
           "format": "time_series"
         }
       ],
@@ -751,20 +1470,126 @@
             "pointSize": 5,
             "showPoints": "auto"
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_overall"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Overall"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_retrieval"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Retrieval"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_memory"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Memory"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_edge"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Edge"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_task"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Task"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_guidance"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Guidance"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_protocol"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Protocol"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_rsic_health_synergy"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Synergy"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull", "mean", "min", "max"]
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
         }
       }
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["mdemg", "rsic"],
+  "tags": [
+    "mdemg",
+    "rsic"
+  ],
   "templating": {
     "list": [
       {
@@ -789,13 +1614,10 @@
         "label": "Space ID",
         "type": "query",
         "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
+          "type": "postgres",
+          "uid": "timescaledb"
         },
-        "query": {
-          "query": "label_values(mdemg_rsic_health_overall{space_id!~\"test-.*\"}, space_id)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": "SELECT DISTINCT space_id AS __value, space_id AS __text FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND space_id !~ 'test-.*' ORDER BY 1",
         "refresh": 2,
         "sort": 1,
         "current": {

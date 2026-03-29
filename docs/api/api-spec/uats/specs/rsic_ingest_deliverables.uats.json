@@ -1,0 +1,97 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "RSIC Ingest Deliverables",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "rsic",
+      "ingest",
+      "b3"
+    ]
+  },
+  "metadata": {
+    "author": "agent",
+    "created": "2026-03-27",
+    "description": "Validates the RSIC self-improve report endpoint returns active tasks with correct deliverable field types (task_id, cycle_id, status, progress_pct, deliverables).",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "rsic",
+      "ingest",
+      "b3"
+    ],
+    "sha256": "f5488d32b52fa42bd95cf833bccfe811e761fa4f867353559dbb8a8c6ab5953d"
+  },
+  "variables": {
+    "test_space": "demo"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/self-improve/report"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "name": "active_tasks field present",
+        "path": "$.active_tasks",
+        "op": "type_is",
+        "expected": "object"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "health_endpoint_deliverables",
+      "description": "Validates the RSIC health endpoint returns active_tasks count and status fields with correct types.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/self-improve/health"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "status field is string",
+            "path": "$.status",
+            "op": "type_is",
+            "expected": "string"
+          },
+          {
+            "name": "active_tasks count is number",
+            "path": "$.active_tasks",
+            "op": "type_is",
+            "expected": "number"
+          }
+        ]
+      }
+    },
+    {
+      "name": "history_deliverables",
+      "description": "Validates the RSIC history endpoint returns cycle outcomes with deliverable fields (cycle_id, tier, actions_executed, success_count, failed_count).",
+      "request": {
+        "method": "GET",
+        "path": "/v1/self-improve/history",
+        "query": {
+          "limit": "5"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "name": "history is array",
+            "path": "$.history",
+            "op": "type_is",
+            "expected": "array"
+          }
+        ]
+      }
+    }
+  ]
+}

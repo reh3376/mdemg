@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -122,6 +123,7 @@ type rsicWatchdogSignalAdapter struct {
 	driver         neo4j.DriverWithContext
 	jiminyEnabled  bool
 	jiminySvc      *jiminy.Service
+	sidecarURL     string
 }
 
 func (a *rsicWatchdogSignalAdapter) GetSessionHealthScore(sessionID string) float64 {
@@ -207,6 +209,19 @@ func (a *rsicWatchdogSignalAdapter) GetConsolidationAgeSec(ctx context.Context, 
 
 func (a *rsicWatchdogSignalAdapter) IsJiminyHealthy(_ context.Context) bool {
 	return a.jiminyEnabled && a.jiminySvc != nil
+}
+
+func (a *rsicWatchdogSignalAdapter) IsSidecarHealthy(_ context.Context) bool {
+	if a.sidecarURL == "" {
+		return true // not configured = not required
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(a.sidecarURL + "/health")
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 // rsicJiminyAdapter adapts *jiminy.Service to ape.JiminyStatsProvider (J10).
@@ -397,9 +412,14 @@ func (a *rsicFreshnessAdapter) GetStaleSpaceCount(ctx context.Context, threshold
 }
 
 func (a *rsicFreshnessAdapter) TriggerIngestForStaleSpaces(ctx context.Context, thresholdHours int) (int, error) {
+	// Count stale spaces BEFORE triggering re-ingest — this is the number
+	// of spaces for which ingest will be triggered, not the "still stale" count.
+	triggeredCount, err := a.GetStaleSpaceCount(ctx, thresholdHours)
+	if err != nil {
+		return 0, err
+	}
 	if a.triggerFn != nil {
 		a.triggerFn()
 	}
-	count, err := a.GetStaleSpaceCount(ctx, thresholdHours)
-	return count, err
+	return triggeredCount, nil
 }

@@ -382,3 +382,11 @@ build-sidecar:
 test-sidecar-python:
 	@echo "Running neural sidecar Python tests..."
 	cd neural && uv run python -m pytest tests/ -v
+
+# Run Grafana e2e Playwright tests (requires running Grafana + MDEMG server)
+PLAYWRIGHT_VENV := deploy/docker/.playwright-venv/bin
+test-e2e-grafana:
+	@echo "Running Grafana Playwright e2e tests..."
+	cd tests/e2e/grafana && \
+		GRAFANA_URL=$${GRAFANA_URL:-http://localhost:3000} \
+		$(PWD)/$(PLAYWRIGHT_VENV)/python -m pytest -v --browser chromium $(PYTEST_ARGS)

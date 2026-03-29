@@ -55,11 +55,11 @@ func (m *MemoryPressure) RejectedCount() int64 {
 
 // isHealthEndpoint returns true for health check endpoints that bypass backpressure.
 func isHealthEndpoint(path string) bool {
-	return path == "/healthz" || path == "/readyz" || path == "/v1/prometheus"
+	return path == "/healthz" || path == "/readyz" || path == "/v1/metrics/snapshot"
 }
 
 // Middleware returns an HTTP middleware that rejects requests when under memory pressure.
-// Health endpoints (/healthz, /readyz, /v1/prometheus) are never rejected.
+// Health endpoints (/healthz, /readyz, /v1/metrics/snapshot) are never rejected.
 func (m *MemoryPressure) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip health endpoints

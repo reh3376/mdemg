@@ -1,0 +1,50 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "metrics_snapshot_observability",
+    "description": "Validates /v1/metrics/snapshot exposes required counters, gauges, and histograms for observability",
+    "type": "metrics"
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_http_requests_total",
+        "section": "counters",
+        "path": "$.data.counters",
+        "description": "Total HTTP requests counter must be present"
+      },
+      {
+        "name": "mdemg_retrieval_cache_hits_total",
+        "section": "counters",
+        "path": "$.data.counters",
+        "description": "Retrieval cache hits counter must be present"
+      },
+      {
+        "name": "mdemg_circuit_breaker_state",
+        "section": "gauges",
+        "path": "$.data.gauges",
+        "description": "Circuit breaker state gauge must be present"
+      },
+      {
+        "name": "mdemg_cache_hit_ratio",
+        "section": "gauges",
+        "path": "$.data.gauges",
+        "description": "Cache hit ratio gauge must be present"
+      },
+      {
+        "name": "mdemg_http_request_duration_seconds",
+        "section": "histograms",
+        "path": "$.data.histograms",
+        "description": "HTTP request duration histogram must be present"
+      },
+      {
+        "name": "mdemg_retrieval_latency_seconds",
+        "section": "histograms",
+        "path": "$.data.histograms",
+        "description": "Retrieval latency histogram must be present"
+      }
+    ],
+    "format_validation": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Metrics Snapshot Method Not Allowed",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "metrics",
+      "snapshot"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-27",
+    "description": "Validates POST /v1/metrics/snapshot returns 405 Method Not Allowed",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "3bacad6f1135d1159b6630bcd1560c0ab2a655eb48a8aa4eb7ca33ab2928060a"
+  },
+  "variables": {},
+  "request": {
+    "method": "POST",
+    "path": "/v1/metrics/snapshot",
+    "body": {}
+  },
+  "expected": {
+    "status": 405,
+    "body_assertions": []
+  }
+}
