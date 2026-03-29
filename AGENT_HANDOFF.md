@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-27
+**Date:** 2026-03-28
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -39,14 +39,16 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Debian Native Packaging — COMPLETE (.deb via goreleaser, APT repo, AUR PKGBUILD, APT publish verified)
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
 - J17 Feedback Loop Closure — COMPLETE (state file bridge, hook feedback delivery, control char sanitization, bootstrap codification)
+- J17 Protocol Pipeline 12-Break Cascading Fix — COMPLETE (code lookup, trust persistence, cache bypass, threshold sync, live collector wiring, all gauges flowing)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/20/21/26/27 done, claude .md ingestion done)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-27
+- CI: ALL GREEN (push + pull_request + release) as of 2026-03-28
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-03-27) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-03-28) ===
 - ✅ J17 Feedback Loop Closure — State file bridge, hook feedback delivery, control char sanitization, bootstrap codification
+- ✅ J17 Protocol Pipeline 12-Break Cascading Fix — Code lookup via content-similarity, TrustStore Neo4j persistence, cache bypass, threshold sync, effectiveness TTL 2h, live collector wiring, metrics snapshot refresh
 - ✅ Prometheus Observability — Cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules
 - ✅ TSDB Sprint infrastructure — Live collectors, trend analyzer, Grafana dashboards
 
@@ -63,9 +65,9 @@ WHAT REMAINS TO BE DONE:
 9. TESTING: SSE streaming — accepted limitation (GAP-05: 14 Go unit tests cover streaming; UATS spec documents gap)
 10. RESEARCH: AutoResearch integration analysis (docs/development/)
 
-=== LIVE VERIFICATION NEEDED ===
-11. J17 feedback loop live test — hooks fire automatically in new sessions; verify state file + feedback delivery + trust progression
-12. Server-side control char fix — guidance responses contain raw U+0000-U+001F in JSON strings; fix at source in writeJSON() or encoder
+=== LIVE VERIFICATION — COMPLETE (2026-03-28) ===
+11. ✅ J17 feedback loop live test — 12-break cascading fix verified: code_coverage=100%, T2 at 80%, compression_ratio=1.714, all gauges flowing
+12. ✅ Server-side control char fix — internal/sanitize/controlchars.go strips U+0000-U+001F; perl hook kept as defense-in-depth
 
 === Gap Analysis — COMPLETED items (Phases 1-3 + partial Phase 4) ===
 - Phase 1 (Quick Wins): GAP-06/-07/-12/-15/-17/-25 — doc/config fixes (+ sprint review remediations: GAP-01 plugin bridge, GAP-06 volume migration, GAP-25 Windows README, GAP-30 UATS assertions)
@@ -361,6 +363,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 86 | UVTS Activation | ✅ | Runner active with inline grading (GAP-04), CI soft-fail |
 | Synergy | Claude Code ↔ MDEMG Optimization | ✅ | `docs/features/synergy-optimization.md` |
 | J17-FL | J17 Feedback Loop Closure | ✅ | `docs/features/j17-feedback-loop-closure.md` — state file bridge, hook feedback, control char fix, bootstrap codification |
+| J17-FIX | J17 Protocol Pipeline 12-Break Fix | ✅ | 12 cascading breaks: code lookup (content-similarity), TrustStore (Neo4j write-behind), cache bypass, threshold sync, effectiveness TTL, live collector wiring, metrics snapshot refresh. Verified: code_coverage=100%, T2 80%, compression_ratio=1.714 |
 | PROM | Prometheus Observability Monitoring | ✅ | `docs/features/prometheus-observability-monitoring.md` — cache hit metrics, bootstrap assessment, self-monitoring, 4 alert rules |
 | Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
 
@@ -380,13 +383,14 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | FSD | — | Constraint Lifecycle & Neural Re-Ranker |
 | AR | — | AutoResearch Integration |
 | J17-FL | — | J17 Feedback Loop Closure |
+| J17-FIX | — | J17 Protocol Pipeline 12-Break Cascading Fix |
 | PROM | — | Prometheus Observability Monitoring |
 
 ---
 
 ## 5. Open Work Items
 
-### Gap Analysis Phase 4 — Status as of 2026-03-27
+### Gap Analysis Phase 4 — Status as of 2026-03-28
 
 Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
@@ -472,8 +476,8 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 |-------|----------|-------|
 | ~~Obsidian integration v2 in progress~~ | ~~Low~~ | ~~COMPLETE (2026-03-25)~~ — Phase 45.4 fully closed: v2 committed (parser+walker+yaml.v3+full Sync, 23 unit tests), CI gate, GoReleaser 4-platform builds, Homebrew+Scoop+.deb packaging, Windows release, ingestion-guide docs. |
 | ~~Claude .md files not ingested into CMS~~ | ~~High~~ | ~~FIXED (2026-03-25)~~ — `mdemg ingest-claude-md` command with SHA256 content-hash change detection. 15 files tracked (3 in-repo, 6 auto-memory, 6 plans). Hooks: session-start (background), pre-compact (forced), post-tool-observe (on Write/Edit). `GET /v1/memory/node/meta` endpoint for hash comparison. |
-| Guidance response control characters | Medium | LLM-generated guidance text contains JSON control chars (U+0000–U+001F). Workaround: `perl` sanitization in hooks. Server-side fix in `writeJSON()` or encoder would eliminate client workaround. |
-| J17 tier graduation — live verification pending | Info | Feedback loop code is implemented and integration-tested but has not yet been verified in a live Claude Code session. Needs session restart to test hooks end-to-end. |
+| ~~Guidance response control characters~~ | ~~Medium~~ | ~~FIXED (2026-03-28)~~ — `internal/sanitize/controlchars.go` strips U+0000–U+001F server-side. Hook `perl` workaround still in place as defense-in-depth. |
+| ~~J17 tier graduation — live verification~~ | ~~Info~~ | ~~VERIFIED (2026-03-28)~~ — 12-break cascading fix resolved: code_coverage=100%, T2 tier at 80%, compression_ratio=1.714, all J17 gauges flowing to TSDB. Trust persists via TrustStore to Neo4j. |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -547,4 +551,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-27 — J17 feedback loop closure COMPLETE: state file bridge between hooks, automated feedback delivery, control char sanitization, bootstrap codification trigger. Prometheus observability monitoring COMPLETE: cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules. 3 new feature docs, 5 new integration tests, 10 new unit tests. Build clean, lint 0 issues, all integration tests pass.*
+*Last updated: 2026-03-28 — J17 Protocol Pipeline 12-Break Cascading Fix COMPLETE: code lookup via content-similarity matching (replaced broken node-ID Cypher), TrustStore Neo4j write-behind persistence, JiminyCacheJ17Bypass, tier threshold sync, effectiveness tracker TTL extended to 2h with re-registration on cache hits, live collector pre-flush hook wiring, metrics snapshot refresh. Verified live: code_coverage=100%, T2 tier at 80%, compression_ratio=1.714, all J17 gauges flowing to TSDB. CI: ALL GREEN.*
