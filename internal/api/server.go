@@ -2206,6 +2206,12 @@ func (s *Server) handleMetricsSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "metrics recorder not initialized"})
 		return
 	}
+	// Refresh live gauge values before snapshot (same as pre-flush hook)
+	if s.liveCollectors != nil {
+		s.liveCollectors.CollectProtocolMetrics()
+		s.liveCollectors.CollectGuidanceMetrics()
+		s.liveCollectors.CollectHealthMetrics()
+	}
 	snap := s.metricsRecorder.SnapshotAll()
 	writeJSON(w, http.StatusOK, map[string]any{"data": snap})
 }
