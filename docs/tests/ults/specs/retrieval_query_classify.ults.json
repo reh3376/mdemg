@@ -1,0 +1,44 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "retrieval.query_classify",
+    "description": "Query classifier — determines query type, temporal intent, and retrieval strategy hints",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "high",
+    "notes": "Runs before retrieval to optimize the pipeline. Classifies query intent (code, architecture, temporal, etc.) and provides retrieval hints (hop depth, edge types, etc.)."
+  },
+  "prompt": {
+    "system_prompt_hash": "dd598bef7150afc2b44764ee53d47e66992966e8a65be850f9d8d92f93c04a8a",
+    "system_prompt_source": "internal/retrieval/query_classifier.go:81",
+    "think_mode": false,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 3000,
+    "max_tokens": 500
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["types"],
+    "properties": {
+      "types": { "type": "array", "items": { "type": "string" } },
+      "temporal": { "type": "string" },
+      "hop_depth": { "type": "integer" },
+      "edge_types": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
+    { "name": "accuracy", "weight": 0.7, "threshold": 0.7, "description": "Correct query type classification" }
+  ],
+  "reward_functions": ["json_valid", "classification_accuracy"],
+  "training_config": {
+    "rank": 8,
+    "min_examples": 500,
+    "quality_gate": 0.7
+  }
+}

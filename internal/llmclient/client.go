@@ -3,6 +3,7 @@ package llmclient
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +16,9 @@ import (
 type contextKey string
 
 const (
-	ctxKeyGuidanceID contextKey = "llm_guidance_id"
-	ctxKeySourcePath contextKey = "llm_source_path"
+	ctxKeyGuidanceID    contextKey = "llm_guidance_id"
+	ctxKeySourcePath    contextKey = "llm_source_path"
+	ctxKeyRetrievalCtx  contextKey = "llm_retrieval_ctx"
 )
 
 // WithGuidanceID returns a context carrying a guidance_id for interaction logging.
@@ -27,6 +29,12 @@ func WithGuidanceID(ctx context.Context, id string) context.Context {
 // WithSourcePath returns a context carrying a source file path for interaction logging.
 func WithSourcePath(ctx context.Context, path string) context.Context {
 	return context.WithValue(ctx, ctxKeySourcePath, path)
+}
+
+// WithRetrievalContext returns a context carrying retrieval context (retrieved node IDs
+// and scores) for RAFT-style training data enrichment.
+func WithRetrievalContext(ctx context.Context, rc *RetrievalContext) context.Context {
+	return context.WithValue(ctx, ctxKeyRetrievalCtx, rc)
 }
 
 // Client provides LLM completions via OpenAI or Ollama APIs.
@@ -171,6 +179,9 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	if callErr != nil {
 		rec.Error = callErr.Error()
 	}
+	if system != "" {
+		rec.SystemPromptHash = fmt.Sprintf("%x", sha256.Sum256([]byte(system)))
+	}
 
 	// Extract <think>...</think> blocks from response
 	if idx := strings.Index(response, "<think>"); idx != -1 {
@@ -186,6 +197,9 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	}
 	if sp, ok := ctx.Value(ctxKeySourcePath).(string); ok {
 		rec.SourcePath = sp
+	}
+	if rc, ok := ctx.Value(ctxKeyRetrievalCtx).(*RetrievalContext); ok {
+		rec.RetrievalCtx = rc
 	}
 
 	c.recorder.Record(ctx, rec)
@@ -302,17 +316,6 @@ func (c *Client) completeOllama(ctx context.Context, messages []Message, opts Co
 	}
 
 	return strings.TrimSpace(ollamaResp.Response), nil
-}
-
-// StripCodeFence removes markdown code fences that LLMs sometimes wrap around JSON.
-func StripCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if after, ok := strings.CutPrefix(s, "```json"); ok {
-		s = strings.TrimSuffix(after, "```")
-	} else if after, ok := strings.CutPrefix(s, "```"); ok {
-		s = strings.TrimSuffix(after, "```")
-	}
-	return strings.TrimSpace(s)
 }
 
 // TruncateForLog truncates a string for error log messages.

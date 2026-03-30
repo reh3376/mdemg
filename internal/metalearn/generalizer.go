@@ -138,8 +138,7 @@ func (g *Generalizer) Generalize(ctx context.Context, name, summary, description
 		return nil, err
 	}
 
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var result GeneralizeResult
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {

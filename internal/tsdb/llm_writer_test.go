@@ -105,13 +105,16 @@ func TestLLMInteractionWriter_Flush(t *testing.T) {
 	if call.Table[0] != "llm_interactions" {
 		t.Errorf("table: got %q, want %q", call.Table[0], "llm_interactions")
 	}
-	if len(call.Columns) != 22 {
-		t.Errorf("columns: got %d, want 22", len(call.Columns))
+	if len(call.Columns) != 26 {
+		t.Errorf("columns: got %d, want 26", len(call.Columns))
 	}
-	// Verify new columns are present at the end
-	lastTwo := call.Columns[len(call.Columns)-2:]
-	if lastTwo[0] != "guidance_id" || lastTwo[1] != "source_path" {
-		t.Errorf("last 2 columns: got %v, want [guidance_id source_path]", lastTwo)
+	// Verify RAFT columns are present at the end
+	lastFour := call.Columns[len(call.Columns)-4:]
+	expected := []string{"retrieval_node_ids", "retrieval_scores", "oracle_node_id", "system_prompt_hash"}
+	for i, col := range lastFour {
+		if col != expected[i] {
+			t.Errorf("column %d from end: got %q, want %q", i, col, expected[i])
+		}
 	}
 
 	// Buffer should be empty after flush
@@ -174,6 +177,63 @@ func TestLLMInteractionWriter_EnrichedColumns(t *testing.T) {
 		ThinkMode:     true,
 		Quality:       &quality,
 		QualitySource: "feedback_outcome",
+	})
+
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	if len(pool.calls) != 1 {
+		t.Fatalf("CopyFrom calls: got %d, want 1", len(pool.calls))
+	}
+	if pool.calls[0].Rows != 1 {
+		t.Errorf("rows: got %d, want 1", pool.calls[0].Rows)
+	}
+}
+
+func TestLLMInteractionWriter_RAFTColumns(t *testing.T) {
+	pool := &mockPool{}
+	w := newTestLLMWriter(pool)
+
+	w.Record(context.Background(), llmclient.InteractionRecord{
+		Time:             time.Now(),
+		TaskName:         "consulting.classify",
+		SystemPromptHash: "abcd1234",
+		RetrievalCtx: &llmclient.RetrievalContext{
+			NodeIDs:  []string{"n1", "n2"},
+			Scores:   []float64{0.95, 0.80},
+			OracleID: "n1",
+		},
+	})
+
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	if len(pool.calls) != 1 {
+		t.Fatalf("CopyFrom calls: got %d, want 1", len(pool.calls))
+	}
+	if pool.calls[0].Rows != 1 {
+		t.Errorf("rows: got %d, want 1", pool.calls[0].Rows)
+	}
+	// Verify 26 columns (22 original + 4 RAFT)
+	if len(pool.calls[0].Columns) != 26 {
+		t.Errorf("columns: got %d, want 26", len(pool.calls[0].Columns))
+	}
+}
+
+func TestLLMInteractionWriter_RAFTColumnsNilContext(t *testing.T) {
+	pool := &mockPool{}
+	w := newTestLLMWriter(pool)
+
+	// No RetrievalCtx — should not panic, should write nil arrays
+	w.Record(context.Background(), llmclient.InteractionRecord{
+		Time:     time.Now(),
+		TaskName: "ape.reflect",
 	})
 
 	if err := w.Flush(context.Background()); err != nil {

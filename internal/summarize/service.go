@@ -372,8 +372,7 @@ func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]str
 		return nil, err
 	}
 
-	// Strip markdown code blocks
-	content = llmclient.StripCodeFence(content)
+	content = llmclient.SanitizeResponse(content)
 
 	var summaries []string
 	if err := json.Unmarshal([]byte(content), &summaries); err != nil {
@@ -402,8 +401,7 @@ func (s *Service) callOllama(ctx context.Context, elements []CodeElement) ([]str
 		return nil, err
 	}
 
-	// Strip markdown code blocks
-	content = llmclient.StripCodeFence(content)
+	content = llmclient.SanitizeResponse(content)
 
 	var summaries []string
 	if err := json.Unmarshal([]byte(content), &summaries); err != nil {

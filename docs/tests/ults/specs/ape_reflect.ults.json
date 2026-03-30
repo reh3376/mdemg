@@ -1,0 +1,55 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "ape.reflect",
+    "description": "RSIC reflection engine — analyzes graph topology, detects patterns/gaps/clusters, produces actionable improvement insights",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "high",
+    "notes": "Core RSIC self-improvement task. Think mode enables deeper structural analysis of graph topology. Output drives APE task dispatch."
+  },
+  "prompt": {
+    "system_prompt_hash": "64d528cc23dfed0c75ccdddeecf507e671b8f8f85f2fc679226b6e1caf13cc33",
+    "system_prompt_source": "internal/ape/llm_reflector.go:62",
+    "think_mode": true,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 15000,
+    "max_tokens": 2000
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["insights"],
+    "properties": {
+      "insights": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["type", "description", "priority"],
+          "properties": {
+            "type": { "type": "string" },
+            "description": { "type": "string" },
+            "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+            "affected_nodes": { "type": "array", "items": { "type": "string" } },
+            "suggested_action": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
+    { "name": "actionability", "weight": 0.4, "threshold": 0.6, "description": "Insights contain actionable suggestions" },
+    { "name": "insight_quality", "weight": 0.3, "threshold": 0.5, "description": "Insights are non-trivial and graph-aware" }
+  ],
+  "reward_functions": ["json_valid", "insight_count", "actionability_score"],
+  "training_config": {
+    "rank": 16,
+    "min_examples": 500,
+    "quality_gate": 0.7
+  }
+}

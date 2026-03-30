@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/ults/v1.0.0",
+  "title": "ULTS - Universal LLM Task Specification",
+  "description": "Schema for defining LLM task contracts: prompts, output schemas, quality metrics, and training configuration",
+  "type": "object",
+  "required": ["ults_version", "task", "metadata"],
+  "properties": {
+    "ults_version": {
+      "type": "string",
+      "description": "Version of the ULTS schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "task": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Canonical task name matching llmclient.WithContext taskName (e.g., ape.reflect)",
+          "pattern": "^[a-z]+\\.[a-z_]+$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version of this task contract",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["author", "created"],
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "description": "System prompt configuration",
+      "properties": {
+        "system_prompt_hash": {
+          "type": "string",
+          "description": "SHA-256 of the system prompt constant. 'dynamic' if prompt is generated at runtime.",
+          "pattern": "^([a-f0-9]{64}|dynamic)$"
+        },
+        "system_prompt_source": {
+          "type": "string",
+          "description": "File:line where the system prompt is defined (e.g., internal/ape/llm_reflector.go:62)"
+        },
+        "think_mode": {
+          "type": "boolean",
+          "description": "Whether this task benefits from chain-of-thought reasoning"
+        },
+        "dynamic_prompt": {
+          "type": "boolean",
+          "description": "True if the prompt is built at runtime with injected parameters",
+          "default": false
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "description": "Performance budgets",
+      "properties": {
+        "latency_budget_ms": {
+          "type": "integer",
+          "description": "Maximum acceptable LLM call latency in milliseconds"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "description": "Maximum output tokens for this task"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "JSON Schema for the expected LLM output format. Used for validation.",
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "quality_metrics": {
+      "type": "array",
+      "description": "Quality metrics for evaluating task output",
+      "items": {
+        "type": "object",
+        "required": ["name", "weight"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name (e.g., json_valid, accuracy, coherence)"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relative weight for composite quality score"
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Minimum acceptable value (0.0-1.0)"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reward_functions": {
+      "type": "array",
+      "description": "Named reward functions for GRPO training",
+      "items": {
+        "type": "string"
+      }
+    },
+    "training_config": {
+      "type": "object",
+      "description": "Fine-tuning configuration for this task",
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "description": "LoRA rank for this task",
+          "minimum": 1
+        },
+        "min_examples": {
+          "type": "integer",
+          "description": "Minimum training examples before fine-tuning is viable",
+          "minimum": 1
+        },
+        "quality_gate": {
+          "type": "number",
+          "description": "Minimum average quality score required for training data",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

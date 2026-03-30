@@ -242,9 +242,7 @@ var validActions = map[string]bool{
 }
 
 func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {
-	// Strip markdown code fences if present
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var llmInsights []llmReflectInsight
 	if err := json.Unmarshal([]byte(raw), &llmInsights); err != nil {

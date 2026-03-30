@@ -1,0 +1,43 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "consulting.synthesis",
+    "description": "SME synthesis — generates expert analysis from retrieved constraints and context",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "high",
+    "notes": "Dynamic prompt — system framing embedded in user message. Think mode benefits synthesis quality. Prompt built by buildSynthesisPrompt() in consulting/synthesis.go."
+  },
+  "prompt": {
+    "system_prompt_hash": "dynamic",
+    "system_prompt_source": "internal/consulting/synthesis.go:161",
+    "think_mode": true,
+    "dynamic_prompt": true
+  },
+  "performance": {
+    "latency_budget_ms": 15000,
+    "max_tokens": 2000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "analysis": { "type": "string" },
+      "recommendations": { "type": "array", "items": { "type": "string" } },
+      "confidence": { "type": "number" }
+    }
+  },
+  "quality_metrics": [
+    { "name": "coherence", "weight": 0.35, "threshold": 0.6, "description": "Logical flow and clarity of synthesis" },
+    { "name": "coverage", "weight": 0.35, "threshold": 0.5, "description": "Covers relevant constraints from retrieval context" },
+    { "name": "actionability", "weight": 0.3, "threshold": 0.5, "description": "Recommendations are specific and implementable" }
+  ],
+  "reward_functions": ["coherence_score", "coverage_score", "actionability_score"],
+  "training_config": {
+    "rank": 16,
+    "min_examples": 500,
+    "quality_gate": 0.65
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "retrieval.rerank_nli",
+    "description": "NLI-style reranker — compressed scoring of retrieval candidates optimized for local model latency",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "medium",
+    "notes": "No system role — prompt built by buildRerankPrompt(compress=true). Preamble: 'Relevance judge: rate each candidate 0.0-1.0 for answering the query.' Designed for fast Ollama inference."
+  },
+  "prompt": {
+    "system_prompt_hash": "dynamic",
+    "system_prompt_source": "internal/retrieval/rerank.go:311",
+    "think_mode": false,
+    "dynamic_prompt": true
+  },
+  "performance": {
+    "latency_budget_ms": 5000,
+    "max_tokens": 200
+  },
+  "output_schema": {
+    "type": "array",
+    "description": "Array of relevance scores [0.0-1.0]",
+    "items": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "quality_metrics": [
+    { "name": "score_accuracy", "weight": 1.0, "threshold": 0.5, "description": "Score ordering correlates with actual relevance" }
+  ],
+  "reward_functions": ["score_correlation", "ndcg_delta"],
+  "training_config": {
+    "rank": 8,
+    "min_examples": 500,
+    "quality_gate": 0.6
+  }
+}

@@ -332,6 +332,20 @@ Circuit breaker logic stays in each caller (wrapping `llm.Complete()` inside `cb
 
 ---
 
+## Three Training Workstreams (FT Infrastructure Sprint)
+
+MDEMG's fine-tuning infrastructure now supports three distinct training workstreams:
+
+| Workstream | Technique | Model | Data Source | Status |
+|---|---|---|---|---|
+| **Cross-encoder reranker** (NR-4) | MSE regression | ms-marco-MiniLM-L-6-v2 | Rerank JSONL collector | Built |
+| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3-30B-A3B | `llm_interactions` hypertable (16 tasks) | Collecting data |
+| **Embedding fine-tuning** (Phase D) | Contrastive learning | Domain-tuned 3072-dim model | `embedding_events` + `retrieval_events` hypertables | Collecting data |
+
+**Generative LoRA** trains the generative model on LLM I/O from all 16 tasks. RAFT context enrichment ensures training data includes retrieval context (open-book mode). ULTS specs define quality thresholds for curation. See [RAFT Retrieval Context](raft-retrieval-context.md) and [ULTS Framework](ults-framework.md).
+
+**Embedding fine-tuning** uses contrastive learning on domain-specific text pairs. The hard-negative mining signal (high vector similarity + low rerank score) is captured in `retrieval_events`. See [Embedding & Retrieval Data Collection](embedding-retrieval-data-collection.md).
+
 ## Documents Accessed
 
 - `internal/llmclient/types.go`, `client.go`, `client_test.go`

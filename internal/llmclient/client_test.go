@@ -694,6 +694,66 @@ func TestContextBothKeys(t *testing.T) {
 	}
 }
 
+func TestSystemPromptHash(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	msgs := []Message{
+		{Role: "system", Content: "You are a helpful assistant."},
+		{Role: "user", Content: "test"},
+	}
+	_, _ = c.Complete(context.Background(), msgs, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+
+	hash := rec.records[0].SystemPromptHash
+	if hash == "" {
+		t.Fatal("SystemPromptHash should not be empty when system prompt is set")
+	}
+	if len(hash) != 64 {
+		t.Errorf("SystemPromptHash length: got %d, want 64 (SHA-256 hex)", len(hash))
+	}
+
+	// Deterministic: same prompt → same hash
+	_, _ = c.Complete(context.Background(), msgs, CompleteOpts{})
+	if rec.records[1].SystemPromptHash != hash {
+		t.Errorf("hash not deterministic: first %q, second %q", hash, rec.records[1].SystemPromptHash)
+	}
+}
+
+func TestSystemPromptHashEmpty(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	// No system message
+	_, _ = c.Complete(context.Background(), []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].SystemPromptHash != "" {
+		t.Errorf("SystemPromptHash should be empty when no system prompt, got %q", rec.records[0].SystemPromptHash)
+	}
+}
+
 func TestContextNoKeys(t *testing.T) {
 	rec := &mockRecorder{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -716,5 +776,69 @@ func TestContextNoKeys(t *testing.T) {
 	}
 	if rec.records[0].SourcePath != "" {
 		t.Errorf("SourcePath should be empty, got %q", rec.records[0].SourcePath)
+	}
+}
+
+func TestWithRetrievalContext(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	rc := &RetrievalContext{
+		NodeIDs:  []string{"node-1", "node-2", "node-3"},
+		Scores:   []float64{0.95, 0.87, 0.72},
+		OracleID: "node-1",
+	}
+	ctx := WithRetrievalContext(context.Background(), rc)
+	_, _ = c.Complete(ctx, []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.RetrievalCtx == nil {
+		t.Fatal("RetrievalCtx should not be nil")
+	}
+	if len(r.RetrievalCtx.NodeIDs) != 3 {
+		t.Errorf("NodeIDs: got %d, want 3", len(r.RetrievalCtx.NodeIDs))
+	}
+	if r.RetrievalCtx.NodeIDs[0] != "node-1" {
+		t.Errorf("NodeIDs[0]: got %q, want %q", r.RetrievalCtx.NodeIDs[0], "node-1")
+	}
+	if r.RetrievalCtx.Scores[0] != 0.95 {
+		t.Errorf("Scores[0]: got %f, want 0.95", r.RetrievalCtx.Scores[0])
+	}
+	if r.RetrievalCtx.OracleID != "node-1" {
+		t.Errorf("OracleID: got %q, want %q", r.RetrievalCtx.OracleID, "node-1")
+	}
+}
+
+func TestRetrievalContextNil(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	// No retrieval context set — should not panic, RetrievalCtx should be nil
+	_, _ = c.Complete(context.Background(), []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].RetrievalCtx != nil {
+		t.Error("RetrievalCtx should be nil when no context is set")
 	}
 }

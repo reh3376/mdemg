@@ -1,0 +1,42 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "hidden.summarize",
+    "description": "Hidden layer summarization — generates structured summaries of ingested code elements",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "medium",
+    "notes": "Shares system prompt with summarize.generate. Uses the same summarize service internally. Think mode benefits comprehension of complex code structures."
+  },
+  "prompt": {
+    "system_prompt_hash": "5110d51bc460daded7e77526c3e7d4a58f4ccf0139da31f50b5f2dad3c1f6d5a",
+    "system_prompt_source": "internal/summarize/service.go:366",
+    "think_mode": true,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 10000,
+    "max_tokens": 1500
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["summary"],
+    "properties": {
+      "summary": { "type": "string" },
+      "key_concepts": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "quality_metrics": [
+    { "name": "coherence", "weight": 0.5, "threshold": 0.6, "description": "Summary is clear and well-structured" },
+    { "name": "coverage", "weight": 0.5, "threshold": 0.5, "description": "Summary covers key aspects of the code element" }
+  ],
+  "reward_functions": ["coherence_score", "coverage_score"],
+  "training_config": {
+    "rank": 16,
+    "min_examples": 500,
+    "quality_gate": 0.65
+  }
+}

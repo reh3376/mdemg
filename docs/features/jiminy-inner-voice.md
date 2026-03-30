@@ -367,6 +367,10 @@ Returns the `prompt_augmentation` text directly for IDE injection.
 | `neural/neural_sidecar/tier_model.py` | J17-5: ML tier prediction model (CrossEncoder) |
 | `neural/neural_sidecar/train_protocol.py` | J17-5: Training pipeline for tier prediction model |
 
+## Training Data: RAFT Context Capture
+
+When Jiminy synthesizes guidance (J8), the retrieval context — which constraint nodes were retrieved and their relevance scores — is now logged alongside the LLM interaction in the `llm_interactions` TSDB table. This enables RAFT (Retrieval Augmented Fine-Tuning): the fine-tuned model trains with the same retrieval context it will see during inference, avoiding the open-book/closed-book quality gap identified in UC Berkeley's RAFT research. See [RAFT Retrieval Context](raft-retrieval-context.md).
+
 ## Dependencies
 
 - **Consulting Service** (`internal/consulting/`) — Source A uses `Suggest()` for constraints and patterns

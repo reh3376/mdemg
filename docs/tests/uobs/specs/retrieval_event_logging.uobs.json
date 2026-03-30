@@ -1,0 +1,30 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "retrieval_event_logging",
+    "description": "Verify retrieval event recording infrastructure for contrastive training data collection",
+    "type": "metrics"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "medium",
+    "notes": "Retrieval events are written to retrieval_events hypertable via RetrievalEventWriter. Captures every Retrieve() pipeline with pre/post rerank scores. The gap between vector recall scores and rerank scores is the hard-negative mining signal for contrastive embedding training."
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_retrieval_events_flushed_total",
+        "type": "counter",
+        "description": "Total retrieval event records flushed to TSDB"
+      },
+      {
+        "name": "mdemg_retrieval_events_buffer_size",
+        "type": "gauge",
+        "description": "Current retrieval event write buffer size"
+      }
+    ],
+    "format_validation": true
+  }
+}

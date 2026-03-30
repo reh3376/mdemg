@@ -1785,6 +1785,8 @@ Show training data collection status including per-task interaction counts, guid
 
 **Output includes:**
 - Per-task table: Task name, Total records, records with GuidanceID, Annotated count
+- Embedding event counts: by call site, element_kind, cache hit rate
+- Retrieval event counts: by call site, average rerank improvement
 - JSONL file summary: directory path, file count, total size
 
 **Usage Examples:**

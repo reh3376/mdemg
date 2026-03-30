@@ -233,6 +233,12 @@ OLLAMA_URL=http://localhost:11434
 | `internal/api/server.go` | Wiring — creates classifiers, calls setters |
 | `internal/circuitbreaker/` | Per-classifier circuit breaker instances |
 
+## Response Sanitization (SanitizeResponse)
+
+All 16 LLM consumers (not just the 3 AR-3 classifiers) now use `SanitizeResponse()` before JSON parsing. This unified pipeline strips `<think>...</think>` blocks (Qwen3 think mode), removes code fences, and trims whitespace. Without this, switching to any local model with think mode would break all JSON-parsing consumers.
+
+See [LLM Response Sanitization](llm-response-sanitization.md) for the full call site table and implementation details.
+
 ## Dependencies
 
 - **EmergenceNamer (Phase 103)** — established the OpenAI/Ollama dual-provider, circuit breaker, JSON grammar pattern

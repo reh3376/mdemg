@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"mdemg/internal/llmclient"
 	"mdemg/internal/sanitize"
 )
 
@@ -137,7 +138,7 @@ func truncateForPrompt(s string, maxLen int) string {
 
 // parseEvalResponse parses the LLM JSON response into an llmEvalResult.
 func parseEvalResponse(raw string) (*llmEvalResult, error) {
-	cleaned := cleanEvalJSONResponse(raw)
+	cleaned := cleanEvalJSONResponse(llmclient.SanitizeResponse(raw))
 	var result llmEvalResult
 	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
 		return nil, fmt.Errorf("parse eval response: %w", err)

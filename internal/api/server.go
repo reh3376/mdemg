@@ -150,9 +150,11 @@ type Server struct {
 	liveCollectors *ape.LiveCollectors
 
 	// TSDB Sprint: Historical metric writer
-	tsdbClient *tsdb.Client
-	tsdbWriter *tsdb.MetricWriter
-	llmWriter  *tsdb.LLMInteractionWriter
+	tsdbClient      *tsdb.Client
+	tsdbWriter      *tsdb.MetricWriter
+	llmWriter       *tsdb.LLMInteractionWriter
+	embeddingWriter *tsdb.EmbeddingEventWriter
+	retrievalWriter *tsdb.RetrievalEventWriter
 
 	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
 	graphMetricsCache struct {
@@ -984,7 +986,95 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			llmclient.SetDefaultRecorder(s.llmWriter)
 			slog.Info("tsdb: LLM interaction logger attached")
 		}
+
+		// Embedding event logger — record all Embed() calls for contrastive training data
+		if s.cfg.EmbeddingEventLogging {
+			s.embeddingWriter = tsdb.NewEmbeddingEventWriter(
+				client.Pool(),
+				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+			)
+			// Wire recorder into CachedEmbedder if available
+			if ce, ok := s.embedder.(*embeddings.CachedEmbedder); ok {
+				ce.SetRecorder(&embeddingRecorderAdapter{writer: s.embeddingWriter})
+			}
+			slog.Info("tsdb: embedding event logger attached")
+		}
+
+		// Retrieval event logger — record all Retrieve() pipelines for contrastive training data
+		if s.cfg.RetrievalEventLogging {
+			s.retrievalWriter = tsdb.NewRetrievalEventWriter(
+				client.Pool(),
+				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+			)
+			s.retriever.SetRetrievalRecorder(&retrievalRecorderAdapter{writer: s.retrievalWriter})
+			slog.Info("tsdb: retrieval event logger attached")
+		}
 	}
+}
+
+// embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
+type embeddingRecorderAdapter struct {
+	writer *tsdb.EmbeddingEventWriter
+}
+
+// retrievalRecorderAdapter adapts tsdb.RetrievalEventWriter to retrieval.RetrievalEventRecorder.
+type retrievalRecorderAdapter struct {
+	writer *tsdb.RetrievalEventWriter
+}
+
+func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retrieval.RetrievalEvent) {
+	a.writer.Record(tsdb.RetrievalEventRow{
+		Time:              event.Time,
+		EventID:           event.EventID,
+		SpaceID:           event.SpaceID,
+		CallSite:          event.CallSite,
+		QueryText:         event.QueryText,
+		QueryHash:         event.QueryHash,
+		RecallNodeIDs:     event.RecallNodeIDs,
+		RecallScores:      event.RecallScores,
+		RecallK:           event.RecallK,
+		BM25NodeIDs:       event.BM25NodeIDs,
+		BM25Scores:        event.BM25Scores,
+		RerankNodeIDs:     event.RerankNodeIDs,
+		RerankScores:      event.RerankScores,
+		RerankModel:       event.RerankModel,
+		ResultNodeIDs:     event.ResultNodeIDs,
+		ResultScores:      event.ResultScores,
+		ResultCount:       event.ResultCount,
+		GuidanceID:        event.GuidanceID,
+		DownstreamQuality: event.DownstreamQuality,
+		RecallLatencyMs:   event.RecallLatencyMs,
+		RerankLatencyMs:   event.RerankLatencyMs,
+		TotalLatencyMs:    event.TotalLatencyMs,
+	})
+}
+
+func (a *embeddingRecorderAdapter) RecordEmbed(_ context.Context, event embeddings.EmbeddingEvent) {
+	a.writer.Record(tsdb.EmbeddingEventRow{
+		Time:        event.Time,
+		EventID:     event.EventID,
+		EventType:   event.EventType,
+		SpaceID:     event.SpaceID,
+		TextContent: event.TextContent,
+		TextHash:    event.TextHash,
+		TextLength:  event.TextLength,
+		ElementKind: event.ElementKind,
+		Language:    event.Language,
+		FilePath:    event.FilePath,
+		ChunkStart:  event.ChunkStart,
+		ChunkEnd:    event.ChunkEnd,
+		PackageName: event.PackageName,
+		Signature:   event.Signature,
+		Tags:        event.Tags,
+		CallSite:    event.CallSite,
+		QueryText:   event.QueryText,
+		ModelName:   event.ModelName,
+		Provider:    event.Provider,
+		Dimensions:  event.Dimensions,
+		LatencyMs:   event.LatencyMs,
+		Cached:      event.Cached,
+		NodeID:      event.NodeID,
+	})
 }
 
 // Shutdown gracefully stops background services
@@ -1021,6 +1111,12 @@ func (s *Server) Shutdown() {
 	}
 	if s.llmWriter != nil {
 		s.llmWriter.Close()
+	}
+	if s.embeddingWriter != nil {
+		s.embeddingWriter.Close()
+	}
+	if s.retrievalWriter != nil {
+		s.retrievalWriter.Close()
 	}
 	if s.tsdbWriter != nil {
 		s.tsdbWriter.Close()

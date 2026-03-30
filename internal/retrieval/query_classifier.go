@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -243,8 +242,7 @@ var validTemporalIntents = map[string]bool{
 }
 
 func (qc *QueryClassifier) parseResponse(raw string) (*QueryClassification, error) {
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var result QueryClassification
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {

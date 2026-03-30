@@ -335,6 +335,7 @@ func (s *Service) doRerankWithOllama(ctx context.Context, prompt string) ([]floa
 
 // parseScores extracts a float array from LLM response
 func parseScores(content string) ([]float64, error) {
+	content = llmclient.SanitizeResponse(content)
 	// Try to find JSON array in the response
 	start := strings.Index(content, "[")
 	end := strings.LastIndex(content, "]")

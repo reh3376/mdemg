@@ -1,0 +1,43 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "retrieval.rerank_cross",
+    "description": "Cross-encoder reranker — scores retrieval candidates for relevance using detailed prompt with full context",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "high",
+    "notes": "No system role — prompt built dynamically by buildRerankPrompt(compress=false). Preamble: 'You are a relevance judge for a code knowledge base.' Think mode benefits careful relevance reasoning."
+  },
+  "prompt": {
+    "system_prompt_hash": "dynamic",
+    "system_prompt_source": "internal/retrieval/rerank.go:262",
+    "think_mode": true,
+    "dynamic_prompt": true
+  },
+  "performance": {
+    "latency_budget_ms": 10000,
+    "max_tokens": 500
+  },
+  "output_schema": {
+    "type": "array",
+    "description": "Array of relevance scores [0.0-1.0] for each candidate",
+    "items": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.2, "threshold": 1.0, "description": "Output parses as valid JSON array" },
+    { "name": "ndcg_improvement", "weight": 0.8, "threshold": 0.5, "description": "Reranking improves NDCG vs. original vector recall order" }
+  ],
+  "reward_functions": ["json_valid", "ndcg_delta", "score_calibration"],
+  "training_config": {
+    "rank": 16,
+    "min_examples": 500,
+    "quality_gate": 0.65
+  }
+}

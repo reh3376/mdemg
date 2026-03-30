@@ -45,16 +45,19 @@ Both are fully built and tested. They write timestamped JSONL with automatic 50M
 | Data CLI (mdemg data status/inspect/stats/annotate/quality) | #219 | ✅ Built |
 | JSONL backup integration in TSDB backup tar | #219 | ✅ Built |
 | Protocol JSONL guidance_id field | #219 | ✅ Built |
+| SanitizeResponse (StripThinkBlock + StripCodeFence) | FT Sprint A | ✅ Built |
+| System prompt hash in InteractionRecord | FT Sprint A | ✅ Built |
+| RAFT retrieval context capture (RetrievalContext struct + wiring) | FT Sprint B | ✅ Built |
+| Migration 007 (retrieval_node_ids, retrieval_scores, oracle_node_id, system_prompt_hash) | FT Sprint B | ✅ Built |
+| ULTS spec framework (16 specs + schema + runner) | FT Sprint C | ✅ Built |
+| Embedding event logger (EmbeddingEventWriter + WithEmbeddingMeta at 8 call sites) | FT Sprint D | ✅ Built |
+| Retrieval event logger (RetrievalEventWriter + RetrievalEvent struct) | FT Sprint D | ✅ Built |
+| Migration 006 (embedding_events + retrieval_events hypertables) | FT Sprint D | ✅ Built |
 
 ### 1.4 Not Yet Built
 
 | Component | Plan Phase | Notes |
 |---|---|---|
-| SanitizeResponse / StripThinkBlock | Phase 2D-2F | Required before switching to local model |
-| RAFT retrieval context capture | Phase 4A (NEW) | Enriches training data with retrieval context |
-| ULTS spec framework | Phase 4B (NEW) | Formalizes LLM call contracts |
-| System prompt hash in records | Phase 2H (NEW) | Enables training data versioning |
-| Retrieval event logger | Embedding sprint | Captures (query, results, scores) for embedding fine-tuning |
 | Chunk provenance tags | Embedding sprint | Parser name, language, chunk type on embedded nodes |
 | Dataset versioner (dataset_versioner.py) | Phase 6D | Not built |
 | Teacher distillation (teacher_distill.py) | Phase 4B | Not built |

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Unreleased)
+
+- **SanitizeResponse (Phase A)**: Unified LLM response cleaning pipeline (`StripThinkBlock` + `StripCodeFence` + `TrimSpace`) in `internal/llmclient/sanitize.go`. Wired into all 11 JSON-parsing call sites across 10 files. Enables local model deployment with think mode (Qwen3 `<think>...</think>` blocks).
+- **System Prompt Hash**: SHA-256 hash of system prompt added to `InteractionRecord`, enabling training data curation by prompt version and stale data filtering.
+- **RAFT Context Enrichment (Phase B)**: `RetrievalContext` struct captures which nodes were retrieved and their relevance scores alongside every LLM interaction. Wired into consulting and jiminy services. TSDB `llm_interactions` expanded from 22 to 26 columns. Migration 007.
+- **ULTS Spec Framework (Phase C)**: Universal LLM Task Specification — machine-readable JSON contracts for all 16 LLM tasks. Defines system prompt hashes, output schemas, quality metrics, reward functions, and training config. Schema: `docs/tests/ults/schema/ults.schema.json`. Runner: `ults_runner.py` (16/16 specs pass).
+- **Embedding Event Collection (Phase D)**: New `embedding_events` TimescaleDB hypertable captures every `Embed()`/`EmbedBatch()` call with parser metadata (element_kind, language, chunk boundaries, signature), provenance (call_site), and model info. `WithEmbeddingMeta` wired at 9 call sites. Privacy scrubbing applied to text content.
+- **Retrieval Event Collection (Phase D)**: New `retrieval_events` TimescaleDB hypertable captures full retrieval pipeline execution (vector recall → BM25 → rerank → final results) with pre/post rerank scores for hard-negative mining. Migration 006.
+
 ### Fixed (Unreleased)
 
 - **TimescaleDB Compose Image Mismatch**: Observability compose used `timescale/timescaledb-ha:pg16` with mount path `/home/postgres/pgdata`, diverging from prod which uses `timescale/timescaledb:2.25.1-pg16` at `/var/lib/postgresql/data`. Standardized to match prod. Note: developers with existing `-ha` volumes should run `docker compose down -v` and recreate the TSDB container (data will be re-populated by the metrics recorder).

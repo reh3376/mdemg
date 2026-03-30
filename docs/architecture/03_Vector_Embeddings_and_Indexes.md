@@ -21,12 +21,12 @@ CREATE VECTOR INDEX memNodeEmbedding IF NOT EXISTS
 FOR (n:MemoryNode)
 ON n.embedding
 OPTIONS { indexConfig: {
-  `vector.dimensions`: 1536,  // text-embedding-3-small (Recommended)
+  `vector.dimensions`: 3072,  // text-embedding-3-large (Recommended)
   `vector.similarity_function`: 'cosine'
 }};
 ```
 
-**Note:** Default Ollama model `qwen3-embedding:8b` uses `1536` dimensions (same as OpenAI `text-embedding-3-small`).
+**Note:** Production uses `text-embedding-3-large` at **3072 dimensions**. Ollama model `qwen3-embedding:8b` natively produces 4096 dimensions but supports Matryoshka Representation Learning (MRL) truncation to 3072 for index compatibility.
 
 ## C) Query the vector index
 
@@ -47,7 +47,7 @@ MATCH (n:MemoryNode {space_id:$spaceId, node_id:$nodeId})
 WITH n, (n.name || ' ' || coalesce(n.description,'') || ' ' || coalesce(n.summary,'')) AS text
 WITH n, genai.vector.encode(text, 'OpenAI', { 
   token: $openaiToken, 
-  model: 'text-embedding-3-small' 
+  model: 'text-embedding-3-large'
 }) AS v
 CALL db.create.setNodeVectorProperty(n, 'embedding', v)
 RETURN n.node_id, size(n.embedding) AS dims;
@@ -79,7 +79,7 @@ If you embed relationships (e.g., edge “meaning”), you can create a relation
 CREATE VECTOR INDEX relEmbedding IF NOT EXISTS
 FOR ()-[r:ASSOCIATED_WITH]-()
 ON (r.embedding)
-OPTIONS { indexConfig: { `vector.dimensions`: 1536, `vector.similarity_function`: 'cosine' }};
+OPTIONS { indexConfig: { `vector.dimensions`: 3072, `vector.similarity_function`: 'cosine' }};
 ```
 
 ## F) Version + Java performance note

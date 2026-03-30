@@ -81,6 +81,15 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 
 	rows := make([][]any, len(batch))
 	for i, r := range batch {
+		// Extract RAFT context fields
+		var retrievalNodeIDs []string
+		var retrievalScores []float64
+		var oracleNodeID string
+		if r.RetrievalCtx != nil {
+			retrievalNodeIDs = r.RetrievalCtx.NodeIDs
+			retrievalScores = r.RetrievalCtx.Scores
+			oracleNodeID = r.RetrievalCtx.OracleID
+		}
 		rows[i] = []any{
 			r.Time, r.TraceID, r.TaskName, r.SpaceID, r.SessionID,
 			r.SystemPrompt, r.UserPrompt, r.Response,
@@ -90,6 +99,8 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 			r.Quality, r.QualitySource,
 			false, "", // used_for_train, dataset_ver
 			r.GuidanceID, r.SourcePath,
+			retrievalNodeIDs, retrievalScores, oracleNodeID,
+			r.SystemPromptHash,
 		}
 	}
 
@@ -104,6 +115,8 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 			"quality", "quality_source",
 			"used_for_train", "dataset_ver",
 			"guidance_id", "source_path",
+			"retrieval_node_ids", "retrieval_scores", "oracle_node_id",
+			"system_prompt_hash",
 		},
 		pgx.CopyFromRows(rows),
 	)

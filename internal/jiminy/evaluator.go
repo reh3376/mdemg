@@ -71,6 +71,12 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 
 	// Tier 1: Embed agent output and find candidate constraints/corrections via vector search
 	if e.embedder != nil {
+		ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite:  "jiminy.evaluate",
+			SpaceID:   req.SpaceID,
+			FilePath:  req.FilePath,
+			QueryText: req.AgentOutput,
+		})
 		embedding, err := e.embedder.Embed(ctx, req.AgentOutput)
 		if err != nil {
 			slog.Error("jiminy evaluator: embedding failed", "error", err)
