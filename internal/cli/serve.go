@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -82,7 +83,9 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	cfg.LogLevel = effectiveLevel
 
 	// Initialize structured logging — bridges stdlib log through slog
-	mlog.Init(cfg.LogFormat, effectiveLevel, nil)
+	// DOCKER-P2: Capture logs in ring buffer for browser dashboard
+	logBuf := api.NewLogRingBuffer(500)
+	mlog.Init(cfg.LogFormat, effectiveLevel, io.MultiWriter(os.Stderr, logBuf))
 
 	// CLI flag overrides
 	if port > 0 {
@@ -181,6 +184,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	}
 
 	srv := api.NewServer(cfg, driver, pluginMgr)
+	srv.SetLogBuffer(logBuf)
 
 	// Wire TimescaleDB client if available
 	if tsdbClient != nil {

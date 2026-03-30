@@ -24,7 +24,7 @@
 
 MDEMG is your persistent memory and cognitive substrate. Markdown memory files are **REMINDERS AND KEYS only** — real memory lives in CMS (Neo4j graph, `mdemg-dev` space). When CMS is disconnected, your memory is disconnected.
 
-**Server**: `http://localhost:9999` | **Check**: `curl -s http://localhost:9999/healthz`
+**Server**: `http://localhost:9999` | **Dashboard**: `http://localhost:9999/ui/` | **Check**: `curl -s http://localhost:9999/healthz`
 **Docker (primary)**: `mdemg init --quick` → `docker compose up -d` (all 5 services)
 **Dev build**: `cd /Users/reh3376/mdemg && go build -o bin/mdemg ./cmd/mdemg`
 **Dev start**: `cd /Users/reh3376/mdemg && ./bin/mdemg start --auto-migrate` (native, dev-only)

@@ -50,6 +50,16 @@ mdemg init
 | Neural sidecar | 8100 | Reranking + NLI models |
 | Grafana | 3000 | Observability dashboards |
 
+### Browser Dashboard
+
+Once the stack is running, open the built-in dashboard:
+
+```
+http://localhost:${MDEMG_PORT}/ui/
+```
+
+The dashboard provides health overview, memory/learning stats, config viewer, log viewer, and RSIC trigger — with links to Grafana for detailed time-series metrics. No additional services required; the UI is embedded in the MDEMG server binary.
+
 **All ports are dynamically assigned.** `mdemg init` scans each preferred port and if it's in use, automatically finds a free alternative. There are no hardcoded defaults — this prevents conflicts with existing Neo4j, PostgreSQL, or other services on the user's machine.
 
 ## Port Configuration

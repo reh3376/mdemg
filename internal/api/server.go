@@ -156,6 +156,9 @@ type Server struct {
 	embeddingWriter *tsdb.EmbeddingEventWriter
 	retrievalWriter *tsdb.RetrievalEventWriter
 
+	// DOCKER-P2: Browser dashboard log buffer
+	logBuffer *LogRingBuffer
+
 	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
 	graphMetricsCache struct {
 		sync.Mutex
@@ -1010,6 +1013,12 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			slog.Info("tsdb: retrieval event logger attached")
 		}
 	}
+}
+
+// SetLogBuffer attaches the log ring buffer for the /v1/admin/logs endpoint.
+// Called from serve.go after logging initialization.
+func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
+	s.logBuffer = buf
 }
 
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
@@ -1907,6 +1916,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/hash-verification/update", s.handleHashVerificationUpdate)
 	mux.HandleFunc("/v1/hash-verification/revert", s.handleHashVerificationRevert)
 	mux.HandleFunc("/v1/hash-verification/scan", s.handleHashVerificationScan)
+
+	// DOCKER-P2: Browser dashboard + admin endpoints
+	mux.HandleFunc("/v1/admin/config", s.handleAdminConfig)
+	mux.HandleFunc("/v1/admin/logs", s.handleAdminLogs)
+	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
 	mux.HandleFunc("/v1/synergy/status", s.handleSynergyStatus)

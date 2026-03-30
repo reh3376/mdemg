@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Docker Deployment — Phase 2: Browser Dashboard (DOCKER-P2)**:
+  - **Browser UI at `/ui/`**: Lightweight dashboard served via Go `embed.FS` from the MDEMG server. Vanilla HTML + JS + CSS (Catppuccin Mocha theme), no build step. 6 tabs: Status (health badges + Grafana links), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/unfreeze/prune), Config (effective config table), Logs (searchable, color-coded viewer), RSIC (trigger cycle + Grafana link).
+  - **`GET /v1/admin/config`**: Returns effective configuration with source attribution (env/yaml/default) and masking for sensitive values.
+  - **`GET /v1/admin/logs`**: Returns recent log entries from in-process ring buffer. Client-side filtering by level and text search.
+  - **LogRingBuffer**: Thread-safe ring buffer implementing `io.Writer`, wired via `io.MultiWriter(os.Stderr, ringBuf)` into slog initialization. Captures structured log output for the browser log viewer.
+  - **Grafana deduplication**: Browser UI links to 7 existing Grafana dashboards for time-series metrics rather than duplicating them. UI focuses on unique data (memory stats, config, logs) and actions (freeze, prune, export, RSIC trigger).
+  - **Documentation**: `docs/features/browser-ui.md` (architecture, tabs, API), quickstart-docker.md updated, api-reference.md updated with new endpoints.
+
 - **Docker Deployment — Phase 1 (DOCKER-P1)**:
   - **Docker Compose consolidation**: Root `docker-compose.yml` rewritten with all 5 services (mdemg, neo4j, timescaledb, neural-sidecar, grafana). All ports parameterized via `.env`. Neo4j community edition (`neo4j:5`). No `container_name` directives for multi-instance isolation via `COMPOSE_PROJECT_NAME`. `neo4j-monitor` moved to `docker-compose.dev.yml`.
   - **Docker image CI**: `.github/workflows/docker-publish.yml` — multi-arch (amd64/arm64) image build pushed to GHCR on release tags and main branch pushes. Uses GitHub Actions cache for layer reuse.

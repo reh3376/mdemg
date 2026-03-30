@@ -3087,6 +3087,53 @@ curl -s -X POST http://localhost:9999/v1/admin/spaces/import \
   -d "{\"space_id\":\"target-space\",\"conflict\":\"skip\",\"chunks\":$CHUNKS}"
 ```
 
+### GET /v1/admin/config
+
+Returns the effective configuration with source attribution for each key.
+
+**Query Parameters:** None.
+
+**Response (200):**
+```json
+{
+  "config": [
+    {"key": "neo4j.uri", "value": "bolt://neo4j:7687", "source": "yaml", "masked": false},
+    {"key": "openai.api_key", "value": "****", "source": "env", "masked": true}
+  ],
+  "yaml_path": ".mdemg/config.yaml"
+}
+```
+
+Each entry includes a `source` field (`env`, `yaml`, or `default`) and a `masked` flag for sensitive values.
+
+```bash
+curl -s "http://localhost:${MDEMG_PORT:-9999}/v1/admin/config" | python3 -m json.tool
+```
+
+### GET /v1/admin/logs
+
+Returns recent log entries from an in-process ring buffer. Filtering (by level or text search) is performed client-side in the browser UI.
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | int | 200 | Max entries to return (most recent first) |
+
+**Response (200):**
+```json
+{
+  "entries": [
+    {"timestamp": "2026-03-30T12:00:00Z", "level": "INFO", "message": "server started", "raw": "time=2026-03-30T12:00:00Z level=INFO msg=\"server started\""}
+  ],
+  "seq": 42
+}
+```
+
+```bash
+curl -s "http://localhost:${MDEMG_PORT:-9999}/v1/admin/logs?limit=10" | python3 -m json.tool
+```
+
 ---
 
 ## Self-Improvement (RSIC) API
