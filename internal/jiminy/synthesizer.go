@@ -50,7 +50,7 @@ func NewGuidanceSynthesizer(cfg SynthesisConfig, cbRegistry *circuitbreaker.Regi
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("jiminy.synthesize", ""),
 	}
 }
 

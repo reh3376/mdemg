@@ -74,7 +74,7 @@ func NewReclassifier(cfg ReclassifierConfig, cbRegistry *circuitbreaker.Registry
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("hidden.reclassify", ""),
 		CategoryDescriptions: make(map[string]string),
 	}
 }

@@ -123,7 +123,7 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 			APIKey:    cfg.LLMAPIKey,
 			BaseURL:   cfg.LLMBaseURL,
 			TimeoutMs: 5000,
-		})
+		}).WithContext("jiminy.evaluate", "")
 	}
 
 	return oc

@@ -55,7 +55,7 @@ func NewGeneralizer(cfg GeneralizerConfig, cbRegistry *circuitbreaker.Registry) 
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("metalearn.generalize", ""),
 	}
 }
 

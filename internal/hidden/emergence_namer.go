@@ -75,7 +75,7 @@ func NewEmergenceNamer(cfg EmergenceNamerConfig, cbRegistry *circuitbreaker.Regi
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("hidden.name_emergence", ""),
 	}
 }
 

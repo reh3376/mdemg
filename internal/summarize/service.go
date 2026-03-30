@@ -182,7 +182,7 @@ func New(cfg Config, structuralFallback func(CodeElement) string) (*Service, err
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("summarize.generate", ""),
 		cache:    cache,
 		structFn: structuralFallback,
 	}, nil

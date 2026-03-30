@@ -55,7 +55,7 @@ func NewLLMReflector(cfg LLMReflectorConfig, cbRegistry *circuitbreaker.Registry
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("ape.reflect", ""),
 	}
 }
 

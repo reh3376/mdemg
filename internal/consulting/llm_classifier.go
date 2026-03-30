@@ -71,7 +71,7 @@ func NewConstraintClassifier(cfg ConstraintClassifierConfig, cbRegistry *circuit
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("consulting.classify", ""),
 		cacheMap:  make(map[string]*list.Element, 512),
 		cacheList: list.New(),
 		cacheCap:  512,

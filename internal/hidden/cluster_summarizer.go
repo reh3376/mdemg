@@ -49,7 +49,7 @@ func NewClusterSummarizer(cfg ClusterSummarizerConfig, cbRegistry *circuitbreake
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("hidden.summarize", ""),
 	}
 }
 

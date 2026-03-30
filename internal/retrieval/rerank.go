@@ -265,7 +265,7 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, prompt string) ([]floa
 		Model:    s.cfg.RerankModel,
 		APIKey:   s.cfg.OpenAIAPIKey,
 		BaseURL:  s.cfg.EffectiveLLMEndpoint(),
-	})
+	}).WithContext("retrieval.rerank_cross", "")
 
 	msgs := []llmclient.Message{
 		{Role: "user", Content: prompt},
@@ -313,7 +313,7 @@ func (s *Service) doRerankWithOllama(ctx context.Context, prompt string) ([]floa
 		Provider: "ollama",
 		Model:    s.cfg.RerankModel,
 		BaseURL:  s.cfg.OllamaEndpoint,
-	})
+	}).WithContext("retrieval.rerank_nli", "")
 
 	msgs := []llmclient.Message{
 		{Role: "user", Content: prompt},

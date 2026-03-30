@@ -1,0 +1,30 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "llm_interaction_logging",
+    "description": "Verify LLM interaction recording infrastructure is observable via metrics snapshot",
+    "type": "metrics"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-29",
+    "priority": "medium",
+    "notes": "LLM interactions are written to llm_interactions hypertable via LLMInteractionWriter. These metrics track the writer's operational health."
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_llm_interactions_flushed_total",
+        "type": "counter",
+        "description": "Total LLM interaction records flushed to TSDB"
+      },
+      {
+        "name": "mdemg_llm_interactions_buffer_size",
+        "type": "gauge",
+        "description": "Current LLM interaction write buffer size"
+      }
+    ],
+    "format_validation": true
+  }
+}

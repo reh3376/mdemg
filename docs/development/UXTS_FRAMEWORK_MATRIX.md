@@ -17,7 +17,7 @@ Last updated: 2026-03-29
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
 | USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 3 canonical, 2 drafts |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only | 4 |
-| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 8 canonical, 1 draft |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 9 canonical, 1 draft |
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 11 |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
@@ -36,7 +36,7 @@ Last updated: 2026-03-29
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
 | USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (3); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
 | UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | none (spec-only, no runner/fixtures) | no CI gate |
-| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (8); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
+| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (9); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
 | UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (11) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
@@ -81,6 +81,8 @@ Last updated: 2026-03-29
 5. ~~UAMS claims fixtures/runner that don't exist~~ — **Remediated**: Marked spec-only, phantom claims removed.
 6. ~~UVTS runner is setup-only~~ — **Demoted**: UVTS reclassified as spec-only (runner stub non-functional).
 7. ~~USTS not audited for schema-runner parity~~ — **Remediated**: Parity checks added. Auth/guardrail specs moved to drafts.
+8. **UOBS `logging` type unimplemented** — `LLMInteractionWriter` writes to `llm_interactions` hypertable but the UOBS runner does not support `type: "logging"`. Interaction metrics tracked via `type: "metrics"` as interim.
+9. **K8s/Helm manifests lack UOTS coverage** — New TimescaleDB and neural-sidecar manifests in `deploy/kubernetes/` and `deploy/helm/` have no artifact observability specs.
 
 ---
 

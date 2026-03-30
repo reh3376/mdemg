@@ -56,7 +56,8 @@ This section defines the "Pass/Fail" criteria for the final public release.
 * [x] **Secret Audit**: `gitleaks` runs in CI on every push and PR via `gitleaks/gitleaks-action@v2.3.9` in `.github/workflows/ci.yml` (`security` job). `trufflehog` is not used but is not required — `gitleaks` covers the same scope. Trivy (CRITICAL/HIGH, exit-code 1) also runs in the same job.
 * [ ] **License Audit**: All `go.mod` dependencies have not yet been formally audited for MIT compatibility. The dependency list is small and well-known (neo4j driver, cobra, grpc, protobuf, etc.) but no automated tool (e.g., `go-licenses`) has been run or added to CI. **Needs completion.**
 * [x] **Static Analysis**: `gosec` is enabled in `.golangci.yml` and runs as part of `golangci-lint` in the CI `lint` job. Suppressions are documented with rationale (G104, G115, G204, etc.). CI blocks PRs if lint fails.
-* [x] **Error Sanitization**: `sanitizeError()` and `writeInternalError()` in `internal/api/server.go` (lines 1745–1761) log full errors internally and return only `"internal error during <operation>"` to clients. The pattern is used consistently across most handlers. **Partial caveat**: `handlers_org_review.go` uses `http.Error(w, "Failed to ...: "+err.Error(), ...)` which can surface internal error strings — this file is not yet fully migrated to `writeInternalError`.
+* [x] **Error Sanitization**: `sanitizeError()` and `writeInternalError()` in `internal/api/server.go` (lines 1745–1761) log full errors internally and return only `"internal error during <operation>"` to clients. The pattern is used consistently across all handlers.
+* [x] **Endpoint scope enforcement** — `RequireScope` middleware wired to 14 destructive endpoints (GAP-16)
 
 ### 4.2 Portability & Developer Experience
 
@@ -67,6 +68,7 @@ This section defines the "Pass/Fail" criteria for the final public release.
 ### 4.3 Reliability & Performance
 
 * [x] **Regression Suite**: `tests/integration/scoring_golden_test.go` implements a golden test graph with cosine similarity targets, activation scores, and baseline score assertions. Runs under the `integration` build tag in CI via `go test -v -tags=integration ./tests/integration/...`.
+* [x] **Neo4j managed transactions** — 32 `session.Run()` migrated to `ExecuteRead`/`ExecuteWrite` with automatic retry
 * [x] **CI Pipeline**: PRs to `main` are blocked by three required CI jobs: `build` (compile check), `test` (unit + integration + UATS contract tests with live Neo4j service container), and `lint` (`golangci-lint` via `golangci-lint-action`). All three must pass before merge.
 * [x] **Documentation Integrity**: UATS contract tests in `docs/api/api-spec/uats/specs/` cover all active `/v1` endpoints with example request/response assertions. The UATS runner validates these against a live server in CI. 100+ spec files exist covering the full API surface.
 

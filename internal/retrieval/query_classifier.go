@@ -72,7 +72,7 @@ func NewQueryClassifier(cfg QueryClassifierConfig, cbRegistry *circuitbreaker.Re
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("retrieval.query_classify", ""),
 		cacheMap:  make(map[string]*list.Element, 256),
 		cacheList: list.New(),
 		cacheCap:  256,
