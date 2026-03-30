@@ -381,6 +381,8 @@ Parent command for backup management. Subcommands: `trigger`, `list`, `config`.
 
 Backups run automatically when the server is running (daily partial, weekly full). Backup files are stored in `~/.mdemg/backups/` (gitignored by default). Only the most recent backups per type are retained based on retention configuration.
 
+> **Training data inclusion:** When the `.mdemg/neural/training-data/` directory exists, backups automatically include JSONL training data as a `training-data.tar.gz` archive alongside the database backup.
+
 ---
 
 ### `mdemg db backup trigger`
@@ -1765,6 +1767,111 @@ mdemg teardown --full --yes
 
 ---
 
+## Training Data Management
+
+### `mdemg data`
+
+Parent command for training data collection management. Subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`.
+
+Training data is collected automatically during LLM interactions when `NEURAL_DATA_COLLECTION` is enabled. Records are stored in TimescaleDB and optionally exported as JSONL files to `.mdemg/neural/training-data/`.
+
+---
+
+### `mdemg data status`
+
+**Synopsis:** `mdemg data status`
+
+Show training data collection status including per-task interaction counts, guidance ID coverage, quality annotation coverage, and JSONL file statistics. No flags.
+
+**Output includes:**
+- Per-task table: Task name, Total records, records with GuidanceID, Annotated count
+- JSONL file summary: directory path, file count, total size
+
+**Usage Examples:**
+```bash
+mdemg data status
+```
+
+**See Also:** `mdemg data stats`, `mdemg data inspect`
+
+---
+
+### `mdemg data inspect`
+
+**Synopsis:** `mdemg data inspect [flags]`
+
+View recent LLM interaction records with truncated prompt/response content.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--task` | string | `""` | Filter by task name (e.g., `jiminy.synthesize`, `ape.reflect`) |
+| `--last` | int | `20` | Number of recent records to show |
+
+**Usage Examples:**
+```bash
+mdemg data inspect --task jiminy.synthesize --last 10
+mdemg data inspect --last 50
+```
+
+**See Also:** `mdemg data status`, `mdemg data stats`
+
+---
+
+### `mdemg data stats`
+
+**Synopsis:** `mdemg data stats`
+
+Show per-task training data statistics including count, average latency, average tokens, error rate, quality annotation coverage, average quality score, and readiness assessment. Tasks with 500 or more annotated rows are marked as "READY". No flags.
+
+**Usage Examples:**
+```bash
+mdemg data stats
+```
+
+**See Also:** `mdemg data status`, `mdemg data quality`
+
+---
+
+### `mdemg data annotate`
+
+**Synopsis:** `mdemg data annotate [flags]`
+
+Run the quality annotation pipeline. Reads protocol JSONL records, joins on `guidance_id` with `llm_interactions`, computes quality scores based on task-specific rules, and writes back to the database.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--dry-run` | bool | `false` | Show what would be annotated without writing |
+| `--task` | string | `""` | Annotate only a specific task |
+
+**Requires:** Python 3 with `psycopg2` installed, TimescaleDB running.
+
+**Usage Examples:**
+```bash
+mdemg data annotate --dry-run
+mdemg data annotate --task jiminy.synthesize
+```
+
+**See Also:** `mdemg data quality`, `mdemg data stats`
+
+---
+
+### `mdemg data quality`
+
+**Synopsis:** `mdemg data quality`
+
+Show training data quality report with per-task coverage, score distribution, and readiness assessment. No flags.
+
+**Requires:** Python 3 with `psycopg2` installed, TimescaleDB running.
+
+**Usage Examples:**
+```bash
+mdemg data quality
+```
+
+**See Also:** `mdemg data annotate`, `mdemg data stats`
+
+---
+
 ## Neural Training Commands
 
 These Python CLI entrypoints are installed alongside the `mdemg` binary by the sidecar installer. They operate on training data collected by `NEURAL_DATA_COLLECTION` and manage cross-encoder model checkpoints in `NEURAL_MODEL_DIR`.
@@ -2783,6 +2890,14 @@ mdemg
       validate        Validate a plugin
     demo              Seed sample data and demonstrate features
     teardown          Remove all MDEMG artifacts from the project
+
+  Training Data Management:
+    data
+      status            Show training data collection status
+      inspect           View recent LLM interaction records
+      stats             Per-task training data statistics
+      annotate          Run quality annotation pipeline
+      quality           Show training data quality report
 
   Neural Training (Python sidecar):
     mdemg-neural-train              Fine-tune cross-encoder re-ranker

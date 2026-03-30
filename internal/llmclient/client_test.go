@@ -553,3 +553,168 @@ func TestWithContext(t *testing.T) {
 		t.Errorf("original taskName modified: got %q", c.taskName)
 	}
 }
+
+func TestThinkContentExtraction(t *testing.T) {
+	tests := []struct {
+		name          string
+		response      string
+		wantThink     string
+		wantThinkMode bool
+	}{
+		{
+			name:          "with think block",
+			response:      "prefix <think>reasoning about constraints</think> suffix",
+			wantThink:     "reasoning about constraints",
+			wantThinkMode: true,
+		},
+		{
+			name:          "no think block",
+			response:      "just a normal response",
+			wantThink:     "",
+			wantThinkMode: false,
+		},
+		{
+			name:          "empty response",
+			response:      "",
+			wantThink:     "",
+			wantThinkMode: false,
+		},
+		{
+			name:          "think at start",
+			response:      "<think>first thought</think> then answer",
+			wantThink:     "first thought",
+			wantThinkMode: true,
+		},
+		{
+			name:          "unclosed think tag",
+			response:      "<think>unclosed reasoning",
+			wantThink:     "",
+			wantThinkMode: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := &mockRecorder{}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				json.NewEncoder(w).Encode(OpenAIChatResponse{
+					Choices: []OpenAIChoice{{Message: Message{Content: tt.response}}},
+				})
+			}))
+			defer srv.Close()
+
+			c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+			c.SetRecorder(rec)
+
+			_, _ = c.Complete(context.Background(), []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+			if len(rec.records) != 1 {
+				t.Fatalf("expected 1 record, got %d", len(rec.records))
+			}
+			if rec.records[0].ThinkContent != tt.wantThink {
+				t.Errorf("ThinkContent: got %q, want %q", rec.records[0].ThinkContent, tt.wantThink)
+			}
+			if rec.records[0].ThinkMode != tt.wantThinkMode {
+				t.Errorf("ThinkMode: got %v, want %v", rec.records[0].ThinkMode, tt.wantThinkMode)
+			}
+		})
+	}
+}
+
+func TestContextGuidanceID(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	ctx := WithGuidanceID(context.Background(), "guid-abc-123")
+	_, _ = c.Complete(ctx, []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].GuidanceID != "guid-abc-123" {
+		t.Errorf("GuidanceID: got %q, want %q", rec.records[0].GuidanceID, "guid-abc-123")
+	}
+}
+
+func TestContextSourcePath(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	ctx := WithSourcePath(context.Background(), "CLAUDE.md")
+	_, _ = c.Complete(ctx, []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].SourcePath != "CLAUDE.md" {
+		t.Errorf("SourcePath: got %q, want %q", rec.records[0].SourcePath, "CLAUDE.md")
+	}
+}
+
+func TestContextBothKeys(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	ctx := WithGuidanceID(context.Background(), "guid-xyz")
+	ctx = WithSourcePath(ctx, "AGENT_HANDOFF.md")
+	_, _ = c.Complete(ctx, []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].GuidanceID != "guid-xyz" {
+		t.Errorf("GuidanceID: got %q, want %q", rec.records[0].GuidanceID, "guid-xyz")
+	}
+	if rec.records[0].SourcePath != "AGENT_HANDOFF.md" {
+		t.Errorf("SourcePath: got %q, want %q", rec.records[0].SourcePath, "AGENT_HANDOFF.md")
+	}
+}
+
+func TestContextNoKeys(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	_, _ = c.Complete(context.Background(), []Message{{Role: "user", Content: "test"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].GuidanceID != "" {
+		t.Errorf("GuidanceID should be empty, got %q", rec.records[0].GuidanceID)
+	}
+	if rec.records[0].SourcePath != "" {
+		t.Errorf("SourcePath should be empty, got %q", rec.records[0].SourcePath)
+	}
+}

@@ -11,6 +11,24 @@ import (
 	"time"
 )
 
+// contextKey is an unexported type for context keys in this package.
+type contextKey string
+
+const (
+	ctxKeyGuidanceID contextKey = "llm_guidance_id"
+	ctxKeySourcePath contextKey = "llm_source_path"
+)
+
+// WithGuidanceID returns a context carrying a guidance_id for interaction logging.
+func WithGuidanceID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, ctxKeyGuidanceID, id)
+}
+
+// WithSourcePath returns a context carrying a source file path for interaction logging.
+func WithSourcePath(ctx context.Context, path string) context.Context {
+	return context.WithValue(ctx, ctxKeySourcePath, path)
+}
+
 // Client provides LLM completions via OpenAI or Ollama APIs.
 type Client struct {
 	provider   string // "openai" or "ollama"
@@ -152,6 +170,22 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	}
 	if callErr != nil {
 		rec.Error = callErr.Error()
+	}
+
+	// Extract <think>...</think> blocks from response
+	if idx := strings.Index(response, "<think>"); idx != -1 {
+		if endIdx := strings.Index(response, "</think>"); endIdx > idx {
+			rec.ThinkContent = response[idx+7 : endIdx]
+			rec.ThinkMode = true
+		}
+	}
+
+	// Pull correlation metadata from context (if present)
+	if gid, ok := ctx.Value(ctxKeyGuidanceID).(string); ok {
+		rec.GuidanceID = gid
+	}
+	if sp, ok := ctx.Value(ctxKeySourcePath).(string); ok {
+		rec.SourcePath = sp
 	}
 
 	c.recorder.Record(ctx, rec)

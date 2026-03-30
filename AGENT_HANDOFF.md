@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-29
+**Date:** 2026-03-30
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -43,7 +43,8 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/20/21/26/27 done, claude .md ingestion done)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-29
+- Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
+- CI: ALL GREEN (push + pull_request + release) as of 2026-03-30
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
@@ -52,6 +53,7 @@ WHAT REMAINS TO BE DONE:
 - ✅ J17 Protocol Pipeline 12-Break Cascading Fix — Code lookup via content-similarity, TrustStore Neo4j persistence, cache bypass, threshold sync, effectiveness TTL 2h, live collector wiring, metrics snapshot refresh
 - ✅ Prometheus Observability — Cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules
 - ✅ TSDB Sprint infrastructure — Live collectors, trend analyzer, Grafana dashboards
+- ✅ Training Data Collection Sprint (2026-03-30) — 7 gaps fixed for Qwen3-30B-A3B fine-tuning pipeline: InteractionRecord enrichment (6 fields, migration 005, schema v5), guidance ID correlation (context.WithValue threading), source document linkage (consulting classifier), privacy scrubber (5 regex categories, 12 tests), quality annotation pipeline (Python batch + report), data monitoring CLI (5 subcommands), JSONL backup integration
 
 === GAP ANALYSIS Phase 4 (in progress) ===
 1. ✅ GAP-18: slog migration — ALL waves complete (internal/ + cmd/ + plugins/)
@@ -84,7 +86,8 @@ WHAT REMAINS TO BE DONE:
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
 
 REPO STATE:
-- Branch: reh3376_dev01 — uncommitted changes from TSDB sprint + J17 feedback loop fix (40+ files)
+- Branch: reh3376_dev01 — uncommitted changes from TSDB sprint + J17 feedback loop fix + Training Data sprint (60+ files)
+- TSDB schema version: 5 (migration 005: interaction enrichment columns)
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
 - CRITICAL: ALWAYS use `docker compose up -d neo4j` to preserve CMS data. Never `mdemg db start` for CMS.
@@ -177,7 +180,7 @@ internal/
   metrics/             # Prometheus metrics + determinism scoring
   plugins/             # Plugin manager + scaffold
   retrieval/           # Core retrieval pipeline (vector + activation + scoring + cache)
-  sanitize/            # Prompt injection sanitization
+  sanitize/            # Prompt injection sanitization + control char stripping
   scraper/             # Web scraper ingestion
   secrets/             # System keychain integration
   summarize/           # LLM summary service
@@ -185,6 +188,7 @@ internal/
   transfer/            # Space transfer (export/import)
 pkg/mdemg/             # Public API types for external Go consumers (GAP-09)
 neural/                # Python sidecar (FastAPI, cross-encoder, NLI)
+  training/            # Quality annotation pipeline (quality_annotator.py, quality_report.py)
 migrations/            # Neo4j Cypher migrations (V0001-V0022)
 plugins/               # Plugin binaries (linear, reflection, keyword-booster, uxts)
 packaging/             # Submodules: homebrew-mdemg, mdemg-windows, mdemg_linux, apt-mdemg, mdemg-menubar, mdemg-linux-sidebar
@@ -369,6 +373,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
 | REM | PR #215 Remediation Sprint | ✅ | Gauge dirty flag (TSDB noise reduction), TSDB backup/restore (pg_dump, CLI, scheduler, retention), compose standardization, 21 alert rules validated, 70/70 Playwright e2e |
 | DD-SPRINT | Deep-Dive Remediation Sprint | ✅ | 2026-03-29 | SEC-LEAK (56 error leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run → managed transactions) |
+| TD-SPRINT | Training Data Collection Sprint | ✅ | 2026-03-30 | TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage in consulting classifier), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline + report), TD-CLI (`mdemg data` CLI with 5 subcommands), TD-BACKUP (JSONL backup integration in TSDB backup service) |
 
 ### Phase Numbering Convention
 
@@ -389,6 +394,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | J17-FIX | — | J17 Protocol Pipeline 12-Break Cascading Fix |
 | PROM | — | Prometheus Observability Monitoring |
 | DDR | — | Deep-Dive Remediation Sprint |
+| TD-SPRINT | — | Training Data Collection Sprint (7 sub-phases: TD-ENRICH, TD-CORR, TD-SRC, TD-SCRUB, TD-QUAL, TD-CLI, TD-BACKUP) |
 
 ---
 
@@ -436,6 +442,13 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | LLM Interaction Logger | `internal/llmclient/recorder.go`, `internal/tsdb/llm_writer.go` | `InteractionRecorder` interface + `LLMInteractionWriter` buffered TSDB writer. `SetDefaultRecorder` for zero-consumer-modification wiring. Config: `LLM_INTERACTION_LOGGING` (default: true). 16 consumers labeled via `WithContext()` |
 | Managed Transactions | 8 files across `internal/` | All 32 `session.Run()` calls migrated to `ExecuteRead`/`ExecuteWrite`. Zero `session.Run()` remaining |
 | K8s/Helm Manifests | `deploy/kubernetes/`, `deploy/helm/mdemg/templates/` | TimescaleDB StatefulSet + neural-sidecar Deployment. Conditional on `.Values.timescaledb.enabled` / `.Values.neuralSidecar.enabled` |
+| Context metadata passing | `internal/llmclient/client.go` | `WithGuidanceID(ctx, id)` / `WithSourcePath(ctx, path)` — context.WithValue-based metadata threading for LLM interaction correlation |
+| Privacy scrubber | `internal/llmclient/scrubber.go` | `Scrub(*InteractionRecord)` — regex-based scrubbing at TSDB write time (API keys, absolute paths, env secrets, emails, Neo4j credentials). 12 test cases in `scrubber_test.go` |
+| Data monitoring CLI | `internal/cli/data.go` | `mdemg data` command with 5 subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`. Training data readiness assessment |
+| Quality annotation pipeline | `neural/training/quality_annotator.py`, `quality_report.py` | Python batch jobs: reads protocol JSONL, joins on guidance_id, writes quality scores back to llm_interactions. Task-specific scoring strategies |
+| JSONL backup integration | `internal/tsdb/backup.go` | `tarGzDirectory()` helper, `JSONLTarPath`/`JSONLTarSize` fields in backup manifests. Includes `.mdemg/neural/training-data/` as `training-data.tar.gz` |
+| InteractionRecord enrichment | `internal/llmclient/recorder.go` | 6 new fields: GuidanceID, SourcePath, ThinkContent, ThinkMode, Quality (*float64), QualitySource. TSDB writer expanded to 22 columns |
+| TSDB migration 005 | `internal/tsdb/migrations/005_interaction_enrichment.sql` | Adds `guidance_id` + `source_path` columns with conditional indexes. Schema version 4 → 5 |
 
 ---
 
@@ -543,6 +556,13 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
   -H "Content-Type: application/json" \
   -d '{"space_id":"mdemg-dev","session_id":"claude-core","max_observations":10}'
 
+# === Training Data ===
+./bin/mdemg data status                                           # Per-task counts + JSONL sizes
+./bin/mdemg data inspect --task jiminy.synthesize --last 5         # View recent records
+./bin/mdemg data stats                                            # Per-task stats + readiness
+./bin/mdemg data annotate --dry-run                               # Preview quality annotation
+./bin/mdemg data quality                                          # Quality coverage report
+
 # === Claude .md File Ingestion ===
 ./bin/mdemg ingest-claude-md --space-id mdemg-dev              # Normal (hash skip)
 ./bin/mdemg ingest-claude-md --space-id mdemg-dev --force      # Force all
@@ -557,4 +577,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-29 — Deep-Dive Remediation Sprint (DDR) COMPLETE: SEC-LEAK (56 err.Error() leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run migrated to managed transactions). CI: ALL GREEN.*
+*Last updated: 2026-03-30 — Training Data Collection Sprint (TD-SPRINT) COMPLETE: TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline), TD-CLI (mdemg data, 5 subcommands), TD-BACKUP (JSONL backup integration). CI: ALL GREEN.*

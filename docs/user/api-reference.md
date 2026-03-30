@@ -2004,6 +2004,8 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 
 **Note:** The guide response now includes a `guidance_id` (CUID2 unique identifier) in the `data` object for effectiveness tracking.
 
+**Context Correlation:** The `guidance_id` flows through the entire Jiminy feedback loop via `context.WithValue`. LLM interactions from guidance synthesis, evaluation, and outcome classification are all correlated by `guidance_id` in the `llm_interactions` table (see [LLM Interaction Records](#llm-interaction-records)). Protocol JSONL records also include `guidance_id` for cross-record joins.
+
 ### POST /v1/jiminy/feedback
 
 Record whether Jiminy guidance was followed, ignored, or contradicted. Requires a `guidance_id` from a prior `/v1/jiminy/guide` response.
@@ -3382,6 +3384,26 @@ List backups with optional type filter.
 
 Get full backup manifest.
 
+**TSDB Backup Manifest Fields:**
+
+TSDB backups (triggered via the backup system) include additional manifest fields for TimescaleDB and training data:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `format_version` | int | Manifest format version |
+| `backup_id` | string | Unique backup identifier |
+| `created_at` | string | ISO8601 creation timestamp |
+| `size_bytes` | int | Backup file size |
+| `checksum` | string | SHA-256 checksum |
+| `schema_version` | int | TSDB schema version (currently 5) |
+| `row_count` | int | Number of rows backed up |
+| `database` | string | Database name |
+| `label` | string | Optional label |
+| `jsonl_tar_path` | string | Path to `training-data.tar.gz` containing JSONL training data |
+| `jsonl_tar_size` | int | Size of the JSONL training data archive in bytes |
+
+> **Note:** Backups now include JSONL training data (exported `llm_interactions` records) as a `training-data.tar.gz` archive alongside the TSDB dump. The `jsonl_tar_path` and `jsonl_tar_size` fields are omitted from the manifest when no training data is included.
+
 ---
 
 ### DELETE /v1/backup/{id}
@@ -3636,7 +3658,7 @@ Graph metrics (node counts, edge counts, hub nodes, etc.).
 
 ### GET /v1/metrics/snapshot
 
-Returns a JSON metrics snapshot including counters, gauges, and histograms from the MetricsRecorder. Metrics are persisted to TimescaleDB on each flush cycle.
+Returns a JSON metrics snapshot including counters, gauges, and histograms from the MetricsRecorder. Metrics are persisted to TimescaleDB on each flush cycle (TSDB schema version 5).
 
 Includes:
 - HTTP request metrics (latency, status codes)
@@ -3680,6 +3702,53 @@ curl -s http://localhost:9999/v1/metrics/snapshot
 **Status Codes:** `200 OK`, `405 Method Not Allowed`, `503 Service Unavailable`
 
 > **Note:** The previous `/v1/prometheus` endpoint has been removed and returns `410 Gone`. Use `/v1/metrics/snapshot` instead.
+
+---
+
+### LLM Interaction Records
+
+Every generative LLM call is recorded in the `llm_interactions` TimescaleDB hypertable. Records are buffered in memory and flushed periodically by the `LLMInteractionWriter`.
+
+**Schema (TSDB schema version 5):**
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `time` | TIMESTAMPTZ | No | Timestamp of the LLM call |
+| `trace_id` | TEXT | No | CUIDv2 unique trace identifier |
+| `task_name` | TEXT | No | Subsystem task (e.g. `ape.reflect`, `jiminy.evaluate`) |
+| `space_id` | TEXT | No | Memory space identifier |
+| `session_id` | TEXT | Yes | Session identifier |
+| `system_prompt` | TEXT | Yes | System prompt sent to LLM |
+| `user_prompt` | TEXT | No | User prompt sent to LLM |
+| `response` | TEXT | Yes | LLM response text |
+| `think_content` | TEXT | Yes | Extracted `<think>...</think>` block content |
+| `think_mode` | BOOLEAN | No | Whether think mode was detected in the response |
+| `latency_ms` | INTEGER | Yes | Round-trip latency in milliseconds |
+| `tokens_in` | INTEGER | Yes | Input token count |
+| `tokens_out` | INTEGER | Yes | Output token count |
+| `model_name` | TEXT | Yes | Model identifier (e.g. `gpt-4o`) |
+| `provider` | TEXT | Yes | LLM provider (e.g. `openai`, `anthropic`) |
+| `error` | TEXT | Yes | Error message if the call failed |
+| `guidance_id` | TEXT | Yes | Jiminy `guidance_id` for feedback loop correlation |
+| `source_path` | TEXT | Yes | Source file path for ingest-triggered classifier calls |
+| `quality` | FLOAT | Yes | Quality score 0.0--1.0, populated by annotation pipeline |
+| `quality_source` | TEXT | Yes | Source of quality annotation: `feedback_outcome`, `llm_judge`, `deterministic`, `human` |
+| `used_for_train` | BOOLEAN | No | Whether this record has been exported for training |
+| `dataset_ver` | TEXT | Yes | Dataset version if exported |
+
+> **Migration history:** The base table was created in migration 002. Migration 005 added the `guidance_id` and `source_path` columns with conditional indexes (indexed only where non-NULL to avoid bloat).
+
+#### Privacy Scrubbing
+
+All LLM interaction records are automatically privacy-scrubbed before storage. The scrubber runs on `system_prompt`, `user_prompt`, `response`, and `think_content` fields.
+
+| Pattern | Replacement |
+|---------|-------------|
+| API keys (`sk-*`, `ghp_*`, `AKIA*`, `Bearer` tokens) | `[REDACTED_KEY]` |
+| Absolute paths (`/Users/*`, `/home/*`) | `/[PATH]/last/two/components` |
+| Environment secrets (`PASSWORD=value`, `SECRET=...`, etc.) | `PASSWORD=[REDACTED]` |
+| Email addresses | `[EMAIL]` |
+| Neo4j credentials in connection strings | `neo4j://[REDACTED]@` |
 
 ---
 

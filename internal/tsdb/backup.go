@@ -1,6 +1,8 @@
 package tsdb
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -40,6 +42,8 @@ type TSDBBackupRecord struct {
 	SchemaVersion int    `json:"schema_version,omitempty"`
 	RowCount      int64  `json:"row_count,omitempty"`
 	Label         string `json:"label,omitempty"`
+	JSONLTarPath  string `json:"jsonl_tar_path,omitempty"`
+	JSONLTarSize  int64  `json:"jsonl_tar_size,omitempty"`
 }
 
 // TSDBBackupManifest is the JSON sidecar written alongside each backup file.
@@ -53,6 +57,8 @@ type TSDBBackupManifest struct {
 	RowCount      int64  `json:"row_count"`
 	Database      string `json:"database"`
 	Label         string `json:"label,omitempty"`
+	JSONLTarPath  string `json:"jsonl_tar_path,omitempty"`
+	JSONLTarSize  int64  `json:"jsonl_tar_size,omitempty"`
 }
 
 // TSDBBackupService manages TimescaleDB backup lifecycle.
@@ -135,6 +141,19 @@ func (s *TSDBBackupService) Trigger(label string) (*TSDBBackupRecord, error) {
 	rec.SizeBytes = size
 	rec.Checksum = checksum
 
+	// Include JSONL training data in backup if directory exists
+	jsonlDir := ".mdemg/neural/training-data"
+	if info, err := os.Stat(jsonlDir); err == nil && info.IsDir() {
+		jsonlTar := filepath.Join(s.cfg.StorageDir, backupID+"-training-data.tar.gz")
+		if tarErr := tarGzDirectory(jsonlDir, jsonlTar); tarErr != nil {
+			slog.Warn("tsdb backup: JSONL tar failed", "error", tarErr)
+		} else {
+			rec.JSONLTarPath = jsonlTar
+			rec.JSONLTarSize = fileSize(jsonlTar)
+			slog.Info("tsdb backup: JSONL training data included", "size", rec.JSONLTarSize)
+		}
+	}
+
 	// Write manifest sidecar
 	manifest := TSDBBackupManifest{
 		FormatVersion: 1,
@@ -144,6 +163,8 @@ func (s *TSDBBackupService) Trigger(label string) (*TSDBBackupRecord, error) {
 		Checksum:      checksum,
 		Database:      s.cfg.Database,
 		Label:         label,
+		JSONLTarPath:  rec.JSONLTarPath,
+		JSONLTarSize:  rec.JSONLTarSize,
 	}
 	if err := s.writeManifest(backupID, &manifest); err != nil {
 		slog.Warn("tsdb backup: write manifest failed", "error", err)
@@ -415,6 +436,64 @@ func (s *TSDBBackupService) deleteBackup(backupID string) (int64, error) {
 	}
 
 	return freed, nil
+}
+
+// tarGzDirectory creates a tar.gz archive of srcDir at destPath.
+func tarGzDirectory(srcDir, destPath string) error {
+	outFile, err := os.Create(destPath) //nolint:gosec // G304: path from backup config
+	if err != nil {
+		return fmt.Errorf("create tar.gz file: %w", err)
+	}
+	defer outFile.Close()
+
+	gw := gzip.NewWriter(outFile)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+
+	walkErr := filepath.Walk(srcDir, func(path string, info os.FileInfo, wErr error) error {
+		if wErr != nil {
+			return wErr
+		}
+
+		// Build the relative path for the tar header
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return fmt.Errorf("relative path: %w", err)
+		}
+
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return fmt.Errorf("file info header: %w", err)
+		}
+		header.Name = relPath
+
+		if err := tw.WriteHeader(header); err != nil {
+			return fmt.Errorf("write header: %w", err)
+		}
+
+		// Only write content for regular files
+		if info.IsDir() {
+			return nil
+		}
+
+		f, err := os.Open(path) //nolint:gosec // G304: path from trusted walk
+		if err != nil {
+			return fmt.Errorf("open file: %w", err)
+		}
+		defer f.Close()
+
+		if _, err := io.Copy(tw, f); err != nil {
+			return fmt.Errorf("copy file: %w", err)
+		}
+		return nil
+	})
+	if walkErr != nil {
+		tw.Close() //nolint:errcheck // best-effort close on walk error path
+		return walkErr
+	}
+
+	return tw.Close()
 }
 
 func sha256File(path string) (string, error) {

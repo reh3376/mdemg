@@ -1,6 +1,8 @@
 package tsdb
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -349,5 +351,90 @@ func TestGetBackup(t *testing.T) {
 	_, err = svc.GetBackup("nonexistent")
 	if err == nil {
 		t.Error("expected error for nonexistent backup")
+	}
+}
+
+func TestTarGzDirectory(t *testing.T) {
+	// Create a temp source directory with some files
+	srcDir := t.TempDir()
+	subDir := filepath.Join(srcDir, "subdir")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "file1.jsonl"), []byte(`{"prompt":"hello"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "file2.jsonl"), []byte(`{"prompt":"world"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "nested.jsonl"), []byte(`{"prompt":"nested"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the tar.gz
+	destDir := t.TempDir()
+	destPath := filepath.Join(destDir, "training-data.tar.gz")
+
+	if err := tarGzDirectory(srcDir, destPath); err != nil {
+		t.Fatalf("tarGzDirectory: %v", err)
+	}
+
+	// Verify tar.gz exists and has content
+	info, err := os.Stat(destPath)
+	if err != nil {
+		t.Fatalf("stat tar.gz: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("tar.gz file is empty")
+	}
+
+	// Open and verify the tar contents
+	f, err := os.Open(destPath)
+	if err != nil {
+		t.Fatalf("open tar.gz: %v", err)
+	}
+	defer f.Close()
+
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	var entries []string
+	for {
+		hdr, err := tr.Next()
+		if err != nil {
+			break
+		}
+		entries = append(entries, hdr.Name)
+	}
+
+	// Expect the root dir entry ".", two files, the subdir, and the nested file
+	expectedFiles := map[string]bool{
+		"file1.jsonl":        false,
+		"file2.jsonl":        false,
+		"subdir/nested.jsonl": false,
+	}
+	for _, e := range entries {
+		if _, ok := expectedFiles[e]; ok {
+			expectedFiles[e] = true
+		}
+	}
+	for name, found := range expectedFiles {
+		if !found {
+			t.Errorf("expected entry %q not found in tar; entries: %v", name, entries)
+		}
+	}
+}
+
+func TestTarGzDirectory_MissingDir(t *testing.T) {
+	destDir := t.TempDir()
+	destPath := filepath.Join(destDir, "should-not-exist.tar.gz")
+
+	err := tarGzDirectory(filepath.Join(destDir, "nonexistent-dir"), destPath)
+	if err == nil {
+		t.Error("expected error for non-existent source directory")
 	}
 }

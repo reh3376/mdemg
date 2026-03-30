@@ -30,6 +30,7 @@ type protocolTrainingRecord struct {
 	MLConfidence       float64 `json:"ml_confidence,omitempty"`   // ML prediction confidence
 	TierSource         string  `json:"tier_source,omitempty"`     // "rule", "ml", or "fallback"
 	SidecarMode        string  `json:"sidecar_mode,omitempty"`    // shadow/compare/canary/active
+	GuidanceID         string  `json:"guidance_id,omitempty"`     // Correlation key for llm_interactions join
 }
 
 // ProtocolDataCollector writes protocol events to JSONL files for ML training.
