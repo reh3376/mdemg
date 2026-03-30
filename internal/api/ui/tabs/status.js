@@ -1,6 +1,6 @@
 // status.js — Status tab: health badges + Grafana dashboard links
 import * as state from '../state.js';
-import { h, infoRow, sectionHeader, statusBadge, clear } from '../utils/dom.js';
+import { h, infoRow, sectionHeader, statusBadge, clear, helpPanel } from '../utils/dom.js';
 
 let container;
 
@@ -79,11 +79,19 @@ function update() {
     const linkList = h('div', { className: 'info-group' });
     for (const [name, path] of dashboards) {
         linkList.append(h('div', { className: 'info-row' },
-            h('a', { href: `${base}${path}`, target: '_blank', className: 'grafana-link' },
+            h('a', { href: `${base}${path}`, target: 'grafana', className: 'grafana-link' },
                 `\u2197 ${name}`),
         ));
     }
     sections.push(linkList);
+
+    sections.push(helpPanel('Help', [
+        { term: 'Status Badge', description: 'Server health: ok (all checks pass), degraded (some checks failing), or unreachable (server not responding). Polled every 10 seconds via GET /healthz.' },
+        { term: 'Version', description: 'MDEMG server version reported by the /healthz endpoint.' },
+        { term: 'Services', description: 'Readiness checks from GET /readyz. Each service (Neo4j, embeddings, plugins) reports its own status. All must be "ready" for the server to accept traffic.' },
+        { term: 'Embeddings', description: 'Embedding provider info from GET /v1/embedding/health. Shows the provider (OpenAI, Ollama), model name, and vector dimensions (e.g., 3072 for text-embedding-3-large).' },
+        { term: 'Grafana Dashboards', description: 'Links to 7 Grafana dashboards for detailed time-series metrics. Clicking a link navigates the existing Grafana tab (or opens one if none exists). Dashboards cover: request metrics, Neo4j stats, RSIC cycles, graph topology, Jiminy guidance, J17 protocol, and fine-tuning training data.' },
+    ]));
 
     clear(container, ...sections);
 }

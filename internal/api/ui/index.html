@@ -339,6 +339,39 @@ body {
 .small { font-size: 12px; }
 .error { color: var(--red); }
 
+/* Help wiki panel */
+.help-panel { margin: 16px 0 8px; }
+.help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.help-header .section-header { flex: 1; margin: 0; }
+.help-toggle { font-size: 12px; padding: 3px 10px; }
+.help-content {
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.help-entry { margin-bottom: 10px; }
+.help-entry:last-child { margin-bottom: 0; }
+.help-term {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--lavender);
+    margin-bottom: 2px;
+}
+.help-desc {
+    font-size: 12px;
+    color: var(--subtext0);
+    line-height: 1.5;
+    margin-left: 0;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--mantle); }

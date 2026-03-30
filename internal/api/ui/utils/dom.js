@@ -41,3 +41,32 @@ export function btn(label, onclick, className = '') {
 export function clear(container, ...children) {
     container.replaceChildren(...children);
 }
+
+// Help wiki panel — toggled by a "?" button in the tab header.
+// entries: array of { term, description } objects.
+export function helpPanel(title, entries) {
+    const content = h('div', { className: 'help-content', style: { display: 'none' } },
+        ...entries.map(e =>
+            h('div', { className: 'help-entry' },
+                h('dt', { className: 'help-term' }, e.term),
+                h('dd', { className: 'help-desc' }, e.description),
+            )
+        ),
+    );
+    const toggle = h('button', {
+        className: 'btn help-toggle',
+        title: 'Toggle help wiki',
+        onclick: () => {
+            const vis = content.style.display === 'none';
+            content.style.display = vis ? 'block' : 'none';
+            toggle.textContent = vis ? 'Hide Help' : '? Help';
+        },
+    }, '? Help');
+    return h('div', { className: 'help-panel' },
+        h('div', { className: 'help-header' },
+            sectionHeader(title),
+            toggle,
+        ),
+        content,
+    );
+}

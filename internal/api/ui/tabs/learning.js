@@ -1,7 +1,7 @@
 // learning.js — Learning tab: Hebbian stats + freeze/unfreeze/prune
 import * as state from '../state.js';
 import * as api from '../api.js';
-import { h, infoRow, sectionHeader, statusBadge, btn, clear } from '../utils/dom.js';
+import { h, infoRow, sectionHeader, statusBadge, btn, clear, helpPanel } from '../utils/dom.js';
 import { formatNumber } from '../utils/formatting.js';
 
 let container;
@@ -89,5 +89,22 @@ function update() {
     }, 'btn-danger'));
 
     sections.push(actionRow);
+
+    sections.push(helpPanel('Help', [
+        { term: 'Total Edges', description: 'Total Hebbian learning edges in the graph. Edges form when two memory nodes are co-activated (referenced together) and strengthen with repeated co-activation.' },
+        { term: 'Co-Activated', description: 'Edges where both connected nodes were activated in the same context. These represent learned associations.' },
+        { term: 'Strong', description: 'Edges with weight above the strong threshold. Strong edges indicate reliable, frequently reinforced associations.' },
+        { term: 'Surprising', description: 'Edges connecting nodes that are semantically distant but frequently co-activated. These represent novel, non-obvious associations \u2014 often the most valuable discoveries.' },
+        { term: 'Below Threshold', description: 'Edges with weight below the prune threshold. These are candidates for pruning \u2014 weak associations that may be noise.' },
+        { term: 'Avg/Max Weight', description: 'Edge weight statistics. Weights range from 0 to 1. Higher weight = stronger association. Weights decay daily by the configured decay rate.' },
+        { term: 'Avg Days Inactive', description: 'Mean number of days since edges were last co-activated. High values indicate the graph has stale associations that may benefit from pruning.' },
+        { term: 'Decay/Day', description: 'Daily decay rate applied to all edge weights. Default 0.01 = 1% per day. Ensures unused associations fade over time.' },
+        { term: 'Prune Threshold', description: 'Weight below which edges are eligible for pruning. Default 0.05.' },
+        { term: 'Max Edges/Node', description: 'Maximum Hebbian edges per node. When exceeded, weakest edges are pruned automatically.' },
+        { term: 'Freeze', description: 'Pauses all Hebbian learning. No new edges are created and no weights are updated while frozen. Use during data imports or maintenance.' },
+        { term: 'Unfreeze', description: 'Resumes Hebbian learning after a freeze.' },
+        { term: 'Prune', description: 'Permanently deletes all edges below the prune threshold. This cannot be undone. Reduces graph noise and improves retrieval precision.' },
+    ]));
+
     clear(container, ...sections);
 }

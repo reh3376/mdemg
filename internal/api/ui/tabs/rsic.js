@@ -1,7 +1,7 @@
 // rsic.js — RSIC tab: trigger action + Grafana link
 import * as state from '../state.js';
 import * as api from '../api.js';
-import { h, sectionHeader, btn, clear } from '../utils/dom.js';
+import { h, sectionHeader, btn, clear, helpPanel } from '../utils/dom.js';
 
 let container;
 
@@ -63,8 +63,15 @@ function buildUI() {
             'For health scores, watchdog, cycle history, calibration, and safety metrics:'),
         h('a', {
             href: `http://localhost:${grafanaPort}/d/mdemg-rsic`,
-            target: '_blank',
+            target: 'grafana',
             className: 'grafana-link large',
         }, '\u2197 Open RSIC Dashboard in Grafana'),
+        helpPanel('Help', [
+            { term: 'RSIC', description: 'Recursive Self-Improvement Cycle. RSIC periodically assesses memory quality, identifies improvements, and applies them. Each cycle: assess \u2192 reflect \u2192 plan \u2192 execute.' },
+            { term: 'Tier', description: 'Cycle scope. Micro: fast, single-dimension fixes (e.g., prune stale edges). Meso: moderate, multi-dimension improvements (default). Macro: comprehensive, full-graph analysis and restructuring.' },
+            { term: 'Dry Run', description: 'When checked, the cycle runs assessment and planning but does not execute any changes. Use to preview what RSIC would do.' },
+            { term: 'Trigger Cycle', description: 'Manually starts an RSIC cycle on the selected space. Shows cycle ID, tier, outcome, duration, and number of improvements when complete.' },
+            { term: 'Grafana RSIC Dashboard', description: 'Links to the full RSIC Grafana dashboard with 8 health dimensions, cycle history, watchdog escalation, safety blocks, calibration progress, and persistence metrics.' },
+        ]),
     );
 }

@@ -25,3 +25,11 @@ export function batch(updates) {
         (subscribers[k] || []).forEach(fn => fn(state[k]));
     }
 }
+
+// Clear all subscribers — call before rendering a new tab to prevent
+// stale callbacks from overwriting the active tab's content.
+export function clearSubscribers() {
+    for (const key of Object.keys(subscribers)) {
+        subscribers[key] = [];
+    }
+}

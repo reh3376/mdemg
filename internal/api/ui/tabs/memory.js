@@ -1,7 +1,7 @@
 // memory.js — Memory tab: stats + knowledge sharing (export/import)
 import * as state from '../state.js';
 import * as api from '../api.js';
-import { h, infoRow, sectionHeader, btn, clear } from '../utils/dom.js';
+import { h, infoRow, sectionHeader, btn, clear, helpPanel } from '../utils/dom.js';
 import { formatNumber } from '../utils/formatting.js';
 
 let container;
@@ -124,6 +124,17 @@ function update() {
         }
     });
     sections.push(h('div', { className: 'action-row' }, importInput, importBtn));
+
+    sections.push(helpPanel('Help', [
+        { term: 'Total Memories', description: 'Total number of memory nodes in the selected space across all layers (L0\u2013L5).' },
+        { term: 'Embedding Coverage', description: 'Percentage of memory nodes that have a vector embedding. Nodes without embeddings cannot participate in semantic retrieval.' },
+        { term: 'Health Score', description: 'Overall memory graph health combining embedding coverage, connectivity, and freshness.' },
+        { term: 'By Layer', description: 'Bar chart showing memory count per layer. L0=raw observations, L1=summaries, L2=concepts, L3=abstractions, L4=meta-concepts, L5=emergent. Higher layers are formed automatically via Hebbian learning.' },
+        { term: 'Temporal Distribution', description: 'How recently memories were created: last 24h, 7d, 30d, or older. Skewed-recent distributions indicate active learning; mostly-older distributions may benefit from fresh ingestion.' },
+        { term: 'Connectivity', description: 'Graph connectivity metrics. Avg Edges: mean edges per node. Max Edges: highest edge count on any node. Orphans: nodes with zero edges (isolated, never co-activated).' },
+        { term: 'Export', description: 'Download the selected space as a .mdemg file. Profiles: Full (all data), Shareable (excludes secrets), Metadata (structure only), Learned (Hebbian edges only), CMS (conversation observations).' },
+        { term: 'Import', description: 'Upload a .mdemg or .json file to import memories into the selected space. Conflict resolution is set to "skip" (existing nodes are not overwritten).' },
+    ]));
 
     clear(container, ...sections);
 }

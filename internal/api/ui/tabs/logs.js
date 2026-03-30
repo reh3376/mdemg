@@ -1,6 +1,6 @@
 // logs.js — Logs tab: searchable, color-coded log viewer
 import * as api from '../api.js';
-import { h, sectionHeader, clear } from '../utils/dom.js';
+import { h, sectionHeader, clear, helpPanel } from '../utils/dom.js';
 
 let container;
 let allEntries = [];
@@ -40,6 +40,13 @@ function buildUI() {
         sectionHeader('Server Logs'),
         h('div', { className: 'log-controls' }, levelSelect, searchInput),
         logContainer,
+        helpPanel('Help', [
+            { term: 'Log Entries', description: 'Recent server log lines captured from an in-process ring buffer (last 500 entries max). Newest entries appear first. Polled every 5 seconds while this tab is active.' },
+            { term: 'Level Filter', description: 'Filter entries by severity: DEBUG (gray, verbose diagnostics), INFO (blue, normal operations), WARN (yellow, non-critical issues), ERROR (red, failures requiring attention). Select "All Levels" to show everything.' },
+            { term: 'Search', description: 'Free-text search across log messages and raw log lines. Matching is case-insensitive and updates instantly. Combines with the level filter.' },
+            { term: 'Timestamp', description: 'Local time when the log entry was recorded, shown in the browser\'s locale format.' },
+            { term: 'Color Coding', description: 'Log lines are color-coded by level: blue=INFO, yellow=WARN, red=ERROR (with subtle background highlight), gray=DEBUG.' },
+        ]),
     );
 }
 

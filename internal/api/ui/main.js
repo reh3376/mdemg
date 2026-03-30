@@ -32,15 +32,17 @@ function switchTab(name) {
         b.classList.toggle('active', b.dataset.tab === name);
     });
 
+    // Clear stale state subscriptions from the previous tab so they
+    // don't overwrite the new tab's content on the next poll cycle.
+    state.clearSubscribers();
+
     // Render tab content
     const content = document.getElementById('content');
     content.innerHTML = '';
     TABS[name].render(content);
 
-    // On-demand fetch for config tab
-    if (name === 'config') {
-        // Config tab fetches on render, no polling needed
-    }
+    // Re-register persistent (non-tab) subscriptions
+    setupSpaceSelector();
 }
 
 // Health polling: 10s
