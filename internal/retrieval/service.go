@@ -197,16 +197,19 @@ func (s *Service) UpdateTapRootFreshness(ctx context.Context, spaceID, ingestTyp
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	_, err := session.Run(ctx, `
-		MERGE (t:TapRoot {space_id: $spaceId})
-		ON CREATE SET t.name = 'tap_root', t.created_at = datetime(), t.prunable = $prunable
-		SET t.last_ingest_at = datetime(),
-		    t.last_ingest_type = $ingestType,
-		    t.ingest_count = coalesce(t.ingest_count, 0) + 1
-	`, map[string]any{
-		"spaceId":    spaceID,
-		"ingestType": ingestType,
-		"prunable":   prunable,
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		_, err := tx.Run(ctx, `
+			MERGE (t:TapRoot {space_id: $spaceId})
+			ON CREATE SET t.name = 'tap_root', t.created_at = datetime(), t.prunable = $prunable
+			SET t.last_ingest_at = datetime(),
+			    t.last_ingest_type = $ingestType,
+			    t.ingest_count = coalesce(t.ingest_count, 0) + 1
+		`, map[string]any{
+			"spaceId":    spaceID,
+			"ingestType": ingestType,
+			"prunable":   prunable,
+		})
+		return nil, err
 	})
 	if err != nil {
 		return fmt.Errorf("update TapRoot freshness: %w", err)
@@ -220,19 +223,26 @@ func (s *Service) GetTapRootFreshness(ctx context.Context, spaceID string) (map[
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, `
-		MATCH (t:TapRoot {space_id: $spaceId})
-		RETURN t.last_ingest_at AS last_ingest_at,
-		       t.last_ingest_type AS last_ingest_type,
-		       t.ingest_count AS ingest_count,
-		       t.created_at AS created_at
-	`, map[string]any{"spaceId": spaceID})
+	raw, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (t:TapRoot {space_id: $spaceId})
+			RETURN t.last_ingest_at AS last_ingest_at,
+			       t.last_ingest_type AS last_ingest_type,
+			       t.ingest_count AS ingest_count,
+			       t.created_at AS created_at
+		`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get TapRoot freshness: %w", err)
 	}
 
-	if result.Next(ctx) {
-		record := result.Record()
+	records := raw.([]*neo4j.Record)
+	if len(records) > 0 {
+		record := records[0]
 		props := make(map[string]any)
 		for _, key := range record.Keys {
 			val, _ := record.Get(key)
@@ -248,20 +258,26 @@ func (s *Service) GetAllTapRootFreshness(ctx context.Context) ([]map[string]any,
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, `
-		MATCH (t:TapRoot)
-		RETURN t.space_id AS space_id,
-		       t.last_ingest_at AS last_ingest_at,
-		       t.last_ingest_type AS last_ingest_type,
-		       t.ingest_count AS ingest_count
-	`, nil)
+	raw, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (t:TapRoot)
+			RETURN t.space_id AS space_id,
+			       t.last_ingest_at AS last_ingest_at,
+			       t.last_ingest_type AS last_ingest_type,
+			       t.ingest_count AS ingest_count
+		`, nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get all TapRoot freshness: %w", err)
 	}
 
+	records := raw.([]*neo4j.Record)
 	var results []map[string]any
-	for result.Next(ctx) {
-		record := result.Record()
+	for _, record := range records {
 		props := make(map[string]any)
 		for _, key := range record.Keys {
 			val, _ := record.Get(key)

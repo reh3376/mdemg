@@ -575,21 +575,27 @@ func teardownDeleteSpace(spaceID string, force bool) *sidecar.ReportChange {
 	totalDeleted := 0
 	batchSize := 1000
 	for {
-		result, err := session.Run(ctx,
-			"MATCH (n {space_id: $spaceID}) WITH n LIMIT $limit DETACH DELETE n RETURN count(*) AS deleted",
-			map[string]any{"spaceID": spaceID, "limit": batchSize},
-		)
+		raw, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx,
+				"MATCH (n {space_id: $spaceID}) WITH n LIMIT $limit DETACH DELETE n RETURN count(*) AS deleted",
+				map[string]any{"spaceID": spaceID, "limit": batchSize},
+			)
+			if err != nil {
+				return nil, err
+			}
+			rec, err := result.Single(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return rec.Values[0].(int64), nil
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: space deletion query failed: %v\n", err)
 			break
 		}
-		if result.Next(ctx) {
-			deleted := result.Record().Values[0].(int64)
-			totalDeleted += int(deleted)
-			if deleted < int64(batchSize) {
-				break
-			}
-		} else {
+		deleted := raw.(int64)
+		totalDeleted += int(deleted)
+		if deleted < int64(batchSize) {
 			break
 		}
 	}

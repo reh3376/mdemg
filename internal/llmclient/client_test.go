@@ -415,3 +415,141 @@ func TestTruncateForLog(t *testing.T) {
 		}
 	}
 }
+
+// ─── Recorder Integration ───
+
+type mockRecorder struct {
+	records []InteractionRecord
+}
+
+func (m *mockRecorder) Record(_ context.Context, rec InteractionRecord) {
+	m.records = append(m.records, rec)
+}
+
+func TestClient_RecorderCalledOnComplete(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "recorded"}}},
+			Usage:   OpenAIUsage{TotalTokens: 10},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "openai", Model: "gpt-4o", APIKey: "k", BaseURL: server.URL})
+	c.SetRecorder(rec)
+	c = c.WithContext("test.task", "test-space")
+
+	msgs := []Message{
+		{Role: "system", Content: "sys prompt"},
+		{Role: "user", Content: "user prompt"},
+	}
+	_, err := c.Complete(context.Background(), msgs, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.TaskName != "test.task" {
+		t.Errorf("TaskName: got %q, want %q", r.TaskName, "test.task")
+	}
+	if r.SpaceID != "test-space" {
+		t.Errorf("SpaceID: got %q, want %q", r.SpaceID, "test-space")
+	}
+	if r.SystemPrompt != "sys prompt" {
+		t.Errorf("SystemPrompt: got %q, want %q", r.SystemPrompt, "sys prompt")
+	}
+	if r.UserPrompt != "user prompt" {
+		t.Errorf("UserPrompt: got %q, want %q", r.UserPrompt, "user prompt")
+	}
+	if r.Response != "recorded" {
+		t.Errorf("Response: got %q, want %q", r.Response, "recorded")
+	}
+	if r.ModelName != "gpt-4o" {
+		t.Errorf("ModelName: got %q, want %q", r.ModelName, "gpt-4o")
+	}
+	if r.Provider != "openai" {
+		t.Errorf("Provider: got %q, want %q", r.Provider, "openai")
+	}
+	if r.LatencyMs < 0 {
+		t.Errorf("LatencyMs: got %d, want >= 0", r.LatencyMs)
+	}
+}
+
+func TestClient_RecorderCalledOnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("server error"))
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "openai", Model: "gpt-4o", APIKey: "k", BaseURL: server.URL})
+	c.SetRecorder(rec)
+
+	_, _ = c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	if rec.records[0].Error == "" {
+		t.Error("expected Error field to be set on failed call")
+	}
+}
+
+func TestClient_NilRecorderNoOp(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	c := New(Config{Provider: "openai", Model: "gpt-4o", APIKey: "k", BaseURL: server.URL})
+	// No recorder set — should not panic
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetDefaultRecorder(t *testing.T) {
+	// Save and restore global state
+	orig := defaultRecorder
+	defer func() { defaultRecorder = orig }()
+
+	rec := &mockRecorder{}
+	SetDefaultRecorder(rec)
+
+	c := New(Config{Provider: "openai", Model: "test"})
+	if c.recorder != rec {
+		t.Error("expected new client to inherit defaultRecorder")
+	}
+
+	SetDefaultRecorder(nil)
+	c2 := New(Config{Provider: "openai", Model: "test"})
+	if c2.recorder != nil {
+		t.Error("expected nil recorder after clearing default")
+	}
+}
+
+func TestWithContext(t *testing.T) {
+	c := New(Config{Provider: "openai", Model: "test"})
+	c2 := c.WithContext("task-a", "space-b")
+
+	if c2.taskName != "task-a" {
+		t.Errorf("taskName: got %q, want %q", c2.taskName, "task-a")
+	}
+	if c2.spaceID != "space-b" {
+		t.Errorf("spaceID: got %q, want %q", c2.spaceID, "space-b")
+	}
+	// Original should be unmodified
+	if c.taskName != "" {
+		t.Errorf("original taskName modified: got %q", c.taskName)
+	}
+}

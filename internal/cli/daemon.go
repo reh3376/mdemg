@@ -526,14 +526,21 @@ func getNeo4jNodeCount(cfg config.Config) (int64, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, "MATCH (n) RETURN count(n) AS cnt", nil)
+	raw, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, "MATCH (n) RETURN count(n) AS cnt", nil)
+		if err != nil {
+			return nil, err
+		}
+		rec, err := result.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return rec.Values[0].(int64), nil
+	})
 	if err != nil {
 		return 0, err
 	}
-	if result.Next(ctx) {
-		return result.Record().Values[0].(int64), nil
-	}
-	return 0, fmt.Errorf("no result")
+	return raw.(int64), nil
 }
 
 // formatDuration returns a human-friendly duration string.

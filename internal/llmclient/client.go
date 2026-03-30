@@ -18,6 +18,9 @@ type Client struct {
 	apiKey     string // OpenAI API key (not used for Ollama)
 	baseURL    string // e.g. "https://api.openai.com/v1" or "http://localhost:11434"
 	httpClient *http.Client
+	recorder   InteractionRecorder // optional; set via SetRecorder
+	taskName   string              // context label for interaction logging
+	spaceID    string              // context label for interaction logging
 }
 
 // Config holds the configuration for creating an LLM client.
@@ -27,6 +30,17 @@ type Config struct {
 	APIKey    string // Required for OpenAI
 	BaseURL   string // API base URL
 	TimeoutMs int    // HTTP client timeout in milliseconds (default: 30000)
+}
+
+// defaultRecorder is automatically attached to every new Client.
+// Set via SetDefaultRecorder before creating clients.
+var defaultRecorder InteractionRecorder
+
+// SetDefaultRecorder sets a package-level recorder that is automatically
+// attached to every subsequently created Client. Safe to call with nil
+// to disable. This allows zero-modification wiring of all 16+ consumers.
+func SetDefaultRecorder(r InteractionRecorder) {
+	defaultRecorder = r
 }
 
 // New creates a new LLM client from the given configuration.
@@ -44,7 +58,23 @@ func New(cfg Config) *Client {
 		httpClient: &http.Client{
 			Timeout: time.Duration(timeoutMs) * time.Millisecond,
 		},
+		recorder: defaultRecorder,
 	}
+}
+
+// SetRecorder attaches an interaction recorder. All subsequent Complete/CompleteWithUsage
+// calls will log their request/response to the recorder. Safe to call with nil to disable.
+func (c *Client) SetRecorder(r InteractionRecorder) {
+	c.recorder = r
+}
+
+// WithContext returns a shallow copy of the Client with task-level metadata set.
+// This allows per-consumer labeling without modifying the shared client.
+func (c *Client) WithContext(taskName, spaceID string) *Client {
+	copy := *c
+	copy.taskName = taskName
+	copy.spaceID = spaceID
+	return &copy
 }
 
 // CompleteOpts holds optional parameters for a completion request.
@@ -59,23 +89,72 @@ type CompleteOpts struct {
 // For OpenAI, it uses the chat completions endpoint.
 // For Ollama, it concatenates messages into a single prompt and uses the generate endpoint.
 func (c *Client) Complete(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
+	start := time.Now()
+	var text string
+	var err error
+
 	switch c.provider {
 	case "ollama":
-		return c.completeOllama(ctx, messages, opts)
-	default: // "openai" or unset
-		return c.completeOpenAI(ctx, messages, opts)
+		text, err = c.completeOllama(ctx, messages, opts)
+	default:
+		text, err = c.completeOpenAI(ctx, messages, opts)
 	}
+
+	c.recordInteraction(ctx, messages, text, 0, int(time.Since(start).Milliseconds()), err)
+	return text, err
 }
 
 // CompleteWithUsage is like Complete but also returns token usage (OpenAI only; Ollama returns 0).
 func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
+	start := time.Now()
+	var text string
+	var tokens int
+	var err error
+
 	switch c.provider {
 	case "ollama":
-		text, err := c.completeOllama(ctx, messages, opts)
-		return text, 0, err
+		text, err = c.completeOllama(ctx, messages, opts)
 	default:
-		return c.completeOpenAIWithUsage(ctx, messages, opts)
+		text, tokens, err = c.completeOpenAIWithUsage(ctx, messages, opts)
 	}
+
+	c.recordInteraction(ctx, messages, text, tokens, int(time.Since(start).Milliseconds()), err)
+	return text, tokens, err
+}
+
+// recordInteraction sends an interaction record to the recorder if one is set.
+func (c *Client) recordInteraction(ctx context.Context, messages []Message, response string, tokens, latencyMs int, callErr error) {
+	if c.recorder == nil {
+		return
+	}
+
+	var system, user string
+	for _, m := range messages {
+		switch m.Role {
+		case "system":
+			system = m.Content
+		case "user":
+			user = m.Content
+		}
+	}
+
+	rec := InteractionRecord{
+		Time:         time.Now(),
+		TaskName:     c.taskName,
+		SpaceID:      c.spaceID,
+		SystemPrompt: system,
+		UserPrompt:   user,
+		Response:     response,
+		LatencyMs:    latencyMs,
+		TokensOut:    tokens,
+		ModelName:    c.model,
+		Provider:     c.provider,
+	}
+	if callErr != nil {
+		rec.Error = callErr.Error()
+	}
+
+	c.recorder.Record(ctx, rec)
 }
 
 // --- OpenAI ---
