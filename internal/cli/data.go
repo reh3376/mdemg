@@ -80,6 +80,36 @@ func newDataStatusCmd() *cobra.Command {
 			fmt.Println(strings.Repeat("─", 62))
 			fmt.Printf("%-30s %8d %10d %10d\n", "TOTAL", totalRows, totalGuid, totalAnnotated)
 
+			// Embedding event counts
+			fmt.Println()
+			fmt.Println("═══ Embedding Events ═══")
+			var embTotal, embCached int64
+			err = pool.QueryRow(ctx,
+				`SELECT COALESCE(COUNT(*), 0), COALESCE(SUM(CASE WHEN cached THEN 1 ELSE 0 END), 0)
+				 FROM embedding_events`).Scan(&embTotal, &embCached)
+			if err != nil {
+				fmt.Println("  (table not yet created)")
+			} else {
+				cacheRate := 0.0
+				if embTotal > 0 {
+					cacheRate = float64(embCached) / float64(embTotal) * 100
+				}
+				fmt.Printf("Total events:  %d\n", embTotal)
+				fmt.Printf("Cache hits:    %d (%.1f%%)\n", embCached, cacheRate)
+			}
+
+			// Retrieval event counts
+			fmt.Println()
+			fmt.Println("═══ Retrieval Events ═══")
+			var retTotal int64
+			err = pool.QueryRow(ctx,
+				`SELECT COALESCE(COUNT(*), 0) FROM retrieval_events`).Scan(&retTotal)
+			if err != nil {
+				fmt.Println("  (table not yet created)")
+			} else {
+				fmt.Printf("Total events:  %d\n", retTotal)
+			}
+
 			// JSONL file status
 			fmt.Println()
 			fmt.Println("═══ JSONL Files ═══")
@@ -239,6 +269,53 @@ func newDataStatsCmd() *cobra.Command {
 					derefF(errorRate)*100, derefF(qualityCoverage)*100,
 					formatQuality(avgQuality), ready)
 			}
+
+			// Embedding event breakdown
+			fmt.Println()
+			fmt.Println("═══ Embedding Events by Type ═══")
+			embRows, embErr := pool.Query(ctx,
+				`SELECT COALESCE(call_site, 'unknown'), COUNT(*),
+				        SUM(CASE WHEN cached THEN 1 ELSE 0 END)
+				 FROM embedding_events
+				 GROUP BY call_site ORDER BY count DESC`)
+			if embErr != nil {
+				fmt.Println("  (table not yet created)")
+			} else {
+				defer embRows.Close()
+				fmt.Printf("%-20s %8s %10s\n", "Call Site", "Total", "Cached")
+				fmt.Println(strings.Repeat("─", 40))
+				for embRows.Next() {
+					var site string
+					var cnt, cached int64
+					if scanErr := embRows.Scan(&site, &cnt, &cached); scanErr == nil {
+						fmt.Printf("%-20s %8d %10d\n", site, cnt, cached)
+					}
+				}
+			}
+
+			// Retrieval event breakdown
+			fmt.Println()
+			fmt.Println("═══ Retrieval Events by Call Site ═══")
+			retRows, retErr := pool.Query(ctx,
+				`SELECT call_site, COUNT(*), AVG(total_latency_ms)
+				 FROM retrieval_events
+				 GROUP BY call_site ORDER BY count DESC`)
+			if retErr != nil {
+				fmt.Println("  (table not yet created)")
+			} else {
+				defer retRows.Close()
+				fmt.Printf("%-20s %8s %12s\n", "Call Site", "Total", "AvgLatency")
+				fmt.Println(strings.Repeat("─", 42))
+				for retRows.Next() {
+					var site string
+					var cnt int64
+					var avgLat *float64
+					if scanErr := retRows.Scan(&site, &cnt, &avgLat); scanErr == nil {
+						fmt.Printf("%-20s %8d %10.0fms\n", site, cnt, derefF(avgLat))
+					}
+				}
+			}
+
 			return nil
 		},
 	}

@@ -1,0 +1,44 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "consulting.classify",
+    "description": "Constraint classifier — determines constraint type and generates summary from retrieved node text",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "high",
+    "notes": "Called per retrieved node in findApplicableConstraints. Fast classification task — no think mode needed. Accuracy is critical for constraint surfacing."
+  },
+  "prompt": {
+    "system_prompt_hash": "d0d51f50deedba09e8cec236f5352f8d811b6227d88913f2d00312ce3f658377",
+    "system_prompt_source": "internal/consulting/llm_classifier.go:80",
+    "think_mode": false,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 3000,
+    "max_tokens": 500
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["type"],
+    "properties": {
+      "type": { "type": "string" },
+      "summary": { "type": "string" },
+      "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+    }
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
+    { "name": "accuracy", "weight": 0.4, "threshold": 0.7, "description": "Correct constraint type classification" },
+    { "name": "precision", "weight": 0.3, "threshold": 0.6, "description": "Low false-positive rate for constraint detection" }
+  ],
+  "reward_functions": ["json_valid", "classification_accuracy", "summary_quality"],
+  "training_config": {
+    "rank": 8,
+    "min_examples": 1000,
+    "quality_gate": 0.75
+  }
+}

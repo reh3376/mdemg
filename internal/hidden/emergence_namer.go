@@ -194,9 +194,7 @@ func (n *EmergenceNamer) nameWithPrompt(ctx context.Context, sysPrompt string, n
 		return nil, err
 	}
 
-	// Strip markdown code fences if present (LLMs sometimes wrap JSON)
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var result EmergenceNamingResult
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {

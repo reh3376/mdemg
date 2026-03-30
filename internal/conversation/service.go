@@ -12,6 +12,7 @@ import (
 	"github.com/nrednav/cuid2"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/metrics"
 	"mdemg/internal/sanitize"
 )
@@ -249,6 +250,12 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	var embedding []float32
 	var err error
 	if s.embedder != nil {
+		ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite:  "conversation",
+			SpaceID:   req.SpaceID,
+			Tags:      req.Tags,
+			QueryText: req.Content,
+		})
 		embedding, err = s.embedder.Embed(ctx, req.Content)
 		if err != nil {
 			slog.Warn("embedding generation failed, dedup skipped", "error", err)

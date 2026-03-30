@@ -140,6 +140,11 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	}
 
 	// Tier 1: Embedding-based comparison
+	ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite:    "jiminy.outcome",
+		ElementKind: string(item.Type),
+		QueryText:   actionSummary,
+	})
 	guidanceEmbed, err := oc.embedder.Embed(ctx, item.Content)
 	if err != nil {
 		slog.Error("jiminy classifier: guidance embedding failed", "error", err)
@@ -279,20 +284,7 @@ func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity flo
 
 // parseClassifyResponse parses the LLM classification JSON response (J14).
 func parseClassifyResponse(raw string, fallbackConfidence float64) ClassificationResult {
-	cleaned := strings.TrimSpace(raw)
-
-	// Strip markdown fences
-	if after, found := strings.CutPrefix(cleaned, "```json"); found {
-		if idx := strings.LastIndex(after, "```"); idx >= 0 {
-			after = after[:idx]
-		}
-		cleaned = strings.TrimSpace(after)
-	} else if after, found := strings.CutPrefix(cleaned, "```"); found {
-		if idx := strings.LastIndex(after, "```"); idx >= 0 {
-			after = after[:idx]
-		}
-		cleaned = strings.TrimSpace(after)
-	}
+	cleaned := llmclient.SanitizeResponse(raw)
 
 	var result struct {
 		Outcome    string  `json:"outcome"`

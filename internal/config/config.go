@@ -789,6 +789,8 @@ type Config struct {
 	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 4)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
+	EmbeddingEventLogging     bool   // EMBEDDING_EVENT_LOGGING — log all Embed() calls for contrastive training data (default: true)
+	RetrievalEventLogging     bool   // RETRIEVAL_EVENT_LOGGING — log all Retrieve() pipelines for contrastive training data (default: true)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -3097,12 +3099,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 5)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 7)
 	if err != nil {
 		return Config{}, err
 	}
 	tsdbOptional := getBool("TSDB_OPTIONAL", true)
 	llmInteractionLogging := getBool("LLM_INTERACTION_LOGGING", true)
+	embeddingEventLogging := getBool("EMBEDDING_EVENT_LOGGING", true)
+	retrievalEventLogging := getBool("RETRIEVAL_EVENT_LOGGING", true)
 
 	// Live Metrics settings
 	liveMetricsEnabled := getBool("LIVE_METRICS_ENABLED", true)
@@ -3718,6 +3722,8 @@ func FromEnv() (Config, error) {
 		TSDBRequiredSchemaVersion: tsdbRequiredSchemaVersion,
 		TSDBOptional:              tsdbOptional,
 		LLMInteractionLogging:     llmInteractionLogging,
+		EmbeddingEventLogging:     embeddingEventLogging,
+		RetrievalEventLogging:     retrievalEventLogging,
 
 		// Live Metrics
 		LiveMetricsEnabled:     liveMetricsEnabled,

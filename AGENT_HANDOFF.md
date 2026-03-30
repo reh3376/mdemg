@@ -44,11 +44,19 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
 - Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
+- FT Infrastructure Sprint — COMPLETE (4 phases: A=SanitizeResponse+prompt hash, B=RAFT context enrichment, C=ULTS spec framework, D=embedding/retrieval data collection)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-30
 - Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-03-28) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-03-30) ===
+- ✅ FT Infrastructure Sprint (2026-03-30) — 4 phases for fine-tuning data quality:
+  - Phase A: SanitizeResponse (StripThinkBlock + StripCodeFence, 11 call sites, system prompt hash)
+  - Phase B: RAFT Context Enrichment (RetrievalContext, consulting + jiminy wiring, migration 007, 26 TSDB columns)
+  - Phase C: ULTS Spec Framework (16 LLM task specs, JSON schema, runner, 100% pass rate)
+  - Phase D: Embedding/Retrieval Data Collection (2 new hypertables, WithEmbeddingMeta at 9 call sites, migration 006)
+
+=== COMPLETED SINCE PREVIOUS HANDOFF (2026-03-28) ===
 - ✅ J17 Feedback Loop Closure — State file bridge, hook feedback delivery, control char sanitization, bootstrap codification
 - ✅ J17 Protocol Pipeline 12-Break Cascading Fix — Code lookup via content-similarity, TrustStore Neo4j persistence, cache bypass, threshold sync, effectiveness TTL 2h, live collector wiring, metrics snapshot refresh
 - ✅ Prometheus Observability — Cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules

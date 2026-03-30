@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-03-29
+Last updated: 2026-03-30
 
 ---
 
@@ -22,6 +22,7 @@ Last updated: 2026-03-29
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
+| ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 16 |
 
 ---
 
@@ -41,6 +42,7 @@ Last updated: 2026-03-29
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 | UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
+| ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (16) | `docs/tests/ults/runners/ults_runner.py` | no CI gate |
 
 ---
 
@@ -59,6 +61,7 @@ Last updated: 2026-03-29
 | USTS | `rate_limiting`, `data_exposure`, `injection` | `authentication` (draft, needs USTS_AUTH_ENABLED), `test_cases` format (draft) | Yes (parity hard-fail for auth, test_cases) |
 | UAMS | N/A (no runner) | All | N/A |
 | UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
+| ULTS | All required fields, version format, task name format, quality weights sum, prompt hash format | none | Yes (parity hard-fail for unknown fields) |
 
 ---
 

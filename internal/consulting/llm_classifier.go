@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -220,8 +219,7 @@ var validConstraintTypes = map[string]bool{
 }
 
 func (cc *ConstraintClassifier) parseResponse(raw string) (*ConstraintClassification, error) {
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var result ConstraintClassification
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {

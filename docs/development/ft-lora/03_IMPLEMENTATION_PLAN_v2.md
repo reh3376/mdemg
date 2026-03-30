@@ -53,7 +53,10 @@ Implementation diverged from the v2.0 plan in a better direction:
 
 ---
 
-## Phase 2: Think Mode + Response Sanitization (Go) ⬜ NOT STARTED
+## Phase 2: Think Mode + Response Sanitization (Go) ✅ PARTIALLY COMPLETE (2D-2F done)
+
+> **2D-2F (SanitizeResponse) COMPLETE:** `internal/llmclient/sanitize.go` with `StripThinkBlock`, `StripCodeFence`, `SanitizeResponse`. Wired into all 11 JSON-parsing call sites (10 files). System prompt hash added to InteractionRecord. See `docs/features/llm-response-sanitization.md`.
+> **2A-2C (Think mode opt-in per consumer) NOT STARTED.**
 
 ### 2A. Modify: `internal/llmclient/client.go` — Add Think to CompleteOpts
 
@@ -142,7 +145,9 @@ Install vllm-mlx, create launchd/systemd service file, point `LLM_BASE_URL` to `
 
 ---
 
-## Phase 4A: RAFT Retrieval Context Enrichment (v3.0 Addition) ⬜ NOT STARTED
+## Phase 4A: RAFT Retrieval Context Enrichment (v3.0 Addition) ✅ COMPLETE (2026-03-30)
+
+> **All sub-phases complete:** RetrievalContext struct, WithRetrievalContext() context propagation, consulting + jiminy wiring, TSDB columns 22→26, migration 007, system prompt hash. See `docs/features/raft-retrieval-context.md`.
 
 MDEMG operates in an open-book setting where every LLM call receives retrieved context from Neo4j. Training data must capture this context so the model learns to work with retrieval, not just answer prompts in isolation.
 
@@ -196,7 +201,9 @@ When curating RAFT-style training data: 80% of examples include retrieved contex
 
 ---
 
-## Phase 4B: ULTS Spec Framework (v3.0 Addition) ⬜ NOT STARTED
+## Phase 4B: ULTS Spec Framework (v3.0 Addition) ✅ COMPLETE (2026-03-30)
+
+> **All sub-phases complete:** JSON Schema, 16 spec files, ults_runner.py, all 16 pass validation (100%). See `docs/features/ults-framework.md`.
 
 Formalize all 16 LLM call contracts as machine-readable specs. Each spec defines: input_schema, output_schema, system_prompt_hash, latency_budget_ms, think_mode, quality_metrics, reward_functions, and training_config.
 
@@ -355,8 +362,8 @@ FT model metrics (version, latency, cycles), data governance metrics (exogenous 
 | **1** Interaction Logger | None | M | 1 week | ✅ COMPLETE |
 | **2** Think Mode + Sanitize | None | M | 3-4 days | ⬜ NEXT |
 | **3** vllm-mlx Integration | None (parallel) | S | 1-2 days | ⬜ |
-| **4A** RAFT Context (v3.0) | Phase 1 | M | 3-4 days | ⬜ NEXT |
-| **4B** ULTS Specs (v3.0) | None | M | 3-4 days | ⬜ NEXT |
+| **4A** RAFT Context (v3.0) | Phase 1 | M | 3-4 days | ✅ COMPLETE |
+| **4B** ULTS Specs (v3.0) | None | M | 3-4 days | ✅ COMPLETE |
 | **4** Teacher Distillation | Phase 1 data (2-3 months) | M | 1-2 weeks | ⬜ |
 | **5** Training Pipeline | Phase 4 | M-L | 1-2 weeks | ⬜ |
 | **6** Recursive Cycle | Phases 4+5 | M | 1 week | ⬜ |

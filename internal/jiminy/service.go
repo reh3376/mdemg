@@ -479,6 +479,12 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	var queryEmbedding []float32
 	if s.embedder != nil {
+		ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite:  "jiminy.guide",
+			SpaceID:   req.SpaceID,
+			FilePath:  req.FilePath,
+			QueryText: contextText,
+		})
 		var err error
 		queryEmbedding, err = s.embedder.Embed(ctx, contextText)
 		if err != nil {
@@ -841,6 +847,24 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	} else {
 		// Static fallback (pre-J17)
 		augmentation = FormatPromptAugmentation(filtered, counts, confidence)
+	}
+
+	// Enrich context with RAFT retrieval context for training data
+	if len(filtered) > 0 {
+		var nodeIDs []string
+		var scores []float64
+		for _, item := range filtered {
+			for _, nid := range item.SourceNodes {
+				nodeIDs = append(nodeIDs, nid)
+				scores = append(scores, item.Confidence)
+			}
+		}
+		if len(nodeIDs) > 0 {
+			ctx = llmclient.WithRetrievalContext(ctx, &llmclient.RetrievalContext{
+				NodeIDs: nodeIDs,
+				Scores:  scores,
+			})
+		}
 	}
 
 	// J8: LLM synthesis — replace static formatting if synthesizer is available

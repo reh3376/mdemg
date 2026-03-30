@@ -1,0 +1,39 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "jiminy.codegen",
+    "description": "Constraint code generator — creates short mnemonic kebab-case codes for Jiminy constraints",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "low",
+    "notes": "No system role — prompt is fully dynamic (user role only). Template injects constraintType, description, and existingCodes. Output is a single string, not JSON."
+  },
+  "prompt": {
+    "system_prompt_hash": "dynamic",
+    "system_prompt_source": "internal/jiminy/codegen.go:45",
+    "think_mode": false,
+    "dynamic_prompt": true
+  },
+  "performance": {
+    "latency_budget_ms": 3000,
+    "max_tokens": 100
+  },
+  "output_schema": {
+    "type": "string",
+    "description": "A short kebab-case constraint code (2-5 words)",
+    "pattern": "^[a-z0-9]+(-[a-z0-9]+){1,4}$"
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.2, "threshold": 1.0, "description": "Output is a parseable string" },
+    { "name": "syntax_valid", "weight": 0.8, "threshold": 0.9, "description": "Code follows kebab-case format, 2-5 words" }
+  ],
+  "reward_functions": ["format_valid", "uniqueness_check"],
+  "training_config": {
+    "rank": 4,
+    "min_examples": 200,
+    "quality_gate": 0.8
+  }
+}

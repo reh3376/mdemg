@@ -1,0 +1,30 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "embedding_event_logging",
+    "description": "Verify embedding event recording infrastructure for contrastive training data collection",
+    "type": "metrics"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "medium",
+    "notes": "Embedding events are written to embedding_events hypertable via EmbeddingEventWriter. Captures every Embed/EmbedBatch call with parser metadata, cache hit/miss status, and call site provenance for future embedding model fine-tuning."
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "mdemg_embedding_events_flushed_total",
+        "type": "counter",
+        "description": "Total embedding event records flushed to TSDB"
+      },
+      {
+        "name": "mdemg_embedding_events_buffer_size",
+        "type": "gauge",
+        "description": "Current embedding event write buffer size"
+      }
+    ],
+    "format_validation": true
+  }
+}

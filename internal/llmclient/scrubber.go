@@ -22,6 +22,11 @@ var (
 	neo4jCredPattern = regexp.MustCompile(`neo4j://[^:]+:[^@]+@`)
 )
 
+// ScrubString removes sensitive data from a single string.
+func ScrubString(s string) string {
+	return scrubText(s)
+}
+
 // Scrub removes sensitive data from an InteractionRecord before storage.
 func Scrub(rec *InteractionRecord) {
 	rec.SystemPrompt = scrubText(rec.SystemPrompt)

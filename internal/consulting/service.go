@@ -162,6 +162,12 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 	if s.embedder == nil {
 		return resp, fmt.Errorf("no embedding provider configured")
 	}
+	ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite:  "consult",
+		SpaceID:   req.SpaceID,
+		Tags:      req.Tags,
+		QueryText: queryText,
+	})
 	queryEmbedding, err := s.embedder.Embed(ctx, queryText)
 	if err != nil {
 		return resp, fmt.Errorf("failed to generate query embedding: %w", err)
@@ -568,6 +574,13 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 	if s.embedder == nil {
 		return resp, fmt.Errorf("no embedding provider configured")
 	}
+	ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite:  "consult.suggest",
+		SpaceID:   req.SpaceID,
+		FilePath:  req.FilePath,
+		Tags:      req.Tags,
+		QueryText: queryForEmbedding,
+	})
 	queryEmbedding, err := s.embedder.Embed(ctx, queryForEmbedding)
 	if err != nil {
 		return resp, fmt.Errorf("failed to generate context embedding: %w", err)
@@ -597,6 +610,20 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 		}
 	}
 	resp.Debug["filtered_count"] = len(filteredResults)
+
+	// Enrich context with RAFT retrieval context for training data
+	if len(filteredResults) > 0 {
+		nodeIDs := make([]string, len(filteredResults))
+		scores := make([]float64, len(filteredResults))
+		for i, r := range filteredResults {
+			nodeIDs[i] = r.NodeID
+			scores[i] = r.Score
+		}
+		ctx = llmclient.WithRetrievalContext(ctx, &llmclient.RetrievalContext{
+			NodeIDs: nodeIDs,
+			Scores:  scores,
+		})
+	}
 
 	// Step 5: Generate proactive suggestions
 	suggestions := s.generateProactiveSuggestions(ctx, req, filteredResults, triggers)

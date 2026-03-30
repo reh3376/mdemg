@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/embeddings"
 )
 
 // scopeClause returns a Cypher fragment that filters constraint nodes by scope.
@@ -116,6 +117,16 @@ func (g *GuardrailService) retrieveConstraints(ctx context.Context, spaceID stri
 // diffCtx is used for optional scope filtering (F7).
 // trustLevel is used for optional authority-level filtering (F20).
 func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary string, diffCtx DiffContext, trustLevel string) ([]constraintMatch, error) {
+	var filePath string
+	if len(diffCtx.FilePaths) > 0 {
+		filePath = diffCtx.FilePaths[0]
+	}
+	ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite:  "guardrail",
+		SpaceID:   spaceID,
+		FilePath:  filePath,
+		QueryText: summary,
+	})
 	embedding, err := g.embedder.Embed(ctx, summary)
 	if err != nil {
 		return nil, fmt.Errorf("embed diff summary: %w", err)

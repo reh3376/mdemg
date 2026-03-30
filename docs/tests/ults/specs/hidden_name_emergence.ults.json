@@ -1,0 +1,43 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "hidden.name_emergence",
+    "description": "Emergence namer — discovers and names emergent concepts from graph node clusters",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "medium",
+    "notes": "Names L3-L5 emergent concepts. Output must be valid JSON with concept name and description. Also has L5 variant (l5EmergenceSystemPrompt at line 97)."
+  },
+  "prompt": {
+    "system_prompt_hash": "bb90d13f0ae210ec0e916e5067aa7d9e3740f68e4f1c38bec21c7504b031a591",
+    "system_prompt_source": "internal/hidden/emergence_namer.go:82",
+    "think_mode": false,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 5000,
+    "max_tokens": 500
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+      "name": { "type": "string" },
+      "description": { "type": "string" },
+      "category": { "type": "string" }
+    }
+  },
+  "quality_metrics": [
+    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
+    { "name": "naming_quality", "weight": 0.7, "threshold": 0.5, "description": "Name is descriptive, concise, and captures the emergent concept" }
+  ],
+  "reward_functions": ["json_valid", "naming_quality_score"],
+  "training_config": {
+    "rank": 8,
+    "min_examples": 300,
+    "quality_gate": 0.6
+  }
+}

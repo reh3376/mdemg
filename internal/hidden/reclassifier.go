@@ -404,9 +404,7 @@ func (r *Reclassifier) proposeSubCategories(ctx context.Context, category string
 		return nil, err
 	}
 
-	// Strip markdown code fences if present
-	raw = llmclient.StripCodeFence(raw)
-	raw = strings.TrimSpace(raw)
+	raw = llmclient.SanitizeResponse(raw)
 
 	var subCats []SubCategory
 	if err := json.Unmarshal([]byte(raw), &subCats); err != nil {

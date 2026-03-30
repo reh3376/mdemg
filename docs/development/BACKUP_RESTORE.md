@@ -402,6 +402,27 @@ All endpoints return `503 Service Unavailable` when `BACKUP_ENABLED=false`.
 
 ---
 
+## 8. TSDB Backup (Training Data)
+
+TimescaleDB training data (LLM interactions, embedding events, retrieval events) is backed up separately from the Neo4j graph.
+
+| Command | Description |
+|---------|-------------|
+| `mdemg tsdb backup trigger` | Start a TSDB backup (JSONL export + pg_dump) |
+| `mdemg tsdb backup list` | List available TSDB backups |
+| `mdemg tsdb backup config` | Show TSDB backup configuration |
+| `mdemg tsdb backup restore <id>` | Restore a TSDB backup |
+
+TSDB backups include:
+- `llm_interactions` hypertable (all 26 columns including RAFT context)
+- `embedding_events` hypertable (parser metadata, call sites, privacy-scrubbed text)
+- `retrieval_events` hypertable (full pipeline scores for hard-negative mining)
+- JSONL training data tar from `.mdemg/neural/training-data/`
+
+Requires `TSDB_BACKUP_ENABLED=true` (default: true when TSDB is configured). See PR #215 for initial implementation.
+
+---
+
 ## Troubleshooting
 
 | Problem | Cause | Fix |

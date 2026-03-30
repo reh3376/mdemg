@@ -18,6 +18,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
 	"mdemg/internal/jobs"
 	"mdemg/internal/models"
@@ -402,7 +403,12 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		emb, err := s.embedder.Embed(r.Context(), req.QueryText)
+		rctx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+			CallSite:  "retrieve",
+			SpaceID:   req.SpaceID,
+			QueryText: req.QueryText,
+		})
+		emb, err := s.embedder.Embed(rctx, req.QueryText)
 		if err != nil {
 			writeInternalError(w, err, "embedding generation")
 			return
@@ -551,7 +557,13 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if textForEmbedding != "" {
-			emb, err := s.embedder.Embed(r.Context(), textForEmbedding)
+			ictx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+				CallSite: "ingest",
+				SpaceID:  req.SpaceID,
+				FilePath: req.Path,
+				Tags:     req.Tags,
+			})
+			emb, err := s.embedder.Embed(ictx, textForEmbedding)
 			if err != nil {
 				// Log but don't fail - embedding is optional
 				// slog.Warn("failed to generate embedding", "error", err)

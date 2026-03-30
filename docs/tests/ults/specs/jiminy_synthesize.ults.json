@@ -1,0 +1,39 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "jiminy.synthesize",
+    "description": "Guidance synthesizer — transforms filtered guidance items into cohesive narrative for agent prompt augmentation",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "priority": "critical",
+    "notes": "The synthesizer is the final LLM call in the Jiminy pipeline. Its output is injected directly into the agent's context. Quality here directly impacts agent behavior. Think mode enables deliberate synthesis."
+  },
+  "prompt": {
+    "system_prompt_hash": "8cf0ae2dbba97fcc627342e27653139b78bd1a04ce1a07556bb85c94a1937f39",
+    "system_prompt_source": "internal/jiminy/guidance_prompt.go:11",
+    "think_mode": true,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 10000,
+    "max_tokens": 2000
+  },
+  "output_schema": {
+    "type": "string",
+    "description": "Narrative guidance text for agent prompt augmentation"
+  },
+  "quality_metrics": [
+    { "name": "follow_rate", "weight": 0.4, "threshold": 0.6, "description": "Agent follows synthesized guidance in subsequent output" },
+    { "name": "coherence", "weight": 0.3, "threshold": 0.6, "description": "Guidance narrative is clear and logically structured" },
+    { "name": "specificity", "weight": 0.3, "threshold": 0.5, "description": "Guidance is specific and actionable, not generic" }
+  ],
+  "reward_functions": ["follow_rate", "coherence_score", "specificity_score"],
+  "training_config": {
+    "rank": 16,
+    "min_examples": 500,
+    "quality_gate": 0.7
+  }
+}

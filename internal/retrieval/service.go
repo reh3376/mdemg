@@ -18,14 +18,20 @@ import (
 )
 
 type Service struct {
-	cfg               config.Config
-	driver            neo4j.DriverWithContext
-	reasoningProvider ReasoningProvider
-	queryCache        *QueryCache
-	embeddingCache    *NodeEmbeddingCache // Cache for node embeddings (query-aware expansion)
-	cbRegistry        *circuitbreaker.Registry // Circuit breaker registry for external API calls
-	intentTranslator  IntentTranslator // Optional BM25 query rewriter
-	dataCollector     *DataCollector // Neural re-ranker training data collector (NR-1)
+	cfg                config.Config
+	driver             neo4j.DriverWithContext
+	reasoningProvider  ReasoningProvider
+	queryCache         *QueryCache
+	embeddingCache     *NodeEmbeddingCache       // Cache for node embeddings (query-aware expansion)
+	cbRegistry         *circuitbreaker.Registry   // Circuit breaker registry for external API calls
+	intentTranslator   IntentTranslator           // Optional BM25 query rewriter
+	dataCollector      *DataCollector             // Neural re-ranker training data collector (NR-1)
+	retrievalRecorder  RetrievalEventRecorder     // Optional retrieval event recorder for contrastive training data
+}
+
+// SetRetrievalRecorder attaches a retrieval event recorder for training data collection.
+func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
+	s.retrievalRecorder = r
 }
 
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
@@ -736,7 +742,57 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		slog.Info("query cache PUT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))], "cache_size", s.queryCache.Len())
 	}
 
+	// Record retrieval event for contrastive training data
+	s.recordRetrievalEvent(ctx, req, vectorCands, results, wasReranked, rerankLatencyMs, time.Since(start).Milliseconds())
+
 	return resp, nil
+}
+
+// recordRetrievalEvent sends a retrieval pipeline event to the recorder if one is set.
+func (s *Service) recordRetrievalEvent(ctx context.Context, req models.RetrieveRequest,
+	vectorCands []Candidate, results []models.RetrieveResult, wasReranked bool,
+	rerankLatencyMs float64, totalLatencyMs int64) {
+	if s.retrievalRecorder == nil {
+		return
+	}
+	// Build recall arrays
+	recallIDs := make([]string, len(vectorCands))
+	recallScores := make([]float64, len(vectorCands))
+	for i, c := range vectorCands {
+		recallIDs[i] = c.NodeID
+		recallScores[i] = c.VectorSim
+	}
+	// Build result arrays
+	resultIDs := make([]string, len(results))
+	resultScores := make([]float64, len(results))
+	for i, r := range results {
+		resultIDs[i] = r.NodeID
+		resultScores[i] = r.Score
+	}
+
+	event := RetrievalEvent{
+		Time:          time.Now(),
+		SpaceID:       req.SpaceID,
+		CallSite:      "retrieve",
+		QueryText:     req.QueryText,
+		QueryHash:     QueryHash(req.QueryText),
+		RecallNodeIDs: recallIDs,
+		RecallScores:  recallScores,
+		RecallK:       len(vectorCands),
+		ResultNodeIDs: resultIDs,
+		ResultScores:  resultScores,
+		ResultCount:   len(results),
+		TotalLatencyMs: int(totalLatencyMs), //nolint:gosec // narrowing int64→int is fine for ms values
+	}
+
+	if wasReranked {
+		event.RerankLatencyMs = int(rerankLatencyMs)
+		// Result IDs/scores post-rerank are already in resultIDs/resultScores
+		event.RerankNodeIDs = resultIDs
+		event.RerankScores = resultScores
+	}
+
+	s.retrievalRecorder.RecordRetrieval(ctx, event)
 }
 
 type Candidate struct {

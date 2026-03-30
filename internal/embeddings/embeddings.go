@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 // ErrNoProvider is returned when no embedding provider is configured.
@@ -57,7 +58,13 @@ type Config struct {
 type CachedEmbedder struct {
 	embedder Embedder
 	cache    *EmbeddingCache
+	recorder EmbeddingEventRecorder
 	debug    bool // Enable debug logging for cache hits/misses
+}
+
+// SetRecorder attaches an embedding event recorder for training data collection.
+func (c *CachedEmbedder) SetRecorder(r EmbeddingEventRecorder) {
+	c.recorder = r
 }
 
 // NewCachedEmbedder creates a new CachedEmbedder wrapping the given embedder.
@@ -97,6 +104,7 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 			}
 			slog.Debug("embedding cache hit", "text", truncated, "cache_size", c.cache.Len())
 		}
+		c.recordEvent(ctx, text, true, 0)
 		return cached, nil
 	}
 
@@ -109,15 +117,63 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 		slog.Debug("embedding cache miss", "text", truncated, "cache_size", c.cache.Len())
 	}
 
+	start := time.Now()
 	embedding, err := c.embedder.Embed(ctx, text)
+	latencyMs := int(time.Since(start).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
 
 	// Store in cache
 	c.cache.Put(cacheKey, embedding)
+	c.recordEvent(ctx, text, false, latencyMs)
 
 	return embedding, nil
+}
+
+// recordEvent sends an embedding event to the recorder if one is set.
+func (c *CachedEmbedder) recordEvent(ctx context.Context, text string, cached bool, latencyMs int) {
+	if c.recorder == nil {
+		return
+	}
+	meta := GetEmbeddingMeta(ctx)
+	event := EmbeddingEvent{
+		Time:        time.Now(),
+		TextContent: text,
+		TextHash:    TextHash(text),
+		TextLength:  len(text),
+		ModelName:   c.embedder.Name(),
+		Dimensions:  c.embedder.Dimensions(),
+		LatencyMs:   latencyMs,
+		Cached:      cached,
+	}
+	if meta != nil {
+		event.EventType = classifyEventType(meta.CallSite)
+		event.SpaceID = meta.SpaceID
+		event.ElementKind = meta.ElementKind
+		event.Language = meta.Language
+		event.FilePath = meta.FilePath
+		event.ChunkStart = meta.ChunkStart
+		event.ChunkEnd = meta.ChunkEnd
+		event.PackageName = meta.PackageName
+		event.Signature = meta.Signature
+		event.Tags = meta.Tags
+		event.CallSite = meta.CallSite
+		event.QueryText = meta.QueryText
+		event.NodeID = meta.NodeID
+	}
+	c.recorder.RecordEmbed(ctx, event)
+}
+
+func classifyEventType(callSite string) string {
+	switch callSite {
+	case "ingest":
+		return "ingest"
+	case "retrieve", "consult":
+		return "query"
+	default:
+		return "internal"
+	}
 }
 
 // EmbedBatch generates embeddings for multiple texts, using cache when possible.

@@ -43,7 +43,7 @@
 |-------|----------|---------|-------------|
 | `space_id` | Yes | - | Memory space identifier |
 | `query_text` | One of query_text/query_embedding | - | Natural language query (auto-embedded) |
-| `query_embedding` | One of query_text/query_embedding | - | Pre-computed embedding (1536 dims default) |
+| `query_embedding` | One of query_text/query_embedding | - | Pre-computed embedding (3072 dims default) |
 | `top_k` | No | 20 | Final results to return |
 | `candidate_k` | No | 200 | Vector recall candidates |
 | `hop_depth` | No | 2 | Graph expansion depth |
@@ -614,3 +614,15 @@ For final top-K nodes:
 - Multi-rate eta: `etaMult` varies by context (conversation 2×, config 1.5×, same-dir 1.2×)
 - Learning rate schedule: `η` scaled by space maturity (cold 2×, learning 1×, warm 0.5×, saturated 0.25×)
 - Negative feedback: `POST /v1/learning/negative-feedback` weakens or contradicts edges
+
+## Retrieval Event Logging (Training Data)
+
+Every retrieval pipeline execution is logged to the `retrieval_events` TimescaleDB hypertable for future embedding model fine-tuning. Captured data includes:
+
+- **Vector recall**: node IDs + cosine similarity scores
+- **BM25 fusion**: node IDs + BM25 scores
+- **Rerank**: node IDs + cross-encoder scores + model name
+- **Final results**: node IDs + composite scores + result count
+- **Correlation**: guidance_id, downstream quality signal, latency breakdown
+
+The gap between vector recall scores (high similarity) and rerank scores (low relevance) identifies **hard negatives** — the most valuable contrastive training signal for domain-specific embedding fine-tuning. See [Embedding & Retrieval Data Collection](../features/embedding-retrieval-data-collection.md).
