@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Docker Deployment — Phase 1 (DOCKER-P1)**:
+  - **Docker Compose consolidation**: Root `docker-compose.yml` rewritten with all 5 services (mdemg, neo4j, timescaledb, neural-sidecar, grafana). All ports parameterized via `.env`. Neo4j community edition (`neo4j:5`). No `container_name` directives for multi-instance isolation via `COMPOSE_PROJECT_NAME`. `neo4j-monitor` moved to `docker-compose.dev.yml`.
+  - **Docker image CI**: `.github/workflows/docker-publish.yml` — multi-arch (amd64/arm64) image build pushed to GHCR on release tags and main branch pushes. Uses GitHub Actions cache for layer reuse.
+  - **`mdemg init` is now Docker-first**: Default init flow checks Docker availability, scans 6 free host ports, generates `.env` with port assignments and credentials, creates `config.yaml` with Docker defaults, runs `docker compose up -d`, and waits for health check. Native init available via `--native` flag (dev-only).
+  - **Dockerfile.prod fix**: Healthcheck now uses `LISTEN_PORT` env var for portability across compose configurations.
+  - **`.env.example` updated**: Docker Deployment section added at top with `COMPOSE_PROJECT_NAME`, port variables.
+  - **Documentation**: `docs/user/quickstart-docker.md` (Docker deployment guide), `docs/user/mdemg_beta_testing.md` (unified cross-platform beta testing guide), `docs/quickstart.md` updated with Docker-first section. Dynamic port notes added to api-reference, cli-reference, ingestion-guide, cms-rsic-guide. `README.md` rewritten with Docker-first Quick Start.
+
 - **Service Resilience (SVC-RES Sprint)**:
   - **Hook Auto-Recovery**: session-start.sh auto-starts MDEMG server if down (10s polling cap within 15s hook timeout). prompt-context.sh shows visible "CMS unavailable" warning. All ingest operations log to `~/.mdemg/logs/ingest-claude-md.log`. TimescaleDB health check at session start.
   - **Ingest JSONL Buffer**: `mdemg ingest-claude-md` buffers locally to `.mdemg/ingest-buffer.jsonl` when server is unreachable. FIFO eviction at 100 entries (configurable via `INGEST_BUFFER_MAX_ENTRIES`). Automatic flush-on-reconnect.

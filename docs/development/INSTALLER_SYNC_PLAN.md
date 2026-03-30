@@ -4,6 +4,8 @@
 **Branch**: mdemg-dev01
 **Scope**: Bring homebrew-mdemg (Mac) and mdemg-windows (Windows) repos inline with current MDEMG codebase (v0.2.11, V0019 schema, 50+ CLI commands, 80+ API endpoints, 255+ env vars)
 
+> **Note (2026-03-30):** Docker Compose is now the primary (and only) deployment path. Docker image CI publishes to GHCR via `.github/workflows/docker-publish.yml`. Native platform installers are deprecated — the CLI binary is still distributed via Homebrew/APT/Scoop for running `mdemg init`, but the server always runs inside Docker. Phase 5 of the Docker deployment plan collapses the native installer deprecation into this change.
+
 ---
 
 ## Gap Summary

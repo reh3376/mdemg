@@ -4,7 +4,21 @@ This document covers the resilience mechanisms that prevent data loss when MDEMG
 
 ## Service Topology
 
-MDEMG runs as three supervised processes:
+### Docker Deployment (Primary)
+
+In Docker mode, all services run as containers with `restart: unless-stopped`. Docker handles process supervision, restart on crash, and startup ordering via `depends_on` with health checks. No LaunchAgent/systemd configuration is needed.
+
+| Service | Container | Supervision | Purpose |
+|---------|-----------|-------------|---------|
+| MDEMG Server | `mdemg` | `restart: unless-stopped` | HTTP API, CMS, RSIC, Jiminy, J17 |
+| Neo4j | `neo4j` | `restart: unless-stopped` | Graph database |
+| TimescaleDB | `timescaledb` | `restart: unless-stopped` | Time-series metrics |
+| Neural Sidecar | `neural-sidecar` | `restart: unless-stopped` | Reranking, NLI |
+| Grafana | `grafana` | `restart: unless-stopped` | Observability dashboards |
+
+### Native Deployment (Dev-Only)
+
+For native development, MDEMG runs as three supervised processes:
 
 | Service | Binary | Supervision | Purpose |
 |---------|--------|-------------|---------|

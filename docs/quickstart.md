@@ -2,12 +2,26 @@
 
 Get MDEMG running with your project in under 10 minutes.
 
+## Docker Deployment (Recommended)
+
+MDEMG runs as a Docker Compose stack. Docker Desktop is the only prerequisite.
+
+```bash
+brew install reh3376/mdemg/mdemg   # Install CLI
+cd /path/to/your/project
+mdemg init --quick                  # Docker Compose setup + start
+```
+
+See `docs/user/quickstart-docker.md` for the full Docker deployment guide including port configuration, multi-instance support, and Grafana dashboards.
+
+---
+
 ## Prerequisites
 
-- **Docker** — for Neo4j database
+- **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux)
 - **Embedding provider** (choose one):
-  - [Ollama](https://ollama.com) (local, free, recommended) — install and run `ollama pull qwen3-embedding:8b`
   - OpenAI API key — set `OPENAI_API_KEY` in your environment
+  - [Ollama](https://ollama.com) (local, free) — install and run `ollama pull qwen3-embedding:8b`
 
 ## Step 1: Install MDEMG
 

@@ -97,6 +97,20 @@ mdemg stop                          # End of day
 mdemg db stop                       # Optional: stop Neo4j too
 ```
 
-## Process Supervision
+## Docker Deployment (Primary)
 
-For persistent process supervision that survives reboots and auto-restarts on crash, see `docs/features/service-resilience.md` and `mdemg service install`.
+Docker Compose is the primary deployment method. All 5 services (mdemg, neo4j, timescaledb, neural-sidecar, grafana) run as containers with `restart: unless-stopped` for automatic recovery.
+
+```bash
+mdemg init --quick              # Initialize + start Docker stack
+docker compose ps               # Check service status
+docker compose logs -f mdemg    # Follow server logs
+docker compose restart          # Restart all services
+docker compose down             # Stop all services
+```
+
+Docker's `restart: unless-stopped` replaces LaunchAgent/systemd for server process supervision. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
+
+## Process Supervision (Native, Dev-Only)
+
+For native development builds (not Docker), persistent process supervision uses OS-level mechanisms. See `docs/features/service-resilience.md` and `mdemg service install`.
