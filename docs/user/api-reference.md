@@ -3634,9 +3634,9 @@ Graph metrics (node counts, edge counts, hub nodes, etc.).
 
 ---
 
-### GET /v1/prometheus
+### GET /v1/metrics/snapshot
 
-Prometheus-format metrics endpoint. Returns `text/plain` with Prometheus exposition format.
+Returns a JSON metrics snapshot including counters, gauges, and histograms from the MetricsRecorder. Metrics are persisted to TimescaleDB on each flush cycle.
 
 Includes:
 - HTTP request metrics (latency, status codes)
@@ -3646,10 +3646,40 @@ Includes:
 - Neo4j graph per-space metrics (nodes, edges, orphans, health score)
 - Neo4j container resource metrics (CPU, memory)
 - Memory pressure metrics
+- TSDB writer health
 
 ```bash
-curl -s http://localhost:9999/v1/prometheus
+curl -s http://localhost:9999/v1/metrics/snapshot
 ```
+
+**Response (200):**
+```json
+{
+  "data": {
+    "timestamp": "2026-03-29T12:00:00Z",
+    "counters": { "mdemg_http_requests_total": 1234 },
+    "gauges": { "mdemg_memory_heap_bytes": 52428800 },
+    "histograms": {
+      "mdemg_http_request_duration_seconds": {
+        "count": 500,
+        "sum": 12.5,
+        "buckets": { "0.01": 100, "0.05": 300, "0.1": 450 },
+        "p95": 0.085,
+        "p99": 0.12
+      }
+    },
+    "writer_health": {
+      "last_successful_write": "2026-03-29T11:59:30Z",
+      "consecutive_failures": 0,
+      "buffer_size": 0
+    }
+  }
+}
+```
+
+**Status Codes:** `200 OK`, `405 Method Not Allowed`, `503 Service Unavailable`
+
+> **Note:** The previous `/v1/prometheus` endpoint has been removed and returns `410 Gone`. Use `/v1/metrics/snapshot` instead.
 
 ---
 

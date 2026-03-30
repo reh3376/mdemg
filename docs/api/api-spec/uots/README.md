@@ -16,7 +16,7 @@ uots/
 
 | Type | Validates |
 |------|-----------|
-| `prometheus_metrics` | Metric presence, type, labels, value ranges on `/v1/prometheus` |
+| `prometheus_metrics` | Metric presence, type, labels, value ranges on `/v1/metrics/snapshot` |
 | `grafana_dashboard` | Dashboard JSON: UID, panels, queries, tags |
 | `alert_rules` | Prometheus alert YAML: names, severity, expressions, durations |
 | `log_format` | Structured log format compliance (future) |

@@ -657,7 +657,7 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/metrics` | Prometheus-style metrics |
-| GET | `/v1/prometheus` | Prometheus format metrics endpoint |
+| GET | `/v1/metrics/snapshot` | JSON metrics snapshot endpoint |
 | GET | `/v1/modules` | List modules |
 | POST | `/v1/modules/{id}` | Module sync |
 | GET/POST/PUT/DELETE | `/v1/plugins` | Plugin operations |

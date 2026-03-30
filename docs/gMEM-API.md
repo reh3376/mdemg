@@ -244,7 +244,7 @@ flowchart TB
 flowchart TB
   subgraph sys["System, plugins & monitoring"]
     x1["GET /v1/metrics<br/>Prometheus metrics"]
-    x2["GET /v1/prometheus<br/>Prometheus format"]
+    x2["GET /v1/metrics/snapshot<br/>JSON metrics snapshot"]
     x3["GET /v1/modules<br/>List modules"]
     x4["POST /v1/modules/id<br/>Module sync"]
     x5["GET /v1/plugins<br/>List plugins"]

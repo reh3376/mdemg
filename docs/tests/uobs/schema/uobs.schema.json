@@ -31,11 +31,11 @@
     },
     "metrics": {
       "type": "object",
-      "description": "Prometheus metrics validation",
+      "description": "Metrics snapshot validation",
       "properties": {
         "endpoint": {
           "type": "string",
-          "default": "/v1/prometheus"
+          "default": "/v1/metrics/snapshot"
         },
         "required_metrics": {
           "type": "array",

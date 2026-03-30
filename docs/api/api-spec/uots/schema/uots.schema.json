@@ -41,7 +41,7 @@
       "properties": {
         "endpoint": {
           "type": "string",
-          "description": "HTTP path for metrics endpoints (e.g. /v1/prometheus)"
+          "description": "HTTP path for metrics endpoints (e.g. /v1/metrics/snapshot)"
         },
         "method": {
           "type": "string",

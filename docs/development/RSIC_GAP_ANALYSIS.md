@@ -1,5 +1,7 @@
 # RSIC Gap Analysis and Hardening Plan
 
+> **Note (2026-03-29):** This analysis predates the TimescaleDB migration (PRs #211-#215). Prometheus references in this document refer to the pre-migration architecture. Current metrics infrastructure uses TimescaleDB with Grafana alerting.
+
 Last updated: 2026-02-19
 
 ## Purpose

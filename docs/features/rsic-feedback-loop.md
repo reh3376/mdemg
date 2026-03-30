@@ -74,7 +74,7 @@ When `criteria_met` is false, the cycle checks whether any dispatched actions ar
 
 For reversible actions, the cycle looks up their snapshot in `SnapshotStore` and calls `Rollback()`, restoring the pre-action state. Irreversible actions are logged as `completed_no_benefit`.
 
-Rollback events emit the `mdemg_rsic_rollbacks_total` Prometheus counter with `{action, reason}` labels.
+Rollback events emit the `mdemg_rsic_rollbacks_total` counter with `{action, reason}` labels. Metrics are exposed via `/v1/metrics/snapshot` and persisted in TimescaleDB.
 
 ## Configuration
 
