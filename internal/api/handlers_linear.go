@@ -127,7 +127,7 @@ func (s *Server) handleLinearIssueCreate(ctx context.Context, w http.ResponseWri
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.issue.create")
 		} else {
 			writeInternalError(w, err, "linear.issue.create")
 		}
@@ -148,7 +148,7 @@ func (s *Server) handleLinearIssueRead(ctx context.Context, w http.ResponseWrite
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.issue.read")
 		} else {
 			writeInternalError(w, err, "linear.issue.read")
 		}
@@ -200,7 +200,7 @@ func (s *Server) handleLinearIssueList(ctx context.Context, w http.ResponseWrite
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.issue.list")
 		} else {
 			writeInternalError(w, err, "linear.issue.list")
 		}
@@ -236,7 +236,7 @@ func (s *Server) handleLinearIssueUpdate(ctx context.Context, w http.ResponseWri
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.issue.update")
 		} else {
 			writeInternalError(w, err, "linear.issue.update")
 		}
@@ -257,7 +257,7 @@ func (s *Server) handleLinearIssueDelete(ctx context.Context, w http.ResponseWri
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.issue.delete")
 		} else {
 			writeInternalError(w, err, "linear.issue.delete")
 		}
@@ -332,7 +332,7 @@ func (s *Server) handleLinearProjectCreate(ctx context.Context, w http.ResponseW
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.project.create")
 		} else {
 			writeInternalError(w, err, "linear.project.create")
 		}
@@ -353,7 +353,7 @@ func (s *Server) handleLinearProjectRead(ctx context.Context, w http.ResponseWri
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.project.read")
 		} else {
 			writeInternalError(w, err, "linear.project.read")
 		}
@@ -396,7 +396,7 @@ func (s *Server) handleLinearProjectList(ctx context.Context, w http.ResponseWri
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.project.list")
 		} else {
 			writeInternalError(w, err, "linear.project.list")
 		}
@@ -432,7 +432,7 @@ func (s *Server) handleLinearProjectUpdate(ctx context.Context, w http.ResponseW
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.project.update")
 		} else {
 			writeInternalError(w, err, "linear.project.update")
 		}
@@ -484,7 +484,7 @@ func (s *Server) handleLinearComments(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if isLinearUnavailableError(err.Error()) {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error()})
+			writeServiceUnavailableError(w, err, "linear.comment.create")
 		} else {
 			writeInternalError(w, err, "linear.comment.create")
 		}

@@ -32,11 +32,19 @@ data:
   # Authentication
   AUTH_ENABLED: "true"
   AUTH_MODE: "apikey"
-  AUTH_SKIP_ENDPOINTS: "/healthz,/readyz,/v1/prometheus"
+  AUTH_SKIP_ENDPOINTS: "/healthz,/readyz,/v1/metrics/snapshot"
 
   # Metrics
   METRICS_ENABLED: "true"
   METRICS_NAMESPACE: "mdemg"
+
+  # TimescaleDB
+  TSDB_ENABLED: "true"
+  TSDB_DSN: "postgres://mdemg:$(TSDB_PASSWORD)@timescaledb:5432/mdemg_metrics?sslmode=disable"
+
+  # Neural sidecar (J17 protocol)
+  J17_SIDECAR_URL: "http://neural-sidecar:8000"
+  J17_SIDECAR_MODE: "shadow"
 
   # Compression
   COMPRESSION_ENABLED: "true"

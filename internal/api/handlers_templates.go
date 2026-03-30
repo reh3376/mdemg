@@ -87,7 +87,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 
 	templates, err := s.templateService.ListTemplates(r.Context(), spaceID)
 	if err != nil {
-		http.Error(w, "Failed to list templates: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "template.list")
 		return
 	}
 
@@ -107,7 +107,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateTemplate(w http.ResponseWriter, r *http.Request) {
 	var req CreateTemplateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (s *Server) handleCreateTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templateService.CreateTemplate(r.Context(), template); err != nil {
-		http.Error(w, "Failed to create template: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "template.create")
 		return
 	}
 
@@ -156,7 +156,7 @@ func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request, templ
 
 	template, err := s.templateService.GetTemplate(r.Context(), spaceID, templateID)
 	if err != nil {
-		http.Error(w, "Failed to get template: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "template.get")
 		return
 	}
 	if template == nil {
@@ -171,7 +171,7 @@ func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request, templ
 func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request, templateID string) {
 	var req CreateTemplateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -202,7 +202,7 @@ func (s *Server) handleUpdateTemplate(w http.ResponseWriter, r *http.Request, te
 			http.Error(w, "Template not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Failed to update template: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "template.update")
 		return
 	}
 
@@ -228,7 +228,7 @@ func (s *Server) handleDeleteTemplate(w http.ResponseWriter, r *http.Request, te
 			http.Error(w, "Template not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Failed to delete template: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "template.delete")
 		return
 	}
 

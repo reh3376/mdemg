@@ -23,7 +23,7 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
-        prometheus.io/path: "/v1/prometheus"
+        prometheus.io/path: "/v1/metrics/snapshot"
     spec:
       serviceAccountName: mdemg
       securityContext:
@@ -71,6 +71,21 @@ spec:
                 secretKeyRef:
                   name: mdemg-secrets
                   key: api-keys
+            - name: J17_SIDECAR_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mdemg-config
+                  key: J17_SIDECAR_URL
+            - name: J17_SIDECAR_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: mdemg-config
+                  key: J17_SIDECAR_MODE
+            - name: TSDB_DSN
+              valueFrom:
+                configMapKeyRef:
+                  name: mdemg-config
+                  key: TSDB_DSN
           envFrom:
             - configMapRef:
                 name: mdemg-config

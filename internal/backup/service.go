@@ -243,30 +243,42 @@ func (s *Service) queryNodeEdgeCounts(ctx context.Context) (int64, int64, error)
 
 	var nodeCount, edgeCount int64
 
-	result, qErr := session.Run(ctx,
-		"MATCH (n:MemoryNode) RETURN count(n) AS nodes",
-		nil,
-	)
+	nodeRecords, qErr := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			"MATCH (n:MemoryNode) RETURN count(n) AS nodes",
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if qErr != nil {
 		return 0, 0, qErr
 	}
-	if result.Next(ctx) {
-		if v, ok := result.Record().Get("nodes"); ok {
+	for _, rec := range nodeRecords.([]*neo4j.Record) {
+		if v, ok := rec.Get("nodes"); ok {
 			if n, ok := v.(int64); ok {
 				nodeCount = n
 			}
 		}
 	}
 
-	result2, qErr2 := session.Run(ctx,
-		"MATCH ()-[r]->() RETURN count(r) AS edges",
-		nil,
-	)
+	edgeRecords, qErr2 := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			"MATCH ()-[r]->() RETURN count(r) AS edges",
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if qErr2 != nil {
 		return 0, 0, qErr2
 	}
-	if result2.Next(ctx) {
-		if v, ok := result2.Record().Get("edges"); ok {
+	for _, rec := range edgeRecords.([]*neo4j.Record) {
+		if v, ok := rec.Get("edges"); ok {
 			if n, ok := v.(int64); ok {
 				edgeCount = n
 			}
@@ -281,17 +293,23 @@ func (s *Service) queryAllSpaceIDs(ctx context.Context) ([]string, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		"MATCH (n:MemoryNode) WHERE n.space_id IS NOT NULL RETURN DISTINCT n.space_id AS sid ORDER BY sid",
-		nil,
-	)
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			"MATCH (n:MemoryNode) WHERE n.space_id IS NOT NULL RETURN DISTINCT n.space_id AS sid ORDER BY sid",
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var spaces []string
-	for result.Next(ctx) {
-		if v, ok := result.Record().Get("sid"); ok {
+	for _, rec := range records.([]*neo4j.Record) {
+		if v, ok := rec.Get("sid"); ok {
 			if s, ok := v.(string); ok {
 				spaces = append(spaces, s)
 			}
@@ -305,15 +323,21 @@ func (s *Service) querySchemaVersion(ctx context.Context) (int, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		"MATCH (m:SchemaMeta) RETURN m.version AS v ORDER BY m.version DESC LIMIT 1",
-		nil,
-	)
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			"MATCH (m:SchemaMeta) RETURN m.version AS v ORDER BY m.version DESC LIMIT 1",
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return 0, err
 	}
-	if result.Next(ctx) {
-		if v, ok := result.Record().Get("v"); ok {
+	for _, rec := range records.([]*neo4j.Record) {
+		if v, ok := rec.Get("v"); ok {
 			switch val := v.(type) {
 			case int64:
 				return int(val), nil

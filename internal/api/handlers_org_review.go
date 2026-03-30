@@ -32,7 +32,7 @@ func (s *Server) handleFlagForOrgReview(w http.ResponseWriter, r *http.Request) 
 		SuggestedVisibility string `json:"suggested_visibility,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -55,7 +55,7 @@ func (s *Server) handleFlagForOrgReview(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Observation not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Failed to flag for review: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "org_review.flag")
 		return
 	}
 
@@ -97,7 +97,7 @@ func (s *Server) handleListOrgReviews(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.orgReviewService.ListPendingReviews(r.Context(), req)
 	if err != nil {
-		http.Error(w, "Failed to list reviews: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "org_review.list")
 		return
 	}
 
@@ -129,7 +129,7 @@ func (s *Server) handleOrgReviewDecision(w http.ResponseWriter, r *http.Request)
 		Notes      string `json:"notes,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -158,7 +158,7 @@ func (s *Server) handleOrgReviewDecision(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Observation not found or not pending review", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Failed to process decision: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "org_review.decision")
 		return
 	}
 
@@ -181,7 +181,7 @@ func (s *Server) handleOrgReviewStats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := s.orgReviewService.GetReviewStats(r.Context(), spaceID)
 	if err != nil {
-		http.Error(w, "Failed to get stats: "+err.Error(), http.StatusInternalServerError)
+		writeInternalError(w, err, "org_review.stats")
 		return
 	}
 

@@ -44,39 +44,45 @@ func (s *Server) handleAdminSpaces(w http.ResponseWriter, r *http.Request) {
 	// Two-pass query: first collect all distinct space_ids from both TapRoots
 	// and MemoryNodes, then enrich with TapRoot metadata and node counts.
 	// This catches orphan spaces that have MemoryNodes but no TapRoot.
-	result, err := session.Run(ctx, `
-		CALL {
-			MATCH (t:TapRoot) RETURN t.space_id AS sid
-			UNION
-			MATCH (n:MemoryNode) WHERE n.space_id IS NOT NULL RETURN DISTINCT n.space_id AS sid
+	collected, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			CALL {
+				MATCH (t:TapRoot) RETURN t.space_id AS sid
+				UNION
+				MATCH (n:MemoryNode) WHERE n.space_id IS NOT NULL RETURN DISTINCT n.space_id AS sid
+			}
+			WITH DISTINCT sid
+			OPTIONAL MATCH (t:TapRoot {space_id: sid})
+			OPTIONAL MATCH (n:MemoryNode {space_id: sid})
+			WITH sid, t, count(n) AS node_count
+			OPTIONAL MATCH (o:MemoryNode {space_id: sid})
+			WHERE o.role_type = 'conversation_observation'
+			WITH sid, t, node_count, count(o) AS obs_count
+			RETURN sid AS space_id,
+			       coalesce(t.prunable, false) AS prunable,
+			       toString(t.created_at) AS created_at,
+			       toString(t.last_ingest_at) AS last_ingest_at,
+			       coalesce(t.ingest_count, 0) AS ingest_count,
+			       node_count, obs_count,
+			       t IS NULL AS orphan_taproot
+			ORDER BY sid
+			LIMIT $limit
+		`, map[string]any{"limit": limit})
+		if err != nil {
+			return nil, err
 		}
-		WITH DISTINCT sid
-		OPTIONAL MATCH (t:TapRoot {space_id: sid})
-		OPTIONAL MATCH (n:MemoryNode {space_id: sid})
-		WITH sid, t, count(n) AS node_count
-		OPTIONAL MATCH (o:MemoryNode {space_id: sid})
-		WHERE o.role_type = 'conversation_observation'
-		WITH sid, t, node_count, count(o) AS obs_count
-		RETURN sid AS space_id,
-		       coalesce(t.prunable, false) AS prunable,
-		       toString(t.created_at) AS created_at,
-		       toString(t.last_ingest_at) AS last_ingest_at,
-		       coalesce(t.ingest_count, 0) AS ingest_count,
-		       node_count, obs_count,
-		       t IS NULL AS orphan_taproot
-		ORDER BY sid
-		LIMIT $limit
-	`, map[string]any{"limit": limit})
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		writeInternalError(w, err, "admin-spaces-list")
 		return
 	}
 
+	records := collected.([]*neo4j.Record)
 	var spaces []models.SpaceInfo
 	prunableCount := 0
 
-	for result.Next(ctx) {
-		rec := result.Record()
+	for _, rec := range records {
 		spaceID, _ := rec.Get("space_id")
 		prunable, _ := rec.Get("prunable")
 		createdAt, _ := rec.Get("created_at")
@@ -163,20 +169,27 @@ func (s *Server) handleAdminSpaceUpdate(w http.ResponseWriter, r *http.Request) 
 	defer session.Close(ctx)
 
 	// Check TapRoot exists, then update
-	result, err := session.Run(ctx, `
-		MATCH (t:TapRoot {space_id: $spaceId})
-		SET t.prunable = $prunable
-		RETURN t.space_id AS space_id, t.prunable AS prunable
-	`, map[string]any{
-		"spaceId":  spaceID,
-		"prunable": *req.Prunable,
+	collected, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			MATCH (t:TapRoot {space_id: $spaceId})
+			SET t.prunable = $prunable
+			RETURN t.space_id AS space_id, t.prunable AS prunable
+		`, map[string]any{
+			"spaceId":  spaceID,
+			"prunable": *req.Prunable,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
 	})
 	if err != nil {
 		writeInternalError(w, err, "admin-space-update")
 		return
 	}
 
-	if !result.Next(ctx) {
+	records := collected.([]*neo4j.Record)
+	if len(records) == 0 {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": fmt.Sprintf("space %q not found", spaceID),
 		})
@@ -221,33 +234,39 @@ func (s *Server) handleAdminSpacePrune(w http.ResponseWriter, r *http.Request) {
 		session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		defer session.Close(ctx)
 
-		result, err := session.Run(ctx, `
-			CALL {
-				MATCH (t:TapRoot) WHERE coalesce(t.prunable, false) = true
-				RETURN t.space_id AS sid
-				UNION
-				MATCH (n:MemoryNode)
-				WHERE n.space_id IS NOT NULL AND NOT EXISTS { MATCH (t:TapRoot {space_id: n.space_id}) }
-				RETURN DISTINCT n.space_id AS sid
+		collected, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, `
+				CALL {
+					MATCH (t:TapRoot) WHERE coalesce(t.prunable, false) = true
+					RETURN t.space_id AS sid
+					UNION
+					MATCH (n:MemoryNode)
+					WHERE n.space_id IS NOT NULL AND NOT EXISTS { MATCH (t:TapRoot {space_id: n.space_id}) }
+					RETURN DISTINCT n.space_id AS sid
+				}
+				WITH DISTINCT sid
+				OPTIONAL MATCH (n:MemoryNode {space_id: sid})
+				WITH sid, count(n) AS node_count
+				RETURN sid AS space_id, node_count
+				ORDER BY sid
+				LIMIT $maxSpaces
+			`, map[string]any{"maxSpaces": req.MaxSpaces})
+			if err != nil {
+				return nil, err
 			}
-			WITH DISTINCT sid
-			OPTIONAL MATCH (n:MemoryNode {space_id: sid})
-			WITH sid, count(n) AS node_count
-			RETURN sid AS space_id, node_count
-			ORDER BY sid
-			LIMIT $maxSpaces
-		`, map[string]any{"maxSpaces": req.MaxSpaces})
+			return result.Collect(ctx)
+		})
 		if err != nil {
 			writeInternalError(w, err, "admin-prune-list")
 			return
 		}
 
+		records := collected.([]*neo4j.Record)
 		resp := models.AdminSpacePruneResponse{
 			DryRun:  true,
 			Results: []models.SpacePruneResult{},
 		}
-		for result.Next(ctx) {
-			rec := result.Record()
+		for _, rec := range records {
 			sid, _ := rec.Get("space_id")
 			nc, _ := rec.Get("node_count")
 			spaceID := toString(sid)
@@ -287,37 +306,42 @@ func (s *Server) runAutoSpacePrune() (int, int, int) {
 	defer cancel()
 
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, `
-		CALL {
-			MATCH (t:TapRoot) WHERE coalesce(t.prunable, false) = true
-			RETURN t.space_id AS sid
-			UNION
-			MATCH (n:MemoryNode)
-			WHERE n.space_id IS NOT NULL AND NOT EXISTS { MATCH (t:TapRoot {space_id: n.space_id}) }
-			RETURN DISTINCT n.space_id AS sid
+	collected, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, `
+			CALL {
+				MATCH (t:TapRoot) WHERE coalesce(t.prunable, false) = true
+				RETURN t.space_id AS sid
+				UNION
+				MATCH (n:MemoryNode)
+				WHERE n.space_id IS NOT NULL AND NOT EXISTS { MATCH (t:TapRoot {space_id: n.space_id}) }
+				RETURN DISTINCT n.space_id AS sid
+			}
+			WITH DISTINCT sid
+			RETURN sid AS space_id
+			ORDER BY sid
+			LIMIT 50
+		`, nil)
+		if err != nil {
+			return nil, err
 		}
-		WITH DISTINCT sid
-		RETURN sid AS space_id
-		ORDER BY sid
-		LIMIT 50
-	`, nil)
+		return result.Collect(ctx)
+	})
 	if err != nil {
-		session.Close(ctx)
 		slog.Error("auto-prune: candidate query failed", "error", err)
 		return 0, 0, 1
 	}
 
+	records := collected.([]*neo4j.Record)
 	var candidates []string
-	for result.Next(ctx) {
-		rec := result.Record()
+	for _, rec := range records {
 		sid, _ := rec.Get("space_id")
 		spaceID := toString(sid)
 		if !IsProtectedSpace(spaceID) {
 			candidates = append(candidates, spaceID)
 		}
 	}
-	session.Close(ctx)
 
 	if len(candidates) == 0 {
 		return 0, 0, 0

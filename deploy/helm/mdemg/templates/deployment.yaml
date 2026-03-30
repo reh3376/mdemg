@@ -72,6 +72,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "mdemg.secretName" . }}
                   key: api-keys
+            - name: J17_SIDECAR_URL
+              value: {{ .Values.config.j17SidecarURL | quote }}
+            - name: J17_SIDECAR_MODE
+              value: {{ .Values.config.j17SidecarMode | quote }}
+            - name: TSDB_DSN
+              value: {{ .Values.config.tsdbDSN | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "mdemg.fullname" . }}-config

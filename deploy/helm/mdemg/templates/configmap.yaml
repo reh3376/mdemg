@@ -83,3 +83,11 @@ data:
 
   # Plugin system
   PLUGINS_ENABLED: {{ .Values.config.pluginsEnabled | quote }}
+
+  # TimescaleDB
+  TSDB_ENABLED: {{ .Values.config.tsdbEnabled | quote }}
+  TSDB_DSN: {{ .Values.config.tsdbDSN | quote }}
+
+  # Neural sidecar (J17 protocol)
+  J17_SIDECAR_URL: {{ .Values.config.j17SidecarURL | quote }}
+  J17_SIDECAR_MODE: {{ .Values.config.j17SidecarMode | quote }}

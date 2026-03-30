@@ -286,7 +286,7 @@ Health, metrics, and diagnostics.
 - `GET /v1/embedding/health` — Embedding provider health
 - `GET /v1/metrics` — Internal metrics
 - `GET /v1/metrics/determinism` — Retrieval determinism score
-- `GET /v1/prometheus` — Prometheus metrics export
+- `GET /v1/metrics/snapshot` — JSON metrics snapshot
 - `GET /v1/neo4j/overview` — Neo4j connection and index stats
 
 #### Neural Sidecar (3 endpoints)
@@ -812,7 +812,7 @@ Lower-frequency operations and specialized subsystems. All accessible via comman
 - Determinism score
 - Cache stats
 - Stale edge stats
-- Prometheus-formatted metrics (rendered as human-readable summary)
+- JSON metrics snapshot (rendered as human-readable summary)
 
 Auto-refreshes every 30 seconds while the float is open.
 

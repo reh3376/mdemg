@@ -1,0 +1,46 @@
+{{- if .Values.neuralSidecar.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mdemg.fullname" . }}-neural-sidecar
+  labels:
+    {{- include "mdemg.labels" . | nindent 4 }}
+    app.kubernetes.io/component: j17-protocol
+spec:
+  replicas: {{ .Values.neuralSidecar.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "mdemg.name" . }}-neural-sidecar
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "mdemg.name" . }}-neural-sidecar
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: neural-sidecar
+          image: "{{ .Values.neuralSidecar.image.repository }}:{{ .Values.neuralSidecar.image.tag }}"
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: NEURAL_RERANK_MODEL
+              value: {{ .Values.neuralSidecar.env.rerankModel | quote }}
+            - name: NEURAL_NLI_MODEL
+              value: {{ .Values.neuralSidecar.env.nliModel | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.neuralSidecar.resources | nindent 12 }}
+{{- end }}

@@ -788,6 +788,7 @@ type Config struct {
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
 	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 4)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
+	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -3101,6 +3102,7 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	tsdbOptional := getBool("TSDB_OPTIONAL", true)
+	llmInteractionLogging := getBool("LLM_INTERACTION_LOGGING", true)
 
 	// Live Metrics settings
 	liveMetricsEnabled := getBool("LIVE_METRICS_ENABLED", true)
@@ -3715,6 +3717,7 @@ func FromEnv() (Config, error) {
 		TSDBHourlyRetentionDays:   tsdbHourlyRetentionDays,
 		TSDBRequiredSchemaVersion: tsdbRequiredSchemaVersion,
 		TSDBOptional:              tsdbOptional,
+		LLMInteractionLogging:     llmInteractionLogging,
 
 		// Live Metrics
 		LiveMetricsEnabled:     liveMetricsEnabled,

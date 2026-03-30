@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -23,7 +22,7 @@ func (s *Server) handleNegativeFeedback(w http.ResponseWriter, r *http.Request) 
 		RejectedNodeIDs []string `json:"rejected_node_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -42,8 +41,7 @@ func (s *Server) handleNegativeFeedback(w http.ResponseWriter, r *http.Request) 
 
 	result, err := s.learner.ApplyNegativeFeedback(r.Context(), req.SpaceID, req.QueryNodeIDs, req.RejectedNodeIDs)
 	if err != nil {
-		slog.Error("negative feedback failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "learning.negative_feedback")
 		return
 	}
 
@@ -76,8 +74,7 @@ func (s *Server) handleFrontierDetection(w http.ResponseWriter, r *http.Request)
 
 	frontiers, err := s.queryFrontiers(r.Context(), spaceID, limit)
 	if err != nil {
-		slog.Error("frontier detection failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "learning.frontier_detection")
 		return
 	}
 

@@ -2676,13 +2676,40 @@ Identify frontier nodes — L3+ concepts with sufficient evidence but low outgoi
 
 **Config**: `FRONTIER_MIN_EVIDENCE` (default 3), `FRONTIER_MAX_OUTGOING` (default 2).
 
-### GET /v1/prometheus
+### GET /v1/metrics/snapshot
 
-Prometheus-format metrics endpoint. Returns `text/plain` in Prometheus exposition format.
+JSON metrics snapshot endpoint. Returns all registered counters, gauges, and histograms from the MetricsRecorder, plus TSDB writer health.
 
 Includes: circuit breaker metrics, cache hit ratios, Neo4j connection pool stats, per-space graph metrics, container resource metrics, and memory pressure metrics.
 
 **Configuration**: `METRICS_ENABLED=true` required.
+
+> **Note:** The previous `/v1/prometheus` endpoint has been removed and returns `410 Gone`.
+
+### GET /v1/jiminy/protocol/status
+
+Returns the current J17 protocol status for a session: trust score, current tier, feedback count, and enabled state.
+
+**Query Parameters**:
+
+- `session_id` (required): The session to query
+
+**Response**:
+
+```json
+{
+  "data": {
+    "session_id": "claude-core",
+    "trust_score": 0.65,
+    "tier": "T2",
+    "feedback_count": 4,
+    "last_feedback_at": "2026-03-29T10:30:00Z",
+    "enabled": true
+  }
+}
+```
+
+**Errors**: 400 (missing `session_id`), 405 (wrong method), 503 (Jiminy not enabled).
 
 ### GET /v1/memory/edges/stale/stats?space_id={space_id}
 

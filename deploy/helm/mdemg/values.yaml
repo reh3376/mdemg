@@ -20,7 +20,7 @@ serviceAccount:
 podAnnotations:
   prometheus.io/scrape: "true"
   prometheus.io/port: "8080"
-  prometheus.io/path: "/v1/prometheus"
+  prometheus.io/path: "/v1/metrics/snapshot"
 
 podSecurityContext:
   runAsNonRoot: true
@@ -124,7 +124,7 @@ config:
   # Authentication
   authEnabled: true
   authMode: "apikey"
-  authSkipEndpoints: "/healthz,/readyz,/v1/prometheus"
+  authSkipEndpoints: "/healthz,/readyz,/v1/metrics/snapshot"
 
   # CORS
   corsEnabled: false
@@ -167,6 +167,14 @@ config:
   # Plugins
   pluginsEnabled: false
 
+  # TimescaleDB
+  tsdbEnabled: true
+  tsdbDSN: "postgres://mdemg:$(TSDB_PASSWORD)@timescaledb:5432/mdemg_metrics?sslmode=disable"
+
+  # Neural sidecar (J17 protocol)
+  j17SidecarURL: "http://neural-sidecar:8000"
+  j17SidecarMode: "shadow"
+
 # Secrets (reference existing secrets or create)
 secrets:
   create: false
@@ -182,6 +190,39 @@ secrets:
 neo4j:
   enabled: false
   # Configure neo4j subchart values here if enabled
+
+# TimescaleDB configuration
+timescaledb:
+  enabled: true
+  image:
+    repository: timescale/timescaledb
+    tag: "2.25.1-pg16"
+  storage: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# Neural sidecar (J17 protocol) configuration
+neuralSidecar:
+  enabled: true
+  image:
+    repository: mdemg/neural-sidecar
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    rerankModel: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    nliModel: "cross-encoder/nli-MiniLM2-L6-H768"
 
 # Prometheus ServiceMonitor
 serviceMonitor:

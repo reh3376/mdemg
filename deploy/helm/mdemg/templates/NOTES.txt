@@ -24,9 +24,9 @@
 2. Check the health status:
   kubectl --namespace {{ .Release.Namespace }} exec -it deploy/{{ include "mdemg.fullname" . }} -- wget -qO- http://localhost:8080/healthz
 
-3. View Prometheus metrics:
+3. View metrics snapshot:
   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "mdemg.fullname" . }} 8080:{{ .Values.service.port }}
-  curl http://localhost:8080/v1/prometheus
+  curl http://localhost:8080/v1/metrics/snapshot
 
 {{- if not .Values.secrets.create }}
 

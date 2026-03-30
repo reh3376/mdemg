@@ -136,11 +136,19 @@ func (s *Server) handleListSkills(w http.ResponseWriter, r *http.Request) {
 		RETURN o.tags AS tags, o.content AS content
 	`
 
-	result, err := session.Run(ctx, query, map[string]any{"space_id": spaceID})
+	collected, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, query, map[string]any{"space_id": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		writeInternalError(w, err, "list skills")
 		return
 	}
+
+	records := collected.([]*neo4j.Record)
 
 	// Group by skill name
 	type skillData struct {
@@ -150,8 +158,7 @@ func (s *Server) handleListSkills(w http.ResponseWriter, r *http.Request) {
 	}
 	skills := make(map[string]*skillData)
 
-	for result.Next(ctx) {
-		record := result.Record()
+	for _, record := range records {
 		tagsRaw, _ := record.Get("tags")
 		contentRaw, _ := record.Get("content")
 		content, _ := contentRaw.(string)
@@ -198,11 +205,6 @@ func (s *Server) handleListSkills(w http.ResponseWriter, r *http.Request) {
 				sd.sections[parts[2]] = true
 			}
 		}
-	}
-
-	if err := result.Err(); err != nil {
-		writeInternalError(w, err, "list skills")
-		return
 	}
 
 	// Build response
@@ -272,19 +274,25 @@ func (s *Server) handleSkillRecall(w http.ResponseWriter, r *http.Request, name 
 		LIMIT $topK
 	`
 
-	result, err := session.Run(ctx, cypher, map[string]any{
-		"spaceId":   req.SpaceID,
-		"tagFilter": tagFilter,
-		"topK":      topK,
+	collected, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":   req.SpaceID,
+			"tagFilter": tagFilter,
+			"topK":      topK,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
 	})
 	if err != nil {
 		writeInternalError(w, err, "skill recall")
 		return
 	}
 
+	records := collected.([]*neo4j.Record)
 	apiResults := make([]models.RecallResult, 0)
-	for result.Next(ctx) {
-		rec := result.Record()
+	for _, rec := range records {
 		nodeID, _ := rec.Get("nodeId")
 		content, _ := rec.Get("content")
 		summary, _ := rec.Get("summary")
@@ -303,11 +311,6 @@ func (s *Server) handleSkillRecall(w http.ResponseWriter, r *http.Request, name 
 			Score:   1.0, // Direct tag match = perfect relevance
 			Layer:   0,
 		})
-	}
-
-	if err := result.Err(); err != nil {
-		writeInternalError(w, err, "skill recall")
-		return
 	}
 
 	writeJSON(w, http.StatusOK, SkillRecallResponse{

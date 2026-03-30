@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sidecar Not Monitored by MDEMG**: Health prober, RSIC reflection, readyz endpoint, and watchdog were all unaware of sidecar status. Added: `probeSidecar()` to health prober, `sidecar_unhealthy` reflection pattern (#21) with `alert_sidecar_down` action, `neural_sidecar` readyz check (degraded, not blocking), watchdog `sidecar-unhealthy` anomaly detection, `IsSidecarHealthy()` on WatchdogSignalProvider interface.
 - **Sidecar Missing from Production Compose**: `docker-compose.prod.yml` had no neural-sidecar service. Added service definition with health check, `J17_SIDECAR_URL` env var, dependency wiring, and resource limits.
 
+- **Deep-Dive Remediation Sprint — Phase 1 (Error Sanitization)**: Control character sanitization for CMS Neo4j record helpers (`asString()`, `asStringSlice()`), guidance response shell handling (`prompt-context.sh`), and new `internal/sanitize/controlchars.go` package with unit tests.
+- **Deep-Dive Remediation Sprint — Phase 2 (Documentation Remediation)**: Updated 11 documentation files referencing the deleted `/v1/prometheus` endpoint (returns 410 Gone since PR #213). Replaced with `/v1/metrics/snapshot` (JSON format). Added TimescaleDB as metrics backend in component tables, updated curl examples, added caveat notes to historical docs, documented `GET /v1/jiminy/protocol/status` endpoint.
+
 ### Changed (Unreleased)
 
 - **Gauge Dirty Flag — TSDB Zero-Noise Reduction**: Gauges now track a `dirty` flag (atomic int32). Only gauges mutated since the last flush cycle are written to TimescaleDB — clean gauges are skipped entirely. Reduces per-flush writes from 73 (all registered gauges) to only those actively being Set/Inc/Dec'd. Debug logging reports `flushed` vs `skipped_clean` counts. 3 new tests.

@@ -28,26 +28,32 @@ func (s *Store) CreateScrapeJob(ctx context.Context, job *ScrapeJob) error {
 	urlsJSON, _ := json.Marshal(job.URLs)
 	optJSON, _ := json.Marshal(job.Options)
 
-	_, err := session.Run(ctx,
-		`MERGE (j:ScrapeJob {job_id: $job_id})
-		 SET j.status = $status,
-		     j.urls = $urls,
-		     j.target_space_id = $target_space_id,
-		     j.options = $options,
-		     j.total_urls = $total_urls,
-		     j.processed_urls = 0,
-		     j.created_at = datetime($created_at),
-		     j.updated_at = datetime($updated_at)`,
-		map[string]any{
-			"job_id":          job.JobID,
-			"status":          job.Status,
-			"urls":            string(urlsJSON),
-			"target_space_id": job.TargetSpaceID,
-			"options":         string(optJSON),
-			"total_urls":      job.TotalURLs,
-			"created_at":      job.CreatedAt.UTC().Format(time.RFC3339),
-			"updated_at":      job.UpdatedAt.UTC().Format(time.RFC3339),
-		})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MERGE (j:ScrapeJob {job_id: $job_id})
+			 SET j.status = $status,
+			     j.urls = $urls,
+			     j.target_space_id = $target_space_id,
+			     j.options = $options,
+			     j.total_urls = $total_urls,
+			     j.processed_urls = 0,
+			     j.created_at = datetime($created_at),
+			     j.updated_at = datetime($updated_at)`,
+			map[string]any{
+				"job_id":          job.JobID,
+				"status":          job.Status,
+				"urls":            string(urlsJSON),
+				"target_space_id": job.TargetSpaceID,
+				"options":         string(optJSON),
+				"total_urls":      job.TotalURLs,
+				"created_at":      job.CreatedAt.UTC().Format(time.RFC3339),
+				"updated_at":      job.UpdatedAt.UTC().Format(time.RFC3339),
+			})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -73,7 +79,13 @@ func (s *Store) UpdateScrapeJobStatus(ctx context.Context, jobID, status string,
 		query += `, j.completed_at = datetime($updated_at)`
 	}
 
-	_, err := session.Run(ctx, query, params)
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, query, params)
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -82,14 +94,20 @@ func (s *Store) SetScrapeJobError(ctx context.Context, jobID, errMsg string) err
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	_, err := session.Run(ctx,
-		`MATCH (j:ScrapeJob {job_id: $job_id})
-		 SET j.error = $error, j.updated_at = datetime($now)`,
-		map[string]any{
-			"job_id": jobID,
-			"error":  errMsg,
-			"now":    time.Now().UTC().Format(time.RFC3339),
-		})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (j:ScrapeJob {job_id: $job_id})
+			 SET j.error = $error, j.updated_at = datetime($now)`,
+			map[string]any{
+				"job_id": jobID,
+				"error":  errMsg,
+				"now":    time.Now().UTC().Format(time.RFC3339),
+			})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -105,40 +123,46 @@ func (s *Store) SaveScrapedContent(ctx context.Context, content *ScrapedContent)
 	tagsJSON, _ := json.Marshal(content.SuggestedTags)
 	similarJSON, _ := json.Marshal(content.SimilarExisting)
 
-	_, err := session.Run(ctx,
-		`MERGE (c:ScrapedContent {content_id: $content_id})
-		 SET c.job_id = $job_id,
-		     c.url = $url,
-		     c.title = $title,
-		     c.content = $content,
-		     c.content_preview = $content_preview,
-		     c.content_hash = $content_hash,
-		     c.quality_score = $quality_score,
-		     c.similar_existing = $similar_existing,
-		     c.suggested_tags = $suggested_tags,
-		     c.summary = $summary,
-		     c.status = $status,
-		     c.word_count = $word_count,
-		     c.created_at = datetime($now)
-		 WITH c
-		 MATCH (j:ScrapeJob {job_id: $job_id})
-		 MERGE (c)-[:BELONGS_TO]->(j)`,
-		map[string]any{
-			"content_id":       content.ContentID,
-			"job_id":           content.JobID,
-			"url":              content.URL,
-			"title":            content.Title,
-			"content":          content.Content,
-			"content_preview":  content.ContentPreview,
-			"content_hash":     content.ContentHash,
-			"quality_score":    content.QualityScore,
-			"similar_existing": string(similarJSON),
-			"suggested_tags":   string(tagsJSON),
-			"summary":          content.Summary,
-			"status":           content.Status,
-			"word_count":       content.WordCount,
-			"now":              time.Now().UTC().Format(time.RFC3339),
-		})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MERGE (c:ScrapedContent {content_id: $content_id})
+			 SET c.job_id = $job_id,
+			     c.url = $url,
+			     c.title = $title,
+			     c.content = $content,
+			     c.content_preview = $content_preview,
+			     c.content_hash = $content_hash,
+			     c.quality_score = $quality_score,
+			     c.similar_existing = $similar_existing,
+			     c.suggested_tags = $suggested_tags,
+			     c.summary = $summary,
+			     c.status = $status,
+			     c.word_count = $word_count,
+			     c.created_at = datetime($now)
+			 WITH c
+			 MATCH (j:ScrapeJob {job_id: $job_id})
+			 MERGE (c)-[:BELONGS_TO]->(j)`,
+			map[string]any{
+				"content_id":       content.ContentID,
+				"job_id":           content.JobID,
+				"url":              content.URL,
+				"title":            content.Title,
+				"content":          content.Content,
+				"content_preview":  content.ContentPreview,
+				"content_hash":     content.ContentHash,
+				"quality_score":    content.QualityScore,
+				"similar_existing": string(similarJSON),
+				"suggested_tags":   string(tagsJSON),
+				"summary":          content.Summary,
+				"status":           content.Status,
+				"word_count":       content.WordCount,
+				"now":              time.Now().UTC().Format(time.RFC3339),
+			})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -147,16 +171,23 @@ func (s *Store) GetScrapeJob(ctx context.Context, jobID string) (*ScrapeJob, err
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (j:ScrapeJob {job_id: $job_id})
-		 RETURN j`,
-		map[string]any{"job_id": jobID})
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (j:ScrapeJob {job_id: $job_id})
+			 RETURN j`,
+			map[string]any{"job_id": jobID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if result.Next(ctx) {
-		node := result.Record().Values[0].(neo4j.Node)
+	recs := records.([]*neo4j.Record)
+	if len(recs) > 0 {
+		node := recs[0].Values[0].(neo4j.Node)
 		return scrapeJobFromNode(node), nil
 	}
 	return nil, fmt.Errorf("scrape job not found: %s", jobID)
@@ -167,18 +198,24 @@ func (s *Store) ListScrapeJobs(ctx context.Context) ([]ScrapeJob, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (j:ScrapeJob)
-		 RETURN j
-		 ORDER BY j.created_at DESC
-		 LIMIT 100`, nil)
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (j:ScrapeJob)
+			 RETURN j
+			 ORDER BY j.created_at DESC
+			 LIMIT 100`, nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var jobs []ScrapeJob
-	for result.Next(ctx) {
-		node := result.Record().Values[0].(neo4j.Node)
+	for _, rec := range records.([]*neo4j.Record) {
+		node := rec.Values[0].(neo4j.Node)
 		jobs = append(jobs, *scrapeJobFromNode(node))
 	}
 	return jobs, nil
@@ -189,18 +226,24 @@ func (s *Store) GetScrapedContents(ctx context.Context, jobID string) ([]Scraped
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent)-[:BELONGS_TO]->(j:ScrapeJob {job_id: $job_id})
-		 RETURN c
-		 ORDER BY c.created_at`,
-		map[string]any{"job_id": jobID})
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent)-[:BELONGS_TO]->(j:ScrapeJob {job_id: $job_id})
+			 RETURN c
+			 ORDER BY c.created_at`,
+			map[string]any{"job_id": jobID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var contents []ScrapedContent
-	for result.Next(ctx) {
-		node := result.Record().Values[0].(neo4j.Node)
+	for _, rec := range records.([]*neo4j.Record) {
+		node := rec.Values[0].(neo4j.Node)
 		contents = append(contents, *scrapedContentFromNode(node))
 	}
 	return contents, nil
@@ -211,10 +254,16 @@ func (s *Store) UpdateContentStatus(ctx context.Context, contentID, status strin
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	_, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent {content_id: $content_id})
-		 SET c.status = $status`,
-		map[string]any{"content_id": contentID, "status": status})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent {content_id: $content_id})
+			 SET c.status = $status`,
+			map[string]any{"content_id": contentID, "status": status})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -224,11 +273,17 @@ func (s *Store) UpdateScrapedContentContent(ctx context.Context, contentID, cont
 	defer session.Close(ctx)
 
 	tagsJSON, _ := json.Marshal(tags)
-	_, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent {content_id: $content_id})
-		 SET c.content = $content,
-		     c.suggested_tags = $tags`,
-		map[string]any{"content_id": contentID, "content": content, "tags": string(tagsJSON)})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent {content_id: $content_id})
+			 SET c.content = $content,
+			     c.suggested_tags = $tags`,
+			map[string]any{"content_id": contentID, "content": content, "tags": string(tagsJSON)})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -237,16 +292,23 @@ func (s *Store) GetScrapedContent(ctx context.Context, contentID string) (*Scrap
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent {content_id: $content_id})
-		 RETURN c`,
-		map[string]any{"content_id": contentID})
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent {content_id: $content_id})
+			 RETURN c`,
+			map[string]any{"content_id": contentID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if result.Next(ctx) {
-		node := result.Record().Values[0].(neo4j.Node)
+	recs := records.([]*neo4j.Record)
+	if len(recs) > 0 {
+		node := recs[0].Values[0].(neo4j.Node)
 		return scrapedContentFromNode(node), nil
 	}
 	return nil, fmt.Errorf("scraped content not found: %s", contentID)
@@ -257,13 +319,19 @@ func (s *Store) CreateIngestedAsRelationship(ctx context.Context, contentID, nod
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	_, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent {content_id: $content_id})
-		 MATCH (m:MemoryNode {node_id: $node_id})
-		 MERGE (c)-[:INGESTED_AS]->(m)
-		 SET c.ingested_node_id = $node_id,
-		     c.status = 'ingested'`,
-		map[string]any{"content_id": contentID, "node_id": nodeID})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent {content_id: $content_id})
+			 MATCH (m:MemoryNode {node_id: $node_id})
+			 MERGE (c)-[:INGESTED_AS]->(m)
+			 SET c.ingested_node_id = $node_id,
+			     c.status = 'ingested'`,
+			map[string]any{"content_id": contentID, "node_id": nodeID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Consume(ctx)
+	})
 	return err
 }
 
@@ -272,16 +340,23 @@ func (s *Store) CountPendingReview(ctx context.Context, jobID string) (int, erro
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (c:ScrapedContent {status: 'pending_review'})-[:BELONGS_TO]->(j:ScrapeJob {job_id: $job_id})
-		 RETURN count(c) AS cnt`,
-		map[string]any{"job_id": jobID})
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (c:ScrapedContent {status: 'pending_review'})-[:BELONGS_TO]->(j:ScrapeJob {job_id: $job_id})
+			 RETURN count(c) AS cnt`,
+			map[string]any{"job_id": jobID})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return 0, err
 	}
 
-	if result.Next(ctx) {
-		cnt, _ := result.Record().Values[0].(int64)
+	recs := records.([]*neo4j.Record)
+	if len(recs) > 0 {
+		cnt, _ := recs[0].Values[0].(int64)
 		return int(cnt), nil
 	}
 	return 0, nil
@@ -292,20 +367,25 @@ func (s *Store) ListSpaces(ctx context.Context) ([]SpaceInfo, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx,
-		`MATCH (m:MemoryNode)
-		 WHERE m.space_id IS NOT NULL
-		 RETURN m.space_id AS space_id, count(m) AS node_count
-		 ORDER BY node_count DESC`, nil)
+	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (m:MemoryNode)
+			 WHERE m.space_id IS NOT NULL
+			 RETURN m.space_id AS space_id, count(m) AS node_count
+			 ORDER BY node_count DESC`, nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var spaces []SpaceInfo
-	for result.Next(ctx) {
-		record := result.Record()
-		sid, _ := record.Get("space_id")
-		cnt, _ := record.Get("node_count")
+	for _, rec := range records.([]*neo4j.Record) {
+		sid, _ := rec.Get("space_id")
+		cnt, _ := rec.Get("node_count")
 		spaces = append(spaces, SpaceInfo{
 			SpaceID:   fmt.Sprintf("%v", sid),
 			NodeCount: int(cnt.(int64)),

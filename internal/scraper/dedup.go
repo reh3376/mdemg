@@ -46,25 +46,31 @@ func (d *DedupChecker) CheckSimilar(ctx context.Context, spaceID, content string
 	defer session.Close(ctx)
 
 	// Query vector index for top-5 similar nodes in the target space
-	result, err := session.Run(ctx,
-		`CALL db.index.vector.queryNodes('memNodeEmbedding', 5, $embedding)
-		 YIELD node, score
-		 WHERE node.space_id = $space_id AND score >= $threshold
-		 RETURN node.node_id AS node_id, score
-		 ORDER BY score DESC`,
-		map[string]any{
-			"embedding": embedding,
-			"space_id":  spaceID,
-			"threshold": d.threshold,
-		})
+	raw, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`CALL db.index.vector.queryNodes('memNodeEmbedding', 5, $embedding)
+			 YIELD node, score
+			 WHERE node.space_id = $space_id AND score >= $threshold
+			 RETURN node.node_id AS node_id, score
+			 ORDER BY score DESC`,
+			map[string]any{
+				"embedding": embedding,
+				"space_id":  spaceID,
+				"threshold": d.threshold,
+			})
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		slog.Warn("scraper dedup: vector query failed", "error", err)
 		return nil, nil // Non-fatal
 	}
 
+	records := raw.([]*neo4j.Record)
 	var similar []string
-	for result.Next(ctx) {
-		record := result.Record()
+	for _, record := range records {
 		if nid, ok := record.Get("node_id"); ok {
 			if s, ok := nid.(string); ok {
 				similar = append(similar, s)

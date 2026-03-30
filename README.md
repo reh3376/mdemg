@@ -509,15 +509,14 @@ docker compose -f docker-compose.observability.yml up -d
 
 # Access dashboards
 open http://localhost:3000  # Grafana (admin/admin)
-open http://localhost:9090  # Prometheus
 ```
 
 ### Components
 
 | Component | Port | Description |
 |-----------|------|-------------|
-| Prometheus | 9090 | Metrics collection and alerting |
-| Grafana | 3000 | Dashboard visualization |
+| TimescaleDB | 5433 | Metrics storage (time-series SQL) |
+| Grafana | 3000 | Dashboard visualization and alerting |
 | Blackbox Exporter | 9115 | HTTP/TCP health probes |
 
 ### MDEMG Overview Dashboard
@@ -532,10 +531,10 @@ Pre-configured dashboard with 10 panels:
 ### Metrics Endpoint
 
 ```bash
-curl http://localhost:9999/v1/prometheus
+curl http://localhost:9999/v1/metrics/snapshot
 ```
 
-Exposes all MDEMG metrics in Prometheus format.
+Returns a JSON metrics snapshot including counters, gauges, and histograms from the MetricsRecorder. Metrics are persisted to TimescaleDB.
 
 ---
 
@@ -558,7 +557,7 @@ Exposes all MDEMG metrics in Prometheus format.
 | 92 | Gap Analysis — Deployable Package (15-gap analysis, Phase 93-100 roadmap) | ✅ Complete |
 | — | Space Pruning Framework (admin API, auto-prune scheduler, UATS specs) | ✅ Complete |
 | D | Validation (2nd codebase benchmark, 28K scale test, architecture docs) | ✅ Complete |
-| 91 | RSIC Observability & Operations (Prometheus metrics, Grafana dashboard, alert rules) | ✅ Complete |
+| 91 | RSIC Observability & Operations (TSDB metrics, Grafana dashboard, alert rules) | ✅ Complete |
 | 90 | RSIC Conformance & CI Gating (integration tests, CI split, tag filtering) | ✅ Complete |
 | 89 | RSIC Persistence & Multi-Space Correctness (write-behind, RSICState nodes) | ✅ Complete |
 | 88 | RSIC Safety & Policy Enforcement (dry-run, rollback, blast-radius) | ✅ Complete |

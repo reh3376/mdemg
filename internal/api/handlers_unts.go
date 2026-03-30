@@ -35,8 +35,7 @@ func (s *Server) handleHashVerificationRegister(w http.ResponseWriter, r *http.R
 	}
 
 	if err := s.untsRegistry.Register(req.Path, req.Framework, req.Hash, req.SourceRef, req.Source); err != nil {
-		slog.Error("hash-verification register failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "hash_verification.register")
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
@@ -124,7 +123,7 @@ func (s *Server) handleHashVerificationVerify(w http.ResponseWriter, r *http.Req
 
 	result, err := s.untsRegistry.Verify(req.Path)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "file not tracked"})
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
@@ -215,7 +214,7 @@ func (s *Server) handleHashVerificationUpdate(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := s.untsRegistry.UpdateHash(req.Path, req.Hash, req.Source); err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "file not tracked"})
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {
@@ -256,9 +255,9 @@ func (s *Server) handleHashVerificationRevert(w http.ResponseWriter, r *http.Req
 
 	if err := s.untsRegistry.RevertHash(req.Path, req.TargetHash); err != nil {
 		if strings.Contains(err.Error(), "not tracked") {
-			writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "file not tracked"})
 		} else {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid revert request"})
 		}
 		return
 	}
@@ -286,8 +285,7 @@ func (s *Server) handleHashVerificationScan(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := s.untsScanner.ScanAll(); err != nil {
-		slog.Error("hash-verification scan failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "hash_verification.scan")
 		return
 	}
 	if err := s.untsRegistry.Save(); err != nil {

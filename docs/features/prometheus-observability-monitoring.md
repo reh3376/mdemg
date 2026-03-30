@@ -1,5 +1,7 @@
 # Prometheus Observability Monitoring
 
+> **Note (2026-03-29):** The `/v1/prometheus` endpoint has been replaced by `/v1/metrics/snapshot` (JSON format). Prometheus has been replaced by TimescaleDB as the metrics backend. Alert rules are now managed via Grafana alerting with SQL queries against TimescaleDB.
+
 **Phase**: TSDB Sprint — Observability Infrastructure
 **Status**: Complete
 **Date**: 2026-03-27
@@ -139,7 +141,7 @@ No new environment variables. All changes use existing infrastructure:
 
 ```bash
 # Check RSIC health gauges are non-zero after restart
-curl -s http://localhost:9999/v1/prometheus | grep rsic_health_overall
+curl -s http://localhost:9999/v1/metrics/snapshot | jq '.data.gauges | with_entries(select(.key | test("rsic_health_overall")))'
 
 # Check J17 events recording
 curl -s http://localhost:9999/v1/jiminy/protocol/metrics | jq .data.total_events

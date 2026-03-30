@@ -246,7 +246,7 @@ Track these time series:
 
 ## 11) RSIC Observability & Operations (Phase 91)
 
-The Recursive Self-Improvement Cycle (RSIC) subsystem has dedicated Prometheus metrics, a Grafana dashboard, and alert rules.
+The Recursive Self-Improvement Cycle (RSIC) subsystem has TSDB-backed metrics (via `/v1/metrics/snapshot`), a Grafana dashboard, and alert rules managed via Grafana alerting with SQL queries against TimescaleDB.
 
 ### 11.1 RSIC Health Indicators
 
