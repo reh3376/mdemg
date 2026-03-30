@@ -54,12 +54,35 @@ Both are fully built and tested. They write timestamped JSONL with automatic 50M
 | RAFT retrieval context capture | Phase 4A (NEW) | Enriches training data with retrieval context |
 | ULTS spec framework | Phase 4B (NEW) | Formalizes LLM call contracts |
 | System prompt hash in records | Phase 2H (NEW) | Enables training data versioning |
+| Retrieval event logger | Embedding sprint | Captures (query, results, scores) for embedding fine-tuning |
+| Chunk provenance tags | Embedding sprint | Parser name, language, chunk type on embedded nodes |
 | Dataset versioner (dataset_versioner.py) | Phase 6D | Not built |
 | Teacher distillation (teacher_distill.py) | Phase 4B | Not built |
 | Entropy monitor (entropy_monitor.py) | Phase 6C | Not built |
 | Input extractor (input_extractor.py) | Phase 4A | Not built |
 
-### 1.5 Additional Data Sources (Not LLM Calls)
+### 1.5 Embedding Training Data (Separate Workstream)
+
+Embedding fine-tuning uses contrastive learning on encoder models (not LoRA on the generative decoder). Data collection for this workstream runs in parallel with generative training data collection. The fine-tuned embedding model must produce **3072-dimension vectors** to remain compatible with the Neo4j vector index and all stored embeddings.
+
+Current embedding dimensions across providers:
+- **OpenAI `text-embedding-3-large`:** 3072 native
+- **Ollama `qwen3-embedding:8b`:** 4096 native → MRL-truncated to 3072
+- **Neo4j vector index:** hardcoded to 3072 (`vectorIndexDimensions` constant)
+
+| Collector | Storage | Status | Training Signal |
+|---|---|---|---|
+| Embedding Event Logger | TimescaleDB `embedding_events` | ⬜ PLANNED | Every Embed() call with parser metadata (element kind, language, chunk boundaries) |
+| Retrieval Event Logger | TimescaleDB `retrieval_events` | ⬜ PLANNED | (query, recall scores, rerank scores) → contrastive pairs |
+| Rerank JSONL Collector | `.mdemg/neural/training-data/` | Built (OFF) | Cross-encoder relevance scores → contrastive labels |
+| Chunk Provenance | Neo4j node properties | ⬜ PLANNED | Parser name, language, chunk type per node |
+| Retrieval-to-Guidance Linkage | Via guidance_id join | ✅ BUILT (PR #219) | Was the retrieved node useful downstream? |
+
+The most valuable signal for embedding improvement is **hard negatives**: nodes with high vector similarity (the current embedding thinks they're similar) but low rerank scores (the cross-encoder says they're actually not relevant). Training the embedding model on these pairs teaches it to distinguish "looks similar" from "actually relevant" in MDEMG's domain.
+
+Both loggers default ON (`EMBEDDING_EVENT_LOGGING=true`, `RETRIEVAL_EVENT_LOGGING=true`) to start accumulating data immediately.
+
+### 1.6 Additional Data Sources (Not LLM Calls)
 
 | Source | Location | Content | Fine-Tuning Value |
 |---|---|---|---|

@@ -94,6 +94,26 @@ The SetDefaultRecorder pattern is superior — it requires zero changes to any L
 
 **Resolution:** `system_prompt_hash` (SHA-256) added to InteractionRecord (Phase 2H). During dataset curation, records are filtered by prompt version via ULTS spec's `system_prompt_hash` field. Stale data from old prompt versions is excluded automatically.
 
+### ISSUE 20: Embedding Scope Not Defined ✅ RESOLVED
+
+**Problem:** The v2.0 plan suite made no distinction between generative LLM fine-tuning and embedding model fine-tuning. These are fundamentally different workstreams — generative uses SFT/GRPO on a decoder model, embedding uses contrastive learning on an encoder model. Without explicit scoping, the plan implied the fine-tuned Qwen3-30B-A3B would also handle embeddings, which is architecturally wrong.
+
+Additionally, a hard constraint was undocumented: MDEMG standardizes on **3072-dimension vectors** across all providers (OpenAI `text-embedding-3-large` native 3072, Ollama `qwen3-embedding:8b` 4096→3072 via MRL truncation, Neo4j vector index hardcoded to 3072). Any future fine-tuned embedding model must produce 3072-dim vectors or require a full re-embedding of 34K+ nodes.
+
+**Resolution:** Embedding explicitly separated as a distinct workstream in 01_RESEARCH.md §1.4. 3072-dim constraint documented. Data collection pipeline designed (embedding_events + retrieval_events tables in TimescaleDB) to capture parser metadata and retrieval pipeline scores for future contrastive training. Sprint plan: `SPRINT_EMBEDDING_DATA_COLLECTION.md`.
+
+### ISSUE 21: Guardrail LLM Consumer Bypasses Interaction Logger ✅ DOCUMENTED
+
+**Problem:** The guardrail service (`internal/guardrail/llm_evaluator.go`) makes direct HTTP calls to OpenAI/Ollama for LLM evaluation. It does NOT use `llmclient.Client`, which means guardrail LLM calls bypass the `InteractionRecorder` and are not captured in `llm_interactions`. Training data from guardrail evaluations is lost.
+
+**Resolution:** Guardrail is disabled by default (`GUARDRAIL_ENABLED=false`), so this has zero impact on current data collection. Note added to 01_RESEARCH.md §1.1 documenting the bypass. Migration of guardrail to `llmclient` is tracked as a future task — when it's migrated, it becomes the 17th consumer with its own `WithContext` label and automatic interaction logging.
+
+### ISSUE 22: UxTS Framework Count Stale ✅ RESOLVED
+
+**Problem:** The deep-dive analysis stated "11 UxTS framework types" but the UXTS_FRAMEWORK_MATRIX.md shows 14 active/pilot/spec-only frameworks (UITS and others added since the original count).
+
+**Resolution:** Deep-dive analysis updated to "14 framework types." ULTS (Universal LLM Task Specification) will be the 15th when implemented.
+
 ---
 
 ## Summary
@@ -104,6 +124,7 @@ The SetDefaultRecorder pattern is superior — it requires zero changes to any L
 | v1.0 → v2.0 | Moderate | 4 | 4 | 0 |
 | v1.0 → v2.0 | Additional | 4 | 4 | 0 |
 | v2.0 → v3.0 | Strategic | 6 | 6 | 0 |
-| **Total** | | **19** | **19** | **0** |
+| v3.0 audit | Accuracy | 3 | 3 | 0 |
+| **Total** | | **22** | **22** | **0** |
 
-All v3.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, and implementation status reflect the actual codebase state as of PR #219.
+All v3.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, embedding dimensions, LLM provider details, and implementation status reflect the actual codebase state as of PR #219.

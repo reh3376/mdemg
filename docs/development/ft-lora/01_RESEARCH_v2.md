@@ -37,6 +37,10 @@ Note: 17 rows because `jiminy.evaluate` appears in both evaluator.go (constraint
 
 **Critical finding:** 9 of 16 consumers call `json.Unmarshal` on the raw LLM response. Qwen3's think mode produces `<think>...</think>\n{json}` which breaks all JSON parsers. A `SanitizeResponse()` function is required (see Implementation Plan Phase 2D).
 
+**Note: Guardrail LLM consumer.** The guardrail service (`internal/guardrail/llm_evaluator.go`) makes direct HTTP calls to OpenAI/Ollama — it does NOT route through `llmclient`. This means guardrail LLM calls bypass the interaction logger and are not captured for training. Guardrail is disabled by default (`GUARDRAIL_ENABLED=false`). Migration to `llmclient` is tracked as a future task.
+
+**Note: Per-task model overrides.** While `LLM_MODEL=gpt-5-nano` is the default, several tasks override to specific models: `gpt-4o-mini` (rerank, summary, synthesis, intent, emergence, guardrail), `gpt-5.4` (reclassification). When switching to the fine-tuned Qwen3-30B-A3B, all overrides collapse to a single model — this is a key simplification the fine-tuning enables.
+
 ### 1.2 Cross-Encoder Tasks (3 Models in Neural Sidecar)
 
 | # | Model | Params | Task | Fine-Tuned? |
@@ -60,6 +64,46 @@ Note: 17 rows because `jiminy.evaluate` appears in both evaluator.go (constraint
 | Protocol JSONL | Built, working | **OFF** | `.mdemg/neural/training-data/*.jsonl` |
 
 All 16 generative LLM call sites are logged to TimescaleDB with task labels, guidance_id correlation, source document linkage, privacy scrubbing, and think content extraction.
+
+### 1.4 Embedding Model (Separate Workstream)
+
+MDEMG's embedding model is architecturally independent from the generative LLM. The embedding pipeline (`internal/embeddings/`) produces **3072-dimension vectors** used for vector search in Neo4j:
+
+| Provider | Model | Native Dims | Output Dims | Method |
+|---|---|---|---|---|
+| OpenAI | `text-embedding-3-large` | 3072 | 3072 | Native |
+| Ollama | `qwen3-embedding:8b` | 4096 | 3072 | MRL truncation |
+
+The Neo4j vector index is hardcoded to 3072 dimensions (`vectorIndexDimensions = 3072`). **Any future fine-tuned embedding model must produce 3072-dimension vectors** — changing dimensions would require re-embedding all 34K+ nodes.
+
+Embedding fine-tuning uses **contrastive learning** (not SFT/GRPO) — a fundamentally different technique from generative LoRA. It is a separate future workstream with its own data collection pipeline:
+
+| Data Source | What It Provides | Training Value |
+|---|---|---|
+| `embedding_events` (TSDB, planned) | Every Embed() call with parser metadata | What text gets embedded, chunking context |
+| `retrieval_events` (TSDB, planned) | Full retrieval pipeline: query → recall → rerank → result | Contrastive pairs (positive + hard negatives) |
+| Rerank JSONL (existing) | Cross-encoder scores | Ground truth relevance labels |
+
+The gap between vector recall cosine similarity and cross-encoder reranking scores is the hard-negative mining signal — the most valuable training data for embedding fine-tuning. MDEMG's 27 language parsers produce AST-aware chunks with rich metadata (element kind, language, file path, chunk boundaries, signatures) that a domain-fine-tuned embedding model could leverage for better code retrieval.
+
+### 1.4 Embedding Model (Separate Workstream)
+
+MDEMG's embedding pipeline (`internal/embeddings/`) is architecturally separate from the generative LLM pipeline (`internal/llmclient/`). Embeddings use dedicated encoder models — `text-embedding-3-large` (OpenAI) or `qwen3-embedding:8b` (Ollama) — not the generative Qwen3-30B-A3B.
+
+**Embedding fine-tuning is NOT part of the generative LoRA plan.** It uses a fundamentally different technique (contrastive learning, not SFT/GRPO), different models (encoder, not decoder), and different training data (retrieval events, not LLM I/O).
+
+However, data collection for future embedding fine-tuning runs in parallel:
+
+| Collector | Status | Training Signal |
+|---|---|---|
+| **Retrieval Event Logger** | Planned | (query, results, vector_sims, rerank_scores) |
+| **Rerank JSONL Collector** | Built (OFF) | Cross-encoder relevance scores → implicit contrastive labels |
+| **Chunk Provenance** | Planned | Parser name, language, chunk type on each embedded node |
+| **Retrieval-to-Guidance Linkage** | Planned | Which retrieved nodes led to followed/ignored guidance |
+
+The rerank cross-encoder scores provide the primary training signal: nodes with high vector similarity but low rerank scores are **hard negatives** — exactly what contrastive learning needs to improve the embedding space. Downstream guidance follow/ignore outcomes provide **gold-standard labels** for whether retrieval was actually useful.
+
+Parser provenance (which of the 27 language parsers produced each chunk, what chunk type — function/class/import/observation) enables per-domain embedding quality analysis and chunk-aware training.
 
 ---
 

@@ -34,6 +34,7 @@ Read in order. Each document builds on the previous.
 | **RAFT training pattern** | MDEMG operates in open-book mode (retrieval context in prompts). Training data must include retrieval context for optimal quality. |
 | **ULTS spec framework** | Formalize all 16 LLM call contracts as machine-readable specs for validation, curation, and benchmark automation. |
 | **Routine retraining** | System prompts evolve, tasks are added, domains shift. Training infrastructure designed for monthly SFT refreshes, not one-time use. |
+| **Embedding: separate workstream** | Embedding fine-tuning uses contrastive learning on encoder models (not LoRA). Target: 3072-dim vectors (Neo4j + OpenAI + Ollama standard). Data collection starts now; training later. |
 
 ---
 
