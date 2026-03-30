@@ -69,7 +69,7 @@ func NewLLMIntentTranslator(cfg IntentConfig, cbRegistry *circuitbreaker.Registr
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("retrieval.intent_translate", ""),
 		cacheMap:  make(map[string]*list.Element, 256),
 		cacheList: list.New(),
 		cacheCap:  256,

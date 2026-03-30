@@ -78,7 +78,7 @@ func NewLLMSynthesizer(cfg SynthesisConfig, cbRegistry *circuitbreaker.Registry)
 			APIKey:    apiKey,
 			BaseURL:   baseURL,
 			TimeoutMs: cfg.TimeoutMs,
-		}),
+		}).WithContext("consulting.synthesis", ""),
 	}
 }
 

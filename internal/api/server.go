@@ -501,7 +501,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				APIKey:    codegenAPIKey,
 				BaseURL:   codegenBaseURL,
 				TimeoutMs: 10000,
-			})
+			}).WithContext("jiminy.codegen", "")
 			codegen := jiminy.NewConstraintCodeGenerator(codegenLLM)
 
 			// Populate collision set from existing codes in Neo4j
@@ -531,7 +531,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				APIKey:    evalAPIKey,
 				BaseURL:   evalBaseURL,
 				TimeoutMs: cfg.JiminyEvaluateLLMTimeoutMs,
-			})
+			}).WithContext("jiminy.evaluate_llm", "")
 			evaluator := jiminySvc.GetEvaluator()
 			if evaluator != nil {
 				evaluator.SetLLM(evalLLM, cbRegistry)

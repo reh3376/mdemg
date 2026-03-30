@@ -368,6 +368,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | PROM | Prometheus Observability Monitoring | ✅ | `docs/features/prometheus-observability-monitoring.md` — cache hit metrics, bootstrap assessment, self-monitoring, 4 alert rules |
 | Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
 | REM | PR #215 Remediation Sprint | ✅ | Gauge dirty flag (TSDB noise reduction), TSDB backup/restore (pg_dump, CLI, scheduler, retention), compose standardization, 21 alert rules validated, 70/70 Playwright e2e |
+| DD-SPRINT | Deep-Dive Remediation Sprint | ✅ | 2026-03-29 | SEC-LEAK (56 error leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run → managed transactions) |
 
 ### Phase Numbering Convention
 
@@ -387,6 +388,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | J17-FL | — | J17 Feedback Loop Closure |
 | J17-FIX | — | J17 Protocol Pipeline 12-Break Cascading Fix |
 | PROM | — | Prometheus Observability Monitoring |
+| DDR | — | Deep-Dive Remediation Sprint |
 
 ---
 
@@ -422,7 +424,7 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | Architecture map generator | `scripts/generate_arch_maps.py` | Generates 10 compact maps for Jiminy context; `--checksum`, `--dry-run`, `--force` modes |
 | UITS optimization protection | `docs/tests/uits/schema/uits.schema.json` | `metadata.optimized: true` prevents generator from overwriting converged maps |
 | Public API types | `pkg/mdemg/types.go` | Importable Go types for external consumers (GAP-09) |
-| Scope-based auth | `internal/auth/types.go`, `middleware.go` | `RequireScope()` middleware, 7 scope constants (GAP-16) |
+| Scope-based auth | `internal/auth/types.go`, `middleware.go` | 7 scope constants defined in `auth/types.go`. Wired to 14 destructive endpoints via `scopedHandler` pattern in `server.go` (GAP-16) |
 | Auto-credentials | `internal/cli/init.go`, `db.go` | `generatePassword()` via crypto/rand, env var fallback (GAP-19) |
 | UAMS runner | `docs/tests/uams/runners/uams_runner.py` | 4 auth specs, 104 assertions (GAP-21) |
 | Submodule changelogs | `packaging/*/CHANGELOG.md` | Keep a Changelog format for all 6 packaging submodules (GAP-27) |
@@ -431,6 +433,9 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | Prometheus alerts | `deploy/docker/prometheus/alerts/observability.yaml` | 4 alert rules: scrape target down, prometheus unhealthy, scrape slowdown, storage high |
 | Cache hit metrics | `internal/jiminy/service.go:recordCacheHitMetrics()` | Records J17 protocol metrics on cached guidance responses |
 | Bootstrap RSIC assessment | `internal/api/server.go` | Goroutine runs Assess() 10s after startup to populate health gauges |
+| LLM Interaction Logger | `internal/llmclient/recorder.go`, `internal/tsdb/llm_writer.go` | `InteractionRecorder` interface + `LLMInteractionWriter` buffered TSDB writer. `SetDefaultRecorder` for zero-consumer-modification wiring. Config: `LLM_INTERACTION_LOGGING` (default: true). 16 consumers labeled via `WithContext()` |
+| Managed Transactions | 8 files across `internal/` | All 32 `session.Run()` calls migrated to `ExecuteRead`/`ExecuteWrite`. Zero `session.Run()` remaining |
+| K8s/Helm Manifests | `deploy/kubernetes/`, `deploy/helm/mdemg/templates/` | TimescaleDB StatefulSet + neural-sidecar Deployment. Conditional on `.Values.timescaledb.enabled` / `.Values.neuralSidecar.enabled` |
 
 ---
 
@@ -478,6 +483,7 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 | ~~Claude .md files not ingested into CMS~~ | ~~High~~ | ~~FIXED (2026-03-25)~~ — `mdemg ingest-claude-md` command with SHA256 content-hash change detection. 15 files tracked (3 in-repo, 6 auto-memory, 6 plans). Hooks: session-start (background), pre-compact (forced), post-tool-observe (on Write/Edit). `GET /v1/memory/node/meta` endpoint for hash comparison. |
 | ~~Guidance response control characters~~ | ~~Medium~~ | ~~FIXED (2026-03-28)~~ — `internal/sanitize/controlchars.go` strips U+0000–U+001F server-side. Hook `perl` workaround still in place as defense-in-depth. |
 | ~~J17 tier graduation — live verification~~ | ~~Info~~ | ~~VERIFIED (2026-03-28)~~ — 12-break cascading fix resolved: code_coverage=100%, T2 tier at 80%, compression_ratio=1.714, all J17 gauges flowing to TSDB. Trust persists via TrustStore to Neo4j. |
+| ~~Error leaks in API handlers~~ | ~~High~~ | ~~56 `err.Error()` leaks across handlers (incl. `handlers_org_review.go`)~~ (Resolved in DD-SPRINT: all 56 err.Error() leaks sanitized) |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
@@ -551,4 +557,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-28 — J17 Protocol Pipeline 12-Break Cascading Fix COMPLETE: code lookup via content-similarity matching (replaced broken node-ID Cypher), TrustStore Neo4j write-behind persistence, JiminyCacheJ17Bypass, tier threshold sync, effectiveness tracker TTL extended to 2h with re-registration on cache hits, live collector pre-flush hook wiring, metrics snapshot refresh. Verified live: code_coverage=100%, T2 tier at 80%, compression_ratio=1.714, all J17 gauges flowing to TSDB. CI: ALL GREEN.*
+*Last updated: 2026-03-29 — Deep-Dive Remediation Sprint (DDR) COMPLETE: SEC-LEAK (56 err.Error() leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run migrated to managed transactions). CI: ALL GREEN.*
