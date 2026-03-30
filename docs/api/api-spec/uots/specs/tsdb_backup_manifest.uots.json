@@ -1,0 +1,65 @@
+{
+  "spec_version": "1.0.0",
+  "name": "tsdb_backup_manifest",
+  "description": "Validates TSDB backup manifest JSON schema produced by pg_dump backup service",
+  "framework": "UOTS",
+  "type": "artifact",
+  "merge_blocking": false,
+  "validation": {
+    "type": "json_schema",
+    "artifact_pattern": ".mdemg/backups/tsdb/tsdb-bk-*.manifest.json",
+    "required_fields": [
+      {
+        "field": "format_version",
+        "type": "integer",
+        "description": "Manifest format version, currently 1"
+      },
+      {
+        "field": "backup_id",
+        "type": "string",
+        "pattern": "^tsdb-bk-\\d{8}-\\d{6}$",
+        "description": "Backup identifier with timestamp"
+      },
+      {
+        "field": "created_at",
+        "type": "string",
+        "format": "rfc3339",
+        "description": "Backup creation timestamp"
+      },
+      {
+        "field": "size_bytes",
+        "type": "integer",
+        "description": "Dump file size in bytes"
+      },
+      {
+        "field": "checksum",
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$",
+        "description": "SHA256 checksum of the dump file"
+      },
+      {
+        "field": "database",
+        "type": "string",
+        "description": "Source database name"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "schema_version",
+        "type": "integer",
+        "description": "TSDB schema version at time of backup"
+      },
+      {
+        "field": "row_count",
+        "type": "integer",
+        "description": "Total rows in metric_samples at backup time"
+      },
+      {
+        "field": "label",
+        "type": "string",
+        "description": "Backup label (manual, scheduled)"
+      }
+    ]
+  },
+  "tags": ["tsdb", "backup", "manifest", "artifact"]
+}
