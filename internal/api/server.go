@@ -152,6 +152,7 @@ type Server struct {
 	// TSDB Sprint: Historical metric writer
 	tsdbClient *tsdb.Client
 	tsdbWriter *tsdb.MetricWriter
+	llmWriter  *tsdb.LLMInteractionWriter
 
 	// Grafana Neo4j Dashboard: cached graph metrics (60s TTL)
 	graphMetricsCache struct {
@@ -973,6 +974,16 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			s.rsicCycle.SetTSDBClient(client)
 		}
 		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
+
+		// LLM interaction logger — record all LLM calls for FT pipeline
+		if s.cfg.LLMInteractionLogging {
+			s.llmWriter = tsdb.NewLLMInteractionWriter(
+				client.Pool(),
+				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+			)
+			llmclient.SetDefaultRecorder(s.llmWriter)
+			slog.Info("tsdb: LLM interaction logger attached")
+		}
 	}
 }
 
@@ -1007,6 +1018,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.metricsRecorder != nil {
 		s.metricsRecorder.Stop()
+	}
+	if s.llmWriter != nil {
+		s.llmWriter.Close()
 	}
 	if s.tsdbWriter != nil {
 		s.tsdbWriter.Close()
@@ -1570,8 +1584,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/readyz", s.handleReadyz)
 	mux.HandleFunc("/v1/embedding/health", s.handleEmbeddingHealth)
 	mux.HandleFunc("/v1/memory/retrieve", s.handleRetrieve)
-	mux.HandleFunc("/v1/memory/ingest", s.handleIngest)
-	mux.HandleFunc("/v1/memory/ingest/batch", s.handleBatchIngest)
+	mux.Handle("/v1/memory/ingest", scopedHandler(auth.ScopeWriteMemory, s.handleIngest))
+	mux.Handle("/v1/memory/ingest/batch", scopedHandler(auth.ScopeWriteMemory, s.handleBatchIngest))
 	mux.HandleFunc("/v1/memory/reflect", s.handleReflect)
 	mux.HandleFunc("/v1/memory/stats", s.handleStats)
 	mux.HandleFunc("/v1/memory/node/meta", s.handleNodeMeta)
@@ -1579,9 +1593,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/metrics/snapshot", s.handleMetricsSnapshot)
 	mux.HandleFunc("/v1/prometheus", s.handlePrometheusMetrics)
 	mux.HandleFunc("/v1/metrics/trends", s.handleMetricsTrends)
-	mux.HandleFunc("/v1/memory/archive/bulk", s.handleBulkArchive)
+	mux.Handle("/v1/memory/archive/bulk", scopedHandler(auth.ScopeDeleteMemory, s.handleBulkArchive))
 	mux.HandleFunc("/v1/memory/nodes/", s.handleNodeOperation)
-	mux.HandleFunc("/v1/memory/consolidate", s.handleConsolidate)
+	mux.Handle("/v1/memory/consolidate", scopedHandler(auth.ScopeWriteMemory, s.handleConsolidate))
 	mux.HandleFunc("/v1/modules", s.handleModules)
 	mux.HandleFunc("/v1/modules/", s.handleModuleSync)
 	mux.HandleFunc("/v1/plugins", s.handlePluginOperation)
@@ -1717,10 +1731,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/self-improve/cycle", s.handleSelfImproveCycle)
 	mux.HandleFunc("/v1/self-improve/history", s.handleSelfImproveHistory)
 	mux.HandleFunc("/v1/self-improve/calibration", s.handleSelfImproveCalibration)
-	mux.HandleFunc("/v1/self-improve/orchestration/reset", s.handleOrchestrationReset)
+	mux.Handle("/v1/self-improve/orchestration/reset", scopedHandler(auth.ScopeAdminSpaces, s.handleOrchestrationReset))
 	mux.HandleFunc("/v1/self-improve/health", s.handleSelfImproveHealth)
 	mux.HandleFunc("/v1/self-improve/signals", s.handleSelfImproveSignals)
-	mux.HandleFunc("/v1/self-improve/rollback", s.handleSelfImproveRollback)
+	mux.Handle("/v1/self-improve/rollback", scopedHandler(auth.ScopeAdminSpaces, s.handleSelfImproveRollback))
 
 	// Skill Registry (Phase 48)
 	mux.HandleFunc("/v1/skills", s.handleSkills)
@@ -1732,11 +1746,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/scraper/spaces", s.handleListScrapeSpaces)
 
 	// Neo4j Backup & Restore (Phase 70)
-	mux.HandleFunc("/v1/backup/trigger", s.handleBackupTrigger)
+	mux.Handle("/v1/backup/trigger", scopedHandler(auth.ScopeWriteSpaces, s.handleBackupTrigger))
 	mux.HandleFunc("/v1/backup/status/", s.handleBackupStatus)
 	mux.HandleFunc("/v1/backup/list", s.handleBackupList)
 	mux.HandleFunc("/v1/backup/manifest/", s.handleBackupManifest)
-	mux.HandleFunc("/v1/backup/restore", s.handleBackupRestore)
+	mux.Handle("/v1/backup/restore", scopedHandler(auth.ScopeAdminSpaces, s.handleBackupRestore))
 	mux.HandleFunc("/v1/backup/restore/status/", s.handleRestoreStatus)
 	mux.HandleFunc("/v1/backup/", s.handleBackupByID)
 
@@ -1752,11 +1766,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/linear/comments", s.handleLinearComments)
 
 	// Cleanup endpoints (Phase 9.5)
-	mux.HandleFunc("/v1/memory/cleanup/orphans", s.handleCleanupOrphans)
+	mux.Handle("/v1/memory/cleanup/orphans", scopedHandler(auth.ScopeWriteSpaces, s.handleCleanupOrphans))
 	mux.HandleFunc("/v1/memory/cleanup/schedule", s.handleScheduleCleanup)
 	mux.HandleFunc("/v1/memory/cleanup/schedules", s.handleListCleanupSchedules)
 	mux.HandleFunc("/v1/memory/cleanup/stats", s.handleCleanupStats)
-	mux.HandleFunc("/v1/memory/cleanup/graph-orphans", s.handleGraphOrphanCleanup)
+	mux.Handle("/v1/memory/cleanup/graph-orphans", scopedHandler(auth.ScopeWriteSpaces, s.handleGraphOrphanCleanup))
 
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
@@ -1780,12 +1794,12 @@ func (s *Server) Routes() http.Handler {
 
 	// Admin: space transfer (export/import)
 	mux.HandleFunc("/v1/admin/spaces/export/preview", s.handleSpaceExportPreview)
-	mux.HandleFunc("/v1/admin/spaces/export", s.handleSpaceExport)
-	mux.HandleFunc("/v1/admin/spaces/import", s.handleSpaceImport)
+	mux.Handle("/v1/admin/spaces/export", scopedHandler(auth.ScopeAdminSpaces, s.handleSpaceExport))
+	mux.Handle("/v1/admin/spaces/import", scopedHandler(auth.ScopeAdminSpaces, s.handleSpaceImport))
 
 	// Admin: space lifecycle management
-	mux.HandleFunc("/v1/admin/spaces/prune", s.handleAdminSpacePrune)
-	mux.HandleFunc("/v1/admin/spaces/", s.handleAdminSpaceUpdate)
+	mux.Handle("/v1/admin/spaces/prune", scopedHandler(auth.ScopeAdminSpaces, s.handleAdminSpacePrune))
+	mux.Handle("/v1/admin/spaces/", scopedHandler(auth.ScopeAdminSpaces, s.handleAdminSpaceUpdate))
 	mux.HandleFunc("/v1/admin/spaces", s.handleAdminSpaces)
 
 	// Hash Verification (Phase 38: UNTS REST API)
@@ -1942,6 +1956,21 @@ func writeInternalError(w http.ResponseWriter, err error, operation string) {
 	})
 }
 
+// scopedHandler wraps a handler with per-route scope enforcement (GAP-16).
+// When auth is disabled or the principal has no scopes (backward compat),
+// the handler executes without scope checks.
+func scopedHandler(scope string, h http.HandlerFunc) http.Handler {
+	return auth.RequireScope(scope)(http.HandlerFunc(h))
+}
+
+// writeServiceUnavailableError writes a sanitized 503 response for upstream
+// service failures (e.g. plugin/CRUD module unavailable).
+func writeServiceUnavailableError(w http.ResponseWriter, err error, operation string) {
+	writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+		"error": sanitizeError(err, operation),
+	})
+}
+
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -1986,43 +2015,53 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	}
 	spaces := make(map[string]*spaceRow)
 
-	result, err := session.Run(ctx,
-		`MATCH (n:MemoryNode)
-		 WHERE n.space_id IS NOT NULL
-		 WITH n.space_id AS sid,
-		      count(n) AS nodes,
-		      sum(CASE WHEN n.role_type = 'conversation_observation' THEN 1 ELSE 0 END) AS obs
-		 RETURN sid, nodes, obs
-		 ORDER BY sid`,
-		nil)
+	collected1, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (n:MemoryNode)
+			 WHERE n.space_id IS NOT NULL
+			 WITH n.space_id AS sid,
+			      count(n) AS nodes,
+			      sum(CASE WHEN n.role_type = 'conversation_observation' THEN 1 ELSE 0 END) AS obs
+			 RETURN sid, nodes, obs
+			 ORDER BY sid`,
+			nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		slog.Error("metrics: neo4j graph query (nodes) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
-	for result.Next(ctx) {
-		rec := result.Record()
+	for _, rec := range collected1.([]*neo4j.Record) {
 		sid, _ := rec.Get("sid")
 		nodes, _ := rec.Get("nodes")
 		obs, _ := rec.Get("obs")
-		s := &spaceRow{nodes: int(nodes.(int64)), observations: int(obs.(int64))}
-		spaces[sid.(string)] = s
+		sr := &spaceRow{nodes: int(nodes.(int64)), observations: int(obs.(int64))}
+		spaces[sid.(string)] = sr
 	}
 
 	// Query 2: Per-space edge counts + learning edges
-	result2, err := session.Run(ctx,
-		`MATCH (a:MemoryNode)-[r]-(b:MemoryNode)
-		 WHERE a.space_id IS NOT NULL
-		 WITH a.space_id AS sid,
-		      count(DISTINCT r) AS edges,
-		      sum(CASE WHEN type(r) = 'LEARNING' THEN 1 ELSE 0 END) AS learning
-		 RETURN sid, edges, learning`,
-		nil)
+	collected2, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (a:MemoryNode)-[r]-(b:MemoryNode)
+			 WHERE a.space_id IS NOT NULL
+			 WITH a.space_id AS sid,
+			      count(DISTINCT r) AS edges,
+			      sum(CASE WHEN type(r) = 'LEARNING' THEN 1 ELSE 0 END) AS learning
+			 RETURN sid, edges, learning`,
+			nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		slog.Error("metrics: neo4j graph query (edges) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
-	for result2.Next(ctx) {
-		rec := result2.Record()
+	for _, rec := range collected2.([]*neo4j.Record) {
 		sid, _ := rec.Get("sid")
 		edges, _ := rec.Get("edges")
 		learning, _ := rec.Get("learning")
@@ -2033,19 +2072,24 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	}
 
 	// Query 3: Per-space orphan counts
-	result3, err := session.Run(ctx,
-		`MATCH (n:MemoryNode)
-		 WHERE n.space_id IS NOT NULL AND NOT (n)--()
-		   AND NOT coalesce(n.is_archived, false)
-		 WITH n.space_id AS sid, count(n) AS orphans
-		 RETURN sid, orphans`,
-		nil)
+	collected3, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (n:MemoryNode)
+			 WHERE n.space_id IS NOT NULL AND NOT (n)--()
+			   AND NOT coalesce(n.is_archived, false)
+			 WITH n.space_id AS sid, count(n) AS orphans
+			 RETURN sid, orphans`,
+			nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
 	if err != nil {
 		slog.Error("metrics: neo4j graph query (orphans) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
-	for result3.Next(ctx) {
-		rec := result3.Record()
+	for _, rec := range collected3.([]*neo4j.Record) {
 		sid, _ := rec.Get("sid")
 		orphans, _ := rec.Get("orphans")
 		if row, ok := spaces[sid.(string)]; ok {

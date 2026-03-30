@@ -27,7 +27,7 @@ func (s *Server) handleSelfImproveAssess(w http.ResponseWriter, r *http.Request)
 		Tier    string `json:"tier"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if req.SpaceID == "" {
@@ -120,7 +120,7 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		DryRun         bool   `json:"dry_run,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	if req.SpaceID == "" {

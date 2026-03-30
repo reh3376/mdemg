@@ -61,7 +61,7 @@ func (s *Server) handleListSnapshots(w http.ResponseWriter, r *http.Request) {
 
 	snapshots, err := s.snapshotService.ListSnapshots(r.Context(), spaceID, sessionID, limit)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to list snapshots: " + err.Error()})
+		writeInternalError(w, err, "snapshot.list")
 		return
 	}
 
@@ -81,7 +81,7 @@ func (s *Server) handleListSnapshots(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 	var req conversation.CreateSnapshotRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.snapshotService.CreateSnapshot(r.Context(), snapshot); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to create snapshot: " + err.Error()})
+		writeInternalError(w, err, "snapshot.create")
 		return
 	}
 
@@ -130,7 +130,7 @@ func (s *Server) handleCreateSnapshot(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetSnapshot(w http.ResponseWriter, r *http.Request, snapshotID string) {
 	snapshot, err := s.snapshotService.GetSnapshot(r.Context(), snapshotID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to get snapshot: " + err.Error()})
+		writeInternalError(w, err, "snapshot.get")
 		return
 	}
 	if snapshot == nil {
@@ -148,7 +148,7 @@ func (s *Server) handleDeleteSnapshot(w http.ResponseWriter, r *http.Request, sn
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "Snapshot not found"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to delete snapshot: " + err.Error()})
+		writeInternalError(w, err, "snapshot.delete")
 		return
 	}
 
@@ -172,7 +172,7 @@ func (s *Server) handleLatestSnapshot(w http.ResponseWriter, r *http.Request) {
 
 	snapshot, err := s.snapshotService.GetLatestSnapshot(r.Context(), spaceID, sessionID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to get latest snapshot: " + err.Error()})
+		writeInternalError(w, err, "snapshot.get_latest")
 		return
 	}
 	if snapshot == nil {
@@ -195,7 +195,7 @@ func (s *Server) handleCleanupSnapshots(w http.ResponseWriter, r *http.Request) 
 		RetentionDays int    `json:"retention_days,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) handleCleanupSnapshots(w http.ResponseWriter, r *http.Request) 
 
 	deleted, err := s.snapshotService.CleanupOldSnapshots(r.Context(), req.SpaceID, req.RetentionDays)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Failed to cleanup snapshots: " + err.Error()})
+		writeInternalError(w, err, "snapshot.cleanup")
 		return
 	}
 

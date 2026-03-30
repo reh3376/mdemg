@@ -90,7 +90,7 @@ func (s *Server) handleJ17Extension(w http.ResponseWriter, r *http.Request) {
 
 	var req jiminy.ExtensionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -126,7 +126,7 @@ func (s *Server) handleJ17ProtocolFeedback(w http.ResponseWriter, r *http.Reques
 
 	var req jiminy.ProtocolFeedbackRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -159,7 +159,7 @@ func (s *Server) handleJ17ProtocolLearn(w http.ResponseWriter, r *http.Request) 
 		FailureReason  string `json:"failure_reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -170,7 +170,7 @@ func (s *Server) handleJ17ProtocolLearn(w http.ResponseWriter, r *http.Request) 
 
 	newCode, err := s.jiminySvc.RegenerateCode(r.Context(), req.ConstraintType, req.Description, req.OldCode, req.FailureReason)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "j17.regenerate_code")
 		return
 	}
 
@@ -234,7 +234,7 @@ func (s *Server) handleJ17Checkpoint(w http.ResponseWriter, r *http.Request) {
 
 	var req jiminy.CheckpointRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -248,7 +248,7 @@ func (s *Server) handleJ17Checkpoint(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.jiminySvc.Checkpoint(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "j17.checkpoint")
 		return
 	}
 
@@ -270,7 +270,7 @@ func (s *Server) handleJ17ResumeProtocol(w http.ResponseWriter, r *http.Request)
 
 	var req jiminy.ResumeProtocolRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body: " + err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
@@ -284,7 +284,7 @@ func (s *Server) handleJ17ResumeProtocol(w http.ResponseWriter, r *http.Request)
 
 	resp, err := s.jiminySvc.ResumeProtocol(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeInternalError(w, err, "j17.resume_protocol")
 		return
 	}
 

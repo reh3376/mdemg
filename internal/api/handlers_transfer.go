@@ -387,7 +387,8 @@ func (s *Server) handleSpaceImport(w http.ResponseWriter, r *http.Request) {
 
 	// Validate schema compatibility
 	if err := transfer.ValidateImport(ctx, s.driver, chunks); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "validation failed: " + err.Error()})
+		slog.Error("import validation failed", "error", err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "import validation failed"})
 		return
 	}
 
@@ -397,7 +398,8 @@ func (s *Server) handleSpaceImport(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Conflict errors return 409
 		if conflictMode == pb.ConflictMode_CONFLICT_ERROR {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			slog.Error("import conflict", "error", err)
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "import conflict: one or more entities already exist"})
 			return
 		}
 		writeInternalError(w, err, "space-import")

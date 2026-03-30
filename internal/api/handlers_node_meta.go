@@ -98,7 +98,7 @@ RETURN n.node_id AS node_id,
 		return nil, res.Err()
 	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		writeInternalError(w, err, "node_meta.get")
 		return
 	}
 
