@@ -1,6 +1,8 @@
 # CMS & RSIC Usage Guide for MDEMG
 
-This guide covers the two core runtime systems in MDEMG: the **Conversation Memory System (CMS)** for capturing and retrieving knowledge, and the **Recursive Self-Improvement Cycle (RSIC)** for automated memory maintenance. All examples use `curl` against a running MDEMG server at `http://localhost:9999`. PowerShell equivalents are included where the syntax differs significantly.
+This guide covers the two core runtime systems in MDEMG: the **Conversation Memory System (CMS)** for capturing and retrieving knowledge, and the **Recursive Self-Improvement Cycle (RSIC)** for automated memory maintenance. All examples use `curl` against a running MDEMG server.
+
+> **Dynamic Ports:** MDEMG uses dynamically assigned ports (set during `mdemg init`). Your port is in `.env` (`MDEMG_PORT`) or `.mdemg.port`. All examples use `localhost:9999` as a placeholder — replace with your assigned port.
 
 ---
 

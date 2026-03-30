@@ -1,0 +1,22 @@
+# MDEMG Docker Compose — Development overlay
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Adds: neo4j-monitor (Python container health monitor, mounts Docker socket)
+
+services:
+  neo4j-monitor:
+    image: docker:cli
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./logs:/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache python3 py3-pip >/dev/null 2>&1
+        python3 /scripts/monitor_container.py --container mdemg-neo4j --interval 2 --log /logs/neo4j_monitor.log --max-lines 20000 --max-bytes 5242880 --max-failures 10
+    networks:
+      - mdemg-net

@@ -2,7 +2,7 @@
 # Multi-stage build for minimal image size
 
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # Install build dependencies (including C compiler for CGO)
 RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
@@ -47,9 +47,12 @@ USER mdemg
 # Expose port
 EXPOSE 9999
 
-# Health check
+# Default listen port (override via LISTEN_ADDR env var in compose)
+ENV LISTEN_PORT=9999
+
+# Health check (uses LISTEN_PORT for portability across compose configurations)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:9999/healthz || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${LISTEN_PORT}/healthz || exit 1
 
 # Run the application
 ENTRYPOINT ["./mdemg", "serve"]

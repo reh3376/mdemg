@@ -1,5 +1,7 @@
 # MDEMG Ingestion Guide
 
+> **Dynamic Ports:** MDEMG uses dynamically assigned ports (set during `mdemg init`). Your port is in `.env` (`MDEMG_PORT`) or `.mdemg.port`. All examples in this document use `localhost:9999` as a placeholder — replace with your assigned port.
+
 ## Overview
 
 MDEMG (Multi-Dimensional Emergent Memory Graph) stores knowledge as graph nodes in Neo4j with vector embeddings for semantic search. Ingestion is the process of getting data into this graph.

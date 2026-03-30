@@ -39,6 +39,7 @@ func newInitCmd() *cobra.Command {
 	var (
 		defaults          bool
 		quick             bool
+		native            bool
 		spaceID           string
 		neo4jURI          string
 		embeddingProvider string
@@ -52,18 +53,20 @@ func newInitCmd() *cobra.Command {
 		Short: "Initialize a new MDEMG project",
 		Long: `Initialize MDEMG in the current directory.
 
-Creates a .mdemg/ directory with config.yaml and a .mdemgignore file.
-By default, runs an interactive wizard to detect your environment and
-guide you through configuration.
+Creates a .mdemg/ directory with config.yaml, generates .env, and starts
+all services via Docker Compose.
+
+Docker Desktop (or Docker Engine) is required.
 
 Use --defaults for non-interactive setup with sensible defaults.
-Use --quick for non-interactive setup that also starts Neo4j and the server.
+Use --quick for non-interactive setup (alias for --defaults).
+Use --native for legacy native deployment (dev-only, not recommended).
 
 Examples:
-  mdemg init                    # Interactive wizard
-  mdemg init --defaults         # Non-interactive with defaults
-  mdemg init --quick            # Non-interactive + auto-start
-  mdemg init --neo4j-uri bolt://db:7687`,
+  mdemg init                    # Docker Compose deployment (interactive)
+  mdemg init --defaults         # Docker Compose (non-interactive)
+  mdemg init --quick            # Alias for --defaults
+  mdemg init --native --quick   # Legacy native deployment (dev-only)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if quick {
 				defaults = true
@@ -71,6 +74,7 @@ Examples:
 			return runInit(initFlags{
 				defaults:          defaults,
 				quick:             quick,
+				native:            native,
 				spaceID:           spaceID,
 				neo4jURI:          neo4jURI,
 				embeddingProvider: embeddingProvider,
@@ -83,7 +87,8 @@ Examples:
 
 	cmd.Flags().BoolVar(&defaults, "defaults", false, "Non-interactive mode with sensible defaults")
 	cmd.Flags().BoolVar(&defaults, "yes", false, "Alias for --defaults")
-	cmd.Flags().BoolVar(&quick, "quick", false, "Non-interactive setup + auto-start Neo4j and server")
+	cmd.Flags().BoolVar(&quick, "quick", false, "Non-interactive setup (alias for --defaults)")
+	cmd.Flags().BoolVar(&native, "native", false, "Legacy native deployment (dev-only, not recommended)")
 	cmd.Flags().StringVar(&spaceID, "space-id", "", "Override space ID (default: directory name)")
 	cmd.Flags().StringVar(&neo4jURI, "neo4j-uri", "", "Override Neo4j URI")
 	cmd.Flags().StringVar(&embeddingProvider, "embedding-provider", "", "Override embedding provider (ollama/openai/disabled)")
@@ -97,6 +102,7 @@ Examples:
 type initFlags struct {
 	defaults          bool
 	quick             bool
+	native            bool
 	spaceID           string
 	neo4jURI          string
 	embeddingProvider string
@@ -504,7 +510,12 @@ func runInit(flags initFlags) error {
 	// Use Overload (not Load) to ensure values are set even if env vars exist as empty
 	_ = godotenv.Overload(envPath)
 
-	// Auto-start for --quick mode
+	// Docker Compose deployment (default mode)
+	if !flags.native {
+		return runDockerInit(cwd, envPath, envLines, opts, flags)
+	}
+
+	// Auto-start for --quick mode (native only)
 	if flags.quick {
 		fmt.Println("Starting Neo4j and server (--quick mode)...")
 		fmt.Println()
@@ -583,6 +594,171 @@ func runInit(flags initFlags) error {
 
 	// Register with menubar app instance registry
 	registerWithMenubar(cwd, opts.SpaceID, opts.ServerPort)
+
+	return nil
+}
+
+// runDockerInit handles the --docker init flow: port allocation, .env generation,
+// docker compose up, and health check.
+func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptions, flags initFlags) error {
+	fmt.Println("Docker Compose deployment mode")
+	fmt.Println()
+
+	// Verify Docker is available
+	if !DockerAvailable() {
+		return fmt.Errorf("docker CLI not found — install Docker Desktop or Docker Engine first")
+	}
+
+	// Check Docker resources
+	_, warnings := CheckDockerResources()
+	for _, w := range warnings {
+		fmt.Printf("  Warning: %s\n", w)
+	}
+
+	// Allocate 6 free host ports
+	type portAlloc struct {
+		name      string
+		preferred int
+		envKey    string
+		port      int
+	}
+	ports := []portAlloc{
+		{"MDEMG server", 9999, "MDEMG_PORT", 0},
+		{"Neo4j Bolt", 7687, "NEO4J_BOLT_PORT", 0},
+		{"Neo4j HTTP", 7474, "NEO4J_HTTP_PORT", 0},
+		{"TimescaleDB", 5433, "TSDB_HOST_PORT", 0},
+		{"Neural sidecar", 8100, "NEURAL_PORT", 0},
+		{"Grafana", 3000, "GRAFANA_PORT", 0},
+	}
+
+	fmt.Println("  Scanning for available ports...")
+	for i := range ports {
+		p, err := FindFreePort(ports[i].preferred, ports[i].preferred, ports[i].preferred+100)
+		if err != nil {
+			return fmt.Errorf("could not find free port for %s: %w", ports[i].name, err)
+		}
+		ports[i].port = p
+		if p != ports[i].preferred {
+			fmt.Printf("  %s: port %d in use, using %d\n", ports[i].name, ports[i].preferred, p)
+		}
+	}
+
+	// Interactive port confirmation — a port may appear free only because
+	// the user's normal container (e.g., Neo4j) isn't currently running.
+	if !flags.defaults {
+		fmt.Println()
+		fmt.Println("  Assigned ports (confirm or change):")
+		fmt.Println("  A port may be free now but normally used by another service.")
+		fmt.Println()
+		for i := range ports {
+			prompt := fmt.Sprintf("  %s port [%d]", ports[i].name, ports[i].port)
+			answer := promptLine(prompt, fmt.Sprintf("%d", ports[i].port))
+			var v int
+			if n, _ := fmt.Sscanf(answer, "%d", &v); n == 1 && v > 0 && v < 65536 {
+				ports[i].port = v
+			}
+		}
+	}
+
+	// Derive project slug for multi-instance isolation
+	slug := filepath.Base(cwd)
+	projectName := fmt.Sprintf("mdemg-%s", slug)
+
+	// Write Docker port assignments to .env
+	// Remove any existing Docker port lines first, then append fresh
+	dockerKeys := map[string]bool{
+		"COMPOSE_PROJECT_NAME": true,
+		"MDEMG_PORT":           true,
+		"NEO4J_BOLT_PORT":      true,
+		"NEO4J_HTTP_PORT":      true,
+		"TSDB_HOST_PORT":       true,
+		"NEURAL_PORT":          true,
+		"GRAFANA_PORT":         true,
+	}
+	filtered := make([]string, 0, len(envLines))
+	for _, line := range envLines {
+		key := strings.SplitN(line, "=", 2)[0]
+		key = strings.TrimSpace(key)
+		if !dockerKeys[key] {
+			filtered = append(filtered, line)
+		}
+	}
+
+	// Append Docker config
+	filtered = append(filtered,
+		fmt.Sprintf("COMPOSE_PROJECT_NAME=%s", projectName),
+	)
+	for _, pa := range ports {
+		filtered = append(filtered, fmt.Sprintf("%s=%d", pa.envKey, pa.port))
+	}
+
+	if err := os.WriteFile(envPath, []byte(strings.Join(filtered, "\n")+"\n"), 0600); err != nil {
+		return fmt.Errorf("write .env: %w", err)
+	}
+
+	// Reload .env so docker compose picks up values
+	_ = godotenv.Overload(envPath)
+
+	// Update config.yaml with host-mapped ports (CLI connects from host, not Docker network)
+	mdemgPort := ports[0].port
+	boltPort := ports[1].port
+	opts.Neo4jURI = fmt.Sprintf("bolt://localhost:%d", boltPort)
+	opts.Neo4jBoltPort = boltPort
+	opts.Neo4jHTTPPort = ports[2].port
+	opts.ServerPort = mdemgPort
+
+	configData, err := config.GenerateConfigYAML(opts)
+	if err != nil {
+		return fmt.Errorf("regenerate config for Docker: %w", err)
+	}
+	configPath := filepath.Join(cwd, ".mdemg", "config.yaml")
+	if err := os.WriteFile(configPath, configData, 0644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	// Write .mdemg.port for CLI client discovery
+	portFilePath := filepath.Join(cwd, ".mdemg.port")
+	if err := os.WriteFile(portFilePath, []byte(fmt.Sprintf("%d\n", mdemgPort)), 0644); err != nil {
+		fmt.Printf("  Warning: could not write .mdemg.port: %v\n", err)
+	}
+
+	// Print port summary
+	fmt.Println()
+	fmt.Println("  Port assignments:")
+	for _, pa := range ports {
+		fmt.Printf("    %-16s %d\n", pa.name+":", pa.port)
+	}
+	fmt.Printf("    %-16s %s\n", "Project name:", projectName)
+	fmt.Println()
+
+	// Run docker compose up
+	fmt.Println("Starting Docker Compose services...")
+	cmd := osExec.Command("docker", "compose", "--project-directory", cwd, "up", "-d")
+	cmd.Dir = cwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker compose up failed: %w\n\nYou can retry manually: docker compose up -d", err)
+	}
+	fmt.Println()
+
+	// Wait for MDEMG server health
+	fmt.Println("Waiting for MDEMG server to become healthy...")
+	waitForServerReady(mdemgPort)
+	fmt.Println()
+
+	// Print success
+	fmt.Println("Docker deployment ready!")
+	fmt.Println()
+	fmt.Printf("  Server:    http://localhost:%d\n", mdemgPort)
+	fmt.Printf("  Neo4j:     http://localhost:%d (browser)\n", ports[2].port)
+	fmt.Printf("  Grafana:   http://localhost:%d\n", ports[5].port)
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  docker compose ps       # Service status")
+	fmt.Println("  docker compose logs -f  # Follow logs")
+	fmt.Println("  docker compose down     # Stop all services")
+	fmt.Println("  docker compose down -v  # Stop + delete data volumes")
 
 	return nil
 }

@@ -58,7 +58,9 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 
 ## Base URL & Authentication
 
-**Default Base URL:** `http://localhost:9999`
+**Base URL:** `http://localhost:<MDEMG_PORT>`
+
+> **Dynamic Ports:** MDEMG uses dynamically assigned ports. Your actual port is in `.env` (`MDEMG_PORT`), the `.mdemg.port` file, or via `mdemg status`. All `curl` examples in this document use `localhost:9999` as a placeholder — replace with your assigned port.
 
 **Authentication** (optional, controlled by `AUTH_ENABLED` env var):
 

@@ -2,9 +2,11 @@
 
 > **Version:** dev (build-time injected via `-ldflags`)
 > **Binary:** `mdemg` (or `mdemg.exe` on Windows)
-> **Build:** `go build -o bin/mdemg ./cmd/mdemg`
+> **Install:** `brew install reh3376/mdemg/mdemg` (macOS) | See `docs/user/quickstart-docker.md`
 
 MDEMG (Multi-Dimensional Emergent Memory Graph) is a persistent memory system for LLMs providing vector-based semantic search, graph-based knowledge representation, hidden layer concept abstraction, learning edges (Hebbian reinforcement), and LLM re-ranking for improved retrieval.
+
+> **Docker Deployment:** MDEMG runs as a Docker Compose stack. Run `mdemg init` to set up. All TCP ports are dynamically assigned — see `.env` for your port assignments. Examples in this document use default ports as placeholders.
 
 ---
 

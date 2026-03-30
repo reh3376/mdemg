@@ -15,7 +15,7 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 
 ### Prerequisites
 
-- **Docker** — required for Neo4j database (Docker Desktop on macOS/Windows, Docker Engine on Linux)
+- **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux) with Compose v2
 - **Embedding provider** (choose one):
   - [OpenAI API key](https://platform.openai.com/api-keys) (recommended, requires account)
   - [Ollama](https://ollama.com) (local, free, no API key needed)
@@ -45,35 +45,26 @@ go build -o bin/mdemg ./cmd/mdemg
 
 </details>
 
-### Step 2: Initialize a Project
+### Step 2: Initialize and Start (Docker Compose)
 
 ```bash
 cd /path/to/your/project
-mdemg init
+mdemg init                  # Interactive setup: scans ports, generates .env, starts Docker stack
+# OR
+mdemg init --quick          # Non-interactive with sensible defaults
 ```
 
-The interactive wizard will:
-1. Set a **space ID** (defaults to directory name)
-2. Detect **Neo4j** on localhost:7687
-3. Ask for your **embedding provider** (ollama/openai/disabled)
-4. If you're using OpenAI: prompt for your **API key** (stored in `.env`, never in config)
-5. Create `.mdemg/config.yaml`, `.mdemgignore`, and `.env`
-6. Optionally install a **git post-commit hook** for auto-ingestion
-7. Optionally configure **MCP** for your IDE (Cursor, VS Code, Claude Code)
+This will:
+1. Check Docker is available and has adequate resources
+2. Scan for **6 free TCP ports** (all dynamically assigned — no hardcoded defaults)
+3. Generate `.env` with port assignments and credentials
+4. Create `.mdemg/config.yaml` and `.mdemgignore`
+5. Run `docker compose up -d` (starts all 5 services)
+6. Wait for the MDEMG server health check
 
-### Step 3: Start Services
+> **All ports are dynamic.** Each project gets its own `COMPOSE_PROJECT_NAME` for multi-instance isolation. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
 
-```bash
-mdemg db start              # Launches a project-scoped Neo4j container
-                            # Auto-selects port if 7687 is in use
-mdemg start --auto-migrate  # Starts server daemon + applies schema migrations
-mdemg status                # Verify everything is running
-```
-
-> Each project gets its own isolated Neo4j container and data volume.
-> If you have other Neo4j instances running, ports are resolved automatically.
-
-### Step 4: Ingest Your Codebase
+### Step 3: Ingest Your Codebase
 
 ```bash
 mdemg ingest --path .       # Index your codebase into the memory graph
