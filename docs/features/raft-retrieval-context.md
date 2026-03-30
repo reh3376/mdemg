@@ -55,3 +55,4 @@ Column count expanded from 22 to 26.
 - internal/jiminy/service.go
 - internal/tsdb/llm_writer.go
 - internal/tsdb/migrations/007_raft_context.sql
+- `docs/features/training-data-capture-verification.md` — column-position verification (positions 22-25 for RAFT columns)

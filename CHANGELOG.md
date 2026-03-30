@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Hook Registration Fix**: `claudeHookFiles()` expanded from 2 to 5 hooks. Matcher support added at group level in settings.local.json. Templates synced from active hooks.
   - **`mdemg data audit`**: Compare disk state vs CMS state for tracked claude-md files. Reports current/stale/shrank/deleted/not-ingested status plus service health and buffer state.
 
+- **Training Data Capture Verification (TD-VERIFY)**: 17 verification tests across all 3 TSDB writers confirming column-position correctness, privacy scrubbing, response sanitization, and metadata completeness. Upgraded shared `mockPool` to capture `CopyFrom` row values. Documents scrubbing boundary (client vs writer), scrub asymmetry (embedding TextContent only), and empty TaskName regression guard. Feature doc: `docs/features/training-data-capture-verification.md`.
+
 - **SanitizeResponse (Phase A)**: Unified LLM response cleaning pipeline (`StripThinkBlock` + `StripCodeFence` + `TrimSpace`) in `internal/llmclient/sanitize.go`. Wired into all 11 JSON-parsing call sites across 10 files. Enables local model deployment with think mode (Qwen3 `<think>...</think>` blocks).
 - **System Prompt Hash**: SHA-256 hash of system prompt added to `InteractionRecord`, enabling training data curation by prompt version and stale data filtering.
 - **RAFT Context Enrichment (Phase B)**: `RetrievalContext` struct captures which nodes were retrieved and their relevance scores alongside every LLM interaction. Wired into consulting and jiminy services. TSDB `llm_interactions` expanded from 22 to 26 columns. Migration 007.

@@ -108,3 +108,4 @@ Migration 006 (`internal/tsdb/migrations/006_embedding_retrieval_events.sql`) cr
 - `internal/tsdb/retrieval_writer.go`
 - `internal/tsdb/migrations/006_embedding_retrieval_events.sql`
 - `docs/development/ft-lora/ft-lora-dev/SPRINT_EMBEDDING_DATA_COLLECTION_v2.md`
+- `docs/features/training-data-capture-verification.md` — column-position verification tests, privacy scrub analysis, silent failure modes

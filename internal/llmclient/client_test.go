@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -840,5 +841,132 @@ func TestRetrievalContextNil(t *testing.T) {
 	}
 	if rec.records[0].RetrievalCtx != nil {
 		t.Error("RetrievalCtx should be nil when no context is set")
+	}
+}
+
+// --- Training Data Capture Verification Tests ---
+
+func TestMultiMessageLastWins(t *testing.T) {
+	rec := &mockRecorder{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "response"}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	// Multiple system and user messages — "last wins" extraction rule
+	msgs := []Message{
+		{Role: "system", Content: "first system prompt"},
+		{Role: "user", Content: "first user message"},
+		{Role: "system", Content: "second system prompt"},
+		{Role: "user", Content: "second user message"},
+	}
+
+	_, err := c.Complete(context.Background(), msgs, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+
+	// Last system message wins
+	if r.SystemPrompt != "second system prompt" {
+		t.Errorf("SystemPrompt: got %q, want %q", r.SystemPrompt, "second system prompt")
+	}
+
+	// Last user message wins
+	if r.UserPrompt != "second user message" {
+		t.Errorf("UserPrompt: got %q, want %q", r.UserPrompt, "second user message")
+	}
+}
+
+func TestScrubBoundary(t *testing.T) {
+	// Scrubbing happens in TSDB writer (Record), NOT in llmclient.
+	// The recorder should receive the raw, unscrubbed record.
+	rec := &mockRecorder{}
+	apiKey := "sk-HvPliFZCy8ohpHoZZ1wUy0EY5ltXXXXX"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "found key: " + apiKey}}},
+		})
+	}))
+	defer srv.Close()
+
+	c := New(Config{Provider: "openai", Model: "test", APIKey: "k", BaseURL: srv.URL})
+	c.SetRecorder(rec)
+
+	_, _ = c.Complete(context.Background(), []Message{
+		{Role: "system", Content: "you are helpful"},
+		{Role: "user", Content: "find the key"},
+	}, CompleteOpts{})
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+
+	// API key should be present in the raw record (not scrubbed at client level)
+	r := rec.records[0]
+	if !strings.Contains(r.Response, apiKey) {
+		t.Errorf("Response should contain raw API key at client level, got %q", r.Response)
+	}
+}
+
+func TestScrubAllPatterns(t *testing.T) {
+	rec := InteractionRecord{
+		SystemPrompt: "key: sk-HvPliFZCy8ohpHoZZ1wUy0EY5ltXXXXX",
+		UserPrompt:   "Check /Users/reh3376/mdemg/internal/api/server.go",
+		Response:     "Found user@example.com and PASSWORD=secret123 in config",
+		ThinkContent: "Connecting to neo4j://admin:pass123@localhost:7687",
+	}
+
+	Scrub(&rec)
+
+	// SystemPrompt: API key scrubbed
+	if strings.Contains(rec.SystemPrompt, "sk-HvPli") {
+		t.Error("SystemPrompt: API key was not scrubbed")
+	}
+	if !strings.Contains(rec.SystemPrompt, "[REDACTED_KEY]") {
+		t.Errorf("SystemPrompt: expected [REDACTED_KEY], got %q", rec.SystemPrompt)
+	}
+
+	// UserPrompt: absolute path scrubbed (keeps last 2 components)
+	if strings.Contains(rec.UserPrompt, "/Users/reh3376") {
+		t.Error("UserPrompt: absolute path was not scrubbed")
+	}
+	if !strings.Contains(rec.UserPrompt, "[PATH]") {
+		t.Errorf("UserPrompt: expected [PATH], got %q", rec.UserPrompt)
+	}
+	if !strings.Contains(rec.UserPrompt, "api/server.go") {
+		t.Errorf("UserPrompt: expected last 2 path components preserved, got %q", rec.UserPrompt)
+	}
+
+	// Response: email + env secret scrubbed
+	if strings.Contains(rec.Response, "user@example.com") {
+		t.Error("Response: email was not scrubbed")
+	}
+	if !strings.Contains(rec.Response, "[EMAIL]") {
+		t.Errorf("Response: expected [EMAIL], got %q", rec.Response)
+	}
+	if strings.Contains(rec.Response, "secret123") {
+		t.Error("Response: env secret was not scrubbed")
+	}
+	if !strings.Contains(rec.Response, "PASSWORD=[REDACTED]") {
+		t.Errorf("Response: expected PASSWORD=[REDACTED], got %q", rec.Response)
+	}
+
+	// ThinkContent: neo4j credentials scrubbed
+	if strings.Contains(rec.ThinkContent, "admin:pass123") {
+		t.Error("ThinkContent: Neo4j credentials were not scrubbed")
+	}
+	if !strings.Contains(rec.ThinkContent, "neo4j://[REDACTED]@") {
+		t.Errorf("ThinkContent: expected neo4j://[REDACTED]@, got %q", rec.ThinkContent)
 	}
 }
