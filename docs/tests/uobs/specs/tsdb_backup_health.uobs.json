@@ -1,0 +1,28 @@
+{
+  "uobs_version": "1.0.0",
+  "test": {
+    "name": "tsdb_backup_health",
+    "description": "Validates TSDB writer health metrics are present in metrics snapshot, ensuring backup-related observability for the MetricsRecorder flush pipeline",
+    "type": "metrics"
+  },
+  "metrics": {
+    "endpoint": "/v1/metrics/snapshot",
+    "required_metrics": [
+      {
+        "name": "writer_health.consecutive_failures",
+        "section": "writer_health",
+        "path": "$.data.writer_health.consecutive_failures",
+        "type": "integer",
+        "description": "Number of consecutive TSDB flush failures (0 = healthy)"
+      },
+      {
+        "name": "writer_health.buffer_size",
+        "section": "writer_health",
+        "path": "$.data.writer_health.buffer_size",
+        "type": "integer",
+        "description": "Number of metric samples queued in retry buffer (0 = flushed)"
+      }
+    ],
+    "format_validation": true
+  }
+}

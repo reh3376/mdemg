@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-03-24
+Last updated: 2026-03-29
 
 ---
 
@@ -17,8 +17,8 @@ Last updated: 2026-03-24
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
 | USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 3 canonical, 2 drafts |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only | 4 |
-| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 3 canonical, 1 draft |
-| UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 5 |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 8 canonical, 1 draft |
+| UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 11 |
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
@@ -36,8 +36,8 @@ Last updated: 2026-03-24
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
 | USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (3); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
 | UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | none (spec-only, no runner/fixtures) | no CI gate |
-| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (3); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
-| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (5) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
+| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (8); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
+| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (11) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 | UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
