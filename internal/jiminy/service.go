@@ -454,6 +454,11 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// Generate guidance_id early so it's available for protocol JSONL and LLM context correlation.
+	// Placed after cache-hit early return (line 447-453) to avoid wasted generation on cache hits.
+	guidanceID := cuid2.Generate()
+	ctx = llmclient.WithGuidanceID(ctx, guidanceID)
+
 	maxItems := req.MaxItems
 	if maxItems <= 0 {
 		maxItems = s.cfg.JiminyMaxItems
@@ -822,6 +827,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 					MLConfidence:     pred.Conf,
 					TierSource:       result.Source,
 					SidecarMode:      s.arbitrator.Mode(),
+					GuidanceID:       guidanceID,
 				})
 			}
 		}
@@ -852,8 +858,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
-	// Phase AR-2: Generate guidance_id and track items for effectiveness feedback
-	guidanceID := cuid2.Generate()
+	// Phase AR-2: Track guidance items for effectiveness feedback
+	// (guidanceID generated earlier, after cache check, for protocol JSONL correlation)
 	if s.tracker != nil && len(filtered) > 0 {
 		s.tracker.Track(guidanceID, filtered)
 	}
@@ -1060,6 +1066,9 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	if req.GuidanceID == "" {
 		return nil, fmt.Errorf("guidance_id is required")
 	}
+
+	// Thread guidance_id into context for LLM interaction correlation
+	ctx = llmclient.WithGuidanceID(ctx, req.GuidanceID)
 
 	items := s.tracker.Lookup(req.GuidanceID)
 	if items == nil {
@@ -1279,6 +1288,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				ScoreSource:        dims.ScoreSource,
 				TrustScore:         trustScoreForFeedback,
 				SessionID:          feedbackSessionID,
+				GuidanceID:         req.GuidanceID,
 			})
 		}
 	}

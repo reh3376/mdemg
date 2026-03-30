@@ -34,6 +34,8 @@ func TestProtocolDataCollector_ExpandedRecord(t *testing.T) {
 		SidecarMode:        "compare",
 	}
 
+	rec.GuidanceID = "guid-test-001"
+
 	dc.Collect(rec)
 
 	// Wait for async write
@@ -68,6 +70,11 @@ func TestProtocolDataCollector_ExpandedRecord(t *testing.T) {
 	}
 	if parsed.Timestamp == "" {
 		t.Error("expected non-empty timestamp")
+	}
+
+	// Verify guidance_id correlation field
+	if parsed.GuidanceID != "guid-test-001" {
+		t.Errorf("guidance_id = %q, want 'guid-test-001'", parsed.GuidanceID)
 	}
 
 	// Verify expanded fields (NS-03)

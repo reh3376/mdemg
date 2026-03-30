@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/mathutil"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
@@ -955,7 +956,12 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 			if classText == "" {
 				classText = r.Name
 			}
-			classification, err := s.constraintClassifier.Classify(ctx, r.NodeID, classText)
+			// Thread source path for LLM interaction logging
+			classCtx := ctx
+			if r.Path != "" {
+				classCtx = llmclient.WithSourcePath(ctx, r.Path)
+			}
+			classification, err := s.constraintClassifier.Classify(classCtx, r.NodeID, classText)
 			if err == nil && classification != nil && classification.Type != "none" {
 				constraintType = classification.Type
 				summary = classification.Summary

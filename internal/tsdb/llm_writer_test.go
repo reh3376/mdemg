@@ -105,8 +105,13 @@ func TestLLMInteractionWriter_Flush(t *testing.T) {
 	if call.Table[0] != "llm_interactions" {
 		t.Errorf("table: got %q, want %q", call.Table[0], "llm_interactions")
 	}
-	if len(call.Columns) != 20 {
-		t.Errorf("columns: got %d, want 20", len(call.Columns))
+	if len(call.Columns) != 22 {
+		t.Errorf("columns: got %d, want 22", len(call.Columns))
+	}
+	// Verify new columns are present at the end
+	lastTwo := call.Columns[len(call.Columns)-2:]
+	if lastTwo[0] != "guidance_id" || lastTwo[1] != "source_path" {
+		t.Errorf("last 2 columns: got %v, want [guidance_id source_path]", lastTwo)
 	}
 
 	// Buffer should be empty after flush
@@ -152,6 +157,36 @@ func TestLLMInteractionWriter_Close(t *testing.T) {
 	}
 	if pool.calls[0].Rows != 1 {
 		t.Errorf("rows on close flush: got %d, want 1", pool.calls[0].Rows)
+	}
+}
+
+func TestLLMInteractionWriter_EnrichedColumns(t *testing.T) {
+	pool := &mockPool{}
+	w := newTestLLMWriter(pool)
+
+	quality := 0.85
+	w.Record(context.Background(), llmclient.InteractionRecord{
+		Time:          time.Now(),
+		TaskName:      "jiminy.synthesize",
+		GuidanceID:    "test-guidance-123",
+		SourcePath:    "CLAUDE.md",
+		ThinkContent:  "reasoning about constraints",
+		ThinkMode:     true,
+		Quality:       &quality,
+		QualitySource: "feedback_outcome",
+	})
+
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	if len(pool.calls) != 1 {
+		t.Fatalf("CopyFrom calls: got %d, want 1", len(pool.calls))
+	}
+	if pool.calls[0].Rows != 1 {
+		t.Errorf("rows: got %d, want 1", pool.calls[0].Rows)
 	}
 }
 

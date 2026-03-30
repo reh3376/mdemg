@@ -31,4 +31,16 @@ type InteractionRecord struct {
 	ModelName    string
 	Provider     string
 	Error        string
+
+	// Correlation
+	GuidanceID string // Jiminy guidance_id for feedback loop correlation
+	SourcePath string // Source file path for ingest-triggered calls
+
+	// Think content
+	ThinkContent string // Extracted <think>...</think> block
+	ThinkMode    bool   // Whether think mode was detected
+
+	// Quality (populated post-hoc by annotation job)
+	Quality       *float64 // 0.0-1.0, nil = not yet annotated
+	QualitySource string   // "feedback_outcome", "llm_judge", "deterministic", "human"
 }

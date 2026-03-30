@@ -62,6 +62,7 @@ func (w *LLMInteractionWriter) Record(_ context.Context, rec llmclient.Interacti
 	if rec.TraceID == "" {
 		rec.TraceID = cuid2.Generate()
 	}
+	llmclient.Scrub(&rec)
 	w.mu.Lock()
 	w.buffer = append(w.buffer, rec)
 	w.mu.Unlock()
@@ -83,13 +84,12 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 		rows[i] = []any{
 			r.Time, r.TraceID, r.TaskName, r.SpaceID, r.SessionID,
 			r.SystemPrompt, r.UserPrompt, r.Response,
-			"",    // think_content (not yet populated)
-			false, // think_mode
+			r.ThinkContent, r.ThinkMode,
 			r.LatencyMs, r.TokensIn, r.TokensOut,
 			r.ModelName, r.Provider, r.Error,
-			nil, // quality
-			"",  // quality_source
+			r.Quality, r.QualitySource,
 			false, "", // used_for_train, dataset_ver
+			r.GuidanceID, r.SourcePath,
 		}
 	}
 
@@ -103,6 +103,7 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 			"model_name", "provider", "error",
 			"quality", "quality_source",
 			"used_for_train", "dataset_ver",
+			"guidance_id", "source_path",
 		},
 		pgx.CopyFromRows(rows),
 	)
