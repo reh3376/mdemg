@@ -41,7 +41,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - J17 Feedback Loop Closure — COMPLETE (state file bridge, hook feedback delivery, control char sanitization, bootstrap codification)
 - J17 Protocol Pipeline 12-Break Cascading Fix — COMPLETE (code lookup, trust persistence, cache bypass, threshold sync, live collector wiring, all gauges flowing)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
-- Gap Analysis — IN PROGRESS (Phases 1-3 complete + sprint review remediations, Phase 4: GAP-02/18/20/21/26/27 done, claude .md ingestion done)
+- Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
 - Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-03-30
@@ -55,7 +55,7 @@ WHAT REMAINS TO BE DONE:
 - ✅ TSDB Sprint infrastructure — Live collectors, trend analyzer, Grafana dashboards
 - ✅ Training Data Collection Sprint (2026-03-30) — 7 gaps fixed for Qwen3-30B-A3B fine-tuning pipeline: InteractionRecord enrichment (6 fields, migration 005, schema v5), guidance ID correlation (context.WithValue threading), source document linkage (consulting classifier), privacy scrubber (5 regex categories, 12 tests), quality annotation pipeline (Python batch + report), data monitoring CLI (5 subcommands), JSONL backup integration
 
-=== GAP ANALYSIS Phase 4 (in progress) ===
+=== GAP ANALYSIS Phase 4 (COMPLETE) ===
 1. ✅ GAP-18: slog migration — ALL waves complete (internal/ + cmd/ + plugins/)
 2. ✅ GAP-02: Obsidian vault ingestion — v2 complete (parser, walker, Sync RPC, CI, release packaging, docs)
 3. ✅ GAP-26: Module developer tutorial with working example
@@ -370,7 +370,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | J17-FL | J17 Feedback Loop Closure | ✅ | `docs/features/j17-feedback-loop-closure.md` — state file bridge, hook feedback, control char fix, bootstrap codification |
 | J17-FIX | J17 Protocol Pipeline 12-Break Fix | ✅ | 12 cascading breaks: code lookup (content-similarity), TrustStore (Neo4j write-behind), cache bypass, threshold sync, effectiveness TTL, live collector wiring, metrics snapshot refresh. Verified: code_coverage=100%, T2 80%, compression_ratio=1.714 |
 | PROM | Prometheus Observability Monitoring | ✅ | `docs/features/prometheus-observability-monitoring.md` — cache hit metrics, bootstrap assessment, self-monitoring, 4 alert rules |
-| Gap | Gap Analysis Implementation | 🔄 | Phases 1-3 complete, Phase 4 in progress. Plan: `.claude/plans/mellow-crunching-hopcroft.md` |
+| Gap | Gap Analysis Implementation | ✅ | Phases 1-4 complete. GAP-13 (Windows companion) and GAP-14 (DBSCAN profiling) deferred to future sprints |
 | REM | PR #215 Remediation Sprint | ✅ | Gauge dirty flag (TSDB noise reduction), TSDB backup/restore (pg_dump, CLI, scheduler, retention), compose standardization, 21 alert rules validated, 70/70 Playwright e2e |
 | DD-SPRINT | Deep-Dive Remediation Sprint | ✅ | 2026-03-29 | SEC-LEAK (56 error leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run → managed transactions) |
 | TD-SPRINT | Training Data Collection Sprint | ✅ | 2026-03-30 | TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage in consulting classifier), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline + report), TD-CLI (`mdemg data` CLI with 5 subcommands), TD-BACKUP (JSONL backup integration in TSDB backup service) |
@@ -400,7 +400,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 
 ## 5. Open Work Items
 
-### Gap Analysis Phase 4 — Status as of 2026-03-28
+### Gap Analysis Phase 4 — COMPLETE as of 2026-03-30
 
 Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
@@ -449,6 +449,20 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | JSONL backup integration | `internal/tsdb/backup.go` | `tarGzDirectory()` helper, `JSONLTarPath`/`JSONLTarSize` fields in backup manifests. Includes `.mdemg/neural/training-data/` as `training-data.tar.gz` |
 | InteractionRecord enrichment | `internal/llmclient/recorder.go` | 6 new fields: GuidanceID, SourcePath, ThinkContent, ThinkMode, Quality (*float64), QualitySource. TSDB writer expanded to 22 columns |
 | TSDB migration 005 | `internal/tsdb/migrations/005_interaction_enrichment.sql` | Adds `guidance_id` + `source_path` columns with conditional indexes. Schema version 4 → 5 |
+
+### Fine-Tuning Pipeline (ft-lora) — Status as of 2026-03-30
+
+Source plan: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN.md`
+
+| Phase | Title | Status | Notes |
+|-------|-------|--------|-------|
+| 1 | LLM Interaction Logger | ✅ COMPLETE | PRs #217-#219. 16 consumers, TSDB writer, scrubber, quality pipeline, data CLI |
+| 2 | Think Mode + Response Sanitization | ⬜ NOT STARTED | Critical path: `SanitizeResponse(StripThinkBlock)` — 9/16 consumers break without it. Needed before any local Qwen3 usage |
+| 3 | vllm-mlx Integration | ⬜ NOT STARTED | Blocked on Phase 2 |
+| 4+ | SFT/GRPO/DPO training | ⬜ BLOCKED | Requires weeks of data accumulation from Phase 1 activation |
+
+**Next actionable step**: Phase 2 (SanitizeResponse) — implement after sufficient training data accumulates.
+**Data collection**: Activated 2026-03-30. Expect 2-4 weeks minimum before sufficient volume for fine-tuning.
 
 ---
 
@@ -577,4 +591,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-30 — Training Data Collection Sprint (TD-SPRINT) COMPLETE: TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline), TD-CLI (mdemg data, 5 subcommands), TD-BACKUP (JSONL backup integration). CI: ALL GREEN.*
+*Last updated: 2026-03-30 — Gap Analysis Phase 4 COMPLETE (GAP-13/14 deferred). Training data collection activated (NEURAL_DATA_COLLECTION + TSDB_BACKUP_ENABLED). Dependabot alerts resolved (jsonparser v1.1.2, pygments 2.20.0). Fine-tuning pipeline status documented (Phase 2 SanitizeResponse is next). CI: ALL GREEN.*
