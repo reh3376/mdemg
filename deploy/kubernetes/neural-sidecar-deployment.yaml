@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neural-sidecar
+  labels:
+    app.kubernetes.io/name: neural-sidecar
+    app.kubernetes.io/component: j17-protocol
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: neural-sidecar
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: neural-sidecar
+    spec:
+      containers:
+        - name: neural-sidecar
+          image: mdemg/neural-sidecar:latest
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: NEURAL_RERANK_MODEL
+              value: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            - name: NEURAL_NLI_MODEL
+              value: "cross-encoder/nli-MiniLM2-L6-H768"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi

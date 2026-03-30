@@ -1,0 +1,19 @@
+{{- if .Values.timescaledb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mdemg.fullname" . }}-timescaledb
+  labels:
+    {{- include "mdemg.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics-database
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    app.kubernetes.io/name: {{ include "mdemg.name" . }}-timescaledb
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

@@ -17,7 +17,7 @@ spec:
       {{- include "mdemg.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
-      path: /v1/prometheus
+      path: /v1/metrics/snapshot
       interval: {{ .Values.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
 {{- end }}
