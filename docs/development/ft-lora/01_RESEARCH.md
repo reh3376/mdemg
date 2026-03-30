@@ -1,6 +1,6 @@
 # Research: Fine-Tuning an Open-Source LLM for MDEMG Recursive Self-Improvement
 
-**Date:** 2026-03-27 (v2.0 — corrected from deep-dive analysis)
+**Date:** 2026-03-30 (v3.0 — aligned to codebase PRs #210-#219 + deep-dive analysis)
 **Hardware:** Apple M5 Max — 128GB unified memory, 614 GB/s bandwidth
 **Model:** Qwen3-30B-A3B MoE (Apache 2.0, 30B total / 3B active, /think + /no_think)
 **Goal:** Replace all external LLM calls with a single fine-tuned model that recursively improves itself
@@ -9,47 +9,57 @@
 
 ## 1. What MDEMG Currently Uses LLMs For
 
-### 1.1 Generative Tasks (15 Call Sites)
+### 1.1 Generative Tasks (16 Call Sites)
 
-MDEMG makes **15** distinct generative LLM calls (not 11 as originally assessed — codebase audit found 4 additional consumers). All are routed through `llmclient.Client` configured via `LLM_PROVIDER` / `LLM_MODEL`.
+MDEMG makes **16** distinct generative LLM calls. All are routed through `llmclient.Client` configured via `LLM_PROVIDER` / `LLM_MODEL`. Each consumer is labeled with a `WithContext(taskName, spaceID)` call for interaction logging.
 
-| # | File | Task | Input | Output | Latency Req | JSON Parse? |
+| # | File | Task Label | Input | Output | Latency Req | JSON Parse? |
 |---|---|---|---|---|---|---|
-| 1 | `ape/llm_reflector.go` | RSIC reflection | Health report + stats | Structured JSON insights | Background | ✅ |
-| 2 | `consulting/llm_classifier.go` | Constraint classification | Node content | JSON: is_constraint + confidence | Inline (<2s) | ✅ |
-| 3 | `consulting/synthesis.go` | Memory synthesis | Memories[] + query | Natural language narrative | Inline (<3s) | ❌ |
-| 4 | `hidden/cluster_summarizer.go` | Cluster summarization | Cluster members | Concept name + summary text | Background | ❌ |
-| 5 | `hidden/emergence_namer.go` | Emergence naming | Layer members + edges | JSON: name + type | Background | ✅ |
-| 6 | `hidden/reclassifier.go` | Node reclassification | Node content + context | JSON: type + confidence | Background | ✅ |
-| 7 | `jiminy/evaluator.go` | J9 evaluation | Agent output + constraints | JSON: violations + warnings | Near-RT (<5s) | ✅ |
-| 8 | `jiminy/outcome_classifier.go` | Outcome classification | Guidance + action | JSON: followed/ignored/contradicted | Near-RT (<3s) | ✅ |
-| 9 | `jiminy/synthesizer.go` | Guidance synthesis | Items[] + context | Prompt augmentation text | Near-RT (<3s) | ❌ |
-| 10 | `jiminy/codegen.go` | J17 code generation | Constraint type + desc | Kebab-case code string | Background | ❌ |
-| 11 | `metalearn/generalizer.go` | Cross-space generalization | Concepts from spaces | JSON: generalized concept | Background | ✅ |
-| 12 | `retrieval/intent_translator.go` | Query rewriting | User query | Rewritten query text | Inline (<2s) | ❌ |
-| 13 | `retrieval/query_classifier.go` | Query type classification | User query | JSON: type + confidence | Inline (<2s) | ✅ |
-| 14 | `retrieval/rerank.go` | LLM-based reranking | Query + candidates | JSON: scored rankings | Inline (<3s) | ✅ |
-| 15 | `summarize/service.go` | Code element summarization | Code element struct | Summary text / JSON | Background | ✅ (partial) |
+| 1 | `ape/llm_reflector.go` | `ape.reflect` | Health report + stats | Structured JSON insights | Background | ✅ |
+| 2 | `consulting/llm_classifier.go` | `consulting.classify` | Node content | JSON: is_constraint + confidence | Inline (<2s) | ✅ |
+| 3 | `consulting/synthesis.go` | `consulting.synthesis` | Memories[] + query | Natural language narrative | Inline (<3s) | ❌ |
+| 4 | `hidden/cluster_summarizer.go` | `hidden.summarize` | Cluster members | Concept name + summary text | Background | ❌ |
+| 5 | `hidden/emergence_namer.go` | `hidden.name_emergence` | Layer members + edges | JSON: name + type | Background | ✅ |
+| 6 | `hidden/reclassifier.go` | `hidden.reclassify` | Node content + context | JSON: type + confidence | Background | ✅ |
+| 7 | `jiminy/evaluator.go` | `jiminy.evaluate` | Agent output + constraints | JSON: violations + warnings | Near-RT (<5s) | ✅ |
+| 8 | `jiminy/evaluator.go` | `jiminy.evaluate_llm` | Agent output + LLM revalidation | JSON: revalidated items | Near-RT (<5s) | ✅ |
+| 9 | `jiminy/outcome_classifier.go` | `jiminy.evaluate` (outcome) | Guidance + action | JSON: followed/ignored/contradicted | Near-RT (<3s) | ✅ |
+| 10 | `jiminy/synthesizer.go` | `jiminy.synthesize` | Items[] + context | Prompt augmentation text | Near-RT (<3s) | ❌ |
+| 11 | `jiminy/codegen.go` | `jiminy.codegen` | Constraint type + desc | Kebab-case code string | Background | ❌ |
+| 12 | `metalearn/generalizer.go` | `metalearn.generalize` | Concepts from spaces | JSON: generalized concept | Background | ✅ |
+| 13 | `retrieval/intent_translator.go` | `retrieval.intent_translate` | User query | Rewritten query text | Inline (<2s) | ❌ |
+| 14 | `retrieval/query_classifier.go` | `retrieval.query_classify` | User query | JSON: type + confidence | Inline (<2s) | ✅ |
+| 15 | `retrieval/rerank.go` | `retrieval.rerank_cross` | Query + candidates | JSON: scored rankings | Inline (<3s) | ✅ |
+| 16 | `retrieval/rerank.go` | `retrieval.rerank_nli` | Query + candidates | JSON: NLI-based rankings | Inline (<3s) | ❌ |
+| 17 | `summarize/service.go` | `summarize.generate` | Code element struct | Summary text / JSON | Background | ✅ (partial) |
 
-**Critical finding:** 9 of 15 consumers call `json.Unmarshal` on the raw LLM response. Qwen3's think mode produces `<think>...</think>\n{json}` which breaks all JSON parsers. A `SanitizeResponse()` function is required (see Implementation Plan Phase 2F).
+Note: 17 rows because `jiminy.evaluate` appears in both evaluator.go (constraint checking) and outcome_classifier.go (feedback classification). The model serves **16 distinct task labels**.
+
+**Critical finding:** 9 of 16 consumers call `json.Unmarshal` on the raw LLM response. Qwen3's think mode produces `<think>...</think>\n{json}` which breaks all JSON parsers. A `SanitizeResponse()` function is required (see Implementation Plan Phase 2D).
 
 ### 1.2 Cross-Encoder Tasks (3 Models in Neural Sidecar)
 
 | # | Model | Params | Task | Fine-Tuned? |
 |---|---|---|---|---|
-| 16 | `cross-encoder/ms-marco-MiniLM-L-6-v2` | ~22M | Re-rank retrieval candidates | Yes (via `train.py`) |
-| 17 | `cross-encoder/nli-deberta-v3-xsmall` | ~22M | NLI comprehension scoring | No |
-| 18 | Configurable | ~22M | J17 tier prediction | Yes (via `train_protocol.py`) |
+| 18 | `cross-encoder/ms-marco-MiniLM-L-6-v2` | ~22M | Re-rank retrieval candidates | Yes (via `train.py`) |
+| 19 | `cross-encoder/nli-deberta-v3-xsmall` | ~22M | NLI comprehension scoring | No |
+| 20 | Configurable | ~22M | J17 tier prediction | Yes (via `train_protocol.py`) |
 
-### 1.3 Existing Training Data Collection
+### 1.3 Training Data Collection (Current State)
 
-| Collector | Status | Default |
-|---|---|---|
-| Rerank JSONL | Built, working | **OFF** (`NEURAL_DATA_COLLECTION=false`) |
-| Protocol JSONL | Built, working | **OFF** (`J17_PROTOCOL_DATA_COLLECTION=false`) |
-| LLM Interaction Logger | **NOT BUILT** | — |
+| Collector | Status | Default | Storage |
+|---|---|---|---|
+| **LLM Interaction Logger** | ✅ BUILT (PR #217/#218) | **ON** | TimescaleDB `llm_interactions` table |
+| **Privacy Scrubber** | ✅ BUILT (PR #219) | Wired into writer | At write time (5 regex patterns) |
+| **Guidance ID Correlation** | ✅ BUILT (PR #219) | Via context.WithValue | `guidance_id` column |
+| **Source Path Linkage** | ✅ BUILT (PR #219) | Via context.WithValue | `source_path` column |
+| **Think Content Extraction** | ✅ BUILT (PR #219) | In recordInteraction | `think_content` column |
+| **Quality Annotation** | ✅ BUILT (PR #219) | Manual trigger | `quality_annotator.py` |
+| **Data CLI** | ✅ BUILT (PR #219) | `mdemg data` | status/inspect/stats/annotate/quality |
+| Rerank JSONL | Built, working | **OFF** | `.mdemg/neural/training-data/*.jsonl` |
+| Protocol JSONL | Built, working | **OFF** | `.mdemg/neural/training-data/*.jsonl` |
 
-**Neither existing collector captures generative LLM inputs/outputs.** The interaction logger (Phase 1 of implementation plan) is the critical path for training data.
+All 16 generative LLM call sites are logged to TimescaleDB with task labels, guidance_id correlation, source document linkage, privacy scrubbing, and think content extraction.
 
 ---
 
@@ -62,8 +72,8 @@ MDEMG makes **15** distinct generative LLM calls (not 11 as originally assessed 
 │                    ITERATION N                               │
 │                                                              │
 │  1. MDEMG operates with fine-tuned model v(N)                │
-│     - All 15 tasks served by single MoE model               │
-│     - Interaction logger captures all I/O to JSONL           │
+│     - All 16 tasks served by single MoE model               │
+│     - Interaction logger captures all I/O to TimescaleDB     │
 │                                                              │
 │  2. RSIC assesses quality using model v(N)                   │
 │     - Health scores, comprehension, effectiveness            │
@@ -73,6 +83,7 @@ MDEMG makes **15** distinct generative LLM calls (not 11 as originally assessed 
 │     - Quality filter → format converter → dataset versioner  │
 │     - Anti-collapse: exogenous ratio α ≥ 0.4                │
 │     - Temporal split: test data from AFTER training data     │
+│     - RAFT enrichment: include retrieval context             │
 │                                                              │
 │  4. Training stages:                                         │
 │     a. SFT (LoRA on accumulated data + anchor)              │
@@ -81,7 +92,7 @@ MDEMG makes **15** distinct generative LLM calls (not 11 as originally assessed 
 │     d. HITL (human review for subjective quality)            │
 │                                                              │
 │  5. Benchmark gate: v(N+1) vs v(N) on held-out test set     │
-│     - All 15 tasks evaluated                                 │
+│     - All 16 tasks evaluated via ULTS specs                  │
 │     - Regression: keep v(N)                                  │
 │     - Improvement: deploy v(N+1) via vllm-mlx               │
 │                                                              │
@@ -110,11 +121,49 @@ v3: Trained on v2 + cascade fix → discovers trust burst issue
     (feedback data now flows, showing trust progression anomalies)
 ```
 
+### 2.4 RAFT: Training for the Open-Book Setting (v3.0 Addition)
+
+MDEMG operates in an "open-book" setting — every LLM call receives retrieved context from the Neo4j knowledge graph. The constraint classifier gets candidate nodes with relevance scores. The guidance synthesizer receives constraint items retrieved by embedding search. The evaluator gets active constraints matched against the agent's output.
+
+UC Berkeley's RAFT research (Retrieval Augmented Fine-Tuning, COLM 2024) proves that training a model to work in this setting — where it must distinguish relevant retrieved information from distractors — significantly outperforms both pure RAG and pure fine-tuning.
+
+MDEMG's RAFT implementation:
+
+- **Training data includes retrieval context:** retrieved node IDs, relevance scores, and which node was the "oracle" (relevant) vs. distractor
+- **80/20 split:** 80% of training examples include retrieved context in the prompt; 20% omit it (forcing the model to fall back on internalized knowledge)
+- **Natural fit:** MDEMG's architecture is already hybrid RAG + fine-tuning. The graph holds facts (constraints, observations, patterns). The fine-tuned model learns behavior (how to classify, synthesize, evaluate, and reflect on those facts)
+- **2026 consensus:** "RAG for facts, fine-tuning for behavior" — MDEMG embodies this pattern
+
+This is the single most important training quality improvement. Without retrieval context, the model trains in closed-book mode but operates in open-book mode. With it, the model trains in the same mode it operates in.
+
+### 2.5 Design for Routine Retraining (v3.0 Addition)
+
+MDEMG evolves rapidly (~4-5 PRs/day). Retraining is routine maintenance, not a special project.
+
+**Retraining triggers:**
+- System prompts change (new output fields, refined formats)
+- New tasks are added
+- The knowledge domain shifts (new codebases, new teams)
+- Model performance degrades (benchmark regression or entropy decay)
+- Better base models become available (Qwen3.5, Qwen4)
+
+**Expected frequency:**
+- Monthly SFT refreshes (incorporate new production data)
+- Quarterly GRPO cycles (after sufficient quality-annotated data accumulates)
+- Ad-hoc retraining when system prompts change significantly
+- Base model upgrades ~1-2x/year
+
+**Design implications:**
+- System prompt hash on every training record (enables data versioning)
+- Automated pipeline with regression gates (can run unattended)
+- Graceful fallback to external LLM when training cycle produces regression
+- ULTS specs version alongside prompts (single source of truth for contracts)
+
 ---
 
 ## 3. Model Selection: Qwen3-30B-A3B MoE
 
-### 3.1 Why MoE over Dense (Corrected from v1.0)
+### 3.1 Why MoE over Dense
 
 Real-world benchmarks revealed Qwen3-32B dense runs at **10-22 tok/s** on Apple Silicon — not the ~24 tok/s originally estimated. The MoE model runs at **64-88 tok/s** on the same hardware with identical quality.
 
@@ -134,13 +183,15 @@ The Qwen3.5-35B-A3B is the newer successor with 262K context and native vision, 
 
 ### 3.2 Training Data Estimate
 
-**15 tasks × 500-1000 examples each = 7,500-15,000 total anchor examples**, plus ongoing production data collection, synthetic failure examples, and HITL preference pairs.
+**16 tasks × 500-1000 examples each = 8,000-16,000 total anchor examples**, plus ongoing production data collection, synthetic failure examples, and HITL preference pairs.
+
+At current development velocity (~50-100 LLM interactions/day), reaching 500 samples per task takes approximately 2-3 months. Low-frequency tasks (metalearn.generalize, hidden.reclassify) will require teacher distillation to supplement.
 
 ---
 
 ## 4. Infrastructure
 
-### 4.1 Production Architecture (Corrected from v1.0)
+### 4.1 Production Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -156,14 +207,15 @@ The Qwen3.5-35B-A3B is the newer successor with 262K context and native vision, 
 │  │   base_url:  │   │ Reasoning parser │  │                   │ │
 │  │   :8100/v1)  │   │                  │  └───────────────────┘ │
 │  │              │   │ Qwen3-30B-A3B    │                        │
-│  └─────────────┘   │ (MoE, ~20GB Q4)  │  ┌───────────────────┐ │
-│                     │ ~80 tok/s         │  │ Training Pipeline │ │
-│                     └──────────────────┘  │ (offline, MLX)    │ │
-│                                           └───────────────────┘ │
+│  │  TSDB ───────┼──→│ (MoE, ~20GB Q4)  │  ┌───────────────────┐ │
+│  │  (metrics +  │   │ ~80 tok/s         │  │ Training Pipeline │ │
+│  │   training   │   └──────────────────┘  │ (offline, MLX)    │ │
+│  │   data)      │                         └───────────────────┘ │
+│  └─────────────┘                                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key change from v1.0:** The custom `generator.py` in the neural sidecar is replaced by **vllm-mlx**, which provides an OpenAI-compatible API with prefix caching (5.8x TTFT speedup on shared system prompts), continuous batching, and native Qwen3 reasoning parser. Since it's OpenAI-compatible, `llmclient`'s existing OpenAI provider works directly — no new "mlx" provider is needed.
+**Key design:** The custom `generator.py` from v1.0 is replaced by **vllm-mlx**, which provides an OpenAI-compatible API with prefix caching (5.8x TTFT speedup on shared system prompts), continuous batching, and native Qwen3 reasoning parser. Since it's OpenAI-compatible, `llmclient`'s existing OpenAI provider works directly — no new provider code needed.
 
 ### 4.2 Memory Budget
 
@@ -171,10 +223,11 @@ The Qwen3.5-35B-A3B is the newer successor with 262K context and native vision, 
 |---|---|
 | macOS + desktop | ~8GB |
 | Neo4j Docker | ~6GB |
+| TimescaleDB Docker | ~1-2GB |
 | MDEMG Go server | ~1GB |
 | Neural sidecar (cross-encoders) | ~2GB |
 | Claude Code | ~2GB |
 | vllm-mlx + Qwen3-30B-A3B Q4 | ~22GB |
-| **Total used** | **~41GB** |
-| **Available for KV cache + context** | **~87GB** |
+| **Total used** | **~42-43GB** |
+| **Available for KV cache + context** | **~85-86GB** |
 | **Training (bf16 LoRA, offline)** | ~74GB (128GB available when inference stopped) |

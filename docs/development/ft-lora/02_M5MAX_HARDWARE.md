@@ -1,14 +1,13 @@
 # M5 Max Hardware-Specific Configuration
 
-**Date:** 2026-03-27 (v2.0)
+**Date:** 2026-03-30 (v3.0)
 **Hardware:** Apple M5 Max — 18-core CPU (6 super + 12 performance), 40-core GPU with Neural Accelerators, 128GB unified memory, 614 GB/s bandwidth, Thunderbolt 5, 2TB internal SSD + unlimited external SSD
 **Model:** Qwen3-30B-A3B MoE (Apache 2.0, 30B total / 3B active per token)
-**Constraint:** Single model for all 15 MDEMG generative LLM tasks
-**Supersedes:** v1.0 which recommended Qwen3-32B dense
+**Constraint:** Single model for all 16 MDEMG generative LLM tasks
 
 ---
 
-## 1. Why MoE over Dense (v2.0 Correction)
+## 1. Why MoE over Dense
 
 Real-world benchmarks contradicted the v1.0 speed estimates for Qwen3-32B dense:
 
@@ -37,7 +36,7 @@ The M5 Max's 614 GB/s bandwidth (vs M4 Max ~546 GB/s) plus Neural Accelerators y
 
 All quantization levels meet every MDEMG latency requirement with massive headroom.
 
-**vllm-mlx prefix caching bonus:** MDEMG's 15 tasks share system prompts per task type. With prefix caching, repeated task calls skip the system prompt prefill entirely — 5.8x TTFT improvement on cached prefixes.
+**vllm-mlx prefix caching bonus:** MDEMG's 16 tasks share system prompts per task type. With prefix caching, repeated task calls skip the system prompt prefill entirely — 5.8x TTFT improvement on cached prefixes.
 
 ---
 
@@ -49,14 +48,15 @@ All quantization levels meet every MDEMG latency requirement with massive headro
 |---|---|
 | macOS + desktop | ~8GB |
 | Neo4j Docker (34K+ nodes) | ~6GB |
+| TimescaleDB Docker | ~1-2GB |
 | MDEMG Go server | ~1GB |
 | Neural sidecar (3 cross-encoders) | ~2GB |
 | Claude Code | ~2GB |
 | vllm-mlx + Qwen3-30B-A3B Q4 | ~22GB |
-| **Total used** | **~41GB** |
-| **Available for KV cache + context** | **~87GB** |
+| **Total used** | **~42-43GB** |
+| **Available for KV cache + context** | **~85-86GB** |
 
-87GB of KV cache supports context windows well beyond 128K tokens for a 3B-active MoE.
+85-86GB of KV cache supports context windows well beyond 128K tokens for a 3B-active MoE.
 
 ### Training Mode (Offline — All Services Stopped)
 
@@ -72,15 +72,27 @@ No production traffic means training can use the full 128GB. bf16 LoRA is the de
 
 **Training time estimate (9,400 examples, 3 epochs, batch=4):** ~6-10 hours. MoE training is faster than dense because only 3B active parameters compute gradients per token. `mlx-lm-lora` has a 12x MoE training speed optimization with 35% less memory than standard implementations.
 
+### Concurrent Inference + QLoRA Training (v3.0 Addition)
+
+For routine retraining without stopping inference:
+
+| Component | Memory |
+|---|---|
+| macOS + services (Neo4j, TSDB, MDEMG, sidecar) | ~20GB |
+| vllm-mlx + Q4 inference | ~22GB |
+| QLoRA training (4-bit base + LoRA adapters) | ~40-50GB |
+| **Total** | **~82-92GB** |
+| **Headroom** | **~36-46GB** |
+
+This fits in 128GB. Speed is reduced (~60% of standalone training speed) but allows retraining during low-usage periods without service interruption. Use bf16 LoRA (the default plan) for maximum quality; use QLoRA only when concurrent operation is needed.
+
 ---
 
-## 4. Inference Server: vllm-mlx (v2.0 Correction)
-
-**v1.0 built a custom `generator.py`. v2.0 replaces it with vllm-mlx.**
+## 4. Inference Server: vllm-mlx
 
 ### Why vllm-mlx
 
-| Feature | Custom generator.py (v1.0) | vllm-mlx (v2.0) |
+| Feature | Custom generator.py (v1.0) | vllm-mlx (v3.0) |
 |---|---|---|
 | API compatibility | Custom format | OpenAI + Anthropic compatible |
 | Prefix caching | Not implemented | 5.8x TTFT speedup |
@@ -120,12 +132,13 @@ No new Go provider code needed. `llmclient`'s existing OpenAI path works directl
 | Base model weights (bf16) | Internal SSD | ~60GB (downloaded once) |
 | Quantized inference model (Q4) | Internal SSD | ~17GB |
 | LoRA adapters (per version) | Internal SSD | ~200-400MB each |
-| Training data (all JSONL) | Internal SSD | ~2-3GB (6 months) |
+| Training data (TimescaleDB) | Internal SSD (Docker volume) | ~2-3GB (6 months) |
+| Training data (JSONL) | Internal SSD | ~500MB-1GB (6 months) |
 | Curated datasets (per version) | Internal SSD | ~20-50MB each |
 | Model archive (old versions) | External SSD (TB5) | ~17GB per version |
 | Training checkpoints | External SSD | ~2-4GB per checkpoint |
 
-Internal SSD budget: ~90GB. Well within 2TB.
+Internal SSD budget: ~95GB. Well within 2TB.
 
 ---
 
@@ -135,7 +148,7 @@ Qwen3's built-in `/think` and `/no_think` modes replace the two-model strategy:
 
 | Mode | Tasks | Speed | Use Case |
 |---|---|---|---|
-| `/no_think` | 2, 5, 6, 8, 10, 12, 13 | Full speed (~80 tok/s) | Classification, codegen, query rewriting |
-| `/think` | 1, 3, 4, 7, 9, 11, 14, 15 | ~60 tok/s (reasoning overhead) | RSIC reflection, synthesis, evaluation |
+| `/no_think` | consulting.classify, hidden.name_emergence, hidden.reclassify, jiminy.codegen, retrieval.intent_translate, retrieval.query_classify, retrieval.rerank_nli | Full speed (~80 tok/s) | Classification, codegen, query rewriting |
+| `/think` | ape.reflect, consulting.synthesis, hidden.summarize, jiminy.evaluate, jiminy.evaluate_llm, jiminy.synthesize, metalearn.generalize, retrieval.rerank_cross, summarize.generate | ~60 tok/s (reasoning overhead) | RSIC reflection, synthesis, evaluation |
 
 Implementation: `CompleteOpts.Think` boolean in each call site. vllm-mlx's `--reasoning-parser qwen3` handles the `<think>` block extraction automatically on the server side. The Go consumers receive clean responses after the `SanitizeResponse()` function strips any residual think blocks.

@@ -1,137 +1,109 @@
 # Corrections Applied: Deep-Dive Analysis Resolution
 
-**Date:** 2026-03-27
-**Source:** Deep-dive analysis conducted against v1.0 plans using web research, real benchmark data, and ICLR 2026 RSI Workshop findings.
-**Status:** All corrections applied to v2.0 documents.
+**Date:** 2026-03-30
+**Versions covered:** v1.0 → v2.0 → v3.0
+**Status:** All corrections applied. 19 total issues, 19 resolved, 0 open.
 
 ---
 
-## Critical Issues (5)
+## v1.0 → v2.0 Corrections (2026-03-27)
 
-### ISSUE 1: Model Choice — Qwen3-32B Dense Too Slow ✅ RESOLVED
+Source: Deep-dive analysis against v1.0 plans using web research, real benchmark data, and ICLR 2026 RSI Workshop findings.
 
-**Problem:** Real benchmarks showed Qwen3-32B dense at 10-22 tok/s on Apple Silicon, not the estimated 24 tok/s. Qwen3-30B-A3B MoE runs at 64-88 tok/s at identical quality (82.20% MMLU-Pro CS).
+### Critical Issues (5)
 
-**Resolution:** All documents updated to Qwen3-30B-A3B MoE. Apache 2.0 license preserved. Speed improvement: 4-5x. Inference memory impact: negligible (~20GB vs ~18GB at Q4).
+**ISSUE 1: Model Choice — Qwen3-32B Dense Too Slow ✅ RESOLVED**
 
-**Documents updated:** 01_RESEARCH.md §3, 02_M5MAX_HARDWARE.md §1-2, 03_IMPLEMENTATION_PLAN.md (throughout), 04_BENCHMARK_RL.md (throughout).
+Real benchmarks showed Qwen3-32B dense at 10-22 tok/s on Apple Silicon, not the estimated 24 tok/s. Qwen3-30B-A3B MoE runs at 64-88 tok/s at identical quality (82.20% MMLU-Pro CS). All documents updated to MoE.
 
-### ISSUE 2: Model Collapse Risk ✅ RESOLVED
+**ISSUE 2: Model Collapse Risk ✅ RESOLVED**
 
-**Problem:** Nature (2024) and ICLR RSI Workshop (2026) prove recursive self-training causes model collapse when exogenous signal vanishes. The v1.0 plan mentioned "anchor data" but didn't formalize anti-collapse requirements.
+Anti-Collapse Protocol formalized: α ≥ 0.4 exogenous ratio, entropy monitoring, fresh injection every 3 cycles, diversity sampling in GRPO. RSIC Patterns 27-28 added.
 
-**Resolution:** Anti-Collapse Protocol formalized:
-- Minimum exogenous ratio α ≥ 0.4 per dataset (enforced in `dataset_versioner.py`)
-- Entropy monitoring across versions (new `entropy_monitor.py`)
-- Fresh exogenous injection every 3 cycles (in `cycle_runner.py`)
-- Diversity sampling in GRPO: temperature ≥ 0.8, top_p = 0.95
-- RSIC Pattern 27 (entropy decay alert) and Pattern 28 (exogenous ratio violation → block training)
+**ISSUE 3: Custom Inference Server Reinvents vllm-mlx ✅ RESOLVED**
 
-**Documents updated:** 01_RESEARCH.md §2.2, 03_IMPLEMENTATION_PLAN.md Phase 6, 05_DATA_COLLECTION.md §5.3.
+Phase 3 reduced to config + service file. Three custom files eliminated. vllm-mlx provides OpenAI-compatible API with prefix caching, continuous batching, and Qwen3 reasoning parser.
 
-### ISSUE 3: Custom Inference Server Reinvents vllm-mlx ✅ RESOLVED
+**ISSUE 4: Test Data Contamination ✅ RESOLVED**
 
-**Problem:** v1.0 Phase 3 built a custom `generator.py` + `schemas_generate.py` + `mlx.go` (3 files). vllm-mlx (EuroMLSys '26) already provides OpenAI-compatible API with prefix caching, continuous batching, and Qwen3 reasoning parser.
+Temporal splits enforced, prompt deduplication via SHA-256, anchor dataset excluded from test, dataset manifests track provenance.
 
-**Resolution:** Phase 3 reduced to config + service file. Three files eliminated. `llmclient`'s existing OpenAI provider connects to vllm-mlx at `http://localhost:8100/v1` — no new provider needed.
+**ISSUE 5: Think Mode GRPO Overhead ✅ RESOLVED**
 
-**Documents updated:** 02_M5MAX_HARDWARE.md §4, 03_IMPLEMENTATION_PLAN.md Phase 3.
+Split GRPO into no-think tasks (group_size=8) and think tasks (group_size=4, think_budget=200). Total overhead reduced ~60%.
 
-### ISSUE 4: Test Data Contamination ✅ RESOLVED
+### Moderate Issues (4)
 
-**Problem:** Random train/valid/test splits allow temporal leakage and prompt duplication between splits.
+**ISSUE 6: Missing Inference Server Options Analysis ✅ RESOLVED** — vllm-mlx selected.
+**ISSUE 7: Training Data Not Versioned ✅ RESOLVED** — dataset_versioner.py with manifests.
+**ISSUE 8: Reward Function Validation Missing ✅ RESOLVED** — test_reward_functions.py added.
+**ISSUE 9: No Dead-Man's Switch ✅ RESOLVED** — 3 consecutive rejections → fallback to external LLM.
 
-**Resolution:**
-- Temporal splits enforced (train before valid before test by timestamp)
-- Prompt deduplication via SHA-256 hash
-- Anchor dataset explicitly excluded from test
-- Dataset manifests track all provenance
+### Additional Issues (4)
 
-**Documents updated:** 05_DATA_COLLECTION.md §5.4, §5.5, §6.4.
-
-### ISSUE 5: Think Mode GRPO Overhead ✅ RESOLVED
-
-**Problem:** GRPO with think mode generates 75% more tokens per completion. For 9,400 prompts × group_size 4 × 3 epochs, that's ~38M extra tokens — ~132 hours on M5 Max.
-
-**Resolution:** Split GRPO into no-think tasks (7 tasks, group_size=8) and think tasks (8 tasks, group_size=4, think_budget=200 tokens). Total GRPO token overhead reduced by ~60%.
-
-**Documents updated:** 04_BENCHMARK_RL.md §11.2.
+**ISSUE 10: Consumer Count Wrong (11 → 15) ✅ RESOLVED** — 4 additional consumers found.
+**ISSUE 11: Think Blocks Break JSON Parsing ✅ RESOLVED** — SanitizeResponse function specified.
+**ISSUE 12: No Format Retry Logic ✅ RESOLVED** — CompleteJSON helper added.
+**ISSUE 13: System Prompts Waste Tokens After Fine-Tuning ✅ RESOLVED** — Progressive compression strategy.
 
 ---
 
-## Moderate Issues (4)
+## v2.0 → v3.0 Corrections (2026-03-30)
 
-### ISSUE 6: Missing Inference Server Options Analysis ✅ RESOLVED
+Source: Deep-dive analysis against codebase state (PRs #210-#219) + 2026 LoRA/GRPO/RAFT research.
 
-Documented vllm-mlx / oMLX / mlx_lm.server trade-offs. vllm-mlx selected for prefix caching benefit.
+### ISSUE 14: Implementation Diverged from Plan Phase 1 ✅ RESOLVED
 
-**Documents updated:** 02_M5MAX_HARDWARE.md §4.
+**Problem:** PRs #217-#219 implemented the interaction logger using a different (better) pattern than the plan specified:
+- Plan: LLMCompleter interface + InteractionLogger wrapper + JSONL collector
+- Reality: InteractionRecorder interface + SetDefaultRecorder pattern + TimescaleDB writer (pgx CopyFrom)
 
-### ISSUE 7: Training Data Not Versioned ✅ RESOLVED
+The SetDefaultRecorder pattern is superior — it requires zero changes to any LLM consumer. The TSDB storage is superior to JSONL — it supports SQL queries, joins, indexes, and the guidance_id correlation that JSONL cannot provide.
 
-Added `dataset_versioner.py` with manifests tracking provenance, source breakdown, exogenous ratio, temporal split boundaries, and quality statistics.
+**Resolution:** All documents updated to reflect actual implementation. Phase 1 marked COMPLETE.
 
-**Documents updated:** 05_DATA_COLLECTION.md §4, §6.4.
+### ISSUE 15: Consumer Count 15 → 16 ✅ RESOLVED
 
-### ISSUE 8: Reward Function Validation Missing ✅ RESOLVED
+**Problem:** v2.0 counted 15 consumers, but the actual codebase has 16:
+- Rerank was split into `retrieval.rerank_cross` and `retrieval.rerank_nli` (2 separate WithContext labels)
+- `jiminy.evaluate_llm` (LLM tier-2 revalidation in evaluator.go) is a separate consumer from `jiminy.evaluate` (outcome classification)
 
-Added `neural/tests/test_reward_functions.py` with unit tests + calibration checks for every reward function.
+**Resolution:** All consumer tables, task registries, reward function mappings, and benchmark configs updated to 16 tasks.
 
-**Documents updated:** 04_BENCHMARK_RL.md §11.4.
+### ISSUE 16: Task Names Mismatch ✅ RESOLVED
 
-### ISSUE 9: No Dead-Man's Switch ✅ RESOLVED
+**Problem:** v2.0 plan used snake_case names (`rsic_reflection`, `constraint_classification`, etc.) but the implementation uses dot-notation (`ape.reflect`, `consulting.classify`, etc.). Every reference to task names in the plan was wrong.
 
-Added consecutive-rejection fallback: after 3 rejected cycles, switch to external LLM, regenerate training data from base model, and resume.
+**Resolution:** All task names updated to match actual `WithContext` labels used in the codebase. This affects tables in 01_RESEARCH, 03_IMPLEMENTATION_PLAN, 04_BENCHMARK_RL, and 05_DATA_COLLECTION.
 
-**Documents updated:** 03_IMPLEMENTATION_PLAN.md Phase 6E.
+### ISSUE 17: Missing RAFT Pattern ✅ RESOLVED
 
----
+**Problem:** Training data captures LLM I/O but not retrieval context. The model trains in closed-book mode but operates in open-book mode (with retrieved graph context). UC Berkeley RAFT research (COLM 2024) proves this gap causes significant quality loss. The fine-tuned model would learn to answer prompts in isolation instead of learning to work with MDEMG's retrieval system.
 
-## Additional Issues Found in Final Review (4)
+**Resolution:** New Phase 4A (RAFT Training Data Enrichment) added. RetrievalContext struct added to InteractionRecord. Wire into consulting/service.go and jiminy/service.go. Migration 006 adds retrieval columns to llm_interactions. Training data curated with 80/20 oracle/distractor split.
 
-### ISSUE 10: Consumer Count Wrong (11 → 15) ✅ RESOLVED
+### ISSUE 18: No LLM Call Contract Framework ✅ RESOLVED
 
-**Problem:** Codebase audit found 4 additional LLM consumers missed in v1.0:
-- `internal/retrieval/intent_translator.go` (query rewriting)
-- `internal/retrieval/query_classifier.go` (query type classification)
-- `internal/retrieval/rerank.go` (LLM-based reranking)
-- `internal/summarize/service.go` (code element summarization)
+**Problem:** 16 LLM tasks have implicit contracts (defined by system prompt constants) but no machine-readable specification for runtime validation, training data curation, or benchmark generation. The Phase 10 task registry was maintained separately from the contracts — dual sources of truth.
 
-**Resolution:** All documents updated to 15 consumers. Task registry, benchmarks, reward functions, and data collection all cover 15 tasks.
+**Resolution:** New ULTS (Universal LLM Task Specification) framework added as Phase 4B. 16 spec files, JSON schema, Python runner. ULTS becomes the single source of truth for task contracts, quality metrics, and reward function mappings. Phase 10 task registry becomes derivable from ULTS specs.
 
-### ISSUE 11: Think Blocks Break JSON Parsing ✅ RESOLVED
+### ISSUE 19: No System Prompt Versioning ✅ RESOLVED
 
-**Problem:** 9 of 15 consumers call `json.Unmarshal` on raw LLM response. Qwen3's think mode returns `<think>...</think>\n{"json"}` — breaking all JSON parsers. The existing `StripCodeFence` only handles markdown fences.
+**Problem:** MDEMG evolves rapidly (~4-5 PRs/day). When system prompts change — new output fields, refined formats, edge case handling — all training data generated under the old prompt becomes noise. No mechanism tracked which prompt version generated each training record.
 
-**Resolution:** New `SanitizeResponse()` function in `internal/llmclient/sanitize.go` that calls `StripThinkBlock()` then `StripCodeFence()`. All 9 JSON-parsing consumers updated to use `SanitizeResponse` instead of `StripCodeFence`.
-
-**Documents updated:** 01_RESEARCH.md §1.1 (JSON Parse column), 03_IMPLEMENTATION_PLAN.md Phase 2D-2E.
-
-### ISSUE 12: No Format Retry Logic ✅ RESOLVED
-
-**Problem:** Fine-tuned models produce malformed JSON more often than external LLMs. No consumer retries on parse failure.
-
-**Resolution:** New `CompleteJSON()` helper in `llmclient` that validates JSON, and on failure retries once with a format correction prompt.
-
-**Documents updated:** 03_IMPLEMENTATION_PLAN.md Phase 2F.
-
-### ISSUE 13: System Prompts Waste Tokens After Fine-Tuning ✅ RESOLVED
-
-**Problem:** 15 system prompts total ~200 lines explaining MDEMG's domain. After fine-tuning, the model already knows this — those tokens are wasted prefill.
-
-**Resolution:** Progressive prompt compression strategy with three modes (full/compact/minimal) controlled by `LLM_PROMPT_MODE` config. Switch to "compact" after benchmarks prove ≥95% quality parity.
-
-**Documents updated:** 03_IMPLEMENTATION_PLAN.md Phase 2G.
+**Resolution:** `system_prompt_hash` (SHA-256) added to InteractionRecord (Phase 2H). During dataset curation, records are filtered by prompt version via ULTS spec's `system_prompt_hash` field. Stale data from old prompt versions is excluded automatically.
 
 ---
 
 ## Summary
 
-| Severity | Found | Resolved | Open |
-|---|---|---|---|
-| Critical | 5 | 5 | 0 |
-| Moderate | 4 | 4 | 0 |
-| Additional | 4 | 4 | 0 |
-| **Total** | **13** | **13** | **0** |
+| Version | Severity | Found | Resolved | Open |
+|---|---|---|---|---|
+| v1.0 → v2.0 | Critical | 5 | 5 | 0 |
+| v1.0 → v2.0 | Moderate | 4 | 4 | 0 |
+| v1.0 → v2.0 | Additional | 4 | 4 | 0 |
+| v2.0 → v3.0 | Strategic | 6 | 6 | 0 |
+| **Total** | | **19** | **19** | **0** |
 
-All v2.0 documents are internally consistent and cross-referenced.
+All v3.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, and implementation status reflect the actual codebase state as of PR #219.

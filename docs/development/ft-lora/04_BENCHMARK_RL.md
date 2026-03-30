@@ -1,6 +1,6 @@
 # Phases 10-12: Automated Benchmarks + Reinforcement Learning
 
-**Date:** 2026-03-27 (v2.0)
+**Date:** 2026-03-30 (v3.0 — task names aligned to codebase, ULTS integration added)
 **Extends:** Implementation Plan Phases 1-9
 **Model:** Qwen3-30B-A3B MoE via vllm-mlx
 
@@ -13,7 +13,7 @@ Stage 1: SFT (Supervised Fine-Tuning)          ← Phase 5
     │ Teacher-distilled data → LoRA adapters
     ▼
 Stage 2: Automated Benchmarks                   ← Phase 10
-    │ Per-task scoring, regression detection
+    │ Per-task scoring via ULTS specs, regression detection
     ▼
 Stage 3: Automated RL (GRPO/DPO)               ← Phase 11
     │ MDEMG reward functions, split by think/no-think
@@ -28,12 +28,14 @@ Stage 5: Deploy or Reject                       ← Regression gate
 
 ## Phase 10: Automated Benchmark Framework
 
-### 10.1 Task Registry (All 15 Tasks)
+### 10.1 Task Registry (All 16 Tasks)
+
+When ULTS specs exist (Phase 4B), this registry is generated from the ULTS spec files. ULTS is the single source of truth for task contracts, quality metrics, and reward function mappings. Until then, this Python dict serves as the reference:
 
 ```python
 TASK_REGISTRY = {
     # === JSON-output tasks (9 tasks, all use SanitizeResponse) ===
-    "rsic_reflection": {
+    "ape.reflect": {
         "type": "structured", "think": True,
         "metrics": {
             "json_valid_rate": {"weight": 0.2, "threshold": 0.95},
@@ -42,7 +44,7 @@ TASK_REGISTRY = {
             "severity_accuracy": {"weight": 0.2, "threshold": 0.8},
         },
     },
-    "constraint_classification": {
+    "consulting.classify": {
         "type": "classification", "think": False,
         "metrics": {
             "accuracy": {"weight": 0.3, "threshold": 0.85},
@@ -51,7 +53,7 @@ TASK_REGISTRY = {
             "f1": {"weight": 0.2, "threshold": 0.80},
         },
     },
-    "emergence_naming": {
+    "hidden.name_emergence": {
         "type": "structured", "think": False,
         "metrics": {
             "name_quality": {"weight": 0.4, "threshold": 0.7},
@@ -59,7 +61,7 @@ TASK_REGISTRY = {
             "format_valid": {"weight": 0.3, "threshold": 0.95},
         },
     },
-    "node_reclassification": {
+    "hidden.reclassify": {
         "type": "classification", "think": False,
         "metrics": {
             "accuracy": {"weight": 0.5, "threshold": 0.85},
@@ -67,7 +69,7 @@ TASK_REGISTRY = {
             "confidence_calibration": {"weight": 0.2, "threshold": 0.7},
         },
     },
-    "j9_evaluation": {
+    "jiminy.evaluate": {
         "type": "detection", "think": True,
         "metrics": {
             "detection_rate": {"weight": 0.3, "threshold": 0.80},
@@ -76,15 +78,15 @@ TASK_REGISTRY = {
             "format_valid": {"weight": 0.2, "threshold": 0.95},
         },
     },
-    "outcome_classification": {
-        "type": "classification", "think": False,
+    "jiminy.evaluate_llm": {
+        "type": "detection", "think": True,
         "metrics": {
-            "accuracy": {"weight": 0.4, "threshold": 0.80},
-            "followed_precision": {"weight": 0.3, "threshold": 0.85},
-            "contradicted_recall": {"weight": 0.3, "threshold": 0.75},
+            "revalidation_accuracy": {"weight": 0.4, "threshold": 0.80},
+            "format_valid": {"weight": 0.3, "threshold": 0.95},
+            "false_positive_rate": {"weight": 0.3, "threshold": 0.15, "direction": "lower"},
         },
     },
-    "cross_space_generalization": {
+    "metalearn.generalize": {
         "type": "structured", "think": True,
         "metrics": {
             "applicability_accuracy": {"weight": 0.4, "threshold": 0.75},
@@ -92,7 +94,7 @@ TASK_REGISTRY = {
             "format_valid": {"weight": 0.3, "threshold": 0.95},
         },
     },
-    "query_classification": {
+    "retrieval.query_classify": {
         "type": "classification", "think": False,
         "metrics": {
             "accuracy": {"weight": 0.5, "threshold": 0.85},
@@ -100,7 +102,7 @@ TASK_REGISTRY = {
             "type_coverage": {"weight": 0.2, "threshold": 0.8},
         },
     },
-    "llm_reranking": {
+    "retrieval.rerank_cross": {
         "type": "structured", "think": True,
         "metrics": {
             "ndcg_at_5": {"weight": 0.4, "threshold": 0.75},
@@ -109,8 +111,8 @@ TASK_REGISTRY = {
         },
     },
 
-    # === Free-form text output tasks (5 tasks) ===
-    "memory_synthesis": {
+    # === Free-form / mixed output tasks (7 tasks) ===
+    "consulting.synthesis": {
         "type": "generation", "think": True,
         "metrics": {
             "coherence": {"weight": 0.3, "threshold": 0.7},
@@ -119,7 +121,7 @@ TASK_REGISTRY = {
             "format_valid": {"weight": 0.2, "threshold": 0.9},
         },
     },
-    "cluster_summarization": {
+    "hidden.summarize": {
         "type": "generation", "think": True,
         "metrics": {
             "name_quality": {"weight": 0.4, "threshold": 0.7},
@@ -127,7 +129,7 @@ TASK_REGISTRY = {
             "abstraction_level": {"weight": 0.3, "threshold": 0.6},
         },
     },
-    "guidance_synthesis": {
+    "jiminy.synthesize": {
         "type": "generation", "think": True,
         "metrics": {
             "coherence": {"weight": 0.3, "threshold": 0.7},
@@ -136,7 +138,7 @@ TASK_REGISTRY = {
             "format_valid": {"weight": 0.2, "threshold": 0.9},
         },
     },
-    "j17_codegen": {
+    "jiminy.codegen": {
         "type": "structured", "think": False,
         "metrics": {
             "format_valid": {"weight": 0.3, "threshold": 0.95},
@@ -144,7 +146,7 @@ TASK_REGISTRY = {
             "mnemonic_quality": {"weight": 0.4, "threshold": 0.7},
         },
     },
-    "intent_translation": {
+    "retrieval.intent_translate": {
         "type": "generation", "think": False,
         "metrics": {
             "relevance": {"weight": 0.4, "threshold": 0.7},
@@ -152,7 +154,15 @@ TASK_REGISTRY = {
             "query_quality": {"weight": 0.3, "threshold": 0.7},
         },
     },
-    "code_summarization": {
+    "retrieval.rerank_nli": {
+        "type": "structured", "think": False,
+        "metrics": {
+            "ndcg_at_5": {"weight": 0.4, "threshold": 0.70},
+            "format_valid": {"weight": 0.3, "threshold": 0.95},
+            "rank_correlation": {"weight": 0.3, "threshold": 0.65},
+        },
+    },
+    "summarize.generate": {
         "type": "generation", "think": True,
         "metrics": {
             "accuracy": {"weight": 0.4, "threshold": 0.75},
@@ -161,7 +171,7 @@ TASK_REGISTRY = {
         },
     },
 
-    # === Meta-task (not one of the 15, for recursive improvement) ===
+    # === Meta-task (not one of the 16, for recursive improvement) ===
     "system_integrity_check": {
         "type": "detection", "think": True,
         "metrics": {
@@ -188,7 +198,6 @@ TASK_REGISTRY = {
 ```bash
 # Weekly (cron/launchd):
 0 6 * * 0 cd /Users/reh3376/mdemg && python -m benchmarks.benchmark_scheduler
-
 # Post-training (called by cycle_runner.py automatically)
 # On-demand:
 mdemg finetune eval
@@ -207,23 +216,26 @@ mdemg finetune eval
 
 Both supported natively by `mlx-lm-lora` on Apple Silicon.
 
-### 11.2 Think-Mode GRPO Split (v2.0 Addition)
+MDEMG is well-suited for GRPO with verifiable rewards (RLVR) because many tasks have deterministic reward signals: JSON validity, classification accuracy, comprehension scores, guidance follow rates. This eliminates the need for a separate reward model — the ToolRL (ICLR 2026) approach of fine-grained reward design for tool use applies directly.
+
+### 11.2 Think-Mode GRPO Split
 
 GRPO with think mode generates 75% more tokens per completion (think blocks). Split into two runs:
 
 ```python
 # No-think tasks: group_size=8 (cheap, fast — 7 tasks)
 NOTHINK_TASKS = [
-    "constraint_classification", "emergence_naming", "node_reclassification",
-    "outcome_classification", "j17_codegen", "intent_translation", "query_classification",
+    "consulting.classify", "hidden.name_emergence", "hidden.reclassify",
+    "jiminy.codegen", "retrieval.intent_translate",
+    "retrieval.query_classify", "retrieval.rerank_nli",
 ]
 # ~50 tok per completion × 8 groups = 400 tok per prompt
 
-# Think tasks: group_size=4, think_budget=200 (capped — 8 tasks)
+# Think tasks: group_size=4, think_budget=200 (capped — 9 tasks)
 THINK_TASKS = [
-    "rsic_reflection", "memory_synthesis", "cluster_summarization",
-    "j9_evaluation", "guidance_synthesis", "cross_space_generalization",
-    "llm_reranking", "code_summarization",
+    "ape.reflect", "consulting.synthesis", "hidden.summarize",
+    "jiminy.evaluate", "jiminy.evaluate_llm", "jiminy.synthesize",
+    "metalearn.generalize", "retrieval.rerank_cross", "summarize.generate",
 ]
 # ~(200 think + 200 answer) × 4 groups = 1600 tok per prompt
 ```
@@ -233,27 +245,32 @@ THINK_TASKS = [
 New file: `neural/training/reward_functions.py`
 
 ```python
-# Format rewards (deterministic)
+# Format rewards (deterministic — verifiable)
 def json_valid_reward(prompt, completion, meta) -> float
 def format_compliance_reward(prompt, completion, meta) -> float
 
-# Accuracy rewards (ground truth comparison)
+# Accuracy rewards (ground truth comparison — verifiable)
 def classification_accuracy_reward(prompt, completion, meta) -> float
 def detection_precision_reward(prompt, completion, meta) -> float
 
-# Quality rewards (MDEMG infrastructure)
+# Quality rewards (MDEMG infrastructure — verifiable)
+def guidance_follow_rate_reward(prompt, completion, meta) -> float
+def comprehension_score_reward(prompt, completion, meta) -> float
+
+# Subjective rewards (LLM-as-judge)
 def rsic_actionability_reward(prompt, completion, meta) -> float
 def think_quality_reward(prompt, completion, meta) -> float
 
 # Composite per-task registry
 TASK_REWARDS = {
-    "rsic_reflection": [(json_valid_reward, 0.2), (rsic_actionability_reward, 0.5), (think_quality_reward, 0.3)],
-    "constraint_classification": [(json_valid_reward, 0.3), (classification_accuracy_reward, 0.5), (format_compliance_reward, 0.2)],
-    # ... all 15 tasks ...
+    "ape.reflect": [(json_valid_reward, 0.2), (rsic_actionability_reward, 0.5), (think_quality_reward, 0.3)],
+    "consulting.classify": [(json_valid_reward, 0.3), (classification_accuracy_reward, 0.5), (format_compliance_reward, 0.2)],
+    "jiminy.synthesize": [(guidance_follow_rate_reward, 0.5), (format_compliance_reward, 0.2), (think_quality_reward, 0.3)],
+    # ... all 16 tasks ...
 }
 ```
 
-### 11.4 Reward Function Validation (v2.0 Addition)
+### 11.4 Reward Function Validation
 
 New file: `neural/tests/test_reward_functions.py`
 
@@ -276,12 +293,7 @@ Unit tests for every reward function + calibration checks on 100 known-good/know
 
 ### 12.1 Review Dimensions
 
-Human review for quality dimensions automated rewards can't judge:
-- RSIC reflection insight quality
-- Synthesis narrative coherence
-- Constraint detection edge cases
-- Silent failure detection novelty
-- Code mnemonic quality
+Human review for quality dimensions automated rewards can't judge: RSIC reflection insight quality, synthesis narrative coherence, constraint detection edge cases, silent failure detection novelty, code mnemonic quality.
 
 ### 12.2 New Files
 
@@ -303,44 +315,11 @@ mdemg finetune hitl train       # Run online DPO with human preferences
 
 ---
 
-## Complete Phase 10-12 File Inventory
-
-### New Files (15)
-
-| File | Phase | Purpose |
-|---|---|---|
-| `neural/benchmarks/task_benchmark.py` | 10 | Per-task benchmark runner |
-| `neural/benchmarks/llm_judge.py` | 10 | LLM-as-judge |
-| `neural/benchmarks/deterministic_evaluators.py` | 10 | Objective metrics |
-| `neural/benchmarks/progress_tracker.py` | 10 | Timeline + stagnation |
-| `neural/benchmarks/benchmark_scheduler.py` | 10 | Scheduling |
-| `neural/training/reward_functions.py` | 11 | GRPO rewards |
-| `neural/training/grpo_data_gen.py` | 11 | GRPO data |
-| `neural/training/run_grpo.py` | 11 | GRPO training |
-| `neural/training/dpo_data_gen.py` | 11 | DPO pairs |
-| `neural/training/run_dpo.py` | 11 | DPO training |
-| `neural/tests/test_reward_functions.py` | 11 | Reward validation |
-| `neural/training/hitl_server.py` | 12 | Review web UI |
-| `neural/training/hitl_queue_gen.py` | 12 | Queue population |
-| `neural/training/hitl_to_dpo.py` | 12 | Decisions → DPO |
-| `neural/training/run_online_dpo.py` | 12 | Online DPO |
-
-### Modified Files (4)
-
-| File | Phase | Change |
-|---|---|---|
-| `neural/training/cycle_runner.py` | 11 | Add GRPO + DPO stages |
-| `internal/ape/self_reflect.go` | 10 | Patterns 23-24 (regression, stagnation) |
-| `internal/metrics/collectors.go` | 10 | Benchmark metrics |
-| `internal/cli/finetune.go` | 12 | HITL subcommands |
-
----
-
 ## Estimated Timeline
 
 | Phase | Duration |
 |---|---|
-| Phases 1-6 (foundation + first cycle) | 6-8 weeks |
+| Phases 1-6 (foundation + first cycle) | 6-8 weeks (Phase 1 DONE) |
 | Phase 10 (benchmarks) | 2 weeks (parallel with 7-9) |
 | Phase 11 (automated RL) | 2 weeks |
 | Phase 12 (HITL) | 2-3 weeks |
