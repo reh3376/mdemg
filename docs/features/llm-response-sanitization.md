@@ -50,3 +50,4 @@ Computed in `recordInteraction()` in `internal/llmclient/client.go`.
 - internal/llmclient/client.go
 - internal/llmclient/recorder.go
 - docs/development/ft-lora/ft-lora-dev/MDEMG_FT_PLAN_DEEP_DIVE_ANALYSIS_v2.md
+- `docs/features/training-data-capture-verification.md` — JSON round-trip verification test for SanitizeResponse pipeline

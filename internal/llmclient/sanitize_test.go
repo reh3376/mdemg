@@ -1,6 +1,9 @@
 package llmclient
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestStripThinkBlock(t *testing.T) {
 	tests := []struct {
@@ -103,6 +106,71 @@ func TestSanitizeResponse(t *testing.T) {
 			result := SanitizeResponse(tt.input)
 			if result != tt.expected {
 				t.Errorf("SanitizeResponse() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeResponse_JSONRoundTrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		key   string
+		want  any
+	}{
+		{
+			name:  "think block + code fence",
+			input: "<think>reasoning</think>```json\n{\"key\": \"value\"}\n```",
+			key:   "key",
+			want:  "value",
+		},
+		{
+			name:  "think block only",
+			input: "<think>reasoning</think>{\"key\": \"value\"}",
+			key:   "key",
+			want:  "value",
+		},
+		{
+			name:  "code fence only",
+			input: "```json\n{\"key\": \"value\"}\n```",
+			key:   "key",
+			want:  "value",
+		},
+		{
+			name:  "plain JSON",
+			input: `{"key": "value"}`,
+			key:   "key",
+			want:  "value",
+		},
+		{
+			name:  "think + fence + array",
+			input: "<think>eval</think>```json\n[1,2,3]\n```",
+			key:   "", // array, not object
+			want:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sanitized := SanitizeResponse(tt.input)
+			if sanitized == "" {
+				return // empty input case
+			}
+
+			// Must be valid JSON
+			if !json.Valid([]byte(sanitized)) {
+				t.Fatalf("SanitizeResponse output is not valid JSON: %q", sanitized)
+			}
+
+			// For object cases, verify the key value
+			if tt.key != "" {
+				var m map[string]any
+				if err := json.Unmarshal([]byte(sanitized), &m); err != nil {
+					t.Fatalf("json.Unmarshal failed: %v (input: %q)", err, sanitized)
+				}
+				if m[tt.key] != tt.want {
+					t.Errorf("parsed[%q] = %v, want %v", tt.key, m[tt.key], tt.want)
+				}
 			}
 		})
 	}

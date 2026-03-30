@@ -383,6 +383,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | DD-SPRINT | Deep-Dive Remediation Sprint | ✅ | 2026-03-29 | SEC-LEAK (56 error leaks sanitized), GAP-16 (RequireScope wired to 14 endpoints), DOC-REM (19 docs remediated), K8S-ALIGN (K8s/Helm + TimescaleDB + neural-sidecar), LLM-LOG (interaction logger), TXN-MGMT (32 session.Run → managed transactions) |
 | SVC-RES | Service Resilience & Ingest Hardening | ✅ | 2026-03-30 | Hook auto-recovery (auto-start, visible warnings, error logging), ingest JSONL buffer (buffer/flush on server down), prune-guard detection, protected overflow (path-based ingest), macOS LaunchAgent supervision (3 plists), `mdemg service` CLI (5 subcommands), hook template sync (5/5 hooks registered with matchers), `mdemg data audit` |
 | TD-SPRINT | Training Data Collection Sprint | ✅ | 2026-03-30 | TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage in consulting classifier), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline + report), TD-CLI (`mdemg data` CLI with 5 subcommands), TD-BACKUP (JSONL backup integration in TSDB backup service) |
+| TD-VERIFY | Training Data Capture Verification | ✅ | 2026-03-30 | 17 tests across 5 files: column-position verification (26+23+22 columns), privacy scrub completeness (5 patterns across 4 fields), scrub asymmetry (embedding TextContent only, not QueryText), response sanitization JSON round-trip, empty TaskName regression guard, batch ordering, training column initialization. `mockPool` upgraded to capture CopyFrom values. Doc: `docs/features/training-data-capture-verification.md` |
 
 ### Phase Numbering Convention
 
@@ -404,6 +405,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | PROM | — | Prometheus Observability Monitoring |
 | DDR | — | Deep-Dive Remediation Sprint |
 | TD-SPRINT | — | Training Data Collection Sprint (7 sub-phases: TD-ENRICH, TD-CORR, TD-SRC, TD-SCRUB, TD-QUAL, TD-CLI, TD-BACKUP) |
+| TD-VERIFY | — | Training Data Capture Verification (17 tests: column positions, privacy scrub, response sanitization, metadata completeness) |
 
 ---
 
