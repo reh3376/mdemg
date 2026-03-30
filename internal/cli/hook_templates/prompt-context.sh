@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
-# MDEMG prompt-context hook (installed by mdemg hooks install)
-# Hook: UserPromptSubmit — recall CMS context + Jiminy guidance for each prompt
+# Hook: UserPromptSubmit — recall relevant CMS context for each user prompt
+# Reads the user's prompt from stdin JSON and queries CMS for relevant memory.
 
 set -euo pipefail
 
 MDEMG_URL="${MDEMG_URL:-{{MDEMG_URL}}}"
-SPACE_ID="{{SPACE_ID}}"
+
+get_space_id() {
+    if [ -n "${MDEMG_SPACE_ID:-}" ]; then
+        echo "$MDEMG_SPACE_ID"
+    elif [ -f ".mdemg/config.yaml" ]; then
+        grep -oP 'space_id:\s*\K\S+' .mdemg/config.yaml 2>/dev/null || echo "{{SPACE_ID}}"
+    else
+        echo "{{SPACE_ID}}"
+    fi
+}
+SPACE_ID=$(get_space_id)
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -23,6 +33,7 @@ fi
 
 # Check server is up (fast fail)
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
+  echo "⚠ CMS unavailable — no memory context for this prompt"
   exit 0
 fi
 
@@ -36,10 +47,12 @@ RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
 RESULT_COUNT=$(echo "$RECALL" | jq -r 'if type == "array" then length elif .results then (.results | length) else 0 end' 2>/dev/null || echo "0")
 
 if [ "$RESULT_COUNT" -eq 0 ] 2>/dev/null; then
+  # Phase 80: Empty recall warning for non-trivial queries
   if [ ${#USER_PROMPT} -gt 15 ]; then
     echo "!! CMS RECALL EMPTY — No relevant memory found for this query."
     echo "!! Consider: POST /v1/conversation/observe to record this topic."
   fi
+  # Session health ribbon (1s timeout)
   HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
     --connect-timeout 1 --max-time 1 2>/dev/null) || true
   if [ -n "$HEALTH_RESP" ]; then
@@ -53,6 +66,7 @@ fi
 # Format relevant context
 echo "═══ CMS RECALL (relevant to this prompt) ═══"
 
+# Handle both array response and object-with-results response
 echo "$RECALL" | jq -r '
   (if type == "array" then . elif .results then .results else [] end)[]? |
   "  • [\(.type // .obs_type // "memory")] (score: \(.score // "?" | tostring | .[0:4])) \(.content // .summary // "no content" | .[0:200])"
@@ -63,21 +77,39 @@ echo "═══ END CMS RECALL ═══"
 # --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
 # Reads pre-computed guidance instantly (<100ms) from warm store.
 # Then triggers async warm-up for NEXT prompt with current context.
-GUIDANCE=$(curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
-  --connect-timeout 1 --max-time 2 2>/dev/null) || true
+# NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
+# string values. Shell variable expansion + echo corrupts these bytes, so we write
+# to a temp file and parse with jq directly from the file.
+GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
+curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
+  --connect-timeout 1 --max-time 2 2>/dev/null | \
+  perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
 
-if [ -n "$GUIDANCE" ]; then
-  WARM=$(echo "$GUIDANCE" | jq -r '.warm // false' 2>/dev/null)
-  AUGMENTATION=$(echo "$GUIDANCE" | jq -r '.data.prompt_augmentation // empty' 2>/dev/null)
-  AGE_MS=$(echo "$GUIDANCE" | jq -r '.age_ms // "?"' 2>/dev/null)
+if [ -s "$GUIDANCE_TMP" ]; then
+  WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
+  AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
+
+  # J17: Capture guidance_id for feedback loop closure
+  GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  if [ -n "$GUIDANCE_ID" ]; then
+    mkdir -p ~/.mdemg 2>/dev/null || true
+    printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
+      "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+  else
+    rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+  fi
+
   if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
     echo ""
-    echo "$AUGMENTATION"
+    printf '%s\n' "$AUGMENTATION"
     if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
       echo "[guidance age: ${AGE_MS}ms — may be stale]"
     fi
   fi
 fi
+GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
+rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 
 # Fire-and-forget: warm guidance for NEXT prompt with current context
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
@@ -94,7 +126,7 @@ curl -sf -X POST "${MDEMG_URL}/v1/memory/retrieve" \
   -d "{\"space_id\":\"${SPACE_ID}\",\"query_text\":$(echo "$USER_PROMPT" | jq -Rs .),\"candidate_k\":10,\"top_k\":5,\"hop_depth\":2}" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
 
-# Session health ribbon
+# Phase 80: Session health ribbon
 HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
   --connect-timeout 1 --max-time 1 2>/dev/null) || true
 if [ -n "$HEALTH_RESP" ]; then
@@ -105,5 +137,4 @@ fi
 
 # Synergy: token count footer for recall + guidance
 RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
-GUIDANCE_TOKENS=$(echo "${GUIDANCE:-}" | wc -c | tr -d ' ')
-echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_TOKENS}]"
+echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_BYTES:-0}]"

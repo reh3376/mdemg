@@ -2,7 +2,10 @@ package cli
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,6 +122,175 @@ func TestComputeHash(t *testing.T) {
 	hash3 := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("different content")))
 	if hash == hash3 {
 		t.Error("different content should produce different hash")
+	}
+}
+
+func TestBufferToLocalJSONL(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test file to buffer
+	testFile := filepath.Join(tmpDir, "CLAUDE.md")
+	if err := os.WriteFile(testFile, []byte("# Test\nLine 2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	bufPath := filepath.Join(tmpDir, ".mdemg", "ingest-buffer.jsonl")
+	t.Setenv("INGEST_BUFFER_PATH", bufPath)
+
+	cfg := &ingestClaudeMDConfig{
+		spaceID:  "test-space",
+		endpoint: "http://localhost:12345", // unreachable
+		quiet:    true,
+		file:     testFile,
+	}
+
+	if err := bufferToLocalJSONL(cfg); err != nil {
+		t.Fatalf("bufferToLocalJSONL failed: %v", err)
+	}
+
+	// Verify buffer file was created
+	data, err := os.ReadFile(bufPath)
+	if err != nil {
+		t.Fatalf("buffer file not created: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 buffer entry, got %d", len(lines))
+	}
+
+	var entry ingestBufferEntry
+	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
+		t.Fatalf("failed to parse buffer entry: %v", err)
+	}
+
+	if entry.SpaceID != "test-space" {
+		t.Errorf("expected space_id test-space, got %s", entry.SpaceID)
+	}
+	if !strings.HasPrefix(entry.ContentHash, "sha256:") {
+		t.Errorf("expected sha256: prefix, got %s", entry.ContentHash)
+	}
+	if entry.LineCount != 2 {
+		t.Errorf("expected 2 lines, got %d", entry.LineCount)
+	}
+}
+
+func TestFlushLocalBuffer(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a mock server that accepts ingest requests
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/memory/ingest" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	// Create a buffer file with one entry
+	bufPath := filepath.Join(tmpDir, "ingest-buffer.jsonl")
+	t.Setenv("INGEST_BUFFER_PATH", bufPath)
+
+	entry := ingestBufferEntry{
+		Path:        "CLAUDE.md",
+		Content:     "# Test",
+		ContentHash: "sha256:abc123",
+		Tags:        []string{"test"},
+		BufferedAt:  "2026-03-30T12:00:00Z",
+		SpaceID:     "test-space",
+		FileSize:    6,
+		LineCount:   1,
+	}
+	line, _ := json.Marshal(entry)
+	if err := os.WriteFile(bufPath, append(line, '\n'), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &http.Client{}
+	cfg := &ingestClaudeMDConfig{
+		endpoint: server.URL,
+		spaceID:  "test-space",
+		quiet:    true,
+	}
+
+	flushed := flushLocalBuffer(client, cfg)
+	if flushed != 1 {
+		t.Errorf("expected 1 flushed, got %d", flushed)
+	}
+
+	// Buffer should be empty after flush
+	data, err := os.ReadFile(bufPath)
+	if err != nil {
+		t.Fatalf("buffer file missing after flush: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "" {
+		t.Errorf("buffer should be empty after successful flush, got: %s", string(data))
+	}
+}
+
+func TestFlushPartialFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if callCount == 1 {
+			w.WriteHeader(http.StatusOK) // First succeeds
+		} else {
+			w.WriteHeader(http.StatusInternalServerError) // Second fails
+		}
+	}))
+	defer server.Close()
+
+	bufPath := filepath.Join(tmpDir, "ingest-buffer.jsonl")
+	t.Setenv("INGEST_BUFFER_PATH", bufPath)
+
+	// Write two entries
+	var buf strings.Builder
+	for i := 0; i < 2; i++ {
+		entry := ingestBufferEntry{
+			Path:        fmt.Sprintf("file%d.md", i),
+			Content:     "test",
+			ContentHash: "sha256:abc",
+			Tags:        []string{"test"},
+			SpaceID:     "test-space",
+		}
+		line, _ := json.Marshal(entry)
+		buf.Write(line)
+		buf.WriteByte('\n')
+	}
+	if err := os.WriteFile(bufPath, []byte(buf.String()), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &http.Client{}
+	cfg := &ingestClaudeMDConfig{endpoint: server.URL, spaceID: "test-space", quiet: true}
+
+	flushed := flushLocalBuffer(client, cfg)
+	if flushed != 1 {
+		t.Errorf("expected 1 flushed (partial), got %d", flushed)
+	}
+
+	// Buffer should still have 1 remaining entry
+	data, _ := os.ReadFile(bufPath)
+	remaining := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(remaining) != 1 {
+		t.Errorf("expected 1 remaining entry, got %d", len(remaining))
+	}
+}
+
+func TestBufferEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	bufPath := filepath.Join(tmpDir, "nonexistent-buffer.jsonl")
+	t.Setenv("INGEST_BUFFER_PATH", bufPath)
+
+	client := &http.Client{}
+	cfg := &ingestClaudeMDConfig{endpoint: "http://localhost:1", spaceID: "test", quiet: true}
+
+	flushed := flushLocalBuffer(client, cfg)
+	if flushed != 0 {
+		t.Errorf("expected 0 flushed for missing buffer, got %d", flushed)
 	}
 }
 

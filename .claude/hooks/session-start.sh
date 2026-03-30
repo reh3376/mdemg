@@ -19,15 +19,39 @@ get_space_id() {
 }
 SPACE_ID=$(get_space_id)
 
-# Check if MDEMG server is reachable
+# Check if MDEMG server is reachable — attempt auto-start if down
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 2; then
-  cat <<'EOF'
-⚠ CMS DISCONNECTED — MDEMG server is not running.
+  # Attempt auto-start (must stay under 15s hook timeout — cap at 10s)
+  if [ -x "./bin/mdemg" ]; then
+    echo "⚠ MDEMG server not running — attempting auto-start..."
+    ./bin/mdemg start --auto-migrate 2>&1 | tail -1 || true
+    # Wait for ready (up to 10s: 5 polls × 2s)
+    for i in $(seq 1 5); do
+      sleep 2
+      if curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1 2>/dev/null; then
+        echo "✓ MDEMG server started successfully"
+        break
+      fi
+    done
+  fi
+  # Re-check after auto-start attempt
+  if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 2; then
+    cat <<'EOF'
+⚠ CMS DISCONNECTED — MDEMG server failed to start.
 Memory is unavailable. You are operating without persistent context.
-Warn the user: "CMS unavailable — memory disconnected."
+Warn the user: "CMS unavailable — auto-start failed."
 Do NOT make irreversible decisions without user confirmation.
 EOF
-  exit 0
+    exit 0
+  fi
+fi
+
+# Check TimescaleDB (training data collection depends on this)
+TSDB_PORT="${TSDB_PORT:-5433}"
+if command -v pg_isready >/dev/null 2>&1; then
+  if ! pg_isready -h localhost -p "$TSDB_PORT" -q 2>/dev/null; then
+    echo "⚠ TimescaleDB not running — training data collection is paused"
+  fi
 fi
 
 # Call resume endpoint
@@ -108,7 +132,9 @@ echo "═══ END CMS CONTEXT ═══"
 
 # Ingest claude .md files with content-hash change detection (fire-and-forget)
 if [ -x "./bin/mdemg" ]; then
-  ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" 2>/dev/null &
+  mkdir -p ~/.mdemg/logs 2>/dev/null || true
+  ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" \
+    2>> ~/.mdemg/logs/ingest-claude-md.log &
 fi
 
 # Architecture map staleness check (respects UITS-optimized flag)
@@ -360,7 +386,7 @@ if [ "$JIMINY_OK" = "true" ]; then
             curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
               -H "Content-Type: application/json" \
               -d "$(jq -nc --arg c "$CONTENT" --arg t "$OBS_TYPE" \
-                '{space_id: "mdemg-dev", session_id: "claude-core", content: $c, obs_type: $t, tags: ["recovery-buffer", "promoted"]}')" \
+                --arg s "$SPACE_ID" '{space_id: $s, session_id: "claude-core", content: $c, obs_type: $t, tags: ["recovery-buffer", "promoted"]}')" \
               --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null && FLUSH_COUNT=$((FLUSH_COUNT + 1)) || true
             [ "$FLUSH_DELAY_SEC" != "0" ] && sleep "$FLUSH_DELAY_SEC" 2>/dev/null || true
           fi
@@ -370,7 +396,7 @@ if [ "$JIMINY_OK" = "true" ]; then
 
     if [ "$FLUSH_COUNT" -gt 0 ] 2>/dev/null; then
       echo ""
-      FLUSH_MSG="Flushed ${FLUSH_COUNT} buffered entries to mdemg-dev"
+      FLUSH_MSG="Flushed ${FLUSH_COUNT} buffered entries to ${SPACE_ID}"
       if [ "$REMAINING" -gt 0 ] 2>/dev/null; then
         FLUSH_MSG="${FLUSH_MSG} (${REMAINING} remaining — will continue next session)"
       fi

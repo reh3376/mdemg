@@ -102,6 +102,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	serveCmd.GroupID = "server"
 	rootCmd.AddCommand(serveCmd)
 
+	serviceCmd := newServiceCmd()
+	serviceCmd.GroupID = "server"
+	rootCmd.AddCommand(serviceCmd)
+
 	// Database Management
 	dbCmd := newDBCmd()
 	dbCmd.GroupID = "database"

@@ -84,6 +84,16 @@ mdemg status
 
 You should see the server running on port 9999 (or the next available port).
 
+### Optional: Persistent Process Supervision
+
+For auto-restart on crash or reboot, install OS-level supervision:
+
+```bash
+mdemg service install
+```
+
+This configures launchd (macOS) or systemd (Linux) to keep MDEMG running. See `docs/features/service-resilience.md` for details.
+
 ## Step 4: Ingest Your Codebase
 
 ```bash

@@ -33,6 +33,7 @@ fi
 
 # Check server is up (fast fail)
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
+  echo "⚠ CMS unavailable — no memory context for this prompt"
   exit 0
 fi
 

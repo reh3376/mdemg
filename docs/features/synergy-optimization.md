@@ -145,6 +145,40 @@ mdemg synergy flush-buffer [--force] [--dry-run]  # Manual flush
 | `SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES` | `50` | Max JSONL entries (FIFO eviction) |
 | `SYNERGY_RECOVERY_AUTO_FLUSH` | `true` | Auto-flush on Jiminy recovery |
 
+## Session-Start Auto-Recovery
+
+When the `session-start.sh` hook detects the server is down, it now attempts auto-start before giving up:
+
+1. Runs `./bin/mdemg start --auto-migrate` in the background
+2. Polls `/healthz` up to 5 times (2s intervals, 10s total) — must stay under the 15-second hook timeout
+3. If auto-start succeeds, proceeds with normal CMS resume
+4. If auto-start fails, shows the `CMS DISCONNECTED` warning and exits gracefully
+
+Additional health checks added to session-start:
+- **TSDB health**: If `pg_isready` is available, checks TimescaleDB on port 5433. Warns if down (training data collection paused).
+- **Error logging**: Ingest calls now log to `~/.mdemg/logs/ingest-claude-md.log` instead of `/dev/null`, making failures diagnosable.
+
+The `prompt-context.sh` hook now shows a visible `⚠ CMS unavailable` warning instead of silently exiting when the server is down.
+
+The `post-tool-observe.py` hook now logs ingest subprocess errors to `~/.mdemg/logs/ingest-claude-md.log` instead of suppressing them to `/dev/null`.
+
+## Prune-Guard Detection
+
+When `post-tool-observe.py` detects a tracked `.md` file being written or edited, it now checks for significant shrinkage before ingesting:
+
+1. Reads the new file's line count
+2. Queries `/v1/memory/node/meta` for the previously stored line count
+3. If the file shrank by more than 10 lines, records a `[prune-guard]` observation tagged with `prune-guard`, `claude-md`, `data-protection`
+4. Proceeds with normal ingest
+
+This creates an audit trail when Claude Code's auto-memory system prunes files, preserving awareness that content was removed even if it wasn't captured before pruning.
+
+## Protected Overflow
+
+MEMORY.md overflow content is now ingested via `POST /v1/memory/ingest` (creates stable `role_type=leaf` nodes) instead of `POST /v1/conversation/observe` (creates volatile `conversation_observation` nodes subject to Context Cooler decay at 10%/day).
+
+This means overflow content is preserved permanently in CMS as a regular memory node, not as a decaying observation that could be tombstoned below 0.05 stability.
+
 ## Critical Prerequisite
 
 **Jiminy must be healthy** before any .md pruning. If Jiminy is down after migration, CMS cannot surface the knowledge that was moved out of .md files — catastrophic forgetting risk. Pattern #17 is the loudest signal in the system for this scenario.

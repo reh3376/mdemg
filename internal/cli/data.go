@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +30,7 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataStatsCmd())
 	cmd.AddCommand(newDataAnnotateCmd())
 	cmd.AddCommand(newDataQualityCmd())
+	cmd.AddCommand(newDataAuditCmd())
 
 	return cmd
 }
@@ -417,4 +422,224 @@ func formatBytes(b int64) string {
 	default:
 		return fmt.Sprintf("%d B", b)
 	}
+}
+
+// newDataAuditCmd creates the `data audit` subcommand that compares disk state
+// against CMS state for all tracked claude-md files.
+func newDataAuditCmd() *cobra.Command {
+	var spaceID string
+	var serverURL string
+
+	cmd := &cobra.Command{
+		Use:   "audit",
+		Short: "Audit ingestion state of tracked claude-md files",
+		Long: `Compare disk state against CMS state for all tracked claude-md files.
+
+Reports each file as: current, stale (>24h since last ingest), deleted, or shrank.
+Also shows pending ingest buffer entries and service health.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if spaceID == "" {
+				spaceID = resolveSpaceID(cmd)
+			}
+			if spaceID == "" {
+				spaceID = "codebase"
+			}
+			if serverURL == "" {
+				serverURL = os.Getenv("MDEMG_URL")
+			}
+			if serverURL == "" {
+				serverURL = "http://localhost:9999"
+			}
+
+			return runDataAudit(spaceID, serverURL)
+		},
+	}
+
+	cmd.Flags().StringVar(&spaceID, "space-id", "", "Space ID to audit (default: codebase)")
+	cmd.Flags().StringVar(&serverURL, "server-url", "", "MDEMG server URL (default: http://localhost:9999)")
+	return cmd
+}
+
+func runDataAudit(spaceID, serverURL string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// Check server health
+	serverUp := false
+	fmt.Println("═══ Service Health ═══")
+	resp, err := client.Get(serverURL + "/healthz")
+	if err != nil {
+		fmt.Printf("  Server:     down (%s unreachable)\n", serverURL)
+	} else {
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			fmt.Printf("  Server:     up (%s)\n", serverURL)
+			serverUp = true
+		} else {
+			fmt.Printf("  Server:     unhealthy (status %d)\n", resp.StatusCode)
+		}
+	}
+
+	// Check Neo4j via server health detail if available
+	if serverUp {
+		healthResp, healthErr := client.Get(serverURL + "/healthz?detail=true")
+		if healthErr == nil {
+			body, _ := io.ReadAll(healthResp.Body)
+			healthResp.Body.Close()
+			var detail map[string]interface{}
+			if json.Unmarshal(body, &detail) == nil {
+				if neo4j, ok := detail["neo4j"].(string); ok {
+					fmt.Printf("  Neo4j:      %s\n", neo4j)
+				}
+				if sidecar, ok := detail["sidecar"].(string); ok {
+					fmt.Printf("  Sidecar:    %s\n", sidecar)
+				}
+			}
+		}
+	}
+	fmt.Println()
+
+	// Discover tracked files
+	projHash := projectPathHash(cwd)
+	files := discoverClaudeMDFiles(cwd, projHash)
+
+	fmt.Println("═══ Tracked Files ═══")
+	fmt.Printf("%-50s %8s %10s %s\n", "File", "Lines", "Size", "Status")
+	fmt.Println(strings.Repeat("─", 90))
+
+	staleThreshold := 24 * time.Hour
+
+	for _, f := range files {
+		absPath := f.Path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(cwd, f.Path)
+		}
+
+		info, statErr := os.Stat(absPath)
+		if statErr != nil {
+			fmt.Printf("%-50s %8s %10s %s\n", truncate(f.Path, 50), "-", "-", "DELETED")
+			continue
+		}
+
+		lineCount := countFileLines(absPath)
+		sizeStr := formatBytes(info.Size())
+
+		if !serverUp {
+			fmt.Printf("%-50s %8d %10s %s\n", truncate(f.Path, 50), lineCount, sizeStr, "(server down)")
+			continue
+		}
+
+		// Query CMS for stored metadata
+		status := auditFileStatus(client, serverURL, spaceID, f.Path, lineCount, staleThreshold)
+		fmt.Printf("%-50s %8d %10s %s\n", truncate(f.Path, 50), lineCount, sizeStr, status)
+	}
+	fmt.Println()
+
+	// Check ingest buffer
+	bufferPath := resolveIngestBufferPath()
+	fmt.Println("═══ Ingest Buffer ═══")
+	bufferInfo, bufErr := os.Stat(bufferPath)
+	if bufErr != nil || bufferInfo.Size() == 0 {
+		fmt.Printf("  Buffer:     empty (%s)\n", bufferPath)
+	} else {
+		entries := countBufferEntries(bufferPath)
+		fmt.Printf("  Buffer:     %d pending entries (%s, %s)\n",
+			entries, bufferPath, formatBytes(bufferInfo.Size()))
+	}
+
+	return nil
+}
+
+// auditFileStatus queries CMS /v1/memory/node/meta for the file and returns a status string.
+func auditFileStatus(client *http.Client, serverURL, spaceID, filePath string, diskLines int, staleThreshold time.Duration) string {
+	baseName := filepath.Base(filePath)
+	url := fmt.Sprintf("%s/v1/memory/node/meta?space_id=%s&path=%s", serverURL, spaceID, baseName)
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return "error (unreachable)"
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "NOT INGESTED"
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Sprintf("error (status %d)", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "error (read)"
+	}
+
+	var meta struct {
+		LineCount      int    `json:"line_count"`
+		LastIngestedAt string `json:"last_ingested_at"`
+		ContentHash    string `json:"content_hash"`
+	}
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return "error (parse)"
+	}
+
+	// Check for shrinkage
+	if meta.LineCount > 0 && diskLines < meta.LineCount-10 {
+		return fmt.Sprintf("SHRANK (%d → %d lines)", meta.LineCount, diskLines)
+	}
+
+	// Check staleness
+	if meta.LastIngestedAt != "" {
+		if t, err := time.Parse(time.RFC3339, meta.LastIngestedAt); err == nil {
+			if time.Since(t) > staleThreshold {
+				return fmt.Sprintf("STALE (ingested %s ago)", formatAgeDuration(time.Since(t)))
+			}
+		}
+	}
+
+	return "current"
+}
+
+func countFileLines(path string) int {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		count++
+	}
+	return count
+}
+
+func countBufferEntries(path string) int {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func formatAgeDuration(d time.Duration) string {
+	hours := int(d.Hours())
+	if hours < 24 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	days := hours / 24
+	return fmt.Sprintf("%dd", days)
 }

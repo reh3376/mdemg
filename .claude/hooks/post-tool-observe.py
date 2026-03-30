@@ -14,6 +14,7 @@ MDEMG_URL = os.environ.get("MDEMG_URL", "http://localhost:9999")
 SESSION_ID = "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
+INGEST_LOG = os.path.join(os.path.expanduser("~"), ".mdemg", "logs", "ingest-claude-md.log")
 RECOVERY_BUFFER_SPACE = os.environ.get("SYNERGY_RECOVERY_BUFFER_SPACE", "synergy-buffer")
 RECOVERY_BUFFER_PATH = os.path.join(
     os.getcwd(), os.environ.get("SYNERGY_RECOVERY_BUFFER_PATH", ".mdemg/synergy-recovery-buffer.jsonl")
@@ -270,6 +271,50 @@ def observe(content: str, obs_type: str, tags: list[str] | None = None):
         pass  # Fire-and-forget: never block on failure
 
 
+def ingest_with_prune_guard(file_path: str):
+    """Detect file shrinkage and record protective observation before ingesting."""
+    try:
+        with open(file_path) as f:
+            new_lines = sum(1 for _ in f)
+    except Exception:
+        return
+
+    try:
+        result = subprocess.run(
+            ["curl", "-sf",
+             f"{MDEMG_URL}/v1/memory/node/meta?space_id={SPACE_ID}&path={os.path.basename(file_path)}",
+             "--connect-timeout", "2", "--max-time", "3"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout:
+            meta = json.loads(result.stdout)
+            old_lines = meta.get("line_count", 0)
+            if old_lines > 0 and (old_lines - new_lines) > 10:
+                observe(
+                    f"[prune-guard] {os.path.basename(file_path)} shrank "
+                    f"from {old_lines} to {new_lines} lines "
+                    f"({old_lines - new_lines} lines removed). "
+                    f"Previous hash: {meta.get('content_hash', '?')[:20]}",
+                    "context",
+                    ["prune-guard", "claude-md", "data-protection"],
+                )
+    except Exception:
+        pass  # Best-effort — don't block ingest on prune-guard failure
+
+    # Proceed with normal ingest
+    try:
+        os.makedirs(os.path.dirname(INGEST_LOG), exist_ok=True)
+        log_fd = open(INGEST_LOG, "a")
+        subprocess.Popen(
+            ["./bin/mdemg", "ingest-claude-md", "--quiet",
+             "--space-id", SPACE_ID, "--file", file_path],
+            stdout=log_fd,
+            stderr=log_fd,
+        )
+    except Exception:
+        pass
+
+
 def check_memory_overflow(file_path: str):
     """Synergy: detect MEMORY.md overflow and auto-ingest excess to CMS.
     Respects Jiminy health gate — if Jiminy is unhealthy, content stays
@@ -317,25 +362,38 @@ def check_memory_overflow(file_path: str):
     if not overflow_text:
         return
 
-    # Classify obs_type by content heuristics
-    obs_type = "note"
-    if any(kw in overflow_text for kw in ["## Phase", "Phase ", "COMPLETE"]):
-        obs_type = "progress"
-    elif any(kw in overflow_text for kw in ["NEVER", "ALWAYS", "MUST", "MANDATORY"]):
-        obs_type = "constraint"
-
-    # Ingest to CMS
-    observe(
-        f"[auto-overflow] MEMORY.md exceeded {threshold} lines ({len(lines)} total). "
-        f"Overflow content ({len(overflow)} lines): {overflow_text[:400]}",
-        obs_type,
-        ["auto-overflow", "synergy"],
-    )
+    # Use path-based ingest for stable leaf node (no Context Cooler decay)
+    try:
+        import urllib.request
+        ingest_payload = json.dumps({
+            "space_id": SPACE_ID,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "source": "ingest-claude-md",
+            "content": overflow_text[:2000],
+            "path": f"overflow/{os.path.basename(file_path)}/{int(time.time())}",
+            "name": f"MEMORY.md overflow ({len(overflow)} lines)",
+            "summary": overflow_text[:200],
+            "tags": ["auto-overflow", "synergy", "claude-md"],
+        }).encode()
+        req = urllib.request.Request(
+            f"{MDEMG_URL}/v1/memory/ingest",
+            data=ingest_payload,
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        # Fallback to observe if ingest fails
+        observe(
+            f"[auto-overflow] MEMORY.md exceeded {threshold} lines ({len(lines)} total). "
+            f"Overflow content ({len(overflow)} lines): {overflow_text[:400]}",
+            "note",
+            ["auto-overflow", "synergy"],
+        )
 
     # Notify via system-reminder
     print(
         f"<system-reminder>MEMORY.md overflow ({len(lines)} lines, threshold: {threshold}). "
-        f"{len(overflow)} lines auto-ingested to CMS as '{obs_type}'.</system-reminder>"
+        f"{len(overflow)} lines auto-ingested to CMS as stable leaf node.</system-reminder>"
     )
 
 
@@ -456,16 +514,7 @@ def main():
             "/memory/", "/plans/", "/rules/",
         ]
         if any(p in file_path for p in CLAUDE_MD_PATTERNS):
-            try:
-                subprocess.Popen(
-                    ["./bin/mdemg", "ingest-claude-md", "--quiet",
-                     "--space-id", SPACE_ID, "--file", file_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    cwd="/Users/reh3376/mdemg",
-                )
-            except Exception:
-                pass  # Fire-and-forget
+            ingest_with_prune_guard(file_path)
 
         # Warm guidance after file edits
         warm_guidance(f"edited: {file_path}")
@@ -560,18 +609,19 @@ def main():
                 )
                 # Fire-and-forget: incremental ingest of mdemg into mdemg-dev
                 try:
+                    os.makedirs(os.path.dirname(INGEST_LOG), exist_ok=True)
+                    log_fd = open(INGEST_LOG, "a")
                     subprocess.Popen(
                         [
-                            "/Users/reh3376/mdemg/bin/mdemg",
+                            "./bin/mdemg",
                             "ingest",
                             "--space-id", SPACE_ID,
                             "--incremental",
                             "--consolidate",
-                            "/Users/reh3376/mdemg",
+                            ".",
                         ],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        cwd="/Users/reh3376/mdemg",
+                        stdout=log_fd,
+                        stderr=log_fd,
                     )
                 except Exception:
                     pass

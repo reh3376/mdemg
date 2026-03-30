@@ -423,6 +423,16 @@ Requires `TSDB_BACKUP_ENABLED=true` (default: true when TSDB is configured). See
 
 ---
 
+## Ingest Buffer (Data Loss Prevention)
+
+When the MDEMG server is unreachable, `mdemg ingest-claude-md` buffers file contents to `.mdemg/ingest-buffer.jsonl` instead of failing. On the next successful run, buffered entries are automatically flushed before processing new files.
+
+This is not a backup mechanism — it's a data loss prevention buffer that ensures `.md` file content is captured even during server outages. Configure via `INGEST_BUFFER_MAX_ENTRIES` (default: 100, FIFO eviction).
+
+Check pending buffer status: `mdemg data audit`.
+
+---
+
 ## Troubleshooting
 
 | Problem | Cause | Fix |

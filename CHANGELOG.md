@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Service Resilience (SVC-RES Sprint)**:
+  - **Hook Auto-Recovery**: session-start.sh auto-starts MDEMG server if down (10s polling cap within 15s hook timeout). prompt-context.sh shows visible "CMS unavailable" warning. All ingest operations log to `~/.mdemg/logs/ingest-claude-md.log`. TimescaleDB health check at session start.
+  - **Ingest JSONL Buffer**: `mdemg ingest-claude-md` buffers locally to `.mdemg/ingest-buffer.jsonl` when server is unreachable. FIFO eviction at 100 entries (configurable via `INGEST_BUFFER_MAX_ENTRIES`). Automatic flush-on-reconnect.
+  - **Prune-Guard Detection**: `post-tool-observe.py` checks CMS metadata before ingesting; if file shrank >10 lines, records protective `[prune-guard]` observation.
+  - **Protected Overflow**: MEMORY.md overflow now uses `POST /v1/memory/ingest` (stable leaf node) instead of `POST /v1/conversation/observe` (volatile with decay).
+  - **macOS Process Supervision**: 3 LaunchAgent plists for server, neural sidecar, and ingest timer. KeepAlive with 30s throttle, timer-based ingest every 30 min.
+  - **`mdemg service` CLI**: 5 subcommands (install, uninstall, status, restart, logs) with platform support for macOS (launchd), Linux (systemd), and stub for unsupported platforms.
+  - **Hook Registration Fix**: `claudeHookFiles()` expanded from 2 to 5 hooks. Matcher support added at group level in settings.local.json. Templates synced from active hooks.
+  - **`mdemg data audit`**: Compare disk state vs CMS state for tracked claude-md files. Reports current/stale/shrank/deleted/not-ingested status plus service health and buffer state.
+
 - **SanitizeResponse (Phase A)**: Unified LLM response cleaning pipeline (`StripThinkBlock` + `StripCodeFence` + `TrimSpace`) in `internal/llmclient/sanitize.go`. Wired into all 11 JSON-parsing call sites across 10 files. Enables local model deployment with think mode (Qwen3 `<think>...</think>` blocks).
 - **System Prompt Hash**: SHA-256 hash of system prompt added to `InteractionRecord`, enabling training data curation by prompt version and stale data filtering.
 - **RAFT Context Enrichment (Phase B)**: `RetrievalContext` struct captures which nodes were retrieved and their relevance scores alongside every LLM interaction. Wired into consulting and jiminy services. TSDB `llm_interactions` expanded from 22 to 26 columns. Migration 007.
