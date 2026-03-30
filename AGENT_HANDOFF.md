@@ -295,7 +295,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | 45 | Modular Intelligence | ✅ | 45.1-45.2 ✅, 45.3 cancelled (parser RPC — researched, bad idea), 45.4 ✅ (Obsidian v2), 45.5 ✅ |
 | 46 | Symbol Indexing | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §8 |
 | 46-PR | Dynamic Pipeline Registry | ✅ | `docs/development/REGISTRY.md` |
-| 47 | Incremental Updates | 🔄 | 47.1 ✅, 47.2 🔄 (APE INGEST pending), 47.3-47.5 ✅ |
+| 47 | Incremental Updates | ✅ | 47.1-47.5 ✅ — APE INGEST wired via StartScheduledSync + RSIC dispatcher |
 | 48 | Query Optimization | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §10 |
 | 48-SR | CMS Skill Registry | ✅ | `internal/api/handlers_skills.go` |
 | 49 | LLM Plugin SDK | ✅ | `docs/development/DEVELOPMENT_ROADMAP.md` §11 |
@@ -405,8 +405,6 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
 ### Partially Complete Phases
 
-**Phase 47.2 — APE INGEST Scheduled Sync** (🔄 Half done)
-Freshness tracking implemented (TapRoot properties, `GET /v1/memory/spaces/{space_id}/freshness`). APE INGEST action type not yet wired into the RSIC action dispatcher.
 
 ### Research (No Implementation Yet)
 

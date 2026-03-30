@@ -110,6 +110,7 @@ type Gauge struct {
 	help   string
 	labels map[string]string
 	value  int64 // Using int64 for atomic ops, convert to float as needed
+	dirty  int32 // 1 if Set/Inc/Dec called since last flush reset
 }
 
 // NewGauge creates and registers a new gauge.
@@ -146,21 +147,34 @@ func (r *Registry) RemoveGaugesByPrefix(prefix string) {
 // Set sets the gauge to the given value.
 func (g *Gauge) Set(v float64) {
 	atomic.StoreInt64(&g.value, int64(v*1000)) // Store as milli-units
+	atomic.StoreInt32(&g.dirty, 1)
 }
 
 // Inc increments the gauge by 1.
 func (g *Gauge) Inc() {
 	atomic.AddInt64(&g.value, 1000)
+	atomic.StoreInt32(&g.dirty, 1)
 }
 
 // Dec decrements the gauge by 1.
 func (g *Gauge) Dec() {
 	atomic.AddInt64(&g.value, -1000)
+	atomic.StoreInt32(&g.dirty, 1)
 }
 
 // Value returns the current gauge value.
 func (g *Gauge) Value() float64 {
 	return float64(atomic.LoadInt64(&g.value)) / 1000
+}
+
+// IsDirty returns true if the gauge has been set since the last ResetDirty call.
+func (g *Gauge) IsDirty() bool {
+	return atomic.LoadInt32(&g.dirty) != 0
+}
+
+// ResetDirty clears the dirty flag after a flush cycle.
+func (g *Gauge) ResetDirty() {
+	atomic.StoreInt32(&g.dirty, 0)
 }
 
 // Histogram tracks the distribution of values.

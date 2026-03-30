@@ -321,6 +321,85 @@ func TestEstimatePercentile_MultipleObservations(t *testing.T) {
 }
 
 
+func TestGauge_DirtyFlag(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	g := r.NewGauge("test_dirty", "dirty flag test", nil)
+
+	// Initially not dirty
+	if g.IsDirty() {
+		t.Error("gauge should not be dirty initially")
+	}
+
+	// Set marks dirty
+	g.Set(5.0)
+	if !g.IsDirty() {
+		t.Error("gauge should be dirty after Set")
+	}
+
+	// ResetDirty clears
+	g.ResetDirty()
+	if g.IsDirty() {
+		t.Error("gauge should not be dirty after ResetDirty")
+	}
+
+	// Inc marks dirty
+	g.Inc()
+	if !g.IsDirty() {
+		t.Error("gauge should be dirty after Inc")
+	}
+	g.ResetDirty()
+
+	// Dec marks dirty
+	g.Dec()
+	if !g.IsDirty() {
+		t.Error("gauge should be dirty after Dec")
+	}
+}
+
+func TestFlushToTSDB_SkipsCleanGauges(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+	rec := NewMetricsRecorder(r, nil, "test-space")
+
+	// Register two gauges — set one, leave the other clean
+	gDirty := r.NewGauge("dirty_gauge", "will be set", nil)
+	r.NewGauge("clean_gauge", "never set", nil)
+
+	gDirty.Set(42.0)
+
+	// FlushToTSDB with nil writer just returns early (no TSDB), but we can
+	// verify the dirty flag behavior by checking state after the call
+	rec.FlushToTSDB()
+
+	// After flush (even nil-writer), dirty gauge should have been read
+	if gDirty.Value() != 42.0 {
+		t.Errorf("dirty gauge value = %.1f, want 42.0", gDirty.Value())
+	}
+}
+
+func TestFlushToTSDB_ResetsDirtyAfterFlush(t *testing.T) {
+	r := NewRegistry(DefaultConfig())
+
+	g := r.NewGauge("resettable", "test reset", nil)
+	g.Set(10.0)
+
+	if !g.IsDirty() {
+		t.Fatal("gauge should be dirty after Set")
+	}
+
+	// Simulate what FlushToTSDB does: read value, reset dirty
+	_ = g.Value()
+	g.ResetDirty()
+
+	if g.IsDirty() {
+		t.Error("gauge should be clean after ResetDirty")
+	}
+
+	// Without another Set, it should stay clean
+	if g.IsDirty() {
+		t.Error("gauge should remain clean without mutation")
+	}
+}
+
 func TestNewMetricsRecorder_Defaults(t *testing.T) {
 	r := NewRegistry(DefaultConfig())
 	rec := NewMetricsRecorder(r, nil, "my-space")

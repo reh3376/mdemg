@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"mdemg/internal/config"
 	"mdemg/internal/tsdb"
 )
 
@@ -56,6 +57,7 @@ func newTSDBCmd() *cobra.Command {
 	cmd.AddCommand(newTSDBMigrateCmd())
 	cmd.AddCommand(newTSDBShellCmd())
 	cmd.AddCommand(newTSDBStatsCmd())
+	cmd.AddCommand(newTSDBBackupCmd())
 
 	return cmd
 }
@@ -310,4 +312,211 @@ Examples:
 			return nil
 		},
 	}
+}
+
+// ── TSDB Backup Commands ──
+
+func newTSDBBackupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "backup",
+		Short: "TimescaleDB backup management",
+		Long: `Manage TimescaleDB backups using pg_dump via docker compose exec.
+
+Backups run automatically when enabled. Use these commands to trigger manual
+backups, list existing backups, restore from a dump, or view configuration.
+
+Backup files are stored in .mdemg/backups/tsdb/ (gitignored by default).`,
+	}
+
+	cmd.AddCommand(newTSDBBackupTriggerCmd())
+	cmd.AddCommand(newTSDBBackupListCmd())
+	cmd.AddCommand(newTSDBBackupConfigCmd())
+	cmd.AddCommand(newTSDBBackupRestoreCmd())
+
+	return cmd
+}
+
+func makeTSDBBackupConfig(cfg config.Config) tsdb.TSDBBackupConfig {
+	return tsdb.TSDBBackupConfig{
+		Enabled:             cfg.TSDBBackupEnabled,
+		StorageDir:          cfg.TSDBBackupStorageDir,
+		ComposeFile:         cfg.TSDBBackupComposeFile,
+		ServiceName:         cfg.TSDBBackupServiceName,
+		Database:            tsdbEnv("TSDB_DATABASE", "mdemg_metrics"),
+		User:                tsdbEnv("TSDB_USER", "mdemg"),
+		IntervalHours:       cfg.TSDBBackupIntervalHours,
+		RetentionCount:      cfg.TSDBBackupRetentionCount,
+		RetentionMaxAgeDays: cfg.TSDBBackupRetentionMaxAgeDays,
+	}
+}
+
+func newTSDBBackupTriggerCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "trigger",
+		Short: "Trigger a manual TSDB backup",
+		Long: `Trigger an immediate TimescaleDB backup using pg_dump.
+
+The backup uses docker compose exec to run pg_dump inside the TimescaleDB
+container, producing a compressed custom-format dump file.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("config error: %w", err)
+			}
+
+			if !cfg.TSDBBackupEnabled {
+				fmt.Println("TSDB backups are disabled. Enable with:")
+				fmt.Println("  TSDB_BACKUP_ENABLED=true")
+				return nil
+			}
+
+			backupCfg := makeTSDBBackupConfig(cfg)
+			svc := tsdb.NewTSDBBackupService(backupCfg)
+
+			fmt.Println("Triggering TSDB backup...")
+			rec, err := svc.Trigger("manual")
+			if err != nil {
+				return fmt.Errorf("backup trigger failed: %w", err)
+			}
+
+			fmt.Printf("Backup ID:   %s\n", rec.BackupID)
+			fmt.Printf("Status:      %s\n", rec.Status)
+			fmt.Printf("Path:        %s\n", rec.Path)
+			if rec.SizeBytes > 0 {
+				fmt.Printf("Size:        %s\n", backupFormatBytes(rec.SizeBytes))
+			}
+			if rec.Checksum != "" {
+				fmt.Printf("Checksum:    %s\n", rec.Checksum)
+			}
+			return nil
+		},
+	}
+}
+
+func newTSDBBackupListCmd() *cobra.Command {
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List existing TSDB backups",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("config error: %w", err)
+			}
+
+			backupCfg := tsdb.TSDBBackupConfig{
+				StorageDir: cfg.TSDBBackupStorageDir,
+			}
+			svc := tsdb.NewTSDBBackupService(backupCfg)
+
+			backups, err := svc.ListBackups(limit)
+			if err != nil {
+				return fmt.Errorf("list backups: %w", err)
+			}
+
+			if len(backups) == 0 {
+				fmt.Println("No TSDB backups found.")
+				fmt.Printf("Storage directory: %s\n", cfg.TSDBBackupStorageDir)
+				return nil
+			}
+
+			fmt.Printf("%-35s  %-10s  %-10s  %s\n", "BACKUP ID", "SIZE", "LABEL", "CREATED")
+			fmt.Printf("%-35s  %-10s  %-10s  %s\n", "─────────", "────", "─────", "───────")
+			for _, b := range backups {
+				size := backupFormatBytes(b.SizeBytes)
+				created := b.CreatedAt
+				if t, tErr := time.Parse(time.RFC3339, b.CreatedAt); tErr == nil {
+					created = t.Format("2006-01-02 15:04")
+				}
+				label := b.Label
+				if label == "" {
+					label = "-"
+				}
+				fmt.Printf("%-35s  %-10s  %-10s  %s\n", b.BackupID, size, label, created)
+			}
+			fmt.Printf("\nTotal: %d backup(s) in %s\n", len(backups), cfg.TSDBBackupStorageDir)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVar(&limit, "limit", 10, "Maximum number of backups to show")
+
+	return cmd
+}
+
+func newTSDBBackupConfigCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "config",
+		Short: "Show current TSDB backup configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("config error: %w", err)
+			}
+
+			fmt.Println("TSDB Backup Configuration")
+			fmt.Println("=========================")
+			fmt.Printf("  Enabled:              %v\n", cfg.TSDBBackupEnabled)
+			fmt.Printf("  Storage directory:     %s\n", cfg.TSDBBackupStorageDir)
+			fmt.Printf("  Compose file:          %s\n", displayOrDefault(cfg.TSDBBackupComposeFile, "(auto-detect)"))
+			fmt.Printf("  Service name:          %s\n", cfg.TSDBBackupServiceName)
+			fmt.Println()
+			fmt.Println("Schedule:")
+			fmt.Printf("  Backup interval:       every %dh (%s)\n", cfg.TSDBBackupIntervalHours, backupFormatHours(cfg.TSDBBackupIntervalHours))
+			fmt.Println()
+			fmt.Println("Retention:")
+			fmt.Printf("  Backups kept:          %d\n", cfg.TSDBBackupRetentionCount)
+			fmt.Printf("  Max age:               %d days\n", cfg.TSDBBackupRetentionMaxAgeDays)
+			fmt.Println()
+			fmt.Println("Environment variables:")
+			fmt.Println("  TSDB_BACKUP_ENABLED, TSDB_BACKUP_STORAGE_DIR,")
+			fmt.Println("  TSDB_BACKUP_COMPOSE_FILE, TSDB_BACKUP_SERVICE,")
+			fmt.Println("  TSDB_BACKUP_INTERVAL_HOURS, TSDB_BACKUP_RETENTION_COUNT,")
+			fmt.Println("  TSDB_BACKUP_RETENTION_MAX_AGE_DAYS")
+			return nil
+		},
+	}
+}
+
+func newTSDBBackupRestoreCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "restore <file>",
+		Short: "Restore TSDB from a backup dump",
+		Long: `Restore TimescaleDB from a pg_dump backup file.
+
+The restore uses pg_restore with --clean --if-exists to drop and recreate
+objects before restoring. This is a destructive operation.
+
+Examples:
+  mdemg tsdb backup restore .mdemg/backups/tsdb/tsdb-bk-20260328-120000.dump`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("config error: %w", err)
+			}
+
+			backupCfg := makeTSDBBackupConfig(cfg)
+			svc := tsdb.NewTSDBBackupService(backupCfg)
+
+			dumpPath := args[0]
+			fmt.Printf("Restoring TSDB from: %s\n", dumpPath)
+			fmt.Println("WARNING: This will overwrite the current database contents.")
+
+			if err := svc.Restore(dumpPath); err != nil {
+				return fmt.Errorf("restore failed: %w", err)
+			}
+
+			fmt.Println("Restore completed successfully.")
+			return nil
+		},
+	}
+}
+
+func displayOrDefault(val, def string) string {
+	if val == "" {
+		return def
+	}
+	return val
 }

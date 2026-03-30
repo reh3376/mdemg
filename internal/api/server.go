@@ -109,6 +109,10 @@ type Server struct {
 	backupSvc       *backup.Service
 	backupScheduler *backup.Scheduler
 
+	// TSDB Backup & Restore
+	tsdbBackupSvc       *tsdb.TSDBBackupService
+	tsdbBackupScheduler *tsdb.TSDBBackupScheduler
+
 	// Phase 75: Relationship extraction
 	symbolParser   *symbols.Parser
 	symbolResolver *symbols.Resolver
@@ -606,6 +610,27 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		slog.Info("backup enabled", "storage_dir", backupCfg.StorageDir, "full_interval_hours", backupCfg.FullIntervalHours, "partial_interval_hours", backupCfg.PartialIntervalHours)
 	}
 
+	// Initialize TSDB Backup service
+	var tsdbBackupSvc *tsdb.TSDBBackupService
+	var tsdbBackupSched *tsdb.TSDBBackupScheduler
+	if cfg.TSDBBackupEnabled {
+		tsdbBackupCfg := tsdb.TSDBBackupConfig{
+			Enabled:             cfg.TSDBBackupEnabled,
+			StorageDir:          cfg.TSDBBackupStorageDir,
+			ComposeFile:         cfg.TSDBBackupComposeFile,
+			ServiceName:         cfg.TSDBBackupServiceName,
+			Database:            cfg.TSDBDatabase,
+			User:                cfg.TSDBUser,
+			IntervalHours:       cfg.TSDBBackupIntervalHours,
+			RetentionCount:      cfg.TSDBBackupRetentionCount,
+			RetentionMaxAgeDays: cfg.TSDBBackupRetentionMaxAgeDays,
+		}
+		tsdbBackupSvc = tsdb.NewTSDBBackupService(tsdbBackupCfg)
+		tsdbBackupSched = tsdb.NewTSDBBackupScheduler(tsdbBackupSvc)
+		tsdbBackupSched.Start()
+		slog.Info("tsdb backup enabled", "storage_dir", tsdbBackupCfg.StorageDir, "interval_hours", tsdbBackupCfg.IntervalHours)
+	}
+
 	// Phase 60b: Initialize RSIC components
 	var rsicCycle *ape.CycleOrchestrator
 	var rsicWatchdog *ape.Watchdog
@@ -824,6 +849,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
+		tsdbBackupSvc:           tsdbBackupSvc,
+		tsdbBackupScheduler:     tsdbBackupSched,
 		intentTranslator:        intentTrans,
 		guardrailValidator:      guardrailVal,
 		jiminySvc:               jiminySvc,
@@ -974,6 +1001,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.backupScheduler != nil {
 		s.backupScheduler.Stop()
+	}
+	if s.tsdbBackupScheduler != nil {
+		s.tsdbBackupScheduler.Stop()
 	}
 	if s.metricsRecorder != nil {
 		s.metricsRecorder.Stop()
