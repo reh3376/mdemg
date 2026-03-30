@@ -504,6 +504,15 @@ type Config struct {
 	BackupRetentionMaxStorageGB int   // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
 	BackupRetentionRunAfter    bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
 
+	// TimescaleDB Backup & Restore
+	TSDBBackupEnabled          bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
+	TSDBBackupStorageDir       string // TSDB_BACKUP_STORAGE_DIR — directory for TSDB backup artifacts (default: ".mdemg/backups/tsdb")
+	TSDBBackupComposeFile      string // TSDB_BACKUP_COMPOSE_FILE — docker compose file path (default: auto-detect)
+	TSDBBackupServiceName      string // TSDB_BACKUP_SERVICE — compose service name (default: "timescaledb")
+	TSDBBackupIntervalHours    int    // TSDB_BACKUP_INTERVAL_HOURS — hours between backups (default: 24)
+	TSDBBackupRetentionCount   int    // TSDB_BACKUP_RETENTION_COUNT — keep last N backups (default: 14)
+	TSDBBackupRetentionMaxAgeDays int // TSDB_BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
+
 	// Phase 75: Relationship Extraction
 	RelExtractImports     bool    // REL_EXTRACT_IMPORTS — extract import relationships (default: true)
 	RelExtractInheritance bool    // REL_EXTRACT_INHERITANCE — extract inheritance relationships (default: true)
@@ -777,7 +786,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 3)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 4)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 
 	// Live Metrics (collect-on-request)
@@ -2385,6 +2394,27 @@ func FromEnv() (Config, error) {
 	}
 	backupRetentionRunAfter := getBool("BACKUP_RETENTION_RUN_AFTER_BACKUP", true)
 
+	// TimescaleDB Backup & Restore
+	tsdbBackupEnabled := getBool("TSDB_BACKUP_ENABLED", false)
+	tsdbBackupStorageDir := get("TSDB_BACKUP_STORAGE_DIR", ".mdemg/backups/tsdb")
+	tsdbBackupComposeFile := get("TSDB_BACKUP_COMPOSE_FILE", "")
+	tsdbBackupServiceName := get("TSDB_BACKUP_SERVICE", "timescaledb")
+	tsdbBackupIntervalHours, err := atoi("TSDB_BACKUP_INTERVAL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	if tsdbBackupIntervalHours < 1 {
+		return Config{}, errors.New("TSDB_BACKUP_INTERVAL_HOURS must be >= 1")
+	}
+	tsdbBackupRetentionCount, err := atoi("TSDB_BACKUP_RETENTION_COUNT", 14)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbBackupRetentionMaxAgeDays, err := atoi("TSDB_BACKUP_RETENTION_MAX_AGE_DAYS", 90)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Phase 75: Relationship Extraction
 	relExtractImports := getBool("REL_EXTRACT_IMPORTS", true)
 	relExtractInheritance := getBool("REL_EXTRACT_INHERITANCE", true)
@@ -3522,6 +3552,15 @@ func FromEnv() (Config, error) {
 		BackupRetentionMaxAgeDays:  backupRetentionMaxAgeDays,
 		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
 		BackupRetentionRunAfter:    backupRetentionRunAfter,
+
+		// TimescaleDB Backup & Restore
+		TSDBBackupEnabled:          tsdbBackupEnabled,
+		TSDBBackupStorageDir:       tsdbBackupStorageDir,
+		TSDBBackupComposeFile:      tsdbBackupComposeFile,
+		TSDBBackupServiceName:      tsdbBackupServiceName,
+		TSDBBackupIntervalHours:    tsdbBackupIntervalHours,
+		TSDBBackupRetentionCount:   tsdbBackupRetentionCount,
+		TSDBBackupRetentionMaxAgeDays: tsdbBackupRetentionMaxAgeDays,
 
 		// Phase 75: Relationship Extraction & Topology Hardening
 		RelExtractImports:        relExtractImports,

@@ -28,7 +28,7 @@ services:
       - timescaledb
 
   timescaledb:
-    image: timescale/timescaledb-ha:pg16
+    image: timescale/timescaledb:2.25.1-pg16
     restart: unless-stopped
     ports:
       - "${TSDB_PORT:-5433}:5432"
@@ -37,7 +37,7 @@ services:
       POSTGRES_PASSWORD: ${TSDB_PASSWORD:-mdemg_metrics}
       POSTGRES_DB: mdemg_metrics
     volumes:
-      - tsdb_data:/home/postgres/pgdata
+      - tsdb_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mdemg -d mdemg_metrics"]
       interval: 10s

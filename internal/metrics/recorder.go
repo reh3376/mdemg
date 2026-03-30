@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -162,9 +163,15 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 		})
 	}
 
-	// --- Gauges (absolute) ---
+	// --- Gauges (absolute, dirty-filtered) ---
+	var gaugeFlushed, gaugeSkipped int
 	for _, g := range mr.registry.gauges {
+		if !g.IsDirty() {
+			gaugeSkipped++
+			continue
+		}
 		val := g.Value()
+		g.ResetDirty()
 		samples = append(samples, tsdb.MetricSample{
 			Time:       now,
 			SpaceID:    mr.spaceID,
@@ -175,6 +182,10 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			MetricType: "gauge",
 			Labels:     copyLabels(g.labels),
 		})
+		gaugeFlushed++
+	}
+	if gaugeSkipped > 0 {
+		slog.Debug("TSDB flush gauge stats", "flushed", gaugeFlushed, "skipped_clean", gaugeSkipped)
 	}
 
 	// --- Histograms (decomposed) ---
@@ -364,9 +375,7 @@ func formatLabels(labels map[string]string) string {
 // copyLabels creates a copy of a labels map.
 func copyLabels(labels map[string]string) map[string]string {
 	result := make(map[string]string, len(labels)+1)
-	for k, v := range labels {
-		result[k] = v
-	}
+	maps.Copy(result, labels)
 	return result
 }
 
