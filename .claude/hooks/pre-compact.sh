@@ -49,7 +49,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
 fi
 
 # Fetch current volatile stats to include in snapshot
-VSTATS=$(curl -sf "http://localhost:9999/v1/conversation/volatile/stats?space_id=${SPACE_ID}" --connect-timeout 1 --max-time 2 2>/dev/null || true)
+VSTATS=$(curl -sf "${MDEMG_URL}/v1/conversation/volatile/stats?space_id=${SPACE_ID}" --connect-timeout 1 --max-time 2 2>/dev/null || true)
 if [ -n "$VSTATS" ]; then
   VOL_COUNT=$(echo "$VSTATS" | jq -r '.volatile_count // 0' 2>/dev/null || echo "0")
   PERM_COUNT=$(echo "$VSTATS" | jq -r '.permanent_count // 0' 2>/dev/null || echo "0")

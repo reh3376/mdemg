@@ -137,6 +137,195 @@ Called automatically by session-start and pre-compact hooks.`,
 	return cmd
 }
 
+// ingestBufferMaxEntries is the maximum number of buffered entries (FIFO eviction).
+var ingestBufferMaxEntries = func() int {
+	if v := os.Getenv("INGEST_BUFFER_MAX_ENTRIES"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 100
+}()
+
+// resolveIngestBufferPath returns the path to the local JSONL ingest buffer.
+func resolveIngestBufferPath() string {
+	if v := os.Getenv("INGEST_BUFFER_PATH"); v != "" {
+		return v
+	}
+	return filepath.Join(".mdemg", "ingest-buffer.jsonl")
+}
+
+// ingestBufferEntry represents a single buffered ingest payload.
+type ingestBufferEntry struct {
+	Path        string   `json:"path"`
+	Content     string   `json:"content"`
+	ContentHash string   `json:"content_hash"`
+	Tags        []string `json:"tags"`
+	BufferedAt  string   `json:"buffered_at"`
+	SpaceID     string   `json:"space_id"`
+	FileSize    int64    `json:"file_size"`
+	LineCount   int      `json:"line_count"`
+}
+
+// bufferToLocalJSONL writes pending ingests to .mdemg/ingest-buffer.jsonl when server is down.
+func bufferToLocalJSONL(cfg *ingestClaudeMDConfig) error {
+	bufPath := resolveIngestBufferPath()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+	projHash := projectPathHash(cwd)
+
+	var files []claudeMDEntry
+	if cfg.file != "" {
+		absPath := cfg.file
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(cwd, absPath)
+		}
+		files = append(files, claudeMDEntry{Path: absPath, Tags: []string{"claude-md", "targeted"}})
+	} else {
+		files = discoverClaudeMDFiles(cwd, projHash)
+	}
+
+	if len(files) == 0 {
+		return nil
+	}
+
+	// Read existing buffer for FIFO enforcement
+	var existingLines []string
+	if data, err := os.ReadFile(bufPath); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.TrimSpace(line) != "" {
+				existingLines = append(existingLines, line)
+			}
+		}
+	}
+
+	buffered := 0
+	for _, entry := range files {
+		absPath := entry.Path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(cwd, absPath)
+		}
+		absPath = expandHome(absPath)
+
+		content, err := os.ReadFile(absPath)
+		if err != nil {
+			continue
+		}
+
+		info, err := os.Stat(absPath)
+		if err != nil {
+			continue
+		}
+
+		hash := fmt.Sprintf("sha256:%x", sha256.Sum256(content))
+		lineCount := strings.Count(string(content), "\n")
+		if len(content) > 0 && content[len(content)-1] != '\n' {
+			lineCount++
+		}
+
+		cmsPath := absPath
+		if rel, err := filepath.Rel(cwd, absPath); err == nil && !strings.HasPrefix(rel, "..") {
+			cmsPath = rel
+		}
+
+		bufEntry := ingestBufferEntry{
+			Path:        cmsPath,
+			Content:     string(content),
+			ContentHash: hash,
+			Tags:        entry.Tags,
+			BufferedAt:  time.Now().UTC().Format(time.RFC3339),
+			SpaceID:     cfg.spaceID,
+			FileSize:    info.Size(),
+			LineCount:   lineCount,
+		}
+
+		line, err := json.Marshal(bufEntry)
+		if err != nil {
+			continue
+		}
+		existingLines = append(existingLines, string(line))
+		buffered++
+	}
+
+	// FIFO eviction: keep only newest entries
+	if len(existingLines) > ingestBufferMaxEntries {
+		existingLines = existingLines[len(existingLines)-ingestBufferMaxEntries:]
+	}
+
+	// Write buffer file
+	if err := os.MkdirAll(filepath.Dir(bufPath), 0755); err != nil {
+		return fmt.Errorf("create buffer directory: %w", err)
+	}
+
+	var buf bytes.Buffer
+	for _, line := range existingLines {
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+
+	if err := os.WriteFile(bufPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("write buffer file: %w", err)
+	}
+
+	if !cfg.quiet {
+		fmt.Printf("Buffered %d files to %s\n", buffered, bufPath)
+	}
+	return nil
+}
+
+// flushLocalBuffer reads .mdemg/ingest-buffer.jsonl and ingests each entry.
+// Returns count of successfully flushed entries. Partially-flushed buffers are preserved.
+func flushLocalBuffer(client *http.Client, cfg *ingestClaudeMDConfig) int {
+	bufPath := resolveIngestBufferPath()
+
+	data, err := os.ReadFile(bufPath)
+	if err != nil {
+		return 0
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var remaining []string
+	flushed := 0
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		var entry ingestBufferEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			remaining = append(remaining, line) // Preserve malformed lines
+			continue
+		}
+
+		// Attempt to ingest
+		err := ingestClaudeMDFile(client, cfg.endpoint, entry.SpaceID, entry.Path,
+			entry.Content, entry.ContentHash, entry.FileSize, entry.LineCount, entry.Tags)
+		if err != nil {
+			remaining = append(remaining, line) // Keep failed entries
+			continue
+		}
+		flushed++
+	}
+
+	// Rewrite buffer with only remaining (unflushed) entries
+	if flushed > 0 {
+		var buf bytes.Buffer
+		for _, line := range remaining {
+			buf.WriteString(line)
+			buf.WriteByte('\n')
+		}
+		_ = os.WriteFile(bufPath, buf.Bytes(), 0644)
+	}
+
+	return flushed
+}
+
 func runIngestClaudeMD(cfg *ingestClaudeMDConfig) error {
 	if cfg.endpoint == "" {
 		cfg.endpoint = config.ResolveEndpoint("http://localhost:9999")
@@ -146,9 +335,20 @@ func runIngestClaudeMD(cfg *ingestClaudeMDConfig) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	healthResp, err := client.Get(cfg.endpoint + "/healthz")
 	if err != nil || healthResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("MDEMG server unreachable at %s", cfg.endpoint)
+		// Server down — buffer locally instead of failing
+		if !cfg.quiet {
+			fmt.Printf("⚠ Server unreachable at %s — buffering to %s\n",
+				cfg.endpoint, resolveIngestBufferPath())
+		}
+		return bufferToLocalJSONL(cfg)
 	}
 	healthResp.Body.Close()
+
+	// Server up — flush any buffered ingests first
+	flushed := flushLocalBuffer(client, cfg)
+	if flushed > 0 && !cfg.quiet {
+		fmt.Printf("Flushed %d buffered ingests\n", flushed)
+	}
 
 	// Resolve project hash for glob expansion
 	cwd, err := os.Getwd()

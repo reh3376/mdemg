@@ -245,6 +245,98 @@ mdemg serve --mcp
 
 ---
 
+### `mdemg service`
+
+Parent command for OS-level process supervision. Unlike `mdemg start` (PID-file-based), `mdemg service` configures the operating system to automatically restart MDEMG on crash or reboot.
+
+Subcommands: `install`, `uninstall`, `status`, `restart`, `logs`
+
+**Platforms:** macOS (launchd LaunchAgents), Linux (systemd units). Unsupported platforms return an error suggesting `mdemg start` for manual mode.
+
+---
+
+### `mdemg service install`
+
+**Synopsis:** `mdemg service install [flags]`
+
+Install OS-level process supervision for MDEMG services. On macOS, installs LaunchAgent plists to `~/Library/LaunchAgents/` and bootstraps them via `launchctl`. On Linux, copies systemd unit files and runs `systemctl daemon-reload && systemctl enable`.
+
+Three services are supervised:
+- **mdemg server** — main HTTP API server (KeepAlive, auto-restart on crash)
+- **neural sidecar** — Python embedding/inference sidecar (KeepAlive)
+- **ingest timer** — periodic `ingest-claude-md` every 30 minutes (timer-based)
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `"mdemg-dev"` | Space ID for the ingest timer |
+
+**Usage Examples:**
+```bash
+mdemg service install
+mdemg service install --space-id my-project
+```
+
+**See Also:** `mdemg service status`, `mdemg service uninstall`, `mdemg start`
+
+---
+
+### `mdemg service uninstall`
+
+**Synopsis:** `mdemg service uninstall`
+
+Remove OS-level process supervision. Stops all supervised services and removes configuration files (LaunchAgent plists on macOS, systemd units on Linux).
+
+**Usage Examples:**
+```bash
+mdemg service uninstall
+```
+
+---
+
+### `mdemg service status`
+
+**Synopsis:** `mdemg service status`
+
+Show the state of all supervised MDEMG services. Reports whether each service is running, stopped, or not loaded.
+
+**Usage Examples:**
+```bash
+mdemg service status
+```
+
+---
+
+### `mdemg service restart`
+
+**Synopsis:** `mdemg service restart`
+
+Restart all supervised MDEMG services. On macOS, performs bootout + bootstrap cycle. On Linux, runs `systemctl restart`.
+
+**Usage Examples:**
+```bash
+mdemg service restart
+```
+
+---
+
+### `mdemg service logs`
+
+**Synopsis:** `mdemg service logs [flags]`
+
+View service log output. On macOS, reads from `~/.mdemg/logs/`. On Linux, reads from `journalctl`.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `-f`, `--follow` | bool | `false` | Follow log output (like `tail -f`) |
+
+**Usage Examples:**
+```bash
+mdemg service logs
+mdemg service logs -f
+```
+
+---
+
 ## Database Management
 
 ### `mdemg db`
@@ -1871,6 +1963,29 @@ mdemg data quality
 ```
 
 **See Also:** `mdemg data annotate`, `mdemg data stats`
+
+---
+
+### `mdemg data audit`
+
+**Synopsis:** `mdemg data audit [flags]`
+
+Compare disk state against CMS state for all tracked claude-md files. Reports each file as: current, stale (>24h since last ingest), deleted, shrank, or not ingested. Also shows pending ingest buffer entries and service health (server, Neo4j, sidecar).
+
+Gracefully handles unreachable server by reporting local state only.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `"codebase"` | Space ID to audit |
+| `--server-url` | string | `"http://localhost:9999"` | MDEMG server URL |
+
+**Usage Examples:**
+```bash
+mdemg data audit
+mdemg data audit --space-id mdemg-dev
+```
+
+**See Also:** `mdemg data status`, `mdemg ingest-claude-md`
 
 ---
 

@@ -27,6 +27,7 @@ MDEMG is your persistent memory and cognitive substrate. Markdown memory files a
 **Server**: `http://localhost:9999` | **Check**: `curl -s http://localhost:9999/healthz`
 **Start**: `cd /Users/reh3376/mdemg && ./bin/mdemg start --auto-migrate`
 **Build**: `cd /Users/reh3376/mdemg && go build -o bin/mdemg ./cmd/mdemg`
+**Supervise**: `mdemg service install` (launchd/systemd — auto-restart on crash/reboot)
 
 ### Observe Continuously (silently, without announcing)
 
@@ -50,7 +51,7 @@ curl -s -X POST http://localhost:9999/v1/conversation/observe \
 - **Observe silently** — do NOT announce when observing
 - **Surprise-weighted**: novel information persists longer than redundant
 - **Hebbian learning**: frequently co-activated concepts strengthen automatically
-- **If server unavailable**: warn "CMS unavailable, memory disconnected" then attempt to start it
+- **If server unavailable**: hooks now auto-start the server (up to 10s). If auto-start fails, warn "CMS unavailable — auto-start failed." For persistent supervision across reboots: `mdemg service install`
 - **Protected space `mdemg-dev`**: hardcoded deletion protection, never circumvent
 
 ### Skill Registry

@@ -96,3 +96,7 @@ mdemg restart                       # After config changes
 mdemg stop                          # End of day
 mdemg db stop                       # Optional: stop Neo4j too
 ```
+
+## Process Supervision
+
+For persistent process supervision that survives reboots and auto-restarts on crash, see `docs/features/service-resilience.md` and `mdemg service install`.

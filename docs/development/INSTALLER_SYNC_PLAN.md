@@ -546,6 +546,17 @@ Sequential: build → tag → update installers → verify.
 
 ---
 
+## Packaging Note: LaunchAgent Plists
+
+The `packaging/launchd/` directory contains 3 LaunchAgent plist templates for macOS process supervision:
+- `com.mdemg.server.plist` — server auto-restart
+- `com.mdemg.neural-sidecar.plist` — sidecar auto-restart
+- `com.mdemg.ingest-claude-md.plist` — periodic ingest timer (30 min)
+
+These should be included in Homebrew and installer distributions. `mdemg service install` copies and activates them. Placeholders (`__MDEMG_BIN__`, `__PROJECT_DIR__`, `__HOME__`) are substituted at install time.
+
+---
+
 ## Risk Assessment
 
 | Risk | Impact | Mitigation |

@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
-# MDEMG pre-compact hook (installed by mdemg hooks install)
 # Hook: PreCompact — save current work state to CMS before context compaction.
 # This ensures critical context survives the compaction boundary.
 
 set -euo pipefail
 
 MDEMG_URL="${MDEMG_URL:-{{MDEMG_URL}}}"
-SPACE_ID="{{SPACE_ID}}"
 SESSION_ID="claude-core"
+
+get_space_id() {
+    if [ -n "${MDEMG_SPACE_ID:-}" ]; then
+        echo "$MDEMG_SPACE_ID"
+    elif [ -f ".mdemg/config.yaml" ]; then
+        grep -oP 'space_id:\s*\K\S+' .mdemg/config.yaml 2>/dev/null || echo "{{SPACE_ID}}"
+    else
+        echo "{{SPACE_ID}}"
+    fi
+}
+SPACE_ID=$(get_space_id)
 
 # Check server is up (fast fail)
 if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
@@ -19,6 +28,7 @@ INPUT=$(cat)
 
 # Extract transcript path and session info
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
+SESSION_ID_INPUT=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
 
 # Build a richer context message by examining recent state
@@ -31,6 +41,7 @@ fi
 
 # If we can read the transcript tail, extract recent tool activity
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  # Get last few lines to identify recent activity (tool calls, files edited)
   RECENT=$(tail -5 "$TRANSCRIPT_PATH" 2>/dev/null | jq -r '.content // empty' 2>/dev/null | head -3 || true)
   if [ -n "$RECENT" ]; then
     CONTEXT_PARTS="${CONTEXT_PARTS} Recent activity: $(echo "$RECENT" | tr '\n' ' ' | head -c 300)"
@@ -45,12 +56,13 @@ if [ -n "$VSTATS" ]; then
   CONTEXT_PARTS="${CONTEXT_PARTS} Memory state: ${VOL_COUNT} volatile, ${PERM_COUNT} permanent observations."
 fi
 
-# Health snapshot before compaction
+# Phase 80: Health snapshot before compaction
 SESSION_HEALTH=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=${SESSION_ID}" \
   --connect-timeout 1 --max-time 2 2>/dev/null || true)
 if [ -n "$SESSION_HEALTH" ]; then
   S_SCORE=$(echo "$SESSION_HEALTH" | jq -r '.health_score // 0' 2>/dev/null || echo "0")
   CONTEXT_PARTS="${CONTEXT_PARTS} Session health: ${S_SCORE}."
+  # If health is critically low, append warning
   if [ "$(echo "$S_SCORE < 0.3" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
     CONTEXT_PARTS="${CONTEXT_PARTS} WARNING: Session health critically low (${S_SCORE}). CMS may not be properly integrated."
   fi
@@ -59,7 +71,7 @@ fi
 # RSIC health assessment before compaction
 RSIC_ASSESS=$(curl -sf -X POST "${MDEMG_URL}/v1/self-improve/assess" \
   -H "Content-Type: application/json" \
-  -d "{\"space_id\":\"{{SPACE_ID}}\",\"tier\":\"micro\"}" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"tier\":\"micro\"}" \
   --connect-timeout 2 --max-time 5 2>/dev/null || true)
 if [ -n "$RSIC_ASSESS" ]; then
   RSIC_OVERALL=$(echo "$RSIC_ASSESS" | jq -r '.overall // 0' 2>/dev/null || echo "0")
@@ -120,14 +132,30 @@ curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
   }" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null || true
 
+# Emergency: ingest all claude .md files before compaction wipes context
+# Uses --force to skip hash check — we want latest content persisted regardless
+if [ -x "./bin/mdemg" ]; then
+  ./bin/mdemg ingest-claude-md --force --quiet --space-id "${SPACE_ID}" 2>/dev/null || true
+fi
+
+# J17: Detect whether J17 is enabled via server healthz (env var may not be in shell)
+J17_ENABLED="${J17_ENABLED:-false}"
+if [ "$J17_ENABLED" != "true" ]; then
+  J17_CHECK=$(curl -sf "${MDEMG_URL}/v1/jiminy/ready" --connect-timeout 2 --max-time 3 2>/dev/null || true)
+  if [ -n "$J17_CHECK" ] && echo "$J17_CHECK" | jq -e '.features.j17 == true' >/dev/null 2>&1; then
+    J17_ENABLED="true"
+  fi
+fi
+
 # J17: Issue session ticket before compaction for state persistence
-if [ "${J17_ENABLED:-false}" = "true" ]; then
+if [ "$J17_ENABLED" = "true" ]; then
   J17_TICKET=$(curl -sf -X POST "${MDEMG_URL}/v1/jiminy/checkpoint" \
     -H "Content-Type: application/json" \
     -d "{\"space_id\":\"${SPACE_ID}\",\"session_id\":\"${SESSION_ID}\"}" \
     --connect-timeout 2 --max-time 5 2>/dev/null || true)
 
   if [ -n "$J17_TICKET" ]; then
+    # Store ticket as CMS observation tagged j17-ticket for session-start to retrieve
     TICKET_JSON=$(echo "$J17_TICKET" | jq -c '.data.ticket // empty' 2>/dev/null || true)
     LAST_SEQ=$(echo "$J17_TICKET" | jq -r '.data.last_seq // 0' 2>/dev/null || echo "0")
     if [ -n "$TICKET_JSON" ] && [ "$TICKET_JSON" != "null" ]; then
@@ -150,6 +178,7 @@ if [ "${J17_ENABLED:-false}" = "true" ]; then
 fi
 
 # Also run consolidation in background — compaction is a natural breakpoint
+# for clustering new observations into themes
 curl -sf -X POST "${MDEMG_URL}/v1/conversation/consolidate" \
   -H "Content-Type: application/json" \
   -d "{\"space_id\":\"${SPACE_ID}\"}" \

@@ -21,20 +21,24 @@ type claudeHookEntry struct {
 	Template string // filename in hook_templates FS
 	Event    string // Claude Code hook event
 	Timeout  int    // timeout in seconds
+	Matcher  string // tool matcher filter (empty = fire on all); placed at group level in settings
 }
 
 // claudeHookFiles returns the platform-appropriate hook entries.
-// On Windows, PowerShell scripts (.ps1) are used; on Unix, bash scripts (.sh).
+// On Windows, PowerShell scripts (.ps1) are used; on Unix, bash/python scripts.
 func claudeHookFiles() []claudeHookEntry {
 	if runtime.GOOS == "windows" {
 		return []claudeHookEntry{
-			{"prompt-context.ps1", "UserPromptSubmit", 12},
-			{"session-start.ps1", "SessionStart", 15},
+			{"session-start.ps1", "SessionStart", 15, ""},
+			{"prompt-context.ps1", "UserPromptSubmit", 12, ""},
 		}
 	}
 	return []claudeHookEntry{
-		{"prompt-context.sh", "UserPromptSubmit", 12},
-		{"session-start.sh", "SessionStart", 15},
+		{"session-start.sh", "SessionStart", 15, ""},
+		{"prompt-context.sh", "UserPromptSubmit", 12, ""},
+		{"post-tool-observe.py", "PostToolUse", 10, "Bash|Write|Edit"},
+		{"pre-compact.sh", "PreCompact", 10, ""},      // empty matcher = fire on all compaction
+		{"pre-bash-check.py", "PreToolUse", 5, "Bash"},
 	}
 }
 
@@ -468,15 +472,19 @@ func mergeClaudeSettings(settingsPath, hookDir string) error {
 			"timeout": hf.Timeout,
 		}
 
+		// Build the group object (matcher is a sibling of hooks at group level)
+		newGroup := map[string]interface{}{
+			"hooks": []interface{}{hookEntry},
+		}
+		if hf.Matcher != "" {
+			newGroup["matcher"] = hf.Matcher
+		}
+
 		// Check if this event already has hooks registered
 		existing, ok := hooks[hf.Event].([]interface{})
 		if !ok {
 			// No existing hooks for this event — create fresh
-			hooks[hf.Event] = []interface{}{
-				map[string]interface{}{
-					"hooks": []interface{}{hookEntry},
-				},
-			}
+			hooks[hf.Event] = []interface{}{newGroup}
 			continue
 		}
 
@@ -501,6 +509,12 @@ func mergeClaudeSettings(settingsPath, hookDir string) error {
 					// Update existing entry in place
 					hMap["command"] = hookCommand
 					hMap["timeout"] = hf.Timeout
+					// Update matcher at group level
+					if hf.Matcher != "" {
+						groupMap["matcher"] = hf.Matcher
+					} else {
+						delete(groupMap, "matcher")
+					}
 					alreadyRegistered = true
 					break
 				}
@@ -512,9 +526,7 @@ func mergeClaudeSettings(settingsPath, hookDir string) error {
 
 		if !alreadyRegistered {
 			// Append new hook group
-			existing = append(existing, map[string]interface{}{
-				"hooks": []interface{}{hookEntry},
-			})
+			existing = append(existing, newGroup)
 			hooks[hf.Event] = existing
 		}
 	}
