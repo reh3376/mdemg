@@ -504,7 +504,7 @@
         "graphMode": "none",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         }
       }
@@ -623,7 +623,7 @@
         "graphMode": "none",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         }
       }

@@ -161,6 +161,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/etc/grafana/dashboards/mdemg-overview.json"
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+      GF_INSTALL_PLUGINS: "kniepdennis-neo4j-datasource,hamedkarbasi93-nodegraphapi-datasource"
       TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
     volumes:
       - grafana-data:/var/lib/grafana
