@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/ape"
 	"mdemg/internal/conversation"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
 
@@ -66,6 +68,13 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 	// Track observation in session tracker (Phase 3A)
 	if s.sessionTracker != nil && req.SessionID != "" {
 		s.sessionTracker.RecordObserve(req.SessionID)
+	}
+
+	// Record compact event timestamp for Auto-compact AVG dashboard metric
+	if containsTag(req.Tags, "pre-compaction") {
+		if m := metrics.Metrics(); m != nil {
+			m.CompactEventTimestamp(req.SpaceID).Set(float64(time.Now().Unix()))
+		}
 	}
 
 	// Convert to API response type
@@ -871,4 +880,9 @@ func (s *Server) countSpaceNodes(ctx context.Context, spaceID string) int64 {
 		return 0
 	}
 	return result.(int64)
+}
+
+// containsTag checks if a tag list contains a specific tag.
+func containsTag(tags []string, tag string) bool {
+	return slices.Contains(tags, tag)
 }

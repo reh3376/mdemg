@@ -35,7 +35,7 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 5,
+        "w": 4,
         "x": 0,
         "y": 1
       },
@@ -52,7 +52,10 @@
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["mean"]
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -85,8 +88,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 5,
+        "w": 4,
+        "x": 4,
         "y": 1
       },
       "datasource": {
@@ -102,7 +105,10 @@
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["mean"]
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -135,8 +141,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 10,
+        "w": 4,
+        "x": 8,
         "y": 1
       },
       "datasource": {
@@ -152,7 +158,10 @@
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["mean"]
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -185,8 +194,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 15,
+        "w": 4,
+        "x": 12,
         "y": 1
       },
       "datasource": {
@@ -202,7 +211,10 @@
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["mean"]
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -225,6 +237,48 @@
                 "color": "green",
                 "value": 0.7
               }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Auto-compact AVG",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT NOW() AS time, CASE WHEN count(*) > 1 THEN EXTRACT(EPOCH FROM (max(time) - min(time))) / (count(*) - 1) / 60.0 ELSE 0 END AS value FROM metric_samples WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["mean"]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 120 },
+              { "color": "red", "value": 240 }
             ]
           }
         }
@@ -276,7 +330,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         }
       ],
@@ -302,17 +356,17 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         }
       ],
@@ -320,7 +374,7 @@
         "pieType": "donut",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         },
         "legend": {
@@ -504,17 +558,17 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         }
       ],

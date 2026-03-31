@@ -292,7 +292,7 @@
         "pieType": "donut",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         },
         "legend": {
@@ -398,7 +398,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         },
         "showThresholdLabels": false,

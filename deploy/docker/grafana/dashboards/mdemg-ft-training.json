@@ -205,7 +205,7 @@
         "showThresholdMarkers": true,
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         }
       },
@@ -262,7 +262,7 @@
         "showThresholdMarkers": true,
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ]
         }
       },

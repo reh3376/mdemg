@@ -32,10 +32,10 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 	cypher := `
 	MATCH (n:MemoryNode {space_id: $spaceId})-[r:GUIDANCE_OUTCOME]-()
 	RETURN
-		count(r) AS total,
-		count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS followed,
-		count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS ignored,
-		count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS contradicted`
+		count(DISTINCT r.guidance_id) AS total,
+		count(DISTINCT CASE WHEN r.outcome_type = 'followed' THEN r.guidance_id END) AS followed,
+		count(DISTINCT CASE WHEN r.outcome_type = 'ignored' THEN r.guidance_id END) AS ignored,
+		count(DISTINCT CASE WHEN r.outcome_type = 'contradicted' THEN r.guidance_id END) AS contradicted`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, cypher, map[string]any{

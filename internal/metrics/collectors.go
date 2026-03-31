@@ -163,6 +163,7 @@ type StandardMetrics struct {
 	JiminyTotalFollowed           func(spaceID string) *Gauge
 	JiminyTotalIgnored            func(spaceID string) *Gauge
 	JiminyTotalContradicted       func(spaceID string) *Gauge
+	CompactEventTimestamp         func(spaceID string) *Gauge
 
 	// Jiminy Guide + Warm metrics (event-driven pre-computation)
 	JiminyGuideCalls    func(spaceID string) *Counter
@@ -531,6 +532,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.JiminyTotalContradicted = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_contradicted_total", "Guidance items contradicted",
+			map[string]string{"space_id": spaceID})
+	}
+	m.CompactEventTimestamp = func(spaceID string) *Gauge {
+		return r.NewGauge("compact_event_ts", "Timestamp of last compact event (unix seconds)",
 			map[string]string{"space_id": spaceID})
 	}
 
