@@ -17,6 +17,8 @@ import (
 	"mdemg/internal/llmclient"
 )
 
+const summarizeSystemPrompt = `You are a code summarization engine for a knowledge graph. Given a batch of code elements (functions, classes, modules), produce a concise semantic summary for each one that captures its purpose, dependencies, and role in the codebase. Respond ONLY with valid JSON matching the requested schema.`
+
 // Config holds configuration for the summarize service.
 type Config struct {
 	Enabled      bool   // Feature toggle (default: false)
@@ -363,7 +365,7 @@ func (s *Service) callOpenAI(ctx context.Context, elements []CodeElement) ([]str
 	}
 
 	msgs := []llmclient.Message{
-		{Role: "system", Content: "You are a helpful code analysis assistant. Respond only with valid JSON."},
+		{Role: "system", Content: summarizeSystemPrompt},
 		{Role: "user", Content: prompt},
 	}
 
@@ -391,6 +393,7 @@ func (s *Service) callOllama(ctx context.Context, elements []CodeElement) ([]str
 	numPredict := s.config.MaxTokens * len(elements)
 
 	msgs := []llmclient.Message{
+		{Role: "system", Content: summarizeSystemPrompt},
 		{Role: "user", Content: prompt},
 	}
 

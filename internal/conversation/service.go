@@ -1140,7 +1140,12 @@ func (s *Service) Recall(ctx context.Context, req RecallRequest) (*RecallRespons
 		embedding = req.QueryEmbedding
 	} else if s.embedder != nil {
 		var err error
-		embedding, err = s.embedder.Embed(ctx, req.Query)
+		embCtx := embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite:  "conversation.recall",
+			SpaceID:   req.SpaceID,
+			QueryText: req.Query,
+		})
+		embedding, err = s.embedder.Embed(embCtx, req.Query)
 		if err != nil {
 			return nil, fmt.Errorf("generate embedding: %w", err)
 		}

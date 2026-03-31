@@ -19,9 +19,9 @@ func TestBuildRerankPrompt_Compressed(t *testing.T) {
 	if !strings.Contains(prompt, "|") {
 		t.Error("compressed prompt should use pipe-separated format")
 	}
-	// Should NOT contain the verbose preamble
-	if strings.Contains(prompt, "Rate how relevant") {
-		t.Error("compressed prompt should NOT contain verbose 'Rate how relevant' preamble")
+	// System framing moved to system role — should NOT appear in user prompt
+	if strings.Contains(prompt, "Relevance judge") {
+		t.Error("compressed prompt should NOT contain system framing (moved to system role)")
 	}
 	// Summary should be truncated to 300 chars (these are short so just check presence)
 	if !strings.Contains(prompt, "Authentication handler") {
@@ -54,12 +54,29 @@ func TestBuildRerankPrompt_BackwardCompat(t *testing.T) {
 
 	prompt := buildRerankPrompt("How does auth work?", candidates, false)
 
-	// Uncompressed should contain the verbose preamble
-	if !strings.Contains(prompt, "Rate how relevant") {
-		t.Error("uncompressed prompt should contain 'Rate how relevant' preamble")
+	// System framing is now in rerankCrossSystemPrompt const, not in user prompt
+	if strings.Contains(prompt, "Rate how relevant") {
+		t.Error("user prompt should NOT contain system framing (moved to system role)")
 	}
 	// Uncompressed should use multi-line format with indented fields
 	if !strings.Contains(prompt, "    Path:") {
 		t.Error("uncompressed prompt should contain multi-line format with indented 'Path:'")
+	}
+	// Should contain the query
+	if !strings.Contains(prompt, "Query: How does auth work?") {
+		t.Error("prompt should contain the query")
+	}
+}
+
+func TestRerankSystemPrompts(t *testing.T) {
+	// Verify system prompt consts exist and contain expected content
+	if !strings.Contains(rerankCrossSystemPrompt, "relevance judge") {
+		t.Error("cross system prompt should contain 'relevance judge'")
+	}
+	if !strings.Contains(rerankNLISystemPrompt, "Relevance judge") {
+		t.Error("NLI system prompt should contain 'Relevance judge'")
+	}
+	if !strings.Contains(rerankCrossSystemPrompt, "JSON array") {
+		t.Error("cross system prompt should mention JSON array output format")
 	}
 }

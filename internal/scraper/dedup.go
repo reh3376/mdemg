@@ -34,7 +34,11 @@ func (d *DedupChecker) CheckSimilar(ctx context.Context, spaceID, content string
 		return nil, nil
 	}
 
-	embedding, err := d.embedder.Embed(ctx, content)
+	embCtx := embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite: "scraper.dedup",
+		SpaceID:  spaceID,
+	})
+	embedding, err := d.embedder.Embed(embCtx, content)
 	if err != nil {
 		return nil, err
 	}

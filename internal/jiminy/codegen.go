@@ -12,6 +12,8 @@ import (
 	"mdemg/internal/llmclient"
 )
 
+const codegenSystemPrompt = `You are a constraint code generator for a knowledge graph. Generate short, mnemonic kebab-case codes (2-5 words) that capture the essence of constraints. Respond with ONLY the kebab-case code, nothing else. Examples: no-force-push-main, test-before-commit, never-stash-goreleaser`
+
 // ConstraintCodeGenerator generates mnemonic kebab-case codes for constraints.
 // Codes are generated once by the LLM and frozen on the Neo4j node.
 type ConstraintCodeGenerator struct {
@@ -42,18 +44,11 @@ func (g *ConstraintCodeGenerator) GenerateCode(ctx context.Context, constraintTy
 	}
 	g.mu.Unlock()
 
-	prompt := fmt.Sprintf(`Generate a short, mnemonic kebab-case code (2-5 words) for this constraint.
-The code should be memorable and capture the essence of the constraint.
-
-Constraint type: %s
-Description: %s
-
-Existing codes to avoid collisions: %s
-
-Respond with ONLY the kebab-case code, nothing else. Examples: no-force-push-main, test-before-commit, never-stash-goreleaser`,
+	prompt := fmt.Sprintf("Constraint type: %s\nDescription: %s\nExisting codes to avoid collisions: %s",
 		constraintType, description, strings.Join(existingCodes, ", "))
 
 	resp, err := g.client.Complete(ctx, []llmclient.Message{
+		{Role: "system", Content: codegenSystemPrompt},
 		{Role: "user", Content: prompt},
 	}, llmclient.CompleteOpts{})
 	if err != nil {

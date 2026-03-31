@@ -87,7 +87,11 @@ func (s *Service) Promote(ctx context.Context, req models.MetaLearnRequest) (mod
 
 		// 3. Embed the generalized text
 		embText := result.Name + ": " + result.Description
-		embedding, err := s.embedder.Embed(ctx, embText)
+		embCtx := embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite: "metalearn",
+			SpaceID:  req.SourceSpaceID,
+		})
+		embedding, err := s.embedder.Embed(embCtx, embText)
 		if err != nil {
 			slog.Warn("metalearn: embedding failed", "node_id", cand.NodeID, "error", err)
 			continue

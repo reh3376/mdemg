@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
@@ -413,11 +414,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// Vector recall runs in main goroutine
+	recallStart := time.Now()
 	vectorCands, err := s.vectorRecall(ctx, spaceIDs, req.QueryEmbedding, candK, filter)
 	if err != nil {
 		<-bm25Ch // drain channel to avoid goroutine leak
 		return models.RetrieveResponse{}, err
 	}
+	recallLatencyMs := time.Since(recallStart).Milliseconds()
 
 	// Collect BM25 result and fuse
 	var cands []Candidate
@@ -617,6 +620,9 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// 6) LLM Re-ranking (if enabled and query text provided)
+	// Snapshot pre-rerank results for contrastive training data
+	preRerankResults := make([]models.RetrieveResult, len(results))
+	copy(preRerankResults, results)
 	var rerankLatencyMs float64
 	var rerankTokens int
 	wasReranked := false
@@ -743,26 +749,35 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// Record retrieval event for contrastive training data
-	s.recordRetrievalEvent(ctx, req, vectorCands, results, wasReranked, rerankLatencyMs, time.Since(start).Milliseconds())
+	s.recordRetrievalEvent(ctx, req, vectorCands, bm25Out.results, preRerankResults,
+		results, wasReranked, rerankLatencyMs, recallLatencyMs, time.Since(start).Milliseconds())
 
 	return resp, nil
 }
 
 // recordRetrievalEvent sends a retrieval pipeline event to the recorder if one is set.
 func (s *Service) recordRetrievalEvent(ctx context.Context, req models.RetrieveRequest,
-	vectorCands []Candidate, results []models.RetrieveResult, wasReranked bool,
-	rerankLatencyMs float64, totalLatencyMs int64) {
+	vectorCands []Candidate, bm25Results []BM25Result, preRerankResults []models.RetrieveResult,
+	results []models.RetrieveResult, wasReranked bool,
+	rerankLatencyMs float64, recallLatencyMs int64, totalLatencyMs int64) {
 	if s.retrievalRecorder == nil {
 		return
 	}
-	// Build recall arrays
+	// Build recall arrays (vector recall)
 	recallIDs := make([]string, len(vectorCands))
 	recallScores := make([]float64, len(vectorCands))
 	for i, c := range vectorCands {
 		recallIDs[i] = c.NodeID
 		recallScores[i] = c.VectorSim
 	}
-	// Build result arrays
+	// Build BM25 arrays
+	bm25IDs := make([]string, len(bm25Results))
+	bm25Scores := make([]float64, len(bm25Results))
+	for i, b := range bm25Results {
+		bm25IDs[i] = b.NodeID
+		bm25Scores[i] = b.Score
+	}
+	// Build result arrays (final post-rerank)
 	resultIDs := make([]string, len(results))
 	resultScores := make([]float64, len(results))
 	for i, r := range results {
@@ -771,25 +786,36 @@ func (s *Service) recordRetrievalEvent(ctx context.Context, req models.RetrieveR
 	}
 
 	event := RetrievalEvent{
-		Time:          time.Now(),
-		SpaceID:       req.SpaceID,
-		CallSite:      "retrieve",
-		QueryText:     req.QueryText,
-		QueryHash:     QueryHash(req.QueryText),
-		RecallNodeIDs: recallIDs,
-		RecallScores:  recallScores,
-		RecallK:       len(vectorCands),
-		ResultNodeIDs: resultIDs,
-		ResultScores:  resultScores,
-		ResultCount:   len(results),
-		TotalLatencyMs: int(totalLatencyMs), //nolint:gosec // narrowing int64→int is fine for ms values
+		Time:            time.Now(),
+		SpaceID:         req.SpaceID,
+		CallSite:        "retrieve",
+		QueryText:       req.QueryText,
+		QueryHash:       QueryHash(req.QueryText),
+		RecallNodeIDs:   recallIDs,
+		RecallScores:    recallScores,
+		RecallK:         len(vectorCands),
+		BM25NodeIDs:     bm25IDs,
+		BM25Scores:      bm25Scores,
+		ResultNodeIDs:   resultIDs,
+		ResultScores:    resultScores,
+		ResultCount:     len(results),
+		RecallLatencyMs: int(recallLatencyMs), //nolint:gosec // narrowing int64→int is fine for ms values
+		TotalLatencyMs:  int(totalLatencyMs),  //nolint:gosec // narrowing int64→int is fine for ms values
+		GuidanceID:      llmclient.GuidanceIDFromContext(ctx),
 	}
 
 	if wasReranked {
 		event.RerankLatencyMs = int(rerankLatencyMs)
-		// Result IDs/scores post-rerank are already in resultIDs/resultScores
-		event.RerankNodeIDs = resultIDs
-		event.RerankScores = resultScores
+		event.RerankModel = s.cfg.RerankModel
+		// Pre-rerank IDs/scores (input to reranker)
+		preIDs := make([]string, len(preRerankResults))
+		preScores := make([]float64, len(preRerankResults))
+		for i, r := range preRerankResults {
+			preIDs[i] = r.NodeID
+			preScores[i] = r.Score
+		}
+		event.RerankNodeIDs = preIDs
+		event.RerankScores = preScores
 	}
 
 	s.retrievalRecorder.RecordRetrieval(ctx, event)

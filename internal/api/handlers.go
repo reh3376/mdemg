@@ -331,9 +331,13 @@ func (s *Server) handleEmbeddingHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Active health check: actually generate an embedding
+	// Active health check: actually generate an embedding (skip recording — not training data)
+	ctx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+		CallSite:      "health_check",
+		SkipRecording: true,
+	})
 	testStart := time.Now()
-	_, err := s.embedder.Embed(r.Context(), "health check test")
+	_, err := s.embedder.Embed(ctx, "health check test")
 	resp.LatencyMs = float64(time.Since(testStart).Milliseconds())
 
 	if err != nil {
@@ -651,6 +655,10 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate embeddings for items that don't have them (batched single API call)
+	batchCtx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+		CallSite: "batch_ingest",
+		SpaceID:  req.SpaceID,
+	})
 	if s.embedder != nil {
 		// Collect texts that need embeddings
 		type needsEmb struct {
@@ -674,7 +682,7 @@ func (s *Server) handleBatchIngest(w http.ResponseWriter, r *http.Request) {
 			for i, n := range needs {
 				texts[i] = n.text
 			}
-			embeddings, err := s.embedder.EmbedBatch(r.Context(), texts)
+			embeddings, err := s.embedder.EmbedBatch(batchCtx, texts)
 			if err != nil {
 				slog.Warn("batch ingest embedding failed", "error", err)
 			} else {
@@ -1420,7 +1428,12 @@ func (s *Server) handleReflect(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		emb, err := s.embedder.Embed(r.Context(), req.Topic)
+		ctx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+			CallSite:  "reflect",
+			SpaceID:   req.SpaceID,
+			QueryText: req.Topic,
+		})
+		emb, err := s.embedder.Embed(ctx, req.Topic)
 		if err != nil {
 			writeInternalError(w, err, "embedding generation")
 			return

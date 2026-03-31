@@ -9,13 +9,13 @@
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "high",
-    "notes": "No system role — prompt built dynamically by buildRerankPrompt(compress=false). Preamble: 'You are a relevance judge for a code knowledge base.' Think mode benefits careful relevance reasoning."
+    "notes": "Static system prompt defines relevance judging task. User message contains query + formatted candidates. Think mode benefits careful relevance reasoning."
   },
   "prompt": {
-    "system_prompt_hash": "dynamic",
-    "system_prompt_source": "internal/retrieval/rerank.go:262",
+    "system_prompt_hash": "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
+    "system_prompt_source": "internal/retrieval/rerank.go:20",
     "think_mode": true,
-    "dynamic_prompt": true
+    "dynamic_prompt": false
   },
   "performance": {
     "latency_budget_ms": 10000,

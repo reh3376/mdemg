@@ -9,13 +9,13 @@
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "medium",
-    "notes": "No system role — prompt built by buildRerankPrompt(compress=true). Preamble: 'Relevance judge: rate each candidate 0.0-1.0 for answering the query.' Designed for fast Ollama inference."
+    "notes": "Compact static system prompt for NLI-style scoring. User message contains query + compressed candidates. Designed for fast Ollama inference."
   },
   "prompt": {
-    "system_prompt_hash": "dynamic",
-    "system_prompt_source": "internal/retrieval/rerank.go:311",
+    "system_prompt_hash": "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb",
+    "system_prompt_source": "internal/retrieval/rerank.go:22",
     "think_mode": false,
-    "dynamic_prompt": true
+    "dynamic_prompt": false
   },
   "performance": {
     "latency_budget_ms": 5000,

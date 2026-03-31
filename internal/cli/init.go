@@ -685,6 +685,7 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"GRAFANA_PORT":         true,
 		"GRAFANA_PASSWORD":     true,
 		"TSDB_PASSWORD":        true,
+		"TSDB_ENABLED":         true,
 	}
 	filtered := make([]string, 0, len(envLines))
 	for _, line := range envLines {
@@ -703,6 +704,7 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		filtered = append(filtered, fmt.Sprintf("%s=%d", pa.envKey, pa.port))
 	}
 	filtered = append(filtered,
+		"TSDB_ENABLED=true",
 		fmt.Sprintf("GRAFANA_PASSWORD=%s", opts.GrafanaPassword),
 		fmt.Sprintf("TSDB_PASSWORD=%s", opts.TSDBPassword),
 	)

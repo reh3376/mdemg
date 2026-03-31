@@ -44,18 +44,19 @@ type embeddingMetaKey struct{}
 
 // EmbeddingMeta carries parser metadata through context to the embedder.
 type EmbeddingMeta struct {
-	ElementKind string
-	Language    string
-	FilePath    string
-	CallSite    string
-	PackageName string
-	Signature   string
-	ChunkStart  int
-	ChunkEnd    int
-	Tags        []string
-	SpaceID     string
-	QueryText   string
-	NodeID      string
+	ElementKind   string
+	Language      string
+	FilePath      string
+	CallSite      string
+	PackageName   string
+	Signature     string
+	ChunkStart    int
+	ChunkEnd      int
+	Tags          []string
+	SpaceID       string
+	QueryText     string
+	NodeID        string
+	SkipRecording bool // suppress event recording (e.g. health checks)
 }
 
 // WithEmbeddingMeta attaches embedding metadata to a context.
