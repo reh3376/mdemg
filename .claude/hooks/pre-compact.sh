@@ -135,7 +135,10 @@ curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
 # Emergency: ingest all claude .md files before compaction wipes context
 # Uses --force to skip hash check — we want latest content persisted regardless
 if [ -x "./bin/mdemg" ]; then
-  ./bin/mdemg ingest-claude-md --force --quiet --space-id "${SPACE_ID}" 2>/dev/null || true
+  INGEST_OUT=$(./bin/mdemg ingest-claude-md --force --space-id "${SPACE_ID}" 2>&1) || {
+    echo "[$(date -u +%FT%TZ)] pre-compact: ingest FAILED: ${INGEST_OUT}" \
+      >> ~/.mdemg/logs/ingest-claude-md.log
+  }
 fi
 
 # J17: Detect whether J17 is enabled via server healthz (env var may not be in shell)

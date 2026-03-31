@@ -456,6 +456,11 @@ func runIngestClaudeMD(cfg *ingestClaudeMDConfig) error {
 			ingested, total, skipped, missing, errors)
 	}
 
+	// Always emit a summary line (even in quiet mode) for log audit trail.
+	// This ensures LaunchAgent, hooks, and manual runs are all verifiable.
+	fmt.Fprintf(os.Stderr, "[%s] ingest-claude-md: %d ingested, %d skipped, %d errors, %d missing (space: %s)\n",
+		time.Now().UTC().Format(time.RFC3339), ingested, skipped, errors, missing, cfg.spaceID)
+
 	return nil
 }
 

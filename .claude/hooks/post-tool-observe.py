@@ -311,8 +311,13 @@ def ingest_with_prune_guard(file_path: str):
             stdout=log_fd,
             stderr=log_fd,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        try:
+            with open(INGEST_LOG, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}] "
+                        f"post-tool ingest FAILED for {file_path}: {e}\n")
+        except Exception:
+            pass
 
 
 def check_memory_overflow(file_path: str):

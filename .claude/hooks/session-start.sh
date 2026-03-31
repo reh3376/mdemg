@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Ensure log directory exists for all ingest/hook logging
+mkdir -p "$HOME/.mdemg/logs"
+
 MDEMG_URL="${MDEMG_URL:-http://localhost:9999}"
 SESSION_ID="claude-core"
 MAX_OBS=10
@@ -132,9 +135,30 @@ echo "═══ END CMS CONTEXT ═══"
 
 # Ingest claude .md files with content-hash change detection (fire-and-forget)
 if [ -x "./bin/mdemg" ]; then
-  mkdir -p ~/.mdemg/logs 2>/dev/null || true
   ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" \
     2>> ~/.mdemg/logs/ingest-claude-md.log &
+fi
+
+# Staleness check: warn if periodic ingest hasn't run recently
+INGEST_LOG_PATH="$HOME/.mdemg/logs/ingest-claude-md.log"
+if [ -f "$INGEST_LOG_PATH" ] && [ -s "$INGEST_LOG_PATH" ]; then
+  LAST_INGEST_LINE=$(tail -1 "$INGEST_LOG_PATH" 2>/dev/null || true)
+  if [ -n "$LAST_INGEST_LINE" ]; then
+    LAST_TS=$(echo "$LAST_INGEST_LINE" | grep -oE '^\[[0-9T:Z-]+\]' | tr -d '[]' 2>/dev/null || true)
+    if [ -n "$LAST_TS" ]; then
+      LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      NOW_EPOCH=$(date "+%s")
+      if [ "$LAST_EPOCH" -gt 0 ] 2>/dev/null; then
+        STALE_SECS=$(( NOW_EPOCH - LAST_EPOCH ))
+        if [ "$STALE_SECS" -gt 7200 ]; then
+          STALE_HOURS=$(( STALE_SECS / 3600 ))
+          echo "⚠ Auto-ingest stale: last run was ${STALE_HOURS}h ago. Check: launchctl list | grep mdemg"
+        fi
+      fi
+    fi
+  fi
+elif [ ! -f "$INGEST_LOG_PATH" ]; then
+  echo "⚠ Auto-ingest log missing — periodic ingest may never have run."
 fi
 
 # Architecture map staleness check (respects UITS-optimized flag)
