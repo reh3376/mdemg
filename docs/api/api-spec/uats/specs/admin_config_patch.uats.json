@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "6ecd6493cd49de8978d6a69c1d4b4501d5d21efdddeafa7e947c5f4f692a847f"
+    "sha256": "d0c0df571332377f800b44ac4bf7de888f8a0073e29ad787c10f2b928e102af8"
   },
   "request": {
     "method": "PATCH",
@@ -33,7 +33,7 @@
     },
     "body": {
       "updates": {
-        "log_level": "info"
+        "learning.eta": "0.02"
       }
     }
   },
@@ -91,7 +91,7 @@
         },
         "body": {
           "updates": {
-            "neo4j_uri": "bolt://localhost:7687"
+            "neo4j.uri": "bolt://localhost:7687"
           }
         }
       },

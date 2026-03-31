@@ -24,7 +24,7 @@
       "admin",
       "rsic"
     ],
-    "sha256": "c1f537ab1b5d445adaa9c98b42f4221fc04b7adf0e5e5cb4a818ee6ec98b3f21"
+    "sha256": "d1b4bcff087991bf78c1d5a1c3b0891133e98a437cfdb47d6aaa3cf9858f7243"
   },
   "request": {
     "method": "POST",
@@ -41,7 +41,7 @@
     "body_assertions": [
       {
         "path": "$.status",
-        "op": "eq",
+        "op": "equals",
         "expected": "restarted"
       }
     ]
