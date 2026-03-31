@@ -77,10 +77,12 @@ func (u *ConfidenceUpdater) UpdateConfidence(ctx context.Context, nodeID string,
 	//   4. Update last_surfaced_at.
 	cypher := `
 MATCH (n:MemoryNode {node_id: $nodeId})
+WITH n, coalesce(n.confidence, 0.5) + $delta AS raw
 WITH n,
      CASE
-       WHEN $delta > 0 THEN min(coalesce(n.confidence, 0.5) + $delta, 0.95)
-       ELSE            max(coalesce(n.confidence, 0.5) + $delta, 0.0)
+       WHEN raw > 0.95 THEN 0.95
+       WHEN raw < 0.0  THEN 0.0
+       ELSE raw
      END AS new_confidence
 SET
   n.confidence        = new_confidence,
