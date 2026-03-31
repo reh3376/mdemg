@@ -48,6 +48,7 @@ function switchTab(name) {
     TABS[name].render(content);
 
     // Re-register persistent (non-tab) subscriptions
+    setupInstanceSelector();
     setupSpaceSelector();
 }
 
@@ -107,6 +108,67 @@ function setupVisibility() {
     });
 }
 
+// Instance selector
+function setupInstanceSelector() {
+    const select = document.getElementById('instance-select');
+    if (!select) return;
+
+    async function refreshInstances() {
+        try {
+            // Always fetch from current host (not baseURL)
+            const instances = await api.adminInstances();
+            state.set('instances', instances);
+        } catch { /* silent — endpoint may not exist on older servers */ }
+    }
+
+    state.subscribe('instances', (instances) => {
+        if (!Array.isArray(instances)) return;
+        const currentBase = api.getBaseURL();
+        select.innerHTML = '';
+        for (const inst of instances) {
+            const url = inst.server_url || '';
+            const opt = document.createElement('option');
+            opt.value = url;
+            const suffix = inst.current ? ' (this)' : '';
+            const offline = inst.status !== 'healthy' ? ' [offline]' : '';
+            opt.textContent = `${inst.name}${suffix}${offline}`;
+            if (url === currentBase || (inst.current && currentBase === '')) opt.selected = true;
+            select.append(opt);
+        }
+    });
+
+    select.onchange = () => {
+        const url = select.value;
+        // For the current server, use relative paths (empty baseURL)
+        const instances = state.get('instances') || [];
+        const selected = instances.find(i => (i.server_url || '') === url);
+        const isCurrentServer = selected && selected.current;
+        api.setBaseURL(isCurrentServer ? '' : url);
+
+        // Persist selection
+        localStorage.setItem('mdemg-selected-instance', isCurrentServer ? '' : url);
+
+        // Clear stale data and re-fetch everything from new instance
+        state.batch({
+            healthz: null, readyz: null, embeddingHealth: null,
+            memoryStats: null, learningStats: null, memoryDistribution: null,
+            freezeStatus: null, staleEdgeStats: null, spaces: null,
+        });
+        pollHealth();
+        pollStats();
+        switchTab(activeTab);
+    };
+
+    // Restore saved selection
+    const saved = localStorage.getItem('mdemg-selected-instance');
+    if (saved) {
+        api.setBaseURL(saved);
+    }
+
+    refreshInstances();
+    setInterval(refreshInstances, 60_000);
+}
+
 // Space selector
 function setupSpaceSelector() {
     const select = document.getElementById('space-select');
@@ -115,13 +177,20 @@ function setupSpaceSelector() {
         if (!Array.isArray(spaces)) return;
         const current = state.get('selectedSpace') || 'mdemg-dev';
         select.innerHTML = '';
+        const allIds = [];
         for (const sp of spaces) {
             const id = sp.space_id || sp;
+            allIds.push(id);
             const opt = document.createElement('option');
             opt.value = id;
             opt.textContent = id;
             if (id === current) opt.selected = true;
             select.append(opt);
+        }
+        // If current space doesn't exist in new list (e.g., after instance switch), reset
+        if (allIds.length > 0 && !allIds.includes(current)) {
+            state.set('selectedSpace', allIds[0]);
+            select.value = allIds[0];
         }
     });
     select.onchange = () => {
@@ -137,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 
+    setupInstanceSelector();
     setupSpaceSelector();
     setupVisibility();
 

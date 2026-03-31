@@ -33,6 +33,17 @@ class TestPageLoad:
         expect(header).to_be_visible(timeout=5000)
         expect(header).to_have_text("MDEMG Dashboard")
 
+    def test_instance_selector_visible(self, ui_page: Page):
+        """The instance selector dropdown should be present in the header."""
+        select = ui_page.locator("#instance-select")
+        expect(select).to_be_visible(timeout=5000)
+
+    def test_instance_selector_has_default(self, ui_page: Page):
+        """Instance selector should have at least one option."""
+        select = ui_page.locator("#instance-select")
+        options = select.locator("option")
+        assert options.count() >= 1, "Instance selector has no options"
+
     def test_space_selector_visible(self, ui_page: Page):
         """The space selector dropdown should be present in the header."""
         select = ui_page.locator("#space-select")
@@ -1420,3 +1431,90 @@ class TestBackupAPI:
         """DELETE /v1/backup/nonexistent should return 404 or 503."""
         resp = requests.delete(f"{MDEMG_URL}/v1/backup/nonexistent-id")
         assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"
+
+
+class TestInstanceSelector:
+    """Tests for the Instance dropdown in the UI header."""
+
+    def test_instance_selector_present(self, ui_page: Page):
+        """Instance dropdown exists in the header."""
+        select = ui_page.locator("#instance-select")
+        expect(select).to_be_visible(timeout=5000)
+
+    def test_instance_selector_has_option(self, ui_page: Page):
+        """Instance dropdown has at least one option (this server)."""
+        select = ui_page.locator("#instance-select")
+        options = select.locator("option")
+        # Wait for discovery to populate (may take a moment)
+        ui_page.wait_for_timeout(2000)
+        assert options.count() >= 1, "Instance selector has no options"
+
+    def test_instance_label_present(self, ui_page: Page):
+        """Instance: label should be visible before the dropdown."""
+        label = ui_page.locator("label[for='instance-select']")
+        expect(label).to_be_visible(timeout=5000)
+        expect(label).to_have_text("Instance:")
+
+    def test_instance_before_space(self, ui_page: Page):
+        """Instance dropdown should appear before Space dropdown in DOM order."""
+        header = ui_page.locator(".header-right")
+        selects = header.locator("select")
+        assert selects.count() >= 2, f"Expected at least 2 selects, got {selects.count()}"
+        first_id = selects.nth(0).get_attribute("id")
+        assert first_id == "instance-select", f"First dropdown should be instance-select, got {first_id}"
+
+    def test_current_instance_selected(self, ui_page: Page):
+        """The current server should be selected by default."""
+        select = ui_page.locator("#instance-select")
+        ui_page.wait_for_timeout(2000)
+        # Current server option should be selected
+        selected = select.locator("option:checked")
+        assert selected.count() >= 1, "No option is selected"
+
+
+class TestInstanceAPI:
+    """Tests for GET /v1/admin/instances discovery endpoint."""
+
+    def test_instances_200(self):
+        """GET /v1/admin/instances should return 200."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/instances")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+
+    def test_instances_json_array(self):
+        """GET /v1/admin/instances should return a JSON array."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/instances")
+        data = resp.json()
+        assert isinstance(data, list), f"Expected array, got {type(data)}"
+        assert len(data) >= 1, "Expected at least one instance (self)"
+
+    def test_instances_has_current(self):
+        """At least one instance should be marked as current."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/instances")
+        data = resp.json()
+        current = [i for i in data if i.get("current")]
+        assert len(current) >= 1, f"No instance marked as current: {data}"
+
+    def test_instances_current_is_healthy(self):
+        """The current instance should have status 'healthy'."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/instances")
+        data = resp.json()
+        current = [i for i in data if i.get("current")]
+        assert current[0]["status"] == "healthy", f"Current instance not healthy: {current[0]}"
+
+    def test_instances_has_required_fields(self):
+        """Each instance should have id, name, server_url, status, current fields."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/instances")
+        data = resp.json()
+        required = {"id", "name", "server_url", "status", "current"}
+        for inst in data:
+            missing = required - set(inst.keys())
+            assert not missing, f"Instance missing fields {missing}: {inst}"
+
+    def test_instances_cors_localhost(self):
+        """Cross-origin request from localhost should include CORS headers."""
+        resp = requests.get(
+            f"{MDEMG_URL}/v1/admin/instances",
+            headers={"Origin": "http://localhost:12345"},
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("Access-Control-Allow-Origin") == "http://localhost:12345"

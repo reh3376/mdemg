@@ -1,13 +1,23 @@
 // api.js — All fetch() calls for the MDEMG browser dashboard
 
+let _baseURL = '';
+
+/** Set the base URL for all API calls (e.g., "http://localhost:10001"). */
+export function setBaseURL(url) {
+    _baseURL = url.replace(/\/$/, '');
+}
+
+/** Get the current base URL. */
+export function getBaseURL() { return _baseURL; }
+
 async function get(path) {
-    const res = await fetch(path);
+    const res = await fetch(_baseURL + path);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
 }
 
 async function patch(path, body) {
-    const res = await fetch(path, {
+    const res = await fetch(_baseURL + path, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -24,13 +34,13 @@ async function post(path, body) {
     if (body !== null && body !== undefined) {
         opts.body = JSON.stringify(body);
     }
-    const res = await fetch(path, opts);
+    const res = await fetch(_baseURL + path, opts);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
 }
 
 async function del(path) {
-    const res = await fetch(path, { method: 'DELETE' });
+    const res = await fetch(_baseURL + path, { method: 'DELETE' });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
 }
@@ -114,3 +124,10 @@ export const featureRestart = (name) => post('/v1/admin/features/restart', { nam
 
 // --- Server ---
 export const serverRestart = () => post('/v1/admin/restart', null);
+
+// --- Instance Discovery ---
+// Always fetches from current host (ignores _baseURL) since discovery is local-only.
+export const adminInstances = () => fetch('/v1/admin/instances').then(r => {
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+});

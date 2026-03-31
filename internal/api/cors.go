@@ -42,11 +42,34 @@ func DefaultCORSConfig() CORSConfig {
 	}
 }
 
+// isLocalhostOrigin returns true if the origin is http://localhost with any port.
+func isLocalhostOrigin(origin string) bool {
+	return strings.HasPrefix(origin, "http://localhost:") || origin == "http://localhost"
+}
+
 // CORSMiddleware adds CORS headers to responses and handles preflight requests.
+// When CORS is disabled, it still allows localhost origins for the browser dashboard
+// to communicate with other MDEMG instances on different ports.
 func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
 	if !cfg.Enabled {
+		// Even when CORS is disabled, allow localhost cross-port requests
+		// so the dashboard can talk to other local MDEMG instances.
 		return func(next http.Handler) http.Handler {
-			return next
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				origin := r.Header.Get("Origin")
+				if origin != "" && isLocalhostOrigin(origin) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Add("Vary", "Origin")
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+					w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-API-Key, X-Request-ID")
+					if r.Method == "OPTIONS" {
+						w.Header().Set("Access-Control-Max-Age", "86400")
+						w.WriteHeader(http.StatusNoContent)
+						return
+					}
+				}
+				next.ServeHTTP(w, r)
+			})
 		}
 	}
 

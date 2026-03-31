@@ -1928,6 +1928,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/admin/features/start", s.handleFeatureLifecycle)
 	mux.HandleFunc("/v1/admin/features/stop", s.handleFeatureLifecycle)
 	mux.HandleFunc("/v1/admin/features/restart", s.handleFeatureLifecycle)
+	mux.HandleFunc("/v1/admin/instances", s.handleAdminInstances)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
@@ -1981,16 +1982,17 @@ func (s *Server) Routes() http.Handler {
 	}
 
 	// CORS middleware (Phase 3.2)
+	// Always apply — when disabled, still allows localhost cross-port for dashboard instance switching.
+	corsCfg := CORSConfig{
+		Enabled:          s.cfg.CORSEnabled,
+		AllowedOrigins:   s.cfg.CORSAllowedOrigins,
+		AllowedMethods:   s.cfg.CORSAllowedMethods,
+		AllowedHeaders:   s.cfg.CORSAllowedHeaders,
+		AllowCredentials: s.cfg.CORSAllowCredentials,
+		MaxAge:           86400,
+	}
+	handler = CORSMiddleware(corsCfg)(handler)
 	if s.cfg.CORSEnabled {
-		corsCfg := CORSConfig{
-			Enabled:          true,
-			AllowedOrigins:   s.cfg.CORSAllowedOrigins,
-			AllowedMethods:   s.cfg.CORSAllowedMethods,
-			AllowedHeaders:   s.cfg.CORSAllowedHeaders,
-			AllowCredentials: s.cfg.CORSAllowCredentials,
-			MaxAge:           86400,
-		}
-		handler = CORSMiddleware(corsCfg)(handler)
 		slog.Info("CORS enabled", "origins", s.cfg.CORSAllowedOrigins)
 	}
 

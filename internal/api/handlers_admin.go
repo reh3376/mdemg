@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -458,4 +461,195 @@ func toInt(v any) int {
 	default:
 		return 0
 	}
+}
+
+// instanceInfo represents a discovered MDEMG instance for the UI dropdown.
+type instanceInfo struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	ProjectDirectory string `json:"project_directory"`
+	ServerURL        string `json:"server_url"`
+	SpaceID          string `json:"space_id"`
+	Status           string `json:"status"`  // "healthy", "unreachable"
+	Version          string `json:"version"` // from healthz response
+	Current          bool   `json:"current"` // true if this is the serving instance
+}
+
+// handleAdminInstances handles GET /v1/admin/instances — discover running MDEMG instances.
+func (s *Server) handleAdminInstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	// Determine this server's URL for the "current" flag
+	thisPort := strings.TrimPrefix(s.cfg.ListenAddr, ":")
+	if thisPort == "" {
+		thisPort = "9999"
+	}
+	thisURL := "http://localhost:" + thisPort
+
+	// Read sidebar/menubar registry files
+	registryInstances := readInstanceRegistry()
+
+	// If registry is empty, return just this server
+	if len(registryInstances) == 0 {
+		self := instanceInfo{
+			ID:        "self",
+			Name:      filepath.Base(mustGetwd()),
+			ServerURL: thisURL,
+			Status:    "healthy",
+			Current:   true,
+		}
+		// Probe own healthz for version
+		if ver := probeHealthz(thisURL); ver != "" {
+			self.Version = ver
+		}
+		writeJSON(w, http.StatusOK, []instanceInfo{self})
+		return
+	}
+
+	// Health-check each registered instance (2s timeout per probe)
+	results := make([]instanceInfo, 0, len(registryInstances))
+	for _, ri := range registryInstances {
+		serverURL := ri.ServerURL
+		if serverURL == "" {
+			serverURL = "http://localhost:9999"
+		}
+
+		inst := instanceInfo{
+			ID:               ri.ID,
+			Name:             ri.Name,
+			ProjectDirectory: ri.ProjectDirectory,
+			ServerURL:        serverURL,
+			SpaceID:          ri.SpaceID,
+			Status:           "unreachable",
+			Current:          serverURL == thisURL,
+		}
+
+		if ver := probeHealthz(serverURL); ver != "" {
+			inst.Status = "healthy"
+			inst.Version = ver
+		}
+
+		results = append(results, inst)
+	}
+
+	// Ensure current server is in the list
+	found := false
+	for _, inst := range results {
+		if inst.Current {
+			found = true
+			break
+		}
+	}
+	if !found {
+		self := instanceInfo{
+			ID:        "self",
+			Name:      filepath.Base(mustGetwd()),
+			ServerURL: thisURL,
+			Status:    "healthy",
+			Current:   true,
+		}
+		if ver := probeHealthz(thisURL); ver != "" {
+			self.Version = ver
+		}
+		results = append([]instanceInfo{self}, results...)
+	}
+
+	writeJSON(w, http.StatusOK, results)
+}
+
+// registryEntry matches the JSON format of the sidebar/menubar instance registry.
+type registryEntry struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	ProjectDirectory string `json:"projectDirectory"`
+	ServerURL        string `json:"serverURL,omitempty"`
+	SpaceID          string `json:"spaceId"`
+}
+
+// readInstanceRegistry reads all sidebar/menubar registry files and returns combined entries.
+func readInstanceRegistry() []registryEntry {
+	paths := instanceRegistryPaths()
+	seen := make(map[string]bool)
+	var all []registryEntry
+
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var entries []registryEntry
+		if err := json.Unmarshal(data, &entries); err != nil {
+			slog.Debug("failed to parse instance registry", "path", p, "error", err)
+			continue
+		}
+		for _, e := range entries {
+			if seen[e.ID] {
+				continue
+			}
+			seen[e.ID] = true
+			all = append(all, e)
+		}
+	}
+	return all
+}
+
+// instanceRegistryPaths returns platform-specific paths to sidebar/menubar registry files.
+func instanceRegistryPaths() []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{
+			filepath.Join(home, "Library", "Application Support", "com.reh3376.mdemg-menubar", "instances.json"),
+		}
+	case "linux":
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			configDir = filepath.Join(home, ".config")
+		}
+		return []string{
+			filepath.Join(configDir, "mdemg-sidebar", "instances.json"),
+		}
+	default:
+		return nil
+	}
+}
+
+// probeHealthz sends a GET /healthz to the given URL and returns the version if healthy.
+func probeHealthz(serverURL string) string {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(serverURL + "/healthz")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	var result struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return ""
+	}
+	if result.Status == "ok" {
+		return result.Version
+	}
+	return ""
+}
+
+// mustGetwd returns the current working directory or "unknown".
+func mustGetwd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "unknown"
+	}
+	return wd
 }
