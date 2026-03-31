@@ -10,6 +10,7 @@ import (
 	"time"
 
 	pb "mdemg/api/modulepb"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/models"
 )
 
@@ -159,10 +160,14 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 				if len(ingestBatch) >= 100 {
 					batchReq := models.BatchIngestRequest{SpaceID: req.SpaceID, Observations: ingestBatch}
 					// Generate embeddings
+					embCtx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+						CallSite: "module_ingest",
+						SpaceID:  req.SpaceID,
+					})
 					if s.embedder != nil {
 						for i := range batchReq.Observations {
 							text := fmt.Sprintf("%s: %v", batchReq.Observations[i].Name, batchReq.Observations[i].Content)
-							emb, err := s.embedder.Embed(r.Context(), text)
+							emb, err := s.embedder.Embed(embCtx, text)
 							if err == nil {
 								batchReq.Observations[i].Embedding = emb
 							}
@@ -191,10 +196,14 @@ func (s *Server) handleModuleSync(w http.ResponseWriter, r *http.Request) {
 	// Ingest remaining batch
 	if req.Ingest && len(ingestBatch) > 0 {
 		batchReq := models.BatchIngestRequest{SpaceID: req.SpaceID, Observations: ingestBatch}
+		embCtx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+			CallSite: "module_ingest",
+			SpaceID:  req.SpaceID,
+		})
 		if s.embedder != nil {
 			for i := range batchReq.Observations {
 				text := fmt.Sprintf("%s: %v", batchReq.Observations[i].Name, batchReq.Observations[i].Content)
-				emb, err := s.embedder.Embed(r.Context(), text)
+				emb, err := s.embedder.Embed(embCtx, text)
 				if err == nil {
 					batchReq.Observations[i].Embedding = emb
 				}

@@ -464,11 +464,12 @@ class TestConfigTab:
 
     def test_yaml_path_shown(self, ui_page: Page):
         """If a YAML config file exists, its path should be displayed."""
-        muted = ui_page.locator(".muted.small")
-        if muted.count() > 0:
-            text = muted.first.inner_text()
-            assert "YAML" in text or "yaml" in text or ".mdemg" in text, \
-                f"YAML path not shown: {text}"
+        muted = ui_page.locator("p.muted.small")
+        if muted.count() == 0:
+            pytest.skip("No YAML config file path displayed")
+        text = muted.first.inner_text()
+        assert "YAML" in text or "yaml" in text or ".mdemg" in text, \
+            f"YAML path not shown: {text}"
 
     def test_editable_fields_present(self, ui_page: Page):
         """Config table should have editable input fields for non-env entries."""
@@ -871,7 +872,7 @@ class TestHelpPanels:
         ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]').click()
         ui_page.wait_for_timeout(3000)
         ui_page.locator(".help-toggle").click()
-        ui_page.wait_for_timeout(300)
+        ui_page.wait_for_selector(".help-content", state="visible", timeout=3000)
         content = ui_page.locator(".help-content")
         display = content.first.evaluate("el => getComputedStyle(el).display")
         assert display != "none", f"Help content should be visible after toggle"
@@ -962,9 +963,11 @@ class TestAdminConfigAPI:
 
     def test_patch_config_rejects_env_key(self):
         """PATCH should reject updates to env-sourced keys."""
-        # Find an env-sourced key from the config
         get_resp = requests.get(f"{MDEMG_URL}/v1/admin/config")
         data = get_resp.json()
+        yaml_path = data.get("yaml_path", "")
+        if not yaml_path:
+            pytest.skip("No YAML config file found — PATCH rejects before env-key check")
         env_keys = [e["key"] for e in data["config"] if e["source"] == "env"]
         if not env_keys:
             pytest.skip("No env-sourced config keys to test")

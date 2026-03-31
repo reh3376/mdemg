@@ -26,6 +26,12 @@ func WithGuidanceID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, ctxKeyGuidanceID, id)
 }
 
+// GuidanceIDFromContext extracts the guidance_id from context, or "" if not set.
+func GuidanceIDFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(ctxKeyGuidanceID).(string)
+	return s
+}
+
 // WithSourcePath returns a context carrying a source file path for interaction logging.
 func WithSourcePath(ctx context.Context, path string) context.Context {
 	return context.WithValue(ctx, ctxKeySourcePath, path)

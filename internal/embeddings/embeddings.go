@@ -136,6 +136,9 @@ func (c *CachedEmbedder) recordEvent(ctx context.Context, text string, cached bo
 	if c.recorder == nil {
 		return
 	}
+	if meta := GetEmbeddingMeta(ctx); meta != nil && meta.SkipRecording {
+		return
+	}
 	meta := GetEmbeddingMeta(ctx)
 	event := EmbeddingEvent{
 		Time:        time.Now(),
