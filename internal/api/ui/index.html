@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MDEMG Dashboard</title>
+<style>
+/* Catppuccin Mocha */
+:root {
+    --base: #1e1e2e;
+    --mantle: #181825;
+    --crust: #11111b;
+    --surface0: #313244;
+    --surface1: #45475a;
+    --surface2: #585b70;
+    --overlay0: #6c7086;
+    --overlay1: #7f849c;
+    --text: #cdd6f4;
+    --subtext0: #a6adc8;
+    --subtext1: #bac2de;
+    --lavender: #b4befe;
+    --blue: #89b4fa;
+    --sapphire: #74c7ec;
+    --teal: #94e2d5;
+    --green: #a6e3a1;
+    --yellow: #f9e2af;
+    --peach: #fab387;
+    --red: #f38ba8;
+    --mauve: #cba6f7;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    background: var(--base);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--mantle);
+    border-bottom: 1px solid var(--surface0);
+}
+.header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--lavender);
+    letter-spacing: 0.5px;
+}
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--subtext0);
+}
+.header-right label { color: var(--subtext0); }
+
+/* Tab bar */
+.tab-bar {
+    display: flex;
+    gap: 2px;
+    padding: 6px 20px 0;
+    background: var(--mantle);
+    border-bottom: 1px solid var(--surface0);
+}
+.tab-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--overlay1);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover {
+    color: var(--subtext1);
+}
+.tab-btn.active {
+    color: var(--lavender);
+    border-bottom-color: var(--lavender);
+}
+
+/* Content area */
+#content {
+    padding: 20px;
+    max-width: 960px;
+}
+
+/* Section header */
+.section-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--lavender);
+    margin: 20px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--surface0);
+}
+.section-header:first-child { margin-top: 0; }
+
+/* Info rows */
+.info-group { margin-bottom: 12px; }
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+.info-row:nth-child(odd) { background: var(--surface0); }
+.info-label {
+    font-size: 13px;
+    color: var(--subtext0);
+    min-width: 140px;
+}
+.info-value {
+    font-size: 13px;
+    color: var(--text);
+    text-align: right;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.badge-ok { background: rgba(166,227,161,0.15); color: var(--green); }
+.badge-warn { background: rgba(249,226,175,0.15); color: var(--yellow); }
+.badge-err { background: rgba(243,139,168,0.15); color: var(--red); }
+
+/* Source badges (config) */
+.source-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.badge-env { background: rgba(166,227,161,0.15); color: var(--green); }
+.badge-yaml { background: rgba(137,180,250,0.15); color: var(--blue); }
+.badge-default { background: rgba(108,112,134,0.15); color: var(--overlay0); }
+
+/* Buttons */
+.btn {
+    padding: 6px 14px;
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    background: var(--surface0);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--surface1); border-color: var(--surface2); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+    background: rgba(137,180,250,0.2);
+    border-color: var(--blue);
+    color: var(--blue);
+}
+.btn-primary:hover { background: rgba(137,180,250,0.3); }
+.btn-danger {
+    background: rgba(243,139,168,0.15);
+    border-color: var(--red);
+    color: var(--red);
+}
+.btn-danger:hover { background: rgba(243,139,168,0.25); }
+
+/* Action row */
+.action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0;
+    flex-wrap: wrap;
+}
+
+/* Form elements */
+.select, .search-input {
+    padding: 6px 10px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+}
+.select:focus, .search-input:focus {
+    outline: none;
+    border-color: var(--lavender);
+}
+.search-input { width: 220px; }
+.search-input::placeholder { color: var(--overlay0); }
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.checkbox-label {
+    font-size: 13px;
+    color: var(--subtext0);
+    cursor: pointer;
+}
+
+.file-input {
+    font-size: 13px;
+    color: var(--subtext0);
+}
+.file-input::file-selector-button {
+    padding: 4px 10px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 4px;
+    color: var(--text);
+    cursor: pointer;
+    margin-right: 8px;
+}
+
+/* Bar chart (memory layers) */
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 10px;
+}
+.bar-row:nth-child(odd) { background: var(--surface0); border-radius: 4px; }
+.bar-label { font-size: 12px; color: var(--subtext0); min-width: 40px; }
+.bar-track {
+    flex: 1;
+    height: 10px;
+    background: var(--surface1);
+    border-radius: 5px;
+    overflow: hidden;
+}
+.bar-fill {
+    height: 100%;
+    background: var(--lavender);
+    border-radius: 5px;
+    transition: width 0.3s;
+}
+.bar-value { font-size: 12px; color: var(--text); min-width: 50px; text-align: right; }
+
+/* Grafana links */
+.grafana-link {
+    color: var(--sapphire);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.15s;
+}
+.grafana-link:hover { color: var(--blue); text-decoration: underline; }
+.grafana-link.large { font-size: 15px; font-weight: 500; }
+
+/* Config table */
+.config-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+}
+.config-table th {
+    text-align: left;
+    padding: 6px 10px;
+    color: var(--subtext0);
+    border-bottom: 1px solid var(--surface1);
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.config-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--surface0);
+}
+.config-table tr:hover td { background: rgba(49,50,68,0.5); }
+.config-key { color: var(--text); font-family: monospace; font-size: 12px; }
+.config-value { color: var(--subtext1); font-family: monospace; font-size: 12px; word-break: break-all; }
+.config-input {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 12px;
+}
+.config-input:focus { outline: none; border-color: var(--lavender); }
+.config-readonly { opacity: 0.6; cursor: not-allowed; }
+.config-lock { font-size: 11px; margin-left: 4px; }
+.config-checkbox { margin-right: 4px; accent-color: var(--lavender); }
+.config-cb-label {
+    display: flex;
+    align-items: center;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--subtext1);
+    cursor: pointer;
+}
+.config-dirty-row td { background: rgba(243,139,168,0.08) !important; }
+.config-dirty-row .config-input { border-color: var(--red); }
+.config-save-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+.config-save-bar.hidden { display: none; }
+
+/* Logs */
+.log-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.log-container {
+    max-height: 65vh;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    background: var(--crust);
+    border-radius: 6px;
+    padding: 8px;
+    border: 1px solid var(--surface0);
+}
+.log-line {
+    display: flex;
+    gap: 8px;
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+.log-line:hover { background: var(--surface0); }
+.log-ts { color: var(--overlay0); min-width: 70px; flex-shrink: 0; }
+.log-level { min-width: 48px; font-weight: 600; flex-shrink: 0; }
+.log-msg { color: var(--subtext1); word-break: break-all; }
+.log-info .log-level { color: var(--blue); }
+.log-warn .log-level { color: var(--yellow); }
+.log-error .log-level { color: var(--red); }
+.log-debug .log-level { color: var(--overlay0); }
+.log-error { background: rgba(243,139,168,0.05); }
+.log-warn { background: rgba(249,226,175,0.05); }
+
+/* RSIC result */
+.rsic-result {
+    margin: 10px 0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    min-height: 20px;
+}
+.rsic-result.success { background: rgba(166,227,161,0.1); color: var(--green); border: 1px solid rgba(166,227,161,0.2); }
+.rsic-result.error { background: rgba(243,139,168,0.1); color: var(--red); border: 1px solid rgba(243,139,168,0.2); }
+
+/* Utility */
+.muted { color: var(--overlay0); font-size: 13px; }
+.small { font-size: 12px; }
+.error { color: var(--red); }
+
+/* Help wiki panel */
+.help-panel { margin: 16px 0 8px; }
+.help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.help-header .section-header { flex: 1; margin: 0; }
+.help-toggle { font-size: 12px; padding: 3px 10px; }
+.help-content {
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.help-entry { margin-bottom: 10px; }
+.help-entry:last-child { margin-bottom: 0; }
+.help-term {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--lavender);
+    margin-bottom: 2px;
+}
+.help-desc {
+    font-size: 12px;
+    color: var(--subtext0);
+    line-height: 1.5;
+    margin-left: 0;
+}
+
+/* Plugin cards */
+.plugin-card {
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+}
+.plugin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.plugin-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.plugin-name {
+    font-weight: 600;
+    font-size: 14px;
+}
+.plugin-card-meta { font-size: 12px; }
+.plugin-detail {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--surface0);
+}
+.plugin-detail.hidden { display: none; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--mantle); }
+::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--surface2); }
+</style>
+</head>
+<body>
+    <div class="header">
+        <span class="header-title">MDEMG Dashboard</span>
+        <div class="header-right">
+            <label for="space-select">Space:</label>
+            <select id="space-select" class="select">
+                <option value="mdemg-dev">mdemg-dev</option>
+            </select>
+        </div>
+    </div>
+    <nav class="tab-bar">
+        <button class="tab-btn active" data-tab="status">Status</button>
+        <button class="tab-btn" data-tab="memory">Memory</button>
+        <button class="tab-btn" data-tab="learning">Learning</button>
+        <button class="tab-btn" data-tab="config">Config</button>
+        <button class="tab-btn" data-tab="logs">Logs</button>
+        <button class="tab-btn" data-tab="rsic">RSIC</button>
+        <button class="tab-btn" data-tab="plugins">Plugins</button>
+        <button class="tab-btn" data-tab="features">Features</button>
+    </nav>
+    <div id="content"></div>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

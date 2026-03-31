@@ -1,0 +1,100 @@
+// api.js — All fetch() calls for the MDEMG browser dashboard
+
+async function get(path) {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+
+async function patch(path, body) {
+    const res = await fetch(path, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+
+async function post(path, body) {
+    const opts = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    };
+    if (body !== null && body !== undefined) {
+        opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(path, opts);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+
+// --- Health (10s polling) ---
+export const healthz = () => get('/healthz');
+export const readyz = () => get('/readyz');
+export const embeddingHealth = () => get('/v1/embedding/health');
+
+// --- Stats (30s polling) ---
+export const memoryStats = (spaceId) => get(`/v1/memory/stats?space_id=${encodeURIComponent(spaceId)}`);
+export const learningStats = (spaceId) => get(`/v1/learning/stats?space_id=${encodeURIComponent(spaceId)}`);
+export const memoryDistribution = (spaceId) => get(`/v1/memory/distribution?space_id=${encodeURIComponent(spaceId)}`);
+export const freezeStatus = () => get('/v1/learning/freeze/status');
+export const staleEdgeStats = (spaceId) => get(`/v1/memory/edges/stale/stats?space_id=${encodeURIComponent(spaceId)}`);
+export const neo4jOverview = () => get('/v1/neo4j/overview');
+export const poolMetrics = () => get('/v1/system/pool-metrics');
+export const adminSpaces = () => get('/v1/admin/spaces');
+export const selfImproveHealth = () => get('/v1/self-improve/health');
+export const selfImproveHistory = (limit = 10) => get(`/v1/self-improve/history?limit=${limit}`);
+export const selfImproveCalibration = () => get('/v1/self-improve/calibration');
+
+// --- Config (on-demand) ---
+export const adminConfig = () => get('/v1/admin/config');
+export const updateConfig = (updates) => patch('/v1/admin/config', { updates });
+
+// --- Logs (5s polling) ---
+export const adminLogs = (limit = 200) => get(`/v1/admin/logs?limit=${limit}`);
+
+// --- Actions ---
+export const triggerCycle = (spaceId, tier = 'meso', dryRun = false) =>
+    post('/v1/self-improve/cycle', { space_id: spaceId, tier, dry_run: dryRun });
+
+export const freezeLearning = (spaceId, reason = '', frozenBy = 'ui') =>
+    post('/v1/learning/freeze', { space_id: spaceId, reason, frozen_by: frozenBy });
+
+export const unfreezeLearning = (spaceId) =>
+    post('/v1/learning/unfreeze', { space_id: spaceId });
+
+// Note: prune uses query param, not JSON body
+export const pruneEdges = (spaceId) =>
+    post(`/v1/learning/prune?space_id=${encodeURIComponent(spaceId)}`, null);
+
+export const triggerBackup = (spaceId) =>
+    post('/v1/backup/trigger', { type: 'partial_space', space_ids: [spaceId] });
+
+export const spaceExport = (spaceId, profile = 'full') =>
+    post('/v1/admin/spaces/export', { space_id: spaceId, profile });
+
+export const spaceImport = (data) =>
+    post('/v1/admin/spaces/import', data);
+
+// --- RSIC Lifecycle ---
+export const rsicStart = () => post('/v1/admin/rsic/start', null);
+export const rsicStop = () => post('/v1/admin/rsic/stop', null);
+export const rsicRestart = () => post('/v1/admin/rsic/restart', null);
+
+// --- Plugins ---
+export const pluginList = () => get('/v1/plugins');
+export const pluginDetail = (id) => get(`/v1/plugins/${encodeURIComponent(id)}`);
+export const pluginStart = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/start`, null);
+export const pluginStop = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/stop`, null);
+export const pluginRestart = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/restart`, null);
+export const pluginValidate = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/validate`, null);
+
+// --- Features ---
+export const featureList = () => get('/v1/admin/features');
+export const featureStart = (name) => post('/v1/admin/features/start', { name });
+export const featureStop = (name) => post('/v1/admin/features/stop', { name });
+export const featureRestart = (name) => post('/v1/admin/features/restart', { name });
+
+// --- Server ---
+export const serverRestart = () => post('/v1/admin/restart', null);

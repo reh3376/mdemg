@@ -1,0 +1,147 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin RSIC Lifecycle",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "rsic",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "description": "Validates POST /v1/admin/rsic/start|stop|restart lifecycle endpoints, and that GET returns 405 on each.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "admin",
+      "rsic"
+    ],
+    "sha256": "d1b4bcff087991bf78c1d5a1c3b0891133e98a437cfdb47d6aaa3cf9858f7243"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/admin/rsic/restart",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "equals",
+        "expected": "restarted"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "rsic_start_returns_200",
+      "description": "POST /v1/admin/rsic/start returns 200 with status field",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/rsic/start",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.status",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rsic_stop_returns_200",
+      "description": "POST /v1/admin/rsic/stop returns 200 with status field",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/rsic/stop",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.status",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rsic_start_get_not_allowed",
+      "description": "GET /v1/admin/rsic/start returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/rsic/start"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rsic_stop_get_not_allowed",
+      "description": "GET /v1/admin/rsic/stop returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/rsic/stop"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rsic_restart_get_not_allowed",
+      "description": "GET /v1/admin/rsic/restart returns 405",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/rsic/restart"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -3785,6 +3785,153 @@ Import space data from export chunks with conflict handling.
 
 ---
 
+## Admin — Dashboard & Lifecycle (DOCKER-P2b)
+
+Endpoints for the browser dashboard at `/ui/`. Config editing, server/service lifecycle, and feature management.
+
+### GET /v1/admin/config
+
+Returns effective configuration with source attribution for each key.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "config": [
+    {"key": "neo4j.uri", "value": "bolt://neo4j:7687", "source": "yaml", "masked": false},
+    {"key": "openai.api_key", "value": "****", "source": "env", "masked": true}
+  ],
+  "yaml_path": ".mdemg/config.yaml"
+}
+```
+
+Each entry: `source` is `env`, `yaml`, or `default`. `masked` is true for sensitive values (API keys, passwords).
+
+### PATCH /v1/admin/config
+
+Update YAML config values. Rejects env-sourced, masked/sensitive, and unknown keys. Validates before writing.
+
+**Request Body:**
+
+```json
+{"updates": {"learning.eta": "0.05", "plugins.enabled": "true"}}
+```
+
+**Response** (`200 OK`):
+
+```json
+{
+  "config": [...],
+  "yaml_path": ".mdemg/config.yaml",
+  "updated": 2
+}
+```
+
+**Error Codes:** `400` (empty updates, env-sourced key, unknown key, validation error), `500` (write error).
+
+### GET /v1/admin/logs
+
+Returns recent log entries from in-process ring buffer.
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | int | 200 | Max entries (most recent first, max 500) |
+
+**Response** (`200 OK`):
+
+```json
+{
+  "entries": [
+    {"timestamp": "...", "level": "INFO", "message": "server started", "raw": "..."}
+  ],
+  "count": 42,
+  "seq": 42
+}
+```
+
+### POST /v1/admin/restart
+
+Triggers graceful server restart via re-exec. Returns immediately; server restarts after 500ms delay.
+
+**Response** (`200 OK`): `{"status": "restarting"}`
+
+Platform-specific: `syscall.Exec` on Unix, `exec.Command` + `os.Exit` on Windows.
+
+### POST /v1/admin/rsic/start
+
+Start the RSIC watchdog.
+
+**Response** (`200 OK`): `{"status": "started"}` or `{"status": "already_running"}`
+
+### POST /v1/admin/rsic/stop
+
+Stop the RSIC watchdog.
+
+**Response** (`200 OK`): `{"status": "stopped"}` or `{"status": "already_stopped"}`
+
+### POST /v1/admin/rsic/restart
+
+Restart the RSIC watchdog (stop + recreate context + start).
+
+**Response** (`200 OK`): `{"status": "restarted"}`
+
+### GET /v1/admin/features
+
+Returns all services/features with runtime status.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "features": [
+    {"name": "ape_scheduler", "status": "healthy", "state": "running", "controllable": true},
+    {"name": "jiminy", "status": "healthy", "state": "running", "controllable": false, "config_key": "jiminy.enabled"}
+  ]
+}
+```
+
+Status: `healthy`, `stopped`, `unavailable`. State: `running`, `stopped`, `n/a`.
+
+Controllable services: `ape_scheduler`, `rsic_watchdog`, `backup_scheduler`, `tsdb_backup_scheduler`, `metrics_recorder`, `plugin_manager`.
+
+Config-only services: `jiminy`, `learning`, `retrieval`, `embeddings`, `anomaly_detection`, `conversation`, `hidden_layer`, `scraper`, `rsic_store`, `file_watcher`.
+
+### POST /v1/admin/features/start
+
+Start a controllable service.
+
+**Request Body:** `{"name": "ape_scheduler"}`
+
+**Response** (`200 OK`): `{"status": "started", "name": "ape_scheduler"}`
+
+**Error Codes:** `400` (unknown/non-controllable name), `503` (service not initialized).
+
+### POST /v1/admin/features/stop
+
+Stop a controllable service. Same request/response format as start.
+
+### POST /v1/admin/features/restart
+
+Restart a controllable service. Same request/response format as start.
+
+### POST /v1/plugins/{id}/start
+
+Start a loaded plugin module by ID.
+
+**Response** (`200 OK`): `{"status": "started", "plugin_id": "my-plugin"}`
+
+**Error Codes:** `405` (wrong method), `500` (module not found or start failed).
+
+### POST /v1/plugins/{id}/stop
+
+Gracefully stop a plugin module. Same response format.
+
+### POST /v1/plugins/{id}/restart
+
+Stop then start a plugin module. Same response format.
+
+---
+
 ## Hash Verification — UNTS (Phase 38)
 
 Hash verification REST API for tracking SHA-256 hashes of framework-protected files. Requires `UNTS_ENABLED=true`. Returns 503 when disabled.

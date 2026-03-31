@@ -462,7 +462,41 @@ func (s *Server) handlePluginOperation(w http.ResponseWriter, r *http.Request) {
 	case "validate":
 		// POST /v1/plugins/{id}/validate
 		s.handlePluginValidate(w, r, pluginID)
+	case "start":
+		s.handlePluginLifecycle(w, r, pluginID, "start")
+	case "stop":
+		s.handlePluginLifecycle(w, r, pluginID, "stop")
+	case "restart":
+		s.handlePluginLifecycle(w, r, pluginID, "restart")
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown action: " + action})
 	}
+}
+
+// handlePluginLifecycle handles POST /v1/plugins/{id}/start|stop|restart.
+func (s *Server) handlePluginLifecycle(w http.ResponseWriter, r *http.Request, pluginID, action string) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	if s.pluginMgr == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "plugin manager not initialized"})
+		return
+	}
+
+	var err error
+	switch action {
+	case "start":
+		err = s.pluginMgr.StartModuleByID(pluginID)
+	case "stop":
+		err = s.pluginMgr.StopModuleByID(pluginID)
+	case "restart":
+		err = s.pluginMgr.RestartModuleByID(pluginID)
+	}
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": action + "ed", "plugin_id": pluginID})
 }

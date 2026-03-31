@@ -264,6 +264,28 @@ flowchart TB
   end
 ```
 
+## Admin dashboard & lifecycle
+
+```mermaid
+flowchart TB
+  subgraph admin["Admin dashboard & lifecycle"]
+    a1["GET /v1/admin/config<br/>Effective config"]
+    a2["PATCH /v1/admin/config<br/>Update YAML config"]
+    a3["GET /v1/admin/logs<br/>Log ring buffer"]
+    a4["POST /v1/admin/restart<br/>Server restart"]
+    a5["POST /v1/admin/rsic/start<br/>Start watchdog"]
+    a6["POST /v1/admin/rsic/stop<br/>Stop watchdog"]
+    a7["POST /v1/admin/rsic/restart<br/>Restart watchdog"]
+    a8["GET /v1/admin/features<br/>Service status"]
+    a9["POST /v1/admin/features/start<br/>Start service"]
+    a10["POST /v1/admin/features/stop<br/>Stop service"]
+    a11["POST /v1/admin/features/restart<br/>Restart service"]
+    a12["POST /v1/plugins/id/start<br/>Start plugin"]
+    a13["POST /v1/plugins/id/stop<br/>Stop plugin"]
+    a14["POST /v1/plugins/id/restart<br/>Restart plugin"]
+  end
+```
+
 ---
 
 ## Related docs

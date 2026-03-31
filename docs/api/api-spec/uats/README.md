@@ -30,7 +30,7 @@ make test-api
 
 ---
 
-## Endpoint Coverage (195 specs, 25 categories)
+## Endpoint Coverage (199 specs, 26 categories)
 
 | Category | Specs | Key Endpoints |
 |----------|------:|---------------|
@@ -45,6 +45,7 @@ make test-api
 | Backup | 7 | `/v1/backup/trigger`, `list`, `restore`, `status` |
 | Learning | 6 | `/v1/learning/stats`, `freeze`, `unfreeze`, `prune` |
 | Admin/Transfer | 6 | `/v1/admin/spaces/*`, `/v1/admin/spaces/export`, `import` |
+| Admin/Dashboard | 4 | `/v1/admin/config` (PATCH), `features`, `restart`, `rsic/start\|stop\|restart` |
 | Scraper | 6 | `/v1/scraper/jobs/*` |
 | Neural | 4 | `/v1/neural/status`, sidecar `/health`, `/nli`, `/rerank` |
 | Linear | 4 | `/v1/linear/issues`, `projects`, `comments`, `/v1/webhooks/linear` |
@@ -368,8 +369,8 @@ To extend runner support for any of these features, implement the corresponding 
 
 ## Stats
 
-- **Canonical Specs:** 195
-- **Total Variants:** 372 (including base + variant test cases)
-- **Categories:** 25 (Health, Memory, Conversation CMS, Jiminy/J17, System, RSIC, Hash Verification, Constraints, Backup, Learning, Admin/Transfer, Scraper, Neural, Linear, Ingest, Filewatcher, Guardrail, Symbols, and more)
+- **Canonical Specs:** 199
+- **Total Variants:** 381 (including base + variant test cases)
+- **Categories:** 26 (Health, Memory, Conversation CMS, Jiminy/J17, System, RSIC, Hash Verification, Constraints, Backup, Learning, Admin/Transfer, Admin/Dashboard, Scraper, Neural, Linear, Ingest, Filewatcher, Guardrail, Symbols, and more)
 - **Most Complex:** ingest_codebase.uats.json (18 variants covering all config options)
 - **Runner Version:** 1.2.0 (SHA256 integrity hashes, exclude-tag, variant assertion isolation)

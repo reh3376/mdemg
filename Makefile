@@ -390,3 +390,13 @@ test-e2e-grafana:
 	cd tests/e2e/grafana && \
 		GRAFANA_URL=$${GRAFANA_URL:-http://localhost:3000} \
 		$(PWD)/$(PLAYWRIGHT_VENV)/python -m pytest -v --browser chromium $(PYTEST_ARGS)
+
+# Run Browser UI e2e Playwright tests (requires running MDEMG server)
+test-e2e-browser-ui:
+	@echo "Running Browser UI Playwright e2e tests..."
+	cd tests/e2e/browser-ui && \
+		MDEMG_URL=$${MDEMG_URL:-http://localhost:9999} \
+		$(PWD)/$(PLAYWRIGHT_VENV)/python -m pytest -v --browser chromium $(PYTEST_ARGS)
+
+# Run all e2e tests
+test-e2e: test-e2e-grafana test-e2e-browser-ui

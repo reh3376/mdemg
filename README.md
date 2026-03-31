@@ -64,6 +64,16 @@ This will:
 
 > **All ports are dynamic.** Each project gets its own `COMPOSE_PROJECT_NAME` for multi-instance isolation. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
 
+### Open the Dashboard
+
+Once the stack is running, open the built-in browser dashboard:
+
+```
+http://localhost:${MDEMG_PORT}/ui/
+```
+
+The dashboard has 8 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), and Features (service status). Links to 7 Grafana dashboards for detailed metrics.
+
 ### Step 3: Ingest Your Codebase
 
 ```bash

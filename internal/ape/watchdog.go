@@ -80,6 +80,23 @@ func (w *Watchdog) Stop() {
 	w.wg.Wait()
 }
 
+// Restart stops the watchdog and starts it again with a fresh context.
+func (w *Watchdog) Restart() {
+	w.Stop()
+	w.ctx, w.cancel = context.WithCancel(context.Background())
+	w.Start()
+}
+
+// Running returns true if the watchdog goroutine is active.
+func (w *Watchdog) Running() bool {
+	select {
+	case <-w.ctx.Done():
+		return false
+	default:
+		return true
+	}
+}
+
 // RecordCycle resets the watchdog after a successful cycle.
 func (w *Watchdog) RecordCycle() {
 	w.mu.Lock()
