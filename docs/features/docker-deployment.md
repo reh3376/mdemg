@@ -94,6 +94,69 @@ Port variables are dynamically assigned by `mdemg init`. Credential variables ar
 
 `deploy/docker/Dockerfile.prod`: 2-stage build (Go 1.26 builder → alpine:3.19 runtime). `LISTEN_PORT` env var configures the healthcheck URL for portability across compose configurations.
 
+## TimescaleDB Configuration
+
+TimescaleDB stores operational metrics, LLM interaction logs, embedding events, and retrieval pipeline traces. All TSDB data collection requires `TSDB_ENABLED=true`.
+
+### Core Flags
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| Master switch | `TSDB_ENABLED` | `false` | Must be `true` for any data collection |
+| Optional mode | `TSDB_OPTIONAL` | `true` | Server starts even if TSDB is unavailable |
+| Auto-migrate | `TSDB_AUTO_MIGRATE` | `false` | Run schema migrations on startup (env var, not in Config struct) |
+| Host | `TSDB_HOST` | `localhost` | TimescaleDB hostname (use `timescaledb` in Docker) |
+| Port | `TSDB_PORT` | `5432` | TimescaleDB port (internal Docker network) |
+| User | `TSDB_USER` | `mdemg` | Database user |
+| Password | `TSDB_PASSWORD` | `mdemg_metrics` | Database password |
+| Database | `TSDB_DATABASE` | `mdemg_metrics` | Database name |
+| SSL mode | `TSDB_SSL_MODE` | `disable` | PostgreSQL SSL mode |
+| Max conns | `TSDB_MAX_CONNS` | `10` | Connection pool size |
+| Flush interval | `TSDB_FLUSH_INTERVAL_SEC` | `60` | Seconds between batch flushes to TSDB |
+| Schema version | `TSDB_REQUIRED_SCHEMA_VERSION` | `7` | Required schema version (server refuses to start if behind) |
+
+### Event Logging Flags
+
+These control which event types are captured. All require `TSDB_ENABLED=true`.
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| LLM logging | `LLM_INTERACTION_LOGGING` | `true` | Log LLM calls (provider, model, latency, tokens, prompts) |
+| Embedding logging | `EMBEDDING_EVENT_LOGGING` | `true` | Log embedding calls (ingest/query, call site, cache hit) |
+| Retrieval logging | `RETRIEVAL_EVENT_LOGGING` | `true` | Log retrieval pipeline stages (recall, BM25, rerank, results) |
+
+### Data Retention
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| Raw retention | `TSDB_RAW_RETENTION_DAYS` | `90` | Days to keep raw metric samples |
+| Hourly retention | `TSDB_HOURLY_RETENTION_DAYS` | `365` | Days to keep hourly aggregates |
+
+### Backup
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| Backup enabled | `TSDB_BACKUP_ENABLED` | `false` | Enable TSDB backup scheduler |
+| Storage dir | `TSDB_BACKUP_STORAGE_DIR` | `.mdemg/backups/tsdb` | Backup file location |
+| Interval | `TSDB_BACKUP_INTERVAL_HOURS` | `24` | Hours between scheduled backups |
+| Retention count | `TSDB_BACKUP_RETENTION_COUNT` | `14` | Number of backups to keep |
+| Retention age | `TSDB_BACKUP_RETENTION_MAX_AGE_DAYS` | `90` | Maximum backup age in days |
+
+### Dependency Chain
+
+```
+TSDB_ENABLED=true (master gate)
+  ├── metric_samples writer (always active when TSDB connected)
+  ├── LLM_INTERACTION_LOGGING=true → llm_interactions writer
+  ├── EMBEDDING_EVENT_LOGGING=true → embedding_events writer
+  ├── RETRIEVAL_EVENT_LOGGING=true → retrieval_events writer
+  └── TSDB_BACKUP_ENABLED=true → backup scheduler
+```
+
+### Docker Compose Defaults
+
+`docker-compose.yml` sets `TSDB_ENABLED=true`, `TSDB_AUTO_MIGRATE=true`, and `TSDB_OPTIONAL=true` for the mdemg service. This ensures Docker deployments collect data out of the box, auto-create the schema on first startup, and tolerate TimescaleDB being temporarily unavailable.
+
 ## Neo4j Edition
 
 The compose uses `neo4j:5` (community edition). MDEMG is MIT-licensed; shipping enterprise edition would create licensing friction. APOC works with community. Enterprise features (backup, clustering) are documented as optional upgrade.

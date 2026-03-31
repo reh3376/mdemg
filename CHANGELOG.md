@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Unreleased)
+
+- **TSDB_ENABLED not set in Docker flow**: `docker-compose.yml` now sets `TSDB_ENABLED: "true"`, `TSDB_AUTO_MIGRATE: "true"`, and `TSDB_OPTIONAL: "true"` in the mdemg service environment. `mdemg init` writes `TSDB_ENABLED=true` to `.env`. Without this, TimescaleDB metrics collection was silently disabled in Docker deployments.
+
 ### Added (Unreleased)
 
 - **Docker Deployment — Phase 3: Backup UI + Distribution + Cleanup (DOCKER-P3)**:

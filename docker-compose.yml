@@ -34,6 +34,9 @@ services:
       TSDB_USER: "${TSDB_USER:-mdemg}"
       TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
       TSDB_DBNAME: "${TSDB_DBNAME:-mdemg_metrics}"
+      TSDB_ENABLED: "true"
+      TSDB_AUTO_MIGRATE: "true"
+      TSDB_OPTIONAL: "true"
 
       # Embedding provider
       EMBEDDING_PROVIDER: "${EMBEDDING_PROVIDER:-openai}"
