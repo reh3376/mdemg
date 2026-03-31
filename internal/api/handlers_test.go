@@ -9,6 +9,36 @@ import (
 	"mdemg/internal/models"
 )
 
+// TestHandleHealthz verifies the healthz response includes version and commit fields
+func TestHandleHealthz(t *testing.T) {
+	s := &Server{}
+	s.cfg.MdemgVersion = "0.6.0"
+	s.cfg.MdemgCommit = "abc1234"
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	w := httptest.NewRecorder()
+	s.handleHealthz(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if body["status"] != "ok" {
+		t.Errorf("status = %v, want ok", body["status"])
+	}
+	if body["version"] != "0.6.0" {
+		t.Errorf("version = %v, want 0.6.0", body["version"])
+	}
+	if body["commit"] != "abc1234" {
+		t.Errorf("commit = %v, want abc1234", body["commit"])
+	}
+}
+
 // TestHandleMetrics_MethodNotAllowed tests that handleMetrics returns 405 for non-GET methods
 func TestHandleMetrics_MethodNotAllowed(t *testing.T) {
 	tests := []struct {

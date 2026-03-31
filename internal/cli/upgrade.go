@@ -19,30 +19,37 @@ import (
 const (
 	upgradeRepo         = "reh3376/mdemg"
 	upgradeGitHubAPI    = "https://api.github.com/repos/" + upgradeRepo + "/releases/latest"
+	edgeReleaseAPI      = "https://api.github.com/repos/" + upgradeRepo + "/releases/tags/edge"
 	upgradeDownloadBase = "https://github.com/" + upgradeRepo + "/releases/download"
 )
 
 func newUpgradeCmd() *cobra.Command {
 	var dryRun bool
 	var forceUpgrade bool
+	var edge bool
 
 	cmd := &cobra.Command{
-		Use:   "upgrade",
-		Short: "Self-update the mdemg binary to the latest release",
+		Use:     "upgrade",
+		Aliases: []string{"update"},
+		Short:   "Self-update the mdemg binary to the latest release",
 		Long: `Download and install the latest mdemg release from GitHub.
 
 Checks the current version against the latest release. If a newer version
 is available, downloads the binary, verifies its checksum, and replaces
 the current executable.
 
+By default, downloads the latest stable (tagged) release. Use --edge to
+download the latest edge build (updated on every PR merge to main).
+
 Use --dry-run to check for updates without installing.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpgrade(dryRun, forceUpgrade)
+			return runUpgrade(dryRun, forceUpgrade, edge)
 		},
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Check for updates without installing")
 	cmd.Flags().BoolVar(&forceUpgrade, "force", false, "Install even if already at latest version")
+	cmd.Flags().BoolVar(&edge, "edge", false, "Update to latest edge build instead of stable release")
 
 	return cmd
 }
@@ -56,60 +63,93 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
-func runUpgrade(dryRun, force bool) error {
-	fmt.Printf("Current version: %s\n", Version)
+func runUpgrade(dryRun, force, edge bool) error {
+	channel := "stable"
+	if edge {
+		channel = "edge"
+	}
+	fmt.Printf("Current version: %s (channel: %s)\n", Version, channel)
 
-	// Fetch latest release info
+	// Fetch release info
 	fmt.Print("Checking for updates... ")
-	release, err := fetchLatestRelease()
+	var release *githubRelease
+	var err error
+	if edge {
+		release, err = fetchEdgeRelease()
+	} else {
+		release, err = fetchLatestRelease()
+	}
 	if err != nil {
 		fmt.Println("FAILED")
 		return fmt.Errorf("check for updates: %w", err)
 	}
-
-	latestVersion := strings.TrimPrefix(release.TagName, "v")
-	currentVersion := strings.TrimPrefix(Version, "v")
 	fmt.Printf("latest is %s\n", release.TagName)
 
-	if currentVersion == "dev" {
-		fmt.Println("\nRunning development build — cannot compare versions.")
+	// Version comparison
+	if edge {
+		// Edge: compare commit hashes (tag format: "edge", version in name like "edge-abc1234")
+		edgeCommit := strings.TrimPrefix(release.Name, "Edge Build (")
+		edgeCommit = strings.TrimSuffix(edgeCommit, ")")
+		if Commit != "unknown" && Commit == edgeCommit && !force {
+			fmt.Println("\nAlready at the latest edge build.")
+			return nil
+		}
 		if dryRun {
-			fmt.Printf("\nLatest release: %s\n", release.TagName)
-			fmt.Println("Run without --dry-run and with --force to install.")
+			fmt.Printf("\nEdge build available: commit %s\n", edgeCommit)
+			fmt.Println("Run without --dry-run to install.")
 			return nil
 		}
-		if !force {
-			fmt.Println("Use --force to install the latest release anyway.")
+	} else {
+		latestVersion := strings.TrimPrefix(release.TagName, "v")
+		currentVersion := strings.TrimPrefix(Version, "v")
+		if currentVersion == "dev" {
+			fmt.Println("\nRunning development build — cannot compare versions.")
+			if dryRun {
+				fmt.Printf("\nLatest release: %s\n", release.TagName)
+				fmt.Println("Run without --dry-run and with --force to install.")
+				return nil
+			}
+			if !force {
+				fmt.Println("Use --force to install the latest release anyway.")
+				return nil
+			}
+		} else if currentVersion == latestVersion && !force {
+			fmt.Println("\nAlready at the latest version.")
+			return nil
+		} else if dryRun {
+			fmt.Printf("\nUpdate available: %s → %s\n", Version, release.TagName)
+			fmt.Println("Run without --dry-run to install.")
 			return nil
 		}
-	} else if currentVersion == latestVersion && !force {
-		fmt.Println("\nAlready at the latest version.")
-		return nil
-	} else if dryRun {
-		fmt.Printf("\nUpdate available: %s → %s\n", Version, release.TagName)
-		fmt.Println("Run without --dry-run to install.")
-		return nil
 	}
 
 	// Find the right asset for this platform
-	ext := ".tar.gz"
-	if runtime.GOOS == "windows" {
-		ext = ".zip"
-	}
-	archiveName := fmt.Sprintf("mdemg_%s_%s_%s%s", latestVersion, runtime.GOOS, runtime.GOARCH, ext)
 	checksumName := "checksums.txt"
+	var assetName string
+	if edge {
+		// Edge: bare binary named mdemg-{os}-{arch}
+		assetName = fmt.Sprintf("mdemg-%s-%s", runtime.GOOS, runtime.GOARCH)
+	} else {
+		// Stable: tar.gz archive from goreleaser
+		ext := ".tar.gz"
+		if runtime.GOOS == "windows" {
+			ext = ".zip"
+		}
+		latestVersion := strings.TrimPrefix(release.TagName, "v")
+		assetName = fmt.Sprintf("mdemg_%s_%s_%s%s", latestVersion, runtime.GOOS, runtime.GOARCH, ext)
+	}
 
-	var archiveURL, checksumURL string
+	var assetURL, checksumURL string
 	for _, asset := range release.Assets {
-		if asset.Name == archiveName {
-			archiveURL = asset.BrowserDownloadURL
+		if asset.Name == assetName {
+			assetURL = asset.BrowserDownloadURL
 		}
 		if asset.Name == checksumName {
 			checksumURL = asset.BrowserDownloadURL
 		}
 	}
 
-	if archiveURL == "" {
+	if assetURL == "" {
 		return fmt.Errorf("no release binary found for %s/%s in %s", runtime.GOOS, runtime.GOARCH, release.TagName)
 	}
 
@@ -120,9 +160,9 @@ func runUpgrade(dryRun, force bool) error {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	archivePath := filepath.Join(tmpDir, archiveName)
-	fmt.Printf("Downloading %s... ", archiveName)
-	if err := downloadFile(archiveURL, archivePath); err != nil {
+	downloadPath := filepath.Join(tmpDir, assetName)
+	fmt.Printf("Downloading %s... ", assetName)
+	if err := downloadFile(assetURL, downloadPath); err != nil {
 		fmt.Println("FAILED")
 		return fmt.Errorf("download: %w", err)
 	}
@@ -136,36 +176,44 @@ func runUpgrade(dryRun, force bool) error {
 			fmt.Println("FAILED")
 			return fmt.Errorf("download checksums: %w", err)
 		}
-		if err := verifyChecksum(archivePath, checksumPath, archiveName); err != nil {
+		if err := verifyChecksum(downloadPath, checksumPath, assetName); err != nil {
 			fmt.Println("FAILED")
 			return fmt.Errorf("checksum verification: %w", err)
 		}
 		fmt.Println("ok")
 	}
 
-	// Extract
-	fmt.Print("Extracting... ")
-	if runtime.GOOS == "windows" {
-		if err := extractZip(archivePath, tmpDir); err != nil {
-			fmt.Println("FAILED")
-			return fmt.Errorf("extract zip: %w", err)
-		}
-	} else {
-		extractCmd := exec.Command("tar", "-xzf", archivePath, "-C", tmpDir)
-		if err := extractCmd.Run(); err != nil {
-			fmt.Println("FAILED")
-			return fmt.Errorf("extract: %w", err)
-		}
-	}
-	fmt.Println("ok")
-
+	// Determine path to the new binary
 	binaryName := "mdemg"
 	if runtime.GOOS == "windows" {
 		binaryName = "mdemg.exe"
 	}
-	newBinary := filepath.Join(tmpDir, binaryName)
+	var newBinary string
+
+	if edge {
+		// Edge: downloaded file IS the binary (bare, no archive)
+		newBinary = downloadPath
+	} else {
+		// Stable: extract archive
+		fmt.Print("Extracting... ")
+		if runtime.GOOS == "windows" {
+			if err := extractZip(downloadPath, tmpDir); err != nil {
+				fmt.Println("FAILED")
+				return fmt.Errorf("extract zip: %w", err)
+			}
+		} else {
+			extractCmd := exec.Command("tar", "-xzf", downloadPath, "-C", tmpDir)
+			if err := extractCmd.Run(); err != nil {
+				fmt.Println("FAILED")
+				return fmt.Errorf("extract: %w", err)
+			}
+		}
+		fmt.Println("ok")
+		newBinary = filepath.Join(tmpDir, binaryName)
+	}
+
 	if _, err := os.Stat(newBinary); err != nil {
-		return fmt.Errorf("binary not found in archive")
+		return fmt.Errorf("binary not found after download")
 	}
 
 	// Find current binary path
@@ -205,6 +253,16 @@ func runUpgrade(dryRun, force bool) error {
 
 	// Clean up backup
 	_ = os.Remove(backupPath)
+
+	// Copy to ./bin/mdemg if the directory exists (for hooks)
+	cwd, _ := os.Getwd()
+	binDest := filepath.Join(cwd, "bin", "mdemg")
+	if _, statErr := os.Stat(filepath.Dir(binDest)); statErr == nil {
+		if cpErr := copyFile(currentBinary, binDest); cpErr == nil {
+			_ = os.Chmod(binDest, 0o755) //nolint:gosec // Binary must be executable
+			fmt.Printf("Updated ./bin/mdemg\n")
+		}
+	}
 
 	// Linux: update systemd unit files if present in archive and currently installed
 	if runtime.GOOS == "linux" {
@@ -256,6 +314,25 @@ func runUpgrade(dryRun, force bool) error {
 
 	fmt.Printf("\nUpgraded mdemg to %s\n", release.TagName)
 	return nil
+}
+
+func fetchEdgeRelease() (*githubRelease, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(edgeReleaseAPI)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github API returned %d (edge release may not exist yet)", resp.StatusCode)
+	}
+
+	var release githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("parse release: %w", err)
+	}
+	return &release, nil
 }
 
 func fetchLatestRelease() (*githubRelease, error) {

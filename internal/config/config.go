@@ -378,6 +378,7 @@ type Config struct {
 	PluginsDir      string // Path to plugins directory (default: ./plugins)
 	PluginSocketDir string // Path to Unix socket directory (default: /tmp/mdemg-plugins)
 	MdemgVersion    string // MDEMG version string for handshake
+	MdemgCommit     string // MDEMG build commit hash for version comparison
 
 	// Linear integration settings (Phase 4)
 	LinearTeamID      string // Default team ID for issue creation
@@ -1535,6 +1536,7 @@ func FromEnv() (Config, error) {
 	pluginsDir := get("PLUGINS_DIR", "./plugins")
 	pluginSocketDir := get("PLUGIN_SOCKET_DIR", "/tmp/mdemg-plugins")
 	mdemgVersion := get("MDEMG_VERSION", "0.6.0")
+	mdemgCommit := get("MDEMG_COMMIT", "unknown")
 
 	// Linear integration settings (Phase 4)
 	linearTeamID := get("LINEAR_TEAM_ID", "")
@@ -3239,6 +3241,7 @@ func FromEnv() (Config, error) {
 		PluginsDir:                pluginsDir,
 		PluginSocketDir:           pluginSocketDir,
 		MdemgVersion:              mdemgVersion,
+		MdemgCommit:               mdemgCommit,
 		LinearTeamID:              linearTeamID,
 		LinearWorkspaceID:         linearWorkspaceID,
 		LinearWebhookSecret:         linearWebhookSecret,

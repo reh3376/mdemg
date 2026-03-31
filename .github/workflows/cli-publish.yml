@@ -1,0 +1,129 @@
+# CLI Publish (Edge) — builds platform-specific binaries on every push to main.
+# Publishes to a rolling "edge" GitHub Release at:
+#   https://github.com/reh3376/mdemg/releases/tag/edge
+#
+# Binaries: mdemg-darwin-arm64, mdemg-darwin-amd64, mdemg-linux-amd64, mdemg-linux-arm64
+# Consumed by: `mdemg upgrade --edge`, `scripts/install.sh` (CHANNEL=edge), manual download
+#
+# Uses CGO_ENABLED=1 — go-tree-sitter requires C bindings via cgo.
+# Darwin builds natively on macOS; Linux cross-compiles via zig.
+
+name: CLI Publish (Edge)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "plugins/**"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+concurrency:
+  group: edge-publish
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+            cc: "zig cc -target x86_64-linux-gnu"
+            cxx: "zig c++ -target x86_64-linux-gnu"
+          - goos: linux
+            goarch: arm64
+            cc: "zig cc -target aarch64-linux-gnu"
+            cxx: "zig c++ -target aarch64-linux-gnu"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Install Zig (for CGO cross-compilation)
+        if: matrix.goos == 'linux'
+        run: brew install zig
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          VERSION="edge-$(git rev-parse --short HEAD)"
+          COMMIT="$(git rev-parse --short HEAD)"
+          BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build \
+            -ldflags="-s -w -X mdemg/internal/cli.Version=${VERSION} -X mdemg/internal/cli.Commit=${COMMIT} -X mdemg/internal/cli.BuildDate=${BUILD_DATE}" \
+            -o mdemg-${{ matrix.goos }}-${{ matrix.goarch }} \
+            ./cmd/mdemg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdemg-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: mdemg-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 1
+
+  publish:
+    name: Publish Edge Release
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate checksums and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd artifacts
+          find . -type f -name "mdemg-*" -exec mv {} . \;
+          shasum -a 256 mdemg-* > checksums.txt
+          cat checksums.txt
+
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+
+          # Delete existing edge release (if any)
+          gh release delete edge --yes 2>/dev/null || true
+          git push origin :refs/tags/edge 2>/dev/null || true
+
+          # Create new edge release
+          gh release create edge \
+            --title "Edge Build (${COMMIT_SHORT})" \
+            --notes "**Latest main branch build — auto-updated on every merge.**
+
+          Commit: ${COMMIT_SHORT} — ${COMMIT_MSG}
+          Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          Download the binary for your platform, \`chmod +x\`, and replace your existing \`mdemg\` binary.
+          Or run: \`mdemg upgrade --edge\` (v0.4.0+)." \
+            --prerelease \
+            mdemg-* checksums.txt

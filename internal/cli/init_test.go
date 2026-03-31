@@ -342,3 +342,57 @@ func TestMaskKey(t *testing.T) {
 		}
 	}
 }
+
+func TestCopyBinaryToProject(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+
+	t.Run("creates bin dir and copies", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcBin := filepath.Join(tmpDir, "mdemg-src")
+		if err := os.WriteFile(srcBin, []byte("test binary"), 0o755); err != nil {
+			t.Fatalf("write src: %v", err)
+		}
+
+		projDir := filepath.Join(tmpDir, "project")
+		if err := os.MkdirAll(projDir, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+
+		binDir := filepath.Join(projDir, "bin")
+		if err := os.MkdirAll(binDir, 0o755); err != nil {
+			t.Fatalf("mkdir bin: %v", err)
+		}
+		binDest := filepath.Join(binDir, "mdemg")
+		if err := copyFile(srcBin, binDest); err != nil {
+			t.Fatalf("copyFile: %v", err)
+		}
+		if err := os.Chmod(binDest, 0o755); err != nil {
+			t.Fatalf("chmod: %v", err)
+		}
+
+		content, err := os.ReadFile(binDest)
+		if err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		if string(content) != "test binary" {
+			t.Errorf("content = %q, want %q", string(content), "test binary")
+		}
+
+		info, err := os.Stat(binDest)
+		if err != nil {
+			t.Fatalf("stat: %v", err)
+		}
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("perm = %o, want 755", info.Mode().Perm())
+		}
+	})
+
+	t.Run("does not crash on nonexistent project", func(t *testing.T) {
+		got := copyBinaryToProject("/nonexistent/path/that/does/not/exist")
+		if got {
+			t.Error("expected false for nonexistent path")
+		}
+	})
+}

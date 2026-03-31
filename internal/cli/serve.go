@@ -68,6 +68,11 @@ See config.FromEnv() for the full list of environment variable options.`,
 }
 
 func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrate bool, mcpEnabled bool, logLevel string) error {
+	// Pass CLI build commit to config so healthz can expose it
+	if os.Getenv("MDEMG_COMMIT") == "" && Commit != "" {
+		_ = os.Setenv("MDEMG_COMMIT", Commit)
+	}
+
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
