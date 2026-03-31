@@ -9,13 +9,13 @@
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "low",
-    "notes": "No system role — prompt is fully dynamic (user role only). Template injects constraintType, description, and existingCodes. Output is a single string, not JSON."
+    "notes": "Static system prompt defines code generation task. User message contains only task inputs (constraintType, description, existingCodes). Output is a single string, not JSON."
   },
   "prompt": {
-    "system_prompt_hash": "dynamic",
-    "system_prompt_source": "internal/jiminy/codegen.go:45",
+    "system_prompt_hash": "0a82506152827fef03fc7fe7bfa6715e55c3391926549978c7d3e311b5a26832",
+    "system_prompt_source": "internal/jiminy/codegen.go:15",
     "think_mode": false,
-    "dynamic_prompt": true
+    "dynamic_prompt": false
   },
   "performance": {
     "latency_budget_ms": 3000,

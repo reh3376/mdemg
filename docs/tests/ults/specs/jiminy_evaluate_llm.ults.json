@@ -13,7 +13,7 @@
   },
   "prompt": {
     "system_prompt_hash": "caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773",
-    "system_prompt_source": "internal/jiminy/evaluator.go:163",
+    "system_prompt_source": "internal/jiminy/eval_prompt.go:12",
     "think_mode": true,
     "dynamic_prompt": false
   },

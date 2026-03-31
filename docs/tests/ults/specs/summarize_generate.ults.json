@@ -9,11 +9,11 @@
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "high",
-    "notes": "High-volume task — called for every ingested code element. System prompt is short and static. Output must be valid JSON. Ollama path omits system role."
+    "notes": "High-volume task — called for every ingested code element. System prompt is a descriptive const shared by OpenAI and Ollama paths. Output must be valid JSON."
   },
   "prompt": {
-    "system_prompt_hash": "5110d51bc460daded7e77526c3e7d4a58f4ccf0139da31f50b5f2dad3c1f6d5a",
-    "system_prompt_source": "internal/summarize/service.go:366",
+    "system_prompt_hash": "6f5be281b9d99b9bfd396e626c51e6507df7f5423ecd9a3cfa84ca0e2adeaeb7",
+    "system_prompt_source": "internal/summarize/service.go:20",
     "think_mode": true,
     "dynamic_prompt": false
   },
