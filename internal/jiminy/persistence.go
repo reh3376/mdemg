@@ -48,9 +48,11 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	outcome GuidanceOutcome,
 	similarity float64,
 ) error {
-	// Resolve target node: prefer constraint node for constraint items
+	// Resolve target node: prefer constraint node for any item with a constraint_code.
+	// Constraint codes are assigned to ALL guidance types (constraints, corrections,
+	// patterns, learnings) via matchConstraintCode — not just type="constraint" items.
 	targetNodeID := ""
-	if item.Type == GuidanceConstraint && item.ConstraintCode != "" {
+	if item.ConstraintCode != "" {
 		targetNodeID = ps.findConstraintNodeID(ctx, spaceID, item.ConstraintCode)
 	}
 	if targetNodeID == "" && len(item.SourceNodes) > 0 {
