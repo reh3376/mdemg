@@ -111,11 +111,54 @@ type initFlags struct {
 	noMenubar         bool
 }
 
+// copyBinaryToProject copies the running mdemg binary to ./bin/mdemg.
+// This ensures hooks can call ./bin/mdemg even if mdemg is installed
+// via Homebrew or a global path. Returns true if a copy was made.
+func copyBinaryToProject(cwd string) bool {
+	execPath, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return false
+	}
+	binDir := filepath.Join(cwd, "bin")
+	binDest := filepath.Join(binDir, "mdemg")
+
+	// Only copy if source is newer than destination
+	srcInfo, err := os.Stat(execPath)
+	if err != nil {
+		return false
+	}
+	if destInfo, err := os.Stat(binDest); err == nil {
+		if !srcInfo.ModTime().After(destInfo.ModTime()) {
+			return false
+		}
+	}
+
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		return false
+	}
+	if err := copyFile(execPath, binDest); err != nil {
+		return false
+	}
+	_ = os.Chmod(binDest, 0o755) //nolint:gosec // Binary must be executable
+	return true
+}
+
 func runInit(flags initFlags) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
+
+	// Ensure ./bin/mdemg exists for hook binary calls
+	defer func() {
+		if copyBinaryToProject(cwd) {
+			fmt.Println("  Copied mdemg binary to ./bin/mdemg (for hooks)")
+		}
+	}()
 
 	// Check for existing .mdemg/
 	mdemgDir := filepath.Join(cwd, ".mdemg")

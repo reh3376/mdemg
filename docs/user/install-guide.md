@@ -151,6 +151,38 @@ Credentials can be customized during interactive `mdemg init`. Defaults are used
 
 ---
 
+## Updating
+
+### Self-Update (v0.4.0+)
+
+```bash
+mdemg upgrade            # Update to latest stable release
+mdemg upgrade --edge     # Update to latest edge build (main branch)
+mdemg upgrade --dry-run  # Check for updates without installing
+```
+
+The `upgrade` command downloads the new binary, verifies its SHA-256 checksum, and replaces the current executable. If a `./bin/` directory exists in the current working directory, the updated binary is also copied there.
+
+### Edge Channel
+
+Edge builds are published on every merge to main. They include the latest features and fixes before a stable release is tagged.
+
+**Install edge via curl:**
+
+```bash
+CHANNEL=edge curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
+```
+
+**Update to edge:**
+
+```bash
+mdemg upgrade --edge
+```
+
+Edge binaries include the commit hash in their version string (e.g., `edge-abc1234`).
+
+---
+
 ## Build from Source
 
 ```bash

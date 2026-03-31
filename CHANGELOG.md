@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Unreleased — Distribution Automation)
+
+- **Edge binary CI** (`.github/workflows/cli-publish.yml`): Platform-specific CLI binaries built on every push to main. Published as rolling `edge` GitHub Release with SHA-256 checksums. Supports darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 via CGO + zig cross-compilation.
+- **`mdemg upgrade --edge`**: Self-update to latest edge build (bare binary from GitHub). Compares commit hashes to skip if already current. Also copies updated binary to `./bin/mdemg` if the directory exists.
+- **`mdemg update` alias**: Alias for `mdemg upgrade`.
+- **`mdemg init` binary copy**: Copies the running mdemg binary to `./bin/mdemg` during init, ensuring hooks have a local binary available.
+- **Healthz commit field**: `/healthz` response now includes `"commit"` field for version mismatch detection between CLI binary and running server.
+- **Session-start version check**: Hook detects CLI/server commit mismatch and warns with upgrade instructions.
+- **Install script edge channel**: `CHANNEL=edge bash install.sh` downloads the latest edge binary (bare format, no tar.gz extraction).
+
 ### Fixed (Unreleased)
 
 - **TSDB_ENABLED not set in Docker flow**: `docker-compose.yml` now sets `TSDB_ENABLED: "true"`, `TSDB_AUTO_MIGRATE: "true"`, and `TSDB_OPTIONAL: "true"` in the mdemg service environment. `mdemg init` writes `TSDB_ENABLED=true` to `.env`. Without this, TimescaleDB metrics collection was silently disabled in Docker deployments.

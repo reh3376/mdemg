@@ -7,6 +7,7 @@
 # Options (via environment variables):
 #   INSTALL_DIR   — target directory (default: ~/.local/bin)
 #   VERSION       — specific version to install (default: latest)
+#   CHANNEL       — release channel: "stable" (default) or "edge" (latest main build)
 
 set -euo pipefail
 
@@ -68,20 +69,28 @@ download_and_verify() {
     local os="$2"
     local arch="$3"
     local install_dir="$4"
+    local channel="$5"
 
-    # Strip leading v for archive name (goreleaser uses version without v prefix)
-    local ver_no_v="${version#v}"
-    local archive_name="${BINARY_NAME}_${ver_no_v}_${os}_${arch}.tar.gz"
     local checksums_name="checksums.txt"
-    local base_url="https://github.com/${REPO}/releases/download/${version}"
-
     local tmpdir
     tmpdir="$(mktemp -d)"
     trap 'rm -rf "$tmpdir"' EXIT
 
-    info "Downloading ${archive_name}..."
-    curl -fsSL -o "${tmpdir}/${archive_name}" "${base_url}/${archive_name}" \
-        || error "Failed to download ${archive_name}. Check that ${version} has a release for ${os}/${arch}."
+    local asset_name base_url
+    if [ "$channel" = "edge" ]; then
+        # Edge: bare binary named mdemg-{os}-{arch}
+        asset_name="${BINARY_NAME}-${os}-${arch}"
+        base_url="https://github.com/${REPO}/releases/download/edge"
+    else
+        # Stable: tar.gz archive from goreleaser
+        local ver_no_v="${version#v}"
+        asset_name="${BINARY_NAME}_${ver_no_v}_${os}_${arch}.tar.gz"
+        base_url="https://github.com/${REPO}/releases/download/${version}"
+    fi
+
+    info "Downloading ${asset_name}..."
+    curl -fsSL -o "${tmpdir}/${asset_name}" "${base_url}/${asset_name}" \
+        || error "Failed to download ${asset_name}. Check that ${version} has a release for ${os}/${arch}."
 
     info "Downloading checksums..."
     curl -fsSL -o "${tmpdir}/${checksums_name}" "${base_url}/${checksums_name}" \
@@ -89,16 +98,16 @@ download_and_verify() {
 
     info "Verifying SHA256 checksum..."
     local expected_hash
-    expected_hash="$(grep "${archive_name}" "${tmpdir}/${checksums_name}" | awk '{print $1}')"
+    expected_hash="$(grep "${asset_name}" "${tmpdir}/${checksums_name}" | awk '{print $1}')"
     if [ -z "$expected_hash" ]; then
-        error "Checksum for ${archive_name} not found in checksums.txt"
+        error "Checksum for ${asset_name} not found in checksums.txt"
     fi
 
     local actual_hash
     if command -v sha256sum > /dev/null 2>&1; then
-        actual_hash="$(sha256sum "${tmpdir}/${archive_name}" | awk '{print $1}')"
+        actual_hash="$(sha256sum "${tmpdir}/${asset_name}" | awk '{print $1}')"
     elif command -v shasum > /dev/null 2>&1; then
-        actual_hash="$(shasum -a 256 "${tmpdir}/${archive_name}" | awk '{print $1}')"
+        actual_hash="$(shasum -a 256 "${tmpdir}/${asset_name}" | awk '{print $1}')"
     else
         error "Neither sha256sum nor shasum found — cannot verify checksum"
     fi
@@ -108,23 +117,34 @@ download_and_verify() {
     fi
     info "Checksum verified."
 
-    info "Extracting to ${install_dir}..."
     mkdir -p "$install_dir"
-    tar -xzf "${tmpdir}/${archive_name}" -C "$tmpdir"
 
-    if [ ! -f "${tmpdir}/${BINARY_NAME}" ]; then
-        error "Binary '${BINARY_NAME}' not found in archive"
-    fi
-
-    # Install the binary
-    if [ -w "$install_dir" ]; then
-        mv "${tmpdir}/${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
+    if [ "$channel" = "edge" ]; then
+        # Edge: bare binary — copy directly
+        if [ -w "$install_dir" ]; then
+            mv "${tmpdir}/${asset_name}" "${install_dir}/${BINARY_NAME}"
+        else
+            info "Elevated permissions required to install to ${install_dir}"
+            sudo mv "${tmpdir}/${asset_name}" "${install_dir}/${BINARY_NAME}"
+        fi
     else
-        info "Elevated permissions required to install to ${install_dir}"
-        sudo mv "${tmpdir}/${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
-    fi
-    chmod +x "${install_dir}/${BINARY_NAME}"
+        # Stable: extract tar.gz archive
+        info "Extracting to ${install_dir}..."
+        tar -xzf "${tmpdir}/${asset_name}" -C "$tmpdir"
 
+        if [ ! -f "${tmpdir}/${BINARY_NAME}" ]; then
+            error "Binary '${BINARY_NAME}' not found in archive"
+        fi
+
+        if [ -w "$install_dir" ]; then
+            mv "${tmpdir}/${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
+        else
+            info "Elevated permissions required to install to ${install_dir}"
+            sudo mv "${tmpdir}/${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
+        fi
+    fi
+
+    chmod +x "${install_dir}/${BINARY_NAME}"
     info "Installed ${BINARY_NAME} ${version} to ${install_dir}/${BINARY_NAME}"
 }
 
@@ -149,20 +169,27 @@ check_path() {
 
 main() {
     need_cmd curl
-    need_cmd tar
 
-    local os arch version install_dir
+    local os arch version install_dir channel
     os="$(detect_os)"
     arch="$(detect_arch)"
-    version="${VERSION:-$(detect_latest_version)}"
+    channel="${CHANNEL:-stable}"
     install_dir="${INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
 
+    if [ "$channel" = "edge" ]; then
+        version="edge"
+    else
+        need_cmd tar
+        version="${VERSION:-$(detect_latest_version)}"
+    fi
+
     info "Platform: ${os}/${arch}"
+    info "Channel:  ${channel}"
     info "Version:  ${version}"
     info "Target:   ${install_dir}"
     echo ""
 
-    download_and_verify "$version" "$os" "$arch" "$install_dir"
+    download_and_verify "$version" "$os" "$arch" "$install_dir" "$channel"
     check_path "$install_dir"
 
     echo ""

@@ -64,6 +64,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"version": s.cfg.MdemgVersion,
+		"commit":  s.cfg.MdemgCommit,
 	})
 }
 
