@@ -208,50 +208,6 @@ archives:
       - src: "plugins/obsidian-module/manifest.json"
         dst: plugins/obsidian-module
         strip_parent: true
-      - src: "packaging/mdemg_linux/systemd/*"
-        dst: systemd
-        strip_parent: true
-
-nfpms:
-  - id: mdemg-deb
-    package_name: mdemg
-    file_name_template: "mdemg_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    builds:
-      - mdemg-linux-amd64
-      - mdemg-linux-arm64
-    vendor: reh3376
-    homepage: https://github.com/reh3376/mdemg
-    maintainer: "reh3376 <reh3376@users.noreply.github.com>"
-    description: "Multi-Dimensional Emergent Memory Graph — cognitive substrate for AI agents"
-    license: MIT
-    formats:
-      - deb
-    dependencies:
-      - curl
-      - tar
-    recommends:
-      - docker.io | docker-ce
-    suggests:
-      - jq
-    section: devel
-    priority: optional
-    contents:
-      - src: man/man1/*.1
-        dst: /usr/share/man/man1/
-      - src: plugins/uxts-module/manifest.json
-        dst: /usr/share/mdemg/plugins/uxts-module/manifest.json
-      - src: plugins/obsidian-module/manifest.json
-        dst: /usr/share/mdemg/plugins/obsidian-module/manifest.json
-      - src: packaging/mdemg_linux/systemd/mdemg.service
-        dst: /usr/lib/systemd/system/mdemg@.service
-      - src: packaging/mdemg_linux/systemd/mdemg-rsic.service
-        dst: /usr/lib/systemd/system/mdemg-rsic@.service
-      - src: packaging/mdemg_linux/systemd/mdemg-rsic.timer
-        dst: /usr/lib/systemd/system/mdemg-rsic@.timer
-    scripts:
-      postinstall: packaging/mdemg_linux/scripts/postinst.sh
-      preremove: packaging/mdemg_linux/scripts/prerm.sh
-      postremove: packaging/mdemg_linux/scripts/postrm.sh
 
 checksum:
   name_template: "checksums.txt"

@@ -2,7 +2,9 @@
 
 ## Overview
 
-Docker Compose is the only deployment path for MDEMG. All 5 services (mdemg server, Neo4j, TimescaleDB, neural-sidecar, Grafana) run as containers. `mdemg init` scans for free ports, generates `.env`, and starts the stack.
+Docker Compose is the only deployment path for MDEMG. All 5 services (mdemg server, Neo4j, TimescaleDB, neural-sidecar, Grafana) run as containers. `mdemg init` scans for free ports, prompts for service credentials, generates `.env`, and starts the stack.
+
+**Windows users**: Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) first, then run all commands inside WSL2. Native Windows is not supported.
 
 ## Problem
 
@@ -61,7 +63,8 @@ Uses Docker Buildx with GitHub Actions cache (`type=gha`) for layer reuse.
 
 ```
 Check Docker available → Check resources → Scan 6 ports →
-[Interactive: confirm ports] → Generate .env → Generate config.yaml →
+[Interactive: confirm ports] → Prompt service credentials →
+Generate .env (ports + credentials) → Generate config.yaml →
 Generate .mdemgignore → docker compose up -d → Health check loop
 ```
 
@@ -82,8 +85,10 @@ Generate .mdemgignore → docker compose up -d → Health check loop
 | `TSDB_HOST_PORT` | Host port for TimescaleDB |
 | `NEURAL_PORT` | Host port for neural sidecar |
 | `GRAFANA_PORT` | Host port for Grafana |
+| `GRAFANA_PASSWORD` | Grafana admin password (default: admin) |
+| `TSDB_PASSWORD` | TimescaleDB password (default: mdemg_metrics) |
 
-All are dynamically assigned by `mdemg init` — no hardcoded defaults.
+Port variables are dynamically assigned by `mdemg init`. Credential variables are prompted interactively (or use defaults with `--defaults`/`--quick`).
 
 ### Dockerfile
 
@@ -93,6 +98,16 @@ All are dynamically assigned by `mdemg init` — no hardcoded defaults.
 
 The compose uses `neo4j:5` (community edition). MDEMG is MIT-licensed; shipping enterprise edition would create licensing friction. APOC works with community. Enterprise features (backup, clustering) are documented as optional upgrade.
 
+## Backup UI
+
+The browser dashboard includes a Backup tab (9th tab) wrapping all 7 backup REST endpoints. Features:
+- **Trigger Backup**: Space selector + type dropdown (full/partial_space)
+- **Backup History**: Filterable table with status/type badges, delete button per row
+- **Restore**: Dropdown of completed backups with confirmation dialog
+- **Active Operations**: Live polling of in-progress backup/restore operations
+
+Returns 503 when backup module is disabled (`BACKUP_ENABLED=false`).
+
 ## Documents Accessed
 
 - `docker-compose.yml` — consolidated compose configuration
@@ -100,7 +115,8 @@ The compose uses `neo4j:5` (community edition). MDEMG is MIT-licensed; shipping 
 - `deploy/docker/Dockerfile.prod` — production Docker image
 - `deploy/docker/docker-compose.prod.yml` — original prod compose (reference)
 - `.env.example` — environment variable template
-- `internal/cli/init.go` — `mdemg init` implementation
+- `internal/cli/init.go` — `mdemg init` implementation (credential prompts, Docker .env write)
 - `internal/cli/docker.go` — `FindFreePort`, `DockerAvailable`, `CheckDockerResources`
-- `internal/config/yaml_config.go` — `GenerateConfigYAML`, `InitOptions`
+- `internal/config/yaml_config.go` — `GenerateConfigYAML`, `InitOptions` (GrafanaPassword, TSDBPassword)
 - `docs/user/quickstart-docker.md` — user-facing Docker guide
+- `docs/user/install-guide.md` — platform-specific installation guide

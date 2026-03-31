@@ -180,10 +180,16 @@ func runInit(flags initFlags) error {
 	// Neo4j credentials
 	if flags.defaults {
 		opts.Neo4jUser = "neo4j"
-		opts.Neo4jPassword = "" // stays in .env
+		opts.Neo4jPassword = "testpassword"
+		opts.GrafanaPassword = "admin"
+		opts.TSDBPassword = "mdemg_metrics"
 	} else {
 		opts.Neo4jUser = promptLine("Neo4j user [neo4j]", "neo4j")
-		// Password is NOT prompted — must go in .env for security
+		fmt.Println()
+		fmt.Println("Service Credentials (press Enter for defaults):")
+		opts.Neo4jPassword = promptLine("  Neo4j password [testpassword]", "testpassword")
+		opts.GrafanaPassword = promptLine("  Grafana password [admin]", "admin")
+		opts.TSDBPassword = promptLine("  TimescaleDB password [mdemg_metrics]", "mdemg_metrics")
 	}
 
 	// Neo4j ports
@@ -478,11 +484,14 @@ func runInit(flags initFlags) error {
 		envLines = strings.Split(strings.TrimSpace(string(data)), "\n")
 	}
 
-	// Add NEO4J_PASS if not already present — auto-generate a secure password (GAP-19)
+	// Add NEO4J_PASS if not already present — use prompted value or auto-generate
 	if !envContains(envLines, "NEO4J_PASS") {
-		generatedPass := generatePassword(16) // 32-char hex string
-		envLines = append(envLines, fmt.Sprintf("NEO4J_PASS=%s", generatedPass))
-		fmt.Printf("  Generated Neo4j password (stored in .env)\n")
+		pass := opts.Neo4jPassword
+		if pass == "" {
+			pass = generatePassword(16) // 32-char hex string
+			fmt.Printf("  Generated Neo4j password (stored in .env)\n")
+		}
+		envLines = append(envLines, fmt.Sprintf("NEO4J_PASS=%s", pass))
 	}
 
 	// Add OPENAI_API_KEY if user provided one and not already present
@@ -674,6 +683,8 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"TSDB_HOST_PORT":       true,
 		"NEURAL_PORT":          true,
 		"GRAFANA_PORT":         true,
+		"GRAFANA_PASSWORD":     true,
+		"TSDB_PASSWORD":        true,
 	}
 	filtered := make([]string, 0, len(envLines))
 	for _, line := range envLines {
@@ -691,6 +702,10 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 	for _, pa := range ports {
 		filtered = append(filtered, fmt.Sprintf("%s=%d", pa.envKey, pa.port))
 	}
+	filtered = append(filtered,
+		fmt.Sprintf("GRAFANA_PASSWORD=%s", opts.GrafanaPassword),
+		fmt.Sprintf("TSDB_PASSWORD=%s", opts.TSDBPassword),
+	)
 
 	if err := os.WriteFile(envPath, []byte(strings.Join(filtered, "\n")+"\n"), 0600); err != nil {
 		return fmt.Errorf("write .env: %w", err)
@@ -748,17 +763,19 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 	fmt.Println()
 
 	// Print success
-	fmt.Println("Docker deployment ready!")
+	fmt.Println("MDEMG Docker deployment ready!")
 	fmt.Println()
-	fmt.Printf("  Server:    http://localhost:%d\n", mdemgPort)
-	fmt.Printf("  Neo4j:     http://localhost:%d (browser)\n", ports[2].port)
-	fmt.Printf("  Grafana:   http://localhost:%d\n", ports[5].port)
+	fmt.Printf("  Dashboard:   http://localhost:%d/ui/\n", mdemgPort)
+	fmt.Printf("  Grafana:     http://localhost:%d     (admin / %s)\n", ports[5].port, opts.GrafanaPassword)
+	fmt.Printf("  Neo4j:       http://localhost:%d     (neo4j / %s)\n", ports[2].port, opts.Neo4jPassword)
+	fmt.Printf("  API:         http://localhost:%d\n", mdemgPort)
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  docker compose ps       # Service status")
 	fmt.Println("  docker compose logs -f  # Follow logs")
 	fmt.Println("  docker compose down     # Stop all services")
-	fmt.Println("  docker compose down -v  # Stop + delete data volumes")
+	fmt.Println()
+	fmt.Printf("Tip: Open http://localhost:%d/ui/ in your browser to monitor MDEMG.\n", mdemgPort)
 
 	return nil
 }

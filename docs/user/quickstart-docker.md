@@ -6,6 +6,9 @@ MDEMG runs as a Docker Compose stack. Docker Desktop (or Docker Engine) is the o
 
 - **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux) with Compose v2
 - **OpenAI API key** (for embeddings) — or Ollama for local embeddings
+- **Windows**: Requires [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) — run all commands inside WSL2
+
+For detailed platform-specific instructions, see [Install Guide](install-guide.md).
 
 Verify Docker is available:
 
@@ -34,11 +37,24 @@ This will:
 
 ## Interactive Setup
 
-For guided setup with API key prompt:
+For guided setup with credential and API key prompts:
 
 ```bash
 mdemg init
 ```
+
+Interactive mode prompts for service credentials:
+- **Neo4j password** (default: testpassword)
+- **Grafana password** (default: admin)
+- **TimescaleDB password** (default: mdemg_metrics)
+
+### Default Credentials
+
+| Service | Username | Default Password |
+|---------|----------|------------------|
+| Neo4j | neo4j | testpassword |
+| Grafana | admin | admin |
+| TimescaleDB | mdemg | mdemg_metrics |
 
 ## Services
 

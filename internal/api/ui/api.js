@@ -29,6 +29,12 @@ async function post(path, body) {
     return res.json();
 }
 
+async function del(path) {
+    const res = await fetch(path, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+
 // --- Health (10s polling) ---
 export const healthz = () => get('/healthz');
 export const readyz = () => get('/readyz');
@@ -68,8 +74,18 @@ export const unfreezeLearning = (spaceId) =>
 export const pruneEdges = (spaceId) =>
     post(`/v1/learning/prune?space_id=${encodeURIComponent(spaceId)}`, null);
 
-export const triggerBackup = (spaceId) =>
-    post('/v1/backup/trigger', { type: 'partial_space', space_ids: [spaceId] });
+export const triggerBackup = (spaceId, type = 'partial_space') =>
+    post('/v1/backup/trigger', { type, space_ids: [spaceId] });
+
+// --- Backup (on-demand + 5s status polling) ---
+export const backupList = (type = '') =>
+    get(`/v1/backup/list${type ? `?type=${encodeURIComponent(type)}` : ''}`);
+export const backupStatus = (id) => get(`/v1/backup/status/${encodeURIComponent(id)}`);
+export const backupManifest = (id) => get(`/v1/backup/manifest/${encodeURIComponent(id)}`);
+export const backupDelete = (id) => del(`/v1/backup/${encodeURIComponent(id)}`);
+export const backupRestore = (backupId) =>
+    post('/v1/backup/restore', { backup_id: backupId });
+export const restoreStatus = (id) => get(`/v1/backup/restore/status/${encodeURIComponent(id)}`);
 
 export const spaceExport = (spaceId, profile = 'full') =>
     post('/v1/admin/spaces/export', { space_id: spaceId, profile });

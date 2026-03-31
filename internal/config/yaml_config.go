@@ -722,6 +722,8 @@ type InitOptions struct {
 	Neo4jURI          string
 	Neo4jUser         string
 	Neo4jPassword     string
+	GrafanaPassword   string
+	TSDBPassword      string
 	Neo4jBoltPort     int
 	Neo4jHTTPPort     int
 	ServerPort        int

@@ -518,8 +518,9 @@ func newDBStartCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start a local Neo4j container for development",
+		Use:        "start",
+		Deprecated: "Docker Compose manages Neo4j. Use 'docker compose up -d' / 'docker compose down' instead.",
+		Short:      "Start a local Neo4j container for development",
 		Long: `Start a lightweight Neo4j Docker container for local development.
 
 Uses reduced memory settings (1GB heap, 512MB page cache) suitable for
@@ -564,8 +565,9 @@ func newDBStopCmd() *cobra.Command {
 	var remove bool
 
 	cmd := &cobra.Command{
-		Use:   "stop",
-		Short: "Stop the local Neo4j container",
+		Use:        "stop",
+		Deprecated: "Docker Compose manages Neo4j. Use 'docker compose up -d' / 'docker compose down' instead.",
+		Short:      "Stop the local Neo4j container",
 		Long: `Stop the MDEMG Neo4j development container.
 
 Use --remove to also remove the container (data volume is preserved).`,
