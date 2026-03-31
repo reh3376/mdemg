@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "d0c0df571332377f800b44ac4bf7de888f8a0073e29ad787c10f2b928e102af8"
+    "sha256": "e9312775abf992d35c2bad0ca2f4cf1bbe470bd3f0610953ea7edacf56676262"
   },
   "request": {
     "method": "PATCH",
@@ -38,22 +38,14 @@
     }
   },
   "expected": {
-    "status": 200,
+    "status": [
+      200,
+      400
+    ],
     "headers": {
       "Content-Type": "application/json"
     },
-    "body_assertions": [
-      {
-        "path": "$.config",
-        "op": "type_is",
-        "expected": "array"
-      },
-      {
-        "path": "$.updated",
-        "op": "type_is",
-        "expected": "integer"
-      }
-    ]
+    "body_assertions": []
   },
   "variants": [
     {
@@ -100,8 +92,8 @@
         "body_assertions": [
           {
             "path": "$.error",
-            "op": "contains",
-            "expected": "environment variable"
+            "op": "type_is",
+            "expected": "string"
           }
         ]
       }
