@@ -617,7 +617,7 @@
       "targets": [
         {
           "refId": "A",
-          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', node_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Ignored, Contradicted, round(toFloat(Followed) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
+          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', role_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Ignored, Contradicted, round(toFloat(Followed) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
           "Format": "table"
         }
       ],
