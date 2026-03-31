@@ -7,14 +7,11 @@
 | Role | Repo URL |
 |------|----------|
 | **MAIN** | `https://github.com/reh3376/mdemg.git` |
-| **SUB-REPO 1**: homebrew-mdemg (macOS Homebrew tap + docs) | `https://github.com/reh3376/homebrew-mdemg.git` |
-| **SUB-REPO 2**: mdemg-windows (Windows installer + docs) | `https://github.com/reh3376/mdemg-windows.git` |
-| **SUB-REPO 3**: mdemg-menubar (macOS menu bar companion app) | `https://github.com/reh3376/mdemg-menubar.git` |
-| **SUB-REPO 4**: mdemg_linux (Linux installer + docs) | `https://github.com/reh3376/mdemg_linux.git` |
-| **SUB-REPO 5**: mdemg-linux-sidebar (Linux desktop companion app) | `https://github.com/reh3376/mdemg-linux-sidebar.git` |
-| **SUB-REPO 6**: apt-mdemg (Debian APT repository, GitHub Pages) | `https://github.com/reh3376/apt-mdemg.git` |
+| **SUB-REPO 1**: homebrew-mdemg (macOS Homebrew tap) | `https://github.com/reh3376/homebrew-mdemg.git` |
+| **SUB-REPO 2**: autoresearch (research) | `https://github.com/reh3376/autoresearch.git` |
 
-> **Note:** All sub-repos are git submodules of the main mdemg repo, located at `packaging/homebrew-mdemg`, `packaging/mdemg-windows`, `packaging/mdemg-menubar`, `packaging/mdemg_linux`, `packaging/mdemg-linux-sidebar`, and `packaging/apt-mdemg`. Work on them from the submodule paths, commit/push within the submodule, then update the submodule pointer in the parent repo.
+> **Note:** Sub-repos are git submodules at `packaging/homebrew-mdemg` and `packaging/autoresearch`. 5 repos archived in DOCKER-P3: mdemg-windows, mdemg-menubar, mdemg_linux, mdemg-linux-sidebar, apt-mdemg.
+> **Windows/Linux**: WSL2 required for Windows. Linux uses `scripts/install.sh` from main repo (no separate installer repo).
 
 ---
 

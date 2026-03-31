@@ -9,6 +9,7 @@ import { render as renderLogs, poll as pollLogsTab } from './tabs/logs.js';
 import { render as renderRsic, poll as pollRsicTab } from './tabs/rsic.js';
 import { render as renderPlugins } from './tabs/plugins.js';
 import { render as renderFeatures } from './tabs/features.js';
+import { render as renderBackup } from './tabs/backup.js';
 
 const TABS = {
     status:   { render: renderStatus,   label: 'Status' },
@@ -19,6 +20,7 @@ const TABS = {
     rsic:     { render: renderRsic,     label: 'RSIC' },
     plugins:  { render: renderPlugins,  label: 'Plugins' },
     features: { render: renderFeatures, label: 'Features' },
+    backup:   { render: renderBackup,   label: 'Backup' },
 };
 
 let activeTab = 'status';

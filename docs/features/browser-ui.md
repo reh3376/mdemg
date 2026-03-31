@@ -30,6 +30,7 @@ The port is whatever `MDEMG_PORT` is set to in your `.env` (default 9999).
 | **RSIC** | Service status/state, start/stop/restart, trigger cycle, Grafana link | `/v1/self-improve/*`, `POST /v1/admin/rsic/*` |
 | **Plugins** | Plugin cards with type/state badges, start/stop/restart/validate/details | `GET /v1/plugins`, `POST /v1/plugins/{id}/start\|stop\|restart\|validate` |
 | **Features** | Controllable + config-only service listing with lifecycle controls | `GET /v1/admin/features`, `POST /v1/admin/features/start\|stop\|restart` |
+| **Backup** | Trigger/list/restore/delete backups, active operation polling, type filter | `/v1/backup/trigger`, `/v1/backup/list`, `/v1/backup/status/*`, `/v1/backup/restore`, `DELETE /v1/backup/{id}` |
 
 ## Config Tab — Editable Configuration
 
@@ -171,8 +172,8 @@ internal/api/
   ui_embed.go             — //go:embed ui/* + http.FileServer
   ui/
     index.html            — HTML shell + Catppuccin Mocha CSS
-    main.js               — Tab switching, polling orchestration (8 tabs)
-    api.js                — All fetch() calls (get/post/patch)
+    main.js               — Tab switching, polling orchestration (9 tabs)
+    api.js                — All fetch() calls (get/post/patch/del)
     state.js              — Pub/sub reactive state
     utils/
       dom.js              — h(), infoRow(), sectionHeader(), statusBadge()
@@ -186,4 +187,5 @@ internal/api/
       rsic.js             — Service status + start/stop/restart + trigger + Grafana link
       plugins.js          — Plugin cards with lifecycle controls
       features.js         — Service listing with lifecycle controls
+      backup.js           — Backup trigger/list/restore/delete + status polling
 ```

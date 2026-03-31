@@ -67,12 +67,12 @@ class TestPageLoad:
 # ---------------------------------------------------------------------------
 
 class TestTabNavigation:
-    """Verify all 8 tabs are present and can be clicked."""
+    """Verify all 9 tabs are present and can be clicked."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup"]
 
     def test_all_tab_buttons_present(self, ui_page: Page):
-        """All 8 tab buttons should be visible."""
+        """All 9 tab buttons should be visible."""
         for tab_name in self.TAB_NAMES:
             btn = ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]')
             expect(btn).to_be_visible(timeout=5000), f"Tab button '{tab_name}' not visible"
@@ -834,7 +834,7 @@ class TestFeaturesTab:
 class TestHelpPanels:
     """Verify each tab has a collapsible help wiki panel."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup"]
 
     @pytest.mark.parametrize("tab_name", TAB_NAMES)
     def test_help_button_present(self, ui_page: Page, tab_name: str):
@@ -1173,7 +1173,7 @@ class TestUIEndpoint:
         paths = [
             "tabs/status.js", "tabs/memory.js", "tabs/learning.js",
             "tabs/config.js", "tabs/logs.js", "tabs/rsic.js",
-            "tabs/plugins.js", "tabs/features.js",
+            "tabs/plugins.js", "tabs/features.js", "tabs/backup.js",
             "utils/dom.js", "utils/formatting.js",
         ]
         for path in paths:
@@ -1282,3 +1282,141 @@ class TestTheme:
         # rgb(24, 24, 37) = #181825
         assert "24, 24, 37" in bg or "181825" in bg, \
             f"Header background is not Catppuccin mantle: {bg}"
+
+
+# ---------------------------------------------------------------------------
+# Backup Tab (Sprint 1 — DOCKER-P3)
+# ---------------------------------------------------------------------------
+
+class TestBackupTab:
+    """Verify the Backup tab in the browser dashboard."""
+
+    @pytest.fixture(autouse=True)
+    def navigate_to_backup(self, ui_page: Page):
+        ui_page.locator('.tab-btn[data-tab="backup"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_backup_tab_button_exists(self, ui_page: Page):
+        """Backup tab button should be visible."""
+        btn = ui_page.locator('.tab-btn[data-tab="backup"]')
+        expect(btn).to_be_visible(timeout=5000)
+
+    def test_backup_tab_renders(self, ui_page: Page):
+        """Backup tab should render content (not empty)."""
+        content = ui_page.locator("#content")
+        expect(content).not_to_be_empty(timeout=5000)
+
+    def test_trigger_section_header(self, ui_page: Page):
+        """Should have a 'Trigger Backup' section header."""
+        header = ui_page.locator("h3.section-header", has_text="Trigger Backup")
+        expect(header).to_be_visible(timeout=5000)
+
+    def test_trigger_button_present(self, ui_page: Page):
+        """Should have a 'Trigger Backup' button."""
+        btn = ui_page.locator("button.btn", has_text="Trigger Backup")
+        expect(btn).to_be_visible(timeout=5000)
+
+    def test_backup_history_header(self, ui_page: Page):
+        """Should have a 'Backup History' section header."""
+        header = ui_page.locator("h3.section-header", has_text="Backup History")
+        expect(header).to_be_visible(timeout=5000)
+
+    def test_type_filter_dropdown(self, ui_page: Page):
+        """Should have a type filter dropdown."""
+        select = ui_page.locator("#backup-type-filter")
+        expect(select).to_be_visible(timeout=5000)
+
+    def test_type_filter_has_options(self, ui_page: Page):
+        """Type filter should have All/Full/Partial options."""
+        options = ui_page.locator("#backup-type-filter option")
+        expect(options).to_have_count(3)
+
+    def test_restore_section_header(self, ui_page: Page):
+        """Should have a 'Restore' section header."""
+        header = ui_page.locator("h3.section-header", has_text="Restore")
+        expect(header).to_be_visible(timeout=5000)
+
+    def test_backup_list_or_empty_message(self, ui_page: Page):
+        """Should show backup table or empty message."""
+        table = ui_page.locator("#backup-list-table")
+        empty = ui_page.locator("p.muted", has_text="No backups found")
+        visible = table.is_visible() or empty.is_visible()
+        assert visible, "Neither backup table nor empty message visible"
+
+    def test_refresh_button_present(self, ui_page: Page):
+        """Should have a Refresh button."""
+        btn = ui_page.locator("button.btn", has_text="Refresh")
+        expect(btn).to_be_visible(timeout=5000)
+
+    def test_space_input_present(self, ui_page: Page):
+        """Should have a space ID input for trigger."""
+        inp = ui_page.locator('input[placeholder*="Space ID"]')
+        expect(inp).to_be_visible(timeout=5000)
+
+    def test_help_panel(self, ui_page: Page):
+        """Should have a help panel with backup terms."""
+        help_btn = ui_page.locator("button.help-toggle")
+        expect(help_btn).to_be_visible(timeout=5000)
+
+
+class TestBackupAPI:
+    """Verify backup API endpoints."""
+
+    def test_backup_list_returns_200_or_503(self):
+        """GET /v1/backup/list should return 200 (enabled) or 503 (disabled)."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/list")
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
+
+    def test_backup_list_json_shape(self):
+        """If backup enabled, response should have backups array and count."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/list")
+        if resp.status_code == 503:
+            pytest.skip("Backup service disabled")
+        data = resp.json()
+        assert "backups" in data, f"Missing 'backups': {list(data.keys())}"
+        assert "count" in data, f"Missing 'count': {list(data.keys())}"
+        # backups can be null (Go nil slice) or an empty list when none exist
+        assert data["backups"] is None or isinstance(data["backups"], list)
+
+    def test_backup_list_type_filter(self):
+        """GET /v1/backup/list?type=full should return 200 or 503."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/list?type=full")
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}"
+
+    def test_backup_status_404_or_503(self):
+        """GET /v1/backup/status/unknown should return 404 or 503."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/status/nonexistent-id")
+        assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"
+
+    def test_backup_manifest_404_or_503(self):
+        """GET /v1/backup/manifest/unknown should return 404 or 503."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/manifest/nonexistent-id")
+        assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"
+
+    def test_backup_trigger_requires_type(self):
+        """POST /v1/backup/trigger without type should return 400 or 503."""
+        resp = requests.post(
+            f"{MDEMG_URL}/v1/backup/trigger",
+            json={},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code in (400, 503), f"Expected 400 or 503, got {resp.status_code}"
+
+    def test_restore_requires_backup_id(self):
+        """POST /v1/backup/restore without backup_id should return 400 or 503."""
+        resp = requests.post(
+            f"{MDEMG_URL}/v1/backup/restore",
+            json={},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code in (400, 503), f"Expected 400 or 503, got {resp.status_code}"
+
+    def test_restore_status_404_or_503(self):
+        """GET /v1/backup/restore/status/unknown should return 404 or 503."""
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/restore/status/nonexistent-id")
+        assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"
+
+    def test_backup_delete_method(self):
+        """DELETE /v1/backup/nonexistent should return 404 or 503."""
+        resp = requests.delete(f"{MDEMG_URL}/v1/backup/nonexistent-id")
+        assert resp.status_code in (404, 503), f"Expected 404 or 503, got {resp.status_code}"

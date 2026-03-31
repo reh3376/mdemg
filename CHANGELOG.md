@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (Unreleased)
 
+- **Docker Deployment — Phase 3: Backup UI + Distribution + Cleanup (DOCKER-P3)**:
+  - **Backup Tab**: 9th browser tab wrapping all 7 backup REST endpoints — trigger backup (space + type selector), backup history table with type filter and delete, restore from completed backups with confirmation, active operation status polling at 5s intervals.
+  - **Credential prompts in `mdemg init`**: Interactive mode now prompts for Neo4j, Grafana, and TimescaleDB passwords. `--defaults`/`--quick` uses sensible defaults. Credentials written to Docker `.env` as `GRAFANA_PASSWORD` and `TSDB_PASSWORD`.
+  - **Enhanced post-install summary**: Shows Dashboard URL, Grafana/Neo4j credentials, and common Docker Compose commands.
+  - **Distribution cleanup**: Removed Windows native build job, Scoop manifest step, and .deb packaging (nfpms) from release pipeline. Removed systemd unit files from archives. Linux/Windows now use WSL2 + `scripts/install.sh`.
+  - **Submodule cleanup**: Archived 5 repos (mdemg-windows, mdemg-menubar, mdemg_linux, mdemg-linux-sidebar, apt-mdemg). Removed corresponding submodules and `apt-publish.yml` workflow.
+  - **`db start`/`db stop` deprecated**: Commands still work but print deprecation warning directing users to `docker compose`.
+  - **221 Playwright e2e tests**: 21 new backup tab + API tests added to existing suite.
+
 - **Docker Deployment — Phase 2: Browser Dashboard (DOCKER-P2)**:
   - **Browser UI at `/ui/`**: Lightweight dashboard served via Go `embed.FS` from the MDEMG server. Vanilla HTML + JS + CSS (Catppuccin Mocha theme), no build step. 6 tabs: Status (health badges + Grafana links), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/unfreeze/prune), Config (effective config table), Logs (searchable, color-coded viewer), RSIC (trigger cycle + Grafana link).
   - **`GET /v1/admin/config`**: Returns effective configuration with source attribution (env/yaml/default) and masking for sensitive values.

@@ -1,21 +1,6 @@
 [submodule "packaging/homebrew-mdemg"]
 	path = packaging/homebrew-mdemg
 	url = https://github.com/reh3376/homebrew-mdemg.git
-[submodule "packaging/mdemg-windows"]
-	path = packaging/mdemg-windows
-	url = https://github.com/reh3376/mdemg-windows.git
-[submodule "packaging/mdemg-menubar"]
-	path = packaging/mdemg-menubar
-	url = https://github.com/reh3376/mdemg-menubar.git
 [submodule "packaging/autoresearch"]
 	path = packaging/autoresearch
 	url = https://github.com/reh3376/autoresearch.git
-[submodule "packaging/mdemg_linux"]
-	path = packaging/mdemg_linux
-	url = https://github.com/reh3376/mdemg_linux.git
-[submodule "packaging/mdemg-linux-sidebar"]
-	path = packaging/mdemg-linux-sidebar
-	url = https://github.com/reh3376/mdemg-linux-sidebar.git
-[submodule "packaging/apt-mdemg"]
-	path = packaging/apt-mdemg
-	url = https://github.com/reh3376/apt-mdemg.git

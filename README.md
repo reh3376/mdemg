@@ -27,12 +27,14 @@ A persistent memory system for AI coding agents built on Neo4j with native vecto
 brew tap reh3376/mdemg
 brew install mdemg
 
-# Linux (curl installer)
-curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg_linux/main/install.sh | bash
+# Linux / Windows (WSL2)
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
 
 # Verify installation
 mdemg version
 ```
+
+> **Windows**: Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) first, then run all commands inside WSL2.
 
 <details>
 <summary>Build from source (alternative)</summary>

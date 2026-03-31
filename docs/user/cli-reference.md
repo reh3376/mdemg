@@ -45,7 +45,7 @@ echo "deb [signed-by=/usr/share/keyrings/mdemg.gpg] https://reh3376.github.io/ap
 sudo apt update && sudo apt install mdemg
 
 # Via install script
-curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg_linux/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
 ```
 
 ### Windows

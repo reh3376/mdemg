@@ -50,6 +50,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-03-30) ===
+- ✅ Docker Deployment Phase 3: Backup UI + Distribution + Cleanup (DOCKER-P3) — 9th Backup tab (trigger/list/restore/delete), credential prompts in `mdemg init`, enhanced post-install summary, removed Windows build/Scoop/nfpms from release, archived 5 submodules, deprecated `db start`/`db stop`, 221 Playwright tests
 - ✅ Docker Deployment Phase 2: Browser Dashboard (DOCKER-P2) — 6-tab browser UI at /ui/ served via embed.FS, admin/config + admin/logs endpoints, LogRingBuffer, Catppuccin Mocha theme, Grafana deduplication (link don't duplicate)
 - ✅ FT Infrastructure Sprint (2026-03-30) — 4 phases for fine-tuning data quality:
   - Phase A: SanitizeResponse (StripThinkBlock + StripCodeFence, 11 call sites, system prompt hash)

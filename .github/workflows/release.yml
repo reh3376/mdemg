@@ -9,66 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      - name: Build Windows amd64
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build \
-            -ldflags "-s -w -X mdemg/internal/cli.Version=$VERSION -X mdemg/internal/cli.Commit=$(git rev-parse --short HEAD) -X mdemg/internal/cli.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            -o mdemg.exe ./cmd/mdemg
-
-      - name: Build UxTS plugin Windows amd64
-        shell: bash
-        run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-            -ldflags "-s -w" \
-            -o plugins/uxts-module/uxts-module.exe ./plugins/uxts-module/
-
-      - name: Build Obsidian plugin Windows amd64
-        shell: bash
-        run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-            -ldflags "-s -w" \
-            -o plugins/obsidian-module/obsidian-module.exe ./plugins/obsidian-module/
-
-      - name: Create archive
-        shell: pwsh
-        run: |
-          $version = $env:GITHUB_REF_NAME.TrimStart("v")
-          Compress-Archive -Path mdemg.exe, plugins/uxts-module/uxts-module.exe, plugins/uxts-module/manifest.json, plugins/obsidian-module/obsidian-module.exe, plugins/obsidian-module/manifest.json -DestinationPath "mdemg_${version}_windows_amd64.zip"
-
-      - name: Generate checksum
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          sha256sum "mdemg_${VERSION}_windows_amd64.zip" > windows_checksums.txt
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-binaries
-          path: |
-            mdemg_*_windows_*.zip
-            windows_checksums.txt
-
   release:
     name: Build & Release
-    needs: build-windows
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -90,12 +32,6 @@ jobs:
       - name: Generate man pages
         run: make man
 
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v8
-        with:
-          name: windows-binaries
-          path: /tmp/windows-binaries
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -105,55 +41,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-
-      - name: Attach Windows binaries to release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          # Upload Windows zip to the release created by GoReleaser
-          for f in /tmp/windows-binaries/mdemg_*_windows_*.zip; do
-            gh release upload "$TAG" "$f" --clobber
-          done
-          # Append Windows checksums to the release checksums
-          if [ -f /tmp/windows-binaries/windows_checksums.txt ]; then
-            # Download existing checksums, append, re-upload
-            gh release download "$TAG" -p "checksums.txt" -D /tmp/release-checksums || true
-            if [ -f /tmp/release-checksums/checksums.txt ]; then
-              cat /tmp/windows-binaries/windows_checksums.txt >> /tmp/release-checksums/checksums.txt
-              gh release upload "$TAG" /tmp/release-checksums/checksums.txt --clobber
-            fi
-          fi
-
-      - name: Update Scoop manifest
-        if: env.SCOOP_TAP_TOKEN != ''
-        env:
-          SCOOP_TAP_TOKEN: ${{ secrets.SCOOP_TAP_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${GITHUB_REF_NAME}"
-          VERSION_NUM="${VERSION#v}"
-          SHA256=$(grep "windows_amd64.zip" /tmp/windows-binaries/windows_checksums.txt | awk '{print $1}')
-          URL="https://github.com/reh3376/mdemg/releases/download/${VERSION}/mdemg_${VERSION_NUM}_windows_amd64.zip"
-
-          cd packaging/mdemg-windows
-
-          # Read existing manifest to preserve description, notes, post_install, etc.
-          python3 -c "
-          import json, sys
-          with open('bucket/mdemg.json') as f:
-              m = json.load(f)
-          m['version'] = '${VERSION_NUM}'
-          m['architecture']['64bit']['url'] = '${URL}'
-          m['architecture']['64bit']['hash'] = '${SHA256}'
-          with open('bucket/mdemg.json', 'w') as f:
-              json.dump(m, f, indent=4)
-              f.write('\n')
-          "
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${SCOOP_TAP_TOKEN}@github.com/reh3376/mdemg-windows.git"
-          git add bucket/mdemg.json
-          git commit -m "chore: bump mdemg to ${VERSION_NUM}"
-          git push origin HEAD:main
