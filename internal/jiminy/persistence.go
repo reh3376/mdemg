@@ -37,9 +37,10 @@ type ConstraintEffectiveness struct {
 	EffectivenessRate float64 `json:"effectiveness_rate"` // followed / surfaced
 }
 
-// PersistGuidanceOutcome creates a GUIDANCE_OUTCOME edge from the first source node
-// of the guidance item to a lightweight outcome record stored as edge properties.
-// If the item has no source nodes the call is a no-op and returns nil.
+// PersistGuidanceOutcome creates a GUIDANCE_OUTCOME edge on the appropriate node.
+// For constraint items with a constraint_code, it targets the matching constraint
+// node (role_type='constraint') so effectiveness metrics are correctly attributed.
+// For other item types, it targets the first source node. No-op if no target found.
 func (ps *PersistenceStore) PersistGuidanceOutcome(
 	ctx context.Context,
 	spaceID, guidanceID, sessionID string,
@@ -47,17 +48,23 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	outcome GuidanceOutcome,
 	similarity float64,
 ) error {
-	if len(item.SourceNodes) == 0 {
+	// Resolve target node: prefer constraint node for constraint items
+	targetNodeID := ""
+	if item.Type == GuidanceConstraint && item.ConstraintCode != "" {
+		targetNodeID = ps.findConstraintNodeID(ctx, spaceID, item.ConstraintCode)
+	}
+	if targetNodeID == "" && len(item.SourceNodes) > 0 {
+		targetNodeID = item.SourceNodes[0]
+	}
+	if targetNodeID == "" {
 		return nil
 	}
-
-	sourceNodeID := item.SourceNodes[0]
 
 	sess := ps.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer sess.Close(ctx) //nolint:errcheck
 
 	cypher := `
-		MATCH (src:MemoryNode {node_id: $sourceNodeID, space_id: $spaceID})
+		MATCH (src:MemoryNode {node_id: $targetNodeID, space_id: $spaceID})
 		CREATE (src)-[r:GUIDANCE_OUTCOME {
 			guidance_id:  $guidanceID,
 			outcome_type: $outcomeType,
@@ -69,7 +76,7 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		_, txErr := tx.Run(ctx, cypher, map[string]any{
-			"sourceNodeID": sourceNodeID,
+			"targetNodeID": targetNodeID,
 			"spaceID":      spaceID,
 			"guidanceID":   guidanceID,
 			"outcomeType":  string(outcome),
@@ -84,6 +91,34 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	}
 
 	return nil
+}
+
+// findConstraintNodeID looks up a constraint node by its constraint_code property.
+// Returns the node_id if found, empty string otherwise.
+func (ps *PersistenceStore) findConstraintNodeID(ctx context.Context, spaceID, constraintCode string) string {
+	sess := ps.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, txErr := tx.Run(ctx, `
+			MATCH (c:MemoryNode {space_id: $spaceID, role_type: 'constraint', constraint_code: $code})
+			RETURN c.node_id AS cid
+			LIMIT 1`,
+			map[string]any{"spaceID": spaceID, "code": constraintCode})
+		if txErr != nil {
+			return "", txErr
+		}
+		if !res.Next(ctx) {
+			return "", nil
+		}
+		v, _ := res.Record().Get("cid")
+		s, _ := v.(string)
+		return s, nil
+	})
+	if err != nil || result == nil {
+		return ""
+	}
+	return result.(string)
 }
 
 // GetConstraintEffectiveness queries Neo4j for all constraint nodes in the space
