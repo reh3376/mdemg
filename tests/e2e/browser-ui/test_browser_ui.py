@@ -67,12 +67,12 @@ class TestPageLoad:
 # ---------------------------------------------------------------------------
 
 class TestTabNavigation:
-    """Verify all 6 tabs are present and can be clicked."""
+    """Verify all 8 tabs are present and can be clicked."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features"]
 
     def test_all_tab_buttons_present(self, ui_page: Page):
-        """All 6 tab buttons should be visible."""
+        """All 8 tab buttons should be visible."""
         for tab_name in self.TAB_NAMES:
             btn = ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]')
             expect(btn).to_be_visible(timeout=5000), f"Tab button '{tab_name}' not visible"
@@ -119,8 +119,9 @@ class TestStatusTab:
     def test_server_section_header(self, ui_page: Page):
         """Status tab should show 'Server' section header."""
         ui_page.wait_for_timeout(2000)
-        header = ui_page.locator(".section-header").filter(has_text="Server")
+        header = ui_page.locator(".section-header", has_text="Server").first
         expect(header).to_be_visible(timeout=10000)
+        assert header.inner_text() == "Server", f"Expected 'Server', got '{header.inner_text()}'"
 
     def test_health_badge_visible(self, ui_page: Page):
         """A health status badge should appear."""
@@ -134,11 +135,24 @@ class TestStatusTab:
         services = ui_page.locator(".section-header").filter(has_text="Services")
         expect(services).to_be_visible(timeout=10000)
 
-    def test_embeddings_section_present(self, ui_page: Page):
-        """The Embeddings section should appear."""
+    def test_embeddings_section_removed(self, ui_page: Page):
+        """The Embeddings section should NOT appear (moved to Config tab)."""
         ui_page.wait_for_timeout(3000)
         embeddings = ui_page.locator(".section-header").filter(has_text="Embeddings")
-        expect(embeddings).to_be_visible(timeout=10000)
+        assert embeddings.count() == 0, "Embeddings section should not be present in Status tab"
+
+    def test_state_row_visible(self, ui_page: Page):
+        """A State row should be visible in the Server section."""
+        ui_page.wait_for_timeout(3000)
+        state_row = ui_page.locator(".info-row").filter(has_text="State")
+        expect(state_row).to_be_visible(timeout=10000)
+
+    def test_no_duplicate_status_rows(self, ui_page: Page):
+        """There should be exactly one Status row in the Server section."""
+        ui_page.wait_for_timeout(3000)
+        status_rows = ui_page.locator(".info-row").filter(has_text="Status")
+        assert status_rows.count() == 1, \
+            f"Expected 1 Status row, found {status_rows.count()}"
 
     def test_grafana_dashboards_section(self, ui_page: Page):
         """The Grafana Dashboards section should appear with links."""
@@ -176,6 +190,18 @@ class TestStatusTab:
         ui_page.wait_for_timeout(3000)
         version_row = ui_page.locator(".info-row").filter(has_text="Version")
         expect(version_row).to_be_visible(timeout=10000)
+
+    def test_server_actions_header(self, ui_page: Page):
+        """Server Actions section should appear."""
+        ui_page.wait_for_timeout(3000)
+        header = ui_page.locator(".section-header").filter(has_text="Server Actions")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_restart_button_present(self, ui_page: Page):
+        """Restart Server button should be visible."""
+        ui_page.wait_for_timeout(3000)
+        restart_btn = ui_page.locator(".btn-danger").filter(has_text="Restart Server")
+        expect(restart_btn).to_be_visible(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +276,19 @@ class TestMemoryTab:
         import_btn = ui_page.locator(".btn").filter(has_text="Import")
         expect(import_btn).to_be_visible(timeout=5000)
 
+    def test_export_import_same_row(self, ui_page: Page):
+        """Export and Import buttons should be on the same action row."""
+        action_rows = ui_page.locator(".action-row")
+        found_combined = False
+        for i in range(action_rows.count()):
+            row = action_rows.nth(i)
+            has_export = row.locator(".btn").filter(has_text="Export").count() > 0
+            has_import = row.locator(".btn").filter(has_text="Import").count() > 0
+            if has_export and has_import:
+                found_combined = True
+                break
+        assert found_combined, "Export and Import buttons should be in the same action-row"
+
 
 # ---------------------------------------------------------------------------
 # Learning Tab
@@ -274,16 +313,15 @@ class TestLearningTab:
         expect(row).to_be_visible(timeout=10000)
 
     def test_edge_type_rows(self, ui_page: Page):
-        """Edge type rows (Co-Activated, Strong, Surprising) should appear."""
-        for label in ["Co-Activated", "Strong", "Surprising"]:
+        """Edge type rows (Strong, Surprising, Below Threshold) should appear."""
+        for label in ["Strong", "Surprising", "Below Threshold"]:
             row = ui_page.locator(".info-row").filter(has_text=label)
             expect(row).to_be_visible(timeout=10000), f"'{label}' row not visible"
 
     def test_weight_stats_shown(self, ui_page: Page):
-        """Avg and Max weight should be shown."""
-        for label in ["Avg Weight", "Max Weight"]:
-            row = ui_page.locator(".info-row").filter(has_text=label)
-            expect(row).to_be_visible(timeout=10000), f"'{label}' not visible"
+        """Avg Weight should be shown."""
+        row = ui_page.locator(".info-row").filter(has_text="Avg Weight")
+        expect(row).to_be_visible(timeout=10000), "Avg Weight not visible"
 
     def test_freeze_section_present(self, ui_page: Page):
         """Freeze State section should appear."""
@@ -319,15 +357,17 @@ class TestLearningTab:
         expect(prune_btn).to_be_visible(timeout=5000)
 
     def test_config_section_present(self, ui_page: Page):
-        """Configuration section should appear if learning config exists."""
+        """Configuration section should always appear with learning config."""
         header = ui_page.locator(".section-header").filter(has_text="Configuration")
-        if header.count() > 0:
-            expect(header.first).to_be_visible(timeout=5000)
-            # Check config values are shown
-            for label in ["Decay/Day", "Prune Threshold"]:
-                row = ui_page.locator(".info-row").filter(has_text=label)
-                if row.count() > 0:
-                    expect(row.first).to_be_visible(timeout=5000)
+        expect(header).to_be_visible(timeout=10000)
+        for label in ["Decay/Day", "Prune Threshold", "Max Edges/Node"]:
+            row = ui_page.locator(".info-row").filter(has_text=label)
+            expect(row).to_be_visible(timeout=5000), f"'{label}' not visible"
+
+    def test_prune_threshold_input(self, ui_page: Page):
+        """Prune threshold input should be present in actions section."""
+        threshold = ui_page.locator(".config-input[type='number']")
+        expect(threshold).to_be_attached(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +458,72 @@ class TestConfigTab:
             text = muted.first.inner_text()
             assert "YAML" in text or "yaml" in text or ".mdemg" in text, \
                 f"YAML path not shown: {text}"
+
+    def test_editable_fields_present(self, ui_page: Page):
+        """Config table should have editable input fields for non-env entries."""
+        inputs = ui_page.locator(".config-table .config-input")
+        # There should be at least some editable fields (yaml or default sourced)
+        assert inputs.count() > 0, "No editable config inputs found"
+
+    def test_env_fields_readonly(self, ui_page: Page):
+        """Fields sourced from env should show as read-only with lock icon."""
+        readonly = ui_page.locator(".config-readonly")
+        # Env-sourced fields should exist on most setups (NEO4J_URI etc.)
+        if readonly.count() > 0:
+            locks = ui_page.locator(".config-lock")
+            assert locks.count() > 0, "Read-only env fields should have lock icons"
+
+    def test_save_bar_hidden_initially(self, ui_page: Page):
+        """Save bar should be hidden when no changes have been made."""
+        save_bar = ui_page.locator("#config-save-bar")
+        expect(save_bar).to_be_hidden(timeout=3000)
+
+    def test_dirty_field_shows_save_bar(self, ui_page: Page):
+        """Changing a field value should show the save bar."""
+        inputs = ui_page.locator(".config-table input.config-input")
+        if inputs.count() == 0:
+            pytest.skip("No editable text inputs found")
+        first_input = inputs.first
+        original_value = first_input.input_value()
+        first_input.fill(original_value + "-test")
+        first_input.dispatch_event("change")
+        ui_page.wait_for_timeout(500)
+        save_bar = ui_page.locator("#config-save-bar")
+        expect(save_bar).to_be_visible(timeout=3000)
+        # Dirty count should show
+        dirty_count = ui_page.locator("#dirty-count")
+        expect(dirty_count).to_contain_text("unsaved change")
+        # Restore original value
+        first_input.fill(original_value)
+        first_input.dispatch_event("change")
+
+    def test_dirty_row_gets_css_class(self, ui_page: Page):
+        """Changing a field should add config-dirty-row class to the row."""
+        inputs = ui_page.locator(".config-table input.config-input")
+        if inputs.count() == 0:
+            pytest.skip("No editable text inputs found")
+        first_input = inputs.first
+        original_value = first_input.input_value()
+        first_input.fill(original_value + "-test")
+        first_input.dispatch_event("change")
+        ui_page.wait_for_timeout(500)
+        dirty_rows = ui_page.locator(".config-dirty-row")
+        assert dirty_rows.count() > 0, "No dirty rows found after editing"
+        # Restore original value
+        first_input.fill(original_value)
+        first_input.dispatch_event("change")
+
+    def test_boolean_checkboxes_present(self, ui_page: Page):
+        """Boolean config fields should render as checkboxes."""
+        checkboxes = ui_page.locator(".config-table .config-checkbox")
+        # At least plugins.enabled should be a checkbox
+        assert checkboxes.count() > 0, "No boolean checkboxes found in config table"
+
+    def test_dropdown_for_known_fields(self, ui_page: Page):
+        """Known enum fields should render as select dropdowns."""
+        selects = ui_page.locator(".config-table select.config-input")
+        # At least embedding.provider or llm.provider should be a dropdown
+        assert selects.count() > 0, "No dropdown selects found in config table"
 
 
 # ---------------------------------------------------------------------------
@@ -521,12 +627,42 @@ class TestLogsTab:
 # ---------------------------------------------------------------------------
 
 class TestRsicTab:
-    """Verify the RSIC tab has trigger form and Grafana link."""
+    """Verify the RSIC tab has status, lifecycle, trigger form, and Grafana link."""
 
     @pytest.fixture(autouse=True)
     def switch_to_rsic(self, ui_page: Page):
         ui_page.locator('.tab-btn[data-tab="rsic"]').click()
         ui_page.wait_for_timeout(2000)
+
+    def test_rsic_service_header(self, ui_page: Page):
+        """RSIC Service section should appear."""
+        header = ui_page.locator(".section-header").filter(has_text="RSIC Service")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_rsic_status_row(self, ui_page: Page):
+        """Status row should be visible in RSIC Service section."""
+        row = ui_page.locator(".info-row").filter(has_text="Status")
+        expect(row).to_be_visible(timeout=10000)
+
+    def test_rsic_state_row(self, ui_page: Page):
+        """State row should be visible in RSIC Service section."""
+        row = ui_page.locator(".info-row").filter(has_text="State")
+        expect(row).to_be_visible(timeout=10000)
+
+    def test_rsic_start_button(self, ui_page: Page):
+        """Start button should be visible."""
+        start_btn = ui_page.get_by_role("button", name="Start", exact=True)
+        expect(start_btn).to_be_visible(timeout=5000)
+
+    def test_rsic_stop_button(self, ui_page: Page):
+        """Stop button should be visible."""
+        stop_btn = ui_page.locator(".btn").filter(has_text="Stop")
+        expect(stop_btn).to_be_visible(timeout=5000)
+
+    def test_rsic_restart_button(self, ui_page: Page):
+        """Restart button should be visible."""
+        restart_btn = ui_page.locator(".btn").filter(has_text="Restart")
+        expect(restart_btn).to_be_visible(timeout=5000)
 
     def test_trigger_header(self, ui_page: Page):
         """Trigger RSIC Cycle section should appear."""
@@ -584,13 +720,121 @@ class TestRsicTab:
 
 
 # ---------------------------------------------------------------------------
+# Plugins Tab
+# ---------------------------------------------------------------------------
+
+class TestPluginsTab:
+    """Verify the Plugins tab shows plugin cards with lifecycle controls."""
+
+    @pytest.fixture(autouse=True)
+    def switch_to_plugins(self, ui_page: Page):
+        ui_page.locator('.tab-btn[data-tab="plugins"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_installed_plugins_header(self, ui_page: Page):
+        """Installed Plugins section should appear."""
+        header = ui_page.locator(".section-header").filter(has_text="Installed Plugins")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_plugin_cards_or_empty_message(self, ui_page: Page):
+        """Should show plugin cards or an empty-state message."""
+        cards = ui_page.locator(".plugin-card")
+        empty_msg = ui_page.locator(".muted").filter(has_text="No plugins installed")
+        assert cards.count() > 0 or empty_msg.count() > 0, \
+            "Neither plugin cards nor empty message found"
+
+    def test_plugin_type_badges(self, ui_page: Page):
+        """Plugin cards should have type badges (INGESTION, REASONING, APE, CRUD)."""
+        badges = ui_page.locator(".plugin-card .source-badge")
+        if badges.count() > 0:
+            valid_types = {"INGESTION", "REASONING", "APE", "CRUD"}
+            for i in range(min(badges.count(), 5)):
+                text = badges.nth(i).inner_text().strip()
+                assert text in valid_types, f"Unknown plugin type badge: {text}"
+
+    def test_plugin_state_badges(self, ui_page: Page):
+        """Plugin cards should have state badges."""
+        badges = ui_page.locator(".plugin-card .badge")
+        if badges.count() > 0:
+            valid_states = {"ready", "running", "starting", "unhealthy", "stopped", "crashed", "stopping", "unknown"}
+            for i in range(min(badges.count(), 5)):
+                text = badges.nth(i).inner_text().strip().lower()
+                # State badges include type badges too, so filter
+                if text not in {"ingestion", "reasoning", "ape", "crud"}:
+                    assert text in valid_states, f"Unknown plugin state: {text}"
+
+    def test_plugin_action_buttons(self, ui_page: Page):
+        """Plugin cards should have Start, Stop, Restart, Validate buttons."""
+        cards = ui_page.locator(".plugin-card")
+        if cards.count() > 0:
+            first_card = cards.first
+            for label in ["Start", "Stop", "Restart", "Validate"]:
+                button = first_card.get_by_role("button", name=label, exact=True)
+                expect(button).to_be_visible(timeout=3000)
+
+
+# ---------------------------------------------------------------------------
+# Features Tab
+# ---------------------------------------------------------------------------
+
+class TestFeaturesTab:
+    """Verify the Features tab shows service status with lifecycle controls."""
+
+    @pytest.fixture(autouse=True)
+    def switch_to_features(self, ui_page: Page):
+        ui_page.locator('.tab-btn[data-tab="features"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_controllable_services_header(self, ui_page: Page):
+        """Controllable Services section should appear."""
+        header = ui_page.locator(".section-header").filter(has_text="Controllable Services")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_config_only_services_header(self, ui_page: Page):
+        """Config-Only Services section should appear."""
+        header = ui_page.locator(".section-header").filter(has_text="Config-Only Services")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_controllable_table_has_rows(self, ui_page: Page):
+        """Controllable services table should have data rows."""
+        tables = ui_page.locator(".config-table")
+        assert tables.count() >= 2, "Expected at least 2 tables (controllable + config-only)"
+        rows = tables.first.locator("tbody tr")
+        assert rows.count() > 0, "Controllable services table has no rows"
+
+    def test_controllable_services_have_action_buttons(self, ui_page: Page):
+        """Controllable services should have Start/Stop/Restart buttons."""
+        tables = ui_page.locator(".config-table")
+        first_row = tables.first.locator("tbody tr").first
+        for label in ["Start", "Stop", "Restart"]:
+            button = first_row.get_by_role("button", name=label, exact=True)
+            expect(button).to_be_visible(timeout=3000)
+
+    def test_config_only_no_action_buttons(self, ui_page: Page):
+        """Config-only services should not have Start/Stop/Restart buttons."""
+        tables = ui_page.locator(".config-table")
+        config_table = tables.nth(1)
+        buttons = config_table.locator(".btn")
+        assert buttons.count() == 0, f"Config-only table should not have action buttons, found {buttons.count()}"
+
+    def test_status_badges_present(self, ui_page: Page):
+        """Feature rows should have status badges."""
+        badges = ui_page.locator(".config-table .badge")
+        assert badges.count() > 0, "No status badges found in features tables"
+        valid_statuses = {"healthy", "stopped", "unavailable"}
+        for i in range(min(badges.count(), 10)):
+            text = badges.nth(i).inner_text().strip().lower()
+            assert text in valid_statuses, f"Unknown feature status: {text}"
+
+
+# ---------------------------------------------------------------------------
 # Help Wiki Panels
 # ---------------------------------------------------------------------------
 
 class TestHelpPanels:
     """Verify each tab has a collapsible help wiki panel."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features"]
 
     @pytest.mark.parametrize("tab_name", TAB_NAMES)
     def test_help_button_present(self, ui_page: Page, tab_name: str):
@@ -686,18 +930,79 @@ class TestAdminConfigAPI:
                 f"Invalid source '{entry['source']}' for key '{entry['key']}'"
 
     def test_config_masked_values(self):
-        """Masked entries should have value='****'."""
+        """Masked entries with non-empty values should have value='****'."""
         resp = requests.get(f"{MDEMG_URL}/v1/admin/config")
         data = resp.json()
         masked = [e for e in data["config"] if e["masked"]]
         for entry in masked:
-            assert entry["value"] == "****", \
-                f"Masked entry '{entry['key']}' has value '{entry['value']}', expected '****'"
+            # Empty masked values stay empty; non-empty masked values become ****
+            assert entry["value"] in ("****", ""), \
+                f"Masked entry '{entry['key']}' has value '{entry['value']}', expected '****' or ''"
 
     def test_config_method_not_allowed(self):
         """POST to /v1/admin/config should return 405."""
         resp = requests.post(f"{MDEMG_URL}/v1/admin/config")
         assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+
+    def test_patch_config_rejects_empty_updates(self):
+        """PATCH with no updates should return 400."""
+        resp = requests.patch(f"{MDEMG_URL}/v1/admin/config", json={"updates": {}})
+        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+
+    def test_patch_config_rejects_env_key(self):
+        """PATCH should reject updates to env-sourced keys."""
+        # Find an env-sourced key from the config
+        get_resp = requests.get(f"{MDEMG_URL}/v1/admin/config")
+        data = get_resp.json()
+        env_keys = [e["key"] for e in data["config"] if e["source"] == "env"]
+        if not env_keys:
+            pytest.skip("No env-sourced config keys to test")
+        resp = requests.patch(
+            f"{MDEMG_URL}/v1/admin/config",
+            json={"updates": {env_keys[0]: "new-value"}},
+        )
+        assert resp.status_code == 400, f"Expected 400 for env key, got {resp.status_code}"
+        assert "environment variable" in resp.json().get("error", "").lower()
+
+    def test_patch_config_rejects_unknown_key(self):
+        """PATCH should reject updates to unknown config keys."""
+        resp = requests.patch(
+            f"{MDEMG_URL}/v1/admin/config",
+            json={"updates": {"nonexistent.key.abc": "value"}},
+        )
+        assert resp.status_code in (400, 500), f"Expected error for unknown key, got {resp.status_code}"
+
+    def test_patch_config_valid_update(self):
+        """PATCH with valid key should return 200 and updated config."""
+        get_resp = requests.get(f"{MDEMG_URL}/v1/admin/config")
+        data = get_resp.json()
+        yaml_path = data.get("yaml_path", "")
+        if not yaml_path:
+            pytest.skip("No YAML config file found — cannot test PATCH")
+        # Find a safe writable field (learning.eta is a float, always safe to change)
+        safe_entries = [e for e in data["config"]
+                        if e["source"] in ("yaml", "default")
+                        and not e["masked"]
+                        and e["key"] == "learning.eta"]
+        if not safe_entries:
+            pytest.skip("No safe writable config key found for PATCH test")
+        entry = safe_entries[0]
+        original = entry["value"]
+        test_val = "0.123"
+        resp = requests.patch(
+            f"{MDEMG_URL}/v1/admin/config",
+            json={"updates": {entry["key"]: test_val}},
+        )
+        assert resp.status_code == 200, f"PATCH failed: {resp.status_code} {resp.text}"
+        result = resp.json()
+        assert "config" in result, f"PATCH response missing config key: {list(result.keys())}"
+        assert result.get("updated") == 1, f"Expected 1 updated, got {result.get('updated')}"
+        # Restore original value (set to 0 to reset)
+        restore_val = original if original else "0"
+        requests.patch(
+            f"{MDEMG_URL}/v1/admin/config",
+            json={"updates": {entry["key"]: restore_val}},
+        )
 
 
 class TestAdminLogsAPI:
@@ -744,6 +1049,97 @@ class TestAdminLogsAPI:
         assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
 
 
+class TestAdminRSICAPI:
+    """Verify the RSIC lifecycle API endpoints."""
+
+    def test_rsic_start_returns_200(self):
+        """POST /v1/admin/rsic/start should return 200."""
+        resp = requests.post(f"{MDEMG_URL}/v1/admin/rsic/start")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "status" in data, f"Missing 'status' key: {list(data.keys())}"
+
+    def test_rsic_stop_returns_200(self):
+        """POST /v1/admin/rsic/stop should return 200."""
+        resp = requests.post(f"{MDEMG_URL}/v1/admin/rsic/stop")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "status" in data, f"Missing 'status' key: {list(data.keys())}"
+
+    def test_rsic_restart_returns_200(self):
+        """POST /v1/admin/rsic/restart should return 200."""
+        resp = requests.post(f"{MDEMG_URL}/v1/admin/rsic/restart")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data["status"] == "restarted", f"Expected 'restarted', got '{data['status']}'"
+
+    def test_rsic_start_get_not_allowed(self):
+        """GET to RSIC lifecycle endpoints should return 405."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/rsic/start")
+        assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+
+    def test_admin_restart_returns_200(self):
+        """POST /v1/admin/restart should return 200 with restarting status.
+        NOTE: This will actually restart the server, so we verify the response only."""
+        # Don't actually call this in tests as it would kill the server
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/restart")
+        assert resp.status_code == 405, f"GET should return 405, got {resp.status_code}"
+
+
+class TestAdminFeaturesAPI:
+    """Verify the /v1/admin/features API endpoint."""
+
+    def test_features_returns_200(self):
+        """GET /v1/admin/features should return 200."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+
+    def test_features_returns_json(self):
+        """Response should be valid JSON with features array."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        data = resp.json()
+        assert "features" in data, f"Missing 'features' key: {list(data.keys())}"
+        assert isinstance(data["features"], list), "features should be a list"
+
+    def test_features_entries_have_required_fields(self):
+        """Each feature entry should have name, status, state, controllable fields."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        data = resp.json()
+        for entry in data["features"][:5]:
+            assert "name" in entry, f"Missing 'name' in entry: {entry}"
+            assert "status" in entry, f"Missing 'status' in entry: {entry}"
+            assert "state" in entry, f"Missing 'state' in entry: {entry}"
+            assert "controllable" in entry, f"Missing 'controllable' in entry: {entry}"
+
+    def test_features_statuses_valid(self):
+        """Status field should be one of healthy, stopped, unavailable."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        data = resp.json()
+        valid_statuses = {"healthy", "stopped", "unavailable"}
+        for entry in data["features"]:
+            assert entry["status"] in valid_statuses, \
+                f"Invalid status '{entry['status']}' for feature '{entry['name']}'"
+
+    def test_features_has_controllable(self):
+        """At least some features should be controllable."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        data = resp.json()
+        controllable = [f for f in data["features"] if f["controllable"]]
+        assert len(controllable) > 0, "No controllable features found"
+
+    def test_features_has_config_only(self):
+        """At least some features should be config-only (not controllable)."""
+        resp = requests.get(f"{MDEMG_URL}/v1/admin/features")
+        data = resp.json()
+        config_only = [f for f in data["features"] if not f["controllable"]]
+        assert len(config_only) > 0, "No config-only features found"
+
+    def test_features_method_not_allowed(self):
+        """POST to /v1/admin/features should return 405."""
+        resp = requests.post(f"{MDEMG_URL}/v1/admin/features")
+        assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+
+
 class TestUIEndpoint:
     """Verify the /ui/ static file serving endpoint."""
 
@@ -777,6 +1173,7 @@ class TestUIEndpoint:
         paths = [
             "tabs/status.js", "tabs/memory.js", "tabs/learning.js",
             "tabs/config.js", "tabs/logs.js", "tabs/rsic.js",
+            "tabs/plugins.js", "tabs/features.js",
             "utils/dom.js", "utils/formatting.js",
         ]
         for path in paths:

@@ -1,0 +1,128 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Config Patch",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "config",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "description": "Validates PATCH /v1/admin/config for updating YAML config values, including rejection of empty updates, env-sourced keys, and unknown keys.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "6ecd6493cd49de8978d6a69c1d4b4501d5d21efdddeafa7e947c5f4f692a847f"
+  },
+  "request": {
+    "method": "PATCH",
+    "path": "/v1/admin/config",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "updates": {
+        "log_level": "info"
+      }
+    }
+  },
+  "expected": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_assertions": [
+      {
+        "path": "$.config",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.updated",
+        "op": "type_is",
+        "expected": "integer"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "empty_updates_returns_400",
+      "description": "PATCH with empty updates object returns 400",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/admin/config",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "updates": {}
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "env_sourced_key_returns_400",
+      "description": "PATCH targeting a key set via environment variable returns 400 with env-var message",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/admin/config",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "updates": {
+            "neo4j_uri": "bolt://localhost:7687"
+          }
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "environment variable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET /v1/admin/config is allowed (read path); DELETE returns 405",
+      "request": {
+        "method": "DELETE",
+        "path": "/v1/admin/config"
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

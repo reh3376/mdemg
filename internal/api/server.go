@@ -1920,6 +1920,14 @@ func (s *Server) Routes() http.Handler {
 	// DOCKER-P2: Browser dashboard + admin endpoints
 	mux.HandleFunc("/v1/admin/config", s.handleAdminConfig)
 	mux.HandleFunc("/v1/admin/logs", s.handleAdminLogs)
+	mux.HandleFunc("/v1/admin/restart", s.handleServerRestart)
+	mux.HandleFunc("/v1/admin/rsic/start", s.handleRSICStart)
+	mux.HandleFunc("/v1/admin/rsic/stop", s.handleRSICStop)
+	mux.HandleFunc("/v1/admin/rsic/restart", s.handleRSICRestart)
+	mux.HandleFunc("/v1/admin/features", s.handleFeatures)
+	mux.HandleFunc("/v1/admin/features/start", s.handleFeatureLifecycle)
+	mux.HandleFunc("/v1/admin/features/stop", s.handleFeatureLifecycle)
+	mux.HandleFunc("/v1/admin/features/restart", s.handleFeatureLifecycle)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization

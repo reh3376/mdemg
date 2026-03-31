@@ -6,6 +6,16 @@ async function get(path) {
     return res.json();
 }
 
+async function patch(path, body) {
+    const res = await fetch(path, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+
 async function post(path, body) {
     const opts = {
         method: 'POST',
@@ -39,6 +49,7 @@ export const selfImproveCalibration = () => get('/v1/self-improve/calibration');
 
 // --- Config (on-demand) ---
 export const adminConfig = () => get('/v1/admin/config');
+export const updateConfig = (updates) => patch('/v1/admin/config', { updates });
 
 // --- Logs (5s polling) ---
 export const adminLogs = (limit = 200) => get(`/v1/admin/logs?limit=${limit}`);
@@ -65,3 +76,25 @@ export const spaceExport = (spaceId, profile = 'full') =>
 
 export const spaceImport = (data) =>
     post('/v1/admin/spaces/import', data);
+
+// --- RSIC Lifecycle ---
+export const rsicStart = () => post('/v1/admin/rsic/start', null);
+export const rsicStop = () => post('/v1/admin/rsic/stop', null);
+export const rsicRestart = () => post('/v1/admin/rsic/restart', null);
+
+// --- Plugins ---
+export const pluginList = () => get('/v1/plugins');
+export const pluginDetail = (id) => get(`/v1/plugins/${encodeURIComponent(id)}`);
+export const pluginStart = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/start`, null);
+export const pluginStop = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/stop`, null);
+export const pluginRestart = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/restart`, null);
+export const pluginValidate = (id) => post(`/v1/plugins/${encodeURIComponent(id)}/validate`, null);
+
+// --- Features ---
+export const featureList = () => get('/v1/admin/features');
+export const featureStart = (name) => post('/v1/admin/features/start', { name });
+export const featureStop = (name) => post('/v1/admin/features/stop', { name });
+export const featureRestart = (name) => post('/v1/admin/features/restart', { name });
+
+// --- Server ---
+export const serverRestart = () => post('/v1/admin/restart', null);

@@ -23,17 +23,17 @@ function update() {
     // Overview
     sections.push(sectionHeader('Memory Overview'));
     sections.push(h('div', { className: 'info-group' },
-        infoRow('Total Memories', formatNumber(ms.total_nodes)),
+        infoRow('Total Memories', formatNumber(ms.memory_count)),
         infoRow('Embedding Coverage', ms.embedding_coverage != null ? `${(ms.embedding_coverage * 100).toFixed(1)}%` : '\u2014'),
         infoRow('Health Score', ms.health_score != null ? `${(ms.health_score * 100).toFixed(1)}%` : '\u2014'),
     ));
 
     // Layer breakdown
-    if (ms.by_layer) {
+    if (ms.memories_by_layer) {
         sections.push(sectionHeader('By Layer'));
-        const maxCount = Math.max(...Object.values(ms.by_layer), 1);
+        const maxCount = Math.max(...Object.values(ms.memories_by_layer), 1);
         const layerGroup = h('div', { className: 'info-group' });
-        for (const [layer, count] of Object.entries(ms.by_layer)) {
+        for (const [layer, count] of Object.entries(ms.memories_by_layer)) {
             const pct = (count / maxCount) * 100;
             layerGroup.append(h('div', { className: 'bar-row' },
                 h('span', { className: 'bar-label' }, layer),
@@ -46,13 +46,12 @@ function update() {
     }
 
     // Temporal distribution
-    if (ms.temporal) {
+    if (ms.temporal_distribution) {
         sections.push(sectionHeader('Temporal Distribution'));
         sections.push(h('div', { className: 'info-group' },
-            infoRow('Last 24h', formatNumber(ms.temporal.last_24h)),
-            infoRow('Last 7d', formatNumber(ms.temporal.last_7d)),
-            infoRow('Last 30d', formatNumber(ms.temporal.last_30d)),
-            infoRow('Older', formatNumber(ms.temporal.older)),
+            infoRow('Last 24h', formatNumber(ms.temporal_distribution.last_24h)),
+            infoRow('Last 7d', formatNumber(ms.temporal_distribution.last_7d)),
+            infoRow('Last 30d', formatNumber(ms.temporal_distribution.last_30d)),
         ));
     }
 
@@ -60,9 +59,9 @@ function update() {
     if (ms.connectivity) {
         sections.push(sectionHeader('Connectivity'));
         sections.push(h('div', { className: 'info-group' },
-            infoRow('Avg Edges', ms.connectivity.avg_edges != null ? ms.connectivity.avg_edges.toFixed(1) : '\u2014'),
-            infoRow('Max Edges', formatNumber(ms.connectivity.max_edges)),
-            infoRow('Orphan Nodes', formatNumber(ms.connectivity.orphans)),
+            infoRow('Avg Degree', ms.connectivity.avg_degree != null ? ms.connectivity.avg_degree.toFixed(1) : '\u2014'),
+            infoRow('Max Degree', formatNumber(ms.connectivity.max_degree)),
+            infoRow('Orphan Nodes', formatNumber(ms.connectivity.orphan_count)),
         ));
     }
 
@@ -97,8 +96,6 @@ function update() {
             exportBtn.textContent = 'Export';
         }
     }, 'btn-primary');
-    sections.push(h('div', { className: 'action-row' }, profileSelect, exportBtn));
-
     // Import
     const importInput = h('input', { type: 'file', accept: '.mdemg,.json', className: 'file-input' });
     const importBtn = btn('Import', async () => {
@@ -123,7 +120,7 @@ function update() {
             importBtn.textContent = 'Import';
         }
     });
-    sections.push(h('div', { className: 'action-row' }, importInput, importBtn));
+    sections.push(h('div', { className: 'action-row' }, profileSelect, exportBtn, importInput, importBtn));
 
     sections.push(helpPanel('Help', [
         { term: 'Total Memories', description: 'Total number of memory nodes in the selected space across all layers (L0\u2013L5).' },
@@ -131,7 +128,7 @@ function update() {
         { term: 'Health Score', description: 'Overall memory graph health combining embedding coverage, connectivity, and freshness.' },
         { term: 'By Layer', description: 'Bar chart showing memory count per layer. L0=raw observations, L1=summaries, L2=concepts, L3=abstractions, L4=meta-concepts, L5=emergent. Higher layers are formed automatically via Hebbian learning.' },
         { term: 'Temporal Distribution', description: 'How recently memories were created: last 24h, 7d, 30d, or older. Skewed-recent distributions indicate active learning; mostly-older distributions may benefit from fresh ingestion.' },
-        { term: 'Connectivity', description: 'Graph connectivity metrics. Avg Edges: mean edges per node. Max Edges: highest edge count on any node. Orphans: nodes with zero edges (isolated, never co-activated).' },
+        { term: 'Connectivity', description: 'Graph connectivity metrics. Avg Degree: mean edges per node. Max Degree: highest edge count on any node. Orphans: nodes with zero edges (isolated, never co-activated).' },
         { term: 'Export', description: 'Download the selected space as a .mdemg file. Profiles: Full (all data), Shareable (excludes secrets), Metadata (structure only), Learned (Hebbian edges only), CMS (conversation observations).' },
         { term: 'Import', description: 'Upload a .mdemg or .json file to import memories into the selected space. Conflict resolution is set to "skip" (existing nodes are not overwritten).' },
     ]));

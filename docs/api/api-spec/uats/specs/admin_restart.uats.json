@@ -1,0 +1,45 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Server Restart",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "lifecycle",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-03-30",
+    "description": "Validates /v1/admin/restart method enforcement. GET returns 405. POST is not executed in contract tests as it triggers a live server re-exec.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "8992282136b7bbd704d8c70d980392c821eb17bf68945e258bccf5a43de5f465"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/admin/restart"
+  },
+  "expected": {
+    "status": 405,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "op": "type_is",
+        "expected": "string"
+      }
+    ]
+  }
+}

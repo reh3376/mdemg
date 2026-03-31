@@ -3134,6 +3134,96 @@ Returns recent log entries from an in-process ring buffer. Filtering (by level o
 curl -s "http://localhost:${MDEMG_PORT:-9999}/v1/admin/logs?limit=10" | python3 -m json.tool
 ```
 
+### PATCH /v1/admin/config
+
+Updates YAML config values. Rejects env-sourced keys, masked/sensitive keys, and unknown keys. Validates values before writing.
+
+**Request Body:**
+```json
+{"updates": {"learning.eta": "0.05", "plugins.enabled": "true"}}
+```
+
+**Response (200):**
+```json
+{
+  "config": [...],
+  "yaml_path": ".mdemg/config.yaml",
+  "updated": 2
+}
+```
+
+**Error (400):** Returns error if key is env-sourced, unknown, or sensitive.
+
+```bash
+curl -s -X PATCH "http://localhost:${MDEMG_PORT:-9999}/v1/admin/config" \
+  -H "Content-Type: application/json" \
+  -d '{"updates":{"learning.eta":"0.05"}}' | python3 -m json.tool
+```
+
+### POST /v1/admin/restart
+
+Triggers a graceful server restart via re-exec. Returns immediately; the server restarts after 500ms.
+
+**Response (200):**
+```json
+{"status": "restarting"}
+```
+
+### POST /v1/admin/rsic/start
+
+Starts the RSIC watchdog. Returns `{"status": "started"}` or `{"status": "already_running"}`.
+
+### POST /v1/admin/rsic/stop
+
+Stops the RSIC watchdog. Returns `{"status": "stopped"}` or `{"status": "already_stopped"}`.
+
+### POST /v1/admin/rsic/restart
+
+Restarts the RSIC watchdog. Returns `{"status": "restarted"}`.
+
+### GET /v1/admin/features
+
+Returns all known services/features with runtime status.
+
+**Response (200):**
+```json
+{
+  "features": [
+    {"name": "ape_scheduler", "status": "healthy", "state": "running", "controllable": true},
+    {"name": "jiminy", "status": "healthy", "state": "running", "controllable": false, "config_key": "jiminy.enabled"}
+  ]
+}
+```
+
+Status values: `healthy`, `stopped`, `unavailable`. Controllable services can be started/stopped at runtime.
+
+```bash
+curl -s "http://localhost:${MDEMG_PORT:-9999}/v1/admin/features" | python3 -m json.tool
+```
+
+### POST /v1/admin/features/start|stop|restart
+
+Controls lifecycle of controllable services.
+
+**Request Body:**
+```json
+{"name": "ape_scheduler"}
+```
+
+**Response (200):**
+```json
+{"status": "started", "name": "ape_scheduler"}
+```
+
+### POST /v1/plugins/{id}/start|stop|restart
+
+Controls lifecycle of individual plugins.
+
+**Response (200):**
+```json
+{"status": "started", "plugin_id": "my-plugin"}
+```
+
 ---
 
 ## Self-Improvement (RSIC) API

@@ -72,7 +72,7 @@ Once the stack is running, open the built-in browser dashboard:
 http://localhost:${MDEMG_PORT}/ui/
 ```
 
-The dashboard shows health status, memory/learning stats, server config and logs, and links to 7 Grafana dashboards for detailed metrics.
+The dashboard has 8 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), and Features (service status). Links to 7 Grafana dashboards for detailed metrics.
 
 ### Step 3: Ingest Your Codebase
 

@@ -6,7 +6,9 @@ import { render as renderMemory } from './tabs/memory.js';
 import { render as renderLearning } from './tabs/learning.js';
 import { render as renderConfig } from './tabs/config.js';
 import { render as renderLogs, poll as pollLogsTab } from './tabs/logs.js';
-import { render as renderRsic } from './tabs/rsic.js';
+import { render as renderRsic, poll as pollRsicTab } from './tabs/rsic.js';
+import { render as renderPlugins } from './tabs/plugins.js';
+import { render as renderFeatures } from './tabs/features.js';
 
 const TABS = {
     status:   { render: renderStatus,   label: 'Status' },
@@ -15,6 +17,8 @@ const TABS = {
     config:   { render: renderConfig,   label: 'Config' },
     logs:     { render: renderLogs,     label: 'Logs' },
     rsic:     { render: renderRsic,     label: 'RSIC' },
+    plugins:  { render: renderPlugins,  label: 'Plugins' },
+    features: { render: renderFeatures, label: 'Features' },
 };
 
 let activeTab = 'status';
@@ -84,6 +88,12 @@ async function pollLogs() {
     await pollLogsTab();
 }
 
+// RSIC polling: on stats interval when RSIC tab is active
+async function pollRsic() {
+    if (paused || activeTab !== 'rsic') return;
+    await pollRsicTab();
+}
+
 // Page Visibility API — pause polling when tab is hidden
 function setupVisibility() {
     document.addEventListener('visibilitychange', () => {
@@ -136,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     healthTimer = setInterval(pollHealth, 10_000);
     statsTimer = setInterval(pollStats, 30_000);
     logsTimer = setInterval(pollLogs, 5_000);
+    setInterval(pollRsic, 10_000);
 
     // Render initial tab
     switchTab('status');

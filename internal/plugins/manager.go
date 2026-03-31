@@ -429,6 +429,52 @@ func (m *Manager) stopModuleInstance(inst *moduleInstance) error {
 	return nil
 }
 
+// StopModuleByID gracefully stops a single module by ID.
+func (m *Manager) StopModuleByID(id string) error {
+	m.mu.Lock()
+	inst, ok := m.modules[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("module %q not found", id)
+	}
+	m.mu.Unlock()
+
+	if inst.info.State == StateStopped || inst.info.State == StateStopping {
+		return nil
+	}
+	return m.stopModuleInstance(inst)
+}
+
+// StartModuleByID starts (or restarts) a single module by ID.
+// The module must have been previously loaded.
+func (m *Manager) StartModuleByID(id string) error {
+	m.mu.RLock()
+	inst, ok := m.modules[id]
+	if !ok {
+		m.mu.RUnlock()
+		return fmt.Errorf("module %q not found", id)
+	}
+	m.mu.RUnlock()
+
+	if inst.info.State == StateReady || inst.info.State == StateStarting {
+		return nil // already running
+	}
+
+	binaryPath := filepath.Join(m.pluginsDir, inst.info.Manifest.ID, inst.info.Manifest.Binary)
+	inst.stopHealthLoop = make(chan struct{})
+	return m.startModuleInstance(inst, binaryPath)
+}
+
+// RestartModuleByID stops then starts a module by ID.
+func (m *Manager) RestartModuleByID(id string) error {
+	if err := m.StopModuleByID(id); err != nil {
+		return fmt.Errorf("stop failed: %w", err)
+	}
+	// Brief pause for socket cleanup
+	time.Sleep(200 * time.Millisecond)
+	return m.StartModuleByID(id)
+}
+
 // startHealthLoop starts periodic health checks for a module
 func (m *Manager) startHealthLoop(inst *moduleInstance) {
 	interval := time.Duration(inst.info.Manifest.HealthCheckIntervalMs) * time.Millisecond

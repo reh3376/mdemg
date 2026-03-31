@@ -288,6 +288,44 @@ body {
 .config-table tr:hover td { background: rgba(49,50,68,0.5); }
 .config-key { color: var(--text); font-family: monospace; font-size: 12px; }
 .config-value { color: var(--subtext1); font-family: monospace; font-size: 12px; word-break: break-all; }
+.config-input {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 12px;
+}
+.config-input:focus { outline: none; border-color: var(--lavender); }
+.config-readonly { opacity: 0.6; cursor: not-allowed; }
+.config-lock { font-size: 11px; margin-left: 4px; }
+.config-checkbox { margin-right: 4px; accent-color: var(--lavender); }
+.config-cb-label {
+    display: flex;
+    align-items: center;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--subtext1);
+    cursor: pointer;
+}
+.config-dirty-row td { background: rgba(243,139,168,0.08) !important; }
+.config-dirty-row .config-input { border-color: var(--red); }
+.config-save-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+.config-save-bar.hidden { display: none; }
 
 /* Logs */
 .log-controls {
@@ -372,6 +410,37 @@ body {
     margin-left: 0;
 }
 
+/* Plugin cards */
+.plugin-card {
+    background: var(--mantle);
+    border: 1px solid var(--surface0);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+}
+.plugin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.plugin-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.plugin-name {
+    font-weight: 600;
+    font-size: 14px;
+}
+.plugin-card-meta { font-size: 12px; }
+.plugin-detail {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--surface0);
+}
+.plugin-detail.hidden { display: none; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--mantle); }
@@ -396,6 +465,8 @@ body {
         <button class="tab-btn" data-tab="config">Config</button>
         <button class="tab-btn" data-tab="logs">Logs</button>
         <button class="tab-btn" data-tab="rsic">RSIC</button>
+        <button class="tab-btn" data-tab="plugins">Plugins</button>
+        <button class="tab-btn" data-tab="features">Features</button>
     </nav>
     <div id="content"></div>
     <script type="module" src="main.js"></script>

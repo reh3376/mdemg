@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Grafana deduplication**: Browser UI links to 7 existing Grafana dashboards for time-series metrics rather than duplicating them. UI focuses on unique data (memory stats, config, logs) and actions (freeze, prune, export, RSIC trigger).
   - **Documentation**: `docs/features/browser-ui.md` (architecture, tabs, API), quickstart-docker.md updated, api-reference.md updated with new endpoints.
 
+- **Docker Deployment — Phase 2b: Browser UI/UX Overhaul (DOCKER-P2b)**:
+  - **Bug Fixes**: Fixed field mapping mismatches in Memory tab (7 fields), Learning tab (10 fields), and Status tab (duplicate status row, orphaned Embeddings section). Root cause: JS used assumed API field names that differed from actual Go JSON responses.
+  - **RSIC Service Controls**: RSIC tab now shows service status/state badges and Start/Stop/Restart buttons. Watchdog gained `Restart()` and `Running()` methods.
+  - **Server Restart**: Status tab has Restart Server button (`btn-danger` with confirm dialog). Platform-specific re-exec via `syscall.Exec` (Unix) / `exec.Command` (Windows). JS polls `/healthz` after restart.
+  - **`PATCH /v1/admin/config`**: Editable config tab — text inputs, dropdowns (known enums), checkboxes (booleans), dirty-field tracking with Save All. Rejects env-sourced, sensitive, and unknown keys. Writes to YAML config file with validation.
+  - **`POST /v1/admin/rsic/start|stop|restart`**: RSIC watchdog lifecycle endpoints.
+  - **`POST /v1/admin/restart`**: Graceful server restart via re-exec.
+  - **Plugins Tab**: New tab showing installed plugins as cards with type/state badges and Start/Stop/Restart/Validate/Details controls. Plugin lifecycle via `POST /v1/plugins/{id}/start|stop|restart`.
+  - **Features Tab**: New tab listing all services in two groups (Controllable with lifecycle buttons, Config-Only with status display). `GET /v1/admin/features` and `POST /v1/admin/features/start|stop|restart`.
+  - **Dashboard now 8 tabs**: Status, Memory, Learning, Config, Logs, RSIC, Plugins, Features.
+  - **193 Playwright e2e tests**: Comprehensive browser testing covering all 8 tabs, API contracts, dirty-field tracking, save bar visibility, theme verification, and polling behavior.
+
 - **Docker Deployment — Phase 1 (DOCKER-P1)**:
   - **Docker Compose consolidation**: Root `docker-compose.yml` rewritten with all 5 services (mdemg, neo4j, timescaledb, neural-sidecar, grafana). All ports parameterized via `.env`. Neo4j community edition (`neo4j:5`). No `container_name` directives for multi-instance isolation via `COMPOSE_PROJECT_NAME`. `neo4j-monitor` moved to `docker-compose.dev.yml`.
   - **Docker image CI**: `.github/workflows/docker-publish.yml` — multi-arch (amd64/arm64) image build pushed to GHCR on release tags and main branch pushes. Uses GitHub Actions cache for layer reuse.

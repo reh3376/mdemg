@@ -389,6 +389,259 @@ func UpdateNeo4jURI(configPath, uri string) error {
 	return os.WriteFile(configPath, []byte(header+string(data)), 0o644)
 }
 
+// sensitiveKeys are YAML paths whose values should never be set via the UI.
+var sensitiveKeys = map[string]bool{
+	"neo4j.password":     true,
+	"embedding.openai_key": true,
+}
+
+// validYAMLKey returns true if the key exists in yamlEnvMapping.
+func validYAMLKey(key string) bool {
+	for _, m := range yamlEnvMapping {
+		if m.yamlPath == key {
+			return true
+		}
+	}
+	return false
+}
+
+// UpdateYAMLConfig applies a set of key→value updates to the YAML config file.
+// Keys are dot-paths (e.g. "server.port", "jiminy.enabled").
+// Returns validation errors (if any) and a write error.
+func UpdateYAMLConfig(configPath string, updates map[string]string) ([]ConfigError, error) {
+	if len(updates) == 0 {
+		return nil, nil
+	}
+
+	// Validate keys up front.
+	for key := range updates {
+		if sensitiveKeys[key] {
+			return []ConfigError{{Field: key, Message: "sensitive key cannot be updated via API", Level: "error"}}, nil
+		}
+		if !validYAMLKey(key) {
+			return []ConfigError{{Field: key, Message: "unknown config key", Level: "error"}}, nil
+		}
+	}
+
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create config dir: %w", err)
+	}
+
+	var cfg YAMLConfig
+	if data, err := os.ReadFile(configPath); err == nil {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("parse existing config: %w", err)
+		}
+	}
+
+	for key, val := range updates {
+		if err := setYAMLField(&cfg, key, val); err != nil {
+			return []ConfigError{{Field: key, Message: err.Error(), Level: "error"}}, nil
+		}
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal config: %w", err)
+	}
+
+	header := "# MDEMG Project Configuration\n" +
+		"# Updated via browser dashboard\n\n"
+
+	if err := os.WriteFile(configPath, []byte(header+string(data)), 0o644); err != nil {
+		return nil, fmt.Errorf("write config: %w", err)
+	}
+
+	// Validate the written file.
+	errs := ValidateConfigFile(configPath)
+	var realErrors []ConfigError
+	for _, e := range errs {
+		if e.Level == "error" {
+			realErrors = append(realErrors, e)
+		}
+	}
+	return realErrors, nil
+}
+
+// setYAMLField sets a single field in the YAMLConfig struct by dot-path key.
+func setYAMLField(cfg *YAMLConfig, key, val string) error {
+	switch key {
+	// Neo4j
+	case "neo4j.uri":
+		cfg.Neo4j.URI = val
+	case "neo4j.user":
+		cfg.Neo4j.User = val
+	case "neo4j.bolt_port":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Neo4j.BoltPort = v
+	case "neo4j.http_port":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Neo4j.HTTPPort = v
+
+	// Server
+	case "server.port":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Server.Port = v
+
+	// LLM
+	case "llm.provider":
+		cfg.LLM.Provider = val
+	case "llm.model":
+		cfg.LLM.Model = val
+
+	// Embedding
+	case "embedding.provider":
+		cfg.Embedding.Provider = val
+	case "embedding.model":
+		cfg.Embedding.Model = val
+	case "embedding.endpoint":
+		cfg.Embedding.Endpoint = val
+
+	// Retrieval
+	case "retrieval.candidate_k":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Retrieval.CandidateK = v
+	case "retrieval.top_k":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Retrieval.TopK = v
+	case "retrieval.hop_depth":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Retrieval.HopDepth = v
+
+	// Learning
+	case "learning.eta":
+		v, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return fmt.Errorf("invalid float: %s", val)
+		}
+		cfg.Learning.Eta = v
+	case "learning.decay_per_day":
+		v, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return fmt.Errorf("invalid float: %s", val)
+		}
+		cfg.Learning.DecayPerDay = v
+	case "learning.max_edges_per_node":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Learning.MaxEdgesPerNode = v
+
+	// Plugins
+	case "plugins.enabled":
+		cfg.Plugins.Enabled = val == "true"
+	case "plugins.dir":
+		cfg.Plugins.Dir = val
+
+	// Schema
+	case "schema.version":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Schema.Version = v
+
+	// Backup
+	case "backup.enabled":
+		cfg.Backup.Enabled = val == "true"
+	case "backup.storage_dir":
+		cfg.Backup.StorageDir = val
+	case "backup.interval_hours":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Backup.IntervalHours = v
+	case "backup.retention_count":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Backup.RetentionCount = v
+
+	// Jiminy
+	case "jiminy.enabled":
+		b := val == "true"
+		cfg.Jiminy.Enabled = &b
+	case "jiminy.synthesis_enabled":
+		cfg.Jiminy.SynthesisEnabled = val == "true"
+	case "jiminy.synthesis_provider":
+		cfg.Jiminy.SynthesisProvider = val
+	case "jiminy.synthesis_model":
+		cfg.Jiminy.SynthesisModel = val
+	case "jiminy.evaluate_enabled":
+		cfg.Jiminy.EvaluateEnabled = val == "true"
+	case "jiminy.evaluate_llm_enabled":
+		cfg.Jiminy.EvaluateLLMEnabled = val == "true"
+	case "jiminy.evaluate_llm_provider":
+		cfg.Jiminy.EvaluateLLMProvider = val
+	case "jiminy.evaluate_llm_model":
+		cfg.Jiminy.EvaluateLLMModel = val
+	case "jiminy.outcome_llm_enabled":
+		cfg.Jiminy.OutcomeLLMEnabled = val == "true"
+	case "jiminy.guidance_context_max_chars":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Jiminy.GuidanceContextMaxChars = v
+	case "jiminy.guidance_output_max_chars":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Jiminy.GuidanceOutputMaxChars = v
+	case "jiminy.evaluate_output_max_chars":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Jiminy.EvaluateOutputMaxChars = v
+	case "jiminy.evaluate_item_max_chars":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Jiminy.EvaluateItemMaxChars = v
+	case "jiminy.j17_enabled":
+		cfg.Jiminy.J17Enabled = val == "true"
+	case "jiminy.j17_ticket_ttl_hours":
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid integer: %s", val)
+		}
+		cfg.Jiminy.J17TicketTTLHours = v
+
+	// Ingest
+	case "ingest.speed":
+		cfg.Ingest.Speed = val
+
+	default:
+		return fmt.Errorf("unknown config key: %s", key)
+	}
+	return nil
+}
+
 // ConfigError represents a validation error in the config file.
 type ConfigError struct {
 	Field   string `json:"field"`
@@ -802,6 +1055,25 @@ type ConfigSource struct {
 
 // EffectiveConfig reads the effective configuration and returns each key's
 // value and source. Used by `mdemg config show`.
+// defaultValues maps YAML config keys to their built-in defaults so the
+// Config tab can display what the server actually uses when nothing is set.
+var defaultValues = map[string]string{
+	"llm.model":                        "gpt-5-nano",
+	"embedding.model":                  "gpt-5-mini",
+	"embedding.endpoint":               "https://api.openai.com/v1",
+	"learning.eta":                     "0.02",
+	"learning.decay_per_day":           "0.05",
+	"plugins.dir":                      "./plugins",
+	"backup.interval_hours":            "24",
+	"backup.retention_count":           "4",
+	"jiminy.synthesis_model":           "gpt-5-nano",
+	"jiminy.evaluate_llm_model":        "gpt-5-nano",
+	"jiminy.guidance_context_max_chars": "200000",
+	"jiminy.guidance_output_max_chars":  "200000",
+	"jiminy.evaluate_output_max_chars":  "200000",
+	"jiminy.evaluate_item_max_chars":    "0",
+}
+
 func EffectiveConfig(yamlPath string) []ConfigSource {
 	var result []ConfigSource
 
@@ -843,7 +1115,7 @@ func EffectiveConfig(yamlPath string) []ConfigSource {
 			cs.Value = yamlVal
 			cs.Source = "yaml"
 		} else {
-			cs.Value = ""
+			cs.Value = defaultValues[m.yamlPath]
 			cs.Source = "default"
 		}
 
