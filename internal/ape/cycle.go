@@ -331,6 +331,16 @@ func (c *CycleOrchestrator) SetTSDBClient(client *tsdb.Client) {
 	}
 }
 
+// SetDatasetProvider attaches a TSDB curated dataset provider to both assessor and reflector.
+func (c *CycleOrchestrator) SetDatasetProvider(p tsdb.DatasetProvider) {
+	if c.assessor != nil {
+		c.assessor.SetDatasetProvider(p)
+	}
+	if c.reflector != nil {
+		c.reflector.SetDatasetProvider(p)
+	}
+}
+
 // SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
 func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProvider) {
 	c.tierEffProvider = p

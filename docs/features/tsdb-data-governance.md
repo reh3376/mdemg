@@ -157,9 +157,23 @@ uv run python tsdb_data_review.py --format both --verbose
 
 `scripts/tsdb_spot_check.sh` provides a quick bash-based spot check of TSDB table health. The Python diagnostic (`tsdb_data_review.py`) is the more comprehensive tool and should be preferred for data quality assessments.
 
+### RSIC Data-Driven Reflection (RSIC-DATA Sprint)
+
+`internal/tsdb/dataset_builder.go` provides curated structured queries consumed by the RSIC assessor and reflector:
+
+| Dataset | Method | Source Table | Returns |
+|---------|--------|-------------|---------|
+| LLM Performance | `LLMPerformance()` | `llm_interactions` | Per-task error rate, latency p50/p95, token usage |
+| Retrieval Quality | `RetrievalQuality()` | `retrieval_events` | Recall/BM25/rerank rates, hard-negative candidates |
+| Embedding Coverage | `EmbeddingCoverage()` | `embedding_events` | Cache hit rate, call site distribution, regression check |
+| Metric Trend | `MetricTrend()` | `metric_samples` | Linear regression slope, volatility, auto-granularity |
+| Training Readiness | `TrainingDataReadiness()` | `llm_interactions` | Per-task SFT readiness (threshold, error rate, prompt coverage) |
+
+The `DatasetProvider` interface allows mocking without a database. 6 TSDB-aware reflection patterns (patterns 25-30) analyze trends over time, detecting latency regressions, error rate spikes, retrieval quality degradation, embedding pipeline regressions, training data readiness, and trust trajectory decline.
+
 ### Grafana Dashboards
 
-The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `timescaledb` datasource, showing metric trends, collection rates, and writer health. The J17 dashboard includes trust score trend panels.
+The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `timescaledb` datasource, showing metric trends, collection rates, and writer health. The J17 dashboard includes trust score trend panels. The RSIC dashboard (`mdemg-rsic.json`) includes a "Data-Driven Insights" row with LLM Performance by Task, Retrieval Pipeline Health, Training Data Volume, and Trust Trajectory panels.
 
 ## Documents Accessed
 
@@ -185,3 +199,8 @@ The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `time
 - `internal/ape/types_rsic.go` — Trust fields on ProtocolStatsResult
 - `internal/metrics/collectors.go` — Trust score TSDB gauge registration
 - `deploy/docker/grafana/dashboards/mdemg-j17.json` — J17 dashboard trust panels
+- `internal/tsdb/dataset_builder.go` — RSIC-DATA curated dataset queries (5 datasets, DatasetProvider interface)
+- `internal/tsdb/dataset_builder_test.go` — DatasetBuilder unit tests (14 tests)
+- `internal/ape/self_reflect_data_test.go` — TSDB-aware reflection pattern tests (11 tests)
+- `internal/ape/task_dispatch.go` — RSIC action handlers (6 new/gap-fix handlers)
+- `deploy/docker/grafana/dashboards/mdemg-rsic.json` — RSIC dashboard with Data-Driven Insights row

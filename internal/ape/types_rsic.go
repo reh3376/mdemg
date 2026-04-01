@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mdemg/internal/jiminy"
+	"mdemg/internal/tsdb"
 )
 
 // ───────────── Tier ─────────────
@@ -150,6 +151,12 @@ type SelfAssessmentReport struct {
 	EdgeWeightEntropy    float64 `json:"edge_weight_entropy"`
 	StaleIngestSpaces    int     `json:"stale_ingest_spaces"`    // Phase 47.2: count of spaces past staleness threshold
 	SidecarHealthy       bool    `json:"sidecar_healthy"`        // Sidecar health: neural sidecar reachable
+
+	// TSDB Dataset fields (populated when DatasetProvider is available)
+	LLMPerformance    []tsdb.LLMPerformanceSummary    `json:"llm_performance,omitempty"`
+	RetrievalDataset  *tsdb.RetrievalQualitySummary    `json:"retrieval_dataset,omitempty"`
+	EmbeddingDataset  *tsdb.EmbeddingCoverageSummary   `json:"embedding_dataset,omitempty"`
+	TrainingReadiness *tsdb.TrainingDataReadiness       `json:"training_readiness,omitempty"`
 }
 
 // ───────────── Reflection ─────────────

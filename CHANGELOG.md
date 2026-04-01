@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session-start version check**: Hook detects CLI/server commit mismatch and warns with upgrade instructions.
 - **Install script edge channel**: `CHANNEL=edge bash install.sh` downloads the latest edge binary (bare format, no tar.gz extraction).
 
+### Added (Unreleased — RSIC-DATA Sprint)
+
+- **RSIC-DATA: TSDBDatasetBuilder** (`internal/tsdb/dataset_builder.go`): Curated data access layer providing 5 structured datasets — LLMPerformance, RetrievalQuality, EmbeddingCoverage, MetricTrend (linear regression slope + volatility), TrainingDataReadiness. DatasetProvider interface allows mocking without a database. Consolidates and supersedes dead-code `trend_analyzer.go`.
+- **RSIC-DATA: 6 TSDB-aware reflection patterns** (patterns 25-30): `llm_latency_regression`, `llm_error_rate_spike`, `retrieval_quality_degradation`, `embedding_pipeline_regression` (CRITICAL), `training_data_ready`, `trust_trajectory_decline`. RSIC now analyzes trends over time, not just point-in-time snapshots.
+- **RSIC-DATA: Assessor + Reflector wiring**: DatasetProvider wired via CycleOrchestrator → Assessor (report population) + Reflector (trend queries). SelfAssessmentReport extended with LLMPerformance, RetrievalDataset, EmbeddingDataset, TrainingReadiness fields.
+- **RSIC-DATA: 6 dispatch handlers**: `review_llm_provider`, `alert_llm_health`, `alert_embedding_regression`, `trigger_training_pipeline` (new), `alert_tsdb_health`, `alert_schema_drift` (gap fixes for existing patterns).
+- **RSIC-DATA: Grafana Data-Driven Insights row**: 4 new panels on mdemg-rsic dashboard — LLM Performance by Task, Retrieval Pipeline Health, Training Data Volume, Trust Trajectory.
+
 ### Added (Unreleased — DATA-GOV Data Governance)
 
 - **DATA-GOV Sprint 2: TSDB Data Quality Diagnostic Script** (`scripts/tsdb_data_review.py`): Comprehensive Python diagnostic that connects to TimescaleDB and produces a data quality report across all 8 TSDB tables. 7 diagnostic sections: schema health, metric_samples catalog, llm_interactions analysis (task coverage, error rate, latency percentiles, privacy scrub verification), embedding_events (call_site regression check, scrub asymmetry), retrieval_events (pipeline stage completeness, hard-negative mining viability), ft_* tables, cross-cutting analysis (growth rates, flush gap detection, config flag check). Output formats: text (ANSI color), JSON, or both. Privacy patterns mirror `internal/llmclient/scrubber.go` exactly. 17 unit tests. UV project setup (`scripts/pyproject.toml`).

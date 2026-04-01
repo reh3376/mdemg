@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"sort"
+	"time"
 
 	"mdemg/internal/config"
 	"mdemg/internal/tsdb"
@@ -20,6 +21,7 @@ type Reflector struct {
 	llmReflector     *LLMReflector
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics for reflection
 	tsdbClient       *tsdb.Client          // optional: TimescaleDB client for schema drift detection
+	datasetProvider  tsdb.DatasetProvider   // RSIC-DATA: curated datasets for trend-based reflection
 }
 
 // NewReflector creates a Reflector.
@@ -40,6 +42,11 @@ func (r *Reflector) SetProtocolProvider(p ProtocolStatsProvider) {
 // SetTSDBClient attaches an optional TimescaleDB client for schema drift detection.
 func (r *Reflector) SetTSDBClient(c *tsdb.Client) {
 	r.tsdbClient = c
+}
+
+// SetDatasetProvider attaches a TSDB curated dataset provider for trend-based reflection (RSIC-DATA).
+func (r *Reflector) SetDatasetProvider(p tsdb.DatasetProvider) {
+	r.datasetProvider = p
 }
 
 // Reflect examines the assessment report and returns ordered insights.
@@ -430,6 +437,119 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 				Severity:          SeverityHigh,
 				Description:       fmt.Sprintf("TimescaleDB schema v%d behind required v%d", tsdbVer, r.cfg.TSDBRequiredSchemaVersion),
 				RecommendedAction: "alert_schema_drift",
+			})
+		}
+	}
+
+	// ─── RSIC-DATA: TSDB-aware reflection patterns ───
+
+	// 25. LLM latency regression: p95 > 2× historical average (7d trend)
+	for _, perf := range report.LLMPerformance {
+		if perf.LatencyP95 > 0 && r.datasetProvider != nil {
+			trend, tErr := r.datasetProvider.MetricTrend(ctx, report.SpaceID,
+				fmt.Sprintf("mdemg_llm_%s_latency_p95", perf.TaskName), 7*24*time.Hour)
+			if tErr == nil && trend != nil && trend.Slope > 0 && trend.AvgValue > 0 && perf.LatencyP95 > trend.AvgValue*2 {
+				insights = append(insights, ReflectionInsight{
+					PatternID:         "llm_latency_regression",
+					Severity:          SeverityMedium,
+					Description:       fmt.Sprintf("Task %s p95 latency %.0fms exceeds 2× average %.0fms (slope: +%.1f)", perf.TaskName, perf.LatencyP95, trend.AvgValue, trend.Slope),
+					RecommendedAction: "review_llm_provider",
+					Metric:            "llm_latency_p95",
+					Value:             perf.LatencyP95,
+					Threshold:         trend.AvgValue * 2,
+				})
+			}
+		}
+	}
+
+	// 26. LLM error rate spike: >5% error rate
+	for _, perf := range report.LLMPerformance {
+		if perf.ErrorRate > 0.05 && perf.TotalCalls > 10 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "llm_error_rate_spike",
+				Severity:          SeverityHigh,
+				Description:       fmt.Sprintf("Task %s error rate %.1f%% exceeds 5%% (%d calls)", perf.TaskName, perf.ErrorRate*100, perf.TotalCalls),
+				RecommendedAction: "alert_llm_health",
+				Metric:            "llm_error_rate",
+				Value:             perf.ErrorRate,
+				Threshold:         0.05,
+			})
+		}
+	}
+
+	// 27. Retrieval quality degradation: rerank < 90% or guidance correlation < 80%
+	if report.RetrievalDataset != nil && report.RetrievalDataset.TotalQueries > 10 {
+		if report.RetrievalDataset.RerankRate < 0.9 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "retrieval_quality_degradation",
+				Severity:          SeverityHigh,
+				Description:       fmt.Sprintf("Rerank rate %.1f%% below 90%% (%d queries)", report.RetrievalDataset.RerankRate*100, report.RetrievalDataset.TotalQueries),
+				RecommendedAction: "review_guidance_effectiveness",
+				Metric:            "retrieval_rerank_rate",
+				Value:             report.RetrievalDataset.RerankRate,
+				Threshold:         0.9,
+			})
+		}
+		if report.RetrievalDataset.GuidanceCorrelation < 0.8 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "retrieval_quality_degradation",
+				Severity:          SeverityMedium,
+				Description:       fmt.Sprintf("Guidance correlation %.1f%% below 80%% — feedback loop may be broken", report.RetrievalDataset.GuidanceCorrelation*100),
+				RecommendedAction: "review_guidance_effectiveness",
+				Metric:            "retrieval_guidance_correlation",
+				Value:             report.RetrievalDataset.GuidanceCorrelation,
+				Threshold:         0.8,
+			})
+		}
+	}
+
+	// 28. Embedding pipeline regression: empty call_sites reappearing (Sprint 1 regression check)
+	if report.EmbeddingDataset != nil && report.EmbeddingDataset.EmptyCallSites > 0 {
+		insights = append(insights, ReflectionInsight{
+			PatternID:         "embedding_pipeline_regression",
+			Severity:          SeverityCritical,
+			Description:       fmt.Sprintf("Embedding pipeline regression: %d events with empty call_site", report.EmbeddingDataset.EmptyCallSites),
+			RecommendedAction: "alert_embedding_regression",
+			Metric:            "embedding_empty_call_sites",
+			Value:             float64(report.EmbeddingDataset.EmptyCallSites),
+			Threshold:         0,
+		})
+	}
+
+	// 29. Training data readiness: any task has sufficient data for SFT
+	if report.TrainingReadiness != nil {
+		readyCount := 0
+		for _, task := range report.TrainingReadiness.Tasks {
+			if task.Ready {
+				readyCount++
+			}
+		}
+		if readyCount > 0 {
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "training_data_ready",
+				Severity:          SeverityLow,
+				Description:       fmt.Sprintf("%d/%d tasks have sufficient training data for SFT", readyCount, len(report.TrainingReadiness.Tasks)),
+				RecommendedAction: "trigger_training_pipeline",
+				Metric:            "training_ready_tasks",
+				Value:             float64(readyCount),
+				Threshold:         1,
+			})
+		}
+	}
+
+	// 30. Trust trajectory decline: 24h slope < -0.01
+	if r.datasetProvider != nil {
+		trustTrend, tErr := r.datasetProvider.MetricTrend(ctx, report.SpaceID, "mdemg_j17_avg_trust_score", 24*time.Hour)
+		if tErr == nil && trustTrend != nil && trustTrend.Slope < -0.01 && len(trustTrend.Points) > 2 {
+			lastVal := trustTrend.Points[len(trustTrend.Points)-1].Value
+			insights = append(insights, ReflectionInsight{
+				PatternID:         "trust_trajectory_decline",
+				Severity:          SeverityMedium,
+				Description:       fmt.Sprintf("Trust score declining (slope: %.4f/interval, current: %.3f)", trustTrend.Slope, lastVal),
+				RecommendedAction: "review_guidance_effectiveness",
+				Metric:            "trust_trajectory_slope",
+				Value:             trustTrend.Slope,
+				Threshold:         -0.01,
 			})
 		}
 	}
