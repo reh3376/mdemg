@@ -54,7 +54,9 @@
         "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
-          "calcs": ["mean"]
+          "calcs": [
+            "mean"
+          ]
         }
       },
       "fieldConfig": {
@@ -107,7 +109,9 @@
         "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
-          "calcs": ["mean"]
+          "calcs": [
+            "mean"
+          ]
         }
       },
       "fieldConfig": {
@@ -160,7 +164,9 @@
         "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
-          "calcs": ["mean"]
+          "calcs": [
+            "mean"
+          ]
         }
       },
       "fieldConfig": {
@@ -213,7 +219,9 @@
         "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
-          "calcs": ["mean"]
+          "calcs": [
+            "mean"
+          ]
         }
       },
       "fieldConfig": {
@@ -266,7 +274,9 @@
         "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
-          "calcs": ["mean"]
+          "calcs": [
+            "mean"
+          ]
         }
       },
       "fieldConfig": {
@@ -276,9 +286,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 120 },
-              { "color": "red", "value": 240 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 240
+              }
             ]
           }
         }
@@ -786,39 +805,54 @@
   "templating": {
     "list": [
       {
-        "name": "instance",
-        "label": "Instance",
-        "type": "custom",
-        "query": "localhost:9999",
+        "allValue": "",
         "current": {
+          "selected": false,
           "text": "localhost:9999",
           "value": "localhost:9999"
         },
-        "options": [
-          {
-            "text": "localhost:9999",
-            "value": "localhost:9999",
-            "selected": true
-          }
-        ]
-      },
-      {
-        "name": "space_id",
-        "label": "Space ID",
-        "type": "query",
         "datasource": {
           "type": "postgres",
           "uid": "timescaledb"
         },
-        "query": "SELECT DISTINCT space_id AS __value, space_id AS __text FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND space_id !~ 'test-.*' ORDER BY 1",
-        "refresh": 2,
-        "sort": 1,
+        "definition": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
         "includeAll": false,
+        "label": "Instance",
         "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
         "current": {
+          "selected": false,
           "text": "mdemg-dev",
           "value": "mdemg-dev"
-        }
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },

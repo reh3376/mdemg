@@ -147,6 +147,12 @@ type StandardMetrics struct {
 	J17TierT2OutcomeCount func(spaceID string) *Gauge
 	J17TierT3OutcomeCount func(spaceID string) *Gauge
 
+	// J17 trust score aggregates
+	J17AvgTrustScore     func(spaceID string) *Gauge
+	J17MinTrustScore     func(spaceID string) *Gauge
+	J17MaxTrustScore     func(spaceID string) *Gauge
+	J17TrustSessionCount func(spaceID string) *Gauge
+
 	// J17 sidecar metrics
 	J17SidecarRequests      func(spaceID string) *Gauge
 	J17SidecarErrors        func(spaceID string) *Gauge
@@ -476,6 +482,24 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.J17TierT3OutcomeCount = func(spaceID string) *Gauge {
 		return r.NewGauge("j17_tier_t3_outcome_count", "T3 comprehension event count",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// J17 trust score aggregates
+	m.J17AvgTrustScore = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_avg_trust_score", "Average trust score across active sessions (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17MinTrustScore = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_min_trust_score", "Minimum trust score across active sessions (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17MaxTrustScore = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_max_trust_score", "Maximum trust score across active sessions (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.J17TrustSessionCount = func(spaceID string) *Gauge {
+		return r.NewGauge("j17_trust_session_count", "Number of active trust-scored sessions",
 			map[string]string{"space_id": spaceID})
 	}
 

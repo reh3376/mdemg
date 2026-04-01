@@ -29,34 +29,34 @@ type trustEntry struct {
 
 // TrustConfig holds trust scorer configuration.
 type TrustConfig struct {
-	Initial           float64       // starting trust score (default: 0.5)
+	Initial           float64       // starting trust score (default: 0.65)
 	BoostPerFollow    float64       // trust increase per followed constraint (default: 0.05)
-	DecayPerIgnore    float64       // trust decrease per ignored constraint (default: 0.03)
-	DecayPerContradict float64      // trust decrease per contradicted constraint (default: 0.05)
-	HighThreshold     float64       // above this → agent has earned dense encoding (default: 0.8)
-	LowThreshold      float64       // below this → agent needs more explanation (default: 0.4)
+	DecayPerIgnore    float64       // trust decrease per ignored constraint (default: 0.02)
+	DecayPerContradict float64      // trust decrease per contradicted constraint (default: 0.04)
+	HighThreshold     float64       // above this → agent has earned dense encoding (default: 0.75)
+	LowThreshold      float64       // below this → agent needs more explanation (default: 0.35)
 	TTL               time.Duration // trust entry expiry (default: 4h)
 }
 
 // NewTrustScorer creates a new trust scorer with the given config.
 func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 	if cfg.Initial <= 0 {
-		cfg.Initial = 0.5
+		cfg.Initial = 0.65
 	}
 	if cfg.BoostPerFollow <= 0 {
-		cfg.BoostPerFollow = 0.02
+		cfg.BoostPerFollow = 0.05
 	}
 	if cfg.DecayPerIgnore <= 0 {
-		cfg.DecayPerIgnore = 0.03
+		cfg.DecayPerIgnore = 0.02
 	}
 	if cfg.DecayPerContradict <= 0 {
-		cfg.DecayPerContradict = 0.05
+		cfg.DecayPerContradict = 0.04
 	}
 	if cfg.HighThreshold <= 0 {
-		cfg.HighThreshold = 0.8
+		cfg.HighThreshold = 0.75
 	}
 	if cfg.LowThreshold <= 0 {
-		cfg.LowThreshold = 0.4
+		cfg.LowThreshold = 0.35
 	}
 
 	ttl := 168 * time.Hour // 7 days — trust persisted to Neo4j, TTL is cleanup threshold
@@ -196,6 +196,36 @@ func (ts *TrustScorer) SetThresholds(high, low float64) {
 	defer ts.mu.Unlock()
 	ts.highThreshold = high
 	ts.lowThreshold = low
+}
+
+// Aggregates returns trust score statistics across all active (non-expired) sessions.
+// Returns avg, min, max scores and session count. If no sessions exist, returns
+// the initial trust score for avg/min/max with count=0.
+func (ts *TrustScorer) Aggregates() (avg, min, max float64, count int) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	now := time.Now()
+	min = 1.0
+	var sum float64
+	for _, entry := range ts.scores {
+		if now.Sub(entry.LastUpdate) > ts.ttl {
+			continue
+		}
+		count++
+		sum += entry.Score
+		if entry.Score < min {
+			min = entry.Score
+		}
+		if entry.Score > max {
+			max = entry.Score
+		}
+	}
+	if count == 0 {
+		return ts.initial, ts.initial, ts.initial, 0
+	}
+	avg = sum / float64(count)
+	return avg, min, max, count
 }
 
 // CleanupExpired removes entries older than TTL.

@@ -97,7 +97,7 @@ RETURN n.node_id AS node_id, n.confidence AS confidence, n.status AS status`
 	sess := u.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer sess.Close(ctx)
 
-	_, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	_, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (bool, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"nodeId":           nodeID,
 			"delta":            delta,
@@ -106,11 +106,11 @@ RETURN n.node_id AS node_id, n.confidence AS confidence, n.status AS status`
 			"archiveThreshold": archiveThreshold,
 		})
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 		// Consume the result to surface any query-level errors.
 		_, err = res.Consume(ctx)
-		return nil, err
+		return err == nil, err
 	})
 	if err != nil {
 		return fmt.Errorf("confidence updater: update node %q (outcome=%s): %w", nodeID, outcome, err)
@@ -133,7 +133,7 @@ RETURN count(n) AS archived_count`
 	sess := u.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer sess.Close(ctx)
 
-	count, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	count, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (int, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId":          spaceID,
 			"archiveThreshold": u.archiveThreshold,
@@ -152,6 +152,5 @@ RETURN count(n) AS archived_count`
 		return 0, fmt.Errorf("confidence updater: archive stale constraints (space=%s): %w", spaceID, err)
 	}
 
-	n, _ := count.(int)
-	return n, nil
+	return count, nil
 }

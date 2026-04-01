@@ -47,8 +47,8 @@ func NewProtocolEncoder(defaultTier int) *ProtocolEncoder {
 	return &ProtocolEncoder{
 		defaultTier:       defaultTier,
 		glossary:          make(map[string]string),
-		tierHighThreshold: 0.8,
-		tierLowThreshold:  0.4,
+		tierHighThreshold: 0.75,
+		tierLowThreshold:  0.35,
 		t1Compact:         T1CompactDefault,
 	}
 }

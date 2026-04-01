@@ -325,12 +325,12 @@ type Config struct {
 	J17DefaultTier     int    // J17_DEFAULT_TIER — default encoding tier 1-3 (default: 1)
 
 	// J17-3: Trust Score
-	J17TrustInitial           float64 // J17_TRUST_INITIAL — starting trust score (default: 0.5)
+	J17TrustInitial           float64 // J17_TRUST_INITIAL — starting trust score (default: 0.65)
 	J17TrustBoostPerFollow    float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
-	J17TrustDecayPerIgnore    float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.03)
-	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.05)
-	J17TrustHighThreshold     float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.8)
-	J17TrustLowThreshold      float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.4)
+	J17TrustDecayPerIgnore    float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.02)
+	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
+	J17TrustHighThreshold     float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
+	J17TrustLowThreshold      float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
 	J17TrustTTLHours          int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
 	J17BootstrapCodification  bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
 	J17BootstrapSpaceID       string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
@@ -2023,7 +2023,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// J17-3: Trust Score
-	j17TrustInitial, err := atof("J17_TRUST_INITIAL", 0.5)
+	j17TrustInitial, err := atof("J17_TRUST_INITIAL", 0.65)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2031,19 +2031,19 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustDecayPerIgnore, err := atof("J17_TRUST_DECAY_PER_IGNORE", 0.03)
+	j17TrustDecayPerIgnore, err := atof("J17_TRUST_DECAY_PER_IGNORE", 0.02)
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustDecayPerContradict, err := atof("J17_TRUST_DECAY_PER_CONTRADICT", 0.05)
+	j17TrustDecayPerContradict, err := atof("J17_TRUST_DECAY_PER_CONTRADICT", 0.04)
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustHighThreshold, err := atof("J17_TRUST_HIGH_THRESHOLD", 0.8)
+	j17TrustHighThreshold, err := atof("J17_TRUST_HIGH_THRESHOLD", 0.75)
 	if err != nil {
 		return Config{}, err
 	}
-	j17TrustLowThreshold, err := atof("J17_TRUST_LOW_THRESHOLD", 0.4)
+	j17TrustLowThreshold, err := atof("J17_TRUST_LOW_THRESHOLD", 0.35)
 	if err != nil {
 		return Config{}, err
 	}

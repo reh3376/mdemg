@@ -8,16 +8,16 @@ import "mdemg/internal/mathutil"
 // that maps it to [0, 1] for use as a confidence value comparable with
 // cosine-similarity-based confidence from other Jiminy sources.
 //
-// midpoint=2.0: a retrieval score of 2.0 maps to confidence 0.50
+// midpoint=1.5: a retrieval score of 1.5 maps to confidence 0.50
 // steepness=1.5: controls transition sharpness (higher = sharper)
 //
 // Resulting mapping:
 //
-//	score 0.5 → ~0.09,  1.0 → ~0.18,  2.0 → ~0.50,  3.0 → ~0.82,  4.0 → ~0.95
+//	score 0.5 → ~0.18,  1.0 → ~0.32,  1.5 → ~0.50,  2.0 → ~0.68,  3.0 → ~0.90
 //
 // These constants MUST match those in internal/consulting/service.go.
 const (
-	retrievalScoreMidpoint  = 2.0
+	retrievalScoreMidpoint  = 1.5
 	retrievalScoreSteepness = 1.5
 	// maxConfidence caps normalized scores. From a Bayesian perspective,
 	// absolute certainty is epistemologically invalid.

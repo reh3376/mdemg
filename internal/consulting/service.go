@@ -28,8 +28,10 @@ const MaxConfidence = 0.95
 // normalization of composite retrieval scores (unbounded sums) into [0, 1]
 // confidence values. These MUST match the values in internal/jiminy/retrieval_source.go
 // to ensure consistent confidence semantics across the system.
+//
+// midpoint=1.5: score 0.5 → ~0.18,  1.0 → ~0.32,  1.5 → ~0.50,  2.0 → ~0.68,  3.0 → ~0.90
 const (
-	retrievalScoreMidpoint  = 2.0
+	retrievalScoreMidpoint  = 1.5
 	retrievalScoreSteepness = 1.5
 )
 
