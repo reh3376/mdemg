@@ -277,6 +277,12 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 	// Token efficiency
 	result.AvgTokensPerGuidance = snapshot.AvgTokensPerGuidance
 
+	// Trust score aggregates
+	result.AvgTrustScore = snapshot.AvgTrustScore
+	result.MinTrustScore = snapshot.MinTrustScore
+	result.MaxTrustScore = snapshot.MaxTrustScore
+	result.TrustSessionCount = snapshot.TrustSessionCount
+
 	// NLI fallback tracking (degraded-state awareness)
 	result.NLIFallbackCount = snapshot.NLIFallbackCount
 	result.NLIFallbackRate = snapshot.NLIFallbackRate

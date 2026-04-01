@@ -1154,8 +1154,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// J17-4: Record outcome for protocol metrics and data collection
 		// NLI feedback loop: when NLI scorer is available, defer recording to the NLI block
-		// to avoid double-counting. When NLI is unavailable, use heuristic scores.
-		if s.protocolMetrics != nil && item.ConstraintCode != "" && s.nliScorer == nil {
+		// to avoid double-counting — but ONLY for GuidanceConstraint items (which the NLI
+		// block processes). Non-constraint items (corrections, patterns, etc.) always use
+		// heuristic scores since the NLI block only handles GuidanceConstraint.
+		if s.protocolMetrics != nil && item.ConstraintCode != "" && (s.nliScorer == nil || item.Type != GuidanceConstraint) {
 			var compScore float64
 			switch outcome {
 			case OutcomeFollowed:
@@ -1319,9 +1321,19 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 	// J17: Aggregate trust update — single update per feedback call, not per item.
 	// Prevents trust burst when multiple items are all "followed" in one call.
+	//
+	// Only items with sufficient classification confidence (similarity >= 0.5) affect
+	// trust scoring. Items with low similarity were "not applicable" to the action —
+	// the agent didn't ignore the guidance, the guidance wasn't relevant. Without
+	// this filter, trust systematically decays because every feedback cycle includes
+	// many irrelevant items that are falsely counted as "ignored."
 	if s.trustScorer != nil && feedbackSessionID != "" && len(results) > 0 {
+		const trustRelevanceThreshold = 0.5 // minimum classifier similarity for trust impact
 		var followCount, ignoreCount, contradictCount int
 		for _, r := range results {
+			if r.Similarity < trustRelevanceThreshold {
+				continue // not applicable to this action — skip for trust
+			}
 			switch r.Outcome {
 			case OutcomeFollowed:
 				followCount++
@@ -1334,11 +1346,13 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		var aggregateOutcome GuidanceOutcome
 		switch {
 		case contradictCount > 0:
-			aggregateOutcome = OutcomeContradicted // any contradiction dominates
+			aggregateOutcome = OutcomeContradicted // high-confidence contradiction dominates
 		case followCount > ignoreCount:
 			aggregateOutcome = OutcomeFollowed
 		case ignoreCount > 0:
 			aggregateOutcome = OutcomeIgnored
+		case followCount == 0 && ignoreCount == 0:
+			aggregateOutcome = OutcomeUnknown // no items met relevance threshold
 		default:
 			aggregateOutcome = OutcomeUnknown
 		}
@@ -1660,11 +1674,20 @@ func (s *Service) BootstrapCodes(ctx context.Context, spaceID string) (int, erro
 
 // GetProtocolMetricsSnapshot returns an immutable snapshot of J17 protocol metrics.
 // Returns nil if metrics collection is not enabled.
+// Trust score aggregates are merged from the TrustScorer if available.
 func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
 	if s.protocolMetrics == nil {
 		return nil
 	}
-	return s.protocolMetrics.Snapshot()
+	snap := s.protocolMetrics.Snapshot()
+	if s.trustScorer != nil {
+		avg, min, max, count := s.trustScorer.Aggregates()
+		snap.AvgTrustScore = avg
+		snap.MinTrustScore = min
+		snap.MaxTrustScore = max
+		snap.TrustSessionCount = count
+	}
+	return snap
 }
 
 // GetProtocolMetricsCollector returns the J17 protocol metrics collector for RSIC wiring.
@@ -1985,10 +2008,10 @@ func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) 
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, `
-			MATCH (c:MemoryNode:Constraint)
+			MATCH (c:MemoryNode)
 			WHERE c.space_id = $spaceId
 			  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
-			RETURN c.constraint_code AS code, c.content AS content
+			RETURN DISTINCT c.constraint_code AS code, c.content AS content
 		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
 			return nil, err

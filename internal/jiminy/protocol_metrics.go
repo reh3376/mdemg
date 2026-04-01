@@ -28,6 +28,12 @@ type ProtocolMetrics struct {
 	NLIFallbackRate  float64            `json:"nli_fallback_rate,omitempty"`
 	CodeOutcomeCount map[string]int64   `json:"code_outcome_count,omitempty"`
 
+	// Trust score aggregates (populated from TrustScorer at snapshot time)
+	AvgTrustScore     float64 `json:"avg_trust_score"`
+	MinTrustScore     float64 `json:"min_trust_score"`
+	MaxTrustScore     float64 `json:"max_trust_score"`
+	TrustSessionCount int     `json:"trust_session_count"`
+
 	WindowStart time.Time `json:"window_start"`
 	WindowEnd   time.Time `json:"window_end"`
 	TotalEvents int64     `json:"total_events"`

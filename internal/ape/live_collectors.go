@@ -226,6 +226,12 @@ func (lc *LiveCollectors) publishProtocolGauges(stats ProtocolStatsResult) {
 	m.J17TierT2OutcomeCount(sid).Set(float64(stats.TierOutcomeCount[1]))
 	m.J17TierT3OutcomeCount(sid).Set(float64(stats.TierOutcomeCount[2]))
 
+	// Trust score aggregates
+	m.J17AvgTrustScore(sid).Set(stats.AvgTrustScore)
+	m.J17MinTrustScore(sid).Set(stats.MinTrustScore)
+	m.J17MaxTrustScore(sid).Set(stats.MaxTrustScore)
+	m.J17TrustSessionCount(sid).Set(float64(stats.TrustSessionCount))
+
 	// NLI calibration
 	m.J17NLIMeanBias(sid).Set(stats.NLIMeanBias)
 	biasAlertVal := 0.0

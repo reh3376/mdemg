@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/nrednav/cuid2"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -41,7 +41,8 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			       obs.tags AS tags,
 			       obs.embedding AS embedding,
 			       obs.structured_data AS structuredData,
-			       obs.surprise_score AS surpriseScore
+			       obs.surprise_score AS surpriseScore,
+			       obs.constraint_code AS constraintCode
 		`
 		findRes, err := tx.Run(ctx, findCypher, map[string]any{"spaceId": spaceID})
 		if err != nil {
@@ -52,6 +53,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			nodeID              string
 			name                string
 			content             string
+			constraintCode      string   // J17 constraint code from observation
 			tags                []string
 			embedding           []float64
 			cTypes              []string // extracted constraint types
@@ -95,6 +97,13 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 					if f, ok := e.(float64); ok {
 						obs.embedding = append(obs.embedding, f)
 					}
+				}
+			}
+
+			// Extract constraint code
+			if ccRaw, _ := rec.Get("constraintCode"); ccRaw != nil {
+				if cc, ok := ccRaw.(string); ok {
+					obs.constraintCode = cc
 				}
 			}
 
@@ -179,7 +188,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 					res.Updated++
 				} else {
 					// Create new constraint node
-					constraintNodeID = uuid.New().String()
+					constraintNodeID = cuid2.Generate()
 					now := time.Now().UTC().Format(time.RFC3339)
 
 					createCypher := `
@@ -189,6 +198,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 							role_type: 'constraint',
 							name: $name,
 							constraint_type: $cType,
+							constraint_code: $constraintCode,
 							content: $content,
 							layer: 1,
 							confidence: $confidence,
@@ -228,16 +238,17 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 					}
 
 					params := map[string]any{
-						"spaceId":    spaceID,
-						"nodeId":     constraintNodeID,
-						"name":       cName,
-						"cType":      cType,
-						"content":    obs.content,
-						"confidence": promotionConfidence,
-						"tags":       []string{"constraint", "constraint:" + cType},
-						"now":        now,
-						"scope":      scope,           // F7: file path scope pattern
-						"authLevel":  authLevel, // F20: authority level from config
+						"spaceId":        spaceID,
+						"nodeId":         constraintNodeID,
+						"name":           cName,
+						"cType":          cType,
+						"constraintCode": obs.constraintCode,
+						"content":        obs.content,
+						"confidence":     promotionConfidence,
+						"tags":           []string{"constraint", "constraint:" + cType},
+						"now":            now,
+						"scope":          scope,     // F7: file path scope pattern
+						"authLevel":      authLevel, // F20: authority level from config
 					}
 
 					if len(embParam) > 0 {
@@ -248,6 +259,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 								role_type: 'constraint',
 								name: $name,
 								constraint_type: $cType,
+								constraint_code: $constraintCode,
 								content: $content,
 								layer: 1,
 								confidence: $confidence,

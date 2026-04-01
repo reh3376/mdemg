@@ -437,6 +437,12 @@ type ProtocolStatsResult struct {
 	// Token efficiency
 	AvgTokensPerGuidance float64 `json:"avg_tokens_per_guidance"`
 
+	// Trust score aggregates
+	AvgTrustScore     float64 `json:"avg_trust_score"`
+	MinTrustScore     float64 `json:"min_trust_score"`
+	MaxTrustScore     float64 `json:"max_trust_score"`
+	TrustSessionCount int     `json:"trust_session_count"`
+
 	// Sidecar metrics (NS-07)
 	Sidecar *jiminy.SidecarMetrics `json:"sidecar,omitempty"`
 }
