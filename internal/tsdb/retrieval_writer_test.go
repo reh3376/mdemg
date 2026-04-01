@@ -80,8 +80,8 @@ func TestRetrievalEventWriter_Flush(t *testing.T) {
 	if call.Table[0] != "retrieval_events" {
 		t.Errorf("table: got %q, want %q", call.Table[0], "retrieval_events")
 	}
-	if len(call.Columns) != 22 {
-		t.Errorf("columns: got %d, want 22", len(call.Columns))
+	if len(call.Columns) != 23 {
+		t.Errorf("columns: got %d, want 23", len(call.Columns))
 	}
 
 	// Buffer should be empty after flush
@@ -192,8 +192,8 @@ func TestRetrievalWriter_ColumnValuePositions(t *testing.T) {
 		t.Fatalf("Values rows: got %d, want 1", len(pool.calls[0].Values))
 	}
 	v := pool.calls[0].Values[0]
-	if len(v) != 22 {
-		t.Fatalf("column count: got %d, want 22", len(v))
+	if len(v) != 23 {
+		t.Fatalf("column count: got %d, want 23", len(v))
 	}
 
 	checks := []struct {
@@ -219,6 +219,8 @@ func TestRetrievalWriter_ColumnValuePositions(t *testing.T) {
 		{19, "recall_latency_ms", 15},
 		{20, "rerank_latency_ms", 28},
 		{21, "total_latency_ms", 50},
+		{22, "instance_id", ""},
+		{22, "instance_id", ""},
 	}
 
 	for _, c := range checks {

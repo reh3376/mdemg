@@ -105,8 +105,8 @@ var llmInteractionsSpec = tableSpec{
 		"system_prompt_hash",
 		"instance_id",
 	},
-	// Text fields: all 5 patterns applied (nil = skip none)
-	textFields: map[int][]string{5: nil, 6: nil, 7: nil, 8: nil, 21: nil},
+	// Text fields: skip abs_path on source_path(21) — field IS a file path
+	textFields: map[int][]string{5: nil, 6: nil, 7: nil, 8: nil, 21: {"abs_path"}},
 }
 
 var retrievalEventsSpec = tableSpec{
@@ -137,9 +137,20 @@ var embeddingEventsSpec = tableSpec{
 		"latency_ms", "cached", "node_id",
 		"instance_id",
 	},
-	// text_content(4): all patterns. file_path(9): skip abs_path (field IS a path).
-	// signature(13): all patterns. query_text(16): skip abs_path (queries reference files).
-	textFields: map[int][]string{4: nil, 9: {"abs_path"}, 13: nil, 16: {"abs_path"}},
+	// Embedding fields contain code chunks that were already scrubbed at write-time.
+	// Export-time scanning produces false positives on scrubbed output (e.g., neo4j://[REDACTED]@
+	// re-triggers the neo4j_cred pattern) and on code literals (regex definitions, docker configs).
+	//
+	// text_content(4): scrubbed at write-time. Skip patterns that trigger on code/scrubbed text.
+	// file_path(9): field IS a path — skip abs_path.
+	// signature(13): function signatures may reference paths — skip abs_path.
+	// query_text(16): internal embedding search key, not user input. Skip all patterns.
+	textFields: map[int][]string{
+		4:  {"abs_path", "env_secret", "neo4j_cred"},
+		9:  {"abs_path"},
+		13: {"abs_path"},
+		16: {"abs_path", "api_key", "env_secret", "email", "neo4j_cred"},
+	},
 }
 
 var tableSpecs = map[string]tableSpec{
@@ -183,7 +194,7 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 		SpaceID:       cfg.SpaceID,
 		MDEMGVersion:  version,
 		MDEMGCommit:   commit,
-		SchemaVersion: 7,
+		SchemaVersion: 8,
 		ExportedAt:    now.Format(time.RFC3339),
 		DataRange: ExportDataRange{
 			From: cfg.From.Format(time.RFC3339),
@@ -208,6 +219,21 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 		}
 
 		slog.Info("exporting table", "table", tableName, "space_id", cfg.SpaceID)
+
+		// Log per-field privacy scan configuration (avoid silent skips)
+		for colIdx, skipPats := range spec.textFields {
+			colName := "?"
+			if colIdx < len(spec.columns) {
+				colName = spec.columns[colIdx]
+			}
+			if len(skipPats) > 0 {
+				slog.Info("privacy scan: patterns skipped",
+					"table", tableName,
+					"column", colName,
+					"skipped_patterns", skipPats,
+				)
+			}
+		}
 
 		result, violations, err := exportTable(ctx, pool, cfg, tableName, spec, tmpDir)
 		if err != nil {

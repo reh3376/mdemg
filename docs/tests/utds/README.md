@@ -21,7 +21,7 @@ docs/tests/utds/
 ## Key Constraints
 
 - `privacy_scrub_violations == 0` — hard gate, any PII makes the export invalid
-- `schema_version >= 7` — minimum TSDB schema version
+- `schema_version >= 8` — minimum TSDB schema version (migration 008: instance_id)
 - `export_id` must match pattern `^exp-`
 - SHA-256 checksums must match actual file contents
 - Row counts must match actual JSONL line counts

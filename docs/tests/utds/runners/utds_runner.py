@@ -47,6 +47,7 @@ EXPECTED_COLUMNS = {
         "error", "quality", "quality_source", "used_for_train", "dataset_ver",
         "guidance_id", "source_path", "retrieval_node_ids", "retrieval_scores",
         "oracle_node_id", "system_prompt_hash",
+        "instance_id",
     },
     "retrieval_events": {
         "time", "event_id", "space_id", "call_site", "query_text", "query_hash",
@@ -56,6 +57,7 @@ EXPECTED_COLUMNS = {
         "result_node_ids", "result_scores", "result_count",
         "guidance_id", "downstream_quality",
         "recall_latency_ms", "rerank_latency_ms", "total_latency_ms",
+        "instance_id",
     },
     "embedding_events": {
         "time", "event_id", "event_type", "space_id", "text_content", "text_hash",
@@ -63,6 +65,7 @@ EXPECTED_COLUMNS = {
         "chunk_start", "chunk_end", "package_name", "signature", "tags",
         "call_site", "query_text", "model_name", "provider", "dimensions",
         "latency_ms", "cached", "node_id",
+        "instance_id",
     },
 }
 
@@ -151,12 +154,12 @@ def validate_manifest_against_schema(manifest: Dict[str, Any], schema: Dict[str,
         else:
             results.append(CheckResult(f"{fld}_present", False, f"{fld} is empty"))
 
-    # schema_version >= 7
+    # schema_version >= 8 (migration 008 adds instance_id)
     sv = manifest.get("schema_version", 0)
-    if isinstance(sv, int) and sv >= 7:
+    if isinstance(sv, int) and sv >= 8:
         results.append(CheckResult("schema_version", True, f"Schema version: {sv}"))
     else:
-        results.append(CheckResult("schema_version", False, f"Schema version must be >= 7, got: {sv}"))
+        results.append(CheckResult("schema_version", False, f"Schema version must be >= 8, got: {sv}"))
 
     # exported_at format (ISO 8601)
     ea = manifest.get("exported_at", "")

@@ -5,7 +5,7 @@
   "space_id": "mdemg-dev",
   "mdemg_version": "edge-c579fdc",
   "mdemg_commit": "c579fdc",
-  "schema_version": 7,
+  "schema_version": 8,
   "exported_at": "2026-04-01T14:30:22Z",
   "data_range": {
     "from": "2026-03-31T10:41:49Z",
@@ -21,7 +21,8 @@
         "latency_ms", "tokens_in", "tokens_out", "model_name", "provider",
         "error", "quality", "quality_source", "used_for_train", "dataset_ver",
         "guidance_id", "source_path", "retrieval_node_ids", "retrieval_scores",
-        "oracle_node_id", "system_prompt_hash"
+        "oracle_node_id", "system_prompt_hash",
+        "instance_id"
       ],
       "task_names": ["retrieval.rerank_cross", "hidden.reclassify"],
       "system_prompt_hashes": [
@@ -39,7 +40,8 @@
         "rerank_node_ids", "rerank_scores", "rerank_model",
         "result_node_ids", "result_scores", "result_count",
         "guidance_id", "downstream_quality",
-        "recall_latency_ms", "rerank_latency_ms", "total_latency_ms"
+        "recall_latency_ms", "rerank_latency_ms", "total_latency_ms",
+        "instance_id"
       ]
     },
     "embedding_events": {
@@ -50,7 +52,8 @@
         "text_length", "element_kind", "language", "file_path",
         "chunk_start", "chunk_end", "package_name", "signature", "tags",
         "call_site", "query_text", "model_name", "provider", "dimensions",
-        "latency_ms", "cached", "node_id"
+        "latency_ms", "cached", "node_id",
+        "instance_id"
       ]
     }
   },

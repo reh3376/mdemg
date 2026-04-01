@@ -35,9 +35,9 @@ func TestTableSpecs(t *testing.T) {
 		table    string
 		expected int
 	}{
-		{"llm_interactions", 26},
-		{"retrieval_events", 22},
-		{"embedding_events", 23},
+		{"llm_interactions", 27},
+		{"retrieval_events", 23},
+		{"embedding_events", 24},
 	}
 
 	for _, tt := range tests {
@@ -86,23 +86,28 @@ func TestTextFieldIndexes(t *testing.T) {
 }
 
 func TestPerFieldPrivacySkip(t *testing.T) {
-	// Verify that retrieval and embedding specs skip abs_path for path-containing fields
+	// Verify per-field privacy pattern skip configuration.
+	// Skip lists prevent false positives on code/doc content that was already scrubbed at write-time.
 	tests := []struct {
 		table   string
 		idx     int
 		colName string
 		skips   []string
 	}{
-		// LLM interactions: all fields apply all patterns (nil skip)
+		// LLM interactions: core text fields apply all patterns (nil skip)
 		{"llm_interactions", 5, "system_prompt", nil},
 		{"llm_interactions", 6, "user_prompt", nil},
-		// Retrieval events: query_text skips abs_path
+		// LLM interactions: source_path IS a file path — skip abs_path
+		{"llm_interactions", 21, "source_path", []string{"abs_path"}},
+		// Retrieval events: query_text skips abs_path (queries reference file paths)
 		{"retrieval_events", 4, "query_text", []string{"abs_path"}},
-		// Embedding events: file_path and query_text skip abs_path
-		{"embedding_events", 4, "text_content", nil},
+		// Embedding events: text_content scrubbed at write-time; skip patterns that re-trigger on scrubbed output
+		{"embedding_events", 4, "text_content", []string{"abs_path", "env_secret", "neo4j_cred"}},
 		{"embedding_events", 9, "file_path", []string{"abs_path"}},
-		{"embedding_events", 13, "signature", nil},
-		{"embedding_events", 16, "query_text", []string{"abs_path"}},
+		// Embedding events: signature may contain file paths
+		{"embedding_events", 13, "signature", []string{"abs_path"}},
+		// Embedding events: query_text is internal search key, not user input — skip all patterns
+		{"embedding_events", 16, "query_text", []string{"abs_path", "api_key", "env_secret", "email", "neo4j_cred"}},
 	}
 
 	for _, tt := range tests {
@@ -131,7 +136,7 @@ func TestExportManifestStructure(t *testing.T) {
 		InstanceID:    "test-instance",
 		SpaceID:       "test-space",
 		MDEMGVersion:  "v0.4.1",
-		SchemaVersion: 7,
+		SchemaVersion: 8,
 		ExportedAt:    time.Now().UTC().Format(time.RFC3339),
 		DataRange: ExportDataRange{
 			From: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
@@ -155,8 +160,8 @@ func TestExportManifestStructure(t *testing.T) {
 	if manifest.UTDSVersion != "1.0.0" {
 		t.Errorf("unexpected UTDS version: %s", manifest.UTDSVersion)
 	}
-	if manifest.SchemaVersion < 7 {
-		t.Errorf("schema version must be >= 7, got: %d", manifest.SchemaVersion)
+	if manifest.SchemaVersion < 8 {
+		t.Errorf("schema version must be >= 8, got: %d", manifest.SchemaVersion)
 	}
 	if manifest.Quality.PrivacyScrubViolations != 0 {
 		t.Error("privacy violations should be 0")

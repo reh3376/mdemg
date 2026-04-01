@@ -41,7 +41,7 @@ def _build_valid_manifest(tables=None, privacy_violations=0):
         "space_id": "test-space",
         "mdemg_version": "v0.4.1",
         "mdemg_commit": "abcdef1",
-        "schema_version": 7,
+        "schema_version": 8,
         "exported_at": "2026-04-01T12:00:00Z",
         "data_range": {"from": "2026-04-01T00:00:00Z", "to": "2026-04-01T12:00:00Z"},
         "tables": tables or {
