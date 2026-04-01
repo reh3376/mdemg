@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-03-30
+**Date:** 2026-04-01
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -45,11 +45,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
 - Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
 - FT Infrastructure Sprint — COMPLETE (4 phases: A=SanitizeResponse+prompt hash, B=RAFT context enrichment, C=ULTS spec framework, D=embedding/retrieval data collection)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-03-30
-- Latest releases: CLI v0.3.4, menubar v1.8.0, sidebar v0.3.0
+- CI: ALL GREEN (push + pull_request + release) as of 2026-04-01
+- Latest releases: CLI v0.4.1, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-03-30) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-04-01) ===
+- ✅ J17 Comprehension Pipeline Fix + Trust Rebalance (2026-04-01) — 5 independent pipeline breaks fixed:
+  - Sigmoid midpoint 2.0→1.5 (retrieval_source.go + consulting/service.go): scores 1.0-1.5 now pass JiminyMinConfidence
+  - NLI guard broadened: allows heuristic comprehension for non-constraint items
+  - constraint_code propagation in hidden layer (constraint_nodes.go)
+  - Trust relevance filter (trustRelevanceThreshold=0.5): prevents "not applicable" items from decaying trust
+  - Trust parameters rebalanced: initial 0.65, threshold 0.75, boost +0.05/follow, decay -0.02/ignore (T1 achievable in 3 follows)
+- ✅ TSDB Trust Score Historization (2026-04-01) — 4 new gauges (avg/min/max trust score, session count) wired through 8 files: TrustScorer.Aggregates() → ProtocolMetrics → adapter → publishProtocolGauges → TSDB flush. J17 Grafana dashboard: Trust Score row + trend panel.
+- ✅ DATA-GOV Sprint 0 (2026-03-31) — Fixed TSDB_ENABLED=false in Docker deployments (env var + auto-migrate support)
+- ✅ DATA-GOV Sprint 1 (2026-03-31) — Pipeline gap fixes: system prompt coverage, call_site propagation, PROMPT-COV
+- ✅ DATA-GOV Sprint 2 (2026-04-01) — Python diagnostic script (scripts/tsdb_data_review.py): 7-section data quality report across all 8 TSDB tables. Text + JSON output. Privacy scrub verification. 17 unit tests. End-to-end verified against live TSDB.
 - ✅ Docker Deployment Phase 3: Backup UI + Distribution + Cleanup (DOCKER-P3) — 9th Backup tab (trigger/list/restore/delete), credential prompts in `mdemg init`, enhanced post-install summary, removed Windows build/Scoop/nfpms from release, archived 5 submodules, deprecated `db start`/`db stop`, 221 Playwright tests
 - ✅ Docker Deployment Phase 2: Browser Dashboard (DOCKER-P2) — 6-tab browser UI at /ui/ served via embed.FS, admin/config + admin/logs endpoints, LogRingBuffer, Catppuccin Mocha theme, Grafana deduplication (link don't duplicate)
 - ✅ FT Infrastructure Sprint (2026-03-30) — 4 phases for fine-tuning data quality:
@@ -96,8 +106,9 @@ WHAT REMAINS TO BE DONE:
 - Phase 50 Public Readiness COMPLETE (MIT license exists, SemVer active at v0.3.0, standard Go layout)
 
 REPO STATE:
-- Branch: reh3376_dev01 — uncommitted changes from TSDB sprint + J17 feedback loop fix + Training Data sprint (60+ files)
-- TSDB schema version: 5 (migration 005: interaction enrichment columns)
+- Branch: reh3376_dev01 — clean (all changes committed and pushed, CI green)
+- TSDB schema version: 7 (migration 007: RAFT context columns)
+- Tag: v0.4.1
 - Binary: bin/mdemg (rebuild with: go build -o bin/mdemg ./cmd/mdemg)
 - CMS: MDEMG server on localhost:9999, Neo4j via docker compose (volume: mdemg_neo4j_data, 34K+ nodes)
 - CRITICAL: ALWAYS use `docker compose up -d neo4j` to preserve CMS data. Never `mdemg db start` for CMS.
@@ -386,7 +397,16 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | SVC-RES | Service Resilience & Ingest Hardening | ✅ | 2026-03-30 | Hook auto-recovery (auto-start, visible warnings, error logging), ingest JSONL buffer (buffer/flush on server down), prune-guard detection, protected overflow (path-based ingest), macOS LaunchAgent supervision (3 plists), `mdemg service` CLI (5 subcommands), hook template sync (5/5 hooks registered with matchers), `mdemg data audit` |
 | TD-SPRINT | Training Data Collection Sprint | ✅ | 2026-03-30 | TD-ENRICH (InteractionRecord 6 new fields, migration 005, TSDB schema v5), TD-CORR (guidance ID correlation via context.WithValue), TD-SRC (source document linkage in consulting classifier), TD-SCRUB (privacy scrubber, 5 regex categories), TD-QUAL (Python quality annotation pipeline + report), TD-CLI (`mdemg data` CLI with 5 subcommands), TD-BACKUP (JSONL backup integration in TSDB backup service) |
 | TD-VERIFY | Training Data Capture Verification | ✅ | 2026-03-30 | 17 tests across 5 files: column-position verification (26+23+22 columns), privacy scrub completeness (5 patterns across 4 fields), scrub asymmetry (embedding TextContent only, not QueryText), response sanitization JSON round-trip, empty TaskName regression guard, batch ordering, training column initialization. `mockPool` upgraded to capture CopyFrom values. Doc: `docs/features/training-data-capture-verification.md` |
-| DOCKER-P1 | Docker Deployment — Phase 1 | 🔄 | 2026-03-30 | Docker Compose consolidation (5 services, parameterized ports, neo4j:5 community, multi-instance via COMPOSE_PROJECT_NAME). Docker image CI (GHCR multi-arch). `mdemg init` Docker-first (6-port scan, .env generation, compose up, health check). Dockerfile.prod healthcheck fix. `docs/user/quickstart-docker.md`. |
+| DOCKER-P1 | Docker Deployment — Phase 1 | ✅ | 2026-03-30 | Docker Compose consolidation (5 services, parameterized ports, neo4j:5 community, multi-instance via COMPOSE_PROJECT_NAME). Docker image CI (GHCR multi-arch). `mdemg init` Docker-first (6-port scan, .env generation, compose up, health check). Dockerfile.prod healthcheck fix. `docs/user/quickstart-docker.md`. |
+| DOCKER-P2 | Docker Deployment — Phase 2: Browser Dashboard | ✅ | 2026-03-30 | 6-tab browser UI at /ui/ via embed.FS, admin/config + admin/logs endpoints, LogRingBuffer, Catppuccin Mocha theme, Grafana deduplication |
+| DOCKER-P2b | Docker Deployment — Phase 2b: UI/UX Overhaul | ✅ | 2026-03-30 | Field mapping fixes, RSIC service controls, server restart, editable config, Plugins + Features tabs, 193 Playwright tests |
+| DOCKER-P3 | Docker Deployment — Phase 3: Backup UI + Distribution | ✅ | 2026-03-31 | Backup tab (9th), credential prompts, distribution cleanup, 5 submodules archived, 221 Playwright tests |
+| FT-INFRA | FT Infrastructure Sprint | ✅ | 2026-03-30 | Phase A: SanitizeResponse, Phase B: RAFT context, Phase C: ULTS specs, Phase D: embedding/retrieval data collection. Migrations 006+007, TSDB schema v7 |
+| DATA-GOV-S0 | DATA-GOV Sprint 0: TSDB_ENABLED Fix | ✅ | 2026-03-31 | TSDB_ENABLED=true in Docker compose, TSDB_AUTO_MIGRATE env var support. `docs/features/tsdb-data-governance.md` |
+| DATA-GOV-S1 | DATA-GOV Sprint 1: Pipeline Gaps | ✅ | 2026-03-31 | System prompt coverage, call_site propagation, PROMPT-COV (system prompt hash + coverage) |
+| DATA-GOV-S2 | DATA-GOV Sprint 2: Diagnostic Script | ✅ | 2026-04-01 | `scripts/tsdb_data_review.py` — 7-section diagnostic (schema, metrics, LLM, embeddings, retrieval, FT, cross-cutting). Text+JSON output. Privacy scrub verification. 17 unit tests. E2E verified |
+| J17-COMP | J17 Comprehension Pipeline Fix | ✅ | 2026-04-01 | 5 independent breaks: sigmoid midpoint, NLI guard, constraint_code propagation, trust relevance filter, trust parameter rebalance. T1 compression achievable in single session |
+| J17-TRUST | TSDB Trust Score Historization | ✅ | 2026-04-01 | 4 new TSDB gauges (avg/min/max trust, session count), Grafana J17 dashboard trust row + trend panel |
 
 ### Phase Numbering Convention
 
@@ -409,7 +429,11 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | DDR | — | Deep-Dive Remediation Sprint |
 | TD-SPRINT | — | Training Data Collection Sprint (7 sub-phases: TD-ENRICH, TD-CORR, TD-SRC, TD-SCRUB, TD-QUAL, TD-CLI, TD-BACKUP) |
 | TD-VERIFY | — | Training Data Capture Verification (17 tests: column positions, privacy scrub, response sanitization, metadata completeness) |
-| DOCKER-P1 | — | Docker Deployment Phase 1 (compose consolidation, image CI, init Docker-first, quickstart docs) |
+| DOCKER-P1/P2/P2b/P3 | — | Docker Deployment Phases 1-3 (compose, browser UI, UI/UX overhaul, backup tab + distribution) |
+| FT-INFRA | — | FT Infrastructure Sprint (SanitizeResponse, RAFT context, ULTS specs, embedding/retrieval collection) |
+| DATA-GOV-S0/S1/S2 | — | Data Governance Sprints 0-2 (TSDB_ENABLED fix, pipeline gaps, diagnostic script) |
+| J17-COMP | — | J17 Comprehension Pipeline Fix (5 breaks: sigmoid, NLI guard, constraint_code, trust filter, trust rebalance) |
+| J17-TRUST | — | TSDB Trust Score Historization (4 gauges, Grafana dashboard) |
 
 ---
 
@@ -472,12 +496,12 @@ Source plan: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN.md`
 | Phase | Title | Status | Notes |
 |-------|-------|--------|-------|
 | 1 | LLM Interaction Logger | ✅ COMPLETE | PRs #217-#219. 16 consumers, TSDB writer, scrubber, quality pipeline, data CLI |
-| 2 | Think Mode + Response Sanitization | ⬜ NOT STARTED | Critical path: `SanitizeResponse(StripThinkBlock)` — 9/16 consumers break without it. Needed before any local Qwen3 usage |
-| 3 | vllm-mlx Integration | ⬜ NOT STARTED | Blocked on Phase 2 |
+| 2 | Think Mode + Response Sanitization | ✅ COMPLETE | FT-INFRA Phase A: `SanitizeResponse(StripThinkBlock + StripCodeFence)`, 11 call sites, system prompt hash |
+| 3 | vllm-mlx Integration | ⬜ NOT STARTED | Unblocked by Phase 2 completion |
 | 4+ | SFT/GRPO/DPO training | ⬜ BLOCKED | Requires weeks of data accumulation from Phase 1 activation |
 
-**Next actionable step**: Phase 2 (SanitizeResponse) — implement after sufficient training data accumulates.
-**Data collection**: Activated 2026-03-30. Expect 2-4 weeks minimum before sufficient volume for fine-tuning.
+**Next actionable step**: Phase 3 (vllm-mlx integration) — unblocked now that Phase 2 is complete.
+**Data collection**: Activated 2026-03-30. Accumulating since — expect sufficient volume by mid-April 2026.
 
 ---
 
@@ -593,6 +617,12 @@ curl -s -X POST http://localhost:9999/v1/conversation/resume \
 ./bin/mdemg data annotate --dry-run                               # Preview quality annotation
 ./bin/mdemg data quality                                          # Quality coverage report
 
+# === TSDB Data Quality ===
+bash scripts/tsdb_spot_check.sh                                   # Quick spot check (bash)
+cd scripts && uv run python tsdb_data_review.py                   # Full diagnostic (text)
+cd scripts && uv run python tsdb_data_review.py --format both     # Text + JSON output
+cd scripts && uv run python tsdb_data_review.py --verbose         # Verbose with detail
+
 # === Claude .md File Ingestion ===
 ./bin/mdemg ingest-claude-md --space-id mdemg-dev              # Normal (hash skip)
 ./bin/mdemg ingest-claude-md --space-id mdemg-dev --force      # Force all
@@ -607,4 +637,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-03-30 — Gap Analysis Phase 4 COMPLETE (GAP-13/14 deferred). Training data collection activated (NEURAL_DATA_COLLECTION + TSDB_BACKUP_ENABLED). Dependabot alerts resolved (jsonparser v1.1.2, pygments 2.20.0). Fine-tuning pipeline status documented (Phase 2 SanitizeResponse is next). CI: ALL GREEN.*
+*Last updated: 2026-04-01 — DATA-GOV Sprint 2 COMPLETE (diagnostic script). J17 comprehension pipeline 5-break fix + trust rebalance. TSDB trust score historization (4 gauges + Grafana). FT-INFRA Sprint complete (Phase 2 SanitizeResponse done). Docker P1-P3 complete. Tag v0.4.1. TSDB schema v7. CI: ALL GREEN.*
