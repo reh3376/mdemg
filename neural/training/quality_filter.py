@@ -56,7 +56,7 @@ def load_ults_specs(ults_dir: str | None) -> dict[str, dict[str, Any]]:
     """Load ULTS specs to get valid system_prompt_hashes and output_schemas.
 
     Returns dict keyed by task_name with keys:
-        - system_prompt_hash: str or None
+        - system_prompt_hash: str, list[str], or None
         - output_schema: dict or None
     """
     specs: dict[str, dict[str, Any]] = {}
@@ -96,8 +96,15 @@ def validate_output_schema(response: str, schema: dict[str, Any]) -> bool:
     """Basic JSON structure validation against an output_schema.
 
     Checks: response is valid JSON and has all required top-level keys.
+    String-type schemas accept any non-empty response without JSON parsing.
     Does NOT use jsonschema library — keeps this zero-dependency.
     """
+    schema_type = schema.get("type", "")
+
+    # String-type schemas: response is plain text, not JSON
+    if schema_type == "string":
+        return bool(response and response.strip())
+
     try:
         parsed = json.loads(response)
     except (json.JSONDecodeError, TypeError):
@@ -110,25 +117,38 @@ def validate_output_schema(response: str, schema: dict[str, Any]) -> bool:
     return len(required) == 0
 
 
+DEDUP_MODES = {"prompt", "prompt-response", "trace"}
+
+
 def run_filter(
     input_path: str,
     output_path: str | None,
     ults_dir: str | None = None,
     dry_run: bool = False,
+    dedup_key: str = "prompt",
 ) -> dict[str, Any]:
     """Run the quality filter pipeline.
+
+    dedup_key modes:
+        prompt: SHA-256(system_prompt + user_prompt) — keeps earliest response (SFT)
+        prompt-response: SHA-256(system_prompt + user_prompt + response) — keeps diverse responses (DPO)
+        trace: SHA-256(trace_id) — no dedup (debugging only)
 
     Returns a filter report dict.
     """
     specs = load_ults_specs(ults_dir)
-    known_hashes = {
-        s["system_prompt_hash"] for s in specs.values()
-        if s.get("system_prompt_hash") and s["system_prompt_hash"] != "dynamic"
-    }
-    dynamic_prompt_tasks = {
-        task for task, s in specs.items()
-        if s.get("system_prompt_hash") == "dynamic"
-    }
+    known_hashes: set[str] = set()
+    dynamic_prompt_tasks: set[str] = set()
+    for task, s in specs.items():
+        hash_val = s.get("system_prompt_hash")
+        if hash_val == "dynamic":
+            dynamic_prompt_tasks.add(task)
+        elif isinstance(hash_val, list):
+            for h in hash_val:
+                if h and h != "dynamic":
+                    known_hashes.add(h)
+        elif hash_val:
+            known_hashes.add(hash_val)
 
     # Track exclusion reasons
     excluded = {
@@ -177,10 +197,16 @@ def run_filter(
                 excluded["error_present"] += 1
                 continue
 
-            # Gate 3: Non-duplicate (SHA-256 of system_prompt + user_prompt)
+            # Gate 3: Non-duplicate (dedup key determines hash input)
             sp = record.get("system_prompt", "") or ""
             up = record.get("user_prompt", "") or ""
-            dup_hash = hashlib.sha256((sp + up).encode()).hexdigest()
+            if dedup_key == "prompt-response":
+                dup_input = sp + up + response
+            elif dedup_key == "trace":
+                dup_input = record.get("trace_id", "") or ""
+            else:
+                dup_input = sp + up
+            dup_hash = hashlib.sha256(dup_input.encode()).hexdigest()
             if dup_hash in seen_hashes:
                 excluded["duplicate_prompt"] += 1
                 continue
@@ -247,6 +273,12 @@ def main():
     parser.add_argument("--ults-dir", help="Directory containing ULTS spec files")
     parser.add_argument("--report", help="Output filter report JSON path")
     parser.add_argument("--dry-run", action="store_true", help="Count only, do not write output")
+    parser.add_argument(
+        "--dedup-key",
+        choices=sorted(DEDUP_MODES),
+        default="prompt",
+        help="Dedup hash mode: prompt (SFT), prompt-response (DPO), trace (debug). Default: prompt",
+    )
     args = parser.parse_args()
 
     if not args.output and not args.dry_run:
@@ -257,6 +289,7 @@ def main():
         output_path=args.output,
         ults_dir=args.ults_dir,
         dry_run=args.dry_run,
+        dedup_key=args.dedup_key,
     )
 
     print(f"Input:  {report['input_rows']} rows")

@@ -58,4 +58,7 @@ type InteractionRecord struct {
 	// Quality (populated post-hoc by annotation job)
 	Quality       *float64 // 0.0-1.0, nil = not yet annotated
 	QualitySource string   // "feedback_outcome", "llm_judge", "deterministic", "human"
+
+	// Multi-instance isolation
+	InstanceID string // Identifies which MDEMG instance produced this record
 }

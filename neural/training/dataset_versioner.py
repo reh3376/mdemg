@@ -86,8 +86,17 @@ def load_records(input_dirs: list[str]) -> list[dict[str, Any]]:
     return records
 
 
-def deduplicate(records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
-    """Deduplicate by SHA-256(system_prompt + user_prompt), keeping first by time."""
+def deduplicate(
+    records: list[dict[str, Any]],
+    dedup_key: str = "prompt",
+) -> tuple[list[dict[str, Any]], int]:
+    """Deduplicate records, keeping first by time.
+
+    dedup_key modes:
+        prompt: SHA-256(system_prompt + user_prompt) — SFT training
+        prompt-response: SHA-256(system_prompt + user_prompt + response) — DPO/diversity
+        trace: SHA-256(trace_id) — no dedup (debugging only)
+    """
     # Sort by time first so "first" is deterministic
     records.sort(key=lambda r: r.get("time", ""))
 
@@ -98,7 +107,14 @@ def deduplicate(records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], in
     for rec in records:
         sp = rec.get("system_prompt", "") or ""
         up = rec.get("user_prompt", "") or ""
-        h = hashlib.sha256((sp + up).encode()).hexdigest()
+        if dedup_key == "prompt-response":
+            resp = rec.get("response", "") or ""
+            dedup_input = sp + up + resp
+        elif dedup_key == "trace":
+            dedup_input = rec.get("trace_id", "") or ""
+        else:
+            dedup_input = sp + up
+        h = hashlib.sha256(dedup_input.encode()).hexdigest()
         if h in seen:
             duplicates += 1
             continue
@@ -205,6 +221,8 @@ def run_versioner(
     min_per_task: int = 10,
     exogenous_ratio: float = 0.4,
     raft_ratio: float = 0.8,
+    dedup_key: str = "prompt",
+    first_cycle: bool = False,
 ) -> dict[str, Any]:
     """Run the dataset versioning pipeline. Returns the dataset manifest."""
     os.makedirs(output_dir, exist_ok=True)
@@ -217,7 +235,7 @@ def run_versioner(
         raise ValueError("No records found in input directories")
 
     # Step 2-3: Deduplicate
-    unique_records, duplicates_removed = deduplicate(all_records)
+    unique_records, duplicates_removed = deduplicate(all_records, dedup_key=dedup_key)
 
     # Step 4: Temporal sort (already done in deduplicate, but re-sort for safety)
     unique_records.sort(key=lambda r: r.get("time", ""))
@@ -239,10 +257,15 @@ def run_versioner(
         if count < min_per_task:
             warnings.append(f"Task '{task}' has only {count} train records (min: {min_per_task})")
 
-    # Step 7: Exogenous ratio (placeholder — requires used_for_train field)
+    # Step 7: Exogenous ratio
     total_for_ratio = len(unique_records)
-    exogenous_count = sum(1 for r in unique_records if not r.get("used_for_train", False))
-    actual_exogenous = exogenous_count / total_for_ratio if total_for_ratio > 0 else 1.0
+    if first_cycle:
+        # First training cycle: all data is exogenous by definition
+        actual_exogenous = 1.0
+        print("INFO: --first-cycle: all data treated as exogenous (no prior training)")
+    else:
+        exogenous_count = sum(1 for r in unique_records if not r.get("used_for_train", False))
+        actual_exogenous = exogenous_count / total_for_ratio if total_for_ratio > 0 else 1.0
 
     # Step 8-9: Format convert + write splits
     train_meta = write_split(train, os.path.join(output_dir, "train.jsonl"), raft_ratio)
@@ -312,6 +335,14 @@ def main():
     parser.add_argument("--min-per-task", type=int, default=10, help="Minimum records per task (default: 10)")
     parser.add_argument("--exogenous-ratio", type=float, default=0.4, help="Minimum exogenous ratio (default: 0.4)")
     parser.add_argument("--raft-ratio", type=float, default=0.8, help="RAFT context inclusion ratio (default: 0.8)")
+    parser.add_argument(
+        "--dedup-key",
+        choices=["prompt", "prompt-response", "trace"],
+        default="prompt",
+        help="Dedup hash mode: prompt (SFT), prompt-response (DPO), trace (debug). Default: prompt",
+    )
+    parser.add_argument("--first-cycle", action="store_true",
+                        help="First training cycle: skip exogenous ratio check (all data is exogenous)")
     args = parser.parse_args()
 
     manifest = run_versioner(
@@ -324,6 +355,8 @@ def main():
         min_per_task=args.min_per_task,
         exogenous_ratio=args.exogenous_ratio,
         raft_ratio=args.raft_ratio,
+        dedup_key=args.dedup_key,
+        first_cycle=args.first_cycle,
     )
 
     print(f"Dataset {manifest['version']} created: {args.output_dir}")

@@ -75,11 +75,50 @@ func TestTextFieldIndexes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.table+"_"+tt.colName, func(t *testing.T) {
 			spec := tableSpecs[tt.table]
-			if !spec.textFields[tt.idx] {
+			if _, ok := spec.textFields[tt.idx]; !ok {
 				t.Errorf("column %d (%s) should be a text field in %s", tt.idx, tt.colName, tt.table)
 			}
 			if spec.columns[tt.idx] != tt.colName {
 				t.Errorf("column %d should be %s but is %s", tt.idx, tt.colName, spec.columns[tt.idx])
+			}
+		})
+	}
+}
+
+func TestPerFieldPrivacySkip(t *testing.T) {
+	// Verify that retrieval and embedding specs skip abs_path for path-containing fields
+	tests := []struct {
+		table   string
+		idx     int
+		colName string
+		skips   []string
+	}{
+		// LLM interactions: all fields apply all patterns (nil skip)
+		{"llm_interactions", 5, "system_prompt", nil},
+		{"llm_interactions", 6, "user_prompt", nil},
+		// Retrieval events: query_text skips abs_path
+		{"retrieval_events", 4, "query_text", []string{"abs_path"}},
+		// Embedding events: file_path and query_text skip abs_path
+		{"embedding_events", 4, "text_content", nil},
+		{"embedding_events", 9, "file_path", []string{"abs_path"}},
+		{"embedding_events", 13, "signature", nil},
+		{"embedding_events", 16, "query_text", []string{"abs_path"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.table+"_"+tt.colName, func(t *testing.T) {
+			spec := tableSpecs[tt.table]
+			skip, ok := spec.textFields[tt.idx]
+			if !ok {
+				t.Fatalf("column %d (%s) not in textFields for %s", tt.idx, tt.colName, tt.table)
+			}
+			if len(skip) != len(tt.skips) {
+				t.Fatalf("expected skip patterns %v, got %v", tt.skips, skip)
+			}
+			for i, s := range tt.skips {
+				if skip[i] != s {
+					t.Errorf("skip[%d] expected %q, got %q", i, s, skip[i])
+				}
 			}
 		})
 	}

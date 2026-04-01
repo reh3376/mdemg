@@ -251,6 +251,30 @@ class TestQualityFilter(unittest.TestCase):
         self.assertEqual(report["output_rows"], 1)
         self.assertEqual(report["excluded"]["stale_prompt_hash"], 0)
 
+    def test_multi_hash_records_pass_gate6(self):
+        """Records from multi-hash tasks should pass if hash matches any in the array."""
+        specs_dir = os.path.join(self.tmpdir, "specs")
+        os.makedirs(specs_dir)
+        spec = {
+            "ults_version": "1.0.0",
+            "task": {"name": "hidden.name_emergence"},
+            "prompt": {"system_prompt_hash": ["aaa111" + "a" * 58, "bbb222" + "b" * 58]},
+        }
+        with open(os.path.join(specs_dir, "emergence.ults.json"), "w") as f:
+            json.dump(spec, f)
+
+        records = [
+            _valid_record(
+                task_name="hidden.name_emergence",
+                system_prompt_hash="bbb222" + "b" * 58,
+                user_prompt="Name this emergent concept",
+            ),
+        ]
+        _write_jsonl(records, self.input_path)
+        report = run_filter(self.input_path, self.output_path, ults_dir=specs_dir)
+        self.assertEqual(report["output_rows"], 1)
+        self.assertEqual(report["excluded"]["stale_prompt_hash"], 0)
+
     def test_adversarial_all_bad_records(self):
         """All records should be excluded."""
         records = [
@@ -294,6 +318,19 @@ class TestULTSSpecLoading(unittest.TestCase):
         if "hidden.reclassify" in specs:
             h = specs["hidden.reclassify"]["system_prompt_hash"]
             self.assertEqual(h, "dynamic")
+
+    def test_multi_hash_array_loaded(self):
+        """Tasks with array-type system_prompt_hash should load correctly."""
+        specs_dir = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "docs", "tests", "ults", "specs"
+        )
+        if not os.path.isdir(specs_dir):
+            self.skipTest("ULTS specs dir not found")
+        specs = load_ults_specs(specs_dir)
+        if "hidden.name_emergence" in specs:
+            h = specs["hidden.name_emergence"]["system_prompt_hash"]
+            self.assertIsInstance(h, list)
+            self.assertEqual(len(h), 2)
 
     def test_nonexistent_dir_returns_empty(self):
         specs = load_ults_specs("/nonexistent/path")

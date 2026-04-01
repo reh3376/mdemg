@@ -221,9 +221,26 @@ def validate_schema(spec: Dict[str, Any], spec_path: str) -> List[CheckResult]:
                 message="No unknown prompt fields",
             ))
 
-        # Validate hash format
+        # Validate hash format (string or array of strings)
         hash_val = prompt.get("system_prompt_hash", "")
-        if hash_val and re.match(r"^([a-f0-9]{64}|dynamic)$", hash_val):
+        if isinstance(hash_val, list):
+            all_valid = all(
+                isinstance(h, str) and re.match(r"^[a-f0-9]{64}$", h)
+                for h in hash_val
+            )
+            if all_valid and len(hash_val) >= 2:
+                results.append(CheckResult(
+                    name="prompt_hash_format",
+                    passed=True,
+                    message=f"Hash array: {len(hash_val)} entries",
+                ))
+            else:
+                results.append(CheckResult(
+                    name="prompt_hash_format",
+                    passed=False,
+                    message=f"Invalid hash array: {hash_val!r}",
+                ))
+        elif hash_val and re.match(r"^([a-f0-9]{64}|dynamic)$", hash_val):
             results.append(CheckResult(
                 name="prompt_hash_format",
                 passed=True,
@@ -256,19 +273,8 @@ def validate_schema(spec: Dict[str, Any], spec_path: str) -> List[CheckResult]:
     return results
 
 
-def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckResult]:
-    """Verify system_prompt_hash against actual source code."""
-    prompt = spec.get("prompt", {})
-    hash_val = prompt.get("system_prompt_hash", "")
-    source = prompt.get("system_prompt_source", "")
-
-    if not hash_val or hash_val == "dynamic" or not source:
-        return CheckResult(
-            name="prompt_hash_verify",
-            passed=True,
-            message=f"Skipped: {'dynamic prompt' if hash_val == 'dynamic' else 'no hash specified'}",
-        )
-
+def _verify_single_hash(hash_val: str, source: str, repo_root: str) -> CheckResult:
+    """Verify a single system_prompt_hash against its source file."""
     # Parse source location (file:line)
     parts = source.rsplit(":", 1)
     if len(parts) != 2:
@@ -286,13 +292,10 @@ def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckRe
             message=f"Source file not found: {file_path}",
         )
 
-    # Read source file and look for the constant
     try:
         with open(file_path) as f:
             content = f.read()
 
-        # Extract Go string constants (backtick or double-quote)
-        # Look for const/var declaration near the specified line
         line_num = int(parts[1])
         lines = content.split("\n")
 
@@ -303,12 +306,9 @@ def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckRe
                 message=f"Line {line_num} exceeds file length — hash verification skipped",
             )
 
-        # Try to find a backtick-delimited string starting near the line
-        # This is a best-effort heuristic — Go string extraction is complex
         search_start = max(0, line_num - 2)
         search_region = "\n".join(lines[search_start:])
 
-        # Find backtick strings
         backtick_match = re.search(r'`([^`]+)`', search_region)
         if backtick_match:
             prompt_text = backtick_match.group(1)
@@ -343,6 +343,53 @@ def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckRe
             passed=False,
             message=f"Error reading source: {e}",
         )
+
+
+def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckResult]:
+    """Verify system_prompt_hash against actual source code.
+
+    Handles both string and array-type hashes. For arrays, each hash is
+    verified against the corresponding source entry.
+    """
+    prompt = spec.get("prompt", {})
+    hash_val = prompt.get("system_prompt_hash", "")
+    source = prompt.get("system_prompt_source", "")
+
+    if not hash_val or hash_val == "dynamic" or not source:
+        return CheckResult(
+            name="prompt_hash_verify",
+            passed=True,
+            message=f"Skipped: {'dynamic prompt' if hash_val == 'dynamic' else 'no hash specified'}",
+        )
+
+    # Array-type: verify each hash against its corresponding source
+    if isinstance(hash_val, list):
+        sources = source if isinstance(source, list) else [source] * len(hash_val)
+        if len(hash_val) != len(sources):
+            return CheckResult(
+                name="prompt_hash_verify",
+                passed=False,
+                message=f"Hash array length ({len(hash_val)}) != source array length ({len(sources)})",
+            )
+        failures = []
+        for h, s in zip(hash_val, sources):
+            result = _verify_single_hash(h, s, repo_root)
+            if not result.passed:
+                failures.append(result.message)
+        if failures:
+            return CheckResult(
+                name="prompt_hash_verify",
+                passed=False,
+                message=f"Array hash verification failed: {'; '.join(failures)}",
+            )
+        return CheckResult(
+            name="prompt_hash_verify",
+            passed=True,
+            message=f"All {len(hash_val)} hashes verified",
+        )
+
+    # String-type: single hash verification
+    return _verify_single_hash(hash_val, source, repo_root)
 
 
 def check_spec_completeness(found_tasks: set) -> List[CheckResult]:

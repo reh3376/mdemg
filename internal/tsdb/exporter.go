@@ -91,7 +91,7 @@ type ExportResult struct {
 // tableSpec defines the columns and text fields for a table.
 type tableSpec struct {
 	columns    []string
-	textFields map[int]bool // column indexes that need privacy scanning
+	textFields map[int][]string // column index → pattern names to SKIP (nil = apply all)
 }
 
 var llmInteractionsSpec = tableSpec{
@@ -103,9 +103,10 @@ var llmInteractionsSpec = tableSpec{
 		"guidance_id", "source_path",
 		"retrieval_node_ids", "retrieval_scores", "oracle_node_id",
 		"system_prompt_hash",
+		"instance_id",
 	},
-	// Text fields needing privacy scan: system_prompt(5), user_prompt(6), response(7), think_content(8), source_path(21)
-	textFields: map[int]bool{5: true, 6: true, 7: true, 8: true, 21: true},
+	// Text fields: all 5 patterns applied (nil = skip none)
+	textFields: map[int][]string{5: nil, 6: nil, 7: nil, 8: nil, 21: nil},
 }
 
 var retrievalEventsSpec = tableSpec{
@@ -118,9 +119,10 @@ var retrievalEventsSpec = tableSpec{
 		"result_node_ids", "result_scores", "result_count",
 		"guidance_id", "downstream_quality",
 		"recall_latency_ms", "rerank_latency_ms", "total_latency_ms",
+		"instance_id",
 	},
-	// Text fields: query_text(4)
-	textFields: map[int]bool{4: true},
+	// query_text(4): skip abs_path — queries reference file paths by design
+	textFields: map[int][]string{4: {"abs_path"}},
 }
 
 var embeddingEventsSpec = tableSpec{
@@ -133,9 +135,11 @@ var embeddingEventsSpec = tableSpec{
 		"call_site", "query_text",
 		"model_name", "provider", "dimensions",
 		"latency_ms", "cached", "node_id",
+		"instance_id",
 	},
-	// Text fields: text_content(4), file_path(9), signature(13), query_text(16)
-	textFields: map[int]bool{4: true, 9: true, 13: true, 16: true},
+	// text_content(4): all patterns. file_path(9): skip abs_path (field IS a path).
+	// signature(13): all patterns. query_text(16): skip abs_path (queries reference files).
+	textFields: map[int][]string{4: nil, 9: {"abs_path"}, 13: nil, 16: {"abs_path"}},
 }
 
 var tableSpecs = map[string]tableSpec{
@@ -298,12 +302,23 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 func exportTable(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, tableName string, spec tableSpec, tmpDir string) (*ExportTable, int, error) {
 	colList := strings.Join(spec.columns, ", ")
 
-	query := fmt.Sprintf(
-		`SELECT %s FROM %s WHERE (space_id = $1 OR space_id IS NULL OR space_id = '') AND time >= $2 AND time <= $3 ORDER BY time`,
-		colList, tableName,
-	)
+	var query string
+	var args []any
+	if cfg.InstanceID != "" {
+		query = fmt.Sprintf(
+			`SELECT %s FROM %s WHERE (space_id = $1 OR space_id IS NULL OR space_id = '') AND (instance_id = $4 OR instance_id = '') AND time >= $2 AND time <= $3 ORDER BY time`,
+			colList, tableName,
+		)
+		args = []any{cfg.SpaceID, cfg.From, cfg.To, cfg.InstanceID}
+	} else {
+		query = fmt.Sprintf(
+			`SELECT %s FROM %s WHERE (space_id = $1 OR space_id IS NULL OR space_id = '') AND time >= $2 AND time <= $3 ORDER BY time`,
+			colList, tableName,
+		)
+		args = []any{cfg.SpaceID, cfg.From, cfg.To}
+	}
 
-	rows, err := pool.Query(ctx, query, cfg.SpaceID, cfg.From, cfg.To)
+	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query %s: %w", tableName, err)
 	}
@@ -344,9 +359,9 @@ func exportTable(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, tabl
 			}
 
 			// Privacy scan on text fields
-			if spec.textFields[i] {
+			if skipPatterns, ok := spec.textFields[i]; ok {
 				if s, ok := val.(string); ok && s != "" {
-					scrubbed := llmclient.ScrubString(s)
+					scrubbed := llmclient.ScrubStringExcluding(s, skipPatterns)
 					if scrubbed != s {
 						violations++
 						slog.Warn("privacy violation detected",

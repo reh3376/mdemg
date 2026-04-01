@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/user"
 	"time"
 
@@ -41,7 +42,10 @@ detected, the export is blocked and no archive is created.`,
 				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
 
-			// Resolve instance ID
+			// Resolve instance ID: flag > MDEMG_INSTANCE_ID env > {username}-{space_id}
+			if instanceID == "" {
+				instanceID = os.Getenv("MDEMG_INSTANCE_ID")
+			}
 			if instanceID == "" {
 				u, err := user.Current()
 				if err == nil {

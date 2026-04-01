@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -38,17 +39,21 @@ type EmbeddingEventRow struct {
 	Dimensions  int
 	LatencyMs   int
 	Cached      bool
-	NodeID      string
+	NodeID     string
+	InstanceID string
 }
 
 // EmbeddingEventWriter buffers embedding events and flushes them to the
 // embedding_events hypertable. Same pattern as LLMInteractionWriter.
 type EmbeddingEventWriter struct {
-	pool      poolIface
-	buffer    []EmbeddingEventRow
-	mu        sync.Mutex
-	flushTick *time.Ticker
-	done      chan struct{}
+	pool         poolIface
+	buffer       []EmbeddingEventRow
+	mu           sync.Mutex
+	flushTick    *time.Ticker
+	done         chan struct{}
+	flushSuccess atomic.Int64
+	flushFailure atomic.Int64
+	flushRows    atomic.Int64
 }
 
 // NewEmbeddingEventWriter creates a writer that auto-flushes at the given interval.
@@ -115,6 +120,7 @@ func (w *EmbeddingEventWriter) Flush(ctx context.Context) error {
 			e.CallSite, e.QueryText,
 			e.ModelName, e.Provider, e.Dimensions,
 			e.LatencyMs, e.Cached, e.NodeID,
+			e.InstanceID,
 		}
 	}
 
@@ -129,15 +135,28 @@ func (w *EmbeddingEventWriter) Flush(ctx context.Context) error {
 			"call_site", "query_text",
 			"model_name", "provider", "dimensions",
 			"latency_ms", "cached", "node_id",
+			"instance_id",
 		},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {
 		slog.Error("embedding_events: flush failed", "count", len(batch), "error", err)
+		w.flushFailure.Add(1)
 	} else {
 		slog.Debug("embedding_events: flushed", "count", len(batch))
+		w.flushSuccess.Add(1)
+		w.flushRows.Add(int64(len(batch)))
 	}
 	return err
+}
+
+// Stats returns flush operation counters for monitoring.
+func (w *EmbeddingEventWriter) Stats() FlushStats {
+	return FlushStats{
+		SuccessCount: w.flushSuccess.Load(),
+		FailureCount: w.flushFailure.Load(),
+		TotalRows:    w.flushRows.Load(),
+	}
 }
 
 // Close stops the auto-flush goroutine and flushes remaining records.
