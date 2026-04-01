@@ -85,6 +85,8 @@ type TaskReadiness struct {
 	OldestRecord         time.Time `json:"oldest_record"`
 	NewestRecord         time.Time `json:"newest_record"`
 	Ready                bool      `json:"ready"`
+	AvgDailyRate         float64   `json:"avg_daily_rate"`
+	ProjectedDaysToReady int       `json:"projected_days_to_ready"`
 }
 
 // TrainingDataReadiness holds readiness assessments across all tasks.
@@ -433,6 +435,19 @@ func (b *DatasetBuilder) TrainingDataReadiness(ctx context.Context) (*TrainingDa
 		t.Ready = t.TotalRows >= b.readinessThreshold &&
 			errorRate < 0.05 &&
 			t.HasSystemPrompt == t.TotalRows
+
+		// Compute accumulation rate: rows per day over the data span
+		if !t.OldestRecord.IsZero() && !t.NewestRecord.IsZero() && t.TotalRows > 0 {
+			daySpan := t.NewestRecord.Sub(t.OldestRecord).Hours() / 24.0
+			if daySpan > 0 {
+				t.AvgDailyRate = float64(t.TotalRows) / daySpan
+				if t.TotalRows < b.readinessThreshold && t.AvgDailyRate > 0 {
+					remaining := float64(b.readinessThreshold - t.TotalRows)
+					t.ProjectedDaysToReady = int(remaining/t.AvgDailyRate) + 1
+				}
+			}
+		}
+
 		tasks = append(tasks, t)
 	}
 

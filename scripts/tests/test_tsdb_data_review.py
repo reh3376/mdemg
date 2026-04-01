@@ -77,7 +77,7 @@ def test_privacy_patterns_no_false_positives():
 def test_report_json_valid():
     """JSON output is parseable and has required structure."""
     sections = [
-        tdr.SectionResult(name="schema_health", data={"schema_version": 7, "tables_present": 8}),
+        tdr.SectionResult(name="schema_health", data={"schema_version": 8, "tables_present": 8}),
         tdr.SectionResult(name="metric_samples", data={"total_rows": 1000, "duration_hours": 24.5}),
     ]
     findings = [
@@ -95,7 +95,7 @@ def test_report_json_valid():
     assert "findings" in parsed
     assert "summary" in parsed
 
-    assert parsed["schema_version"] == 7
+    assert parsed["schema_version"] == 8
     assert parsed["collection_duration_hours"] == 24.5
     assert parsed["summary"]["critical"] == 0
     assert parsed["summary"]["warning"] == 1
@@ -273,7 +273,7 @@ def test_near_duplicate_detection():
 def test_format_text_basic():
     """format_text produces non-empty output without errors."""
     sections = [
-        tdr.SectionResult(name="schema_health", data={"schema_version": 7, "tables_present": 8, "tables_expected": 8, "index_count": 14, "continuous_aggregates": ["metrics_hourly", "metrics_daily"]}),
+        tdr.SectionResult(name="schema_health", data={"schema_version": 8, "tables_present": 8, "tables_expected": 8, "index_count": 14, "continuous_aggregates": ["metrics_hourly", "metrics_daily"]}),
         tdr.SectionResult(name="ft_tables", data={"table_counts": {"ft_benchmarks": 0}, "all_empty": True}),
     ]
     findings = [tdr.Finding("info", "ft_tables", "All empty")]

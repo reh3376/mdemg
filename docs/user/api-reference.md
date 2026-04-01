@@ -48,7 +48,8 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 38. [Hash Verification (UNTS)](#hash-verification-unts)
 39. [Plugins & Modules](#plugins--modules)
 40. [System](#system)
-41. [MCP Server Tools](#mcp-server-tools)
+41. [Training Data Export](#training-data-export)
+42. [MCP Server Tools](#mcp-server-tools)
 42. [Common Status Codes](#common-status-codes)
 43. [Common Headers](#common-headers)
 44. [Protected Spaces](#protected-spaces)
@@ -4152,6 +4153,58 @@ List active modules.
 ### POST /v1/modules/{module_id}/sync
 
 Trigger a module sync operation.
+
+---
+
+## Training Data Export
+
+API endpoints for exporting TSDB training data as `.tar.gz` archives for the LoRA fine-tuning curation pipeline.
+
+### POST /v1/training-data/export
+
+Trigger an async training data export. The export streams TSDB rows to JSONL, applies privacy scanning on all text fields, packages into a `.tar.gz` archive with a UTDS-compliant manifest.
+
+**Auth:** `ScopeAdminSpaces`
+
+**Request Body:**
+```json
+{
+  "space_id": "mdemg-dev",
+  "from": "2026-01-01T00:00:00Z",
+  "to": "2026-04-01T00:00:00Z",
+  "tables": ["llm_interactions", "retrieval_events"]
+}
+```
+
+**Response (202):**
+```json
+{
+  "export_id": "exp-reh3376-mdemg-dev-20260401-120000",
+  "status": "pending"
+}
+```
+
+### GET /v1/training-data/status/{id}
+
+Poll export job status.
+
+**Response (200):**
+```json
+{
+  "export_id": "exp-reh3376-mdemg-dev-20260401-120000",
+  "status": "completed",
+  "progress": 100,
+  "output_path": "/tmp/mdemg-export.tar.gz"
+}
+```
+
+Status values: `pending`, `running`, `completed`, `failed`.
+
+### GET /v1/training-data/download/{id}
+
+Download the completed export archive. Returns `application/gzip` with `Content-Disposition: attachment`.
+
+**Response:** Binary `.tar.gz` file.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 
 ---
 
@@ -23,6 +23,7 @@ Last updated: 2026-03-30
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
 | ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 16 |
+| UTDS | Universal Training Data Specification | Training data export manifest validation, privacy gates, archive integrity | active | 3 |
 
 ---
 
@@ -43,6 +44,7 @@ Last updated: 2026-03-30
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
 | UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
 | ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (16) | `docs/tests/ults/runners/ults_runner.py` | no CI gate |
+| UTDS | `docs/tests/utds/schema/utds.schema.json` | `docs/tests/utds/specs/` (3) | `docs/tests/utds/runners/utds_runner.py` | no CI gate |
 
 ---
 
@@ -62,6 +64,7 @@ Last updated: 2026-03-30
 | UAMS | N/A (no runner) | All | N/A |
 | UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
 | ULTS | All required fields, version format, task name format, quality weights sum, prompt hash format | none | Yes (parity hard-fail for unknown fields) |
+| UTDS | All required fields, export_id pattern, schema_version ≥ 7, SHA-256 checksums, row counts, privacy hard gate (violations = 0) | none | Yes (hard-fail on privacy violations, unknown tables, schema mismatch) |
 
 ---
 

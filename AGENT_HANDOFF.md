@@ -45,11 +45,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
 - Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
 - FT Infrastructure Sprint — COMPLETE (4 phases: A=SanitizeResponse+prompt hash, B=RAFT context enrichment, C=ULTS spec framework, D=embedding/retrieval data collection)
+- FT-DATA Sprint — COMPLETE (8 phases: UTDS spec framework, TSDB exporter+CLI+API, browser UI tab, quality_filter.py, format_converter.py, dataset_versioner.py, round-trip verification, documentation)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-04-01
 - Latest releases: CLI v0.4.1, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-01) ===
+- ✅ FT-DATA Sprint (2026-04-01) — Full training data export + curation pipeline:
+  - Phase 1: UTDS spec framework (14th UxTS, JSON Schema, 3 fixture specs, runner, 23 tests)
+  - Phase 2: TSDB exporter + `mdemg data export` CLI + API handler (streaming, privacy scan 10 fields, tar.gz)
+  - Phase 3: Browser UI Training Data tab (10th tab, export form, status polling, download)
+  - Phase 4: quality_filter.py (8 gates, privacy hard-reject, ULTS validation, 25 tests)
+  - Phase 5: format_converter.py (MLX chat format, RAFT 80/20, think-mode, 21 tests)
+  - Phase 6: dataset_versioner.py (temporal split, dedup, SHA-256, manifest, 20 tests)
+  - Phase 7: Round-trip verified: TSDB→export(449)→UTDS(26/26)→filter(287)→convert→version(229/28/30)
+  - Known: retrieval_events.query_text contains codebase paths flagged by privacy scanner (correct behavior — different threat model for exported data)
 - ✅ J17 Comprehension Pipeline Fix + Trust Rebalance (2026-04-01) — 5 independent pipeline breaks fixed:
   - Sigmoid midpoint 2.0→1.5 (retrieval_source.go + consulting/service.go): scores 1.0-1.5 now pass JiminyMinConfidence
   - NLI guard broadened: allows heuristic comprehension for non-constraint items

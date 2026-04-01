@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UTDS — Universal Training Data Specification",
+  "description": "Validates MDEMG training data export manifests. Defines the machine-readable contract for training data exchange between distributed MDEMG instances and the central curation pipeline.",
+  "type": "object",
+  "required": [
+    "utds_version",
+    "export_id",
+    "instance_id",
+    "space_id",
+    "mdemg_version",
+    "schema_version",
+    "exported_at",
+    "data_range",
+    "tables",
+    "quality_summary"
+  ],
+  "properties": {
+    "utds_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the UTDS spec"
+    },
+    "export_id": {
+      "type": "string",
+      "pattern": "^exp-",
+      "description": "Unique export identifier (format: exp-{instance_id}-{YYYYMMDD}-{HHMMSS})"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Instance identifier ({username}-{space_id})"
+    },
+    "space_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MDEMG space identifier"
+    },
+    "mdemg_version": {
+      "type": "string",
+      "description": "MDEMG CLI version string"
+    },
+    "mdemg_commit": {
+      "type": "string",
+      "description": "Git commit hash of the MDEMG build"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 7,
+      "description": "TSDB schema version (must be >= 7 for RAFT context columns)"
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 timestamp of when the export was created"
+    },
+    "data_range": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Earliest record timestamp in the export"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Latest record timestamp in the export"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tables": {
+      "type": "object",
+      "required": ["llm_interactions"],
+      "properties": {
+        "llm_interactions": { "$ref": "#/$defs/table_meta" },
+        "retrieval_events": { "$ref": "#/$defs/table_meta" },
+        "embedding_events": { "$ref": "#/$defs/table_meta" }
+      },
+      "additionalProperties": false
+    },
+    "quality_summary": {
+      "type": "object",
+      "required": [
+        "llm_error_rate",
+        "llm_empty_system_prompt",
+        "llm_empty_response",
+        "privacy_scrub_violations"
+      ],
+      "properties": {
+        "llm_error_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of LLM interactions with non-empty error field"
+        },
+        "llm_empty_system_prompt": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of LLM interactions with empty/null system_prompt"
+        },
+        "llm_empty_response": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of LLM interactions with empty/null response"
+        },
+        "embedding_empty_call_sites": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of embedding events with empty/null call_site"
+        },
+        "retrieval_recall_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of retrieval events that produced recall results"
+        },
+        "privacy_scrub_violations": {
+          "type": "integer",
+          "maximum": 0,
+          "description": "HARD GATE: must be exactly 0. Any detected PII makes the export invalid."
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "os": { "type": "string" },
+        "arch": { "type": "string" },
+        "go_version": { "type": "string" },
+        "llm_provider": { "type": "string" },
+        "llm_model": { "type": "string" },
+        "embedding_model": { "type": "string" },
+        "embedding_dimensions": { "type": "integer" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "table_meta": {
+      "type": "object",
+      "required": ["row_count", "sha256", "columns"],
+      "properties": {
+        "row_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact number of JSONL lines in the data file"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of the JSONL file contents"
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Ordered list of column names present in each JSONL record"
+        },
+        "task_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Distinct task_name values (llm_interactions only)"
+        },
+        "system_prompt_hashes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Distinct system_prompt_hash values (llm_interactions only)"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

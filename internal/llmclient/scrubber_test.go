@@ -191,6 +191,84 @@ func TestScrub_MultiByte(t *testing.T) {
 	}
 }
 
+func TestScrubStringExcluding_SkipAbsPath(t *testing.T) {
+	input := "query for /Users/reh3376/mdemg/internal/retrieval/pipeline.go"
+	result := ScrubStringExcluding(input, []string{"abs_path"})
+	// abs_path should NOT be redacted
+	if result != input {
+		t.Errorf("abs_path should be skipped, got %q", result)
+	}
+}
+
+func TestScrubStringExcluding_APIKeyStillCaughtWhenAbsPathSkipped(t *testing.T) {
+	input := "/Users/reh3376/project/main.go sk-abc12345678901234567890"
+	result := ScrubStringExcluding(input, []string{"abs_path"})
+	// abs_path should be preserved, but API key should still be caught
+	if !contains(result, "/Users/reh3376/project/main.go") {
+		t.Errorf("abs_path should be preserved, got %q", result)
+	}
+	if !contains(result, "[REDACTED_KEY]") {
+		t.Errorf("API key should still be caught, got %q", result)
+	}
+}
+
+func TestScrubStringExcluding_NilSkipEquivalentToScrubString(t *testing.T) {
+	input := "email user@example.com at /Users/reh3376/code/main.go with PASSWORD=secret"
+	got := ScrubStringExcluding(input, nil)
+	want := ScrubString(input)
+	if got != want {
+		t.Errorf("nil skip should equal ScrubString\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestScrubStringExcluding_EmptySkipEquivalentToScrubString(t *testing.T) {
+	input := "email user@example.com at /Users/reh3376/code/main.go with PASSWORD=secret"
+	got := ScrubStringExcluding(input, []string{})
+	want := ScrubString(input)
+	if got != want {
+		t.Errorf("empty skip should equal ScrubString\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestScrubStringExcluding_MultipleSkips(t *testing.T) {
+	input := "user@example.com at /Users/reh3376/code/main.go"
+	result := ScrubStringExcluding(input, []string{"abs_path", "email"})
+	// Both patterns skipped — input should be unchanged
+	if result != input {
+		t.Errorf("both patterns skipped should return original, got %q", result)
+	}
+}
+
+func TestScrub_GoldenRegression(t *testing.T) {
+	// Golden test: verify Scrub() produces known output for known input.
+	// This catches any inadvertent change from the patternEntry refactor.
+	rec := &InteractionRecord{
+		SystemPrompt: "You are a helpful assistant. Contact admin@corp.com for support.",
+		UserPrompt:   "file at /Users/reh3376/mdemg/internal/api/server.go found with key sk-abc12345678901234567890",
+		Response:     "Set PASSWORD=hunter2 in env. See neo4j://admin:secret@localhost:7687 for DB.",
+		ThinkContent: "The user has token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij",
+	}
+	Scrub(rec)
+
+	wantSystem := "You are a helpful assistant. Contact [EMAIL] for support."
+	wantUser := "file at /[PATH]/api/server.go found with key [REDACTED_KEY]"
+	wantResponse := "Set PASSWORD=[REDACTED] in env. See neo4j://[REDACTED]@localhost:7687 for DB."
+	wantThink := "The user has token [REDACTED_KEY]"
+
+	if rec.SystemPrompt != wantSystem {
+		t.Errorf("SystemPrompt:\n  got:  %q\n  want: %q", rec.SystemPrompt, wantSystem)
+	}
+	if rec.UserPrompt != wantUser {
+		t.Errorf("UserPrompt:\n  got:  %q\n  want: %q", rec.UserPrompt, wantUser)
+	}
+	if rec.Response != wantResponse {
+		t.Errorf("Response:\n  got:  %q\n  want: %q", rec.Response, wantResponse)
+	}
+	if rec.ThinkContent != wantThink {
+		t.Errorf("ThinkContent:\n  got:  %q\n  want: %q", rec.ThinkContent, wantThink)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
 }

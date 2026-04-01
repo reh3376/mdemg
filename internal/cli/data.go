@@ -31,15 +31,24 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataAnnotateCmd())
 	cmd.AddCommand(newDataQualityCmd())
 	cmd.AddCommand(newDataAuditCmd())
+	cmd.AddCommand(newDataExportCmd())
 
 	return cmd
 }
 
 // newDataStatusCmd creates the `data status` subcommand.
 func newDataStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		warn       bool
+		jsonOutput bool
+	)
+
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show training data collection status",
+		Long: `Show per-task row counts, accumulation rates, and projected days to readiness.
+Use --warn to exit non-zero if any task is below the readiness threshold.
+Use --json for structured output suitable for monitoring pipelines.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -65,54 +74,110 @@ func newDataStatusCmd() *cobra.Command {
 			}
 			defer rows.Close()
 
+			type taskRow struct {
+				Name      string `json:"task_name"`
+				Total     int64  `json:"total"`
+				WithGuid  int64  `json:"with_guidance_id"`
+				Annotated int64  `json:"annotated"`
+			}
+			var taskRows []taskRow
+			var totalRows, totalGuid, totalAnnotated int64
+			for rows.Next() {
+				var tr taskRow
+				if err := rows.Scan(&tr.Name, &tr.Total, &tr.WithGuid, &tr.Annotated); err != nil {
+					return err
+				}
+				taskRows = append(taskRows, tr)
+				totalRows += tr.Total
+				totalGuid += tr.WithGuid
+				totalAnnotated += tr.Annotated
+			}
+
+			// Readiness with accumulation rates
+			builder := tsdb.NewDatasetBuilder(pool)
+			readiness, readErr := builder.TrainingDataReadiness(ctx)
+
+			// Embedding + retrieval counts
+			var embTotal, embCached int64
+			_ = pool.QueryRow(ctx,
+				`SELECT COALESCE(COUNT(*), 0), COALESCE(SUM(CASE WHEN cached THEN 1 ELSE 0 END), 0)
+				 FROM embedding_events`).Scan(&embTotal, &embCached)
+			var retTotal int64
+			_ = pool.QueryRow(ctx,
+				`SELECT COALESCE(COUNT(*), 0) FROM retrieval_events`).Scan(&retTotal)
+
+			// JSON output
+			if jsonOutput {
+				report := map[string]any{
+					"tasks":            taskRows,
+					"total_rows":       totalRows,
+					"embedding_events": embTotal,
+					"retrieval_events": retTotal,
+				}
+				if readErr == nil && readiness != nil {
+					report["readiness"] = readiness.Tasks
+				}
+				out, _ := json.MarshalIndent(report, "", "  ")
+				fmt.Println(string(out))
+
+				if warn {
+					return checkWarnThresholds(readiness)
+				}
+				return nil
+			}
+
+			// Human-readable output
 			fmt.Println("═══ Training Data Status ═══")
 			fmt.Println()
 			fmt.Printf("%-30s %8s %10s %10s\n", "Task", "Total", "w/GuidID", "Annotated")
 			fmt.Println(strings.Repeat("─", 62))
-
-			var totalRows, totalGuid, totalAnnotated int64
-			for rows.Next() {
-				var taskName string
-				var cnt, withGuid, annotated int64
-				if err := rows.Scan(&taskName, &cnt, &withGuid, &annotated); err != nil {
-					return err
-				}
-				fmt.Printf("%-30s %8d %10d %10d\n", taskName, cnt, withGuid, annotated)
-				totalRows += cnt
-				totalGuid += withGuid
-				totalAnnotated += annotated
+			for _, tr := range taskRows {
+				fmt.Printf("%-30s %8d %10d %10d\n", tr.Name, tr.Total, tr.WithGuid, tr.Annotated)
 			}
 			fmt.Println(strings.Repeat("─", 62))
 			fmt.Printf("%-30s %8d %10d %10d\n", "TOTAL", totalRows, totalGuid, totalAnnotated)
 
+			// Readiness + rates
+			if readErr == nil && readiness != nil {
+				fmt.Println()
+				fmt.Println("═══ Readiness & Accumulation ═══")
+				fmt.Printf("%-30s %8s %10s %10s %8s\n", "Task", "Rows", "Rate/day", "Days Left", "Ready")
+				fmt.Println(strings.Repeat("─", 72))
+				for _, t := range readiness.Tasks {
+					readyStr := "NO"
+					if t.Ready {
+						readyStr = "YES"
+					}
+					daysStr := "-"
+					if t.ProjectedDaysToReady > 0 {
+						daysStr = fmt.Sprintf("%d", t.ProjectedDaysToReady)
+					}
+					fmt.Printf("%-30s %8d %10.1f %10s %8s\n",
+						t.TaskName, t.TotalRows, t.AvgDailyRate, daysStr, readyStr)
+				}
+			}
+
 			// Embedding event counts
 			fmt.Println()
 			fmt.Println("═══ Embedding Events ═══")
-			var embTotal, embCached int64
-			err = pool.QueryRow(ctx,
-				`SELECT COALESCE(COUNT(*), 0), COALESCE(SUM(CASE WHEN cached THEN 1 ELSE 0 END), 0)
-				 FROM embedding_events`).Scan(&embTotal, &embCached)
-			if err != nil {
-				fmt.Println("  (table not yet created)")
-			} else {
+			if embTotal > 0 {
 				cacheRate := 0.0
 				if embTotal > 0 {
 					cacheRate = float64(embCached) / float64(embTotal) * 100
 				}
 				fmt.Printf("Total events:  %d\n", embTotal)
 				fmt.Printf("Cache hits:    %d (%.1f%%)\n", embCached, cacheRate)
+			} else {
+				fmt.Println("  (no events)")
 			}
 
 			// Retrieval event counts
 			fmt.Println()
 			fmt.Println("═══ Retrieval Events ═══")
-			var retTotal int64
-			err = pool.QueryRow(ctx,
-				`SELECT COALESCE(COUNT(*), 0) FROM retrieval_events`).Scan(&retTotal)
-			if err != nil {
-				fmt.Println("  (table not yet created)")
-			} else {
+			if retTotal > 0 {
 				fmt.Printf("Total events:  %d\n", retTotal)
+			} else {
+				fmt.Println("  (no events)")
 			}
 
 			// JSONL file status
@@ -138,9 +203,44 @@ func newDataStatusCmd() *cobra.Command {
 				fmt.Printf("Directory: %s (not found)\n", jsonlDir)
 			}
 
+			if warn {
+				return checkWarnThresholds(readiness)
+			}
+
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&warn, "warn", false, "Exit non-zero if any task is below readiness threshold")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON for monitoring pipelines")
+
+	return cmd
+}
+
+// checkWarnThresholds returns an error if any readiness threshold is unmet.
+func checkWarnThresholds(readiness *tsdb.TrainingDataReadiness) error {
+	if readiness == nil {
+		return fmt.Errorf("WARNING: could not check readiness (TSDB query failed)")
+	}
+	var warnings []string
+	for _, t := range readiness.Tasks {
+		if !t.Ready {
+			warnings = append(warnings, fmt.Sprintf("  %s: %d rows (need %d)",
+				t.TaskName, t.TotalRows, tsdb.DefaultReadinessThreshold))
+		}
+		if t.DistinctPromptHashes > 1 {
+			warnings = append(warnings, fmt.Sprintf("  %s: %d distinct prompt hashes (drift?)",
+				t.TaskName, t.DistinctPromptHashes))
+		}
+	}
+	if len(warnings) > 0 {
+		fmt.Fprintln(os.Stderr, "\nWARNINGS:")
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, w)
+		}
+		return fmt.Errorf("%d warning(s) — thresholds not met", len(warnings))
+	}
+	return nil
 }
 
 // newDataInspectCmd creates the `data inspect` subcommand.
@@ -490,7 +590,7 @@ func runDataAudit(spaceID, serverURL string) error {
 		if healthErr == nil {
 			body, _ := io.ReadAll(healthResp.Body)
 			healthResp.Body.Close()
-			var detail map[string]interface{}
+			var detail map[string]any
 			if json.Unmarshal(body, &detail) == nil {
 				if neo4j, ok := detail["neo4j"].(string); ok {
 					fmt.Printf("  Neo4j:      %s\n", neo4j)

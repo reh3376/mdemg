@@ -1,0 +1,48 @@
+{
+  "utds_version": "1.0.0",
+  "export_id": "exp-dev1-project-a-20260402-091500",
+  "instance_id": "dev1-project-a",
+  "space_id": "project-a",
+  "mdemg_version": "v0.4.1",
+  "mdemg_commit": "abc1234",
+  "schema_version": 8,
+  "exported_at": "2026-04-02T09:15:00Z",
+  "data_range": {
+    "from": "2026-03-28T00:00:00Z",
+    "to": "2026-04-02T09:00:00Z"
+  },
+  "tables": {
+    "llm_interactions": {
+      "row_count": 150,
+      "sha256": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "columns": [
+        "time", "trace_id", "task_name", "space_id", "session_id",
+        "system_prompt", "user_prompt", "response", "think_content", "think_mode",
+        "latency_ms", "tokens_in", "tokens_out", "model_name", "provider",
+        "error", "quality", "quality_source", "used_for_train", "dataset_ver",
+        "guidance_id", "source_path", "retrieval_node_ids", "retrieval_scores",
+        "oracle_node_id", "system_prompt_hash",
+        "instance_id"
+      ],
+      "task_names": ["retrieval.rerank_cross", "jiminy.synthesize", "hidden.reclassify"],
+      "system_prompt_hashes": [
+        "aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344"
+      ]
+    }
+  },
+  "quality_summary": {
+    "llm_error_rate": 0.02,
+    "llm_empty_system_prompt": 0,
+    "llm_empty_response": 0,
+    "privacy_scrub_violations": 0
+  },
+  "environment": {
+    "os": "linux",
+    "arch": "amd64",
+    "go_version": "1.24",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4.1",
+    "embedding_model": "text-embedding-3-large",
+    "embedding_dimensions": 3072
+  }
+}

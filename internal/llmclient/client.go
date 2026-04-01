@@ -68,11 +68,21 @@ type Config struct {
 // Set via SetDefaultRecorder before creating clients.
 var defaultRecorder InteractionRecorder
 
+// defaultInstanceID is propagated to every InteractionRecord.
+// Set via SetDefaultInstanceID before creating clients.
+var defaultInstanceID string
+
 // SetDefaultRecorder sets a package-level recorder that is automatically
 // attached to every subsequently created Client. Safe to call with nil
 // to disable. This allows zero-modification wiring of all 16+ consumers.
 func SetDefaultRecorder(r InteractionRecorder) {
 	defaultRecorder = r
+}
+
+// SetDefaultInstanceID sets the instance identifier propagated to all
+// InteractionRecords. Called once at server startup from cfg.InstanceID.
+func SetDefaultInstanceID(id string) {
+	defaultInstanceID = id
 }
 
 // New creates a new LLM client from the given configuration.
@@ -174,6 +184,7 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 		Time:         time.Now(),
 		TaskName:     c.taskName,
 		SpaceID:      c.spaceID,
+		InstanceID:   defaultInstanceID,
 		SystemPrompt: system,
 		UserPrompt:   user,
 		Response:     response,

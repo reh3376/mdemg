@@ -12,8 +12,14 @@
     "notes": "Names L3-L5 emergent concepts. Output must be valid JSON with concept name and description. Also has L5 variant (l5EmergenceSystemPrompt at line 97)."
   },
   "prompt": {
-    "system_prompt_hash": "bb90d13f0ae210ec0e916e5067aa7d9e3740f68e4f1c38bec21c7504b031a591",
-    "system_prompt_source": "internal/hidden/emergence_namer.go:82",
+    "system_prompt_hash": [
+      "bb90d13f0ae210ec0e916e5067aa7d9e3740f68e4f1c38bec21c7504b031a591",
+      "eefddf2ed714178a500f78a2ada0847f26e9c2f42dedeba2cd40b5f3c5152aff"
+    ],
+    "system_prompt_source": [
+      "internal/hidden/emergence_namer.go:82",
+      "internal/hidden/emergence_namer.go:97"
+    ],
     "think_mode": false,
     "dynamic_prompt": false
   },

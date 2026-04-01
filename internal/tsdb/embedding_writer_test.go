@@ -76,8 +76,8 @@ func TestEmbeddingEventWriter_Flush(t *testing.T) {
 	if call.Table[0] != "embedding_events" {
 		t.Errorf("table: got %q, want %q", call.Table[0], "embedding_events")
 	}
-	if len(call.Columns) != 23 {
-		t.Errorf("columns: got %d, want 23", len(call.Columns))
+	if len(call.Columns) != 24 {
+		t.Errorf("columns: got %d, want 24", len(call.Columns))
 	}
 
 	// Buffer should be empty after flush
@@ -191,8 +191,8 @@ func TestEmbeddingWriter_ColumnValuePositions(t *testing.T) {
 		t.Fatalf("Values rows: got %d, want 1", len(pool.calls[0].Values))
 	}
 	v := pool.calls[0].Values[0]
-	if len(v) != 23 {
-		t.Fatalf("column count: got %d, want 23", len(v))
+	if len(v) != 24 {
+		t.Fatalf("column count: got %d, want 24", len(v))
 	}
 
 	checks := []struct {
@@ -223,6 +223,8 @@ func TestEmbeddingWriter_ColumnValuePositions(t *testing.T) {
 		{20, "latency_ms", 42},
 		{21, "cached", true},
 		{22, "node_id", "node-xyz"},
+		{23, "instance_id", ""},
+		{23, "instance_id", ""},
 	}
 
 	for _, c := range checks {

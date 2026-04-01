@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,14 +14,24 @@ import (
 	"github.com/nrednav/cuid2"
 )
 
+// FlushStats holds flush operation counters for monitoring.
+type FlushStats struct {
+	SuccessCount int64 `json:"success_count"`
+	FailureCount int64 `json:"failure_count"`
+	TotalRows    int64 `json:"total_rows"`
+}
+
 // LLMInteractionWriter buffers LLM interaction records and flushes them to
 // the llm_interactions hypertable. It mirrors the MetricWriter pattern.
 type LLMInteractionWriter struct {
-	pool      poolIface
-	buffer    []llmclient.InteractionRecord
-	mu        sync.Mutex
-	flushTick *time.Ticker
-	done      chan struct{}
+	pool         poolIface
+	buffer       []llmclient.InteractionRecord
+	mu           sync.Mutex
+	flushTick    *time.Ticker
+	done         chan struct{}
+	flushSuccess atomic.Int64
+	flushFailure atomic.Int64
+	flushRows    atomic.Int64
 }
 
 // poolIface allows testing without a real pgxpool.Pool.
@@ -101,6 +112,7 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 			r.GuidanceID, r.SourcePath,
 			retrievalNodeIDs, retrievalScores, oracleNodeID,
 			r.SystemPromptHash,
+			r.InstanceID,
 		}
 	}
 
@@ -117,15 +129,28 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 			"guidance_id", "source_path",
 			"retrieval_node_ids", "retrieval_scores", "oracle_node_id",
 			"system_prompt_hash",
+			"instance_id",
 		},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {
 		slog.Error("llm_interactions: flush failed", "count", len(batch), "error", err)
+		w.flushFailure.Add(1)
 	} else {
 		slog.Debug("llm_interactions: flushed", "count", len(batch))
+		w.flushSuccess.Add(1)
+		w.flushRows.Add(int64(len(batch)))
 	}
 	return err
+}
+
+// Stats returns flush operation counters for monitoring.
+func (w *LLMInteractionWriter) Stats() FlushStats {
+	return FlushStats{
+		SuccessCount: w.flushSuccess.Load(),
+		FailureCount: w.flushFailure.Load(),
+		TotalRows:    w.flushRows.Load(),
+	}
 }
 
 // Close stops the auto-flush goroutine and flushes remaining records.

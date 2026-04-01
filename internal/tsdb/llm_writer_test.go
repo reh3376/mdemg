@@ -110,13 +110,13 @@ func TestLLMInteractionWriter_Flush(t *testing.T) {
 	if call.Table[0] != "llm_interactions" {
 		t.Errorf("table: got %q, want %q", call.Table[0], "llm_interactions")
 	}
-	if len(call.Columns) != 26 {
-		t.Errorf("columns: got %d, want 26", len(call.Columns))
+	if len(call.Columns) != 27 {
+		t.Errorf("columns: got %d, want 27", len(call.Columns))
 	}
 	// Verify RAFT columns are present at the end
-	lastFour := call.Columns[len(call.Columns)-4:]
-	expected := []string{"retrieval_node_ids", "retrieval_scores", "oracle_node_id", "system_prompt_hash"}
-	for i, col := range lastFour {
+	lastFive := call.Columns[len(call.Columns)-5:]
+	expected := []string{"retrieval_node_ids", "retrieval_scores", "oracle_node_id", "system_prompt_hash", "instance_id"}
+	for i, col := range lastFive {
 		if col != expected[i] {
 			t.Errorf("column %d from end: got %q, want %q", i, col, expected[i])
 		}
@@ -225,9 +225,9 @@ func TestLLMInteractionWriter_RAFTColumns(t *testing.T) {
 	if pool.calls[0].Rows != 1 {
 		t.Errorf("rows: got %d, want 1", pool.calls[0].Rows)
 	}
-	// Verify 26 columns (22 original + 4 RAFT)
-	if len(pool.calls[0].Columns) != 26 {
-		t.Errorf("columns: got %d, want 26", len(pool.calls[0].Columns))
+	// Verify 27 columns (22 original + 4 RAFT + 1 instance_id)
+	if len(pool.calls[0].Columns) != 27 {
+		t.Errorf("columns: got %d, want 27", len(pool.calls[0].Columns))
 	}
 }
 
@@ -324,8 +324,8 @@ func TestLLMWriter_ColumnValuePositions(t *testing.T) {
 		t.Fatalf("Values rows: got %d, want 1", len(pool.calls[0].Values))
 	}
 	v := pool.calls[0].Values[0]
-	if len(v) != 26 {
-		t.Fatalf("column count: got %d, want 26", len(v))
+	if len(v) != 27 {
+		t.Fatalf("column count: got %d, want 27", len(v))
 	}
 
 	// Positional assertions — column index : expected value
@@ -357,6 +357,8 @@ func TestLLMWriter_ColumnValuePositions(t *testing.T) {
 		{21, "source_path", "CLAUDE.md"},
 		// [22-24] retrieval arrays, checked separately
 		{25, "system_prompt_hash", "deadbeef1234"},
+		{26, "instance_id", ""},
+		{26, "instance_id", ""},
 	}
 
 	for _, c := range checks {

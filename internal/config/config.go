@@ -789,6 +789,7 @@ type Config struct {
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
 	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 4)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
+	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
 	EmbeddingEventLogging     bool   // EMBEDDING_EVENT_LOGGING — log all Embed() calls for contrastive training data (default: true)
 	RetrievalEventLogging     bool   // RETRIEVAL_EVENT_LOGGING — log all Retrieve() pipelines for contrastive training data (default: true)
@@ -3101,11 +3102,16 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 7)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 8)
 	if err != nil {
 		return Config{}, err
 	}
 	tsdbOptional := getBool("TSDB_OPTIONAL", true)
+	instanceID := get("MDEMG_INSTANCE_ID", "")
+	if instanceID == "" {
+		hostname, _ := os.Hostname()
+		instanceID = fmt.Sprintf("%s-%s", hostname, rsicWatchdogSpaceID)
+	}
 	llmInteractionLogging := getBool("LLM_INTERACTION_LOGGING", true)
 	embeddingEventLogging := getBool("EMBEDDING_EVENT_LOGGING", true)
 	retrievalEventLogging := getBool("RETRIEVAL_EVENT_LOGGING", true)
@@ -3724,6 +3730,7 @@ func FromEnv() (Config, error) {
 		TSDBHourlyRetentionDays:   tsdbHourlyRetentionDays,
 		TSDBRequiredSchemaVersion: tsdbRequiredSchemaVersion,
 		TSDBOptional:              tsdbOptional,
+		InstanceID:                instanceID,
 		LLMInteractionLogging:     llmInteractionLogging,
 		EmbeddingEventLogging:     embeddingEventLogging,
 		RetrievalEventLogging:     retrievalEventLogging,

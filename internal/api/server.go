@@ -1035,7 +1035,8 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
 			)
 			llmclient.SetDefaultRecorder(s.llmWriter)
-			slog.Info("tsdb: LLM interaction logger attached")
+			llmclient.SetDefaultInstanceID(s.cfg.InstanceID)
+			slog.Info("tsdb: LLM interaction logger attached", "instance_id", s.cfg.InstanceID)
 		}
 
 		// Embedding event logger — record all Embed() calls for contrastive training data
@@ -1046,7 +1047,7 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			)
 			// Wire recorder into CachedEmbedder if available
 			if ce, ok := s.embedder.(*embeddings.CachedEmbedder); ok {
-				ce.SetRecorder(&embeddingRecorderAdapter{writer: s.embeddingWriter})
+				ce.SetRecorder(&embeddingRecorderAdapter{writer: s.embeddingWriter, instanceID: s.cfg.InstanceID})
 			}
 			slog.Info("tsdb: embedding event logger attached")
 		}
@@ -1057,8 +1058,37 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				client.Pool(),
 				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
 			)
-			s.retriever.SetRetrievalRecorder(&retrievalRecorderAdapter{writer: s.retrievalWriter})
+			s.retriever.SetRetrievalRecorder(&retrievalRecorderAdapter{writer: s.retrievalWriter, instanceID: s.cfg.InstanceID})
 			slog.Info("tsdb: retrieval event logger attached")
+		}
+
+		// Multi-instance collision detection
+		if s.cfg.InstanceID != "" {
+			var otherInstances []string
+			rows, qErr := client.Pool().Query(context.Background(),
+				`SELECT DISTINCT instance_id FROM llm_interactions
+				 WHERE instance_id != '' AND instance_id != $1
+				   AND space_id = $2
+				   AND time > now() - interval '24 hours'
+				 LIMIT 5`,
+				s.cfg.InstanceID, s.cfg.RSICWatchdogSpaceID,
+			)
+			if qErr == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var id string
+					if rows.Scan(&id) == nil {
+						otherInstances = append(otherInstances, id)
+					}
+				}
+			}
+			if len(otherInstances) > 0 {
+				slog.Warn("tsdb: other MDEMG instances detected on same space_id",
+					"this_instance", s.cfg.InstanceID,
+					"space_id", s.cfg.RSICWatchdogSpaceID,
+					"other_instances", otherInstances,
+				)
+			}
 		}
 	}
 }
@@ -1071,12 +1101,14 @@ func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
 
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
 type embeddingRecorderAdapter struct {
-	writer *tsdb.EmbeddingEventWriter
+	writer     *tsdb.EmbeddingEventWriter
+	instanceID string
 }
 
 // retrievalRecorderAdapter adapts tsdb.RetrievalEventWriter to retrieval.RetrievalEventRecorder.
 type retrievalRecorderAdapter struct {
-	writer *tsdb.RetrievalEventWriter
+	writer     *tsdb.RetrievalEventWriter
+	instanceID string
 }
 
 func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retrieval.RetrievalEvent) {
@@ -1103,6 +1135,7 @@ func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retr
 		RecallLatencyMs:   event.RecallLatencyMs,
 		RerankLatencyMs:   event.RerankLatencyMs,
 		TotalLatencyMs:    event.TotalLatencyMs,
+		InstanceID:        a.instanceID,
 	})
 }
 
@@ -1131,6 +1164,7 @@ func (a *embeddingRecorderAdapter) RecordEmbed(_ context.Context, event embeddin
 		LatencyMs:   event.LatencyMs,
 		Cached:      event.Cached,
 		NodeID:      event.NodeID,
+		InstanceID:  a.instanceID,
 	})
 }
 
@@ -1941,6 +1975,11 @@ func (s *Server) Routes() http.Handler {
 	// Codebase ingestion endpoint
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
+
+	// Training Data Export (FT-DATA Sprint)
+	mux.Handle("/v1/training-data/export", scopedHandler(auth.ScopeAdminSpaces, s.handleTrainingDataExport))
+	mux.HandleFunc("/v1/training-data/status/", s.handleTrainingDataStatus)
+	mux.HandleFunc("/v1/training-data/download/", s.handleTrainingDataDownload)
 
 	// SSE streaming endpoint for job progress (Phase 48.3.3)
 	mux.HandleFunc("/v1/jobs/", s.handleJobStream)

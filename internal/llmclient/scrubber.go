@@ -22,29 +22,53 @@ var (
 	neo4jCredPattern = regexp.MustCompile(`neo4j://[^:]+:[^@]+@`)
 )
 
+// patternEntry pairs a named privacy pattern with its replacement logic.
+type patternEntry struct {
+	name    string
+	regex   *regexp.Regexp
+	replace func(string) string
+}
+
+// patterns is the ordered registry of all privacy scrub patterns.
+// Each entry captures its own replacement strategy (simple string vs custom func).
+var patterns = []patternEntry{
+	{"api_key", apiKeyPattern, func(s string) string { return apiKeyPattern.ReplaceAllString(s, "[REDACTED_KEY]") }},
+	{"abs_path", absPathPattern, func(s string) string { return absPathPattern.ReplaceAllStringFunc(s, scrubAbsPath) }},
+	{"env_secret", envSecretPattern, func(s string) string { return envSecretPattern.ReplaceAllString(s, "${1}=[REDACTED]") }},
+	{"email", emailPattern, func(s string) string { return emailPattern.ReplaceAllString(s, "[EMAIL]") }},
+	{"neo4j_cred", neo4jCredPattern, func(s string) string { return neo4jCredPattern.ReplaceAllString(s, "neo4j://[REDACTED]@") }},
+}
+
 // ScrubString removes sensitive data from a single string.
 func ScrubString(s string) string {
-	return scrubText(s)
+	return ScrubStringExcluding(s, nil)
+}
+
+// ScrubStringExcluding removes sensitive data but skips named patterns in skip.
+// Pass nil or empty skip to apply all patterns (equivalent to ScrubString).
+func ScrubStringExcluding(s string, skip []string) string {
+	if s == "" {
+		return s
+	}
+	skipSet := make(map[string]bool, len(skip))
+	for _, name := range skip {
+		skipSet[name] = true
+	}
+	for _, p := range patterns {
+		if skipSet[p.name] {
+			continue
+		}
+		s = p.replace(s)
+	}
+	return s
 }
 
 // Scrub removes sensitive data from an InteractionRecord before storage.
 func Scrub(rec *InteractionRecord) {
-	rec.SystemPrompt = scrubText(rec.SystemPrompt)
-	rec.UserPrompt = scrubText(rec.UserPrompt)
-	rec.Response = scrubText(rec.Response)
-	rec.ThinkContent = scrubText(rec.ThinkContent)
-}
-
-func scrubText(s string) string {
-	if s == "" {
-		return s
-	}
-	s = apiKeyPattern.ReplaceAllString(s, "[REDACTED_KEY]")
-	s = absPathPattern.ReplaceAllStringFunc(s, scrubAbsPath)
-	s = envSecretPattern.ReplaceAllString(s, "${1}=[REDACTED]")
-	s = emailPattern.ReplaceAllString(s, "[EMAIL]")
-	s = neo4jCredPattern.ReplaceAllString(s, "neo4j://[REDACTED]@")
-	return s
+	rec.SystemPrompt = ScrubStringExcluding(rec.SystemPrompt, nil)
+	rec.UserPrompt = ScrubStringExcluding(rec.UserPrompt, nil)
+	rec.Response = ScrubStringExcluding(rec.Response, nil)
+	rec.ThinkContent = ScrubStringExcluding(rec.ThinkContent, nil)
 }
 
 // scrubAbsPath replaces /Users/username/path with /[PATH]/last/two/components

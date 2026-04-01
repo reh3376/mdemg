@@ -55,13 +55,18 @@
       "description": "System prompt configuration",
       "properties": {
         "system_prompt_hash": {
-          "type": "string",
-          "description": "SHA-256 of the system prompt constant. 'dynamic' if prompt is generated at runtime.",
-          "pattern": "^([a-f0-9]{64}|dynamic)$"
+          "description": "SHA-256 of the system prompt constant(s). 'dynamic' if prompt is generated at runtime. Array for tasks with multiple static prompts.",
+          "oneOf": [
+            { "type": "string", "pattern": "^([a-f0-9]{64}|dynamic)$" },
+            { "type": "array", "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "minItems": 2 }
+          ]
         },
         "system_prompt_source": {
-          "type": "string",
-          "description": "File:line where the system prompt is defined (e.g., internal/ape/llm_reflector.go:62)"
+          "description": "File:line where the system prompt is defined. Array if multiple prompts.",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+          ]
         },
         "think_mode": {
           "type": "boolean",

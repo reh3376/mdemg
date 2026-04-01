@@ -31,6 +31,7 @@ The port is whatever `MDEMG_PORT` is set to in your `.env` (default 9999).
 | **Plugins** | Plugin cards with type/state badges, start/stop/restart/validate/details | `GET /v1/plugins`, `POST /v1/plugins/{id}/start\|stop\|restart\|validate` |
 | **Features** | Controllable + config-only service listing with lifecycle controls | `GET /v1/admin/features`, `POST /v1/admin/features/start\|stop\|restart` |
 | **Backup** | Trigger/list/restore/delete backups, active operation polling, type filter | `/v1/backup/trigger`, `/v1/backup/list`, `/v1/backup/status/*`, `/v1/backup/restore`, `DELETE /v1/backup/{id}` |
+| **Training Data** | Export TSDB training data for LoRA fine-tuning curation pipeline | `POST /v1/training-data/export`, `GET /v1/training-data/status/{id}`, `GET /v1/training-data/download/{id}` |
 
 ## Config Tab — Editable Configuration
 

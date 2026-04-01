@@ -78,12 +78,12 @@ class TestPageLoad:
 # ---------------------------------------------------------------------------
 
 class TestTabNavigation:
-    """Verify all 9 tabs are present and can be clicked."""
+    """Verify all 10 tabs are present and can be clicked."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup", "training"]
 
     def test_all_tab_buttons_present(self, ui_page: Page):
-        """All 9 tab buttons should be visible."""
+        """All 10 tab buttons should be visible."""
         for tab_name in self.TAB_NAMES:
             btn = ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]')
             expect(btn).to_be_visible(timeout=5000), f"Tab button '{tab_name}' not visible"
@@ -846,7 +846,7 @@ class TestFeaturesTab:
 class TestHelpPanels:
     """Verify each tab has a collapsible help wiki panel."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup", "training"]
 
     @pytest.mark.parametrize("tab_name", TAB_NAMES)
     def test_help_button_present(self, ui_page: Page, tab_name: str):
