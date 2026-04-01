@@ -23,9 +23,10 @@ import (
 // TSDB rows = "events in the last flush interval". Grafana: SUM(value) for totals.
 // Differs from Prometheus monotonically-increasing counters. TSDB model is simpler.
 type MetricsRecorder struct {
-	registry *Registry
-	writer   *tsdb.MetricWriter
-	spaceID  string
+	registry   *Registry
+	writer     *tsdb.MetricWriter
+	spaceID    string
+	instanceID string // e.g. "localhost:9999" — injected into every sample's labels
 
 	// Counter delta tracking — stores last-flushed value per counter key
 	lastCounterValues sync.Map // map[string]int64
@@ -55,6 +56,12 @@ func NewMetricsRecorder(registry *Registry, writer *tsdb.MetricWriter, spaceID s
 		spaceID:      spaceID,
 		maxBufferLen: 10000,
 	}
+}
+
+// SetInstanceID sets the instance identifier (e.g. "localhost:9999") that gets
+// injected into every metric sample's labels for multi-instance filtering.
+func (mr *MetricsRecorder) SetInstanceID(id string) {
+	mr.instanceID = id
 }
 
 // SetPreFlushHook registers a function called before each FlushToTSDB cycle.
@@ -133,6 +140,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 
 	now := time.Now()
 	var samples []tsdb.MetricSample
+	instanceID := mr.instanceID
 
 	mr.registry.mu.RLock()
 
@@ -159,7 +167,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "counter",
-			Labels:     copyLabels(c.labels),
+			Labels:     copyLabels(c.labels, instanceID),
 		})
 	}
 
@@ -180,7 +188,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "gauge",
-			Labels:     copyLabels(g.labels),
+			Labels:     copyLabels(g.labels, instanceID),
 		})
 		gaugeFlushed++
 	}
@@ -194,7 +202,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 
 		// Bucket samples
 		for le, cnt := range buckets {
-			lbls := copyLabels(h.labels)
+			lbls := copyLabels(h.labels, instanceID)
 			lbls["le"] = fmt.Sprintf("%.3f", le)
 			samples = append(samples, tsdb.MetricSample{
 				Time:       now,
@@ -217,7 +225,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "histogram_sum",
-			Labels:     copyLabels(h.labels),
+			Labels:     copyLabels(h.labels, instanceID),
 		})
 
 		// Count
@@ -229,7 +237,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "histogram_count",
-			Labels:     copyLabels(h.labels),
+			Labels:     copyLabels(h.labels, instanceID),
 		})
 
 		// Synthetic P95 / P99 gauges
@@ -243,7 +251,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "gauge",
-			Labels:     copyLabels(h.labels),
+			Labels:     copyLabels(h.labels, instanceID),
 		})
 		samples = append(samples, tsdb.MetricSample{
 			Time:       now,
@@ -253,7 +261,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Source:     "recorder",
 			QualityTag: "nominal",
 			MetricType: "gauge",
-			Labels:     copyLabels(h.labels),
+			Labels:     copyLabels(h.labels, instanceID),
 		})
 	}
 
@@ -372,10 +380,13 @@ func formatLabels(labels map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
-// copyLabels creates a copy of a labels map.
-func copyLabels(labels map[string]string) map[string]string {
-	result := make(map[string]string, len(labels)+1)
+// copyLabels creates a copy of a labels map, optionally injecting an instance label.
+func copyLabels(labels map[string]string, instanceID string) map[string]string {
+	result := make(map[string]string, len(labels)+2)
 	maps.Copy(result, labels)
+	if instanceID != "" {
+		result["instance"] = instanceID
+	}
 	return result
 }
 

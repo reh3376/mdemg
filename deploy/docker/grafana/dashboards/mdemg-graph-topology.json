@@ -67,7 +67,7 @@
       "collapsed": false
     },
     {
-      "title": "Layer Topology — 3D",
+      "title": "Layer Topology \u2014 3D",
       "description": "3D graph topology with layers stacked vertically. Nodes colored by layer, edges show cross-layer connections. Scroll to zoom, drag to rotate, click node to inspect.",
       "type": "text",
       "gridPos": {
@@ -86,7 +86,7 @@
       }
     },
     {
-      "title": "Layer Topology — 2D",
+      "title": "Layer Topology \u2014 2D",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -448,40 +448,54 @@
   "templating": {
     "list": [
       {
-        "name": "instance",
-        "label": "Instance",
-        "type": "custom",
-        "query": "localhost:9999",
+        "allValue": "",
         "current": {
+          "selected": false,
           "text": "localhost:9999",
           "value": "localhost:9999"
         },
-        "options": [
-          {
-            "text": "localhost:9999",
-            "value": "localhost:9999",
-            "selected": true
-          }
-        ]
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Instance",
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
-        "name": "space_id",
-        "label": "Space ID",
-        "type": "query",
-        "datasource": {
-          "type": "kniepdennis-neo4j-datasource",
-          "uid": "neo4j"
-        },
-        "query": {
-          "cypherQuery": "MATCH (n:MemoryNode) RETURN DISTINCT n.space_id AS __value, n.space_id AS __text ORDER BY n.space_id",
-          "Format": "table"
-        },
-        "refresh": 2,
-        "sort": 1,
+        "allValue": "",
         "current": {
+          "selected": false,
           "text": "mdemg-dev",
           "value": "mdemg-dev"
-        }
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       },
       {
         "name": "layers",

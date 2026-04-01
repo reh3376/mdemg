@@ -842,7 +842,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		fileWatcherMgr:          filewatcher.NewManager(),
 		cbRegistry:              cbRegistry,
 		metricsRegistry:         metricsRegistry,
-		metricsRecorder:         metrics.NewMetricsRecorder(metricsRegistry, nil, cfg.RSICWatchdogSpaceID),
+		metricsRecorder:         metrics.NewMetricsRecorder(metricsRegistry, nil, cfg.RSICWatchdogSpaceID), // instanceID set below
 		memoryPressure:          memPressure,
 		templateService:         conversation.NewTemplateService(driver),
 		snapshotService:         conversation.NewSnapshotService(driver),
@@ -868,6 +868,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		eventDispatcher:         plugins.NewEventDispatcher(pluginMgr),
 		enforcementLog:          newEnforcementEventLog(1000),
 		conflictDetector:        conflictDet,
+	}
+
+	// Set instance ID for metric labels (e.g. "localhost:9999")
+	if cfg.ListenAddr != "" {
+		addr := cfg.ListenAddr
+		if addr[0] == ':' {
+			addr = "localhost" + addr
+		}
+		s.metricsRecorder.SetInstanceID(addr)
 	}
 
 	// TSDB Sprint: Create LiveCollectors for real-time Prometheus gauges
@@ -962,14 +971,50 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		// Wire writer into MetricsRecorder for periodic flushing
 		if s.metricsRecorder != nil {
 			s.metricsRecorder.SetWriter(s.tsdbWriter)
-			// Pre-flush hook: refresh live protocol/sidecar/guidance gauge values
-			// before each TSDB write so dashboards show current data
-			if s.liveCollectors != nil {
+			// Pre-flush hook: refresh ALL gauge values before each TSDB write
+			// so dashboards show current data for all panels.
+			{
 				lc := s.liveCollectors
+				srv := s // capture server reference for infrastructure metrics
 				s.metricsRecorder.SetPreFlushHook(func() {
-					lc.CollectProtocolMetrics()
-					lc.CollectGuidanceMetrics()
-					lc.CollectHealthMetrics()
+					m := metrics.Metrics()
+
+					// Live collectors: protocol, guidance, RSIC health
+					if lc != nil {
+						lc.CollectProtocolMetrics()
+						lc.CollectGuidanceMetrics()
+						lc.CollectHealthMetrics()
+					}
+
+					// Infrastructure: circuit breakers
+					if srv.cbRegistry != nil {
+						_ = srv.cbRegistry.Get("openai-embeddings")
+						_ = srv.cbRegistry.Get("openai-rerank")
+						_ = srv.cbRegistry.Get("ollama-rerank")
+						_ = srv.cbRegistry.Get("ollama-embeddings")
+						m.CollectCircuitBreakerMetrics(srv.cbRegistry)
+					}
+
+					// Infrastructure: cache hit ratios
+					if srv.retriever != nil {
+						cacheStats := map[string]map[string]any{
+							"query":     srv.retriever.QueryCacheStats(),
+							"embedding": srv.retriever.EmbeddingCacheStats(),
+						}
+						m.CollectCacheMetrics(cacheStats)
+					}
+
+					// Infrastructure: Neo4j pool, graph, container
+					m.CollectNeo4jPoolMetrics()
+					graphData := srv.collectNeo4jGraphData()
+					m.CollectNeo4jGraphMetrics(graphData)
+					containerStats := srv.collectNeo4jContainerStats()
+					m.CollectNeo4jContainerMetrics(containerStats)
+
+					// Infrastructure: memory pressure
+					if srv.memoryPressure != nil {
+						m.CollectMemoryMetrics(srv.memoryPressure.HeapUsageMB()*1024*1024, srv.memoryPressure.RejectedCount())
+					}
 				})
 			}
 			s.metricsRecorder.Start(time.Duration(s.cfg.TSDBFlushIntervalSec) * time.Second)
@@ -2262,14 +2307,34 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 		containerName = "mdemg-neo4j"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Try multiple container name variants:
+	// 1. Configured name (e.g. "mdemg-neo4j-mdemg" from ContainerNameForProject)
+	// 2. That name + "-1" (Docker Compose v2 suffix)
+	// 3. Docker Compose v2 standard: "{project}-neo4j-1" (project = directory name)
+	candidates := []string{containerName, containerName + "-1", "mdemg-neo4j-1"}
+	// Deduplicate
+	seen := make(map[string]bool, len(candidates))
+	var unique []string
+	for _, c := range candidates {
+		if !seen[c] {
+			seen[c] = true
+			unique = append(unique, c)
+		}
+	}
 
-	// docker stats --no-stream --format '{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'
-	out, err := exec.CommandContext(ctx, "docker", "stats", containerName,
-		"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
+	var out []byte
+	var err error
+	for _, name := range unique {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		out, err = exec.CommandContext(ctx, "docker", "stats", name,
+			"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
+		cancel()
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
-		slog.Error("metrics: docker stats failed", "error", err)
+		slog.Error("metrics: docker stats failed", "error", err, "tried", unique)
 		return s.containerStatsCache.data
 	}
 
