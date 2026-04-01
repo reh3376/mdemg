@@ -98,13 +98,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Generate checksums and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd artifacts
-          find . -type f -name "mdemg-*" -exec mv {} . \;
           shasum -a 256 mdemg-* > checksums.txt
           cat checksums.txt
 

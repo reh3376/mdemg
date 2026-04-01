@@ -10,7 +10,7 @@
 | **SUB-REPO 1**: homebrew-mdemg (macOS Homebrew tap) | `https://github.com/reh3376/homebrew-mdemg.git` |
 | **SUB-REPO 2**: autoresearch (research) | `https://github.com/reh3376/autoresearch.git` |
 
-> **Note:** Sub-repos are git submodules at `packaging/homebrew-mdemg` and `packaging/autoresearch`. 5 repos archived in DOCKER-P3: mdemg-windows, mdemg-menubar, mdemg_linux, mdemg-linux-sidebar, apt-mdemg.
+> **Note:** Sub-repos are git submodules at `packaging/homebrew-mdemg` and `packaging/autoresearch`.
 > **Windows/Linux**: WSL2 required for Windows. Linux uses `scripts/install.sh` from main repo (no separate installer repo).
 
 ---
