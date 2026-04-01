@@ -656,7 +656,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_neo4j_graph_total_nodes','mdemg_neo4j_graph_total_edges') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, metric_name AS metric, avg(value) AS value FROM metric_samples WHERE metric_name IN ('mdemg_neo4j_graph_total_nodes','mdemg_neo4j_graph_total_edges') AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, metric_name ORDER BY 1",
           "format": "time_series"
         }
       ],
