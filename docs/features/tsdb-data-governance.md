@@ -175,6 +175,66 @@ The `DatasetProvider` interface allows mocking without a database. 6 TSDB-aware 
 
 The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `timescaledb` datasource, showing metric trends, collection rates, and writer health. The J17 dashboard includes trust score trend panels. The RSIC dashboard (`mdemg-rsic.json`) includes a "Data-Driven Insights" row with LLM Performance by Task, Retrieval Pipeline Health, Training Data Volume, and Trust Trajectory panels.
 
+## Training Data Export (FT-DATA Sprint)
+
+The export pipeline extracts TSDB training data as `.tar.gz` archives for the LoRA fine-tuning curation pipeline.
+
+### Export Architecture
+
+```
+TSDB (pgx streaming) → per-row JSON marshal → privacy scan → bufio.Writer → tar.Writer → gzip.Writer → .tar.gz
+```
+
+Memory: O(1) per row. Privacy scanning happens during streaming — not as a post-process.
+
+### Privacy Scan Scope (Export)
+
+Export scans **all** text fields across all 3 tables — a broader scope than the write-time scrubber (which only covers 4 fields in `llm_interactions`). Training data leaves the machine — different threat model than internal logging.
+
+| Table | Scrubbed Fields |
+|-------|----------------|
+| `llm_interactions` | system_prompt, user_prompt, response, think_content, source_path |
+| `embedding_events` | text_content, file_path, signature, query_text |
+| `retrieval_events` | query_text |
+
+If any violation is detected, the export is **BLOCKED** with zero output (hard gate).
+
+### UTDS Validation
+
+Export archives are validated against the UTDS (Universal Training Data Specification) JSON Schema at `docs/tests/utds/schema/utds.schema.json`. Key constraints:
+- `privacy_scrub_violations == 0` (hard gate)
+- `schema_version >= 7`
+- SHA-256 checksums match actual file contents
+- Row counts match actual JSONL line counts
+
+### Curation Pipeline
+
+After export, Python tools in `neural/training/` process the data:
+
+```
+export.tar.gz → quality_filter.py → format_converter.py → dataset_versioner.py → MLX-ready dataset
+```
+
+| Tool | Purpose |
+|------|---------|
+| `quality_filter.py` | 8 quality gates: privacy, empty response, errors, duplicates, latency, model, stale prompts, ULTS validation |
+| `format_converter.py` | Converts to HuggingFace MLX chat format with RAFT 80/20 context handling |
+| `dataset_versioner.py` | Temporal train/test/val split, cross-source dedup, SHA-256 per split, manifest generation |
+
+### CLI
+
+```bash
+# Export
+mdemg data export --space-id mdemg-dev --output /tmp/export.tar.gz
+
+# Filter
+cd neural && PYTHONPATH=. python3 -m training.quality_filter --input /tmp/raw/llm_interactions.jsonl --output /tmp/filtered/llm_interactions.jsonl --ults-dir ../docs/tests/ults/specs/
+
+# Convert + Version
+PYTHONPATH=. python3 -m training.format_converter --input /tmp/filtered/llm_interactions.jsonl --output /tmp/converted/train.jsonl
+PYTHONPATH=. python3 -m training.dataset_versioner --input-dir /tmp/filtered/ --output-dir /tmp/curated/v1/ --version v1
+```
+
 ## Documents Accessed
 
 - `internal/config/config.go` — TSDB config flag definitions and defaults (lines 778-790, 3076-3109)

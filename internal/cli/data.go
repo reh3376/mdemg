@@ -31,6 +31,7 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataAnnotateCmd())
 	cmd.AddCommand(newDataQualityCmd())
 	cmd.AddCommand(newDataAuditCmd())
+	cmd.AddCommand(newDataExportCmd())
 
 	return cmd
 }

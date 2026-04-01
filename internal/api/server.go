@@ -1942,6 +1942,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
 	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
 
+	// Training Data Export (FT-DATA Sprint)
+	mux.Handle("/v1/training-data/export", scopedHandler(auth.ScopeAdminSpaces, s.handleTrainingDataExport))
+	mux.HandleFunc("/v1/training-data/status/", s.handleTrainingDataStatus)
+	mux.HandleFunc("/v1/training-data/download/", s.handleTrainingDataDownload)
+
 	// SSE streaming endpoint for job progress (Phase 48.3.3)
 	mux.HandleFunc("/v1/jobs/", s.handleJobStream)
 

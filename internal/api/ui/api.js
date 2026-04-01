@@ -97,6 +97,11 @@ export const backupRestore = (backupId) =>
     post('/v1/backup/restore', { backup_id: backupId });
 export const restoreStatus = (id) => get(`/v1/backup/restore/status/${encodeURIComponent(id)}`);
 
+// --- Training Data Export ---
+export const trainingDataExport = (req) => post('/v1/training-data/export', req);
+export const trainingDataStatus = (id) => get(`/v1/training-data/status/${encodeURIComponent(id)}`);
+export const trainingDataDownloadURL = (id) => `${_baseURL}/v1/training-data/download/${encodeURIComponent(id)}`;
+
 export const spaceExport = (spaceId, profile = 'full') =>
     post('/v1/admin/spaces/export', { space_id: spaceId, profile });
 

@@ -22,19 +22,14 @@
     "max_tokens": 500
   },
   "output_schema": {
-    "type": "object",
-    "required": ["categories"],
-    "properties": {
-      "categories": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "required": ["name"],
-          "properties": {
-            "name": { "type": "string" },
-            "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
-          }
-        }
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "keywords": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
       }
     }
   },

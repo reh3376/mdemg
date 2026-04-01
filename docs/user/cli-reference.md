@@ -1865,7 +1865,7 @@ mdemg teardown --full --yes
 
 ### `mdemg data`
 
-Parent command for training data collection management. Subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`.
+Parent command for training data collection management. Subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`, `audit`, `export`.
 
 Training data is collected automatically during LLM interactions when `NEURAL_DATA_COLLECTION` is enabled. Records are stored in TimescaleDB and optionally exported as JSONL files to `.mdemg/neural/training-data/`.
 
@@ -1988,6 +1988,49 @@ mdemg data audit --space-id mdemg-dev
 ```
 
 **See Also:** `mdemg data status`, `mdemg ingest-claude-md`
+
+---
+
+### `mdemg data export`
+
+**Synopsis:** `mdemg data export [flags]`
+
+Export TSDB training data as a `.tar.gz` archive containing JSONL files and a UTDS-compliant `manifest.json`. Streams rows via pgx with O(1) memory. Privacy scans all text fields across all tables — export is BLOCKED if any violations are detected.
+
+The export archive can be fed into the Python curation pipeline: `quality_filter.py` → `format_converter.py` → `dataset_versioner.py` to produce MLX-ready training datasets.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--output` | string | `mdemg-export-{instance}-{date}.tar.gz` | Output file path |
+| `--instance-id` | string | `{user}-{space_id}` | Instance identifier for manifest |
+| `--since` | string | 180 days ago | Start of export time range (RFC3339) |
+| `--until` | string | now | End of export time range (RFC3339) |
+| `--tables` | strings | `llm_interactions,retrieval_events,embedding_events` | Tables to include |
+| `--exclude-embedding` | bool | `false` | Skip embedding_events table |
+| `--dry-run` | bool | `false` | Show row counts without exporting |
+| `--no-validate` | bool | `false` | Skip UTDS validation after export |
+
+**Usage Examples:**
+```bash
+# Export all tables (default: last 180 days)
+mdemg data export --space-id mdemg-dev --output /tmp/export.tar.gz
+
+# Export LLM interactions only
+mdemg data export --space-id mdemg-dev --tables llm_interactions
+
+# Dry run to check row counts
+mdemg data export --space-id mdemg-dev --dry-run
+
+# Export with custom time range
+mdemg data export --space-id mdemg-dev --since 2026-01-01T00:00:00Z --until 2026-04-01T00:00:00Z
+
+# Skip embedding_events (large table)
+mdemg data export --space-id mdemg-dev --exclude-embedding
+```
+
+**Privacy Gate:** The exporter scans 10 text fields across 3 tables using the same 5 regex patterns as the write-time scrubber (`internal/llmclient/scrubber.go`). If any privacy violation is detected, the export is **BLOCKED** — no partial archive is written.
+
+**See Also:** `mdemg data status`, `mdemg data stats`
 
 ---
 

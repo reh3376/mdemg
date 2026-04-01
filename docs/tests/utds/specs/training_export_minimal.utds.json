@@ -1,0 +1,47 @@
+{
+  "utds_version": "1.0.0",
+  "export_id": "exp-minimal-test-20260401-120000",
+  "instance_id": "minimal-test",
+  "space_id": "test",
+  "mdemg_version": "v0.4.1",
+  "mdemg_commit": "deadbeef",
+  "schema_version": 7,
+  "exported_at": "2026-04-01T12:00:00Z",
+  "data_range": {
+    "from": "2026-04-01T00:00:00Z",
+    "to": "2026-04-01T12:00:00Z"
+  },
+  "tables": {
+    "llm_interactions": {
+      "row_count": 5,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "columns": [
+        "time", "trace_id", "task_name", "space_id", "session_id",
+        "system_prompt", "user_prompt", "response", "think_content", "think_mode",
+        "latency_ms", "tokens_in", "tokens_out", "model_name", "provider",
+        "error", "quality", "quality_source", "used_for_train", "dataset_ver",
+        "guidance_id", "source_path", "retrieval_node_ids", "retrieval_scores",
+        "oracle_node_id", "system_prompt_hash"
+      ],
+      "task_names": ["retrieval.rerank_cross"],
+      "system_prompt_hashes": [
+        "aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344"
+      ]
+    }
+  },
+  "quality_summary": {
+    "llm_error_rate": 0.0,
+    "llm_empty_system_prompt": 0,
+    "llm_empty_response": 0,
+    "privacy_scrub_violations": 0
+  },
+  "environment": {
+    "os": "darwin",
+    "arch": "arm64",
+    "go_version": "1.24",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4.1",
+    "embedding_model": "text-embedding-3-large",
+    "embedding_dimensions": 3072
+  }
+}

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Unreleased — FT-DATA Training Data Export + Curation Pipeline)
+
+- **UTDS Spec Framework** (`docs/tests/utds/`): 14th UxTS framework — JSON Schema validating export `manifest.json` files. Schema enforces `privacy_scrub_violations == 0` (hard gate), `schema_version >= 7`, `export_id` pattern `^exp-`. 3 fixture specs (standard/llm-only/minimal), validation runner, 23 unit tests.
+- **`mdemg data export` CLI** (`internal/cli/data_export.go`): Export TSDB training data as `.tar.gz` archives containing JSONL + manifest. Flags: `--tables`, `--since`, `--until`, `--exclude-embedding`, `--dry-run`, `--no-validate`. Streams rows via pgx with O(1) memory. Privacy scans ALL 10 text fields across 3 tables (llm_interactions, retrieval_events, embedding_events) — export BLOCKED if any violations detected.
+- **Training Data Export API** (`internal/api/handlers_training_data.go`): `POST /v1/training-data/export` (async via jobs queue), `GET /v1/training-data/status/{id}`, `GET /v1/training-data/download/{id}`. Auth: `ScopeAdminSpaces`.
+- **Training Data Browser Tab** (`internal/api/ui/tabs/training_data.js`): 10th browser UI tab — export form with table selection, date range, status polling at 5s, download on completion.
+- **`quality_filter.py`** (`neural/training/quality_filter.py`): 8 quality gates (privacy hard-reject, empty response, error present, duplicate prompt, latency exceeded, unknown model, stale prompt hash, ULTS output invalid). Privacy patterns mirror Go scrubber exactly. 25 unit tests.
+- **`format_converter.py`** (`neural/training/format_converter.py`): Converts filtered JSONL to HuggingFace MLX chat format. RAFT 80/20 context handling (deterministic via SHA-256 trace_id seed). Think-mode wrapping. MLX format validation. 21 unit tests.
+- **`dataset_versioner.py`** (`neural/training/dataset_versioner.py`): Temporal train/test/val splits (NEVER random), cross-source deduplication, SHA-256 per split, task balance warnings, exogenous ratio checks, dataset manifest generation. 20 unit tests.
+- **Round-trip verified**: TSDB → export (449 rows) → UTDS validate (26/26) → quality filter (449→287) → format convert (287 MLX) → dataset version (229 train / 28 test / 30 val) — all quality gates passed.
+
 ### Added (Unreleased — Distribution Automation)
 
 - **Edge binary CI** (`.github/workflows/cli-publish.yml`): Platform-specific CLI binaries built on every push to main. Published as rolling `edge` GitHub Release with SHA-256 checksums. Supports darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 via CGO + zig cross-compilation.
