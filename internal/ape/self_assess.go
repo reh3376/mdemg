@@ -13,6 +13,7 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/tsdb"
 )
 
 // SynergyFileReader provides synergy file metrics for RSIC assessment.
@@ -42,6 +43,7 @@ type Assessor struct {
 	freshnessProvider FreshnessProvider     // Phase 47.2: ingest staleness provider
 	sidecarChecker    func(context.Context) bool  // Sidecar health checker (nil = not configured)
 	reportCallback    func(*SelfAssessmentReport) // TSDB Sprint: called after Assess with the report
+	datasetProvider   tsdb.DatasetProvider         // RSIC-DATA: TSDB curated datasets for trend analysis
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.
@@ -78,6 +80,11 @@ func (a *Assessor) SetSidecarChecker(fn func(context.Context) bool) {
 // Used by LiveCollectors to cache the latest report for inter-cycle health publishing.
 func (a *Assessor) SetReportCallback(cb func(*SelfAssessmentReport)) {
 	a.reportCallback = cb
+}
+
+// SetDatasetProvider attaches a TSDB curated dataset provider for trend analysis (RSIC-DATA).
+func (a *Assessor) SetDatasetProvider(p tsdb.DatasetProvider) {
+	a.datasetProvider = p
 }
 
 // Assess runs the assessment stage and returns a SelfAssessmentReport.
@@ -180,6 +187,31 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 			slog.Warn("RSIC assess: freshness query failed", "error", fErr)
 		} else {
 			report.StaleIngestSpaces = staleCount
+		}
+	}
+
+	// 5f. TSDB datasets (if available) — populate LLM, retrieval, embedding, training readiness
+	if a.datasetProvider != nil {
+		window := 24 * time.Hour
+		if llmPerf, dErr := a.datasetProvider.LLMPerformance(ctx, spaceID, window); dErr == nil {
+			report.LLMPerformance = llmPerf
+		} else {
+			slog.Warn("RSIC assess: LLM performance query failed", "error", dErr)
+		}
+		if retQual, dErr := a.datasetProvider.RetrievalQuality(ctx, spaceID, window); dErr == nil {
+			report.RetrievalDataset = retQual
+		} else {
+			slog.Warn("RSIC assess: retrieval quality query failed", "error", dErr)
+		}
+		if embCov, dErr := a.datasetProvider.EmbeddingCoverage(ctx, spaceID, window); dErr == nil {
+			report.EmbeddingDataset = embCov
+		} else {
+			slog.Warn("RSIC assess: embedding coverage query failed", "error", dErr)
+		}
+		if readiness, dErr := a.datasetProvider.TrainingDataReadiness(ctx); dErr == nil {
+			report.TrainingReadiness = readiness
+		} else {
+			slog.Warn("RSIC assess: training readiness query failed", "error", dErr)
 		}
 	}
 

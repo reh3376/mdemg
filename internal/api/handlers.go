@@ -17,7 +17,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
-	"mdemg/internal/ape"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
 	"mdemg/internal/jobs"
@@ -3873,8 +3872,7 @@ func (s *Server) handleMetricsTrends(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	analyzer := ape.NewTrendAnalyzer(s.tsdbClient)
-	points, err := analyzer.Query(ctx, tsdb.MetricQuery{
+	points, err := s.tsdbClient.Query(ctx, tsdb.MetricQuery{
 		SpaceID:     spaceID,
 		MetricName:  metric,
 		From:        from,

@@ -271,6 +271,20 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeReviewNLICalibration(ctx, at.Spec.TargetSpace)
 	case "alert_sidecar_down":
 		deliverables, execErr = d.executeAlertSidecarDown(ctx, at.Spec.TargetSpace)
+	// RSIC-DATA: TSDB-aware action handlers
+	case "review_llm_provider":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "LLM provider performance issue detected")
+	case "alert_llm_health":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "LLM error rate spike")
+	case "alert_embedding_regression":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "Embedding pipeline regression: empty call_sites")
+	case "trigger_training_pipeline":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "Training data threshold reached")
+	// Gap fixes: handlers referenced by existing reflection patterns
+	case "alert_tsdb_health":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "TSDB health alert")
+	case "alert_schema_drift":
+		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "TSDB schema drift detected")
 	default:
 		execErr = fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -821,4 +835,18 @@ func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, s
 	d.mu.Lock()
 	d.reports[taskID] = append(d.reports[taskID], report)
 	d.mu.Unlock()
+}
+
+// executeAlertLog is a generic alert/log handler for RSIC-DATA and gap-fix actions.
+func (d *Dispatcher) executeAlertLog(_ context.Context, spec RSICTaskSpec, message string) (map[string]any, error) {
+	slog.Warn("RSIC alert", "action", spec.ActionType, "space", spec.TargetSpace, "message", message, "rationale", spec.Rationale)
+	if m := metrics.Metrics(); m != nil {
+		m.RSICActionTotal(spec.ActionType, "success").Inc()
+	}
+	return map[string]any{
+		"alerted":  true,
+		"action":   spec.ActionType,
+		"space_id": spec.TargetSpace,
+		"message":  message,
+	}, nil
 }

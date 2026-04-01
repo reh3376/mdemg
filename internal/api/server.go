@@ -1022,6 +1022,9 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		// Wire TSDB client into RSIC reflector for schema drift detection
 		if s.rsicCycle != nil {
 			s.rsicCycle.SetTSDBClient(client)
+			// Wire TSDB dataset builder for RSIC data-driven reflection
+			datasetBuilder := tsdb.NewDatasetBuilder(client.Pool())
+			s.rsicCycle.SetDatasetProvider(datasetBuilder)
 		}
 		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
 
