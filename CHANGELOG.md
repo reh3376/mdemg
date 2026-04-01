@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session-start version check**: Hook detects CLI/server commit mismatch and warns with upgrade instructions.
 - **Install script edge channel**: `CHANNEL=edge bash install.sh` downloads the latest edge binary (bare format, no tar.gz extraction).
 
+### Added (Unreleased — DATA-GOV Data Governance)
+
+- **DATA-GOV Sprint 2: TSDB Data Quality Diagnostic Script** (`scripts/tsdb_data_review.py`): Comprehensive Python diagnostic that connects to TimescaleDB and produces a data quality report across all 8 TSDB tables. 7 diagnostic sections: schema health, metric_samples catalog, llm_interactions analysis (task coverage, error rate, latency percentiles, privacy scrub verification), embedding_events (call_site regression check, scrub asymmetry), retrieval_events (pipeline stage completeness, hard-negative mining viability), ft_* tables, cross-cutting analysis (growth rates, flush gap detection, config flag check). Output formats: text (ANSI color), JSON, or both. Privacy patterns mirror `internal/llmclient/scrubber.go` exactly. 17 unit tests. UV project setup (`scripts/pyproject.toml`).
+- **DATA-GOV Sprint 1: Pipeline Gap Fixes**: System prompt coverage for all LLM callers, call_site propagation fixes, PROMPT-COV (system prompt hash + coverage analysis).
+- **DATA-GOV Sprint 0: TSDB_ENABLED Fix**: `TSDB_ENABLED=true` in Docker compose environment, `TSDB_AUTO_MIGRATE` env var support in `serve.go`. Feature doc: `docs/features/tsdb-data-governance.md`.
+
+### Added (Unreleased — J17 Comprehension Pipeline)
+
+- **J17 Comprehension Pipeline 5-Break Fix**: Sigmoid normalization midpoint 2.0→1.5 (retrieval_source.go + consulting/service.go), NLI guard broadened for non-constraint items, constraint_code propagation in hidden layer, trust relevance filter (trustRelevanceThreshold=0.5).
+- **J17 Trust Parameter Rebalance**: Initial trust 0.5→0.65, high threshold 0.8→0.75, boost +0.05/follow, decay -0.02/ignore, -0.04/contradict. T1 compression achievable in 3 follows instead of 7+.
+- **TSDB Trust Score Historization**: 4 new Prometheus gauges (`j17_avg_trust_score`, `j17_min_trust_score`, `j17_max_trust_score`, `j17_trust_session_count`) wired through TrustScorer.Aggregates() → ProtocolMetrics → adapter → live_collectors → TSDB flush. J17 Grafana dashboard: Trust Score row with 4 stat panels + trend timeseries.
+- **Multi-Instance UI Dropdown**: Instance selector in browser dashboard header for switching between MDEMG instances.
+
 ### Fixed (Unreleased)
 
 - **TSDB_ENABLED not set in Docker flow**: `docker-compose.yml` now sets `TSDB_ENABLED: "true"`, `TSDB_AUTO_MIGRATE: "true"`, and `TSDB_OPTIONAL: "true"` in the mdemg service environment. `mdemg init` writes `TSDB_ENABLED=true` to `.env`. Without this, TimescaleDB metrics collection was silently disabled in Docker deployments.

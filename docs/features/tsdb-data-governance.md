@@ -114,6 +114,37 @@ LLM interaction logs pass through `internal/llmclient/scrubber.go` before being 
 
 ## Data Quality Monitoring
 
+### Diagnostic Script (DATA-GOV Sprint 2)
+
+`scripts/tsdb_data_review.py` is a comprehensive Python diagnostic that connects to TimescaleDB and produces a data quality report across all 8 TSDB tables. It is the primary tool for assessing TSDB data quality before remediation.
+
+```bash
+# Quick text report
+cd scripts && uv run python tsdb_data_review.py
+
+# JSON output for programmatic analysis
+uv run python tsdb_data_review.py --format json --output report.json
+
+# Both text + JSON with verbose detail
+uv run python tsdb_data_review.py --format both --verbose
+```
+
+**7 Diagnostic Sections:**
+
+| Section | Coverage |
+|---------|----------|
+| A: Schema Health | Schema version, table presence, indexes, continuous aggregates |
+| B: metric_samples | Catalog, prefix distribution, daily gaps, labels, near-duplicates |
+| C: llm_interactions | Task coverage, error rate, column population, latency percentiles, token usage, privacy scrub verification |
+| D: embedding_events | Call_site regression check, cache hit rate, model consistency, scrub asymmetry |
+| E: retrieval_events | Pipeline stage completeness, hard-negative mining viability, latency breakdown |
+| F: ft_* tables | All 4 expected empty (FT pipeline not yet built) |
+| G: Cross-cutting | Growth rates, flush gap detection, temporal coverage, config flag check via HTTP |
+
+**Privacy verification**: Mirrors 5 regex patterns from `internal/llmclient/scrubber.go` exactly. Checks that `llm_interactions` fields are scrubbed and that `embedding_events.query_text` is NOT scrubbed (required for contrastive training).
+
+**Finding levels**: CRITICAL (action required), WARNING (investigate), INFO (informational). Exit code 1 on any CRITICAL findings.
+
 ### CLI Commands
 
 - `mdemg data status` — TSDB connection health and table row counts
@@ -122,9 +153,13 @@ LLM interaction logs pass through `internal/llmclient/scrubber.go` before being 
 - `mdemg data quality` — Data quality checks (NULL rates, gap detection)
 - `mdemg data audit` — Privacy audit (scrub pattern detection)
 
+### Spot Check Script
+
+`scripts/tsdb_spot_check.sh` provides a quick bash-based spot check of TSDB table health. The Python diagnostic (`tsdb_data_review.py`) is the more comprehensive tool and should be preferred for data quality assessments.
+
 ### Grafana Dashboards
 
-The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `timescaledb` datasource, showing metric trends, collection rates, and writer health.
+The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `timescaledb` datasource, showing metric trends, collection rates, and writer health. The J17 dashboard includes trust score trend panels.
 
 ## Documents Accessed
 
@@ -140,3 +175,13 @@ The mdemg-overview Grafana dashboard includes TSDB panels sourced from the `time
 - `internal/api/server.go` — TSDB client wiring (SetTSDBClient)
 - `docker-compose.yml` — Docker TSDB environment overrides
 - `docs/features/docker-deployment.md` — TSDB config flags table
+- `scripts/tsdb_data_review.py` — DATA-GOV Sprint 2 diagnostic script (7 sections, privacy verification)
+- `scripts/pyproject.toml` — UV project config for diagnostic scripts
+- `scripts/tests/test_tsdb_data_review.py` — 17 unit tests for diagnostic script
+- `scripts/tsdb_spot_check.sh` — Quick bash spot check (Sprint 2 baseline comparison)
+- `internal/ape/live_collectors.go` — Trust score gauge publishing
+- `internal/jiminy/trust.go` — TrustScorer.Aggregates() method
+- `internal/jiminy/protocol_metrics.go` — Trust fields on ProtocolMetrics struct
+- `internal/ape/types_rsic.go` — Trust fields on ProtocolStatsResult
+- `internal/metrics/collectors.go` — Trust score TSDB gauge registration
+- `deploy/docker/grafana/dashboards/mdemg-j17.json` — J17 dashboard trust panels
