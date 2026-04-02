@@ -21,6 +21,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+	"mdemg/internal/cli/compose_templates"
 	"mdemg/internal/config"
 )
 
@@ -808,6 +809,21 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 	}
 	fmt.Printf("    %-16s %s\n", "Project name:", projectName)
 	fmt.Println()
+
+	// Write docker-compose.yml if not already present (Homebrew/edge binary installs)
+	composePath := filepath.Join(cwd, "docker-compose.yml")
+	if _, err := os.Stat(composePath); os.IsNotExist(err) {
+		composeData, readErr := compose_templates.FS.ReadFile("docker-compose.yml")
+		if readErr != nil {
+			return fmt.Errorf("read embedded docker-compose.yml: %w", readErr)
+		}
+		if writeErr := os.WriteFile(composePath, composeData, 0644); writeErr != nil {
+			return fmt.Errorf("write docker-compose.yml: %w", writeErr)
+		}
+		fmt.Println("  Wrote docker-compose.yml to project directory")
+	} else if err == nil {
+		fmt.Println("  Using existing docker-compose.yml")
+	}
 
 	// Run docker compose up
 	fmt.Println("Starting Docker Compose services...")

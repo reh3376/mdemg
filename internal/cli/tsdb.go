@@ -62,6 +62,20 @@ func newTSDBCmd() *cobra.Command {
 	return cmd
 }
 
+// resolveComposeFilePath returns the path to a Docker Compose file,
+// checking the working directory first (Homebrew/edge install where init
+// writes the embedded compose file), then the repo-relative path
+// (development checkout).
+func resolveComposeFilePath() string {
+	if _, err := os.Stat("docker-compose.yml"); err == nil {
+		return "docker-compose.yml"
+	}
+	if _, err := os.Stat("deploy/docker/docker-compose.observability.yml"); err == nil {
+		return "deploy/docker/docker-compose.observability.yml"
+	}
+	return "docker-compose.yml"
+}
+
 // newTSDBStartCmd creates the `tsdb start` subcommand.
 func newTSDBStartCmd() *cobra.Command {
 	return &cobra.Command{
@@ -69,14 +83,13 @@ func newTSDBStartCmd() *cobra.Command {
 		Short: "Start the TimescaleDB container",
 		Long: `Start the TimescaleDB Docker container via docker compose.
 
-Uses the observability compose file at deploy/docker/docker-compose.observability.yml.
-
 Examples:
   mdemg tsdb start`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Starting TimescaleDB container...")
+			composePath := resolveComposeFilePath()
 			c := exec.Command("docker", "compose",
-				"-f", "deploy/docker/docker-compose.observability.yml",
+				"-f", composePath,
 				"up", "-d", "timescaledb")
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
@@ -100,8 +113,9 @@ Examples:
   mdemg tsdb stop`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Stopping TimescaleDB container...")
+			composePath := resolveComposeFilePath()
 			c := exec.Command("docker", "compose",
-				"-f", "deploy/docker/docker-compose.observability.yml",
+				"-f", composePath,
 				"stop", "timescaledb")
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
