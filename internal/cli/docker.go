@@ -80,6 +80,40 @@ func CheckDockerResources() (DockerResources, []string) {
 	return res, warnings
 }
 
+// Neo4jMemoryConfig holds computed Neo4j memory settings based on available RAM.
+type Neo4jMemoryConfig struct {
+	Pagecache   string
+	HeapInit    string
+	HeapMax     string
+	MaxPoolSize int
+}
+
+// neo4jMemoryTier returns Neo4j memory settings appropriate for the given
+// system RAM (in gigabytes). The tiers ensure Neo4j does not overwhelm
+// smaller machines while still performing well on larger ones.
+func neo4jMemoryTier(systemRAMGB int) Neo4jMemoryConfig {
+	switch {
+	case systemRAMGB <= 16:
+		return Neo4jMemoryConfig{"512M", "256M", "512M", 50}
+	case systemRAMGB <= 32:
+		return Neo4jMemoryConfig{"1G", "512M", "1G", 75}
+	case systemRAMGB <= 64:
+		return Neo4jMemoryConfig{"2G", "512M", "2G", 100}
+	default:
+		return Neo4jMemoryConfig{"2G", "1G", "2G", 100}
+	}
+}
+
+// DetectSystemRAMGB returns the total system RAM in gigabytes (rounded down),
+// or 0 if detection fails.
+func DetectSystemRAMGB() int {
+	bytes, err := detectSystemRAMBytes()
+	if err != nil {
+		return 0
+	}
+	return int(bytes / (1024 * 1024 * 1024))
+}
+
 // InspectContainer returns the state of a named Docker container.
 func InspectContainer(name string) (ContainerState, error) {
 	out, err := RunDockerCommand("inspect", "--format", "{{.State.Status}}", name)

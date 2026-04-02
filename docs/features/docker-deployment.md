@@ -90,6 +90,19 @@ Generate .mdemgignore → docker compose up -d → Health check loop
 
 Port variables are dynamically assigned by `mdemg init`. Credential variables are prompted interactively (or use defaults with `--defaults`/`--quick`).
 
+### Neo4j Memory Tiering
+
+`mdemg init` detects system RAM and auto-configures Neo4j memory via `.env`:
+
+| System RAM | `NEO4J_PAGECACHE` | `NEO4J_HEAP_INIT` | `NEO4J_HEAP_MAX` | `NEO4J_MAX_POOL_SIZE` |
+|---|---|---|---|---|
+| ≤16 GB | 512M | 256M | 512M | 50 |
+| ≤32 GB | 1G | 512M | 1G | 75 |
+| ≤64 GB | 2G | 512M | 2G | 100 |
+| ≥65 GB | 2G | 1G | 2G | 100 |
+
+The compose file defaults (`512M/256M/512M`) are conservative — safe for manual `docker compose up` without running `mdemg init`. Running `mdemg init` writes the tier-appropriate values to `.env`, overriding the compose defaults.
+
 ### Dockerfile
 
 `deploy/docker/Dockerfile.prod`: 2-stage build (Go 1.26 builder → alpine:3.19 runtime). `LISTEN_PORT` env var configures the healthcheck URL for portability across compose configurations.
@@ -113,7 +126,7 @@ TimescaleDB stores operational metrics, LLM interaction logs, embedding events, 
 | SSL mode | `TSDB_SSL_MODE` | `disable` | PostgreSQL SSL mode |
 | Max conns | `TSDB_MAX_CONNS` | `10` | Connection pool size |
 | Flush interval | `TSDB_FLUSH_INTERVAL_SEC` | `60` | Seconds between batch flushes to TSDB |
-| Schema version | `TSDB_REQUIRED_SCHEMA_VERSION` | `7` | Required schema version (server refuses to start if behind) |
+| Schema version | `TSDB_REQUIRED_SCHEMA_VERSION` | `8` | Required schema version (server refuses to start if behind) |
 
 ### Event Logging Flags
 

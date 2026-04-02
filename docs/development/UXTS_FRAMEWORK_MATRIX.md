@@ -64,7 +64,7 @@ Last updated: 2026-04-01
 | UAMS | N/A (no runner) | All | N/A |
 | UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
 | ULTS | All required fields, version format, task name format, quality weights sum, prompt hash format | none | Yes (parity hard-fail for unknown fields) |
-| UTDS | All required fields, export_id pattern, schema_version ≥ 7, SHA-256 checksums, row counts, privacy hard gate (violations = 0) | none | Yes (hard-fail on privacy violations, unknown tables, schema mismatch) |
+| UTDS | All required fields, export_id pattern, schema_version ≥ 8, SHA-256 checksums, row counts, privacy hard gate (violations = 0) | none | Yes (hard-fail on privacy violations, unknown tables, schema mismatch) |
 
 ---
 
