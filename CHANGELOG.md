@@ -7,7 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (Unreleased — FT-DATA Training Data Export + Curation Pipeline)
+## [0.5.1] - 2026-04-02
+
+### Added
+
+- Embedded `docker-compose.yml` in binary for Homebrew/edge installs — `mdemg init` works without repo checkout (PR #244)
+- `mdemg data export-auto` command with retention management (`--keep N`) and `latest.tar.gz` symlink (PR #245)
+- Training-export LaunchAgent for automated 24h export cycle via `mdemg service install` (PR #245)
+- vllm-mlx setup guide (`docs/operations/vllm-mlx-setup.md`) with M5 Max memory budget and prefix caching docs (PR #246)
+- 16-task smoke test for vllm-mlx (`scripts/test_vllm_mlx.py`) validating all ULTS tasks through OpenAI-compatible API (PR #246)
+- `train_ft.py` — LoRA fine-tuning script with manifest validation, anti-collapse gate (exogenous ratio >= 0.4), and ULTS-aware LoRA rank resolution (PR #246)
+- `evaluate_ft.py` — per-task evaluation against held-out test set using ULTS quality_metrics contract, supports stored responses and live inference (PR #247)
+- `regression_gate.py` — deployment gate comparing candidate vs baseline eval reports: no task regresses >5%, >=2 tasks improve >=2%, JSON validity >=95%, overall score >= baseline. Exits PASS/FAIL/WARN (PR #248)
+- `teacher_distill.py` — synthetic training data generation for under-represented tasks using teacher LLM with exact MDEMG system prompts, Go source prompt extraction, input templates for all 16 tasks (PR #249)
+- `reward_functions.py` — 21 GRPO reward functions covering all 18 ULTS reward_function names. Registry with `get_reward_function()` and `compute_reward()` API (PR #249)
+- `quantize_deploy.py` — fuse LoRA adapter into base model via `mlx_lm.fuse`, quantize to 4-bit/8-bit, optional verification inference (PR #250)
+- `mlx-lm` optional dependency in `pyproject.toml` `[lora]` extras group (PR #246)
+
+### Fixed
+
+- `mdemg init` fails for Homebrew/edge binary users — compose file not in release tarball (PR #244)
+- `mdemg tsdb start/stop` hardcoded to repo-relative `deploy/docker/docker-compose.observability.yml` path (PR #244)
+- `docker-compose.yml` candidate order in `internal/tsdb/backup.go` — cwd checked first (PR #244)
+
+## [0.5.0] - 2026-04-02
+
+### Added
+
+- `mdemg data check --pre-campaign` with 8 automated validation checks for collection campaign readiness (PR #243)
+- QueryClassifier wired into retrieval service with `QUERY_CLASSIFY_ENABLED` env var (PR #243)
+- `session_id` propagation from API handlers through to LLM interaction TSDB records (PR #243)
+- Campaign task activation guide (`docs/operations/campaign-task-activation.md`) (PR #243)
+- FT Implementation Plan reconciliation — Phases 1-12 current with `03_IMPLEMENTATION_PLAN_v2.md` (PR #243)
+
+## [0.4.2] - 2026-04-01
+
+### Added
+
+- Instance ID backfill on server startup — all training tables get `instance_id` (PR #242)
+- `defaultSpaceID` fallback for all 16 LLM consumers (PR #242)
+- Neo4j memory tiering based on system RAM detection during `mdemg init` (PR #242)
+- Migration 009: `space_id` backfill for existing TSDB records (PR #242)
+
+### Fixed
+
+- All 16 LLM consumers wrote empty `space_id` to TSDB records (PR #242)
+- Neo4j defaults too aggressive for 32GB machines — tiered config based on RAM (PR #242)
+
+## [0.4.1] - 2026-03-31
+
+### Added
+
+- FT-HARDENING: per-field privacy skip patterns for multi-table export (PR #241)
+- Instance ID column on training tables — migration 008 (PR #241)
+- Schema version bumped to 8 (PR #241)
+- CI: edge publish artifact download fix (PR #241)
+
+## [0.4.0] - 2026-03-30
+
+### Added (FT-DATA Training Data Export + Curation Pipeline)
 
 - **UTDS Spec Framework** (`docs/tests/utds/`): 14th UxTS framework — JSON Schema validating export `manifest.json` files. Schema enforces `privacy_scrub_violations == 0` (hard gate), `schema_version >= 7`, `export_id` pattern `^exp-`. 3 fixture specs (standard/llm-only/minimal), validation runner, 23 unit tests.
 - **`mdemg data export` CLI** (`internal/cli/data_export.go`): Export TSDB training data as `.tar.gz` archives containing JSONL + manifest. Flags: `--tables`, `--since`, `--until`, `--exclude-embedding`, `--dry-run`, `--no-validate`. Streams rows via pgx with O(1) memory. Privacy scans ALL 10 text fields across 3 tables (llm_interactions, retrieval_events, embedding_events) — export BLOCKED if any violations detected.
@@ -18,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`dataset_versioner.py`** (`neural/training/dataset_versioner.py`): Temporal train/test/val splits (NEVER random), cross-source deduplication, SHA-256 per split, task balance warnings, exogenous ratio checks, dataset manifest generation. 20 unit tests.
 - **Round-trip verified**: TSDB → export (449 rows) → UTDS validate (26/26) → quality filter (449→287) → format convert (287 MLX) → dataset version (229 train / 28 test / 30 val) — all quality gates passed.
 
-### Added (Unreleased — Distribution Automation)
+### Added (Distribution Automation)
 
 - **Edge binary CI** (`.github/workflows/cli-publish.yml`): Platform-specific CLI binaries built on every push to main. Published as rolling `edge` GitHub Release with SHA-256 checksums. Supports darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 via CGO + zig cross-compilation.
 - **`mdemg upgrade --edge`**: Self-update to latest edge build (bare binary from GitHub). Compares commit hashes to skip if already current. Also copies updated binary to `./bin/mdemg` if the directory exists.
@@ -28,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session-start version check**: Hook detects CLI/server commit mismatch and warns with upgrade instructions.
 - **Install script edge channel**: `CHANNEL=edge bash install.sh` downloads the latest edge binary (bare format, no tar.gz extraction).
 
-### Added (Unreleased — RSIC-DATA Sprint)
+### Added (RSIC-DATA Sprint)
 
 - **RSIC-DATA: TSDBDatasetBuilder** (`internal/tsdb/dataset_builder.go`): Curated data access layer providing 5 structured datasets — LLMPerformance, RetrievalQuality, EmbeddingCoverage, MetricTrend (linear regression slope + volatility), TrainingDataReadiness. DatasetProvider interface allows mocking without a database. Consolidates and supersedes dead-code `trend_analyzer.go`.
 - **RSIC-DATA: 6 TSDB-aware reflection patterns** (patterns 25-30): `llm_latency_regression`, `llm_error_rate_spike`, `retrieval_quality_degradation`, `embedding_pipeline_regression` (CRITICAL), `training_data_ready`, `trust_trajectory_decline`. RSIC now analyzes trends over time, not just point-in-time snapshots.
@@ -36,24 +94,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RSIC-DATA: 6 dispatch handlers**: `review_llm_provider`, `alert_llm_health`, `alert_embedding_regression`, `trigger_training_pipeline` (new), `alert_tsdb_health`, `alert_schema_drift` (gap fixes for existing patterns).
 - **RSIC-DATA: Grafana Data-Driven Insights row**: 4 new panels on mdemg-rsic dashboard — LLM Performance by Task, Retrieval Pipeline Health, Training Data Volume, Trust Trajectory.
 
-### Added (Unreleased — DATA-GOV Data Governance)
+### Added (DATA-GOV Data Governance)
 
 - **DATA-GOV Sprint 2: TSDB Data Quality Diagnostic Script** (`scripts/tsdb_data_review.py`): Comprehensive Python diagnostic that connects to TimescaleDB and produces a data quality report across all 8 TSDB tables. 7 diagnostic sections: schema health, metric_samples catalog, llm_interactions analysis (task coverage, error rate, latency percentiles, privacy scrub verification), embedding_events (call_site regression check, scrub asymmetry), retrieval_events (pipeline stage completeness, hard-negative mining viability), ft_* tables, cross-cutting analysis (growth rates, flush gap detection, config flag check). Output formats: text (ANSI color), JSON, or both. Privacy patterns mirror `internal/llmclient/scrubber.go` exactly. 17 unit tests. UV project setup (`scripts/pyproject.toml`).
 - **DATA-GOV Sprint 1: Pipeline Gap Fixes**: System prompt coverage for all LLM callers, call_site propagation fixes, PROMPT-COV (system prompt hash + coverage analysis).
 - **DATA-GOV Sprint 0: TSDB_ENABLED Fix**: `TSDB_ENABLED=true` in Docker compose environment, `TSDB_AUTO_MIGRATE` env var support in `serve.go`. Feature doc: `docs/features/tsdb-data-governance.md`.
 
-### Added (Unreleased — J17 Comprehension Pipeline)
+### Added (J17 Comprehension Pipeline)
 
 - **J17 Comprehension Pipeline 5-Break Fix**: Sigmoid normalization midpoint 2.0→1.5 (retrieval_source.go + consulting/service.go), NLI guard broadened for non-constraint items, constraint_code propagation in hidden layer, trust relevance filter (trustRelevanceThreshold=0.5).
 - **J17 Trust Parameter Rebalance**: Initial trust 0.5→0.65, high threshold 0.8→0.75, boost +0.05/follow, decay -0.02/ignore, -0.04/contradict. T1 compression achievable in 3 follows instead of 7+.
 - **TSDB Trust Score Historization**: 4 new Prometheus gauges (`j17_avg_trust_score`, `j17_min_trust_score`, `j17_max_trust_score`, `j17_trust_session_count`) wired through TrustScorer.Aggregates() → ProtocolMetrics → adapter → live_collectors → TSDB flush. J17 Grafana dashboard: Trust Score row with 4 stat panels + trend timeseries.
 - **Multi-Instance UI Dropdown**: Instance selector in browser dashboard header for switching between MDEMG instances.
 
-### Fixed (Unreleased)
+### Fixed
 
 - **TSDB_ENABLED not set in Docker flow**: `docker-compose.yml` now sets `TSDB_ENABLED: "true"`, `TSDB_AUTO_MIGRATE: "true"`, and `TSDB_OPTIONAL: "true"` in the mdemg service environment. `mdemg init` writes `TSDB_ENABLED=true` to `.env`. Without this, TimescaleDB metrics collection was silently disabled in Docker deployments.
 
-### Added (Unreleased)
+### Added
 
 - **Docker Deployment — Phase 3: Backup UI + Distribution + Cleanup (DOCKER-P3)**:
   - **Backup Tab**: 9th browser tab wrapping all 7 backup REST endpoints — trigger backup (space + type selector), backup history table with type filter and delete, restore from completed backups with confirmation, active operation status polling at 5s intervals.
@@ -111,7 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Embedding Event Collection (Phase D)**: New `embedding_events` TimescaleDB hypertable captures every `Embed()`/`EmbedBatch()` call with parser metadata (element_kind, language, chunk boundaries, signature), provenance (call_site), and model info. `WithEmbeddingMeta` wired at 9 call sites. Privacy scrubbing applied to text content.
 - **Retrieval Event Collection (Phase D)**: New `retrieval_events` TimescaleDB hypertable captures full retrieval pipeline execution (vector recall → BM25 → rerank → final results) with pre/post rerank scores for hard-negative mining. Migration 006.
 
-### Fixed (Unreleased)
+### Fixed
 
 - **TimescaleDB Compose Image Mismatch**: Observability compose used `timescale/timescaledb-ha:pg16` with mount path `/home/postgres/pgdata`, diverging from prod which uses `timescale/timescaledb:2.25.1-pg16` at `/var/lib/postgresql/data`. Standardized to match prod. Note: developers with existing `-ha` volumes should run `docker compose down -v` and recreate the TSDB container (data will be re-populated by the metrics recorder).
 - **Config Comment Stale**: `TSDBRequiredSchemaVersion` comment said `(default: 3)` but actual default was `4`. Fixed.
@@ -164,14 +222,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deep-Dive Remediation Sprint — Phase 1 (Error Sanitization)**: Control character sanitization for CMS Neo4j record helpers (`asString()`, `asStringSlice()`), guidance response shell handling (`prompt-context.sh`), and new `internal/sanitize/controlchars.go` package with unit tests.
 - **Deep-Dive Remediation Sprint — Phase 2 (Documentation Remediation)**: Updated 11 documentation files referencing the deleted `/v1/prometheus` endpoint (returns 410 Gone since PR #213). Replaced with `/v1/metrics/snapshot` (JSON format). Added TimescaleDB as metrics backend in component tables, updated curl examples, added caveat notes to historical docs, documented `GET /v1/jiminy/protocol/status` endpoint.
 
-### Changed (Unreleased)
+### Changed
 
 - **Gauge Dirty Flag — TSDB Zero-Noise Reduction**: Gauges now track a `dirty` flag (atomic int32). Only gauges mutated since the last flush cycle are written to TimescaleDB — clean gauges are skipped entirely. Reduces per-flush writes from 73 (all registered gauges) to only those actively being Set/Inc/Dec'd. Debug logging reports `flushed` vs `skipped_clean` counts. 3 new tests.
 
 - **CUIDv2 for Guidance & Evaluation IDs**: `guidance_id` (from `Guide()`) and `eval_id` (from `Evaluate()`) now use CUIDv2 identifiers (`github.com/nrednav/cuid2 v1.1.0`) instead of UUID v4. CUIDv2 is collision-resistant, k-sortable, and shorter. Consumers treating these as opaque strings are unaffected. New dependency: `github.com/nrednav/cuid2`.
 - **J17 Control-Loop Optimization (7 Gaps)**: Stress-test-driven fixes to J17 protocol internals — RSIC health formula correction (normalized to 0-1 range), MetricsCollector moved to struct field, `protocolDataCollector` nil guard, sidecar tier predictor idle-session guard, sidecar health retry loop, session-start.sh checkpoint error handling, guardrail prompt escaping. 3 new config vars: `JIMINY_CACHE_J17_BYPASS`, `J17_SIDECAR_URL`, `J17_SIDECAR_TIMEOUT_MS`. 11 new tests.
 
-### Added (Unreleased)
+### Added
 
 - **TimescaleDB Backup & Restore Service**: New `internal/tsdb/backup.go` provides pg_dump-based backup/restore via `docker compose exec -T timescaledb` (uses compose service name, not container name, avoiding `COMPOSE_PROJECT_NAME` fragility). Features: manifest sidecar files (SHA256 checksum, format version, metadata), count-based + age-based retention (mirrors `internal/backup/retention.go` semantics with cross-reference comment), ticker-based scheduler with configurable interval, bounded growth. CLI commands: `mdemg tsdb backup trigger`, `mdemg tsdb backup list [--limit N]`, `mdemg tsdb backup config`, `mdemg tsdb backup restore <file>`. 7 config env vars (`TSDB_BACKUP_ENABLED`, `TSDB_BACKUP_STORAGE_DIR`, `TSDB_BACKUP_COMPOSE_FILE`, `TSDB_BACKUP_SERVICE`, `TSDB_BACKUP_INTERVAL_HOURS`, `TSDB_BACKUP_RETENTION_COUNT`, `TSDB_BACKUP_RETENTION_MAX_AGE_DAYS`). Server wiring with clean shutdown. Default: disabled. 11 unit tests. 1 UOBS spec (`tsdb_backup_health`), 1 UOTS spec (`tsdb_backup_manifest`).
 - **Grafana Alert Rule Validation**: All 21 TSDB-backed alert rules verified provisioned and functional. 4 critical alert SQL queries (P99 latency, Neo4j pool exhaustion, node count drop, RSIC watchdog force triggers) validated against live TimescaleDB — all parse correctly and handle empty result sets gracefully.
@@ -260,7 +318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **27 UPTS-Validated Parsers**: All 27 language parsers pass CI validation (100% pass rate) — Go, Python, TypeScript, Rust, Java, C, C++, CUDA, SQL, Cypher, YAML, TOML, JSON, INI, Dockerfile, Shell, C#, Kotlin, Terraform, Makefile, Protocol Buffers, GraphQL, OpenAPI, Markdown, XML, Lua, Scraper Markdown
 - **UPTS Summary Document**: `docs/lang-parser/lang-parse-spec/upts/UPTS_SUMMARY.md` — comprehensive parser table with parent-child relationships, pattern coverage, and validation commands
 
-### Fixed (Unreleased)
+### Fixed
 
 - **`space copy` infinite loop**: Cypher-based deduplication was unreliable for copy operations (creates new nodes, no natural termination). Replaced with two-phase approach: collect all source node IDs upfront, then batch by explicit ID list (`WHERE src.node_id IN $ids`). Added `:MemoryNode` label to all MATCH clauses for consistency with `delete` and `rename`. Previously caused 14,239 orphaned nodes from a 10-node source.
 - **Full backup "database in use" failure**: `runFullBackup()` attempted `neo4j-admin database dump` which requires exclusive database access (incompatible with running MDEMG server). Replaced with logical export by delegating to `runPartialBackup()` with all spaces. Both `full` and `partial_space` backups now produce portable `.mdemg` files that work with a live database. Restore auto-detects format (`.mdemg` logical import vs legacy `.dump` physical restore).

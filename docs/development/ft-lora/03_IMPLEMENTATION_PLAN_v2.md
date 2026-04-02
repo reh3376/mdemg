@@ -1,6 +1,6 @@
 # MDEMG Fine-Tuned LLM: Implementation Plan
 
-**Date:** 2026-04-02 (v4.0 — reconciled through PR #243, 13 phases)
+**Date:** 2026-04-02 (v4.0 — reconciled through PR #243, 13 phases) | **Last verified:** 2026-04-02
 **Model:** Qwen3-30B-A3B MoE via vllm-mlx
 **Scope:** 13 phases, 16 LLM consumers, ~70 files
 
@@ -125,9 +125,11 @@ Add column to `llm_interactions` via migration 006.
 
 ---
 
-## Phase 3: vllm-mlx Integration ⬜ CONFIG ONLY
+## Phase 3: vllm-mlx Integration ✅ COMPLETE
 
 Install vllm-mlx, create launchd/systemd service file, point `LLM_BASE_URL` to `http://localhost:8100/v1`. No Go or Python code changes needed — existing OpenAI provider works directly.
+
+> **Delivered (PR #246):** Setup guide (`docs/development/ft-lora/vllm-mlx-setup.md`) + smoke test (`neural/training/test_vllm_mlx.py`) written and verified.
 
 **Effort:** S — config + service file only.
 
@@ -254,12 +256,14 @@ Example (`consulting.classify`):
 
 ---
 
-## Phase 5: Training Pipeline (Python + MLX) ⬜ NOT STARTED
+## Phase 5: Training Pipeline (Python + MLX) ✅ COMPLETE
 
-### 5A. `neural/training/train_ft.py` — LoRA fine-tuning via `mlx-lm-lora`
-### 5B. `neural/training/evaluate_ft.py` — Per-task evaluation against held-out test set
-### 5C. `neural/training/regression_gate.py` — Version comparison (no task regresses >5%, at least 2 improve ≥2%)
-### 5D. `neural/training/quantize_deploy.py` — Fuse LoRA adapter and quantize for production
+### 5A. `neural/training/train_ft.py` — LoRA fine-tuning via `mlx-lm-lora` ✅ COMPLETE (PR #246)
+### 5B. `neural/training/evaluate_ft.py` — Per-task evaluation against held-out test set ✅ COMPLETE (PR #247)
+### 5C. `neural/training/regression_gate.py` — Version comparison (no task regresses >5%, at least 2 improve ≥2%) ✅ COMPLETE (PR #248)
+### 5D. `neural/training/quantize_deploy.py` — Fuse LoRA adapter and quantize for production ✅ COMPLETE (PR #250)
+### `neural/training/teacher_distill.py` — Teacher distillation for anchor dataset generation ✅ COMPLETE (PR #249)
+### `neural/training/reward_functions.py` — Per-task reward functions for RLHF/DPO ✅ COMPLETE (PR #249)
 
 **Effort:** M-L — 4 Python scripts with evaluation logic.
 
@@ -415,11 +419,11 @@ Remaining: FT model-specific metrics (version, latency, cycles), data governance
 |---|---|---|---|
 | **1** Interaction Logger | None | M | ✅ COMPLETE (PRs #217-#219) |
 | **2** Think Mode + Sanitize | None | M | 🔄 PARTIAL (2D-2F done) |
-| **3** vllm-mlx Integration | None | S | ⬜ CONFIG ONLY |
+| **3** vllm-mlx Integration | None | S | ✅ COMPLETE (PR #246) |
 | **4A** RAFT Context | Phase 1 | M | ✅ COMPLETE (PR #222) |
 | **4B** ULTS Specs | None | M | ✅ COMPLETE (PR #225) |
 | **4** Teacher Distillation | 30-day campaign data | S-M | 🔄 PARTIAL (4D, 4E done) |
-| **5** Training Pipeline | Phase 4 | M-L | ⬜ NOT STARTED |
+| **5** Training Pipeline | Phase 4 | M-L | ✅ COMPLETE (PRs #246-#250) |
 | **6** Recursive Cycle | Phases 4+5 | M | 🔄 PARTIAL (6D done) |
 | **7** RSIC Integration | Phases 1+6 | S-M | 🔄 PARTIAL (patterns 25-30 done) |
 | **8** CLI Commands | Phases 5+6 | S | 🔄 MOSTLY COMPLETE |
