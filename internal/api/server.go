@@ -387,6 +387,29 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		slog.Info("intent translator wired to retrieval service for BM25 rewriting")
 	}
 
+	// PROD-READINESS: Initialize Query Classifier
+	var queryClassifier *retrieval.QueryClassifier
+	if cfg.QueryClassifyEnabled {
+		qcCfg := retrieval.QueryClassifierConfig{
+			Enabled:   true,
+			Provider:  cfg.QueryClassifyProvider,
+			Model:     cfg.QueryClassifyModel,
+			MaxTokens: cfg.QueryClassifyMaxTokens,
+			TimeoutMs: cfg.QueryClassifyTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
+			OllamaURL: cfg.OllamaEndpoint,
+		}
+		queryClassifier = retrieval.NewQueryClassifier(qcCfg, cbRegistry)
+		slog.Info("query classifier enabled", "provider", cfg.QueryClassifyProvider, "model", cfg.QueryClassifyModel)
+	}
+
+	// Wire query classifier to retrieval service
+	if queryClassifier != nil {
+		ret.SetQueryClassifier(queryClassifier)
+		slog.Info("query classifier wired to retrieval service")
+	}
+
 	// Phase 104: Initialize Guardrail Validator
 	var guardrailVal guardrail.Validator
 	if cfg.GuardrailEnabled {
@@ -1037,6 +1060,7 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			llmclient.SetDefaultRecorder(s.llmWriter)
 			llmclient.SetDefaultInstanceID(s.cfg.InstanceID)
 			llmclient.SetDefaultSpaceID(s.cfg.RSICWatchdogSpaceID)
+			llmclient.SetDefaultSessionID(s.cfg.InstanceID)
 			slog.Info("tsdb: LLM interaction logger attached", "instance_id", s.cfg.InstanceID)
 		}
 

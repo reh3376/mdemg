@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"mdemg/internal/jiminy"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
 )
 
@@ -183,7 +184,9 @@ func (s *Server) handleJiminyGuide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := s.jiminySvc.Guide(r.Context(), jiminy.GuidanceRequest{
+	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+
+	resp, err := s.jiminySvc.Guide(ctx, jiminy.GuidanceRequest{
 		SpaceID:     req.SpaceID,
 		Context:     req.Context,
 		FilePath:    req.FilePath,
@@ -226,7 +229,9 @@ func (s *Server) handleJiminyFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := s.jiminySvc.RecordOutcome(r.Context(), req)
+	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+
+	resp, err := s.jiminySvc.RecordOutcome(ctx, req)
 	if err != nil {
 		writeInternalError(w, err, "jiminy feedback")
 		return

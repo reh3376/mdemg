@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/ape"
 	"mdemg/internal/conversation"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
@@ -59,7 +60,9 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 		Pinned:     req.Pinned,
 	}
 
-	resp, err := s.conversationSvc.Observe(r.Context(), internalReq)
+	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+
+	resp, err := s.conversationSvc.Observe(ctx, internalReq)
 	if err != nil {
 		writeInternalError(w, err, "observe")
 		return
@@ -157,7 +160,9 @@ func (s *Server) handleCorrect(w http.ResponseWriter, r *http.Request) {
 		RefersTo:   req.RefersTo,
 	}
 
-	resp, err := s.conversationSvc.Correct(r.Context(), internalReq)
+	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+
+	resp, err := s.conversationSvc.Correct(ctx, internalReq)
 	if err != nil {
 		writeInternalError(w, err, "correct")
 		return
@@ -212,7 +217,9 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		AgentID:          req.AgentID,
 	}
 
-	resp, err := s.conversationSvc.Resume(r.Context(), internalReq)
+	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+
+	resp, err := s.conversationSvc.Resume(ctx, internalReq)
 	if err != nil {
 		writeInternalError(w, err, "resume")
 		return

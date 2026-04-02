@@ -555,6 +555,87 @@ func TestWithContext(t *testing.T) {
 	}
 }
 
+func TestWithSessionID(t *testing.T) {
+	ctx := context.Background()
+
+	// No session in fresh context
+	if got := SessionIDFromContext(ctx); got != "" {
+		t.Errorf("SessionIDFromContext(background) = %q, want empty", got)
+	}
+
+	// Round-trip
+	ctx = WithSessionID(ctx, "sess-abc-123")
+	if got := SessionIDFromContext(ctx); got != "sess-abc-123" {
+		t.Errorf("SessionIDFromContext = %q, want %q", got, "sess-abc-123")
+	}
+}
+
+func TestRecordInteraction_SessionID(t *testing.T) {
+	rec := &mockRecorder{}
+
+	c := New(Config{Provider: "openai", Model: "test"})
+	c.recorder = rec
+	c.taskName = "test.task"
+
+	// Session from context should be set on the record
+	ctx := WithSessionID(context.Background(), "explicit-session")
+	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].SessionID != "explicit-session" {
+		t.Errorf("SessionID = %q, want %q", rec.records[0].SessionID, "explicit-session")
+	}
+}
+
+func TestRecordInteraction_DefaultSessionID(t *testing.T) {
+	rec := &mockRecorder{}
+
+	oldDefault := defaultSessionID
+	defer func() { defaultSessionID = oldDefault }()
+
+	SetDefaultSessionID("instance-fallback")
+
+	c := New(Config{Provider: "openai", Model: "test"})
+	c.recorder = rec
+	c.taskName = "test.task"
+
+	// No session in context — should fall back to default
+	c.recordInteraction(context.Background(), []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].SessionID != "instance-fallback" {
+		t.Errorf("SessionID = %q, want %q", rec.records[0].SessionID, "instance-fallback")
+	}
+}
+
+func TestRecordInteraction_ExplicitOverridesDefault(t *testing.T) {
+	rec := &mockRecorder{}
+
+	oldDefault := defaultSessionID
+	defer func() { defaultSessionID = oldDefault }()
+
+	SetDefaultSessionID("instance-fallback")
+
+	c := New(Config{Provider: "openai", Model: "test"})
+	c.recorder = rec
+	c.taskName = "test.task"
+
+	// Explicit session should override default
+	ctx := WithSessionID(context.Background(), "request-session")
+	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	if rec.records[0].SessionID != "request-session" {
+		t.Errorf("SessionID = %q, want %q", rec.records[0].SessionID, "request-session")
+	}
+}
+
 func TestThinkContentExtraction(t *testing.T) {
 	tests := []struct {
 		name          string

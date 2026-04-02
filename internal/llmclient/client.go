@@ -19,6 +19,7 @@ const (
 	ctxKeyGuidanceID    contextKey = "llm_guidance_id"
 	ctxKeySourcePath    contextKey = "llm_source_path"
 	ctxKeyRetrievalCtx  contextKey = "llm_retrieval_ctx"
+	ctxKeySessionID     contextKey = "llm_session_id"
 )
 
 // WithGuidanceID returns a context carrying a guidance_id for interaction logging.
@@ -41,6 +42,17 @@ func WithSourcePath(ctx context.Context, path string) context.Context {
 // and scores) for RAFT-style training data enrichment.
 func WithRetrievalContext(ctx context.Context, rc *RetrievalContext) context.Context {
 	return context.WithValue(ctx, ctxKeyRetrievalCtx, rc)
+}
+
+// WithSessionID returns a context carrying a session_id for interaction logging.
+func WithSessionID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, ctxKeySessionID, id)
+}
+
+// SessionIDFromContext extracts the session_id from context, or "" if not set.
+func SessionIDFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(ctxKeySessionID).(string)
+	return s
 }
 
 // Client provides LLM completions via OpenAI or Ollama APIs.
@@ -94,6 +106,17 @@ func SetDefaultInstanceID(id string) {
 // Called once at server startup from cfg.RSICWatchdogSpaceID.
 func SetDefaultSpaceID(id string) {
 	defaultSpaceID = id
+}
+
+// defaultSessionID is the fallback session_id for background LLM calls
+// that have no request-scoped session context. Set via SetDefaultSessionID
+// at server startup (typically to the instance ID).
+var defaultSessionID string
+
+// SetDefaultSessionID sets the fallback session_id for LLM interactions
+// that have no request-scoped session. Called once at server startup.
+func SetDefaultSessionID(id string) {
+	defaultSessionID = id
 }
 
 // New creates a new LLM client from the given configuration.
@@ -233,6 +256,12 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	}
 	if rc, ok := ctx.Value(ctxKeyRetrievalCtx).(*RetrievalContext); ok {
 		rec.RetrievalCtx = rc
+	}
+	if sid, ok := ctx.Value(ctxKeySessionID).(string); ok && sid != "" {
+		rec.SessionID = sid
+	}
+	if rec.SessionID == "" && defaultSessionID != "" {
+		rec.SessionID = defaultSessionID
 	}
 
 	c.recorder.Record(ctx, rec)

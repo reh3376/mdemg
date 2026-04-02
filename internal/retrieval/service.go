@@ -28,6 +28,7 @@ type Service struct {
 	intentTranslator   IntentTranslator           // Optional BM25 query rewriter
 	dataCollector      *DataCollector             // Neural re-ranker training data collector (NR-1)
 	retrievalRecorder  RetrievalEventRecorder     // Optional retrieval event recorder for contrastive training data
+	queryClassifier    *QueryClassifier            // Optional LLM query type classifier (PROD-READINESS)
 }
 
 // SetRetrievalRecorder attaches a retrieval event recorder for training data collection.
@@ -38,6 +39,11 @@ func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
 func (s *Service) SetIntentTranslator(t IntentTranslator) {
 	s.intentTranslator = t
+}
+
+// SetQueryClassifier sets the LLM query type classifier.
+func (s *Service) SetQueryClassifier(qc *QueryClassifier) {
+	s.queryClassifier = qc
 }
 
 // FileFilter specifies file extension filtering for retrieval queries.
@@ -337,7 +343,8 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 
 	// Compute query-type aware retrieval hints (V0011 - Query-Aware Retrieval)
-	hints := ComputeRetrievalHints(req.QueryText, s.cfg)
+	// Uses LLM classifier when available, falls back to regex-based detection.
+	hints := ComputeRetrievalHintsWithLLM(ctx, req.QueryText, s.cfg, s.queryClassifier)
 
 	// Override temporal intent with explicit API fields if provided
 	if req.TemporalAfter != "" || req.TemporalBefore != "" {
