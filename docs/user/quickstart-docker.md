@@ -32,8 +32,9 @@ This will:
 2. Scan for 6 free host ports (MDEMG, Neo4j Bolt/HTTP, TimescaleDB, Neural, Grafana)
 3. Generate `.env` with port assignments and credentials
 4. Generate `.mdemg/config.yaml` with Docker-appropriate defaults
-5. Run `docker compose up -d` to start all 5 services
-6. Wait for the MDEMG server health check
+5. Write `docker-compose.yml` to the project directory (embedded in binary — no repo clone needed)
+6. Run `docker compose up -d` to start all 5 services
+7. Wait for the MDEMG server health check
 
 ## Interactive Setup
 

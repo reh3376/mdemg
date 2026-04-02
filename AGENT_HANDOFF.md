@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-01
+**Date:** 2026-04-02
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -46,11 +46,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Training Data Collection Sprint — COMPLETE (7 sub-phases: InteractionRecord enrichment, guidance ID correlation, source linkage, privacy scrubber, quality annotation, data CLI, JSONL backup)
 - FT Infrastructure Sprint — COMPLETE (4 phases: A=SanitizeResponse+prompt hash, B=RAFT context enrichment, C=ULTS spec framework, D=embedding/retrieval data collection)
 - FT-DATA Sprint — COMPLETE (8 phases: UTDS spec framework, TSDB exporter+CLI+API, browser UI tab, quality_filter.py, format_converter.py, dataset_versioner.py, round-trip verification, documentation)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-04-01
-- Latest releases: CLI v0.4.1, menubar v1.8.0, sidebar v0.3.0
+- FT Training Pipeline — COMPLETE (PRs #243-250: PROD-READINESS, compose embed, export-auto LaunchAgent, vllm-mlx/train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py/21 GRPO rewards, quantize_deploy.py)
+- CI: ALL GREEN (push + pull_request + release) as of 2026-04-02
+- Latest releases: CLI v0.4.2, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-04-01) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-04-02) ===
+- ✅ FT Training Pipeline (2026-04-02) — Complete training pipeline via PRs #243-250:
+  - PR #243: PROD-READINESS — QueryClassifier wired, session_id propagation, pre-campaign CLI
+  - PR #244: Compose embed fix — docker-compose.yml embedded in binary for Homebrew/edge
+  - PR #245: Export-auto + training-export LaunchAgent
+  - PR #246: vllm-mlx setup guide + train_ft.py
+  - PR #247: evaluate_ft.py — per-task evaluation against ULTS quality_metrics
+  - PR #248: regression_gate.py — deployment gate (PASS/FAIL/WARN)
+  - PR #249: teacher_distill.py + reward_functions.py (21 GRPO rewards)
+  - PR #250: quantize_deploy.py — fuse + quantize for production
 - ✅ FT-DATA Sprint (2026-04-01) — Full training data export + curation pipeline:
   - Phase 1: UTDS spec framework (14th UxTS, JSON Schema, 3 fixture specs, runner, 23 tests)
   - Phase 2: TSDB exporter + `mdemg data export` CLI + API handler (streaming, privacy scan 10 fields, tar.gz)
@@ -417,6 +427,14 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | DATA-GOV-S2 | DATA-GOV Sprint 2: Diagnostic Script | ✅ | 2026-04-01 | `scripts/tsdb_data_review.py` — 7-section diagnostic (schema, metrics, LLM, embeddings, retrieval, FT, cross-cutting). Text+JSON output. Privacy scrub verification. 17 unit tests. E2E verified |
 | J17-COMP | J17 Comprehension Pipeline Fix | ✅ | 2026-04-01 | 5 independent breaks: sigmoid midpoint, NLI guard, constraint_code propagation, trust relevance filter, trust parameter rebalance. T1 compression achievable in single session |
 | J17-TRUST | TSDB Trust Score Historization | ✅ | 2026-04-01 | 4 new TSDB gauges (avg/min/max trust, session count), Grafana J17 dashboard trust row + trend panel |
+| PROD-READY | PROD-READINESS Sprint | ✅ | 2026-04-02 | PR #243: QueryClassifier wired, session_id propagation, pre-campaign CLI |
+| COMPOSE-EMBED | Docker Compose Embed Fix | ✅ | 2026-04-02 | PR #244: docker-compose.yml embedded in binary for Homebrew/edge deployments |
+| EXPORT-AUTO | Export-Auto + Training Export LaunchAgent | ✅ | 2026-04-02 | PR #245: Automated export trigger + macOS LaunchAgent for training data |
+| FT-TRAIN | vllm-mlx Setup + train_ft.py | ✅ | 2026-04-02 | PR #246: vllm-mlx setup guide + train_ft.py training script |
+| FT-EVAL | evaluate_ft.py | ✅ | 2026-04-02 | PR #247: Per-task evaluation against ULTS quality_metrics |
+| FT-GATE | regression_gate.py | ✅ | 2026-04-02 | PR #248: Deployment gate with PASS/FAIL/WARN outcomes |
+| FT-REWARD | teacher_distill.py + reward_functions.py | ✅ | 2026-04-02 | PR #249: Teacher distillation + 21 GRPO reward functions |
+| FT-DEPLOY | quantize_deploy.py | ✅ | 2026-04-02 | PR #250: Fuse + quantize pipeline for production deployment |
 
 ### Phase Numbering Convention
 
@@ -501,16 +519,16 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
 ### Fine-Tuning Pipeline (ft-lora) — Status as of 2026-03-30
 
-Source plan: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN.md`
+Source plan: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md`
 
 | Phase | Title | Status | Notes |
 |-------|-------|--------|-------|
 | 1 | LLM Interaction Logger | ✅ COMPLETE | PRs #217-#219. 16 consumers, TSDB writer, scrubber, quality pipeline, data CLI |
 | 2 | Think Mode + Response Sanitization | ✅ COMPLETE | FT-INFRA Phase A: `SanitizeResponse(StripThinkBlock + StripCodeFence)`, 11 call sites, system prompt hash |
-| 3 | vllm-mlx Integration | ⬜ NOT STARTED | Unblocked by Phase 2 completion |
-| 4+ | SFT/GRPO/DPO training | ⬜ BLOCKED | Requires weeks of data accumulation from Phase 1 activation |
+| 3 | vllm-mlx Integration | ✅ COMPLETE | PR #246 |
+| 4+ | SFT/GRPO/DPO training | ✅ COMPLETE | PRs #246-250 |
 
-**Next actionable step**: Phase 3 (vllm-mlx integration) — unblocked now that Phase 2 is complete.
+**Next actionable step**: Collection Campaign running. Training pipeline complete (export → filter → convert → version → train → evaluate → gate → deploy). First training cycle pending sufficient data accumulation (~500+ records per task).
 **Data collection**: Activated 2026-03-30. Accumulating since — expect sufficient volume by mid-April 2026.
 
 ---
@@ -647,4 +665,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-04-01 — DATA-GOV Sprint 2 COMPLETE (diagnostic script). J17 comprehension pipeline 5-break fix + trust rebalance. TSDB trust score historization (4 gauges + Grafana). FT-INFRA Sprint complete (Phase 2 SanitizeResponse done). Docker P1-P3 complete. Tag v0.4.1. TSDB schema v7. CI: ALL GREEN.*
+*Last updated: 2026-04-02 — Training pipeline COMPLETE (PRs #243-250): PROD-READINESS, compose embed fix, export-auto LaunchAgent, vllm-mlx + train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py + 21 GRPO rewards, quantize_deploy.py. FT phases 3+4+ COMPLETE. Collection campaign running. Tag v0.4.2. CI: ALL GREEN.*

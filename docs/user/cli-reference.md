@@ -1865,7 +1865,7 @@ mdemg teardown --full --yes
 
 ### `mdemg data`
 
-Parent command for training data collection management. Subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`, `audit`, `export`.
+Parent command for training data collection management. Subcommands: `status`, `inspect`, `stats`, `annotate`, `quality`, `audit`, `export`, `export-auto`, `check`.
 
 Training data is collected automatically during LLM interactions when `NEURAL_DATA_COLLECTION` is enabled. Records are stored in TimescaleDB and optionally exported as JSONL files to `.mdemg/neural/training-data/`.
 
@@ -2030,7 +2030,55 @@ mdemg data export --space-id mdemg-dev --exclude-embedding
 
 **Privacy Gate:** The exporter scans 10 text fields across 3 tables using the same 5 regex patterns as the write-time scrubber (`internal/llmclient/scrubber.go`). If any privacy violation is detected, the export is **BLOCKED** — no partial archive is written.
 
-**See Also:** `mdemg data status`, `mdemg data stats`
+**See Also:** `mdemg data status`, `mdemg data stats`, `mdemg data export-auto`
+
+---
+
+### `mdemg data export-auto`
+
+**Synopsis:** `mdemg data export-auto [flags]`
+
+Automated daily export with retention management. Designed to run via LaunchAgent/systemd timer (installed by `mdemg service install`). Exports last 24 hours of training data, prunes old archives beyond `--keep` limit, and updates a `latest.tar.gz` symlink.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--output-dir` | string | `~/.mdemg/exports/` | Directory for export archives |
+| `--keep` | int | `7` | Number of archives to retain (oldest pruned) |
+| `--space-id` | string | auto-detected | Space ID for export |
+
+**Usage Examples:**
+```bash
+# Run automated export (typically via LaunchAgent)
+mdemg data export-auto --space-id mdemg-dev
+
+# Custom output directory with retention of 3
+mdemg data export-auto --output-dir /tmp/exports --keep 3
+```
+
+**LaunchAgent:** Installed by `mdemg service install`. Runs every 24 hours. Template: `packaging/launchd/com.mdemg.training-export.plist`.
+
+**See Also:** `mdemg data export`, `mdemg service install`
+
+---
+
+### `mdemg data check`
+
+**Synopsis:** `mdemg data check [flags]`
+
+Pre-campaign validation checks for collection readiness. Verifies 8 prerequisites: TSDB connectivity, schema version, LLM interaction recording active, session_id propagation, query classifier enabled, space_id populated, instance_id set, and sufficient baseline data.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--pre-campaign` | bool | `false` | Run all 8 pre-campaign checks |
+| `--space-id` | string | auto-detected | Space ID to check |
+
+**Usage Examples:**
+```bash
+# Run pre-campaign validation
+mdemg data check --pre-campaign --space-id mdemg-dev
+```
+
+**See Also:** `mdemg data status`, `mdemg data export`
 
 ---
 

@@ -339,10 +339,31 @@ MDEMG's fine-tuning infrastructure now supports three distinct training workstre
 | Workstream | Technique | Model | Data Source | Status |
 |---|---|---|---|---|
 | **Cross-encoder reranker** (NR-4) | MSE regression | ms-marco-MiniLM-L-6-v2 | Rerank JSONL collector | Built |
-| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3-30B-A3B | `llm_interactions` hypertable (16 tasks) | Collecting data |
+| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3-30B-A3B | `llm_interactions` hypertable (16 tasks) | Pipeline complete |
 | **Embedding fine-tuning** (Phase D) | Contrastive learning | Domain-tuned 3072-dim model | `embedding_events` + `retrieval_events` hypertables | Collecting data |
 
 **Generative LoRA** trains the generative model on LLM I/O from all 16 tasks. RAFT context enrichment ensures training data includes retrieval context (open-book mode). ULTS specs define quality thresholds for curation. See [RAFT Retrieval Context](raft-retrieval-context.md) and [ULTS Framework](ults-framework.md).
+
+### Generative LoRA Pipeline (Complete)
+
+The full pipeline from data collection to deployment:
+
+| Step | Script | Description |
+|------|--------|-------------|
+| 1. Collect | `mdemg data export-auto` | Automated daily TSDB export with retention (LaunchAgent) |
+| 2. Filter | `quality_filter.py` | 8 quality gates: privacy, empty, error, duplicate, latency, model, prompt hash, ULTS schema |
+| 3. Convert | `format_converter.py` | Raw JSONL → HuggingFace MLX chat format with RAFT context + think-mode wrapping |
+| 4. Version | `dataset_versioner.py` | Temporal train/test/val splits, dedup, exogenous ratio checks, manifest generation |
+| 5. Train | `train_ft.py` | LoRA fine-tuning via mlx-lm-lora with manifest validation + anti-collapse gate |
+| 6. Evaluate | `evaluate_ft.py` | Per-task evaluation against held-out test set using ULTS quality_metrics contract |
+| 7. Gate | `regression_gate.py` | Deployment decision: no task regresses >5%, >=2 improve, JSON validity >=95% |
+| 8. Deploy | `quantize_deploy.py` | Fuse adapter → quantize to 4-bit → verify with test inference |
+| 9. Serve | `vllm-mlx` | OpenAI-compatible inference server with prefix caching |
+
+**Supplementary tools:**
+- `teacher_distill.py` — synthetic data generation for under-represented tasks using teacher LLM
+- `reward_functions.py` — 21 GRPO reward functions for post-SFT reinforcement learning
+- `test_vllm_mlx.py` — smoke test all 16 ULTS tasks through vllm-mlx
 
 **Embedding fine-tuning** uses contrastive learning on domain-specific text pairs. The hard-negative mining signal (high vector similarity + low rerank score) is captured in `retrieval_events`. See [Embedding & Retrieval Data Collection](embedding-retrieval-data-collection.md).
 
