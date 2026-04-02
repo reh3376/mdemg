@@ -29,6 +29,13 @@ jobs:
       - name: Verify embedded compose files match source
         run: diff -q docker-compose.yml internal/cli/compose_templates/docker-compose.yml
 
+      - name: Verify embedded launchd templates match source
+        run: |
+          for f in packaging/launchd/*.plist; do
+            base=$(basename "$f")
+            diff -q "$f" "internal/cli/launchd_templates/$base"
+          done
+
       - name: Build unified CLI
         run: |
           go build -v \

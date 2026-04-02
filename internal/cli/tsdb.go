@@ -32,10 +32,16 @@ func tsdbEnvInt(key string, fallback int) int {
 }
 
 // tsdbConfigFromEnv builds a tsdb.Config from environment variables.
+// For CLI commands running on the host (not inside Docker), TSDB_HOST_PORT
+// (from .env) is the host-mapped port. Falls back to TSDB_PORT, then 5432.
 func tsdbConfigFromEnv() tsdb.Config {
+	port := tsdbEnvInt("TSDB_HOST_PORT", 0)
+	if port == 0 {
+		port = tsdbEnvInt("TSDB_PORT", 5432)
+	}
 	return tsdb.Config{
 		Host:     tsdbEnv("TSDB_HOST", "localhost"),
-		Port:     tsdbEnvInt("TSDB_PORT", 5432),
+		Port:     port,
 		User:     tsdbEnv("TSDB_USER", "mdemg"),
 		Password: tsdbEnv("TSDB_PASSWORD", "mdemg_metrics"), //nolint:gosec // G101: default dev password
 		Database: tsdbEnv("TSDB_DATABASE", "mdemg_metrics"),

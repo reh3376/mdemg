@@ -37,6 +37,7 @@ services:
       TSDB_ENABLED: "true"
       TSDB_AUTO_MIGRATE: "true"
       TSDB_OPTIONAL: "true"
+      AUTO_MIGRATE: "true"
 
       # Embedding provider
       EMBEDDING_PROVIDER: "${EMBEDDING_PROVIDER:-openai}"
@@ -137,7 +138,9 @@ services:
       - mdemg-net
 
   neural-sidecar:
-    build: ./neural
+    image: ghcr.io/reh3376/mdemg-neural-sidecar:${MDEMG_VERSION:-latest}
+    # For local development builds, uncomment the next line and comment out image:
+    # build: ./neural
     restart: unless-stopped
     ports:
       - "${NEURAL_PORT}:8000"
