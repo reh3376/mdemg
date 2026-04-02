@@ -1,8 +1,8 @@
 # MDEMG Fine-Tuned LLM: Implementation Plan
 
-**Date:** 2026-03-30 (v3.0 — Phase 1 COMPLETE, new phases 4A/4B added, task names aligned to codebase)
+**Date:** 2026-04-02 (v4.0 — reconciled through PR #243, 13 phases)
 **Model:** Qwen3-30B-A3B MoE via vllm-mlx
-**Scope:** 11 phases (was 9), 16 LLM consumers (was 15), ~55 files
+**Scope:** 13 phases, 16 LLM consumers, ~70 files
 
 ---
 
@@ -133,15 +133,15 @@ Install vllm-mlx, create launchd/systemd service file, point `LLM_BASE_URL` to `
 
 ---
 
-## Phase 4: Teacher Distillation Pipeline (Python) ⬜ NOT STARTED
+## Phase 4: Teacher Distillation Pipeline (Python) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
 
-### 4A. `neural/training/input_extractor.py` — Extract real task inputs from Neo4j
-### 4B. `neural/training/teacher_distill.py` — Generate anchor dataset via external LLM (~9,400 examples across 16 tasks)
-### 4C. `neural/training/synthetic_failures.py` — Generate failure detection training examples
-### 4D. `neural/training/quality_filter.py` — Filter raw data (errors, empties, duplicates, timeouts)
-### 4E. `neural/training/format_converter.py` — Convert to MLX chat format with task-prefix system prompts
+### 4A. `neural/training/input_extractor.py` — Extract real task inputs from Neo4j ⬜ NOT STARTED
+### 4B. `neural/training/teacher_distill.py` — Generate anchor dataset via external LLM ⬜ NOT STARTED
+### 4C. `neural/training/synthetic_failures.py` — Generate failure detection examples ⬜ NOT STARTED
+### 4D. `neural/training/quality_filter.py` ✅ COMPLETE (PR #240) — 8 quality gates, 25 tests, ULTS validation
+### 4E. `neural/training/format_converter.py` ✅ COMPLETE (PR #240) — HuggingFace MLX chat format, RAFT 80/20 handling
 
-**Effort:** M — 5 Python scripts, mostly data processing.
+**Effort:** S-M remaining (4A-4C only).
 
 ---
 
@@ -265,41 +265,78 @@ Example (`consulting.classify`):
 
 ---
 
-## Phase 6: Recursive Cycle Automation (Python) ⬜ NOT STARTED
+## Phase 6: Recursive Cycle Automation (Python) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
 
-### 6A. `neural/training/cycle_runner.py` — Orchestrates complete cycle with anti-collapse protocol
-### 6B. `neural/training/anchor_manager.py` — Manages anchor dataset (never deleted, included in every run)
-### 6C. `neural/training/entropy_monitor.py` — Tracks output entropy across versions, alerts on >10% decay
-### 6D. `neural/training/dataset_versioner.py` — Assembles datasets with temporal splits, dedup, α enforcement, ULTS-based filtering, provenance manifests
-### 6E. Dead-Man's Switch — After 3 consecutive rejections, fall back to external LLM and retrain from base
+### 6A. `neural/training/cycle_runner.py` — Orchestrates complete cycle with anti-collapse protocol ⬜ NOT STARTED
+### 6B. `neural/training/anchor_manager.py` — Manages anchor dataset ⬜ NOT STARTED
+### 6C. `neural/training/entropy_monitor.py` — Tracks output entropy across versions ⬜ NOT STARTED
+### 6D. `neural/training/dataset_versioner.py` ✅ COMPLETE (PR #240) — Temporal train/test/val split, cross-source dedup, SHA-256, manifest generation, 20 tests
+### 6E. Dead-Man's Switch ⬜ NOT STARTED
 
-**Effort:** M — orchestration + anti-collapse monitoring.
-
----
-
-## Phase 7: RSIC Integration (Go) ⬜ NOT STARTED
-
-New reflection patterns 22-28 (training cycle trigger, regression/stagnation alerts, data balance checks, entropy decay, exogenous ratio enforcement). Training cycle handler in task_dispatch.go.
-
-**Effort:** S-M
+**Effort:** M remaining (6A-6C, 6E).
 
 ---
 
-## Phase 8: CLI Commands (Go) 🔄 PARTIAL
+## Phase 7: RSIC Integration (Go) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
 
-`mdemg data` subcommands built in PR #219: status, inspect, stats, annotate, quality.
+> **Patterns 25-30 COMPLETE (PR #237):** 6 TSDB-aware reflection patterns (latency regression, error rate spike, retrieval quality degradation, embedding pipeline regression, training data readiness, trust trajectory decline). DatasetBuilder with 5 curated dataset queries. DatasetProvider interface for testing. 14 DatasetBuilder tests + 11 TSDB reflection tests. RSIC dashboard with Data-Driven Insights row.
 
-Remaining: `mdemg finetune` subcommands — status, train, eval, deploy, rollback. Plus `mdemg data curate`, `mdemg data anchor generate`, `mdemg data manifest`.
+Remaining: Training cycle trigger patterns (22-24), data balance checks, entropy decay, exogenous ratio enforcement, training cycle handler in task_dispatch.go.
 
-**Effort:** S-M
+**Effort:** S remaining.
 
 ---
 
-## Phase 9: Monitoring (Go + Grafana) ⬜ NOT STARTED
+## Phase 8: CLI Commands (Go) 🔄 MOSTLY COMPLETE [Verified: 2026-04-02]
 
-FT model metrics (version, latency, cycles), data governance metrics (exogenous ratio, entropy), benchmark metrics. Two new Grafana dashboards.
+> **Built:** `mdemg data status/inspect/stats/annotate/quality/audit/export/check` (PRs #219, #240, #243). Multi-table export with streaming privacy scan. Pre-campaign validation (`data check --pre-campaign`).
 
-**Effort:** S
+Remaining: `mdemg finetune` subcommands — status, train, eval, deploy, rollback (blocked on Phase 5). `mdemg data curate`, `mdemg data anchor generate`, `mdemg data manifest`.
+
+**Effort:** S remaining (blocked on Phase 5).
+
+---
+
+## Phase 9: Monitoring (Go + Grafana) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
+
+> **Built:** RSIC data-driven Grafana panels (PR #237), TSDB data quality diagnostic script (`scripts/tsdb_data_review.py`, 7 sections, PR #238), `mdemg data status` with `--warn` exit code (PR #219). J17 trust trend panels (PR #236).
+
+Remaining: FT model-specific metrics (version, latency, cycles), data governance metrics (exogenous ratio, entropy), FT training dashboard.
+
+**Effort:** S remaining.
+
+---
+
+## Phase 10: Data Collection Infrastructure ✅ COMPLETE [Verified: 2026-04-02]
+
+> **All built in PRs #225-#242:**
+> - Embedding event logging (`embedding_events` hypertable, PR #225)
+> - Retrieval event logging (`retrieval_events` hypertable, PR #225)
+> - Multi-table export pipeline with streaming privacy scan (PR #240)
+> - UTDS spec framework (3 specs, schema, runner, PR #240)
+> - TSDB data review diagnostic (7 sections, privacy verification, PR #238)
+
+---
+
+## Phase 11: Instance Isolation ✅ COMPLETE [Verified: 2026-04-02]
+
+> **All built in PR #242:**
+> - Migration 008: `instance_id TEXT NOT NULL DEFAULT ''` on all 3 training tables
+> - Migration 009: Backfill empty `space_id` to `'mdemg-dev'`
+> - Runtime `BackfillInstanceID()` at server startup (idempotent)
+> - `defaultSpaceID` package-level fallback fixing 16 background LLM call sites
+> - Neo4j memory tiering (4-tier auto-detection, platform-specific RAM detection)
+
+---
+
+## Phase 12: Campaign Hardening (PROD-READINESS Sprint) ✅ COMPLETE [Verified: 2026-04-02]
+
+> **Built in PR #243:**
+> - `session_id` propagation: context key, WithSessionID/SessionIDFromContext helpers, per-handler injection, defaultSessionID fallback
+> - Query classifier wiring: 5 config vars, service field + setter, call site change to `ComputeRetrievalHintsWithLLM`
+> - `mdemg data check --pre-campaign`: 8 automated checks with pass/fail + JSON output
+> - Campaign task activation guide (`docs/operations/campaign-task-activation.md`)
+> - FT implementation plan reconciliation (this update)
 
 ---
 
@@ -341,6 +378,23 @@ FT model metrics (version, latency, cycles), data governance metrics (exogenous 
 | `neural/training/quality_annotator.py` | #219 | Post-hoc quality annotation from feedback outcomes |
 | `neural/training/quality_report.py` | #219 | Data quality analysis + reporting |
 | `internal/tsdb/migrations/005_interaction_enrichment.sql` | #219 | guidance_id + source_path columns |
+| `internal/tsdb/migrations/006_embedding_retrieval_events.sql` | #225 | embedding_events + retrieval_events hypertables |
+| `internal/tsdb/migrations/007_raft_context.sql` | #222 | RAFT context columns on llm_interactions |
+| `internal/tsdb/migrations/008_instance_id.sql` | #242 | instance_id on all 3 training tables |
+| `internal/tsdb/migrations/009_backfill_space_id.sql` | #242 | space_id backfill data fix |
+| `internal/tsdb/embedding_writer.go` | #225 | Embedding event logger |
+| `internal/tsdb/retrieval_writer.go` | #225 | Retrieval event logger |
+| `internal/tsdb/backfill.go` | #242 | Runtime instance_id backfill |
+| `internal/tsdb/dataset_builder.go` | #237 | RSIC-DATA curated dataset queries |
+| `internal/cli/data_export.go` | #240 | Multi-table training data export |
+| `internal/cli/data_check.go` | #243 | Pre-campaign validation checks |
+| `docs/tests/utds/schema/utds.schema.json` | #240 | UTDS validation schema |
+| `docs/tests/utds/runners/utds_runner.py` | #240 | UTDS export validation runner |
+| `neural/training/quality_filter.py` | #240 | 8 quality gates for training data |
+| `neural/training/format_converter.py` | #240 | HuggingFace MLX chat format converter |
+| `neural/training/dataset_versioner.py` | #240 | Temporal split + dedup + manifest |
+| `scripts/tsdb_data_review.py` | #238 | TSDB data quality diagnostic (7 sections) |
+| `docs/operations/campaign-task-activation.md` | #243 | Campaign task activation guide |
 
 ### Files Eliminated (vs v1.0)
 
@@ -357,23 +411,27 @@ FT model metrics (version, latency, cycles), data governance metrics (exogenous 
 
 ## Implementation Schedule
 
-| Phase | Dependencies | Effort | Duration | Status |
-|---|---|---|---|---|
-| **1** Interaction Logger | None | M | 1 week | ✅ COMPLETE |
-| **2** Think Mode + Sanitize | None | M | 3-4 days | ⬜ NEXT |
-| **3** vllm-mlx Integration | None (parallel) | S | 1-2 days | ⬜ |
-| **4A** RAFT Context (v3.0) | Phase 1 | M | 3-4 days | ✅ COMPLETE |
-| **4B** ULTS Specs (v3.0) | None | M | 3-4 days | ✅ COMPLETE |
-| **4** Teacher Distillation | Phase 1 data (2-3 months) | M | 1-2 weeks | ⬜ |
-| **5** Training Pipeline | Phase 4 | M-L | 1-2 weeks | ⬜ |
-| **6** Recursive Cycle | Phases 4+5 | M | 1 week | ⬜ |
-| **7** RSIC Integration | Phases 1+6 | S-M | 3-4 days | ⬜ |
-| **8** CLI Commands | Phases 5+6 | S | 2-3 days | 🔄 Partial |
-| **9** Monitoring | Phases 3+7 | S | 2-3 days | ⬜ |
+| Phase | Dependencies | Effort | Status |
+|---|---|---|---|
+| **1** Interaction Logger | None | M | ✅ COMPLETE (PRs #217-#219) |
+| **2** Think Mode + Sanitize | None | M | 🔄 PARTIAL (2D-2F done) |
+| **3** vllm-mlx Integration | None | S | ⬜ CONFIG ONLY |
+| **4A** RAFT Context | Phase 1 | M | ✅ COMPLETE (PR #222) |
+| **4B** ULTS Specs | None | M | ✅ COMPLETE (PR #225) |
+| **4** Teacher Distillation | 30-day campaign data | S-M | 🔄 PARTIAL (4D, 4E done) |
+| **5** Training Pipeline | Phase 4 | M-L | ⬜ NOT STARTED |
+| **6** Recursive Cycle | Phases 4+5 | M | 🔄 PARTIAL (6D done) |
+| **7** RSIC Integration | Phases 1+6 | S-M | 🔄 PARTIAL (patterns 25-30 done) |
+| **8** CLI Commands | Phases 5+6 | S | 🔄 MOSTLY COMPLETE |
+| **9** Monitoring | Phases 3+7 | S | 🔄 PARTIAL |
+| **10** Data Collection Infra | Phase 1 | M | ✅ COMPLETE (PRs #225-#240) |
+| **11** Instance Isolation | Phase 10 | M | ✅ COMPLETE (PR #242) |
+| **12** Campaign Hardening | Phase 11 | M | ✅ COMPLETE (PR #243) |
 
-**Critical path:** Phase 2 → Phase 4A → (data accumulation 2-3 months) → Phase 4 → Phase 5 → Phase 6
+**Critical path:** 30-day campaign (task activation + data accumulation) → Phase 4A-C (teacher distillation for rare tasks) → Phase 5 (training pipeline) → Phase 6A-C (recursive automation)
 
-**Next sprint priorities:**
-1. Phase 2 (SanitizeResponse) — blocks local model switch
-2. Phase 4A (RAFT context) — enriches training data quality
+**Next priorities:**
+1. **30-day multi-instance collection campaign** — infrastructure ready, data activation needed
+2. Phase 2A-2C (Think mode opt-in per consumer) — blocks local model switch
+3. Phase 3 (vllm-mlx integration) — config-only, can be done anytime
 3. Phase 4B (ULTS specs) — formalizes contracts, enables automation

@@ -138,6 +138,16 @@ These control which event types are captured. All require `TSDB_ENABLED=true`.
 | Embedding logging | `EMBEDDING_EVENT_LOGGING` | `true` | Log embedding calls (ingest/query, call site, cache hit) |
 | Retrieval logging | `RETRIEVAL_EVENT_LOGGING` | `true` | Log retrieval pipeline stages (recall, BM25, rerank, results) |
 
+### Query Classification
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| Enabled | `QUERY_CLASSIFY_ENABLED` | `false` | Enable LLM query type classification |
+| Provider | `QUERY_CLASSIFY_PROVIDER` | (LLM provider) | LLM provider for classification |
+| Model | `QUERY_CLASSIFY_MODEL` | (LLM model) | Model for classification |
+| Max tokens | `QUERY_CLASSIFY_MAX_TOKENS` | `500` | Max tokens for classification response |
+| Timeout | `QUERY_CLASSIFY_TIMEOUT_MS` | `5000` | Timeout in ms |
+
 ### Data Retention
 
 | Flag | Env Var | Default | Purpose |

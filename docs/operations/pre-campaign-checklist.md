@@ -1,6 +1,18 @@
 # Pre-Campaign Checklist: 30-Day Multi-Instance Data Collection
 
-Run through this checklist before starting the training data collection campaign.
+## Automated Check
+
+Run the automated pre-campaign validation first:
+```bash
+./bin/mdemg data check --pre-campaign
+# JSON output for CI: ./bin/mdemg data check --pre-campaign --json
+```
+
+This runs 8 checks (schema version, instance ID, TSDB writable, event logging, task accumulation, session ID, export dry-run, campaign flags) and reports pass/fail with next-step guidance.
+
+## Manual Verification
+
+Run through this checklist if automated checks pass but you want additional verification.
 All items must pass before data collection begins.
 
 ## 1. Schema & Migration
@@ -35,7 +47,7 @@ All items must pass before data collection begins.
 
 - [ ] Run hash verification — all 16 specs pass:
   ```bash
-  python3 scripts/verify_ults_hashes.py --specs-dir docs/tests/ults/specs/ --repo-root .
+  python3 docs/tests/ults/runners/ults_runner.py --spec "docs/tests/ults/specs/*.ults.json" --verify-hashes --repo-root .
   ```
 - [ ] ULTS self-check passes:
   ```bash

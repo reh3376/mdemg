@@ -154,6 +154,15 @@ uv run python tsdb_data_review.py --format both --verbose
 - `mdemg data stats` — Aggregate statistics per table
 - `mdemg data quality` — Data quality checks (NULL rates, gap detection)
 - `mdemg data audit` — Privacy audit (scrub pattern detection)
+- `mdemg data check --pre-campaign` — Automated pre-campaign validation (8 checks)
+
+### Session ID Propagation (PROD-READINESS Sprint)
+
+`session_id` is propagated from API request bodies through Go context into `llm_interactions` records. API handlers (observe, correct, resume, jiminy guide, jiminy feedback) inject `session_id` via `llmclient.WithSessionID()`. Background tasks (RSIC, consolidation) use a `defaultSessionID` fallback set to the instance ID at startup. This enables per-session correlation of LLM interactions for data quality analysis and DPO preference pair construction.
+
+### Query Classification (PROD-READINESS Sprint)
+
+When `QUERY_CLASSIFY_ENABLED=true`, the retrieval pipeline uses an LLM-powered query type classifier (`internal/retrieval/query_classifier.go`) instead of regex-based classification. This produces `llm_interactions` records with `task_name = 'retrieval.query_classify'` for training data collection. Results are cached (LRU, 256 entries) to avoid duplicate LLM calls for repeated queries. Falls back to regex classification on LLM error or when disabled.
 
 ### Spot Check Script
 
@@ -246,7 +255,7 @@ PYTHONPATH=. python3 -m training.dataset_versioner --input-dir /tmp/filtered/ --
 - `internal/tsdb/llm_writer.go` — LLM interaction logger
 - `internal/tsdb/embedding_writer.go` — Embedding event logger
 - `internal/tsdb/retrieval_writer.go` — Retrieval event logger
-- `internal/tsdb/migrations/` — Schema migration SQL files (001-007)
+- `internal/tsdb/migrations/` — Schema migration SQL files (001-009)
 - `internal/llmclient/scrubber.go` — Privacy scrubber patterns
 - `internal/api/server.go` — TSDB client wiring (SetTSDBClient)
 - `docker-compose.yml` — Docker TSDB environment overrides

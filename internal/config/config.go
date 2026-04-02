@@ -199,6 +199,13 @@ type Config struct {
 	IntentMaxTokens int    // INTENT_MAX_TOKENS — max tokens for rewritten query (default: 150)
 	IntentTimeoutMs int    // INTENT_TIMEOUT_MS — timeout for intent translation in ms (default: 2000)
 
+	// Query Classification settings (PROD-READINESS)
+	QueryClassifyEnabled   bool   // QUERY_CLASSIFY_ENABLED — enable LLM query type classification (default: false)
+	QueryClassifyProvider  string // QUERY_CLASSIFY_PROVIDER — LLM provider for classification (openai/ollama, default: llmProvider)
+	QueryClassifyModel     string // QUERY_CLASSIFY_MODEL — model for classification (default: llmModel)
+	QueryClassifyMaxTokens int    // QUERY_CLASSIFY_MAX_TOKENS — max tokens for classification response (default: 500)
+	QueryClassifyTimeoutMs int    // QUERY_CLASSIFY_TIMEOUT_MS — timeout for classification in ms (default: 5000)
+
 	// Dynamic Emergence settings (Phase 103)
 	EmergenceEnabled        bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
 	EmergenceProvider       string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
@@ -1684,6 +1691,25 @@ func FromEnv() (Config, error) {
 	}
 	if intentTimeoutMs < 200 {
 		return Config{}, errors.New("INTENT_TIMEOUT_MS must be >= 200")
+	}
+
+	// Query Classification settings (PROD-READINESS)
+	queryClassifyEnabled := getBool("QUERY_CLASSIFY_ENABLED", false)
+	queryClassifyProvider := get("QUERY_CLASSIFY_PROVIDER", llmProvider)
+	queryClassifyModel := get("QUERY_CLASSIFY_MODEL", llmModel)
+	queryClassifyMaxTokens, err := atoi("QUERY_CLASSIFY_MAX_TOKENS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if queryClassifyMaxTokens < 10 || queryClassifyMaxTokens > 1000 {
+		return Config{}, errors.New("QUERY_CLASSIFY_MAX_TOKENS must be in range [10, 1000]")
+	}
+	queryClassifyTimeoutMs, err := atoi("QUERY_CLASSIFY_TIMEOUT_MS", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if queryClassifyTimeoutMs < 200 {
+		return Config{}, errors.New("QUERY_CLASSIFY_TIMEOUT_MS must be >= 200")
 	}
 
 	// Dynamic Emergence settings (Phase 103)
@@ -3290,6 +3316,13 @@ func FromEnv() (Config, error) {
 		IntentModel:     intentModel,
 		IntentMaxTokens: intentMaxTokens,
 		IntentTimeoutMs: intentTimeoutMs,
+
+		// PROD-READINESS: Query Classification
+		QueryClassifyEnabled:   queryClassifyEnabled,
+		QueryClassifyProvider:  queryClassifyProvider,
+		QueryClassifyModel:     queryClassifyModel,
+		QueryClassifyMaxTokens: queryClassifyMaxTokens,
+		QueryClassifyTimeoutMs: queryClassifyTimeoutMs,
 
 		// Phase 103: Dynamic Emergence
 		EmergenceEnabled:        emergenceEnabled,
