@@ -26,6 +26,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify embedded compose files match source
+        run: diff -q docker-compose.yml internal/cli/compose_templates/docker-compose.yml
+
       - name: Build unified CLI
         run: |
           go build -v \

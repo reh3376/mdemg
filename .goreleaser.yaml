@@ -187,6 +187,9 @@ archives:
       - src: "plugins/obsidian-module/manifest.json"
         dst: plugins/obsidian-module
         strip_parent: true
+      - src: "docker-compose.yml"
+        dst: .
+        strip_parent: true
   - id: linux
     formats:
       - tar.gz
@@ -207,6 +210,9 @@ archives:
         strip_parent: true
       - src: "plugins/obsidian-module/manifest.json"
         dst: plugins/obsidian-module
+        strip_parent: true
+      - src: "docker-compose.yml"
+        dst: .
         strip_parent: true
 
 checksum:
@@ -243,6 +249,8 @@ brews:
       obsdir = share/"mdemg/plugins/obsidian-module"
       obsdir.install "obsidian-module"
       obsdir.install "plugins/obsidian-module/manifest.json"
+      # Docker Compose file (embedded in binary, also available for inspection)
+      share.install "docker-compose.yml" => "mdemg/docker-compose.yml"
     test: |
       system "#{bin}/mdemg", "version"
     caveats: |

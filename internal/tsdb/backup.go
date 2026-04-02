@@ -381,11 +381,11 @@ func (s *TSDBBackupService) resolveComposeFile() string {
 		}
 	}
 
-	// Auto-detect: check common paths
+	// Auto-detect: check common paths (cwd first for Homebrew/edge installs)
 	candidates := []string{
+		"docker-compose.yml",
 		"deploy/docker/docker-compose.observability.yml",
 		"deploy/docker/docker-compose.prod.yml",
-		"docker-compose.yml",
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
