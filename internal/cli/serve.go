@@ -78,9 +78,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Support TSDB_AUTO_MIGRATE env var for Docker deployments where CLI flags aren't available
-	if !autoMigrate && os.Getenv("TSDB_AUTO_MIGRATE") == "true" {
-		autoMigrate = true
+	// Support AUTO_MIGRATE / TSDB_AUTO_MIGRATE env vars for Docker deployments
+	// where CLI flags aren't available. AUTO_MIGRATE covers both Neo4j and TSDB.
+	if !autoMigrate {
+		if os.Getenv("AUTO_MIGRATE") == "true" || os.Getenv("TSDB_AUTO_MIGRATE") == "true" {
+			autoMigrate = true
+		}
 	}
 
 	// Resolve log level: --log-level flag > --verbose flag > LOG_LEVEL env > "info"

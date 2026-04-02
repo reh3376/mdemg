@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"mdemg/internal/tsdb"
 )
@@ -23,6 +24,9 @@ func newDataCmd() *cobra.Command {
 		Use:   "data",
 		Short: "Training data collection status and management",
 		Long:  "Commands for monitoring and managing LLM interaction training data",
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
+			_ = godotenv.Load() // Load .env for TSDB_HOST_PORT and other settings
+		},
 	}
 
 	cmd.AddCommand(newDataStatusCmd())

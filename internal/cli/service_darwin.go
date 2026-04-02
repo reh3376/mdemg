@@ -9,6 +9,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	launchd_templates "mdemg/internal/cli/launchd_templates"
 )
 
 var launchdServices = []struct {
@@ -54,9 +56,13 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	templateDir := filepath.Join(projectDir, "packaging", "launchd")
 
 	for _, svc := range launchdServices {
+		// Try disk first (repo checkout), fall back to embedded templates (Homebrew/binary)
 		tmpl, err := os.ReadFile(filepath.Join(templateDir, svc.Template))
 		if err != nil {
-			return fmt.Errorf("read template %s: %w", svc.Template, err)
+			tmpl, err = launchd_templates.FS.ReadFile(svc.Template)
+			if err != nil {
+				return fmt.Errorf("read template %s: %w", svc.Template, err)
+			}
 		}
 
 		content := string(tmpl)
