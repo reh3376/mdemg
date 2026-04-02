@@ -22,6 +22,9 @@ training = [
     "jsonschema>=4.20.0",
     "cuid2>=2.0.0",
 ]
+lora = [
+    "mlx-lm>=0.20.0",
+]
 
 [project.scripts]
 mdemg-neural-train = "neural_sidecar.train:main"
