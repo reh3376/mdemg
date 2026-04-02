@@ -72,6 +72,10 @@ var defaultRecorder InteractionRecorder
 // Set via SetDefaultInstanceID before creating clients.
 var defaultInstanceID string
 
+// defaultSpaceID is the fallback space_id for background LLM calls that
+// pass "" to WithContext. Set via SetDefaultSpaceID at server startup.
+var defaultSpaceID string
+
 // SetDefaultRecorder sets a package-level recorder that is automatically
 // attached to every subsequently created Client. Safe to call with nil
 // to disable. This allows zero-modification wiring of all 16+ consumers.
@@ -83,6 +87,13 @@ func SetDefaultRecorder(r InteractionRecorder) {
 // InteractionRecords. Called once at server startup from cfg.InstanceID.
 func SetDefaultInstanceID(id string) {
 	defaultInstanceID = id
+}
+
+// SetDefaultSpaceID sets the fallback space_id for background LLM calls.
+// When WithContext is called with an empty spaceID, this value is used instead.
+// Called once at server startup from cfg.RSICWatchdogSpaceID.
+func SetDefaultSpaceID(id string) {
+	defaultSpaceID = id
 }
 
 // New creates a new LLM client from the given configuration.
@@ -112,10 +123,15 @@ func (c *Client) SetRecorder(r InteractionRecorder) {
 
 // WithContext returns a shallow copy of the Client with task-level metadata set.
 // This allows per-consumer labeling without modifying the shared client.
+// If spaceID is empty, falls back to the package-level defaultSpaceID.
 func (c *Client) WithContext(taskName, spaceID string) *Client {
 	copy := *c
 	copy.taskName = taskName
-	copy.spaceID = spaceID
+	if spaceID == "" {
+		copy.spaceID = defaultSpaceID
+	} else {
+		copy.spaceID = spaceID
+	}
 	return &copy
 }
 

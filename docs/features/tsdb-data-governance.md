@@ -57,7 +57,7 @@ TSDB_ENABLED=true
   │     │
   │     ├── TSDB_AUTO_MIGRATE=true → run schema migrations on startup
   │     │
-  │     └── TSDB_REQUIRED_SCHEMA_VERSION=7 → refuse to start if schema is behind
+  │     └── TSDB_REQUIRED_SCHEMA_VERSION=8 → refuse to start if schema is behind
   │
   ├── metric_samples writer (always active when TSDB connected)
   │     └── TSDB_FLUSH_INTERVAL_SEC=60 → batch flush cadence
@@ -98,8 +98,10 @@ Migrations live in `internal/tsdb/migrations/` and are applied in order:
 | `005_interaction_enrichment.sql` | 5 | RAFT context columns on `llm_interactions` |
 | `006_embedding_retrieval_events.sql` | 6 | `embedding_events`, `retrieval_events` hypertables |
 | `007_raft_context.sql` | 7 | Additional RAFT training context columns |
+| `008_instance_id.sql` | 8 | `instance_id TEXT NOT NULL DEFAULT ''` on all 3 training tables + composite indexes |
+| `009_backfill_space_id.sql` | — | Data fix: backfills empty `space_id` to `'mdemg-dev'` (no schema version bump) |
 
-Current required version: **7** (`TSDB_REQUIRED_SCHEMA_VERSION`).
+Current required version: **8** (`TSDB_REQUIRED_SCHEMA_VERSION`).
 
 ## Privacy and Scrubbing
 
@@ -203,7 +205,7 @@ If any violation is detected, the export is **BLOCKED** with zero output (hard g
 
 Export archives are validated against the UTDS (Universal Training Data Specification) JSON Schema at `docs/tests/utds/schema/utds.schema.json`. Key constraints:
 - `privacy_scrub_violations == 0` (hard gate)
-- `schema_version >= 7`
+- `schema_version >= 8`
 - SHA-256 checksums match actual file contents
 - Row counts match actual JSONL line counts
 

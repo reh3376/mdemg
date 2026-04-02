@@ -100,9 +100,9 @@ services:
     environment:
       NEO4J_AUTH: "neo4j/${NEO4J_PASS:-testpassword}"
       NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_memory_pagecache_size: "${NEO4J_PAGECACHE:-2G}"
-      NEO4J_dbms_memory_heap_initial__size: "${NEO4J_HEAP_INIT:-1G}"
-      NEO4J_dbms_memory_heap_max__size: "${NEO4J_HEAP_MAX:-2G}"
+      NEO4J_dbms_memory_pagecache_size: "${NEO4J_PAGECACHE:-512M}"
+      NEO4J_dbms_memory_heap_initial__size: "${NEO4J_HEAP_INIT:-256M}"
+      NEO4J_dbms_memory_heap_max__size: "${NEO4J_HEAP_MAX:-512M}"
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
       NEO4J_dbms_security_procedures_allowlist: "apoc.*"
     volumes:

@@ -163,6 +163,13 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				}
 			}
 
+			// Backfill instance_id on pre-migration-008 records (idempotent)
+			if cfg.InstanceID != "" {
+				if backfillErr := tsdb.BackfillInstanceID(context.Background(), tsdbClient.Pool(), cfg.InstanceID); backfillErr != nil {
+					slog.Warn("tsdb: instance_id backfill failed", "error", backfillErr)
+				}
+			}
+
 			// Schema version enforcement
 			tsdbVer, verErr := tsdbClient.GetSchemaVersion(context.Background())
 			if verErr != nil {

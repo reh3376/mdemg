@@ -729,6 +729,20 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"GRAFANA_PASSWORD":     true,
 		"TSDB_PASSWORD":        true,
 		"TSDB_ENABLED":         true,
+		"NEO4J_PAGECACHE":      true,
+		"NEO4J_HEAP_INIT":      true,
+		"NEO4J_HEAP_MAX":       true,
+		"NEO4J_MAX_POOL_SIZE":  true,
+	}
+
+	// Detect system RAM and compute Neo4j memory tier
+	ramGB := DetectSystemRAMGB()
+	memCfg := neo4jMemoryTier(ramGB)
+	if ramGB > 0 {
+		fmt.Printf("  System RAM: %d GB — Neo4j: pagecache=%s, heap=%s-%s, pool=%d\n",
+			ramGB, memCfg.Pagecache, memCfg.HeapInit, memCfg.HeapMax, memCfg.MaxPoolSize)
+	} else {
+		fmt.Println("  System RAM: unknown — using conservative Neo4j defaults")
 	}
 	filtered := make([]string, 0, len(envLines))
 	for _, line := range envLines {
@@ -750,6 +764,10 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"TSDB_ENABLED=true",
 		fmt.Sprintf("GRAFANA_PASSWORD=%s", opts.GrafanaPassword),
 		fmt.Sprintf("TSDB_PASSWORD=%s", opts.TSDBPassword),
+		fmt.Sprintf("NEO4J_PAGECACHE=%s", memCfg.Pagecache),
+		fmt.Sprintf("NEO4J_HEAP_INIT=%s", memCfg.HeapInit),
+		fmt.Sprintf("NEO4J_HEAP_MAX=%s", memCfg.HeapMax),
+		fmt.Sprintf("NEO4J_MAX_POOL_SIZE=%d", memCfg.MaxPoolSize),
 	)
 
 	if err := os.WriteFile(envPath, []byte(strings.Join(filtered, "\n")+"\n"), 0600); err != nil {

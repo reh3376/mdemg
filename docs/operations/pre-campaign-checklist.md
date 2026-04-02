@@ -5,7 +5,7 @@ All items must pass before data collection begins.
 
 ## 1. Schema & Migration
 
-- [ ] All instances on schema v8+ (migration 008 adds `instance_id`)
+- [ ] All instances on schema v8+ (migration 008: `instance_id`, 009: `space_id` backfill)
 - [ ] Verify column exists on all 3 tables:
   ```bash
   docker compose exec -T timescaledb psql -U mdemg -d mdemg_metrics -c "

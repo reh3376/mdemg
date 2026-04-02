@@ -1036,6 +1036,7 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			)
 			llmclient.SetDefaultRecorder(s.llmWriter)
 			llmclient.SetDefaultInstanceID(s.cfg.InstanceID)
+			llmclient.SetDefaultSpaceID(s.cfg.RSICWatchdogSpaceID)
 			slog.Info("tsdb: LLM interaction logger attached", "instance_id", s.cfg.InstanceID)
 		}
 
@@ -1047,7 +1048,11 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			)
 			// Wire recorder into CachedEmbedder if available
 			if ce, ok := s.embedder.(*embeddings.CachedEmbedder); ok {
-				ce.SetRecorder(&embeddingRecorderAdapter{writer: s.embeddingWriter, instanceID: s.cfg.InstanceID})
+				ce.SetRecorder(&embeddingRecorderAdapter{
+					writer:         s.embeddingWriter,
+					instanceID:     s.cfg.InstanceID,
+					defaultSpaceID: s.cfg.RSICWatchdogSpaceID,
+				})
 			}
 			slog.Info("tsdb: embedding event logger attached")
 		}
@@ -1058,7 +1063,11 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				client.Pool(),
 				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
 			)
-			s.retriever.SetRetrievalRecorder(&retrievalRecorderAdapter{writer: s.retrievalWriter, instanceID: s.cfg.InstanceID})
+			s.retriever.SetRetrievalRecorder(&retrievalRecorderAdapter{
+				writer:         s.retrievalWriter,
+				instanceID:     s.cfg.InstanceID,
+				defaultSpaceID: s.cfg.RSICWatchdogSpaceID,
+			})
 			slog.Info("tsdb: retrieval event logger attached")
 		}
 
@@ -1101,21 +1110,27 @@ func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
 
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
 type embeddingRecorderAdapter struct {
-	writer     *tsdb.EmbeddingEventWriter
-	instanceID string
+	writer         *tsdb.EmbeddingEventWriter
+	instanceID     string
+	defaultSpaceID string
 }
 
 // retrievalRecorderAdapter adapts tsdb.RetrievalEventWriter to retrieval.RetrievalEventRecorder.
 type retrievalRecorderAdapter struct {
-	writer     *tsdb.RetrievalEventWriter
-	instanceID string
+	writer         *tsdb.RetrievalEventWriter
+	instanceID     string
+	defaultSpaceID string
 }
 
 func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retrieval.RetrievalEvent) {
+	spaceID := event.SpaceID
+	if spaceID == "" {
+		spaceID = a.defaultSpaceID
+	}
 	a.writer.Record(tsdb.RetrievalEventRow{
 		Time:              event.Time,
 		EventID:           event.EventID,
-		SpaceID:           event.SpaceID,
+		SpaceID:           spaceID,
 		CallSite:          event.CallSite,
 		QueryText:         event.QueryText,
 		QueryHash:         event.QueryHash,
@@ -1140,11 +1155,15 @@ func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retr
 }
 
 func (a *embeddingRecorderAdapter) RecordEmbed(_ context.Context, event embeddings.EmbeddingEvent) {
+	spaceID := event.SpaceID
+	if spaceID == "" {
+		spaceID = a.defaultSpaceID
+	}
 	a.writer.Record(tsdb.EmbeddingEventRow{
 		Time:        event.Time,
 		EventID:     event.EventID,
 		EventType:   event.EventType,
-		SpaceID:     event.SpaceID,
+		SpaceID:     spaceID,
 		TextContent: event.TextContent,
 		TextHash:    event.TextHash,
 		TextLength:  event.TextLength,
