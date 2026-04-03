@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,18 +41,11 @@ detected, the export is blocked and no archive is created.`,
 				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
 
-			// Resolve instance ID: flag > MDEMG_INSTANCE_ID env > {username}-{space_id}
+			// Resolve instance ID: flag > MDEMG_INSTANCE_ID env > empty (all instances)
 			if instanceID == "" {
 				instanceID = os.Getenv("MDEMG_INSTANCE_ID")
 			}
-			if instanceID == "" {
-				u, err := user.Current()
-				if err == nil {
-					instanceID = u.Username + "-" + spaceID
-				} else {
-					instanceID = "unknown-" + spaceID
-				}
-			}
+			// No auto-detection fallback — empty means "all instances for this space"
 
 			// Parse time range
 			var fromTime, toTime time.Time
@@ -137,6 +129,13 @@ detected, the export is blocked and no archive is created.`,
 			fmt.Printf("  Total rows: %d\n", result.TotalRows)
 			fmt.Printf("  Privacy:    %d violations\n", result.Manifest.Quality.PrivacyScrubViolations)
 
+			if result.TotalRows == 0 {
+				fmt.Fprintf(os.Stderr, "WARNING: Export produced 0 rows for space_id=%q.\n", spaceID)
+				if instanceID != "" {
+					fmt.Fprintf(os.Stderr, "  Instance filter: %q — try without --instance-id to see all data.\n", instanceID)
+				}
+			}
+
 			if !noValidate {
 				fmt.Println("\nTo validate: python docs/tests/utds/runners/utds_runner.py validate --archive", result.OutputPath)
 			}
@@ -146,7 +145,7 @@ detected, the export is blocked and no archive is created.`,
 	}
 
 	cmd.Flags().StringVar(&output, "output", "", "Output archive path (default: mdemg-export-{instance}-{date}.tar.gz)")
-	cmd.Flags().StringVar(&instanceID, "instance-id", "", "Instance identifier (default: {username}-{space-id})")
+	cmd.Flags().StringVar(&instanceID, "instance-id", "", "Instance identifier (default: all instances)")
 	cmd.Flags().StringVar(&since, "since", "", "Start time (RFC3339, default: 180 days ago)")
 	cmd.Flags().StringVar(&until, "until", "", "End time (RFC3339, default: now)")
 	cmd.Flags().StringSliceVar(&tables, "tables", []string{"llm_interactions", "retrieval_events", "embedding_events"},

@@ -41,7 +41,12 @@ def load_eval_report(path: str) -> dict[str, Any]:
 
 
 def index_by_task(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Index task_results by task name for quick lookup."""
+    """Index task_results by task name for quick lookup.
+
+    Only includes tasks with status == "evaluated". This field is set
+    by evaluate_ft.py. Manual reports must include it or tasks will
+    be silently excluded from gate checks.
+    """
     return {
         r["task"]: r
         for r in report.get("task_results", [])

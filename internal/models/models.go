@@ -28,6 +28,9 @@ type RetrieveRequest struct {
 	// Intent Translation (Phase 102)
 	TranslateIntent bool `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding
 
+	// Session tracking for TSDB training data
+	SessionID string `json:"session_id,omitempty"` // Propagated to TSDB for session-level analysis
+
 	// Global Meta-Learning (Phase 105)
 	IncludeGlobalSpace bool `json:"include_global_space,omitempty"` // Include mdemg-global space in retrieval results
 
@@ -393,6 +396,7 @@ type ConsultRequest struct {
 	IncludeEvidence bool    `json:"include_evidence,omitempty"` // Include symbol evidence for suggestions
 	LlmSynthesis    bool    `json:"llm_synthesis,omitempty"`    // Enable LLM synthesis for narrative response (Phase 101)
 	TranslateIntent bool    `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding (Phase 102)
+	SessionID       string  `json:"session_id,omitempty"`       // Propagated to TSDB for session-level analysis
 }
 
 // ConsultResponse - response from the Agent Consulting Service

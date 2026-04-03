@@ -641,6 +641,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 
 		rerankResult, rerankErr := s.Rerank(ctx, RerankRequest{
+			SpaceID:    req.SpaceID,
 			Query:      req.QueryText,
 			Candidates: results,
 			TopN:       s.cfg.RerankTopN,

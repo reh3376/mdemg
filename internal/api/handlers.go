@@ -20,6 +20,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
 	"mdemg/internal/jobs"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
@@ -420,7 +421,12 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 		req.QueryEmbedding = emb
 	}
 
-	resp, err := s.retriever.Retrieve(r.Context(), req)
+	ctx := r.Context()
+	if req.SessionID != "" {
+		ctx = llmclient.WithSessionID(ctx, req.SessionID)
+	}
+
+	resp, err := s.retriever.Retrieve(ctx, req)
 	if err != nil {
 		writeInternalError(w, err, "retrieve")
 		return
@@ -2179,7 +2185,12 @@ func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := s.consultant.Consult(r.Context(), req)
+	ctx := r.Context()
+	if req.SessionID != "" {
+		ctx = llmclient.WithSessionID(ctx, req.SessionID)
+	}
+
+	resp, err := s.consultant.Consult(ctx, req)
 	if err != nil {
 		writeInternalError(w, err, "consult")
 		return

@@ -20,6 +20,7 @@ import (
 	"mdemg/internal/api"
 	"mdemg/internal/config"
 	"mdemg/internal/db"
+	"mdemg/internal/llmclient"
 	mlog "mdemg/internal/logging"
 	"mdemg/internal/plugins"
 	"mdemg/internal/tsdb"
@@ -203,11 +204,30 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		}
 	}
 
+	// Set package-level LLM recording defaults BEFORE NewServer creates LLM clients.
+	// Without this, clients created during NewServer (query classifier, intent translator)
+	// get recorder=nil and silently drop all TSDB recording.
+	var earlyLLMWriter *tsdb.LLMInteractionWriter
+	if tsdbClient != nil && cfg.LLMInteractionLogging {
+		earlyLLMWriter = tsdb.NewLLMInteractionWriter(
+			tsdbClient.Pool(),
+			time.Duration(cfg.TSDBFlushIntervalSec)*time.Second,
+		)
+		llmclient.SetDefaultRecorder(earlyLLMWriter)
+		llmclient.SetDefaultInstanceID(cfg.InstanceID)
+		llmclient.SetDefaultSpaceID(cfg.RSICWatchdogSpaceID)
+		llmclient.SetDefaultSessionID("") // empty default — callers provide via WithSessionID
+		slog.Info("tsdb: early LLM recorder attached (pre-server init)")
+	}
+
 	srv := api.NewServer(cfg, driver, pluginMgr)
 	srv.SetLogBuffer(logBuf)
 
 	// Wire TimescaleDB client if available
 	if tsdbClient != nil {
+		if earlyLLMWriter != nil {
+			srv.SetLLMWriter(earlyLLMWriter)
+		}
 		srv.SetTSDBClient(tsdbClient)
 	}
 

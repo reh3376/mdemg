@@ -23,6 +23,7 @@ const rerankNLISystemPrompt = `Relevance judge: rate each candidate 0.0-1.0 for 
 
 // RerankRequest specifies what to re-rank
 type RerankRequest struct {
+	SpaceID    string // Propagated to TSDB via WithContext for correct space attribution
 	Query      string
 	Candidates []models.RetrieveResult
 	TopN       int // How many candidates to re-rank
@@ -82,9 +83,9 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 
 	switch s.cfg.RerankProvider {
 	case "openai":
-		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, systemPrompt, prompt)
+		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, systemPrompt, prompt, req.SpaceID)
 	case "ollama":
-		scores, tokensUsed, err = s.rerankWithOllama(timeoutCtx, systemPrompt, prompt)
+		scores, tokensUsed, err = s.rerankWithOllama(timeoutCtx, systemPrompt, prompt, req.SpaceID)
 	case "jina":
 		scores, tokensUsed, err = s.rerankWithJina(timeoutCtx, req.Query, req.Candidates[:topN])
 	case "neural":
@@ -111,7 +112,7 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		}, req.Query, docTexts, topN, s.cbRegistry)
 		scores = neuralScores
 	default:
-		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, systemPrompt, prompt)
+		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, systemPrompt, prompt, req.SpaceID)
 	}
 
 	if err != nil {
@@ -229,7 +230,7 @@ func buildRerankPrompt(query string, candidates []models.RetrieveResult, compres
 	return sb.String()
 }
 
-func (s *Service) rerankWithOpenAI(ctx context.Context, systemPrompt, prompt string) ([]float64, int, error) {
+func (s *Service) rerankWithOpenAI(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
 	// Use circuit breaker if available
 	if s.cbRegistry != nil {
 		cb := s.cbRegistry.Get("openai-rerank")
@@ -237,7 +238,7 @@ func (s *Service) rerankWithOpenAI(ctx context.Context, systemPrompt, prompt str
 		var tokens int
 		err := cb.Execute(ctx, func(ctx context.Context) error {
 			var innerErr error
-			scores, tokens, innerErr = s.doRerankWithOpenAI(ctx, systemPrompt, prompt)
+			scores, tokens, innerErr = s.doRerankWithOpenAI(ctx, systemPrompt, prompt, spaceID)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -246,17 +247,17 @@ func (s *Service) rerankWithOpenAI(ctx context.Context, systemPrompt, prompt str
 		return scores, tokens, err
 	}
 
-	return s.doRerankWithOpenAI(ctx, systemPrompt, prompt)
+	return s.doRerankWithOpenAI(ctx, systemPrompt, prompt, spaceID)
 }
 
 // doRerankWithOpenAI performs the actual OpenAI rerank API call.
-func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt string) ([]float64, int, error) {
+func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
 	client := llmclient.New(llmclient.Config{
 		Provider: "openai",
 		Model:    s.cfg.RerankModel,
 		APIKey:   s.cfg.OpenAIAPIKey,
 		BaseURL:  s.cfg.EffectiveLLMEndpoint(),
-	}).WithContext("retrieval.rerank_cross", "")
+	}).WithContext("retrieval.rerank_cross", spaceID)
 
 	msgs := []llmclient.Message{
 		{Role: "system", Content: systemPrompt},
@@ -279,7 +280,7 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt s
 	return scores, tokens, nil
 }
 
-func (s *Service) rerankWithOllama(ctx context.Context, systemPrompt, prompt string) ([]float64, int, error) {
+func (s *Service) rerankWithOllama(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
 	// Use circuit breaker if available
 	if s.cbRegistry != nil {
 		cb := s.cbRegistry.Get("ollama-rerank")
@@ -287,7 +288,7 @@ func (s *Service) rerankWithOllama(ctx context.Context, systemPrompt, prompt str
 		var tokens int
 		err := cb.Execute(ctx, func(ctx context.Context) error {
 			var innerErr error
-			scores, tokens, innerErr = s.doRerankWithOllama(ctx, systemPrompt, prompt)
+			scores, tokens, innerErr = s.doRerankWithOllama(ctx, systemPrompt, prompt, spaceID)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -296,16 +297,16 @@ func (s *Service) rerankWithOllama(ctx context.Context, systemPrompt, prompt str
 		return scores, tokens, err
 	}
 
-	return s.doRerankWithOllama(ctx, systemPrompt, prompt)
+	return s.doRerankWithOllama(ctx, systemPrompt, prompt, spaceID)
 }
 
 // doRerankWithOllama performs the actual Ollama rerank API call.
-func (s *Service) doRerankWithOllama(ctx context.Context, systemPrompt, prompt string) ([]float64, int, error) {
+func (s *Service) doRerankWithOllama(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
 	client := llmclient.New(llmclient.Config{
 		Provider: "ollama",
 		Model:    s.cfg.RerankModel,
 		BaseURL:  s.cfg.OllamaEndpoint,
-	}).WithContext("retrieval.rerank_nli", "")
+	}).WithContext("retrieval.rerank_nli", spaceID)
 
 	msgs := []llmclient.Message{
 		{Role: "system", Content: systemPrompt},
