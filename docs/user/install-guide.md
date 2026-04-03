@@ -224,6 +224,42 @@ Ensure Docker Desktop's "Use the WSL 2 based engine" is enabled and WSL integrat
 
 ---
 
+## Uninstall / Full Purge
+
+### macOS (Homebrew)
+
+```bash
+# Stop services
+mdemg service uninstall          # Remove LaunchAgents
+docker compose down -v           # Stop containers, delete volumes
+
+# Remove binary
+brew uninstall mdemg
+
+# Remove data (optional — destroys all stored memories)
+rm -rf ~/.mdemg                  # Config, backups, exports, logs
+rm -rf .mdemg                    # Project-level config
+rm .env                          # Secrets (API keys, passwords)
+rm docker-compose.yml            # Compose file (if written by mdemg init)
+rm .mdemgignore                  # Ignore file
+
+# Remove Docker volumes (if not removed by docker compose down -v)
+docker volume rm mdemg_neo4j_data mdemg_neo4j_logs mdemg_tsdb_data mdemg_grafana_data 2>/dev/null
+```
+
+### Linux
+
+```bash
+# Stop services
+docker compose down -v
+sudo rm /usr/local/bin/mdemg     # Remove binary
+
+# Same data cleanup as macOS above
+rm -rf ~/.mdemg .mdemg .env docker-compose.yml .mdemgignore
+```
+
+---
+
 ## Next Steps
 
 - [Quick Start Guide](quickstart-docker.md) — condensed setup walkthrough

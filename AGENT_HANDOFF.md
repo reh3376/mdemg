@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-02
+**Date:** 2026-04-03
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -48,10 +48,19 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FT-DATA Sprint — COMPLETE (8 phases: UTDS spec framework, TSDB exporter+CLI+API, browser UI tab, quality_filter.py, format_converter.py, dataset_versioner.py, round-trip verification, documentation)
 - FT Training Pipeline — COMPLETE (PRs #243-250: PROD-READINESS, compose embed, export-auto LaunchAgent, vllm-mlx/train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py/21 GRPO rewards, quantize_deploy.py)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-04-02
-- Latest releases: CLI v0.4.2, menubar v1.8.0, sidebar v0.3.0
+- Latest releases: CLI v0.5.3, GHCR mdemg:v0.5.3, GHCR neural-sidecar:v0.5.3, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-02) ===
+- ✅ Live Validation Hardening (2026-04-03) — Campaign hardening via PR #254:
+  - PR #254: WithSpaceID context, compose env vars, campaign init prompt, migration 010, live_validation.py (19 tests), docker-publish cron
+  - v0.5.3 tagged + released, GHCR images updated, full release chain verified
+- ✅ Live Validation: Data Propagation (2026-04-03) — 5 data propagation fixes via PR #253:
+  - PR #253: session_id propagation (F7), space_id reranker threading (F8), recorder init ordering (F9), export instance_id (F10), regression_gate docstring (F11)
+  - All 19 live validation tests re-run: 4 FAILs → PASS, 15 PASSes held, 0 regressions
+- ✅ Live Validation: Docker/Init Fixes (2026-04-02) — 6 infrastructure fixes via PR #252:
+  - PR #252: neural-sidecar GHCR image, AUTO_MIGRATE, docker-publish CI trigger, .env loading, LaunchAgent embed, compose sync CI check
+  - 11 findings from manual live validation sprint, first 6 fixed in-sprint
 - ✅ FT Training Pipeline (2026-04-02) — Complete training pipeline via PRs #243-250:
   - PR #243: PROD-READINESS — QueryClassifier wired, session_id propagation, pre-campaign CLI
   - PR #244: Compose embed fix — docker-compose.yml embedded in binary for Homebrew/edge
