@@ -269,6 +269,7 @@ Retrieve relevant memories via vector similarity + graph activation spreading.
   "temporal_after": "2026-01-01T00:00:00Z",  // optional: hard temporal filter
   "temporal_before": "2026-02-01T00:00:00Z", // optional: hard temporal filter
   "translate_intent": true,                // optional: LLM query rewriting (Phase 102)
+  "session_id": "my-session-001",         // optional: propagated to TSDB for session-level training data analysis
   "include_global_space": true,            // optional: include mdemg-global space (Phase 105)
   "cursor": "node-id-123",                // optional: cursor pagination
   "limit": 50,                            // optional: max results per page (max 500)
@@ -395,7 +396,8 @@ Agent Consulting Service (SME). Provides contextual suggestions based on accumul
   "max_suggestions": 5,                                   // optional (1-20)
   "include_evidence": true,                               // optional
   "llm_synthesis": true,                                  // optional: enable LLM narrative (Phase 101)
-  "translate_intent": true                                // optional: query rewriting (Phase 102)
+  "translate_intent": true,                               // optional: query rewriting (Phase 102)
+  "session_id": "my-session-001"                          // optional: propagated to TSDB for session-level analysis
 }
 ```
 
@@ -3168,6 +3170,25 @@ Triggers a graceful server restart via re-exec. Returns immediately; the server 
 **Response (200):**
 ```json
 {"status": "restarting"}
+```
+
+### GET /v1/admin/instances
+
+Discover running MDEMG instances. Returns the current server and any additional instances found via sidebar/menubar registry files.
+
+**Response (200):**
+```json
+{
+  "instances": [
+    {
+      "id": "self",
+      "name": "mdemg-dev",
+      "url": "http://localhost:9999",
+      "status": "healthy",
+      "version": "v0.5.3"
+    }
+  ]
+}
 ```
 
 ### POST /v1/admin/rsic/start

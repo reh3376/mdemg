@@ -19,7 +19,7 @@ MDEMG previously required 3 platform-specific installers (Homebrew, APT/Debian, 
 | mdemg | `ghcr.io/reh3376/mdemg:latest` | 9999 | `wget /healthz` |
 | neo4j | `neo4j:5` (community) | 7687 (Bolt), 7474 (HTTP) | `cypher-shell RETURN 1` |
 | timescaledb | `timescale/timescaledb:2.25.1-pg16` | 5432 | `pg_isready` |
-| neural-sidecar | Local build (`./neural`) | 8000 | Python `urlopen /health` |
+| neural-sidecar | `ghcr.io/reh3376/mdemg-neural-sidecar:latest` | 8000 | Python `urlopen /health` |
 | grafana | `grafana/grafana:10.2.2` | 3000 | `wget /api/health` |
 
 ### Dynamic Port Assignment

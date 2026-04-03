@@ -101,10 +101,37 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 - `internal/jiminy/` - Jiminy inner voice guidance
 - `internal/cli/` - Unified CLI commands
 
+## Additional CLI Commands
+
+- `mdemg data export-auto` — automated daily export with retention (`--keep N`), `latest.tar.gz` symlink
+- `mdemg data check --pre-campaign` — 8 validation checks (schema, instance ID, task coverage, etc.)
+- `mdemg tsdb status` — TimescaleDB connection and schema version
+- `mdemg tsdb migrate` — apply pending TSDB schema migrations
+- `mdemg synergy status` — Claude Code ↔ MDEMG synergy health
+
+## Campaign Configuration
+
+These env vars are forwarded in the compose template. Set in `.env`, or enable via `mdemg init` interactive prompt:
+
+- `QUERY_CLASSIFY_ENABLED` — LLM query type classification (default: false)
+- `INTENT_ENABLED` — query rewriting before embedding (default: false)
+- `JIMINY_ENABLED` — Jiminy inner-voice guidance (default: false)
+- `EMERGENCE_ENABLED` — LLM-driven concept naming (default: false)
+- `LLM_INTERACTION_LOGGING` — TSDB LLM interaction recording (default: true)
+- `AUTO_MIGRATE` — unified Neo4j + TSDB schema migration on startup (default: true in Docker)
+
+## Architecture Notes
+
+- **Compose embed:** `mdemg init` writes `docker-compose.yml` from `internal/cli/compose_templates/` (both files must stay in sync — CI checks this)
+- **LaunchAgent embed:** `mdemg service install` reads templates from `packaging/launchd/` embedded via `embed.FS`
+- **LLM recorder init order:** `llmclient.SetDefaultRecorder()` MUST be called BEFORE `api.NewServer()` — clients capture the recorder at construction time. See `internal/cli/serve.go` early writer block.
+- **Context helpers:** `WithSpaceID(ctx, id)` and `WithSessionID(ctx, id)` carry request-scoped values to TSDB recording, overriding construction-time defaults in `recordInteraction()`
+
 ## Testing
 
 - Benchmark: `python docs/benchmarks/run_benchmark_v4.py` / `grader_v4.py`
 - Question set: `test_questions_120.json` (120 questions)
+- Live validation: `python3 scripts/live_validation.py` (19 end-to-end tests)
 - Synergy: `mdemg synergy status` | `mdemg synergy check --auto` | `mdemg synergy migrate --dry-run`
 - Synergy API: `GET /v1/synergy/status?space_id=mdemg-dev`
 

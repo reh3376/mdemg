@@ -535,6 +535,106 @@ mdemg db backup config
 
 ---
 
+## TimescaleDB Management
+
+### `mdemg tsdb`
+
+Parent command for TimescaleDB metrics database management. Subcommands: `start`, `stop`, `status`, `migrate`, `shell`, `stats`, `backup`.
+
+---
+
+### `mdemg tsdb start`
+
+**Synopsis:** `mdemg tsdb start`
+
+Start the TimescaleDB Docker container via docker compose.
+
+---
+
+### `mdemg tsdb stop`
+
+**Synopsis:** `mdemg tsdb stop`
+
+Stop the TimescaleDB Docker container via docker compose.
+
+---
+
+### `mdemg tsdb status`
+
+**Synopsis:** `mdemg tsdb status`
+
+Check the TimescaleDB connection and display schema version. Reads connection details from environment variables (`TSDB_HOST`, `TSDB_PORT`, `TSDB_USER`, `TSDB_PASSWORD`, `TSDB_DATABASE`, `TSDB_SSL_MODE`).
+
+---
+
+### `mdemg tsdb migrate`
+
+**Synopsis:** `mdemg tsdb migrate`
+
+Connect to TimescaleDB and run all pending schema migrations. Migrations are in `internal/tsdb/migrations/` (001-010).
+
+---
+
+### `mdemg tsdb shell`
+
+**Synopsis:** `mdemg tsdb shell`
+
+Open an interactive psql session connected to the TimescaleDB instance. Reads connection details from environment variables.
+
+---
+
+### `mdemg tsdb stats`
+
+**Synopsis:** `mdemg tsdb stats`
+
+Query row counts for all metric tables and show compression settings. Tables queried: `metric_samples`, `llm_interactions`, `embedding_events`, `retrieval_events`, `ft_benchmarks`, `ft_training_cycles`, `ft_model_versions`, `ft_hitl_decisions`.
+
+---
+
+### `mdemg tsdb backup`
+
+Parent command for TimescaleDB backup management. Subcommands: `trigger`, `list`, `config`, `restore`.
+
+Backups use `pg_dump` via docker compose exec. Backup files are stored in `.mdemg/backups/tsdb/` (gitignored by default).
+
+---
+
+### `mdemg tsdb backup trigger`
+
+**Synopsis:** `mdemg tsdb backup trigger`
+
+Trigger an immediate TimescaleDB backup using `pg_dump`. Produces a compressed custom-format dump file.
+
+---
+
+### `mdemg tsdb backup list`
+
+**Synopsis:** `mdemg tsdb backup list`
+
+List existing TSDB backups in `.mdemg/backups/tsdb/`.
+
+---
+
+### `mdemg tsdb backup config`
+
+**Synopsis:** `mdemg tsdb backup config`
+
+Show current TSDB backup configuration including storage directory, interval, and retention settings.
+
+---
+
+### `mdemg tsdb backup restore`
+
+**Synopsis:** `mdemg tsdb backup restore <file>`
+
+Restore TimescaleDB from a `pg_dump` backup file. Uses `pg_restore` with `--clean --if-exists` to drop and recreate objects before restoring. This is a destructive operation.
+
+```bash
+mdemg tsdb backup restore .mdemg/backups/tsdb/tsdb-bk-20260328-120000.dump
+```
+
+---
+
 ## Memory & Ingestion
 
 ### `mdemg ingest`
@@ -1405,6 +1505,56 @@ mdemg sidebar status
 ```
 
 **See Also:** `mdemg init --no-sidebar`
+
+---
+
+## Synergy Optimization
+
+### `mdemg synergy`
+
+Parent command for Claude Code + MDEMG synergy optimization. Manages the synergy between Claude Code's persistent state (`.md` files) and MDEMG's CMS (Neo4j graph). Reduces token overhead by migrating archival content to CMS and monitoring for re-bloat.
+
+Subcommands: `status`, `check`, `migrate`, `buffer-status`, `flush-buffer`.
+
+---
+
+### `mdemg synergy status`
+
+**Synopsis:** `mdemg synergy status`
+
+Display synergy health metrics including memory file sizes, CMS node counts, and optimization ratio.
+
+---
+
+### `mdemg synergy check`
+
+**Synopsis:** `mdemg synergy check [--auto]`
+
+Health check for synergy (cron-compatible, exits non-zero if unhealthy). With `--auto`, automatically applies recommended optimizations.
+
+---
+
+### `mdemg synergy migrate`
+
+**Synopsis:** `mdemg synergy migrate [--dry-run]`
+
+Migrates archival content from Claude Code auto-memory files and MEMORY.md sections into MDEMG CMS. Requires Jiminy to be healthy. Content is moved to `~/mdemg/temp/` for dev safety. Use `--dry-run` to preview without making changes.
+
+---
+
+### `mdemg synergy buffer-status`
+
+**Synopsis:** `mdemg synergy buffer-status`
+
+Display recovery buffer status showing pending entries from Jiminy outages.
+
+---
+
+### `mdemg synergy flush-buffer`
+
+**Synopsis:** `mdemg synergy flush-buffer`
+
+Flush recovery buffer entries to `mdemg-dev`. Promotes buffered observations from Jiminy outages back to the primary CMS space. Throttled to avoid overwhelming Jiminy after long outages.
 
 ---
 

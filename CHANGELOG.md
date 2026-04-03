@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-04-03
+
+### Added
+
+- `WithSpaceID` context helper — query_classify and intent_translate TSDB records now get correct request space_id instead of defaultSpaceID (PR #254)
+- Campaign env vars forwarded in compose template: `QUERY_CLASSIFY_ENABLED`, `INTENT_ENABLED`, `JIMINY_ENABLED`, `EMERGENCE_ENABLED`, `LLM_INTERACTION_LOGGING` (PR #254)
+- Campaign task activation prompt during interactive `mdemg init` — writes campaign env vars to `.env` (PR #254)
+- `scripts/live_validation.py` — 19 automated end-to-end tests covering API, TSDB recording, export pipeline, regression gate, and error handling (PR #254)
+- Weekly cron safety net for `docker-publish.yml` (Monday 6am UTC) — catches missed `workflow_run` triggers (PR #254)
+- Post-fix re-validation results doc (`docs/operations/post-fix-revalidation-results.md`) (PR #254)
+
+### Fixed
+
+- TSDB schema version stuck at 7 despite 10 migrations applied — migration 010 corrects to 10 (PR #254)
+- `data check --pre-campaign` threshold updated from >= 9 to >= 10 to match migration 010 (PR #254)
+
+## [0.5.2] - 2026-04-03
+
+### Added
+
+- `AUTO_MIGRATE` env var for unified Neo4j + TSDB schema migration in Docker deployments (PR #252)
+- Neural-sidecar Docker image published to GHCR — `ghcr.io/reh3376/mdemg-neural-sidecar` replaces `build: ./neural` (PR #252)
+- `docker-publish.yml` triggers via `workflow_run` on Release completion — GHCR images update on every tagged release (PR #252)
+- LaunchAgent templates embedded in binary via `embed.FS` — `mdemg service install` works without repo checkout (PR #252)
+- `PersistentPreRun` on `data` command loads `.env` file for all subcommands including `export`, `check` (PR #252)
+- `session_id` field on `/v1/memory/retrieve` and `/v1/memory/consult` endpoints — propagated to TSDB for session-level training data analysis (PR #253)
+- Live validation findings documentation in `docs/operations/` (PR #252, #253)
+
+### Fixed
+
+- neural-sidecar `build: ./neural` in compose breaks all non-repo installs (PR #252)
+- Fresh Neo4j crash-loops with "SchemaMeta missing" — no AUTO_MIGRATE for first-start schema creation (PR #252)
+- Docker Publish CI never triggers on release — GHCR images stuck at v0.3.4 since original publish (PR #252)
+- `mdemg data` commands don't load `.env` — TSDB connection refused on Docker installs where creds are in `.env` (PR #252)
+- `mdemg service install` fails for Homebrew users — LaunchAgent templates not in release tarball (PR #252)
+- `session_id` in TSDB contains instance_id instead of request-provided session_id (PR #253)
+- `space_id` in TSDB reranking records shows defaultSpaceID instead of request space_id (PR #253)
+- `query_classify` and `intent_translate` produce zero TSDB records — recorder nil at construction due to init ordering (PR #253)
+- `mdemg data export` silently returns 0 rows — instance_id auto-detection generates wrong ID for Docker containers (PR #253)
+
 ## [0.5.1] - 2026-04-02
 
 ### Added
