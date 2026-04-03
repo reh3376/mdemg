@@ -162,7 +162,7 @@ func runTeardown(flags teardownFlags) error {
 
 	// Phase 2: Stop and remove Docker container
 	fmt.Println("=== Phase 2: Removing Docker container ===")
-	if c := teardownRemoveContainer(containerName); c != nil {
+	if c := teardownRemoveContainer(containerName, cwd, flags.keepData); c != nil {
 		changes = append(changes, *c)
 	}
 	fmt.Println()
@@ -495,12 +495,33 @@ func teardownStopServer() *sidecar.ReportChange {
 	return &sidecar.ReportChange{Path: pidPath, Action: "stopped"}
 }
 
-func teardownRemoveContainer(containerName string) *sidecar.ReportChange {
+func teardownRemoveContainer(containerName, cwd string, keepData bool) *sidecar.ReportChange {
 	if !DockerAvailable() {
 		fmt.Println("Docker not available — skipping")
 		return nil
 	}
 
+	// Docker Compose deployment: stop all services
+	composePath := filepath.Join(cwd, "docker-compose.yml")
+	if _, statErr := os.Stat(composePath); statErr == nil {
+		fmt.Println("Docker Compose deployment detected")
+		args := []string{"compose", "-f", composePath, "down"}
+		if !keepData {
+			args = append(args, "-v")
+		}
+		cmd := osExec.Command("docker", args...)
+		cmd.Dir = cwd
+		out, composeErr := cmd.CombinedOutput()
+		if composeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: docker compose down failed: %s\n", strings.TrimSpace(string(out)))
+			// Fall through to legacy cleanup
+		} else {
+			fmt.Println("Stopped and removed Docker Compose services")
+			return &sidecar.ReportChange{Path: "docker-compose", Action: "removed"}
+		}
+	}
+
+	// Legacy single-container cleanup
 	state, err := InspectContainer(containerName)
 	if err != nil || !state.Exists {
 		fmt.Printf("Container '%s' not found — skipping\n", containerName)

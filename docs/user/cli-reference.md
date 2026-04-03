@@ -1977,7 +1977,7 @@ mdemg demo --endpoint http://localhost:8080
 
 Remove all MDEMG artifacts from the current project.
 
-**Instance scope** (default): Stops server, removes Docker container/volume, deletes Neo4j space data, removes keyring secrets, uninstalls hooks, cleans up IDE configs, removes `.mdemg/` directory, and deregisters from companion apps.
+**Instance scope** (default): Detects Docker Compose deployments and runs `docker compose down -v` to stop all 5 services and remove volumes. Also stops the native server (if running), deletes Neo4j space data, removes keyring secrets, uninstalls hooks, cleans up IDE configs, removes `.mdemg/` directory, and deregisters from companion apps. Falls back to legacy single-container cleanup if no `docker-compose.yml` is found.
 
 **Full scope** (`--full`): Additionally removes system-level artifacts: binary, plugins, completions, and systemd units (Linux).
 
