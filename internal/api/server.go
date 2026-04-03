@@ -1051,16 +1051,21 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		}
 		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
 
-		// LLM interaction logger — record all LLM calls for FT pipeline
+		// LLM interaction logger — record all LLM calls for FT pipeline.
+		// If serve.go already created an early writer (via SetLLMWriter), reuse it
+		// to avoid duplicate flush goroutines. Otherwise create one here.
 		if s.cfg.LLMInteractionLogging {
-			s.llmWriter = tsdb.NewLLMInteractionWriter(
-				client.Pool(),
-				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
-			)
+			if s.llmWriter == nil {
+				s.llmWriter = tsdb.NewLLMInteractionWriter(
+					client.Pool(),
+					time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+				)
+			}
+			// Re-set defaults (idempotent if already set in serve.go)
 			llmclient.SetDefaultRecorder(s.llmWriter)
 			llmclient.SetDefaultInstanceID(s.cfg.InstanceID)
 			llmclient.SetDefaultSpaceID(s.cfg.RSICWatchdogSpaceID)
-			llmclient.SetDefaultSessionID(s.cfg.InstanceID)
+			llmclient.SetDefaultSessionID("") // empty — callers provide via WithSessionID
 			slog.Info("tsdb: LLM interaction logger attached", "instance_id", s.cfg.InstanceID)
 		}
 
@@ -1124,6 +1129,13 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			}
 		}
 	}
+}
+
+// SetLLMWriter attaches a pre-created LLM interaction writer.
+// Called from serve.go BEFORE NewServer so that LLM clients created during
+// NewServer (query classifier, intent translator) can record to TSDB.
+func (s *Server) SetLLMWriter(w *tsdb.LLMInteractionWriter) {
+	s.llmWriter = w
 }
 
 // SetLogBuffer attaches the log ring buffer for the /v1/admin/logs endpoint.
