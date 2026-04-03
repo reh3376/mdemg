@@ -76,6 +76,13 @@ services:
       RERANK_WEIGHT: "${RERANK_WEIGHT:-0.50}"
       RERANK_TIMEOUT_MS: "${RERANK_TIMEOUT_MS:-10000}"
 
+      # Campaign task activation (set in .env to enable training data collection)
+      QUERY_CLASSIFY_ENABLED: "${QUERY_CLASSIFY_ENABLED:-false}"
+      INTENT_ENABLED: "${INTENT_ENABLED:-false}"
+      JIMINY_ENABLED: "${JIMINY_ENABLED:-false}"
+      EMERGENCE_ENABLED: "${EMERGENCE_ENABLED:-false}"
+      LLM_INTERACTION_LOGGING: "${LLM_INTERACTION_LOGGING:-true}"
+
       # Graceful shutdown
       GRACEFUL_SHUTDOWN_TIMEOUT: "${GRACEFUL_SHUTDOWN_TIMEOUT:-30}"
     healthcheck:

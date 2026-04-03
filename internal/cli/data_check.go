@@ -110,11 +110,11 @@ func checkSchemaVersion(ctx context.Context, client *tsdb.Client) checkResult {
 			NextStep: "Run migrations: mdemg start --auto-migrate",
 		}
 	}
-	if version < 9 {
+	if version < 10 {
 		return checkResult{
 			Name:     "Schema Version",
 			Status:   "FAIL",
-			Detail:   fmt.Sprintf("schema version %d, need >= 9 (migration 009: space_id backfill)", version),
+			Detail:   fmt.Sprintf("schema version %d, need >= 10 (migration 010: schema version fix)", version),
 			NextStep: "Run migrations: mdemg start --auto-migrate",
 		}
 	}

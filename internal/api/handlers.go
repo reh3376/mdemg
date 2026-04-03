@@ -425,6 +425,9 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	if req.SessionID != "" {
 		ctx = llmclient.WithSessionID(ctx, req.SessionID)
 	}
+	if req.SpaceID != "" {
+		ctx = llmclient.WithSpaceID(ctx, req.SpaceID)
+	}
 
 	resp, err := s.retriever.Retrieve(ctx, req)
 	if err != nil {
@@ -2188,6 +2191,9 @@ func (s *Server) handleConsult(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if req.SessionID != "" {
 		ctx = llmclient.WithSessionID(ctx, req.SessionID)
+	}
+	if req.SpaceID != "" {
+		ctx = llmclient.WithSpaceID(ctx, req.SpaceID)
 	}
 
 	resp, err := s.consultant.Consult(ctx, req)
