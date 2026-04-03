@@ -1988,7 +1988,7 @@ Remove all MDEMG artifacts from the current project.
 | `--yes`, `-y` | bool | `false` | Skip confirmation prompt |
 | `--force` | bool | `false` | Allow deletion of protected spaces |
 | `--full` | bool | `false` | Include system-level cleanup |
-| `--export` | bool | `false` | Export CMS/RSIC/Jiminy data before teardown |
+| `--export` | bool | `false` | Export Neo4j graph data and TSDB backup before teardown |
 | `--keep-data` | bool | `false` | Preserve Neo4j volume |
 | `--space-id` | string | `""` | Target specific space (defaults to project config) |
 
@@ -2000,8 +2000,9 @@ mdemg teardown --dry-run
 # Teardown without prompts
 mdemg teardown --yes
 
-# Export data before teardown
+# Export Neo4j graph + TSDB backup before teardown
 mdemg teardown --export --yes
+# TSDB backup saved to .mdemg/backups/tsdb/ (preserved in .mdemg-backup-*/)
 
 # Full system removal
 mdemg teardown --full --yes

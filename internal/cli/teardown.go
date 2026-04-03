@@ -19,6 +19,7 @@ import (
 	"mdemg/internal/secrets"
 	"mdemg/internal/sidecar"
 	"mdemg/internal/transfer"
+	"mdemg/internal/tsdb"
 
 	osExec "os/exec"
 )
@@ -149,6 +150,15 @@ func runTeardown(flags teardownFlags) error {
 			exportPath = ep
 			changes = append(changes, sidecar.ReportChange{Path: ep, Action: "exported"})
 			fmt.Printf("Exported to: %s\n", ep)
+		}
+		fmt.Println()
+	}
+
+	// Phase 0b: Backup TSDB before Docker Compose teardown
+	if flags.export {
+		fmt.Println("=== Phase 0b: Backing up TSDB ===")
+		if c := teardownBackupTSDB(cwd); c != nil {
+			changes = append(changes, *c)
 		}
 		fmt.Println()
 	}
@@ -453,6 +463,32 @@ func teardownExport(cwd, spaceID string) (string, error) {
 		return "", fmt.Errorf("write export file: %w", err)
 	}
 	return outputPath, nil
+}
+
+func teardownBackupTSDB(cwd string) *sidecar.ReportChange {
+	composePath := filepath.Join(cwd, "docker-compose.yml")
+	if _, err := os.Stat(composePath); err != nil {
+		fmt.Println("No docker-compose.yml — skipping TSDB backup")
+		return nil
+	}
+
+	backupCfg := tsdb.TSDBBackupConfig{
+		StorageDir:  filepath.Join(cwd, ".mdemg", "backups", "tsdb"),
+		ComposeFile: composePath,
+		ServiceName: "timescaledb",
+		Database:    tsdbEnv("TSDB_DATABASE", "mdemg_metrics"),
+		User:        tsdbEnv("TSDB_USER", "mdemg"),
+	}
+
+	svc := tsdb.NewTSDBBackupService(backupCfg)
+	rec, err := svc.Trigger("teardown")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: TSDB backup failed: %v\n", err)
+		return nil
+	}
+
+	fmt.Printf("TSDB backup: %s (%d bytes)\n", rec.Path, rec.SizeBytes)
+	return &sidecar.ReportChange{Path: rec.Path, Action: "exported"}
 }
 
 func teardownStopServer() *sidecar.ReportChange {
