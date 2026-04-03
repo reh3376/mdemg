@@ -20,6 +20,7 @@ const (
 	ctxKeySourcePath    contextKey = "llm_source_path"
 	ctxKeyRetrievalCtx  contextKey = "llm_retrieval_ctx"
 	ctxKeySessionID     contextKey = "llm_session_id"
+	ctxKeySpaceID       contextKey = "llm_space_id"
 )
 
 // WithGuidanceID returns a context carrying a guidance_id for interaction logging.
@@ -52,6 +53,19 @@ func WithSessionID(ctx context.Context, id string) context.Context {
 // SessionIDFromContext extracts the session_id from context, or "" if not set.
 func SessionIDFromContext(ctx context.Context) string {
 	s, _ := ctx.Value(ctxKeySessionID).(string)
+	return s
+}
+
+// WithSpaceID returns a context carrying a space_id for interaction logging.
+// When set, this overrides the Client's construction-time spaceID in TSDB records,
+// ensuring request-scoped space attribution for all LLM calls in the request path.
+func WithSpaceID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, ctxKeySpaceID, id)
+}
+
+// SpaceIDFromContext extracts the space_id from context, or "" if not set.
+func SpaceIDFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(ctxKeySpaceID).(string)
 	return s
 }
 
@@ -256,6 +270,9 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	}
 	if rc, ok := ctx.Value(ctxKeyRetrievalCtx).(*RetrievalContext); ok {
 		rec.RetrievalCtx = rc
+	}
+	if spid, ok := ctx.Value(ctxKeySpaceID).(string); ok && spid != "" {
+		rec.SpaceID = spid
 	}
 	if sid, ok := ctx.Value(ctxKeySessionID).(string); ok && sid != "" {
 		rec.SessionID = sid

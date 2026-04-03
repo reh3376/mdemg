@@ -396,6 +396,17 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// Campaign task activation
+	var campaignEnabled bool
+	if !flags.defaults {
+		fmt.Println()
+		fmt.Println("  Training data collection tasks generate LLM interaction records in TSDB")
+		fmt.Println("  for downstream LoRA fine-tuning. Safe to enable — adds minor latency.")
+		fmt.Println()
+		answer := promptLine("Enable training data collection tasks? (yes/no) [no]", "no")
+		campaignEnabled = (answer == "yes")
+	}
+
 	// UxTS plugin
 	pluginsDir := detectPluginsDir(cwd)
 	if flags.defaults {
@@ -541,6 +552,19 @@ func runInit(flags initFlags) error {
 	// Add OPENAI_API_KEY if user provided one and not already present
 	if openAIKey != "" && !envContains(envLines, "OPENAI_API_KEY") {
 		envLines = append(envLines, fmt.Sprintf("OPENAI_API_KEY=%s", openAIKey))
+	}
+
+	// Add campaign task env vars if enabled during interactive init
+	if campaignEnabled {
+		if !envContains(envLines, "QUERY_CLASSIFY_ENABLED") {
+			envLines = append(envLines, "QUERY_CLASSIFY_ENABLED=true")
+		}
+		if !envContains(envLines, "INTENT_ENABLED") {
+			envLines = append(envLines, "INTENT_ENABLED=true")
+		}
+		if !envContains(envLines, "LLM_INTERACTION_LOGGING") {
+			envLines = append(envLines, "LLM_INTERACTION_LOGGING=true")
+		}
 	}
 
 	if err := os.WriteFile(envPath, []byte(strings.Join(envLines, "\n")+"\n"), 0600); err != nil {

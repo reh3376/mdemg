@@ -16,6 +16,8 @@ on:
     workflows: ["Release"]
     types: [completed]
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am UTC — catches missed triggers
 
 env:
   REGISTRY: ghcr.io
