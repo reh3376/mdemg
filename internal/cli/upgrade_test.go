@@ -132,3 +132,41 @@ func TestCopyToBinDir(t *testing.T) {
 		}
 	})
 }
+
+func TestUpgradeDockerInstances_NoDocker(t *testing.T) {
+	// When Docker is not available, function should return silently
+	// This test works in CI (no Docker) and verifies graceful degradation
+	if DockerAvailable() {
+		t.Skip("Docker is available — this test validates the no-Docker path")
+	}
+	// Should not panic, should not produce errors
+	upgradeDockerInstances("test-version")
+}
+
+func TestUpgradeDockerInstances_NoContainers(t *testing.T) {
+	if !DockerAvailable() {
+		t.Skip("Docker not available")
+	}
+	// With Docker available but no mdemg containers running in a fake project,
+	// function should return silently (no "Updating..." output).
+	// Note: if real mdemg containers are running, this still exercises the
+	// discovery + dedup logic safely (pull is non-fatal).
+	upgradeDockerInstances("test-version")
+}
+
+func TestRunUpgrade_DockerOnlyFlag(t *testing.T) {
+	// --docker-only should skip binary download entirely
+	// and only call upgradeDockerInstances
+	err := runUpgrade(false, false, false, false, true) // dockerOnly=true
+	if err != nil {
+		t.Errorf("runUpgrade with dockerOnly=true should not error: %v", err)
+	}
+}
+
+func TestRunUpgrade_NoDockerDryRun(t *testing.T) {
+	// --no-docker --dry-run should check for updates but skip Docker
+	err := runUpgrade(true, false, false, true, false) // dryRun=true, noDocker=true
+	if err != nil {
+		t.Errorf("runUpgrade with noDocker+dryRun should not error: %v", err)
+	}
+}
