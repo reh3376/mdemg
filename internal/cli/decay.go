@@ -48,10 +48,11 @@ type decayConfig struct {
 	Neo4jPass string
 
 	// Decay parameters
-	DecayRate      float64
-	PruneThreshold float64
-	MinEvidence    int
-	OlderThanDays  int
+	DecayRate       float64
+	PruneThreshold  float64
+	MinEvidence     int
+	OlderThanDays   int
+	MaxDecayPercent float64
 
 	// Processing options
 	DryRun    bool
@@ -132,10 +133,11 @@ Protected edges (high evidence count or pinned) are never pruned.`,
 	}
 
 	// Register flags
-	cmd.Flags().Float64Var(&cfg.DecayRate, "decay-rate", 0.1, "Exponential decay rate constant")
+	cmd.Flags().Float64Var(&cfg.DecayRate, "decay-rate", 0.02, "Evidence-weighted decay rate (applied as rate/sqrt(evidence))")
 	cmd.Flags().Float64Var(&cfg.PruneThreshold, "prune-threshold", 0.01, "Minimum weight to keep (below = prune candidate)")
 	cmd.Flags().IntVar(&cfg.MinEvidence, "min-evidence", 3, "Minimum evidence_count to protect from pruning")
 	cmd.Flags().IntVar(&cfg.OlderThanDays, "older-than", 7, "Only process edges older than N days")
+	cmd.Flags().Float64Var(&cfg.MaxDecayPercent, "max-decay-percent", 50.0, "Maximum allowed decay percentage per run (safety cap)")
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
 	cmd.Flags().StringVar(&cfg.SpaceID, "space-id", "", "Limit to specific space (empty = all)")
 	cmd.Flags().IntVar(&cfg.BatchSize, "batch-size", 1000, "Process edges in batches of this size")
@@ -291,6 +293,12 @@ func processEdge(e edge, cfg decayConfig, now time.Time) decayResult {
 	// Calculate decayed weight
 	newWeight, decayPercent := calculateDecay(e, cfg.DecayRate, now)
 
+	// Clamp decay to max-decay-percent safety cap
+	if cfg.MaxDecayPercent > 0 && decayPercent > cfg.MaxDecayPercent {
+		newWeight = e.Weight * (1.0 - cfg.MaxDecayPercent/100.0)
+		decayPercent = cfg.MaxDecayPercent
+	}
+
 	// Determine if edge should be pruned
 	prune, protected, reason := shouldPrune(newWeight, e.EvidenceCount, e.Pinned, cfg.PruneThreshold, cfg.MinEvidence)
 
@@ -305,16 +313,27 @@ func processEdge(e edge, cfg decayConfig, now time.Time) decayResult {
 	}
 }
 
-// calculateDecay applies exponential decay formula to an edge weight.
-// Formula: w_new = w_old * exp(-decay_rate * days_since_activation)
-// From docs/04_Activation_and_Learning.md Section 5
+// minEdgeWeight is the floor below which decayed weights are clamped.
+const minEdgeWeight = 0.001
+
+// calculateDecay applies evidence-weighted decay to an edge weight.
+// Formula: w_new = w_old * (1 - rate/sqrt(evidence))^days
+// Aligned with learning service (service.go:955). Surprise factor is omitted
+// because CLI decay operates on stored edges without session context.
 func calculateDecay(e edge, decayRate float64, now time.Time) (newWeight float64, decayPercent float64) {
-	// Calculate days since last activation
 	daysSince := daysSinceActivation(e.LastActivated, now)
 
-	// Apply exponential decay: w_new = w_old * exp(-decay_rate * days)
-	decayFactor := math.Exp(-decayRate * daysSince)
+	// Evidence-weighted decay: higher evidence = slower decay
+	evidence := float64(e.EvidenceCount)
+	if evidence < 1 {
+		evidence = 1
+	}
+	effectiveRate := decayRate / math.Sqrt(evidence)
+	decayFactor := math.Pow(1.0-effectiveRate, daysSince)
 	newWeight = e.Weight * decayFactor
+
+	// Apply minimum weight floor
+	newWeight = math.Max(newWeight, minEdgeWeight)
 
 	// Calculate percentage decay for reporting
 	if e.Weight > 0 {
