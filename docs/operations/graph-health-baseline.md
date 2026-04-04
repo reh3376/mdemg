@@ -149,15 +149,16 @@ j17-comprehension-test/
 
 | Metric | Phase 0 (Baseline) | Phase 1 (Vendor) | Phase 2 (MERGE Fix) | Phase 3 (Dedup) | Phase 7 (Final) |
 |--------|-------------------|-------------------|---------------------|-----------------|-----------------|
-| Total nodes | 391,113 | 218,272 | 218,272 | ___ | ___ |
-| SymbolNodes | 242,627 | 78,191 | 78,438 | ___ | ___ |
-| MemoryNodes | 63,003 | 54,011 | 54,011 | ___ | ___ |
-| Observations | 85,482 | 86,070 | 86,070 | ___ | ___ |
-| CO_ACTIVATED edges | 622,632 | 404,153 | 404,153 | ___ | ___ |
-| Avg edge weight | 0.1307 | 0.1344 | 0.1344 | ___ | ___ |
-| Duplicate groups | 14,542 | ___ | 6,369 (12,665 excess) | ___ | ___ |
-| Embedding coverage % | 99.84% | 99.81% | 99.81% | ___ | ___ |
+| Total nodes | 391,113 | 218,272 | 218,272 | 231,560 | ___ |
+| SymbolNodes | 242,627 | 78,191 | 78,438 | 65,773 | ___ |
+| MemoryNodes | 63,003 | 54,011 | 54,011 | 57,942 | ___ |
+| Observations | 85,482 | 86,070 | 86,070 | 104,680 | ___ |
+| CO_ACTIVATED edges | 622,632 | 404,153 | 404,153 | 483,777 | ___ |
+| Avg edge weight | 0.1307 | 0.1344 | 0.1344 | 0.1610 | ___ |
+| Duplicate groups | 14,542 | ___ | 6,369 (12,665 excess) | 0 | ___ |
+| Embedding coverage % | 99.84% | 99.81% | 99.81% | 99.83% | ___ |
 | Health score | 0.7408 | 0.7446 | 0.7446 | ___ | ___ |
-| Vendor nodes | 171,300 | 0 | 0 | ___ | ___ |
-| Orphan SymbolNodes | — | — | 7,649 | ___ | ___ |
-| Idempotent re-ingest | — | — | PASS (78,438=78,438) | ___ | ___ |
+| Vendor nodes | 171,300 | 0 | 0 | 0 | ___ |
+| Orphan SymbolNodes | — | — | 7,649 | 1,639 | ___ |
+| Idempotent re-ingest | — | — | PASS (78,438=78,438) | PASS | ___ |
+| Natural-key constraint | — | — | — | CREATED | ___ |
