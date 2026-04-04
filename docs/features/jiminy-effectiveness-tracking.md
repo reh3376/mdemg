@@ -1,4 +1,19 @@
+---
+created: 2026-03-30
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "AR-2"
+---
+
 # Jiminy Guidance Effectiveness Tracking
+
+## Summary
+
+**Feature**: Jiminy Effectiveness Tracking
+**Summary**: Tracks whether Jiminy guidance was followed, ignored, or contradicted, feeding effectiveness metrics into RSIC for self-calibrating guidance.
+
 
 **Phase AR-2** — Track whether Jiminy guidance was followed, ignored, or contradicted.
 

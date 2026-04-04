@@ -1,4 +1,19 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "NR-4"
+---
+
 # Neural Training Pipeline & LLM Client Unification
+
+## Summary
+
+**Feature**: Neural Training Pipeline
+**Summary**: Complete LoRA fine-tuning pipeline for personalizing the neural re-ranker, including data collection, quality filtering, training, evaluation, regression gating, and deployment.
+
 
 **Phases NR-4 + F21** — Fine-tuning the neural re-ranker from collected data, and consolidating duplicate LLM client code into a shared package.
 

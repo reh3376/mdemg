@@ -1,58 +1,106 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: FT-INFRA
+---
+
 # RAFT Retrieval Context Enrichment
 
-## Overview
-RAFT (Retrieval Augmented Fine-Tuning) context enrichment captures which documents were retrieved and their relevance scores alongside every LLM interaction. This enables training data that matches MDEMG's open-book inference mode.
+## Summary
 
-## Problem
-MDEMG operates in open-book mode — retrieval context is injected into LLM prompts — but training data only captured LLM I/O (closed-book). UC Berkeley's RAFT research (COLM 2024) shows this gap degrades fine-tuned model quality by 5-15%.
+**Feature**: RAFT Retrieval Context
+**Summary**: Captures which documents were retrieved and their relevance scores alongside every LLM interaction, enabling training data that matches MDEMG's open-book inference mode. Based on UC Berkeley's RAFT research (COLM 2024).
 
-## Architecture
+## Vision & Goals
 
-### RetrievalContext Struct
-Located in `internal/llmclient/recorder.go`:
+MDEMG operates in open-book mode — retrieval context is injected into LLM prompts. But training data that only captures LLM I/O (closed-book) degrades fine-tuned model quality by 5-15% (RAFT, COLM 2024). By capturing retrieval context alongside interactions, training data matches the actual inference-time conditions, producing better fine-tuned models.
+
+## Current State
+
+### Architecture
+
+**RetrievalContext Struct** (`internal/llmclient/recorder.go`):
+
 ```go
 type RetrievalContext struct {
     NodeIDs  []string  `json:"node_ids"`
     Scores   []float64 `json:"scores"`
-    OracleID string    `json:"oracle_id,omitempty"` // the "correct" node if known
+    OracleID string    `json:"oracle_id,omitempty"`
 }
 ```
 
-### Context Propagation
+**Context Propagation:**
 - `WithRetrievalContext(ctx, rc)` — attaches RetrievalContext to Go context
 - `recordInteraction()` reads it back and stores on InteractionRecord
 - TSDB writer extracts into 4 new columns
 
-### Wired Services
+### Workflow
 
-**consulting/service.go — Suggest()**: After filteredResults are scored (Step 4: filter by minimum confidence threshold), before proactive suggestion generation (Step 5). Captures node IDs and scores from retrieval results.
+**Wired Services:**
 
-**jiminy/service.go — Guide()**: After constraints are retrieved and filtered, before J8 LLM synthesis call. Captures constraint source node IDs and confidence scores, iterating over `item.SourceNodes` for each filtered guidance item.
+- **consulting/service.go — Suggest()**: After filteredResults scored, before proactive suggestion generation. Captures node IDs and scores from retrieval results.
+- **jiminy/service.go — Guide()**: After constraints retrieved and filtered, before J8 LLM synthesis. Captures constraint source node IDs and confidence scores.
 
-### TSDB Schema (Migration 007)
-New columns on llm_interactions:
-- `retrieval_node_ids TEXT[]` — IDs of retrieved nodes
-- `retrieval_scores DOUBLE PRECISION[]` — corresponding relevance scores
-- `oracle_node_id TEXT` — the "correct" node if known (for supervised signals)
-- `system_prompt_hash TEXT` — SHA-256 of system prompt used
-- Index on `(system_prompt_hash, time DESC)` for prompt-version queries
+**TSDB Schema** (Migration 007): 4 new columns on `llm_interactions`:
+- `retrieval_node_ids TEXT[]`, `retrieval_scores DOUBLE PRECISION[]`
+- `oracle_node_id TEXT`, `system_prompt_hash TEXT`
+- Index on `(system_prompt_hash, time DESC)`
 
-Column count expanded from 22 to 26.
+**Training Data Strategy:**
+- 80/20 split: 80% with retrieval context (open-book), 20% without (parametric recall)
+- `guidance_id` correlation for joining retrieval events with quality signals
+- Oracle ID marks the "correct" answer when ground truth available
 
-## Training Data Strategy
-- **80/20 split**: 80% of training examples include retrieval context (open-book), 20% without (forces parametric recall)
-- **guidance_id correlation**: Built in PR #219, enables joining retrieval events with downstream quality signals
-- **Oracle ID**: When ground truth is available, marks which retrieved node was the "correct" answer for RAFT's oracle-document training signal
+### Configuration
 
-## Configuration
-- Schema version bumped from 6 to 7 (`TSDB_REQUIRED_SCHEMA_VERSION`)
-- No feature flags — RAFT context is always captured when available (nil-safe)
+No feature flags — RAFT context is always captured when available (nil-safe). Schema version bumped from 6 to 7.
 
-## Documents Accessed
-- internal/llmclient/recorder.go
-- internal/llmclient/client.go
-- internal/consulting/service.go
-- internal/jiminy/service.go
-- internal/tsdb/llm_writer.go
-- internal/tsdb/migrations/007_raft_context.sql
-- `docs/features/training-data-capture-verification.md` — column-position verification (positions 22-25 for RAFT columns)
+## Notes
+
+### Known Limitations
+
+- Oracle ID requires manual annotation — no automatic ground truth detection
+- Only 2 services currently wired (consulting, jiminy) — other LLM consumers not yet instrumented
+
+### Risks & Gaps
+
+None identified.
+
+### Future Improvements
+
+- Wire RAFT context to all 16 LLM consumers
+- Automatic oracle detection from user feedback signals
+
+## API Endpoints
+
+None — RAFT context is captured internally, not exposed via API.
+
+## CLI Commands
+
+None — automatic capture, no CLI interaction needed.
+
+## Configuration Reference
+
+None — always active when TSDB is available.
+
+## Dependencies
+
+| Feature | Relationship |
+|---------|-------------|
+| TimescaleDB | Requires — RAFT columns stored in llm_interactions table |
+| LLM Client Recorder | Requires — context propagated via Go context |
+| Consulting Service | Enhances — captures retrieval context for suggest calls |
+| Jiminy Service | Enhances — captures constraint retrieval context for guidance calls |
+| Training Data Pipeline | Feeds into — RAFT context used in training data export |
+
+## Related Files
+
+- `internal/llmclient/recorder.go` - RetrievalContext struct, WithRetrievalContext()
+- `internal/llmclient/client.go` - recordInteraction() context extraction
+- `internal/consulting/service.go` - Suggest() RAFT wiring
+- `internal/jiminy/service.go` - Guide() RAFT wiring
+- `internal/tsdb/llm_writer.go` - TSDB column extraction
+- `internal/tsdb/migrations/007_raft_context.sql` - Schema migration

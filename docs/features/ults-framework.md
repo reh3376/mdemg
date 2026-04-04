@@ -1,4 +1,19 @@
+---
+created: 2026-03-30
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "FT-INFRA-C"
+---
+
 # ULTS Framework — Universal LLM Task Specification
+
+## Summary
+
+**Feature**: ULTS Framework
+**Summary**: Universal LLM Task Specifications — machine-readable JSON contracts for all 16 LLM tasks, enabling automated quality benchmarking and regression gating.
+
 
 ## Overview
 

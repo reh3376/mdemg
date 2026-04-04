@@ -1,4 +1,19 @@
+---
+created: 2026-03-20
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "S16"
+---
+
 # Feature: Instance Teardown
+
+## Summary
+
+**Feature**: Instance Teardown
+**Summary**: Comprehensive project teardown removing 17 categories of artifacts including Docker Compose services, Neo4j data, TSDB backups, hooks, IDE configs, and keyring secrets.
+
 
 **Command:** `mdemg teardown`
 **Phase:** S16 (Sidecar)

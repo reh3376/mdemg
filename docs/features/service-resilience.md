@@ -1,4 +1,19 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "SVC-RES"
+---
+
 # Service Resilience & Ingest Pipeline Hardening
+
+## Summary
+
+**Feature**: Service Resilience
+**Summary**: Resilience mechanisms for data loss prevention across Docker and native deployment topologies, including supervision models and ingest pipeline hardening.
+
 
 This document covers the resilience mechanisms that prevent data loss when MDEMG services are unavailable.
 

@@ -1,116 +1,116 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "97"
+---
+
 # Process Lifecycle
 
-Phase 97 adds daemon-mode process management so you don't need a dedicated terminal for the MDEMG server.
+## Summary
 
-## Commands
+**Feature**: Process Lifecycle Management
+**Summary**: Daemon-mode process management (`mdemg start/stop/restart/status`) so you don't need a dedicated terminal for the MDEMG server. Includes Docker Compose as the primary deployment method.
 
-### Start (Background)
+## Vision & Goals
 
-```bash
-mdemg start                         # Start with defaults
-mdemg start --port 9999             # Custom port
-mdemg start --auto-migrate          # Apply migrations on startup
-mdemg start --mcp                   # Start MCP server alongside
-mdemg start --no-db                 # Don't auto-start Neo4j
-```
+Developers need the server running in the background during their work sessions. Process lifecycle management provides start/stop/restart/status commands that work like any Unix daemon — PID file, log rotation, health checks. For production, Docker Compose with `restart: unless-stopped` replaces OS-level supervision.
 
-The server runs as a detached background process. Logs go to `.mdemg/logs/mdemg.log` and the PID is stored in `.mdemg/mdemg.pid`.
+## Current State
 
-Before forking the daemon child, `mdemg start` loads configuration into the parent process environment so the child inherits the correct values. The loading order matches the documented config priority: `.env` is loaded first (via `godotenv`), then `.mdemg/config.yaml` (which skips any env var already set). This ensures `.env` values take precedence over YAML defaults. The child process inherits the fully resolved environment via `os.Environ()`.
+### Architecture
 
-If Docker is available and a Neo4j container exists but is stopped, `mdemg start` will start it automatically. Use `--no-db` to skip this behavior.
+**Native Mode** — Server runs as a detached background process:
+- Logs to `.mdemg/logs/mdemg.log` (truncated on each start)
+- PID stored in `.mdemg/mdemg.pid`
+- Port written to `.mdemg.port` for client discovery
+- Config loading: `.env` (godotenv) -> `.mdemg/config.yaml` -> env vars -> CLI flags
+- Auto-starts Neo4j container if Docker available and container exists but stopped
 
-### Stop
+**Docker Mode** (Primary) — All 5 services via Docker Compose:
+- `restart: unless-stopped` for automatic recovery
+- `mdemg init --quick` initializes and starts the full stack
 
-```bash
-mdemg stop
-```
+### Workflow
 
-Sends SIGTERM and waits up to 30 seconds for graceful shutdown. If the process doesn't exit, SIGKILL is sent.
-
-This stops the MDEMG server only — Neo4j is left running. The output includes a reminder:
-
-```
-MDEMG server stopped
-Note: Neo4j container may still be running (stop with: mdemg db stop)
-```
-
-### Restart
+**Start/Stop/Restart:**
 
 ```bash
-mdemg restart                       # Stop then start
-mdemg restart --port 9999           # Stop then start with new port
+mdemg start                         # Background daemon
+mdemg start --port 9999 --auto-migrate --mcp  # With options
+mdemg stop                          # SIGTERM + 30s grace + SIGKILL
+mdemg restart                       # Stop then start (inherits flags)
+mdemg status                        # PID, port, uptime, health, Neo4j status
+mdemg serve                         # Foreground (dev/debug)
 ```
 
-Supports all flags from `mdemg start`.
+**Stop** sends SIGTERM and waits up to 30 seconds. Stops MDEMG server only — Neo4j left running.
 
-### Status
+**Docker Compose:**
 
 ```bash
-mdemg status
+mdemg init --quick              # Initialize + start
+docker compose ps               # Check status
+docker compose logs -f mdemg    # Follow logs
+docker compose restart           # Restart all
+docker compose down              # Stop all
 ```
 
-Output:
+### Configuration
 
-```
-MDEMG Status
-============
-  Server:    running (pid=12345)
-  Port:      9999
-  Uptime:    2h 15m
-  Log:       .mdemg/logs/mdemg.log
-  Health:    ok
-  Neo4j:     running (mdemg-neo4j-dev)
-```
+No special configuration — uses standard config priority chain.
 
-When the server is running, `mdemg status` also hits `/healthz` to verify the HTTP server is responsive.
+## Notes
 
-### Foreground (Existing)
+### Known Limitations
 
-```bash
-mdemg serve                         # Foreground mode (unchanged)
-```
+- `mdemg stop` only stops the MDEMG server, not Neo4j (by design — displays reminder)
+- Log file truncated on each start (no rotation)
 
-`mdemg serve` continues to work as before for development and debugging.
+### Risks & Gaps
 
-## Files
+None identified.
 
-| Path | Purpose |
-|------|---------|
-| `.mdemg/mdemg.pid` | PID of the running server process |
-| `.mdemg/logs/mdemg.log` | Server log output (truncated on each start) |
-| `.mdemg.port` | Port file written by the server for client discovery |
+### Future Improvements
 
-## Typical Workflow
+- Log rotation with configurable retention
+- `mdemg start --all` to also start Neo4j + TSDB containers
 
-```bash
-# One-time setup
-mdemg db start                      # Start Neo4j
-mdemg db migrate                    # Apply schema
+## API Endpoints
 
-# Daily development
-mdemg start --auto-migrate          # Start server in background
-# ... work on code ...
-mdemg status                        # Check health
-mdemg restart                       # After config changes
-mdemg stop                          # End of day
-mdemg db stop                       # Optional: stop Neo4j too
-```
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| GET | `/healthz` | Basic health check (used by `mdemg status`) | `specs/health.uats.json` |
 
-## Docker Deployment (Primary)
+## CLI Commands
 
-Docker Compose is the primary deployment method. All 5 services (mdemg, neo4j, timescaledb, neural-sidecar, grafana) run as containers with `restart: unless-stopped` for automatic recovery.
+| Command | Description |
+|---------|-------------|
+| `mdemg start [flags]` | Start server in background (daemon mode) |
+| `mdemg stop` | Stop background server (SIGTERM + SIGKILL fallback) |
+| `mdemg restart [flags]` | Stop then start with new flags |
+| `mdemg status` | Show PID, port, uptime, health, Neo4j status |
+| `mdemg serve [flags]` | Start server in foreground (dev/debug) |
 
-```bash
-mdemg init --quick              # Initialize + start Docker stack
-docker compose ps               # Check service status
-docker compose logs -f mdemg    # Follow server logs
-docker compose restart          # Restart all services
-docker compose down             # Stop all services
-```
+## Configuration Reference
 
-Docker's `restart: unless-stopped` replaces LaunchAgent/systemd for server process supervision. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
+None — uses standard config priority chain.
 
-## Process Supervision (Native, Dev-Only)
+## Dependencies
 
-For native development builds (not Docker), persistent process supervision uses OS-level mechanisms. See `docs/features/service-resilience.md` and `mdemg service install`.
+| Feature | Relationship |
+|---------|-------------|
+| Docker | Optional — auto-starts Neo4j container if available |
+| Config System | Requires — loads .env and config.yaml before forking |
+| Service Resilience | Enhances — OS-level supervision for native deployments |
+
+## Related Files
+
+- `internal/cli/daemon.go` - Start/stop/restart/status implementation
+- `internal/cli/serve.go` - Foreground server (`mdemg serve`)
+- `.mdemg/mdemg.pid` - PID file
+- `.mdemg/logs/mdemg.log` - Server log output
+- `.mdemg.port` - Port discovery file
+- `docs/features/service-resilience.md` - OS-level supervision details

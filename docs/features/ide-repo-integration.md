@@ -1,4 +1,19 @@
+---
+created: 2026-03-30
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "96"
+---
+
 # IDE + Repo Integration
+
+## Summary
+
+**Feature**: IDE & Repository Integration
+**Summary**: Git hook management and MCP configuration for Claude Code, Cursor, and VS Code integration with MDEMG.
+
 
 Phase 96 adds standalone hook management, Claude Code MCP configuration, and `--mcp` co-location for `mdemg serve`.
 

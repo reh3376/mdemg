@@ -1,4 +1,19 @@
+---
+created: 2026-03-21
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "submod"
+---
+
 # Submodule Documentation Consolidation
+
+## Summary
+
+**Feature**: Documentation Consolidation
+**Summary**: Consolidation of divergent documentation across 4 submodules into a single canonical location in docs/user/, with git subtree sync workflow.
+
 
 **Date:** 2026-03-19
 **Commit:** `4380c04` (main repo), submodule commits pushed to all 4 repos
