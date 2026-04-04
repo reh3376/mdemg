@@ -254,6 +254,44 @@ The protocol evolves through RSIC: tier thresholds adjust based on measured comp
 
 ---
 
+## Operational Architecture (v0.5.x)
+
+### Deployment Model
+
+MDEMG runs as a Docker Compose stack with 5 services:
+
+| Service | Role |
+|---------|------|
+| mdemg | Go server — API, retrieval, consolidation, RSIC |
+| neo4j | Knowledge graph (5-layer memory hierarchy) |
+| timescaledb | Time-series metrics + LLM interaction recording for training |
+| neural-sidecar | Python ML sidecar (re-ranking, NLI, tier prediction) |
+| grafana | Observability dashboards (7 pre-provisioned) |
+
+`mdemg init` generates `.env` with dynamic port allocation, writes `docker-compose.yml` from embedded template, and starts all services.
+
+### Training Pipeline
+
+LLM interactions are recorded to TimescaleDB during normal operation. A complete LoRA fine-tuning pipeline processes this data:
+
+export → quality filter → format converter → dataset versioner → train → evaluate → regression gate → quantize/deploy
+
+All scripts in `neural/training/`. See `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md`.
+
+### Multi-Instance Support
+
+Each project directory gets an isolated MDEMG stack via COMPOSE_PROJECT_NAME scoping. Resource profile: ~2.3 GiB per fresh instance, ~5.7 GiB per mature instance. See `docs/user/multi-instance.md`.
+
+### Browser Dashboard
+
+`http://localhost:{PORT}/ui/` — 10-tab dashboard for status, memory, learning, config, logs, RSIC, plugins, features, backups, and training data.
+
+### Upgrade Automation
+
+`mdemg upgrade` and `brew upgrade mdemg` update the binary and automatically discover + update all running Docker instances. See `docs/user/cli-reference.md`.
+
+---
+
 ## What MDEMG Stores
 
 > **Important:** MDEMG stores only domain-specific, organization-specific, and task-specific knowledge. It does NOT duplicate general knowledge that LLMs already possess.

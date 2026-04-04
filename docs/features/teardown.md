@@ -143,6 +143,14 @@ Teardown is accessible from the native companion apps on macOS and Linux via a g
 - `packaging/mdemg-linux-sidebar/src/tabs/config.js` — Linux Remove Instance button in config tab
 - `packaging/mdemg-windows/Install-MDEMG.ps1` — Windows installer teardown integration
 
+## Docker Compose Teardown (PR #257)
+
+`mdemg teardown` now detects `docker-compose.yml` in the project directory and runs `docker compose down [-v]` instead of legacy single-container removal. Falls back to legacy container cleanup if no compose file is found.
+
+## TSDB Backup (Phase 0b, PR #258)
+
+When `--export` is used, teardown runs `pg_dump` via `docker compose exec` BEFORE volume destruction. The backup is preserved in `.mdemg-backup-{ts}/backups/tsdb/`. Non-fatal on failure — prints warning and continues with teardown.
+
 ## Documents Accessed
 
 - `internal/cli/sidecar_uninstall.go` — Pattern reference (phased teardown, dry-run, backup)

@@ -1,5 +1,15 @@
 # MDEMG Development Roadmap
 
+> **Note (2026-04-04):** This roadmap covers Phases 1-100 which were completed through
+> v0.3.x. Development since v0.4.0 follows sprint-based cycles documented in
+> `AGENT_HANDOFF.md` and `CHANGELOG.md`. Key post-roadmap work:
+> - Docker Compose deployment (v0.3.0-v0.3.4)
+> - Training data pipeline (v0.4.0-v0.5.1)
+> - Live validation + data propagation fixes (v0.5.2-v0.5.3)
+> - Multi-instance support + teardown hardening (v0.5.4)
+> - Upgrade automation (v0.5.4, PR #260)
+> - Graph health sprint (planned)
+
 **Created**: 2026-01-22
 **Updated**: 2026-02-23 (All phases complete through Phase 91. Phase 92 gap analysis complete — Phases 93-100 roadmap for deployable MDEMG package. Phase D validated. Space Pruning Framework + auto-prune scheduler. Security hardening complete: gosec, gitleaks, error sanitization. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)
 **Based on**: v4 Test Results (whk-wms codebase, 100-question evaluation)

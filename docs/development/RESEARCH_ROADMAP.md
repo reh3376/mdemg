@@ -60,8 +60,8 @@ Transform MDEMG from an inference-time memory augmentation system into a **nativ
 | Workstream | Status | Completion |
 |------------|--------|------------|
 | 1. Hidden Layer Architecture | **COMPLETE** | 100% |
-| 2. Interceptor Agent | **IMPLEMENTED** | 80% |
-| 3. Training Data & Fine-Tuning | Not Started | 0% |
+| 2. Interceptor Agent | **COMPLETE** | 100% |
+| 3. Training Data & Fine-Tuning | **LARGELY COMPLETE** | 85% |
 | 4. Research & Funding | In Progress | 10% |
 
 ---
@@ -142,9 +142,11 @@ See `docs/HIDDEN_LAYER_SPEC.md` for full technical specification including:
 
 ---
 
-## Workstream 2: Interceptor Agent (aci-claude-go)
+## Workstream 2: Interceptor Agent (aci-claude-go) ✅ COMPLETE
 
-### Status: In Design
+### Status: COMPLETE
+
+Interceptor pattern (detect → correct → iterate → learn) implemented across 5 components: Jiminy Guide (pre-action), Guardrail Validate + pre-bash-check (during-action), Jiminy Evaluate (post-action), EffectivenessTracker (feedback), SignalLearner + RSIC SK1 (Hebbian learning loop).
 
 ### Problem Statement
 
@@ -215,17 +217,24 @@ See `docs/INTERCEPTOR_DESIGN.md` for full design specification.
 
 ---
 
-## Workstream 3: Training Data & Model Fine-Tuning
+## Workstream 3: Training Data & Model Fine-Tuning ✅ LARGELY COMPLETE
 
-### Status: Not Started
+### Status: LARGELY COMPLETE — Pipeline Built, First Training Cycle Pending
+
+Complete LoRA fine-tuning pipeline delivered in PRs #217-250:
+- TSDB interaction recording: 16 LLM consumers, all recording
+- Export + curation pipeline: quality_filter, format_converter, dataset_versioner
+- Training pipeline: train_ft.py, evaluate_ft.py, regression_gate.py, quantize_deploy.py
+- Teacher distillation: teacher_distill.py, reward_functions.py (21 GRPO functions)
+- Remaining: first LoRA training cycle (requires 30-day data accumulation)
 
 ### Phases
 
-**Phase 3.1: Interaction Logging** - Not Started
+**Phase 3.1: Interaction Logging** - COMPLETE (PRs #217-219, #253)
 
-- Add structured logging for all MDEMG interactions
-- Export in training-ready format (JSONL)
-- Privacy filtering for sensitive content
+- Structured TSDB recording for all 16 LLM consumers
+- Export in training-ready format (JSONL) via `mdemg data export`
+- Privacy scrubbing via SanitizeResponse
 
 **Phase 3.2: Synthetic Data Generation** - Not Started
 
@@ -233,11 +242,11 @@ See `docs/INTERCEPTOR_DESIGN.md` for full design specification.
 - Generate synthetic examples
 - Mix with real interaction logs
 
-**Phase 3.3: Fine-Tuning Pipeline** - Not Started (requires compute)
+**Phase 3.3: Fine-Tuning Pipeline** - COMPLETE (PRs #246-250)
 
-- Select base model
-- Prepare training data
-- Run fine-tuning experiments
+- Base model: Qwen3-30B-A3B MoE via vllm-mlx
+- Training: LoRA fine-tuning with MLX on Apple Silicon
+- Evaluation: per-task scoring, regression gate, deployment pipeline
 
 ---
 

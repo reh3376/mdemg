@@ -197,6 +197,17 @@ mdemg upgrade --edge
 
 Edge binaries include the commit hash in their version string (e.g., `edge-abc1234`).
 
+### Multi-Instance
+
+Run multiple MDEMG instances on one machine, each in its own project directory:
+
+```bash
+cd ~/project-alpha && mdemg init --quick
+cd ~/project-beta && mdemg init --quick
+```
+
+Each instance gets isolated Docker services via COMPOSE_PROJECT_NAME scoping. See the [Multi-Instance Guide](multi-instance.md) for resource requirements and known limitations.
+
 ---
 
 ## Build from Source

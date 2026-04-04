@@ -444,7 +444,11 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | FT-GATE | regression_gate.py | ✅ | 2026-04-02 | PR #248: Deployment gate with PASS/FAIL/WARN outcomes |
 | FT-REWARD | teacher_distill.py + reward_functions.py | ✅ | 2026-04-02 | PR #249: Teacher distillation + 21 GRPO reward functions |
 | FT-DEPLOY | quantize_deploy.py | ✅ | 2026-04-02 | PR #250: Fuse + quantize pipeline for production deployment |
-| UPGRADE-AUTO | Upgrade Automation | ✅ | 2026-04-04 | `mdemg upgrade` + `brew upgrade mdemg` now auto-update Docker instances. New flags: `--no-docker`, `--docker-only`. GoReleaser `post_install` hook. |
+| MULTI-INST | Multi-Instance Testing | ✅ | 2026-04-03 | PR #256: 4 simultaneous instances (20 containers), all isolated, FindFreePort verified. Resource: ~2.3 GiB/fresh, ~5.7 GiB/mature. Guide: docs/user/multi-instance.md |
+| TEARDOWN-COMPOSE | Teardown Docker Compose Awareness | ✅ | 2026-04-03 | PR #257: Detects docker-compose.yml, runs docker compose down [-v]. Falls back to legacy container cleanup |
+| TEARDOWN-TSDB | Teardown TSDB Backup | ✅ | 2026-04-03 | PR #258: Phase 0b — pg_dump via docker compose exec BEFORE volume destruction. Non-fatal on failure |
+| SUBMOD-054 | Submodule Update v0.5.4 | ✅ | 2026-04-03 | PR #259: homebrew-mdemg submodule pointer to v0.5.4 |
+| UPGRADE-AUTO | Upgrade Automation | ✅ | 2026-04-04 | PR #260: `mdemg upgrade` + `brew upgrade mdemg` now auto-update Docker instances. New flags: `--no-docker`, `--docker-only`. GoReleaser `post_install` hook. |
 
 ### Phase Numbering Convention
 
@@ -590,6 +594,8 @@ python3 docs/api/api-spec/uats/runners/uats_runner.py verify-hashes --spec-dir d
 | ~~Error leaks in API handlers~~ | ~~High~~ | ~~56 `err.Error()` leaks across handlers (incl. `handlers_org_review.go`)~~ (Resolved in DD-SPRINT: all 56 err.Error() leaks sanitized) |
 | ~~Hook template drift~~ | ~~High~~ | ~~FIXED (2026-03-30)~~ — `claudeHookFiles()` expanded to all 5 hooks with Matcher support. Templates synced from active hooks with `{{SPACE_ID}}`/`{{MDEMG_URL}}` placeholders. `mergeClaudeSettings()` places matcher at group level. SVC-RES sprint Phase D. |
 | DBSCAN clustering performance | Info | O(n^2) on CPU, 10-15min for 8K+ nodes. GPU investigation needed. |
+| LaunchAgent labels not instance-scoped | Low | Multi-instance limitation: all instances share same LaunchAgent label. Documented in `docs/user/multi-instance.md`. |
+| Graph health: 6 bugs, 4 gaps | Medium | Identified in codebase assessment (2026-04-04). Key: SymbolNode dedup, vendor nodes 44.7%, two decay systems, unprotected admin endpoints. |
 | ~~`docker.go` volume name mismatch~~ | ~~Medium~~ | ~~FIXED (2026-03-25)~~ — `tryMigrateVolume()` in `internal/cli/docker.go` detects legacy hyphen-named volumes, migrates data to compose-style underscore volumes, wired into `mdemg db start`. |
 | ~~apt-publish GPG fingerprint~~ | ~~Critical~~ | ~~FIXED (2026-03-20)~~ — `gpg --import-ownertrust` required 40-char fingerprint, was receiving 16-char key ID. PR #171. |
 | ~~Linux docs: wrong Ollama model~~ | ~~Medium~~ | ~~FIXED (2026-03-20)~~ — README.md + beta guide recommended `nomic-embed-text` (768d, incompatible). Corrected to `qwen3-embedding:8b` (4096d → MRL truncate to 3072d). PR #172. |
