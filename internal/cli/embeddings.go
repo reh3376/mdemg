@@ -19,6 +19,7 @@ func newEmbeddingsCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newEmbeddingsCheckCmd())
+	cmd.AddCommand(newEmbeddingsBackfillCmd())
 
 	return cmd
 }

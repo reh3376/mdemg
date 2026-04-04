@@ -113,6 +113,7 @@ func newPruneCmd() *cobra.Command {
 
 	// Label selection
 	cmd.Flags().StringSliceVar(&cfg.IncludeLabels, "include-labels", []string{"MemoryNode"}, "Labels to scan for orphans (e.g. MemoryNode,SymbolNode,Observation)")
+	cmd.Flags().BoolVar(&cfg.MatchIgnore, "match-ignore", false, "Delete nodes with file_path matching .mdemgignore patterns")
 
 	// Processing options
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
@@ -182,6 +183,7 @@ type pruneConfig struct {
 
 	// Label selection
 	IncludeLabels []string // default: ["MemoryNode"]
+	MatchIgnore   bool     // delete nodes matching .mdemgignore patterns
 
 	// Processing options
 	DryRun    bool
@@ -319,6 +321,16 @@ func runPruneJob(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneC
 			}
 			fmt.Printf("  Found: %d, Deleted: %d\n", obsStats.found, obsStats.deleted)
 		}
+	}
+
+	// Step 2d: Match-ignore sweep (if enabled)
+	if cfg.MatchIgnore {
+		fmt.Println("\nStep 2d: Match-ignore sweep (.mdemgignore)...")
+		ignoreStats, err := sweepIgnoreMatches(ctx, driver, cfg)
+		if err != nil {
+			return fmt.Errorf("match-ignore sweep: %w", err)
+		}
+		fmt.Printf("  Found: %d, Deleted: %d\n", ignoreStats.found, ignoreStats.deleted)
 	}
 
 	// Step 3: Node merging (if enabled)
@@ -952,6 +964,91 @@ RETURN count(*) AS deleted`
 		return stats, err
 	}
 	stats.deleted = delResult.(int)
+
+	return stats, nil
+}
+
+// sweepIgnoreMatches deletes nodes whose file_path matches .mdemgignore patterns.
+func sweepIgnoreMatches(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (orphanLabelStats, error) {
+	stats := orphanLabelStats{label: "ignore-match"}
+
+	ignoreFile := config.FindIgnoreFile(".")
+	if ignoreFile == "" {
+		fmt.Println("  No .mdemgignore found, skipping")
+		return stats, nil
+	}
+	patterns, err := config.ParseIgnoreFile(ignoreFile)
+	if err != nil {
+		return stats, fmt.Errorf("parse ignore file: %w", err)
+	}
+	if len(patterns) == 0 {
+		fmt.Println("  .mdemgignore is empty, skipping")
+		return stats, nil
+	}
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+MATCH (n {space_id: $spaceId})
+WHERE n.file_path IS NOT NULL
+RETURN DISTINCT n.file_path AS fp`, map[string]any{"spaceId": cfg.SpaceID})
+		if err != nil {
+			return nil, err
+		}
+		var paths []string
+		for res.Next(ctx) {
+			fp, _ := res.Record().Get("fp")
+			if s, ok := fp.(string); ok {
+				paths = append(paths, s)
+			}
+		}
+		return paths, res.Err()
+	})
+	sess.Close(ctx)
+	if err != nil {
+		return stats, err
+	}
+
+	allPaths := result.([]string)
+	var matchedPaths []string
+	for _, p := range allPaths {
+		relPath := strings.TrimPrefix(p, "/")
+		if config.MatchesIgnorePatterns(relPath, false, patterns) {
+			matchedPaths = append(matchedPaths, p)
+		}
+	}
+	stats.found = len(matchedPaths)
+
+	if stats.found == 0 {
+		return stats, nil
+	}
+
+	if cfg.DryRun {
+		fmt.Printf("  [dry-run] Would delete nodes for %d file_paths matching .mdemgignore\n", stats.found)
+		for i, p := range matchedPaths {
+			if i >= 10 {
+				fmt.Printf("  ... and %d more\n", len(matchedPaths)-10)
+				break
+			}
+			fmt.Printf("    %s\n", p)
+		}
+		return stats, nil
+	}
+
+	wSess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer wSess.Close(ctx)
+	for _, fp := range matchedPaths {
+		_, err := wSess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, `
+MATCH (n {space_id: $spaceId, file_path: $fp})
+DETACH DELETE n`, map[string]any{"spaceId": cfg.SpaceID, "fp": fp})
+			return nil, err
+		})
+		if err != nil {
+			return stats, fmt.Errorf("delete nodes for %s: %w", fp, err)
+		}
+		stats.deleted++
+	}
 
 	return stats, nil
 }
