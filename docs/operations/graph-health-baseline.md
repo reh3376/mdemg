@@ -149,16 +149,20 @@ j17-comprehension-test/
 
 | Metric | Phase 0 (Baseline) | Phase 1 (Vendor) | Phase 2 (MERGE Fix) | Phase 3 (Dedup) | Phase 7 (Final) |
 |--------|-------------------|-------------------|---------------------|-----------------|-----------------|
-| Total nodes | 391,113 | 218,272 | 218,272 | 231,560 | ___ |
-| SymbolNodes | 242,627 | 78,191 | 78,438 | 65,773 | ___ |
-| MemoryNodes | 63,003 | 54,011 | 54,011 | 57,942 | ___ |
-| Observations | 85,482 | 86,070 | 86,070 | 104,680 | ___ |
-| CO_ACTIVATED edges | 622,632 | 404,153 | 404,153 | 483,777 | ___ |
-| Avg edge weight | 0.1307 | 0.1344 | 0.1344 | 0.1610 | ___ |
-| Duplicate groups | 14,542 | ___ | 6,369 (12,665 excess) | 0 | ___ |
-| Embedding coverage % | 99.84% | 99.81% | 99.81% | 99.83% | ___ |
-| Health score | 0.7408 | 0.7446 | 0.7446 | ___ | ___ |
-| Vendor nodes | 171,300 | 0 | 0 | 0 | ___ |
-| Orphan SymbolNodes | — | — | 7,649 | 1,639 | ___ |
-| Idempotent re-ingest | — | — | PASS (78,438=78,438) | PASS | ___ |
-| Natural-key constraint | — | — | — | CREATED | ___ |
+| Total nodes | 391,113 | 218,272 | 218,272 | 231,560 | 232,780 |
+| SymbolNodes | 242,627 | 78,191 | 78,438 | 65,773 | 65,792 |
+| MemoryNodes | 63,003 | 54,011 | 54,011 | 57,942 | 62,175 |
+| — L0 | 57,126 | — | — | — | 48,762 |
+| — L1 | 4,717 | — | — | — | 13,412 |
+| — L2-L5 | 1,160 | — | — | — | 0 (OOM) |
+| Observations | 85,482 | 86,070 | 86,070 | 104,680 | 104,812 |
+| CO_ACTIVATED edges | 622,632 | 404,153 | 404,153 | 483,777 | 292,667 |
+| Avg edge weight | 0.1307 | 0.1344 | 0.1344 | 0.1610 | 0.1360 |
+| Duplicate groups | 14,542 | ___ | 6,369 (12,665 excess) | 0 | 0 |
+| Embedding coverage % | 99.84% | 99.81% | 99.81% | 99.83% | 99.997% |
+| Vendor nodes | 171,300 | 0 | 0 | 0 | 0 |
+| Orphan SymbolNodes | — | — | 7,649 | 1,639 | 1,219 |
+| Idempotent re-ingest | — | — | PASS (78,438=78,438) | PASS | PASS |
+| Natural-key constraint | — | — | — | CREATED | ACTIVE |
+| Retrieval spot checks | — | — | — | — | 5/5 PASS |
+| Live validation | — | — | — | — | 9/19 PASS (6 infra) |
