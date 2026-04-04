@@ -381,6 +381,11 @@ func reEmbedNodes(ctx context.Context, driver neo4j.DriverWithContext, spaceID s
 		return fmt.Errorf("init embedder: %w", err)
 	}
 
+	type nodeContent struct {
+		ID      string
+		Content string
+	}
+
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	res, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		r, err := tx.Run(ctx, `
@@ -390,10 +395,6 @@ RETURN n.node_id AS nodeId, n.content AS content
 LIMIT 1000`, map[string]any{"spaceId": spaceID})
 		if err != nil {
 			return nil, err
-		}
-		type nodeContent struct {
-			ID      string
-			Content string
 		}
 		var nodes []nodeContent
 		for r.Next(ctx) {
@@ -409,10 +410,6 @@ LIMIT 1000`, map[string]any{"spaceId": spaceID})
 		return fmt.Errorf("query nodes: %w", err)
 	}
 
-	type nodeContent struct {
-		ID      string
-		Content string
-	}
 	nodes := res.([]nodeContent)
 	if len(nodes) == 0 {
 		fmt.Fprintln(os.Stderr, "No nodes need re-embedding.")
