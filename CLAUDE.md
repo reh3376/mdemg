@@ -108,6 +108,9 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 - `mdemg tsdb status` — TimescaleDB connection and schema version
 - `mdemg tsdb migrate` — apply pending TSDB schema migrations
 - `mdemg synergy status` — Claude Code ↔ MDEMG synergy health
+- `mdemg upgrade` — self-update binary + all running Docker instances
+- `mdemg upgrade --docker-only` — update Docker instances only (used by brew post-install)
+- `mdemg upgrade --no-docker` — update binary only, skip Docker
 
 ## Campaign Configuration
 

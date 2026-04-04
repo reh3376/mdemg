@@ -1396,20 +1396,28 @@ mdemg sidecar uninstall --force
 
 **Synopsis:** `mdemg upgrade [flags]`
 
-Self-update the `mdemg` binary to the latest GitHub release. Downloads the binary for your platform, verifies the SHA256 checksum, and replaces the current executable. On Linux, also updates systemd unit files if present in the archive and already installed on the system (both `/etc/systemd/system/` and `/usr/local/share/mdemg/systemd/`), then runs `systemctl daemon-reload`.
+Self-update the `mdemg` binary to the latest GitHub release and update all running MDEMG Docker instances. Downloads the binary for your platform, verifies the SHA256 checksum, replaces the current executable, then discovers running MDEMG Docker Compose projects via container labels and pulls latest images + restarts containers. On Linux, also updates systemd unit files if present.
 
-> **Note:** If you installed via a package manager, prefer that manager's update mechanism instead: `brew upgrade mdemg` (macOS), `sudo apt update && sudo apt upgrade mdemg` (Debian/Ubuntu), or `scoop update mdemg` (Windows).
+After `brew upgrade mdemg`, Docker instances are updated automatically via a post-install hook.
+
+> **Note:** If you installed via a package manager, prefer that manager's update mechanism instead: `brew upgrade mdemg` (macOS), `sudo apt update && sudo apt upgrade mdemg` (Debian/Ubuntu), or `scoop update mdemg` (Windows). All paths now include Docker instance updates.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--dry-run` | bool | `false` | Check for updates without installing |
 | `--force` | bool | `false` | Install even if already at latest version |
+| `--edge` | bool | `false` | Update to latest edge build instead of stable release |
+| `--no-docker` | bool | `false` | Skip Docker image updates |
+| `--docker-only` | bool | `false` | Only update Docker images (skip binary download) |
 
 **Usage Examples:**
 ```bash
-mdemg upgrade
-mdemg upgrade --dry-run
-mdemg upgrade --force
+mdemg upgrade                # Update binary + all running Docker instances
+mdemg upgrade --dry-run      # Check for updates without installing
+mdemg upgrade --force        # Force reinstall even if up to date
+mdemg upgrade --edge         # Update to latest edge build
+mdemg upgrade --no-docker    # Update binary only, skip Docker
+mdemg upgrade --docker-only  # Update Docker instances only (used by brew post-install)
 ```
 
 **See Also:** `mdemg version`

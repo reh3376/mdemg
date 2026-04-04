@@ -27,29 +27,36 @@ func newUpgradeCmd() *cobra.Command {
 	var dryRun bool
 	var forceUpgrade bool
 	var edge bool
+	var noDocker bool
+	var dockerOnly bool
 
 	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"update"},
-		Short:   "Self-update the mdemg binary to the latest release",
-		Long: `Download and install the latest mdemg release from GitHub.
+		Short:   "Self-update the mdemg binary and running Docker instances",
+		Long: `Download and install the latest mdemg release from GitHub, then update
+all running MDEMG Docker Compose instances.
 
-Checks the current version against the latest release. If a newer version
-is available, downloads the binary, verifies its checksum, and replaces
-the current executable.
+After replacing the binary, automatically discovers running MDEMG Docker
+Compose projects via container labels and pulls latest images + restarts
+containers.
 
 By default, downloads the latest stable (tagged) release. Use --edge to
 download the latest edge build (updated on every PR merge to main).
 
-Use --dry-run to check for updates without installing.`,
+Use --dry-run to check for updates without installing.
+Use --no-docker to skip Docker image updates.
+Use --docker-only to update Docker instances without downloading a new binary.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpgrade(dryRun, forceUpgrade, edge)
+			return runUpgrade(dryRun, forceUpgrade, edge, noDocker, dockerOnly)
 		},
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Check for updates without installing")
 	cmd.Flags().BoolVar(&forceUpgrade, "force", false, "Install even if already at latest version")
 	cmd.Flags().BoolVar(&edge, "edge", false, "Update to latest edge build instead of stable release")
+	cmd.Flags().BoolVar(&noDocker, "no-docker", false, "Skip Docker image updates")
+	cmd.Flags().BoolVar(&dockerOnly, "docker-only", false, "Only update Docker images (skip binary download)")
 
 	return cmd
 }
@@ -63,7 +70,13 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
-func runUpgrade(dryRun, force, edge bool) error {
+func runUpgrade(dryRun, force, edge, noDocker, dockerOnly bool) error {
+	// Docker-only mode: skip binary download, just update containers
+	if dockerOnly {
+		upgradeDockerInstances("current")
+		return nil
+	}
+
 	channel := "stable"
 	if edge {
 		channel = "edge"
@@ -312,8 +325,68 @@ func runUpgrade(dryRun, force, edge bool) error {
 		}
 	}
 
+	// Update running Docker Compose instances
+	if !noDocker {
+		upgradeDockerInstances(release.TagName)
+	}
+
 	fmt.Printf("\nUpgraded mdemg to %s\n", release.TagName)
 	return nil
+}
+
+// upgradeDockerInstances discovers running MDEMG Docker Compose projects
+// via container labels and pulls latest images + restarts containers.
+// Non-fatal — prints warnings on failure, never blocks the upgrade.
+func upgradeDockerInstances(version string) {
+	if !DockerAvailable() {
+		return
+	}
+
+	out, err := exec.Command("docker", "ps",
+		"--filter", "label=com.docker.compose.project",
+		"--format", `{{.Label "com.docker.compose.project"}}|{{.Label "com.docker.compose.project.working_dir"}}`,
+	).Output()
+	if err != nil {
+		return // Docker daemon not running — skip silently
+	}
+
+	// Deduplicate by project name (multiple containers per project, we want 1 entry)
+	seen := make(map[string]string) // project name → working dir
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) != 2 || !strings.HasPrefix(parts[0], "mdemg") {
+			continue
+		}
+		seen[parts[0]] = parts[1]
+	}
+
+	if len(seen) == 0 {
+		return
+	}
+
+	fmt.Printf("\nUpdating %d running MDEMG Docker instance(s)...\n", len(seen))
+	for project, dir := range seen {
+		fmt.Printf("  %s: pulling images... ", project)
+
+		pull := exec.Command("docker", "compose", "--project-directory", dir, "pull")
+		pull.Stderr = io.Discard
+		if err := pull.Run(); err != nil {
+			fmt.Printf("FAILED (%v)\n", err)
+			continue
+		}
+
+		fmt.Print("restarting... ")
+		up := exec.Command("docker", "compose", "--project-directory", dir, "up", "-d")
+		up.Stderr = io.Discard
+		if err := up.Run(); err != nil {
+			fmt.Printf("FAILED (%v)\n", err)
+			continue
+		}
+		fmt.Println("ok")
+	}
 }
 
 func fetchEdgeRelease() (*githubRelease, error) {

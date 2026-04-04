@@ -251,9 +251,13 @@ brews:
       obsdir.install "plugins/obsidian-module/manifest.json"
       # Docker Compose file (embedded in binary, also available for inspection)
       share.install "docker-compose.yml" => "mdemg/docker-compose.yml"
+    post_install: |
+      system bin/"mdemg", "upgrade", "--docker-only"
     test: |
       system "#{bin}/mdemg", "version"
     caveats: |
+      Docker is required for running MDEMG services.
+      After 'brew upgrade mdemg', running Docker instances are updated automatically.
       Jiminy inner-voice guidance is configured during 'mdemg init'.
       Default model: gpt-5.4-nano (OpenAI) or qwen3:8b (Ollama).
       Run 'mdemg init' in your project directory to get started.
