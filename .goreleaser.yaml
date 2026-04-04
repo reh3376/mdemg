@@ -252,6 +252,8 @@ brews:
       # Docker Compose file (embedded in binary, also available for inspection)
       share.install "docker-compose.yml" => "mdemg/docker-compose.yml"
     post_install: |
+      # Runs on both install and upgrade. On fresh install, no Docker instances
+      # exist, so upgradeDockerInstances returns silently (< 200ms overhead).
       system bin/"mdemg", "upgrade", "--docker-only"
     test: |
       system "#{bin}/mdemg", "version"
