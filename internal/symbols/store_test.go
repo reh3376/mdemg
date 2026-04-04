@@ -43,10 +43,17 @@ func TestGenerateSymbolID(t *testing.T) {
 				t.Errorf("GenerateSymbolID length = %d, want 32", len(id1))
 			}
 
-			// Different inputs should produce different IDs
+			// Line number is excluded from hash — same symbol at different lines
+			// produces the same ID (prevents duplicates on code reformatting)
 			id3 := GenerateSymbolID(tt.spaceID, tt.filePath, tt.symbolName, tt.lineNumber+1)
-			if id1 == id3 {
-				t.Error("Different line numbers should produce different IDs")
+			if id1 != id3 {
+				t.Error("Different line numbers should produce the same ID")
+			}
+
+			// Different names should still produce different IDs
+			id4 := GenerateSymbolID(tt.spaceID, tt.filePath, tt.symbolName+"_other", tt.lineNumber)
+			if id1 == id4 {
+				t.Error("Different symbol names should produce different IDs")
 			}
 		})
 	}

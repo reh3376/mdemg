@@ -1,4 +1,19 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "DOCKER-P2b"
+---
+
 # Browser Dashboard (DOCKER-P2 / P2b)
+
+## Summary
+
+**Feature**: Browser Dashboard UI
+**Summary**: 10-tab embedded web dashboard at /ui/ for status monitoring, memory exploration, learning controls, configuration, logs, RSIC, plugins, features, backups, and training data.
+
 
 The MDEMG browser dashboard is a lightweight web UI served at `/ui/` from the MDEMG server. It provides quick health overview, unique data not available in Grafana, and action triggers — all without leaving the browser.
 

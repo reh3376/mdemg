@@ -1,4 +1,19 @@
+---
+created: 2026-03-30
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "Jiminy"
+---
+
 # Jiminy Inner Voice
+
+## Summary
+
+**Feature**: Jiminy Inner Voice
+**Summary**: 5-source parallel fan-out guidance system (J7) with LLM synthesis (J8), constraint tracking, trust scoring, and feedback loop closure for AI-agent behavioral guidance.
+
 
 **Phase Jiminy** — Proactive guidance service for AI coding agents.
 

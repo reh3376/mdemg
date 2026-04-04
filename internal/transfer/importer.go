@@ -561,25 +561,32 @@ func (imp *Importer) importSymbols(ctx context.Context, syms []*pb.SymbolData) (
 				props["embedding"] = emb
 			}
 
-			_, err := tx.Run(ctx, `MERGE (s:SymbolNode {space_id: $spaceId, symbol_id: $symbolId})
-ON CREATE SET s += $props`, map[string]any{
-				"spaceId":  sd.SpaceId,
-				"symbolId": sd.SymbolId,
-				"props":    props,
+			// MERGE on natural key to match store.go pattern and prevent duplicates
+			_, err := tx.Run(ctx, `MERGE (s:SymbolNode {space_id: $spaceId, name: $name, file_path: $filePath, symbol_type: $symbolType})
+ON CREATE SET s.symbol_id = $symbolId, s += $props
+ON MATCH SET s.symbol_id = $symbolId, s += $props`, map[string]any{
+				"spaceId":    sd.SpaceId,
+				"name":       sd.Name,
+				"filePath":   sd.FilePath,
+				"symbolType": sd.SymbolType,
+				"symbolId":   sd.SymbolId,
+				"props":      props,
 			})
 			if err != nil {
 				return nil, err
 			}
 
-			// Link to parent memory node
+			// Link to parent memory node (match by natural key for consistency)
 			if sd.ParentNodeId != "" {
 				_, err = tx.Run(ctx, `
 MATCH (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
-MATCH (s:SymbolNode {space_id: $spaceId, symbol_id: $symbolId})
+MATCH (s:SymbolNode {space_id: $spaceId, name: $name, file_path: $filePath, symbol_type: $symbolType})
 MERGE (n)-[:HAS_SYMBOL]->(s)`, map[string]any{
-					"spaceId":  sd.SpaceId,
-					"nodeId":   sd.ParentNodeId,
-					"symbolId": sd.SymbolId,
+					"spaceId":    sd.SpaceId,
+					"nodeId":     sd.ParentNodeId,
+					"name":       sd.Name,
+					"filePath":   sd.FilePath,
+					"symbolType": sd.SymbolType,
 				})
 				if err != nil {
 					slog.Warn("could not link symbol to node", "symbol_id", sd.SymbolId, "parent_node_id", sd.ParentNodeId, "error", err)

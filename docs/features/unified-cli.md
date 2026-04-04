@@ -1,4 +1,19 @@
+---
+created: 2026-03-20
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "93"
+---
+
 # Unified CLI
+
+## Summary
+
+**Feature**: Unified CLI
+**Summary**: Single mdemg binary merging 12 separate tools into a unified command structure with 30+ subcommands across 6 command groups.
+
 
 Phase 93 merges 12 separate Go binaries into a single `mdemg` command using Cobra. Instead of building and managing individual tools (`mdemg-server`, `mdemg-ingest`, `mdemg-decay`, etc.), everything is accessible through one binary with subcommands.
 

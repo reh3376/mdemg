@@ -1,4 +1,19 @@
+---
+created: 2026-04-02
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "FT-INFRA"
+---
+
 # Embedding and Retrieval Data Collection
+
+## Summary
+
+**Feature**: Embedding & Retrieval Data Collection
+**Summary**: Infrastructure for collecting every embedding call and retrieval pipeline execution into TimescaleDB, enabling future domain-specific embedding model training via contrastive learning.
+
 
 ## Overview
 

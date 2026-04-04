@@ -1,4 +1,19 @@
+---
+created: 2026-03-30
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "AR-3"
+---
+
 # LLM-Powered Intelligence
+
+## Summary
+
+**Feature**: LLM-Powered Intelligence
+**Summary**: Optional LLM-based alternatives to rule-based systems for RSIC reflection, constraint detection, query classification, and concept emergence naming.
+
 
 **Phase AR-3** — LLM reflection, constraint classification, and query classification.
 

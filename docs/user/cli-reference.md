@@ -2016,6 +2016,8 @@ mdemg teardown --export --yes
 mdemg teardown --full --yes
 ```
 
+When `--export` is used, TSDB data is backed up via pg_dump before Docker volumes are destroyed (Phase 0b). The backup is non-fatal — if pg_dump fails, teardown continues with a warning.
+
 **See Also:** `mdemg stop`, `mdemg db stop`, `mdemg hooks uninstall`
 
 ---

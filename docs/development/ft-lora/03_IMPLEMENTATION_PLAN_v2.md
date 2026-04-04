@@ -138,7 +138,7 @@ Install vllm-mlx, create launchd/systemd service file, point `LLM_BASE_URL` to `
 ## Phase 4: Teacher Distillation Pipeline (Python) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
 
 ### 4A. `neural/training/input_extractor.py` — Extract real task inputs from Neo4j ⬜ NOT STARTED
-### 4B. `neural/training/teacher_distill.py` — Generate anchor dataset via external LLM ⬜ NOT STARTED
+### 4B. `neural/training/teacher_distill.py` — Generate anchor dataset via external LLM ✅ COMPLETE (PR #249)
 ### 4C. `neural/training/synthetic_failures.py` — Generate failure detection examples ⬜ NOT STARTED
 ### 4D. `neural/training/quality_filter.py` ✅ COMPLETE (PR #240) — 8 quality gates, 25 tests, ULTS validation
 ### 4E. `neural/training/format_converter.py` ✅ COMPLETE (PR #240) — HuggingFace MLX chat format, RAFT 80/20 handling
@@ -295,9 +295,9 @@ Remaining: Training cycle trigger patterns (22-24), data balance checks, entropy
 
 > **Built:** `mdemg data status/inspect/stats/annotate/quality/audit/export/check` (PRs #219, #240, #243). Multi-table export with streaming privacy scan. Pre-campaign validation (`data check --pre-campaign`).
 
-Remaining: `mdemg finetune` subcommands — status, train, eval, deploy, rollback (blocked on Phase 5). `mdemg data curate`, `mdemg data anchor generate`, `mdemg data manifest`.
+Remaining: `mdemg finetune` subcommands — status, train, eval, deploy, rollback (Phase 5 now COMPLETE). `mdemg data curate`, `mdemg data anchor generate`, `mdemg data manifest`.
 
-**Effort:** S remaining (blocked on Phase 5).
+**Effort:** S remaining (unblocked — Phase 5 complete).
 
 ---
 
@@ -432,7 +432,7 @@ Remaining: FT model-specific metrics (version, latency, cycles), data governance
 | **11** Instance Isolation | Phase 10 | M | ✅ COMPLETE (PR #242) |
 | **12** Campaign Hardening | Phase 11 | M | ✅ COMPLETE (PR #243) |
 
-**Critical path:** 30-day campaign (task activation + data accumulation) → Phase 4A-C (teacher distillation for rare tasks) → Phase 5 (training pipeline) → Phase 6A-C (recursive automation)
+**Critical path:** 30-day campaign (task activation + data accumulation) → Phase 4A/4C (teacher distillation for rare tasks — 4B complete PR #249) → Phase 6A-C (recursive automation). Phase 5 (training pipeline) is COMPLETE.
 
 **Next priorities:**
 1. **30-day multi-instance collection campaign** — infrastructure ready, data activation needed

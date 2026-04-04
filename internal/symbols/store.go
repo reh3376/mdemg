@@ -47,8 +47,10 @@ type SymbolRecord struct {
 }
 
 // GenerateSymbolID creates a unique identifier for a symbol.
-func GenerateSymbolID(spaceID, filePath, name string, lineNumber int) string {
-	data := fmt.Sprintf("%s|%s|%s|%d", spaceID, filePath, name, lineNumber)
+// Line number is excluded from the hash — same symbol at different lines is the
+// same symbol. The parameter is kept for signature compatibility with callers.
+func GenerateSymbolID(spaceID, filePath, name string, _ int) string {
+	data := fmt.Sprintf("%s|%s|%s", spaceID, filePath, name)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:16]) // 32 char hex string
 }
@@ -184,20 +186,21 @@ func (s *Store) SaveSymbols(ctx context.Context, spaceID string, symbols []Symbo
 		}
 
 		// Batch upsert symbols and link to parent MemoryNode
+		// MERGE on natural key (name, file_path, symbol_type) instead of symbol_id
+		// to prevent duplicates when line numbers change. symbol_id becomes metadata.
 		_, err := tx.Run(ctx, `
 UNWIND $symbols AS sym
-MERGE (s:SymbolNode {space_id: sym.space_id, symbol_id: sym.symbol_id})
+MERGE (s:SymbolNode {space_id: sym.space_id, name: sym.name, file_path: sym.file_path, symbol_type: sym.symbol_type})
 ON CREATE SET
+  s.symbol_id = sym.symbol_id,
   s.created_at = datetime(),
   s.updated_at = datetime()
 ON MATCH SET
+  s.symbol_id = sym.symbol_id,
   s.updated_at = datetime()
 SET
-  s.name = sym.name,
-  s.symbol_type = sym.symbol_type,
   s.value = sym.value,
   s.raw_value = sym.raw_value,
-  s.file_path = sym.file_path,
   s.line = sym.line,
   s.line_end = sym.line_end,
   s.column = sym.column,

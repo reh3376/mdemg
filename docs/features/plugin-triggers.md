@@ -1,71 +1,50 @@
-# Plugin-Specific Triggers (Phase 9.4)
+---
+created: 2026-02-24
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "9.4"
+---
 
-Phase 9.4 adds plugin-specific trigger mechanisms: Linear webhook integration, file watcher REST API management, and event-driven module updates for non-APE modules.
+# Plugin-Specific Triggers
 
-## Components
+## Summary
 
-### 9.4.1 Linear Webhook Integration (Pre-existing)
+**Feature**: Plugin-Specific Triggers
+**Summary**: Plugin-specific trigger mechanisms including Linear webhook integration, file watcher REST API management, and event-driven module updates for non-APE modules.
 
-Full webhook handler with HMAC-SHA256 verification, 10s debouncing, gRPC dispatch to the Linear module, batch ingest, and APE event triggering.
+## Vision & Goals
 
-- **Handler**: `internal/api/handle_webhooks.go`
-- **Route**: `POST /v1/webhooks/linear`
-- **Config**: `LinearWebhookSecret`, `LinearWebhookSpaceID` env vars
-- Processes `Issue.created`, `Issue.updated`, `Project.updated` events
-- Dispatches to `linear-module` via `IngestionClient.Parse` gRPC
+MDEMG's plugin system needs to react to external events — code changes on disk, Linear ticket updates, webhook payloads. Plugin triggers provide the input side of the plugin lifecycle: how data enters the system from external sources. This complements the plugin SDK (Phase 49) which provides the processing side.
 
-### 9.4.2 File Watcher REST API
+## Current State
 
-Runtime management of file watchers via REST endpoints. The core watcher (`internal/filewatcher/watcher.go`) provides Manager, debouncing, extension filtering, and exclude patterns. The new handlers expose this at runtime.
+### Architecture
 
-#### Endpoints
+Three trigger components:
 
-**Start Watcher** — `POST /v1/filewatcher/start`
+**9.4.1 Linear Webhook Integration** — Full webhook handler with HMAC-SHA256 verification, 10s debouncing, gRPC dispatch to the Linear module, batch ingest, and APE event triggering. Processes `Issue.created`, `Issue.updated`, `Project.updated` events.
 
-```json
-{
-  "space_id": "my-project",
-  "path": "/path/to/repo",
-  "extensions": [".go", ".ts", ".py"],
-  "excludes": ["node_modules", ".git"],
-  "debounce_ms": 500
-}
+**9.4.2 File Watcher REST API** — Runtime management of file watchers via REST endpoints. The core watcher provides Manager, debouncing, extension filtering, and exclude patterns. On file changes, calls `handleFileWatcherChange` which ingests files and triggers `source_changed` APE event.
+
+**9.4.3 Event-Driven Module Updates** — Extends event dispatch beyond APE modules so that INGESTION and CRUD modules can subscribe to events via manifest `event_subscriptions`.
+
+### Workflow
+
+**Event Flow:**
+
+```
+source_changed event fired
+    |
+    +---> APE Scheduler (existing) -> APE modules with matching EventTriggers
+    |
+    +---> EventDispatcher (new) -> Non-APE modules with matching EventSubscriptions
+         +---> INGESTION modules: calls IngestionClient.Parse(event metadata)
+         +---> CRUD modules: logged (no OnEvent RPC yet)
 ```
 
-Response: `{ "space_id": "...", "path": "/abs/path", "status": "watching" }`
-
-- Validates: space_id required, path required + must exist + must be directory
-- Resolves path to absolute
-- Replaces any existing watcher for the space
-- Defaults: extensions from `filewatcher.DefaultExtensions`, excludes from `filewatcher.DefaultExcludes`, debounce 500ms
-- On file changes: calls `handleFileWatcherChange` which ingests files and triggers `source_changed` APE event
-
-**List Watchers** — `GET /v1/filewatcher/status`
-
-Response: `{ "watchers": { "space-id": { "path": "...", "debounce_ms": 500, "extensions": [...] } }, "count": 1 }`
-
-**Stop Watcher** — `POST /v1/filewatcher/stop`
-
-```json
-{ "space_id": "my-project" }
-```
-
-Response: `{ "space_id": "...", "status": "stopped" }`
-
-#### Config-Based Startup
-
-Watchers can also be configured at startup via env vars:
-
-- `FILE_WATCHER_ENABLED=true`
-- `FILE_WATCHER_CONFIGS=space_id:/path:ext1|ext2:debounce_ms,...`
-
-### 9.4.3 Event-Driven Module Updates
-
-Extends event dispatch beyond APE modules so that INGESTION and CRUD modules can subscribe to events.
-
-#### Manifest Subscription
-
-Modules declare `event_subscriptions` in their manifest capabilities:
+**Module Subscription** via manifest:
 
 ```json
 {
@@ -76,44 +55,66 @@ Modules declare `event_subscriptions` in their manifest capabilities:
 }
 ```
 
-Supported values:
+Supported: specific event names (`"source_changed"`, `"ingest_complete"`) or wildcard `"*"`.
 
-- Specific event names: `"source_changed"`, `"ingest_complete"`, etc.
-- Wildcard: `"*"` matches all events
+### Configuration
 
-#### Event Flow
+Watchers can be configured at startup via env vars or managed at runtime via REST API.
 
-```
-source_changed event fired
-    |
-    ├─→ APE Scheduler (existing) → APE modules with matching EventTriggers
-    |
-    └─→ EventDispatcher (new) → Non-APE modules with matching EventSubscriptions
-         ├─→ INGESTION modules: calls IngestionClient.Parse(event metadata)
-         └─→ CRUD modules: logged (no OnEvent RPC yet)
-```
+## Notes
 
-#### Implementation
+### Known Limitations
 
-- **Types**: `EventSubscriptions []string` added to `Capabilities` in `internal/plugins/types.go`
-- **Dispatcher**: `internal/plugins/events.go` — `EventDispatcher` struct with `DispatchEvent(event, ctx)`
-- **Server wiring**: `TriggerAPEEventWithContext` now calls both `apeScheduler.TriggerEventWithContext` and `eventDispatcher.DispatchEvent`
-- **Tests**: `internal/plugins/events_test.go`
+- CRUD modules receive events but have no OnEvent RPC yet (logged only)
+- File watcher debounce is per-watcher, not per-file
 
-## Files
+### Risks & Gaps
 
-| File | Description |
-|------|-------------|
-| `internal/api/handlers_filewatcher.go` | 3 REST handlers (start, status, stop) |
-| `internal/api/server.go` | Routes + eventDispatcher field + wiring |
-| `internal/plugins/types.go` | EventSubscriptions field on Capabilities |
-| `internal/plugins/events.go` | EventDispatcher for non-APE module routing |
-| `internal/plugins/events_test.go` | Unit tests for EventDispatcher |
-| `internal/filewatcher/watcher.go` | Core file watcher (pre-existing) |
-| `internal/api/handle_webhooks.go` | Linear webhook handler (pre-existing) |
+None identified.
 
-## UATS Specs
+### Future Improvements
 
-- `filewatcher_start.uats.json` — 3 variants (valid start, missing space_id, invalid path)
-- `filewatcher_status.uats.json` — 1 variant (list watchers)
-- `filewatcher_stop.uats.json` — 2 variants (valid stop, missing space_id)
+- OnEvent gRPC RPC for CRUD modules
+- Per-file debouncing in file watcher
+
+## API Endpoints
+
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| POST | `/v1/webhooks/linear` | Linear webhook handler with HMAC-SHA256 verification | N/A |
+| POST | `/v1/filewatcher/start` | Start file watcher for a space | `specs/filewatcher_start.uats.json` |
+| GET | `/v1/filewatcher/status` | List active file watchers | `specs/filewatcher_status.uats.json` |
+| POST | `/v1/filewatcher/stop` | Stop file watcher for a space | `specs/filewatcher_stop.uats.json` |
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `mdemg watch` | Start file watcher via CLI |
+
+## Configuration Reference
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `LINEAR_WEBHOOK_SECRET` | - | HMAC-SHA256 secret for Linear webhook verification |
+| `LINEAR_WEBHOOK_SPACE_ID` | - | Target space for Linear webhook events |
+| `FILE_WATCHER_ENABLED` | `false` | Enable file watcher at startup |
+| `FILE_WATCHER_CONFIGS` | - | Startup watcher configs: `space_id:/path:ext1\|ext2:debounce_ms,...` |
+
+## Dependencies
+
+| Feature | Relationship |
+|---------|-------------|
+| Plugin System (Phase 9) | Requires — triggers dispatch to plugin modules |
+| APE Scheduler | Requires — `source_changed` events trigger APE cycle |
+| Ingest Pipeline | Feeds into — file changes and webhooks trigger ingestion |
+
+## Related Files
+
+- `internal/api/handlers_filewatcher.go` - 3 REST handlers (start, status, stop)
+- `internal/api/handle_webhooks.go` - Linear webhook handler
+- `internal/plugins/events.go` - EventDispatcher for non-APE module routing
+- `internal/plugins/events_test.go` - Unit tests for EventDispatcher
+- `internal/plugins/types.go` - EventSubscriptions field on Capabilities
+- `internal/filewatcher/watcher.go` - Core file watcher
+- `internal/api/server.go` - Routes + eventDispatcher wiring

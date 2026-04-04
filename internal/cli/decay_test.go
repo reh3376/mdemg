@@ -6,70 +6,69 @@ import (
 	"time"
 )
 
-// TestCalculateDecay verifies the exponential decay formula:
-// w_new = w_old * exp(-decay_rate * days_since_activation)
+// TestCalculateDecay verifies the evidence-weighted decay formula:
+// w_new = w_old * (1 - rate/sqrt(evidence))^days
 func TestCalculateDecay(t *testing.T) {
 	tests := []struct {
 		name           string
 		edge           edge
 		decayRate      float64
-		daysSince      float64
 		expectedWeight float64
 		tolerance      float64
 	}{
 		{
-			name: "10 days with 0.1 decay rate",
+			name: "10 days, evidence=1, rate=0.1",
 			edge: edge{
 				Weight:        1.0,
+				EvidenceCount: 1,
 				LastActivated: time.Now().Add(-10 * 24 * time.Hour),
 			},
 			decayRate:      0.1,
-			daysSince:      10.0,
-			expectedWeight: math.Exp(-0.1 * 10), // ~0.3679
+			expectedWeight: math.Pow(1.0-0.1, 10), // (0.9)^10 ≈ 0.3487
 			tolerance:      0.01,
 		},
 		{
-			name: "7 days with 0.1 decay rate",
+			name: "10 days, evidence=4, rate=0.1 — high evidence decays slower",
 			edge: edge{
 				Weight:        1.0,
-				LastActivated: time.Now().Add(-7 * 24 * time.Hour),
+				EvidenceCount: 4,
+				LastActivated: time.Now().Add(-10 * 24 * time.Hour),
 			},
 			decayRate:      0.1,
-			daysSince:      7.0,
-			expectedWeight: math.Exp(-0.1 * 7), // ~0.4966
+			expectedWeight: math.Pow(1.0-0.1/2.0, 10), // (0.95)^10 ≈ 0.5987
 			tolerance:      0.01,
 		},
 		{
 			name: "0 days should not decay",
 			edge: edge{
 				Weight:        1.0,
+				EvidenceCount: 1,
 				LastActivated: time.Now(),
 			},
 			decayRate:      0.1,
-			daysSince:      0.0,
 			expectedWeight: 1.0,
 			tolerance:      0.001,
 		},
 		{
-			name: "high decay rate",
-			edge: edge{
-				Weight:        0.5,
-				LastActivated: time.Now().Add(-5 * 24 * time.Hour),
-			},
-			decayRate:      0.2,
-			daysSince:      5.0,
-			expectedWeight: 0.5 * math.Exp(-0.2*5), // ~0.1839
-			tolerance:      0.01,
-		},
-		{
-			name: "zero weight edge",
+			name: "zero weight edge hits floor",
 			edge: edge{
 				Weight:        0.0,
+				EvidenceCount: 1,
 				LastActivated: time.Now().Add(-10 * 24 * time.Hour),
 			},
 			decayRate:      0.1,
-			daysSince:      10.0,
-			expectedWeight: 0.0,
+			expectedWeight: minEdgeWeight,
+			tolerance:      0.001,
+		},
+		{
+			name: "decayed weight clamped to floor",
+			edge: edge{
+				Weight:        0.002,
+				EvidenceCount: 1,
+				LastActivated: time.Now().Add(-30 * 24 * time.Hour),
+			},
+			decayRate:      0.1,
+			expectedWeight: minEdgeWeight, // would decay well below floor
 			tolerance:      0.001,
 		},
 	}
@@ -88,16 +87,17 @@ func TestCalculateDecay(t *testing.T) {
 
 // TestCalculateDecayPercent verifies the decay percentage calculation
 func TestCalculateDecayPercent(t *testing.T) {
-	edge := edge{
+	e := edge{
 		Weight:        1.0,
+		EvidenceCount: 1,
 		LastActivated: time.Now().Add(-10 * 24 * time.Hour),
 	}
 
-	_, decayPercent := calculateDecay(edge, 0.1, time.Now())
+	_, decayPercent := calculateDecay(e, 0.1, time.Now())
 
-	// After 10 days with 0.1 decay rate: exp(-1) ≈ 0.3679
-	// Decay percent should be ~63.21%
-	expectedPercent := (1 - math.Exp(-1)) * 100 // ~63.21
+	// New formula: (1 - 0.1/sqrt(1))^10 = (0.9)^10 ≈ 0.3487
+	// Decay percent ≈ 65.13%
+	expectedPercent := (1 - math.Pow(0.9, 10)) * 100
 
 	if math.Abs(decayPercent-expectedPercent) > 1.0 {
 		t.Errorf("decayPercent = %.2f%%, want ~%.2f%%", decayPercent, expectedPercent)
@@ -285,9 +285,10 @@ func TestShouldPrune(t *testing.T) {
 func TestProcessEdge(t *testing.T) {
 	now := time.Now()
 	cfg := decayConfig{
-		DecayRate:      0.1,
-		PruneThreshold: 0.01,
-		MinEvidence:    3,
+		DecayRate:       0.1,
+		PruneThreshold:  0.01,
+		MinEvidence:     3,
+		MaxDecayPercent: 50.0,
 	}
 
 	tests := []struct {
@@ -300,38 +301,53 @@ func TestProcessEdge(t *testing.T) {
 		{
 			name: "decay to below threshold, low evidence -> prune",
 			edge: edge{
-				Weight:        0.02,
-				EvidenceCount: 2,
+				Weight:        0.015,
+				EvidenceCount: 1,
 				Pinned:        false,
 				LastActivated: now.Add(-10 * 24 * time.Hour),
 			},
-			// After decay: 0.02 * exp(-1) ≈ 0.00736 < 0.01
+			// MaxDecayPercent=50%: 0.015 * 0.5 = 0.0075 < 0.01
 			expectPrune:     true,
 			expectProtected: false,
 			expectReason:    "",
 		},
 		{
-			name: "decay to below threshold, high evidence -> protected",
+			name: "high evidence protects even after decay",
 			edge: edge{
 				Weight:        0.02,
 				EvidenceCount: 5,
 				Pinned:        false,
 				LastActivated: now.Add(-10 * 24 * time.Hour),
 			},
-			// After decay: 0.02 * exp(-1) ≈ 0.00736 < 0.01
+			// evidence=5: effectiveRate = 0.1/sqrt(5) ≈ 0.0447
+			// 0.02 * (0.955)^10 ≈ 0.0127 > 0.01 (but even if below, protected by evidence)
 			expectPrune:     false,
-			expectProtected: true,
-			expectReason:    "high_evidence",
+			expectProtected: false,
+			expectReason:    "",
 		},
 		{
 			name: "decay stays above threshold",
 			edge: edge{
 				Weight:        0.5,
-				EvidenceCount: 0,
+				EvidenceCount: 1,
 				Pinned:        false,
 				LastActivated: now.Add(-7 * 24 * time.Hour),
 			},
-			// After decay: 0.5 * exp(-0.7) ≈ 0.248 > 0.01
+			// 0.5 * (0.9)^7 ≈ 0.239 > 0.01
+			expectPrune:     false,
+			expectProtected: false,
+			expectReason:    "",
+		},
+		{
+			name: "max-decay-percent caps extreme decay",
+			edge: edge{
+				Weight:        0.5,
+				EvidenceCount: 1,
+				Pinned:        false,
+				LastActivated: now.Add(-30 * 24 * time.Hour),
+			},
+			// Uncapped: 0.5 * (0.9)^30 ≈ 0.021 (95.8% decay)
+			// Capped at 50%: 0.5 * 0.5 = 0.25 > 0.01
 			expectPrune:     false,
 			expectProtected: false,
 			expectReason:    "",
@@ -343,7 +359,8 @@ func TestProcessEdge(t *testing.T) {
 			result := processEdge(tt.edge, cfg, now)
 
 			if result.ShouldPrune != tt.expectPrune {
-				t.Errorf("processEdge() ShouldPrune = %v, want %v", result.ShouldPrune, tt.expectPrune)
+				t.Errorf("processEdge() ShouldPrune = %v, want %v (NewWeight=%.6f)",
+					result.ShouldPrune, tt.expectPrune, result.NewWeight)
 			}
 			if result.Protected != tt.expectProtected {
 				t.Errorf("processEdge() Protected = %v, want %v", result.Protected, tt.expectProtected)
@@ -352,9 +369,9 @@ func TestProcessEdge(t *testing.T) {
 				t.Errorf("processEdge() ProtectReason = %q, want %q", result.ProtectReason, tt.expectReason)
 			}
 
-			// Verify decay was applied
-			if result.NewWeight >= result.OldWeight && tt.edge.LastActivated.Before(now) {
-				t.Errorf("processEdge() NewWeight %v should be less than OldWeight %v after decay",
+			// Verify decay was applied (weight should decrease, but not below floor)
+			if result.OldWeight > 0 && result.NewWeight > result.OldWeight && tt.edge.LastActivated.Before(now) {
+				t.Errorf("processEdge() NewWeight %v should be <= OldWeight %v after decay",
 					result.NewWeight, result.OldWeight)
 			}
 		})

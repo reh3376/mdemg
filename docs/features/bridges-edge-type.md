@@ -1,16 +1,28 @@
+---
+created: 2026-02-24
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "75C"
+---
+
 # BRIDGES Edge Type
 
-**Introduced:** Phase 75C | **Depends on:** Phase 75B (dynamic edge infrastructure)
+## Summary
 
-## What It Does
+**Feature**: BRIDGES Edge Type
+**Summary**: A dynamic edge type that connects nodes across different layers of the memory graph when they have moderate embedding similarity (0.4-0.7), indicating cross-domain connections that are key inputs to L5 emergent concept detection.
 
-BRIDGES is a dynamic edge type that connects nodes across different layers of the memory graph. When two nodes at different layers have moderate embedding similarity (0.4-0.7), a BRIDGES edge is created to indicate a cross-domain connection. These edges are key inputs to L5 emergent concept detection.
+## Vision & Goals
 
-## How It Works
+Cross-domain connections are the most valuable discoveries in a knowledge graph. BRIDGES edges capture relationships that span abstraction layers — connecting a low-level implementation detail to a high-level architectural concept, for example. These are the edges that power genuine insight and emergence at L5, bridging semantic domains that traditional same-layer clustering would never connect.
 
-### Inference Logic
+## Current State
 
-BRIDGES edges are inferred by `InferEdgeType()` in `internal/hidden/service.go` (line 2357):
+### Architecture
+
+BRIDGES edges are inferred by `InferEdgeType()` in `internal/hidden/service.go`:
 
 ```go
 // Cross-layer with moderate similarity = BRIDGES
@@ -27,9 +39,9 @@ case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.4 && metrics.Cos
 
 **Confidence formula:** `similarity * (1.0 + 0.1 * layerDistance)`, capped at 1.0. Higher layer distances slightly boost confidence, reflecting that cross-layer connections spanning more layers are more structurally significant.
 
-### Position in Edge Type Hierarchy
+### Workflow
 
-`InferEdgeType()` evaluates conditions in priority order:
+**Position in Edge Type Hierarchy** — `InferEdgeType()` evaluates conditions in priority order:
 
 | Priority | Condition | Edge Type |
 |----------|-----------|-----------|
@@ -40,11 +52,43 @@ case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.4 && metrics.Cos
 | 5 | Cross-layer + high sim | SPECIALIZES / GENERALIZES_TO |
 | 6 | Default | INFLUENCES |
 
-### Role in L5 Emergence
+**Role in L5 Emergence:** BRIDGES edges are one of three qualifying edge types for L5 emergent concept detection (along with ANALOGOUS_TO and COMPOSES_WITH). The L5 step queries for L3+ nodes connected by these edge types and clusters them using union-find. Without BRIDGES, cross-layer patterns could not feed into L5 emergence.
 
-BRIDGES edges are one of three qualifying edge types for L5 emergent concept detection (along with ANALOGOUS_TO and COMPOSES_WITH). The L5 step queries for L3+ nodes connected by these edge types and clusters them using union-find. Without BRIDGES, cross-layer patterns could not feed into L5 emergence.
+BRIDGES edges are created automatically during consolidation (pipeline phase 25, `dynamic_edges` step).
 
-## Configuration
+### Configuration
+
+See Configuration Reference table below.
+
+## Notes
+
+### Known Limitations
+
+- Similarity thresholds (0.4, 0.7) are not independently configurable — derived from AnalogousMinSim
+- Only considers cosine similarity and layer distance — no temporal or co-activation weighting
+
+### Risks & Gaps
+
+None identified.
+
+### Future Improvements
+
+- Temporal weighting for BRIDGES (recently co-retrieved nodes get stronger bridges)
+- Configurable similarity band for BRIDGES inference
+
+## API Endpoints
+
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| POST | `/v1/memory/consolidate` | Triggers consolidation including dynamic edge creation at phase 25 | `specs/consolidate.uats.json` |
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `mdemg consolidate` | Triggers full consolidation pipeline including dynamic edges |
+
+## Configuration Reference
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
@@ -53,26 +97,19 @@ BRIDGES edges are one of three qualifying edge types for L5 emergent concept det
 | `DYNAMIC_EDGE_DEGREE_CAP` | `10` | Max dynamic edges per node |
 | `L5_SOURCE_MIN_LAYER` | `3` | Minimum layer for source nodes (affects which nodes get BRIDGES edges) |
 
-## Usage
+## Dependencies
 
-BRIDGES edges are created automatically during consolidation (pipeline phase 25, `dynamic_edges` step). Check them via:
-
-```bash
-# See dynamic edge counts in consolidation output
-curl -s -X POST http://localhost:9999/v1/memory/consolidate \
-  -H "Content-Type: application/json" \
-  -d '{"space_id":"mdemg-dev"}' | jq '.data.steps.dynamic_edges'
-
-# Query BRIDGES edges directly in Neo4j
-# MATCH ()-[r:BRIDGES]->() RETURN count(r)
-```
+| Feature | Relationship |
+|---------|-------------|
+| Dynamic Edge Infrastructure (Phase 75B) | Requires — BRIDGES uses the dynamic edge creation framework |
+| Split Pipeline Execution (Phase 75C) | Requires — runs in post-clustering phase 25 |
+| L5 Emergent Layer (Phase 75B) | Feeds into — BRIDGES edges are key input for L5 detection |
+| Multi-layer Clustering | Requires — needs nodes at different layers to create cross-layer edges |
 
 ## Related Files
 
-| File | Purpose |
-|------|---------|
-| `internal/hidden/service.go` | `InferEdgeType()` — BRIDGES inference logic (line 2357) |
-| `internal/hidden/service.go` | `CreateDynamicEdges()` — creates all dynamic edges including BRIDGES |
-| `internal/hidden/step_dynamic_edges.go` | Pipeline step adapter (phase 25) |
-| `internal/config/config.go` | `DynamicEdgesEnabled`, `DynamicEdgeMinConfidence`, `DynamicEdgeDegreeCap` |
-| `docs/development/RELATIONSHIP_EXTRACTION.md` | Full dynamic edge documentation |
+- `internal/hidden/service.go` - `InferEdgeType()` BRIDGES inference logic and `CreateDynamicEdges()`
+- `internal/hidden/step_dynamic_edges.go` - Pipeline step adapter (phase 25)
+- `internal/config/config.go` - `DynamicEdgesEnabled`, `DynamicEdgeMinConfidence`, `DynamicEdgeDegreeCap`
+- `docs/development/RELATIONSHIP_EXTRACTION.md` - Full dynamic edge documentation
+- `docs/features/l5-emergent-layer.md` - L5 emergent layer (consumes BRIDGES edges)

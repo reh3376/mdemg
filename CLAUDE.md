@@ -112,6 +112,21 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 - `mdemg upgrade --docker-only` — update Docker instances only (used by brew post-install)
 - `mdemg upgrade --no-docker` — update binary only, skip Docker
 
+## Teardown
+- `mdemg teardown --export` backs up TSDB (pg_dump) before destroying Docker volumes (Phase 0b)
+- `mdemg teardown` detects docker-compose.yml and runs `docker compose down -v`
+- Backup preserved in `.mdemg-backup-{ts}/backups/tsdb/`
+
+## Multi-Instance
+- See `docs/user/multi-instance.md` for running multiple instances
+- Each instance: 5 containers, 6 ports, ~2.3 GiB RAM (fresh)
+- COMPOSE_PROJECT_NAME=mdemg-{dirname} provides isolation
+- Known limitation: LaunchAgent labels not instance-scoped
+
+## Graph Health (In Progress)
+- 6 bugs, 4 gaps identified — see assessment report
+- Key issues: SymbolNode dedup (BUG-1), vendor nodes 44.7% of graph (BUG-2), two decay systems (BUG-5)
+
 ## Campaign Configuration
 
 These env vars are forwarded in the compose template. Set in `.env`, or enable via `mdemg init` interactive prompt:

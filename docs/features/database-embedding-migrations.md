@@ -1,165 +1,139 @@
-# Database + Embedding + Migrations (Phase 95)
+---
+created: 2026-03-20
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "95"
+---
 
-Phase 95 eliminates database bootstrapping friction. Developers no longer need to manually download `cypher-shell`, apply migration files via shell loops, set `REQUIRED_SCHEMA_VERSION`, or manage Docker containers with hostile memory settings.
+# Database + Embedding + Migrations
 
-## Migration Runner
+## Summary
 
-### Embedded Migrations
+**Feature**: Database Bootstrapping & Migration System
+**Summary**: Eliminates database bootstrapping friction with embedded Cypher migrations, auto-detect schema version, Docker container management, and embedding provider health checks. Developers no longer need manual migration scripts or external tools.
 
-All 17 Cypher migration files are embedded in the binary via Go's `//go:embed` directive. No external files needed at runtime.
+## Vision & Goals
 
-```bash
-# Show current migration status
-mdemg db migrate --status
+A zero-friction developer experience is essential for adoption. Phase 95 ensures that `mdemg db migrate` and `mdemg serve --auto-migrate` handle all database setup automatically. Embedded migrations mean the binary is self-contained — no external files needed at runtime. This supports both development (fast iteration) and production (Docker Compose with `AUTO_MIGRATE=true`).
 
-# Preview what would be applied
-mdemg db migrate --dry-run
+## Current State
 
-# Apply all pending migrations
-mdemg db migrate
+### Architecture
 
-# Rerun is safe (idempotent)
-mdemg db migrate
-# "Database is up to date."
-```
+**Embedded Migrations** — All Cypher migration files are embedded in the binary via Go's `//go:embed` directive. The migration runner handles complex Cypher including `//` comments, `CALL { } IN TRANSACTIONS` blocks (brace-depth tracking), and multi-statement files.
 
-### Statement Splitting
+**Migration Recording** — After each migration succeeds, records a `(:Migration {version: N})` node and updates `(:SchemaMeta {key: 'schema'})` via idempotent `MERGE`.
 
-The migration runner handles complex Cypher files including:
+**Auto-Detect Schema Version** — `REQUIRED_SCHEMA_VERSION` is optional. If not set (or set to 0), the server automatically detects the latest version from embedded migrations.
 
-- `//` line comments (stripped)
-- `CALL { } IN TRANSACTIONS` blocks (brace-depth tracking)
-- Multiple statements separated by `;`
-- Auto-commit mode per statement (matching cypher-shell behavior)
+### Workflow
 
-### Migration Recording
-
-After each migration succeeds, the runner records a `(:Migration {version: N})` node and updates `(:SchemaMeta {key: 'schema'})`. This is idempotent via `MERGE`.
-
-### Development Override
-
-During development, use a filesystem directory instead of embedded migrations:
+**Migration Flow:**
 
 ```bash
-mdemg db migrate --migrations-dir ./migrations
+mdemg db migrate --status    # Show current status
+mdemg db migrate --dry-run   # Preview pending migrations
+mdemg db migrate             # Apply all pending (idempotent, safe to rerun)
 ```
 
-## Auto-Detect Schema Version
-
-`REQUIRED_SCHEMA_VERSION` is now optional. If not set (or set to 0), the server automatically detects the latest version from embedded migrations. Existing deployments with explicit values continue to work unchanged.
-
-## `--auto-migrate` on Server Start
+**Server Start with Auto-Migrate:**
 
 ```bash
-mdemg serve --auto-migrate
+mdemg serve --auto-migrate   # Apply pending migrations, then start server
 ```
 
-Applies pending migrations before starting the server. Useful for development and CI.
-
-## Docker Container Management
-
-### Start a Development Neo4j
+**Docker Container Management:**
 
 ```bash
-mdemg db start
+mdemg db start               # Lightweight Neo4j container (1GB heap, 512MB page cache)
+mdemg db start --port 7688   # Custom port
+mdemg db status              # Check container status
+mdemg db stop                # Stop (data preserved)
+mdemg db stop --remove       # Stop and remove container (volume preserved)
+mdemg db shell               # Open cypher-shell in running container
 ```
 
-Creates a lightweight Docker container with reduced memory settings (1GB heap, 512MB page cache) suitable for development. Data persists in a Docker volume.
+**Embedding Provider Check:**
 
 ```bash
-# Custom port and password
-mdemg db start --port 7688 --password mypassword
-
-# Check status
-mdemg db status
-
-# Stop (data preserved)
-mdemg db stop
-
-# Stop and remove container (volume preserved)
-mdemg db stop --remove
+mdemg embeddings check       # Full pipeline test (connectivity + model + test embedding)
 ```
 
-### Interactive Shell
+Shows provider, endpoint, model, dimensions, and status. For failures, shows specific remediation steps.
+
+**Development Override:**
 
 ```bash
-mdemg db shell
+mdemg db migrate --migrations-dir ./migrations   # Use filesystem instead of embedded
 ```
 
-Opens `cypher-shell` inside the running container.
+### Configuration
 
-## Embedding Provider Check
+See Configuration Reference table below.
 
-```bash
-mdemg embeddings check
-```
+## Notes
 
-Unlike `config validate` (which only does TCP/HTTP probes), `embeddings check` performs an actual test embedding to verify the full pipeline:
+### Known Limitations
 
-```
-Embedding Provider Check
-========================
-Provider: ollama
-Endpoint: http://localhost:11434
-Model:    qwen3-embedding:8b
+- Migration runner is append-only — no rollback support
+- `mdemg db start` creates a single-container Neo4j, not Docker Compose (use `mdemg init` for full stack)
 
-Connectivity... ok
-Model check... ok
-Test embedding... ok
+### Risks & Gaps
 
-Dimensions: 1536
-Status:     working
-```
+- Schema version mismatch between deploy configs and actual migrations (identified in assessment as P0-2)
 
-For disabled providers, it shows setup instructions. For failures, it shows specific remediation steps (install URLs, pull commands, missing API keys).
+### Future Improvements
 
-## Improved Error Messages
+- Migration rollback support
+- CI schema version validation
 
-Schema version mismatches now include actionable guidance:
+## API Endpoints
 
-```
-schema version 10 < required 17 — run 'mdemg db migrate' to upgrade
-```
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| GET | `/readyz` | Checks schema version, Neo4j connectivity | `specs/readiness.uats.json` |
+| GET | `/v1/embedding/health` | Tests embedding provider | N/A |
 
-## CI Improvements
+## CLI Commands
 
-The CI workflow no longer downloads `cypher-shell` or loops through migration files. It uses the built binary directly:
+| Command | Description |
+|---------|-------------|
+| `mdemg db migrate` | Apply pending migrations |
+| `mdemg db migrate --status` | Show migration status |
+| `mdemg db migrate --dry-run` | Preview pending migrations |
+| `mdemg db migrate --migrations-dir <path>` | Use filesystem migrations |
+| `mdemg db start [--port N] [--password P]` | Start development Neo4j container |
+| `mdemg db stop [--remove]` | Stop Neo4j container |
+| `mdemg db status` | Check container status |
+| `mdemg db shell` | Open cypher-shell |
+| `mdemg serve --auto-migrate` | Apply migrations then start server |
+| `mdemg embeddings check` | Full embedding provider health check |
 
-```yaml
-- name: Apply Neo4j migrations
-  run: ./bin/mdemg db migrate
-```
+## Configuration Reference
 
-`REQUIRED_SCHEMA_VERSION` is removed from CI environment variables (auto-detected).
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `REQUIRED_SCHEMA_VERSION` | auto-detect | Required schema version (0 = auto-detect from embedded migrations) |
+| `AUTO_MIGRATE` | `true` (Docker) | Apply pending migrations on startup |
 
-## New Files
+## Dependencies
 
-| File | Description |
-|------|-------------|
-| `migrations/embed.go` | `//go:embed *.cypher` filesystem |
-| `migrations/version.go` | `MaxVersion()` auto-detection |
-| `internal/db/migrate.go` | Migration runner (split, parse, discover, apply) |
-| `internal/db/migrate_test.go` | 10 unit tests for migration runner |
-| `internal/cli/docker.go` | Docker container management helpers |
-| `internal/cli/embeddings.go` | `mdemg embeddings check` command |
+| Feature | Relationship |
+|---------|-------------|
+| Neo4j | Requires — all migrations target Neo4j |
+| Docker | Optional — `mdemg db start` requires Docker for container management |
+| Embedding Provider | Optional — `embeddings check` requires configured provider |
 
-## Documents Accessed
+## Related Files
 
-- `internal/db/neo4j.go` — AssertSchemaVersion error message
-- `internal/db/schema.go` — GetSchemaVersion
-- `internal/cli/db.go` — newDBCmd, DB subcommands
-- `internal/cli/serve.go` — --auto-migrate flag
-- `internal/cli/root.go` — command registration
-- `internal/config/config.go` — REQUIRED_SCHEMA_VERSION auto-detect
-- `internal/config/yaml_config.go` — schema.version validation message
-- `internal/embeddings/embeddings.go` — Embedder interface
-- `internal/embeddings/ollama.go` — Ollama provider
-- `internal/embeddings/openai.go` — OpenAI provider
-- `internal/cli/init.go` — removed dead code (countMigrations, portFromString)
-- `migrations/V0001__schema_meta.cypher` — self-recording pattern
-- `migrations/V0015__secondary_labels.cypher` — CALL IN TRANSACTIONS
-- `.github/workflows/ci.yml` — replaced cypher-shell with mdemg db migrate
-- `docs/features/unified-cli.md` — updated with new commands
-- `AGENT_HANDOFF.md` — phase registry update
-- `CHANGELOG.md` — unreleased entries
-- `MEMORY.md` — session state update
+- `migrations/embed.go` - `//go:embed *.cypher` filesystem
+- `migrations/version.go` - `MaxVersion()` auto-detection
+- `internal/db/migrate.go` - Migration runner (split, parse, discover, apply)
+- `internal/db/migrate_test.go` - 10 unit tests for migration runner
+- `internal/cli/docker.go` - Docker container management helpers
+- `internal/cli/db.go` - DB subcommands
+- `internal/cli/embeddings.go` - `mdemg embeddings check` command
+- `internal/cli/serve.go` - `--auto-migrate` flag
+- `internal/config/config.go` - REQUIRED_SCHEMA_VERSION auto-detect

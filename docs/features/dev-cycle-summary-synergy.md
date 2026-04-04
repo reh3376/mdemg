@@ -1,44 +1,36 @@
-# Dev Cycle Summary: Synergy Optimization (2026-03-24)
-
-All features shipped on `reh3376_dev01`, merged to `main` via PR.
-
+---
+created: 2026-03-24
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: synergy
 ---
 
-## 1. Synergy Optimization (Claude Code <-> MDEMG)
+# Synergy Optimization
 
-Reduced token overhead ~60% by trimming context files and migrating content to CMS.
+## Summary
 
+**Feature**: Synergy Optimization (Claude Code <-> MDEMG)
+**Summary**: Reduces token overhead ~60% between Claude Code and MDEMG by trimming context files, migrating content to CMS, adding a synergy health API and CLI, and integrating synergy as an RSIC health dimension.
+
+## Vision & Goals
+
+Claude Code's context window is finite. Every token spent on static memory files is a token not available for reasoning. Synergy optimization ensures MDEMG's Claude Code integration is token-efficient: context files are minimal pointers, real content lives in CMS, and the synergy health score tracks whether the integration is drifting back toward bloat.
+
+## Current State
+
+### Architecture
+
+**Token Reduction:**
 - `CLAUDE.md` trimmed 348 -> 124 lines
 - `MEMORY.md` trimmed 220 -> 40 lines
 - Auto-memory files reduced 14 -> 3
-- Migration script: `scripts/synergy-migrate.sh` (Jiminy health gate, persistent flag, dev safety)
-- 8 files ingested to CMS, 2 obsolete moved to `~/mdemg/temp/`
+- 8 files ingested to CMS, 2 obsolete moved to archive
 
-## 2. `GET /v1/synergy/status` API Endpoint
+**SynergyHealth RSIC Dimension** — 7th RSIC dimension at 10% weight. `scoreSynergy()` scorer evaluates file counts, line counts, CMS node totals, overlap ratio.
 
-Returns synergy health metrics (file counts, line counts, CMS node totals, overlap ratio).
-
-- Handler: `internal/api/handlers_synergy.go`
-- UATS spec: `synergy_status.uats.json` (9 assertions)
-
-## 3. `mdemg synergy` CLI Commands
-
-Three subcommands: `status`, `migrate`, `check`.
-
-- Implementation: `internal/cli/synergy.go` (~600 lines)
-- 8 unit tests
-
-## 4. SynergyHealth RSIC Dimension
-
-Added as the 7th RSIC dimension at 10% weight.
-
-- `scoreSynergy()` scorer in `internal/ape/self_assess.go`
-- 6 synergy fields added to `SelfAssessmentReport` in `internal/ape/types_rsic.go`
-- 6 unit tests
-
-## 5. RSIC Reflection Patterns #17-19
-
-New patterns in `internal/ape/self_reflect.go`:
+**RSIC Reflection Patterns #17-19:**
 
 | # | Pattern | Severity |
 |---|---------|----------|
@@ -46,52 +38,74 @@ New patterns in `internal/ape/self_reflect.go`:
 | 18 | `memory_file_bloat` | Medium |
 | 19 | `synergy_overlap_drift` | Medium |
 
-## 6. Hook Enhancements
+**Confidence Score Normalization** — Discovered unbounded retrieval scores leaking into `GuidanceItem.Confidence`. New `internal/mathutil/` package with Clamp, Sigmoid, NormalizeScore. MaxConfidence cap at 0.95 (Bayesian ceiling).
 
-- `post-tool-observe.py` -- Memory overflow interceptor with Jiminy gate
-- `session-start.sh` -- Synergy fingerprint written to CMS
-- `prompt-context.sh` -- Token count footer appended
-- `pre-compact.sh` -- Jiminy health check before compaction
+### Workflow
 
-## 7. 13 `SYNERGY_*` Config Vars
+**Hook Enhancements:**
+- `post-tool-observe.py` — Memory overflow interceptor with Jiminy gate
+- `session-start.sh` — Synergy fingerprint written to CMS
+- `prompt-context.sh` — Token count footer appended
+- `pre-compact.sh` — Jiminy health check before compaction
 
-Added to `internal/config/config.go` and `.env.example`.
+**Migration:** `scripts/synergy-migrate.sh` (Jiminy health gate, persistent flag, dev safety)
 
-## 8. Confidence Score Normalization
+### Configuration
 
-Discovered during E2E testing: unbounded retrieval scores were leaking into `GuidanceItem.Confidence`.
+13 `SYNERGY_*` config vars in `internal/config/config.go` and `.env.example`.
 
-- New package: `internal/mathutil/` (`Clamp`, `Clamp01`, `Sigmoid`, `NormalizeScore`)
-- Sigmoid normalization applied in `internal/jiminy/retrieval_source.go` and `internal/consulting/service.go`
-- `MaxConfidence` cap at 0.95 (Bayesian ceiling)
-- 4 mathutil tests, 2 updated existing tests
+## Notes
 
-## 9. Documentation Updates
+### Known Limitations
 
-`VISION.md` updated with synergy optimization narrative, lesson #8, and current RSIC dimension/pattern counts.
+- Migration script must be run manually for existing installations
+- Synergy health scoring uses fixed 10% weight in RSIC
 
----
+### Risks & Gaps
 
-## Key Files
+None identified.
 
-| Category | Files |
-|----------|-------|
-| API | `internal/api/handlers_synergy.go` |
-| CLI | `internal/cli/synergy.go` |
-| RSIC | `internal/ape/types_rsic.go`, `self_assess.go`, `self_reflect.go` |
-| Config | `internal/config/config.go`, `.env.example` |
-| Math | `internal/mathutil/normalize.go` |
-| Jiminy | `internal/jiminy/retrieval_source.go` |
-| Consulting | `internal/consulting/service.go` |
-| Hooks | `.claude/hooks/post-tool-observe.py`, `session-start.sh`, `prompt-context.sh`, `pre-compact.sh` |
-| Migration | `scripts/synergy-migrate.sh` |
-| Specs | `docs/features/synergy-optimization.md`, `synergy_status.uats.json` |
-| Docs | `CLAUDE.md`, `MEMORY.md`, `VISION.md`, `CHANGELOG.md`, `AGENT_HANDOFF.md`, `api-reference.md` |
+### Future Improvements
 
-## Test Coverage
+- Automatic synergy migration during `mdemg upgrade`
+- Configurable RSIC dimension weights
 
-- 17 synergy unit tests (handler, assess, CLI)
-- 4 mathutil unit tests
-- 1 UATS spec (9 assertions)
-- 1 integration test (RSIC synergy)
-- Manual E2E: 4 Jiminy guidance scenarios verified
+## API Endpoints
+
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| GET | `/v1/synergy/status?space_id=<id>` | Synergy health metrics (file counts, line counts, CMS totals, overlap ratio) | `specs/synergy_status.uats.json` |
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `mdemg synergy status` | Display synergy health metrics |
+| `mdemg synergy migrate` | Migrate content from files to CMS |
+| `mdemg synergy check [--auto]` | Check and optionally fix synergy issues |
+
+## Configuration Reference
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `SYNERGY_*` (13 vars) | Various | Synergy optimization configuration (see `internal/config/config.go`) |
+
+## Dependencies
+
+| Feature | Relationship |
+|---------|-------------|
+| RSIC Engine | Feeds into — SynergyHealth is RSIC dimension #7 |
+| Jiminy | Requires — health gate for memory overflow |
+| CMS | Requires — content migrated from files to CMS observations |
+| Claude Code Hooks | Enhances — fingerprinting, token counting, overflow detection |
+
+## Related Files
+
+- `internal/api/handlers_synergy.go` - Synergy status handler
+- `internal/cli/synergy.go` - CLI subcommands (~600 lines)
+- `internal/ape/self_assess.go` - `scoreSynergy()` RSIC scorer
+- `internal/ape/self_reflect.go` - Reflection patterns #17-19
+- `internal/mathutil/normalize.go` - Clamp, Sigmoid, NormalizeScore
+- `internal/jiminy/retrieval_source.go` - Sigmoid normalization
+- `scripts/synergy-migrate.sh` - Migration script
+- `docs/features/synergy-optimization.md` - Full optimization specification

@@ -431,7 +431,7 @@ WITH a,b,prod,pathSim,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id:$spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
               r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
-              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.dim_semantic=pathSim, r.decay_rate=0.001,
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.dim_semantic=pathSim,
               r.surprise_factor=surpriseFactor,
               r.direction=$fwdDir,
               r.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
@@ -453,7 +453,7 @@ END
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
-              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.dim_semantic=pathSim, rr.decay_rate=0.001,
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.dim_semantic=pathSim,
               rr.surprise_factor=surpriseFactor,
               rr.direction=$revDir,
               rr.session_id=CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END,
@@ -687,7 +687,7 @@ WITH a, b, temporalProximity, surpriseFactor,
 MERGE (a)-[r:CO_ACTIVATED_WITH {space_id: $spaceId}]->(b)
 ON CREATE SET r.edge_id=randomUUID(), r.created_at=datetime(), r.updated_at=datetime(),
               r.last_activated_at=datetime(), r.status='active', r.weight=initialWeight,
-              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0, r.decay_rate=0.001,
+              r.evidence_count=1, r.version=1, r.dim_coactivation=1.0,
               r.surprise_factor=surpriseFactor,
               r.session_id=$sessionId,
               r.obs_type=coalesce(a.obs_type, b.obs_type, ''),
@@ -712,7 +712,7 @@ END
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id: $spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
               rr.last_activated_at=datetime(), rr.status='active', rr.weight=r.weight,
-              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0, rr.decay_rate=0.001,
+              rr.evidence_count=1, rr.version=1, rr.dim_coactivation=1.0,
               rr.surprise_factor=surpriseFactor,
               rr.session_id=$sessionId,
               rr.obs_type=coalesce(a.obs_type, b.obs_type, ''),

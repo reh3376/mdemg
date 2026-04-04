@@ -1,4 +1,19 @@
+---
+created: 2026-03-20
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "S16"
+---
+
 # Feature: Instance Teardown
+
+## Summary
+
+**Feature**: Instance Teardown
+**Summary**: Comprehensive project teardown removing 17 categories of artifacts including Docker Compose services, Neo4j data, TSDB backups, hooks, IDE configs, and keyring secrets.
+
 
 **Command:** `mdemg teardown`
 **Phase:** S16 (Sidecar)
@@ -142,6 +157,14 @@ Teardown is accessible from the native companion apps on macOS and Linux via a g
 - `packaging/mdemg-linux-sidebar/src-tauri/src/commands.rs` — Linux teardown Rust commands
 - `packaging/mdemg-linux-sidebar/src/tabs/config.js` — Linux Remove Instance button in config tab
 - `packaging/mdemg-windows/Install-MDEMG.ps1` — Windows installer teardown integration
+
+## Docker Compose Teardown (PR #257)
+
+`mdemg teardown` now detects `docker-compose.yml` in the project directory and runs `docker compose down [-v]` instead of legacy single-container removal. Falls back to legacy container cleanup if no compose file is found.
+
+## TSDB Backup (Phase 0b, PR #258)
+
+When `--export` is used, teardown runs `pg_dump` via `docker compose exec` BEFORE volume destruction. The backup is preserved in `.mdemg-backup-{ts}/backups/tsdb/`. Non-fatal on failure — prints warning and continues with teardown.
 
 ## Documents Accessed
 

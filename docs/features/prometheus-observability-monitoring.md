@@ -1,4 +1,19 @@
+---
+created: 2026-03-27
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: deprecated
+phase: "TSDB-Sprint"
+---
+
 # Prometheus Observability Monitoring
+
+## Summary
+
+**Feature**: Prometheus Observability Monitoring
+**Summary**: DEPRECATED: Originally provided Prometheus-based monitoring. Now replaced by TimescaleDB as the metrics backend with Grafana SQL-based alerting.
+
 
 > **Note (2026-03-29):** The `/v1/prometheus` endpoint has been replaced by `/v1/metrics/snapshot` (JSON format). Prometheus has been replaced by TimescaleDB as the metrics backend. Alert rules are now managed via Grafana alerting with SQL queries against TimescaleDB.
 

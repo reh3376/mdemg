@@ -1132,10 +1132,11 @@ CALL {
          duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
        ELSE 0 END AS daysSinceActive,
        coalesce(r.weight, 0.0) AS rawWeight,
-       coalesce(r.evidence_count, 1) AS evidenceCount
-  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount,
+       coalesce(r.evidence_count, 1) AS evidenceCount,
+       coalesce(r.surprise_factor, 1.0) AS surpriseFactor
+  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
        CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
-         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
+         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
        ELSE rawWeight END AS decayedWeight
   WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
   RETURN src.node_id AS s, dst.node_id AS d, relType AS t,
@@ -1258,7 +1259,7 @@ func (s *Service) fetchOutgoingEdges(ctx context.Context, spaceIDs []string, nod
 		// Query applies evidence-based decay to CO_ACTIVATED_WITH edges:
 		// - Calculates days since last_activated_at
 		// - Decay rate is reduced by sqrt(evidence_count) - frequently co-activated edges decay slower
-		// - Formula: weight * (1 - decayPerDay/sqrt(evidence_count))^days
+		// - Formula: weight * (1 - decayPerDay/sqrt(evidence_count * surprise_factor))^days
 		// - Filters out edges below pruneThreshold
 		// This ensures edges that have been repeatedly strengthened persist while
 		// spurious one-off connections decay quickly.
@@ -1275,12 +1276,13 @@ CALL {
          duration.between(coalesce(r.last_activated_at, r.created_at, datetime()), datetime()).days
        ELSE 0 END AS daysSinceActive,
        coalesce(r.weight, 0.0) AS rawWeight,
-       coalesce(r.evidence_count, 1) AS evidenceCount
-  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount,
+       coalesce(r.evidence_count, 1) AS evidenceCount,
+       coalesce(r.surprise_factor, 1.0) AS surpriseFactor
+  WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
        // Evidence-based decay: stronger edges (more evidence) decay slower
-       // effectiveDecay = baseDecay / sqrt(evidenceCount)
+       // effectiveDecay = baseDecay / sqrt(evidenceCount * surpriseFactor)
        CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
-         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount))) ^ daysSinceActive)
+         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
        ELSE rawWeight END AS decayedWeight
   WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
   RETURN src.node_id AS s, dst.node_id AS d, relType AS t,

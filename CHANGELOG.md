@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-04-03
+
+### Added
+
+- Multi-instance deployment guide (`docs/user/multi-instance.md`) with resource measurements (PR #256)
+- Multi-instance testing results (`docs/operations/multi-instance-testing-results.md`) — 4 simultaneous instances, port allocation, data isolation verified (PR #256)
+- TSDB backup before teardown via `--export` flag — pg_dump runs before `docker compose down -v` destroys volumes (PR #258)
+- Upgrade automation: `mdemg upgrade` and `brew upgrade mdemg` now auto-update running Docker instances (PR #260)
+- New upgrade flags: `--no-docker` (skip Docker), `--docker-only` (Docker only) (PR #260)
+- GoReleaser `post_install` hook for Homebrew — `brew upgrade` triggers Docker instance updates (PR #260)
+
+### Fixed
+
+- `mdemg teardown` does not stop Docker Compose services — uses legacy single-container naming (PR #257)
+- Teardown silently destroys TSDB training data when removing Docker volumes (PR #258)
+
 ## [0.5.3] - 2026-04-03
 
 ### Added

@@ -198,6 +198,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	dataCmd.GroupID = "advanced"
 	rootCmd.AddCommand(dataCmd)
 
+	maintenanceCmd := newMaintenanceCmd()
+	maintenanceCmd.GroupID = "advanced"
+	rootCmd.AddCommand(maintenanceCmd)
+
 	return rootCmd
 }
 
