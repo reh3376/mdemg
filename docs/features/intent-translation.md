@@ -1,10 +1,26 @@
-# Intent Translation (Phase 102)
+---
+created: 2026-02-24
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "102"
+---
 
-Phase 102 adds LLM-driven query rewriting before vector embedding, bridging the vocabulary mismatch between conversational agent queries and the declarative text stored in MDEMG's knowledge graph.
+# Intent Translation
 
-## How It Works
+## Summary
 
-### Query Rewriting Pipeline
+**Feature**: Intent Translation
+**Summary**: LLM-driven query rewriting before vector embedding, bridging the vocabulary mismatch between conversational agent queries and the declarative text stored in MDEMG's knowledge graph.
+
+## Vision & Goals
+
+Users and agents ask questions in conversational language ("Why do we use Redis?") while the knowledge graph stores information in declarative form ("Architecture Decision: Redis selected for session state"). Intent translation bridges this vocabulary gap by rewriting queries into keyword-rich search strings optimized for vector similarity, dramatically improving retrieval recall for conversational inputs.
+
+## Current State
+
+### Architecture
 
 When `translate_intent: true` is set on a retrieval request:
 
@@ -16,32 +32,12 @@ When `translate_intent: true` is set on a retrieval request:
 **Example**:
 - Input: `"Why do we use Redis?"`
 - Translated: `"Redis session state architecture decision caching layer database optimization"`
-- The translated version embeds much closer to graph nodes like "Architecture Decision: Redis selected for session state due to..."
 
-### System Prompt (The Cognitive Core)
+The LLM is constrained by a system prompt that instructs output of ONLY the rewritten query, requires domain-specific terms, expands abbreviations, removes conversational filler, and keeps output under 100 words. Temperature is set to 0.0 for deterministic rewrites.
 
-The LLM is constrained by a carefully designed system prompt that:
-- Describes what the knowledge graph contains (architecture decisions, code patterns, constraints, etc.)
-- Instructs output of ONLY the rewritten query — no explanation, no preamble, no quotes
-- Requires domain-specific terms, file names, function names, and technical jargon
-- Expands abbreviations and adds synonyms
-- Removes conversational filler
-- Keeps output under 100 words
-- Returns already keyword-dense queries unchanged
+### Workflow
 
-Temperature is set to `0.0` for deterministic rewrites — same query always produces the same translation.
-
-### Fail-Open Design
-
-Three independent fallback paths ensure the system never breaks:
-
-1. **`translate_intent: false`** — Translation skipped entirely (default)
-2. **`INTENT_ENABLED=false`** — Translator not initialized (nil check)
-3. **LLM error or timeout** — Original query used, error logged, request continues
-
-### Endpoint Integration
-
-Translation is available on all three retrieval-adjacent endpoints:
+**Endpoint Integration** — Translation is available on all three retrieval-adjacent endpoints:
 
 | Endpoint | Request Field | Response Field |
 |----------|--------------|----------------|
@@ -51,26 +47,69 @@ Translation is available on all three retrieval-adjacent endpoints:
 
 **Critical**: In the consult endpoint, only the embedding input (`queryText`) is translated. The original `req.Question` is preserved for Phase 101 synthesis, preventing the synthesis engine from receiving keyword soup instead of the user's actual question.
 
-## Configuration
+**Fail-Open Design** — Three independent fallback paths:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+1. `translate_intent: false` — Translation skipped entirely (default)
+2. `INTENT_ENABLED=false` — Translator not initialized (nil check)
+3. LLM error or timeout — Original query used, error logged, request continues
+
+### Configuration
+
+See Configuration Reference table below.
+
+## Notes
+
+### Known Limitations
+
+- Disabled by default (`INTENT_ENABLED=false`) — must be explicitly enabled
+- Adds ~200-500ms latency per query (LLM round-trip)
+- Quality depends on LLM model capability
+
+### Risks & Gaps
+
+- No caching of translated queries (same input re-translated each time)
+
+### Future Improvements
+
+- Translation cache with TTL
+- Offline translation model (eliminate LLM dependency)
+
+## API Endpoints
+
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| POST | `/v1/memory/retrieve` | Semantic retrieval with optional `translate_intent` | `specs/retrieve.uats.json` |
+| POST | `/v1/memory/consult` | SME consultation with optional `translate_intent` | `specs/consult.uats.json` |
+| POST | `/v1/memory/suggest` | Suggestion with optional `translate_intent` | `specs/suggest.uats.json` |
+
+## CLI Commands
+
+None — intent translation is API-only (triggered via request field).
+
+## Configuration Reference
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
 | `INTENT_ENABLED` | `false` | Enable intent translation |
 | `INTENT_PROVIDER` | `openai` | LLM provider: `openai` or `ollama` |
 | `INTENT_MODEL` | `gpt-4o-mini` | Model for intent translation |
-| `INTENT_MAX_TOKENS` | `150` | Max tokens for rewritten query (range: 10-500) |
-| `INTENT_TIMEOUT_MS` | `2000` | Timeout in ms (min: 200, NFR-1: ≤2s P95) |
+| `INTENT_MAX_TOKENS` | `150` | Max tokens for rewritten query (10-500) |
+| `INTENT_TIMEOUT_MS` | `2000` | Timeout in ms (min: 200) |
 
-Reuses shared `OPENAI_API_KEY`, `OPENAI_ENDPOINT`, `OLLAMA_ENDPOINT` from existing config.
+## Dependencies
 
-## Key Files
+| Feature | Relationship |
+|---------|-------------|
+| Retrieval Pipeline | Requires — translation runs before embedding generation |
+| LLM Client Infrastructure | Requires — OpenAI or Ollama provider |
+| Phase 101 SME Synthesis | Enhances — translated embedding improves consult retrieval |
+| TSDB Recording | Feeds into — translation events recorded for training data |
 
-| File | Purpose |
-|------|---------|
-| `internal/retrieval/intent_translator.go` | IntentTranslator interface, LLMIntentTranslator, system prompt, OpenAI/Ollama calls |
-| `internal/retrieval/intent_translator_test.go` | 7 unit tests (disabled, empty, OpenAI success/failure, Ollama, timeout, prompt content) |
-| `internal/consulting/service.go` | Consult() and Suggest() integration with local IntentTranslator interface |
-| `internal/api/handlers.go` | handleRetrieve integration |
-| `internal/api/server.go` | IntentTranslator initialization and wiring |
-| `internal/config/config.go` | 5 INTENT_* config fields |
-| `internal/models/models.go` | TranslateIntent/TranslatedIntent on 6 structs |
+## Related Files
+
+- `internal/retrieval/intent_translator.go` - IntentTranslator interface, LLM calls, system prompt
+- `internal/retrieval/intent_translator_test.go` - 7 unit tests
+- `internal/consulting/service.go` - Consult() and Suggest() integration
+- `internal/api/handlers.go` - handleRetrieve integration
+- `internal/api/server.go` - IntentTranslator initialization and wiring
+- `internal/config/config.go` - 5 `INTENT_*` config fields

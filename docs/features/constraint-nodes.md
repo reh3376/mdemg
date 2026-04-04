@@ -1,10 +1,26 @@
+---
+created: 2026-02-24
+updated: 2026-04-04
+version: v0.5.4
+author: reh3376
+status: active
+phase: "45.5"
+---
+
 # Constraint Nodes
 
-Phase 45.5 automatically detects and promotes constraint-tagged observations to first-class constraint nodes in the knowledge graph. This enables structured tracking of requirements, prohibitions, recommendations, and deadlines extracted from natural language.
+## Summary
 
-## How It Works
+**Feature**: Constraint Nodes
+**Summary**: Automatically detects and promotes constraint-tagged observations to first-class constraint nodes in the knowledge graph, enabling structured tracking of requirements, prohibitions, recommendations, and deadlines extracted from natural language.
 
-### Auto-Detection
+## Vision & Goals
+
+Constraints are the operational backbone of AI-assisted development — "never do X", "always use Y", "deadline by Z". By promoting these from unstructured text to first-class graph nodes with typed edges, MDEMG enables Jiminy's inner voice to surface relevant constraints during retrieval, track compliance, and measure enforcement effectiveness. This is a key bridge between human intent and machine-enforceable rules.
+
+## Current State
+
+### Architecture
 
 The `ConstraintDetector` scans observation content for natural language patterns indicating constraints:
 
@@ -18,95 +34,67 @@ The `ConstraintDetector` scans observation content for natural language patterns
 
 Detection confidence is boosted by observation type: `decision` (+0.2), `correction` (+0.15). Detections below the minimum confidence threshold (0.6) are discarded.
 
-Detected constraints are added as tags on the observation (e.g., `constraint:must`, `constraint:deadline`).
+### Workflow
 
-### Node Promotion
+1. **Detection**: During `Observe()` calls, the ConstraintDetector scans content and adds tags (e.g., `constraint:must`, `constraint:deadline`)
+2. **Promotion**: During consolidation phase 20 (enrichment), tagged observations are promoted to constraint nodes:
+   - Find observations with `constraint:*` tags not yet linked to a constraint node
+   - Match or Create a constraint node (`role_type: 'constraint'`, `layer: 1`) with extracted label and type
+   - Link via `IMPLEMENTS_CONSTRAINT` edge (initial weight: 1.0)
+   - Reinforce existing constraints: increment `reinforcement_count` and edge weight (+0.1) on repeated matches
+3. **Label Extraction**: Constraint names extracted from the first sentence (up to first period/newline, max 120 characters)
 
-During consolidation, the pipeline's constraint step (phase 20, enrichment) promotes tagged observations to constraint nodes:
+The constraint step is non-required — failure does not block the pipeline. Results appear in the consolidation response under `steps.constraint`.
 
-1. **Find** observations with `constraint:*` tags not yet linked to a constraint node
-2. **Match or Create** a constraint node (`role_type: 'constraint'`, `layer: 1`) with the extracted label and type
-3. **Link** the observation to the constraint via an `IMPLEMENTS_CONSTRAINT` edge (initial weight: 1.0)
-4. **Reinforce** existing constraints: increment `reinforcement_count` and edge weight (+0.1) on repeated matches
+### Configuration
 
-### Label Extraction
+No configuration required — constraint detection is always active during observation and consolidation.
 
-Constraint node names are extracted from the first sentence of the observation content (up to the first period/newline, max 120 characters).
+## Notes
 
-## Usage
+### Known Limitations
 
-```bash
-# List all constraints in a space
-curl -s "http://localhost:9999/v1/constraints?space_id=mdemg-dev" | jq
+- Regex-based detection has limited accuracy for complex or negated constraints
+- Label extraction uses simple first-sentence heuristic (max 120 chars)
 
-# Get constraint statistics
-curl -s "http://localhost:9999/v1/constraints/stats?space_id=mdemg-dev" | jq
-```
+### Risks & Gaps
 
-### Example Response — List
+- No LLM-based constraint classification yet (would improve accuracy for nuanced constraints)
 
-```json
-{
-  "space_id": "mdemg-dev",
-  "constraints": [
-    {
-      "node_id": "uuid",
-      "name": "Must use CMS for all operations",
-      "constraint_type": "must",
-      "content": "Must use CMS for all operations...",
-      "confidence": 0.9,
-      "created_at": "2026-02-07T...",
-      "updated_at": "2026-02-07T...",
-      "source_count": 3
-    }
-  ]
-}
-```
+### Future Improvements
 
-### Example Response — Stats
+- LLM-powered constraint classification (Phase 104: Active MCP Guardrails)
+- Constraint lifecycle management (expiry, superseding)
 
-```json
-{
-  "space_id": "mdemg-dev",
-  "total_constraint_nodes": 15,
-  "by_type": [
-    { "constraint_type": "must", "count": 8, "avg_confidence": 0.82 },
-    { "constraint_type": "must_not", "count": 5, "avg_confidence": 0.78 }
-  ],
-  "tagged_observation_count": 23
-}
-```
+## API Endpoints
 
-## Pipeline Integration
+| Method | Endpoint | Description | UATS Spec |
+|--------|----------|-------------|-----------|
+| GET | `/v1/constraints?space_id=<id>` | List all constraints in a space | `specs/constraints_list.uats.json` |
+| GET | `/v1/constraints/stats?space_id=<id>` | Constraint statistics by type | `specs/constraints_stats.uats.json` |
 
-The constraint step runs at phase 20 (enrichment), after core hidden node creation (phase 10) but before dynamic edges (phase 25). It is non-required — failure does not block the pipeline.
+## CLI Commands
 
-Results appear in the consolidation response under `steps.constraint`:
+None — API-only endpoints.
 
-```json
-{
-  "steps": {
-    "constraint": {
-      "created": 2,
-      "updated": 1,
-      "linked": 3
-    }
-  }
-}
-```
+## Configuration Reference
 
-## Related Files
-
-| File | Description |
-|------|-------------|
-| `internal/conversation/constraint_detector.go` | Regex-based auto-detection with confidence scoring |
-| `internal/hidden/constraint_nodes.go` | Node promotion and `IMPLEMENTS_CONSTRAINT` edge creation |
-| `internal/hidden/step_constraint.go` | Pipeline step adapter (phase 20) |
-| `internal/api/handlers_conversation.go` | `handleConstraintsList`, `handleConstraintStats` handlers |
-| `docs/api/api-spec/uats/specs/constraints_list.uats.json` | Contract test for list endpoint |
-| `docs/api/api-spec/uats/specs/constraints_stats.uats.json` | Contract test for stats endpoint |
+None — no configurable parameters.
 
 ## Dependencies
 
-- Consolidation pipeline (Phase 46-PR) — constraint step registered in `buildPipeline()`
-- CMS observe endpoint — constraints detected during `Observe()` calls
+| Feature | Relationship |
+|---------|-------------|
+| Consolidation Pipeline | Requires — constraint step runs at phase 20 in `buildPipeline()` |
+| CMS Observe | Requires — constraints detected during `Observe()` calls |
+| Jiminy Inner Voice | Feeds into — constraints surfaced during guidance generation |
+| J17 Protocol | Feeds into — constraints codified for AI-to-AI communication |
+
+## Related Files
+
+- `internal/conversation/constraint_detector.go` - Regex-based auto-detection with confidence scoring
+- `internal/hidden/constraint_nodes.go` - Node promotion and `IMPLEMENTS_CONSTRAINT` edge creation
+- `internal/hidden/step_constraint.go` - Pipeline step adapter (phase 20)
+- `internal/api/handlers_conversation.go` - `handleConstraintsList`, `handleConstraintStats` handlers
+- `docs/api/api-spec/uats/specs/constraints_list.uats.json` - Contract test for list endpoint
+- `docs/api/api-spec/uats/specs/constraints_stats.uats.json` - Contract test for stats endpoint
