@@ -444,6 +444,7 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | FT-GATE | regression_gate.py | ✅ | 2026-04-02 | PR #248: Deployment gate with PASS/FAIL/WARN outcomes |
 | FT-REWARD | teacher_distill.py + reward_functions.py | ✅ | 2026-04-02 | PR #249: Teacher distillation + 21 GRPO reward functions |
 | FT-DEPLOY | quantize_deploy.py | ✅ | 2026-04-02 | PR #250: Fuse + quantize pipeline for production deployment |
+| UPGRADE-AUTO | Upgrade Automation | ✅ | 2026-04-04 | `mdemg upgrade` + `brew upgrade mdemg` now auto-update Docker instances. New flags: `--no-docker`, `--docker-only`. GoReleaser `post_install` hook. |
 
 ### Phase Numbering Convention
 

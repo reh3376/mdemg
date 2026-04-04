@@ -153,15 +153,31 @@ Credentials can be customized during interactive `mdemg init`. Defaults are used
 
 ## Updating
 
+### Homebrew (recommended)
+
+```bash
+brew upgrade mdemg
+```
+
+This updates the binary and automatically pulls latest Docker images for all running MDEMG instances, then restarts their containers. No manual `docker compose pull` needed.
+
 ### Self-Update (v0.4.0+)
 
 ```bash
-mdemg upgrade            # Update to latest stable release
+mdemg upgrade            # Update binary + all running Docker instances
 mdemg upgrade --edge     # Update to latest edge build (main branch)
 mdemg upgrade --dry-run  # Check for updates without installing
+mdemg upgrade --no-docker  # Update binary only, skip Docker updates
+mdemg upgrade --docker-only  # Update Docker instances only (skip binary)
 ```
 
-The `upgrade` command downloads the new binary, verifies its SHA-256 checksum, and replaces the current executable. If a `./bin/` directory exists in the current working directory, the updated binary is also copied there.
+The `upgrade` command downloads the new binary, verifies its SHA-256 checksum, and replaces the current executable. It then discovers all running MDEMG Docker Compose projects and pulls latest images + restarts containers. If a `./bin/` directory exists in the current working directory, the updated binary is also copied there.
+
+To update Docker instances without upgrading the binary:
+
+```bash
+mdemg upgrade --docker-only
+```
 
 ### Edge Channel
 
