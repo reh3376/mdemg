@@ -111,6 +111,9 @@ func newPruneCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&cfg.MergeEnabled, "merge-enabled", false, "Enable node merging (more destructive)")
 	cmd.Flags().StringVar(&cfg.VectorIndexName, "vector-index", "memNodeEmbedding", "Vector index name for similarity search")
 
+	// Label selection
+	cmd.Flags().StringSliceVar(&cfg.IncludeLabels, "include-labels", []string{"MemoryNode"}, "Labels to scan for orphans (e.g. MemoryNode,SymbolNode,Observation)")
+
 	// Processing options
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", true, "Preview mode - no modifications (default: true)")
 	cmd.Flags().StringVar(&cfg.SpaceID, "space-id", "", "Space ID to process (or set MDEMG_SPACE_ID)")
@@ -176,6 +179,9 @@ type pruneConfig struct {
 	SimilarityThreshold float64 // default: 0.98
 	MergeEnabled        bool    // default: false
 	VectorIndexName     string  // default: memNodeEmbedding
+
+	// Label selection
+	IncludeLabels []string // default: ["MemoryNode"]
 
 	// Processing options
 	DryRun    bool
@@ -294,6 +300,26 @@ func runPruneJob(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneC
 	stats.nodesScanned = nodeStats.scanned
 	stats.nodesTombstoned = nodeStats.tombstoned
 	stats.nodesProtected = nodeStats.protected
+
+	// Step 2b: Sweep orphan SymbolNodes (if included in labels)
+	for _, label := range cfg.IncludeLabels {
+		switch label {
+		case "SymbolNode":
+			fmt.Println("\nStep 2b: Orphan SymbolNode sweep...")
+			symStats, err := sweepOrphanSymbolNodes(ctx, driver, cfg)
+			if err != nil {
+				return fmt.Errorf("orphan SymbolNode sweep: %w", err)
+			}
+			fmt.Printf("  Found: %d, Deleted: %d\n", symStats.found, symStats.deleted)
+		case "Observation":
+			fmt.Println("\nStep 2c: Orphan Observation sweep...")
+			obsStats, err := sweepOrphanObservations(ctx, driver, cfg)
+			if err != nil {
+				return fmt.Errorf("orphan Observation sweep: %w", err)
+			}
+			fmt.Printf("  Found: %d, Deleted: %d\n", obsStats.found, obsStats.deleted)
+		}
+	}
 
 	// Step 3: Node merging (if enabled)
 	if cfg.MergeEnabled {
@@ -787,6 +813,147 @@ ORDER BY degree ASC, lastObsTime ASC`
 		return nil, err
 	}
 	return result.([]node), nil
+}
+
+// orphanLabelStats tracks results for a single label sweep
+type orphanLabelStats struct {
+	label   string
+	found   int
+	deleted int
+}
+
+// sweepOrphanSymbolNodes finds and removes SymbolNodes with no incoming
+// DEFINES_SYMBOL edge and no CO_ACTIVATED_WITH, CALLS, IMPORTS, EXTENDS,
+// or IMPLEMENTS edges. These are fully disconnected symbols left behind
+// by duplicate merges or stale ingests.
+func sweepOrphanSymbolNodes(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (orphanLabelStats, error) {
+	stats := orphanLabelStats{label: "SymbolNode"}
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	// Count orphan candidates first
+	countCypher := `
+MATCH (s:SymbolNode {space_id: $spaceId})
+WHERE NOT EXISTS { MATCH ()-[:DEFINES_SYMBOL]->(s) }
+  AND NOT EXISTS { MATCH (s)-[:CO_ACTIVATED_WITH]-() }
+  AND NOT EXISTS { MATCH (s)-[:CALLS|IMPORTS|EXTENDS|IMPLEMENTS]-() }
+RETURN count(s) AS cnt`
+
+	countResult, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, countCypher, map[string]any{"spaceId": cfg.SpaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("cnt")
+			return neo4jutil.AsInt(cnt), nil
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return stats, err
+	}
+	stats.found = countResult.(int)
+
+	if stats.found == 0 {
+		return stats, nil
+	}
+
+	if cfg.DryRun {
+		fmt.Printf("  [dry-run] Would delete %d orphan SymbolNodes\n", stats.found)
+		return stats, nil
+	}
+
+	// Delete in batches
+	deleteCypher := `
+MATCH (s:SymbolNode {space_id: $spaceId})
+WHERE NOT EXISTS { MATCH ()-[:DEFINES_SYMBOL]->(s) }
+  AND NOT EXISTS { MATCH (s)-[:CO_ACTIVATED_WITH]-() }
+  AND NOT EXISTS { MATCH (s)-[:CALLS|IMPORTS|EXTENDS|IMPLEMENTS]-() }
+CALL (s) { DETACH DELETE s } IN TRANSACTIONS OF 1000 ROWS
+RETURN count(*) AS deleted`
+
+	delResult, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("deleted")
+			return neo4jutil.AsInt(cnt), nil
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return stats, err
+	}
+	stats.deleted = delResult.(int)
+
+	return stats, nil
+}
+
+// sweepOrphanObservations finds and removes Observations with no incoming
+// HAS_OBSERVATION edge. These are detached observations left by node deletions.
+func sweepOrphanObservations(ctx context.Context, driver neo4j.DriverWithContext, cfg pruneConfig) (orphanLabelStats, error) {
+	stats := orphanLabelStats{label: "Observation"}
+
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+
+	countCypher := `
+MATCH (o:Observation {space_id: $spaceId})
+WHERE NOT EXISTS { MATCH ()-[:HAS_OBSERVATION]->(o) }
+RETURN count(o) AS cnt`
+
+	countResult, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, countCypher, map[string]any{"spaceId": cfg.SpaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("cnt")
+			return neo4jutil.AsInt(cnt), nil
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return stats, err
+	}
+	stats.found = countResult.(int)
+
+	if stats.found == 0 {
+		return stats, nil
+	}
+
+	if cfg.DryRun {
+		fmt.Printf("  [dry-run] Would delete %d orphan Observations\n", stats.found)
+		return stats, nil
+	}
+
+	deleteCypher := `
+MATCH (o:Observation {space_id: $spaceId})
+WHERE NOT EXISTS { MATCH ()-[:HAS_OBSERVATION]->(o) }
+CALL (o) { DETACH DELETE o } IN TRANSACTIONS OF 1000 ROWS
+RETURN count(*) AS deleted`
+
+	delResult, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			cnt, _ := res.Record().Get("deleted")
+			return neo4jutil.AsInt(cnt), nil
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return stats, err
+	}
+	stats.deleted = delResult.(int)
+
+	return stats, nil
 }
 
 // mergeRedundantNodes merges highly similar nodes
