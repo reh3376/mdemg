@@ -88,6 +88,14 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 3. **Code investigation** → Use general-purpose agent with sonnet
 4. **Planning** → Use Plan agent with sonnet/opus
 
+### Sprint Plan Format (v1.0)
+All sprint development plans follow the standardized 12-section format.
+Recall: `POST /v1/skills/sprint-planning/recall` or `filter_tags: ["skill:sprint-planning"]`.
+Required sections: Header & Metadata, Problem Statement, Scope & Constraints,
+Dependencies, Implementation Plan (sequential epics + gates), Testing Plan (3 tiers),
+Commit Strategy, Verification Checklist, Documentation Update (final epic — never cut),
+Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destructive ops).
+
 ## Project Context
 
 **MDEMG** — Cognitive substrate for AI-assisted development. Persistent emergent long-term memory via Hebbian learning, 5-layer hierarchy, RSIC self-improvement. 105 core phases + sidecar phases complete.
