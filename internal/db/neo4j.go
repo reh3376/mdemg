@@ -34,6 +34,34 @@ func GetPoolMetrics() ConnectionPoolMetrics {
 	return *poolMetrics.Load()
 }
 
+// StartPoolMetricsCollector runs a background goroutine that probes the Neo4j
+// connection pool every 10s, populating metrics. Returns a cancel func.
+func StartPoolMetricsCollector(ctx context.Context, driver neo4j.DriverWithContext) context.CancelFunc {
+	ctx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel is returned to caller
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				m := poolMetrics.Load()
+				updated := *m
+				err := driver.VerifyConnectivity(ctx)
+				if err != nil {
+					updated.TotalFailedAcquire++
+					slog.Debug("neo4j pool probe failed", "error", err)
+				} else {
+					updated.TotalAcquired++
+				}
+				poolMetrics.Store(&updated)
+			}
+		}
+	}()
+	return cancel
+}
+
 func NewDriver(cfg config.Config) (neo4j.DriverWithContext, error) {
 	// Configure connection pool options
 	configurator := func(conf *nconfig.Config) {

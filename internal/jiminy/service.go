@@ -198,6 +198,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		}
 		if cfg.J17NLIComprehensionEnabled {
 			nliScorer = NewNLIComprehensionScorer(cfg.J17SidecarURL, cfg.J17SidecarTimeoutMs, true)
+			nliScorer.minConfidence = cfg.J17SidecarConfidenceFloor
 			slog.Info("jiminy: NLI comprehension scorer enabled", "mode", cfg.J17SidecarMode, "score_of_record", cfg.J17NLIScoreOfRecord)
 		}
 		// Create arbitrator regardless of which ML components are enabled

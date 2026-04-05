@@ -13,11 +13,12 @@ import (
 
 // NLIComprehensionScorer scores constraint comprehension via the neural sidecar.
 type NLIComprehensionScorer struct {
-	sidecarURL string
-	timeoutMs  int
-	enabled    bool
-	client     *http.Client
-	breaker    *circuitbreaker.Breaker
+	sidecarURL    string
+	timeoutMs     int
+	enabled       bool
+	minConfidence float64 // below this threshold, fall back to heuristic
+	client        *http.Client
+	breaker       *circuitbreaker.Breaker
 }
 
 // NewNLIComprehensionScorer creates a new NLI comprehension scorer.
@@ -85,6 +86,15 @@ func (s *NLIComprehensionScorer) ScoreComprehension(ctx context.Context,
 	if callErr != nil {
 		if followed {
 			return 0.5, true // fallback: NLI call failed
+		}
+		return 0.0, true
+	}
+
+	// Confidence floor: if the highest NLI score is below threshold, treat as unreliable
+	maxScore := max(result.Scores.Entailment, result.Scores.Contradiction, result.Scores.Neutral)
+	if s.minConfidence > 0 && maxScore < s.minConfidence {
+		if followed {
+			return 0.5, true // low confidence NLI → fallback
 		}
 		return 0.0, true
 	}
