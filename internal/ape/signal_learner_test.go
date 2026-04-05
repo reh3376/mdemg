@@ -71,16 +71,16 @@ func TestRecordEmission_NewSignal(t *testing.T) {
 
 	// Initial strength is 0.5, decay is 0.05 → should be 0.45
 	expectedStrength := 0.5 - 0.05
-	if s.strength != expectedStrength {
-		t.Errorf("strength = %f, want %f", s.strength, expectedStrength)
+	if s.Strength != expectedStrength {
+		t.Errorf("strength = %f, want %f", s.Strength, expectedStrength)
 	}
 
-	if s.emissions != 1 {
-		t.Errorf("emissions = %d, want 1", s.emissions)
+	if s.Emissions != 1 {
+		t.Errorf("emissions = %d, want 1", s.Emissions)
 	}
 
-	if s.responses != 0 {
-		t.Errorf("responses = %d, want 0", s.responses)
+	if s.Responses != 0 {
+		t.Errorf("responses = %d, want 0", s.Responses)
 	}
 }
 
@@ -97,12 +97,12 @@ func TestRecordEmission_ExistingSignal(t *testing.T) {
 	// 0.5 - 0.05 = 0.45 (first)
 	// 0.45 - 0.05 = 0.40 (second)
 	expectedStrength := 0.5 - 0.05 - 0.05
-	if s.strength != expectedStrength {
-		t.Errorf("strength = %f, want %f", s.strength, expectedStrength)
+	if s.Strength != expectedStrength {
+		t.Errorf("strength = %f, want %f", s.Strength, expectedStrength)
 	}
 
-	if s.emissions != 2 {
-		t.Errorf("emissions = %d, want 2", s.emissions)
+	if s.Emissions != 2 {
+		t.Errorf("emissions = %d, want 2", s.Emissions)
 	}
 }
 
@@ -117,12 +117,12 @@ func TestRecordEmission_StrengthFloor(t *testing.T) {
 	s := sl.signals["TEST_FLOOR"]
 
 	// Strength should never go below 0.1
-	if s.strength != 0.1 {
-		t.Errorf("strength = %f, want 0.1 (floor)", s.strength)
+	if s.Strength != 0.1 {
+		t.Errorf("strength = %f, want 0.1 (floor)", s.Strength)
 	}
 
-	if s.emissions != 20 {
-		t.Errorf("emissions = %d, want 20", s.emissions)
+	if s.Emissions != 20 {
+		t.Errorf("emissions = %d, want 20", s.Emissions)
 	}
 }
 
@@ -137,14 +137,14 @@ func TestRecordEmission_DecayToFloor(t *testing.T) {
 
 	s := sl.signals["TEST_DECAY"]
 
-	if !almostEqual(s.strength, 0.1, 0.0001) {
-		t.Errorf("strength = %f, want 0.1", s.strength)
+	if !almostEqual(s.Strength, 0.1, 0.0001) {
+		t.Errorf("strength = %f, want 0.1", s.Strength)
 	}
 
 	// One more emission should still be at floor
 	sl.RecordEmission("TEST_DECAY")
-	if !almostEqual(s.strength, 0.1, 0.0001) {
-		t.Errorf("strength = %f, want 0.1 (still at floor)", s.strength)
+	if !almostEqual(s.Strength, 0.1, 0.0001) {
+		t.Errorf("strength = %f, want 0.1 (still at floor)", s.Strength)
 	}
 }
 
@@ -165,16 +165,16 @@ func TestRecordResponse_NewSignal(t *testing.T) {
 	// Initial strength is 0.5, boost is 0.1 + 0.05 (decay) = 0.15
 	// 0.5 + 0.15 = 0.65
 	expectedStrength := 0.5 + 0.1 + 0.05
-	if s.strength != expectedStrength {
-		t.Errorf("strength = %f, want %f", s.strength, expectedStrength)
+	if s.Strength != expectedStrength {
+		t.Errorf("strength = %f, want %f", s.Strength, expectedStrength)
 	}
 
-	if s.responses != 1 {
-		t.Errorf("responses = %d, want 1", s.responses)
+	if s.Responses != 1 {
+		t.Errorf("responses = %d, want 1", s.Responses)
 	}
 
-	if s.emissions != 0 {
-		t.Errorf("emissions = %d, want 0", s.emissions)
+	if s.Emissions != 0 {
+		t.Errorf("emissions = %d, want 0", s.Emissions)
 	}
 }
 
@@ -192,16 +192,16 @@ func TestRecordResponse_ExistingSignal(t *testing.T) {
 	// After emission: 0.5 - 0.05 = 0.45
 	// After response: 0.45 + 0.1 + 0.05 = 0.60
 	expectedStrength := 0.5 - 0.05 + 0.1 + 0.05
-	if !almostEqual(s.strength, expectedStrength, 0.0001) {
-		t.Errorf("strength = %f, want %f", s.strength, expectedStrength)
+	if !almostEqual(s.Strength, expectedStrength, 0.0001) {
+		t.Errorf("strength = %f, want %f", s.Strength, expectedStrength)
 	}
 
-	if s.emissions != 1 {
-		t.Errorf("emissions = %d, want 1", s.emissions)
+	if s.Emissions != 1 {
+		t.Errorf("emissions = %d, want 1", s.Emissions)
 	}
 
-	if s.responses != 1 {
-		t.Errorf("responses = %d, want 1", s.responses)
+	if s.Responses != 1 {
+		t.Errorf("responses = %d, want 1", s.Responses)
 	}
 }
 
@@ -216,12 +216,12 @@ func TestRecordResponse_StrengthCeiling(t *testing.T) {
 	s := sl.signals["RESP_CEILING"]
 
 	// Strength should never go above 1.0
-	if s.strength != 1.0 {
-		t.Errorf("strength = %f, want 1.0 (ceiling)", s.strength)
+	if s.Strength != 1.0 {
+		t.Errorf("strength = %f, want 1.0 (ceiling)", s.Strength)
 	}
 
-	if s.responses != 10 {
-		t.Errorf("responses = %d, want 10", s.responses)
+	if s.Responses != 10 {
+		t.Errorf("responses = %d, want 10", s.Responses)
 	}
 }
 
@@ -236,14 +236,14 @@ func TestRecordResponse_BoostToCeiling(t *testing.T) {
 
 	s := sl.signals["RESP_BOOST"]
 
-	if s.strength != 1.0 {
-		t.Errorf("strength = %f, want 1.0", s.strength)
+	if s.Strength != 1.0 {
+		t.Errorf("strength = %f, want 1.0", s.Strength)
 	}
 
 	// One more response should still be at ceiling
 	sl.RecordResponse("RESP_BOOST")
-	if s.strength != 1.0 {
-		t.Errorf("strength = %f, want 1.0 (still at ceiling)", s.strength)
+	if s.Strength != 1.0 {
+		t.Errorf("strength = %f, want 1.0 (still at ceiling)", s.Strength)
 	}
 }
 
@@ -464,8 +464,8 @@ func TestHebbianCycle_DecayWithoutResponse(t *testing.T) {
 
 	// Each emission decays by 0.05
 	expectedStrength := initialStrength - 0.05 - 0.05 - 0.05
-	if s.strength != expectedStrength {
-		t.Errorf("strength = %f, want %f", s.strength, expectedStrength)
+	if s.Strength != expectedStrength {
+		t.Errorf("strength = %f, want %f", s.Strength, expectedStrength)
 	}
 }
 
@@ -593,8 +593,8 @@ func TestConcurrentEmissions(t *testing.T) {
 	wg.Wait()
 
 	s := sl.signals["CONCURRENT_EMIT"]
-	if s.emissions != numGoroutines {
-		t.Errorf("emissions = %d, want %d", s.emissions, numGoroutines)
+	if s.Emissions != numGoroutines {
+		t.Errorf("emissions = %d, want %d", s.Emissions, numGoroutines)
 	}
 }
 
@@ -615,8 +615,8 @@ func TestConcurrentResponses(t *testing.T) {
 	wg.Wait()
 
 	s := sl.signals["CONCURRENT_RESP"]
-	if s.responses != numGoroutines {
-		t.Errorf("responses = %d, want %d", s.responses, numGoroutines)
+	if s.Responses != numGoroutines {
+		t.Errorf("responses = %d, want %d", s.Responses, numGoroutines)
 	}
 }
 
@@ -657,11 +657,11 @@ func TestConcurrentMixedOperations(t *testing.T) {
 
 	// No panics = success
 	s := sl.signals["MIXED"]
-	if s.emissions != numOpsPerType {
-		t.Errorf("emissions = %d, want %d", s.emissions, numOpsPerType)
+	if s.Emissions != numOpsPerType {
+		t.Errorf("emissions = %d, want %d", s.Emissions, numOpsPerType)
 	}
-	if s.responses != numOpsPerType {
-		t.Errorf("responses = %d, want %d", s.responses, numOpsPerType)
+	if s.Responses != numOpsPerType {
+		t.Errorf("responses = %d, want %d", s.Responses, numOpsPerType)
 	}
 }
 
