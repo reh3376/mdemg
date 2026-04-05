@@ -135,6 +135,18 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - COMPOSE_PROJECT_NAME=mdemg-{dirname} provides isolation
 - Known limitation: LaunchAgent labels not instance-scoped
 
+## Codebase Hardening (v0.7.0 — Complete)
+- P0: RRF activation seeding — BM25-only candidates no longer suppressed
+- P0: Pre-bash guard fails closed on pattern decode error
+- P0: Schema version 23 across all deploy configs + CI validation
+- P1: Signal learner persists to Neo4j (V0024 migration, 30s flush, graceful shutdown)
+- P1: Background goroutine WaitGroup tracking + shutdown wait
+- P1: Per-space consolidation TryLock prevents duplicate concepts
+- P1: Cache key includes IncludeGlobalSpace, CodeOnly, TranslateIntent
+- P1: NilSafe embedder wrapper (ErrNoEmbedder, not panic)
+- P2: Config.Validate() cross-field checks, pool metrics, writeback timeout, sidecar confidence floor
+- Scheduled maintenance LaunchAgent (weekly decay + prune)
+
 ## Graph Health (v0.6.0 — Complete)
 - BUG-1 (SymbolNode dedup): Fixed — natural-key MERGE + V0023 uniqueness constraint
 - BUG-2 (vendor nodes): Fixed — `prune --match-ignore` + `graph repair` vendor cleanup

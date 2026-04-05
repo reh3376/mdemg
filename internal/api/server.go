@@ -73,6 +73,7 @@ type Server struct {
 	stopInterviewer    chan struct{}
 	stopScheduledSync  chan struct{}
 	stopSpacePrune     chan struct{}
+	bgWg               sync.WaitGroup // tracks background goroutine completion
 
 	// Phase 3: Production readiness components
 	cbRegistry     *circuitbreaker.Registry
@@ -832,8 +833,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		slog.Info("UNTS hash verification enabled", "base_path", cfg.UNTSBasePath)
 	}
 
-	// Phase 80: Initialize signal learner
+	// Phase 80: Initialize signal learner with Neo4j persistence
 	signalLearner := ape.NewSignalLearner(cfg.MetaCogSignalDecayRate, cfg.MetaCogSignalBoostRate)
+	signalLearner.SetDriver(driver)
 	slog.Info("signal learner initialized", "decay", cfg.MetaCogSignalDecayRate, "boost", cfg.MetaCogSignalBoostRate)
 	// RSIC-SK1: Wire signal learner to Jiminy for guidance emission/response tracking
 	if jiminySvc != nil {
@@ -845,7 +847,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		driver:          driver,
 		retriever:       ret,
 		learner:         lea,
-		embedder:        emb,
+		embedder:        embeddings.NilSafe(emb),
 		anomalyDetector: anom,
 		hiddenLayer:     hid,
 		hiddenSvc:       hid,
@@ -959,6 +961,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 		jiminySvc.StartTrustPersistence(context.Background())
 	}
+
+	// Phase 80: Hydrate signal learner from Neo4j and start persistence
+	if err := signalLearner.HydrateSignals(context.Background()); err != nil {
+		slog.Warn("signal learner: hydration failed", "error", err)
+	}
+	signalLearner.StartPersistence(context.Background())
 
 	// B3: Bootstrap codification — codify constraints without codes on startup
 	if cfg.J17BootstrapCodification && jiminySvc != nil {
@@ -1255,6 +1263,13 @@ func (s *Server) Shutdown() {
 	if s.metricsRecorder != nil {
 		s.metricsRecorder.Stop()
 	}
+	if s.signalLearner != nil {
+		s.signalLearner.StopPersistence()
+	}
+
+	// Wait for all tracked background goroutines to exit
+	s.bgWg.Wait()
+
 	if s.llmWriter != nil {
 		s.llmWriter.Close()
 	}
@@ -1288,7 +1303,9 @@ func (s *Server) StartMacroCronScheduler() {
 	s.macroCronCancel = cancel
 	s.macroNextRun = time.Now().Add(interval)
 
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		slog.Info("RSIC macro cron scheduler started", "interval", interval, "next_run", s.macroNextRun.Format(time.RFC3339))
@@ -1491,7 +1508,9 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 	}
 
 	s.stopConsolidate = make(chan struct{})
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -1548,7 +1567,9 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 	}
 
 	s.stopCooler = make(chan struct{})
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -1598,7 +1619,9 @@ func (s *Server) StartSpacePruneScheduler(interval time.Duration) {
 		return
 	}
 	s.stopSpacePrune = make(chan struct{})
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		slog.Info("space prune scheduler started", "interval", interval)
@@ -1637,7 +1660,9 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 	}
 
 	s.stopInterviewer = make(chan struct{})
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -1682,7 +1707,9 @@ func (s *Server) StartScheduledSync(interval time.Duration) {
 	}
 
 	s.stopScheduledSync = make(chan struct{})
+	s.bgWg.Add(1)
 	go func() {
+		defer s.bgWg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 

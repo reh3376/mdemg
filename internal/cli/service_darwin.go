@@ -21,6 +21,7 @@ var launchdServices = []struct {
 	{"com.mdemg.neural-sidecar", "com.mdemg.neural-sidecar.plist"},
 	{"com.mdemg.ingest-claude-md", "com.mdemg.ingest-claude-md.plist"},
 	{"com.mdemg.training-export", "com.mdemg.training-export.plist"},
+	{"com.mdemg.maintenance", "com.mdemg.maintenance.plist"},
 }
 
 type darwinServiceManager struct{}
@@ -198,6 +199,7 @@ func (m *darwinServiceManager) Logs(follow bool) error {
 		filepath.Join(home, ".mdemg", "logs", "neural-sidecar.log"),
 		filepath.Join(home, ".mdemg", "logs", "ingest-claude-md.log"),
 		filepath.Join(home, ".mdemg", "logs", "training-export.log"),
+		filepath.Join(home, ".mdemg", "logs", "maintenance.log"),
 	}
 
 	if follow {

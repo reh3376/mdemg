@@ -68,6 +68,7 @@ type BackwardPassResult struct {
 
 // ConsolidationResult holds the combined results of a full consolidation run
 type ConsolidationResult struct {
+	Skipped               bool                 // true if consolidation was skipped (concurrent lock)
 	HiddenNodesCreated    int
 	ConceptNodesCreated   map[int]int          // layer -> count of concepts created
 	ConceptNodesMerged    int                  // count of clusters merged into existing concepts

@@ -56,19 +56,25 @@ func NewQueryCache(capacity int, ttl time.Duration) *QueryCache {
 func CacheKey(req models.RetrieveRequest) string {
 	// Create a deterministic key from the relevant query parameters
 	keyData := struct {
-		SpaceID        string `json:"s"`
-		QueryText      string `json:"q"`
-		CandidateK     int    `json:"ck"`
-		TopK           int    `json:"tk"`
-		HopDepth       int    `json:"hd"`
-		IncludeEvidence bool   `json:"ie"`
+		SpaceID            string `json:"s"`
+		QueryText          string `json:"q"`
+		CandidateK         int    `json:"ck"`
+		TopK               int    `json:"tk"`
+		HopDepth           int    `json:"hd"`
+		IncludeEvidence    bool   `json:"ie"`
+		IncludeGlobalSpace bool   `json:"ig"`
+		CodeOnly           bool   `json:"co"`
+		TranslateIntent    bool   `json:"ti"`
 	}{
-		SpaceID:         req.SpaceID,
-		QueryText:       req.QueryText,
-		CandidateK:      req.CandidateK,
-		TopK:            req.TopK,
-		HopDepth:        req.HopDepth,
-		IncludeEvidence: req.IncludeEvidence,
+		SpaceID:            req.SpaceID,
+		QueryText:          req.QueryText,
+		CandidateK:         req.CandidateK,
+		TopK:               req.TopK,
+		HopDepth:           req.HopDepth,
+		IncludeEvidence:    req.IncludeEvidence,
+		IncludeGlobalSpace: req.IncludeGlobalSpace,
+		CodeOnly:           req.CodeOnly,
+		TranslateIntent:    req.TranslateIntent,
 	}
 
 	data, _ := json.Marshal(keyData)

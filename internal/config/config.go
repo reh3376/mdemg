@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -3807,4 +3808,62 @@ func ResolveEndpoint(defaultAddr string) string {
 
 	// Priority 4: fallback
 	return defaultAddr
+}
+
+// Validate checks cross-field constraints that individual parsing can't catch.
+// Returns warnings (non-fatal) as a slice and an error if anything is critically wrong.
+func (c Config) Validate() (warnings []string, err error) {
+	var errs []error
+
+	// Weight groups that should sum to ~1.0 (tolerance: 0.01)
+	checkWeightSum := func(name string, vals ...float64) {
+		sum := 0.0
+		for _, v := range vals {
+			sum += v
+		}
+		if math.Abs(sum-1.0) > 0.01 {
+			warnings = append(warnings, fmt.Sprintf("%s weights sum to %.3f, expected ~1.0", name, sum))
+		}
+	}
+
+	// Scoring weights: Alpha + Beta + Gamma + Delta = 1.0
+	checkWeightSum("Scoring(Alpha+Beta+Gamma+Delta)",
+		c.ScoringAlpha, c.ScoringBeta, c.ScoringGamma, c.ScoringDelta)
+
+	// Hidden layer forward: Alpha + Beta = 1.0
+	checkWeightSum("HiddenLayerForward(Alpha+Beta)",
+		c.HiddenLayerForwardAlpha, c.HiddenLayerForwardBeta)
+
+	// Hidden layer backward: Self + Base + Conc = 1.0
+	checkWeightSum("HiddenLayerBackward(Self+Base+Conc)",
+		c.HiddenLayerBackwardSelf, c.HiddenLayerBackwardBase, c.HiddenLayerBackwardConc)
+
+	// Activation dimension weights: Semantic + Temporal + Coactivation = 1.0
+	// Only validate if any are non-zero (zero = unconfigured, defaults applied later)
+	if c.ActivationDimSemanticWeight > 0 || c.ActivationDimTemporalWeight > 0 || c.ActivationDimCoactivationWeight > 0 {
+		checkWeightSum("ActivationDim(Semantic+Temporal+Coactivation)",
+			c.ActivationDimSemanticWeight, c.ActivationDimTemporalWeight, c.ActivationDimCoactivationWeight)
+	}
+
+	// Hybrid retrieval: BM25 + Vector = 1.0
+	if c.HybridRetrievalEnabled {
+		checkWeightSum("HybridRetrieval(BM25+Vector)",
+			c.BM25Weight, c.VectorWeight)
+	}
+
+	// Bound checks
+	if c.DefaultTopK > c.DefaultCandidateK && c.DefaultCandidateK > 0 {
+		warnings = append(warnings, fmt.Sprintf("DefaultTopK (%d) > DefaultCandidateK (%d)", c.DefaultTopK, c.DefaultCandidateK))
+	}
+	if c.DefaultHopDepth > c.MaxHopDepth && c.MaxHopDepth > 0 {
+		warnings = append(warnings, fmt.Sprintf("DefaultHopDepth (%d) > MaxHopDepth (%d)", c.DefaultHopDepth, c.MaxHopDepth))
+	}
+	if c.LearningWMin >= c.LearningWMax {
+		errs = append(errs, fmt.Errorf("LearningWMin (%.2f) must be < LearningWMax (%.2f)", c.LearningWMin, c.LearningWMax))
+	}
+
+	if len(errs) > 0 {
+		err = errors.Join(errs...)
+	}
+	return warnings, err
 }

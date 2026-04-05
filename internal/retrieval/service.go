@@ -839,6 +839,7 @@ type Candidate struct {
 	Confidence    float64
 	VectorSim     float64
 	BM25Score     float64  // Actual BM25 score (0.0 for vector-only)
+	RRFScore      float64  // Normalized RRF fusion score (authoritative ranking signal)
 	Layer         int      // 0=base, 1=hidden/concern, 2+=concept
 	Tags          []string // Tags for scoring boosts (e.g., "config")
 }

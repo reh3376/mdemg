@@ -488,7 +488,8 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 
 	// Learning deltas: async writeback (don't block response on O(N²) learning)
 	go func(spaceID string, respCopy models.RetrieveResponse) { //nolint:gosec // G118: learning writeback must outlive HTTP request
-		bgCtx := context.WithoutCancel(r.Context())
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+		defer cancel()
 		_ = s.learner.ApplyCoactivation(bgCtx, spaceID, respCopy)
 		_ = s.learner.ApplySymbolCoactivation(bgCtx, spaceID, respCopy)
 	}(req.SpaceID, resp)

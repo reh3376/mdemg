@@ -6,7 +6,7 @@ metadata:
     app: mdemg
 data:
   # Schema version
-  REQUIRED_SCHEMA_VERSION: "15"
+  REQUIRED_SCHEMA_VERSION: "24"
 
   # Embedding provider
   EMBEDDING_PROVIDER: "openai"

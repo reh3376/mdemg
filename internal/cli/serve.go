@@ -115,6 +115,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	}
 	defer driver.Close(context.Background())
 
+	// Start pool metrics collector (10s probe interval)
+	cancelPoolMetrics := db.StartPoolMetricsCollector(context.Background(), driver)
+	defer cancelPoolMetrics()
+
 	// Auto-migrate if requested
 	if autoMigrate {
 		applied, migrateErr := db.RunMigrations(context.Background(), driver, migrations.FS)

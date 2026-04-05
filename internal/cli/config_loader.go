@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -39,6 +40,15 @@ func loadConfig() (config.Config, error) {
 	if cfg.BackupNeo4jContainer == "mdemg-neo4j" {
 		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
 			cfg.BackupNeo4jContainer = ContainerNameForProject(cwd)
+		}
+	}
+
+	// Cross-field validation (warn-not-error by default)
+	if warnings, vErr := cfg.Validate(); vErr != nil {
+		return cfg, vErr
+	} else {
+		for _, w := range warnings {
+			slog.Warn("config validation", "warning", w)
 		}
 	}
 

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-05
+
+### Added
+
+- V0024 migration — `SignalState` node type for signal learner persistence
+- `com.mdemg.maintenance` LaunchAgent — weekly scheduled maintenance (decay + prune) via `mdemg service install`
+- `Config.Validate()` — cross-field constraint checking for weight sums, bound relationships
+- Pool metrics collector — periodic Neo4j connectivity probe (10s interval)
+- `NilSafe` embedder wrapper �� returns `ErrNoEmbedder` instead of panic when no provider configured
+
+### Fixed
+
+- **P0: RRF activation bias** — activation seeding now uses RRF score (authoritative fused ranking signal) instead of `max(VectorSim, BM25Score)` which compared unequal scales, systematically suppressing BM25-only candidates
+- **P0: Pre-bash guard fail-open** — hook now decodes/compiles patterns individually with fail-closed design; blocks ALL commands when zero patterns load; returns deny on broken stdin
+- **P0: Schema version drift** — deploy configs (Docker, K8s, Helm, .env.example) updated from stale 15/19 to 23; CI validation step checks all configs match migration count
+- **P1: Signal learner ephemeral** — persists Hebbian signal intelligence to Neo4j via `HydrateSignals`/`FlushSignals` with 30s periodic flush and graceful shutdown flush
+- **P1: Goroutine lifecycle** — all background goroutines tracked with `sync.WaitGroup`; `Shutdown()` waits for completion before closing writers
+- **P1: Consolidation race** — per-space `TryLock` on `RunConsolidation` prevents concurrent runs from creating duplicate L2+ concepts
+- **P1: Cache key gap** — `IncludeGlobalSpace`, `CodeOnly`, `TranslateIntent` now included in cache key to prevent cross-flag result contamination
+- **P2: Learning writeback timeout** — async Hebbian writeback goroutine now has 10s context timeout
+- **P2: Sidecar confidence floor** — NLI comprehension scorer applies `J17SidecarConfidenceFloor` uniformly with tier predictor
+
 ## [0.6.1] - 2026-04-05
 
 ### Fixed
