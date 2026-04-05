@@ -111,6 +111,7 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 
 ## Additional CLI Commands
 
+- `mdemg data export` — UTDS archive export; auto-generates `instance_id` as `{hostname}-{space_id}` when `MDEMG_INSTANCE_ID` not set
 - `mdemg data export-auto` — automated daily export with retention (`--keep N`), `latest.tar.gz` symlink
 - `mdemg data check --pre-campaign` — 8 validation checks (schema, instance ID, task coverage, etc.)
 - `mdemg tsdb status` — TimescaleDB connection and schema version

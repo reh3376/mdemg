@@ -2244,7 +2244,7 @@ The export archive can be fed into the Python curation pipeline: `quality_filter
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--output` | string | `mdemg-export-{instance}-{date}.tar.gz` | Output file path |
-| `--instance-id` | string | `{user}-{space_id}` | Instance identifier for manifest |
+| `--instance-id` | string | auto: `{hostname}-{space_id}` | Instance identifier (auto-generated if not set) |
 | `--since` | string | 180 days ago | Start of export time range (RFC3339) |
 | `--until` | string | now | End of export time range (RFC3339) |
 | `--tables` | strings | `llm_interactions,retrieval_events,embedding_events` | Tables to include |

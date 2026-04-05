@@ -13,6 +13,8 @@ This guide covers upgrading from v0.5.x to v0.6.0.
 | New commands | `graph repair`, `maintenance`, `embeddings backfill` | Graph health tooling |
 | Prune flags | `--match-ignore`, `--include-labels` | Finer-grained orphan control |
 | Hidden layer | Batched orphan cleanup | No OOM during L2-L5 consolidation |
+| Training data export | `instance_id` auto-generated as `{hostname}-{space_id}` | Export no longer requires `MDEMG_INSTANCE_ID` to be set manually |
+| `mdemg init` | Writes `MDEMG_INSTANCE_ID` to `.env` | New installs get consistent instance tracking |
 
 ## Upgrade Steps
 

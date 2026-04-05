@@ -34,6 +34,21 @@ func resolveSpaceID(cmd *cobra.Command) string {
 	return ""
 }
 
+// resolveInstanceID returns the instance ID using the following priority:
+//  1. Explicit value (from flag)
+//  2. MDEMG_INSTANCE_ID environment variable
+//  3. Auto-generate as "{hostname}-{spaceID}"
+func resolveInstanceID(explicit, spaceID string) string {
+	if explicit != "" {
+		return explicit
+	}
+	if v := os.Getenv("MDEMG_INSTANCE_ID"); v != "" {
+		return v
+	}
+	hostname, _ := os.Hostname()
+	return fmt.Sprintf("%s-%s", hostname, spaceID)
+}
+
 // Build-time variables set via -ldflags
 var (
 	Version   = "dev"

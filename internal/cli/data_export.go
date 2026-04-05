@@ -41,11 +41,8 @@ detected, the export is blocked and no archive is created.`,
 				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
 
-			// Resolve instance ID: flag > MDEMG_INSTANCE_ID env > empty (all instances)
-			if instanceID == "" {
-				instanceID = os.Getenv("MDEMG_INSTANCE_ID")
-			}
-			// No auto-detection fallback — empty means "all instances for this space"
+			// Resolve instance ID: flag > MDEMG_INSTANCE_ID env > auto-generate
+			instanceID = resolveInstanceID(instanceID, spaceID)
 
 			// Parse time range
 			var fromTime, toTime time.Time
