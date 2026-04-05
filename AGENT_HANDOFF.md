@@ -58,6 +58,12 @@ WHAT REMAINS TO BE DONE:
   - Extracted `resolveInstanceID()` helper with 6 unit tests (flag > env > auto-generate)
   - E2E validation: 10/10 tests PASS (export, UTDS 36/36, quality_filter, format_converter, dataset_versioner, multi-source merge, train dry-run, export-auto, regression)
   - Remaining gaps (future): G3 (quality_filter --archive), G4 (data import), G5 (DevSpace gRPC), G7 (PYTHONPATH), G8 (pipeline script), G9 (export-auto UTDS)
+- ✅ Codebase Hardening + Operational Readiness (2026-04-05) — v0.7.0:
+  - P0 fixes: RRF activation seeding (BM25-only candidates no longer suppressed), pre-bash fail-closed guard, schema version 23 across all deploy configs + CI validation
+  - P1 fixes: Signal learner Neo4j persistence (V0024, 30s flush), goroutine WaitGroup tracking, per-space consolidation TryLock, cache key completeness, nil-safe embedder
+  - P2 fixes: Config.Validate() cross-field checks, pool metrics collector, writeback 10s timeout, sidecar confidence floor for NLI scorer
+  - Scheduled maintenance LaunchAgent (weekly decay + prune)
+  - 4 unit tests for activation seeding, all existing tests pass
 - ✅ Init Config Propagation + Hook Port Discovery (2026-04-05) — v0.6.1:
   - Issue #265: `mdemg init` now writes Jiminy env vars to `.env` (JIMINY_ENABLED, synthesis model/provider, evaluate model/provider) for both native and Docker paths
   - Issue #267: Hook templates use runtime port discovery (`.mdemg.port` → `.env` MDEMG_PORT → 9999) instead of hardcoded URL baked at install time

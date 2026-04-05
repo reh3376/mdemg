@@ -263,10 +263,12 @@ Subcommands: `install`, `uninstall`, `status`, `restart`, `logs`
 
 Install OS-level process supervision for MDEMG services. On macOS, installs LaunchAgent plists to `~/Library/LaunchAgents/` and bootstraps them via `launchctl`. On Linux, copies systemd unit files and runs `systemctl daemon-reload && systemctl enable`.
 
-Three services are supervised:
+Five services are supervised:
 - **mdemg server** — main HTTP API server (KeepAlive, auto-restart on crash)
 - **neural sidecar** — Python embedding/inference sidecar (KeepAlive)
 - **ingest timer** — periodic `ingest-claude-md` every 30 minutes (timer-based)
+- **training export** — daily training data export with retention (`--keep N`)
+- **maintenance** — weekly decay + prune cycle (`mdemg maintenance --space-id <id>`)
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
