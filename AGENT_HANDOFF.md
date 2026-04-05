@@ -58,6 +58,14 @@ WHAT REMAINS TO BE DONE:
   - Extracted `resolveInstanceID()` helper with 6 unit tests (flag > env > auto-generate)
   - E2E validation: 10/10 tests PASS (export, UTDS 36/36, quality_filter, format_converter, dataset_versioner, multi-source merge, train dry-run, export-auto, regression)
   - Remaining gaps (future): G3 (quality_filter --archive), G4 (data import), G5 (DevSpace gRPC), G7 (PYTHONPATH), G8 (pipeline script), G9 (export-auto UTDS)
+- ✅ Init Config Propagation + Hook Port Discovery (2026-04-05) — v0.6.1:
+  - Issue #265: `mdemg init` now writes Jiminy env vars to `.env` (JIMINY_ENABLED, synthesis model/provider, evaluate model/provider) for both native and Docker paths
+  - Issue #267: Hook templates use runtime port discovery (`.mdemg.port` → `.env` MDEMG_PORT → 9999) instead of hardcoded URL baked at install time
+  - All 5 hook templates include `# MDEMG` marker for lifecycle management
+  - Upstreamed hook customizations: staleness check, ingest error logging, prune-guard error capture
+  - `mdemg init` force-updates hooks to latest templates on re-run
+  - 4 new unit tests (marker, no placeholder, shell port discovery, python port discovery)
+  - Integration verified: Jiminy propagation, port cascade, no .env duplicates
 - ✅ Graph Health User Upgrade Sprint (2026-04-05) — v0.6.0 release prep:
   - V0023 self-healing migration: batched SymbolNode dedup before uniqueness constraint
   - `mdemg graph repair` command: weight-preserving dedup with CO_ACTIVATED_WITH edge aggregation

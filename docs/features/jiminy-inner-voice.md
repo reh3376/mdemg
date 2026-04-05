@@ -168,6 +168,20 @@ Additional CMS config: `CMS_JIMINY_BASE_CONFIDENCE` (default: `0.5`) — base co
 | JiminyOutcomeCacheSize | `256` | `JIMINY_OUTCOME_CACHE_SIZE` | LRU cache capacity for classifications |
 | JiminySynthesisTemperature | (API default) | `JIMINY_SYNTHESIS_TEMPERATURE` | Optional temperature override (J15) |
 
+### Docker Deployment
+
+When running via Docker Compose, Jiminy configuration is propagated from `.env` to the container. Running `mdemg init --defaults` (or answering "yes" to the Jiminy prompt) writes the following to `.env`:
+
+```bash
+JIMINY_ENABLED=true
+JIMINY_SYNTHESIS_MODEL=gpt-5.4-nano      # or your chosen model
+JIMINY_EVALUATE_LLM_MODEL=gpt-5.4-nano
+JIMINY_SYNTHESIS_PROVIDER=openai          # inherits from LLM_PROVIDER
+JIMINY_EVALUATE_LLM_PROVIDER=openai
+```
+
+The `docker-compose.yml` template passes these through with empty defaults — the server's `FromEnv()` falls back to `LLM_PROVIDER`/`LLM_MODEL` when sub-settings are unset. If `.env` does not contain `JIMINY_ENABLED`, Docker Compose defaults to `false`.
+
 ## Hook Integration
 
 Jiminy guidance is injected via Claude Code hooks that run on every user prompt submission.
