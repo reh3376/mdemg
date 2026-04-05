@@ -519,7 +519,7 @@ func runInit(flags initFlags) error {
 		}
 		if installClaude {
 			serverURL := fmt.Sprintf("http://localhost:%d", opts.ServerPort)
-			installed, err := InstallClaudeHooks(cwd, opts.SpaceID, serverURL, false)
+			installed, err := InstallClaudeHooks(cwd, opts.SpaceID, serverURL, true)
 			if err != nil {
 				fmt.Printf("  Warning: Claude Code hook installation failed: %v\n", err)
 			} else {
@@ -564,6 +564,29 @@ func runInit(flags initFlags) error {
 		}
 		if !envContains(envLines, "LLM_INTERACTION_LOGGING") {
 			envLines = append(envLines, "LLM_INTERACTION_LOGGING=true")
+		}
+	}
+
+	// Add Jiminy env vars when user enabled Jiminy during init
+	if opts.JiminyEnabled {
+		if !envContains(envLines, "JIMINY_ENABLED") {
+			envLines = append(envLines, "JIMINY_ENABLED=true")
+		}
+		if opts.JiminyModel != "" {
+			if !envContains(envLines, "JIMINY_SYNTHESIS_MODEL") {
+				envLines = append(envLines, fmt.Sprintf("JIMINY_SYNTHESIS_MODEL=%s", opts.JiminyModel))
+			}
+			if !envContains(envLines, "JIMINY_EVALUATE_LLM_MODEL") {
+				envLines = append(envLines, fmt.Sprintf("JIMINY_EVALUATE_LLM_MODEL=%s", opts.JiminyModel))
+			}
+		}
+		if opts.JiminyProvider != "" {
+			if !envContains(envLines, "JIMINY_SYNTHESIS_PROVIDER") {
+				envLines = append(envLines, fmt.Sprintf("JIMINY_SYNTHESIS_PROVIDER=%s", opts.JiminyProvider))
+			}
+			if !envContains(envLines, "JIMINY_EVALUATE_LLM_PROVIDER") {
+				envLines = append(envLines, fmt.Sprintf("JIMINY_EVALUATE_LLM_PROVIDER=%s", opts.JiminyProvider))
+			}
 		}
 	}
 
@@ -761,10 +784,15 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"GRAFANA_PASSWORD":     true,
 		"TSDB_PASSWORD":        true,
 		"TSDB_ENABLED":         true,
-		"NEO4J_PAGECACHE":      true,
-		"NEO4J_HEAP_INIT":      true,
-		"NEO4J_HEAP_MAX":       true,
-		"NEO4J_MAX_POOL_SIZE":  true,
+		"NEO4J_PAGECACHE":              true,
+		"NEO4J_HEAP_INIT":              true,
+		"NEO4J_HEAP_MAX":               true,
+		"NEO4J_MAX_POOL_SIZE":          true,
+		"JIMINY_ENABLED":               true,
+		"JIMINY_SYNTHESIS_MODEL":       true,
+		"JIMINY_SYNTHESIS_PROVIDER":    true,
+		"JIMINY_EVALUATE_LLM_MODEL":    true,
+		"JIMINY_EVALUATE_LLM_PROVIDER": true,
 	}
 
 	// Detect system RAM and compute Neo4j memory tier
@@ -801,6 +829,23 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		fmt.Sprintf("NEO4J_HEAP_MAX=%s", memCfg.HeapMax),
 		fmt.Sprintf("NEO4J_MAX_POOL_SIZE=%d", memCfg.MaxPoolSize),
 	)
+
+	// Add Jiminy env vars when user enabled Jiminy during init
+	if opts.JiminyEnabled {
+		filtered = append(filtered, "JIMINY_ENABLED=true")
+		if opts.JiminyModel != "" {
+			filtered = append(filtered,
+				fmt.Sprintf("JIMINY_SYNTHESIS_MODEL=%s", opts.JiminyModel),
+				fmt.Sprintf("JIMINY_EVALUATE_LLM_MODEL=%s", opts.JiminyModel),
+			)
+		}
+		if opts.JiminyProvider != "" {
+			filtered = append(filtered,
+				fmt.Sprintf("JIMINY_SYNTHESIS_PROVIDER=%s", opts.JiminyProvider),
+				fmt.Sprintf("JIMINY_EVALUATE_LLM_PROVIDER=%s", opts.JiminyProvider),
+			)
+		}
+	}
 
 	// Add MDEMG_INSTANCE_ID if not already present
 	if !envContains(filtered, "MDEMG_INSTANCE_ID") {
