@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-04-05
+
 ### Fixed
 
 - `mdemg init` now propagates Jiminy config (`JIMINY_ENABLED`, synthesis model/provider, evaluate model/provider) to `.env` for Docker Compose (#265)
