@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -25,6 +26,9 @@ type Service struct {
 	pipeline   *Pipeline
 	cbRegistry *circuitbreaker.Registry
 	edgePruner EdgePruner // optional; nil if auto-prune is disabled
+
+	// Per-space consolidation lock: prevents concurrent consolidation on the same space
+	consolidateLocks sync.Map // map[string]*sync.Mutex
 }
 
 // NewService creates a new hidden layer service.
@@ -1534,6 +1538,15 @@ RETURN count(h) AS updated`
 // RunConsolidation performs a full consolidation: clustering + forward + backward pass
 // Multi-layer hierarchy: base (L0) → hidden (L1) → concepts (L2, L3, ...)
 func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*ConsolidationResult, error) {
+	// Per-space lock: prevent concurrent consolidation from creating duplicate concepts
+	muI, _ := s.consolidateLocks.LoadOrStore(spaceID, &sync.Mutex{})
+	mu := muI.(*sync.Mutex)
+	if !mu.TryLock() {
+		slog.Warn("consolidation: skipping — already running for space", "space_id", spaceID)
+		return &ConsolidationResult{Skipped: true}, nil
+	}
+	defer mu.Unlock()
+
 	start := time.Now()
 	result := &ConsolidationResult{
 		ConceptNodesCreated: make(map[int]int),
