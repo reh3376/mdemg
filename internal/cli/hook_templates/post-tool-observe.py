@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MDEMG hook — managed by mdemg hooks install
 """
 Hook: PostToolUse — auto-capture observations after significant tool completions.
 Fires-and-forgets a CMS observe call for noteworthy events.
@@ -10,7 +11,31 @@ import subprocess
 import sys
 import time
 
-MDEMG_URL = os.environ.get("MDEMG_URL", "{{MDEMG_URL}}")
+
+def _resolve_mdemg_url() -> str:
+    """Discover MDEMG URL: env > .mdemg.port > .env MDEMG_PORT > 9999."""
+    url = os.environ.get("MDEMG_URL")
+    if url:
+        return url
+    port = None
+    try:
+        with open(".mdemg.port") as f:
+            port = f.read().strip()
+    except FileNotFoundError:
+        pass
+    if not port:
+        try:
+            with open(".env") as f:
+                for line in f:
+                    if line.startswith("MDEMG_PORT="):
+                        port = line.split("=", 1)[1].strip()
+                        break
+        except FileNotFoundError:
+            pass
+    return f"http://localhost:{port or '9999'}"
+
+
+MDEMG_URL = _resolve_mdemg_url()
 SESSION_ID = "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -311,8 +336,13 @@ def ingest_with_prune_guard(file_path: str):
             stdout=log_fd,
             stderr=log_fd,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        try:
+            with open(INGEST_LOG, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}] "
+                        f"post-tool ingest FAILED for {file_path}: {e}\n")
+        except Exception:
+            pass
 
 
 def check_memory_overflow(file_path: str):

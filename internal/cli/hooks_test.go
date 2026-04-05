@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -206,5 +207,68 @@ func TestMergeClaudeSettingsPreservesExisting(t *testing.T) {
 	hooks := root["hooks"].(map[string]interface{})
 	if _, ok := hooks["CustomEvent"]; !ok {
 		t.Error("existing CustomEvent hook was not preserved")
+	}
+}
+
+func TestHookTemplates_HaveMDEMGMarker(t *testing.T) {
+	for _, hf := range claudeHookFiles() {
+		data, err := hook_templates.FS.ReadFile(hf.Template)
+		if err != nil {
+			t.Fatalf("read %s: %v", hf.Template, err)
+		}
+		lines := strings.SplitN(string(data), "\n", 6) // first 5 lines
+		found := false
+		for _, line := range lines {
+			if strings.Contains(line, "# MDEMG") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("%s: missing '# MDEMG' marker in first 5 lines", hf.Template)
+		}
+	}
+}
+
+func TestHookTemplates_NoMDEMGURLPlaceholder(t *testing.T) {
+	for _, hf := range claudeHookFiles() {
+		data, err := hook_templates.FS.ReadFile(hf.Template)
+		if err != nil {
+			t.Fatalf("read %s: %v", hf.Template, err)
+		}
+		if strings.Contains(string(data), "{{MDEMG_URL}}") {
+			t.Errorf("%s: still contains {{MDEMG_URL}} placeholder", hf.Template)
+		}
+	}
+}
+
+func TestHookTemplates_ShellPortDiscovery(t *testing.T) {
+	shellTemplates := []string{"session-start.sh", "prompt-context.sh", "pre-compact.sh"}
+	for _, name := range shellTemplates {
+		data, err := hook_templates.FS.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		content := string(data)
+		if !strings.Contains(content, ".mdemg.port") {
+			t.Errorf("%s: missing .mdemg.port port discovery", name)
+		}
+		if !strings.Contains(content, "MDEMG_PORT") {
+			t.Errorf("%s: missing .env MDEMG_PORT fallback", name)
+		}
+	}
+}
+
+func TestHookTemplates_PythonPortDiscovery(t *testing.T) {
+	data, err := hook_templates.FS.ReadFile("post-tool-observe.py")
+	if err != nil {
+		t.Fatalf("read post-tool-observe.py: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "_resolve_mdemg_url") {
+		t.Error("post-tool-observe.py: missing _resolve_mdemg_url function")
+	}
+	if !strings.Contains(content, ".mdemg.port") {
+		t.Error("post-tool-observe.py: missing .mdemg.port port discovery")
 	}
 }

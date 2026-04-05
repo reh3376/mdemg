@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MDEMG hook — managed by mdemg hooks install
 """
 Hook: PreToolUse (Bash) — block destructive commands without user confirmation.
 Reads tool input from stdin JSON, checks against destructive patterns, and

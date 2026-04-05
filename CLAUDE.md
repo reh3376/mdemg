@@ -150,7 +150,7 @@ These env vars are forwarded in the compose template. Set in `.env`, or enable v
 
 - `QUERY_CLASSIFY_ENABLED` — LLM query type classification (default: true)
 - `INTENT_ENABLED` — query rewriting before embedding (default: false)
-- `JIMINY_ENABLED` — Jiminy inner-voice guidance (default: false)
+- `JIMINY_ENABLED` — Jiminy inner-voice guidance (default: false in compose, `mdemg init --defaults` writes `true` + sub-settings to `.env`)
 - `EMERGENCE_ENABLED` — LLM-driven concept naming (default: false)
 - `LLM_INTERACTION_LOGGING` — TSDB LLM interaction recording (default: true)
 - `AUTO_MIGRATE` — unified Neo4j + TSDB schema migration on startup (default: true in Docker)
@@ -158,6 +158,7 @@ These env vars are forwarded in the compose template. Set in `.env`, or enable v
 ## Architecture Notes
 
 - **Compose embed:** `mdemg init` writes `docker-compose.yml` from `internal/cli/compose_templates/` (both files must stay in sync — CI checks this)
+- **Hook port discovery:** Hooks auto-discover MDEMG server port at runtime (`.mdemg.port` → `.env` MDEMG_PORT → 9999). No URL baked at install time.
 - **LaunchAgent embed:** `mdemg service install` reads templates from `packaging/launchd/` embedded via `embed.FS`
 - **LLM recorder init order:** `llmclient.SetDefaultRecorder()` MUST be called BEFORE `api.NewServer()` — clients capture the recorder at construction time. See `internal/cli/serve.go` early writer block.
 - **Context helpers:** `WithSpaceID(ctx, id)` and `WithSessionID(ctx, id)` carry request-scoped values to TSDB recording, overriding construction-time defaults in `recordInteraction()`

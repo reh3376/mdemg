@@ -1031,13 +1031,15 @@ Install MDEMG git hooks into the repository's `.git/hooks/` directory.
 | `--type` | string | `"git"` | Hook type to install: `git`, `claude`, or `all` |
 | `--force` | bool | `false` | Overwrite existing hooks |
 | `--space-id` | string | `""` | Space ID to configure in hooks |
-| `--server-url` | string | `""` | MDEMG server URL to configure in hooks |
+| `--server-url` | string | `""` | MDEMG server URL (legacy — hooks now auto-discover port at runtime) |
+
+> **Note (v0.6.1+):** Claude hooks auto-discover the MDEMG server port at runtime using a three-level cascade: `MDEMG_URL` env var → `.mdemg.port` file → `.env` `MDEMG_PORT` → fallback `9999`. The `--server-url` flag is retained for backward compatibility but is no longer baked into hook templates. Running `mdemg init` force-updates hooks to the latest templates.
 
 **Usage Examples:**
 ```bash
 mdemg hooks install
 mdemg hooks install --force --space-id my-project
-mdemg hooks install --type claude --server-url http://localhost:9999
+mdemg hooks install --type claude --space-id my-project
 mdemg hooks install --type all --space-id my-project --force
 ```
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `mdemg init` now propagates Jiminy config (`JIMINY_ENABLED`, synthesis model/provider, evaluate model/provider) to `.env` for Docker Compose (#265)
+- Hook templates use runtime port discovery instead of hardcoded URL (#267) — reads `.mdemg.port` → `.env` MDEMG_PORT → fallback 9999
+- Claude hook templates include `# MDEMG` marker for lifecycle management (install/uninstall/re-install)
+- Hook template ingest error logging upstreamed from installed hooks (session-start staleness check, pre-compact error capture, post-tool ingest failure logging)
+
+### Changed
+
+- `mdemg init` force-updates hooks to latest templates on re-run (ensures port discovery and markers are deployed)
+
 ## [0.6.0] - 2026-04-05
 
 ### Added

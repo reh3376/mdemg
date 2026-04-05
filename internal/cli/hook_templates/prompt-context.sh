@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
+# MDEMG hook — managed by mdemg hooks install
 # Hook: UserPromptSubmit — recall relevant CMS context for each user prompt
 # Reads the user's prompt from stdin JSON and queries CMS for relevant memory.
 
 set -euo pipefail
 
-MDEMG_URL="${MDEMG_URL:-{{MDEMG_URL}}}"
+# MDEMG server URL: env > .mdemg.port > .env MDEMG_PORT > 9999
+if [ -z "${MDEMG_URL:-}" ]; then
+    if [ -f ".mdemg.port" ]; then
+        _PORT=$(tr -d '[:space:]' < .mdemg.port)
+    elif [ -f ".env" ]; then
+        _PORT=$(sed -n 's/^MDEMG_PORT=//p' .env 2>/dev/null | tr -d '[:space:]')
+    fi
+    MDEMG_URL="http://localhost:${_PORT:-9999}"
+fi
 
 get_space_id() {
     if [ -n "${MDEMG_SPACE_ID:-}" ]; then
