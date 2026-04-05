@@ -615,30 +615,41 @@ RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
 	}
 	detached := result.(int)
 
-	// Remove orphaned HiddenPattern nodes (no remaining members)
+	// Remove orphaned HiddenPattern nodes (no remaining members).
+	// Batched to prevent OOM on large graphs — each iteration deletes
+	// up to orphanBatchSize nodes in its own transaction.
 	if detached > 0 {
-		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			res, err := tx.Run(ctx, `
+		const orphanBatchSize = 500
+		totalRemoved := 0
+		for {
+			removed, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				res, err := tx.Run(ctx, `
 MATCH (h:HiddenPattern {space_id: $spaceId, layer: 1})
 WHERE NOT ()-[:GENERALIZES]->(h)
+WITH h LIMIT $limit
 DETACH DELETE h
-RETURN count(h) AS removed`, map[string]any{"spaceId": spaceID})
-			if err != nil {
-				return 0, err
-			}
-			if res.Next(ctx) {
-				rec := res.Record()
-				cnt, _ := rec.Get("removed")
-				removed := asInt(cnt)
-				if removed > 0 {
-					slog.Info("CreateHiddenNodes: removed orphaned HiddenPattern nodes", "count", removed)
+RETURN count(h) AS removed`, map[string]any{"spaceId": spaceID, "limit": orphanBatchSize})
+				if err != nil {
+					return 0, err
 				}
-				return removed, res.Err()
+				if res.Next(ctx) {
+					rec := res.Record()
+					cnt, _ := rec.Get("removed")
+					return asInt(cnt), res.Err()
+				}
+				return 0, res.Err()
+			})
+			if err != nil {
+				return detached, fmt.Errorf("cleanup orphaned hidden nodes: %w", err)
 			}
-			return 0, res.Err()
-		})
-		if err != nil {
-			return detached, fmt.Errorf("cleanup orphaned hidden nodes: %w", err)
+			batch := removed.(int)
+			totalRemoved += batch
+			if batch == 0 {
+				break
+			}
+		}
+		if totalRemoved > 0 {
+			slog.Info("CreateHiddenNodes: removed orphaned HiddenPattern nodes", "count", totalRemoved)
 		}
 	}
 

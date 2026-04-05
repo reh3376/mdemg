@@ -1591,22 +1591,25 @@ Apply time-based decay to Hebbian learning edges (CO_ACTIVATED_WITH) and prune e
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--decay-rate` | float64 | `0.1` | Weight decay rate per day of inactivity |
+| `--decay-rate` | float64 | `0.02` | Evidence-weighted decay rate (applied as rate/sqrt(evidence)) |
 | `--prune-threshold` | float64 | `0.01` | Weight threshold below which edges are pruned |
 | `--min-evidence` | int | `3` | Minimum evidence_count to protect from pruning |
 | `--older-than` | int | `7` | Only process edges older than N days |
 | `--dry-run` | bool | `true` | Preview mode -- no modifications |
 | `--space-id` | string | `""` | Space ID to process (or set `MDEMG_SPACE_ID`) |
+| `--max-decay-percent` | float64 | `50.0` | Maximum allowed decay percentage per run (safety cap) |
 | `--batch-size` | int | `1000` | Process items in batches of this size |
+
+The decay formula is evidence-weighted: `effective_rate = decay_rate / sqrt(evidence_count)`. Edges with more evidence decay slower. The `--max-decay-percent` cap prevents catastrophic weight loss in any single run.
 
 **Usage Examples:**
 ```bash
 mdemg decay --space-id codebase --dry-run=false
-mdemg decay --decay-rate 0.2 --prune-threshold 0.05 --older-than 14
+mdemg decay --decay-rate 0.05 --prune-threshold 0.05 --older-than 14
 mdemg decay --space-id codebase --dry-run
 ```
 
-**See Also:** `mdemg prune`, `mdemg consolidate`
+**See Also:** `mdemg prune`, `mdemg consolidate`, `mdemg maintenance`
 
 ---
 
@@ -1646,15 +1649,93 @@ Prune weak edges, tombstone orphan nodes, and optionally merge redundant nodes. 
 | `--dry-run` | bool | `true` | Preview mode -- no modifications |
 | `--space-id` | string | `""` | Space ID to process (or set `MDEMG_SPACE_ID`) |
 | `--batch-size` | int | `1000` | Process items in batches of this size |
+| `--match-ignore` | bool | `false` | Delete nodes with `file_path` matching `.mdemgignore` patterns |
+| `--include-labels` | strings | `MemoryNode` | Labels to scan for orphans (e.g. `MemoryNode,SymbolNode,Observation`) |
 
 **Usage Examples:**
 ```bash
 mdemg prune --space-id codebase --dry-run
 mdemg prune --space-id codebase --dry-run=false --weight-threshold 0.05
 mdemg prune --merge-enabled --similarity-threshold 0.95 --dry-run=false
+mdemg prune --match-ignore --include-labels MemoryNode,SymbolNode --dry-run
 ```
 
-**See Also:** `mdemg decay`, `mdemg consolidate`
+**See Also:** `mdemg decay`, `mdemg consolidate`, `mdemg graph repair`
+
+---
+
+### `mdemg graph repair`
+
+**Synopsis:** `mdemg graph repair [flags]`
+
+Repairs common graph health issues. Run this before upgrading to v0.6.0+ which includes the SymbolNode natural-key uniqueness constraint (V0023). The repair is idempotent and safe to run multiple times.
+
+**Steps performed (in order):**
+
+1. **Vendor cleanup** — removes nodes matching `.mdemgignore` patterns
+2. **SymbolNode dedup** — merges duplicates by `(space_id, name, file_path, symbol_type)`, keeps oldest node, aggregates CO_ACTIVATED_WITH edge weights
+3. **Orphan sweep** — removes orphaned SymbolNodes and Observations
+4. **Embedding backfill** — generates embeddings for nodes missing them
+5. **V0023 readiness check** — counts remaining duplicate groups, reports READY/NOT READY
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `""` | Space to repair (required) |
+| `--dry-run` | bool | `true` | Preview mode -- no modifications |
+| `--batch-size` | int | `500` | Process items in batches of this size |
+
+**Usage Examples:**
+```bash
+mdemg graph repair --space-id myspace --dry-run        # Preview
+mdemg graph repair --space-id myspace --dry-run=false   # Execute
+```
+
+**See Also:** `mdemg prune`, `mdemg maintenance`, `mdemg embeddings backfill`
+
+---
+
+### `mdemg maintenance`
+
+**Synopsis:** `mdemg maintenance [flags]`
+
+Runs a full maintenance cycle: edge decay followed by orphan pruning. Equivalent to running `mdemg decay` then `mdemg prune` with sensible defaults. Suitable for scheduling via launchd, systemd, or cron.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `""` | Space to maintain (required) |
+| `--dry-run` | bool | `true` | Preview mode -- no modifications |
+
+**Usage Examples:**
+```bash
+mdemg maintenance --space-id myspace --dry-run          # Preview
+mdemg maintenance --space-id myspace --dry-run=false     # Execute
+
+# Schedule weekly via cron
+0 3 * * 0 /usr/local/bin/mdemg maintenance --space-id myspace --dry-run=false
+```
+
+**See Also:** `mdemg decay`, `mdemg prune`, `mdemg graph repair`
+
+---
+
+### `mdemg embeddings backfill`
+
+**Synopsis:** `mdemg embeddings backfill [flags]`
+
+Find MemoryNodes with content but missing embeddings and generate embeddings using the configured embedding provider.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `""` | Space to backfill (required) |
+| `--dry-run` | bool | `false` | Only count nodes needing embeddings |
+
+**Usage Examples:**
+```bash
+mdemg embeddings backfill --space-id myspace --dry-run   # Count missing
+mdemg embeddings backfill --space-id myspace              # Fill missing
+```
+
+**See Also:** `mdemg embeddings check`, `mdemg graph repair`
 
 ---
 

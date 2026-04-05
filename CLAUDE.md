@@ -88,6 +88,14 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 3. **Code investigation** → Use general-purpose agent with sonnet
 4. **Planning** → Use Plan agent with sonnet/opus
 
+### Sprint Plan Format (v1.0)
+All sprint development plans follow the standardized 12-section format.
+Recall: `POST /v1/skills/sprint-planning/recall` or `filter_tags: ["skill:sprint-planning"]`.
+Required sections: Header & Metadata, Problem Statement, Scope & Constraints,
+Dependencies, Implementation Plan (sequential epics + gates), Testing Plan (3 tiers),
+Commit Strategy, Verification Checklist, Documentation Update (final epic — never cut),
+Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destructive ops).
+
 ## Project Context
 
 **MDEMG** — Cognitive substrate for AI-assisted development. Persistent emergent long-term memory via Hebbian learning, 5-layer hierarchy, RSIC self-improvement. 105 core phases + sidecar phases complete.
@@ -111,6 +119,9 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 - `mdemg upgrade` — self-update binary + all running Docker instances
 - `mdemg upgrade --docker-only` — update Docker instances only (used by brew post-install)
 - `mdemg upgrade --no-docker` — update binary only, skip Docker
+- `mdemg graph repair --space-id <id>` — weight-preserving SymbolNode dedup, vendor cleanup, orphan sweep, embedding backfill
+- `mdemg maintenance --space-id <id>` — combined decay + prune cycle (schedulable via cron/launchd)
+- `mdemg embeddings backfill --space-id <id>` — fill missing embeddings on MemoryNodes
 
 ## Teardown
 - `mdemg teardown --export` backs up TSDB (pg_dump) before destroying Docker volumes (Phase 0b)
@@ -123,15 +134,20 @@ Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev
 - COMPOSE_PROJECT_NAME=mdemg-{dirname} provides isolation
 - Known limitation: LaunchAgent labels not instance-scoped
 
-## Graph Health (In Progress)
-- 6 bugs, 4 gaps identified — see assessment report
-- Key issues: SymbolNode dedup (BUG-1), vendor nodes 44.7% of graph (BUG-2), two decay systems (BUG-5)
+## Graph Health (v0.6.0 — Complete)
+- BUG-1 (SymbolNode dedup): Fixed — natural-key MERGE + V0023 uniqueness constraint
+- BUG-2 (vendor nodes): Fixed — `prune --match-ignore` + `graph repair` vendor cleanup
+- BUG-5 (dual decay): Fixed — unified evidence-weighted formula, decay-rate default 0.02
+- BUG-6 (prune label scope): Fixed — `--include-labels` flag
+- V0023 migration self-heals: dedup before constraint, safe on any graph
+- Hidden layer OOM: Fixed — batched orphan HiddenPattern deletion
+- `QUERY_CLASSIFY_ENABLED` compose default changed from `false` to `true`
 
 ## Campaign Configuration
 
 These env vars are forwarded in the compose template. Set in `.env`, or enable via `mdemg init` interactive prompt:
 
-- `QUERY_CLASSIFY_ENABLED` — LLM query type classification (default: false)
+- `QUERY_CLASSIFY_ENABLED` — LLM query type classification (default: true)
 - `INTENT_ENABLED` — query rewriting before embedding (default: false)
 - `JIMINY_ENABLED` — Jiminy inner-voice guidance (default: false)
 - `EMERGENCE_ENABLED` — LLM-driven concept naming (default: false)

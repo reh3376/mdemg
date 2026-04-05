@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-03
-**Branch:** `reh3376_dev01`
+**Date:** 2026-04-05
+**Branch:** `reh3376_dev02`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
@@ -47,10 +47,18 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FT Infrastructure Sprint — COMPLETE (4 phases: A=SanitizeResponse+prompt hash, B=RAFT context enrichment, C=ULTS spec framework, D=embedding/retrieval data collection)
 - FT-DATA Sprint — COMPLETE (8 phases: UTDS spec framework, TSDB exporter+CLI+API, browser UI tab, quality_filter.py, format_converter.py, dataset_versioner.py, round-trip verification, documentation)
 - FT Training Pipeline — COMPLETE (PRs #243-250: PROD-READINESS, compose embed, export-auto LaunchAgent, vllm-mlx/train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py/21 GRPO rewards, quantize_deploy.py)
-- CI: ALL GREEN (push + pull_request + release) as of 2026-04-02
-- Latest releases: CLI v0.5.3, GHCR mdemg:v0.5.3, GHCR neural-sidecar:v0.5.3, menubar v1.8.0, sidebar v0.3.0
+- CI: ALL GREEN (push + pull_request + release) as of 2026-04-03
+- Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-05) ===
+- ✅ Graph Health User Upgrade Sprint (2026-04-05) — v0.6.0 release prep:
+  - V0023 self-healing migration: batched SymbolNode dedup before uniqueness constraint
+  - `mdemg graph repair` command: weight-preserving dedup with CO_ACTIVATED_WITH edge aggregation
+  - Hidden layer OOM fix: batched orphan HiddenPattern deletion (500/tx)
+  - Live validation fixes: python3 symlink, QUERY_CLASSIFY_ENABLED default, pre-campaign check, curation pipeline args
+  - Live validation: 15/15 non-destructive PASS, 1 PARTIAL (launchd), 3 SKIP (destructive)
+  - Documentation: CLI reference, upgrade guide, changelog, homebrew README, beta testing, CLAUDE.md
 === COMPLETED SINCE LAST HANDOFF (2026-04-02) ===
 - ✅ Live Validation Hardening (2026-04-03) — Campaign hardening via PR #254:
   - PR #254: WithSpaceID context, compose env vars, campaign init prompt, migration 010, live_validation.py (19 tests), docker-publish cron
