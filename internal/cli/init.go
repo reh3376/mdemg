@@ -567,6 +567,13 @@ func runInit(flags initFlags) error {
 		}
 	}
 
+	// Add MDEMG_INSTANCE_ID if not already present
+	if !envContains(envLines, "MDEMG_INSTANCE_ID") {
+		hostname, _ := os.Hostname()
+		iid := fmt.Sprintf("%s-%s", hostname, opts.SpaceID)
+		envLines = append(envLines, fmt.Sprintf("MDEMG_INSTANCE_ID=%s", iid))
+	}
+
 	if err := os.WriteFile(envPath, []byte(strings.Join(envLines, "\n")+"\n"), 0600); err != nil {
 		fmt.Printf("  Warning: could not write .env: %v\n", err)
 	} else {
@@ -794,6 +801,13 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		fmt.Sprintf("NEO4J_HEAP_MAX=%s", memCfg.HeapMax),
 		fmt.Sprintf("NEO4J_MAX_POOL_SIZE=%d", memCfg.MaxPoolSize),
 	)
+
+	// Add MDEMG_INSTANCE_ID if not already present
+	if !envContains(filtered, "MDEMG_INSTANCE_ID") {
+		hostname, _ := os.Hostname()
+		iid := fmt.Sprintf("%s-%s", hostname, opts.SpaceID)
+		filtered = append(filtered, fmt.Sprintf("MDEMG_INSTANCE_ID=%s", iid))
+	}
 
 	if err := os.WriteFile(envPath, []byte(strings.Join(filtered, "\n")+"\n"), 0600); err != nil {
 		return fmt.Errorf("write .env: %w", err)

@@ -37,9 +37,8 @@ Designed for use with launchd/systemd timers (see mdemg service install).`,
 				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
 
-			// Resolve instance ID: MDEMG_INSTANCE_ID env > empty (all instances)
-			instanceID := os.Getenv("MDEMG_INSTANCE_ID")
-			// No auto-detection fallback — empty means "all instances for this space"
+			// Resolve instance ID: MDEMG_INSTANCE_ID env > auto-generate
+			instanceID := resolveInstanceID("", spaceID)
 
 			// Resolve output directory
 			if outputDir == "" {

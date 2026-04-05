@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
 **Date:** 2026-04-05
-**Branch:** `reh3376_dev02`
+**Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
@@ -52,6 +52,12 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-05) ===
+- ✅ Training Data Export E2E Fix (2026-04-05) — P0 blocking bug fix:
+  - G1: `data export` and `data export-auto` auto-generate `instance_id` as `{hostname}-{space_id}` when `MDEMG_INSTANCE_ID` not set
+  - G2: `mdemg init` writes `MDEMG_INSTANCE_ID` to `.env` (both native and Docker modes)
+  - Extracted `resolveInstanceID()` helper with 6 unit tests (flag > env > auto-generate)
+  - E2E validation: 10/10 tests PASS (export, UTDS 36/36, quality_filter, format_converter, dataset_versioner, multi-source merge, train dry-run, export-auto, regression)
+  - Remaining gaps (future): G3 (quality_filter --archive), G4 (data import), G5 (DevSpace gRPC), G7 (PYTHONPATH), G8 (pipeline script), G9 (export-auto UTDS)
 - ✅ Graph Health User Upgrade Sprint (2026-04-05) — v0.6.0 release prep:
   - V0023 self-healing migration: batched SymbolNode dedup before uniqueness constraint
   - `mdemg graph repair` command: weight-preserving dedup with CO_ACTIVATED_WITH edge aggregation
