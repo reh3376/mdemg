@@ -352,7 +352,6 @@ func InstallClaudeHooks(dir, spaceID, serverURL string, force bool) ([]string, e
 		// Substitute placeholders
 		content := string(tmpl)
 		content = strings.ReplaceAll(content, "{{SPACE_ID}}", spaceID)
-		content = strings.ReplaceAll(content, "{{MDEMG_URL}}", serverURL)
 
 		// Write hook script
 		if err := os.WriteFile(destPath, []byte(content), 0755); err != nil {

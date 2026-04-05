@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
+# MDEMG hook — managed by mdemg hooks install
 # Hook: SessionStart — restore CMS memory context on every session start
 # This runs automatically before Claude sees any user input.
 
 set -euo pipefail
 
-MDEMG_URL="${MDEMG_URL:-{{MDEMG_URL}}}"
+# Ensure log directory exists for all ingest/hook logging
+mkdir -p "$HOME/.mdemg/logs"
+
+# MDEMG server URL: env > .mdemg.port > .env MDEMG_PORT > 9999
+if [ -z "${MDEMG_URL:-}" ]; then
+    if [ -f ".mdemg.port" ]; then
+        _PORT=$(tr -d '[:space:]' < .mdemg.port)
+    elif [ -f ".env" ]; then
+        _PORT=$(sed -n 's/^MDEMG_PORT=//p' .env 2>/dev/null | tr -d '[:space:]')
+    fi
+    MDEMG_URL="http://localhost:${_PORT:-9999}"
+fi
 SESSION_ID="claude-core"
 MAX_OBS=10
 
@@ -145,6 +157,28 @@ if [ -x "./bin/mdemg" ]; then
   mkdir -p ~/.mdemg/logs 2>/dev/null || true
   ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" \
     2>> ~/.mdemg/logs/ingest-claude-md.log &
+fi
+
+# Staleness check: warn if periodic ingest hasn't run recently
+INGEST_LOG_PATH="$HOME/.mdemg/logs/ingest-claude-md.log"
+if [ -f "$INGEST_LOG_PATH" ] && [ -s "$INGEST_LOG_PATH" ]; then
+  LAST_INGEST_LINE=$(tail -1 "$INGEST_LOG_PATH" 2>/dev/null || true)
+  if [ -n "$LAST_INGEST_LINE" ]; then
+    LAST_TS=$(echo "$LAST_INGEST_LINE" | grep -oE '^\[[0-9T:Z-]+\]' | tr -d '[]' 2>/dev/null || true)
+    if [ -n "$LAST_TS" ]; then
+      LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      NOW_EPOCH=$(date "+%s")
+      if [ "$LAST_EPOCH" -gt 0 ] 2>/dev/null; then
+        STALE_SECS=$(( NOW_EPOCH - LAST_EPOCH ))
+        if [ "$STALE_SECS" -gt 7200 ]; then
+          STALE_HOURS=$(( STALE_SECS / 3600 ))
+          echo "⚠ Auto-ingest stale: last run was ${STALE_HOURS}h ago. Check: launchctl list | grep mdemg"
+        fi
+      fi
+    fi
+  fi
+elif [ ! -f "$INGEST_LOG_PATH" ]; then
+  echo "⚠ Auto-ingest log missing — periodic ingest may never have run."
 fi
 
 # Architecture map staleness check (respects UITS-optimized flag)
