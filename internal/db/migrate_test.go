@@ -178,7 +178,6 @@ func TestSplitStatements_V0023Dedup(t *testing.T) {
   WITH dupes[0] AS keeper, dupes[1..] AS victims
   UNWIND victims AS v
   DETACH DELETE v
-  RETURN count(v) AS removed
 } IN TRANSACTIONS OF 500 ROWS;
 
 CREATE CONSTRAINT symbol_natural_key IF NOT EXISTS
@@ -215,7 +214,6 @@ func TestDiscoverMigrations_V0023(t *testing.T) {
   WITH dupes[0] AS keeper, dupes[1..] AS victims
   UNWIND victims AS v
   DETACH DELETE v
-  RETURN count(v) AS removed
 } IN TRANSACTIONS OF 500 ROWS;
 
 CREATE CONSTRAINT symbol_natural_key IF NOT EXISTS

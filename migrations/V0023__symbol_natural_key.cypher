@@ -22,7 +22,6 @@ CALL {
   WITH dupes[0] AS keeper, dupes[1..] AS victims
   UNWIND victims AS v
   DETACH DELETE v
-  RETURN count(v) AS removed
 } IN TRANSACTIONS OF 500 ROWS;
 
 CREATE CONSTRAINT symbol_natural_key IF NOT EXISTS
