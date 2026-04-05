@@ -28,6 +28,7 @@ Environment:
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -42,6 +43,7 @@ MDEMG_BIN = "./bin/mdemg"
 SPACE_ID = "mdemg-dev"
 NEURAL_DIR = "neural"
 TSDB_FLUSH_WAIT = 35  # seconds to wait for TSDB flush
+PYTHON = shutil.which("python3") or shutil.which("python") or "python3"
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -398,24 +400,41 @@ def test_3_1_curation(results: Results):
             results.fail("3.1", "Curation pipeline", f"export failed: {r.stderr[:100]}")
             return
 
+        # Extract archive to get JSONL files
+        extract_dir = os.path.join(tmpdir, "extracted")
+        os.makedirs(extract_dir, exist_ok=True)
+        try:
+            with tarfile.open(export_path, "r:gz") as tf:
+                tf.extractall(extract_dir)
+        except tarfile.TarError as e:
+            results.fail("3.1", "Curation pipeline", f"cannot extract archive: {e}")
+            return
+
+        input_jsonl = os.path.join(extract_dir, "llm_interactions.jsonl")
+        if not os.path.exists(input_jsonl):
+            results.fail("3.1", "Curation pipeline", "no llm_interactions.jsonl in archive")
+            return
+
         # Quality filter
-        filter_out = os.path.join(tmpdir, "filtered")
+        filter_out = os.path.join(tmpdir, "filtered.jsonl")
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.quality_filter --input {export_path} --output-dir {filter_out}",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.quality_filter --input {input_jsonl} --output {filter_out}",
             check=False, timeout=120,
         )
         if r.returncode != 0:
             results.fail("3.1", "Curation pipeline", f"quality_filter failed: {r.stderr[:100]}")
             return
 
-        # Format converter
-        chat_out = os.path.join(tmpdir, "chat")
-        filtered_jsonl = list(Path(filter_out).glob("*.jsonl"))
-        if not filtered_jsonl:
+        if not os.path.exists(filter_out):
             results.fail("3.1", "Curation pipeline", "no filtered JSONL output")
             return
+
+        # Format converter — output into a dedicated directory for versioner input
+        chat_dir = os.path.join(tmpdir, "chat")
+        os.makedirs(chat_dir)
+        chat_out = os.path.join(chat_dir, "chat.jsonl")
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.format_converter --input {filtered_jsonl[0]} --output-dir {chat_out}",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.format_converter --input {filter_out} --output {chat_out}",
             check=False, timeout=60,
         )
         if r.returncode != 0:
@@ -424,12 +443,9 @@ def test_3_1_curation(results: Results):
 
         # Dataset versioner
         ds_out = os.path.join(tmpdir, "dataset")
-        chat_jsonl = list(Path(chat_out).glob("*.jsonl"))
-        if not chat_jsonl:
-            results.fail("3.1", "Curation pipeline", "no chat JSONL output")
-            return
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.dataset_versioner --input {chat_jsonl[0]} --output-dir {ds_out}",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.dataset_versioner"
+            f" --input-dir {chat_dir} --output-dir {ds_out} --version v0-test --first-cycle",
             check=False, timeout=60,
         )
         if r.returncode != 0:
@@ -445,14 +461,34 @@ def test_3_2_training_dry_run(results: Results):
     if not train_script.exists():
         results.skip("3.2", "Training dry-run", "train_ft.py not yet implemented")
         return
-    r = run_cmd(
-        f"cd {NEURAL_DIR} && python -m training.train_ft --dry-run",
-        check=False, timeout=60,
-    )
-    if r.returncode == 0:
-        results.ok("3.2", "Training dry-run")
-    else:
-        results.fail("3.2", "Training dry-run", f"exit {r.returncode}: {r.stderr[:100]}")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create minimal dataset directory with valid manifest
+        ds_dir = os.path.join(tmpdir, "dataset")
+        os.makedirs(ds_dir)
+        manifest = {
+            "dataset_id": "lv-dry-run-test",
+            "version": "0.0.1",
+            "splits": {"train": {"file": "train.jsonl", "rows": 10}},
+            "quality_gates": {
+                "exogenous_ratio": 0.5,
+                "exogenous_ratio_met": True,
+                "no_train_test_overlap": True,
+            },
+        }
+        with open(os.path.join(ds_dir, "manifest.json"), "w") as f:
+            json.dump(manifest, f)
+
+        adapter_dir = os.path.join(tmpdir, "adapter")
+        r = run_cmd(
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.train_ft"
+            f" --dataset {ds_dir} --base-model test-model --adapter-path {adapter_dir} --dry-run",
+            check=False, timeout=60,
+        )
+        if r.returncode == 0:
+            results.ok("3.2", "Training dry-run")
+        else:
+            results.fail("3.2", "Training dry-run", f"exit {r.returncode}: {r.stderr[:100]}")
 
 
 def test_3_4_gate_self_compare(results: Results):
@@ -476,7 +512,7 @@ def test_3_4_gate_self_compare(results: Results):
 
     try:
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.regression_gate --candidate {report_path} --baseline {report_path}",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.regression_gate --candidate {report_path} --baseline {report_path}",
             check=False, timeout=30,
         )
         if r.returncode == 2:
@@ -593,7 +629,7 @@ def test_6_3_invalid_manifest(results: Results):
             json.dump(manifest, f)
 
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.train_ft --dataset {tmpdir} --dry-run",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.train_ft --dataset {tmpdir} --dry-run",
             check=False, timeout=30,
         )
         if r.returncode != 0:
@@ -633,7 +669,7 @@ def test_6_4_regression_catch(results: Results):
 
     try:
         r = run_cmd(
-            f"cd {NEURAL_DIR} && python -m training.regression_gate --candidate {candidate_path} --baseline {baseline_path}",
+            f"cd {NEURAL_DIR} && {PYTHON} -m training.regression_gate --candidate {candidate_path} --baseline {baseline_path}",
             check=False, timeout=30,
         )
         if r.returncode == 1:

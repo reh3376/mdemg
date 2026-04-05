@@ -168,6 +168,78 @@ func TestDiscoverMigrations_Empty(t *testing.T) {
 	}
 }
 
+func TestSplitStatements_V0023Dedup(t *testing.T) {
+	// Mirrors the actual V0023 migration: CALL IN TRANSACTIONS dedup + CREATE CONSTRAINT
+	input := `CALL {
+  MATCH (s:SymbolNode)
+  WITH s.space_id AS sid, s.name AS name, s.file_path AS fp, s.symbol_type AS st,
+       collect(s) AS dupes
+  WHERE size(dupes) > 1
+  WITH dupes[0] AS keeper, dupes[1..] AS victims
+  UNWIND victims AS v
+  DETACH DELETE v
+  RETURN count(v) AS removed
+} IN TRANSACTIONS OF 500 ROWS;
+
+CREATE CONSTRAINT symbol_natural_key IF NOT EXISTS
+FOR (s:SymbolNode) REQUIRE (s.space_id, s.name, s.file_path, s.symbol_type) IS UNIQUE;`
+
+	stmts := SplitStatements(input)
+	if len(stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d: %v", len(stmts), stmts)
+	}
+	if !containsSubstring(stmts[0], "CALL") {
+		t.Errorf("statement 0 should contain CALL: %s", stmts[0])
+	}
+	if !containsSubstring(stmts[0], "IN TRANSACTIONS OF 500 ROWS") {
+		t.Errorf("statement 0 should contain IN TRANSACTIONS: %s", stmts[0])
+	}
+	if !containsSubstring(stmts[0], "DETACH DELETE v") {
+		t.Errorf("statement 0 should contain DETACH DELETE: %s", stmts[0])
+	}
+	if !containsSubstring(stmts[1], "CREATE CONSTRAINT") {
+		t.Errorf("statement 1 should contain CREATE CONSTRAINT: %s", stmts[1])
+	}
+	if !containsSubstring(stmts[1], "symbol_natural_key") {
+		t.Errorf("statement 1 should contain constraint name: %s", stmts[1])
+	}
+}
+
+func TestDiscoverMigrations_V0023(t *testing.T) {
+	// Verify V0023 with dedup+constraint parses correctly via DiscoverMigrations
+	v0023Content := `CALL {
+  MATCH (s:SymbolNode)
+  WITH s.space_id AS sid, s.name AS name, s.file_path AS fp, s.symbol_type AS st,
+       collect(s) AS dupes
+  WHERE size(dupes) > 1
+  WITH dupes[0] AS keeper, dupes[1..] AS victims
+  UNWIND victims AS v
+  DETACH DELETE v
+  RETURN count(v) AS removed
+} IN TRANSACTIONS OF 500 ROWS;
+
+CREATE CONSTRAINT symbol_natural_key IF NOT EXISTS
+FOR (s:SymbolNode) REQUIRE (s.space_id, s.name, s.file_path, s.symbol_type) IS UNIQUE;`
+
+	fs := fstest.MapFS{
+		"V0023__symbol_natural_key.cypher": {Data: []byte(v0023Content)},
+	}
+
+	migs, err := DiscoverMigrations(fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(migs) != 1 {
+		t.Fatalf("expected 1 migration, got %d", len(migs))
+	}
+	if migs[0].Version != 23 {
+		t.Errorf("expected version 23, got %d", migs[0].Version)
+	}
+	if len(migs[0].Statements) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(migs[0].Statements))
+	}
+}
+
 func containsSubstring(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(s) > 0 && contains(s, sub))
 }

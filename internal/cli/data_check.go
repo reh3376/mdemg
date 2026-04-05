@@ -130,8 +130,8 @@ func checkInstanceID(ctx context.Context, pool *pgxpool.Pool) checkResult {
 	if envID == "" {
 		return checkResult{
 			Name:     "Instance ID",
-			Status:   "FAIL",
-			Detail:   "MDEMG_INSTANCE_ID env var is empty",
+			Status:   "WARN",
+			Detail:   "MDEMG_INSTANCE_ID env var is empty (set for multi-instance tracking)",
 			NextStep: "Set MDEMG_INSTANCE_ID in your .env or environment",
 		}
 	}
@@ -169,8 +169,8 @@ func checkInstanceID(ctx context.Context, pool *pgxpool.Pool) checkResult {
 func checkTSDBWritable(ctx context.Context, pool *pgxpool.Pool) checkResult {
 	// Insert a test metric and delete it
 	_, err := pool.Exec(ctx,
-		`INSERT INTO metric_samples (time, name, value, labels)
-		 VALUES (now(), '__pre_campaign_check__', 0, '{}')`)
+		`INSERT INTO metric_samples (time, space_id, metric_name, value, labels)
+		 VALUES (now(), '__test__', '__pre_campaign_check__', 0, '{}')`)
 	if err != nil {
 		return checkResult{
 			Name:     "TSDB Writable",
@@ -181,7 +181,7 @@ func checkTSDBWritable(ctx context.Context, pool *pgxpool.Pool) checkResult {
 	}
 
 	_, _ = pool.Exec(ctx,
-		`DELETE FROM metric_samples WHERE name = '__pre_campaign_check__'`)
+		`DELETE FROM metric_samples WHERE metric_name = '__pre_campaign_check__'`)
 
 	return checkResult{
 		Name:   "TSDB Writable",

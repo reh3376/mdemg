@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-05
+
+### Added
+
+- `mdemg graph repair` command — weight-preserving SymbolNode dedup with CO_ACTIVATED_WITH edge aggregation, vendor cleanup, orphan sweep, embedding backfill, and V0023 readiness check
+- `mdemg maintenance` command — combined decay + prune cycle suitable for scheduling via launchd/cron
+- `mdemg embeddings backfill` command — find and fill missing embeddings on MemoryNodes
+- `mdemg prune --match-ignore` flag — delete nodes matching `.mdemgignore` patterns
+- `mdemg prune --include-labels` flag — control which labels are scanned for orphans (default: MemoryNode)
+- V0023 self-healing migration — batched dedup of duplicate SymbolNodes before uniqueness constraint, safe on any user graph
+- Evidence-weighted decay formula — `rate/sqrt(evidence_count)` protects well-evidenced edges, with `--max-decay-percent` safety cap
+- Upgrade guide (`docs/user/upgrade-guide.md`) for v0.5.x → v0.6.0
+
+### Changed
+
+- Decay rate default `0.1` → `0.02` (less aggressive, evidence-weighted formula compensates)
+- SymbolNode MERGE key now uses `(space_id, name, file_path, symbol_type)` natural key
+- `QUERY_CLASSIFY_ENABLED` compose default `false` → `true` (users with explicit `.env` setting are unaffected)
+
+### Fixed
+
+- SymbolNode duplication (BUG-1) — MERGE uses natural key; V0023 constraint prevents recurrence
+- Decay formula (BUG-5) — unified to single evidence-weighted system with safety cap
+- Prune label scope (BUG-6) — `--include-labels` flag allows scanning SymbolNode, Observation, etc.
+- Hidden layer OOM during L2-L5 consolidation — batched orphan HiddenPattern deletion (500 per transaction)
+- `data check --pre-campaign` TSDB Writable check uses correct `metric_samples` column names
+- `data check --pre-campaign` Instance ID check returns WARN (not FAIL) when `MDEMG_INSTANCE_ID` is empty
+- `live_validation.py` python3 resolution — uses `shutil.which("python3")` instead of bare `python`
+- `live_validation.py` curation pipeline — correct argument names for quality_filter, format_converter, dataset_versioner
+- `space.go` `reEmbedNodes` type scope panic — `nodeContent` struct moved before closure
+
 ## [0.5.4] - 2026-04-03
 
 ### Added
