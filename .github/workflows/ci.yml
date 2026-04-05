@@ -36,6 +36,25 @@ jobs:
             diff -q "$f" "internal/cli/launchd_templates/$base"
           done
 
+      - name: Validate schema version consistency
+        run: |
+          EXPECTED=$(ls migrations/V*.cypher | wc -l | tr -d ' ')
+          FAIL=0
+          for f in deploy/docker/docker-compose.prod.yml deploy/kubernetes/configmap.yaml .env.example; do
+            ACTUAL=$(grep -oP 'REQUIRED_SCHEMA_VERSION[=:]\s*"?\K[0-9]+' "$f" || echo "0")
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "FAIL: $f has REQUIRED_SCHEMA_VERSION=$ACTUAL, expected $EXPECTED"
+              FAIL=1
+            fi
+          done
+          HELM_VER=$(grep -oP 'requiredSchemaVersion:\s*"?\K[0-9]+' deploy/helm/mdemg/values.yaml || echo "0")
+          if [ "$HELM_VER" != "$EXPECTED" ]; then
+            echo "FAIL: deploy/helm/mdemg/values.yaml has requiredSchemaVersion=$HELM_VER, expected $EXPECTED"
+            FAIL=1
+          fi
+          if [ "$FAIL" = "1" ]; then exit 1; fi
+          echo "All deploy configs match migration count: $EXPECTED"
+
       - name: Build unified CLI
         run: |
           go build -v \
