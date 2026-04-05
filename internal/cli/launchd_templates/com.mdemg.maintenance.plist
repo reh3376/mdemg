@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mdemg.maintenance</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__MDEMG_BIN__</string>
+        <string>maintenance</string>
+        <string>--space-id</string>
+        <string>__SPACE_ID__</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_DIR__</string>
+    <key>StartInterval</key>
+    <integer>604800</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/.mdemg/logs/maintenance.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.mdemg/logs/maintenance.log</string>
+</dict>
+</plist>
