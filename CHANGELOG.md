@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Training data export produces invalid archive when `MDEMG_INSTANCE_ID` not set — `instance_id` auto-generated as `{hostname}-{space_id}`
-- `mdemg init` now writes `MDEMG_INSTANCE_ID` to `.env` for server/CLI consistency (both native and Docker modes)
-- Export filename and `export_id` no longer contain double-dash when instance ID was previously empty
-
 ## [0.6.0] - 2026-04-05
 
 ### Added
@@ -34,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Training data export produces invalid archive when `MDEMG_INSTANCE_ID` not set — `instance_id` auto-generated as `{hostname}-{space_id}`
+- `mdemg init` now writes `MDEMG_INSTANCE_ID` to `.env` for server/CLI consistency (both native and Docker modes)
+- Export filename and `export_id` no longer contain double-dash when instance ID was previously empty
 - SymbolNode duplication (BUG-1) — MERGE uses natural key; V0023 constraint prevents recurrence
 - Decay formula (BUG-5) — unified to single evidence-weighted system with safety cap
 - Prune label scope (BUG-6) — `--include-labels` flag allows scanning SymbolNode, Observation, etc.
