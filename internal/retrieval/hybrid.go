@@ -309,6 +309,7 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 			Confidence: f.Confidence,
 			VectorSim:  f.VectorSim,  // Real value, 0.0 for BM25-only
 			BM25Score:  f.BM25Score,   // Real value, 0.0 for vector-only
+			RRFScore:   f.RRFScore,    // Fused RRF score — authoritative ranking signal
 			Layer:      f.Layer,
 			Tags:       f.Tags,
 		}

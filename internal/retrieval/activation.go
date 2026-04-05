@@ -27,13 +27,16 @@ func SpreadingActivation(cands []Candidate, edges []Edge, steps int, lambda floa
 		lambda = 0.9
 	}
 
-	// Seed: ALL candidates seeded from max(VectorSim, BM25Score)
-	// This enables Hebbian learning by ensuring all returned nodes have activation values.
-	// Uses max of vector and BM25 signals so BM25-only candidates also seed properly.
+	// Seed: ALL candidates seeded from RRF score (authoritative fused ranking signal).
+	// Falls back to max(VectorSim, BM25Score) for candidates without RRF score
+	// (e.g., single-source candidates that bypassed fusion).
 	for _, c := range cands {
-		v := c.VectorSim
-		if c.BM25Score > v {
-			v = c.BM25Score
+		v := c.RRFScore
+		if v <= 0 {
+			v = c.VectorSim
+			if c.BM25Score > v {
+				v = c.BM25Score
+			}
 		}
 		if v < 0 {
 			v = 0
