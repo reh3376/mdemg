@@ -684,6 +684,14 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	wg.Wait()
 
+	// Normalize structured metadata to natural language for embedding similarity.
+	// Ingested summaries use a keyword-list format ("Module: X. Related to: a, b")
+	// that embeds into a different semantic region than action descriptions, producing
+	// a cosine similarity ceiling of ~0.33. Natural language produces ~0.70.
+	for i := range items {
+		items[i].Content = normalizeGuidanceContent(items[i].Content)
+	}
+
 	// J17-2: Populate ConstraintCode from Neo4j for all guidance items.
 	// Constraint codes live on Constraint nodes (promoted from ConversationObs),
 	// while guidance source nodes come from vector search (file-ingested nodes).
