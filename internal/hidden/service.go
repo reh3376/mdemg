@@ -597,27 +597,38 @@ func (s *Service) detachBaseNodeHiddenEdges(ctx context.Context, spaceID string)
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Delete GENERALIZES edges from L0→L1 HiddenPattern
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, `
+	// Delete GENERALIZES edges from L0→L1 HiddenPattern.
+	// Batched to prevent OOM on large graphs (48K+ nodes exceed
+	// Neo4j transaction memory limit in a single DELETE).
+	const edgeBatchSize = 500
+	detached := 0
+	for {
+		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
       -[r:GENERALIZES]->(h:HiddenPattern {space_id: $spaceId, layer: 1})
+WITH r LIMIT $limit
 DELETE r
-RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
+RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID, "limit": edgeBatchSize})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				cnt, _ := rec.Get("deleted")
+				return asInt(cnt), res.Err()
+			}
+			return 0, res.Err()
+		})
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("detach GENERALIZES edges: %w", err)
 		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			cnt, _ := rec.Get("deleted")
-			return asInt(cnt), res.Err()
+		batch := result.(int)
+		detached += batch
+		if batch == 0 {
+			break
 		}
-		return 0, res.Err()
-	})
-	if err != nil {
-		return 0, err
 	}
-	detached := result.(int)
 
 	// Remove orphaned HiddenPattern nodes (no remaining members).
 	// Batched to prevent OOM on large graphs — each iteration deletes
@@ -1367,14 +1378,18 @@ func (s *Service) ForwardPass(ctx context.Context, spaceID string) (*ForwardPass
 	return result, nil
 }
 
-// forwardPassHiddenLayer aggregates base node embeddings into hidden nodes
+// forwardPassHiddenLayer aggregates base node embeddings into hidden nodes.
+// Batched to prevent OOM on large graphs — each batch processes a subset of
+// hidden nodes in its own transaction.
 func (s *Service) forwardPassHiddenLayer(ctx context.Context, spaceID string) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// GraphSAGE-style weighted mean aggregation with embedding combination
+	// GraphSAGE-style weighted mean aggregation with embedding combination.
+	// Uses SKIP/LIMIT to process hidden nodes in batches.
 	cypher := `
 MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})
+WITH h ORDER BY h.node_id SKIP $skip LIMIT $limit
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})-[r:GENERALIZES]->(h)
 WHERE b.embedding IS NOT NULL
 WITH h, collect({emb: b.embedding, weight: coalesce(r.weight, 1.0)}) AS neighbors
@@ -1392,27 +1407,38 @@ SET h.message_pass_embedding = [i IN range(0, size(h.embedding)-1) |
     h.aggregation_count = size(neighbors)
 RETURN count(h) AS updated`
 
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId": spaceID,
-			"alpha":   s.cfg.HiddenLayerForwardAlpha,
-			"beta":    s.cfg.HiddenLayerForwardBeta,
+	const forwardBatchSize = 50
+	totalUpdated := 0
+	for skip := 0; ; skip += forwardBatchSize {
+		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, cypher, map[string]any{
+				"spaceId": spaceID,
+				"alpha":   s.cfg.HiddenLayerForwardAlpha,
+				"beta":    s.cfg.HiddenLayerForwardBeta,
+				"skip":    skip,
+				"limit":   forwardBatchSize,
+			})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				updated, _ := rec.Get("updated")
+				return asInt(updated), res.Err()
+			}
+			return 0, res.Err()
 		})
-		if err != nil {
-			return 0, err
-		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			updated, _ := rec.Get("updated")
-			return asInt(updated), res.Err()
-		}
-		return 0, res.Err()
-	})
 
-	if err != nil {
-		return 0, err
+		if err != nil {
+			return totalUpdated, fmt.Errorf("forward pass hidden batch at skip=%d: %w", skip, err)
+		}
+		batch := result.(int)
+		totalUpdated += batch
+		if batch == 0 {
+			break
+		}
 	}
-	return result.(int), nil
+	return totalUpdated, nil
 }
 
 // forwardPassConceptLayer aggregates hidden node embeddings into concept nodes
@@ -1420,10 +1446,12 @@ func (s *Service) forwardPassConceptLayer(ctx context.Context, spaceID string) (
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Update concept nodes (layer >= 2) from hidden layer via ABSTRACTS_TO
+	// Update concept nodes (layer >= 2) from hidden layer via ABSTRACTS_TO.
+	// Batched to prevent OOM on large graphs.
 	cypher := `
 MATCH (c:MemoryNode {space_id: $spaceId})
 WHERE c.layer >= 2
+WITH c ORDER BY c.node_id SKIP $skip LIMIT $limit
 MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})-[r:ABSTRACTS_TO]->(c)
 WHERE h.message_pass_embedding IS NOT NULL OR h.embedding IS NOT NULL
 WITH c, collect({
@@ -1444,27 +1472,38 @@ SET c.message_pass_embedding = [i IN range(0, size(c.embedding)-1) |
     c.aggregation_count = size(neighbors)
 RETURN count(c) AS updated`
 
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId": spaceID,
-			"alpha":   s.cfg.HiddenLayerForwardAlpha,
-			"beta":    s.cfg.HiddenLayerForwardBeta,
+	const conceptBatchSize = 50
+	totalUpdated := 0
+	for skip := 0; ; skip += conceptBatchSize {
+		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, cypher, map[string]any{
+				"spaceId": spaceID,
+				"alpha":   s.cfg.HiddenLayerForwardAlpha,
+				"beta":    s.cfg.HiddenLayerForwardBeta,
+				"skip":    skip,
+				"limit":   conceptBatchSize,
+			})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				updated, _ := rec.Get("updated")
+				return asInt(updated), res.Err()
+			}
+			return 0, res.Err()
 		})
-		if err != nil {
-			return 0, err
-		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			updated, _ := rec.Get("updated")
-			return asInt(updated), res.Err()
-		}
-		return 0, res.Err()
-	})
 
-	if err != nil {
-		return 0, err
+		if err != nil {
+			return totalUpdated, fmt.Errorf("forward pass concept batch at skip=%d: %w", skip, err)
+		}
+		batch := result.(int)
+		totalUpdated += batch
+		if batch == 0 {
+			break
+		}
 	}
-	return result.(int), nil
+	return totalUpdated, nil
 }
 
 // BackwardPass propagates feedback from concepts to hidden layers
@@ -1479,9 +1518,11 @@ func (s *Service) BackwardPass(ctx context.Context, spaceID string) (*BackwardPa
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Update hidden nodes with signals from both concepts (above) and base data (below)
+	// Update hidden nodes with signals from both concepts (above) and base data (below).
+	// Batched to prevent OOM on large graphs.
 	cypher := `
 MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})
+WITH h ORDER BY h.node_id SKIP $skip LIMIT $limit
 OPTIONAL MATCH (h)-[rUp:ABSTRACTS_TO]->(c:MemoryNode)
 WHERE c.layer >= 2 AND (c.message_pass_embedding IS NOT NULL OR c.embedding IS NOT NULL)
 WITH h, collect(coalesce(c.message_pass_embedding, c.embedding)) AS conceptEmbs
@@ -1508,29 +1549,40 @@ SET h.message_pass_embedding = [i IN range(0, size(h.embedding)-1) |
     h.last_backward_pass = datetime()
 RETURN count(h) AS updated`
 
-	updated, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId": spaceID,
-			"selfW":   s.cfg.HiddenLayerBackwardSelf,
-			"baseW":   s.cfg.HiddenLayerBackwardBase,
-			"concW":   s.cfg.HiddenLayerBackwardConc,
+	const backwardBatchSize = 50
+	totalUpdated := 0
+	for skip := 0; ; skip += backwardBatchSize {
+		updated, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, cypher, map[string]any{
+				"spaceId": spaceID,
+				"selfW":   s.cfg.HiddenLayerBackwardSelf,
+				"baseW":   s.cfg.HiddenLayerBackwardBase,
+				"concW":   s.cfg.HiddenLayerBackwardConc,
+				"skip":    skip,
+				"limit":   backwardBatchSize,
+			})
+			if err != nil {
+				return 0, err
+			}
+			if res.Next(ctx) {
+				rec := res.Record()
+				u, _ := rec.Get("updated")
+				return asInt(u), res.Err()
+			}
+			return 0, res.Err()
 		})
-		if err != nil {
-			return 0, err
-		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			u, _ := rec.Get("updated")
-			return asInt(u), res.Err()
-		}
-		return 0, res.Err()
-	})
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, fmt.Errorf("backward pass batch at skip=%d: %w", skip, err)
+		}
+		batch := updated.(int)
+		totalUpdated += batch
+		if batch == 0 {
+			break
+		}
 	}
 
-	result.HiddenNodesUpdated = updated.(int)
+	result.HiddenNodesUpdated = totalUpdated
 	result.Duration = time.Since(start)
 	return result, nil
 }
