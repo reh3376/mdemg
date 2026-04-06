@@ -17,6 +17,9 @@ docs/internal/
 *.key
 *.pem
 
+# Investigation working data (raw query outputs)
+investigation-data/
+
 # GoReleaser build artifacts
 dist/
 
