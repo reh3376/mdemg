@@ -191,3 +191,84 @@ Key Performance Indicators to track:
 - `internal/cli/hook_templates/prompt-context.sh` — Guidance injection flow
 - `internal/tsdb/migrations/005_interaction_enrichment.sql` — guidance_id column
 - `scripts/tsdb_data_review.py` — Template for diagnostic script architecture
+
+---
+
+## Post-Fix Validation (v0.7.1)
+
+**Date:** 2026-04-06
+**Commits:** `cec891e` (not_applicable outcome), `37479d0` (content normalization)
+**Method:** 6 manual chain tests (3 matching topic, 3 mismatched topic), 10 items each
+
+### Fixes Applied
+
+1. **PR #274** (merged): LLM tier enabled, heuristic fallback fixed, action summaries enriched, source filtering, cooldown reduction
+2. **`not_applicable` outcome** (`cec891e`): Items below low similarity threshold (0.20) classified as `not_applicable` instead of `ignored` — excluded from persistence, confidence decay, escalation, and protocol metrics
+3. **Content normalization** (`37479d0`): Structured metadata (`"Module: X. Related to: a, b"`) normalized to natural language in Guide() before embedding comparison. SEMANTIC blocks (LLM-generated) extracted as primary content. Raises cosine similarity ceiling from ~0.33 to ~0.59 for matching topics.
+
+### Root Cause Confirmed
+
+Direct OpenAI embedding tests (`text-embedding-3-large`, 3072 dims):
+
+| Content Format | Matching Topic | Cosine Sim |
+|---------------|---------------|-----------|
+| Natural language vs natural language | Yes | 0.6984 |
+| Structured metadata vs action summary | Yes | 0.3225 |
+| Constraint (natural language) vs action | Yes | 0.5613 |
+| Structured metadata vs action summary | No | 0.1726 |
+
+The problem was the content format (structured keyword lists), not the embedding model or thresholds. Content normalization brings structured metadata into the same embedding region as natural language.
+
+### Before / After Comparison
+
+| Metric | Baseline (PR #273) | Post-Fix | Target | Pass? |
+|--------|-------------------|----------|--------|-------|
+| Ignore rate | 82.4% | 0.0% | <50% | PASS |
+| Partial compliance | 0% | 46.0% | >10% | PASS |
+| Followed rate | 16.3% (bogus sim=1.0) | 2.0% (genuine sim=0.60) | >0% | PASS |
+| Max sim (matching topic) | 0.33 | 0.60 | >0.50 | PASS |
+| Avg max sim (matching) | 0.33 | 0.48 | >0.40 | PASS |
+| Avg max sim (mismatched) | 0.22 | 0.19 | <0.25 | PASS |
+| Edges on untyped nodes | 91.9% | 0% | 0% | PASS |
+| Feedback loop | Dead (Mar 31) | Active | Active | PASS |
+| "Followed" threshold reachable | No (ceiling 0.33) | Yes (0.60) | Yes | PASS |
+| False confidence decay | -0.03/false ignored | 0 (skipped) | 0 | PASS |
+
+### Manual Review — Classifier Accuracy
+
+10 outcomes sampled from matching-topic tests. Human assessment:
+
+- **7/10 clear agreement** (70%): Classifier correctly identified followed (1), partial_compliance (5), not_applicable (1)
+- **2/10 borderline disagree**: Items in 0.20-0.30 sim range classified partial_compliance; human assessment suggests not_applicable. These are in the range where LLM Tier 2 should make the call.
+- **1/10 borderline agree**: API handler guidance tangentially related to error handling.
+
+**Agreement rate: 70-80%.** Target was >50%. **PASS.**
+
+### Tag Decision
+
+**PASS — all criteria met.** Tag v0.7.1.
+
+| Criterion | Result |
+|-----------|--------|
+| Ignore rate < 60% | 0% (PASS) |
+| Partial compliance > 0 | 46% (PASS) |
+| Manual review agreement > 50% | 70% (PASS) |
+| Feedback loop active | Active (PASS) |
+| No new untyped-node outcomes | 0% (PASS) |
+| No critical regressions | None found (PASS) |
+
+### Known Limitations
+
+1. **LLM Tier 2 not exercised**: OpenAI classifier is configured but items either score < 0.20 (not_applicable) or 0.20-0.55 (partial_compliance by heuristic). The LLM tier would improve accuracy in the 0.20-0.30 borderline range.
+2. **SymbolNode content quality**: Items without SEMANTIC blocks normalize to prose but still max out at ~0.40 similarity. Improving `generateSummary()` at ingestion time would further improve scores.
+3. **Multi-repo contamination**: SymbolNodes from other codebases (Hugging Face transformers, etc.) are still surfaced as guidance. This is a retrieval pipeline issue, not a classifier issue.
+
+### Files Modified (v0.7.1)
+
+- `internal/jiminy/types.go` — Added `OutcomeNotApplicable`
+- `internal/jiminy/outcome_classifier.go` — Low sim → not_applicable; mapOutcomeString
+- `internal/jiminy/service.go` — Downstream guards; content normalization in Guide()
+- `internal/jiminy/confidence_updater.go` — Defense-in-depth early return
+- `internal/jiminy/content_normalizer.go` — NEW: normalizeGuidanceContent()
+- `internal/jiminy/content_normalizer_test.go` — NEW: 12 normalizer tests
+- `internal/jiminy/outcome_classifier_test.go` — Updated + 4 new tests
