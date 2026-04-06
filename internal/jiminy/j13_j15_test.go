@@ -317,7 +317,7 @@ func TestClassifyPromptBuild(t *testing.T) {
 		Content:     "Must use OAuth2",
 		SourceNodes: []string{"c1"},
 	}
-	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false)
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false, false, "")
 
 	if !strings.Contains(prompt, "constraint") {
 		t.Error("prompt should contain guidance type")
@@ -566,7 +566,7 @@ func TestClassifyPromptBuild_Compressed_NoTaskSection(t *testing.T) {
 		Content:     "Must use OAuth2",
 		SourceNodes: []string{"c1"},
 	}
-	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, true)
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, true, false, "")
 
 	if strings.Contains(prompt, "## Task") {
 		t.Error("compressed prompt should NOT contain '## Task' section")
@@ -581,7 +581,7 @@ func TestClassifyPromptBuild_Compressed_ContentTruncated(t *testing.T) {
 		Content:     longContent,
 		SourceNodes: []string{"c1"},
 	}
-	prompt := buildClassifyPrompt(item, "some action", 0.5, true)
+	prompt := buildClassifyPrompt(item, "some action", 0.5, true, false, "")
 
 	// The full 500-char content should NOT appear verbatim
 	if strings.Contains(prompt, longContent) {
@@ -600,7 +600,7 @@ func TestClassifyPromptBuild_BackwardCompat(t *testing.T) {
 		Content:     "Must use OAuth2",
 		SourceNodes: []string{"c1"},
 	}
-	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false)
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false, false, "")
 
 	if !strings.Contains(prompt, "## Task") {
 		t.Error("uncompressed prompt should contain '## Task' section")

@@ -49,16 +49,18 @@ Effectiveness tracking closes this loop. Every `Guide()` call now returns a `gui
 
 ### Outcome Classification
 
-For each tracked guidance item, the system compares the agent's `action_summary` against the item's content using text overlap scoring with negation detection:
+For each tracked guidance item, the system classifies the outcome using a 3-tier system based on embedding cosine similarity, LLM judgment, and negation detection:
 
-| Outcome | Meaning | Detection |
+| Outcome | Meaning | Classification Path |
 |---------|---------|-----------|
-| `followed` | Agent acted consistently with guidance | Overlap > 0.3 AND no negation detected |
-| `contradicted` | Agent did the opposite of guidance | Overlap > 0.15 AND negation words present ("not", "don't", "never", "without", "removed", "deleted") |
-| `ignored` | Agent's action is unrelated | Overlap ≤ 0.15 |
-| `unknown` | No action_summary provided | Empty or missing action_summary |
+| `followed` | Agent acted consistently with guidance | Tier 1: similarity >= 0.55 and no negation; or Tier 2: LLM judgment |
+| `partial_compliance` | Agent partially addressed guidance | Tier 2: LLM judgment; or Tier 3: heuristic fallback for uncertain range |
+| `ignored` | Agent's action shows no evidence of considering guidance | Tier 2: LLM semantic judgment only |
+| `contradicted` | Agent's action directly opposes guidance | Tier 2: LLM judgment (with negation context); or Tier 3: heuristic when negation detected and no LLM |
+| `not_applicable` | Guidance topic unrelated to action | Tier 1: similarity < 0.20 |
+| `unknown` | No action_summary provided or classification failed | Empty input or LLM/parse error |
 
-The overlap score is calculated from significant words (4+ characters) shared between the guidance content and the action summary, normalized by total content words.
+Negation patterns ("instead of", "did not", "skipped", etc.) are detected but never short-circuit classification — they are passed as context to the LLM Tier 2 for semantic evaluation. The LLM prompt explains that action summaries using `replaced 'OLD' with 'NEW'` format mean OLD was removed, so negation words in OLD text are from deleted code.
 
 ### EffectivenessTracker
 
