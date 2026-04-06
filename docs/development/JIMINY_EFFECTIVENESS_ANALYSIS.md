@@ -257,11 +257,56 @@ The problem was the content format (structured keyword lists), not the embedding
 | No new untyped-node outcomes | 0% (PASS) |
 | No critical regressions | None found (PASS) |
 
-### Known Limitations
+### Known Limitations (Resolved)
 
-1. **LLM Tier 2 not exercised**: OpenAI classifier is configured but items either score < 0.20 (not_applicable) or 0.20-0.55 (partial_compliance by heuristic). The LLM tier would improve accuracy in the 0.20-0.30 borderline range.
-2. **SymbolNode content quality**: Items without SEMANTIC blocks normalize to prose but still max out at ~0.40 similarity. Improving `generateSummary()` at ingestion time would further improve scores.
-3. **Multi-repo contamination**: SymbolNodes from other codebases (Hugging Face transformers, etc.) are still surfaced as guidance. This is a retrieval pipeline issue, not a classifier issue.
+All three known limitations from the initial v0.7.1 validation have been addressed:
+
+#### 1. LLM Tier 2 — FIXED
+
+**Problem:** Server log showed `llm_enabled=false` at startup. Items in the 0.20-0.55 similarity range fell through to the heuristic fallback (`partial_compliance`) without LLM semantic judgment.
+
+**Root cause:** The running binary was built before `JIMINY_OUTCOME_LLM_ENABLED` default was changed from `false` to `true`. Additionally, `JIMINY_OUTCOME_CLASSIFIER_ENABLED` was missing from the Docker Compose template, and the config comment was stale.
+
+**Fix:**
+- Added `JIMINY_OUTCOME_CLASSIFIER_ENABLED` to both `docker-compose.yml` and `internal/cli/compose_templates/docker-compose.yml`
+- Fixed stale comment in `config.go:292` (said "default: false", code says `true`)
+- Rebuilt binary — server now logs `llm_enabled=true`
+
+**Status:** LLM Tier 2 active. Items in the 0.20-0.55 range are classified by OpenAI (`text-embedding-3-large`) with 5s timeout and 256-entry LRU cache.
+
+#### 2. SymbolNode Content Quality — FIXED
+
+**Problem:** Items without SEMANTIC blocks normalized to prose but still maxed out at ~0.40 cosine similarity because `generateSummary()` produced keyword-list summaries and ignored rich semantic content in `ingestSymbol.DocComment` and `Signature` fields.
+
+**Root cause:** `generateSummary()` (`ingest.go:1372-1478`) iterated `elem.Symbols` but only extracted `Name` and `Type` for class/method/function lists. The `DocComment` field — containing natural-language descriptions — was silently discarded.
+
+**Fix:** `generateSummary()` now appends the `DocComment` from the first exported symbol matching `elem.Name` (capped at 400 chars). This adds a natural-language sentence to the structural summary, boosting the embedding similarity ceiling for nodes without SEMANTIC blocks.
+
+**Before:** `"Function Classify in outcome_classifier. Related to: guidance, classification"`
+**After:** `"Function Classify in outcome_classifier. Related to: guidance, classification. Classify determines the outcome of a guidance item given an action summary."`
+
+**Status:** Fixed. Existing nodes benefit after re-ingestion (`mdemg ingest --space-id mdemg-dev --path .`).
+
+#### 3. Multi-Repo Contamination — FIXED
+
+**Problem:** 27% of live guidance items were wrong-context (Python synchronization classes surfaced for Go tasks). 59,891 of 65,946 SymbolNodes in `mdemg-dev` were from foreign codebases (Python venvs, whk-wms, Megatron-LM benchmarks).
+
+**Root cause (two issues):**
+1. Multiple repos ingested into `mdemg-dev` via `MDEMG_SPACE_ID=mdemg-dev` env var
+2. `GetSymbolsForMemoryNode()` (`symbols/store.go:513-537`) had no `space_id` filter on SymbolNode destinations in its three `OPTIONAL MATCH` clauses — a bug compared to `learning/service.go:516` which correctly filters
+
+**Fix:**
+- Added `{space_id: $space_id}` filter to all three SymbolNode matches in `GetSymbolsForMemoryNode()`
+- Deleted 59,891 foreign SymbolNodes from `mdemg-dev` space via `scripts/cleanup_foreign_symbols.sh`
+- 6,055 legitimate nodes remain (paths: `/internal/`, `/cmd/`, `/pkg/`, `/tests/`)
+
+**Status:** Fixed. Space-scoped queries prevent cross-repo contamination. Foreign nodes removed.
+
+### Remaining Caveats
+
+1. **DocComment benefit requires re-ingestion**: Existing MemoryNode summaries in Neo4j won't include DocComment until `mdemg ingest` is re-run.
+2. **Ingestion space isolation is a user config concern**: If `MDEMG_SPACE_ID=mdemg-dev` is set while ingesting non-mdemg repos, contamination will recur. Users should use repo-specific space IDs.
+3. **LLM Tier 2 latency**: Each uncertain-range classification makes an OpenAI API call (5s timeout). The LRU cache (256 entries) mitigates repeated calls.
 
 ### Files Modified (v0.7.1)
 
@@ -272,3 +317,13 @@ The problem was the content format (structured keyword lists), not the embedding
 - `internal/jiminy/content_normalizer.go` — NEW: normalizeGuidanceContent()
 - `internal/jiminy/content_normalizer_test.go` — NEW: 12 normalizer tests
 - `internal/jiminy/outcome_classifier_test.go` — Updated + 4 new tests
+
+### Files Modified (Known Limitations Fix)
+
+- `docker-compose.yml` — Added `JIMINY_OUTCOME_CLASSIFIER_ENABLED`
+- `internal/cli/compose_templates/docker-compose.yml` — Same (kept in sync)
+- `internal/config/config.go` — Fixed stale default comments for thresholds and LLM enabled
+- `internal/cli/ingest.go` — `generateSummary()` DocComment enrichment from exported symbols
+- `internal/symbols/store.go` — `GetSymbolsForMemoryNode()` space_id filter on SymbolNode matches
+- `internal/cli/ingest_test.go` — 4 new DocComment enrichment tests
+- `scripts/cleanup_foreign_symbols.sh` — NEW: batch foreign SymbolNode cleanup script

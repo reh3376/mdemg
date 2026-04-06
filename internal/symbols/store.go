@@ -514,18 +514,18 @@ func (s *Store) GetSymbolsForMemoryNode(ctx context.Context, spaceID, nodeID str
 MATCH (m:MemoryNode {space_id: $space_id, node_id: $node_id})
 
 // Collect direct symbols
-OPTIONAL MATCH (m)-[:DEFINES_SYMBOL]->(s1:SymbolNode)
+OPTIONAL MATCH (m)-[:DEFINES_SYMBOL]->(s1:SymbolNode {space_id: $space_id})
 WITH m, collect(DISTINCT s1) AS directSymbols
 
 // Collect symbols from descendant leaf nodes (for hidden/concept nodes)
 OPTIONAL MATCH (leaf:MemoryNode {layer: 0})-[:GENERALIZES*]->(m)
-OPTIONAL MATCH (leaf)-[:DEFINES_SYMBOL]->(s2:SymbolNode)
+OPTIONAL MATCH (leaf)-[:DEFINES_SYMBOL]->(s2:SymbolNode {space_id: $space_id})
 WITH m, directSymbols, collect(DISTINCT s2) AS descendantSymbols
 
 // Collect symbols from parent file node (for fragment nodes with # in path)
 OPTIONAL MATCH (parent:MemoryNode {space_id: $space_id, layer: 0})
 WHERE m.path CONTAINS '#' AND parent.path = split(m.path, '#')[0]
-OPTIONAL MATCH (parent)-[:DEFINES_SYMBOL]->(s3:SymbolNode)
+OPTIONAL MATCH (parent)-[:DEFINES_SYMBOL]->(s3:SymbolNode {space_id: $space_id})
 WITH directSymbols, descendantSymbols, collect(DISTINCT s3) AS parentSymbols
 
 // Combine all symbol sources

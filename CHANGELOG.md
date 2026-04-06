@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `guidance_type` property on GUIDANCE_OUTCOME edges for downstream analysis
 - `JIMINY_OUTCOME_LLM_ENABLED`, `JIMINY_OUTCOME_SIMILARITY_HIGH`, `JIMINY_OUTCOME_SIMILARITY_LOW` env vars in Docker Compose templates and `mdemg init`
+- `JIMINY_OUTCOME_CLASSIFIER_ENABLED` env var in Docker Compose templates — was missing, causing inconsistency between Docker and native mode
+- DocComment enrichment in `generateSummary()` — appends exported symbol doc comments (up to 400 chars) to structural summaries for improved embedding similarity
+- `scripts/cleanup_foreign_symbols.sh` — batch cleanup script for foreign SymbolNodes ingested into wrong space
+- `space_id` filter on `GetSymbolsForMemoryNode()` SymbolNode matches — prevents cross-space symbol contamination in retrieval
 
 ### Investigation
 

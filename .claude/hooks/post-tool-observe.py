@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MDEMG hook — managed by mdemg hooks install
 """
 Hook: PostToolUse — auto-capture observations after significant tool completions.
 Fires-and-forgets a CMS observe call for noteworthy events.
@@ -10,7 +11,31 @@ import subprocess
 import sys
 import time
 
-MDEMG_URL = os.environ.get("MDEMG_URL", "http://localhost:9999")
+
+def _resolve_mdemg_url() -> str:
+    """Discover MDEMG URL: env > .mdemg.port > .env MDEMG_PORT > 9999."""
+    url = os.environ.get("MDEMG_URL")
+    if url:
+        return url
+    port = None
+    try:
+        with open(".mdemg.port") as f:
+            port = f.read().strip()
+    except FileNotFoundError:
+        pass
+    if not port:
+        try:
+            with open(".env") as f:
+                for line in f:
+                    if line.startswith("MDEMG_PORT="):
+                        port = line.split("=", 1)[1].strip()
+                        break
+        except FileNotFoundError:
+            pass
+    return f"http://localhost:{port or '9999'}"
+
+
+MDEMG_URL = _resolve_mdemg_url()
 SESSION_ID = "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
@@ -24,7 +49,7 @@ RECOVERY_BUFFER_MAX_ENTRIES = int(os.environ.get("SYNERGY_RECOVERY_BUFFER_MAX_EN
 # J17: Feedback loop closure — correlate guidance with agent actions
 JIMINY_STATE_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-guidance-state")
 FEEDBACK_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-last-feedback")
-FEEDBACK_COOLDOWN_SEC = 30
+FEEDBACK_COOLDOWN_SEC = 10
 FEEDBACK_STATE_MAX_AGE = 7200  # 2 hours, matching EffectivenessTracker TTL
 
 
@@ -176,18 +201,52 @@ def _mark_feedback_sent():
         pass
 
 
+def _infer_intent(file_path: str) -> str:
+    """Infer likely intent from file path patterns for semantic anchoring."""
+    fp = file_path.lower()
+    if "_test" in fp or "test_" in fp:
+        return "writing tests"
+    if "migration" in fp:
+        return "database migration"
+    if "hook" in fp or "template" in fp:
+        return "hook/template modification"
+    if "config" in fp:
+        return "configuration change"
+    if "doc" in fp or "readme" in fp or "changelog" in fp:
+        return "documentation update"
+    return ""
+
+
 def _build_action_summary(tool_name: str, tool_input: dict, tool_output: str) -> str:
-    """Build a concise action summary for Jiminy feedback classification."""
+    """Build a semantically rich action summary for Jiminy feedback classification.
+
+    Summaries include file content snippets and intent annotations to improve
+    cosine similarity with guidance content during outcome classification.
+    """
     if tool_name == "Write":
-        return f"Wrote file: {tool_input.get('file_path', 'unknown')}"
+        fp = tool_input.get("file_path", "unknown")
+        intent = _infer_intent(fp)
+        prefix = f"[{intent}] " if intent else ""
+        content = tool_input.get("content", "")
+        # Extract first meaningful lines (skip shebangs, imports, blank lines, package decls)
+        lines = [
+            l.strip() for l in content.split("\n")
+            if l.strip() and not l.strip().startswith(("#!", "import ", "from ", "package ", "//"))
+        ]
+        snippet = " | ".join(lines[:5])[:300]
+        if snippet:
+            return f"{prefix}Wrote {fp}: {snippet}"
+        return f"{prefix}Wrote file: {fp}"
     elif tool_name == "Edit":
         fp = tool_input.get("file_path", "unknown")
-        old = tool_input.get("old_string", "")[:80]
-        new = tool_input.get("new_string", "")[:80]
-        return f"Edited {fp}: replaced '{old}' with '{new}'"
+        intent = _infer_intent(fp)
+        prefix = f"[{intent}] " if intent else ""
+        old = tool_input.get("old_string", "")[:200]
+        new = tool_input.get("new_string", "")[:200]
+        return f"{prefix}Edited {fp}: replaced '{old}' with '{new}'"
     elif tool_name == "Bash":
         cmd = tool_input.get("command", "")[:200]
-        out = (tool_output or "")[:200]
+        out = (tool_output or "")[:400]
         return f"Ran: {cmd}\nOutput: {out}"
     return ""
 

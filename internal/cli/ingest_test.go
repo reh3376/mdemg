@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -131,5 +132,100 @@ func TestBuildInitialIngestConfig_SpeedPreservesLLMProvider(t *testing.T) {
 	}
 	if cfg.llmSummaryModel != "gpt-4o-mini" {
 		t.Errorf("llmSummaryModel = %q, want %q", cfg.llmSummaryModel, "gpt-4o-mini")
+	}
+}
+
+func TestGenerateSummary_DocCommentEnrichment(t *testing.T) {
+	elem := codeElement{
+		Name: "Classify",
+		Kind: "function",
+		Symbols: []ingestSymbol{
+			{
+				Name:       "Classify",
+				Type:       "function",
+				Exported:   true,
+				DocComment: "Classify determines the outcome of a guidance item given an action summary.",
+			},
+		},
+	}
+	got := generateSummary(elem)
+	if !strings.Contains(got, "Classify determines the outcome") {
+		t.Errorf("should include DocComment, got: %s", got)
+	}
+}
+
+func TestGenerateSummary_NoDocComment(t *testing.T) {
+	elem := codeElement{
+		Name: "Classify",
+		Kind: "function",
+		Symbols: []ingestSymbol{
+			{
+				Name:     "Classify",
+				Type:     "function",
+				Exported: true,
+			},
+		},
+	}
+	got := generateSummary(elem)
+	// Without DocComment, summary includes symbol names but no doc comment text
+	if strings.Contains(got, "determines the outcome") {
+		t.Errorf("should NOT include DocComment text when absent, got: %s", got)
+	}
+	if !strings.HasPrefix(got, "Function Classify") {
+		t.Errorf("should start with function name, got: %s", got)
+	}
+}
+
+func TestGenerateSummary_DocCommentTruncation(t *testing.T) {
+	longDoc := strings.Repeat("A detailed description. ", 30) // ~720 chars
+	elem := codeElement{
+		Name: "Process",
+		Kind: "function",
+		Symbols: []ingestSymbol{
+			{
+				Name:       "Process",
+				Type:       "function",
+				Exported:   true,
+				DocComment: longDoc,
+			},
+		},
+	}
+	got := generateSummary(elem)
+	// The DocComment portion should be capped at 400 chars.
+	// Total summary = "Function Process. " + 400-char doc = ~418 chars, well under 700 max.
+	if len(got) > 700 {
+		t.Errorf("summary should be under 700 chars, got %d", len(got))
+	}
+	// Should contain the start of the doc comment
+	if !strings.Contains(got, "A detailed description") {
+		t.Errorf("should include truncated DocComment, got: %s", got)
+	}
+}
+
+func TestGenerateSummary_DocCommentOnlyMatchingExported(t *testing.T) {
+	elem := codeElement{
+		Name: "Service",
+		Kind: "struct",
+		Symbols: []ingestSymbol{
+			{
+				Name:       "helper",
+				Type:       "function",
+				Exported:   false,
+				DocComment: "helper is an internal utility function.",
+			},
+			{
+				Name:       "Service",
+				Type:       "struct",
+				Exported:   true,
+				DocComment: "Service orchestrates the core business logic.",
+			},
+		},
+	}
+	got := generateSummary(elem)
+	if !strings.Contains(got, "Service orchestrates") {
+		t.Errorf("should include matching exported symbol DocComment, got: %s", got)
+	}
+	if strings.Contains(got, "helper is an internal") {
+		t.Errorf("should NOT include non-matching symbol DocComment, got: %s", got)
 	}
 }

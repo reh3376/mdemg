@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
+# MDEMG hook — managed by mdemg hooks install
 # Hook: PreCompact — save current work state to CMS before context compaction.
 # This ensures critical context survives the compaction boundary.
 
 set -euo pipefail
 
-MDEMG_URL="${MDEMG_URL:-http://localhost:9999}"
+# MDEMG server URL: env > .mdemg.port > .env MDEMG_PORT > 9999
+if [ -z "${MDEMG_URL:-}" ]; then
+    if [ -f ".mdemg.port" ]; then
+        _PORT=$(tr -d '[:space:]' < .mdemg.port)
+    elif [ -f ".env" ]; then
+        _PORT=$(sed -n 's/^MDEMG_PORT=//p' .env 2>/dev/null | tr -d '[:space:]')
+    fi
+    MDEMG_URL="http://localhost:${_PORT:-9999}"
+fi
 SESSION_ID="claude-core"
 
 get_space_id() {
@@ -136,6 +145,7 @@ curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
 # Uses --force to skip hash check — we want latest content persisted regardless
 if [ -x "./bin/mdemg" ]; then
   INGEST_OUT=$(./bin/mdemg ingest-claude-md --force --space-id "${SPACE_ID}" 2>&1) || {
+    mkdir -p ~/.mdemg/logs 2>/dev/null || true
     echo "[$(date -u +%FT%TZ)] pre-compact: ingest FAILED: ${INGEST_OUT}" \
       >> ~/.mdemg/logs/ingest-claude-md.log
   }
