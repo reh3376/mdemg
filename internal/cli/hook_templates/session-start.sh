@@ -166,7 +166,12 @@ if [ -f "$INGEST_LOG_PATH" ] && [ -s "$INGEST_LOG_PATH" ]; then
   if [ -n "$LAST_INGEST_LINE" ]; then
     LAST_TS=$(echo "$LAST_INGEST_LINE" | grep -oE '^\[[0-9T:Z-]+\]' | tr -d '[]' 2>/dev/null || true)
     if [ -n "$LAST_TS" ]; then
-      LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      # Portable date parsing: macOS uses -jf, Linux/GNU uses -d
+      if date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" >/dev/null 2>&1; then
+        LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      else
+        LAST_EPOCH=$(date -d "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      fi
       NOW_EPOCH=$(date "+%s")
       if [ "$LAST_EPOCH" -gt 0 ] 2>/dev/null; then
         STALE_SECS=$(( NOW_EPOCH - LAST_EPOCH ))
