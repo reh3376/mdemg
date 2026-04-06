@@ -588,6 +588,9 @@ func runInit(flags initFlags) error {
 				envLines = append(envLines, fmt.Sprintf("JIMINY_EVALUATE_LLM_PROVIDER=%s", opts.JiminyProvider))
 			}
 		}
+		if !envContains(envLines, "JIMINY_OUTCOME_LLM_ENABLED") {
+			envLines = append(envLines, "JIMINY_OUTCOME_LLM_ENABLED=true")
+		}
 	}
 
 	// Add MDEMG_INSTANCE_ID if not already present
@@ -793,6 +796,7 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		"JIMINY_SYNTHESIS_PROVIDER":    true,
 		"JIMINY_EVALUATE_LLM_MODEL":    true,
 		"JIMINY_EVALUATE_LLM_PROVIDER": true,
+		"JIMINY_OUTCOME_LLM_ENABLED":   true,
 	}
 
 	// Detect system RAM and compute Neo4j memory tier

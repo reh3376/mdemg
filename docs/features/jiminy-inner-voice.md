@@ -1,7 +1,7 @@
 ---
 created: 2026-03-30
-updated: 2026-04-04
-version: v0.5.4
+updated: 2026-04-06
+version: v0.7.1
 author: reh3376
 status: active
 phase: "Jiminy"
@@ -145,9 +145,9 @@ Additional CMS config: `CMS_JIMINY_BASE_CONFIDENCE` (default: `0.5`) — base co
 | JiminyEvaluateTimeoutMs | `3000` | `JIMINY_EVALUATE_TIMEOUT_MS` | Evaluation timeout (ms) |
 | JiminyEvaluateMaxConstraints | `10` | `JIMINY_EVALUATE_MAX_CONSTRAINTS` | Max constraints to check per evaluation |
 | JiminyOutcomeClassifierEnabled | `true` | `JIMINY_OUTCOME_CLASSIFIER_ENABLED` | Enable semantic outcome classification (J11) |
-| JiminyOutcomeLLMEnabled | `false` | `JIMINY_OUTCOME_LLM_ENABLED` | Enable LLM tier for uncertain classifications |
-| JiminyOutcomeSimilarityHigh | `0.7` | `JIMINY_OUTCOME_SIMILARITY_HIGH` | Cosine similarity threshold for "followed" |
-| JiminyOutcomeSimilarityLow | `0.3` | `JIMINY_OUTCOME_SIMILARITY_LOW` | Cosine similarity threshold for "uncertain" |
+| JiminyOutcomeLLMEnabled | `true` | `JIMINY_OUTCOME_LLM_ENABLED` | Enable LLM tier for uncertain classifications |
+| JiminyOutcomeSimilarityHigh | `0.55` | `JIMINY_OUTCOME_SIMILARITY_HIGH` | Cosine similarity threshold for "followed" |
+| JiminyOutcomeSimilarityLow | `0.20` | `JIMINY_OUTCOME_SIMILARITY_LOW` | Cosine similarity threshold for "uncertain" |
 | JiminyEscalationEnabled | `true` | `JIMINY_ESCALATION_ENABLED` | Enable session-aware escalation (J12) |
 | JiminyEscalationWarnAfter | `2` | `JIMINY_ESCALATION_WARN_AFTER` | Ignores before WARNED |
 | JiminyEscalationEscalateAfter | `4` | `JIMINY_ESCALATION_ESCALATE_AFTER` | Ignores before ESCALATED |
@@ -181,6 +181,24 @@ JIMINY_EVALUATE_LLM_PROVIDER=openai
 ```
 
 The `docker-compose.yml` template passes these through with empty defaults — the server's `FromEnv()` falls back to `LLM_PROVIDER`/`LLM_MODEL` when sub-settings are unset. If `.env` does not contain `JIMINY_ENABLED`, Docker Compose defaults to `false`.
+
+### Outcome Classification (3-Tier System)
+
+The outcome classifier determines whether the agent followed, partially followed, ignored, or contradicted guidance. It uses a 3-tier system:
+
+| Tier | Method | Range | Outcomes |
+|------|--------|-------|----------|
+| 1 | Embedding cosine similarity | `>= highThreshold` (0.55) | followed |
+| 1 | Embedding cosine similarity | `< lowThreshold` (0.20) | ignored |
+| 1 | Negation detection + similarity | `>= lowThreshold` + negation patterns | contradicted |
+| 2 | LLM classification | `lowThreshold <= sim < highThreshold` | followed / partial_compliance / ignored / contradicted |
+| 3 | Heuristic fallback | Tier 2 unavailable or returns unknown | partial_compliance |
+
+**Tier 2 (LLM)** uses the same provider/model as Jiminy synthesis. It sends a compact prompt (<100 tokens) and parses a JSON response with `outcome` and `reasoning` fields. Enabled by default (`JIMINY_OUTCOME_LLM_ENABLED=true`).
+
+**Tier 3 (heuristic)** only fires when the LLM tier is unavailable (timeout, error, disabled). Items in the uncertain range are classified as `partial_compliance` rather than a binary guess.
+
+**GUIDANCE_OUTCOME edges** are only created on typed guidance nodes (`obs_type` IN constraint, correction, pattern, learning OR `role_type` = constraint). Each edge includes a `guidance_type` property for downstream analysis.
 
 ## Hook Integration
 

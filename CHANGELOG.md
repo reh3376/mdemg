@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Jiminy outcome classifier LLM tier enabled by default (`JIMINY_OUTCOME_LLM_ENABLED=true`) — was disabled, causing 35% of items to hit a binary heuristic fallback
+- Heuristic fallback now produces `partial_compliance` for the uncertain similarity range (0.20-0.55) instead of a binary followed/ignored split at 0.5
+- Outcome similarity thresholds adjusted (high: 0.7→0.55, low: 0.3→0.20) to match action summary embedding characteristics
+- Action summaries enriched with file content snippets (Write: first 5 lines up to 300 chars, Edit: 200 chars) and intent annotations for improved cosine similarity
+- GUIDANCE_OUTCOME edges filtered to typed nodes only (constraint, correction, pattern, learning) — eliminates 92% of edges on untyped code description nodes
+- Feedback cooldown reduced from 30s to 10s for higher coverage (~48% suppression → ~15%)
+
+### Added
+
+- `guidance_type` property on GUIDANCE_OUTCOME edges for downstream analysis
+- `JIMINY_OUTCOME_LLM_ENABLED`, `JIMINY_OUTCOME_SIMILARITY_HIGH`, `JIMINY_OUTCOME_SIMILARITY_LOW` env vars in Docker Compose templates and `mdemg init`
+
 ### Investigation
 
 - Jiminy guidance effectiveness analysis: diagnostic script + findings report

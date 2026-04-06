@@ -2974,6 +2974,18 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `JIMINY_INCLUDE_FRONTIERS` | bool | `true` | Include frontier node suggestions |
 | `JIMINY_FRONTIER_MIN_SIM` | float64 | `0.5` | Min similarity for frontier nodes |
 
+### Jiminy Outcome Classifier (Phase J14)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `JIMINY_OUTCOME_CLASSIFIER_ENABLED` | bool | `true` | Enable semantic outcome classification |
+| `JIMINY_OUTCOME_LLM_ENABLED` | bool | `true` | Enable LLM tier 2 classification for uncertain range |
+| `JIMINY_OUTCOME_SIMILARITY_HIGH` | float64 | `0.55` | Similarity threshold above which outcome is "followed" |
+| `JIMINY_OUTCOME_SIMILARITY_LOW` | float64 | `0.20` | Similarity threshold below which outcome is "ignored" |
+| `JIMINY_OUTCOME_LLM_MAX_TOKENS` | int | `100` | Max tokens for LLM classifier response |
+| `JIMINY_OUTCOME_CACHE_SIZE` | int | `256` | LRU cache size for classification results |
+| `JIMINY_CLASSIFY_COMPRESS` | bool | `true` | Compress prompts sent to LLM classifier |
+
 ### J17 AI-to-AI Protocol (Phase J17)
 
 | Variable | Type | Default | Description |
