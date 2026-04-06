@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Investigation
+
+- Jiminy guidance effectiveness analysis: diagnostic script + findings report
+- `scripts/jiminy_effectiveness_report.py` — reusable diagnostic for ongoing monitoring
+
 ## [0.7.0] - 2026-04-05
 
 ### Added
