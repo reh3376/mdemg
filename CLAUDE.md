@@ -182,6 +182,7 @@ These env vars are forwarded in the compose template. Set in `.env`, or enable v
 - Live validation: `python3 scripts/live_validation.py` (19 end-to-end tests)
 - Synergy: `mdemg synergy status` | `mdemg synergy check --auto` | `mdemg synergy migrate --dry-run`
 - Synergy API: `GET /v1/synergy/status?space_id=mdemg-dev`
+- Jiminy effectiveness: `python3 scripts/jiminy_effectiveness_report.py --space-id mdemg-dev --days 7`
 
 ---
 
