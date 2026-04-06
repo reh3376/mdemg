@@ -294,6 +294,7 @@ func (lc *LiveCollectors) LastGaugeValues() map[string]float64 {
 		gauges["jiminy_source_diversity"] = jiminy.SourceDiversity
 		gauges["jiminy_total_issued"] = float64(jiminy.TotalGuidanceIssued)
 		gauges["jiminy_total_followed"] = float64(jiminy.TotalFollowed)
+		gauges["jiminy_total_partial_compliance"] = float64(jiminy.TotalPartialCompliance)
 		gauges["jiminy_total_ignored"] = float64(jiminy.TotalIgnored)
 		gauges["jiminy_total_contradicted"] = float64(jiminy.TotalContradicted)
 	}
@@ -324,6 +325,7 @@ func (lc *LiveCollectors) publishGuidanceGauges(stats JiminyStatsResult) {
 	m.JiminySourceDiversity(sid).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(sid).Set(float64(stats.TotalGuidanceIssued))
 	m.JiminyTotalFollowed(sid).Set(float64(stats.TotalFollowed))
+	m.JiminyTotalPartialCompliance(sid).Set(float64(stats.TotalPartialCompliance))
 	m.JiminyTotalIgnored(sid).Set(float64(stats.TotalIgnored))
 	m.JiminyTotalContradicted(sid).Set(float64(stats.TotalContradicted))
 }

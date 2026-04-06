@@ -41,7 +41,8 @@ type GuidanceResponse struct {
 	GuidanceID            string              `json:"guidance_id"` // CUID2 identifier for feedback correlation (Phase AR-2)
 	Guidance              []GuidanceItem      `json:"guidance"`
 	PromptAugmentation    string              `json:"prompt_augmentation"`
-	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"` // J8: LLM-synthesized guidance
+	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"`  // J8: LLM-synthesized guidance
+	EncodedAugmentation   string              `json:"encoded_augmentation,omitempty"`   // J17: tier-encoded form (pre-synthesis)
 	Confidence            float64             `json:"confidence"`
 	Rationale             string              `json:"rationale"`
 	Warnings              []string            `json:"warnings,omitempty"`
@@ -213,13 +214,14 @@ type EvaluationItem struct {
 
 // JiminyStats holds aggregated guidance metrics for RSIC assessment.
 type JiminyStats struct {
-	TotalGuidanceIssued int     `json:"total_guidance_issued"`
-	TotalFollowed       int     `json:"total_followed"`
-	TotalIgnored        int     `json:"total_ignored"`
-	TotalContradicted   int     `json:"total_contradicted"`
-	FollowRate          float64 `json:"follow_rate"`
-	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
-	SourceDiversity     float64 `json:"source_diversity"` // 0-1, higher = more diverse
+	TotalGuidanceIssued    int     `json:"total_guidance_issued"`
+	TotalFollowed          int     `json:"total_followed"`
+	TotalPartialCompliance int     `json:"total_partial_compliance"`
+	TotalIgnored           int     `json:"total_ignored"`
+	TotalContradicted      int     `json:"total_contradicted"`
+	FollowRate             float64 `json:"follow_rate"`
+	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	SourceDiversity        float64 `json:"source_diversity"` // 0-1, higher = more diverse
 }
 
 // --- J12: Escalation types ---

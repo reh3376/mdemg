@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Trust accrual: partial_compliance excluded from trust scoring** — `trustRelevanceThreshold` lowered from 0.5 to 0.20, aligning with the classifier's `not_applicable` cutoff. 38% of outcomes (partial_compliance) were filtered before reaching the trust scorer, halving effective trust growth rate.
+- **Trust accrual: OutcomePartialCompliance missing from aggregate switch** — partial compliance outcomes were silently dropped in the trust aggregate logic, never reaching `TrustScorer.RecordOutcome()`. Added `partialCount` to the aggregate with conservative priority (boosted only when no ignores present).
+- **WarmStore upward-crossing invalidation** — cache invalidation only fired on downward tier crossings (T1→T2, T2→T3). Added upward crossing checks so T3→T2 and T2→T1 promotions immediately invalidate stale lower-tier guidance.
+- **J8 synthesis overrides T1 compact encoding** — synthesis unconditionally replaced tier-encoded augmentation with a ~2000-token LLM narrative, nullifying T1's 5.2x compression. Synthesis is now skipped at T1 trust (> 0.75); compact coded format is delivered directly. Added `EncodedAugmentation` response field to preserve J17-encoded form when synthesis runs at T2/T3.
+- **Partial compliance in metrics pipeline** — added `partial_compliance` outcome to all Jiminy Guidance Dashboard panels (pie chart, trends, per-constraint table), follow rate formula (`(followed + 0.5*partial) / total`), and constraint effectiveness (volume-weighted with >= 5 surfaced minimum).
+
+### Investigation
+
+- **J17 tier promotion analysis** — tested full T3→T2→T1 chain; trust accrued 0.22→0.76 in 15 cycles. Found J8 synthesis overrides T1 compact encoding (P1). See `docs/development/J17_TIER_PROMOTION_ANALYSIS.md`.
+
+### Fixed
+
 - **Negation detection false positives** — negation patterns ("instead of", "did not", "skipped", etc.) in action summaries no longer short-circuit to `contradicted` before LLM Tier 2. The `Classify()` flow now defers negation to the LLM with full context (matched pattern, action format guidance). Heuristic fallback only applies when LLM is unavailable. Eliminates constant ~4.5% contradicted rate caused by negation words in quoted code within `replaced 'OLD' with 'NEW'` action summaries.
 - **LLM system prompt: action summary format** — classification prompt now explains that `"replaced 'OLD' with 'NEW'"` means OLD was removed and NEW was added. Negation words in OLD text (deleted code) are not indicators of contradiction. Reduces LLM misclassification of edit actions.
 - **Source Diversity metric query** — `computeSourceDiversity()` was grouping by `n.obs_type` which is null on constraint nodes (they use `role_type`). Changed to `COALESCE(r.guidance_type, n.obs_type)` which uses the `guidance_type` property already stored on every GUIDANCE_OUTCOME edge. Restores diversity metric from 0% to ~68%.

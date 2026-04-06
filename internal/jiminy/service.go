@@ -876,18 +876,34 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
-	// J8: LLM synthesis — replace static formatting if synthesizer is available
+	// Save J17-encoded form before synthesis may overwrite it
+	encodedAugmentation := augmentation
+
+	// J8: LLM synthesis — replace static formatting if synthesizer is available.
+	// J17: Skip synthesis at T1 — compact coded format IS the augmentation.
+	// Synthesis would replace ~15-token-per-item codes with a ~2000-token narrative,
+	// destroying the 5.2x compression that trust promotion was designed to achieve.
 	var synthesizedNarrative string
 	if s.synthesizer != nil && s.cfg.JiminySynthesisEnabled && len(filtered) > 0 {
-		narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
-		if synthErr != nil {
-			slog.Warn("jiminy: synthesis failed, using static formatting", "error", synthErr)
-			debug["synthesis_error"] = synthErr.Error()
-		} else if narrative != "" {
-			synthesizedNarrative = narrative
-			// Use synthesized narrative as the prompt augmentation
-			augmentation = "═══ JIMINY GUIDANCE ═══\n" + sanitize.StripControlChars(narrative) + "\n═══ END JIMINY GUIDANCE ═══"
-			debug["synthesis_used"] = true
+		highT := 0.75
+		if s.trustScorer != nil {
+			highT = s.trustScorer.HighThreshold()
+		}
+		if trustScore > highT {
+			slog.Info("jiminy: T1 trust — skipping synthesis, using J17 encoded augmentation",
+				"trust", trustScore, "items", len(filtered))
+			debug["synthesis_skipped"] = "T1_trust"
+		} else {
+			narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
+			if synthErr != nil {
+				slog.Warn("jiminy: synthesis failed, using static formatting", "error", synthErr)
+				debug["synthesis_error"] = synthErr.Error()
+			} else if narrative != "" {
+				synthesizedNarrative = narrative
+				// Use synthesized narrative as the prompt augmentation
+				augmentation = "═══ JIMINY GUIDANCE ═══\n" + sanitize.StripControlChars(narrative) + "\n═══ END JIMINY GUIDANCE ═══"
+				debug["synthesis_used"] = true
+			}
 		}
 	}
 
@@ -956,6 +972,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Guidance:             filtered,
 		PromptAugmentation:   augmentation,
 		SynthesizedNarrative: synthesizedNarrative,
+		EncodedAugmentation:  encodedAugmentation,
 		Confidence:           confidence,
 		Rationale:            rationale,
 		Warnings:             warnings,
@@ -1338,8 +1355,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	// this filter, trust systematically decays because every feedback cycle includes
 	// many irrelevant items that are falsely counted as "ignored."
 	if s.trustScorer != nil && feedbackSessionID != "" && len(results) > 0 {
-		const trustRelevanceThreshold = 0.5 // minimum classifier similarity for trust impact
-		var followCount, ignoreCount, contradictCount int
+		const trustRelevanceThreshold = 0.20 // minimum classifier similarity for trust impact
+		var followCount, partialCount, ignoreCount, contradictCount int
 		for _, r := range results {
 			if r.Similarity < trustRelevanceThreshold {
 				continue // not applicable to this action — skip for trust
@@ -1347,6 +1364,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			switch r.Outcome {
 			case OutcomeFollowed:
 				followCount++
+			case OutcomePartialCompliance:
+				partialCount++
 			case OutcomeIgnored:
 				ignoreCount++
 			case OutcomeContradicted:
@@ -1359,10 +1378,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			aggregateOutcome = OutcomeContradicted // high-confidence contradiction dominates
 		case followCount > ignoreCount:
 			aggregateOutcome = OutcomeFollowed
+		case partialCount > 0 && ignoreCount == 0:
+			aggregateOutcome = OutcomePartialCompliance // net-positive, boost trust
 		case ignoreCount > 0:
 			aggregateOutcome = OutcomeIgnored
-		case followCount == 0 && ignoreCount == 0:
-			aggregateOutcome = OutcomeUnknown // no items met relevance threshold
 		default:
 			aggregateOutcome = OutcomeUnknown
 		}
@@ -1373,8 +1392,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			if s.warmStore != nil {
 				highT := s.trustScorer.HighThreshold()
 				lowT := s.trustScorer.LowThreshold()
-				if (trustScoreForFeedback > highT && newTrust <= highT) ||
-					(trustScoreForFeedback >= lowT && newTrust < lowT) {
+				if (trustScoreForFeedback <= highT && newTrust > highT) || // T2→T1 promotion
+					(trustScoreForFeedback < lowT && newTrust >= lowT) || // T3→T2 promotion
+					(trustScoreForFeedback > highT && newTrust <= highT) || // T1→T2 demotion
+					(trustScoreForFeedback >= lowT && newTrust < lowT) { // T2→T3 demotion
 					s.warmStore.Invalidate(req.SpaceID)
 				}
 			}

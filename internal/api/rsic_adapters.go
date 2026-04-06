@@ -235,13 +235,14 @@ func (a *rsicJiminyAdapter) GetGuidanceStats(ctx context.Context, spaceID string
 		return ape.JiminyStatsResult{}, err
 	}
 	return ape.JiminyStatsResult{
-		TotalGuidanceIssued: stats.TotalGuidanceIssued,
-		TotalFollowed:       stats.TotalFollowed,
-		TotalIgnored:        stats.TotalIgnored,
-		TotalContradicted:   stats.TotalContradicted,
-		FollowRate:          stats.FollowRate,
-		ConstraintEffRate:   stats.ConstraintEffRate,
-		SourceDiversity:     stats.SourceDiversity,
+		TotalGuidanceIssued:    stats.TotalGuidanceIssued,
+		TotalFollowed:          stats.TotalFollowed,
+		TotalPartialCompliance: stats.TotalPartialCompliance,
+		TotalIgnored:           stats.TotalIgnored,
+		TotalContradicted:      stats.TotalContradicted,
+		FollowRate:             stats.FollowRate,
+		ConstraintEffRate:      stats.ConstraintEffRate,
+		SourceDiversity:        stats.SourceDiversity,
 	}, nil
 }
 

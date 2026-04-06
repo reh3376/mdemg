@@ -167,6 +167,7 @@ type StandardMetrics struct {
 	JiminySourceDiversity         func(spaceID string) *Gauge
 	JiminyTotalIssued             func(spaceID string) *Gauge
 	JiminyTotalFollowed           func(spaceID string) *Gauge
+	JiminyTotalPartialCompliance  func(spaceID string) *Gauge
 	JiminyTotalIgnored            func(spaceID string) *Gauge
 	JiminyTotalContradicted       func(spaceID string) *Gauge
 	CompactEventTimestamp         func(spaceID string) *Gauge
@@ -548,6 +549,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.JiminyTotalFollowed = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_followed_total", "Guidance items followed",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyTotalPartialCompliance = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_partial_compliance_total", "Guidance items partially complied with",
 			map[string]string{"space_id": spaceID})
 	}
 	m.JiminyTotalIgnored = func(spaceID string) *Gauge {

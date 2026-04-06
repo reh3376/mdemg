@@ -401,13 +401,14 @@ type JiminyStatsProvider interface {
 
 // JiminyStatsResult mirrors jiminy.JiminyStats for RSIC use.
 type JiminyStatsResult struct {
-	TotalGuidanceIssued int     `json:"total_guidance_issued"`
-	TotalFollowed       int     `json:"total_followed"`
-	TotalIgnored        int     `json:"total_ignored"`
-	TotalContradicted   int     `json:"total_contradicted"`
-	FollowRate          float64 `json:"follow_rate"`
-	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
-	SourceDiversity     float64 `json:"source_diversity"`
+	TotalGuidanceIssued    int     `json:"total_guidance_issued"`
+	TotalFollowed          int     `json:"total_followed"`
+	TotalPartialCompliance int     `json:"total_partial_compliance"`
+	TotalIgnored           int     `json:"total_ignored"`
+	TotalContradicted      int     `json:"total_contradicted"`
+	FollowRate             float64 `json:"follow_rate"`
+	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	SourceDiversity        float64 `json:"source_diversity"`
 }
 
 // ProtocolStatsProvider exposes J17 protocol metrics for RSIC assessment.

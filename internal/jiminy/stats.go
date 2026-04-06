@@ -34,6 +34,7 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 	RETURN
 		count(DISTINCT r.guidance_id) AS total,
 		count(DISTINCT CASE WHEN r.outcome_type = 'followed' THEN r.guidance_id END) AS followed,
+		count(DISTINCT CASE WHEN r.outcome_type = 'partial_compliance' THEN r.guidance_id END) AS partial_compliance,
 		count(DISTINCT CASE WHEN r.outcome_type = 'ignored' THEN r.guidance_id END) AS ignored,
 		count(DISTINCT CASE WHEN r.outcome_type = 'contradicted' THEN r.guidance_id END) AS contradicted`
 
@@ -52,20 +53,23 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 		rec := res.Record()
 		total := toInt(rec, "total")
 		followed := toInt(rec, "followed")
+		partial := toInt(rec, "partial_compliance")
 		ignored := toInt(rec, "ignored")
 		contradicted := toInt(rec, "contradicted")
 
+		// Follow rate: followed = full credit, partial_compliance = half credit
 		var followRate float64
 		if total > 0 {
-			followRate = float64(followed) / float64(total)
+			followRate = (float64(followed) + 0.5*float64(partial)) / float64(total)
 		}
 
 		return JiminyStats{
-			TotalGuidanceIssued: total,
-			TotalFollowed:       followed,
-			TotalIgnored:        ignored,
-			TotalContradicted:   contradicted,
-			FollowRate:          followRate,
+			TotalGuidanceIssued:    total,
+			TotalFollowed:          followed,
+			TotalPartialCompliance: partial,
+			TotalIgnored:           ignored,
+			TotalContradicted:      contradicted,
+			FollowRate:             followRate,
 		}, res.Err()
 	})
 	if err != nil {
@@ -86,19 +90,23 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 	return stats, nil
 }
 
-// computeConstraintEffectivenessRate returns the average effectiveness rate across all constraints.
+// computeConstraintEffectivenessRate returns the volume-weighted effectiveness rate
+// across constraints with sufficient data (>= 5 surfaced outcomes). Low-volume
+// constraints are excluded to reduce noise. Each qualifying constraint contributes
+// proportionally to its surfaced count.
 func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context, spaceID string) (float64, error) {
 	sess := sc.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
 	cypher := `
-	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
-	OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-()
-	WITH c,
-	     count(r) AS surfaced,
-	     count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS followed
-	WHERE surfaced > 0
-	RETURN avg(toFloat(followed) / toFloat(surfaced)) AS avg_effectiveness`
+	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})-[r:GUIDANCE_OUTCOME]-()
+	WITH c, count(r) AS surfaced,
+	     sum(CASE WHEN r.outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,
+	     sum(CASE WHEN r.outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half
+	WHERE surfaced >= 5
+	WITH sum(followed) + sum(partial_half) AS effective, toFloat(sum(surfaced)) AS total
+	WHERE total > 0
+	RETURN effective / total AS weighted_effectiveness`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
@@ -109,7 +117,7 @@ func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context
 			return 0.0, res.Err()
 		}
 		rec := res.Record()
-		v, _ := rec.Get("avg_effectiveness")
+		v, _ := rec.Get("weighted_effectiveness")
 		if v == nil {
 			return 0.0, nil
 		}
