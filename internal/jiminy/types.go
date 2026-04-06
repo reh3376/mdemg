@@ -213,13 +213,14 @@ type EvaluationItem struct {
 
 // JiminyStats holds aggregated guidance metrics for RSIC assessment.
 type JiminyStats struct {
-	TotalGuidanceIssued int     `json:"total_guidance_issued"`
-	TotalFollowed       int     `json:"total_followed"`
-	TotalIgnored        int     `json:"total_ignored"`
-	TotalContradicted   int     `json:"total_contradicted"`
-	FollowRate          float64 `json:"follow_rate"`
-	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
-	SourceDiversity     float64 `json:"source_diversity"` // 0-1, higher = more diverse
+	TotalGuidanceIssued    int     `json:"total_guidance_issued"`
+	TotalFollowed          int     `json:"total_followed"`
+	TotalPartialCompliance int     `json:"total_partial_compliance"`
+	TotalIgnored           int     `json:"total_ignored"`
+	TotalContradicted      int     `json:"total_contradicted"`
+	FollowRate             float64 `json:"follow_rate"`
+	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	SourceDiversity        float64 `json:"source_diversity"` // 0-1, higher = more diverse
 }
 
 // --- J12: Escalation types ---

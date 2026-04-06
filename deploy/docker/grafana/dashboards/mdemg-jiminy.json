@@ -318,7 +318,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### Guidance Health\n\n| Weight | Factor |\n|--------|--------|\n| **50%** | Follow Rate |\n| **30%** | Effectiveness |\n| **20%** | Source Diversity |"
+        "content": "### Guidance Health\n\n| Weight | Factor |\n|--------|--------|\n| **50%** | Follow Rate |\n| **30%** | Effectiveness |\n| **20%** | Source Diversity |\n\n*Follow Rate = (followed + 0.5 * partial) / total*"
       }
     },
     {
@@ -380,11 +380,16 @@
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_partial_compliance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
           "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         }
@@ -431,6 +436,25 @@
             "properties": [
               {
                 "id": "displayName",
+                "value": "Partial Compliance"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#56A64B",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
                 "value": "Ignored"
               },
               {
@@ -445,7 +469,7 @@
           {
             "matcher": {
               "id": "byFrameRefID",
-              "options": "C"
+              "options": "D"
             },
             "properties": [
               {
@@ -582,11 +606,16 @@
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_partial_compliance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {
           "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
           "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         }
@@ -629,6 +658,25 @@
             "properties": [
               {
                 "id": "displayName",
+                "value": "Partial Compliance"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#56A64B",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
                 "value": "Ignored"
               },
               {
@@ -643,7 +691,7 @@
           {
             "matcher": {
               "id": "byFrameRefID",
-              "options": "C"
+              "options": "D"
             },
             "properties": [
               {
@@ -690,7 +738,7 @@
       "targets": [
         {
           "refId": "A",
-          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', role_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Ignored, Contradicted, round(toFloat(Followed) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
+          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', role_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'partial_compliance' THEN 1 END) AS Partial, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Partial, Ignored, Contradicted, round((toFloat(Followed) + 0.5 * toFloat(Partial)) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
           "Format": "table"
         }
       ],
