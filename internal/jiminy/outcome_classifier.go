@@ -102,10 +102,10 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 	}
 
 	if oc.highThreshold <= 0 {
-		oc.highThreshold = 0.7
+		oc.highThreshold = 0.55
 	}
 	if oc.lowThreshold <= 0 {
-		oc.lowThreshold = 0.3
+		oc.lowThreshold = 0.20
 	}
 	if oc.maxTokens <= 0 {
 		oc.maxTokens = 100
@@ -195,11 +195,10 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 		}
 	}
 
-	// Default: use similarity to make best guess
-	if similarity >= 0.5 {
-		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
-	}
-	return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity}
+	// Heuristic fallback: uncertain range (between low and high thresholds) is partial compliance.
+	// At this point we're guaranteed lowThreshold <= similarity < highThreshold and the LLM
+	// tier was either unavailable or returned OutcomeUnknown.
+	return ClassificationResult{Outcome: OutcomePartialCompliance, Confidence: similarity}
 }
 
 // llmClassify uses an LLM to determine the outcome for uncertain cases (J14 upgraded).

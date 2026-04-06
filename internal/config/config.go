@@ -1947,12 +1947,12 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyOutcomeClassifierEnabled := getBool("JIMINY_OUTCOME_CLASSIFIER_ENABLED", true)
-	jiminyOutcomeLLMEnabled := getBool("JIMINY_OUTCOME_LLM_ENABLED", false)
-	jiminyOutcomeSimilarityHigh, err := atof("JIMINY_OUTCOME_SIMILARITY_HIGH", 0.7)
+	jiminyOutcomeLLMEnabled := getBool("JIMINY_OUTCOME_LLM_ENABLED", true)
+	jiminyOutcomeSimilarityHigh, err := atof("JIMINY_OUTCOME_SIMILARITY_HIGH", 0.55)
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyOutcomeSimilarityLow, err := atof("JIMINY_OUTCOME_SIMILARITY_LOW", 0.3)
+	jiminyOutcomeSimilarityLow, err := atof("JIMINY_OUTCOME_SIMILARITY_LOW", 0.20)
 	if err != nil {
 		return Config{}, err
 	}
