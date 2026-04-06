@@ -55,16 +55,19 @@ func TestHeuristicFallback_PartialCompliance(t *testing.T) {
 	}
 }
 
-func TestHeuristicFallback_IgnoredBelowLow(t *testing.T) {
-	// Similarity 0.15 is below low threshold (0.20) — should be ignored
+func TestHeuristicFallback_NotApplicableBelowLow(t *testing.T) {
+	// Similarity 0.15 is below low threshold (0.20) — should be not_applicable (topics unrelated)
 	emb := &sequenceEmbedder{targetSim: 0.15}
 	oc := newTestClassifier(emb, false)
 	item := GuidanceItem{Content: "use CUIDv2 for all identifiers", Type: GuidanceConstraint}
 
 	cr := oc.Classify(context.Background(), item, "updated README documentation")
 
-	if cr.Outcome != OutcomeIgnored {
-		t.Errorf("expected ignored for similarity=0.15, got %s", cr.Outcome)
+	if cr.Outcome != OutcomeNotApplicable {
+		t.Errorf("expected not_applicable for similarity=0.15, got %s", cr.Outcome)
+	}
+	if math.Abs(cr.Confidence-0.15) > 0.05 {
+		t.Errorf("expected confidence ~0.15, got %f", cr.Confidence)
 	}
 }
 
@@ -103,5 +106,44 @@ func TestHeuristicFallback_LLMDisabled(t *testing.T) {
 
 	if cr.Outcome != OutcomePartialCompliance {
 		t.Errorf("expected partial_compliance for similarity=0.35 with LLM disabled, got %s", cr.Outcome)
+	}
+}
+
+func TestMapOutcomeString_NotApplicable(t *testing.T) {
+	got := mapOutcomeString("not_applicable")
+	if got != OutcomeNotApplicable {
+		t.Errorf("expected OutcomeNotApplicable, got %s", got)
+	}
+	// Also test with whitespace
+	got = mapOutcomeString("  Not_Applicable  ")
+	if got != OutcomeNotApplicable {
+		t.Errorf("expected OutcomeNotApplicable for padded input, got %s", got)
+	}
+}
+
+func TestNotApplicable_VerySimilarIsStillFollowed(t *testing.T) {
+	// High similarity should still be followed even with the not_applicable change
+	emb := &sequenceEmbedder{targetSim: 0.7}
+	oc := newTestClassifier(emb, false)
+	item := GuidanceItem{Content: "always validate config weights sum to 1.0", Type: GuidanceConstraint}
+
+	cr := oc.Classify(context.Background(), item, "added weight validation to config.go Validate()")
+
+	if cr.Outcome != OutcomeFollowed {
+		t.Errorf("expected followed for similarity=0.7, got %s", cr.Outcome)
+	}
+}
+
+func TestNotApplicable_BoundaryAtLowThreshold(t *testing.T) {
+	// Exactly at lowThreshold (0.20) should be in the uncertain range, NOT not_applicable
+	emb := &sequenceEmbedder{targetSim: 0.20}
+	oc := newTestClassifier(emb, false)
+	item := GuidanceItem{Content: "use error wrapping with %w", Type: GuidanceConstraint}
+
+	cr := oc.Classify(context.Background(), item, "wrote error handling code")
+
+	// 0.20 is >= lowThreshold, so it enters the uncertain range → partial_compliance (LLM disabled)
+	if cr.Outcome != OutcomePartialCompliance {
+		t.Errorf("expected partial_compliance at boundary sim=0.20, got %s", cr.Outcome)
 	}
 }

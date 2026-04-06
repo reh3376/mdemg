@@ -191,3 +191,139 @@ Key Performance Indicators to track:
 - `internal/cli/hook_templates/prompt-context.sh` — Guidance injection flow
 - `internal/tsdb/migrations/005_interaction_enrichment.sql` — guidance_id column
 - `scripts/tsdb_data_review.py` — Template for diagnostic script architecture
+
+---
+
+## Post-Fix Validation (v0.7.1)
+
+**Date:** 2026-04-06
+**Commits:** `cec891e` (not_applicable outcome), `37479d0` (content normalization)
+**Method:** 6 manual chain tests (3 matching topic, 3 mismatched topic), 10 items each
+
+### Fixes Applied
+
+1. **PR #274** (merged): LLM tier enabled, heuristic fallback fixed, action summaries enriched, source filtering, cooldown reduction
+2. **`not_applicable` outcome** (`cec891e`): Items below low similarity threshold (0.20) classified as `not_applicable` instead of `ignored` — excluded from persistence, confidence decay, escalation, and protocol metrics
+3. **Content normalization** (`37479d0`): Structured metadata (`"Module: X. Related to: a, b"`) normalized to natural language in Guide() before embedding comparison. SEMANTIC blocks (LLM-generated) extracted as primary content. Raises cosine similarity ceiling from ~0.33 to ~0.59 for matching topics.
+
+### Root Cause Confirmed
+
+Direct OpenAI embedding tests (`text-embedding-3-large`, 3072 dims):
+
+| Content Format | Matching Topic | Cosine Sim |
+|---------------|---------------|-----------|
+| Natural language vs natural language | Yes | 0.6984 |
+| Structured metadata vs action summary | Yes | 0.3225 |
+| Constraint (natural language) vs action | Yes | 0.5613 |
+| Structured metadata vs action summary | No | 0.1726 |
+
+The problem was the content format (structured keyword lists), not the embedding model or thresholds. Content normalization brings structured metadata into the same embedding region as natural language.
+
+### Before / After Comparison
+
+| Metric | Baseline (PR #273) | Post-Fix | Target | Pass? |
+|--------|-------------------|----------|--------|-------|
+| Ignore rate | 82.4% | 0.0% | <50% | PASS |
+| Partial compliance | 0% | 46.0% | >10% | PASS |
+| Followed rate | 16.3% (bogus sim=1.0) | 2.0% (genuine sim=0.60) | >0% | PASS |
+| Max sim (matching topic) | 0.33 | 0.60 | >0.50 | PASS |
+| Avg max sim (matching) | 0.33 | 0.48 | >0.40 | PASS |
+| Avg max sim (mismatched) | 0.22 | 0.19 | <0.25 | PASS |
+| Edges on untyped nodes | 91.9% | 0% | 0% | PASS |
+| Feedback loop | Dead (Mar 31) | Active | Active | PASS |
+| "Followed" threshold reachable | No (ceiling 0.33) | Yes (0.60) | Yes | PASS |
+| False confidence decay | -0.03/false ignored | 0 (skipped) | 0 | PASS |
+
+### Manual Review — Classifier Accuracy
+
+10 outcomes sampled from matching-topic tests. Human assessment:
+
+- **7/10 clear agreement** (70%): Classifier correctly identified followed (1), partial_compliance (5), not_applicable (1)
+- **2/10 borderline disagree**: Items in 0.20-0.30 sim range classified partial_compliance; human assessment suggests not_applicable. These are in the range where LLM Tier 2 should make the call.
+- **1/10 borderline agree**: API handler guidance tangentially related to error handling.
+
+**Agreement rate: 70-80%.** Target was >50%. **PASS.**
+
+### Tag Decision
+
+**PASS — all criteria met.** Tag v0.7.1.
+
+| Criterion | Result |
+|-----------|--------|
+| Ignore rate < 60% | 0% (PASS) |
+| Partial compliance > 0 | 46% (PASS) |
+| Manual review agreement > 50% | 70% (PASS) |
+| Feedback loop active | Active (PASS) |
+| No new untyped-node outcomes | 0% (PASS) |
+| No critical regressions | None found (PASS) |
+
+### Known Limitations (Resolved)
+
+All three known limitations from the initial v0.7.1 validation have been addressed:
+
+#### 1. LLM Tier 2 — FIXED
+
+**Problem:** Server log showed `llm_enabled=false` at startup. Items in the 0.20-0.55 similarity range fell through to the heuristic fallback (`partial_compliance`) without LLM semantic judgment.
+
+**Root cause:** The running binary was built before `JIMINY_OUTCOME_LLM_ENABLED` default was changed from `false` to `true`. Additionally, `JIMINY_OUTCOME_CLASSIFIER_ENABLED` was missing from the Docker Compose template, and the config comment was stale.
+
+**Fix:**
+- Added `JIMINY_OUTCOME_CLASSIFIER_ENABLED` to both `docker-compose.yml` and `internal/cli/compose_templates/docker-compose.yml`
+- Fixed stale comment in `config.go:292` (said "default: false", code says `true`)
+- Rebuilt binary — server now logs `llm_enabled=true`
+
+**Status:** LLM Tier 2 active. Items in the 0.20-0.55 range are classified by OpenAI (`text-embedding-3-large`) with 5s timeout and 256-entry LRU cache.
+
+#### 2. SymbolNode Content Quality — FIXED
+
+**Problem:** Items without SEMANTIC blocks normalized to prose but still maxed out at ~0.40 cosine similarity because `generateSummary()` produced keyword-list summaries and ignored rich semantic content in `ingestSymbol.DocComment` and `Signature` fields.
+
+**Root cause:** `generateSummary()` (`ingest.go:1372-1478`) iterated `elem.Symbols` but only extracted `Name` and `Type` for class/method/function lists. The `DocComment` field — containing natural-language descriptions — was silently discarded.
+
+**Fix:** `generateSummary()` now appends the `DocComment` from the first exported symbol matching `elem.Name` (capped at 400 chars). This adds a natural-language sentence to the structural summary, boosting the embedding similarity ceiling for nodes without SEMANTIC blocks.
+
+**Before:** `"Function Classify in outcome_classifier. Related to: guidance, classification"`
+**After:** `"Function Classify in outcome_classifier. Related to: guidance, classification. Classify determines the outcome of a guidance item given an action summary."`
+
+**Status:** Fixed. Existing nodes benefit after re-ingestion (`mdemg ingest --space-id mdemg-dev --path .`).
+
+#### 3. Multi-Repo Contamination — FIXED
+
+**Problem:** 27% of live guidance items were wrong-context (Python synchronization classes surfaced for Go tasks). 59,891 of 65,946 SymbolNodes in `mdemg-dev` were from foreign codebases (Python venvs, whk-wms, Megatron-LM benchmarks).
+
+**Root cause (two issues):**
+1. Multiple repos ingested into `mdemg-dev` via `MDEMG_SPACE_ID=mdemg-dev` env var
+2. `GetSymbolsForMemoryNode()` (`symbols/store.go:513-537`) had no `space_id` filter on SymbolNode destinations in its three `OPTIONAL MATCH` clauses — a bug compared to `learning/service.go:516` which correctly filters
+
+**Fix:**
+- Added `{space_id: $space_id}` filter to all three SymbolNode matches in `GetSymbolsForMemoryNode()`
+- Deleted 59,891 foreign SymbolNodes from `mdemg-dev` space via `scripts/cleanup_foreign_symbols.sh`
+- 6,055 legitimate nodes remain (paths: `/internal/`, `/cmd/`, `/pkg/`, `/tests/`)
+
+**Status:** Fixed. Space-scoped queries prevent cross-repo contamination. Foreign nodes removed.
+
+### Remaining Caveats
+
+1. **DocComment benefit requires re-ingestion**: Existing MemoryNode summaries in Neo4j won't include DocComment until `mdemg ingest` is re-run.
+2. **Ingestion space isolation is a user config concern**: If `MDEMG_SPACE_ID=mdemg-dev` is set while ingesting non-mdemg repos, contamination will recur. Users should use repo-specific space IDs.
+3. **LLM Tier 2 latency**: Each uncertain-range classification makes an OpenAI API call (5s timeout). The LRU cache (256 entries) mitigates repeated calls.
+
+### Files Modified (v0.7.1)
+
+- `internal/jiminy/types.go` — Added `OutcomeNotApplicable`
+- `internal/jiminy/outcome_classifier.go` — Low sim → not_applicable; mapOutcomeString
+- `internal/jiminy/service.go` — Downstream guards; content normalization in Guide()
+- `internal/jiminy/confidence_updater.go` — Defense-in-depth early return
+- `internal/jiminy/content_normalizer.go` — NEW: normalizeGuidanceContent()
+- `internal/jiminy/content_normalizer_test.go` — NEW: 12 normalizer tests
+- `internal/jiminy/outcome_classifier_test.go` — Updated + 4 new tests
+
+### Files Modified (Known Limitations Fix)
+
+- `docker-compose.yml` — Added `JIMINY_OUTCOME_CLASSIFIER_ENABLED`
+- `internal/cli/compose_templates/docker-compose.yml` — Same (kept in sync)
+- `internal/config/config.go` — Fixed stale default comments for thresholds and LLM enabled
+- `internal/cli/ingest.go` — `generateSummary()` DocComment enrichment from exported symbols
+- `internal/symbols/store.go` — `GetSymbolsForMemoryNode()` space_id filter on SymbolNode matches
+- `internal/cli/ingest_test.go` — 4 new DocComment enrichment tests
+- `scripts/cleanup_foreign_symbols.sh` — NEW: batch foreign SymbolNode cleanup script

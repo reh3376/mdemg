@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Outcome classifier: `not_applicable` for topically unrelated guidance** — items with cosine similarity below the low threshold (0.20) are now classified as `not_applicable` instead of `ignored`. This prevents false confidence decay (-0.03/item), false escalation advancement, and polluted GUIDANCE_OUTCOME edges for guidance that was topically unrelated to the action taken. `OutcomeIgnored` is now only reachable via LLM Tier 2 semantic judgment.
+- **Guidance content normalization** — structured metadata from ingestion (`"Module: X. Related to: a, b. Key functions: f"`) is now normalized to natural language before embedding comparison. Items with LLM-generated `SEMANTIC:` blocks use the natural language portion directly. This raises the cosine similarity ceiling from ~0.33 to ~0.59 for matching topics, making the "followed" threshold (0.55) reachable.
 - Jiminy outcome classifier LLM tier enabled by default (`JIMINY_OUTCOME_LLM_ENABLED=true`) — was disabled, causing 35% of items to hit a binary heuristic fallback
 - Heuristic fallback now produces `partial_compliance` for the uncertain similarity range (0.20-0.55) instead of a binary followed/ignored split at 0.5
 - Outcome similarity thresholds adjusted (high: 0.7→0.55, low: 0.3→0.20) to match action summary embedding characteristics
@@ -20,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `guidance_type` property on GUIDANCE_OUTCOME edges for downstream analysis
 - `JIMINY_OUTCOME_LLM_ENABLED`, `JIMINY_OUTCOME_SIMILARITY_HIGH`, `JIMINY_OUTCOME_SIMILARITY_LOW` env vars in Docker Compose templates and `mdemg init`
+- `JIMINY_OUTCOME_CLASSIFIER_ENABLED` env var in Docker Compose templates — was missing, causing inconsistency between Docker and native mode
+- DocComment enrichment in `generateSummary()` — appends exported symbol doc comments (up to 400 chars) to structural summaries for improved embedding similarity
+- `scripts/cleanup_foreign_symbols.sh` — batch cleanup script for foreign SymbolNodes ingested into wrong space
+- `space_id` filter on `GetSymbolsForMemoryNode()` SymbolNode matches — prevents cross-space symbol contamination in retrieval
 
 ### Investigation
 

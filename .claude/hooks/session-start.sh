@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# MDEMG hook — managed by mdemg hooks install
 # Hook: SessionStart — restore CMS memory context on every session start
 # This runs automatically before Claude sees any user input.
 
@@ -7,7 +8,15 @@ set -euo pipefail
 # Ensure log directory exists for all ingest/hook logging
 mkdir -p "$HOME/.mdemg/logs"
 
-MDEMG_URL="${MDEMG_URL:-http://localhost:9999}"
+# MDEMG server URL: env > .mdemg.port > .env MDEMG_PORT > 9999
+if [ -z "${MDEMG_URL:-}" ]; then
+    if [ -f ".mdemg.port" ]; then
+        _PORT=$(tr -d '[:space:]' < .mdemg.port)
+    elif [ -f ".env" ]; then
+        _PORT=$(sed -n 's/^MDEMG_PORT=//p' .env 2>/dev/null | tr -d '[:space:]')
+    fi
+    MDEMG_URL="http://localhost:${_PORT:-9999}"
+fi
 SESSION_ID="claude-core"
 MAX_OBS=10
 
@@ -98,8 +107,8 @@ if [ "$OBS_COUNT" -eq 0 ] 2>/dev/null; then
 ║                                                             ║
 ║  MANDATORY INVESTIGATION:                                   ║
 ║    1. POST /v1/self-improve/assess                          ║
-║       {"space_id":"mdemg-dev","tier":"micro"}               ║
-║    2. GET /v1/memory/stats?space_id=mdemg-dev               ║
+║       {"space_id":"<space>","tier":"micro"}               ║
+║    2. GET /v1/memory/stats?space_id=<space>               ║
 ║                                                             ║
 ║  DO NOT PROCEED until investigated.                         ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -145,6 +154,7 @@ echo "═══ END CMS CONTEXT ═══"
 
 # Ingest claude .md files with content-hash change detection (fire-and-forget)
 if [ -x "./bin/mdemg" ]; then
+  mkdir -p ~/.mdemg/logs 2>/dev/null || true
   ./bin/mdemg ingest-claude-md --quiet --space-id "${SPACE_ID}" \
     2>> ~/.mdemg/logs/ingest-claude-md.log &
 fi
@@ -156,7 +166,12 @@ if [ -f "$INGEST_LOG_PATH" ] && [ -s "$INGEST_LOG_PATH" ]; then
   if [ -n "$LAST_INGEST_LINE" ]; then
     LAST_TS=$(echo "$LAST_INGEST_LINE" | grep -oE '^\[[0-9T:Z-]+\]' | tr -d '[]' 2>/dev/null || true)
     if [ -n "$LAST_TS" ]; then
-      LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      # Portable date parsing: macOS uses -jf, Linux/GNU uses -d
+      if date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" >/dev/null 2>&1; then
+        LAST_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      else
+        LAST_EPOCH=$(date -d "$LAST_TS" "+%s" 2>/dev/null || echo 0)
+      fi
       NOW_EPOCH=$(date "+%s")
       if [ "$LAST_EPOCH" -gt 0 ] 2>/dev/null; then
         STALE_SECS=$(( NOW_EPOCH - LAST_EPOCH ))
@@ -209,9 +224,9 @@ EOF
 
 !! DEGRADED HEALTH DETECTED !!
 Investigation checklist:
-  1. GET /v1/memory/stats?space_id=mdemg-dev
-  2. GET /v1/learning/stats?space_id=mdemg-dev
-  3. POST /v1/self-improve/cycle {"space_id":"mdemg-dev","tier":"meso"}
+  1. GET /v1/memory/stats?space_id=<space>
+  2. GET /v1/learning/stats?space_id=<space>
+  3. POST /v1/self-improve/cycle {"space_id":"<space>","tier":"meso"}
 DEGRADED
   fi
 fi

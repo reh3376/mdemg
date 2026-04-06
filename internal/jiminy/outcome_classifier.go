@@ -182,9 +182,9 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
 	}
 
-	// Low similarity = ignored
+	// Low similarity = not applicable (topics don't overlap — guidance wasn't relevant to this action)
 	if similarity < oc.lowThreshold {
-		return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity}
+		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity}
 	}
 
 	// Uncertain range: try LLM Tier 2 if available
@@ -321,6 +321,8 @@ func mapOutcomeString(s string) GuidanceOutcome {
 		return OutcomeIgnored
 	case "contradicted":
 		return OutcomeContradicted
+	case "not_applicable":
+		return OutcomeNotApplicable
 	default:
 		return OutcomeUnknown
 	}

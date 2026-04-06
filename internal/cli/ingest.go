@@ -1470,6 +1470,22 @@ func generateSummary(elem codeElement) string {
 		}
 	}
 
+	// Append DocComment from first exported symbol matching the element name.
+	// DocComments are natural-language descriptions that improve embedding similarity
+	// for nodes without SEMANTIC blocks.
+	if len(elem.Symbols) > 0 {
+		for _, s := range elem.Symbols {
+			if s.DocComment != "" && s.Exported && s.Name == elem.Name {
+				comment := strings.TrimSpace(s.DocComment)
+				if len(comment) > 400 {
+					comment = comment[:400]
+				}
+				summary.WriteString(". " + comment)
+				break
+			}
+		}
+	}
+
 	result := summary.String()
 	if len(result) > maxLen {
 		result = result[:maxLen-3] + "..."
