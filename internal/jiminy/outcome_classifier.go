@@ -56,6 +56,7 @@ type OutcomeClassifier struct {
 	embedder        embeddings.Embedder
 	llm             *llmclient.Client // optional, for Tier 2 classification
 	llmEnabled      bool
+	llmProvider     string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
 	compressPrompts bool    // J17-PC: compress classification prompts
 	highThreshold   float64 // above this similarity = followed (default: 0.7)
 	lowThreshold    float64 // below this similarity = ignored (default: 0.3)
@@ -108,7 +109,7 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 		oc.lowThreshold = 0.20
 	}
 	if oc.maxTokens <= 0 {
-		oc.maxTokens = 100
+		oc.maxTokens = 500
 	}
 
 	oc.cacheCap = cfg.CacheSize
@@ -117,12 +118,13 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 	}
 
 	if cfg.LLMEnabled && cfg.LLMProvider != "" {
+		oc.llmProvider = cfg.LLMProvider
 		oc.llm = llmclient.New(llmclient.Config{
 			Provider:  cfg.LLMProvider,
 			Model:     cfg.LLMModel,
 			APIKey:    cfg.LLMAPIKey,
 			BaseURL:   cfg.LLMBaseURL,
-			TimeoutMs: 5000,
+			TimeoutMs: 15000,
 		}).WithContext("jiminy.evaluate", "")
 	}
 
@@ -161,55 +163,49 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 
 	similarity := cosineSimilarity(guidanceEmbed, actionEmbed)
 
-	// Check for negation
+	// Detect negation indicators in action summary (saved for LLM context, not short-circuited)
 	actionLower := strings.ToLower(actionSummary)
-	negationPatterns := []string{"instead of", "did not", "didn't", "ignored", "skipped", "contrary to"}
-	hasNegation := false
-	for _, neg := range negationPatterns {
-		if strings.Contains(actionLower, neg) {
-			hasNegation = true
-			break
-		}
-	}
-
-	// High similarity + negation = contradicted
-	if similarity >= oc.lowThreshold && hasNegation {
-		return ClassificationResult{Outcome: OutcomeContradicted, Confidence: similarity}
-	}
-
-	// High similarity, no negation = followed
-	if similarity >= oc.highThreshold {
-		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
-	}
+	hasNegation, matchedPattern := detectNegation(actionLower)
 
 	// Low similarity = not applicable (topics don't overlap — guidance wasn't relevant to this action)
 	if similarity < oc.lowThreshold {
 		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity}
 	}
 
-	// Uncertain range: try LLM Tier 2 if available
+	// High similarity + no negation = followed
+	if similarity >= oc.highThreshold && !hasNegation {
+		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
+	}
+
+	// Uncertain range OR high-similarity-with-negation: try LLM Tier 2 if available.
+	// Negation is passed as context so the LLM can judge whether it's a real contradiction
+	// or a false positive (e.g., negation words appearing in quoted code content).
 	if oc.llm != nil && oc.llmEnabled {
-		cr := oc.llmClassify(ctx, item, actionSummary, similarity)
+		cr := oc.llmClassify(ctx, item, actionSummary, similarity, hasNegation, matchedPattern)
 		if cr.Outcome != OutcomeUnknown {
 			return cr
 		}
 	}
 
-	// Heuristic fallback: uncertain range (between low and high thresholds) is partial compliance.
-	// At this point we're guaranteed lowThreshold <= similarity < highThreshold and the LLM
-	// tier was either unavailable or returned OutcomeUnknown.
+	// Heuristic fallback: no LLM available or LLM returned unknown.
+	if hasNegation {
+		return ClassificationResult{Outcome: OutcomeContradicted, Confidence: similarity}
+	}
+	if similarity >= oc.highThreshold {
+		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
+	}
 	return ClassificationResult{Outcome: OutcomePartialCompliance, Confidence: similarity}
 }
 
 // llmClassify uses an LLM to determine the outcome for uncertain cases (J14 upgraded).
-func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem, actionSummary string, baseSimilarity float64) ClassificationResult {
+func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem, actionSummary string, baseSimilarity float64, hasNegation bool, matchedPattern string) ClassificationResult {
 	// Check cache first
 	cacheKey := classifyCacheKey(item.Content, actionSummary)
 	if cached := oc.classifyCacheGet(cacheKey); cached != nil {
 		return *cached
 	}
 
-	prompt := buildClassifyPrompt(item, actionSummary, baseSimilarity, oc.compressPrompts)
+	prompt := buildClassifyPrompt(item, actionSummary, baseSimilarity, oc.compressPrompts, hasNegation, matchedPattern)
 
 	sysPrompt := classifySystemPrompt
 	if oc.compressPrompts {
@@ -221,14 +217,12 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		{Role: "user", Content: prompt},
 	}
 
-	temperature := 0.1
 	opts := llmclient.CompleteOpts{
-		MaxTokens:   oc.maxTokens,
-		Temperature: &temperature,
+		MaxTokens: oc.maxTokens,
 	}
 
-	// Ollama: set JSON schema
-	if oc.llm != nil {
+	// Ollama: set JSON schema for grammar-constrained output
+	if oc.llmProvider == "ollama" {
 		opts.Format = ollamaClassifySchema
 	}
 
@@ -237,6 +231,8 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		slog.Error("jiminy classifier: LLM classification failed", "error", err)
 		return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
 	}
+
+	slog.Debug("jiminy classifier: raw LLM response", "response_len", len(response), "response_preview", encoding.TruncateAtWord(response, 200))
 
 	// Parse structured response
 	cr := parseClassifyResponse(response, baseSimilarity)
@@ -249,7 +245,8 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 
 // buildClassifyPrompt constructs the enriched Tier 2 classification prompt (J14).
 // When compress is true, removes redundant Task section and truncates content.
-func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity float64, compress bool) string {
+// hasNegation/matchedPattern provide negation detection context for the LLM.
+func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity float64, compress bool, hasNegation bool, matchedPattern string) string {
 	var sb strings.Builder
 
 	content := item.Content
@@ -266,7 +263,14 @@ func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity flo
 	if len(item.SourceNodes) > 0 {
 		fmt.Fprintf(&sb, "- Source Node: %s\n", item.SourceNodes[0])
 	}
-	fmt.Fprintf(&sb, "- Vector Similarity: %.3f\n\n", similarity)
+	fmt.Fprintf(&sb, "- Vector Similarity: %.3f\n", similarity)
+	if hasNegation {
+		fmt.Fprintf(&sb, "- Negation Detected: true (matched: %q)\n", matchedPattern)
+		sb.WriteString("- Note: The action contains negation language. Determine whether this indicates ")
+		sb.WriteString("the agent contradicted the guidance, or if the negation words appear in quoted ")
+		sb.WriteString("code/content and are not semantically relevant.\n")
+	}
+	sb.WriteString("\n")
 
 	sb.WriteString("## Agent Action\n")
 	sb.WriteString(action)
@@ -368,6 +372,20 @@ func (oc *OutcomeClassifier) classifyCachePut(key string, result ClassificationR
 			delete(oc.cacheMap, back.Value.(*classifyCacheEntry).key)
 		}
 	}
+}
+
+// negationPatterns are substring indicators of potential contradiction.
+var negationPatterns = []string{"instead of", "did not", "didn't", "ignored", "skipped", "contrary to"}
+
+// detectNegation checks if any negation patterns appear in the lowercased action text.
+// Returns true and the matched pattern, or false and empty string.
+func detectNegation(actionLower string) (bool, string) {
+	for _, neg := range negationPatterns {
+		if strings.Contains(actionLower, neg) {
+			return true, neg
+		}
+	}
+	return false, ""
 }
 
 // cosineSimilarity computes cosine similarity between two vectors.

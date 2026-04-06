@@ -2,8 +2,14 @@ package jiminy
 
 import (
 	"context"
+	"encoding/json"
 	"math"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"mdemg/internal/llmclient"
 )
 
 // sequenceEmbedder returns different embeddings on successive calls to control cosine similarity.
@@ -145,5 +151,168 @@ func TestNotApplicable_BoundaryAtLowThreshold(t *testing.T) {
 	// 0.20 is >= lowThreshold, so it enters the uncertain range → partial_compliance (LLM disabled)
 	if cr.Outcome != OutcomePartialCompliance {
 		t.Errorf("expected partial_compliance at boundary sim=0.20, got %s", cr.Outcome)
+	}
+}
+
+// --- Negation detection tests ---
+
+func TestDetectNegation_Patterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    bool
+		pattern string
+	}{
+		{"instead_of", "used fmt instead of slog", true, "instead of"},
+		{"did_not", "did not add error handling", true, "did not"},
+		{"didnt", "didn't follow the pattern", true, "didn't"},
+		{"ignored", "ignored the constraint", true, "ignored"},
+		{"skipped", "skipped validation step", true, "skipped"},
+		{"contrary_to", "contrary to guidance, used raw sql", true, "contrary to"},
+		{"no_negation", "added structured logging to handlers", false, ""},
+		{"code_content", "replaced 'skipped_test' with 'enabled_test'", true, "skipped"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, pat := detectNegation(tt.input)
+			if got != tt.want {
+				t.Errorf("detectNegation(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+			if pat != tt.pattern {
+				t.Errorf("detectNegation(%q) pattern = %q, want %q", tt.input, pat, tt.pattern)
+			}
+		})
+	}
+}
+
+func TestNegation_NoLLM_HeuristicContradicted(t *testing.T) {
+	// Similarity 0.35 is in uncertain range, negation present, no LLM → contradicted
+	emb := &sequenceEmbedder{targetSim: 0.35}
+	oc := newTestClassifier(emb, false)
+	item := GuidanceItem{Content: "use structured logging", Type: GuidanceConstraint}
+
+	cr := oc.Classify(context.Background(), item, "did not use structured logging")
+
+	if cr.Outcome != OutcomeContradicted {
+		t.Errorf("expected contradicted for negation+no-LLM, got %s", cr.Outcome)
+	}
+}
+
+func TestNegation_HighSim_NoLLM_HeuristicContradicted(t *testing.T) {
+	// Similarity 0.7 is above high threshold, but negation present, no LLM → contradicted
+	emb := &sequenceEmbedder{targetSim: 0.7}
+	oc := newTestClassifier(emb, false)
+	item := GuidanceItem{Content: "use structured logging", Type: GuidanceConstraint}
+
+	cr := oc.Classify(context.Background(), item, "ignored structured logging requirement")
+
+	if cr.Outcome != OutcomeContradicted {
+		t.Errorf("expected contradicted for high-sim negation+no-LLM, got %s", cr.Outcome)
+	}
+}
+
+func TestNegation_HighSim_NoNegation_Followed(t *testing.T) {
+	// Similarity 0.7, no negation → followed (unchanged behavior)
+	emb := &sequenceEmbedder{targetSim: 0.7}
+	oc := newTestClassifier(emb, false)
+	item := GuidanceItem{Content: "use structured logging", Type: GuidanceConstraint}
+
+	cr := oc.Classify(context.Background(), item, "added structured slog logging")
+
+	if cr.Outcome != OutcomeFollowed {
+		t.Errorf("expected followed for high-sim no-negation, got %s", cr.Outcome)
+	}
+}
+
+func TestNegation_WithLLM_DelegatesToLLM(t *testing.T) {
+	// When LLM is available, negation does NOT short-circuit — LLM decides
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := llmclient.OpenAIChatResponse{
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: `{"outcome": "followed", "confidence": 0.85, "reasoning": "negation words are from quoted code content"}`}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	emb := &sequenceEmbedder{targetSim: 0.35}
+	oc := NewOutcomeClassifier(emb, OutcomeClassifierConfig{
+		LLMEnabled:    true,
+		LLMProvider:   "openai",
+		LLMBaseURL:    server.URL,
+		LLMAPIKey:     "test-key",
+		HighThreshold: 0.55,
+		LowThreshold:  0.20,
+	})
+
+	item := GuidanceItem{Content: "use structured logging", Type: GuidanceConstraint}
+	cr := oc.Classify(context.Background(), item, "replaced 'skipped_validation' with 'enabled_validation' instead of removing it")
+
+	// The LLM should decide, not the heuristic
+	if cr.Outcome != OutcomeFollowed {
+		t.Errorf("expected LLM to override heuristic negation, got %s", cr.Outcome)
+	}
+	if cr.Confidence != 0.85 {
+		t.Errorf("expected confidence 0.85 from LLM, got %f", cr.Confidence)
+	}
+}
+
+func TestNegation_WithLLM_HighSim_DelegatesToLLM(t *testing.T) {
+	// High similarity + negation + LLM available → LLM confirms contradicted
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := llmclient.OpenAIChatResponse{
+			Choices: []llmclient.OpenAIChoice{
+				{Message: llmclient.Message{Content: `{"outcome": "contradicted", "confidence": 0.90, "reasoning": "agent explicitly ignored the guidance"}`}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	emb := &sequenceEmbedder{targetSim: 0.7}
+	oc := NewOutcomeClassifier(emb, OutcomeClassifierConfig{
+		LLMEnabled:    true,
+		LLMProvider:   "openai",
+		LLMBaseURL:    server.URL,
+		LLMAPIKey:     "test-key",
+		HighThreshold: 0.55,
+		LowThreshold:  0.20,
+	})
+
+	item := GuidanceItem{Content: "use structured logging", Type: GuidanceConstraint}
+	cr := oc.Classify(context.Background(), item, "ignored the structured logging requirement entirely")
+
+	if cr.Outcome != OutcomeContradicted {
+		t.Errorf("expected LLM to confirm contradicted, got %s", cr.Outcome)
+	}
+}
+
+func TestBuildClassifyPrompt_WithNegation(t *testing.T) {
+	item := GuidanceItem{
+		Type:     GuidanceConstraint,
+		Priority: "high",
+		Content:  "Must use OAuth2",
+	}
+	prompt := buildClassifyPrompt(item, "did not use OAuth2", 0.45, false, true, "did not")
+
+	if !strings.Contains(prompt, "Negation Detected: true") {
+		t.Error("prompt should contain negation detection flag")
+	}
+	if !strings.Contains(prompt, `"did not"`) {
+		t.Error("prompt should contain matched pattern")
+	}
+}
+
+func TestBuildClassifyPrompt_WithoutNegation(t *testing.T) {
+	item := GuidanceItem{
+		Type:     GuidanceConstraint,
+		Priority: "high",
+		Content:  "Must use OAuth2",
+	}
+	prompt := buildClassifyPrompt(item, "Used OAuth2 for auth", 0.65, false, false, "")
+
+	if strings.Contains(prompt, "Negation Detected") {
+		t.Error("prompt should NOT contain negation section when no negation found")
 	}
 }
