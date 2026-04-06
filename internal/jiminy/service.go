@@ -1146,8 +1146,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// Alias for downstream use
 		outcome := cr.Outcome
 
-		// J12: Feed escalation tracker with outcome
-		if s.escalation != nil && len(item.SourceNodes) > 0 {
+		// J12: Feed escalation tracker with outcome (skip not_applicable — topically unrelated)
+		if s.escalation != nil && len(item.SourceNodes) > 0 && outcome != OutcomeNotApplicable {
 			for _, nodeID := range item.SourceNodes {
 				s.escalation.RecordOutcome(feedbackSessionID, nodeID, outcome)
 			}
@@ -1158,7 +1158,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// to avoid double-counting — but ONLY for GuidanceConstraint items (which the NLI
 		// block processes). Non-constraint items (corrections, patterns, etc.) always use
 		// heuristic scores since the NLI block only handles GuidanceConstraint.
-		if s.protocolMetrics != nil && item.ConstraintCode != "" && (s.nliScorer == nil || item.Type != GuidanceConstraint) {
+		if s.protocolMetrics != nil && item.ConstraintCode != "" && outcome != OutcomeNotApplicable && (s.nliScorer == nil || item.Type != GuidanceConstraint) {
 			var compScore float64
 			switch outcome {
 			case OutcomeFollowed:
@@ -1176,7 +1176,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}
 
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
-		if s.persistence != nil && outcome != OutcomeUnknown {
+		// Skip not_applicable — topically unrelated items should not create edges or decay confidence
+		if s.persistence != nil && outcome != OutcomeUnknown && outcome != OutcomeNotApplicable {
 			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
 				slog.Error("jiminy: persist outcome failed", "error", err)
 			}
@@ -1196,7 +1197,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// NS-03: Build multi-dimensional feedback (comprehension, applicability, score source)
 		var dims *FeedbackDimensions
-		if item.Type == GuidanceConstraint {
+		if item.Type == GuidanceConstraint && outcome != OutcomeNotApplicable {
 			followed := outcome == OutcomeFollowed || outcome == OutcomePartialCompliance
 			var comprehension float64
 			scoreSource := "heuristic"
@@ -1434,8 +1435,11 @@ func classifyOutcome(item GuidanceItem, actionLower string) (GuidanceOutcome, fl
 	if similarity >= 0.5 {
 		return OutcomeFollowed, similarity
 	}
-	if similarity > 0.0 {
+	if similarity >= 0.2 {
 		return OutcomeIgnored, similarity
+	}
+	if similarity > 0.0 {
+		return OutcomeNotApplicable, similarity
 	}
 	return OutcomeUnknown, 0.0
 }

@@ -184,21 +184,23 @@ The `docker-compose.yml` template passes these through with empty defaults — t
 
 ### Outcome Classification (3-Tier System)
 
-The outcome classifier determines whether the agent followed, partially followed, ignored, or contradicted guidance. It uses a 3-tier system:
+The outcome classifier determines whether the agent followed, partially followed, or contradicted guidance — and critically, whether the guidance was even applicable to the action taken. It uses a 3-tier system:
 
 | Tier | Method | Range | Outcomes |
 |------|--------|-------|----------|
 | 1 | Embedding cosine similarity | `>= highThreshold` (0.55) | followed |
-| 1 | Embedding cosine similarity | `< lowThreshold` (0.20) | ignored |
+| 1 | Embedding cosine similarity | `< lowThreshold` (0.20) | not_applicable |
 | 1 | Negation detection + similarity | `>= lowThreshold` + negation patterns | contradicted |
 | 2 | LLM classification | `lowThreshold <= sim < highThreshold` | followed / partial_compliance / ignored / contradicted |
 | 3 | Heuristic fallback | Tier 2 unavailable or returns unknown | partial_compliance |
+
+**`not_applicable` vs `ignored`**: Guidance is surfaced based on the user's context (e.g., "implementing error handling"), but outcomes are classified against the actual action taken (e.g., "Wrote config.go: func Validate()"). When the guidance topic doesn't overlap with the action topic, cosine similarity is correctly low — but the guidance wasn't *ignored*, it was *not applicable* to that specific action. Items classified as `not_applicable` are excluded from persistence, confidence decay, escalation tracking, and protocol metrics. `OutcomeIgnored` is now only reachable via LLM Tier 2 semantic judgment, representing a deliberate determination that relevant guidance was not followed.
 
 **Tier 2 (LLM)** uses the same provider/model as Jiminy synthesis. It sends a compact prompt (<100 tokens) and parses a JSON response with `outcome` and `reasoning` fields. Enabled by default (`JIMINY_OUTCOME_LLM_ENABLED=true`).
 
 **Tier 3 (heuristic)** only fires when the LLM tier is unavailable (timeout, error, disabled). Items in the uncertain range are classified as `partial_compliance` rather than a binary guess.
 
-**GUIDANCE_OUTCOME edges** are only created on typed guidance nodes (`obs_type` IN constraint, correction, pattern, learning OR `role_type` = constraint). Each edge includes a `guidance_type` property for downstream analysis.
+**GUIDANCE_OUTCOME edges** are only created on typed guidance nodes (`obs_type` IN constraint, correction, pattern, learning OR `role_type` = constraint) and only for applicable outcomes (not `not_applicable` or `unknown`). Each edge includes a `guidance_type` property for downstream analysis.
 
 ## Hook Integration
 

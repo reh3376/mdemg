@@ -117,6 +117,7 @@ const (
 	OutcomeFollowed          GuidanceOutcome = "followed"
 	OutcomePartialCompliance GuidanceOutcome = "partial_compliance" // J14: agent addressed some but not all aspects
 	OutcomeIgnored           GuidanceOutcome = "ignored"
+	OutcomeNotApplicable     GuidanceOutcome = "not_applicable" // guidance topic unrelated to the action taken
 	OutcomeContradicted      GuidanceOutcome = "contradicted"
 	OutcomeUnknown           GuidanceOutcome = "unknown"
 )

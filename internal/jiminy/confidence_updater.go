@@ -52,7 +52,7 @@ func NewConfidenceUpdater(driver neo4j.DriverWithContext, cfg config.Config) *Co
 //   - OutcomeContradicted: -decayPerNegative * 1.5
 //   - OutcomeUnknown:      no change (returns nil immediately)
 func (u *ConfidenceUpdater) UpdateConfidence(ctx context.Context, nodeID string, outcome GuidanceOutcome) error {
-	if outcome == OutcomeUnknown {
+	if outcome == OutcomeUnknown || outcome == OutcomeNotApplicable {
 		return nil
 	}
 
