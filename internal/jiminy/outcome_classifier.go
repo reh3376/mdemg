@@ -31,12 +31,22 @@ Consider:
 - Similarity between guidance and action (provided as context)
 - Whether the action achieves the intent of the guidance, not just literal text matching
 
+Action summary format:
+- "Edited FILE: replaced 'OLD' with 'NEW'" means the agent REMOVED the OLD text and ADDED the NEW text.
+  The OLD text is what was deleted — do not treat its content as the agent's intent.
+  Focus on the NEW text and the overall effect of the change.
+- Negation words appearing inside quoted code strings (variable names, log messages, assertions)
+  are NOT indicators of contradiction. Only treat negation as contradiction when the agent's
+  overall action semantically opposes the guidance.
+
 Respond with ONLY valid JSON: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 
 // classifySystemPromptCompact is a condensed system prompt for classification
 // used when CompressPrompts is enabled.
 const classifySystemPromptCompact = `Guidance outcome classifier. Classify: followed/partial_compliance/ignored/contradicted.
 must/must_not=strict, should/should_not=flexible. Consider intent not literal text.
+Action format: "replaced 'OLD' with 'NEW'" = OLD was REMOVED, NEW was ADDED. Focus on NEW text and overall effect.
+Negation words in quoted code are NOT contradiction indicators.
 JSON only: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 
 // ollamaClassifySchema is the JSON schema for Ollama grammar-constrained classification.
@@ -266,9 +276,10 @@ func buildClassifyPrompt(item GuidanceItem, actionSummary string, similarity flo
 	fmt.Fprintf(&sb, "- Vector Similarity: %.3f\n", similarity)
 	if hasNegation {
 		fmt.Fprintf(&sb, "- Negation Detected: true (matched: %q)\n", matchedPattern)
-		sb.WriteString("- Note: The action contains negation language. Determine whether this indicates ")
-		sb.WriteString("the agent contradicted the guidance, or if the negation words appear in quoted ")
-		sb.WriteString("code/content and are not semantically relevant.\n")
+		sb.WriteString("- IMPORTANT: If the action uses \"replaced 'OLD' with 'NEW'\" format, the OLD text ")
+		sb.WriteString("was REMOVED by the agent. Negation words in the OLD text are from deleted code ")
+		sb.WriteString("and do NOT represent the agent's intent. Focus on the NEW text and the overall ")
+		sb.WriteString("effect of the change to determine the outcome.\n")
 	}
 	sb.WriteString("\n")
 
