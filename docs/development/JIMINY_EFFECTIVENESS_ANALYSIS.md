@@ -327,3 +327,23 @@ All three known limitations from the initial v0.7.1 validation have been address
 - `internal/symbols/store.go` — `GetSymbolsForMemoryNode()` space_id filter on SymbolNode matches
 - `internal/cli/ingest_test.go` — 4 new DocComment enrichment tests
 - `scripts/cleanup_foreign_symbols.sh` — NEW: batch foreign SymbolNode cleanup script
+
+### Negation Detection Fix (2026-04-06)
+
+**Problem:** Dashboard showed a constant ~4.5% contradicted rate (300/6600 outcomes) that never changed. All 17 recent contradicted edges had similarity 0.32-0.46 (uncertain zone) and came from legitimate coding actions.
+
+**Root cause:** Naive negation detection at `outcome_classifier.go` did substring matching for "instead of", "did not", "didn't", "ignored", "skipped", "contrary to". If ANY appeared in the action summary AND similarity >= 0.20, it **returned "contradicted" immediately — short-circuiting before LLM Tier 2**. The Edit tool hook produces `replaced 'OLD_CODE' with 'NEW_CODE'` action summaries where negation words from deleted code created false positives.
+
+**Fix (3 changes):**
+1. **Restructured `Classify()` flow** — negation detection result is saved but no longer short-circuits. When negation is present AND similarity is above the low threshold, the case is delegated to LLM Tier 2 with full context (matched pattern, action format). Heuristic fallback to "contradicted" only applies when no LLM is available.
+2. **Enhanced LLM system prompt** — added action summary format guidance explaining that `replaced 'OLD' with 'NEW'` means OLD was removed. Negation words in OLD text are from deleted code and do not represent the agent's intent.
+3. **Source Diversity query fix** — `computeSourceDiversity()` in `stats.go` was grouping by `n.obs_type` (null on constraint nodes) instead of `r.guidance_type` (populated on every edge). Changed to `COALESCE(r.guidance_type, n.obs_type)`. Restores diversity from 0% to ~68%.
+
+**Validation:** Full test suite (10/10 pass), 0% contradicted across 3 validation rounds.
+
+### Files Modified (Negation Detection Fix)
+
+- `internal/jiminy/outcome_classifier.go` — Restructured Classify(), extracted detectNegation(), negation context in LLM prompt, system prompt action format guidance
+- `internal/jiminy/outcome_classifier_test.go` — 8 new tests (negation paths, LLM delegation, prompt content)
+- `internal/jiminy/j13_j15_test.go` — Updated 4 buildClassifyPrompt calls with new params
+- `internal/jiminy/stats.go` — computeSourceDiversity() COALESCE fix

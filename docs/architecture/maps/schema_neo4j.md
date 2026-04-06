@@ -22,7 +22,7 @@ EDGES:
   COMPOSES_WITH|L5↔L5 composition
   CONTRADICTS|known conflict between concepts
   THEME_OF|theme→memory node
-  GUIDANCE_OUTCOME|jiminy feedback:followed|ignored|contradicted
+  GUIDANCE_OUTCOME|jiminy feedback:followed|partial_compliance|ignored|contradicted|not_applicable (props: guidance_type, outcome_type, similarity, guidance_id, session_id, created_at)
 
 LAYERS:
   L0:base observations|eps=0.10,minSamples=3

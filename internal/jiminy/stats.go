@@ -131,9 +131,9 @@ func (sc *StatsCollector) computeSourceDiversity(ctx context.Context, spaceID st
 
 	cypher := `
 	MATCH (n:MemoryNode {space_id: $spaceId})-[r:GUIDANCE_OUTCOME]-()
-	WITH n.obs_type AS obs_type, count(r) AS cnt
-	WHERE obs_type IS NOT NULL
-	RETURN obs_type, cnt`
+	WITH COALESCE(r.guidance_type, n.obs_type) AS source_type, count(r) AS cnt
+	WHERE source_type IS NOT NULL
+	RETURN source_type, cnt`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
