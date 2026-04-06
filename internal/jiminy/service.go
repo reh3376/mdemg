@@ -1338,8 +1338,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	// this filter, trust systematically decays because every feedback cycle includes
 	// many irrelevant items that are falsely counted as "ignored."
 	if s.trustScorer != nil && feedbackSessionID != "" && len(results) > 0 {
-		const trustRelevanceThreshold = 0.5 // minimum classifier similarity for trust impact
-		var followCount, ignoreCount, contradictCount int
+		const trustRelevanceThreshold = 0.20 // minimum classifier similarity for trust impact
+		var followCount, partialCount, ignoreCount, contradictCount int
 		for _, r := range results {
 			if r.Similarity < trustRelevanceThreshold {
 				continue // not applicable to this action — skip for trust
@@ -1347,6 +1347,8 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			switch r.Outcome {
 			case OutcomeFollowed:
 				followCount++
+			case OutcomePartialCompliance:
+				partialCount++
 			case OutcomeIgnored:
 				ignoreCount++
 			case OutcomeContradicted:
@@ -1359,10 +1361,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			aggregateOutcome = OutcomeContradicted // high-confidence contradiction dominates
 		case followCount > ignoreCount:
 			aggregateOutcome = OutcomeFollowed
+		case partialCount > 0 && ignoreCount == 0:
+			aggregateOutcome = OutcomePartialCompliance // net-positive, boost trust
 		case ignoreCount > 0:
 			aggregateOutcome = OutcomeIgnored
-		case followCount == 0 && ignoreCount == 0:
-			aggregateOutcome = OutcomeUnknown // no items met relevance threshold
 		default:
 			aggregateOutcome = OutcomeUnknown
 		}
@@ -1373,8 +1375,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			if s.warmStore != nil {
 				highT := s.trustScorer.HighThreshold()
 				lowT := s.trustScorer.LowThreshold()
-				if (trustScoreForFeedback > highT && newTrust <= highT) ||
-					(trustScoreForFeedback >= lowT && newTrust < lowT) {
+				if (trustScoreForFeedback <= highT && newTrust > highT) || // T2→T1 promotion
+					(trustScoreForFeedback < lowT && newTrust >= lowT) || // T3→T2 promotion
+					(trustScoreForFeedback > highT && newTrust <= highT) || // T1→T2 demotion
+					(trustScoreForFeedback >= lowT && newTrust < lowT) { // T2→T3 demotion
 					s.warmStore.Invalidate(req.SpaceID)
 				}
 			}
