@@ -65,14 +65,22 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	sess := ps.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
 	defer sess.Close(ctx) //nolint:errcheck
 
+	// Only persist outcomes on typed guidance nodes (constraint, correction, pattern,
+	// learning). Generic MemoryNodes (code descriptions, progress notes) produce
+	// meaningless similarity comparisons and pollute outcome data.
+	// NOTE: constraint nodes resolved by findConstraintNodeID use role_type='constraint'
+	// (not obs_type), so we check both properties.
 	cypher := `
 		MATCH (src:MemoryNode {node_id: $targetNodeID, space_id: $spaceID})
+		WHERE src.obs_type IN ['constraint', 'correction', 'pattern', 'learning']
+		   OR src.role_type = 'constraint'
 		CREATE (src)-[r:GUIDANCE_OUTCOME {
-			guidance_id:  $guidanceID,
-			outcome_type: $outcomeType,
-			similarity:   $similarity,
-			session_id:   $sessionID,
-			created_at:   $createdAt
+			guidance_id:   $guidanceID,
+			outcome_type:  $outcomeType,
+			guidance_type: $guidanceType,
+			similarity:    $similarity,
+			session_id:    $sessionID,
+			created_at:    $createdAt
 		}]->(src)
 		RETURN r`
 
@@ -82,6 +90,7 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 			"spaceID":      spaceID,
 			"guidanceID":   guidanceID,
 			"outcomeType":  string(outcome),
+			"guidanceType": string(item.Type),
 			"similarity":   similarity,
 			"sessionID":    sessionID,
 			"createdAt":    time.Now().UTC().Format(time.RFC3339),
