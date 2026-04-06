@@ -207,6 +207,43 @@ The outcome classifier determines whether the agent followed, partially followed
 
 **GUIDANCE_OUTCOME edges** are only created on typed guidance nodes (`obs_type` IN constraint, correction, pattern, learning OR `role_type` = constraint) and only for applicable outcomes (not `not_applicable` or `unknown`). Each edge includes a `guidance_type` property for downstream analysis.
 
+### J17 Trust & Tier Promotion
+
+The J17 protocol uses trust-modulated encoding tiers to compress guidance as the agent demonstrates compliance. Higher trust = denser encoding = less context window consumed.
+
+| Tier | Trust Required | Format | Token Cost | Example |
+|------|---------------|--------|------------|---------|
+| T1 (Coded) | > 0.75 | `TYPE:SEV\|code\|[annotations]` | ~15 tokens | `C:!\|NO_UUID_V4\|neg:uuid.New()` |
+| T2 (Telegraphic) | >= 0.35 OR has code | Stripped articles/pronouns | ~50 tokens | `C: Never use UUID v4 [NO_UUID_V4]` |
+| T3 (Full NL) | < 0.35, no code | Full natural language | ~200+ tokens | Full paragraph with source references |
+
+**Trust scoring** (`internal/jiminy/trust.go`):
+
+| Outcome | Trust Delta |
+|---------|------------|
+| `followed` | +0.05 |
+| `partial_compliance` | +0.025 |
+| `ignored` | -0.02 |
+| `contradicted` | -0.04 |
+
+Trust starts at 0.65, is clamped to [0.0, 1.0], and has a 168-hour TTL. One trust update per feedback call (burst protection). Items with similarity < 0.20 are excluded from trust scoring.
+
+**Configuration:**
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `J17_TRUST_INITIAL` | 0.65 | Starting trust score for new sessions |
+| `J17_TRUST_BOOST_PER_FOLLOW` | 0.05 | Trust boost per followed outcome |
+| `J17_TRUST_DECAY_PER_IGNORE` | 0.02 | Trust decay per ignored outcome |
+| `J17_TRUST_DECAY_PER_CONTRADICT` | 0.04 | Trust decay per contradicted outcome |
+| `J17_TRUST_HIGH_THRESHOLD` | 0.75 | T1 threshold (compact coded encoding) |
+| `J17_TRUST_LOW_THRESHOLD` | 0.35 | T2 lower bound |
+| `J17_TRUST_TTL_HOURS` | 168 | Trust entry expiry (7 days) |
+
+**T1 prerequisite:** Items need a `constraint_code` to be eligible for T1. Codes are assigned by `BootstrapCodes()` during RSIC meso cycles. Items without codes cap at T2 regardless of trust.
+
+**Known limitation:** When `JIMINY_SYNTHESIS_ENABLED=true` (default), J8 LLM synthesis generates a full natural language narrative that replaces the tier-encoded augmentation. T1 compact encoding is computed but overwritten. The token compression benefit of T1 requires synthesis to be tier-aware (not yet implemented).
+
 ## Hook Integration
 
 Jiminy guidance is injected via Claude Code hooks that run on every user prompt submission.
