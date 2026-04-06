@@ -41,7 +41,8 @@ type GuidanceResponse struct {
 	GuidanceID            string              `json:"guidance_id"` // CUID2 identifier for feedback correlation (Phase AR-2)
 	Guidance              []GuidanceItem      `json:"guidance"`
 	PromptAugmentation    string              `json:"prompt_augmentation"`
-	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"` // J8: LLM-synthesized guidance
+	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"`  // J8: LLM-synthesized guidance
+	EncodedAugmentation   string              `json:"encoded_augmentation,omitempty"`   // J17: tier-encoded form (pre-synthesis)
 	Confidence            float64             `json:"confidence"`
 	Rationale             string              `json:"rationale"`
 	Warnings              []string            `json:"warnings,omitempty"`

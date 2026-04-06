@@ -75,18 +75,17 @@ Cycle  F  P  I  Trust   Tier  Notes
 
 ## Issue Found: J8 Synthesis Overrides T1 Encoding
 
-**Severity:** P1
+**Severity:** P1 — **RESOLVED** (2026-04-06)
 
 When `JIMINY_SYNTHESIS_ENABLED=true` (default), the J8 LLM synthesizer generates a full natural language narrative that replaces the tier-encoded `prompt_augmentation` at `service.go:889`. The T1 compact encoding (`TYPE:SEV|code|[annotations]`) is computed by `encoder.Encode()` but immediately overwritten.
 
 **Impact:** The primary benefit of T1 — ~5.2x token compression — never reaches the agent. All guidance is delivered as full natural language regardless of tier, defeating the purpose of trust-based tier promotion.
 
-**Recommendation:** Make synthesis tier-aware:
-- At T1 trust: skip synthesis, use compact encoding directly
-- At T2 trust: use synthesis but with a telegraphic style prompt
-- At T3 trust: full synthesis (current behavior)
+**Fix applied:** Trust-score gate added at `service.go:879-908`. When `trustScore > highThreshold` (0.75), synthesis is skipped entirely and the J17 compact-coded augmentation is used directly. At T2/T3, synthesis continues normally. Additionally, `EncodedAugmentation` field added to `GuidanceResponse` to preserve the J17-encoded form even when synthesis runs.
 
-Alternatively, pass the tier-encoded augmentation to the synthesizer as structured context, letting the LLM maintain the compact format while adding coherence.
+**Verification:**
+- T1 (trust 0.76): `synthesis_skipped=T1_trust`, 627-char compact codes, no LLM narrative (4.1x reduction)
+- T2 (trust 0.65): `synthesis_used=true`, 1414-char LLM narrative, 545-char encoded form preserved separately
 
 ## Trust Accrual Rate
 

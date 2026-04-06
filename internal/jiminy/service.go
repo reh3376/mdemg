@@ -876,18 +876,34 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
-	// J8: LLM synthesis — replace static formatting if synthesizer is available
+	// Save J17-encoded form before synthesis may overwrite it
+	encodedAugmentation := augmentation
+
+	// J8: LLM synthesis — replace static formatting if synthesizer is available.
+	// J17: Skip synthesis at T1 — compact coded format IS the augmentation.
+	// Synthesis would replace ~15-token-per-item codes with a ~2000-token narrative,
+	// destroying the 5.2x compression that trust promotion was designed to achieve.
 	var synthesizedNarrative string
 	if s.synthesizer != nil && s.cfg.JiminySynthesisEnabled && len(filtered) > 0 {
-		narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
-		if synthErr != nil {
-			slog.Warn("jiminy: synthesis failed, using static formatting", "error", synthErr)
-			debug["synthesis_error"] = synthErr.Error()
-		} else if narrative != "" {
-			synthesizedNarrative = narrative
-			// Use synthesized narrative as the prompt augmentation
-			augmentation = "═══ JIMINY GUIDANCE ═══\n" + sanitize.StripControlChars(narrative) + "\n═══ END JIMINY GUIDANCE ═══"
-			debug["synthesis_used"] = true
+		highT := 0.75
+		if s.trustScorer != nil {
+			highT = s.trustScorer.HighThreshold()
+		}
+		if trustScore > highT {
+			slog.Info("jiminy: T1 trust — skipping synthesis, using J17 encoded augmentation",
+				"trust", trustScore, "items", len(filtered))
+			debug["synthesis_skipped"] = "T1_trust"
+		} else {
+			narrative, synthErr := s.synthesizer.Synthesize(ctx, filtered, req.Context, req.AgentOutput)
+			if synthErr != nil {
+				slog.Warn("jiminy: synthesis failed, using static formatting", "error", synthErr)
+				debug["synthesis_error"] = synthErr.Error()
+			} else if narrative != "" {
+				synthesizedNarrative = narrative
+				// Use synthesized narrative as the prompt augmentation
+				augmentation = "═══ JIMINY GUIDANCE ═══\n" + sanitize.StripControlChars(narrative) + "\n═══ END JIMINY GUIDANCE ═══"
+				debug["synthesis_used"] = true
+			}
 		}
 	}
 
@@ -956,6 +972,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		Guidance:             filtered,
 		PromptAugmentation:   augmentation,
 		SynthesizedNarrative: synthesizedNarrative,
+		EncodedAugmentation:  encodedAugmentation,
 		Confidence:           confidence,
 		Rationale:            rationale,
 		Warnings:             warnings,

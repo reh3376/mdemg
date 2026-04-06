@@ -242,7 +242,7 @@ Trust starts at 0.65, is clamped to [0.0, 1.0], and has a 168-hour TTL. One trus
 
 **T1 prerequisite:** Items need a `constraint_code` to be eligible for T1. Codes are assigned by `BootstrapCodes()` during RSIC meso cycles. Items without codes cap at T2 regardless of trust.
 
-**Known limitation:** When `JIMINY_SYNTHESIS_ENABLED=true` (default), J8 LLM synthesis generates a full natural language narrative that replaces the tier-encoded augmentation. T1 compact encoding is computed but overwritten. The token compression benefit of T1 requires synthesis to be tier-aware (not yet implemented).
+**Synthesis gate:** At T1 trust (> 0.75), J8 LLM synthesis is automatically skipped. The J17 compact-coded augmentation is used directly, preserving the ~5x token compression. At T2/T3, synthesis runs normally, generating a coherent LLM narrative. The `EncodedAugmentation` response field always carries the J17-encoded form regardless of whether synthesis ran.
 
 ## Hook Integration
 
