@@ -49,7 +49,7 @@ RECOVERY_BUFFER_MAX_ENTRIES = int(os.environ.get("SYNERGY_RECOVERY_BUFFER_MAX_EN
 # J17: Feedback loop closure — correlate guidance with agent actions
 JIMINY_STATE_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-guidance-state")
 FEEDBACK_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".jiminy-last-feedback")
-FEEDBACK_COOLDOWN_SEC = 30
+FEEDBACK_COOLDOWN_SEC = 10
 FEEDBACK_STATE_MAX_AGE = 7200  # 2 hours, matching EffectivenessTracker TTL
 
 
