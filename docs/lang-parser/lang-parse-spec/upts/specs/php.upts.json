@@ -439,6 +439,18 @@
         "pattern": "P2_FUNCTION",
         "_regression": "indented guarded function"
       }
+    ],
+    "excluded": [
+      {
+        "name": "el",
+        "type": "constant",
+        "reason": "JS const inside heredoc string — must not be parsed as PHP constant"
+      },
+      {
+        "name": "buttons",
+        "type": "constant",
+        "reason": "JS const inside heredoc string — must not be parsed as PHP constant"
+      }
     ]
   },
   "patterns_covered": [

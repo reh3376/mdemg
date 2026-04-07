@@ -4,7 +4,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 
 ## Supported Languages
 
-27 parsers, 27 with UPTS validation specs (100%).
+28 parsers, 28 with UPTS validation specs (100%).
 
 | Language | File | Extensions | UPTS |
 |----------|------|------------|------|
@@ -42,7 +42,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 Each parser's symbol extraction is validated against a [UPTS (Universal Parser Test Specification)](../../../docs/lang-parser/lang-parse-spec/upts/README.md) spec file. The Go-native test harness loads the spec, parses the associated fixture file through the parser, and asserts that all expected symbols are found with correct name, type, line number, and export status.
 
 ```bash
-# Run all 27 UPTS-validated parsers
+# Run all 28 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Run a single language

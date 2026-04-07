@@ -1,4 +1,4 @@
-// +build ignore
+//go:build ignore
 
 // php_parser_verify.go — standalone tool to extract PHP symbols from a file or directory.
 // Usage: go run scripts/php_parser_verify.go <path> [path2 ...]
@@ -60,12 +60,15 @@ func main() {
 
 	var results []FileResult
 	totalSymbols := 0
+	filesWithSymbols := 0
+	parseErrors := 0
 
 	for _, f := range allFiles {
 		root := filepath.Dir(f)
 		elements, err := parser.ParseFile(root, f, true)
 		if err != nil {
 			results = append(results, FileResult{File: f, Error: err.Error()})
+			parseErrors++
 			continue
 		}
 		var syms []languages.Symbol
@@ -75,10 +78,15 @@ func main() {
 		if len(syms) > 0 {
 			results = append(results, FileResult{File: f, Symbols: syms})
 			totalSymbols += len(syms)
+			filesWithSymbols++
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "Scanned %d PHP files, found %d with symbols, %d total symbols\n", len(allFiles), len(results), totalSymbols)
+	fmt.Fprintf(os.Stderr, "Scanned %d PHP files, found %d with symbols, %d total symbols", len(allFiles), filesWithSymbols, totalSymbols)
+	if parseErrors > 0 {
+		fmt.Fprintf(os.Stderr, " (%d parse errors)", parseErrors)
+	}
+	fmt.Fprintln(os.Stderr)
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

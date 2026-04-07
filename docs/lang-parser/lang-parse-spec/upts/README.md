@@ -28,7 +28,7 @@ UPTS provides:
 
 ## Current Status
 
-**27 UPTS-validated parsers** — all pass via `go test`:
+**28 UPTS-validated parsers** — all pass via `go test`:
 
 | Language | Spec | Fixture | Parser |
 |----------|------|---------|--------|
@@ -70,7 +70,7 @@ upts/
 ├── schema/
 │   └── upts.schema.json             # JSON Schema (canonical definition)
 │
-├── specs/                            # 27 UPTS spec files
+├── specs/                            # 28 UPTS spec files
 │   ├── go.upts.json
 │   ├── rust.upts.json
 │   ├── python.upts.json
@@ -99,7 +99,7 @@ upts/
 │   ├── lua.upts.json
 │   └── scraper_markdown.upts.json
 │
-├── fixtures/                         # 27 test fixture files
+├── fixtures/                         # 28 test fixture files
 │   ├── go_test_fixture.go
 │   ├── rust_test_fixture.rs
 │   ├── python_test_fixture.py
@@ -129,7 +129,7 @@ The primary validation method is the Go-native test harness in the parser direct
 ### 1. Run All UPTS Tests (Go-Native — Recommended)
 
 ```bash
-# All 27 UPTS-validated parsers
+# All 28 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Single language
