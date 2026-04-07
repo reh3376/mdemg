@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"mdemg/internal/languages"
 	"mdemg/internal/config"
+	"mdemg/internal/languages"
 	"mdemg/internal/summarize"
 )
 
@@ -46,6 +46,7 @@ var (
 	includePy      = flag.Bool("include-py", true, "Include Python files (*.py)")
 	includeJava    = flag.Bool("include-java", true, "Include Java files (*.java)")
 	includeRust    = flag.Bool("include-rust", true, "Include Rust files (*.rs)")
+	includePHP     = flag.Bool("include-php", true, "Include PHP files (*.php)")
 	limitElements  = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
 	extractSymbols = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
@@ -67,7 +68,7 @@ var (
 	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
 
 	// Phase 2.5: Performance guards for large repos
-	maxFileSize       = flag.Int("max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
+	maxFileSize        = flag.Int("max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
 	maxElementsPerFile = flag.Int("max-elements-per-file", 500, "Max elements to extract per file (default: 500)")
 	maxSymbolsPerFile  = flag.Int("max-symbols-per-file", 1000, "Max symbols to extract per file (default: 1000)")
 	preset             = flag.String("preset", "", "Exclusion preset: default, ml_cuda, web_monorepo")
@@ -98,8 +99,8 @@ type BatchIngestItem struct {
 type IngestSymbol struct {
 	Name           string `json:"name"`
 	Type           string `json:"type"`
-	Line           int    `json:"line"`                      // 1-indexed line number (UPTS standard)
-	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
+	Line           int    `json:"line"`               // 1-indexed line number (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"` // End line for multi-line symbols
 	Exported       bool   `json:"exported"`
 	Parent         string `json:"parent,omitempty"`
 	Signature      string `json:"signature,omitempty"`
@@ -115,7 +116,7 @@ type CodeElement struct {
 	Kind     string
 	Path     string
 	Content  string
-	Summary  string         // Brief summary for reranking (generated from docstrings/comments)
+	Summary  string // Brief summary for reranking (generated from docstrings/comments)
 	Package  string
 	FilePath string
 	Tags     []string
@@ -809,10 +810,16 @@ func getEnabledLanguages() map[string]bool {
 		"cuda":       true,
 		"cypher":     true,
 		// New parsers
-		"csharp":     true,
-		"kotlin":     true,
-		"terraform":  true,
-		"makefile":   true,
+		"csharp":           true,
+		"kotlin":           true,
+		"terraform":        true,
+		"makefile":         true,
+		"php":              *includePHP,
+		"graphql":          true,
+		"lua":              true,
+		"protobuf":         true,
+		"openapi":          true,
+		"scraper-markdown": true,
 	}
 }
 
@@ -1193,7 +1200,6 @@ func parseEnvFile(root, path string) *CodeElement {
 		Concerns: concerns,
 	}
 }
-
 
 // generateSummaryAdapter adapts generateSummary for use with the summarize package.
 // This allows the LLM summarize service to fall back to structural summaries.
