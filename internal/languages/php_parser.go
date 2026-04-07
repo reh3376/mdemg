@@ -175,25 +175,30 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 	var typeStartDepth int     // brace depth when we entered the type
 	var inHeredoc string       // heredoc/nowdoc closing label (empty = not in heredoc)
 	var inMultilineConst bool  // inside a multi-line const = [...];
+	var inBlockComment bool    // inside a /* ... */ block comment
 	var skipUntilLine int      // skip lines consumed by multi-line constructor scan
 
 	for i, line := range lines {
 		lineNum := i + 1
 
 		// Skip lines already consumed by multi-line constructor param scan
+		// Braces were already counted during the lookahead — do NOT re-count.
 		if lineNum <= skipUntilLine {
-			// Still count braces for context tracking
-			openBraces := strings.Count(line, "{")
-			closeBraces := strings.Count(line, "}")
-			if currentType != "" {
-				braceDepth += openBraces - closeBraces
-				if braceDepth <= typeStartDepth {
-					currentType = ""
-					currentTypeKind = ""
-				}
-			} else {
-				braceDepth += openBraces - closeBraces
+			continue
+		}
+
+		// Track block comments
+		if inBlockComment {
+			if strings.Contains(line, "*/") {
+				inBlockComment = false
 			}
+			continue
+		}
+		if strings.Contains(strings.TrimSpace(line), "/*") && !strings.Contains(line, "*/") {
+			inBlockComment = true
+			// Still count braces on this line (before the comment marker)
+			braceDepth += countBracesOutsideStrings(line)
+			updateTypeScope(&currentType, &currentTypeKind, &braceDepth, typeStartDepth)
 			continue
 		}
 
@@ -219,20 +224,15 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 			continue
 		}
 
-		// Count braces for context tracking
-		openBraces := strings.Count(line, "{")
-		closeBraces := strings.Count(line, "}")
+		// Count braces using string-aware counting (skips braces inside quotes)
+		braceDelta := countBracesOutsideStrings(line)
+		braceDepth += braceDelta
+		if braceDepth < 0 {
+			braceDepth = 0
+		}
 
 		// Check if we've exited the current type
-		if currentType != "" {
-			braceDepth += openBraces - closeBraces
-			if braceDepth <= typeStartDepth {
-				currentType = ""
-				currentTypeKind = ""
-			}
-		} else {
-			braceDepth += openBraces - closeBraces
-		}
+		updateTypeScope(&currentType, &currentTypeKind, &braceDepth, typeStartDepth)
 
 		trimmed := strings.TrimSpace(line)
 
@@ -295,10 +295,11 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 				for j := i + 1; j < len(lines); j++ {
 					paramLine := lines[j]
 					paramLineNum := j + 1
-					// Count braces on param lines too
-					openBraces := strings.Count(paramLine, "{")
-					closeBraces := strings.Count(paramLine, "}")
-					braceDepth += openBraces - closeBraces
+					// Count braces on param lines (these lines will be skipped by skipUntilLine)
+					braceDepth += countBracesOutsideStrings(paramLine)
+					if braceDepth < 0 {
+						braceDepth = 0
+					}
 
 					for _, m := range promotedPropInParens.FindAllStringSubmatch(paramLine, -1) {
 						symbols = append(symbols, Symbol{
@@ -365,7 +366,7 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 		if matches := classPattern.FindStringSubmatch(line); matches != nil {
 			currentType = matches[1]
 			currentTypeKind = "class"
-			typeStartDepth = braceDepth - openBraces
+			typeStartDepth = braceDepth - braceDelta
 			symbols = append(symbols, Symbol{
 				Name:     matches[1],
 				Type:     "class",
@@ -380,7 +381,7 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 		if matches := interfacePattern.FindStringSubmatch(line); matches != nil {
 			currentType = matches[1]
 			currentTypeKind = "interface"
-			typeStartDepth = braceDepth - openBraces
+			typeStartDepth = braceDepth - braceDelta
 			symbols = append(symbols, Symbol{
 				Name:     matches[1],
 				Type:     "interface",
@@ -395,7 +396,7 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 		if matches := traitPattern.FindStringSubmatch(line); matches != nil {
 			currentType = matches[1]
 			currentTypeKind = "trait"
-			typeStartDepth = braceDepth - openBraces
+			typeStartDepth = braceDepth - braceDelta
 			symbols = append(symbols, Symbol{
 				Name:     matches[1],
 				Type:     "trait",
@@ -410,7 +411,7 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 		if matches := enumPattern.FindStringSubmatch(line); matches != nil {
 			currentType = matches[1]
 			currentTypeKind = "enum"
-			typeStartDepth = braceDepth - openBraces
+			typeStartDepth = braceDepth - braceDelta
 			symbols = append(symbols, Symbol{
 				Name:     matches[1],
 				Type:     "enum",
@@ -608,11 +609,74 @@ func extractPHPTypeContent(content, typeName, moduleName string) string {
 		}
 
 		builder.WriteString(line + "\n")
-		braceCount += strings.Count(line, "{") - strings.Count(line, "}")
+		braceCount += countBracesOutsideStrings(line)
 		if inType && braceCount <= 0 && strings.Contains(line, "}") {
 			break
 		}
 	}
 
 	return TruncateContent(builder.String(), 4000)
+}
+
+// countBracesOutsideStrings counts { and } braces on a line while skipping
+// braces inside single-quoted, double-quoted strings, and inline comments.
+// Returns (opens - closes) as a signed delta.
+func countBracesOutsideStrings(line string) int {
+	delta := 0
+	inSingle := false
+	inDouble := false
+	escaped := false
+
+	for j := 0; j < len(line); j++ {
+		ch := line[j]
+
+		if escaped {
+			escaped = false
+			continue
+		}
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+
+		// Skip rest of line on single-line comment (// or #)
+		if !inSingle && !inDouble {
+			if ch == '/' && j+1 < len(line) && line[j+1] == '/' {
+				break
+			}
+			if ch == '#' && (j+1 >= len(line) || line[j+1] != '[') {
+				// PHP # comment (but not #[ attribute)
+				break
+			}
+		}
+
+		if ch == '\'' && !inDouble {
+			inSingle = !inSingle
+			continue
+		}
+		if ch == '"' && !inSingle {
+			inDouble = !inDouble
+			continue
+		}
+		if inSingle || inDouble {
+			continue
+		}
+
+		switch ch {
+		case '{':
+			delta++
+		case '}':
+			delta--
+		}
+	}
+	return delta
+}
+
+// updateTypeScope resets currentType/currentTypeKind when braceDepth falls
+// to or below the type's starting depth.
+func updateTypeScope(currentType, currentTypeKind *string, braceDepth *int, typeStartDepth int) {
+	if *currentType != "" && *braceDepth <= typeStartDepth {
+		*currentType = ""
+		*currentTypeKind = ""
+	}
 }
