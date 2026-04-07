@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/alert"
 	"mdemg/internal/ape"
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
@@ -429,4 +430,19 @@ func (a *rsicFreshnessAdapter) TriggerIngestForStaleSpaces(ctx context.Context, 
 		a.triggerFn()
 	}
 	return triggeredCount, nil
+}
+
+// rsicAlertAdapter bridges ape.AlertDispatcher → *alert.Dispatcher.
+// InsightSeverity maps 1:1 to alert.Severity (both use "low"/"medium"/"high"/"critical").
+type rsicAlertAdapter struct {
+	dispatcher *alert.Dispatcher
+}
+
+func (a *rsicAlertAdapter) SendAlert(ctx context.Context, service, title, message string, sev ape.InsightSeverity) {
+	a.dispatcher.Send(ctx, alert.Alert{
+		Service:  service,
+		Severity: alert.Severity(sev),
+		Title:    title,
+		Message:  message,
+	})
 }

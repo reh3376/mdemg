@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"mdemg/internal/alert"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
 	"mdemg/internal/auth"
@@ -91,6 +92,9 @@ type Server struct {
 	// Phase 60b: RSIC (Recursive Self-Improvement Cycle)
 	rsicCycle    *ape.CycleOrchestrator
 	rsicWatchdog *ape.Watchdog
+
+	// SR-001: Alert dispatcher
+	alertDispatcher *alert.Dispatcher
 
 	// Phase 87: RSIC Orchestration
 	orchestrationPolicy *ape.OrchestrationPolicy
@@ -842,6 +846,36 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc.SetSignalLearner(signalLearner)
 	}
 
+	// SR-001: Alert dispatcher
+	alertDisp := alert.NewDispatcher(alert.Config{
+		Enabled:           cfg.AlertEnabled,
+		CooldownSec:       cfg.AlertCooldownSec,
+		AlertFilePath:     cfg.AlertFilePath,
+		MacOSNotify:       cfg.AlertMacOSNotify,
+		MacOSNotifyMinSev: alert.Severity(cfg.AlertMacOSNotifyMinSev),
+		MaxAlerts:         cfg.AlertMaxEntries,
+	})
+
+	// Wire CB state change → alert dispatcher
+	if cfg.AlertEnabled {
+		cbRegistry.SetOnStateChange(func(name string, from, to circuitbreaker.State) {
+			if to == circuitbreaker.StateOpen {
+				alertDisp.SendAlert(context.Background(), "circuit-breaker",
+					"Circuit Breaker Opened: "+name,
+					fmt.Sprintf("Circuit breaker %q transitioned %s → %s", name, from, to),
+					alert.SeverityHigh)
+			} else if from == circuitbreaker.StateOpen && to == circuitbreaker.StateClosed {
+				alertDisp.SendAlert(context.Background(), "circuit-breaker",
+					"Circuit Breaker Recovered: "+name,
+					fmt.Sprintf("Circuit breaker %q recovered: %s → %s", name, from, to),
+					alert.SeverityLow)
+			}
+		})
+	}
+
+	// Wire RSIC dispatcher → alert dispatcher
+	rsicDispatcher.SetAlertDispatcher(&rsicAlertAdapter{dispatcher: alertDisp})
+
 	s := &Server{
 		cfg:             cfg,
 		driver:          driver,
@@ -893,6 +927,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		eventDispatcher:         plugins.NewEventDispatcher(pluginMgr),
 		enforcementLog:          newEnforcementEventLog(1000),
 		conflictDetector:        conflictDet,
+		alertDispatcher:         alertDisp,
 	}
 
 	// Set instance ID for metric labels (e.g. "localhost:9999")
@@ -2044,6 +2079,9 @@ func (s *Server) Routes() http.Handler {
 	// Webhook endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
 	mux.HandleFunc("/v1/webhooks/", s.handleGenericWebhook)
+
+	// SR-001: Grafana alert webhook
+	mux.HandleFunc("POST /v1/alerts/grafana", s.handleGrafanaAlertWebhook)
 
 	// File watcher management endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/filewatcher/start", s.handleFileWatcherStart)

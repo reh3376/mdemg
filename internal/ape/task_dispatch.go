@@ -37,6 +37,9 @@ type Dispatcher struct {
 	// B2: Background cleanup goroutine lifecycle
 	stopCleanup chan struct{}
 	cleanupDone chan struct{}
+
+	// SR-001: Alert delivery
+	alertDispatcher AlertDispatcher
 }
 
 type activeTask struct {
@@ -81,6 +84,11 @@ func (d *Dispatcher) SetGuidanceCalibrator(gc GuidanceCalibrationProvider) {
 // SetFreshnessProvider attaches an ingest freshness provider for stale space re-ingestion (Phase 47.2).
 func (d *Dispatcher) SetFreshnessProvider(p FreshnessProvider) {
 	d.freshnessProvider = p
+}
+
+// SetAlertDispatcher attaches an alert dispatcher for delivering RSIC alerts to the user.
+func (d *Dispatcher) SetAlertDispatcher(ad AlertDispatcher) {
+	d.alertDispatcher = ad
 }
 
 // SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
@@ -622,10 +630,14 @@ func (d *Dispatcher) executeIngestStaleSpaces(ctx context.Context, spaceID strin
 
 // ─── RSIC alert + recovery executors ───
 
-func (d *Dispatcher) executeAlertJiminyCritical(_ context.Context, spaceID string) (map[string]any, error) {
+func (d *Dispatcher) executeAlertJiminyCritical(ctx context.Context, spaceID string) (map[string]any, error) {
 	slog.Error("RSIC alert: Jiminy guidance pipeline critical", "space_id", spaceID)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("alert_jiminy_critical", "success").Inc()
+	}
+	if d.alertDispatcher != nil {
+		d.alertDispatcher.SendAlert(ctx, "jiminy", "Jiminy Pipeline Critical",
+			"Jiminy guidance pipeline is unhealthy — guidance not reaching agent", SeverityCritical)
 	}
 	return map[string]any{
 		"alert":    "jiminy_critical",
@@ -635,10 +647,14 @@ func (d *Dispatcher) executeAlertJiminyCritical(_ context.Context, spaceID strin
 	}, nil
 }
 
-func (d *Dispatcher) executeAlertSidecarDown(_ context.Context, spaceID string) (map[string]any, error) {
+func (d *Dispatcher) executeAlertSidecarDown(ctx context.Context, spaceID string) (map[string]any, error) {
 	slog.Error("RSIC alert: Neural sidecar is down — J17 protocol degraded", "space_id", spaceID)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("alert_sidecar_down", "success").Inc()
+	}
+	if d.alertDispatcher != nil {
+		d.alertDispatcher.SendAlert(ctx, "neural-sidecar", "Neural Sidecar Down",
+			"Neural sidecar is down — J17 protocol running in T3 fallback mode, no ML tier prediction or NLI scoring", SeverityHigh)
 	}
 	return map[string]any{
 		"alert":    "sidecar_down",
@@ -676,6 +692,10 @@ func (d *Dispatcher) executeAlertMemoryBloat(ctx context.Context, spaceID string
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("alert_memory_bloat", "success").Inc()
 	}
+	if d.alertDispatcher != nil {
+		d.alertDispatcher.SendAlert(ctx, "memory", "Memory Bloat Detected",
+			fmt.Sprintf("Memory node count %d exceeds healthy threshold — consider pruning", nodeCount), SeverityMedium)
+	}
 	return map[string]any{
 		"alert":      "memory_bloat",
 		"space_id":   spaceID,
@@ -683,10 +703,14 @@ func (d *Dispatcher) executeAlertMemoryBloat(ctx context.Context, spaceID string
 	}, nil
 }
 
-func (d *Dispatcher) executeAlertSynergyOverlap(_ context.Context, spaceID string) (map[string]any, error) {
+func (d *Dispatcher) executeAlertSynergyOverlap(ctx context.Context, spaceID string) (map[string]any, error) {
 	slog.Warn("RSIC alert: synergy overlap detected", "space_id", spaceID)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("alert_synergy_overlap", "success").Inc()
+	}
+	if d.alertDispatcher != nil {
+		d.alertDispatcher.SendAlert(ctx, "synergy", "Synergy Overlap Detected",
+			"Synergy layer overlap or redundancy detected — review consolidation pipeline", SeverityLow)
 	}
 	return map[string]any{
 		"alert":    "synergy_overlap",
@@ -838,10 +862,13 @@ func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, s
 }
 
 // executeAlertLog is a generic alert/log handler for RSIC-DATA and gap-fix actions.
-func (d *Dispatcher) executeAlertLog(_ context.Context, spec RSICTaskSpec, message string) (map[string]any, error) {
+func (d *Dispatcher) executeAlertLog(ctx context.Context, spec RSICTaskSpec, message string) (map[string]any, error) {
 	slog.Warn("RSIC alert", "action", spec.ActionType, "space", spec.TargetSpace, "message", message, "rationale", spec.Rationale)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal(spec.ActionType, "success").Inc()
+	}
+	if d.alertDispatcher != nil {
+		d.alertDispatcher.SendAlert(ctx, "rsic", "RSIC: "+spec.ActionType, message, SeverityMedium)
 	}
 	return map[string]any{
 		"alerted":  true,
