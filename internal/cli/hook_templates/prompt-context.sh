@@ -49,7 +49,7 @@ fi
 # --- Alert delivery: show pending MDEMG service alerts ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then
-  _ALERT_COUNT=$(timeout 2 jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  _ALERT_COUNT=$(jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
   if [ "$_ALERT_COUNT" -gt 0 ] 2>/dev/null; then
     echo ""
     echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending] !!"

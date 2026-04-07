@@ -1,0 +1,154 @@
+{
+  "sprint": "SR-001",
+  "date": "2026-04-07",
+  "pr": "#291",
+  "environment": {
+    "version": "0.6.0",
+    "commit": "1a0b149 (v0.5.4 tag, SR-001 merged in #291)",
+    "platform": "darwin/arm64",
+    "deployment": "native (go build + serve --auto-migrate)",
+    "docker_services": ["neo4j", "timescaledb", "grafana", "neural-sidecar"],
+    "config_overrides": [
+      "ALERT_COOLDOWN_SEC=0 (NOTE: treated as 300s default due to <= 0 guard in dispatcher.go:36)",
+      "HEALTH_PROBE_INTERVAL_SEC=5",
+      "TSDB_WRITER_BUFFER_MAX_SIZE=5"
+    ]
+  },
+  "results": {
+    "phase_2_baseline": {
+      "verdict": "PASS",
+      "healthz": {
+        "status": "ok",
+        "checks": {
+          "neo4j": "ok",
+          "circuit_breakers": "ok",
+          "tsdb": "ok",
+          "jiminy": "ok"
+        }
+      },
+      "readyz": {
+        "status": "ready",
+        "subsystems": 8,
+        "all_healthy": true
+      },
+      "prober_started": true,
+      "prober_interval_sec": 5,
+      "uats": {
+        "total_specs": 394,
+        "passed": 375,
+        "failed": 0,
+        "skipped": 18,
+        "errors": 1,
+        "error_detail": "Refresh Stale Edges timeout (pre-existing)"
+      }
+    },
+    "phase_3_alert_dispatcher": {
+      "verdict": "PASS",
+      "webhook_200": true,
+      "alert_file_created": true,
+      "alert_format_valid": true,
+      "invalid_json_400": true,
+      "cooldown_dedup_works": true,
+      "fifo_eviction": "unit-tested only — live test blocked by cooldown dedup (ALERT_COOLDOWN_SEC=0 → 300s default)",
+      "finding_cooldown_zero": "ALERT_COOLDOWN_SEC=0 falls back to 300s default (dispatcher.go:36: if cfg.CooldownSec <= 0). Should support 0 as 'no cooldown'."
+    },
+    "phase_4_degraded": {
+      "verdict": "PASS (with design note)",
+      "healthz_stays_ok": true,
+      "healthz_design_note": "/healthz does nil checks only (lightweight liveness) — driver object persists when Neo4j is down, so healthz stays 'ok'. /readyz correctly detects unhealthy via live VerifyConnectivity.",
+      "readyz_unhealthy": true,
+      "readyz_neo4j_error": "dial tcp [::1]:7687: connect: connection refused",
+      "readyz_tsdb_also_unhealthy": true,
+      "prober_alert_fired": false,
+      "prober_alert_note": "SetAlertCallback() never called on prober in serve.go — wiring gap #2",
+      "recovery_confirmed": true,
+      "cb_alert_fired_organically": true,
+      "cb_alert_detail": "Circuit breaker openai-intent opened during Neo4j disruption — CB→alert wiring confirmed live"
+    },
+    "phase_5_retry": {
+      "verdict": "PASS",
+      "config_wired": true,
+      "wiring_location": "internal/cli/serve.go:213 — SetDefaultRetryConfig() before NewServer",
+      "normal_call_ok": true,
+      "retry_defaults": {
+        "enabled": true,
+        "max_attempts": 3,
+        "base_delay_ms": 500,
+        "max_delay_ms": 10000
+      }
+    },
+    "phase_6_overflow": {
+      "verdict": "PARTIAL — FIFO eviction works, alert callback not wired",
+      "fifo_eviction_code_correct": true,
+      "fifo_eviction_location": "internal/tsdb/llm_writer.go:98",
+      "alert_callback_wired": false,
+      "alert_callback_note": "SetAlertCallback() never called on LLM writer in serve.go or server.go — wiring gap #1",
+      "tsdb_records_written": 46,
+      "note": "46 records from ~50 LLM requests suggests FIFO eviction is active (buffer capped at 5)"
+    },
+    "phase_7_hooks": {
+      "verdict": "PASS (after bug fix)",
+      "session_start_banner": true,
+      "session_start_alert_count": 2,
+      "prompt_context_banner": true,
+      "prompt_context_alert_count": 2,
+      "degraded_subsystem_banner": true,
+      "degraded_detail": "circuit_breakers: open:1",
+      "bug_found": "timeout command not available on macOS — broke jq alert parsing in both hooks",
+      "bug_fix": "Removed 'timeout 2' wrapper from jq calls in session-start.sh:64 and prompt-context.sh:52"
+    },
+    "phase_8_uats": {
+      "verdict": "PASS",
+      "new_specs_created": 2,
+      "existing_specs_updated": 1,
+      "specs": [
+        "grafana_alert_webhook.uats.json (3 variants: base + empty_alerts + resolved_alert)",
+        "healthz_enhanced.uats.json (8 assertions: status, checks exists/type, neo4j/cb/tsdb keys)"
+      ],
+      "updated": "health.uats.json (added $.checks exists assertion)",
+      "uats_after": {
+        "total_specs": 398,
+        "passed": 379,
+        "failed": 0,
+        "errors": 1,
+        "skipped": 18
+      }
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "medium",
+      "title": "ALERT_COOLDOWN_SEC=0 treated as 300s default",
+      "location": "internal/alert/dispatcher.go:36",
+      "detail": "if cfg.CooldownSec <= 0 { cfg.CooldownSec = 300 } — 0 should mean 'no cooldown', not 'use default'",
+      "fix": "Change to < 0 or add explicit sentinel value"
+    },
+    {
+      "id": "F-002",
+      "severity": "medium",
+      "title": "Health prober SetAlertCallback not wired",
+      "location": "internal/cli/serve.go:246-252",
+      "detail": "Prober detects Neo4j/TSDB transitions but SetAlertCallback() is never called — no alert fires on health transitions",
+      "fix": "Wire prober.SetAlertCallback → alertDispatcher.SendAlert in serve.go after NewServer (needs alertDispatcher reference)"
+    },
+    {
+      "id": "F-003",
+      "severity": "medium",
+      "title": "TSDB LLM writer SetAlertCallback not wired",
+      "location": "internal/cli/serve.go:227-231",
+      "detail": "LLM writer has FIFO eviction and overflow counter but SetAlertCallback() never called — overflow alert never fires",
+      "fix": "Wire earlyLLMWriter.SetAlertCallback → alertDispatcher.SendAlert in serve.go after NewServer"
+    },
+    {
+      "id": "F-004",
+      "severity": "high",
+      "title": "macOS timeout command missing breaks alert hooks",
+      "location": "internal/cli/hook_templates/session-start.sh:64, prompt-context.sh:52",
+      "detail": "timeout is GNU coreutils, not available on macOS. Causes jq alert parsing to fail silently (|| echo 0), suppressing all alert banners.",
+      "fix": "FIXED — removed timeout 2 wrapper from jq calls"
+    }
+  ],
+  "verdict": "CONDITIONAL PASS",
+  "verdict_detail": "Core features work correctly. Alert dispatcher, enhanced healthz, UATS specs, LLM retry config, hook alert delivery (after fix) all verified. Three wiring gaps (F-001 to F-003) prevent full alert pipeline operation but are non-blocking. One bug (F-004) fixed during testing."
+}

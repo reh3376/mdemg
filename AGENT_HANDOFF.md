@@ -32,7 +32,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Phase J17-PC: J17 Prompt Compression — COMPLETE (5 LLM callers optimized, 5 config vars, 14 new tests)
 - Phase RSIC-SK1: Jiminy Guidance Self-Calibration — COMPLETE (3 gap closures, 3 new RSIC actions, pattern #15, SignalLearner wiring)
 - Deployable package chain (93-100) — COMPLETE (10/10 criteria pass, v0.2.1+ verified)
-- Quality hardening — COMPLETE (195 UATS specs / 224 variants / 318 test cases, 213 Go test files, 0 lint issues)
+- Quality hardening — COMPLETE (208 UATS specs / 398 variants, 213 Go test files, 0 lint issues)
 - ANN Optimization Suite — COMPLETE (10 optimizations, 28 config params)
 - AutoResearch Integration — COMPLETE (AR-1 feedback loop, AR-2 effectiveness, AR-3 LLM intelligence)
 - FSD-2026-001 Gap Closure — FULLY COMPLETE (21 gaps + NR-1 through NR-5 + F21)
@@ -62,6 +62,14 @@ WHAT REMAINS TO BE DONE:
   - E7: Documentation (CHANGELOG, AGENT_HANDOFF, CLAUDE.md)
   - Config: 15 new env vars (Alert*, HealthProbe*, LLMRetry*, TSDBWriterBufferMaxSize)
   - Tests: 12 alert tests + 10 retry tests + 4 Grafana webhook tests, all passing with -race
+- ✅ SR-001 Live Validation & Hotfix (2026-04-07):
+  - Live tested all SR-001 features across 10 phases (baseline, webhook, degraded healthz, LLM retry, TSDB overflow, hook delivery)
+  - Fixed: macOS `timeout` command missing — broke alert banner rendering in both hooks (session-start.sh, prompt-context.sh)
+  - New UATS specs: `grafana_alert_webhook.uats.json` (3 variants), `healthz_enhanced.uats.json` (8 assertions)
+  - Updated: `health.uats.json` — added `$.checks` exists assertion for enhanced /healthz
+  - Updated: `api-reference.md` — enhanced /healthz docs (checks map, degraded response), Grafana webhook endpoint
+  - Evidence artifact: `scripts/tsdb_data_review_sr001.json` (CONDITIONAL PASS)
+  - Findings: F-001 cooldown zero fallback, F-002 prober callback not wired, F-003 TSDB writer callback not wired
 === COMPLETED SINCE LAST HANDOFF (2026-04-06) ===
 - ✅ FT Plan v4.0 Doc Update + Default LLM Migration (2026-04-06):
   - Default LLM migrated: gpt-5-nano → gpt-4.1-nano (non-tool-use, 2x cheaper output, 1M context)
