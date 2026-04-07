@@ -9,7 +9,7 @@ import (
 	"mdemg/internal/models"
 )
 
-// TestHandleHealthz verifies the healthz response includes version and commit fields
+// TestHandleHealthz verifies the healthz response includes version, commit, and checks fields
 func TestHandleHealthz(t *testing.T) {
 	s := &Server{}
 	s.cfg.MdemgVersion = "0.6.0"
@@ -28,14 +28,24 @@ func TestHandleHealthz(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if body["status"] != "ok" {
-		t.Errorf("status = %v, want ok", body["status"])
+	// With nil driver, status should be degraded
+	if body["status"] != "degraded" {
+		t.Errorf("status = %v, want degraded (nil driver)", body["status"])
 	}
 	if body["version"] != "0.6.0" {
 		t.Errorf("version = %v, want 0.6.0", body["version"])
 	}
 	if body["commit"] != "abc1234" {
 		t.Errorf("commit = %v, want abc1234", body["commit"])
+	}
+
+	// Verify checks map exists and reports neo4j as no_driver
+	checks, ok := body["checks"].(map[string]any)
+	if !ok {
+		t.Fatal("expected checks map in response")
+	}
+	if checks["neo4j"] != "no_driver" {
+		t.Errorf("checks[neo4j] = %v, want no_driver", checks["neo4j"])
 	}
 }
 
