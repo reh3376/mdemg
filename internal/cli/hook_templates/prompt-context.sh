@@ -46,6 +46,20 @@ if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
   exit 0
 fi
 
+# --- Alert delivery: show pending MDEMG service alerts ---
+_ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
+if [ -f "$_ALERT_FILE" ]; then
+  _ALERT_COUNT=$(timeout 2 jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  if [ "$_ALERT_COUNT" -gt 0 ] 2>/dev/null; then
+    echo ""
+    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending] !!"
+    jq -r '.alerts[] | select(.cleared == false) |
+      "  [\(.severity | ascii_upcase)] [\(.time | .[0:19])] \(.service): \(.title) — \(.message)"
+    ' "$_ALERT_FILE" 2>/dev/null | head -10
+    echo ""
+  fi
+fi
+
 # Recall relevant context from CMS
 RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
   -H "Content-Type: application/json" \

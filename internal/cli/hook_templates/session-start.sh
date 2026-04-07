@@ -58,6 +58,20 @@ EOF
   fi
 fi
 
+# --- Alert delivery: show critical/high service alerts at session start ---
+_ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
+if [ -f "$_ALERT_FILE" ]; then
+  _CRIT_COUNT=$(timeout 2 jq '.alerts | map(select(.cleared == false and (.severity == "critical" or .severity == "high"))) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  if [ "$_CRIT_COUNT" -gt 0 ] 2>/dev/null; then
+    echo ""
+    echo "!! MDEMG HIGH/CRITICAL ALERTS [$_CRIT_COUNT] — INVESTIGATE BEFORE PROCEEDING !!"
+    jq -r '.alerts[] | select(.cleared == false and (.severity == "critical" or .severity == "high")) |
+      "  [\(.severity | ascii_upcase)] \(.service): \(.title)\n    \(.message)"
+    ' "$_ALERT_FILE" 2>/dev/null
+    echo ""
+  fi
+fi
+
 # Version mismatch detection (CLI binary vs running server)
 if [ -x "./bin/mdemg" ]; then
   LOCAL_COMMIT=$(./bin/mdemg version 2>/dev/null | awk '/commit:/{print $2}')
