@@ -263,14 +263,7 @@ See existing specs for examples of the full schema.
 
 ### Step 6: Register in the Ingester
 
-The parser auto-registers in the parser registry via `init()`, but the ingester has a separate enabled-languages gate. Add your language to `getEnabledLanguages()` in `cmd/ingest-codebase/main.go`:
-
-```go
-// In getEnabledLanguages():
-"mylang": true,
-```
-
-For languages that users may want to toggle off, add a CLI flag instead:
+The parser auto-registers in the parser registry via `init()`, but the ingester has a separate enabled-languages gate. Add a CLI flag and wire it into `getEnabledLanguages()` in `cmd/ingest-codebase/main.go`:
 
 ```go
 // At the top with other flags:
@@ -280,7 +273,7 @@ includeMyLang = flag.Bool("include-mylang", true, "Include MyLang files (*.ml)")
 "mylang": *includeMyLang,
 ```
 
-Without this step, `.ml` files will be silently skipped during ingestion even though the parser works.
+All languages must use CLI flags (no hardcoded `true` entries). Without this step, `.ml` files will be silently skipped during ingestion even though the parser works.
 
 ### Step 7: Rebuild
 
