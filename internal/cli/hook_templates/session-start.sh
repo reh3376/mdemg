@@ -61,7 +61,7 @@ fi
 # --- Alert delivery: show critical/high service alerts at session start ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then
-  _CRIT_COUNT=$(timeout 2 jq '.alerts | map(select(.cleared == false and (.severity == "critical" or .severity == "high"))) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  _CRIT_COUNT=$(jq '.alerts | map(select(.cleared == false and (.severity == "critical" or .severity == "high"))) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
   if [ "$_CRIT_COUNT" -gt 0 ] 2>/dev/null; then
     echo ""
     echo "!! MDEMG HIGH/CRITICAL ALERTS [$_CRIT_COUNT] — INVESTIGATE BEFORE PROCEEDING !!"
