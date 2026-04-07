@@ -170,6 +170,43 @@ Also shows: pending ingest buffer entries, server/Neo4j/sidecar health.
 
 Active hooks in `.claude/hooks/` are the source of truth. Templates in `internal/cli/hook_templates/` are parameterized copies. `claudeHookFiles()` registers all 5 hooks with correct events, timeouts, and matchers. See `docs/features/ide-repo-integration.md` for the full registration table.
 
+## Server-Native Alert Evaluation (SNA-001)
+
+The server evaluates 13 TSDB-query alert rules natively, eliminating the dependency on Grafana for alerting. Rules are defined in `internal/alert/rules.go` and evaluated by the `Evaluator` in `internal/alert/evaluator.go`.
+
+### Alert Delivery Chain (Server-Native)
+
+```
+MDEMG Server
+├── Health Prober (4 targets)       → alert dispatcher → user
+├── CB State Changes                → alert dispatcher → user
+├── LLM Consecutive Failures        → alert dispatcher → user
+├── TSDB Writer Overflow            → alert dispatcher → user
+├── RSIC Self-Reflect (29 patterns) → alert dispatcher → user
+└── Alert Evaluator (13 rules)      → alert dispatcher → user
+      ├── Periodic TSDB queries (30s default)
+      ├── ForDuration state tracking (prevents flapping)
+      └── Graceful degradation (log + skip on TSDB unavailable)
+
+Grafana remains for dashboards only. Grafana alert rules are supplementary.
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ALERT_EVALUATOR_ENABLED` | `true` | Enable server-native rule evaluation |
+| `ALERT_EVALUATOR_INTERVAL_SEC` | `30` | Base evaluation tick interval |
+
+## Goroutine Supervisor (SNA-001)
+
+Background goroutines (health prober, alert evaluator) are monitored by a supervisor (`internal/supervisor/`) that provides:
+
+- **Panic recovery** — `defer recover()` on every supervised goroutine
+- **Auto-restart** — exponential backoff (5s base, doubles each retry, max 3 restarts)
+- **Alerts** — warning on restart, critical on permanent failure (max retries exceeded)
+- **Graceful shutdown** — context cancellation stops all supervised workers
+
 ## Documents Accessed
 
 - `internal/cli/service.go`, `service_darwin.go`, `service_linux.go`, `service_stub.go` — service management CLI

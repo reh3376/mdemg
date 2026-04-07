@@ -1,14 +1,20 @@
-# MDEMG Grafana Contact Points — SR-001
-# Routes alerts to the MDEMG webhook handler for file-based delivery.
-apiVersion: 1
-
-contactPoints:
-  - orgId: 1
-    name: mdemg-webhook
-    receivers:
-      - uid: mdemg-webhook-receiver
-        type: webhook
-        settings:
-          url: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
-          httpMethod: POST
-        disableResolveMessage: false
+# MDEMG Grafana Contact Points — DISABLED (SNA-001)
+#
+# The MDEMG server now evaluates all alert rules natively and delivers
+# alerts through its own dispatcher. Grafana webhook delivery is no longer
+# needed. The /v1/alerts/grafana endpoint is kept for backward compatibility.
+#
+# To re-enable Grafana webhook delivery, uncomment the block below:
+#
+# apiVersion: 1
+#
+# contactPoints:
+#   - orgId: 1
+#     name: mdemg-webhook
+#     receivers:
+#       - uid: mdemg-webhook-receiver
+#         type: webhook
+#         settings:
+#           url: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
+#           httpMethod: POST
+#         disableResolveMessage: false

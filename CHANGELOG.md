@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Server-native alert evaluator** (`internal/alert/evaluator.go`) — 13 TSDB-query alert rules migrated from Grafana to run natively on the server. Periodic evaluation with configurable interval (`ALERT_EVALUATOR_INTERVAL_SEC`, default: 30s), ForDuration state tracking to prevent flapping, and graceful degradation when TSDB is unavailable. Grafana is no longer required for alert evaluation.
+- **Goroutine supervisor** (`internal/supervisor/`) — monitors background goroutines (health prober, alert evaluator) with panic recovery, automatic restart with exponential backoff (5s base, max 3 retries), and alerts on restart (warning) and permanent failure (critical).
+
+### Fixed
+
+- **Trust persistence goroutine leak** — `StartTrustPersistence` now wraps context with `WithCancel`; new `StopTrustPersistence()` called during `Shutdown()` ensures final flush and clean goroutine exit.
+- **Dead startup code wired** — `StartContextCoolerProcessing` and `StartWeeklyGapInterviews` were fully implemented but never called; now wired behind opt-in config gates (`CONTEXT_COOLER_ENABLED`, `WEEKLY_GAP_INTERVIEWS_ENABLED`, both default: false).
+- **Grafana alert rules demoted to supplementary** — contact point and notification policy disabled; alert rules kept in `alerts.yml` with header comment for users who want redundant Grafana alerting. `/v1/alerts/grafana` endpoint preserved for backward compatibility.
+
 - **LLM consecutive failure alert** — tracks consecutive LLM call failures per-client via shared atomic counter; fires high-severity alert through dispatcher when threshold reached (default: 3, configurable via `LLM_CONSECUTIVE_FAILURE_THRESHOLD`). Counter resets on success. Late-binding callback avoids init ordering issues.
 - **Alert dispatcher** (`internal/alert/`) — new package with file backend (atomic JSON writes, FIFO eviction at configurable cap), macOS notification backend (opt-in, `//go:build darwin`), per-(service,severity) cooldown dedup, and fire-and-forget dispatch to multiple backends
 - **Hook alert delivery** — `prompt-context.sh` shows all pending alerts per prompt; `session-start.sh` shows critical/high alerts at session start; both read from `~/.mdemg/alerts/current.json`
