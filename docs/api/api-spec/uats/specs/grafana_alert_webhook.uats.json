@@ -5,7 +5,11 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["alert", "webhook", "sr001"]
+    "tags": [
+      "alert",
+      "webhook",
+      "sr001"
+    ]
   },
   "metadata": {
     "author": "reh3376",
@@ -16,7 +20,10 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["alert"]
+    "tags": [
+      "alert"
+    ],
+    "sha256": "53d1b41f7bd592b5914e85db919b0ae6427816b08fa9f5357a88167e66595246"
   },
   "request": {
     "method": "POST",

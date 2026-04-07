@@ -18,7 +18,8 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 15000
+    "timeout_ms": 15000,
+    "sha256": "50eecd9378bf9903e06b0b1b0824a946c6802322dc7ebc6eeb55ad4ac93291ff"
   },
   "variables": {
     "test_space": "demo"

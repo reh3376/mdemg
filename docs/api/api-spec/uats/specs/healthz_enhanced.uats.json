@@ -5,7 +5,10 @@
     "base_url": "${MDEMG_BASE_URL}",
     "version": "v1",
     "service": "mdemg",
-    "tags": ["health", "sr001"]
+    "tags": [
+      "health",
+      "sr001"
+    ]
   },
   "metadata": {
     "author": "reh3376",
@@ -16,7 +19,10 @@
   },
   "config": {
     "timeout_ms": 5000,
-    "tags": ["health"]
+    "tags": [
+      "health"
+    ],
+    "sha256": "82bffcd105baea93c0cec6658cdb57646d9dc13ced76f31c26fc37e6ab10aa1b"
   },
   "request": {
     "method": "GET",
@@ -31,7 +37,10 @@
       {
         "path": "$.status",
         "op": "one_of",
-        "expected": ["ok", "degraded"]
+        "expected": [
+          "ok",
+          "degraded"
+        ]
       },
       {
         "path": "$.checks",
