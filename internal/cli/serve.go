@@ -286,6 +286,17 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 					"TSDB buffer overflow", msg, alert.SeverityMedium)
 			})
 		}
+
+		// G4+G11: Wire LLM consecutive failure alert callback.
+		// Late binding: callback reads disp at call time, works even though
+		// LLM clients were created inside NewServer before this point.
+		llmclient.SetDefaultFailureThreshold(cfg.LLMConsecutiveFailureThreshold)
+		llmclient.SetDefaultAlertCallback(func(taskName string, count int, lastErr error) {
+			disp.SendAlert(context.Background(), "llm-"+taskName,
+				fmt.Sprintf("LLM consecutive failures: %s", taskName),
+				fmt.Sprintf("%d consecutive failures, last: %v", count, lastErr),
+				alert.SeverityHigh)
+		})
 	}
 
 	// Start periodic conversation memory consolidation (every 5 minutes)

@@ -827,6 +827,9 @@ type Config struct {
 	LLMRetryMultiplier  float64 // LLM_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
 	LLMRetryJitter      float64 // LLM_RETRY_JITTER — jitter factor 0-1 (default: 0.2)
 
+	// ===== LLM Consecutive Failure Alert =====
+	LLMConsecutiveFailureThreshold int // LLM_CONSECUTIVE_FAILURE_THRESHOLD — fires alert after N consecutive failures (default: 3)
+
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
 }
@@ -3218,6 +3221,12 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// LLM Consecutive Failure Alert
+	llmConsecutiveFailureThreshold, err := atoi("LLM_CONSECUTIVE_FAILURE_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// TSDB Writer
 	tsdbWriterBufferMaxSize, err := atoi("TSDB_WRITER_BUFFER_MAX_SIZE", 1000)
 	if err != nil {
@@ -3866,6 +3875,9 @@ func FromEnv() (Config, error) {
 		LLMRetryMaxDelayMs:  llmRetryMaxDelayMs,
 		LLMRetryMultiplier:  llmRetryMultiplier,
 		LLMRetryJitter:      llmRetryJitter,
+
+		// LLM Consecutive Failure Alert
+		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,
