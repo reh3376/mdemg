@@ -18,8 +18,7 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 15000,
-    "sha256": "5f6e872d81a1eb21471503e4576a01d9786f4065b8f495ee83bbc725eb4b2185"
+    "timeout_ms": 15000
   },
   "variables": {
     "test_space": "demo"
@@ -35,6 +34,10 @@
         "path": "$.status",
         "op": "equals",
         "expected": "ok"
+      },
+      {
+        "path": "$.checks",
+        "op": "exists"
       }
     ]
   }

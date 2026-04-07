@@ -1,0 +1,59 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Enhanced Health Check",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": ["health", "sr001"]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-04-07",
+    "description": "Validates enhanced /healthz endpoint returns checks map with subsystem statuses",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 5000,
+    "tags": ["health"]
+  },
+  "request": {
+    "method": "GET",
+    "path": "/healthz"
+  },
+  "expected": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "one_of",
+        "expected": ["ok", "degraded"]
+      },
+      {
+        "path": "$.checks",
+        "op": "exists"
+      },
+      {
+        "path": "$.checks",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "path": "$.checks.neo4j",
+        "op": "exists"
+      },
+      {
+        "path": "$.checks.circuit_breakers",
+        "op": "exists"
+      },
+      {
+        "path": "$.checks.tsdb",
+        "op": "exists"
+      }
+    ]
+  }
+}
