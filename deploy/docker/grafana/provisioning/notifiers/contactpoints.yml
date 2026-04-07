@@ -1,0 +1,14 @@
+# MDEMG Grafana Contact Points — SR-001
+# Routes alerts to the MDEMG webhook handler for file-based delivery.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: mdemg-webhook
+    receivers:
+      - uid: mdemg-webhook-receiver
+        type: webhook
+        settings:
+          url: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
+          httpMethod: POST
+        disableResolveMessage: false
