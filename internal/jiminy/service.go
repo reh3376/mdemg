@@ -421,6 +421,11 @@ func (s *Service) GetEvaluator() *Evaluator {
 	return s.evaluator
 }
 
+// GetOutcomeClassifier returns the outcome classifier for CB wiring (G8).
+func (s *Service) GetOutcomeClassifier() *OutcomeClassifier {
+	return s.classifier
+}
+
 // GetGuidanceStats returns aggregated guidance stats for RSIC integration (J10).
 func (s *Service) GetGuidanceStats(ctx context.Context, spaceID string) (JiminyStats, error) {
 	if s.statsCollector == nil {
