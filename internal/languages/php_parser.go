@@ -347,18 +347,23 @@ func (p *PHPParser) extractSymbols(content string) []Symbol {
 			continue
 		}
 
-		// Top-level define() constant
-		if matches := definePattern.FindStringSubmatch(line); matches != nil {
-			symbols = append(symbols, Symbol{
-				Name:     matches[1],
-				Type:     "constant",
-				Value:    CleanValue(matches[2]),
-				RawValue: matches[2],
-				Line:     lineNum,
-				Exported: true,
-				Language: "php",
-			})
-			continue
+		// Track whether we're inside a function/method body
+		inFunctionBody := (currentType == "" && braceDepth > 0) || (currentType != "" && braceDepth > typeStartDepth+1)
+
+		// Top-level define() constant (skip if inside a function/method body)
+		if !inFunctionBody {
+			if matches := definePattern.FindStringSubmatch(line); matches != nil {
+				symbols = append(symbols, Symbol{
+					Name:     matches[1],
+					Type:     "constant",
+					Value:    CleanValue(matches[2]),
+					RawValue: matches[2],
+					Line:     lineNum,
+					Exported: true,
+					Language: "php",
+				})
+				continue
+			}
 		}
 
 		// Top-level const
@@ -587,17 +592,17 @@ func detectPHPFrameworkTags(relPath, content string) []string {
 }
 
 // detectPHPTypeKind determines whether a name is a class, interface, trait, or enum.
+// Note: regex is compiled per call because the pattern includes the dynamic type name.
+// This runs once per class/interface/trait/enum in the file (typically < 10 calls).
 func detectPHPTypeKind(content, name string) string {
-	interfaceRe := regexp.MustCompile(`(?m)^\s*interface\s+` + regexp.QuoteMeta(name))
-	if interfaceRe.MatchString(content) {
+	quotedName := regexp.QuoteMeta(name)
+	if regexp.MustCompile(`(?m)^\s*interface\s+` + quotedName).MatchString(content) {
 		return "interface"
 	}
-	traitRe := regexp.MustCompile(`(?m)^\s*trait\s+` + regexp.QuoteMeta(name))
-	if traitRe.MatchString(content) {
+	if regexp.MustCompile(`(?m)^\s*trait\s+` + quotedName).MatchString(content) {
 		return "trait"
 	}
-	enumRe := regexp.MustCompile(`(?m)^\s*enum\s+` + regexp.QuoteMeta(name))
-	if enumRe.MatchString(content) {
+	if regexp.MustCompile(`(?m)^\s*enum\s+` + quotedName).MatchString(content) {
 		return "enum"
 	}
 	return "class"
@@ -609,13 +614,14 @@ func extractPHPTypeContent(content, typeName, moduleName string) string {
 	builder.WriteString(fmt.Sprintf("PHP %s: %s (in %s)\n", detectPHPTypeKind(content, typeName), typeName, moduleName))
 
 	lines := strings.Split(content, "\n")
-	pattern := regexp.MustCompile(`^\s*(?:abstract\s+|final\s+|readonly\s+)*(?:class|interface|trait|enum)\s+` + regexp.QuoteMeta(typeName))
+	// Build pattern using pre-compiled prefix concept + dynamic name suffix
+	typePattern := regexp.MustCompile(`^\s*(?:abstract\s+|final\s+|readonly\s+)*(?:class|interface|trait|enum)\s+` + regexp.QuoteMeta(typeName))
 
 	inType := false
 	braceCount := 0
 	for _, line := range lines {
 		if !inType {
-			if pattern.MatchString(line) {
+			if typePattern.MatchString(line) {
 				inType = true
 				braceCount = 0
 			} else {
