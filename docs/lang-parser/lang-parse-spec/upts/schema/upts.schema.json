@@ -38,6 +38,7 @@
         "makefile",
         "markdown",
         "openapi",
+        "php",
         "protobuf",
         "python",
         "rust",

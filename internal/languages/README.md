@@ -4,7 +4,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 
 ## Supported Languages
 
-27 parsers, 27 with UPTS validation specs (100%).
+28 parsers, 28 with UPTS validation specs (100%).
 
 | Language | File | Extensions | UPTS |
 |----------|------|------------|------|
@@ -14,6 +14,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 | TypeScript/JavaScript | [`typescript_parser.go`](typescript_parser.go) | `.ts`, `.tsx`, `.js`, `.jsx` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/typescript.upts.json) |
 | Java | [`java_parser.go`](java_parser.go) | `.java` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/java.upts.json) |
 | C# | [`csharp_parser.go`](csharp_parser.go) | `.cs` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/csharp.upts.json) |
+| PHP | [`php_parser.go`](php_parser.go) | `.php` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/php.upts.json) |
 | Kotlin | [`kotlin_parser.go`](kotlin_parser.go) | `.kt`, `.kts` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/kotlin.upts.json) |
 | C++ | [`cpp_parser.go`](cpp_parser.go) | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/cpp.upts.json) |
 | C | [`c_parser.go`](c_parser.go) | `.c`, `.h` | [Yes](../../../docs/lang-parser/lang-parse-spec/upts/specs/c.upts.json) |
@@ -41,7 +42,7 @@ This directory contains modular language parsers for the MDEMG codebase ingestio
 Each parser's symbol extraction is validated against a [UPTS (Universal Parser Test Specification)](../../../docs/lang-parser/lang-parse-spec/upts/README.md) spec file. The Go-native test harness loads the spec, parses the associated fixture file through the parser, and asserts that all expected symbols are found with correct name, type, line number, and export status.
 
 ```bash
-# Run all 27 UPTS-validated parsers
+# Run all 28 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Run a single language

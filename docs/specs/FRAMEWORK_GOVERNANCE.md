@@ -17,7 +17,7 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 | UNTS | Universal Hash Test Specification | Hash verification registry, verify-now, revert | active |
 | UDTS | Universal DevSpace Test Specification | gRPC contract and integration tests | active |
 | UATS | Universal API Test Specification | HTTP acceptance contract tests | active (124 specs, CI-gated) |
-| UPTS | Universal Parser Test Specification | Parser contract conformance across languages | active (27 specs, CI-gated) |
+| UPTS | Universal Parser Test Specification | Parser contract conformance across languages | active (28 specs, CI-gated) |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load regression testing | active (CI smoke, soft-fail) |
 | USTS | Universal Security Test Specification | Security behavior and hardening checks | pilot |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only (no runner/fixtures) |

@@ -28,7 +28,7 @@ UPTS provides:
 
 ## Current Status
 
-**27 UPTS-validated parsers** — all pass via `go test`:
+**28 UPTS-validated parsers** — all pass via `go test`:
 
 | Language | Spec | Fixture | Parser |
 |----------|------|---------|--------|
@@ -38,6 +38,7 @@ UPTS provides:
 | TypeScript | [`typescript.upts.json`](specs/typescript.upts.json) | [`typescript_test_fixture.ts`](fixtures/typescript_test_fixture.ts) | [`typescript_parser.go`](../../../../cmd/ingest-codebase/languages/typescript_parser.go) |
 | Java | [`java.upts.json`](specs/java.upts.json) | [`java_test_fixture.java`](fixtures/java_test_fixture.java) | [`java_parser.go`](../../../../cmd/ingest-codebase/languages/java_parser.go) |
 | C# | [`csharp.upts.json`](specs/csharp.upts.json) | [`csharp_test_fixture.cs`](fixtures/csharp_test_fixture.cs) | [`csharp_parser.go`](../../../../cmd/ingest-codebase/languages/csharp_parser.go) |
+| PHP | [`php.upts.json`](specs/php.upts.json) | [`php_test_fixture.php`](fixtures/php_test_fixture.php) | [`php_parser.go`](../../../../internal/languages/php_parser.go) |
 | Kotlin | [`kotlin.upts.json`](specs/kotlin.upts.json) | [`kotlin_test_fixture.kt`](fixtures/kotlin_test_fixture.kt) | [`kotlin_parser.go`](../../../../cmd/ingest-codebase/languages/kotlin_parser.go) |
 | C++ | [`cpp.upts.json`](specs/cpp.upts.json) | [`cpp_test_fixture.cpp`](fixtures/cpp_test_fixture.cpp) | [`cpp_parser.go`](../../../../cmd/ingest-codebase/languages/cpp_parser.go) |
 | C | [`c.upts.json`](specs/c.upts.json) | [`c_test_fixture.c`](fixtures/c_test_fixture.c) | [`c_parser.go`](../../../../cmd/ingest-codebase/languages/c_parser.go) |
@@ -69,13 +70,14 @@ upts/
 ├── schema/
 │   └── upts.schema.json             # JSON Schema (canonical definition)
 │
-├── specs/                            # 27 UPTS spec files
+├── specs/                            # 28 UPTS spec files
 │   ├── go.upts.json
 │   ├── rust.upts.json
 │   ├── python.upts.json
 │   ├── typescript.upts.json
 │   ├── java.upts.json
 │   ├── csharp.upts.json
+│   ├── php.upts.json
 │   ├── kotlin.upts.json
 │   ├── cpp.upts.json
 │   ├── c.upts.json
@@ -98,7 +100,7 @@ upts/
 │   ├── lua.upts.json
 │   └── scraper_markdown.upts.json
 │
-├── fixtures/                         # 27 test fixture files
+├── fixtures/                         # 28 test fixture files
 │   ├── go_test_fixture.go
 │   ├── rust_test_fixture.rs
 │   ├── python_test_fixture.py
@@ -128,7 +130,7 @@ The primary validation method is the Go-native test harness in the parser direct
 ### 1. Run All UPTS Tests (Go-Native — Recommended)
 
 ```bash
-# All 27 UPTS-validated parsers
+# All 28 UPTS-validated parsers
 go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
 
 # Single language

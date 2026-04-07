@@ -1,0 +1,570 @@
+{
+  "upts_version": "1.0.0",
+  "language": "php",
+  "variants": [
+    ".php"
+  ],
+  "metadata": {
+    "author": "diegovogel",
+    "created": "2026-04-06",
+    "updated": "2026-04-07",
+    "description": "PHP parser \u2014 classes, interfaces, traits, enums, functions, constants, namespaces, fields, methods. Includes regression tests for: heredoc false-positives, multi-line array constants, trailing-comment constants, bare methods, reversed static modifiers, readonly class, reference-return functions, indented guarded functions, constructor emission, promoted properties.",
+    "parser_status": "functional",
+    "tags": [
+      "canonical",
+      "oop",
+      "php8",
+      "laravel",
+      "wordpress"
+    ]
+  },
+  "config": {
+    "line_tolerance": 2,
+    "require_all_symbols": true,
+    "allow_extra_symbols": true,
+    "validate_parent": true,
+    "validate_signature": false,
+    "validate_value": false
+  },
+  "fixture": {
+    "type": "file",
+    "path": "../fixtures/php_test_fixture.php",
+    "sha256": "26f64532b73f6c317ad5a1af85c14f199ad9a37982f4c01da0e9046fa5dde03b"
+  },
+  "expected": {
+    "symbol_count": {
+      "min": 48,
+      "max": 55
+    },
+    "symbols": [
+      {
+        "name": "App\\Services",
+        "type": "namespace",
+        "line": 5,
+        "exported": true,
+        "pattern": "P5_NAMESPACE"
+      },
+      {
+        "name": "MAX_RETRIES",
+        "type": "constant",
+        "line": 11,
+        "exported": true,
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "PLUGIN_VERSION",
+        "type": "constant",
+        "line": 14,
+        "exported": true,
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "Cacheable",
+        "type": "interface",
+        "line": 19,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT"
+      },
+      {
+        "name": "getCacheKey",
+        "type": "method",
+        "line": 21,
+        "exported": true,
+        "parent": "Cacheable",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getCacheTtl",
+        "type": "method",
+        "line": 23,
+        "exported": true,
+        "parent": "Cacheable",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "HasSlug",
+        "type": "trait",
+        "line": 29,
+        "exported": true,
+        "pattern": "P4_INTERFACE_TRAIT"
+      },
+      {
+        "name": "generateSlug",
+        "type": "method",
+        "line": 31,
+        "exported": true,
+        "parent": "HasSlug",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "slugExists",
+        "type": "method",
+        "line": 36,
+        "exported": false,
+        "parent": "HasSlug",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "UserStatus",
+        "type": "enum",
+        "line": 45,
+        "exported": true,
+        "pattern": "P5_ENUM"
+      },
+      {
+        "name": "Active",
+        "type": "enum_value",
+        "line": 47,
+        "exported": true,
+        "parent": "UserStatus",
+        "pattern": "P5_ENUM_VALUE"
+      },
+      {
+        "name": "Inactive",
+        "type": "enum_value",
+        "line": 48,
+        "exported": true,
+        "parent": "UserStatus",
+        "pattern": "P5_ENUM_VALUE"
+      },
+      {
+        "name": "Suspended",
+        "type": "enum_value",
+        "line": 49,
+        "exported": true,
+        "parent": "UserStatus",
+        "pattern": "P5_ENUM_VALUE"
+      },
+      {
+        "name": "UserService",
+        "type": "class",
+        "line": 55,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT"
+      },
+      {
+        "name": "DEFAULT_ROLE",
+        "type": "constant",
+        "line": 59,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "CACHE_PREFIX",
+        "type": "constant",
+        "line": 60,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "MAX_BATCH_SIZE",
+        "type": "constant",
+        "line": 61,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "ALLOWED_TYPES",
+        "type": "constant",
+        "line": 64,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "THROTTLE_SECONDS",
+        "type": "constant",
+        "line": 71,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P1_CONSTANT"
+      },
+      {
+        "name": "serviceName",
+        "type": "field",
+        "line": 73,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "timeout",
+        "type": "field",
+        "line": 74,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "apiKey",
+        "type": "field",
+        "line": 75,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "__construct",
+        "type": "method",
+        "line": 78,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "repository",
+        "type": "field",
+        "line": 79,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "findById",
+        "type": "method",
+        "line": 84,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "createUser",
+        "type": "method",
+        "line": 89,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "validateData",
+        "type": "method",
+        "line": 95,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "hashPassword",
+        "type": "method",
+        "line": 100,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getVersion",
+        "type": "method",
+        "line": 105,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getInstance",
+        "type": "method",
+        "line": 111,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "instanceCount",
+        "type": "field",
+        "line": 117,
+        "exported": false,
+        "parent": "UserService",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "getReference",
+        "type": "method",
+        "line": 120,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getCacheKey",
+        "type": "method",
+        "line": 125,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getCacheTtl",
+        "type": "method",
+        "line": 130,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "getScript",
+        "type": "method",
+        "line": 136,
+        "exported": true,
+        "parent": "UserService",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "BaseController",
+        "type": "class",
+        "line": 148,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT"
+      },
+      {
+        "name": "index",
+        "type": "method",
+        "line": 150,
+        "exported": true,
+        "parent": "BaseController",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "respond",
+        "type": "method",
+        "line": 152,
+        "exported": true,
+        "parent": "BaseController",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "LegacyWidget",
+        "type": "class",
+        "line": 161,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT"
+      },
+      {
+        "name": "render",
+        "type": "method",
+        "line": 163,
+        "exported": true,
+        "parent": "LegacyWidget",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "update",
+        "type": "method",
+        "line": 168,
+        "exported": true,
+        "parent": "LegacyWidget",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "ValueObject",
+        "type": "class",
+        "line": 177,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT"
+      },
+      {
+        "name": "__construct",
+        "type": "method",
+        "line": 179,
+        "exported": true,
+        "parent": "ValueObject",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "name",
+        "type": "field",
+        "line": 180,
+        "exported": true,
+        "parent": "ValueObject",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "value",
+        "type": "field",
+        "line": 181,
+        "exported": true,
+        "parent": "ValueObject",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "Notification",
+        "type": "class",
+        "line": 188,
+        "exported": true,
+        "pattern": "P3_CLASS_STRUCT"
+      },
+      {
+        "name": "__construct",
+        "type": "method",
+        "line": 190,
+        "exported": true,
+        "parent": "Notification",
+        "pattern": "P6_METHOD"
+      },
+      {
+        "name": "message",
+        "type": "field",
+        "line": 190,
+        "exported": true,
+        "parent": "Notification",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "priority",
+        "type": "field",
+        "line": 190,
+        "exported": true,
+        "parent": "Notification",
+        "pattern": "P9_FIELD"
+      },
+      {
+        "name": "formatCurrency",
+        "type": "function",
+        "line": 196,
+        "exported": true,
+        "pattern": "P2_FUNCTION"
+      },
+      {
+        "name": "calculateDiscount",
+        "type": "function",
+        "line": 205,
+        "exported": true,
+        "pattern": "P2_FUNCTION"
+      }
+    ],
+    "excluded": [
+      {
+        "name": "el",
+        "reason": "JS const inside heredoc string \u2014 must not be parsed as PHP constant"
+      },
+      {
+        "name": "buttons",
+        "reason": "JS const inside heredoc string \u2014 must not be parsed as PHP constant"
+      }
+    ],
+    "relationships": [
+      {
+        "source": "Cacheable",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheKey"
+      },
+      {
+        "source": "Cacheable",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheTtl"
+      },
+      {
+        "source": "HasSlug",
+        "relation": "DEFINES_METHOD",
+        "target": "generateSlug"
+      },
+      {
+        "source": "HasSlug",
+        "relation": "DEFINES_METHOD",
+        "target": "slugExists"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "findById"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "createUser"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "validateData"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "hashPassword"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getVersion"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getInstance"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getReference"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheKey"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheTtl"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getScript"
+      },
+      {
+        "source": "UserService",
+        "relation": "IMPLEMENTS",
+        "target": "Cacheable"
+      },
+      {
+        "source": "BaseController",
+        "relation": "DEFINES_METHOD",
+        "target": "index"
+      },
+      {
+        "source": "BaseController",
+        "relation": "DEFINES_METHOD",
+        "target": "respond"
+      },
+      {
+        "source": "LegacyWidget",
+        "relation": "DEFINES_METHOD",
+        "target": "render"
+      },
+      {
+        "source": "LegacyWidget",
+        "relation": "DEFINES_METHOD",
+        "target": "update"
+      },
+      {
+        "source": "ValueObject",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
+      },
+      {
+        "source": "Notification",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
+      }
+    ]
+  },
+  "patterns_covered": [
+    "P1_CONSTANT",
+    "P2_FUNCTION",
+    "P3_CLASS_STRUCT",
+    "P4_INTERFACE_TRAIT",
+    "P5_ENUM",
+    "P5_ENUM_VALUE",
+    "P5_NAMESPACE",
+    "P6_METHOD",
+    "P9_FIELD"
+  ]
+}
