@@ -30,9 +30,24 @@ func (p *PHPParser) IsTestFile(path string) bool {
 	name := filepath.Base(path)
 	inTestDir := strings.Contains(path, "/tests/") || strings.Contains(path, "/test/")
 	hasTestSuffix := strings.HasSuffix(name, "Test.php") || strings.HasSuffix(name, "_test.php")
-	// Require test directory for suffix-based detection to avoid false positives
-	// on production files like app/Models/Test.php
-	return inTestDir || (hasTestSuffix && !strings.Contains(path, "/app/"))
+	// In test directory — always a test file
+	if inTestDir {
+		return true
+	}
+	// Suffix heuristic: exclude known Laravel/WordPress production directories
+	// to avoid false positives on files like app/Models/Test.php
+	if hasTestSuffix {
+		prodDirs := []string{"/app/Models/", "/app/Http/", "/app/Providers/",
+			"/app/Services/", "/app/Actions/", "/app/Livewire/",
+			"/app/Nova/", "/wp-content/", "/wp-admin/", "/wp-includes/"}
+		for _, dir := range prodDirs {
+			if strings.Contains(path, dir) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (p *PHPParser) ParseFile(root, path string, extractSymbols bool) ([]CodeElement, error) {
