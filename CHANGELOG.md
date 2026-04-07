@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hook alert banners broken on macOS** — `timeout` command (GNU coreutils) is not available on macOS. Both `session-start.sh` and `prompt-context.sh` used `timeout 2 jq ...` to parse the alert file, which failed silently and suppressed all alert banners. Removed the `timeout` wrapper — jq reads a small local JSON file and completes instantly.
+
+### Added (UATS)
+
+- **`grafana_alert_webhook.uats.json`** — 3 variants: base firing alert (200), empty alerts (200), resolved alert (200)
+- **`healthz_enhanced.uats.json`** — 8 assertions validating enhanced `/healthz` response: `status` one_of `[ok, degraded]`, `checks` map exists with `neo4j`, `circuit_breakers`, `tsdb` keys
+- **`health.uats.json`** updated — added `$.checks` exists assertion for enhanced `/healthz` compatibility
+
+### Fixed
+
 - **Trust accrual: partial_compliance excluded from trust scoring** — `trustRelevanceThreshold` lowered from 0.5 to 0.20, aligning with the classifier's `not_applicable` cutoff. 38% of outcomes (partial_compliance) were filtered before reaching the trust scorer, halving effective trust growth rate.
 - **Trust accrual: OutcomePartialCompliance missing from aggregate switch** — partial compliance outcomes were silently dropped in the trust aggregate logic, never reaching `TrustScorer.RecordOutcome()`. Added `partialCount` to the aggregate with conservative priority (boosted only when no ignores present).
 - **WarmStore upward-crossing invalidation** — cache invalidation only fired on downward tier crossings (T1→T2, T2→T3). Added upward crossing checks so T3→T2 and T2→T1 promotions immediately invalidate stale lower-tier guidance.

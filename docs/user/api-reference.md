@@ -86,17 +86,48 @@ Endpoints `/healthz`, `/readyz`, and `/v1/metrics` are exempt from authenticatio
 
 ### GET /healthz
 
-Liveness probe. Returns immediately if server is running.
+Liveness probe with lightweight subsystem checks. Returns immediately if server is running.
 
-**Response:**
+**Response (healthy):**
 ```json
-{ "status": "ok" }
+{
+  "status": "ok",
+  "version": "0.6.0",
+  "commit": "abc1234",
+  "checks": {
+    "neo4j": "ok",
+    "circuit_breakers": "ok",
+    "tsdb": "ok",
+    "jiminy": "ok"
+  }
+}
 ```
 
-**Status Codes:** `200 OK`
+**Response (degraded):**
+```json
+{
+  "status": "degraded",
+  "version": "0.6.0",
+  "commit": "abc1234",
+  "checks": {
+    "neo4j": "no_driver",
+    "circuit_breakers": "open:2",
+    "tsdb": "ok",
+    "jiminy": "not_initialized"
+  }
+}
+```
+
+The `checks` map reports subsystem status. Possible values:
+- `neo4j`: `"ok"` or `"no_driver"` (nil check only — no live DB query)
+- `circuit_breakers`: `"ok"` or `"open:N"` (count of open circuits)
+- `tsdb`: `"ok"` or `"no_client"` (only when `TSDB_ENABLED=true`)
+- `jiminy`: `"ok"`, `"not_initialized"`, or omitted (only when `JIMINY_ENABLED=true`)
+
+**Status Codes:** `200 OK` (always returns 200, even when degraded — this is a liveness endpoint)
 
 ```bash
-curl -s http://localhost:9999/healthz
+curl -s http://localhost:9999/healthz | jq .
 ```
 
 ---
@@ -2749,6 +2780,56 @@ Add a comment to an issue.
 ---
 
 ## Webhooks
+
+### POST /v1/alerts/grafana
+
+Grafana alert webhook receiver. Processes incoming Grafana alert notifications and dispatches them through the alert system.
+
+**Request Body** (Grafana webhook format):
+```json
+{
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "mdemg-probe-neo4j-down",
+        "severity": "high"
+      },
+      "annotations": {
+        "summary": "Neo4j health probe failing for > 2 minutes"
+      }
+    }
+  ]
+}
+```
+
+**Response (200):**
+```json
+{ "status": "ok" }
+```
+
+**Severity Mapping** (from Grafana `labels.severity`):
+| Label Value | Mapped Severity |
+|-------------|-----------------|
+| `critical` | critical |
+| `high` | high |
+| `warning`, `medium` | medium |
+| `low`, `info` | low |
+| *(missing/other)* | medium |
+
+Only alerts with `status: "firing"` are dispatched. Resolved alerts are acknowledged but not stored.
+
+**Status Codes:** `200 OK`, `400 Bad Request` (invalid JSON), `503 Service Unavailable` (no alert dispatcher)
+
+```bash
+curl -s -X POST http://localhost:9999/v1/alerts/grafana \
+  -H "Content-Type: application/json" \
+  -d '{"alerts":[{"status":"firing","labels":{"alertname":"test","severity":"high"},"annotations":{"summary":"Test alert"}}]}'
+```
+
+**UATS Specs:** `grafana_alert_webhook.uats.json` (3 variants)
+
+---
 
 ### POST /v1/webhooks/linear
 
