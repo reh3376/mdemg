@@ -261,15 +261,34 @@ Create a fixture file and spec to validate your parser's symbol extraction:
 
 See existing specs for examples of the full schema.
 
-### Step 6: Rebuild
+### Step 6: Register in the Ingester
+
+The parser auto-registers in the parser registry via `init()`, but the ingester has a separate enabled-languages gate. Add your language to `getEnabledLanguages()` in `cmd/ingest-codebase/main.go`:
+
+```go
+// In getEnabledLanguages():
+"mylang": true,
+```
+
+For languages that users may want to toggle off, add a CLI flag instead:
+
+```go
+// At the top with other flags:
+includeMyLang = flag.Bool("include-mylang", true, "Include MyLang files (*.ml)")
+
+// In getEnabledLanguages():
+"mylang": *includeMyLang,
+```
+
+Without this step, `.ml` files will be silently skipped during ingestion even though the parser works.
+
+### Step 7: Rebuild
 
 After adding your parser:
 
 ```bash
 go build ./cmd/ingest-codebase/
 ```
-
-The parser auto-registers via `init()`, so no other changes needed.
 
 ## Architecture
 
