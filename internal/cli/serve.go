@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"mdemg/internal/alert"
 	"mdemg/internal/api"
 	"mdemg/internal/config"
 	"mdemg/internal/db"
@@ -237,13 +238,14 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	}
 
 	// SR-001: Start health prober (probes API, Neo4j, TSDB, sidecar)
+	var prober *healthprobe.Prober
 	if cfg.HealthProbeEnabled {
 		apiURL := fmt.Sprintf("http://localhost%s", cfg.ListenAddr)
 		var sidecarArgs []string
 		if cfg.J17SidecarURL != "" {
 			sidecarArgs = append(sidecarArgs, cfg.J17SidecarURL)
 		}
-		prober := healthprobe.New(
+		prober = healthprobe.New(
 			time.Duration(cfg.HealthProbeIntervalSec)*time.Second,
 			apiURL, driver, tsdbClient, sidecarArgs...,
 		)
@@ -261,6 +263,29 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			srv.SetLLMWriter(earlyLLMWriter)
 		}
 		srv.SetTSDBClient(tsdbClient)
+	}
+
+	// SR-001: Wire alert callbacks for prober and TSDB writer
+	if disp := srv.AlertDispatcher(); disp != nil {
+		if prober != nil {
+			prober.SetAlertCallback(func(target string, healthy bool, errMsg string) {
+				sev := alert.SeverityHigh
+				title := fmt.Sprintf("Health probe failed: %s", target)
+				msg := errMsg
+				if healthy {
+					sev = alert.SeverityLow
+					title = fmt.Sprintf("Health probe recovered: %s", target)
+					msg = "target is healthy again"
+				}
+				disp.SendAlert(context.Background(), "health-"+target, title, msg, sev)
+			})
+		}
+		if earlyLLMWriter != nil {
+			earlyLLMWriter.SetAlertCallback(func(msg string) {
+				disp.SendAlert(context.Background(), "tsdb-writer",
+					"TSDB buffer overflow", msg, alert.SeverityMedium)
+			})
+		}
 	}
 
 	// Start periodic conversation memory consolidation (every 5 minutes)

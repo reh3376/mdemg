@@ -1187,6 +1187,11 @@ func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
 	s.logBuffer = buf
 }
 
+// AlertDispatcher returns the server's alert dispatcher for external callback wiring.
+func (s *Server) AlertDispatcher() *alert.Dispatcher {
+	return s.alertDispatcher
+}
+
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
 type embeddingRecorderAdapter struct {
 	writer         *tsdb.EmbeddingEventWriter
