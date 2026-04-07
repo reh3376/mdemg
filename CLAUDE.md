@@ -156,16 +156,22 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - Hidden layer OOM: Fixed — batched orphan HiddenPattern deletion
 - `QUERY_CLASSIFY_ENABLED` compose default changed from `false` to `true`
 
-## Service Alert System (SR-001)
+## Service Alert System (SR-001 + SNA-001)
 - Alert file: `~/.mdemg/alerts/current.json` (configurable via `ALERT_FILE_PATH`)
 - Dispatcher: `internal/alert/` — file backend + optional macOS osascript notifications
 - Config: `ALERT_ENABLED` (default: true), `ALERT_COOLDOWN_SEC` (default: 300), `ALERT_MAX_ENTRIES` (default: 50), `ALERT_MACOS_NOTIFY` (default: false)
 - Hook delivery: `prompt-context.sh` shows all pending alerts; `session-start.sh` shows critical/high only
-- Sources: RSIC alert actions, circuit breaker state changes, health prober transitions, Grafana webhook
+- Sources: RSIC alert actions, circuit breaker state changes, health prober transitions, alert evaluator, Grafana webhook (backward compat)
+- **Server-native alert evaluator**: 13 TSDB-query rules evaluated natively — Grafana NOT required for alerting
+  - Config: `ALERT_EVALUATOR_ENABLED` (default: true), `ALERT_EVALUATOR_INTERVAL_SEC` (default: 30)
+  - Rules: latency SLO, error rate, graph health, orphans, Neo4j resources, rate limiting, cache hit ratio, Jiminy follow rate
+  - ForDuration state tracking prevents alert flapping; graceful degradation when TSDB unavailable
+- **Goroutine supervisor** (`internal/supervisor/`): monitors health prober and alert evaluator with panic recovery, auto-restart (3 max, exponential backoff), alerts on restart/failure
 - LLM retry: `LLM_RETRY_ENABLED` (default: true), `LLM_RETRY_MAX_ATTEMPTS` (default: 3), retries on 429/503 only
 - LLM consecutive failure alert: `LLM_CONSECUTIVE_FAILURE_THRESHOLD` (default: 3), fires high-severity alert after N consecutive failures per task
 - Health prober: `HEALTH_PROBE_ENABLED` (default: true), `HEALTH_PROBE_INTERVAL_SEC` (default: 60), probes API/Neo4j/TSDB/sidecar
 - Enhanced `/healthz`: returns `status: "degraded"` with `checks` map when subsystems unhealthy; CMS check is live Ping (not nil guard)
+- Dead startup methods: `CONTEXT_COOLER_ENABLED` (default: false), `WEEKLY_GAP_INTERVIEWS_ENABLED` (default: false)
 
 ## Campaign Configuration
 

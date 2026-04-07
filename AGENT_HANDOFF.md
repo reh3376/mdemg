@@ -52,6 +52,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-07) ===
+- ✅ SNA-001: Server-Native Alerting & Final Resilience Hardening (2026-04-07):
+  - E1: Trust persistence goroutine leak fixed — cancellable context, StopTrustPersistence() in Shutdown()
+  - E1: Dead startup code wired — StartContextCoolerProcessing and StartWeeklyGapInterviews behind config gates
+  - E2: Server-native alert evaluator — 13 TSDB-query rules migrated from Grafana, ForDuration state tracking
+  - E3: Goroutine supervisor — panic recovery, exponential backoff restart, warning/critical alerts
+  - E4: Grafana alert rules demoted to supplementary — contact point/policy disabled, endpoint preserved
+  - Config: 4 new env vars (ALERT_EVALUATOR_ENABLED, ALERT_EVALUATOR_INTERVAL_SEC, CONTEXT_COOLER_ENABLED, WEEKLY_GAP_INTERVIEWS_ENABLED)
+  - Tests: 7 evaluator + 6 supervisor tests, all passing
+  - Grafana no longer required for alert evaluation — all 28 rules evaluated server-natively
 - ✅ SR-001 Gap Closure Sprint (2026-04-07):
   - F-001: CooldownSec=0 now means "no cooldown" (was defaulting to 300s)
   - F-002: Health prober SetAlertCallback wired to alert dispatcher on transitions

@@ -1,6 +1,13 @@
-# MDEMG Grafana Unified Alerting Rules
-# Migrated from Prometheus alerting rules (A4 — Sprint Plan)
+# MDEMG Grafana Unified Alerting Rules — SUPPLEMENTARY
 #
+# NOTE: As of SNA-001, all alert rules are evaluated server-natively by the
+# MDEMG alert evaluator (internal/alert/evaluator.go). Grafana is no longer
+# required for alert evaluation or delivery. These rules are kept for users
+# who run Grafana and want supplementary alerting as a second opinion.
+# The server evaluates all 28 rules natively — removing or disabling these
+# rules has no effect on alert delivery.
+#
+# Original migration: Prometheus alerting rules (A4 — Sprint Plan)
 # Original files:
 #   - deploy/docker/prometheus/alerts/latency_slo.yaml (7 rules → 6 migrated, 1 replaced by health probes)
 #   - deploy/docker/prometheus/alerts/neo4j_graph.yaml (7 rules → 7 migrated)

@@ -25,6 +25,7 @@ import (
 	"mdemg/internal/llmclient"
 	mlog "mdemg/internal/logging"
 	"mdemg/internal/plugins"
+	"mdemg/internal/supervisor"
 	"mdemg/internal/tsdb"
 	"mdemg/migrations"
 )
@@ -249,9 +250,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			time.Duration(cfg.HealthProbeIntervalSec)*time.Second,
 			apiURL, driver, tsdbClient, sidecarArgs...,
 		)
-		prober.Start()
-		defer prober.Stop()
-		slog.Info("health prober started", "interval_sec", cfg.HealthProbeIntervalSec)
+		slog.Info("health prober created", "interval_sec", cfg.HealthProbeIntervalSec)
 	}
 
 	srv := api.NewServer(cfg, driver, pluginMgr)
@@ -263,6 +262,44 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			srv.SetLLMWriter(earlyLLMWriter)
 		}
 		srv.SetTSDBClient(tsdbClient)
+	}
+
+	// SNA-001: Goroutine supervisor with panic recovery and auto-restart
+	var sup *supervisor.Supervisor
+	if disp := srv.AlertDispatcher(); disp != nil {
+		sup = supervisor.New(func(service, title, message, severity string) {
+			sev := alert.Severity(severity)
+			disp.SendAlert(context.Background(), service, title, message, sev)
+		})
+
+		// Register health prober
+		if prober != nil {
+			sup.Register("health-prober", func(ctx context.Context) error {
+				prober.Start()
+				<-ctx.Done()
+				prober.Stop()
+				return nil
+			})
+		}
+
+		// Register alert evaluator
+		if tsdbClient != nil && cfg.AlertEvaluatorEnabled {
+			evalInterval := time.Duration(cfg.AlertEvaluatorIntervalSec) * time.Second
+			evaluator := alert.NewEvaluator(alert.DefaultRules(), tsdbClient.Pool(), disp, evalInterval)
+			sup.Register("alert-evaluator", func(_ context.Context) error {
+				evaluator.Start() // blocks until evaluator.Stop()
+				return nil
+			})
+		}
+
+		go sup.Start(context.Background())
+		defer sup.Stop()
+	} else {
+		// Fallback: start prober directly if no supervisor
+		if prober != nil {
+			prober.Start()
+			defer prober.Stop()
+		}
 	}
 
 	// SR-001: Wire alert callbacks for prober and TSDB writer
@@ -316,6 +353,16 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	// Start automatic space prune scheduler
 	if cfg.SpacePruneIntervalHours > 0 {
 		srv.StartSpacePruneScheduler(time.Duration(cfg.SpacePruneIntervalHours) * time.Hour)
+	}
+
+	// Start context cooler background processing (opt-in)
+	if cfg.ContextCoolerEnabled {
+		srv.StartContextCoolerProcessing("mdemg-dev", 10*time.Minute)
+	}
+
+	// Start weekly gap interviews (opt-in)
+	if cfg.WeeklyGapInterviewsEnabled {
+		srv.StartWeeklyGapInterviews(7 * 24 * time.Hour)
 	}
 
 	h := &http.Server{

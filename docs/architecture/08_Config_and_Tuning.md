@@ -470,6 +470,17 @@ LLM_RETRY_MAX_DELAY_MS=10000           # Maximum backoff delay cap
 # LLM Consecutive Failure Alert (SR-001 Gap Closure)
 LLM_CONSECUTIVE_FAILURE_THRESHOLD=3    # Alert after N consecutive LLM failures per task
 
+# Server-Native Alert Evaluator (SNA-001)
+ALERT_EVALUATOR_ENABLED=true           # Enable server-native TSDB rule evaluation
+ALERT_EVALUATOR_INTERVAL_SEC=30        # Base evaluation tick interval in seconds
+
+# Goroutine Supervisor (SNA-001)
+# No config — fixed: max 3 restarts, 5s base backoff (doubles per retry)
+
+# Background Workers (SNA-001)
+CONTEXT_COOLER_ENABLED=false           # Enable background context cooler processing (opt-in)
+WEEKLY_GAP_INTERVIEWS_ENABLED=false    # Enable background weekly gap interviews (opt-in)
+
 # TSDB Writer Buffer (SR-001)
 TSDB_WRITER_BUFFER_MAX_SIZE=1000       # Max LLM interaction buffer (0=unlimited)
 ```

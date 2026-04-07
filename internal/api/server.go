@@ -1312,6 +1312,9 @@ func (s *Server) Shutdown() {
 	if s.signalLearner != nil {
 		s.signalLearner.StopPersistence()
 	}
+	if s.jiminySvc != nil {
+		s.jiminySvc.StopTrustPersistence()
+	}
 
 	// Wait for all tracked background goroutines to exit
 	s.bgWg.Wait()

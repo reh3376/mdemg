@@ -457,7 +457,9 @@ type Config struct {
 	RSICGuidanceDecayThreshold     float64 // RSIC_GUIDANCE_DECAY_THRESHOLD — effectiveness rate below which confidence is decayed (default: 0.1)
 	RSICGuidanceDecayMinSurfaces   int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES — min surfaces before decay applies (default: 5)
 
-	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+	SpacePruneIntervalHours       int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+	ContextCoolerEnabled          bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
+	WeeklyGapInterviewsEnabled    bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
 
 	// Phase AR-3: LLM-powered RSIC reflection
 	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: false)
@@ -829,6 +831,10 @@ type Config struct {
 
 	// ===== LLM Consecutive Failure Alert =====
 	LLMConsecutiveFailureThreshold int // LLM_CONSECUTIVE_FAILURE_THRESHOLD — fires alert after N consecutive failures (default: 3)
+
+	// ===== Alert Evaluator =====
+	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
+	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
 
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
@@ -2331,6 +2337,8 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	contextCoolerEnabled := getBool("CONTEXT_COOLER_ENABLED", false)
+	weeklyGapInterviewsEnabled := getBool("WEEKLY_GAP_INTERVIEWS_ENABLED", false)
 
 	// Phase AR-3: LLM-powered intelligence
 	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", false)
@@ -3227,6 +3235,13 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Alert Evaluator
+	alertEvaluatorEnabled := getBool("ALERT_EVALUATOR_ENABLED", true)
+	alertEvaluatorIntervalSec, err := atoi("ALERT_EVALUATOR_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// TSDB Writer
 	tsdbWriterBufferMaxSize, err := atoi("TSDB_WRITER_BUFFER_MAX_SIZE", 1000)
 	if err != nil {
@@ -3633,6 +3648,8 @@ func FromEnv() (Config, error) {
 		RSICGuidanceDecayThreshold:     rsicGuidanceDecayThreshold,
 		RSICGuidanceDecayMinSurfaces:   rsicGuidanceDecayMinSurfaces,
 		SpacePruneIntervalHours:        spacePruneIntervalHours,
+		ContextCoolerEnabled:           contextCoolerEnabled,
+		WeeklyGapInterviewsEnabled:     weeklyGapInterviewsEnabled,
 
 		// Phase AR-3: LLM-powered intelligence
 		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,
@@ -3878,6 +3895,10 @@ func FromEnv() (Config, error) {
 
 		// LLM Consecutive Failure Alert
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
+
+		// Alert Evaluator
+		AlertEvaluatorEnabled:     alertEvaluatorEnabled,
+		AlertEvaluatorIntervalSec: alertEvaluatorIntervalSec,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

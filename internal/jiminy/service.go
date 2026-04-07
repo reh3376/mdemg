@@ -56,6 +56,7 @@ type Service struct {
 	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
 	warmStore           *WarmStore               // B7: WarmStore reference for trust-based invalidation
 	trustStore          *TrustStore              // J17: write-behind trust persistence to Neo4j
+	trustCancel         context.CancelFunc       // cancels trust persistence goroutine
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -293,6 +294,8 @@ func (s *Service) StartTrustPersistence(ctx context.Context) {
 	if s.trustStore == nil {
 		return
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	s.trustCancel = cancel
 	s.trustStore.Start(ctx)
 
 	// Background flush goroutine — reads trust scores and feedback counts, writes to Neo4j
@@ -312,6 +315,13 @@ func (s *Service) StartTrustPersistence(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// StopTrustPersistence stops the background trust flush loop and performs a final flush.
+func (s *Service) StopTrustPersistence() {
+	if s.trustCancel != nil {
+		s.trustCancel()
+	}
 }
 
 // FlushTrust writes all dirty trust + feedback state to Neo4j.
