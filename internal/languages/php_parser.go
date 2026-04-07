@@ -578,20 +578,45 @@ func detectPHPFrameworkTags(relPath, content string) []string {
 }
 
 // detectPHPTypeKind determines whether a name is a class, interface, trait, or enum.
-// Note: regex is compiled per call because the pattern includes the dynamic type name.
-// This runs once per class/interface/trait/enum in the file (typically < 10 calls).
+// Uses line-based string matching to avoid regex compilation in loops.
 func detectPHPTypeKind(content, name string) string {
-	quotedName := regexp.QuoteMeta(name)
-	if regexp.MustCompile(`(?m)^\s*interface\s+` + quotedName).MatchString(content) {
-		return "interface"
-	}
-	if regexp.MustCompile(`(?m)^\s*trait\s+` + quotedName).MatchString(content) {
-		return "trait"
-	}
-	if regexp.MustCompile(`(?m)^\s*enum\s+` + quotedName).MatchString(content) {
-		return "enum"
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if matchesTypeKeyword(trimmed, "interface", name) {
+			return "interface"
+		}
+		if matchesTypeKeyword(trimmed, "trait", name) {
+			return "trait"
+		}
+		if matchesTypeKeyword(trimmed, "enum", name) {
+			return "enum"
+		}
 	}
 	return "class"
+}
+
+// matchesTypeKeyword checks if a trimmed line declares a type with the given keyword and name.
+// Handles optional modifiers (abstract, final, readonly) before the keyword.
+func matchesTypeKeyword(trimmed, keyword, name string) bool {
+	// Strip optional leading modifiers
+	for _, mod := range []string{"abstract ", "final ", "readonly "} {
+		if strings.HasPrefix(trimmed, mod) {
+			trimmed = strings.TrimSpace(trimmed[len(mod):])
+		}
+	}
+	prefix := keyword + " "
+	if !strings.HasPrefix(trimmed, prefix) {
+		return false
+	}
+	rest := trimmed[len(prefix):]
+	// The name should be the next word
+	return strings.HasPrefix(rest, name) &&
+		(len(rest) == len(name) || !isWordChar(rest[len(name)]))
+}
+
+// isWordChar returns true if c is a letter, digit, or underscore.
+func isWordChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
 // extractPHPTypeContent extracts the definition block for a class/interface/trait/enum.
@@ -600,14 +625,16 @@ func extractPHPTypeContent(content, typeName, moduleName string) string {
 	builder.WriteString(fmt.Sprintf("PHP %s: %s (in %s)\n", detectPHPTypeKind(content, typeName), typeName, moduleName))
 
 	lines := strings.Split(content, "\n")
-	// Build pattern using pre-compiled prefix concept + dynamic name suffix
-	typePattern := regexp.MustCompile(`^\s*(?:abstract\s+|final\s+|readonly\s+)*(?:class|interface|trait|enum)\s+` + regexp.QuoteMeta(typeName))
 
 	inType := false
 	braceCount := 0
 	for _, line := range lines {
 		if !inType {
-			if typePattern.MatchString(line) {
+			trimmed := strings.TrimSpace(line)
+			if matchesTypeKeyword(trimmed, "class", typeName) ||
+				matchesTypeKeyword(trimmed, "interface", typeName) ||
+				matchesTypeKeyword(trimmed, "trait", typeName) ||
+				matchesTypeKeyword(trimmed, "enum", typeName) {
 				inType = true
 				braceCount = 0
 			} else {
