@@ -1,6 +1,6 @@
 # MDEMG Fine-Tuned LLM: Implementation Plan
 
-**Date:** 2026-04-02 (v4.0 — reconciled through PR #243, 13 phases) | **Last verified:** 2026-04-02
+**Date:** 2026-04-07 (v4.0 — reconciled through PR #243, 13 phases) | **Last verified:** 2026-04-07
 **Model:** Qwen3-30B-A3B MoE via vllm-mlx
 **Scope:** 13 phases, 16 LLM consumers, ~70 files
 
@@ -50,6 +50,8 @@ Implementation diverged from the v2.0 plan in a better direction:
 | 15 | `retrieval/rerank.go` | `retrieval.rerank_cross` | ✅ |
 | 16 | `retrieval/rerank.go` | `retrieval.rerank_nli` | ❌ |
 | 17 | `summarize/service.go` | `summarize.generate` | ✅ |
+
+**Note:** The Jiminy outcome classifier (`outcome_classifier.go:llmClassify`) uses the `jiminy.evaluate` task label for its LLM calls. This shares the label with the existing evaluator. Training data for both paths is currently mixed under the same task_name. Consider splitting to `jiminy.outcome_classify` for cleaner per-task training data if the two tasks show divergent quality requirements.
 
 ---
 
@@ -344,6 +346,21 @@ Remaining: FT model-specific metrics (version, latency, cycles), data governance
 
 ---
 
+## TSDB Schema: 10 migrations (001-010)
+
+- 001: Base metrics schema
+- 002: FT schema (llm_interactions, retrieval_events)
+- 003: Metric types
+- 004: Aggregate policies
+- 005: Interaction enrichment (guidance_id, source_path)
+- 006: Embedding retrieval events
+- 007: RAFT context (retrieval_node_ids, retrieval_scores, oracle_node_id, system_prompt_hash)
+- 008: Instance ID
+- 009: Backfill space_id
+- 010: Fix schema version
+
+---
+
 ## Complete File Inventory
 
 ### New Files (Phase 2+)
@@ -386,6 +403,7 @@ Remaining: FT model-specific metrics (version, latency, cycles), data governance
 | `internal/tsdb/migrations/007_raft_context.sql` | #222 | RAFT context columns on llm_interactions |
 | `internal/tsdb/migrations/008_instance_id.sql` | #242 | instance_id on all 3 training tables |
 | `internal/tsdb/migrations/009_backfill_space_id.sql` | #242 | space_id backfill data fix |
+| `internal/tsdb/migrations/010_fix_schema_version.sql` | #258 | Fix schema version |
 | `internal/tsdb/embedding_writer.go` | #225 | Embedding event logger |
 | `internal/tsdb/retrieval_writer.go` | #225 | Retrieval event logger |
 | `internal/tsdb/backfill.go` | #242 | Runtime instance_id backfill |
@@ -399,6 +417,13 @@ Remaining: FT model-specific metrics (version, latency, cycles), data governance
 | `neural/training/dataset_versioner.py` | #240 | Temporal split + dedup + manifest |
 | `scripts/tsdb_data_review.py` | #238 | TSDB data quality diagnostic (7 sections) |
 | `docs/operations/campaign-task-activation.md` | #243 | Campaign task activation guide |
+
+### Additional Scripts (Built Post-v3.0)
+
+| File | Purpose | Status |
+|---|---|---|
+| `neural/training/reward_functions.py` | 21 GRPO reward functions referenced by ULTS specs (json_valid, classification_accuracy, format_compliance, etc.) | COMPLETE |
+| `neural/training/quality_report.py` | Training data readiness report — per-task row counts, quality coverage, quality_source breakdown | COMPLETE |
 
 ### Files Eliminated (vs v1.0)
 

@@ -1,6 +1,6 @@
 # Research: Fine-Tuning an Open-Source LLM for MDEMG Recursive Self-Improvement
 
-**Date:** 2026-03-30 (v3.0 — aligned to codebase PRs #210-#219 + deep-dive analysis)
+**Date:** 2026-04-07 (v4.0 — architectural constraints, Jiminy training signals, classifier boundary)
 **Hardware:** Apple M5 Max — 128GB unified memory, 614 GB/s bandwidth
 **Model:** Qwen3-30B-A3B MoE (Apache 2.0, 30B total / 3B active, /think + /no_think)
 **Goal:** Replace all external LLM calls with a single fine-tuned model that recursively improves itself
@@ -39,7 +39,24 @@ Note: 17 rows because `jiminy.evaluate` appears in both evaluator.go (constraint
 
 **Note: Guardrail LLM consumer.** The guardrail service (`internal/guardrail/llm_evaluator.go`) makes direct HTTP calls to OpenAI/Ollama — it does NOT route through `llmclient`. This means guardrail LLM calls bypass the interaction logger and are not captured for training. Guardrail is disabled by default (`GUARDRAIL_ENABLED=false`). Migration to `llmclient` is tracked as a future task.
 
-**Note: Per-task model overrides.** While `LLM_MODEL=gpt-5-nano` is the default, several tasks override to specific models: `gpt-4o-mini` (rerank, summary, synthesis, intent, emergence, guardrail), `gpt-5.4` (reclassification). When switching to the fine-tuned Qwen3-30B-A3B, all overrides collapse to a single model — this is a key simplification the fine-tuning enables.
+**Note: Per-task model overrides.** While `LLM_MODEL=gpt-4.1-nano` is the default, several tasks override to specific models: `gpt-4o-mini` (rerank, summary, synthesis, intent, emergence, guardrail), `gpt-4.1-nano` (reclassification). When switching to the fine-tuned Qwen3-30B-A3B, all overrides collapse to a single model — this is a key simplification the fine-tuning enables.
+
+### Architectural Constraints
+
+**No Tool-Use Models.** All 16 LLM consumer tasks are pure text-in, JSON-out:
+
+| Task Pattern | Examples | Output |
+|---|---|---|
+| Classification | consulting.classify, retrieval.query_classify | `{type, confidence}` |
+| Synthesis | jiminy.synthesize, consulting.synthesis | JSON or short NL |
+| Evaluation | jiminy.evaluate, jiminy.evaluate_llm | `{outcome, confidence, reasoning}` |
+| Reasoning | ape.reflect, metalearning.generalize | `{insights, recommendations}` |
+| Naming | hidden.name_emergence | `{name, description}` |
+| Reranking | retrieval.rerank_cross, retrieval.rerank_nli | `{scores}` |
+
+No task calls external tools, searches the web, or executes code. The fine-tuned model is an internal intelligence layer (oracle), not an agent. Tool-use models (e.g., gpt-5-nano) emit tool-call JSON that breaks `json.Unmarshal` parsing on all classification/evaluation tasks.
+
+**Constraint:** The target model must be a base or instruct variant, NOT a tool-use variant. This applies to both the fine-tuned Qwen3-30B-A3B and the external fallback LLM (now gpt-4.1-nano).
 
 ### 1.2 Cross-Encoder Tasks (3 Models in Neural Sidecar)
 
@@ -202,6 +219,24 @@ MDEMG evolves rapidly (~4-5 PRs/day). Retraining is routine maintenance, not a s
 - Automated pipeline with regression gates (can run unattended)
 - Graceful fallback to external LLM when training cycle produces regression
 - ULTS specs version alongside prompts (single source of truth for contracts)
+
+### 2.6 Jiminy Guidance Outcomes as Training Quality Signal
+
+The Jiminy effectiveness investigation (v0.7.1) established a new quality signal pipeline:
+
+- **GUIDANCE_OUTCOME edges** in Neo4j record per-item outcomes (followed, partial_compliance, ignored, not_applicable) with similarity scores
+- **guidance_id correlation** in `llm_interactions` links LLM calls to their downstream outcomes
+- **Content normalization** transforms structured metadata into natural language for accurate embedding comparison
+- **Trust-based tier data** records which encoding tier (T1/T2/T3) was used and whether the agent followed
+
+This data enables quality annotation of Jiminy-related training examples:
+- `jiminy.synthesize` examples can be labeled by downstream follow rate
+- `jiminy.evaluate` / `jiminy.evaluate_llm` examples can be validated against GUIDANCE_OUTCOME ground truth
+- `jiminy.codegen` examples can be assessed by whether generated codes achieved T1 comprehension
+
+### 2.7 Training Data Versioning Note
+
+The v0.7.1 classifier overhaul (thresholds, prompts, outcome types, negation detection) creates a hard boundary in Jiminy training data. Pre-v0.7.1 `jiminy.evaluate` data classified 82.4% of outcomes as "ignored" due to measurement error. This data should be excluded or down-weighted — see 05_DATA_COLLECTION for the full versioning boundary specification.
 
 ---
 

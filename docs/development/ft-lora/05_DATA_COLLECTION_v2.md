@@ -1,6 +1,6 @@
 # MDEMG Training Data Collection, Governance, Storage & Curation Plan
 
-**Date:** 2026-03-30 (v3.0 — reflects built infrastructure PRs #217-#219, RAFT pattern, ULTS integration)
+**Date:** 2026-04-07 (v4.0 — curated dataset pipeline validated, Jiminy classifier quality signals, training data versioning boundary)
 **Purpose:** Define the complete data infrastructure needed to support the fine-tuning pipeline (Phases 1-12) and ensure high-quality training data collection.
 
 ---
@@ -53,16 +53,28 @@ Both are fully built and tested. They write timestamped JSONL with automatic 50M
 | Embedding event logger (EmbeddingEventWriter + WithEmbeddingMeta at 8 call sites) | FT Sprint D | ✅ Built |
 | Retrieval event logger (RetrievalEventWriter + RetrievalEvent struct) | FT Sprint D | ✅ Built |
 | Migration 006 (embedding_events + retrieval_events hypertables) | FT Sprint D | ✅ Built |
+| Migration 008 (instance_id column on training tables) | DATA-GOV | ✅ Built (PR #241) |
+| Migration 009 (space_id backfill for existing TSDB records) | DATA-GOV | ✅ Built (PR #242) |
+| Migration 010 (schema version correction to 10) | DATA-GOV | ✅ Built (PR #254) |
+| Instance ID resolution (`{hostname}-{space_id}` via `resolveInstanceID()`) | DATA-GOV | ✅ Built (PR #241) |
+| UTDS archive export (`mdemg data export`) | DATA-GOV | ✅ Built (PR #241) |
+| UTDS validation runner (utds_runner.py, 36 checks) | DATA-GOV | ✅ Built (PR #241) |
+| Quality filter (quality_filter.py, 8 gates) | DATA-GOV | ✅ Built |
+| Format converter (format_converter.py, HuggingFace chat format) | DATA-GOV | ✅ Built |
+| Dataset versioner (dataset_versioner.py, temporal split + dedup + α) | DATA-GOV | ✅ Built |
+| Teacher distillation (teacher_distill.py) | DATA-GOV | ✅ Built |
+| Daily automated export (`mdemg data export-auto`) | DATA-GOV | ✅ Built |
+| Pre-campaign validation (`mdemg data check --pre-campaign`, 8 checks) | DATA-GOV | ✅ Built (PR #254) |
 
 ### 1.4 Not Yet Built
 
 | Component | Plan Phase | Notes |
 |---|---|---|
 | Chunk provenance tags | Embedding sprint | Parser name, language, chunk type on embedded nodes |
-| Dataset versioner (dataset_versioner.py) | Phase 6D | Not built |
-| Teacher distillation (teacher_distill.py) | Phase 4B | Not built |
 | Entropy monitor (entropy_monitor.py) | Phase 6C | Not built |
 | Input extractor (input_extractor.py) | Phase 4A | Not built |
+
+> **v4.0 note:** `dataset_versioner.py`, `quality_filter.py`, `format_converter.py`, and `teacher_distill.py` are now built (see section 1.3 and the Curated Dataset Pipeline section below).
 
 ### 1.5 Embedding Training Data (Separate Workstream)
 
@@ -75,8 +87,8 @@ Current embedding dimensions across providers:
 
 | Collector | Storage | Status | Training Signal |
 |---|---|---|---|
-| Embedding Event Logger | TimescaleDB `embedding_events` | ⬜ PLANNED | Every Embed() call with parser metadata (element kind, language, chunk boundaries) |
-| Retrieval Event Logger | TimescaleDB `retrieval_events` | ⬜ PLANNED | (query, recall scores, rerank scores) → contrastive pairs |
+| Embedding Event Logger | TimescaleDB `embedding_events` | ✅ BUILT (FT Sprint D) | Every Embed() call with parser metadata (element kind, language, chunk boundaries) |
+| Retrieval Event Logger | TimescaleDB `retrieval_events` | ✅ BUILT (FT Sprint D) | (query, recall scores, rerank scores) → contrastive pairs |
 | Rerank JSONL Collector | `.mdemg/neural/training-data/` | Built (OFF) | Cross-encoder relevance scores → contrastive labels |
 | Chunk Provenance | Neo4j node properties | ⬜ PLANNED | Parser name, language, chunk type per node |
 | Retrieval-to-Guidance Linkage | Via guidance_id join | ✅ BUILT (PR #219) | Was the retrieved node useful downstream? |
@@ -157,9 +169,9 @@ PRE-COMPACT (context window compaction)
 
 All 16 internal LLM calls are captured in `llm_interactions`. The guidance_id correlation (PR #219) enables joining "what guidance we synthesized" with "whether Claude followed it."
 
-**Still missing (planned for Phase 4A):**
-- Retrieval context (which nodes were retrieved, their scores, which was the oracle) — needed for RAFT training
-- System prompt hash — needed for training data versioning when prompts change
+**Now captured (FT Sprint A/B):**
+- Retrieval context (which nodes were retrieved, their scores, which was the oracle) — `RetrievalContext` struct, Migration 007 ✅
+- System prompt hash (SHA-256) — in `InteractionRecord`, enabling prompt version filtering ✅
 
 ---
 
@@ -305,7 +317,15 @@ mdemg data annotate [--dry-run]       # Run quality annotation pipeline
 mdemg data quality                    # Quality report
 ```
 
-### 8.2 Planned (Not Yet Built)
+### 8.2 Built (DATA-GOV Sprints)
+
+```bash
+mdemg data export --space-id <id>     # Export TSDB → UTDS archive (.tar.gz)
+mdemg data export-auto --keep N       # Daily automated export with retention + latest.tar.gz symlink
+mdemg data check --pre-campaign       # 8 validation checks (schema, instance ID, task coverage, etc.)
+```
+
+### 8.3 Planned (Not Yet Built)
 
 ```bash
 mdemg data curate                     # Run full curation pipeline (filter → format → version)
@@ -314,7 +334,6 @@ mdemg data anchor generate            # Generate anchor dataset via teacher dist
 mdemg data anchor verify              # Verify anchor dataset integrity
 mdemg data quality entropy            # Entropy health check against baseline
 mdemg data manifest --version v3      # Show dataset manifest with provenance
-mdemg data export --version v3 --format huggingface   # Export for external tools
 ```
 
 ---
@@ -331,10 +350,105 @@ mdemg data export --version v3 --format huggingface   # Export for external tool
 | **P0 (DONE)** | Quality annotation pipeline | PR #219 | — | ✅ COMPLETE |
 | **P0 (DONE)** | Data monitoring CLI | PR #219 | — | ✅ COMPLETE |
 | **P0 (DONE)** | JSONL backup integration | PR #219 | — | ✅ COMPLETE |
-| **P1 (NEXT)** | SanitizeResponse / StripThinkBlock | Next sprint | S | ⬜ |
-| **P1 (NEXT)** | RAFT retrieval context capture | Next sprint | M | ⬜ |
-| **P1 (NEXT)** | ULTS spec framework (16 specs) | Next sprint | M | ⬜ |
-| **P1 (NEXT)** | System prompt hash in InteractionRecord | Next sprint | S | ⬜ |
-| **P2** | Teacher distillation | After 2-3 months data | M | ⬜ |
-| **P2** | Dataset versioner | Before first training cycle | M | ⬜ |
+| **P1 (DONE)** | SanitizeResponse / StripThinkBlock | FT Sprint A | S | ✅ COMPLETE |
+| **P1 (DONE)** | RAFT retrieval context capture | FT Sprint B | M | ✅ COMPLETE |
+| **P1 (DONE)** | ULTS spec framework (16 specs) | FT Sprint C | M | ✅ COMPLETE |
+| **P1 (DONE)** | System prompt hash in InteractionRecord | FT Sprint A | S | ✅ COMPLETE |
+| **P1 (DONE)** | UTDS export pipeline (export, export-auto, check) | DATA-GOV | M | ✅ COMPLETE |
+| **P1 (DONE)** | Migrations 008-010 (instance_id, space_id, schema fix) | DATA-GOV | M | ✅ COMPLETE |
+| **P1 (DONE)** | Quality filter + format converter + dataset versioner | DATA-GOV | M | ✅ COMPLETE |
+| **P2 (DONE)** | Teacher distillation | DATA-GOV | M | ✅ COMPLETE |
 | **P3** | Entropy monitor | Before second cycle | S | ⬜ |
+
+---
+
+## 10. Curated Dataset Pipeline (Validated)
+
+The full data pipeline from collection to training-ready dataset has been built and validated end-to-end (10/10 tests PASS, PR #265-266):
+
+### Pipeline Flow
+
+```
+mdemg data export --space-id <id>        # Export TSDB → UTDS archive (.tar.gz)
+    ↓
+utds_runner.py validate --archive <f>    # Validate archive integrity (36 checks)
+    ↓
+quality_filter.py --input <jsonl>        # 8 quality gates (JSON valid, non-empty, latency, etc.)
+    ↓
+format_converter.py --input <jsonl>      # Convert to HuggingFace chat format
+    ↓
+dataset_versioner.py --input-dir <dirs>  # Temporal split, dedup, α enforcement, multi-source merge
+    ↓
+train_ft.py --dataset <dir>              # MLX bf16 LoRA training
+```
+
+### Key Capabilities
+- **Multi-source merge:** Multiple user exports combined via `--input-dir dir1 dir2`
+- **Auto instance_id:** `resolveInstanceID()` generates `{hostname}-{space_id}` when not set
+- **Daily automation:** `mdemg data export-auto` with retention and `latest.tar.gz` symlink
+- **Pre-campaign validation:** `mdemg data check --pre-campaign` (8 checks)
+- **UTDS validation:** 36 checks including instance_id_present, checksums, row counts
+
+---
+
+## 11. Jiminy Effectiveness Quality Signals (v0.7.1)
+
+The Jiminy classifier fix sprint (PRs #273-277) established new quality signals for training data curation:
+
+### GUIDANCE_OUTCOME Edges (Neo4j)
+
+Each guidance feedback cycle creates `GUIDANCE_OUTCOME` edges on typed constraint/correction/pattern nodes:
+
+| Property | Type | Use in Training |
+|---|---|---|
+| `outcome_type` | followed/partial_compliance/ignored/not_applicable | Direct quality label |
+| `similarity` | float (0-1) | Confidence of classification |
+| `guidance_type` | constraint/correction/pattern/learning | Per-type quality analysis |
+| `guidance_id` | string | Joins to `llm_interactions.guidance_id` for full context |
+
+### Quality Annotation Enrichment
+
+The `quality_annotator.py` can leverage GUIDANCE_OUTCOME data to annotate Jiminy task training examples:
+
+- `jiminy.synthesize`: Quality = downstream follow rate of the guidance it produced
+- `jiminy.evaluate` / `jiminy.evaluate_llm`: Quality = agreement with GUIDANCE_OUTCOME ground truth
+- `jiminy.codegen`: Quality = whether generated codes achieved T1 comprehension scores
+
+### Content Normalization Impact
+
+Training data from before v0.7.1 may contain structured metadata (`"Module: X. Related to: a, b"`) as guidance content. Post-v0.7.1, the content normalizer transforms these to natural language before embedding comparison. Training examples should be tagged with the content format version to prevent format-mismatch noise.
+
+---
+
+## 12. Training Data Versioning Boundary: v0.7.1 Classifier Overhaul
+
+The v0.7.1 classifier changes create a **hard boundary** in the training data. Pre- and post-v0.7.1 data was produced by fundamentally different classification systems:
+
+| Dimension | Pre-v0.7.1 | Post-v0.7.1 |
+|-----------|------------|-------------|
+| Outcome types | 4 (followed, partial_compliance, ignored, contradicted) | 5 (+ not_applicable) |
+| Similarity thresholds | high=0.7, low=0.3 | high=0.55, low=0.20 |
+| Negation detection | Heuristic short-circuit | LLM Tier 2 delegation |
+| Max tokens | 100 | 500 |
+| Action summaries | Terse | Enriched (format guidance in classification prompt) |
+| Guidance content | Structured metadata | Normalized natural language |
+
+**Impact:** Pre-v0.7.1 training data for `jiminy.evaluate` and `jiminy.evaluate_llm` was produced by a classifier that misclassified 82.4% of outcomes as "ignored" due to measurement error (not actual agent behavior). Mixing pre and post data without version tagging will introduce noise — the model would learn from examples where "ignored" actually meant "measurement error."
+
+**Recommendation:** `dataset_versioner.py` should filter by MDEMG version (>= v0.7.1) for Jiminy task training data, or at minimum tag pre/post classifier-fix data with a `classifier_version` field so training can exclude or down-weight pre-fix examples. Specifically:
+
+- **jiminy.evaluate**: EXCLUDE all pre-v0.7.1 data (classification prompt completely different)
+- **jiminy.evaluate_llm**: EXCLUDE all pre-v0.7.1 data (LLM classifier was disabled pre-fix)
+- **jiminy.synthesize**: SAFE to include pre-v0.7.1 data (synthesis prompt unchanged)
+- **jiminy.codegen**: SAFE to include pre-v0.7.1 data (code generation unchanged)
+- **All other tasks**: Unaffected by classifier changes
+
+---
+
+## 13. Collection Campaign Status
+
+- Campaign activated: ~2026-03-30
+- Current data window: Day 7+
+- First LoRA cycle target: Day 30 (~2026-04-29)
+- Export pipeline: Validated (10/10 PASS)
+- Daily automated export: Active via `mdemg data export-auto`

@@ -240,7 +240,7 @@ A single `Client` struct handles both providers:
 ```go
 client := llmclient.New(llmclient.Config{
     Provider:  "openai",                          // or "ollama"
-    Model:     "gpt-5-nano",
+    Model:     "gpt-4.1-nano",
     APIKey:    "sk-...",
     BaseURL:   "https://api.openai.com/v1",
     TimeoutMs: 30000,

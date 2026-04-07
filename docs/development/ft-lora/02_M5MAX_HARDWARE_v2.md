@@ -1,9 +1,11 @@
 # M5 Max Hardware-Specific Configuration
 
-**Date:** 2026-03-30 (v3.0)
+**Date:** 2026-04-07 (v4.0)
 **Hardware:** Apple M5 Max — 18-core CPU (6 super + 12 performance), 40-core GPU with Neural Accelerators, 128GB unified memory, 614 GB/s bandwidth, Thunderbolt 5, 2TB internal SSD + unlimited external SSD
 **Model:** Qwen3-30B-A3B MoE (Apache 2.0, 30B total / 3B active per token)
 **Constraint:** Single model for all 16 MDEMG generative LLM tasks
+
+> **Tool-use exclusion:** Qwen3-30B-A3B is a base MoE model without tool-use training. This is required — tool-use variants produce function-call JSON structures that break MDEMG's JSON-parsing consumers. If Qwen releases a "-Tool" variant, do not use it.
 
 ---
 

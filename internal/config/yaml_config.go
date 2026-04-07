@@ -42,7 +42,7 @@ type BackupYAML struct {
 // LLMYAML holds top-level LLM text-generation settings that cascade to all features.
 type LLMYAML struct {
 	Provider string `yaml:"provider,omitempty"` // "ollama" or "openai" (default: "openai")
-	Model    string `yaml:"model,omitempty"`    // default: "gpt-5-nano"
+	Model    string `yaml:"model,omitempty"`    // default: "gpt-4.1-nano"
 }
 
 // Neo4jYAML holds Neo4j connection settings.
@@ -1060,7 +1060,7 @@ type ConfigSource struct {
 // defaultValues maps YAML config keys to their built-in defaults so the
 // Config tab can display what the server actually uses when nothing is set.
 var defaultValues = map[string]string{
-	"llm.model":                        "gpt-5-nano",
+	"llm.model":                        "gpt-4.1-nano",
 	"embedding.model":                  "gpt-5-mini",
 	"embedding.endpoint":               "https://api.openai.com/v1",
 	"learning.eta":                     "0.02",
@@ -1068,8 +1068,8 @@ var defaultValues = map[string]string{
 	"plugins.dir":                      "./plugins",
 	"backup.interval_hours":            "24",
 	"backup.retention_count":           "4",
-	"jiminy.synthesis_model":           "gpt-5-nano",
-	"jiminy.evaluate_llm_model":        "gpt-5-nano",
+	"jiminy.synthesis_model":           "gpt-4.1-nano",
+	"jiminy.evaluate_llm_model":        "gpt-4.1-nano",
 	"jiminy.guidance_context_max_chars": "200000",
 	"jiminy.guidance_output_max_chars":  "200000",
 	"jiminy.evaluate_output_max_chars":  "200000",

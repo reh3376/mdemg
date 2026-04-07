@@ -115,7 +115,7 @@ func main() {
 	}
 
 	// Configuration
-	model := "gpt-5.4"
+	model := "gpt-4.1-nano"
 	baseURL := "https://api.openai.com/v1"
 	maxIterations := 3
 	mdemgURL := mdemgDefault

@@ -252,7 +252,7 @@ RECLASS_MAX_CATEGORIES=10            # Max sub-categories LLM may propose (defau
 RECLASS_MAX_ITERATIONS=5             # Max reclassification loops until convergence (default: 5, range: 1-10)
 RECLASS_MAX_DEPTH=4                  # Max dot-path taxonomy depth (default: 4, range: 1-10)
 RECLASS_PROVIDER=                    # LLM provider: openai or ollama (cascades from EMERGENCE_PROVIDER)
-RECLASS_MODEL=gpt-5.4                # LLM model name (default: gpt-5.4)
+RECLASS_MODEL=gpt-4.1-nano           # LLM model name (default: gpt-4.1-nano)
 RECLASS_MAX_TOKENS=2000              # Max response tokens (default: 2000, range: 500-8000)
 RECLASS_TIMEOUT_MS=30000             # LLM call timeout in ms (default: 30000, min: 5000)
 ```

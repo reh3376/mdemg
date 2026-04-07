@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Default LLM model: gpt-5-nano → gpt-4.1-nano** — all 16 classification/evaluation tasks use prompt-engineered JSON (`json_object` mode), not tool-call schemas. gpt-4.1-nano is non-tool-use, 2x cheaper output tokens ($0.20/M vs $0.40/M), and has a 1M context window. Affects `LLM_MODEL`, `RECLASS_MODEL`, `RERANK_MODEL` defaults in config, compose templates, and CLI init prompts.
+- Fine-tuning plan documents updated from v3.0 to v4.0 — adds tool-use architectural constraint, curated dataset pipeline, Jiminy quality signals, and v0.7.1 classifier overhaul as a critical training data versioning boundary (Issues 20-28 in corrections log)
+
 ### Fixed
 
 - **Trust accrual: partial_compliance excluded from trust scoring** — `trustRelevanceThreshold` lowered from 0.5 to 0.20, aligning with the classifier's `not_applicable` cutoff. 38% of outcomes (partial_compliance) were filtered before reaching the trust scorer, halving effective trust growth rate.
