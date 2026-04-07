@@ -72,7 +72,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   go test -tags=integration ./tests/integration/...
 
   # Parser validation — Go-native UPTS harness (no external deps)
-  go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
+  go test ./internal/languages/ -run TestUPTS -v
 
   # Parser validation — Python UPTS runner (requires bin/extract-symbols)
   make test-parsers
@@ -83,7 +83,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
   make test-parser-typescript
 
   # Go-native UPTS for a single language
-  go test ./cmd/ingest-codebase/languages/ -run TestUPTS/rust -v
+  go test ./internal/languages/ -run TestUPTS/rust -v
 
   # API validation (UATS - requires running server)
   make test-api
@@ -113,7 +113,7 @@ All test frameworks in this project follow the **UxTS (Universal-x Test Specific
 
 **UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
-1. **Go-native test harness** (`cmd/ingest-codebase/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
+1. **Go-native test harness** (`internal/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
 
 2. **Python runner** (`docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py`): Validates via the `bin/extract-symbols` CLI binary. Useful for cross-validation and CI.
 
@@ -123,7 +123,7 @@ Specs live in `docs/lang-parser/lang-parse-spec/upts/specs/`. Fixtures live in `
 
 1. Create or edit `docs/lang-parser/lang-parse-spec/upts/specs/<language>.upts.json`
 2. Create or edit the fixture file in `docs/lang-parser/lang-parse-spec/upts/fixtures/`
-3. Run the Go-native harness: `go test ./cmd/ingest-codebase/languages/ -run TestUPTS/<language> -v`
+3. Run the Go-native harness: `go test ./internal/languages/ -run TestUPTS/<language> -v`
 4. Optionally cross-validate with the Python runner: `make test-parser-<language>`
 
 ### Parser Development Workflow
