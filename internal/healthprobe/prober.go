@@ -37,6 +37,8 @@ type Prober struct {
 	mu      sync.RWMutex
 	results map[string]ProbeResult
 
+	alertCallback func(target string, healthy bool, errMsg string)
+
 	stopCh chan struct{}
 	doneCh chan struct{}
 }
@@ -233,10 +235,24 @@ func (p *Prober) probeSidecar(ctx context.Context) {
 	p.store(result)
 }
 
+// SetAlertCallback sets a function called on healthy→unhealthy or unhealthy→healthy transitions.
+func (p *Prober) SetAlertCallback(fn func(target string, healthy bool, errMsg string)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.alertCallback = fn
+}
+
 func (p *Prober) store(r ProbeResult) {
 	p.mu.Lock()
+	prev, existed := p.results[r.Target]
 	p.results[r.Target] = r
+	cb := p.alertCallback
 	p.mu.Unlock()
+
+	// Fire alert on state transitions only (not on every probe cycle).
+	if cb != nil && existed && prev.Healthy != r.Healthy {
+		cb(r.Target, r.Healthy, r.Error)
+	}
 }
 
 func (p *Prober) recordMetrics() {

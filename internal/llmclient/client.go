@@ -5,9 +5,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"math"
+	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -79,6 +84,17 @@ type Client struct {
 	recorder   InteractionRecorder // optional; set via SetRecorder
 	taskName   string              // context label for interaction logging
 	spaceID    string              // context label for interaction logging
+	retryCfg   RetryConfig
+}
+
+// RetryConfig controls automatic retry behaviour for transient LLM errors.
+type RetryConfig struct {
+	Enabled     bool
+	MaxAttempts int     // maximum number of retries (0 = no retries, just the initial attempt)
+	BaseDelayMs int     // base delay in milliseconds before first retry
+	MaxDelayMs  int     // cap on computed backoff delay
+	Multiplier  float64 // exponential growth factor (default: 2.0)
+	Jitter      float64 // jitter fraction in [0, 1] (default: 0.2)
 }
 
 // Config holds the configuration for creating an LLM client.
@@ -88,6 +104,7 @@ type Config struct {
 	APIKey    string // Required for OpenAI
 	BaseURL   string // API base URL
 	TimeoutMs int    // HTTP client timeout in milliseconds (default: 30000)
+	Retry     RetryConfig
 }
 
 // defaultRecorder is automatically attached to every new Client.
@@ -133,11 +150,32 @@ func SetDefaultSessionID(id string) {
 	defaultSessionID = id
 }
 
+// defaultRetryConfig is automatically applied to every new Client when Config.Retry
+// is not explicitly set. Set via SetDefaultRetryConfig at server startup.
+var defaultRetryConfig RetryConfig
+
+// SetDefaultRetryConfig sets a package-level retry configuration applied to all
+// subsequently created Clients. Called once at server startup from cfg.LLMRetry*.
+func SetDefaultRetryConfig(rc RetryConfig) {
+	defaultRetryConfig = rc
+}
+
 // New creates a new LLM client from the given configuration.
 func New(cfg Config) *Client {
 	timeoutMs := cfg.TimeoutMs
 	if timeoutMs <= 0 {
 		timeoutMs = 30000
+	}
+
+	rc := cfg.Retry
+	if !rc.Enabled && defaultRetryConfig.Enabled {
+		rc = defaultRetryConfig
+	}
+	if rc.Multiplier <= 0 {
+		rc.Multiplier = 2.0
+	}
+	if rc.Jitter < 0 || rc.Jitter > 1 {
+		rc.Jitter = 0.2
 	}
 
 	return &Client{
@@ -149,6 +187,7 @@ func New(cfg Config) *Client {
 			Timeout: time.Duration(timeoutMs) * time.Millisecond,
 		},
 		recorder: defaultRecorder,
+		retryCfg: rc,
 	}
 }
 
@@ -284,6 +323,121 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 	c.recorder.Record(ctx, rec)
 }
 
+// --- Retry infrastructure ---
+
+// httpError wraps an HTTP status code with optional Retry-After duration.
+type httpError struct {
+	StatusCode int
+	Body       string
+	RetryAfter time.Duration // parsed from Retry-After header; 0 if absent
+}
+
+func (e *httpError) Error() string {
+	return fmt.Sprintf("http %d: %s", e.StatusCode, e.Body)
+}
+
+// shouldRetry returns true if the error is transient and the request should be retried.
+func shouldRetry(err error) bool {
+	// Context cancellation/deadline — never retry
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	var he *httpError
+	if errors.As(err, &he) {
+		switch he.StatusCode {
+		case 429, 503: // rate-limited or service unavailable
+			return true
+		default:
+			return false // 400, 401, 403, 404, 422, 500, 502 — not retryable
+		}
+	}
+
+	// Network-level errors (connection refused, timeout, DNS) are retryable
+	return strings.Contains(err.Error(), "http request:")
+}
+
+// calculateBackoff returns the delay before the given retry attempt (0-indexed).
+func (c *Client) calculateBackoff(attempt int, retryAfter time.Duration) time.Duration {
+	if retryAfter > 0 {
+		maxDelay := time.Duration(c.retryCfg.MaxDelayMs) * time.Millisecond
+		if retryAfter > maxDelay {
+			return maxDelay
+		}
+		return retryAfter
+	}
+
+	base := float64(c.retryCfg.BaseDelayMs)
+	delay := base * math.Pow(c.retryCfg.Multiplier, float64(attempt))
+
+	maxDelay := float64(c.retryCfg.MaxDelayMs)
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	// Apply jitter: delay * (1 ± jitter/2)
+	jitter := c.retryCfg.Jitter
+	if jitter > 0 {
+		delay *= 1 + jitter*(rand.Float64()-0.5)
+	}
+
+	return time.Duration(delay) * time.Millisecond
+}
+
+// doWithRetry wraps fn with retry logic. fn is called up to MaxAttempts+1 times.
+func (c *Client) doWithRetry(ctx context.Context, fn func() (string, int, error)) (string, int, error) {
+	if !c.retryCfg.Enabled || c.retryCfg.MaxAttempts <= 0 {
+		return fn()
+	}
+
+	var lastErr error
+	for attempt := range c.retryCfg.MaxAttempts + 1 {
+		if attempt > 0 {
+			var retryAfter time.Duration
+			var he *httpError
+			if errors.As(lastErr, &he) {
+				retryAfter = he.RetryAfter
+			}
+			delay := c.calculateBackoff(attempt-1, retryAfter)
+			slog.Warn("llmclient: retrying", "attempt", attempt+1, "max", c.retryCfg.MaxAttempts+1,
+				"delay_ms", delay.Milliseconds(), "error", lastErr)
+			select {
+			case <-ctx.Done():
+				return "", 0, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		text, tokens, err := fn()
+		if err == nil {
+			return text, tokens, nil
+		}
+		if !shouldRetry(err) {
+			return "", 0, err
+		}
+		lastErr = err
+	}
+	return "", 0, fmt.Errorf("llm request failed after %d attempts: %w", c.retryCfg.MaxAttempts+1, lastErr)
+}
+
+// parseRetryAfter extracts a duration from the Retry-After header (seconds or HTTP-date).
+func parseRetryAfter(resp *http.Response) time.Duration {
+	val := resp.Header.Get("Retry-After")
+	if val == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(val); err == nil {
+		return time.Duration(secs) * time.Second
+	}
+	if t, err := http.ParseTime(val); err == nil {
+		d := time.Until(t)
+		if d > 0 {
+			return d
+		}
+	}
+	return 0
+}
+
 // --- OpenAI ---
 
 func (c *Client) completeOpenAI(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
@@ -292,6 +446,12 @@ func (c *Client) completeOpenAI(ctx context.Context, messages []Message, opts Co
 }
 
 func (c *Client) completeOpenAIWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
+	return c.doWithRetry(ctx, func() (string, int, error) {
+		return c.doOpenAIRequest(ctx, messages, opts)
+	})
+}
+
+func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
 	maxTokens := opts.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = 2000
@@ -326,7 +486,11 @@ func (c *Client) completeOpenAIWithUsage(ctx context.Context, messages []Message
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", 0, fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
+		return "", 0, &httpError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+			RetryAfter: parseRetryAfter(resp),
+		}
 	}
 
 	var chatResp OpenAIChatResponse
@@ -348,6 +512,14 @@ func (c *Client) completeOpenAIWithUsage(ctx context.Context, messages []Message
 // --- Ollama ---
 
 func (c *Client) completeOllama(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
+	text, _, err := c.doWithRetry(ctx, func() (string, int, error) {
+		t, e := c.doOllamaRequest(ctx, messages, opts)
+		return t, 0, e
+	})
+	return text, err
+}
+
+func (c *Client) doOllamaRequest(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
 	// Concatenate all messages into a single prompt (Ollama generate API)
 	var sb strings.Builder
 	for i, msg := range messages {
@@ -386,7 +558,11 @@ func (c *Client) completeOllama(ctx context.Context, messages []Message, opts Co
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
+		return "", &httpError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+			RetryAfter: parseRetryAfter(resp),
+		}
 	}
 
 	var ollamaResp OllamaGenerateResponse

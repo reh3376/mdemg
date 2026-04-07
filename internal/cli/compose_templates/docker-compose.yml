@@ -93,6 +93,24 @@ services:
       EMERGENCE_ENABLED: "${EMERGENCE_ENABLED:-false}"
       LLM_INTERACTION_LOGGING: "${LLM_INTERACTION_LOGGING:-true}"
 
+      # Alert dispatcher
+      ALERT_ENABLED: "${ALERT_ENABLED:-true}"
+      ALERT_COOLDOWN_SEC: "${ALERT_COOLDOWN_SEC:-300}"
+      ALERT_MACOS_NOTIFY: "${ALERT_MACOS_NOTIFY:-false}"
+
+      # Health probe
+      HEALTH_PROBE_ENABLED: "${HEALTH_PROBE_ENABLED:-true}"
+      HEALTH_PROBE_INTERVAL_SEC: "${HEALTH_PROBE_INTERVAL_SEC:-60}"
+
+      # LLM retry
+      LLM_RETRY_ENABLED: "${LLM_RETRY_ENABLED:-true}"
+      LLM_RETRY_MAX_ATTEMPTS: "${LLM_RETRY_MAX_ATTEMPTS:-3}"
+      LLM_RETRY_BASE_DELAY_MS: "${LLM_RETRY_BASE_DELAY_MS:-500}"
+      LLM_RETRY_MAX_DELAY_MS: "${LLM_RETRY_MAX_DELAY_MS:-10000}"
+
+      # TSDB writer
+      TSDB_WRITER_BUFFER_MAX_SIZE: "${TSDB_WRITER_BUFFER_MAX_SIZE:-1000}"
+
       # Graceful shutdown
       GRACEFUL_SHUTDOWN_TIMEOUT: "${GRACEFUL_SHUTDOWN_TIMEOUT:-30}"
     healthcheck:
@@ -185,11 +203,13 @@ services:
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
       GF_INSTALL_PLUGINS: "kniepdennis-neo4j-datasource,hamedkarbasi93-nodegraphapi-datasource"
       TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
+      MDEMG_GRAFANA_ALERT_WEBHOOK_URL: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deploy/docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deploy/docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./deploy/docker/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./deploy/docker/grafana/provisioning/notifiers:/etc/grafana/provisioning/notifiers:ro
       - ./deploy/docker/grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]

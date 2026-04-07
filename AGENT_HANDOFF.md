@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-06
+**Date:** 2026-04-07
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -51,6 +51,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-07) ===
+- ✅ SR-001: Service Resilience & User Alerting Sprint (2026-04-07):
+  - E1: Alert dispatcher package (internal/alert/) — file + macOS backends, cooldown dedup, atomic writes, FIFO eviction
+  - E2: Hook alert delivery — prompt-context.sh and session-start.sh read alert file
+  - E3: Wire dispatcher to RSIC actions (5 handlers), circuit breaker OnStateChange, health prober transitions
+  - E4: LLM retry with exponential backoff — retries 429/503, Retry-After header support, package-level default config
+  - E5: Enhanced /healthz with subsystem checks, TSDB buffer overflow detection
+  - E6: Grafana contact point provisioning + 7 new alert rules (28 total)
+  - E7: Documentation (CHANGELOG, AGENT_HANDOFF, CLAUDE.md)
+  - Config: 15 new env vars (Alert*, HealthProbe*, LLMRetry*, TSDBWriterBufferMaxSize)
+  - Tests: 12 alert tests + 10 retry tests + 4 Grafana webhook tests, all passing with -race
 === COMPLETED SINCE LAST HANDOFF (2026-04-06) ===
 - ✅ FT Plan v4.0 Doc Update + Default LLM Migration (2026-04-06):
   - Default LLM migrated: gpt-5-nano → gpt-4.1-nano (non-tool-use, 2x cheaper output, 1M context)

@@ -958,3 +958,293 @@ groups:
           team: platform
         annotations:
           summary: "RSIC cycle P95 duration exceeds 5 minutes"
+
+  # ── SR-001: Service Resilience Rules ──────────────────────────────────
+  - orgId: 1
+    name: mdemg_resilience
+    folder: MDEMG Alerts
+    interval: 60s
+    rules:
+      - uid: mdemg-tsdb-writer-overflow
+        title: "TSDB Writer Buffer Overflow"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_tsdb_writer_overflow_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "TSDB LLM interaction buffer has overflowed — records being evicted"
+
+      - uid: mdemg-llm-retry-exhausted
+        title: "LLM Retry Exhausted"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_llm_retry_exhausted_total'
+                  AND metric_type = 'counter'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 5m
+        labels:
+          severity: high
+          team: platform
+        annotations:
+          summary: "LLM requests failing after all retry attempts exhausted"
+
+      - uid: mdemg-probe-api-down
+        title: "MDEMG API Probe Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_probe_up'
+                  AND metric_type = 'gauge'
+                  AND labels->>'target' = 'mdemg_api'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "MDEMG API health probe reports service down"
+
+      - uid: mdemg-probe-neo4j-down
+        title: "Neo4j Probe Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_probe_up'
+                  AND metric_type = 'gauge'
+                  AND labels->>'target' = 'neo4j'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Neo4j health probe reports database down"
+
+      - uid: mdemg-probe-tsdb-down
+        title: "TimescaleDB Probe Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_probe_up'
+                  AND metric_type = 'gauge'
+                  AND labels->>'target' = 'timescaledb'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        for: 2m
+        labels:
+          severity: high
+          team: platform
+        annotations:
+          summary: "TimescaleDB health probe reports database down"
+
+      - uid: mdemg-probe-sidecar-down
+        title: "Neural Sidecar Probe Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_probe_up'
+                  AND metric_type = 'gauge'
+                  AND labels->>'target' = 'neural_sidecar'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Neural sidecar health probe reports service down"
+
+      - uid: mdemg-jiminy-follow-rate-drop
+        title: "Jiminy Follow Rate Drop"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: timescaledb
+            model:
+              rawSql: |
+                SELECT time, value
+                FROM metric_samples
+                WHERE metric_name = 'mdemg_jiminy_follow_rate'
+                  AND metric_type = 'gauge'
+                  AND $__timeFilter(time)
+                ORDER BY time
+              format: time_series
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.3]
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Jiminy guidance follow rate dropped below 30% for 30 minutes"

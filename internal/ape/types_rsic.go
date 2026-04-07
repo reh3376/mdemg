@@ -502,3 +502,8 @@ type FreshnessProvider interface {
 	GetStaleSpaceCount(ctx context.Context, thresholdHours int) (int, error)
 	TriggerIngestForStaleSpaces(ctx context.Context, thresholdHours int) (int, error) // returns count re-ingested
 }
+
+// AlertDispatcher delivers RSIC-generated alerts to the user via the alert subsystem.
+type AlertDispatcher interface {
+	SendAlert(ctx context.Context, service, title, message string, sev InsightSeverity)
+}

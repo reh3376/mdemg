@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -805,6 +806,29 @@ type Config struct {
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
 	LiveGuidanceRefreshSec      int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
+
+	// ===== Alert Dispatcher =====
+	AlertEnabled           bool   // ALERT_ENABLED — master switch for alert delivery (default: true)
+	AlertFilePath          string // ALERT_FILE_PATH — path to alert JSON file (default: ~/.mdemg/alerts/current.json)
+	AlertCooldownSec       int    // ALERT_COOLDOWN_SEC — per-service-severity cooldown in seconds (default: 300)
+	AlertMaxEntries        int    // ALERT_MAX_ENTRIES — max alerts in file before FIFO eviction (default: 50)
+	AlertMacOSNotify       bool   // ALERT_MACOS_NOTIFY — enable macOS desktop notifications (default: false)
+	AlertMacOSNotifyMinSev string // ALERT_MACOS_NOTIFY_MIN_SEV — minimum severity for macOS notify (default: "high")
+
+	// ===== Health Probe =====
+	HealthProbeEnabled     bool // HEALTH_PROBE_ENABLED — enable periodic health probing (default: true)
+	HealthProbeIntervalSec int  // HEALTH_PROBE_INTERVAL_SEC — probe interval in seconds (default: 60)
+
+	// ===== LLM Client Retry =====
+	LLMRetryEnabled     bool    // LLM_RETRY_ENABLED — enable retry for transient LLM errors (default: true)
+	LLMRetryMaxAttempts int     // LLM_RETRY_MAX_ATTEMPTS — max retry attempts (default: 3)
+	LLMRetryBaseDelayMs int     // LLM_RETRY_BASE_DELAY_MS — initial backoff delay in ms (default: 500)
+	LLMRetryMaxDelayMs  int     // LLM_RETRY_MAX_DELAY_MS — max backoff delay in ms (default: 10000)
+	LLMRetryMultiplier  float64 // LLM_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
+	LLMRetryJitter      float64 // LLM_RETRY_JITTER — jitter factor 0-1 (default: 0.2)
+
+	// ===== TSDB Writer =====
+	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
 }
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
@@ -3150,6 +3174,56 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Alert Dispatcher
+	alertEnabled := getBool("ALERT_ENABLED", true)
+	alertFilePath := get("ALERT_FILE_PATH", filepath.Join(os.Getenv("HOME"), ".mdemg", "alerts", "current.json"))
+	alertCooldownSec, err := atoi("ALERT_COOLDOWN_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	alertMaxEntries, err := atoi("ALERT_MAX_ENTRIES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	alertMacOSNotify := getBool("ALERT_MACOS_NOTIFY", false)
+	alertMacOSNotifyMinSev := get("ALERT_MACOS_NOTIFY_MIN_SEV", "high")
+
+	// Health Probe
+	healthProbeEnabled := getBool("HEALTH_PROBE_ENABLED", true)
+	healthProbeIntervalSec, err := atoi("HEALTH_PROBE_INTERVAL_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// LLM Client Retry
+	llmRetryEnabled := getBool("LLM_RETRY_ENABLED", true)
+	llmRetryMaxAttempts, err := atoi("LLM_RETRY_MAX_ATTEMPTS", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	llmRetryBaseDelayMs, err := atoi("LLM_RETRY_BASE_DELAY_MS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	llmRetryMaxDelayMs, err := atoi("LLM_RETRY_MAX_DELAY_MS", 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	llmRetryMultiplier, err := atof("LLM_RETRY_MULTIPLIER", 2.0)
+	if err != nil {
+		return Config{}, err
+	}
+	llmRetryJitter, err := atof("LLM_RETRY_JITTER", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// TSDB Writer
+	tsdbWriterBufferMaxSize, err := atoi("TSDB_WRITER_BUFFER_MAX_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ListenAddr: listen,
 		Neo4jURI: uri,
@@ -3772,6 +3846,29 @@ func FromEnv() (Config, error) {
 		// Live Metrics
 		LiveMetricsEnabled:     liveMetricsEnabled,
 		LiveGuidanceRefreshSec: liveGuidanceRefreshSec,
+
+		// Alert Dispatcher
+		AlertEnabled:           alertEnabled,
+		AlertFilePath:          alertFilePath,
+		AlertCooldownSec:       alertCooldownSec,
+		AlertMaxEntries:        alertMaxEntries,
+		AlertMacOSNotify:       alertMacOSNotify,
+		AlertMacOSNotifyMinSev: alertMacOSNotifyMinSev,
+
+		// Health Probe
+		HealthProbeEnabled:     healthProbeEnabled,
+		HealthProbeIntervalSec: healthProbeIntervalSec,
+
+		// LLM Client Retry
+		LLMRetryEnabled:     llmRetryEnabled,
+		LLMRetryMaxAttempts: llmRetryMaxAttempts,
+		LLMRetryBaseDelayMs: llmRetryBaseDelayMs,
+		LLMRetryMaxDelayMs:  llmRetryMaxDelayMs,
+		LLMRetryMultiplier:  llmRetryMultiplier,
+		LLMRetryJitter:      llmRetryJitter,
+
+		// TSDB Writer
+		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,
 	}, nil
 }
 

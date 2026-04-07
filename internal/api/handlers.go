@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
 	"mdemg/internal/jobs"
@@ -59,12 +60,56 @@ type ReadinessStatus struct {
 	Version string                 `json:"version"` // MDEMG version
 }
 
-func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	// Basic liveness check - just confirms the process is running
+func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	// Lightweight liveness check with subsystem status (no live DB queries).
+	checks := map[string]string{}
+	status := "ok"
+
+	// Neo4j driver nil check
+	if s.driver == nil {
+		checks["neo4j"] = "no_driver"
+		status = "degraded"
+	} else {
+		checks["neo4j"] = "ok"
+	}
+
+	// Circuit breaker open count
+	if s.cbRegistry != nil {
+		openCount := 0
+		for _, st := range s.cbRegistry.States() {
+			if st == circuitbreaker.StateOpen {
+				openCount++
+			}
+		}
+		if openCount > 0 {
+			checks["circuit_breakers"] = fmt.Sprintf("open:%d", openCount)
+			status = "degraded"
+		} else {
+			checks["circuit_breakers"] = "ok"
+		}
+	}
+
+	// TSDB client nil check
+	if s.cfg.TSDBEnabled && s.tsdbClient == nil {
+		checks["tsdb"] = "no_client"
+		status = "degraded"
+	} else if s.cfg.TSDBEnabled {
+		checks["tsdb"] = "ok"
+	}
+
+	// Jiminy enabled + nil check
+	if s.cfg.JiminyEnabled && s.jiminySvc == nil {
+		checks["jiminy"] = "not_initialized"
+		status = "degraded"
+	} else if s.cfg.JiminyEnabled {
+		checks["jiminy"] = "ok"
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
+		"status":  status,
 		"version": s.cfg.MdemgVersion,
 		"commit":  s.cfg.MdemgCommit,
+		"checks":  checks,
 	})
 }
 

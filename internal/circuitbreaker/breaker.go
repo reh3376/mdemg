@@ -267,9 +267,10 @@ func (b *Breaker) Counts() (failures, successes int, total int64) {
 
 // Registry manages multiple circuit breakers by name.
 type Registry struct {
-	mu       sync.RWMutex
-	breakers map[string]*Breaker
-	cfg      Config
+	mu            sync.RWMutex
+	breakers      map[string]*Breaker
+	cfg           Config
+	onStateChange func(name string, from, to State) // propagated to lazily created breakers
 }
 
 // NewRegistry creates a registry with the given default config.
@@ -277,6 +278,17 @@ func NewRegistry(cfg Config) *Registry {
 	return &Registry{
 		breakers: make(map[string]*Breaker),
 		cfg:      cfg,
+	}
+}
+
+// SetOnStateChange sets a callback that will be propagated to all existing
+// and future breakers created by this registry.
+func (r *Registry) SetOnStateChange(fn func(name string, from, to State)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onStateChange = fn
+	for _, b := range r.breakers {
+		b.OnStateChange(fn)
 	}
 }
 
@@ -299,6 +311,9 @@ func (r *Registry) Get(name string) *Breaker {
 	}
 
 	b = New(name, r.cfg)
+	if r.onStateChange != nil {
+		b.OnStateChange(r.onStateChange)
+	}
 	r.breakers[name] = b
 	return b
 }
