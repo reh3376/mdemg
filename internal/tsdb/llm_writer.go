@@ -16,22 +16,28 @@ import (
 
 // FlushStats holds flush operation counters for monitoring.
 type FlushStats struct {
-	SuccessCount int64 `json:"success_count"`
-	FailureCount int64 `json:"failure_count"`
-	TotalRows    int64 `json:"total_rows"`
+	SuccessCount  int64 `json:"success_count"`
+	FailureCount  int64 `json:"failure_count"`
+	TotalRows     int64 `json:"total_rows"`
+	OverflowCount int64 `json:"overflow_count"`
+	BufferSize    int   `json:"buffer_size"`
 }
 
 // LLMInteractionWriter buffers LLM interaction records and flushes them to
 // the llm_interactions hypertable. It mirrors the MetricWriter pattern.
 type LLMInteractionWriter struct {
-	pool         poolIface
-	buffer       []llmclient.InteractionRecord
-	mu           sync.Mutex
-	flushTick    *time.Ticker
-	done         chan struct{}
-	flushSuccess atomic.Int64
-	flushFailure atomic.Int64
-	flushRows    atomic.Int64
+	pool          poolIface
+	buffer        []llmclient.InteractionRecord
+	mu            sync.Mutex
+	flushTick     *time.Ticker
+	done          chan struct{}
+	flushSuccess  atomic.Int64
+	flushFailure  atomic.Int64
+	flushRows     atomic.Int64
+	overflowCount atomic.Int64
+	maxBufferSize int
+	alertCallback func(msg string)
+	alertFired    atomic.Bool
 }
 
 // poolIface allows testing without a real pgxpool.Pool.
@@ -41,18 +47,31 @@ type poolIface interface {
 }
 
 // NewLLMInteractionWriter creates a writer that auto-flushes at the given interval.
-func NewLLMInteractionWriter(pool poolIface, flushInterval time.Duration) *LLMInteractionWriter {
+// maxBufferSize caps the in-memory buffer; 0 means unlimited (legacy behaviour).
+func NewLLMInteractionWriter(pool poolIface, flushInterval time.Duration, maxBufferSize ...int) *LLMInteractionWriter {
 	if flushInterval <= 0 {
 		flushInterval = 30 * time.Second
 	}
+	maxBuf := 0
+	if len(maxBufferSize) > 0 && maxBufferSize[0] > 0 {
+		maxBuf = maxBufferSize[0]
+	}
 	w := &LLMInteractionWriter{
-		pool:   pool,
-		buffer: make([]llmclient.InteractionRecord, 0, 32),
-		done:   make(chan struct{}),
+		pool:          pool,
+		buffer:        make([]llmclient.InteractionRecord, 0, 32),
+		done:          make(chan struct{}),
+		maxBufferSize: maxBuf,
 	}
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w
+}
+
+// SetAlertCallback sets a function called once when the buffer first overflows.
+func (w *LLMInteractionWriter) SetAlertCallback(fn func(msg string)) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.alertCallback = fn
 }
 
 func (w *LLMInteractionWriter) flushLoop() {
@@ -75,6 +94,19 @@ func (w *LLMInteractionWriter) Record(_ context.Context, rec llmclient.Interacti
 	}
 	llmclient.Scrub(&rec)
 	w.mu.Lock()
+	// FIFO eviction if buffer exceeds cap
+	if w.maxBufferSize > 0 && len(w.buffer) >= w.maxBufferSize {
+		evict := len(w.buffer) - w.maxBufferSize + 1
+		w.buffer = w.buffer[evict:]
+		w.overflowCount.Add(int64(evict))
+
+		if w.alertCallback != nil && w.alertFired.CompareAndSwap(false, true) {
+			cb := w.alertCallback
+			w.mu.Unlock()
+			cb("TSDB LLM interaction buffer overflow — oldest records evicted")
+			w.mu.Lock()
+		}
+	}
 	w.buffer = append(w.buffer, rec)
 	w.mu.Unlock()
 }
@@ -146,10 +178,15 @@ func (w *LLMInteractionWriter) Flush(ctx context.Context) error {
 
 // Stats returns flush operation counters for monitoring.
 func (w *LLMInteractionWriter) Stats() FlushStats {
+	w.mu.Lock()
+	bufSize := len(w.buffer)
+	w.mu.Unlock()
 	return FlushStats{
-		SuccessCount: w.flushSuccess.Load(),
-		FailureCount: w.flushFailure.Load(),
-		TotalRows:    w.flushRows.Load(),
+		SuccessCount:  w.flushSuccess.Load(),
+		FailureCount:  w.flushFailure.Load(),
+		TotalRows:     w.flushRows.Load(),
+		OverflowCount: w.overflowCount.Load(),
+		BufferSize:    bufSize,
 	}
 }
 

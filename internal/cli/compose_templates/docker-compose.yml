@@ -203,11 +203,13 @@ services:
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
       GF_INSTALL_PLUGINS: "kniepdennis-neo4j-datasource,hamedkarbasi93-nodegraphapi-datasource"
       TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
+      MDEMG_GRAFANA_ALERT_WEBHOOK_URL: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deploy/docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deploy/docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./deploy/docker/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./deploy/docker/grafana/provisioning/notifiers:/etc/grafana/provisioning/notifiers:ro
       - ./deploy/docker/grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
