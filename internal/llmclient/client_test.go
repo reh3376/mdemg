@@ -3,6 +3,7 @@ package llmclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1049,5 +1050,260 @@ func TestScrubAllPatterns(t *testing.T) {
 	}
 	if !strings.Contains(rec.ThinkContent, "neo4j://[REDACTED]@") {
 		t.Errorf("ThinkContent: expected neo4j://[REDACTED]@, got %q", rec.ThinkContent)
+	}
+}
+
+// ─── Retry Tests ───
+
+func retryConfig() RetryConfig {
+	return RetryConfig{
+		Enabled:     true,
+		MaxAttempts: 2,
+		BaseDelayMs: 10,
+		MaxDelayMs:  100,
+		Multiplier:  2.0,
+		Jitter:      0.0, // deterministic for tests
+	}
+}
+
+func TestRetry_429WithRetryAfter(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte("rate limited"))
+			return
+		}
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "success"}}},
+		})
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL, Retry: retryConfig(),
+	})
+
+	text, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if text != "success" {
+		t.Errorf("expected 'success', got %q", text)
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+}
+
+func TestRetry_503(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("service unavailable"))
+			return
+		}
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "recovered"}}},
+		})
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL, Retry: retryConfig(),
+	})
+
+	text, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("expected recovery, got: %v", err)
+	}
+	if text != "recovered" {
+		t.Errorf("expected 'recovered', got %q", text)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestRetry_NoRetryOn400(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("bad request"))
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL, Retry: retryConfig(),
+	})
+
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err == nil {
+		t.Fatal("expected error for 400 response")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retry), got %d", attempts)
+	}
+}
+
+func TestRetry_MaxAttemptsExhausted(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte("rate limited"))
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL, Retry: retryConfig(),
+	})
+
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err == nil {
+		t.Fatal("expected error after max attempts")
+	}
+	if !strings.Contains(err.Error(), "failed after") {
+		t.Errorf("expected 'failed after' in error, got: %v", err)
+	}
+	// MaxAttempts=2 means initial + 2 retries = 3 total
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+}
+
+func TestRetry_Disabled(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("unavailable"))
+			return
+		}
+		json.NewEncoder(w).Encode(OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "ok"}}},
+		})
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL,
+		Retry:   RetryConfig{Enabled: false},
+	})
+
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err == nil {
+		t.Fatal("expected error without retry")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (retry disabled), got %d", attempts)
+	}
+}
+
+func TestRetry_OllamaTimeout(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("unavailable"))
+			return
+		}
+		json.NewEncoder(w).Encode(OllamaGenerateResponse{Response: "ollama ok", Done: true})
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "ollama", Model: "llama3",
+		BaseURL: server.URL, Retry: retryConfig(),
+	})
+
+	text, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("expected success, got: %v", err)
+	}
+	if text != "ollama ok" {
+		t.Errorf("expected 'ollama ok', got %q", text)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestRetry_ContextCanceled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte("rate limited"))
+	}))
+	defer server.Close()
+
+	c := New(Config{
+		Provider: "openai", Model: "test", APIKey: "k",
+		BaseURL: server.URL, Retry: RetryConfig{
+			Enabled:     true,
+			MaxAttempts: 10,
+			BaseDelayMs: 5000, // long delay
+			MaxDelayMs:  10000,
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	_, err := c.Complete(ctx, []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err == nil {
+		t.Fatal("expected error from context cancellation")
+	}
+}
+
+func TestShouldRetry(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		want   bool
+	}{
+		{"429", &httpError{StatusCode: 429}, true},
+		{"503", &httpError{StatusCode: 503}, true},
+		{"400", &httpError{StatusCode: 400}, false},
+		{"401", &httpError{StatusCode: 401}, false},
+		{"500", &httpError{StatusCode: 500}, false},
+		{"context.Canceled", context.Canceled, false},
+		{"context.DeadlineExceeded", context.DeadlineExceeded, false},
+		{"network error", fmt.Errorf("http request: connection refused"), true},
+		{"non-retryable", fmt.Errorf("marshal request: invalid"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldRetry(tt.err); got != tt.want {
+				t.Errorf("shouldRetry(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	// Seconds
+	resp := &http.Response{Header: http.Header{}}
+	resp.Header.Set("Retry-After", "5")
+	if got := parseRetryAfter(resp); got != 5*time.Second {
+		t.Errorf("parseRetryAfter(5) = %v, want 5s", got)
+	}
+
+	// Missing
+	resp2 := &http.Response{Header: http.Header{}}
+	if got := parseRetryAfter(resp2); got != 0 {
+		t.Errorf("parseRetryAfter(missing) = %v, want 0", got)
 	}
 }
