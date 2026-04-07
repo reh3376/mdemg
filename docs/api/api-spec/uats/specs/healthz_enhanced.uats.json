@@ -49,10 +49,6 @@
       {
         "path": "$.checks.circuit_breakers",
         "op": "exists"
-      },
-      {
-        "path": "$.checks.tsdb",
-        "op": "exists"
       }
     ]
   }
