@@ -113,6 +113,14 @@ func (s *Service) SetCodeGenerator(gen ConstraintCodeGen) {
 	s.codeGenerator = gen
 }
 
+// Ping verifies the Neo4j connection is alive with a lightweight read query.
+func (s *Service) Ping(ctx context.Context) error {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+	_, err := sess.Run(ctx, "RETURN 1", nil)
+	return err
+}
+
 // ObserveRequest is the request for capturing an observation
 type ObserveRequest struct {
 	SpaceID   string         `json:"space_id"`

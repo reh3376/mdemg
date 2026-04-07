@@ -197,11 +197,19 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check 5: Conversation service
+	// Check 5: Conversation service — live Neo4j connectivity check
 	if s.conversationSvc != nil {
-		status.Checks["conversation"] = HealthCheck{
-			Status:  "healthy",
-			Message: "CMS available",
+		if err := s.conversationSvc.Ping(r.Context()); err != nil {
+			status.Checks["conversation"] = HealthCheck{
+				Status:  "degraded",
+				Message: fmt.Sprintf("CMS ping failed: %v", err),
+			}
+			overallHealthy = false
+		} else {
+			status.Checks["conversation"] = HealthCheck{
+				Status:  "healthy",
+				Message: "CMS available",
+			}
 		}
 	} else {
 		status.Checks["conversation"] = HealthCheck{
