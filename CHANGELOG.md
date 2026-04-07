@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LLM consecutive failure alert** — tracks consecutive LLM call failures per-client via shared atomic counter; fires high-severity alert through dispatcher when threshold reached (default: 3, configurable via `LLM_CONSECUTIVE_FAILURE_THRESHOLD`). Counter resets on success. Late-binding callback avoids init ordering issues.
 - **Alert dispatcher** (`internal/alert/`) — new package with file backend (atomic JSON writes, FIFO eviction at configurable cap), macOS notification backend (opt-in, `//go:build darwin`), per-(service,severity) cooldown dedup, and fire-and-forget dispatch to multiple backends
 - **Hook alert delivery** — `prompt-context.sh` shows all pending alerts per prompt; `session-start.sh` shows critical/high alerts at session start; both read from `~/.mdemg/alerts/current.json`
 - **Alert wiring** — RSIC alert actions (5 handlers), circuit breaker state change callbacks, and health prober transitions now dispatch through the alert system for real-time user notification
@@ -21,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ALERT_COOLDOWN_SEC=0` means no cooldown** — previously defaulted to 300s. Zero is useful for testing; negative values still fall back to 300s default.
+- **`/readyz` check #5 (conversation)** — upgraded from nil guard to live `Ping()` query (`RETURN 1`), detecting CMS degradation when Neo4j is under stress
+- **Circuit breaker expansion** — Jiminy outcome classifier and constraint code generator now wrapped with circuit breakers. On breaker open, classifier falls back to heuristic and codegen falls back to deterministic hash.
+- **Health prober alert callback wired** — prober healthy↔unhealthy transitions now dispatch through the alert system
+- **TSDB writer alert callback wired** — buffer overflow events now fire medium-severity alerts through the dispatcher
 - **Default LLM model: gpt-5-nano → gpt-4.1-nano** — all 16 classification/evaluation tasks use prompt-engineered JSON (`json_object` mode), not tool-call schemas. gpt-4.1-nano is non-tool-use, 2x cheaper output tokens ($0.20/M vs $0.40/M), and has a 1M context window. Affects `LLM_MODEL`, `RECLASS_MODEL`, `RERANK_MODEL` defaults in config, compose templates, and CLI init prompts.
 - Fine-tuning plan documents updated from v3.0 to v4.0 — adds tool-use architectural constraint, curated dataset pipeline, Jiminy quality signals, and v0.7.1 classifier overhaul as a critical training data versioning boundary (Issues 20-28 in corrections log)
 

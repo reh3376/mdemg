@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1305,5 +1307,106 @@ func TestParseRetryAfter(t *testing.T) {
 	resp2 := &http.Response{Header: http.Header{}}
 	if got := parseRetryAfter(resp2); got != 0 {
 		t.Errorf("parseRetryAfter(missing) = %v, want 0", got)
+	}
+}
+
+func TestConsecutiveFailure_FiresAtThreshold(t *testing.T) {
+	// Save and restore global state.
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var mu sync.Mutex
+	var fired []int
+	defaultAlertCallback = func(taskName string, count int, lastErr error) {
+		mu.Lock()
+		fired = append(fired, count)
+		mu.Unlock()
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+	}
+
+	err := fmt.Errorf("connection refused")
+	c.trackResult(err) // 1
+	c.trackResult(err) // 2
+	c.trackResult(err) // 3 — should fire
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(fired) != 1 {
+		t.Fatalf("expected 1 alert, got %d", len(fired))
+	}
+	if fired[0] != 3 {
+		t.Errorf("expected count=3, got %d", fired[0])
+	}
+}
+
+func TestConsecutiveFailure_ResetsOnSuccess(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var alertCount atomic.Int32
+	defaultAlertCallback = func(_ string, _ int, _ error) {
+		alertCount.Add(1)
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+	}
+
+	err := fmt.Errorf("timeout")
+	c.trackResult(err) // 1
+	c.trackResult(err) // 2
+	c.trackResult(nil) // success — resets to 0
+	c.trackResult(err) // 1
+	c.trackResult(err) // 2
+
+	if alertCount.Load() != 0 {
+		t.Errorf("expected 0 alerts (counter reset by success), got %d", alertCount.Load())
+	}
+}
+
+func TestConsecutiveFailure_NoFireBelowThreshold(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var alertCount atomic.Int32
+	defaultAlertCallback = func(_ string, _ int, _ error) {
+		alertCount.Add(1)
+	}
+	defaultFailureThreshold = 5
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    5,
+	}
+
+	err := fmt.Errorf("error")
+	for range 4 {
+		c.trackResult(err)
+	}
+
+	if alertCount.Load() != 0 {
+		t.Errorf("expected 0 alerts (below threshold 5), got %d", alertCount.Load())
 	}
 }

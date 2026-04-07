@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -85,6 +86,10 @@ type Client struct {
 	taskName   string              // context label for interaction logging
 	spaceID    string              // context label for interaction logging
 	retryCfg   RetryConfig
+
+	// Consecutive failure tracking — pointer shared across WithContext() copies.
+	consecutiveFailures *atomic.Int32
+	failureThreshold    int32
 }
 
 // RetryConfig controls automatic retry behaviour for transient LLM errors.
@@ -160,6 +165,28 @@ func SetDefaultRetryConfig(rc RetryConfig) {
 	defaultRetryConfig = rc
 }
 
+// defaultAlertCallback is called when consecutive LLM failures reach the threshold.
+// Read at call time (late binding) so it works even when set after client creation.
+var defaultAlertCallback func(taskName string, count int, lastErr error)
+
+// defaultFailureThreshold is the consecutive failure count that triggers an alert.
+var defaultFailureThreshold int32 = 3
+
+// SetDefaultAlertCallback sets the function called when any LLM client accumulates
+// consecutive failures reaching the threshold. Called once at server startup.
+func SetDefaultAlertCallback(fn func(taskName string, count int, lastErr error)) {
+	defaultAlertCallback = fn
+}
+
+// SetDefaultFailureThreshold sets the consecutive failure count that triggers an alert.
+// Called once at server startup from cfg.LLMConsecutiveFailureThreshold.
+func SetDefaultFailureThreshold(n int) {
+	if n <= 0 {
+		n = 3
+	}
+	defaultFailureThreshold = int32(n)
+}
+
 // New creates a new LLM client from the given configuration.
 func New(cfg Config) *Client {
 	timeoutMs := cfg.TimeoutMs
@@ -186,8 +213,10 @@ func New(cfg Config) *Client {
 		httpClient: &http.Client{
 			Timeout: time.Duration(timeoutMs) * time.Millisecond,
 		},
-		recorder: defaultRecorder,
-		retryCfg: rc,
+		recorder:            defaultRecorder,
+		retryCfg:            rc,
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    defaultFailureThreshold,
 	}
 }
 
@@ -235,6 +264,7 @@ func (c *Client) Complete(ctx context.Context, messages []Message, opts Complete
 	}
 
 	c.recordInteraction(ctx, messages, text, 0, int(time.Since(start).Milliseconds()), err)
+	c.trackResult(err)
 	return text, err
 }
 
@@ -253,7 +283,26 @@ func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts
 	}
 
 	c.recordInteraction(ctx, messages, text, tokens, int(time.Since(start).Milliseconds()), err)
+	c.trackResult(err)
 	return text, tokens, err
+}
+
+// trackResult updates the consecutive failure counter and fires the alert callback
+// when the threshold is reached. On success the counter resets to zero.
+func (c *Client) trackResult(err error) {
+	if c.consecutiveFailures == nil {
+		return
+	}
+	if err == nil {
+		c.consecutiveFailures.Store(0)
+		return
+	}
+	count := c.consecutiveFailures.Add(1)
+	if count >= c.failureThreshold {
+		if cb := defaultAlertCallback; cb != nil {
+			cb(c.taskName, int(count), err)
+		}
+	}
 }
 
 // recordInteraction sends an interaction record to the recorder if one is set.

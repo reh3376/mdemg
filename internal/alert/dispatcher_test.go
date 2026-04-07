@@ -128,6 +128,29 @@ func TestDispatcher_FillsDefaults(t *testing.T) {
 	}
 }
 
+func TestDispatcher_ZeroCooldown(t *testing.T) {
+	d := NewDispatcher(Config{
+		Enabled:     true,
+		CooldownSec: 0,
+		MaxAlerts:   50,
+	})
+
+	mb := &mockBackend{}
+	d.mu.Lock()
+	d.backends = []Backend{mb}
+	d.mu.Unlock()
+
+	a := Alert{Service: "neo4j", Severity: SeverityHigh, Title: "down"}
+
+	d.Send(context.Background(), a)
+	d.Send(context.Background(), a) // Should NOT be suppressed with zero cooldown.
+
+	time.Sleep(100 * time.Millisecond)
+	if mb.calls.Load() != 2 {
+		t.Errorf("zero cooldown should allow both calls, got %d", mb.calls.Load())
+	}
+}
+
 func TestSendAlert_Convenience(t *testing.T) {
 	d := NewDispatcher(Config{
 		Enabled:     true,

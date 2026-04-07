@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/llmclient"
 )
 
@@ -17,9 +18,10 @@ const codegenSystemPrompt = `You are a constraint code generator for a knowledge
 // ConstraintCodeGenerator generates mnemonic kebab-case codes for constraints.
 // Codes are generated once by the LLM and frozen on the Neo4j node.
 type ConstraintCodeGenerator struct {
-	mu       sync.Mutex
-	client   *llmclient.Client
-	existing map[string]bool // all known codes for collision avoidance
+	mu         sync.Mutex
+	client     *llmclient.Client
+	existing   map[string]bool         // all known codes for collision avoidance
+	cbRegistry *circuitbreaker.Registry // G8: circuit breaker for LLM calls
 }
 
 // NewConstraintCodeGenerator creates a new code generator.
@@ -28,6 +30,11 @@ func NewConstraintCodeGenerator(client *llmclient.Client) *ConstraintCodeGenerat
 		client:   client,
 		existing: make(map[string]bool),
 	}
+}
+
+// SetCircuitBreakerRegistry sets the circuit breaker registry for LLM calls.
+func (g *ConstraintCodeGenerator) SetCircuitBreakerRegistry(reg *circuitbreaker.Registry) {
+	g.cbRegistry = reg
 }
 
 // GenerateCode generates a mnemonic kebab-case code for a constraint.
@@ -47,13 +54,34 @@ func (g *ConstraintCodeGenerator) GenerateCode(ctx context.Context, constraintTy
 	prompt := fmt.Sprintf("Constraint type: %s\nDescription: %s\nExisting codes to avoid collisions: %s",
 		constraintType, description, strings.Join(existingCodes, ", "))
 
-	resp, err := g.client.Complete(ctx, []llmclient.Message{
+	msgs := []llmclient.Message{
 		{Role: "system", Content: codegenSystemPrompt},
 		{Role: "user", Content: prompt},
-	}, llmclient.CompleteOpts{})
-	if err != nil {
-		slog.Warn("j17: codegen LLM failed, using fallback", "error", err)
-		return g.fallbackCode(description), nil
+	}
+
+	var resp string
+	if g.cbRegistry != nil {
+		cb := g.cbRegistry.Get("jiminy-codegen")
+		err := cb.Execute(ctx, func(cbCtx context.Context) error {
+			var innerErr error
+			resp, innerErr = g.client.Complete(cbCtx, msgs, llmclient.CompleteOpts{})
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			slog.Warn("j17: codegen circuit breaker open, using fallback")
+			return g.fallbackCode(description), nil
+		}
+		if err != nil {
+			slog.Warn("j17: codegen LLM failed, using fallback", "error", err)
+			return g.fallbackCode(description), nil
+		}
+	} else {
+		var err error
+		resp, err = g.client.Complete(ctx, msgs, llmclient.CompleteOpts{})
+		if err != nil {
+			slog.Warn("j17: codegen LLM failed, using fallback", "error", err)
+			return g.fallbackCode(description), nil
+		}
 	}
 
 	code := sanitizeCode(resp)

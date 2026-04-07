@@ -163,8 +163,9 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - Hook delivery: `prompt-context.sh` shows all pending alerts; `session-start.sh` shows critical/high only
 - Sources: RSIC alert actions, circuit breaker state changes, health prober transitions, Grafana webhook
 - LLM retry: `LLM_RETRY_ENABLED` (default: true), `LLM_RETRY_MAX_ATTEMPTS` (default: 3), retries on 429/503 only
+- LLM consecutive failure alert: `LLM_CONSECUTIVE_FAILURE_THRESHOLD` (default: 3), fires high-severity alert after N consecutive failures per task
 - Health prober: `HEALTH_PROBE_ENABLED` (default: true), `HEALTH_PROBE_INTERVAL_SEC` (default: 60), probes API/Neo4j/TSDB/sidecar
-- Enhanced `/healthz`: returns `status: "degraded"` with `checks` map when subsystems unhealthy
+- Enhanced `/healthz`: returns `status: "degraded"` with `checks` map when subsystems unhealthy; CMS check is live Ping (not nil guard)
 
 ## Campaign Configuration
 

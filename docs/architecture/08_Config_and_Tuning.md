@@ -467,6 +467,9 @@ LLM_RETRY_MAX_ATTEMPTS=3               # Maximum retry attempts
 LLM_RETRY_BASE_DELAY_MS=500            # Base delay before first retry
 LLM_RETRY_MAX_DELAY_MS=10000           # Maximum backoff delay cap
 
+# LLM Consecutive Failure Alert (SR-001 Gap Closure)
+LLM_CONSECUTIVE_FAILURE_THRESHOLD=3    # Alert after N consecutive LLM failures per task
+
 # TSDB Writer Buffer (SR-001)
 TSDB_WRITER_BUFFER_MAX_SIZE=1000       # Max LLM interaction buffer (0=unlimited)
 ```

@@ -52,6 +52,16 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-07) ===
+- ✅ SR-001 Gap Closure Sprint (2026-04-07):
+  - F-001: CooldownSec=0 now means "no cooldown" (was defaulting to 300s)
+  - F-002: Health prober SetAlertCallback wired to alert dispatcher on transitions
+  - F-003: TSDB LLM writer SetAlertCallback wired for buffer overflow events
+  - G4+G11: LLM consecutive failure tracking with alert callback (threshold configurable via LLM_CONSECUTIVE_FAILURE_THRESHOLD, default: 3)
+  - G8: Circuit breaker added to outcome classifier and constraint code generator
+  - G5: /readyz check #5 upgraded to live CMS Ping (RETURN 1) — detects Neo4j degradation
+  - Config: 1 new env var (LLM_CONSECUTIVE_FAILURE_THRESHOLD)
+  - Tests: 3 consecutive failure tests + 1 zero cooldown test, all passing
+  - B3 (Neo4j driver reconnection) deferred — Go driver v5 handles internally; prober now alerts on connectivity loss
 - ✅ SR-001: Service Resilience & User Alerting Sprint (2026-04-07):
   - E1: Alert dispatcher package (internal/alert/) — file + macOS backends, cooldown dedup, atomic writes, FIFO eviction
   - E2: Hook alert delivery — prompt-context.sh and session-start.sh read alert file

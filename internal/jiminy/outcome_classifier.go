@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
@@ -71,6 +72,9 @@ type OutcomeClassifier struct {
 	highThreshold   float64 // above this similarity = followed (default: 0.7)
 	lowThreshold    float64 // below this similarity = ignored (default: 0.3)
 	maxTokens       int     // J14: max tokens for LLM classification
+
+	// G8: circuit breaker for LLM calls
+	cbRegistry *circuitbreaker.Registry
 
 	// J14: LRU cache for classification results
 	cacheMu   sync.Mutex
@@ -139,6 +143,11 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 	}
 
 	return oc
+}
+
+// SetCircuitBreakerRegistry sets the circuit breaker registry for LLM calls.
+func (oc *OutcomeClassifier) SetCircuitBreakerRegistry(reg *circuitbreaker.Registry) {
+	oc.cbRegistry = reg
 }
 
 // Classify determines the outcome of a guidance item given an action summary.
@@ -236,10 +245,30 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		opts.Format = ollamaClassifySchema
 	}
 
-	response, _, err := oc.llm.CompleteWithUsage(ctx, msgs, opts)
-	if err != nil {
-		slog.Error("jiminy classifier: LLM classification failed", "error", err)
-		return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
+	var response string
+	if oc.cbRegistry != nil {
+		cbName := "jiminy-outcome-classifier"
+		cb := oc.cbRegistry.Get(cbName)
+		err := cb.Execute(ctx, func(cbCtx context.Context) error {
+			var innerErr error
+			response, _, innerErr = oc.llm.CompleteWithUsage(cbCtx, msgs, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			slog.Warn("jiminy classifier: circuit breaker open, using heuristic fallback")
+			return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
+		}
+		if err != nil {
+			slog.Error("jiminy classifier: LLM classification failed", "error", err)
+			return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
+		}
+	} else {
+		var err error
+		response, _, err = oc.llm.CompleteWithUsage(ctx, msgs, opts)
+		if err != nil {
+			slog.Error("jiminy classifier: LLM classification failed", "error", err)
+			return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}
+		}
 	}
 
 	slog.Debug("jiminy classifier: raw LLM response", "response_len", len(response), "response_preview", encoding.TruncateAtWord(response, 200))

@@ -33,7 +33,7 @@ type Dispatcher struct {
 
 // NewDispatcher creates a dispatcher with the configured backends.
 func NewDispatcher(cfg Config) *Dispatcher {
-	if cfg.CooldownSec <= 0 {
+	if cfg.CooldownSec < 0 {
 		cfg.CooldownSec = 300
 	}
 	if cfg.MaxAlerts <= 0 {

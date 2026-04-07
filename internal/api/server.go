@@ -546,6 +546,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				slog.Info("J17-2: loaded existing constraint codes for collision avoidance", "count", len(existingCodes))
 			}
 
+			codegen.SetCircuitBreakerRegistry(cbRegistry)
 			jiminySvc.SetCodeGenerator(codegen)
 			convSvc.SetCodeGenerator(codegen)
 			slog.Info("J17-2: constraint code generator enabled", "provider", cfg.J17CodegenProvider, "model", cfg.J17CodegenModel)
@@ -570,6 +571,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				evaluator.SetLLM(evalLLM, cbRegistry)
 				slog.Info("Jiminy J13: evaluator LLM enabled", "provider", cfg.JiminyEvaluateLLMProvider, "model", cfg.JiminyEvaluateLLMModel)
 			}
+		}
+
+		// G8: Wire circuit breaker to outcome classifier
+		if oc := jiminySvc.GetOutcomeClassifier(); oc != nil {
+			oc.SetCircuitBreakerRegistry(cbRegistry)
 		}
 	}
 
@@ -1185,6 +1191,11 @@ func (s *Server) SetLLMWriter(w *tsdb.LLMInteractionWriter) {
 // Called from serve.go after logging initialization.
 func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
 	s.logBuffer = buf
+}
+
+// AlertDispatcher returns the server's alert dispatcher for external callback wiring.
+func (s *Server) AlertDispatcher() *alert.Dispatcher {
+	return s.alertDispatcher
 }
 
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
