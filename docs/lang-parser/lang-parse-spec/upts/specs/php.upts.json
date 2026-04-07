@@ -1,12 +1,22 @@
 {
   "upts_version": "1.0.0",
   "language": "php",
-  "variants": [".php"],
+  "variants": [
+    ".php"
+  ],
   "metadata": {
     "author": "diegovogel",
     "created": "2026-04-06",
-    "description": "PHP parser — classes, interfaces, traits, enums, functions, constants, namespaces, fields, methods. Includes regression tests for: heredoc false-positives, multi-line array constants, trailing-comment constants, bare methods, reversed static modifiers, readonly class, reference-return functions, indented guarded functions, constructor emission, promoted properties.",
-    "parser_status": "functional"
+    "updated": "2026-04-07",
+    "description": "PHP parser \u2014 classes, interfaces, traits, enums, functions, constants, namespaces, fields, methods. Includes regression tests for: heredoc false-positives, multi-line array constants, trailing-comment constants, bare methods, reversed static modifiers, readonly class, reference-return functions, indented guarded functions, constructor emission, promoted properties.",
+    "parser_status": "functional",
+    "tags": [
+      "canonical",
+      "oop",
+      "php8",
+      "laravel",
+      "wordpress"
+    ]
   },
   "config": {
     "line_tolerance": 2,
@@ -162,8 +172,7 @@
         "line": 64,
         "exported": false,
         "parent": "UserService",
-        "pattern": "P1_CONSTANT",
-        "_regression": "multi-line array constant"
+        "pattern": "P1_CONSTANT"
       },
       {
         "name": "THROTTLE_SECONDS",
@@ -171,8 +180,7 @@
         "line": 71,
         "exported": false,
         "parent": "UserService",
-        "pattern": "P1_CONSTANT",
-        "_regression": "constant with trailing comment"
+        "pattern": "P1_CONSTANT"
       },
       {
         "name": "serviceName",
@@ -204,8 +212,7 @@
         "line": 78,
         "exported": true,
         "parent": "UserService",
-        "pattern": "P6_METHOD",
-        "_regression": "constructor emitted as method"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "repository",
@@ -213,8 +220,7 @@
         "line": 79,
         "exported": false,
         "parent": "UserService",
-        "pattern": "P9_FIELD",
-        "_regression": "constructor promoted property"
+        "pattern": "P9_FIELD"
       },
       {
         "name": "findById",
@@ -262,8 +268,7 @@
         "line": 111,
         "exported": true,
         "parent": "UserService",
-        "pattern": "P6_METHOD",
-        "_regression": "reversed static modifier order"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "instanceCount",
@@ -271,8 +276,7 @@
         "line": 117,
         "exported": false,
         "parent": "UserService",
-        "pattern": "P9_FIELD",
-        "_regression": "reversed static field modifier"
+        "pattern": "P9_FIELD"
       },
       {
         "name": "getReference",
@@ -280,8 +284,7 @@
         "line": 120,
         "exported": true,
         "parent": "UserService",
-        "pattern": "P6_METHOD",
-        "_regression": "reference-return method"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "getCacheKey",
@@ -305,8 +308,7 @@
         "line": 136,
         "exported": true,
         "parent": "UserService",
-        "pattern": "P6_METHOD",
-        "_regression": "heredoc should not produce false-positive constants"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "BaseController",
@@ -336,8 +338,7 @@
         "type": "class",
         "line": 161,
         "exported": true,
-        "pattern": "P3_CLASS_STRUCT",
-        "_regression": "bare methods without visibility"
+        "pattern": "P3_CLASS_STRUCT"
       },
       {
         "name": "render",
@@ -345,8 +346,7 @@
         "line": 163,
         "exported": true,
         "parent": "LegacyWidget",
-        "pattern": "P6_METHOD",
-        "_regression": "bare method defaults to public"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "update",
@@ -354,16 +354,14 @@
         "line": 168,
         "exported": true,
         "parent": "LegacyWidget",
-        "pattern": "P6_METHOD",
-        "_regression": "bare method defaults to public"
+        "pattern": "P6_METHOD"
       },
       {
         "name": "ValueObject",
         "type": "class",
         "line": 177,
         "exported": true,
-        "pattern": "P3_CLASS_STRUCT",
-        "_regression": "readonly class (PHP 8.2)"
+        "pattern": "P3_CLASS_STRUCT"
       },
       {
         "name": "__construct",
@@ -379,8 +377,7 @@
         "line": 180,
         "exported": true,
         "parent": "ValueObject",
-        "pattern": "P9_FIELD",
-        "_regression": "multi-line constructor promoted property"
+        "pattern": "P9_FIELD"
       },
       {
         "name": "value",
@@ -395,8 +392,7 @@
         "type": "class",
         "line": 188,
         "exported": true,
-        "pattern": "P3_CLASS_STRUCT",
-        "_regression": "single-line constructor promoted properties"
+        "pattern": "P3_CLASS_STRUCT"
       },
       {
         "name": "__construct",
@@ -412,8 +408,7 @@
         "line": 190,
         "exported": true,
         "parent": "Notification",
-        "pattern": "P9_FIELD",
-        "_regression": "single-line constructor promoted property"
+        "pattern": "P9_FIELD"
       },
       {
         "name": "priority",
@@ -421,8 +416,7 @@
         "line": 190,
         "exported": true,
         "parent": "Notification",
-        "pattern": "P9_FIELD",
-        "_regression": "single-line constructor promoted property"
+        "pattern": "P9_FIELD"
       },
       {
         "name": "formatCurrency",
@@ -436,20 +430,129 @@
         "type": "function",
         "line": 205,
         "exported": true,
-        "pattern": "P2_FUNCTION",
-        "_regression": "indented guarded function"
+        "pattern": "P2_FUNCTION"
       }
     ],
     "excluded": [
       {
         "name": "el",
-        "type": "constant",
-        "reason": "JS const inside heredoc string — must not be parsed as PHP constant"
+        "reason": "JS const inside heredoc string \u2014 must not be parsed as PHP constant"
       },
       {
         "name": "buttons",
-        "type": "constant",
-        "reason": "JS const inside heredoc string — must not be parsed as PHP constant"
+        "reason": "JS const inside heredoc string \u2014 must not be parsed as PHP constant"
+      }
+    ],
+    "relationships": [
+      {
+        "source": "Cacheable",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheKey"
+      },
+      {
+        "source": "Cacheable",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheTtl"
+      },
+      {
+        "source": "HasSlug",
+        "relation": "DEFINES_METHOD",
+        "target": "generateSlug"
+      },
+      {
+        "source": "HasSlug",
+        "relation": "DEFINES_METHOD",
+        "target": "slugExists"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "findById"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "createUser"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "validateData"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "hashPassword"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getVersion"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getInstance"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getReference"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheKey"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getCacheTtl"
+      },
+      {
+        "source": "UserService",
+        "relation": "DEFINES_METHOD",
+        "target": "getScript"
+      },
+      {
+        "source": "UserService",
+        "relation": "IMPLEMENTS",
+        "target": "Cacheable"
+      },
+      {
+        "source": "BaseController",
+        "relation": "DEFINES_METHOD",
+        "target": "index"
+      },
+      {
+        "source": "BaseController",
+        "relation": "DEFINES_METHOD",
+        "target": "respond"
+      },
+      {
+        "source": "LegacyWidget",
+        "relation": "DEFINES_METHOD",
+        "target": "render"
+      },
+      {
+        "source": "LegacyWidget",
+        "relation": "DEFINES_METHOD",
+        "target": "update"
+      },
+      {
+        "source": "ValueObject",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
+      },
+      {
+        "source": "Notification",
+        "relation": "DEFINES_METHOD",
+        "target": "__construct"
       }
     ]
   },

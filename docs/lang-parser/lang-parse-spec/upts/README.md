@@ -77,6 +77,7 @@ upts/
 │   ├── typescript.upts.json
 │   ├── java.upts.json
 │   ├── csharp.upts.json
+│   ├── php.upts.json
 │   ├── kotlin.upts.json
 │   ├── cpp.upts.json
 │   ├── c.upts.json
