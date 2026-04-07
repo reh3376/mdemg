@@ -23,7 +23,7 @@ func (p *PHPParser) Extensions() []string {
 }
 
 func (p *PHPParser) CanParse(path string) bool {
-	return strings.HasSuffix(strings.ToLower(path), ".php")
+	return HasExtension(path, p.Extensions())
 }
 
 func (p *PHPParser) IsTestFile(path string) bool {
