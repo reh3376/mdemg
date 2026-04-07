@@ -174,8 +174,8 @@ When running via Docker Compose, Jiminy configuration is propagated from `.env` 
 
 ```bash
 JIMINY_ENABLED=true
-JIMINY_SYNTHESIS_MODEL=gpt-5.4-nano      # or your chosen model
-JIMINY_EVALUATE_LLM_MODEL=gpt-5.4-nano
+JIMINY_SYNTHESIS_MODEL=gpt-4.1-nano      # or your chosen model
+JIMINY_EVALUATE_LLM_MODEL=gpt-4.1-nano
 JIMINY_SYNTHESIS_PROVIDER=openai          # inherits from LLM_PROVIDER
 JIMINY_EVALUATE_LLM_PROVIDER=openai
 ```

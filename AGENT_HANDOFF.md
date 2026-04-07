@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-05
+**Date:** 2026-04-06
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -51,6 +51,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-06) ===
+- ✅ FT Plan v4.0 Doc Update + Default LLM Migration (2026-04-06):
+  - Default LLM migrated: gpt-5-nano → gpt-4.1-nano (non-tool-use, 2x cheaper output, 1M context)
+  - RECLASS_MODEL: gpt-5.4 → gpt-4.1-nano, RERANK_MODEL: gpt-5.4 → gpt-4.1-nano
+  - All 7 FT plan documents updated v3.0 → v4.0 (00_README through 06_CORRECTIONS_APPLIED)
+  - Corrections Issues 20-28 documented: tool-use constraint (CRITICAL), default LLM change (CRITICAL), classifier overhaul training data boundary (CRITICAL), curated pipeline, reward count 18→21, TSDB schema 005→010, Jiminy quality signals, collection campaign
+  - Training Data Versioning Boundary (§12 in 05_DATA_COLLECTION): v0.7.1 classifier overhaul creates hard boundary — pre-v0.7.1 jiminy.evaluate data has 82.4% misclassification from measurement error. Per-task EXCLUDE/SAFE recommendations for dataset_versioner.py
+  - Config changes: config.go, yaml_config.go, compose template, init.go, j17-comprehension-test
+  - Doc updates: cli-reference, architecture, installer sync, jiminy, neural-training-pipeline
 === COMPLETED SINCE LAST HANDOFF (2026-04-05) ===
 - ✅ Training Data Export E2E Fix (2026-04-05) — P0 blocking bug fix:
   - G1: `data export` and `data export-auto` auto-generate `instance_id` as `{hostname}-{space_id}` when `MDEMG_INSTANCE_ID` not set

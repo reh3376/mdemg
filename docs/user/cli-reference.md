@@ -121,7 +121,7 @@ mdemg init --neo4j-uri bolt://localhost:7687 --embedding-provider ollama
 ```
 
 The wizard also configures **Jiminy inner-voice guidance** (enabled by default). Users select a Jiminy-specific LLM model for guidance synthesis and constraint evaluation:
-- **OpenAI default:** `gpt-5.4-nano` (cheapest option for small JSON tasks)
+- **OpenAI default:** `gpt-4.1-nano` (cheapest non-tool-use option for small JSON tasks)
 - **Ollama default:** `qwen3:8b` (best local model for structured output)
 
 **See Also:** `mdemg config show`, `mdemg config validate`, `mdemg hooks install`
@@ -2488,7 +2488,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `LLM_PROVIDER` | string | `"openai"` | Top-level text-gen LLM provider |
-| `LLM_MODEL` | string | `"gpt-5-nano"` | Top-level text-gen LLM model |
+| `LLM_MODEL` | string | `"gpt-4.1-nano"` | Top-level text-gen LLM model |
 | `LLM_ENDPOINT` | string | (uses OpenAI endpoint) | Override endpoint for LLM text-generation |
 
 ### Embedding Provider
