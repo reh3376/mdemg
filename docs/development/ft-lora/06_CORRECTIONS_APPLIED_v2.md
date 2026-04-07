@@ -1,8 +1,8 @@
 # Corrections Applied: Deep-Dive Analysis Resolution
 
-**Date:** 2026-03-30
-**Versions covered:** v1.0 → v2.0 → v3.0
-**Status:** All corrections applied. 19 total issues, 19 resolved, 0 open.
+**Date:** 2026-04-07
+**Versions covered:** v1.0 → v2.0 → v3.0 → v4.0
+**Status:** All corrections applied. 31 total issues, 31 resolved, 0 open.
 
 ---
 
@@ -116,6 +116,54 @@ Additionally, a hard constraint was undocumented: MDEMG standardizes on **3072-d
 
 ---
 
+## v3.0 → v4.0 Corrections (2026-04-07)
+
+Source: Codebase audit at PR #277 (v0.7.2), Jiminy effectiveness investigation, training data E2E validation, tool-use model discovery, classifier overhaul analysis.
+
+### Critical Issues (2)
+
+**ISSUE 20: Tool-Use Model Constraint ✅ RESOLVED**
+
+gpt-5-nano (default LLM) is a tool-use model. When MDEMG sends classification prompts expecting `{"is_constraint": true}`, gpt-5-nano may emit tool-call structures instead of plain JSON, breaking `json.Unmarshal` across all 16 consumers. Added architectural constraint: target model must NOT be a tool-use variant. Applies to both fine-tuned Qwen3-30B-A3B (already non-tool) and external fallback LLM.
+
+**ISSUE 21: Default LLM Changed gpt-5-nano → gpt-4.1-nano ✅ RESOLVED**
+
+Switched default `LLM_MODEL` from gpt-5-nano (tool-use, $0.40/M output) to gpt-4.1-nano (non-tool-use, $0.20/M output, 1M context). Updated in config.go, yaml_config.go, compose template, CLI init, and all documentation. Users with explicit `LLM_MODEL=gpt-5-nano` in .env are unaffected (env overrides defaults).
+
+### Medium Issues (5)
+
+**ISSUE 22: Outcome Classifier Shares Task Label ✅ DOCUMENTED**
+
+The Jiminy outcome classifier (`llmClassify` in `outcome_classifier.go`) uses `jiminy.evaluate` as its `WithContext` task label. This mixes outcome classification training data with Jiminy evaluation data under the same `task_name`. Documented as a known limitation; splitting to `jiminy.outcome_classify` recommended for per-task LoRA if training data shows divergent patterns.
+
+**ISSUE 23: Curated Dataset Pipeline Undocumented ✅ RESOLVED**
+
+The full export → validate → filter → convert → version → train pipeline was built and validated (10/10 PASS) but not referenced in FT plan docs. Added to 05_DATA_COLLECTION.
+
+**ISSUE 24: Reward Function Count Stale ✅ RESOLVED**
+
+FT plan referenced 18 GRPO reward functions. Actual count is 21 in `neural/training/reward_functions.py` (3 added post-docstring: recall_improvement, score_correlation, latency_reward). Updated in 03_IMPLEMENTATION_PLAN and 04_BENCHMARK_RL.
+
+**ISSUE 25: TSDB Schema Drift ✅ RESOLVED**
+
+FT plan referenced migrations up to 005. Actual schema is at migration 010 with additions for embedding events, RAFT context, instance_id, backfill, and schema version fix. Updated in 03_IMPLEMENTATION_PLAN and 05_DATA_COLLECTION.
+
+**ISSUE 26: Collection Campaign Not Referenced ✅ RESOLVED**
+
+Active collection campaign (started ~2026-03-30, Day 30 target ~2026-04-29) not mentioned in FT plan. Added campaign status and timeline to 05_DATA_COLLECTION.
+
+### Low Issues (2)
+
+**ISSUE 27: Jiminy Quality Signals Not Referenced ✅ RESOLVED**
+
+GUIDANCE_OUTCOME edges, content normalization, not_applicable outcome, and trust-based tier data provide new training quality signals not mentioned in the FT plan. Added to 01_RESEARCH and 05_DATA_COLLECTION.
+
+**ISSUE 28: Classifier Overhaul Creates Hard Training Data Versioning Boundary ✅ RESOLVED (CRITICAL IMPACT)**
+
+The v0.7.1 classifier overhaul (thresholds 0.7/0.3 → 0.55/0.20, 5th outcome type not_applicable, LLM negation detection, prompt enrichment, max tokens 100 → 500, content normalization) creates a hard boundary in Jiminy training data. Pre-v0.7.1 `jiminy.evaluate` data classified 82.4% of outcomes as "ignored" due to measurement error — this data is not ground truth and will poison the model if included without version filtering. Recommendation: exclude pre-v0.7.1 data for `jiminy.evaluate` and `jiminy.evaluate_llm` tasks; tag all data with `classifier_version` for `dataset_versioner.py` filtering. Full specification in 05_DATA_COLLECTION §12.
+
+---
+
 ## Summary
 
 | Version | Severity | Found | Resolved | Open |
@@ -125,6 +173,9 @@ Additionally, a hard constraint was undocumented: MDEMG standardizes on **3072-d
 | v1.0 → v2.0 | Additional | 4 | 4 | 0 |
 | v2.0 → v3.0 | Strategic | 6 | 6 | 0 |
 | v3.0 audit | Accuracy | 3 | 3 | 0 |
-| **Total** | | **22** | **22** | **0** |
+| v3.0 → v4.0 | Critical | 2 | 2 | 0 |
+| v3.0 → v4.0 | Medium | 5 | 5 | 0 |
+| v3.0 → v4.0 | Low | 2 | 2 | 0 |
+| **Total** | | **31** | **31** | **0** |
 
-All v3.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, embedding dimensions, LLM provider details, and implementation status reflect the actual codebase state as of PR #219.
+All v4.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, embedding dimensions, LLM provider details, default model selection, classifier versioning boundaries, and implementation status reflect the actual codebase state as of PR #277 (v0.7.2).

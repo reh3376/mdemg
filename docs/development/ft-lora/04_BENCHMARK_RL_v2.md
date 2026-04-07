@@ -1,6 +1,6 @@
 # Phases 10-12: Automated Benchmarks + Reinforcement Learning
 
-**Date:** 2026-03-30 (v3.0 — task names aligned to codebase, ULTS integration added)
+**Date:** 2026-04-07 (v4.0 — reward functions implemented, Jiminy benchmarks added)
 **Extends:** Implementation Plan Phases 1-9
 **Model:** Qwen3-30B-A3B MoE via vllm-mlx
 
@@ -203,6 +203,16 @@ TASK_REGISTRY = {
 mdemg finetune eval
 ```
 
+### 10.4 Jiminy-Specific Benchmarks
+
+Post-v0.7.1, Jiminy effectiveness data provides additional benchmark dimensions:
+
+- **Outcome accuracy:** Does `jiminy.evaluate_llm` classification match human review? (baseline: 70-80% agreement)
+- **Tier effectiveness:** Does T1-encoded guidance achieve comparable follow rates to T3?
+- **Content normalization impact:** Does the fine-tuned model handle both structured metadata and natural language equally well?
+
+Data source: `scripts/jiminy_effectiveness_report.py --space-id <space> --days 7`
+
 ---
 
 ## Phase 11: Automated Reinforcement Learning
@@ -242,33 +252,42 @@ THINK_TASKS = [
 
 ### 11.3 MDEMG-Specific Reward Functions
 
-New file: `neural/training/reward_functions.py`
+**Implemented:** `neural/training/reward_functions.py` — 21 GRPO reward functions across 5 categories, registered in `REWARD_REGISTRY` with lookup via `get_reward_function(name)` and batch computation via `compute_reward(response, reward_names)`.
 
 ```python
-# Format rewards (deterministic — verifiable)
-def json_valid_reward(prompt, completion, meta) -> float
-def format_compliance_reward(prompt, completion, meta) -> float
+# ── Structural (3) ──
+json_valid          # 1.0 if valid JSON object
+schema_match        # Partial credit: required keys + type checks
+format_valid        # Non-empty, well-formed (JSON or text)
 
-# Accuracy rewards (ground truth comparison — verifiable)
-def classification_accuracy_reward(prompt, completion, meta) -> float
-def detection_precision_reward(prompt, completion, meta) -> float
+# ── Classification (2) ──
+classification_accuracy   # Exact match against expected label
+evaluation_accuracy       # Correct verdict for jiminy.evaluate tasks
 
-# Quality rewards (MDEMG infrastructure — verifiable)
-def guidance_follow_rate_reward(prompt, completion, meta) -> float
-def comprehension_score_reward(prompt, completion, meta) -> float
+# ── Quality (11) ──
+coherence_score              # Sentence structure + length + repetition penalty
+coverage_score               # Detail breadth via word count tiers
+summary_quality              # (coherence + coverage) / 2
+explanation_quality          # Reasoning depth for evaluation tasks
+specificity_score            # Concrete > generic language
+actionability_score          # Actionable recommendations
+follow_rate                  # (specificity + actionability) / 2
+insight_count                # Distinct points/bullets
+uniqueness_check             # Lexical diversity ratio
+naming_quality_score         # 2-5 word descriptive concept names
+generalization_quality_score # (coherence + specificity + coverage) / 3
 
-# Subjective rewards (LLM-as-judge)
-def rsic_actionability_reward(prompt, completion, meta) -> float
-def think_quality_reward(prompt, completion, meta) -> float
+# ── Ranking (4) ──
+ndcg_delta          # Ranking quality improvement vs reference
+score_calibration   # Scores in [0, 1] range
+score_correlation   # Proxy via calibration
+recall_improvement  # Query expansion breadth
 
-# Composite per-task registry
-TASK_REWARDS = {
-    "ape.reflect": [(json_valid_reward, 0.2), (rsic_actionability_reward, 0.5), (think_quality_reward, 0.3)],
-    "consulting.classify": [(json_valid_reward, 0.3), (classification_accuracy_reward, 0.5), (format_compliance_reward, 0.2)],
-    "jiminy.synthesize": [(guidance_follow_rate_reward, 0.5), (format_compliance_reward, 0.2), (think_quality_reward, 0.3)],
-    # ... all 16 tasks ...
-}
+# ── Performance (1) ──
+latency_reward      # Sigmoid decay vs latency budget
 ```
+
+ULTS specs reference these by name in their `reward_functions` arrays. The `REWARD_REGISTRY` dict maps string names to callables, enabling data-driven reward composition per task without hardcoded mappings.
 
 ### 11.4 Reward Function Validation
 

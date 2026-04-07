@@ -1,7 +1,7 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
-**Date:** 2026-03-30
-**Version:** 3.0 (aligned to codebase state PRs #210-#219 + deep-dive strategic analysis)
+**Date:** 2026-04-07
+**Version:** 4.0 (aligned to codebase state PRs #210-#219 + deep-dive strategic analysis)
 
 ---
 
@@ -20,7 +20,7 @@ Read in order. Each document builds on the previous.
 
 ---
 
-## Key Decisions (v3.0)
+## Key Decisions (v4.0)
 
 | Decision | Rationale |
 |---|---|
@@ -35,6 +35,27 @@ Read in order. Each document builds on the previous.
 | **ULTS spec framework** | Formalize all 16 LLM call contracts as machine-readable specs for validation, curation, and benchmark automation. |
 | **Routine retraining** | System prompts evolve, tasks are added, domains shift. Training infrastructure designed for monthly SFT refreshes, not one-time use. |
 | **Embedding: separate workstream** | Embedding fine-tuning uses contrastive learning on encoder models (not LoRA). Target: 3072-dim vectors (Neo4j + OpenAI + Ollama standard). Data collection starts now; training later. |
+| **No tool-use models** | All 16 tasks are text-in/JSON-out. Tool-use models emit tool-call structures that break json.Unmarshal. Target model must be base or instruct variant, not tool-use. |
+| **Default LLM: gpt-4.1-nano** | gpt-5-nano (tool-use) breaks JSON tasks. Switched to gpt-4.1-nano (non-tool-use, 2x cheaper output, 1M context). LoRA target remains Qwen3-30B-A3B. |
+| **Curated dataset pipeline** | export → UTDS validate → quality_filter → format_converter → dataset_versioner → train_ft. Validated E2E (10/10 PASS). |
+| **Jiminy outcomes as quality signal** | GUIDANCE_OUTCOME edges (followed/partial/ignored/not_applicable) provide direct training quality labels for Jiminy tasks. |
+| **Training data version boundary** | v0.7.1 classifier overhaul creates hard boundary. Pre-v0.7.1 Jiminy data is measurement error, not ground truth. Filter by MDEMG version >= v0.7.1. |
+
+---
+
+## Changes from v3.0
+
+| Change | Affected Documents | Status |
+|---|---|---|
+| Tool-use model constraint added | 01, 02, 06 | ✅ Applied |
+| Default LLM: gpt-5-nano → gpt-4.1-nano | 00, 01, 03, 06 | ✅ Applied |
+| E2E curated pipeline documented | 05 | ✅ Applied |
+| Jiminy outcome quality signals added | 05 | ✅ Applied |
+| Training data version boundary documented | 05, 06 | ✅ Applied |
+| reward_functions.py (21 functions), quality_report.py documented | 03 | ✅ Applied |
+| TSDB migrations 006-010 documented | 03, 05 | ✅ Applied |
+| Collection campaign status added | 05 | ✅ Applied |
+| Outcome classifier shared task label noted | 03, 06 | ✅ Applied |
 
 ---
 
