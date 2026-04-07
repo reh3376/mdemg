@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Alert dispatcher** (`internal/alert/`) — new package with file backend (atomic JSON writes, FIFO eviction at configurable cap), macOS notification backend (opt-in, `//go:build darwin`), per-(service,severity) cooldown dedup, and fire-and-forget dispatch to multiple backends
+- **Hook alert delivery** — `prompt-context.sh` shows all pending alerts per prompt; `session-start.sh` shows critical/high alerts at session start; both read from `~/.mdemg/alerts/current.json`
+- **Alert wiring** — RSIC alert actions (5 handlers), circuit breaker state change callbacks, and health prober transitions now dispatch through the alert system for real-time user notification
+- **LLM retry with exponential backoff** — `llmclient.Client` retries on 429 (with `Retry-After` header support) and 503; configurable max attempts, base delay, jitter; never retries 4xx client errors
+- **Enhanced `/healthz`** — now returns lightweight subsystem checks (Neo4j driver, circuit breaker open count, TSDB client, Jiminy) with `status: "degraded"` when subsystems are unhealthy; `session-start.sh` parses and reports degraded status
+- **TSDB buffer overflow detection** — `LLMInteractionWriter` enforces configurable max buffer size with FIFO eviction, overflow counter, and alert callback on first overflow
+- **Health prober instantiation** — orphaned `internal/healthprobe/` package now wired into production startup with configurable interval and alert callbacks on healthy↔unhealthy transitions
+- **Grafana contact point** — `provisioning/notifiers/` with webhook contact point routing alerts to `POST /v1/alerts/grafana`; notification policy with 30s group wait
+- **7 new Grafana alert rules** — TSDB writer overflow, LLM retry exhausted, probe down (API, Neo4j, TSDB, sidecar), Jiminy follow rate drop (total: 28 rules across 4 groups)
+
 ### Changed
 
 - **Default LLM model: gpt-5-nano → gpt-4.1-nano** — all 16 classification/evaluation tasks use prompt-engineered JSON (`json_object` mode), not tool-call schemas. gpt-4.1-nano is non-tool-use, 2x cheaper output tokens ($0.20/M vs $0.40/M), and has a 1M context window. Affects `LLM_MODEL`, `RECLASS_MODEL`, `RERANK_MODEL` defaults in config, compose templates, and CLI init prompts.

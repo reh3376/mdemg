@@ -156,6 +156,16 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - Hidden layer OOM: Fixed — batched orphan HiddenPattern deletion
 - `QUERY_CLASSIFY_ENABLED` compose default changed from `false` to `true`
 
+## Service Alert System (SR-001)
+- Alert file: `~/.mdemg/alerts/current.json` (configurable via `ALERT_FILE_PATH`)
+- Dispatcher: `internal/alert/` — file backend + optional macOS osascript notifications
+- Config: `ALERT_ENABLED` (default: true), `ALERT_COOLDOWN_SEC` (default: 300), `ALERT_MAX_ENTRIES` (default: 50), `ALERT_MACOS_NOTIFY` (default: false)
+- Hook delivery: `prompt-context.sh` shows all pending alerts; `session-start.sh` shows critical/high only
+- Sources: RSIC alert actions, circuit breaker state changes, health prober transitions, Grafana webhook
+- LLM retry: `LLM_RETRY_ENABLED` (default: true), `LLM_RETRY_MAX_ATTEMPTS` (default: 3), retries on 429/503 only
+- Health prober: `HEALTH_PROBE_ENABLED` (default: true), `HEALTH_PROBE_INTERVAL_SEC` (default: 60), probes API/Neo4j/TSDB/sidecar
+- Enhanced `/healthz`: returns `status: "degraded"` with `checks` map when subsystems unhealthy
+
 ## Campaign Configuration
 
 These env vars are forwarded in the compose template. Set in `.env`, or enable via `mdemg init` interactive prompt:

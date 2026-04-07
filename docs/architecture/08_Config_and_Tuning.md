@@ -448,4 +448,25 @@ JIMINY_MAX_ITEMS=10
 JIMINY_MIN_CONFIDENCE=0.3
 JIMINY_INCLUDE_FRONTIERS=true
 JIMINY_FRONTIER_MIN_SIM=0.5
+
+# Alert Dispatcher (SR-001)
+ALERT_ENABLED=true                     # Enable alert delivery system
+ALERT_FILE_PATH=~/.mdemg/alerts/current.json  # Alert file location
+ALERT_COOLDOWN_SEC=300                 # Per-(service,severity) cooldown seconds
+ALERT_MAX_ENTRIES=50                   # Max alerts in file (FIFO eviction)
+ALERT_MACOS_NOTIFY=false               # macOS notification center (opt-in)
+ALERT_MACOS_NOTIFY_MIN_SEV=high        # Min severity for macOS notifications
+
+# Health Prober (SR-001)
+HEALTH_PROBE_ENABLED=true              # Enable periodic health probing
+HEALTH_PROBE_INTERVAL_SEC=60           # Probe interval in seconds
+
+# LLM Retry (SR-001)
+LLM_RETRY_ENABLED=true                 # Enable retry with backoff
+LLM_RETRY_MAX_ATTEMPTS=3               # Maximum retry attempts
+LLM_RETRY_BASE_DELAY_MS=500            # Base delay before first retry
+LLM_RETRY_MAX_DELAY_MS=10000           # Maximum backoff delay cap
+
+# TSDB Writer Buffer (SR-001)
+TSDB_WRITER_BUFFER_MAX_SIZE=1000       # Max LLM interaction buffer (0=unlimited)
 ```
