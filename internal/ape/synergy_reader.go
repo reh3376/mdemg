@@ -2,6 +2,7 @@ package ape
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,15 +11,18 @@ import (
 // FileSynergyReader reads Claude Code integration files from disk to
 // supply synergy metrics for RSIC health assessment.
 type FileSynergyReader struct {
-	claudeMDPath string
-	memoryMDPath string
-	jiminyCheck  func() bool
+	claudeMDPath        string
+	memoryMDPath        string
+	jiminyCheck         func() bool
+	memoryLineThreshold int // from cfg.SynergyMemoryLineThreshold
+	overlapSampleSize   int // from cfg.SynergyOverlapSampleSize
 }
 
 // NewFileSynergyReader creates a reader for Claude Code synergy files.
 // Paths may be empty — auto-detection via detectClaudeMD/detectMemoryMD
 // is attempted for any empty path.
-func NewFileSynergyReader(claudePath, memoryPath string, jiminyCheck func() bool) *FileSynergyReader {
+func NewFileSynergyReader(claudePath, memoryPath string, jiminyCheck func() bool,
+	memoryLineThreshold, overlapSampleSize int) *FileSynergyReader {
 	if claudePath == "" {
 		claudePath = detectClaudeMD()
 	}
@@ -26,9 +30,11 @@ func NewFileSynergyReader(claudePath, memoryPath string, jiminyCheck func() bool
 		memoryPath = detectMemoryMD()
 	}
 	return &FileSynergyReader{
-		claudeMDPath: claudePath,
-		memoryMDPath: memoryPath,
-		jiminyCheck:  jiminyCheck,
+		claudeMDPath:        claudePath,
+		memoryMDPath:        memoryPath,
+		jiminyCheck:         jiminyCheck,
+		memoryLineThreshold: memoryLineThreshold,
+		overlapSampleSize:   overlapSampleSize,
 	}
 }
 
@@ -44,7 +50,71 @@ func (r *FileSynergyReader) ReadSynergyMetrics() SynergyMetrics {
 	if r.jiminyCheck != nil {
 		sm.JiminyHealthy = r.jiminyCheck()
 	}
+	// G1: Compute overflow rate as raw excess lines above threshold
+	if r.memoryLineThreshold > 0 && sm.MemoryMDLines > r.memoryLineThreshold {
+		sm.OverflowRate = float64(sm.MemoryMDLines - r.memoryLineThreshold)
+	}
+	// G2: Compute overlap score between MEMORY.md and CLAUDE.md
+	sm.OverlapScore = r.computeOverlap()
 	return sm
+}
+
+// computeOverlap samples content lines from MEMORY.md and checks what fraction
+// appear verbatim in CLAUDE.md. Returns 0 if either file is unreadable.
+func (r *FileSynergyReader) computeOverlap() float64 {
+	if r.claudeMDPath == "" || r.memoryMDPath == "" {
+		return 0
+	}
+	claudeData, err := os.ReadFile(r.claudeMDPath)
+	if err != nil {
+		return 0
+	}
+	memData, err := os.ReadFile(r.memoryMDPath)
+	if err != nil {
+		return 0
+	}
+
+	claudeContent := string(claudeData)
+	lines := strings.Split(string(memData), "\n")
+
+	// Extract meaningful content lines (skip empty, headers, separators, short lines)
+	var candidates []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "---") {
+			continue
+		}
+		if len(trimmed) >= 20 {
+			candidates = append(candidates, trimmed)
+		}
+	}
+	if len(candidates) == 0 {
+		return 0
+	}
+
+	// Evenly distribute sample across candidates
+	sampleSize := r.overlapSampleSize
+	if sampleSize <= 0 {
+		sampleSize = 5
+	}
+	var samples []string
+	if len(candidates) <= sampleSize {
+		samples = candidates
+	} else {
+		step := float64(len(candidates)) / float64(sampleSize)
+		for i := range sampleSize {
+			idx := int(float64(i) * step)
+			samples = append(samples, candidates[idx])
+		}
+	}
+
+	matches := 0
+	for _, s := range samples {
+		if strings.Contains(claudeContent, s) {
+			matches++
+		}
+	}
+	return float64(matches) / float64(len(samples))
 }
 
 // countFileLines counts newlines in a file. Returns 0 if the file is missing or unreadable.
@@ -116,17 +186,6 @@ func detectMemoryMD() string {
 	if _, err := os.Stat(candidate); err == nil {
 		return candidate
 	}
-	// Fallback: glob for longest path match
-	pattern := filepath.Join(home, ".claude", "projects", "*", "memory", "MEMORY.md")
-	matches, _ := filepath.Glob(pattern)
-	if len(matches) == 0 {
-		return ""
-	}
-	best := matches[0]
-	for _, m := range matches[1:] {
-		if len(m) > len(best) {
-			best = m
-		}
-	}
-	return best
+	slog.Warn("synergy: MEMORY.md not found at expected path", "path", candidate)
+	return ""
 }
