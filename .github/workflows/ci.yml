@@ -58,7 +58,7 @@ jobs:
       - name: Validate TSDB schema version consistency
         run: |
           EXPECTED=$(ls internal/tsdb/migrations/*.sql | wc -l | tr -d ' ')
-          ACTUAL=$(grep -oP 'TSDB_REQUIRED_SCHEMA_VERSION.*default.*?:\s*\K[0-9]+' internal/config/config.go || echo "0")
+          ACTUAL=$(grep -oP 'atoi\("TSDB_REQUIRED_SCHEMA_VERSION",\s*\K[0-9]+' internal/config/config.go || echo "0")
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "FAIL: config.go TSDB_REQUIRED_SCHEMA_VERSION default=$ACTUAL, expected $EXPECTED"
             exit 1
