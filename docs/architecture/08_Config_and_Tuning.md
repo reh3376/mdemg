@@ -483,4 +483,19 @@ WEEKLY_GAP_INTERVIEWS_ENABLED=false    # Enable background weekly gap interviews
 
 # TSDB Writer Buffer (SR-001)
 TSDB_WRITER_BUFFER_MAX_SIZE=1000       # Max LLM interaction buffer (0=unlimited)
+
+# Synergy Assessment (DASH-001)
+SYNERGY_ASSESSMENT_ENABLED=true        # RSIC synergy dimension master switch
+SYNERGY_CLAUDE_MD_PATH=               # Path to CLAUDE.md (auto-detect if empty)
+SYNERGY_MEMORY_MD_PATH=               # Path to MEMORY.md (auto-detect if empty)
+SYNERGY_TARGET_CLAUDE_LINES=150        # Target CLAUDE.md line count for health scoring
+SYNERGY_TARGET_MEMORY_LINES=120        # Target MEMORY.md line count for health scoring
+SYNERGY_OVERLAP_SAMPLE_SIZE=5          # Lines sampled for overlap check
+SYNERGY_OVERLAP_THRESHOLD=0.85         # Similarity threshold for "overlapping"
+SYNERGY_OVERFLOW_ALERT_THRESHOLD=5     # Overflow events/24h before RSIC alert
+SYNERGY_MAX_HOOK_TOKENS=500            # Max per-prompt hook injection tokens
+SYNERGY_CRON_INTERVAL=4h               # Health check cron interval
+SYNERGY_CRON_ENABLED=true              # Cron-based synergy health checks
+SYNERGY_MEMORY_LINE_THRESHOLD=120      # Overflow trigger threshold
+SYNERGY_MEMORY_AUTO_INGEST=true        # Auto-ingestion master switch
 ```
