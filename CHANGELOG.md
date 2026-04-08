@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Code comprehension feedback loop** (P1-15) — `CodeComprehensionTracker` monitors per-constraint-code comprehension scores in a sliding window. When average drops below threshold, triggers code regeneration via `ConstraintCodeGenerator`. Feature-gated off by default (`JIMINY_CODE_REGEN_ENABLED=false`). Config: `JIMINY_CODE_REGEN_THRESHOLD` (0.3), `JIMINY_CODE_REGEN_MIN_SAMPLES` (10). Includes cooldown timer + max-regen-per-hour cap.
+- **NLI bias alert consumer** (P2-15) — `RecordOutcome` now checks NLI calibration report after tracking and logs a warning when systematic NLI-vs-heuristic bias is detected.
+- **Embedding cache TTL** (P2-21) — `NodeEmbeddingCache` now supports TTL-based eviction. Config: `NODE_EMBEDDING_CACHE_TTL_SEC` (default: 3600, 0 = no TTL). Stale entries evicted on access.
+- **EdgeTypeStrategy validation** (P2-2) — `Config.Validate()` now rejects invalid `EDGE_TYPE_STRATEGY` values.
+- **TSDB schema version CI check** (P2-12) — CI now validates `TSDB_REQUIRED_SCHEMA_VERSION` matches migration file count.
+- **Goroutine semaphore** (P2-16) — RSIC task `Dispatcher` now bounds concurrent goroutines to 50 via channel semaphore.
+
+### Fixed
+
+- **Sequence counter not restored on resume** (P1-16) — `ResumeProtocol()` now calls `SetCounter(req.LastSeq)` after event replay, ensuring monotonic sequence continuity.
+- **Tier predictor timeout conflation** (P1-17) — `TierPredictResult` now carries `TimedOut` bool. Timeouts logged at `slog.Warn` with latency for distinct metrics recording.
+- **Training script TOCTOU** (P1-23) — `build_train_config()` now accepts manifest row count directly instead of re-counting file lines after manifest validation.
+- **Watchdog context race** (P1-13) — `Restart()` now holds `mu.Lock` when reassigning `ctx`/`cancel`, preventing concurrent `check()` from reading stale context.
+- **postReport lock upgrade race** (P1-12) — Replaced `RLock→RUnlock→Lock` gap with single write `Lock` for atomic read-then-write.
+- **Task cycle detection stale reads** (P1-10) — Added `stateVersion` counter to `Dispatcher`, incremented on every task state change. `WaitForCycle` detects stale reads by comparing versions between polls.
+- **TryLock skip not reported** (P1-22) — Consolidation handler now checks `result.Skipped` and returns a warning instead of counting skipped consolidation as success.
+- **Consolidation cascade on empty graph** (P1-9) — `RunConsolidation` now guards against empty graphs (zero hidden nodes created + zero forward pass updates) and returns early with `EmptyGraph: true`.
+- **Healthcheck port hardcoded** (P1-19) — Both `docker-compose.yml` files now use `CMD-SHELL` with `${MDEMG_PORT:-9999}` variable interpolation.
+- **Effectiveness TTL too short** (P2-1) — Default `JIMINY_EFFECTIVENESS_TTL_SEC` raised from 7200 to 86400 (24 hours).
+- **LISTEN_PORT dead code** (P2-3) — Removed unused `LISTEN_PORT` env var from both compose files.
+- **Missing stop_grace_period** (P2-5) — Added `stop_grace_period: 35s` to mdemg service (5s > graceful shutdown timeout).
+- **AUTH_API_KEYS naming** (P2-6) — Compose files now accept both `AUTH_API_KEYS` and `MDEMG_API_KEYS` via fallback interpolation.
+- **Decay formula NaN** (P2-7) — All 4 Cypher decay formulas now clamp the base to 0.01 when `(1 - decay/sqrt(evidence*surprise))` goes non-positive.
+- **CONFLICTS_WITH not idempotent** (P2-11) — Changed `CREATE` to `MERGE` with `ON CREATE SET`/`ON MATCH SET` for safe re-runs.
+- **LLM handler timeouts** (P2-10) — `handleJiminyGuide` and `handleRecall` now use `context.WithTimeout(30s)`.
+- **TSDB schema version stale** (P2-12) — Default `TSDB_REQUIRED_SCHEMA_VERSION` updated from 8 to 10.
+- **Trust store eventual consistency** (P1-10) — Documented that `feedbackCounts` may lag by up to 30s after crash recovery; impact is cosmetic (protocolStatus display only).
+
+> **Validated 2026-04-08**: All 30+ DD-P1P2 fixes live-validated — 14 static checks, 8 unit/race suites, 15 live_validation.py tests, 379 UATS contract tests, 7 fix-specific API tests, 139 integration tests. Zero failures, zero regressions. See [`docs/testing/dd-p1p2-validation-report.md`](docs/testing/dd-p1p2-validation-report.md).
+
 - **Synergy file reader** (`internal/ape/synergy_reader.go`) — implements the `SynergyFileReader` interface for RSIC health assessment. Reads CLAUDE.md and MEMORY.md line counts from disk with auto-detection of file paths. Wired in `server.go` when `SYNERGY_ASSESSMENT_ENABLED=true` (default). Fixes 4 dashboard panels (Synergy gauge, CLAUDE.md Lines, MEMORY.md Lines, Synergy Overflow & Buffer) that previously showed 0.
 - **Assessment confidence debug logging** — `computeConfidence()` now logs data point values when confidence drops below 0.3 threshold for faster diagnosis of low-confidence cycle bailouts.
 

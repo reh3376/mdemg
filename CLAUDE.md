@@ -147,6 +147,15 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - P2: Config.Validate() cross-field checks, pool metrics, writeback timeout, sidecar confidence floor
 - Scheduled maintenance LaunchAgent (weekly decay + prune)
 
+## Deep Dive Bug Fix Campaign (DD-P1P2 — Complete)
+- P1: Sequence counter restored on resume, tier predictor timeout differentiation, training TOCTOU fix
+- P1: Watchdog ctx race guard, postReport lock upgrade, task cycle version counter
+- P1: TryLock skip reporting, empty-graph cascade guard, healthcheck port parameterized
+- P1: Trust store consistency documented, code comprehension feedback loop (feature-gated)
+- P2: TTL raised to 86400, EdgeTypeStrategy validation, decay NaN guard, CONFLICTS_WITH MERGE
+- P2: LLM handler timeouts, goroutine semaphore, embedding cache TTL, TSDB schema version CI check
+- P2: NLI bias alert consumer, compose cleanup (LISTEN_PORT, stop_grace_period, AUTH_API_KEYS)
+
 ## Graph Health (v0.6.0 — Complete)
 - BUG-1 (SymbolNode dedup): Fixed — natural-key MERGE + V0023 uniqueness constraint
 - BUG-2 (vendor nodes): Fixed — `prune --match-ignore` + `graph repair` vendor cleanup

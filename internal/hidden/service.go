@@ -1639,6 +1639,14 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 	result.ForwardPass = fwdResult
 
+	// Guard: skip concept clustering and backward pass if graph is empty
+	if fwdResult.HiddenNodesUpdated == 0 && result.HiddenNodesCreated == 0 {
+		slog.Warn("consolidation: empty graph, skipping concept clustering", "space_id", spaceID)
+		result.EmptyGraph = true
+		result.TotalDuration = time.Since(start)
+		return result, nil
+	}
+
 	// Step 3: Multi-layer concept clustering (L1 → L2, L2 → L3, etc.)
 	// Try ALL layers - don't break early. Upper layers have looser constraints
 	// and may form clusters even if intermediate layers don't.

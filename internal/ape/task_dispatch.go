@@ -38,6 +38,12 @@ type Dispatcher struct {
 	stopCleanup chan struct{}
 	cleanupDone chan struct{}
 
+	// DD-P1P2: Version counter for stale-read detection in WaitForCycle
+	stateVersion uint64
+
+	// DD-P2-16: Goroutine semaphore to bound concurrent RSIC task execution
+	sem chan struct{}
+
 	// SR-001: Alert delivery
 	alertDispatcher AlertDispatcher
 }
@@ -58,6 +64,7 @@ func NewDispatcher(driver neo4j.DriverWithContext, learner LearningStatsProvider
 		convSvc:     convSvc,
 		hiddenSvc:   hiddenSvc,
 		driver:      driver,
+		sem:         make(chan struct{}, 50), // DD-P2-16: bound concurrent goroutines
 	}
 }
 
@@ -141,7 +148,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 		d.mu.Unlock()
 
 		metrics.Metrics().RSICActionTotal(task.ActionType, "dispatched").Inc()
-		go d.executeTask(taskCtx, at)
+		d.sem <- struct{}{} // DD-P2-16: acquire semaphore
+		go func() {
+			defer func() { <-d.sem }() // release semaphore
+			d.executeTask(taskCtx, at)
+		}()
 	}
 	return nil
 }
@@ -178,6 +189,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 			fmt.Sprintf("Dry-run delta computed for %s", actionType), nil, "")
 		d.mu.Lock()
 		at.Status = "completed"
+		d.stateVersion++
 		d.mu.Unlock()
 		return
 	}
@@ -208,6 +220,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 				fmt.Sprintf("Rejected by safety validator: %s", decision.Reason), nil, decision.Reason)
 			d.mu.Lock()
 			at.Status = "failed"
+			d.stateVersion++
 			d.mu.Unlock()
 			return
 		}
@@ -302,6 +315,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		metrics.Metrics().RSICActionDuration(actionType).ObserveDuration(taskStart)
 		d.mu.Lock()
 		at.Status = "failed"
+		d.stateVersion++
 		d.mu.Unlock()
 		d.postReport(taskID, "failed", 100, "execution_complete", "", nil, execErr.Error())
 		slog.Error("RSIC task failed", "task_id", taskID, "error", execErr)
@@ -319,6 +333,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 
 	d.mu.Lock()
 	at.Status = "completed"
+	d.stateVersion++
 	d.mu.Unlock()
 }
 
@@ -849,14 +864,11 @@ func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, s
 		Timestamp:    time.Now(),
 		Error:        errMsg,
 	}
-	// Find cycleID from active task
-	d.mu.RLock()
+	// Single write lock for both read and append to prevent race between RUnlock and Lock.
+	d.mu.Lock()
 	if at, ok := d.activeTasks[taskID]; ok {
 		report.CycleID = at.Spec.CycleID
 	}
-	d.mu.RUnlock()
-
-	d.mu.Lock()
 	d.reports[taskID] = append(d.reports[taskID], report)
 	d.mu.Unlock()
 }

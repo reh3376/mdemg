@@ -151,6 +151,7 @@ type Config struct {
 	QueryAwareExpansionEnabled bool    // Feature toggle (default: true)
 	QueryAwareAttentionWeight  float64 // Weight of query-node similarity vs edge weight (default: 0.5)
 	NodeEmbeddingCacheSize     int     // LRU cache size for node embeddings (default: 5000)
+	NodeEmbeddingCacheTTLSec   int     // NODE_EMBEDDING_CACHE_TTL_SEC — TTL for embedding cache entries in seconds (default: 3600, 0 = no TTL)
 
 	// Hybrid Edge Type Strategy settings (V0010) - different edge types at different hop depths
 	EdgeTypeStrategy    string   // Strategy: "all", "structural_first", "learned_only", "hybrid" (default: "hybrid")
@@ -313,6 +314,11 @@ type Config struct {
 	JiminyEscalationBlockAfter   int  // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
 	JiminyEscalationBlockEnabled bool // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
 	JiminyEscalationDecayMinutes int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+
+	// Jiminy Code Comprehension Feedback Loop
+	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
+	JiminyCodeRegenThreshold  float64 // JIMINY_CODE_REGEN_THRESHOLD — avg comprehension below this triggers regen (default: 0.3)
+	JiminyCodeRegenMinSamples int     // JIMINY_CODE_REGEN_MIN_SAMPLES — minimum samples before evaluating (default: 10)
 
 	// RSIC Jiminy Integration (J10)
 	RSICJiminyFollowRateThreshold           float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
@@ -1472,6 +1478,10 @@ func FromEnv() (Config, error) {
 	if nodeEmbeddingCacheSize < 100 {
 		return Config{}, errors.New("NODE_EMBEDDING_CACHE_SIZE must be >= 100")
 	}
+	nodeEmbeddingCacheTTLSec, err := atoi("NODE_EMBEDDING_CACHE_TTL_SEC", 3600)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Hybrid Edge Type Strategy settings (V0010)
 	edgeTypeStrategy := get("EDGE_TYPE_STRATEGY", "hybrid")
@@ -1921,7 +1931,7 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
-	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 7200)
+	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 86400)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2041,6 +2051,15 @@ func FromEnv() (Config, error) {
 	}
 	jiminyEscalationBlockEnabled := getBool("JIMINY_ESCALATION_BLOCK_ENABLED", false)
 	jiminyEscalationDecayMinutes, err := atoi("JIMINY_ESCALATION_DECAY_MINUTES", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCodeRegenEnabled := getBool("JIMINY_CODE_REGEN_ENABLED", false)
+	jiminyCodeRegenThreshold, err := atof("JIMINY_CODE_REGEN_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCodeRegenMinSamples, err := atoi("JIMINY_CODE_REGEN_MIN_SAMPLES", 10)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3164,7 +3183,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 8)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 10)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3349,6 +3368,7 @@ func FromEnv() (Config, error) {
 		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
 		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
 		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
+		NodeEmbeddingCacheTTLSec:     nodeEmbeddingCacheTTLSec,
 		EdgeTypeStrategy:             edgeTypeStrategy,
 		StructuralEdgeTypes:          structuralEdgeTypes,
 		LearnedEdgeTypes:             learnedEdgeTypes,
@@ -3490,6 +3510,9 @@ func FromEnv() (Config, error) {
 		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
 		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
 		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
+		JiminyCodeRegenEnabled:    jiminyCodeRegenEnabled,
+		JiminyCodeRegenThreshold:  jiminyCodeRegenThreshold,
+		JiminyCodeRegenMinSamples: jiminyCodeRegenMinSamples,
 		RSICJiminyFollowRateThreshold:           rsicJiminyFollowRateThreshold,
 		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
 		RSICJiminySourceImbalanceThreshold:      rsicJiminySourceImbalanceThreshold,
@@ -3990,6 +4013,12 @@ func (c Config) Validate() (warnings []string, err error) {
 	}
 	if c.LearningWMin >= c.LearningWMax {
 		errs = append(errs, fmt.Errorf("LearningWMin (%.2f) must be < LearningWMax (%.2f)", c.LearningWMin, c.LearningWMax))
+	}
+
+	// EdgeTypeStrategy validation
+	validStrategies := map[string]bool{"all": true, "structural_first": true, "learned_only": true, "hybrid": true}
+	if c.EdgeTypeStrategy != "" && !validStrategies[c.EdgeTypeStrategy] {
+		errs = append(errs, fmt.Errorf("invalid EdgeTypeStrategy %q (valid: all, structural_first, learned_only, hybrid)", c.EdgeTypeStrategy))
 	}
 
 	if len(errs) > 0 {

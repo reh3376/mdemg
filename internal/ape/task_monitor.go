@@ -52,19 +52,30 @@ func (m *Monitor) WaitForCycle(cycleID string, timeout time.Duration) bool {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
+	var lastVersion uint64
 	for {
 		select {
 		case <-deadline:
 			return false
 		case <-ticker.C:
-			if m.allTasksDone(cycleID) {
+			done, ver := m.allTasksDone(cycleID)
+			if done {
 				return true
 			}
+			// Detect stale reads: if version hasn't changed, tasks may have been
+			// cleaned up between polls. Continue waiting only if version advances.
+			if ver > 0 && ver == lastVersion {
+				// No state changes since last poll — check if cycle still has tasks
+				if !done && ver == lastVersion {
+					continue
+				}
+			}
+			lastVersion = ver
 		}
 	}
 }
 
-func (m *Monitor) allTasksDone(cycleID string) bool {
+func (m *Monitor) allTasksDone(cycleID string) (done bool, version uint64) {
 	m.dispatcher.mu.RLock()
 	defer m.dispatcher.mu.RUnlock()
 
@@ -73,11 +84,11 @@ func (m *Monitor) allTasksDone(cycleID string) bool {
 		if at.Spec.CycleID == cycleID {
 			found = true
 			if at.Status == "running" {
-				return false
+				return false, m.dispatcher.stateVersion
 			}
 		}
 	}
-	return found // true if all done, false if no tasks found
+	return found, m.dispatcher.stateVersion
 }
 
 // CollectReportsForCycle returns all progress reports for tasks in a cycle.

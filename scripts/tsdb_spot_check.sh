@@ -10,7 +10,7 @@ FAILURES=0
 echo ""; echo "=== MDEMG TSDB Data Spot Check ==="; echo ""
 echo "── 1. Schema ──"
 SCHEMA=$(Q "SELECT value FROM tsdb_schema_meta WHERE key='schema_version';")
-[ "$SCHEMA" = "7" ] && PASS "Schema version: $SCHEMA" || FAIL "Schema version: $SCHEMA (expected 7)"
+[ "$SCHEMA" = "10" ] && PASS "Schema version: $SCHEMA" || FAIL "Schema version: $SCHEMA (expected 10)"
 echo ""; echo "── 2. Row Counts ──"
 for t in metric_samples llm_interactions embedding_events retrieval_events; do
   c=$(Q "SELECT count(*) FROM $t;"); [ "$c" -gt 0 ] 2>/dev/null && PASS "$t: $c rows" || FAIL "$t: 0 rows"

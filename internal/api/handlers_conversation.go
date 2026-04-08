@@ -328,7 +328,9 @@ func (s *Server) handleRecall(w http.ResponseWriter, r *http.Request) {
 		FilterTags:       req.FilterTags,
 	}
 
-	resp, err := s.conversationSvc.Recall(r.Context(), internalReq)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	resp, err := s.conversationSvc.Recall(ctx, internalReq)
 	if err != nil {
 		writeInternalError(w, err, "recall")
 		return

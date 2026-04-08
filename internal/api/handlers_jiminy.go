@@ -184,7 +184,9 @@ func (s *Server) handleJiminyGuide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 	resp, err := s.jiminySvc.Guide(ctx, jiminy.GuidanceRequest{
 		SpaceID:     req.SpaceID,
