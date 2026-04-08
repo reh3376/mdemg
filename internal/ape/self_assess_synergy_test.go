@@ -122,3 +122,17 @@ func TestScoreSynergy_HighOverflow(t *testing.T) {
 		t.Errorf("expected %f, got %f", want, got)
 	}
 }
+
+func TestScoreSynergy_BothFilesZero(t *testing.T) {
+	a := newSynergyAssessor()
+	r := &SelfAssessmentReport{
+		JiminyHealthy:      true,
+		SynergyLinesClaude: 0,
+		SynergyLinesMemory: 0,
+	}
+
+	got := a.scoreSynergy(r)
+	if !synergyAlmostEqual(got, 0.0) {
+		t.Errorf("expected 0.0 (excluded from formula), got %f", got)
+	}
+}

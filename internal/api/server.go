@@ -712,6 +712,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 		rsicAssessor.SetSynergyReader(ape.NewFileSynergyReader(
 			cfg.SynergyClaudeMDPath, cfg.SynergyMemoryMDPath, jiminyCheck,
+			cfg.SynergyMemoryLineThreshold, cfg.SynergyOverlapSampleSize,
 		))
 		slog.Info("rsic: synergy reader wired")
 	}

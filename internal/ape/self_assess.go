@@ -29,6 +29,7 @@ type SynergyMetrics struct {
 	AutoMemoryLines int
 	JiminyHealthy   bool
 	OverflowRate    float64
+	OverlapScore    float64
 }
 
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
@@ -165,6 +166,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyLinesClaude = sm.ClaudeMDLines
 		report.SynergyLinesMemory = sm.MemoryMDLines
 		report.SynergyOverflowRate = sm.OverflowRate
+		report.SynergyOverlapScore = sm.OverlapScore
 		report.JiminyHealthy = sm.JiminyHealthy
 		report.SynergyHealth = a.scoreSynergy(report)
 
@@ -430,7 +432,12 @@ func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
 
 // scoreSynergy computes Claude Code ↔ MDEMG synergy health.
 // Jiminy must be healthy — without it, synergy pruning is dangerous.
+// Returns 0.0 (excluded from OverallHealth formula) when both files are missing.
 func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) float64 {
+	// G3: Files not found → cannot assess, exclude from formula
+	if r.SynergyLinesClaude == 0 && r.SynergyLinesMemory == 0 {
+		return 0.0
+	}
 	if !r.JiminyHealthy {
 		return 0.0
 	}
