@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Synergy file reader** (`internal/ape/synergy_reader.go`) — implements the `SynergyFileReader` interface for RSIC health assessment. Reads CLAUDE.md and MEMORY.md line counts from disk with auto-detection of file paths. Wired in `server.go` when `SYNERGY_ASSESSMENT_ENABLED=true` (default). Fixes 4 dashboard panels (Synergy gauge, CLAUDE.md Lines, MEMORY.md Lines, Synergy Overflow & Buffer) that previously showed 0.
+- **Assessment confidence debug logging** — `computeConfidence()` now logs data point values when confidence drops below 0.3 threshold for faster diagnosis of low-confidence cycle bailouts.
+
+### Fixed
+
+- **Dashboard sparse-event panels** — Action Success Rate, Safety Blocks, Snapshots Created, and Trigger Rejections panels now display "None" instead of confusing "No data" when no events exist in the current time window.
 - **Server-native alert evaluator** (`internal/alert/evaluator.go`) — 13 TSDB-query alert rules migrated from Grafana to run natively on the server. Periodic evaluation with configurable interval (`ALERT_EVALUATOR_INTERVAL_SEC`, default: 30s), ForDuration state tracking to prevent flapping, and graceful degradation when TSDB is unavailable. Grafana is no longer required for alert evaluation.
 - **Goroutine supervisor** (`internal/supervisor/`) — monitors background goroutines (health prober, alert evaluator) with panic recovery, automatic restart with exponential backoff (5s base, max 3 retries), and alerts on restart (warning) and permanent failure (critical).
 

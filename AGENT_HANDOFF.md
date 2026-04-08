@@ -556,6 +556,14 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 
 ## 5. Open Work Items
 
+### DASH-001: RSIC Dashboard Data Fix — COMPLETE as of 2026-04-08
+
+Fixes for RSIC Operations Grafana dashboard data issues (7 panels showing "No data" or 0):
+- **SynergyFileReader** implemented (`internal/ape/synergy_reader.go`) — reads CLAUDE.md/MEMORY.md line counts, wired via `SetSynergyReader()` in `server.go`. Fixed 4 panels (Synergy gauge, CLAUDE.md Lines, MEMORY.md Lines, Synergy Overflow & Buffer).
+- **Assessment confidence debug logging** — `computeConfidence()` logs data point values when confidence < 0.3 for faster diagnosis.
+- **Dashboard noValue display** — Action Success Rate, Safety Blocks, Snapshots Created, Trigger Rejections panels show "None" instead of "No data" when empty.
+- **Cycle completion** — Confirmed cycles complete normally (confidence=1.0) after clean server restart; previous low_confidence was transient from server bouncing during SNA-001 live testing.
+
 ### Gap Analysis Phase 4 — COMPLETE as of 2026-03-30
 
 Source plan: `.claude/plans/mellow-crunching-hopcroft.md`

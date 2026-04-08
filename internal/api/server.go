@@ -705,6 +705,16 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			return resp.StatusCode == http.StatusOK
 		})
 	}
+	// Synergy: Wire file reader for RSIC synergy health assessment
+	if cfg.SynergyAssessmentEnabled {
+		jiminyCheck := func() bool {
+			return cfg.JiminyEnabled && jiminySvc != nil
+		}
+		rsicAssessor.SetSynergyReader(ape.NewFileSynergyReader(
+			cfg.SynergyClaudeMDPath, cfg.SynergyMemoryMDPath, jiminyCheck,
+		))
+		slog.Info("rsic: synergy reader wired")
+	}
 	rsicReflector := ape.NewReflector(cfg, driver)
 	// J17: Wire protocol stats provider to reflector
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
