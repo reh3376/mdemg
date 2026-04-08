@@ -20,27 +20,35 @@ type NodeEmbeddingCache struct {
 	items    map[string]*list.Element // nodeID -> list element
 	lruList  *list.List              // front = most recent, back = least recent
 	capacity int
+	maxAge   time.Duration // DD-P2-21: TTL for cache entries (0 = no TTL)
 	hits     int64
 	misses   int64
+	evicts   int64 // TTL evictions
 }
 
 type embeddingEntry struct {
 	key        string
 	embedding  []float32
 	accessedAt time.Time
+	createdAt  time.Time // DD-P2-21: for TTL eviction
 }
 
 // NewNodeEmbeddingCache creates a new embedding cache with the specified capacity.
 // Minimum capacity is 1 for production use (config enforces minimum of 100 at env level).
-func NewNodeEmbeddingCache(capacity int) *NodeEmbeddingCache {
+// maxAge of 0 means no TTL eviction.
+func NewNodeEmbeddingCache(capacity int, maxAge ...time.Duration) *NodeEmbeddingCache {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &NodeEmbeddingCache{
+	c := &NodeEmbeddingCache{
 		items:    make(map[string]*list.Element, capacity),
 		lruList:  list.New(),
 		capacity: capacity,
 	}
+	if len(maxAge) > 0 {
+		c.maxAge = maxAge[0]
+	}
+	return c
 }
 
 // Get retrieves an embedding from cache. Returns nil if not found. O(1).
@@ -54,8 +62,18 @@ func (c *NodeEmbeddingCache) Get(nodeID string) []float32 {
 		return nil
 	}
 
-	c.hits++
 	entry := elem.Value.(*embeddingEntry)
+
+	// DD-P2-21: TTL eviction — remove stale entries on access
+	if c.maxAge > 0 && time.Since(entry.createdAt) > c.maxAge {
+		c.lruList.Remove(elem)
+		delete(c.items, nodeID)
+		c.misses++
+		c.evicts++
+		return nil
+	}
+
+	c.hits++
 	entry.accessedAt = time.Now()
 	c.lruList.MoveToFront(elem)
 
@@ -87,10 +105,12 @@ func (c *NodeEmbeddingCache) Put(nodeID string, embedding []float32) {
 	}
 
 	// Add new entry
+	now := time.Now()
 	entry := &embeddingEntry{
 		key:        nodeID,
 		embedding:  embedding,
-		accessedAt: time.Now(),
+		accessedAt: now,
+		createdAt:  now,
 	}
 	elem := c.lruList.PushFront(entry)
 	c.items[nodeID] = elem

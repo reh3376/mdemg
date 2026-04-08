@@ -73,13 +73,16 @@ WHERE sim >= $simThreshold
   )
 WITH a, b, sim
 LIMIT $maxPairs
-CREATE (a)-[r:CONFLICTS_WITH {
-  similarity_score: sim,
-  detection_method: 'embedding_similarity',
-  resolution_status: 'unresolved',
-  resolution_text: '',
-  detected_at: $detectedAt
-}]->(b)
+MERGE (a)-[r:CONFLICTS_WITH]->(b)
+ON CREATE SET
+  r.similarity_score = sim,
+  r.detection_method = 'embedding_similarity',
+  r.resolution_status = 'unresolved',
+  r.resolution_text = '',
+  r.detected_at = $detectedAt
+ON MATCH SET
+  r.similarity_score = sim,
+  r.detected_at = $detectedAt
 RETURN count(r) AS new_conflicts`
 
 	now := time.Now().UTC().Format(time.RFC3339)

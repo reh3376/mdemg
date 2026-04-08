@@ -505,9 +505,12 @@ LIMIT $limit`, joinWhereClauses(whereClauses))
 			case "consolidate":
 				affected := 0
 				if s.hiddenSvc != nil {
-					if _, err := s.hiddenSvc.RunConsolidation(ctx, spaceID); err != nil {
+					consResult, err := s.hiddenSvc.RunConsolidation(ctx, spaceID)
+					if err != nil {
 						slog.Warn("consolidation failed", "space_id", spaceID, "error", err)
 						resp.Warnings = append(resp.Warnings, fmt.Sprintf("consolidation failed for %s: %v", spaceID, err))
+					} else if consResult != nil && consResult.Skipped {
+						resp.Warnings = append(resp.Warnings, fmt.Sprintf("consolidation skipped for %s: already running", spaceID))
 					} else {
 						affected += len(nodes)
 					}

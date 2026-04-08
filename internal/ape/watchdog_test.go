@@ -3,6 +3,7 @@ package ape
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -195,9 +196,9 @@ func TestCheckWithoutSignalProvider(t *testing.T) {
 				RSICForceThreshold:    tt.forceThreshold,
 			}
 
-			cycleTriggerCalled := false
+			var cycleTriggerCalled atomic.Bool
 			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string, meta TriggerMetadata) {
-				cycleTriggerCalled = true
+				cycleTriggerCalled.Store(true)
 			})
 			defer w.Stop()
 
@@ -218,7 +219,7 @@ func TestCheckWithoutSignalProvider(t *testing.T) {
 
 			// For force level with cycle trigger, state resets immediately
 			if tt.name == "force level triggers auto-reset" {
-				if !cycleTriggerCalled {
+				if !cycleTriggerCalled.Load() {
 					t.Error("cycleTrigger should be called at force level")
 				}
 				// State should be reset after force trigger
@@ -239,7 +240,7 @@ func TestCheckWithoutSignalProvider(t *testing.T) {
 					t.Errorf("EscalationLevel = %d, want %d", state.EscalationLevel, tt.wantEscalation)
 				}
 
-				if cycleTriggerCalled {
+				if cycleTriggerCalled.Load() {
 					t.Error("cycleTrigger should not be called below force level")
 				}
 			}
@@ -487,9 +488,9 @@ func TestAdditionalEscalation(t *testing.T) {
 				RSICForceThreshold:    0.9,
 			}
 
-			cycleTriggerCalled := false
+			var cycleTriggerCalled atomic.Bool
 			w := NewWatchdog(cfg, "test-space", func(ctx context.Context, spaceID string, meta TriggerMetadata) {
-				cycleTriggerCalled = true
+				cycleTriggerCalled.Store(true)
 			})
 			defer w.Stop()
 
@@ -516,8 +517,8 @@ func TestAdditionalEscalation(t *testing.T) {
 				t.Errorf("EscalationLevel = %d, want %d", state.EscalationLevel, tt.wantEscalation)
 			}
 
-			if cycleTriggerCalled != tt.wantCycleTrigger {
-				t.Errorf("cycleTriggerCalled = %v, want %v", cycleTriggerCalled, tt.wantCycleTrigger)
+			if cycleTriggerCalled.Load() != tt.wantCycleTrigger {
+				t.Errorf("cycleTriggerCalled = %v, want %v", cycleTriggerCalled.Load(), tt.wantCycleTrigger)
 			}
 		})
 	}

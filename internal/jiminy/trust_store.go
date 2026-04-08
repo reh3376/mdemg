@@ -101,6 +101,9 @@ func (ts *TrustStore) RemarkDirty(sessionID string) {
 }
 
 // FlushSnapshots writes trust snapshots to Neo4j.
+// NOTE: Eventual consistency — after crash recovery, feedbackCounts may lag by up
+// to 30s (the flush interval). This is acceptable because feedbackCounts affect only
+// the protocolStatus display, not trust score computation or guidance decisions.
 func (ts *TrustStore) FlushSnapshots(ctx context.Context, snapshots []TrustSnapshot) error {
 	if len(snapshots) == 0 {
 		return nil

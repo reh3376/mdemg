@@ -83,7 +83,9 @@ func (w *Watchdog) Stop() {
 // Restart stops the watchdog and starts it again with a fresh context.
 func (w *Watchdog) Restart() {
 	w.Stop()
+	w.mu.Lock()
 	w.ctx, w.cancel = context.WithCancel(context.Background())
+	w.mu.Unlock()
 	w.Start()
 }
 

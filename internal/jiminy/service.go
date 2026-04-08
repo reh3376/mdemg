@@ -54,9 +54,10 @@ type Service struct {
 	arbitrator          *SidecarArbitrator       // NS-01: sidecar mode arbitration
 	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
 	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
-	warmStore           *WarmStore               // B7: WarmStore reference for trust-based invalidation
-	trustStore          *TrustStore              // J17: write-behind trust persistence to Neo4j
-	trustCancel         context.CancelFunc       // cancels trust persistence goroutine
+	warmStore               *WarmStore               // B7: WarmStore reference for trust-based invalidation
+	trustStore              *TrustStore              // J17: write-behind trust persistence to Neo4j
+	trustCancel             context.CancelFunc       // cancels trust persistence goroutine
+	codeComprehensionTracker *CodeComprehensionTracker // P1-15: code comprehension feedback loop
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -1302,6 +1303,15 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 							heuristicComp = 0.5
 						}
 						s.calibrationTracker.Track(nliScore, heuristicComp)
+
+						// P2-15: Check for NLI bias alert after tracking
+						if report := s.calibrationTracker.Report(); report != nil && report.BiasAlert {
+							slog.Warn("jiminy: NLI calibration bias detected",
+								"mean_bias", report.MeanBias,
+								"window_size", report.WindowSize,
+								"constraint_code", item.ConstraintCode,
+							)
+						}
 					}
 				}
 			} else {
@@ -1341,6 +1351,13 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// Attach dimensions to the result
 		results[len(results)-1].Dimensions = dims
+
+		// P1-15: Code comprehension feedback loop — track comprehension per constraint code
+		if s.codeComprehensionTracker != nil && dims != nil && item.ConstraintCode != "" {
+			if needsRegen := s.codeComprehensionTracker.Record(item.ConstraintCode, dims.Comprehension); needsRegen {
+				go s.codeComprehensionTracker.TriggerRegen(ctx, item.ConstraintCode, "constraint", item.Content)
+			}
+		}
 
 		// NS-14: Collect outcome training data
 		if s.dataCollector != nil && dims != nil {
@@ -1418,7 +1435,10 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}
 	}
 
-	// B4: Track per-session feedback count and timestamp for protocol status
+	// B4: Track per-session feedback count and timestamp for protocol status.
+	// NOTE: feedbackCounts are in-memory only and flushed via TrustStore.
+	// After crash recovery, counts may lag by up to 30s (flush interval).
+	// Impact is cosmetic (protocolStatus display only) — trust scoring is unaffected.
 	if feedbackSessionID != "" {
 		s.feedbackMu.Lock()
 		sf := s.feedbackCounts[feedbackSessionID]
@@ -1604,6 +1624,7 @@ func (s *Service) ResumeProtocol(_ context.Context, req ResumeProtocolRequest) (
 			maxReplay = 50
 		}
 		replayedEvents = s.sequenceTracker.EventsSince(req.LastSeq, maxReplay)
+		s.sequenceTracker.SetCounter(req.LastSeq)
 	}
 
 	// Gap 2: Record replay events
@@ -1632,8 +1653,22 @@ func (s *Service) GetTicketManager() *TicketManager {
 }
 
 // SetCodeGenerator sets the J17 constraint code generator.
+// Also initializes the code comprehension feedback loop if enabled.
 func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
 	s.codeGenerator = gen
+	if s.cfg.JiminyCodeRegenEnabled && gen != nil {
+		s.codeComprehensionTracker = NewCodeComprehensionTracker(
+			s.cfg.JiminyCodeRegenThreshold,
+			s.cfg.JiminyCodeRegenMinSamples,
+			5,             // max 5 regens per hour
+			time.Hour,     // 1 hour cooldown per code
+			gen,
+		)
+		slog.Info("jiminy: code comprehension feedback loop enabled",
+			"threshold", s.cfg.JiminyCodeRegenThreshold,
+			"min_samples", s.cfg.JiminyCodeRegenMinSamples,
+		)
+	}
 }
 
 // SetWarmStore sets the warm store reference for trust-based invalidation (B7).

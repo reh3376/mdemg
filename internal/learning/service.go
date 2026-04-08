@@ -952,7 +952,7 @@ WITH r,
      coalesce(r.surprise_factor, 1.0) AS surpriseFactor
 WITH r, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
+       rawWeight * (CASE WHEN (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) <= 0 THEN 0.01 ELSE (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) END ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 WHERE decayedWeight < $pruneThreshold
 DELETE r
@@ -1074,7 +1074,7 @@ WITH r,
      coalesce(r.surprise_factor, 1.0) AS surpriseFactor
 WITH r, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
      CASE WHEN daysSinceActive > 0 THEN
-       rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
+       rawWeight * (CASE WHEN (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) <= 0 THEN 0.01 ELSE (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) END ^ daysSinceActive)
      ELSE rawWeight END AS decayedWeight
 RETURN count(r) AS total_edges,
        avg(rawWeight) AS avg_raw_weight,
