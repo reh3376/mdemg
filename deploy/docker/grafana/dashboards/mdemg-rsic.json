@@ -980,6 +980,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",
@@ -1073,7 +1074,12 @@
             }
           }
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "None"
+        }
+      }
     },
     {
       "title": "Action Duration p95",
@@ -1128,6 +1134,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",
@@ -1414,6 +1421,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",

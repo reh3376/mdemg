@@ -501,7 +501,20 @@ func (a *Assessor) computeConfidence(r *SelfAssessmentReport) float64 {
 	if r.ConsolidationAgeSec > 0 {
 		dataPoints++
 	}
-	return clamp(float64(dataPoints)/4.0, 0.1, 1.0)
+	confidence := clamp(float64(dataPoints)/4.0, 0.1, 1.0)
+	if confidence < 0.3 {
+		slog.Warn("rsic: low assessment confidence",
+			"space_id", r.SpaceID,
+			"confidence", confidence,
+			"data_points", dataPoints,
+			"edge_count", r.EdgeCount,
+			"total_nodes", r.TotalNodes,
+			"volatile_count", r.VolatileCount,
+			"permanent_count", r.PermanentCount,
+			"consolidation_age_sec", r.ConsolidationAgeSec,
+		)
+	}
+	return confidence
 }
 
 // ─── Utility ───
