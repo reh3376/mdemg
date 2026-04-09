@@ -544,12 +544,12 @@ func TestRSIC_Systems_FullHealthCompositeValidation(t *testing.T) {
 		t.Error("expected bounds.protected_spaces key to exist")
 	}
 
-	// Cross-validate safety bounds are positive numbers
-	if maxNodes, ok := bounds["max_nodes_affected"].(float64); !ok || maxNodes <= 0 {
-		t.Errorf("expected positive max_nodes_affected, got %v", bounds["max_nodes_affected"])
+	// Cross-validate safety bounds are positive percentages
+	if maxNodes, ok := bounds["max_node_prune_pct"].(float64); !ok || maxNodes <= 0 {
+		t.Errorf("expected positive max_node_prune_pct, got %v", bounds["max_node_prune_pct"])
 	}
-	if maxEdges, ok := bounds["max_edges_affected"].(float64); !ok || maxEdges <= 0 {
-		t.Errorf("expected positive max_edges_affected, got %v", bounds["max_edges_affected"])
+	if maxEdges, ok := bounds["max_edge_prune_pct"].(float64); !ok || maxEdges <= 0 {
+		t.Errorf("expected positive max_edge_prune_pct, got %v", bounds["max_edge_prune_pct"])
 	}
 }
 
