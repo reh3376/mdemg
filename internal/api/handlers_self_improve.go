@@ -361,9 +361,9 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 			"enforcement_active": true,
 			"safety_version":     ape.SafetyVersion,
 			"bounds": map[string]any{
-				"max_nodes_affected": int(float64(1000) * s.cfg.RSICMaxNodePrunePct),
-				"max_edges_affected": int(float64(1000) * s.cfg.RSICMaxEdgePrunePct),
-				"protected_spaces":   []string{"mdemg-dev"},
+				"max_node_prune_pct": s.cfg.RSICMaxNodePrunePct,
+				"max_edge_prune_pct": s.cfg.RSICMaxEdgePrunePct,
+				"protected_spaces":   s.cfg.RSICProtectedSpaces,
 			},
 			"rollback": map[string]any{
 				"window_sec":            s.cfg.RSICRollbackWindow,

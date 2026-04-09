@@ -1384,8 +1384,8 @@ func (s *Server) StartMacroCronScheduler() {
 					continue
 				}
 
-				// Fire macro cycle for mdemg-dev space
-				spaceID := "mdemg-dev"
+				// Fire macro cycle for configured space
+				spaceID := s.cfg.RSICMacroCronSpace
 				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMacroCron, spaceID, ape.TierMacro, "")
 				if !decision.Allowed {
 					slog.Info("RSIC macro cron: skipped", "space_id", spaceID, "reason", decision.Reason)

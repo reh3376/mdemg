@@ -453,8 +453,10 @@ type Config struct {
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
 	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
-	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
-	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICWatchdogSpaceID     string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
+	RSICPersistenceEnabled  bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICProtectedSpaces     []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
+	RSICMacroCronSpace      string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
 
 	// RSIC-SK1: Guidance self-calibration
 	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
@@ -2332,6 +2334,17 @@ func FromEnv() (Config, error) {
 	}
 	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
 	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
+	rsicProtectedSpacesStr := get("RSIC_PROTECTED_SPACES", "")
+	var rsicProtectedSpaces []string
+	if rsicProtectedSpacesStr != "" {
+		for _, s := range strings.Split(rsicProtectedSpacesStr, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				rsicProtectedSpaces = append(rsicProtectedSpaces, s)
+			}
+		}
+	}
+	rsicMacroCronSpace := get("RSIC_MACRO_CRON_SPACE", "mdemg-dev")
 
 	// RSIC-SK1: Guidance self-calibration
 	rsicGuidanceCalibrationEnabled := getBool("RSIC_GUIDANCE_CALIBRATION_ENABLED", true)
@@ -3665,6 +3678,8 @@ func FromEnv() (Config, error) {
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:         rsicPersistenceEnabled,
+		RSICProtectedSpaces:            rsicProtectedSpaces,
+		RSICMacroCronSpace:             rsicMacroCronSpace,
 		RSICGuidanceCalibrationEnabled: rsicGuidanceCalibrationEnabled,
 		RSICGuidanceMinSurfaces:        rsicGuidanceMinSurfaces,
 		RSICGuidanceBoostThreshold:     rsicGuidanceBoostThreshold,

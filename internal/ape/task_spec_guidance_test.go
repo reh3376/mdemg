@@ -19,7 +19,7 @@ func TestBuildTaskSpec_AdjustGuidanceConfidence(t *testing.T) {
 		Priority:    1,
 	}
 
-	spec := BuildTaskSpec(cfg, action, "cycle-123", nil)
+	spec := BuildTaskSpec(cfg, action, "cycle-123", nil, 1000)
 
 	if spec.ActionType != "adjust_guidance_confidence" {
 		t.Errorf("expected action type adjust_guidance_confidence, got %s", spec.ActionType)

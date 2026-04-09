@@ -537,19 +537,11 @@ func TestRSIC_Systems_FullHealthCompositeValidation(t *testing.T) {
 		t.Fatal("expected safety.bounds map")
 	}
 
-	protectedSpaces, ok := bounds["protected_spaces"].([]any)
-	if !ok {
-		t.Fatal("expected bounds.protected_spaces to be array")
-	}
-	foundProtected := false
-	for _, ps := range protectedSpaces {
-		if ps == "mdemg-dev" {
-			foundProtected = true
-			break
-		}
-	}
-	if !foundProtected {
-		t.Error("expected 'mdemg-dev' in bounds.protected_spaces")
+	// protected_spaces is configurable via RSIC_PROTECTED_SPACES (default: empty).
+	// When empty, the health endpoint returns null/nil. When set, it returns an array.
+	// We only verify the key exists — the actual value depends on config.
+	if _, exists := bounds["protected_spaces"]; !exists {
+		t.Error("expected bounds.protected_spaces key to exist")
 	}
 
 	// Cross-validate safety bounds are positive numbers

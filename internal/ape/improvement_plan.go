@@ -38,11 +38,15 @@ func (p *Planner) Plan(_ context.Context, insights []ReflectionInsight, spaceID 
 		}
 	}
 
-	// Build task specs
+	// Build task specs — graph size from baseline drives blast radius calculation
+	graphSize := int(baseline["total_nodes"])
+	if graphSize == 0 {
+		graphSize = int(baseline["edge_count"])
+	}
 	var specs []RSICTaskSpec
 	cycleID := "" // will be set by CycleOrchestrator before dispatch
 	for _, action := range actionMap {
-		spec := BuildTaskSpec(p.cfg, action, cycleID, baseline)
+		spec := BuildTaskSpec(p.cfg, action, cycleID, baseline, graphSize)
 		specs = append(specs, *spec)
 	}
 
