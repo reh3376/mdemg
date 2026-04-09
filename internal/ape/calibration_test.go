@@ -144,6 +144,60 @@ func TestCriteriaEvaluation_MissingData(t *testing.T) {
 	}
 }
 
+func TestCriteriaEvaluation_DeltaSuffixResolution(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{
+			TaskID:     "t1",
+			ActionType: "tombstone_stale",
+			SuccessCriteria: []Criterion{
+				// Uses "_delta" suffix — should resolve to "correction_rate" in maps
+				{Metric: "correction_rate_delta", Operator: "lte", Threshold: 0},
+			},
+		},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+	}
+	metricsBefore := map[string]float64{"correction_rate": 0.10}
+	postReport := &SelfAssessmentReport{CorrectionRate: 0.05} // delta = -0.05 <= 0 → met
+
+	outcome := cal.Validate(context.Background(), "cycle-delta", TierMicro, "test-space", tasks, reports, metricsBefore, postReport)
+
+	if !outcome.CriteriaMet {
+		t.Error("expected CriteriaMet=true (correction_rate_delta resolved via suffix strip)")
+	}
+	if outcome.CriteriaDetail["correction_rate_delta"] != "met" {
+		t.Errorf("expected criteria detail 'met', got %q", outcome.CriteriaDetail["correction_rate_delta"])
+	}
+}
+
+func TestCriteriaEvaluation_DeltaSuffixNotMet(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{
+			TaskID:     "t1",
+			ActionType: "tombstone_stale",
+			SuccessCriteria: []Criterion{
+				{Metric: "correction_rate_delta", Operator: "lte", Threshold: 0},
+			},
+		},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+	}
+	metricsBefore := map[string]float64{"correction_rate": 0.05}
+	postReport := &SelfAssessmentReport{CorrectionRate: 0.10} // delta = +0.05 > 0 → not met
+
+	outcome := cal.Validate(context.Background(), "cycle-delta-fail", TierMicro, "test-space", tasks, reports, metricsBefore, postReport)
+
+	if outcome.CriteriaMet {
+		t.Error("expected CriteriaMet=false (correction_rate increased)")
+	}
+}
+
 func TestEvaluateCriterion_AllOperators(t *testing.T) {
 	tests := []struct {
 		name     string

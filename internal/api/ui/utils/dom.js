@@ -16,9 +16,10 @@ export function h(tag, attrs = {}, ...children) {
 }
 
 export function infoRow(label, value) {
+    const display = (value instanceof Node) ? value : String(value ?? '\u2014');
     return h('div', { className: 'info-row' },
         h('span', { className: 'info-label' }, label),
-        h('span', { className: 'info-value' }, String(value ?? '\u2014')),
+        h('span', { className: 'info-value' }, display),
     );
 }
 

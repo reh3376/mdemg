@@ -43,7 +43,7 @@ type Config struct {
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
-	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-4.1-nano")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-4.1")
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -236,7 +236,7 @@ type Config struct {
 	ReclassMaxIterations int     // RECLASS_MAX_ITERATIONS — max reclassification loops until convergence (default: 5, range: 1-10)
 	ReclassMaxDepth      int     // RECLASS_MAX_DEPTH — max dot-path taxonomy depth (default: 4, range: 1-10)
 	ReclassProvider      string  // RECLASS_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
-	ReclassModel         string  // RECLASS_MODEL — model name (default: gpt-4.1-nano)
+	ReclassModel         string  // RECLASS_MODEL — model name (default: gpt-4.1)
 	ReclassMaxTokens     int     // RECLASS_MAX_TOKENS — max response tokens (default: 2000, range: 500-8000)
 	ReclassTimeoutMs     int     // RECLASS_TIMEOUT_MS — LLM call timeout in ms (default: 30000, min: 5000)
 
@@ -1285,7 +1285,7 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-4.1-nano")
+	llmModel := get("LLM_MODEL", "gpt-4.1")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
@@ -1861,7 +1861,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("RECLASS_MAX_DEPTH must be in range [1, 10]")
 	}
 	reclassProvider := get("RECLASS_PROVIDER", emergenceProvider)
-	reclassModel := get("RECLASS_MODEL", "gpt-4.1-nano")
+	reclassModel := get("RECLASS_MODEL", "gpt-4.1")
 	reclassMaxTokens, err := atoi("RECLASS_MAX_TOKENS", 2000)
 	if err != nil {
 		return Config{}, err

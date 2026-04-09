@@ -51,6 +51,16 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-09) ===
+- ✅ UI-AUDIT-2026-04-09: Browser UI Comprehensive Audit & Testing (2026-04-09):
+  - E1: Screenshot baselines for all 10 tabs + JS error + API 5xx per-tab tests (30 new tests)
+  - E1: TestTrainingDataTab (10 read-only tests) + TestTrainingDataAPI (3 endpoint tests)
+  - E2: 10 TestInteractive* classes — all buttons/inputs/dropdowns/checkboxes tested (25 new tests)
+  - E3: 2 bug fixes — training_data.js helpPanel signature, dom.js infoRow Node handling
+  - E4: Gap analysis — 48/125 endpoints covered (38%), 77 uncovered routes documented
+  - Suite: 309 total tests (306 pass, 3 skip), zero failures
+  - Docs: CHANGELOG, AGENT_HANDOFF, ui-gap-analysis.md, browser-ui.md updated
+
 === COMPLETED SINCE LAST HANDOFF (2026-04-07) ===
 - ✅ SNA-001: Server-Native Alerting & Final Resilience Hardening (2026-04-07):
   - E1: Trust persistence goroutine leak fixed — cancellable context, StopTrustPersistence() in Shutdown()
