@@ -173,3 +173,40 @@ func TestBuildUserPrompt_BackwardCompat(t *testing.T) {
 		t.Error("uncompressed prompt should contain indented JSON (double-space + quote)")
 	}
 }
+
+func TestLLMReflector_ValidActions_Has16Entries(t *testing.T) {
+	if len(validActions) != 16 {
+		t.Errorf("expected 16 valid actions, got %d", len(validActions))
+	}
+
+	expected := []string{
+		"prune_decayed_edges", "prune_excess_edges", "tombstone_stale",
+		"graduate_volatile", "trigger_consolidation", "refresh_stale_edges",
+		"codify_constraint", "codify_all_constraints", "retire_code",
+		"adjust_tier_threshold", "adjust_replay_buffer",
+		"review_guidance_effectiveness", "adjust_guidance_confidence",
+		"archive_ineffective_constraints", "flush_recovery_buffer",
+		"review_nli_calibration",
+	}
+	for _, a := range expected {
+		if !validActions[a] {
+			t.Errorf("expected %s in validActions", a)
+		}
+	}
+}
+
+func TestLLMReflector_ParseResponse_ExpandedActions(t *testing.T) {
+	lr := &LLMReflector{}
+
+	// Test that the newly added actions are accepted
+	raw := `[{"pattern_id": "test1", "severity": "medium", "description": "constraints need codification", "recommended_action": "codify_constraint", "reasoning": "test"},
+	{"pattern_id": "test2", "severity": "low", "description": "guidance needs review", "recommended_action": "review_guidance_effectiveness", "reasoning": "test"}]`
+
+	insights, err := lr.parseResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(insights) != 2 {
+		t.Errorf("expected 2 insights for expanded actions, got %d", len(insights))
+	}
+}

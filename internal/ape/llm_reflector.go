@@ -75,7 +75,7 @@ Your task: Identify patterns the rule-based reflector might miss. Look for:
 - Return a JSON array of insights (may be empty [])
 - Each insight MUST have: pattern_id, severity, description, recommended_action, reasoning
 - severity MUST be one of: "low", "medium", "high", "critical"
-- recommended_action MUST be one of: "prune_decayed_edges", "prune_excess_edges", "tombstone_stale", "graduate_volatile", "trigger_consolidation", "refresh_stale_edges"
+- recommended_action MUST be one of: "prune_decayed_edges", "prune_excess_edges", "tombstone_stale", "graduate_volatile", "trigger_consolidation", "refresh_stale_edges", "codify_constraint", "codify_all_constraints", "retire_code", "adjust_tier_threshold", "adjust_replay_buffer", "review_guidance_effectiveness", "adjust_guidance_confidence", "archive_ineffective_constraints", "flush_recovery_buffer", "review_nli_calibration"
 - Output ONLY valid JSON — no markdown, no preamble
 
 [{"pattern_id": "...", "severity": "...", "description": "...", "recommended_action": "...", "reasoning": "..."}]`
@@ -214,7 +214,7 @@ var ollamaReflectSchema = json.RawMessage(`{
 			"pattern_id": {"type": "string"},
 			"severity": {"type": "string", "enum": ["low","medium","high","critical"]},
 			"description": {"type": "string"},
-			"recommended_action": {"type": "string", "enum": ["prune_decayed_edges","prune_excess_edges","tombstone_stale","graduate_volatile","trigger_consolidation","refresh_stale_edges"]},
+			"recommended_action": {"type": "string", "enum": ["prune_decayed_edges","prune_excess_edges","tombstone_stale","graduate_volatile","trigger_consolidation","refresh_stale_edges","codify_constraint","codify_all_constraints","retire_code","adjust_tier_threshold","adjust_replay_buffer","review_guidance_effectiveness","adjust_guidance_confidence","archive_ineffective_constraints","flush_recovery_buffer","review_nli_calibration"]},
 			"reasoning": {"type": "string"}
 		},
 		"required": ["pattern_id", "severity", "description", "recommended_action", "reasoning"]
@@ -233,12 +233,22 @@ var validSeverities = map[string]InsightSeverity{
 
 // validActions constrains LLM output to known action types.
 var validActions = map[string]bool{
-	"prune_decayed_edges":  true,
-	"prune_excess_edges":   true,
-	"tombstone_stale":      true,
-	"graduate_volatile":    true,
-	"trigger_consolidation": true,
-	"refresh_stale_edges":  true,
+	"prune_decayed_edges":            true,
+	"prune_excess_edges":             true,
+	"tombstone_stale":                true,
+	"graduate_volatile":              true,
+	"trigger_consolidation":          true,
+	"refresh_stale_edges":            true,
+	"codify_constraint":              true,
+	"codify_all_constraints":         true,
+	"retire_code":                    true,
+	"adjust_tier_threshold":          true,
+	"adjust_replay_buffer":           true,
+	"review_guidance_effectiveness":  true,
+	"adjust_guidance_confidence":     true,
+	"archive_ineffective_constraints": true,
+	"flush_recovery_buffer":          true,
+	"review_nli_calibration":         true,
 }
 
 func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {

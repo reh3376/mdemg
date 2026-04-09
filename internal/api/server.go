@@ -738,6 +738,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
+	rsicPlanner.SetCalibrator(rsicCalibrator)
 
 	// Phase AR-3: Wire LLM-powered reflector if enabled
 	if cfg.RSICLLMReflectEnabled {
