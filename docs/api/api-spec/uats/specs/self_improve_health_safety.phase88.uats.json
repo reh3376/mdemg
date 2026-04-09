@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "3bcdf67feb07f991d913b0c35e4221c874f7ae8d71b8f601bb899a1e0d4b0f47"
+    "sha256": "09c13e4259f538cef3374cf352a15d9d020cccf40df7459e3f3f13b9d7e861ac"
   },
   "request": {
     "method": "GET",
@@ -59,9 +59,8 @@
         "expected": "number"
       },
       {
-        "path": "$.safety.bounds",
-        "op": "key_exists",
-        "expected": "protected_spaces"
+        "path": "$.safety.bounds.protected_spaces",
+        "op": "exists"
       },
       {
         "path": "$.safety.rollback.window_sec",
