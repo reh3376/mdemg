@@ -24,7 +24,7 @@
       "admin",
       "rsic"
     ],
-    "sha256": "d1b4bcff087991bf78c1d5a1c3b0891133e98a437cfdb47d6aaa3cf9858f7243"
+    "sha256": "a9cf39e4b485a258bf651f80040ec0d55c46b87ae84ac550d4d2d6df3088e58f"
   },
   "request": {
     "method": "POST",
@@ -48,11 +48,11 @@
   },
   "variants": [
     {
-      "name": "rsic_start_returns_200",
-      "description": "POST /v1/admin/rsic/start returns 200 with status field",
+      "name": "rsic_stop_returns_200",
+      "description": "POST /v1/admin/rsic/stop returns 200 with status field",
       "request": {
         "method": "POST",
-        "path": "/v1/admin/rsic/start",
+        "path": "/v1/admin/rsic/stop",
         "headers": {
           "Content-Type": "application/json"
         }
@@ -69,11 +69,11 @@
       }
     },
     {
-      "name": "rsic_stop_returns_200",
-      "description": "POST /v1/admin/rsic/stop returns 200 with status field",
+      "name": "rsic_start_returns_200",
+      "description": "POST /v1/admin/rsic/start returns 200 with status field",
       "request": {
         "method": "POST",
-        "path": "/v1/admin/rsic/stop",
+        "path": "/v1/admin/rsic/start",
         "headers": {
           "Content-Type": "application/json"
         }
