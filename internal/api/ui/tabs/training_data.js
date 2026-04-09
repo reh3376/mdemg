@@ -20,7 +20,6 @@ export function render(el) {
         sectionHeader('Training Data Export'),
         exportForm(),
         h('div', { id: 'export-status-area' }),
-        sectionHeader('Export Guide'),
         helpSection(),
     );
 }
@@ -189,16 +188,12 @@ function startStatusPolling(exportId) {
 }
 
 function helpSection() {
-    return helpPanel([
-        'Training data exports are UTDS-compliant .tar.gz archives.',
-        'Each archive contains manifest.json + JSONL data files.',
-        'Privacy scanning runs on ALL text fields — export is blocked if PII is detected.',
-        'After export, use the curation pipeline:',
-        '  1. quality_filter.py — apply quality gates',
-        '  2. format_converter.py — convert to MLX chat format',
-        '  3. dataset_versioner.py — temporal split + versioning',
-        '',
-        'CLI: mdemg data export --space-id mdemg-dev',
-        'Validate: python utds_runner.py validate --archive export.tar.gz',
+    return helpPanel('Export Guide', [
+        { term: 'UTDS Format', description: 'Training data exports are UTDS-compliant .tar.gz archives containing manifest.json + JSONL data files.' },
+        { term: 'Privacy Scanning', description: 'Privacy scanning runs on ALL text fields — export is blocked if PII is detected.' },
+        { term: 'Tables', description: 'LLM Interactions: prompt/response pairs. Retrieval Events: query/result pairs. Embedding Events: text/vector pairs.' },
+        { term: 'Curation Pipeline', description: '1. quality_filter.py — apply quality gates. 2. format_converter.py — convert to MLX chat format. 3. dataset_versioner.py — temporal split + versioning.' },
+        { term: 'CLI Export', description: 'mdemg data export --space-id mdemg-dev' },
+        { term: 'Validation', description: 'python utds_runner.py validate --archive export.tar.gz' },
     ]);
 }

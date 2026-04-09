@@ -67,10 +67,10 @@ services:
 
       # LLM / Reranker
       LLM_PROVIDER: "${LLM_PROVIDER:-openai}"
-      LLM_MODEL: "${LLM_MODEL:-gpt-4.1-nano}"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4.1}"
       RERANK_ENABLED: "${RERANK_ENABLED:-true}"
       RERANK_PROVIDER: "${RERANK_PROVIDER:-openai}"
-      RERANK_MODEL: "${RERANK_MODEL:-gpt-4.1-nano}"
+      RERANK_MODEL: "${RERANK_MODEL:-gpt-4.1}"
       RERANK_TOP_N: "${RERANK_TOP_N:-50}"
       RERANK_WEIGHT: "${RERANK_WEIGHT:-0.50}"
       RERANK_TIMEOUT_MS: "${RERANK_TIMEOUT_MS:-10000}"

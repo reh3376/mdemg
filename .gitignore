@@ -137,5 +137,8 @@ mdemg_neo4j/
 __pycache__/
 *.pyc
 
+# Playwright screenshots (environment-specific, regenerated on each run)
+tests/e2e/browser-ui/screenshots/*.png
+
 # Parser spec (generated)
 parser-spec/

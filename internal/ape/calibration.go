@@ -3,6 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,8 +114,11 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 
 	for _, task := range tasks {
 		for _, criterion := range task.SuccessCriteria {
-			beforeVal, hasBefore := metricsBefore[criterion.Metric]
-			afterVal, hasAfter := outcome.MetricsAfter[criterion.Metric]
+			// Resolve metric key: criteria use names like "correction_rate_delta"
+			// but MetricsBefore/MetricsAfter use base names like "correction_rate".
+			metricKey, _ := strings.CutSuffix(criterion.Metric, "_delta")
+			beforeVal, hasBefore := metricsBefore[metricKey]
+			afterVal, hasAfter := outcome.MetricsAfter[metricKey]
 			if !hasBefore || !hasAfter {
 				outcome.CriteriaDetail[criterion.Metric] = "missing_data"
 				continue

@@ -169,12 +169,15 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	// Stage 3: Plan
 	baseline := map[string]float64{
-		"overall_health":   report.OverallHealth,
-		"edge_count":       float64(report.EdgeCount),
-		"orphan_ratio":     report.OrphanRatio,
-		"volatile_count":   float64(report.VolatileCount),
-		"correction_rate":  report.CorrectionRate,
-		"edge_entropy":     report.EdgeWeightEntropy,
+		"overall_health":      report.OverallHealth,
+		"retrieval_quality":   report.RetrievalQuality,
+		"memory_health":       report.MemoryHealth,
+		"edge_health":         report.EdgeHealth,
+		"edge_count":          float64(report.EdgeCount),
+		"orphan_ratio":        report.OrphanRatio,
+		"volatile_count":      float64(report.VolatileCount),
+		"correction_rate":     report.CorrectionRate,
+		"edge_weight_entropy": report.EdgeWeightEntropy,
 	}
 
 	tasks, err := c.planner.Plan(ctx, insights, spaceID, baseline)

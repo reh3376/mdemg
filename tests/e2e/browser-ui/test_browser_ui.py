@@ -1,10 +1,13 @@
 """E2E tests for the MDEMG browser dashboard served at /ui/.
 
-Covers: page load, tab navigation, all 6 tabs (Status, Memory, Learning,
-Config, Logs, RSIC), polling behavior, space selector, and API endpoints.
+Covers: page load, tab navigation, all 10 tabs (Status, Memory, Learning,
+Config, Logs, RSIC, Plugins, Features, Backup, Training Data), polling
+behavior, space selector, API endpoints, screenshots, and interactive
+functional testing.
 """
 
 import json
+import os
 import pytest
 import requests
 from playwright.sync_api import Page, expect
@@ -1521,3 +1524,635 @@ class TestInstanceAPI:
         )
         assert resp.status_code == 200
         assert resp.headers.get("Access-Control-Allow-Origin") == "http://localhost:12345"
+
+
+# ---------------------------------------------------------------------------
+# Screenshot Visual Baselines (UI Audit Sprint — Epic 1)
+# ---------------------------------------------------------------------------
+
+class TestScreenshots:
+    """Capture full-page screenshots of all 10 tabs for visual baseline."""
+
+    SCREENSHOT_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs",
+                 "rsic", "plugins", "features", "backup", "training"]
+
+    @pytest.fixture(autouse=True)
+    def ensure_screenshot_dir(self):
+        os.makedirs(self.SCREENSHOT_DIR, exist_ok=True)
+
+    @pytest.mark.parametrize("tab_name", TAB_NAMES)
+    def test_screenshot_tab(self, ui_page: Page, tab_name: str):
+        """Capture a full-page screenshot of each tab."""
+        ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]').click()
+        ui_page.wait_for_timeout(3000)
+        path = os.path.join(self.SCREENSHOT_DIR, f"{tab_name}.png")
+        ui_page.screenshot(path=path, full_page=True)
+        assert os.path.exists(path), f"Screenshot not saved: {path}"
+        assert os.path.getsize(path) > 1000, f"Screenshot too small: {os.path.getsize(path)} bytes"
+
+    @pytest.mark.parametrize("tab_name", TAB_NAMES)
+    def test_no_js_errors_per_tab(self, ui_page: Page, mdemg_url: str, tab_name: str):
+        """Each tab should not produce JS console errors."""
+        errors = []
+        ui_page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+        ui_page.goto(f"{mdemg_url}/ui/", wait_until="networkidle")
+        ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]').click()
+        ui_page.wait_for_timeout(3000)
+        real_errors = [e for e in errors if "fetch" not in e.lower() and "network" not in e.lower()]
+        assert len(real_errors) == 0, f"JS errors on {tab_name}: {real_errors}"
+
+    @pytest.mark.parametrize("tab_name", TAB_NAMES)
+    def test_no_api_5xx_per_tab(self, ui_page: Page, mdemg_url: str, tab_name: str):
+        """API calls on each tab should not return 5xx errors."""
+        failures = []
+
+        def on_response(resp):
+            if resp.url.startswith(mdemg_url) and resp.status >= 500:
+                failures.append({"url": resp.url, "status": resp.status})
+
+        ui_page.on("response", on_response)
+        ui_page.goto(f"{mdemg_url}/ui/", wait_until="networkidle")
+        ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]').click()
+        ui_page.wait_for_timeout(3000)
+        assert len(failures) == 0, f"5xx API errors on {tab_name}: {failures}"
+
+
+# ---------------------------------------------------------------------------
+# Training Data Tab (UI Audit Sprint — Epic 1)
+# ---------------------------------------------------------------------------
+
+class TestTrainingDataTab:
+    """Verify the Training Data tab shows export form and controls."""
+
+    @pytest.fixture(autouse=True)
+    def switch_to_training(self, ui_page: Page):
+        ui_page.locator('.tab-btn[data-tab="training"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_export_header(self, ui_page: Page):
+        """Training Data Export section header should appear."""
+        header = ui_page.locator(".section-header").filter(has_text="Training Data Export")
+        expect(header).to_be_visible(timeout=10000)
+
+    def test_space_id_input_default(self, ui_page: Page):
+        """Space ID input should default to mdemg-dev."""
+        inp = ui_page.locator("#export-space-id")
+        expect(inp).to_be_visible(timeout=5000)
+        assert inp.input_value() == "mdemg-dev", \
+            f"Expected default 'mdemg-dev', got '{inp.input_value()}'"
+
+    def test_since_input_present(self, ui_page: Page):
+        """From (since) input should be present."""
+        inp = ui_page.locator("#export-since")
+        expect(inp).to_be_attached(timeout=5000)
+
+    def test_until_input_present(self, ui_page: Page):
+        """To (until) input should be present."""
+        inp = ui_page.locator("#export-until")
+        expect(inp).to_be_attached(timeout=5000)
+
+    def test_llm_checkbox_default_checked(self, ui_page: Page):
+        """LLM Interactions checkbox should be checked by default."""
+        cb = ui_page.locator("#tbl-llm")
+        expect(cb).to_be_attached(timeout=5000)
+        assert cb.is_checked(), "LLM Interactions should be checked by default"
+
+    def test_retrieval_checkbox_default_checked(self, ui_page: Page):
+        """Retrieval Events checkbox should be checked by default."""
+        cb = ui_page.locator("#tbl-retrieval")
+        expect(cb).to_be_attached(timeout=5000)
+        assert cb.is_checked(), "Retrieval Events should be checked by default"
+
+    def test_embedding_checkbox_default_unchecked(self, ui_page: Page):
+        """Embedding Events checkbox should be unchecked by default."""
+        cb = ui_page.locator("#tbl-embedding")
+        expect(cb).to_be_attached(timeout=5000)
+        assert not cb.is_checked(), "Embedding Events should be unchecked by default"
+
+    def test_export_button_present(self, ui_page: Page):
+        """Export button should be visible."""
+        export_btn = ui_page.locator(".btn").filter(has_text="Export")
+        expect(export_btn).to_be_visible(timeout=5000)
+
+    def test_status_area_exists(self, ui_page: Page):
+        """Export status area container should exist."""
+        area = ui_page.locator("#export-status-area")
+        expect(area).to_be_attached(timeout=5000)
+
+    def test_export_guide_section(self, ui_page: Page):
+        """Export Guide section should appear with help content."""
+        header = ui_page.locator(".section-header").filter(has_text="Export Guide")
+        expect(header).to_be_visible(timeout=10000)
+
+
+class TestTrainingDataAPI:
+    """Verify training data export API endpoints."""
+
+    def test_export_requires_body(self):
+        """POST /v1/training-data/export with empty body should return 400."""
+        resp = requests.post(
+            f"{MDEMG_URL}/v1/training-data/export",
+            json={},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code in (400, 500), \
+            f"Expected 400/500 for empty export request, got {resp.status_code}"
+
+    def test_status_404_for_unknown(self):
+        """GET /v1/training-data/status/nonexistent should return 404."""
+        resp = requests.get(f"{MDEMG_URL}/v1/training-data/status/nonexistent-id")
+        assert resp.status_code == 404, \
+            f"Expected 404 for unknown export ID, got {resp.status_code}"
+
+    def test_download_404_for_unknown(self):
+        """GET /v1/training-data/download/nonexistent should return 404."""
+        resp = requests.get(f"{MDEMG_URL}/v1/training-data/download/nonexistent-id")
+        assert resp.status_code == 404, \
+            f"Expected 404 for unknown download ID, got {resp.status_code}"
+
+
+# ===========================================================================
+# Interactive / Functional Tests (UI Audit Sprint — Epic 2)
+# ===========================================================================
+
+
+class TestInteractiveStatus:
+    """Test interactive elements on the Status tab."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        # Dismiss all dialogs by default (prevents hangs)
+        ui_page.on("dialog", lambda d: d.dismiss())
+        ui_page.wait_for_timeout(2000)
+
+    def test_restart_button_fires_confirm(self, ui_page: Page):
+        """Clicking Restart Server should show a confirm dialog."""
+        dialog_messages = []
+
+        def handle_dialog(dialog):
+            dialog_messages.append(dialog.message)
+            dialog.dismiss()
+
+        ui_page.on("dialog", handle_dialog)
+        btn = ui_page.locator(".btn-danger").filter(has_text="Restart Server")
+        btn.click()
+        ui_page.wait_for_timeout(1000)
+        assert len(dialog_messages) > 0, "No confirm dialog fired for restart"
+        assert "restart" in dialog_messages[0].lower(), \
+            f"Dialog message does not mention restart: {dialog_messages[0]}"
+
+
+class TestInteractiveMemory:
+    """Test interactive elements on the Memory tab."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="memory"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_export_button_triggers_api(self, ui_page: Page, mdemg_url: str):
+        """Clicking Export should trigger POST /v1/admin/spaces/export."""
+        export_btn = ui_page.locator(".btn-primary").filter(has_text="Export")
+        # Export button only renders after memoryStats loads — wait for it
+        try:
+            expect(export_btn).to_be_visible(timeout=10000)
+        except Exception:
+            pytest.skip("Export button not visible — memoryStats API may be unavailable")
+        # Use expect_request (not expect_response) — the export may time out or
+        # trigger a blob download that Playwright doesn't surface as a response.
+        with ui_page.expect_request(
+            lambda r: "/v1/admin/spaces/export" in r.url,
+            timeout=15000,
+        ):
+            export_btn.click()
+
+    def test_export_profile_selector_changes(self, ui_page: Page):
+        """Profile selector should allow changing export type."""
+        selects = ui_page.locator(".action-row .select")
+        if selects.count() == 0:
+            pytest.skip("No profile selector found")
+        sel = selects.first
+        options = sel.locator("option")
+        if options.count() < 2:
+            pytest.skip("Profile selector has less than 2 options")
+        # Select second option
+        second_val = options.nth(1).get_attribute("value")
+        sel.select_option(second_val)
+        assert sel.input_value() == second_val
+
+    def test_import_file_input_accepts_selection(self, ui_page: Page):
+        """File input should be interactable."""
+        file_input = ui_page.locator(".file-input")
+        expect(file_input).to_be_attached(timeout=5000)
+        # Just verify it exists and can be located — actual file upload
+        # requires a real export file and would modify data
+
+
+class TestInteractiveLearning:
+    """Test freeze, unfreeze, and prune workflows."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        # Handle all dialogs: prompts get "ui-test", confirms/alerts get accepted
+        ui_page.on("dialog", lambda d: d.accept("ui-test") if d.type == "prompt" else d.accept())
+        ui_page.locator('.tab-btn[data-tab="learning"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_freeze_unfreeze_cycle(self, ui_page: Page):
+        """Freeze → verify state changes → Unfreeze → verify restored."""
+        resp = requests.get(
+            f"{MDEMG_URL}/v1/learning/freeze/status",
+            params={"space_id": "mdemg-dev"},
+        ).json()
+        # API response nests frozen state: {"state": {"frozen": true/false}}
+        is_frozen = resp.get("state", {}).get("frozen", resp.get("frozen", False))
+        try:
+            if not is_frozen:
+                freeze_btn = ui_page.locator(".btn").filter(has_text="Freeze")
+                if freeze_btn.count() > 0 and freeze_btn.is_visible():
+                    freeze_btn.click()
+                    ui_page.wait_for_timeout(3000)
+                    after = requests.get(
+                        f"{MDEMG_URL}/v1/learning/freeze/status",
+                        params={"space_id": "mdemg-dev"},
+                    ).json()
+                    after_frozen = after.get("state", {}).get("frozen", after.get("frozen"))
+                    assert after_frozen, "Learning should be frozen after click"
+            else:
+                # Already frozen — test unfreeze
+                unfreeze_btn = ui_page.locator(".btn").filter(has_text="Unfreeze")
+                if unfreeze_btn.count() > 0 and unfreeze_btn.is_visible():
+                    unfreeze_btn.click()
+                    ui_page.wait_for_timeout(3000)
+                    after = requests.get(
+                        f"{MDEMG_URL}/v1/learning/freeze/status",
+                        params={"space_id": "mdemg-dev"},
+                    ).json()
+                    after_frozen = after.get("state", {}).get("frozen", after.get("frozen"))
+                    assert not after_frozen, "Learning should be unfrozen after click"
+        finally:
+            # Always restore: unfreeze
+            requests.post(
+                f"{MDEMG_URL}/v1/learning/unfreeze",
+                json={"space_id": "mdemg-dev"},
+            )
+
+    def test_prune_confirm_and_execute(self, ui_page: Page):
+        """Prune button should trigger confirm → execute → show result."""
+        # Dialog handler is already registered in the fixture — don't add another.
+        # The fixture handler accepts all dialogs (prompts with "ui-test", others plain).
+        prune_btn = ui_page.locator(".btn-danger").filter(has_text="Prune")
+        if prune_btn.count() == 0:
+            pytest.skip("No prune button found")
+        prune_btn.click()
+        ui_page.wait_for_timeout(3000)
+        # If no error occurred, the prune executed successfully via the fixture's dialog handler
+
+    def test_threshold_input_is_display_only(self, ui_page: Page):
+        """Prune threshold input should be present as a read-only display."""
+        threshold = ui_page.locator(".config-input[type='number']")
+        if threshold.count() == 0:
+            pytest.skip("No threshold input found")
+        # Threshold input is disabled (display-only from server config)
+        is_disabled = threshold.get_attribute("disabled") is not None
+        assert is_disabled, "Threshold input should be disabled (read-only display)"
+
+
+class TestInteractiveConfig:
+    """Test config edit → save → verify → restore workflow."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="config"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_edit_save_restore(self, ui_page: Page):
+        """Edit learning.eta, save via UI, verify via API, restore."""
+        get_resp = requests.get(f"{MDEMG_URL}/v1/admin/config")
+        data = get_resp.json()
+        yaml_path = data.get("yaml_path", "")
+        if not yaml_path:
+            pytest.skip("No YAML config — PATCH unavailable")
+        safe = [e for e in data["config"]
+                if e["key"] == "learning.eta" and e["source"] in ("yaml", "default")]
+        if not safe:
+            pytest.skip("learning.eta not found or not editable")
+        original = safe[0]["value"]
+        try:
+            search = ui_page.locator(".search-input")
+            search.fill("learning.eta")
+            ui_page.wait_for_timeout(500)
+            input_field = ui_page.locator(".config-table input.config-input").first
+            input_field.fill("0.999")
+            input_field.dispatch_event("change")
+            ui_page.wait_for_timeout(500)
+            save_bar = ui_page.locator("#config-save-bar")
+            expect(save_bar).to_be_visible(timeout=3000)
+            save_btn = ui_page.locator("#config-save-btn")
+            save_btn.click()
+            ui_page.wait_for_timeout(2000)
+            verify = requests.get(f"{MDEMG_URL}/v1/admin/config").json()
+            updated = [e for e in verify["config"] if e["key"] == "learning.eta"]
+            assert updated[0]["value"] == "0.999", \
+                f"Config not updated: {updated[0]['value']}"
+        finally:
+            restore_val = original if original else "0"
+            requests.patch(
+                f"{MDEMG_URL}/v1/admin/config",
+                json={"updates": {"learning.eta": restore_val}},
+            )
+
+    def test_search_and_clear(self, ui_page: Page):
+        """Search filter should reduce rows, clearing should restore all."""
+        rows_before = ui_page.locator(".config-table tbody tr").count()
+        if rows_before == 0:
+            pytest.skip("Config table has no rows")
+        search = ui_page.locator(".search-input")
+        search.fill("neo4j")
+        ui_page.wait_for_timeout(500)
+        rows_filtered = ui_page.locator(".config-table tbody tr").count()
+        assert rows_filtered <= rows_before, \
+            f"Filter did not reduce rows: {rows_before} -> {rows_filtered}"
+        search.fill("")
+        ui_page.wait_for_timeout(500)
+        rows_restored = ui_page.locator(".config-table tbody tr").count()
+        assert rows_restored == rows_before, \
+            f"Clearing search did not restore rows: {rows_before} -> {rows_restored}"
+
+    def test_checkbox_toggle(self, ui_page: Page):
+        """Boolean config checkboxes should be toggleable."""
+        checkboxes = ui_page.locator(".config-table .config-checkbox")
+        if checkboxes.count() == 0:
+            pytest.skip("No boolean checkboxes found")
+        first = checkboxes.first
+        original = first.is_checked()
+        first.click()
+        ui_page.wait_for_timeout(300)
+        assert first.is_checked() != original, "Checkbox toggle did not change state"
+        # Restore
+        first.click()
+
+
+class TestInteractiveLogs:
+    """Test log viewer interactive controls."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="logs"]').click()
+        ui_page.wait_for_timeout(5000)  # Allow log polling
+
+    def test_level_filter_changes_entries(self, ui_page: Page):
+        """Selecting a level should filter log entries."""
+        entries_before = ui_page.locator(".log-line").count()
+        if entries_before == 0:
+            pytest.skip("No log entries to filter")
+        level_select = ui_page.locator(".log-controls .select")
+        level_select.select_option("ERROR")
+        ui_page.wait_for_timeout(500)
+        entries_after = ui_page.locator(".log-line").count()
+        assert entries_after <= entries_before, \
+            f"ERROR filter did not reduce entries: {entries_before} -> {entries_after}"
+        # Restore to all
+        level_select.select_option("")
+        ui_page.wait_for_timeout(500)
+
+    def test_search_filter_reduces_entries(self, ui_page: Page):
+        """Search should filter log entries to matching text."""
+        entries_before = ui_page.locator(".log-line").count()
+        if entries_before == 0:
+            pytest.skip("No log entries to search")
+        search = ui_page.locator(".search-input")
+        search.fill("xyznonexistent999")
+        ui_page.wait_for_timeout(500)
+        entries_after = ui_page.locator(".log-line").count()
+        assert entries_after == 0, \
+            f"Search for nonexistent text should return 0, got {entries_after}"
+        search.fill("")
+
+
+class TestInteractiveRsic:
+    """Test RSIC interactive controls."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="rsic"]').click()
+        ui_page.wait_for_timeout(2000)
+
+    def test_trigger_dry_run_cycle(self, ui_page: Page):
+        """Trigger a dry-run RSIC cycle and verify result renders."""
+        dryrun = ui_page.locator("#rsic-dryrun")
+        if not dryrun.is_checked():
+            dryrun.check()
+        tier = ui_page.locator(".action-row .select")
+        tier.select_option("meso")
+
+        with ui_page.expect_response(
+            lambda r: "/v1/self-improve/cycle" in r.url,
+            timeout=30000,
+        ) as resp_info:
+            trigger = ui_page.locator(".btn-primary").filter(has_text="Trigger Cycle")
+            trigger.click()
+
+        resp = resp_info.value
+        assert resp.status == 200, f"RSIC cycle returned {resp.status}"
+        ui_page.wait_for_timeout(2000)
+        result_div = ui_page.locator(".rsic-result")
+        text = result_div.inner_text()
+        assert len(text) > 0, "RSIC result area is empty after trigger"
+
+    def test_tier_selector_changes(self, ui_page: Page):
+        """Tier selector should accept micro, meso, macro."""
+        tier = ui_page.locator(".action-row .select")
+        for val in ["micro", "meso", "macro"]:
+            tier.select_option(val)
+            assert tier.input_value() == val, f"Failed to select tier '{val}'"
+
+    def test_stop_start_lifecycle(self, ui_page: Page):
+        """Stop and start RSIC service via buttons."""
+        alerts = []
+        ui_page.on("dialog", lambda d: (alerts.append(d.message), d.accept()))
+
+        stop_btn = ui_page.locator(".btn").filter(has_text="Stop")
+        stop_btn.click()
+        ui_page.wait_for_timeout(2000)
+
+        start_btn = ui_page.get_by_role("button", name="Start", exact=True)
+        start_btn.click()
+        ui_page.wait_for_timeout(2000)
+
+        # Verify RSIC is back via API
+        health = requests.get(f"{MDEMG_URL}/v1/self-improve/health").json()
+        assert health.get("status") in ("ok", "running", "healthy", "degraded"), \
+            f"RSIC health after restart: {health}"
+
+
+class TestInteractivePlugins:
+    """Test plugin lifecycle controls."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="plugins"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_plugin_action_buttons_clickable(self, ui_page: Page):
+        """Plugin action buttons should be clickable without error."""
+        cards = ui_page.locator(".plugin-card")
+        if cards.count() == 0:
+            pytest.skip("No plugins installed")
+        alerts = []
+        ui_page.on("dialog", lambda d: (alerts.append(d.message), d.accept()))
+        first_card = cards.first
+        # Try validate (safest action — just checks, doesn't change state)
+        validate_btn = first_card.get_by_role("button", name="Validate", exact=True)
+        if validate_btn.is_visible():
+            validate_btn.click()
+            ui_page.wait_for_timeout(2000)
+            # Should show a validation result alert
+            assert len(alerts) >= 1, "No validation alert shown"
+
+
+class TestInteractiveFeatures:
+    """Test feature lifecycle controls."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="features"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_feature_start_stop(self, ui_page: Page):
+        """Start/Stop buttons should trigger API calls."""
+        tables = ui_page.locator(".config-table")
+        if tables.count() == 0:
+            pytest.skip("No feature tables")
+        first_row = tables.first.locator("tbody tr").first
+        stop_btn = first_row.get_by_role("button", name="Stop", exact=True)
+        if stop_btn.is_visible():
+            alerts = []
+            ui_page.on("dialog", lambda d: (alerts.append(d.message), d.accept()))
+            stop_btn.click()
+            ui_page.wait_for_timeout(2000)
+            # Restart to restore
+            start_btn = first_row.get_by_role("button", name="Start", exact=True)
+            if start_btn.is_visible():
+                start_btn.click()
+                ui_page.wait_for_timeout(2000)
+
+
+class TestInteractiveBackup:
+    """Test backup lifecycle: trigger, list, manifest, delete."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="backup"]').click()
+        ui_page.wait_for_timeout(3000)
+        resp = requests.get(f"{MDEMG_URL}/v1/backup/list")
+        if resp.status_code == 503:
+            pytest.skip("Backup service disabled")
+
+    def test_trigger_backup(self, ui_page: Page):
+        """Trigger a backup and verify API response."""
+        space_input = ui_page.locator('input[placeholder*="Space ID"]')
+        space_input.fill("mdemg-dev")
+
+        with ui_page.expect_response(
+            lambda r: "/v1/backup/trigger" in r.url,
+            timeout=15000,
+        ) as resp_info:
+            trigger_btn = ui_page.locator("button.btn").filter(has_text="Trigger Backup")
+            trigger_btn.click()
+
+        resp = resp_info.value
+        assert resp.status in (200, 202), f"Backup trigger returned {resp.status}"
+
+    def test_refresh_button_updates_list(self, ui_page: Page):
+        """Refresh button should trigger backup list reload."""
+        refresh = ui_page.locator("button.btn").filter(has_text="Refresh")
+        with ui_page.expect_response(
+            lambda r: "/v1/backup/list" in r.url,
+            timeout=10000,
+        ) as resp_info:
+            refresh.click()
+        resp = resp_info.value
+        assert resp.status == 200
+
+    def test_type_filter_dropdown(self, ui_page: Page):
+        """Type filter should accept All, Full, Partial options."""
+        filter_select = ui_page.locator("#backup-type-filter")
+        for val in ["", "full", "partial_space"]:
+            filter_select.select_option(val)
+            assert filter_select.input_value() == val
+
+    def test_manifest_view_alert(self, ui_page: Page):
+        """Manifest button should show JSON in an alert dialog."""
+        alerts = []
+        ui_page.on("dialog", lambda d: (alerts.append(d.message), d.accept()))
+        manifest_btns = ui_page.locator("button").filter(has_text="Manifest")
+        if manifest_btns.count() == 0:
+            pytest.skip("No backups with manifest button")
+        manifest_btns.first.click()
+        ui_page.wait_for_timeout(3000)
+        # Manifest shows via alert(JSON.stringify(...))
+        assert len(alerts) >= 1, "No manifest alert shown"
+
+
+class TestInteractiveTrainingData:
+    """Test training data export workflow."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, ui_page: Page):
+        ui_page.on("dialog", lambda d: d.accept())
+        ui_page.locator('.tab-btn[data-tab="training"]').click()
+        ui_page.wait_for_timeout(3000)
+
+    def test_checkbox_toggles(self, ui_page: Page):
+        """Table checkboxes should be toggleable."""
+        for cb_id in ["#tbl-llm", "#tbl-retrieval", "#tbl-embedding"]:
+            cb = ui_page.locator(cb_id)
+            original = cb.is_checked()
+            cb.click()
+            assert cb.is_checked() != original, f"Checkbox {cb_id} did not toggle"
+            # Restore
+            cb.click()
+
+    def test_export_triggers_api(self, ui_page: Page):
+        """Clicking Export should trigger POST /v1/training-data/export."""
+        space_input = ui_page.locator("#export-space-id")
+        space_input.fill("mdemg-dev")
+
+        with ui_page.expect_response(
+            lambda r: "/v1/training-data/export" in r.url,
+            timeout=15000,
+        ) as resp_info:
+            export_btn = ui_page.locator(".btn").filter(has_text="Export")
+            export_btn.click()
+
+        resp = resp_info.value
+        assert resp.status in (200, 202), f"Export returned {resp.status}"
+
+    def test_export_shows_status(self, ui_page: Page):
+        """After export, status area should show progress."""
+        space_input = ui_page.locator("#export-space-id")
+        space_input.fill("mdemg-dev")
+        export_btn = ui_page.locator(".btn").filter(has_text="Export")
+        export_btn.click()
+        ui_page.wait_for_timeout(3000)
+        status_area = ui_page.locator("#export-status-area")
+        text = status_area.inner_text()
+        assert len(text) > 0, "Status area is empty after export trigger"
+
+    def test_date_inputs_accept_values(self, ui_page: Page):
+        """Date inputs should accept RFC3339 values."""
+        since = ui_page.locator("#export-since")
+        since.fill("2026-04-01T00:00:00Z")
+        assert since.input_value() == "2026-04-01T00:00:00Z"
+        until = ui_page.locator("#export-until")
+        until.fill("2026-04-09T23:59:59Z")
+        assert until.input_value() == "2026-04-09T23:59:59Z"

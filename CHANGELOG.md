@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Browser UI audit tests** (UI-AUDIT-2026-04-09) — 76 new Playwright tests: 30 screenshot/JS-error/API-5xx baselines (10 tabs), 10 Training Data tab read-only tests, 3 Training Data API tests, 25 interactive/functional tests across all 10 tabs, 8 new test classes. Total suite: 309 tests (306 pass, 3 skip).
+- **UI gap analysis** (`docs/features/ui-gap-analysis.md`) — documents 48/125 API endpoints with UI coverage (38%), identifies 77 uncovered routes across Jiminy, conversation, constraints, ingestion, metrics, and infrastructure.
+
+### Fixed
+
+- **Training Data tab renders empty** — `helpSection()` in `training_data.js` passed string array instead of `{term, description}` objects to `helpPanel()`, causing `entries.map()` to throw silently.
+- **Form inputs show `[object HTMLInputElement]`** — `infoRow()` in `dom.js` used `String(value)` which stringified DOM Node elements. Added `instanceof Node` check to pass elements through directly.
+
 ## [0.7.4] - 2026-04-08
 
 ### Added

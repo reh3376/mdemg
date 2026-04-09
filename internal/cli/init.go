@@ -346,10 +346,10 @@ func runInit(flags initFlags) error {
 	case "openai":
 		if flags.defaults {
 			opts.EmbeddingModel = "text-embedding-3-large"
-			opts.LLMModel = "gpt-4.1-nano"
+			opts.LLMModel = "gpt-4.1"
 		} else {
 			opts.EmbeddingModel = promptLine("Embedding model [text-embedding-3-large]", "text-embedding-3-large")
-			opts.LLMModel = promptLine("Naming/LLM model [gpt-4.1-nano]", "gpt-4.1-nano")
+			opts.LLMModel = promptLine("Naming/LLM model [gpt-4.1]", "gpt-4.1")
 		}
 		opts.LLMProvider = "openai"
 		if !flags.defaults && !hasOpenAIKey {
@@ -372,7 +372,7 @@ func runInit(flags initFlags) error {
 		case "ollama":
 			opts.JiminyModel = "qwen3:8b"
 		default:
-			opts.JiminyModel = "gpt-4.1-nano"
+			opts.JiminyModel = "gpt-4.1"
 		}
 	} else {
 		fmt.Println()
@@ -391,7 +391,7 @@ func runInit(flags initFlags) error {
 					ensureOllamaModel(opts.JiminyModel)
 				}
 			default:
-				opts.JiminyModel = promptLine("Jiminy LLM model [gpt-4.1-nano]", "gpt-4.1-nano")
+				opts.JiminyModel = promptLine("Jiminy LLM model [gpt-4.1]", "gpt-4.1")
 			}
 		}
 	}
