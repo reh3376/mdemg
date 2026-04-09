@@ -54,7 +54,7 @@ Note: 17 rows because `jiminy.evaluate` appears in both evaluator.go (constraint
 | Naming | hidden.name_emergence | `{name, description}` |
 | Reranking | retrieval.rerank_cross, retrieval.rerank_nli | `{scores}` |
 
-No task calls external tools, searches the web, or executes code. The fine-tuned model is an internal intelligence layer (oracle), not an agent. Tool-use models (e.g., gpt-5-nano) emit tool-call JSON that breaks `json.Unmarshal` parsing on all classification/evaluation tasks.
+No task calls external tools, searches the web, or executes code. The fine-tuned model is an internal intelligence layer (oracle), not an agent. Tool-use models (e.g., the former default gpt-5-nano) emit tool-call JSON that breaks `json.Unmarshal` parsing on all classification/evaluation tasks.
 
 **Constraint:** The target model must be a base or instruct variant, NOT a tool-use variant. This applies to both the fine-tuned Qwen3-30B-A3B and the external fallback LLM (now gpt-4.1-nano).
 

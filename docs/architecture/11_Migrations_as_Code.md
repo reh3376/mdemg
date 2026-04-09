@@ -92,6 +92,11 @@ The skeleton service uses `REQUIRED_SCHEMA_VERSION` for simplicity.
 - `V0002__constraints_and_btree_indexes.cypher`
 - `V0003__vector_indexes.cypher`
 - `V0004__safety_checks.cypher`
+- ...
+- `V0023__symbol_natural_key.cypher`
+- `V0024__signal_state.cypher`
+
+As of v0.7.4, production runs 24 migrations (V0001-V0024).
 
 ## Checksums (optional but recommended)
 

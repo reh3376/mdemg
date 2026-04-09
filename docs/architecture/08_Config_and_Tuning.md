@@ -11,7 +11,7 @@ All configuration is done via environment variables. Set these in `mdemg_build/s
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASS=testpassword
-REQUIRED_SCHEMA_VERSION=4
+REQUIRED_SCHEMA_VERSION=23
 ```
 
 ---
@@ -377,7 +377,17 @@ Jiminy is the proactive guidance service that surfaces constraints, corrections,
 | JiminyIncludeFrontiers | `true` | `JIMINY_INCLUDE_FRONTIERS` | Include frontier suggestions |
 | JiminyFrontierMinSim | `0.5` | `JIMINY_FRONTIER_MIN_SIM` | Min cosine similarity for frontiers |
 
+| JiminyCodeRegenEnabled | `false` | `JIMINY_CODE_REGEN_ENABLED` | Enable code comprehension feedback loop (feature-gated) |
+| JiminyCodeRegenThreshold | `0.3` | `JIMINY_CODE_REGEN_THRESHOLD` | Avg comprehension below this triggers code regeneration |
+| JiminyCodeRegenMinSamples | `10` | `JIMINY_CODE_REGEN_MIN_SAMPLES` | Min samples before evaluating comprehension |
+
 See `docs/features/jiminy-inner-voice.md` for the full feature guide.
+
+### Embedding Cache
+
+| Parameter | Default | Env Var | Description |
+|-----------|---------|---------|-------------|
+| NodeEmbeddingCacheTTLSec | `3600` | `NODE_EMBEDDING_CACHE_TTL_SEC` | TTL for node embedding cache entries (0 = no TTL) |
 
 ---
 
@@ -390,7 +400,7 @@ See `docs/features/jiminy-inner-voice.md` for the full feature guide.
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASS=testpassword
-REQUIRED_SCHEMA_VERSION=4
+REQUIRED_SCHEMA_VERSION=23
 
 # Service
 LISTEN_ADDR=:9999
@@ -448,6 +458,14 @@ JIMINY_MAX_ITEMS=10
 JIMINY_MIN_CONFIDENCE=0.3
 JIMINY_INCLUDE_FRONTIERS=true
 JIMINY_FRONTIER_MIN_SIM=0.5
+
+# Code Comprehension Feedback Loop (DD-P1P2)
+JIMINY_CODE_REGEN_ENABLED=false        # Enable code comprehension feedback loop
+JIMINY_CODE_REGEN_THRESHOLD=0.3        # Avg comprehension below this triggers regen
+JIMINY_CODE_REGEN_MIN_SAMPLES=10       # Min samples before evaluating
+
+# Embedding Cache TTL (DD-P1P2)
+NODE_EMBEDDING_CACHE_TTL_SEC=3600      # TTL for node embedding cache (0=no TTL)
 
 # Alert Dispatcher (SR-001)
 ALERT_ENABLED=true                     # Enable alert delivery system

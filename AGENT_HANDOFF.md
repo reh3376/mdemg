@@ -765,4 +765,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-04-02 — Training pipeline COMPLETE (PRs #243-250): PROD-READINESS, compose embed fix, export-auto LaunchAgent, vllm-mlx + train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py + 21 GRPO rewards, quantize_deploy.py. FT phases 3+4+ COMPLETE. Collection campaign running. Tag v0.4.2. CI: ALL GREEN.*
+*Last updated: 2026-04-08 — DD-P1P2 deep dive bug fix campaign COMPLETE (PR #301): 10 P1s + 21 P2s, all live-validated. Service alert system (SR-001/SNA-001), synergy reader, dashboard fixes. Tag v0.7.4. CI: ALL GREEN.*
