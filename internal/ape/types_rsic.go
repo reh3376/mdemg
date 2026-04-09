@@ -50,6 +50,22 @@ func IsDestructiveAction(actionType string) bool {
 	return DestructiveActions[actionType]
 }
 
+// DiagnosticActions lists action types that only observe/alert without mutating state.
+// These are excluded from calibration success/failure tracking.
+var DiagnosticActions = map[string]bool{
+	"review_llm_provider":        true,
+	"alert_llm_health":           true,
+	"alert_embedding_regression": true,
+	"trigger_training_pipeline":  true,
+	"alert_tsdb_health":          true,
+	"alert_schema_drift":         true,
+}
+
+// IsDiagnosticAction returns true if the action is observation-only (excluded from calibration).
+func IsDiagnosticAction(actionType string) bool {
+	return DiagnosticActions[actionType]
+}
+
 // ValidTriggerSources maps valid source strings for input validation.
 var ValidTriggerSources = map[string]TriggerSource{
 	"manual_api":        TriggerManualAPI,
@@ -276,6 +292,7 @@ type RSICProgressReport struct {
 	Deliverables map[string]any     `json:"deliverables,omitempty"`
 	Timestamp    time.Time          `json:"timestamp"`
 	Error        string             `json:"error,omitempty"`
+	Diagnostic   bool               `json:"diagnostic,omitempty"`
 }
 
 // CycleOutcome summarises a completed RSIC cycle.
@@ -288,6 +305,7 @@ type CycleOutcome struct {
 	ActionsExecuted  int                `json:"actions_executed"`
 	SuccessCount     int                `json:"success_count"`
 	FailedCount      int                `json:"failed_count"`
+	DiagnosticCount  int                `json:"diagnostic_count,omitempty"`
 	MetricsBefore    map[string]float64 `json:"metrics_before"`
 	MetricsAfter     map[string]float64 `json:"metrics_after"`
 	CalibrationDelta map[string]float64 `json:"calibration_delta,omitempty"`

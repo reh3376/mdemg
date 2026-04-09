@@ -88,6 +88,10 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 
 	outcome.ActionsExecuted = len(tasks)
 	for _, r := range taskFinal {
+		if r.Diagnostic {
+			outcome.DiagnosticCount++
+			continue
+		}
 		if r.Status == "completed" {
 			outcome.SuccessCount++
 		} else {
@@ -162,13 +166,20 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Build task status map
+	// Build task status map (exclude diagnostic reports from calibration)
 	taskFinal := make(map[string]string)
+	diagnosticTasks := make(map[string]bool)
 	for _, r := range reports {
 		taskFinal[r.TaskID] = r.Status
+		if r.Diagnostic {
+			diagnosticTasks[r.TaskID] = true
+		}
 	}
 
 	for _, t := range tasks {
+		if diagnosticTasks[t.TaskID] || IsDiagnosticAction(t.ActionType) {
+			continue // diagnostic actions excluded from calibration history
+		}
 		success := taskFinal[t.TaskID] == "completed" && outcome.CriteriaMet
 		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], ActionOutcome{
 			ActionType: t.ActionType,
