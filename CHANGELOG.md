@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RSIC overhaul** (RSIC-OVH-2026-04-09) — transforms RSIC from zero-value to high-value recursive self-improvement:
+  - `RSIC_PROTECTED_SPACES` env var replaces hardcoded `mdemg-dev` protection (default: empty = no spaces blocked)
+  - Graph-relative blast radius computed from actual node count (was hardcoded 1000)
+  - `RSIC_MACRO_CRON_SPACE` configures macro cron target space
+  - Calibration-aware planner suppresses low-confidence actions (`RSIC_MIN_ACTION_CONFIDENCE`, default: 0.2)
+  - LLM reflector whitelist expanded from 6 to 16 action types
+  - Diagnostic action classification — alert-only actions excluded from calibration tracking
+  - Default changes: micro cycles enabled, macro daily (was weekly), LLM reflection enabled
+- **Real RSIC executors** — `flush_recovery_buffer` graduates stable volatile nodes, `refresh_stale_edges` recomputes weights via co-activation decay, `review_nli_calibration` queries actual constraint metrics
 - **Browser UI audit tests** (UI-AUDIT-2026-04-09) — 76 new Playwright tests: 30 screenshot/JS-error/API-5xx baselines (10 tabs), 10 Training Data tab read-only tests, 3 Training Data API tests, 25 interactive/functional tests across all 10 tabs, 8 new test classes. Total suite: 309 tests (306 pass, 3 skip).
 - **UI gap analysis** (`docs/features/ui-gap-analysis.md`) — documents 48/125 API endpoints with UI coverage (38%), identifies 77 uncovered routes across Jiminy, conversation, constraints, ingestion, metrics, and infrastructure.
 

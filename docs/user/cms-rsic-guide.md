@@ -715,10 +715,12 @@ RSIC can execute these actions based on reflection insights:
 ### Safety Enforcement
 
 All RSIC actions pass through a safety validator:
-- **Bounds checking**: Max nodes and edges affected per action (configurable via `RSIC_MAX_NODE_PRUNE_PCT`, `RSIC_MAX_EDGE_PRUNE_PCT`)
-- **Protected spaces**: Actions on `mdemg-dev` are blocked by the safety validator
+- **Graph-relative bounds**: Max nodes/edges affected computed as a percentage of actual graph size (`RSIC_MAX_NODE_PRUNE_PCT`, `RSIC_MAX_EDGE_PRUNE_PCT`), with a floor of 10
+- **Configurable protected spaces**: `RSIC_PROTECTED_SPACES` (comma-separated, default: empty). When empty, RSIC can operate on all spaces including `mdemg-dev`. Set to block destructive actions on specific spaces.
 - **Pre-mutation snapshots**: Before any destructive action, a snapshot is captured for potential rollback
 - **Dry-run mode**: Preview what actions would do without executing
+- **Calibration-aware planner**: Actions with historical success rate below `RSIC_MIN_ACTION_CONFIDENCE` (default: 0.2) are suppressed unless severity is critical
+- **Diagnostic classification**: Alert-only actions are excluded from calibration success/failure tracking
 
 ---
 

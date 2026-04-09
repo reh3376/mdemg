@@ -82,7 +82,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["Dispatcher.executeTask()"] --> B["Safety Validator"]
-    B --> C{"Protected space<br/>+ destructive action?"}
+    B --> C{"Protected space<br/>(via RSIC_PROTECTED_SPACES)<br/>+ destructive action?"}
     C -->|yes| D["REJECT: protected_space_violation"]
     C -->|no| E["Estimate blast radius<br/>(COUNT query)"]
     E --> F{"Exceeds MaxNodes<br/>or MaxEdges?"}
@@ -98,9 +98,9 @@ flowchart TD
 
 | Action | Destructive? | Protected Space Policy | Blast Radius Check |
 |--------|-------------|----------------------|-------------------|
-| `prune_decayed_edges` | Yes | Block on protected spaces | MaxEdgesAffected |
-| `prune_excess_edges` | Yes | Block on protected spaces | MaxEdgesAffected |
-| `tombstone_stale` | Yes | Block on protected spaces | MaxNodesAffected |
+| `prune_decayed_edges` | Yes | Block on spaces listed in `RSIC_PROTECTED_SPACES` | MaxEdgesAffected (graph-relative) |
+| `prune_excess_edges` | Yes | Block on spaces listed in `RSIC_PROTECTED_SPACES` | MaxEdgesAffected (graph-relative) |
+| `tombstone_stale` | Yes | Block on spaces listed in `RSIC_PROTECTED_SPACES` | MaxNodesAffected (graph-relative) |
 | `trigger_consolidation` | No (additive) | Allow | Skip (constructive) |
 | `graduate_volatile` | No (promotion) | Allow | Skip (constructive) |
 | `refresh_stale_edges` | No (maintenance) | Allow | Skip (maintenance) |
