@@ -173,6 +173,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		"retrieval_quality":   report.RetrievalQuality,
 		"memory_health":       report.MemoryHealth,
 		"edge_health":         report.EdgeHealth,
+		"total_nodes":         float64(report.TotalNodes),
 		"edge_count":          float64(report.EdgeCount),
 		"orphan_ratio":        report.OrphanRatio,
 		"volatile_count":      float64(report.VolatileCount),

@@ -8,7 +8,10 @@ import (
 )
 
 // BuildTaskSpec translates an ImprovementAction into a fully specified RSICTaskSpec.
-func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, baseline map[string]float64) *RSICTaskSpec {
+// graphSize is the actual node count in the target space; blast radius is computed as a percentage of it.
+func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, baseline map[string]float64, graphSize int) *RSICTaskSpec {
+	maxNodes := max(int(float64(graphSize)*cfg.RSICMaxNodePrunePct), 10)
+	maxEdges := max(int(float64(graphSize)*cfg.RSICMaxEdgePrunePct), 10)
 	spec := &RSICTaskSpec{
 		TaskID:          fmt.Sprintf("%s-%s-%d", cycleID, action.ActionType, time.Now().UnixMilli()),
 		CycleID:         cycleID,
@@ -19,9 +22,9 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		Priority:        action.Priority,
 		BaselineMetrics: baseline,
 		Safety: SafetyBounds{
-			MaxNodesAffected: int(float64(1000) * cfg.RSICMaxNodePrunePct),
-			MaxEdgesAffected: int(float64(1000) * cfg.RSICMaxEdgePrunePct),
-			ProtectedSpaces:  []string{"mdemg-dev"},
+			MaxNodesAffected: maxNodes,
+			MaxEdgesAffected: maxEdges,
+			ProtectedSpaces:  cfg.RSICProtectedSpaces,
 			DryRun:           false,
 		},
 		ReportSchedule: ReportSchedule{

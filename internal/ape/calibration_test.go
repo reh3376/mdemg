@@ -286,3 +286,73 @@ func TestIsReversibleAction(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate_DiagnosticActionsExcluded(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{TaskID: "t1", ActionType: "prune_decayed_edges"},
+		{TaskID: "t2", ActionType: "alert_llm_health"},
+		{TaskID: "t3", ActionType: "alert_tsdb_health"},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+		{TaskID: "t2", Status: "completed", Diagnostic: true},
+		{TaskID: "t3", Status: "completed", Diagnostic: true},
+	}
+
+	outcome := cal.Validate(context.Background(), "cycle-diag", TierMicro, "test-space", tasks, reports, nil, nil)
+
+	if outcome.SuccessCount != 1 {
+		t.Errorf("expected 1 success (non-diagnostic), got %d", outcome.SuccessCount)
+	}
+	if outcome.DiagnosticCount != 2 {
+		t.Errorf("expected 2 diagnostic, got %d", outcome.DiagnosticCount)
+	}
+}
+
+func TestUpdateCalibration_DiagnosticActionsSkipped(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	outcome := &CycleOutcome{CycleID: "cycle-diag-cal", CriteriaMet: true}
+	tasks := []RSICTaskSpec{
+		{TaskID: "t1", ActionType: "prune_decayed_edges"},
+		{TaskID: "t2", ActionType: "alert_llm_health"},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+		{TaskID: "t2", Status: "completed", Diagnostic: true},
+	}
+
+	cal.UpdateCalibration(outcome, tasks, reports)
+
+	confidence := cal.GetCalibration()
+	if confidence["prune_decayed_edges"] != 1.0 {
+		t.Errorf("expected prune_decayed_edges confidence=1.0, got %f", confidence["prune_decayed_edges"])
+	}
+	if _, exists := confidence["alert_llm_health"]; exists {
+		t.Error("expected alert_llm_health to be absent from calibration (diagnostic)")
+	}
+}
+
+func TestDiagnosticActionsMap(t *testing.T) {
+	diagnosticActions := []string{
+		"review_llm_provider", "alert_llm_health", "alert_embedding_regression",
+		"trigger_training_pipeline", "alert_tsdb_health", "alert_schema_drift",
+	}
+	for _, a := range diagnosticActions {
+		if !IsDiagnosticAction(a) {
+			t.Errorf("expected %s to be diagnostic", a)
+		}
+	}
+
+	nonDiagnostic := []string{
+		"prune_decayed_edges", "trigger_consolidation", "refresh_stale_edges",
+		"tombstone_stale", "graduate_volatile",
+	}
+	for _, a := range nonDiagnostic {
+		if IsDiagnosticAction(a) {
+			t.Errorf("expected %s to be non-diagnostic", a)
+		}
+	}
+}

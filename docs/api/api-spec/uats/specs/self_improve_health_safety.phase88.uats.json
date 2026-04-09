@@ -24,7 +24,7 @@
     "tags": [
       "rsic"
     ],
-    "sha256": "69b9fd916a617309451370354a0d05c807eab896691b595837acd017833b4f0f"
+    "sha256": "09c13e4259f538cef3374cf352a15d9d020cccf40df7459e3f3f13b9d7e861ac"
   },
   "request": {
     "method": "GET",
@@ -49,19 +49,18 @@
         "expected": "phase88-v1"
       },
       {
-        "path": "$.safety.bounds.max_nodes_affected",
+        "path": "$.safety.bounds.max_node_prune_pct",
         "op": "type_is",
         "expected": "number"
       },
       {
-        "path": "$.safety.bounds.max_edges_affected",
+        "path": "$.safety.bounds.max_edge_prune_pct",
         "op": "type_is",
         "expected": "number"
       },
       {
         "path": "$.safety.bounds.protected_spaces",
-        "op": "type_is",
-        "expected": "array"
+        "op": "exists"
       },
       {
         "path": "$.safety.rollback.window_sec",

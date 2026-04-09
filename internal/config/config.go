@@ -435,10 +435,10 @@ type Config struct {
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 
 	// RSIC (Recursive Self-Improvement Cycle) settings (Phase 60b)
-	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: false)
+	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
 	RSICMesoPeriodHours    int     // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
 	RSICMesoPeriodSessions int     // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
-	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * 0")
+	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
 	RSICMaxNodePrunePct    float64 // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
 	RSICMaxEdgePrunePct    float64 // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
 	RSICRollbackWindow     int     // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
@@ -453,8 +453,11 @@ type Config struct {
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
 	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
-	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
-	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICWatchdogSpaceID     string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
+	RSICPersistenceEnabled  bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICProtectedSpaces      []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
+	RSICMacroCronSpace       string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
+	RSICMinActionConfidence  float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
 
 	// RSIC-SK1: Guidance self-calibration
 	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
@@ -468,7 +471,7 @@ type Config struct {
 	WeeklyGapInterviewsEnabled    bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
 
 	// Phase AR-3: LLM-powered RSIC reflection
-	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: false)
+	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: true)
 	RSICLLMReflectProvider string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
 	RSICLLMReflectModel    string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
 	RSICLLMReflectCompress bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
@@ -2267,7 +2270,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// RSIC settings (Phase 60b)
-	rsicMicroEnabled := getBool("RSIC_MICRO_ENABLED", false)
+	rsicMicroEnabled := getBool("RSIC_MICRO_ENABLED", true)
 	rsicMesoPeriodHours, err := atoi("RSIC_MESO_PERIOD_HOURS", 6)
 	if err != nil {
 		return Config{}, err
@@ -2276,7 +2279,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	rsicMacroCron := get("RSIC_MACRO_CRON", "0 3 * * 0")
+	rsicMacroCron := get("RSIC_MACRO_CRON", "0 3 * * *")
 	rsicMaxNodePrunePct, err := atof("RSIC_MAX_NODE_PRUNE_PCT", 0.05)
 	if err != nil {
 		return Config{}, err
@@ -2332,6 +2335,21 @@ func FromEnv() (Config, error) {
 	}
 	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
 	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
+	rsicProtectedSpacesStr := get("RSIC_PROTECTED_SPACES", "")
+	var rsicProtectedSpaces []string
+	if rsicProtectedSpacesStr != "" {
+		for _, s := range strings.Split(rsicProtectedSpacesStr, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				rsicProtectedSpaces = append(rsicProtectedSpaces, s)
+			}
+		}
+	}
+	rsicMacroCronSpace := get("RSIC_MACRO_CRON_SPACE", "mdemg-dev")
+	rsicMinActionConfidence, err := atof("RSIC_MIN_ACTION_CONFIDENCE", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// RSIC-SK1: Guidance self-calibration
 	rsicGuidanceCalibrationEnabled := getBool("RSIC_GUIDANCE_CALIBRATION_ENABLED", true)
@@ -2360,7 +2378,7 @@ func FromEnv() (Config, error) {
 	weeklyGapInterviewsEnabled := getBool("WEEKLY_GAP_INTERVIEWS_ENABLED", false)
 
 	// Phase AR-3: LLM-powered intelligence
-	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", false)
+	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", true)
 	rsicLLMReflectProvider := get("RSIC_LLM_REFLECT_PROVIDER", emergenceProvider)
 	rsicLLMReflectModel := get("RSIC_LLM_REFLECT_MODEL", emergenceModel)
 	rsicLLMReflectCompress := getBool("RSIC_LLM_REFLECT_COMPRESS", true)
@@ -3665,6 +3683,9 @@ func FromEnv() (Config, error) {
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:         rsicPersistenceEnabled,
+		RSICProtectedSpaces:            rsicProtectedSpaces,
+		RSICMacroCronSpace:             rsicMacroCronSpace,
+		RSICMinActionConfidence:        rsicMinActionConfidence,
 		RSICGuidanceCalibrationEnabled: rsicGuidanceCalibrationEnabled,
 		RSICGuidanceMinSurfaces:        rsicGuidanceMinSurfaces,
 		RSICGuidanceBoostThreshold:     rsicGuidanceBoostThreshold,

@@ -130,6 +130,10 @@ func (sv *SafetyValidator) EstimateBlastRadius(ctx context.Context, actionType s
 		return 0, nil // no estimation query for this action
 	}
 
+	if sv.driver == nil {
+		return -1, fmt.Errorf("no driver available for blast radius estimation")
+	}
+
 	sess := sv.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 

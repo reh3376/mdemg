@@ -738,6 +738,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
+	rsicPlanner.SetCalibrator(rsicCalibrator)
 
 	// Phase AR-3: Wire LLM-powered reflector if enabled
 	if cfg.RSICLLMReflectEnabled {
@@ -1384,8 +1385,8 @@ func (s *Server) StartMacroCronScheduler() {
 					continue
 				}
 
-				// Fire macro cycle for mdemg-dev space
-				spaceID := "mdemg-dev"
+				// Fire macro cycle for configured space
+				spaceID := s.cfg.RSICMacroCronSpace
 				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMacroCron, spaceID, ape.TierMacro, "")
 				if !decision.Allowed {
 					slog.Info("RSIC macro cron: skipped", "space_id", spaceID, "reason", decision.Reason)
