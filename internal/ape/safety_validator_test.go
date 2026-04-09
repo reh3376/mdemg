@@ -59,22 +59,24 @@ func TestValidateAction_BlocksCustomProtectedSpaceDestructive(t *testing.T) {
 	}
 }
 
-func TestValidateAction_AllowsDestructiveOnDefaultConfig(t *testing.T) {
-	// Default config has empty ProtectedSpaces — RSIC should be able to operate on mdemg-dev
+func TestValidateAction_FailsClosed_OnEstimationError(t *testing.T) {
+	// Without a driver, blast radius estimation fails — safety must fail closed
 	sv := &SafetyValidator{}
 	spec := &RSICTaskSpec{
 		ActionType:  "prune_decayed_edges",
 		TargetSpace: "mdemg-dev",
 		Safety: SafetyBounds{
 			MaxEdgesAffected: 100,
-			ProtectedSpaces:  nil, // default: no protected spaces
+			ProtectedSpaces:  nil,
 		},
 	}
 
 	decision := sv.ValidateAction(context.TODO(), spec, "prune_decayed_edges")
-	// Without a driver, blast radius check will fail-open (allowed with caution)
-	if !decision.Allowed {
-		t.Errorf("expected destructive action on mdemg-dev allowed with empty ProtectedSpaces, got rejected: %s", decision.Reason)
+	if decision.Allowed {
+		t.Error("expected destructive action to be blocked when estimation fails (fail-closed)")
+	}
+	if decision.EstimatedAffected != -1 {
+		t.Errorf("expected estimated_affected=-1, got %d", decision.EstimatedAffected)
 	}
 }
 

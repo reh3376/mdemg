@@ -29,7 +29,6 @@ type Dispatcher struct {
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
 	snapshotStore   *SnapshotStore
-	dryRun          bool
 	safetySummary   *SafetySummary
 	deltas          []ActionDelta
 	safetyMu        sync.Mutex
@@ -52,6 +51,7 @@ type activeTask struct {
 	Spec      RSICTaskSpec
 	StartedAt time.Time
 	Status    string // "running" | "completed" | "failed"
+	DryRun    bool
 	cancel    context.CancelFunc
 }
 
@@ -98,11 +98,6 @@ func (d *Dispatcher) SetAlertDispatcher(ad AlertDispatcher) {
 	d.alertDispatcher = ad
 }
 
-// SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
-func (d *Dispatcher) SetDryRun(dryRun bool) {
-	d.dryRun = dryRun
-}
-
 // ResetSafetySummary initializes a fresh safety summary for a cycle.
 func (d *Dispatcher) ResetSafetySummary() {
 	d.safetyMu.Lock()
@@ -130,7 +125,8 @@ func (d *Dispatcher) GetDeltas() []ActionDelta {
 }
 
 // Dispatch launches all tasks as background goroutines and returns immediately.
-func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
+// dryRun is stored per-task to avoid shared mutable state across goroutines.
+func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec, dryRun bool) error {
 	for i := range tasks {
 		task := tasks[i]
 		taskCtx, cancel := context.WithTimeout(ctx, task.Timeout) //nolint:gosec // G118: cancel stored in activeTask.cancel, called on completion
@@ -139,6 +135,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 			Spec:      task,
 			StartedAt: time.Now(),
 			Status:    "running",
+			DryRun:    dryRun,
 			cancel:    cancel,
 		}
 
@@ -165,7 +162,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	taskStart := time.Now()
 
 	// Phase 88: Dry-run mode — build delta, skip execution
-	if d.dryRun && d.safetyValidator != nil {
+	if at.DryRun && d.safetyValidator != nil {
 		delta := d.safetyValidator.BuildDelta(ctx, &at.Spec, actionType)
 		d.safetyMu.Lock()
 		d.deltas = append(d.deltas, delta)
@@ -229,8 +226,8 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	// Milestone: snapshot_taken
 	d.postReport(taskID, "running", 10, "snapshot_taken", "Baseline metrics captured", nil, "")
 
-	// Phase 88: Capture pre-mutation snapshot
-	if d.snapshotStore != nil {
+	// Phase 88: Capture pre-mutation snapshot (only for reversible actions)
+	if d.snapshotStore != nil && isReversibleAction(actionType) {
 		snap, err := d.snapshotStore.CaptureSnapshot(ctx, at.Spec.CycleID, actionType, at.Spec.TargetSpace)
 		if err != nil {
 			slog.Warn("RSIC snapshot: capture failed, continuing", "action", actionType, "error", err)
@@ -263,11 +260,19 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	case "refresh_stale_edges":
 		deliverables, execErr = d.executeRefreshStaleEdges(ctx, at.Spec.TargetSpace)
 	case "codify_constraint":
-		deliverables, execErr = d.executeCodifyConstraint(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+		nodeID := at.Spec.TargetNodeID
+		if nodeID == "" {
+			nodeID = at.Spec.Rationale // backward compat
+		}
+		deliverables, execErr = d.executeCodifyConstraint(ctx, at.Spec.TargetSpace, nodeID)
 	case "codify_all_constraints":
 		deliverables, execErr = d.executeCodifyAllConstraints(ctx, at.Spec.TargetSpace)
 	case "retire_code":
-		deliverables, execErr = d.executeRetireCode(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+		code := at.Spec.TargetCode
+		if code == "" {
+			code = at.Spec.Rationale // backward compat
+		}
+		deliverables, execErr = d.executeRetireCode(ctx, at.Spec.TargetSpace, code)
 	case "adjust_tier_threshold":
 		deliverables, execErr = d.executeAdjustTierThreshold(ctx, at.Spec.TargetSpace)
 	case "adjust_replay_buffer":
@@ -373,6 +378,9 @@ func (d *Dispatcher) executeConsolidation(ctx context.Context, spaceID string) (
 }
 
 func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	// Graduate volatile observations via Neo4j directly
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
@@ -404,6 +412,9 @@ func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string
 }
 
 func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -440,6 +451,9 @@ func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) 
 }
 
 func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -533,6 +547,9 @@ func (d *Dispatcher) executeCodifyConstraint(ctx context.Context, spaceID, ratio
 func (d *Dispatcher) executeCodifyAllConstraints(ctx context.Context, spaceID string) (map[string]any, error) {
 	if d.protoEvolver == nil {
 		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
 	}
 
 	// Query Neo4j for all constraint nodes without constraint_code
@@ -731,6 +748,9 @@ func (d *Dispatcher) executeAlertSidecarDown(ctx context.Context, spaceID string
 }
 
 func (d *Dispatcher) executeAlertMemoryBloat(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	// Query total node count to assess bloat
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
@@ -786,7 +806,10 @@ func (d *Dispatcher) executeAlertSynergyOverlap(ctx context.Context, spaceID str
 }
 
 func (d *Dispatcher) executeFlushRecoveryBuffer(ctx context.Context, spaceID string) (map[string]any, error) {
-	// Graduate volatile observations that have stabilised (stability_score >= 0.7)
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
+	// Flush recovery buffer entries: re-classify recovery_buffer nodes as regular observations
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -796,51 +819,53 @@ func (d *Dispatcher) executeFlushRecoveryBuffer(ctx context.Context, spaceID str
 	}
 
 	res, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (flushResult, error) {
-		// Graduate stable volatile nodes
-		graduated, err := tx.Run(ctx, `
+		// Re-classify recovery buffer nodes back to conversation_observation
+		flushed, err := tx.Run(ctx, `
 			MATCH (n:MemoryNode {space_id: $spaceId})
-			WHERE n.volatile = true AND coalesce(n.stability_score, 0) >= 0.7
+			WHERE n.obs_type = 'recovery_buffer' OR n.source = 'synergy_recovery'
 			WITH n LIMIT 100
-			SET n.volatile = false, n.graduated_at = datetime()
+			SET n.obs_type = 'conversation_observation', n.recovered_at = datetime()
 			RETURN count(n) AS flushed
 		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
 			return flushResult{}, err
 		}
-		var flushed int64
-		if graduated.Next(ctx) {
-			if v, ok := graduated.Record().Get("flushed"); ok {
-				if cnt, ok := v.(int64); ok {
-					flushed = cnt
+		var cnt int64
+		if flushed.Next(ctx) {
+			if v, ok := flushed.Record().Get("flushed"); ok {
+				if n, ok := v.(int64); ok {
+					cnt = n
 				}
 			}
 		}
-		if err := graduated.Err(); err != nil {
+		if err := flushed.Err(); err != nil {
 			return flushResult{}, err
 		}
 
-		// Count remaining volatile
-		remaining, err := tx.Run(ctx,
-			`MATCH (n:MemoryNode {space_id: $spaceId}) WHERE n.volatile = true RETURN count(n) AS cnt`,
-			map[string]any{"spaceId": spaceID})
+		// Count remaining recovery buffer entries
+		remaining, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.obs_type = 'recovery_buffer' OR n.source = 'synergy_recovery'
+			RETURN count(n) AS cnt
+		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
-			return flushResult{Flushed: flushed}, err
+			return flushResult{Flushed: cnt}, err
 		}
 		var rem int64
 		if remaining.Next(ctx) {
 			if v, ok := remaining.Record().Get("cnt"); ok {
-				if cnt, ok := v.(int64); ok {
-					rem = cnt
+				if c, ok := v.(int64); ok {
+					rem = c
 				}
 			}
 		}
-		return flushResult{Flushed: flushed, Remaining: rem}, remaining.Err()
+		return flushResult{Flushed: cnt, Remaining: rem}, remaining.Err()
 	})
 	if err != nil {
 		return nil, fmt.Errorf("flush recovery buffer: %w", err)
 	}
 
-	slog.Info("RSIC: recovery buffer flushed", "space_id", spaceID, "graduated", res.Flushed, "remaining", res.Remaining)
+	slog.Info("RSIC: recovery buffer flushed", "space_id", spaceID, "flushed", res.Flushed, "remaining", res.Remaining)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("flush_recovery_buffer", "success").Inc()
 	}
@@ -853,6 +878,9 @@ func (d *Dispatcher) executeFlushRecoveryBuffer(ctx context.Context, spaceID str
 }
 
 func (d *Dispatcher) executeReviewNLICalibration(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	// Query NLI calibration metrics from the graph
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)

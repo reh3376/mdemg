@@ -1,6 +1,7 @@
 package ape
 
 import (
+	"bufio"
 	"context"
 	"log/slog"
 	"math"
@@ -217,36 +218,8 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 	}
 
-	// 6. Weighted overall (adjusted weights for dimensions present)
-	if report.SynergyHealth > 0 && report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
-		// All 7 dimensions
-		report.OverallHealth = 0.18*report.RetrievalQuality +
-			0.18*report.MemoryHealth +
-			0.13*report.EdgeHealth +
-			0.13*report.TaskPerformance +
-			0.13*report.GuidanceHealth +
-			0.13*report.ProtocolHealth +
-			0.12*report.SynergyHealth
-	} else if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
-		// All 6 dimensions (no synergy)
-		report.OverallHealth = 0.20*report.RetrievalQuality +
-			0.20*report.MemoryHealth +
-			0.15*report.EdgeHealth +
-			0.15*report.TaskPerformance +
-			0.15*report.GuidanceHealth +
-			0.15*report.ProtocolHealth
-	} else if report.GuidanceHealth > 0 {
-		report.OverallHealth = 0.25*report.RetrievalQuality +
-			0.25*report.MemoryHealth +
-			0.20*report.EdgeHealth +
-			0.15*report.TaskPerformance +
-			0.15*report.GuidanceHealth
-	} else {
-		report.OverallHealth = 0.30*report.RetrievalQuality +
-			0.25*report.MemoryHealth +
-			0.25*report.EdgeHealth +
-			0.20*report.TaskPerformance
-	}
+	// 6. Weighted overall (single source: ComputeOverallHealth)
+	report.OverallHealth = ComputeOverallHealth(report)
 
 	report.Confidence = a.computeConfidence(report)
 
@@ -608,17 +581,20 @@ func countBufferSpaceEntries(ctx context.Context, driver neo4j.DriverWithContext
 }
 
 // countLocalBufferEntries counts lines in the local JSONL recovery buffer file.
+// Uses streaming scanner to avoid loading the entire file into memory.
 func countLocalBufferEntries(path string) int {
 	if path == "" {
 		return 0
 	}
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return 0
 	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
 	count := 0
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) != "" {
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
 			count++
 		}
 	}

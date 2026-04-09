@@ -40,7 +40,8 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
 - J17 Feedback Loop Closure — COMPLETE (state file bridge, hook feedback delivery, control char sanitization, bootstrap codification)
 - J17 Protocol Pipeline 12-Break Cascading Fix — COMPLETE (code lookup, trust persistence, cache bypass, threshold sync, live collector wiring, all gauges flowing)
-- RSIC Overhaul (RSIC-OVH-2026-04-09) — COMPLETE (configurable ProtectedSpaces, graph-relative blast radius, real executors, diagnostic classification, calibration-aware planner, 16-action LLM reflector, daily cycles)
+- RSIC Overhaul (RSIC-OVH-2026-04-09) — COMPLETE (configurable ProtectedSpaces, graph-relative blast radius, real executors, diagnostic classification, calibration-aware planner, 20-action LLM reflector, daily cycles)
+- RSIC Hardening (RSIC-HDN-2026-04-09) — COMPLETE (32 deep dive findings remediated: nil postReport, nil driver guards, dryRun race, per-task CriteriaMet, executor correctness, watchdog lock/reset, safety fail-closed, LLM sanitization, SSE race fix)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
@@ -53,6 +54,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-09) ===
+- ✅ RSIC-HDN-2026-04-09: RSIC Hardening — Deep Dive Remediation (2026-04-09):
+  - 32 findings remediated (2 P0, 9 P1, 19 P2, 2 P3) across 6 sequential epics
+  - P0: Nil postReport calibration corruption fix, nil driver guards (7 executors)
+  - P1: dryRun data race eliminated, per-task CriteriaMet, executor correctness (flush buffer, params, OOM)
+  - P2: Watchdog lock contention + reset timing, safety fail-closed, config cross-validation
+  - P2: LLM reflector single action source (20 actions), prompt injection sanitization
+  - P2: Orchestration atomic snapshot, synergy cache TTL, CompleteCycle timeout handling
+  - P2: SSE job stream race fix (Job.Snapshot()), health formula extraction
+  - P3: Dead code cleanup, cron parser documentation
+  - CI: -race flag added to test pipeline
+  - 0 lint issues, all tests pass with -race
 - ✅ UI-AUDIT-2026-04-09: Browser UI Comprehensive Audit & Testing (2026-04-09):
   - E1: Screenshot baselines for all 10 tabs + JS error + API 5xx per-tab tests (30 new tests)
   - E1: TestTrainingDataTab (10 read-only tests) + TestTrainingDataAPI (3 endpoint tests)

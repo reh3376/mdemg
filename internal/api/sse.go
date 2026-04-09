@@ -78,23 +78,26 @@ func (s *Server) handleJobStreamWithConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Read initial snapshot under lock
+	initSnap := job.Snapshot()
+
 	// Send initial event
 	sendSSEEvent(w, flusher, "connected", map[string]any{
 		"job_id": jobID,
-		"status": job.Status,
+		"status": initSnap.Status,
 	})
 
 	// If job is already in terminal state, send complete and exit immediately
-	if isTerminalStatus(job.Status) {
+	if isTerminalStatus(initSnap.Status) {
 		completeData := map[string]any{
 			"job_id":       jobID,
-			"final_status": job.Status,
+			"final_status": initSnap.Status,
 		}
-		if job.Result != nil {
-			completeData["result"] = job.Result
+		if initSnap.Result != nil {
+			completeData["result"] = initSnap.Result
 		}
-		if job.Error != "" {
-			completeData["error"] = job.Error
+		if initSnap.Error != "" {
+			completeData["error"] = initSnap.Error
 		}
 		sendSSEEvent(w, flusher, "complete", completeData)
 		return
@@ -106,8 +109,8 @@ func (s *Server) handleJobStreamWithConfig(w http.ResponseWriter, r *http.Reques
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
 
-	lastStatus := job.Status
-	lastProgress := job.Progress.Current
+	lastStatus := initSnap.Status
+	lastProgress := initSnap.Progress.Current
 
 	for {
 		select {
@@ -135,40 +138,43 @@ func (s *Server) handleJobStreamWithConfig(w http.ResponseWriter, r *http.Reques
 				return
 			}
 
+			// Read a consistent snapshot of mutable job fields
+			snap := job.Snapshot()
+
 			// Only send updates when something changes
-			if job.Status != lastStatus || job.Progress.Current != lastProgress {
-				lastStatus = job.Status
-				lastProgress = job.Progress.Current
+			if snap.Status != lastStatus || snap.Progress.Current != lastProgress {
+				lastStatus = snap.Status
+				lastProgress = snap.Progress.Current
 
 				eventData := map[string]any{
 					"job_id":  jobID,
-					"status":  job.Status,
+					"status":  snap.Status,
 					"progress": map[string]any{
-						"total":      job.Progress.Total,
-						"current":    job.Progress.Current,
-						"percentage": job.Progress.Percentage,
-						"phase":      job.Progress.Phase,
-						"rate":       job.Progress.Rate,
+						"total":      snap.Progress.Total,
+						"current":    snap.Progress.Current,
+						"percentage": snap.Progress.Percentage,
+						"phase":      snap.Progress.Phase,
+						"rate":       snap.Progress.Rate,
 					},
 				}
 
-				if job.Error != "" {
-					eventData["error"] = job.Error
+				if snap.Error != "" {
+					eventData["error"] = snap.Error
 				}
 
 				sendSSEEvent(w, flusher, "progress", eventData)
 
 				// Send complete event for terminal statuses
-				if isTerminalStatus(job.Status) {
+				if isTerminalStatus(snap.Status) {
 					completeData := map[string]any{
 						"job_id":       jobID,
-						"final_status": job.Status,
+						"final_status": snap.Status,
 					}
-					if job.Result != nil {
-						completeData["result"] = job.Result
+					if snap.Result != nil {
+						completeData["result"] = snap.Result
 					}
-					if job.Error != "" {
-						completeData["error"] = job.Error
+					if snap.Error != "" {
+						completeData["error"] = snap.Error
 					}
 					sendSSEEvent(w, flusher, "complete", completeData)
 					return

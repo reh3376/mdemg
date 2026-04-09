@@ -34,11 +34,13 @@ func (p *Planner) Plan(_ context.Context, insights []ReflectionInsight, spaceID 
 	actionMap := make(map[string]ImprovementAction)
 	for _, insight := range insights {
 		action := ImprovementAction{
-			ActionType:  insight.RecommendedAction,
-			TargetSpace: spaceID,
-			Scope:       "space",
-			Priority:    severityRank(insight.Severity),
-			Rationale:   insight.Description,
+			ActionType:   insight.RecommendedAction,
+			TargetSpace:  spaceID,
+			Scope:        "space",
+			Priority:     severityRank(insight.Severity),
+			Rationale:    insight.Description,
+			TargetNodeID: insight.TargetNodeID,
+			TargetCode:   insight.TargetCode,
 		}
 		if existing, ok := actionMap[action.ActionType]; !ok || action.Priority > existing.Priority {
 			actionMap[action.ActionType] = action

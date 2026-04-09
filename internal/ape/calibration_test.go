@@ -64,6 +64,88 @@ func TestValidateWithNilPostReport(t *testing.T) {
 	}
 }
 
+func TestValidate_NilPostReportWithCriteria(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{
+			TaskID:     "t1",
+			ActionType: "tombstone_stale",
+			SuccessCriteria: []Criterion{
+				{Metric: "correction_rate_delta", Operator: "lte", Threshold: 0},
+			},
+		},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+	}
+
+	outcome := cal.Validate(context.Background(), "cycle-nil-post", TierMicro, "test-space", tasks, reports,
+		map[string]float64{"correction_rate": 0.1}, nil)
+
+	// P0 fix: nil postReport with defined criteria → CriteriaMet must be false
+	if outcome.CriteriaMet {
+		t.Error("expected CriteriaMet=false when postReport is nil but criteria are defined")
+	}
+	if outcome.CriteriaDetail["_post_assessment"] != "failed" {
+		t.Errorf("expected _post_assessment=failed, got %q", outcome.CriteriaDetail["_post_assessment"])
+	}
+}
+
+func TestValidate_PerTaskCriteriaMet(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{
+			TaskID:     "t1",
+			ActionType: "prune_decayed_edges",
+			SuccessCriteria: []Criterion{
+				{Metric: "overall_health", Operator: "gte", Threshold: 0.05},
+			},
+		},
+		{
+			TaskID:     "t2",
+			ActionType: "tombstone_stale",
+			SuccessCriteria: []Criterion{
+				{Metric: "overall_health", Operator: "gte", Threshold: 0.5}, // delta=0.1 < 0.5 → fails
+			},
+		},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+		{TaskID: "t2", Status: "completed"},
+	}
+	metricsBefore := map[string]float64{"overall_health": 0.6}
+	postReport := &SelfAssessmentReport{OverallHealth: 0.7} // delta = 0.1
+
+	outcome := cal.Validate(context.Background(), "cycle-ptc", TierMicro, "test-space", tasks, reports, metricsBefore, postReport)
+
+	// Cycle-level CriteriaMet should be false (t2 failed)
+	if outcome.CriteriaMet {
+		t.Error("expected cycle-level CriteriaMet=false because t2 failed")
+	}
+	// Per-task: t1 should pass, t2 should fail
+	if !outcome.PerTaskCriteria["t1"] {
+		t.Error("expected PerTaskCriteria[t1]=true")
+	}
+	if outcome.PerTaskCriteria["t2"] {
+		t.Error("expected PerTaskCriteria[t2]=false")
+	}
+
+	// UpdateCalibration should use per-task criteria
+	cal.UpdateCalibration(outcome, tasks, reports)
+	confidence := cal.GetCalibration()
+
+	// t1 completed + criteria met → success (confidence 1.0)
+	if confidence["prune_decayed_edges"] != 1.0 {
+		t.Errorf("expected prune_decayed_edges confidence=1.0, got %f", confidence["prune_decayed_edges"])
+	}
+	// t2 completed but criteria NOT met → failure (confidence 0.0)
+	if confidence["tombstone_stale"] != 0.0 {
+		t.Errorf("expected tombstone_stale confidence=0.0, got %f", confidence["tombstone_stale"])
+	}
+}
+
 func TestCriteriaEvaluation_Met(t *testing.T) {
 	cal := NewCalibrator(nil, 100)
 
@@ -133,14 +215,42 @@ func TestCriteriaEvaluation_MissingData(t *testing.T) {
 		{TaskID: "t1", Status: "completed"},
 	}
 
-	outcome := cal.Validate(context.Background(), "cycle-5", TierMicro, "test-space", tasks, reports, map[string]float64{}, nil)
+	// With postReport present but missing the specific metric → missing_data, criteria stays true
+	postReport := &SelfAssessmentReport{OverallHealth: 0.7}
+	outcome := cal.Validate(context.Background(), "cycle-5", TierMicro, "test-space", tasks, reports, map[string]float64{}, postReport)
 
-	// Missing data should not fail criteria (CriteriaMet stays true)
 	if !outcome.CriteriaMet {
 		t.Error("expected CriteriaMet=true for missing data (no delta to evaluate)")
 	}
 	if outcome.CriteriaDetail["nonexistent_metric"] != "missing_data" {
 		t.Errorf("expected 'missing_data', got %q", outcome.CriteriaDetail["nonexistent_metric"])
+	}
+}
+
+func TestCriteriaEvaluation_MissingData_NilPostReport(t *testing.T) {
+	cal := NewCalibrator(nil, 100)
+
+	tasks := []RSICTaskSpec{
+		{
+			TaskID:     "t1",
+			ActionType: "prune_decayed_edges",
+			SuccessCriteria: []Criterion{
+				{Metric: "nonexistent_metric", Operator: "gte", Threshold: 0.1},
+			},
+		},
+	}
+	reports := []RSICProgressReport{
+		{TaskID: "t1", Status: "completed"},
+	}
+
+	// Nil postReport with criteria → P0 fix: fail safe
+	outcome := cal.Validate(context.Background(), "cycle-5b", TierMicro, "test-space", tasks, reports, map[string]float64{}, nil)
+
+	if outcome.CriteriaMet {
+		t.Error("expected CriteriaMet=false when postReport is nil and criteria exist")
+	}
+	if outcome.CriteriaDetail["_post_assessment"] != "failed" {
+		t.Errorf("expected _post_assessment=failed, got %q", outcome.CriteriaDetail["_post_assessment"])
 	}
 }
 

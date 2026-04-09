@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **RSIC hardening** (RSIC-HDN-2026-04-09) — 32 findings from deep dive remediated across 6 epics:
+  - P0: Nil postReport no longer silently inflates calibration — `CriteriaMet=false` when post-assessment fails
+  - P0: Nil driver guards added to 7 executor methods (prevents nil-pointer panics)
+  - P1: `dryRun` data race eliminated — passed as `Dispatch()` parameter, not mutable shared field
+  - P1: `executeFlushRecoveryBuffer` rewritten to target recovery buffer nodes (was duplicating volatile graduation)
+  - P1: `executeCodifyConstraint`/`executeRetireCode` receive proper node ID/code parameters
+  - P1: Per-task `CriteriaMet` evaluation replaces cycle-level shared flag
+  - P2: Watchdog releases lock before I/O, resets decay counter only on trigger success
+  - P2: Safety validator fails closed on estimation error, blast radius LIMIT aligned with executor batch size
+  - P2: Orchestration status snapshot is atomic (single lock scope)
+  - P2: `ComputeOverallHealth` extracted as single source of truth (was duplicated in 2 files)
+  - P2: Synergy reader caches file reads with 60s TTL
+  - P2: Config cross-field validation warns on protected space conflicts
+  - P2: LLM reflector single action source, expanded whitelist (16→20), prompt injection sanitization
+  - P2: SSE job stream race fix (`Job.Snapshot()` for thread-safe reads)
+  - P2: `CleanupExpired()` wired to macro cron ticker, `CompleteCycle` skipped on timeout
+  - P3: Dead code cleanup (unreachable branch, cron parser documented)
+  - CI: `-race` flag added to test pipeline
 - **Training Data tab renders empty** — `helpSection()` in `training_data.js` passed string array instead of `{term, description}` objects to `helpPanel()`, causing `entries.map()` to throw silently.
 - **Form inputs show `[object HTMLInputElement]`** — `infoRow()` in `dom.js` used `String(value)` which stringified DOM Node elements. Added `instanceof Node` check to pass elements through directly.
 

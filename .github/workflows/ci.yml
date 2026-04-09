@@ -106,7 +106,7 @@ jobs:
         run: go mod download
 
       - name: Run Unit Tests
-        run: go test -v ./internal/...
+        run: go test -race -v ./internal/...
 
       - name: Wait for Neo4j
         run: |
