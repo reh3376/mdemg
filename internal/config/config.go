@@ -43,7 +43,7 @@ type Config struct {
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
-	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-4.1")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-5.4")
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -107,7 +107,6 @@ type Config struct {
 	ScoringDelta       float64 // Confidence weight (default: 0.05)
 	ScoringPhi         float64 // Hub penalty coefficient (default: 0.08)
 	ScoringKappa       float64 // Redundancy penalty coefficient (default: 0.12)
-	ScoringRho         float64 // Recency decay rate per day (default: 0.05) - legacy, used as fallback
 	ScoringRhoL0       float64 // Layer 0 decay rate per day (default: 0.05 - faster decay for files)
 	ScoringRhoL1       float64 // Layer 1 decay rate per day (default: 0.02 - slower for hidden/concepts)
 	ScoringRhoL2       float64 // Layer 2+ decay rate per day (default: 0.01 - slowest for abstractions)
@@ -169,7 +168,7 @@ type Config struct {
 	// LLM Re-ranking settings (V0006)
 	RerankEnabled   bool    // Enable LLM re-ranking (default: false)
 	RerankProvider  string  // LLM provider for rerank (openai/ollama/jina)
-	RerankModel     string  // Model for re-ranking (default: gpt-4o-mini)
+	RerankModel     string  // Model for re-ranking (cascades from LLM_MODEL)
 	RerankTopN      int     // Candidates to re-rank (default: 30)
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
@@ -297,6 +296,9 @@ type Config struct {
 	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
 	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
 	JiminyClassifyCompress         bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
+	JiminyDedupSimilarityThreshold float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
+	JiminyCorrectionDecayRate      float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
+	J17TicketCacheSize             int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
 
 	// Jiminy J15: Synthesis temperature
 	JiminySynthesisTemperature *float64 // JIMINY_SYNTHESIS_TEMPERATURE — LLM temperature (default: nil = API default)
@@ -1184,13 +1186,6 @@ func FromEnv() (Config, error) {
 	if scoringKappa < 0 {
 		return Config{}, errors.New("SCORING_KAPPA must be >= 0")
 	}
-	scoringRho, err := atof("SCORING_RHO", 0.05)
-	if err != nil {
-		return Config{}, err
-	}
-	if scoringRho < 0 {
-		return Config{}, errors.New("SCORING_RHO must be >= 0")
-	}
 	// Layer-specific decay rates (faster decay for L0 files, slower for abstractions)
 	scoringRhoL0, err := atof("SCORING_RHO_L0", 0.05)
 	if err != nil {
@@ -2012,6 +2007,18 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyClassifyCompress := getBool("JIMINY_CLASSIFY_COMPRESS", true)
+	jiminyDedupSimilarityThreshold, err := atof("JIMINY_DEDUP_SIMILARITY_THRESHOLD", 0.85)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCorrectionDecayRate, err := atof("JIMINY_CORRECTION_DECAY_RATE", 0.01)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TicketCacheSize, err := atoi("J17_TICKET_CACHE_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
 	// J15: Synthesis temperature
 	var jiminySynthesisTemperature *float64
 	if v := os.Getenv("JIMINY_SYNTHESIS_TEMPERATURE"); v != "" {
@@ -3342,7 +3349,6 @@ func FromEnv() (Config, error) {
 		ScoringDelta:              scoringDelta,
 		ScoringPhi:                scoringPhi,
 		ScoringKappa:              scoringKappa,
-		ScoringRho:                scoringRho,
 		ScoringRhoL0:              scoringRhoL0,
 		ScoringRhoL1:              scoringRhoL1,
 		ScoringRhoL2:              scoringRhoL2,
@@ -3517,6 +3523,9 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
 		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
 		JiminyClassifyCompress:         jiminyClassifyCompress,
+		JiminyDedupSimilarityThreshold: jiminyDedupSimilarityThreshold,
+		JiminyCorrectionDecayRate:      jiminyCorrectionDecayRate,
+		J17TicketCacheSize:             j17TicketCacheSize,
 		JiminySynthesisTemperature:      jiminySynthesisTemperature,
 		JiminyGuidanceContextMaxChars:   jiminyGuidanceContextMaxChars,
 		JiminyGuidanceOutputMaxChars:    jiminyGuidanceOutputMaxChars,
