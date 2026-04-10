@@ -679,6 +679,7 @@ func (a *Assessor) publishGuidanceMetrics(spaceID string, stats JiminyStatsResul
 
 	m.JiminyFollowRate(spaceID).Set(stats.FollowRate)
 	m.JiminyConstraintEffectiveness(spaceID).Set(stats.ConstraintEffRate)
+	m.JiminyConstraintEffectiveness30d(spaceID).Set(stats.ConstraintEffRate30d)
 	m.JiminySourceDiversity(spaceID).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(spaceID).Set(float64(stats.TotalGuidanceIssued))
 	m.JiminyTotalFollowed(spaceID).Set(float64(stats.TotalFollowed))

@@ -163,8 +163,9 @@ type StandardMetrics struct {
 
 	// Jiminy guidance metrics (published after each assessment)
 	JiminyFollowRate              func(spaceID string) *Gauge
-	JiminyConstraintEffectiveness func(spaceID string) *Gauge
-	JiminySourceDiversity         func(spaceID string) *Gauge
+	JiminyConstraintEffectiveness    func(spaceID string) *Gauge
+	JiminyConstraintEffectiveness30d func(spaceID string) *Gauge
+	JiminySourceDiversity            func(spaceID string) *Gauge
 	JiminyTotalIssued             func(spaceID string) *Gauge
 	JiminyTotalFollowed           func(spaceID string) *Gauge
 	JiminyTotalPartialCompliance  func(spaceID string) *Gauge
@@ -537,6 +538,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.JiminyConstraintEffectiveness = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_constraint_effectiveness", "Constraint effectiveness rate (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyConstraintEffectiveness30d = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_constraint_effectiveness_30d", "Constraint effectiveness rate 30-day rolling window (0-1)",
 			map[string]string{"space_id": spaceID})
 	}
 	m.JiminySourceDiversity = func(spaceID string) *Gauge {
