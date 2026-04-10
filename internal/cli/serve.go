@@ -181,6 +181,18 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				}
 			}
 
+			// Backfill constraint_outcomes from Neo4j GUIDANCE_OUTCOME edges (idempotent).
+			// Catches up data created before the TSDB outcome writer was wired.
+			if cfg.JiminyEnabled {
+				spaceID := cfg.RSICWatchdogSpaceID
+				if spaceID == "" {
+					spaceID = "mdemg-dev"
+				}
+				if backfillErr := tsdb.BackfillConstraintOutcomes(context.Background(), tsdbClient.Pool(), driver, spaceID); backfillErr != nil {
+					slog.Warn("tsdb: constraint_outcomes backfill failed", "error", backfillErr)
+				}
+			}
+
 			// Schema version enforcement
 			tsdbVer, verErr := tsdbClient.GetSchemaVersion(context.Background())
 			if verErr != nil {
