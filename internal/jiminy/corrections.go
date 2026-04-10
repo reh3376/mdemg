@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -35,7 +37,8 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 	  AND node.obs_type = 'correction'
 	  AND NOT coalesce(node.is_archived, false)
 	  AND score > 0.4
-	RETURN node.node_id AS node_id, node.content AS content, node.summary AS summary, score AS sim
+	RETURN node.node_id AS node_id, node.content AS content, node.summary AS summary,
+	       score AS sim, node.created_at AS created_at
 	ORDER BY sim DESC LIMIT $limit`
 
 	var matches []correctionMatch
@@ -58,12 +61,27 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 			content, _ := rec.Get("content")
 			summary, _ := rec.Get("summary")
 			sim, _ := rec.Get("sim")
+			createdAtRaw, _ := rec.Get("created_at")
+
+			createdAt := asTime(createdAtRaw)
+			similarity := asFloat64(sim)
+
+			// Apply temporal decay: recent corrections rank higher
+			lambda := s.cfg.JiminyCorrectionDecayRate
+			if lambda <= 0 {
+				lambda = 0.01
+			}
+			if !createdAt.IsZero() {
+				daysSince := time.Since(createdAt).Hours() / 24.0
+				similarity *= math.Exp(-lambda * daysSince)
+			}
 
 			matches = append(matches, correctionMatch{
 				NodeID:     asString(nodeID),
 				Content:    asString(content),
 				Summary:    asString(summary),
-				Similarity: asFloat64(sim),
+				Similarity: similarity,
+				CreatedAt:  createdAt,
 			})
 		}
 		return nil, res.Err()
@@ -75,6 +93,23 @@ func (s *Service) findRelevantCorrections(ctx context.Context, spaceID string, e
 
 	slog.Info("jiminy: found relevant corrections", "count", len(matches), "space_id", spaceID)
 	return matches, nil
+}
+
+// asTime safely converts an interface{} to time.Time.
+// Handles Neo4j time types and RFC3339 strings.
+func asTime(v any) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	switch t := v.(type) {
+	case time.Time:
+		return t
+	case string:
+		if parsed, err := time.Parse(time.RFC3339, t); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }
 
 // asString safely converts an interface{} to string.

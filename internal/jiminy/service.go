@@ -142,7 +142,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	var ticketManager *TicketManager
 	var sequenceTracker *SequenceTracker
 	if cfg.J17Enabled {
-		ticketManager = NewTicketManager(cfg.J17TicketSecret, cfg.J17TicketTTLHours)
+		ticketManager = NewTicketManager(cfg.J17TicketSecret, cfg.J17TicketTTLHours, cfg.J17TicketCacheSize)
 		sequenceTracker = NewSequenceTracker(cfg.J17SequenceBufferSize)
 		slog.Info("jiminy: J17 protocol enabled", "ttl_hours", cfg.J17TicketTTLHours, "buffer_size", cfg.J17SequenceBufferSize)
 	}
@@ -733,8 +733,8 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
-	// Deduplicate by content (simple dedup)
-	filtered = deduplicateItems(filtered)
+	// Deduplicate by content (semantic if embedder available, exact otherwise)
+	filtered = s.deduplicateItems(filtered)
 
 	// Sort by priority (high > medium > low) then confidence (desc)
 	sort.Slice(filtered, func(i, j int) bool {
@@ -1113,8 +1113,60 @@ func join(parts []string, sep string) string {
 	return result
 }
 
-// deduplicateItems removes items with identical content.
-func deduplicateItems(items []GuidanceItem) []GuidanceItem {
+// deduplicateItems removes semantically similar items using embedding cosine similarity.
+// Falls back to exact-string dedup if the embedder is unavailable.
+func (s *Service) deduplicateItems(items []GuidanceItem) []GuidanceItem {
+	if len(items) <= 1 {
+		return items
+	}
+
+	threshold := s.cfg.JiminyDedupSimilarityThreshold
+	if threshold <= 0 {
+		threshold = 0.85
+	}
+
+	// Try semantic dedup with embeddings
+	if s.embedder != nil {
+		type embedded struct {
+			item GuidanceItem
+			vec  []float32
+		}
+		var kept []embedded
+		ctx := context.Background()
+
+		for _, item := range items {
+			vec, err := s.embedder.Embed(ctx, item.Content)
+			if err != nil {
+				// Embedder failed — fall through to exact-match dedup
+				slog.Debug("jiminy dedup: embedding failed, falling back to exact match", "error", err)
+				return deduplicateItemsExact(items)
+			}
+
+			isDup := false
+			for _, k := range kept {
+				sim := cosineSimilarity(vec, k.vec)
+				if sim >= threshold {
+					isDup = true
+					break
+				}
+			}
+			if !isDup {
+				kept = append(kept, embedded{item: item, vec: vec})
+			}
+		}
+
+		result := make([]GuidanceItem, len(kept))
+		for i, k := range kept {
+			result[i] = k.item
+		}
+		return result
+	}
+
+	return deduplicateItemsExact(items)
+}
+
+// deduplicateItemsExact removes items with identical content (fallback).
+func deduplicateItemsExact(items []GuidanceItem) []GuidanceItem {
 	seen := make(map[string]bool)
 	var result []GuidanceItem
 	for _, item := range items {

@@ -230,9 +230,23 @@ func TestDeduplicateItems(t *testing.T) {
 		{Type: GuidanceCorrection, Content: "Rule A", Confidence: 0.8},
 		{Type: GuidancePattern, Content: "Rule B", Confidence: 0.7},
 	}
-	result := deduplicateItems(items)
+	// No embedder → falls back to exact-match dedup
+	svc := &Service{}
+	result := svc.deduplicateItems(items)
 	if len(result) != 2 {
 		t.Errorf("deduplicateItems() = %d items, want 2", len(result))
+	}
+}
+
+func TestDeduplicateItemsExact_Fallback(t *testing.T) {
+	items := []GuidanceItem{
+		{Content: "Always validate input."},
+		{Content: "Always validate input."},
+		{Content: "Check return values."},
+	}
+	result := deduplicateItemsExact(items)
+	if len(result) != 2 {
+		t.Errorf("deduplicateItemsExact() = %d items, want 2", len(result))
 	}
 }
 

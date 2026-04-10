@@ -82,6 +82,7 @@ type correctionMatch struct {
 	Content    string
 	Summary    string
 	Similarity float64
+	CreatedAt  time.Time // for temporal decay weighting
 }
 
 // contradictionMatch represents a CONTRADICTS edge found near the context.
