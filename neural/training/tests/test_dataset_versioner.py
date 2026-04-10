@@ -305,6 +305,38 @@ class TestRunVersioner(unittest.TestCase):
                 version="v1",
             )
 
+    def test_paradigm_in_manifest(self):
+        """Manifest includes paradigm field."""
+        records = [_record(f"t{i}", f"2026-04-01T{i:02d}:00:00Z") for i in range(10)]
+        _write_jsonl(records, os.path.join(self.input_dir, "llm_interactions.jsonl"))
+
+        manifest = run_versioner(
+            input_dirs=[self.input_dir],
+            output_dir=self.output_dir,
+            version="v1",
+            paradigm="sft",
+        )
+        self.assertEqual(manifest["paradigm"], "sft")
+
+    def test_dpo_manifest(self):
+        """DPO paradigm manifest includes correct paradigm field."""
+        records = [_record(f"t{i}", f"2026-04-01T{i:02d}:00:00Z") for i in range(10)]
+        _write_jsonl(records, os.path.join(self.input_dir, "llm_interactions.jsonl"))
+
+        manifest = run_versioner(
+            input_dirs=[self.input_dir],
+            output_dir=self.output_dir,
+            version="v1",
+            paradigm="dpo",
+        )
+        self.assertEqual(manifest["paradigm"], "dpo")
+
+        # Verify manifest file also has it
+        manifest_path = os.path.join(self.output_dir, "manifest.json")
+        with open(manifest_path) as f:
+            saved = json.load(f)
+        self.assertEqual(saved["paradigm"], "dpo")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -189,7 +189,7 @@ func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constra
 		cb := e.cbRegistry.Get(cbName)
 		err := cb.Execute(ctx, func(cbCtx context.Context) error {
 			var innerErr error
-			raw, _, innerErr = e.llm.CompleteWithUsage(cbCtx, msgs, opts)
+			raw, _, _, innerErr = e.llm.CompleteWithUsage(cbCtx, msgs, opts)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -200,7 +200,7 @@ func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constra
 		}
 	} else {
 		var err error
-		raw, _, err = e.llm.CompleteWithUsage(ctx, msgs, opts)
+		raw, _, _, err = e.llm.CompleteWithUsage(ctx, msgs, opts)
 		if err != nil {
 			return nil, fmt.Errorf("LLM evaluation: %w", err)
 		}

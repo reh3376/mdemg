@@ -76,6 +76,22 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		systemPrompt = rerankNLISystemPrompt
 	}
 
+	// Wire RAFT retrieval context for training data capture
+	if topN > 0 {
+		var nodeIDs []string
+		var candidateScores []float64
+		for _, c := range req.Candidates[:topN] {
+			nodeIDs = append(nodeIDs, c.NodeID)
+			candidateScores = append(candidateScores, c.Score)
+		}
+		if len(nodeIDs) > 0 {
+			timeoutCtx = llmclient.WithRetrievalContext(timeoutCtx, &llmclient.RetrievalContext{
+				NodeIDs: nodeIDs,
+				Scores:  candidateScores,
+			})
+		}
+	}
+
 	// Call LLM based on provider
 	var scores []float64
 	var tokensUsed int
@@ -264,7 +280,7 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt, 
 		{Role: "user", Content: prompt},
 	}
 
-	content, tokens, err := client.CompleteWithUsage(ctx, msgs, llmclient.CompleteOpts{
+	content, _, tokens, err := client.CompleteWithUsage(ctx, msgs, llmclient.CompleteOpts{
 		MaxTokens: 2000, // Reasoning models consume tokens for internal thought
 	})
 	if err != nil {

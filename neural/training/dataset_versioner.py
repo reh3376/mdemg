@@ -29,7 +29,6 @@ import argparse
 import hashlib
 import json
 import os
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -223,6 +222,7 @@ def run_versioner(
     raft_ratio: float = 0.8,
     dedup_key: str = "prompt",
     first_cycle: bool = False,
+    paradigm: str = "sft",
 ) -> dict[str, Any]:
     """Run the dataset versioning pipeline. Returns the dataset manifest."""
     os.makedirs(output_dir, exist_ok=True)
@@ -285,6 +285,7 @@ def run_versioner(
     manifest = {
         "dataset_id": dataset_id,
         "version": version,
+        "paradigm": paradigm,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "sources": sources,
         "total_loaded": total_loaded,
@@ -343,6 +344,8 @@ def main():
     )
     parser.add_argument("--first-cycle", action="store_true",
                         help="First training cycle: skip exogenous ratio check (all data is exogenous)")
+    parser.add_argument("--paradigm", default="sft", choices=["sft", "dpo", "raft", "curriculum"],
+                        help="Training paradigm (default: sft)")
     args = parser.parse_args()
 
     manifest = run_versioner(
@@ -357,6 +360,7 @@ def main():
         raft_ratio=args.raft_ratio,
         dedup_key=args.dedup_key,
         first_cycle=args.first_cycle,
+        paradigm=args.paradigm,
     )
 
     print(f"Dataset {manifest['version']} created: {args.output_dir}")

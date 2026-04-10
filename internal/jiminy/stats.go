@@ -78,10 +78,13 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 
 	stats := result.(JiminyStats)
 
-	// Compute constraint effectiveness rate
-	effRate, err := sc.computeConstraintEffectivenessRate(ctx, spaceID)
+	// Compute constraint effectiveness rate (all-time, from Neo4j)
+	// The 30d/windowed metric is now computed dynamically by Grafana from the
+	// constraint_outcomes TSDB table, respecting the user's selected time range.
+	effRate, hasData, err := sc.computeConstraintEffectivenessRate(ctx, spaceID)
 	if err == nil {
 		stats.ConstraintEffRate = effRate
+		stats.ConstraintDataAvail = hasData
 	}
 
 	// Compute source diversity
@@ -94,7 +97,11 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 // across constraints with sufficient data (>= 5 surfaced outcomes). Low-volume
 // constraints are excluded to reduce noise. Each qualifying constraint contributes
 // proportionally to its surfaced count.
-func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context, spaceID string) (float64, error) {
+//
+// Returns (rate, hasData, error) where hasData distinguishes "no qualifying
+// constraints" from "0% effective". Time-windowed effectiveness is computed
+// dynamically by Grafana from the constraint_outcomes TSDB table.
+func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context, spaceID string) (float64, bool, error) {
 	sess := sc.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
@@ -111,25 +118,30 @@ func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
 		if txErr != nil {
-			return 0.0, txErr
+			return nil, txErr
 		}
 		if !res.Next(ctx) {
-			return 0.0, res.Err()
+			return nil, res.Err()
 		}
 		rec := res.Record()
 		v, _ := rec.Get("weighted_effectiveness")
 		if v == nil {
-			return 0.0, nil
+			return nil, nil
 		}
 		if f, ok := v.(float64); ok {
-			return f, nil
+			return &f, nil
 		}
-		return 0.0, nil
+		return nil, nil
 	})
 	if err != nil {
-		return 0.0, err
+		return 0.0, false, err
 	}
-	return result.(float64), nil
+	if result == nil {
+		// No qualifying constraints met the threshold — no data, not "0% effective"
+		return 0.0, false, nil
+	}
+	f := *result.(*float64)
+	return f, true, nil
 }
 
 // computeSourceDiversity measures how evenly guidance comes from different sources (0-1).

@@ -2,5 +2,13 @@
   "version": "1.0.0",
   "updated_at": "2026-02-06T00:00:00Z",
   "description": "UNTS Hash Verification Registry - tracks all hash-verified files across MDEMG frameworks",
-  "files": []
+  "files": [
+    {
+      "path": "docs/tests/uaits/schema/uaits.schema.json",
+      "sha256": "9c8092103f5e5acb843c0334b0cacf9254c04ce85c60f4a8b66946a71da25c07",
+      "framework": "uaits",
+      "type": "schema",
+      "added": "2026-04-10"
+    }
+  ]
 }

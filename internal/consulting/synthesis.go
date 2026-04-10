@@ -117,6 +117,22 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 
 	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
 
+	// Wire RAFT retrieval context for training data capture
+	if len(req.Results) > 0 {
+		var nodeIDs []string
+		var scores []float64
+		for _, r := range req.Results {
+			nodeIDs = append(nodeIDs, r.NodeID)
+			scores = append(scores, r.Score)
+		}
+		if len(nodeIDs) > 0 {
+			timeoutCtx = llmclient.WithRetrievalContext(timeoutCtx, &llmclient.RetrievalContext{
+				NodeIDs: nodeIDs,
+				Scores:  scores,
+			})
+		}
+	}
+
 	cbName := "openai-synthesis"
 	if s.cfg.Provider == "ollama" {
 		cbName = "ollama-synthesis"
@@ -130,14 +146,14 @@ func (s *LLMSynthesizer) Synthesize(ctx context.Context, req SynthesisRequest) (
 		cb := s.cbRegistry.Get(cbName)
 		err = cb.Execute(timeoutCtx, func(ctx context.Context) error {
 			var innerErr error
-			narrative, tokensUsed, innerErr = s.llm.CompleteWithUsage(ctx, msgs, opts)
+			narrative, _, tokensUsed, innerErr = s.llm.CompleteWithUsage(ctx, msgs, opts)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
 			return SynthesisResult{}, fmt.Errorf("%s circuit breaker open", cbName)
 		}
 	} else {
-		narrative, tokensUsed, err = s.llm.CompleteWithUsage(timeoutCtx, msgs, opts)
+		narrative, _, tokensUsed, err = s.llm.CompleteWithUsage(timeoutCtx, msgs, opts)
 	}
 
 	if err != nil {

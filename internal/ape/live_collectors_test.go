@@ -225,6 +225,7 @@ func TestLiveCollectors_LastGaugeValues_Full(t *testing.T) {
 			TotalContradicted:   5,
 			FollowRate:          0.80,
 			ConstraintEffRate:   0.75,
+			ConstraintDataAvail: true,
 			SourceDiversity:     0.65,
 		},
 	}

@@ -158,8 +158,9 @@ type Server struct {
 	tsdbClient      *tsdb.Client
 	tsdbWriter      *tsdb.MetricWriter
 	llmWriter       *tsdb.LLMInteractionWriter
-	embeddingWriter *tsdb.EmbeddingEventWriter
-	retrievalWriter *tsdb.RetrievalEventWriter
+	embeddingWriter          *tsdb.EmbeddingEventWriter
+	retrievalWriter          *tsdb.RetrievalEventWriter
+	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
 	logBuffer *LogRingBuffer
@@ -1157,6 +1158,16 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			slog.Info("tsdb: retrieval event logger attached")
 		}
 
+		// Constraint outcomes logger — record guidance outcomes for dynamic Grafana queries
+		s.constraintOutcomesWriter = tsdb.NewConstraintOutcomesWriter(
+			client.Pool(),
+			time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+		)
+		if s.jiminySvc != nil {
+			s.jiminySvc.SetOutcomeWriter(s.constraintOutcomesWriter)
+		}
+		slog.Info("tsdb: constraint outcomes logger attached")
+
 		// Multi-instance collision detection
 		if s.cfg.InstanceID != "" {
 			var otherInstances []string
@@ -1335,6 +1346,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.retrievalWriter != nil {
 		s.retrievalWriter.Close()
+	}
+	if s.constraintOutcomesWriter != nil {
+		s.constraintOutcomesWriter.Close()
 	}
 	if s.tsdbWriter != nil {
 		s.tsdbWriter.Close()

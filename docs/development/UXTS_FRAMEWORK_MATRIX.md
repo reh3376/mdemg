@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-04-01
+Last updated: 2026-04-10
 
 ---
 
@@ -24,6 +24,7 @@ Last updated: 2026-04-01
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
 | ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 16 |
 | UTDS | Universal Training Data Specification | Training data export manifest validation, privacy gates, archive integrity | active | 3 |
+| UAITS | Universal AI Training Specification | Training data curation governance: 4 paradigms (SFT, DPO, RAFT, curriculum), quality gates, format rules | active | 1 (4 datasets) |
 
 ---
 
@@ -45,6 +46,7 @@ Last updated: 2026-04-01
 | UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
 | ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (16) | `docs/tests/ults/runners/ults_runner.py` | no CI gate |
 | UTDS | `docs/tests/utds/schema/utds.schema.json` | `docs/tests/utds/specs/` (3) | `docs/tests/utds/runners/utds_runner.py` | no CI gate |
+| UAITS | `docs/tests/uaits/schema/uaits.schema.json` | `docs/tests/uaits/specs/` (1: mdemg, 4 datasets) | `docs/tests/uaits/runners/uaits_runner.py` | no CI gate |
 
 ---
 
@@ -65,6 +67,7 @@ Last updated: 2026-04-01
 | UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
 | ULTS | All required fields, version format, task name format, quality weights sum, prompt hash format | none | Yes (parity hard-fail for unknown fields) |
 | UTDS | All required fields, export_id pattern, schema_version ≥ 8, SHA-256 checksums, row counts, privacy hard gate (violations = 0) | none | Yes (hard-fail on privacy violations, unknown tables, schema mismatch) |
+| UAITS | All required fields, paradigm enum, output_type↔paradigm match, temporal_split=true, split ratio sum, dataset name uniqueness, ULTS task name format, TSDB table names | none | Yes (parity hard-fail for unknown paradigm, invalid output type, ratio mismatch) |
 
 ---
 
@@ -106,4 +109,6 @@ Last updated: 2026-04-01
 - `docs/research/UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226.md`
 - `docs/tests/uits/README.md`
 - `docs/guides/UXTS_DEVELOPER_GUIDE.md` (comprehensive UxTS methodology guide)
+- `docs/tests/uaits/README.md`
+- `docs/features/uaits-framework.md`
 - `AGENT_HANDOFF.md` (Governance & Testing Frameworks)

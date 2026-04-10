@@ -98,7 +98,7 @@ func TestCompleteWithUsageOpenAI(t *testing.T) {
 			Choices: []OpenAIChoice{
 				{Message: Message{Content: "response text"}},
 			},
-			Usage: OpenAIUsage{TotalTokens: 99},
+			Usage: OpenAIUsage{PromptTokens: 42, CompletionTokens: 57, TotalTokens: 99},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -106,15 +106,18 @@ func TestCompleteWithUsageOpenAI(t *testing.T) {
 
 	c := New(Config{Provider: "openai", Model: "gpt-4o", APIKey: "k", BaseURL: server.URL})
 
-	text, tokens, err := c.CompleteWithUsage(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	text, tokensIn, tokensOut, err := c.CompleteWithUsage(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
 	if err != nil {
 		t.Fatalf("CompleteWithUsage failed: %v", err)
 	}
 	if text != "response text" {
 		t.Errorf("expected 'response text', got %q", text)
 	}
-	if tokens != 99 {
-		t.Errorf("expected 99 tokens, got %d", tokens)
+	if tokensIn != 42 {
+		t.Errorf("expected tokensIn=42, got %d", tokensIn)
+	}
+	if tokensOut != 57 {
+		t.Errorf("expected tokensOut=57, got %d", tokensOut)
 	}
 }
 
@@ -134,15 +137,18 @@ func TestCompleteWithUsageOllama(t *testing.T) {
 
 	c := New(Config{Provider: "ollama", Model: "llama3", BaseURL: server.URL})
 
-	text, tokens, err := c.CompleteWithUsage(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	text, tokensIn, tokensOut, err := c.CompleteWithUsage(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
 	if err != nil {
 		t.Fatalf("CompleteWithUsage failed: %v", err)
 	}
 	if text != "ollama usage response" {
 		t.Errorf("expected 'ollama usage response', got %q", text)
 	}
-	if tokens != 0 {
-		t.Errorf("expected tokens=0 for Ollama (no usage reporting), got %d", tokens)
+	if tokensIn != 0 {
+		t.Errorf("expected tokensIn=0 for Ollama, got %d", tokensIn)
+	}
+	if tokensOut != 0 {
+		t.Errorf("expected tokensOut=0 for Ollama, got %d", tokensOut)
 	}
 }
 
@@ -434,7 +440,7 @@ func TestClient_RecorderCalledOnComplete(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		resp := OpenAIChatResponse{
 			Choices: []OpenAIChoice{{Message: Message{Content: "recorded"}}},
-			Usage:   OpenAIUsage{TotalTokens: 10},
+			Usage:   OpenAIUsage{PromptTokens: 15, CompletionTokens: 8, TotalTokens: 23},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -481,6 +487,78 @@ func TestClient_RecorderCalledOnComplete(t *testing.T) {
 	}
 	if r.LatencyMs < 0 {
 		t.Errorf("LatencyMs: got %d, want >= 0", r.LatencyMs)
+	}
+	if r.TokensIn != 15 {
+		t.Errorf("TokensIn: got %d, want 15", r.TokensIn)
+	}
+	if r.TokensOut != 8 {
+		t.Errorf("TokensOut: got %d, want 8", r.TokensOut)
+	}
+}
+
+func TestComplete_RecordsTokensEndToEnd(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "token test"}}},
+			Usage:   OpenAIUsage{PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "openai", Model: "gpt-5.4", APIKey: "k", BaseURL: server.URL})
+	c.SetRecorder(rec)
+	c = c.WithContext("training.test", "mdemg-dev")
+
+	_, err := c.Complete(context.Background(), []Message{
+		{Role: "system", Content: "system"},
+		{Role: "user", Content: "user"},
+	}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.TokensIn != 100 {
+		t.Errorf("TokensIn: got %d, want 100 (prompt_tokens from OpenAI)", r.TokensIn)
+	}
+	if r.TokensOut != 50 {
+		t.Errorf("TokensOut: got %d, want 50 (completion_tokens from OpenAI)", r.TokensOut)
+	}
+	if r.TaskName != "training.test" {
+		t.Errorf("TaskName: got %q, want %q", r.TaskName, "training.test")
+	}
+}
+
+func TestComplete_OllamaRecordsZeroTokens(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OllamaGenerateResponse{Response: "ollama token test", Done: true}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "ollama", Model: "llama3", BaseURL: server.URL})
+	c.SetRecorder(rec)
+
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.TokensIn != 0 {
+		t.Errorf("TokensIn: got %d, want 0 (Ollama has no token reporting)", r.TokensIn)
+	}
+	if r.TokensOut != 0 {
+		t.Errorf("TokensOut: got %d, want 0 (Ollama has no token reporting)", r.TokensOut)
 	}
 }
 
@@ -582,7 +660,7 @@ func TestRecordInteraction_SessionID(t *testing.T) {
 
 	// Session from context should be set on the record
 	ctx := WithSessionID(context.Background(), "explicit-session")
-	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 5, 100, nil)
 
 	if len(rec.records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(rec.records))
@@ -605,7 +683,7 @@ func TestRecordInteraction_DefaultSessionID(t *testing.T) {
 	c.taskName = "test.task"
 
 	// No session in context — should fall back to default
-	c.recordInteraction(context.Background(), []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+	c.recordInteraction(context.Background(), []Message{{Role: "user", Content: "hello"}}, "world", 10, 5, 100, nil)
 
 	if len(rec.records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(rec.records))
@@ -629,7 +707,7 @@ func TestRecordInteraction_ExplicitOverridesDefault(t *testing.T) {
 
 	// Explicit session should override default
 	ctx := WithSessionID(context.Background(), "request-session")
-	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 100, nil)
+	c.recordInteraction(ctx, []Message{{Role: "user", Content: "hello"}}, "world", 10, 5, 100, nil)
 
 	if len(rec.records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(rec.records))

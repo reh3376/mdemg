@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **UAITS Framework** (UAITS-2026-04-10) — Universal AI Training Specification, the 10th UxTS framework. Spec-driven training data curation with 4 paradigms (SFT, DPO, RAFT, curriculum):
+  - UAITS JSON Schema (`docs/tests/uaits/schema/uaits.schema.json`) and MDEMG spec with 4 datasets
+  - UAITS runner with 41 schema + data compliance checks
+  - DPO pair builder: constructs preference pairs from `constraint_outcomes` + `llm_interactions` on `guidance_id`
+  - Paradigm router: spec-driven pipeline dispatch across all 4 paradigms
+  - DPO format support in `format_converter.py` (`convert_dpo_record`, `run_dpo_converter`)
+  - Spec-driven gate overrides in `quality_filter.py` (`uaits_spec_path` parameter)
+  - Paradigm metadata in `dataset_versioner.py` manifest
+  - CLI: `mdemg data curate` and `mdemg data validate` commands
 - **RSIC overhaul** (RSIC-OVH-2026-04-09) — transforms RSIC from zero-value to high-value recursive self-improvement:
   - `RSIC_PROTECTED_SPACES` env var replaces hardcoded `mdemg-dev` protection (default: empty = no spaces blocked)
   - Graph-relative blast radius computed from actual node count (was hardcoded 1000)
@@ -20,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Real RSIC executors** — `flush_recovery_buffer` graduates stable volatile nodes, `refresh_stale_edges` recomputes weights via co-activation decay, `review_nli_calibration` queries actual constraint metrics
 - **Browser UI audit tests** (UI-AUDIT-2026-04-09) — 76 new Playwright tests: 30 screenshot/JS-error/API-5xx baselines (10 tabs), 10 Training Data tab read-only tests, 3 Training Data API tests, 25 interactive/functional tests across all 10 tabs, 8 new test classes. Total suite: 309 tests (306 pass, 3 skip).
 - **UI gap analysis** (`docs/features/ui-gap-analysis.md`) — documents 48/125 API endpoints with UI coverage (38%), identifies 77 uncovered routes across Jiminy, conversation, constraints, ingestion, metrics, and infrastructure.
+
+### Changed
+
+- **LLM Model Config** (TRAIN-DQ-2026-04-10) — standardized all LLM tasks to gpt-5.4 (from mixed gpt-4.1/gpt-4o-mini) for training data quality during distillation campaign
+- **Token Counting** — fixed `tokens_in` always recording 0 in TSDB; now properly captures `prompt_tokens` and `completion_tokens` from OpenAI API response as separate fields
+- **RAFT Context** — wired `retrieval_node_ids` for `consulting.synthesis` and `retrieval.rerank_cross` (enables retrieval-augmented fine-tuning)
+- **Task Activation** — enabled `CONSULTING_LLM_CONSTRAINTS_ENABLED` and `JIMINY_EVALUATE_LLM_ENABLED` in .env, .env.example, and compose template for training data collection
 
 ### Fixed
 

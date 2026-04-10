@@ -114,6 +114,8 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - `mdemg data export` — UTDS archive export; auto-generates `instance_id` as `{hostname}-{space_id}` when `MDEMG_INSTANCE_ID` not set
 - `mdemg data export-auto` — automated daily export with retention (`--keep N`), `latest.tar.gz` symlink
 - `mdemg data check --pre-campaign` — 8 validation checks (schema, instance ID, task coverage, etc.)
+- `mdemg data curate` — UAITS spec-driven training data curation (SFT/DPO/RAFT/curriculum paradigms)
+- `mdemg data validate` — UAITS spec schema validation + optional data compliance
 - `mdemg tsdb status` — TimescaleDB connection and schema version
 - `mdemg tsdb migrate` — apply pending TSDB schema migrations
 - `mdemg synergy status` — Claude Code ↔ MDEMG synergy health

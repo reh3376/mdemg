@@ -58,6 +58,7 @@ type Service struct {
 	trustStore              *TrustStore              // J17: write-behind trust persistence to Neo4j
 	trustCancel             context.CancelFunc       // cancels trust persistence goroutine
 	codeComprehensionTracker *CodeComprehensionTracker // P1-15: code comprehension feedback loop
+	outcomeWriter            OutcomeWriter              // TSDB writer for constraint outcomes
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -1229,6 +1230,20 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				}
 			}
 		}
+		// Record constraint outcome to TSDB for dynamic Grafana effectiveness queries
+		if s.outcomeWriter != nil && outcome != OutcomeUnknown && outcome != OutcomeNotApplicable {
+			constraintID := ""
+			if len(item.SourceNodes) > 0 {
+				constraintID = item.SourceNodes[0]
+			}
+			s.outcomeWriter.RecordOutcome(
+				req.SpaceID, constraintID, item.ConstraintCode,
+				req.GuidanceID, feedbackSessionID,
+				string(outcome), string(item.Type), s.cfg.InstanceID,
+				cr.Confidence,
+			)
+		}
+
 		// RSIC-SK1: Record signal response for positive outcomes (independent of persistence)
 		if s.signalLearner != nil && (outcome == OutcomeFollowed || outcome == OutcomePartialCompliance) {
 			if code := guidanceSignalCode(item); code != "" {
@@ -1669,6 +1684,11 @@ func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
 			"min_samples", s.cfg.JiminyCodeRegenMinSamples,
 		)
 	}
+}
+
+// SetOutcomeWriter sets the TSDB writer for constraint outcome events.
+func (s *Service) SetOutcomeWriter(w OutcomeWriter) {
+	s.outcomeWriter = w
 }
 
 // SetWarmStore sets the warm store reference for trust-based invalidation (B7).

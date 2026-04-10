@@ -242,7 +242,8 @@ func (a *rsicJiminyAdapter) GetGuidanceStats(ctx context.Context, spaceID string
 		TotalIgnored:           stats.TotalIgnored,
 		TotalContradicted:      stats.TotalContradicted,
 		FollowRate:             stats.FollowRate,
-		ConstraintEffRate:      stats.ConstraintEffRate,
+		ConstraintEffRate:   stats.ConstraintEffRate,
+		ConstraintDataAvail: stats.ConstraintDataAvail,
 		SourceDiversity:        stats.SourceDiversity,
 	}, nil
 }

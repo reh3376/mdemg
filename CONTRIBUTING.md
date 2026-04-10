@@ -109,7 +109,7 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-All test frameworks in this project follow the **UxTS (Universal-x Test Specification)** methodology — declarative JSON specs validated by executable runners governed by explicit schemas. For the comprehensive guide covering architecture, spec writing, CI integration, governance, and all 12 frameworks, see **[docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md)**.
+All test frameworks in this project follow the **UxTS (Universal-x Test Specification)** methodology — declarative JSON specs validated by executable runners governed by explicit schemas. For the comprehensive guide covering architecture, spec writing, CI integration, governance, and all 15 frameworks, see **[docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md)**.
 
 **UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 

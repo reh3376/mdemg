@@ -220,8 +220,15 @@ type JiminyStats struct {
 	TotalIgnored           int     `json:"total_ignored"`
 	TotalContradicted      int     `json:"total_contradicted"`
 	FollowRate             float64 `json:"follow_rate"`
-	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
+	ConstraintDataAvail bool    `json:"constraint_data_available"`
 	SourceDiversity        float64 `json:"source_diversity"` // 0-1, higher = more diverse
+}
+
+// OutcomeWriter records constraint guidance outcomes to TSDB for dynamic
+// Grafana queries (user-selected time range effectiveness calculation).
+type OutcomeWriter interface {
+	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID string, similarity float64)
 }
 
 // --- J12: Escalation types ---

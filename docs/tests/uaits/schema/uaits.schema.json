@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/uaits/v1.0.0",
+  "title": "UAITS - Universal AI Training Specification",
+  "description": "Schema for declaring training data contracts: datasets, paradigms, quality gates, format, and versioning configuration. Built on the UxTS framework pattern.",
+  "type": "object",
+  "required": ["uaits_version", "application", "metadata", "datasets"],
+  "additionalProperties": false,
+  "properties": {
+    "uaits_version": {
+      "type": "string",
+      "description": "Version of the UAITS schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "application": {
+      "type": "object",
+      "description": "Identity of the application producing training data",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Application name (e.g., mdemg, forge-ot, whk-cmms)"
+        },
+        "version": {
+          "type": "string",
+          "description": "Application version",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["author", "created", "description"],
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "description": "Training datasets declared by this application",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/dataset"
+      }
+    }
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "required": ["name", "paradigm", "description", "source", "quality_gates", "format", "versioning"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique dataset identifier within this spec",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "paradigm": {
+          "type": "string",
+          "description": "Training paradigm determining the pipeline path",
+          "enum": ["sft", "dpo", "raft", "curriculum"]
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "required": ["primary_table"],
+          "additionalProperties": false,
+          "properties": {
+            "primary_table": {
+              "type": "string",
+              "description": "Primary TSDB table for this dataset"
+            },
+            "join_tables": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Additional tables to join for record enrichment"
+            },
+            "filter": {
+              "type": "object",
+              "description": "Paradigm-specific filter conditions",
+              "additionalProperties": true
+            }
+          }
+        },
+        "quality_gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "privacy_scan": {
+              "type": "boolean",
+              "description": "Enable PII/secret regex scanning (hard gate)",
+              "default": true
+            },
+            "min_response_length": {
+              "type": "integer",
+              "description": "Minimum response character length",
+              "default": 10,
+              "minimum": 0
+            },
+            "max_latency_ms": {
+              "type": "integer",
+              "description": "Maximum acceptable latency in milliseconds",
+              "default": 60000,
+              "minimum": 0
+            },
+            "require_model_name": {
+              "type": "boolean",
+              "description": "Require non-empty model_name field",
+              "default": true
+            },
+            "require_non_error": {
+              "type": "boolean",
+              "description": "Require empty/null error field",
+              "default": true
+            },
+            "dedup_mode": {
+              "type": "string",
+              "description": "Deduplication strategy",
+              "enum": ["prompt", "prompt-response", "trace"],
+              "default": "prompt"
+            },
+            "model_exclude": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Model names to exclude from this dataset"
+            },
+            "custom_gates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "description", "type"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "type": {
+                    "type": "string",
+                    "enum": ["hard", "soft"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "format": {
+          "type": "object",
+          "required": ["output_type"],
+          "additionalProperties": false,
+          "properties": {
+            "output_type": {
+              "type": "string",
+              "description": "Output format matching the paradigm",
+              "enum": ["chat", "dpo", "raft", "metadata"]
+            },
+            "raft_ratio": {
+              "type": "number",
+              "description": "Fraction of RAFT records that include retrieved context (0-1)",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "chosen_criteria": {
+              "type": "string",
+              "description": "SQL-like expression identifying chosen responses (DPO)"
+            },
+            "rejected_criteria": {
+              "type": "string",
+              "description": "SQL-like expression identifying rejected responses (DPO)"
+            },
+            "think_mode_preservation": {
+              "type": "boolean",
+              "description": "Preserve <think> blocks in assistant content",
+              "default": true
+            }
+          }
+        },
+        "versioning": {
+          "type": "object",
+          "required": ["train_ratio", "test_ratio", "val_ratio", "temporal_split"],
+          "additionalProperties": false,
+          "properties": {
+            "train_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "test_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "val_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "temporal_split": {
+              "type": "boolean",
+              "description": "Must be true — random splits are prohibited",
+              "const": true
+            },
+            "min_per_task": {
+              "type": "integer",
+              "description": "Minimum records per task for balance warnings",
+              "minimum": 1
+            },
+            "exogenous_ratio_min": {
+              "type": "number",
+              "description": "Minimum fraction of records not previously used for training",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "training_config": {
+          "type": "object",
+          "description": "Optional training configuration for this dataset",
+          "properties": {
+            "min_examples": {
+              "type": "integer",
+              "description": "Minimum records for a viable training dataset",
+              "minimum": 1
+            },
+            "quality_gate": {
+              "type": "number",
+              "description": "Minimum average quality score for training readiness",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ults_task_names": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z]+\\.[a-z_]+$"
+              },
+              "description": "ULTS task names that feed this dataset"
+            }
+          }
+        }
+      }
+    }
+  }
+}
