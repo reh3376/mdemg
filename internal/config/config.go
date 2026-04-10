@@ -43,7 +43,7 @@ type Config struct {
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
-	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-5.4")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-5.4-mini")
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -1283,7 +1283,7 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-5.4")
+	llmModel := get("LLM_MODEL", "gpt-5.4-mini")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
@@ -1859,7 +1859,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("RECLASS_MAX_DEPTH must be in range [1, 10]")
 	}
 	reclassProvider := get("RECLASS_PROVIDER", emergenceProvider)
-	reclassModel := get("RECLASS_MODEL", "gpt-5.4")
+	reclassModel := get("RECLASS_MODEL", "gpt-5.4-mini")
 	reclassMaxTokens, err := atoi("RECLASS_MAX_TOKENS", 2000)
 	if err != nil {
 		return Config{}, err
