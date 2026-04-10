@@ -90,6 +90,7 @@ type Client struct {
 	// Consecutive failure tracking — pointer shared across WithContext() copies.
 	consecutiveFailures *atomic.Int32
 	failureThreshold    int32
+	tripped             *atomic.Bool // guards alert callback: fires only on transition
 }
 
 // RetryConfig controls automatic retry behaviour for transient LLM errors.
@@ -217,6 +218,7 @@ func New(cfg Config) *Client {
 		retryCfg:            rc,
 		consecutiveFailures: new(atomic.Int32),
 		failureThreshold:    defaultFailureThreshold,
+		tripped:             new(atomic.Bool),
 	}
 }
 
@@ -289,17 +291,20 @@ func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts
 }
 
 // trackResult updates the consecutive failure counter and fires the alert callback
-// when the threshold is reached. On success the counter resets to zero.
+// only on the transition to tripped state. On success the counter and tripped flag reset.
 func (c *Client) trackResult(err error) {
 	if c.consecutiveFailures == nil {
 		return
 	}
 	if err == nil {
 		c.consecutiveFailures.Store(0)
+		if c.tripped != nil {
+			c.tripped.Store(false)
+		}
 		return
 	}
 	count := c.consecutiveFailures.Add(1)
-	if count >= c.failureThreshold {
+	if count >= c.failureThreshold && c.tripped != nil && c.tripped.CompareAndSwap(false, true) {
 		if cb := defaultAlertCallback; cb != nil {
 			cb(c.taskName, int(count), err)
 		}
@@ -397,10 +402,10 @@ func shouldRetry(err error) bool {
 	var he *httpError
 	if errors.As(err, &he) {
 		switch he.StatusCode {
-		case 429, 503: // rate-limited or service unavailable
+		case 429, 502, 503: // rate-limited, bad gateway, or service unavailable
 			return true
 		default:
-			return false // 400, 401, 403, 404, 422, 500, 502 — not retryable
+			return false // 400, 401, 403, 404, 422, 500 — not retryable
 		}
 	}
 
