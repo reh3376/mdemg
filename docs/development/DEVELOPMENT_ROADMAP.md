@@ -8,7 +8,13 @@
 > - Live validation + data propagation fixes (v0.5.2-v0.5.3)
 > - Multi-instance support + teardown hardening (v0.5.4)
 > - Upgrade automation (v0.5.4, PR #260)
-> - Graph health sprint (planned)
+> - Graph health sprint (v0.6.0-v0.6.1)
+> - Jiminy effectiveness arc (v0.7.0-v0.7.1)
+> - Default LLM migration + FT plan v4.0 (v0.7.2)
+> - Service resilience: alert system, LLM retry, supervisor (v0.7.3)
+> - DD-P1P2 deep dive bug fix campaign (v0.7.4)
+>
+> Last updated: 2026-04-09
 
 **Created**: 2026-01-22
 **Updated**: 2026-02-23 (All phases complete through Phase 91. Phase 92 gap analysis complete — Phases 93-100 roadmap for deployable MDEMG package. Phase D validated. Space Pruning Framework + auto-prune scheduler. Security hardening complete: gosec, gitleaks, error sanitization. 113 UATS specs, 190 variants, 100% passing. 22 RSIC integration tests. CI gated on non-embedding specs.)

@@ -93,6 +93,7 @@ func (b *Breaker) State() State {
 
 // currentState returns the state, checking for timeout transitions.
 // Must be called with b.mu held (write lock needed for state transitions).
+// Returns the current state and an optional callback to invoke AFTER releasing the lock.
 func (b *Breaker) currentState() State {
 	if b.state == StateOpen {
 		if time.Since(b.openedAt) >= b.cfg.Timeout {
@@ -102,6 +103,9 @@ func (b *Breaker) currentState() State {
 			b.counts.successes = 0
 			atomic.StoreInt32(&b.halfOpenRequests, 0)
 			if b.onStateChange != nil {
+				// DD-P2-17: Fire callback asynchronously to avoid holding lock
+				// during callback execution. The go keyword ensures the callback
+				// cannot re-enter the breaker's locked section synchronously.
 				go b.onStateChange(b.name, StateOpen, StateHalfOpen)
 			}
 		}

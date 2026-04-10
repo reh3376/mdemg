@@ -18,7 +18,6 @@ services:
       - "${MDEMG_PORT}:9999"
     environment:
       LISTEN_ADDR: ":9999"
-      LISTEN_PORT: "9999"
       LOG_FORMAT: "${LOG_FORMAT:-json}"
       LOG_SKIP_HEALTH: "true"
 
@@ -56,7 +55,7 @@ services:
       # Authentication
       AUTH_ENABLED: "${AUTH_ENABLED:-false}"
       AUTH_MODE: "${AUTH_MODE:-apikey}"
-      AUTH_API_KEYS: "${MDEMG_API_KEYS}"
+      AUTH_API_KEYS: "${AUTH_API_KEYS:-${MDEMG_API_KEYS}}"
 
       # Metrics
       METRICS_ENABLED: "${METRICS_ENABLED:-true}"
@@ -68,10 +67,10 @@ services:
 
       # LLM / Reranker
       LLM_PROVIDER: "${LLM_PROVIDER:-openai}"
-      LLM_MODEL: "${LLM_MODEL:-gpt-4.1-nano}"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4.1}"
       RERANK_ENABLED: "${RERANK_ENABLED:-true}"
       RERANK_PROVIDER: "${RERANK_PROVIDER:-openai}"
-      RERANK_MODEL: "${RERANK_MODEL:-gpt-4.1-nano}"
+      RERANK_MODEL: "${RERANK_MODEL:-gpt-4.1}"
       RERANK_TOP_N: "${RERANK_TOP_N:-50}"
       RERANK_WEIGHT: "${RERANK_WEIGHT:-0.50}"
       RERANK_TIMEOUT_MS: "${RERANK_TIMEOUT_MS:-10000}"
@@ -111,10 +110,16 @@ services:
       # TSDB writer
       TSDB_WRITER_BUFFER_MAX_SIZE: "${TSDB_WRITER_BUFFER_MAX_SIZE:-1000}"
 
+      # Synergy assessment
+      SYNERGY_ASSESSMENT_ENABLED: "${SYNERGY_ASSESSMENT_ENABLED:-true}"
+      SYNERGY_CLAUDE_MD_PATH: "${SYNERGY_CLAUDE_MD_PATH:-}"
+      SYNERGY_MEMORY_MD_PATH: "${SYNERGY_MEMORY_MD_PATH:-}"
+
       # Graceful shutdown
       GRACEFUL_SHUTDOWN_TIMEOUT: "${GRACEFUL_SHUTDOWN_TIMEOUT:-30}"
+    stop_grace_period: 35s
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/healthz"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${MDEMG_PORT:-9999}/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

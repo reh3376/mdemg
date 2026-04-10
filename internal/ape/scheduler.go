@@ -275,6 +275,7 @@ func (s *Scheduler) executeModuleWithContext(moduleID, trigger string, eventCtx 
 // parseNextCronRun parses a cron expression and returns the next run time.
 // Simplified implementation supporting: minute hour day month weekday
 // Examples: "0 * * * *" (hourly), "*/15 * * * *" (every 15 min), "0 0 * * *" (daily)
+// Note: server.go has a separate parseCronInterval() that returns a Duration — different purpose.
 func (s *Scheduler) parseNextCronRun(cron string) time.Time {
 	// Simplified: parse common patterns
 	now := time.Now()

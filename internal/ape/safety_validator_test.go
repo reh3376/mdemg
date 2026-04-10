@@ -1,6 +1,7 @@
 package ape
 
 import (
+	"context"
 	"testing"
 )
 
@@ -32,29 +33,50 @@ func TestValidateAction_AllowsNonDestructiveAlways(t *testing.T) {
 		},
 	}
 
-	decision := sv.ValidateAction(nil, spec, "trigger_consolidation")
+	decision := sv.ValidateAction(context.TODO(), spec, "trigger_consolidation")
 	if !decision.Allowed {
 		t.Errorf("expected non-destructive action on protected space to be allowed, got rejected: %s", decision.Reason)
 	}
 }
 
-func TestValidateAction_BlocksProtectedSpaceDestructive(t *testing.T) {
+func TestValidateAction_BlocksCustomProtectedSpaceDestructive(t *testing.T) {
+	sv := &SafetyValidator{}
+	spec := &RSICTaskSpec{
+		ActionType:  "prune_decayed_edges",
+		TargetSpace: "production-space",
+		Safety: SafetyBounds{
+			MaxEdgesAffected: 100,
+			ProtectedSpaces:  []string{"production-space"},
+		},
+	}
+
+	decision := sv.ValidateAction(context.TODO(), spec, "prune_decayed_edges")
+	if decision.Allowed {
+		t.Error("expected destructive action on custom protected space to be rejected")
+	}
+	if decision.Reason == "" {
+		t.Error("expected rejection reason")
+	}
+}
+
+func TestValidateAction_FailsClosed_OnEstimationError(t *testing.T) {
+	// Without a driver, blast radius estimation fails — safety must fail closed
 	sv := &SafetyValidator{}
 	spec := &RSICTaskSpec{
 		ActionType:  "prune_decayed_edges",
 		TargetSpace: "mdemg-dev",
 		Safety: SafetyBounds{
 			MaxEdgesAffected: 100,
-			ProtectedSpaces:  []string{"mdemg-dev"},
+			ProtectedSpaces:  nil,
 		},
 	}
 
-	decision := sv.ValidateAction(nil, spec, "prune_decayed_edges")
+	decision := sv.ValidateAction(context.TODO(), spec, "prune_decayed_edges")
 	if decision.Allowed {
-		t.Error("expected destructive action on protected space to be rejected")
+		t.Error("expected destructive action to be blocked when estimation fails (fail-closed)")
 	}
-	if decision.Reason == "" {
-		t.Error("expected rejection reason")
+	if decision.EstimatedAffected != -1 {
+		t.Errorf("expected estimated_affected=-1, got %d", decision.EstimatedAffected)
 	}
 }
 
@@ -69,7 +91,7 @@ func TestValidateAction_AllowsProtectedSpaceConstructive(t *testing.T) {
 				ProtectedSpaces: []string{"mdemg-dev"},
 			},
 		}
-		decision := sv.ValidateAction(nil, spec, action)
+		decision := sv.ValidateAction(context.TODO(), spec, action)
 		if !decision.Allowed {
 			t.Errorf("expected constructive action %s on protected space to be allowed", action)
 		}
@@ -79,18 +101,34 @@ func TestValidateAction_AllowsProtectedSpaceConstructive(t *testing.T) {
 func TestBuildDelta_ProtectedSpaceDestructive(t *testing.T) {
 	sv := &SafetyValidator{}
 	spec := &RSICTaskSpec{
-		TargetSpace: "mdemg-dev",
+		TargetSpace: "protected-space",
 		Safety: SafetyBounds{
-			ProtectedSpaces: []string{"mdemg-dev"},
+			ProtectedSpaces: []string{"protected-space"},
 		},
 	}
 
-	delta := sv.BuildDelta(nil, spec, "tombstone_stale")
+	delta := sv.BuildDelta(context.TODO(), spec, "tombstone_stale")
 	if delta.WouldExecute {
 		t.Error("expected would_execute=false for destructive on protected space")
 	}
 	if !delta.ProtectedSpaceBlocked {
 		t.Error("expected protected_space_blocked=true")
+	}
+}
+
+func TestBuildDelta_EmptyProtectedSpacesAllows(t *testing.T) {
+	sv := &SafetyValidator{}
+	spec := &RSICTaskSpec{
+		TargetSpace: "mdemg-dev",
+		Safety: SafetyBounds{
+			MaxNodesAffected: 50,
+			ProtectedSpaces:  nil, // default: no protected spaces
+		},
+	}
+
+	delta := sv.BuildDelta(context.TODO(), spec, "tombstone_stale")
+	if delta.ProtectedSpaceBlocked {
+		t.Error("expected protected_space_blocked=false with empty ProtectedSpaces")
 	}
 }
 
@@ -101,7 +139,7 @@ func TestBuildDelta_NonDestructiveAllowed(t *testing.T) {
 		Safety:      SafetyBounds{},
 	}
 
-	delta := sv.BuildDelta(nil, spec, "trigger_consolidation")
+	delta := sv.BuildDelta(context.TODO(), spec, "trigger_consolidation")
 	if !delta.WouldExecute {
 		t.Error("expected would_execute=true for non-destructive action")
 	}

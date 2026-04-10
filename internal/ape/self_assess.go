@@ -1,6 +1,7 @@
 package ape
 
 import (
+	"bufio"
 	"context"
 	"log/slog"
 	"math"
@@ -29,6 +30,7 @@ type SynergyMetrics struct {
 	AutoMemoryLines int
 	JiminyHealthy   bool
 	OverflowRate    float64
+	OverlapScore    float64
 }
 
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
@@ -165,6 +167,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyLinesClaude = sm.ClaudeMDLines
 		report.SynergyLinesMemory = sm.MemoryMDLines
 		report.SynergyOverflowRate = sm.OverflowRate
+		report.SynergyOverlapScore = sm.OverlapScore
 		report.JiminyHealthy = sm.JiminyHealthy
 		report.SynergyHealth = a.scoreSynergy(report)
 
@@ -215,36 +218,8 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 	}
 
-	// 6. Weighted overall (adjusted weights for dimensions present)
-	if report.SynergyHealth > 0 && report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
-		// All 7 dimensions
-		report.OverallHealth = 0.18*report.RetrievalQuality +
-			0.18*report.MemoryHealth +
-			0.13*report.EdgeHealth +
-			0.13*report.TaskPerformance +
-			0.13*report.GuidanceHealth +
-			0.13*report.ProtocolHealth +
-			0.12*report.SynergyHealth
-	} else if report.ProtocolHealth > 0 && report.GuidanceHealth > 0 {
-		// All 6 dimensions (no synergy)
-		report.OverallHealth = 0.20*report.RetrievalQuality +
-			0.20*report.MemoryHealth +
-			0.15*report.EdgeHealth +
-			0.15*report.TaskPerformance +
-			0.15*report.GuidanceHealth +
-			0.15*report.ProtocolHealth
-	} else if report.GuidanceHealth > 0 {
-		report.OverallHealth = 0.25*report.RetrievalQuality +
-			0.25*report.MemoryHealth +
-			0.20*report.EdgeHealth +
-			0.15*report.TaskPerformance +
-			0.15*report.GuidanceHealth
-	} else {
-		report.OverallHealth = 0.30*report.RetrievalQuality +
-			0.25*report.MemoryHealth +
-			0.25*report.EdgeHealth +
-			0.20*report.TaskPerformance
-	}
+	// 6. Weighted overall (single source: ComputeOverallHealth)
+	report.OverallHealth = ComputeOverallHealth(report)
 
 	report.Confidence = a.computeConfidence(report)
 
@@ -430,7 +405,12 @@ func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
 
 // scoreSynergy computes Claude Code ↔ MDEMG synergy health.
 // Jiminy must be healthy — without it, synergy pruning is dangerous.
+// Returns 0.0 (excluded from OverallHealth formula) when both files are missing.
 func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) float64 {
+	// G3: Files not found → cannot assess, exclude from formula
+	if r.SynergyLinesClaude == 0 && r.SynergyLinesMemory == 0 {
+		return 0.0
+	}
 	if !r.JiminyHealthy {
 		return 0.0
 	}
@@ -501,7 +481,20 @@ func (a *Assessor) computeConfidence(r *SelfAssessmentReport) float64 {
 	if r.ConsolidationAgeSec > 0 {
 		dataPoints++
 	}
-	return clamp(float64(dataPoints)/4.0, 0.1, 1.0)
+	confidence := clamp(float64(dataPoints)/4.0, 0.1, 1.0)
+	if confidence < 0.3 {
+		slog.Warn("rsic: low assessment confidence",
+			"space_id", r.SpaceID,
+			"confidence", confidence,
+			"data_points", dataPoints,
+			"edge_count", r.EdgeCount,
+			"total_nodes", r.TotalNodes,
+			"volatile_count", r.VolatileCount,
+			"permanent_count", r.PermanentCount,
+			"consolidation_age_sec", r.ConsolidationAgeSec,
+		)
+	}
+	return confidence
 }
 
 // ─── Utility ───
@@ -588,17 +581,20 @@ func countBufferSpaceEntries(ctx context.Context, driver neo4j.DriverWithContext
 }
 
 // countLocalBufferEntries counts lines in the local JSONL recovery buffer file.
+// Uses streaming scanner to avoid loading the entire file into memory.
 func countLocalBufferEntries(path string) int {
 	if path == "" {
 		return 0
 	}
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return 0
 	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
 	count := 0
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) != "" {
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) != "" {
 			count++
 		}
 	}

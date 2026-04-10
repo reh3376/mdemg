@@ -41,12 +41,12 @@ func TestLLMCascade_AllDefaultToOpenAI(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	// Top-level defaults (now openai/gpt-4.1-nano)
+	// Top-level defaults (now openai/gpt-4.1)
 	if cfg.LLMProvider != "openai" {
 		t.Errorf("LLMProvider = %q, want %q", cfg.LLMProvider, "openai")
 	}
-	if cfg.LLMModel != "gpt-4.1-nano" {
-		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "gpt-4.1-nano")
+	if cfg.LLMModel != "gpt-4.1" {
+		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "gpt-4.1")
 	}
 
 	// All features should cascade from top-level
@@ -67,8 +67,8 @@ func TestLLMCascade_AllDefaultToOpenAI(t *testing.T) {
 		if f.provider != "openai" {
 			t.Errorf("%s.Provider = %q, want %q", f.name, f.provider, "openai")
 		}
-		if f.model != "gpt-4.1-nano" {
-			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "gpt-4.1-nano")
+		if f.model != "gpt-4.1" {
+			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "gpt-4.1")
 		}
 	}
 }
@@ -138,8 +138,8 @@ func TestLLMCascade_MetaLearnDoubleInherit(t *testing.T) {
 	if cfg.MetaLearnProvider != "openai" {
 		t.Errorf("MetaLearnProvider = %q, want %q", cfg.MetaLearnProvider, "openai")
 	}
-	if cfg.MetaLearnModel != "gpt-4.1-nano" {
-		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "gpt-4.1-nano")
+	if cfg.MetaLearnModel != "gpt-4.1" {
+		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "gpt-4.1")
 	}
 }
 
@@ -284,7 +284,7 @@ func TestGenerateConfigYAML_JiminyEnabled(t *testing.T) {
 		Neo4jUser:      "neo4j",
 		ServerPort:     9999,
 		LLMProvider:    "openai",
-		LLMModel:       "gpt-4.1-nano",
+		LLMModel:       "gpt-4.1",
 		JiminyEnabled:  true,
 		JiminyProvider: "openai",
 		JiminyModel:    "gpt-5.4-nano",
@@ -319,7 +319,7 @@ func TestGenerateConfigYAML_JiminyDeclined(t *testing.T) {
 		Neo4jUser:     "neo4j",
 		ServerPort:    9999,
 		LLMProvider:   "openai",
-		LLMModel:      "gpt-4.1-nano",
+		LLMModel:      "gpt-4.1",
 		JiminyEnabled: false,
 	}
 

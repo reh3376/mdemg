@@ -50,6 +50,22 @@ func IsDestructiveAction(actionType string) bool {
 	return DestructiveActions[actionType]
 }
 
+// DiagnosticActions lists action types that only observe/alert without mutating state.
+// These are excluded from calibration success/failure tracking.
+var DiagnosticActions = map[string]bool{
+	"review_llm_provider":        true,
+	"alert_llm_health":           true,
+	"alert_embedding_regression": true,
+	"trigger_training_pipeline":  true,
+	"alert_tsdb_health":          true,
+	"alert_schema_drift":         true,
+}
+
+// IsDiagnosticAction returns true if the action is observation-only (excluded from calibration).
+func IsDiagnosticAction(actionType string) bool {
+	return DiagnosticActions[actionType]
+}
+
 // ValidTriggerSources maps valid source strings for input validation.
 var ValidTriggerSources = map[string]TriggerSource{
 	"manual_api":        TriggerManualAPI,
@@ -180,17 +196,21 @@ type ReflectionInsight struct {
 	Metric            string          `json:"metric"`
 	Value             float64         `json:"value"`
 	Threshold         float64         `json:"threshold"`
+	TargetNodeID      string          `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode        string          `json:"target_code,omitempty"`    // for retire_code: constraint code to retire
 }
 
 // ───────────── Improvement Actions ─────────────
 
 // ImprovementAction maps an insight to a concrete action.
 type ImprovementAction struct {
-	ActionType string    `json:"action_type"`
-	TargetSpace string   `json:"target_space"`
-	Scope       string   `json:"scope"` // "space" | "global"
-	Priority    int      `json:"priority"`
-	Rationale   string   `json:"rationale"`
+	ActionType   string `json:"action_type"`
+	TargetSpace  string `json:"target_space"`
+	Scope        string `json:"scope"` // "space" | "global"
+	Priority     int    `json:"priority"`
+	Rationale    string `json:"rationale"`
+	TargetNodeID string `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode   string `json:"target_code,omitempty"`    // for retire_code: constraint code
 }
 
 // ───────────── Task Spec ─────────────
@@ -260,6 +280,10 @@ type RSICTaskSpec struct {
 	Timeout         time.Duration  `json:"timeout"`
 	BaselineMetrics map[string]float64 `json:"baseline_metrics"`
 	Priority        int            `json:"priority"`
+
+	// Parameter routing for protocol mutation actions
+	TargetNodeID string `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode   string `json:"target_code,omitempty"`    // for retire_code: constraint code
 }
 
 // ───────────── Progress & Outcome ─────────────
@@ -276,6 +300,7 @@ type RSICProgressReport struct {
 	Deliverables map[string]any     `json:"deliverables,omitempty"`
 	Timestamp    time.Time          `json:"timestamp"`
 	Error        string             `json:"error,omitempty"`
+	Diagnostic   bool               `json:"diagnostic,omitempty"`
 }
 
 // CycleOutcome summarises a completed RSIC cycle.
@@ -288,6 +313,7 @@ type CycleOutcome struct {
 	ActionsExecuted  int                `json:"actions_executed"`
 	SuccessCount     int                `json:"success_count"`
 	FailedCount      int                `json:"failed_count"`
+	DiagnosticCount  int                `json:"diagnostic_count,omitempty"`
 	MetricsBefore    map[string]float64 `json:"metrics_before"`
 	MetricsAfter     map[string]float64 `json:"metrics_after"`
 	CalibrationDelta map[string]float64 `json:"calibration_delta,omitempty"`
@@ -308,8 +334,12 @@ type CycleOutcome struct {
 	Deltas         []ActionDelta   `json:"deltas,omitempty"`
 
 	// Phase AR-1: Feedback loop — criteria evaluation
-	CriteriaMet    bool              `json:"criteria_met"`
-	CriteriaDetail map[string]string `json:"criteria_detail,omitempty"`
+	CriteriaMet     bool              `json:"criteria_met"`
+	CriteriaDetail  map[string]string `json:"criteria_detail,omitempty"`
+	PerTaskCriteria map[string]bool   `json:"per_task_criteria,omitempty"`
+
+	// Timeout handling
+	TimedOut bool `json:"timed_out,omitempty"`
 }
 
 // SafetySummary records safety enforcement results for a cycle.

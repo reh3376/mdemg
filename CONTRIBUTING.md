@@ -287,9 +287,11 @@ go test ./tests/udts/... -run TestUNTS -v
 
 The MDEMG server uses dynamic port allocation. When started, it writes the actual bound port to `.mdemg.port`. All test commands (`make test-api`, `make test-smoke`) read this file automatically. If the file doesn't exist, port `9999` is used as the fallback default.
 
-## Claude Code Hooks (Local-Only)
+## Claude Code Hooks
 
-The `.claude/` directory is gitignored and contains local-only configuration for the Claude Code CLI. These hooks are **not committed to the repository** and must be set up per-developer.
+Five hooks in `.claude/hooks/` are **tracked in the repository** (explicitly un-ignored in `.gitignore`). These are project-level infrastructure — CMS integration, destructive command guards, and context management — shared across all developers. Do not modify them without a PR.
+
+The rest of `.claude/` (settings, memory, etc.) remains gitignored and developer-specific.
 
 ### Available Hooks
 
@@ -317,12 +319,12 @@ curl -X POST http://localhost:9999/v1/memory/ingest/trigger \
 curl http://localhost:9999/v1/memory/ingest/status/<job_id>
 ```
 
-### Setting Up Hooks
+### Hook Registration
 
-Hooks are stored in `.claude/hooks/` and configured in `.claude/settings.local.json`. Since these are gitignored, new developers must set them up per-project:
+The 5 tracked hooks are automatically available when you clone the repo. Hook registration in `.claude/settings.local.json` (developer-specific, gitignored) can be generated with:
 
 ```bash
-# Automatic (recommended) — generates both hooks and registers them in settings
+# Automatic (recommended) — registers hooks in settings
 mdemg sidecar generate-hooks
 
 # Or one-command full setup (includes hooks + MCP + services)
@@ -331,8 +333,6 @@ mdemg sidecar quickstart
 # Alternative: install from embedded templates
 mdemg hooks install --type claude
 ```
-
-`generate-hooks` creates `session-start.sh` and `prompt-context.sh` with project-scoped endpoint and space_id from sidecar config, and registers both in `.claude/settings.local.json`.
 
 See `CLAUDE.md` for the full hook specification.
 

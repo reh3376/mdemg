@@ -3,6 +3,7 @@ package ape
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,6 +88,10 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 
 	outcome.ActionsExecuted = len(tasks)
 	for _, r := range taskFinal {
+		if r.Diagnostic {
+			outcome.DiagnosticCount++
+			continue
+		}
 		if r.Status == "completed" {
 			outcome.SuccessCount++
 		} else {
@@ -110,11 +115,33 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 	// Phase AR-1: Evaluate success criteria per task
 	outcome.CriteriaMet = true // assume success unless proven otherwise
 	outcome.CriteriaDetail = make(map[string]string)
+	outcome.PerTaskCriteria = make(map[string]bool)
+
+	// P0 fix: If postReport is nil but tasks have criteria, we cannot
+	// verify success — fail safe rather than record false-positive.
+	if postReport == nil {
+		hasCriteria := false
+		for _, task := range tasks {
+			if len(task.SuccessCriteria) > 0 {
+				hasCriteria = true
+				break
+			}
+		}
+		if hasCriteria {
+			outcome.CriteriaMet = false
+			outcome.CriteriaDetail["_post_assessment"] = "failed"
+			return outcome
+		}
+	}
 
 	for _, task := range tasks {
+		taskMet := true // per-task criteria result
 		for _, criterion := range task.SuccessCriteria {
-			beforeVal, hasBefore := metricsBefore[criterion.Metric]
-			afterVal, hasAfter := outcome.MetricsAfter[criterion.Metric]
+			// Resolve metric key: criteria use names like "correction_rate_delta"
+			// but MetricsBefore/MetricsAfter use base names like "correction_rate".
+			metricKey, _ := strings.CutSuffix(criterion.Metric, "_delta")
+			beforeVal, hasBefore := metricsBefore[metricKey]
+			afterVal, hasAfter := outcome.MetricsAfter[metricKey]
 			if !hasBefore || !hasAfter {
 				outcome.CriteriaDetail[criterion.Metric] = "missing_data"
 				continue
@@ -122,12 +149,14 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 			delta := afterVal - beforeVal
 			met := evaluateCriterion(criterion, delta, afterVal)
 			if !met {
+				taskMet = false
 				outcome.CriteriaMet = false
 				outcome.CriteriaDetail[criterion.Metric] = fmt.Sprintf("not_met: delta=%.4f, threshold=%.4f, op=%s", delta, criterion.Threshold, criterion.Operator)
 			} else {
 				outcome.CriteriaDetail[criterion.Metric] = "met"
 			}
 		}
+		outcome.PerTaskCriteria[task.TaskID] = taskMet
 	}
 
 	return outcome
@@ -158,14 +187,26 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Build task status map
+	// Build task status map (exclude diagnostic reports from calibration)
 	taskFinal := make(map[string]string)
+	diagnosticTasks := make(map[string]bool)
 	for _, r := range reports {
 		taskFinal[r.TaskID] = r.Status
+		if r.Diagnostic {
+			diagnosticTasks[r.TaskID] = true
+		}
 	}
 
 	for _, t := range tasks {
-		success := taskFinal[t.TaskID] == "completed" && outcome.CriteriaMet
+		if diagnosticTasks[t.TaskID] || IsDiagnosticAction(t.ActionType) {
+			continue // diagnostic actions excluded from calibration history
+		}
+		// Use per-task criteria when available; fall back to cycle-level CriteriaMet
+		criteriaMet := outcome.CriteriaMet
+		if ptc, ok := outcome.PerTaskCriteria[t.TaskID]; ok {
+			criteriaMet = ptc
+		}
+		success := taskFinal[t.TaskID] == "completed" && criteriaMet
 		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], ActionOutcome{
 			ActionType: t.ActionType,
 			Success:    success,

@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 )
 
 // LLMReflectorConfig holds configuration for the LLM reflector.
@@ -59,7 +61,17 @@ func NewLLMReflector(cfg LLMReflectorConfig, cbRegistry *circuitbreaker.Registry
 	}
 }
 
-const llmReflectSystemPrompt = `You are an RSIC (Recursive Self-Improvement Cycle) reflection engine for a knowledge graph memory system.
+// llmReflectSystemPromptTemplate is formatted at init with the action list.
+var llmReflectSystemPrompt string
+
+func init() {
+	quoted := make([]string, len(AllowedLLMActions))
+	for i, a := range AllowedLLMActions {
+		quoted[i] = `"` + a + `"`
+	}
+	actionEnum := strings.Join(quoted, ", ")
+
+	llmReflectSystemPrompt = `You are an RSIC (Recursive Self-Improvement Cycle) reflection engine for a knowledge graph memory system.
 
 You receive:
 1. A self-assessment report with health metrics
@@ -75,10 +87,11 @@ Your task: Identify patterns the rule-based reflector might miss. Look for:
 - Return a JSON array of insights (may be empty [])
 - Each insight MUST have: pattern_id, severity, description, recommended_action, reasoning
 - severity MUST be one of: "low", "medium", "high", "critical"
-- recommended_action MUST be one of: "prune_decayed_edges", "prune_excess_edges", "tombstone_stale", "graduate_volatile", "trigger_consolidation", "refresh_stale_edges"
+- recommended_action MUST be one of: ` + actionEnum + `
 - Output ONLY valid JSON — no markdown, no preamble
 
 [{"pattern_id": "...", "severity": "...", "description": "...", "recommended_action": "...", "reasoning": "..."}]`
+}
 
 // llmReflectInsight is the JSON structure returned by the LLM.
 type llmReflectInsight struct {
@@ -139,6 +152,7 @@ func (lr *LLMReflector) Reflect(ctx context.Context, report *SelfAssessmentRepor
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
+			metrics.Metrics().RSICActionTotal("llm_reflect", "circuit_open").Inc()
 			return nil, fmt.Errorf("%s circuit breaker open", cbName)
 		}
 	} else {
@@ -152,16 +166,50 @@ func (lr *LLMReflector) Reflect(ctx context.Context, report *SelfAssessmentRepor
 	return lr.parseResponse(raw)
 }
 
+// sanitizeLLMInput strips prompt injection markers, control characters, and
+// truncates overly long strings before they are interpolated into the LLM prompt.
+func sanitizeLLMInput(s string, maxLen int) string {
+	// Strip known prompt injection markers
+	injectionPatterns := []string{
+		"<|system|>", "<|user|>", "<|assistant|>", "<|im_start|>", "<|im_end|>",
+		"### Instructions", "### System", "[INST]", "[/INST]",
+		"<s>", "</s>", "<<SYS>>", "<</SYS>>",
+	}
+	for _, p := range injectionPatterns {
+		s = strings.ReplaceAll(s, p, "")
+	}
+
+	// Strip control characters (keep newlines, tabs, and printable)
+	var clean strings.Builder
+	clean.Grow(len(s))
+	for _, r := range s {
+		if r == '\n' || r == '\t' || (unicode.IsPrint(r) && !unicode.IsControl(r)) {
+			clean.WriteRune(r)
+		}
+	}
+	s = clean.String()
+
+	// Truncate
+	if maxLen > 0 && len(s) > maxLen {
+		s = s[:maxLen] + "…"
+	}
+	return s
+}
+
 func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 	var sb strings.Builder
 	compress := lr.cfg.CompressPrompts
 
+	// Sanitize report string fields before serialization
+	sanitized := *report
+	sanitized.SpaceID = sanitizeLLMInput(sanitized.SpaceID, 100)
+
 	// Current assessment — compact JSON saves ~40% tokens vs indented
 	sb.WriteString("## Current Assessment\n")
 	if compress {
-		sb.WriteString(encoding.CompactJSON(report))
+		sb.WriteString(encoding.CompactJSON(&sanitized))
 	} else {
-		reportJSON, _ := json.MarshalIndent(report, "", "  ")
+		reportJSON, _ := json.MarshalIndent(&sanitized, "", "  ")
 		sb.Write(reportJSON)
 	}
 	sb.WriteString("\n\n")
@@ -172,7 +220,8 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 		if len(history) > 0 {
 			sb.WriteString("## Recent Cycle History\n")
 			for i, h := range history {
-				fmt.Fprintf(&sb, "### Cycle %d: %s (tier=%s)\n", i+1, h.CycleID, h.Tier)
+				cycleID := sanitizeLLMInput(h.CycleID, 200)
+				fmt.Fprintf(&sb, "### Cycle %d: %s (tier=%s)\n", i+1, cycleID, h.Tier)
 				fmt.Fprintf(&sb, "- Actions: %d executed, %d success, %d failed\n", h.ActionsExecuted, h.SuccessCount, h.FailedCount)
 				fmt.Fprintf(&sb, "- Criteria met: %v\n", h.CriteriaMet)
 				if len(h.MetricsBefore) > 0 {
@@ -182,7 +231,7 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 					fmt.Fprintf(&sb, "- Metrics after: %v\n", h.MetricsAfter)
 				}
 				if len(h.CriteriaDetail) > 0 {
-					detail := fmt.Sprintf("%v", h.CriteriaDetail)
+					detail := sanitizeLLMInput(fmt.Sprintf("%v", h.CriteriaDetail), 500)
 					if compress {
 						detail = encoding.TruncateAtWord(detail, 200)
 					}
@@ -197,6 +246,7 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 		if len(calibration) > 0 {
 			sb.WriteString("## Calibration Confidence (action → success rate)\n")
 			for action, conf := range calibration {
+				action = sanitizeLLMInput(action, 100)
 				fmt.Fprintf(&sb, "- %s: %.2f\n", action, conf)
 			}
 		}
@@ -206,7 +256,17 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 }
 
 // ollamaReflectSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).
-var ollamaReflectSchema = json.RawMessage(`{
+// Generated from AllowedLLMActions at init time.
+var ollamaReflectSchema json.RawMessage
+
+func init() {
+	quoted := make([]string, len(AllowedLLMActions))
+	for i, a := range AllowedLLMActions {
+		quoted[i] = `"` + a + `"`
+	}
+	actionEnum := strings.Join(quoted, ",")
+
+	ollamaReflectSchema = json.RawMessage(`{
 	"type": "array",
 	"items": {
 		"type": "object",
@@ -214,12 +274,13 @@ var ollamaReflectSchema = json.RawMessage(`{
 			"pattern_id": {"type": "string"},
 			"severity": {"type": "string", "enum": ["low","medium","high","critical"]},
 			"description": {"type": "string"},
-			"recommended_action": {"type": "string", "enum": ["prune_decayed_edges","prune_excess_edges","tombstone_stale","graduate_volatile","trigger_consolidation","refresh_stale_edges"]},
+			"recommended_action": {"type": "string", "enum": [` + actionEnum + `]},
 			"reasoning": {"type": "string"}
 		},
 		"required": ["pattern_id", "severity", "description", "recommended_action", "reasoning"]
 	}
 }`)
+}
 
 // --- Response parsing ---
 
@@ -231,14 +292,46 @@ var validSeverities = map[string]InsightSeverity{
 	"critical": SeverityCritical,
 }
 
-// validActions constrains LLM output to known action types.
-var validActions = map[string]bool{
-	"prune_decayed_edges":  true,
-	"prune_excess_edges":   true,
-	"tombstone_stale":      true,
-	"graduate_volatile":    true,
-	"trigger_consolidation": true,
-	"refresh_stale_edges":  true,
+// AllowedLLMActions is the single source of truth for actions the LLM reflector may
+// recommend. The system prompt enum, Ollama JSON schema enum, and validation map
+// are all derived from this slice. Diagnostic-only alert actions are included so the
+// LLM can recommend them; they are excluded from calibration by design.
+var AllowedLLMActions = []string{
+	// Graph mutation actions
+	"prune_decayed_edges",
+	"prune_excess_edges",
+	"tombstone_stale",
+	"graduate_volatile",
+	"trigger_consolidation",
+	"refresh_stale_edges",
+	// Constraint/code management
+	"codify_constraint",
+	"codify_all_constraints",
+	"retire_code",
+	// Tuning actions
+	"adjust_tier_threshold",
+	"adjust_replay_buffer",
+	"review_guidance_effectiveness",
+	"adjust_guidance_confidence",
+	"archive_ineffective_constraints",
+	// Recovery/review
+	"flush_recovery_buffer",
+	"review_nli_calibration",
+	// Diagnostic actions (alert-only, not calibrated)
+	"ingest_stale_spaces",
+	"alert_jiminy_critical",
+	"alert_memory_bloat",
+	"alert_synergy_overlap",
+}
+
+// validActions is derived from AllowedLLMActions at init time.
+var validActions map[string]bool
+
+func init() {
+	validActions = make(map[string]bool, len(AllowedLLMActions))
+	for _, a := range AllowedLLMActions {
+		validActions[a] = true
+	}
 }
 
 func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {

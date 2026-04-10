@@ -83,6 +83,15 @@ Properties:
 - `math_block` (optional JSON string)
 - `created_at`
 
+### `:SignalState`
+
+Singleton per space. Stores Hebbian signal learner state for persistence across restarts.
+
+- `space_id` (string) — space identifier
+- `signal_data` (string) — serialized signal state
+- `flushed_at` (datetime) — last flush timestamp
+- Added in V0024 migration (v0.7.0)
+
 ### Optional debug labels
 
 - `:ActivationSnapshot` (store per-query activation traces for debugging)

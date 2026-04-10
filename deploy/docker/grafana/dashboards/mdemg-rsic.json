@@ -701,7 +701,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(SUM(CASE WHEN 1=1 AND labels->>'outcome' = 'completed' THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN 1=1 AND labels->>'outcome' IN ('completed', 'error', 'low_confidence') THEN value ELSE 0 END), 0) * 100, 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run') THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run', 'error', 'low_confidence') THEN value ELSE 0 END), 0) * 100, 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -980,6 +980,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",
@@ -1073,7 +1074,12 @@
             }
           }
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "None"
+        }
+      }
     },
     {
       "title": "Action Duration p95",
@@ -1128,6 +1134,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",
@@ -1414,6 +1421,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "None",
           "unit": "cpm",
           "custom": {
             "drawStyle": "bars",

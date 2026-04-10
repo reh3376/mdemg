@@ -9,6 +9,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RSIC overhaul** (RSIC-OVH-2026-04-09) — transforms RSIC from zero-value to high-value recursive self-improvement:
+  - `RSIC_PROTECTED_SPACES` env var replaces hardcoded `mdemg-dev` protection (default: empty = no spaces blocked)
+  - Graph-relative blast radius computed from actual node count (was hardcoded 1000)
+  - `RSIC_MACRO_CRON_SPACE` configures macro cron target space
+  - Calibration-aware planner suppresses low-confidence actions (`RSIC_MIN_ACTION_CONFIDENCE`, default: 0.2)
+  - LLM reflector whitelist expanded from 6 to 16 action types
+  - Diagnostic action classification — alert-only actions excluded from calibration tracking
+  - Default changes: micro cycles enabled, macro daily (was weekly), LLM reflection enabled
+- **Real RSIC executors** — `flush_recovery_buffer` graduates stable volatile nodes, `refresh_stale_edges` recomputes weights via co-activation decay, `review_nli_calibration` queries actual constraint metrics
+- **Browser UI audit tests** (UI-AUDIT-2026-04-09) — 76 new Playwright tests: 30 screenshot/JS-error/API-5xx baselines (10 tabs), 10 Training Data tab read-only tests, 3 Training Data API tests, 25 interactive/functional tests across all 10 tabs, 8 new test classes. Total suite: 309 tests (306 pass, 3 skip).
+- **UI gap analysis** (`docs/features/ui-gap-analysis.md`) — documents 48/125 API endpoints with UI coverage (38%), identifies 77 uncovered routes across Jiminy, conversation, constraints, ingestion, metrics, and infrastructure.
+
+### Fixed
+
+- **RSIC hardening** (RSIC-HDN-2026-04-09) — 32 findings from deep dive remediated across 6 epics:
+  - P0: Nil postReport no longer silently inflates calibration — `CriteriaMet=false` when post-assessment fails
+  - P0: Nil driver guards added to 7 executor methods (prevents nil-pointer panics)
+  - P1: `dryRun` data race eliminated — passed as `Dispatch()` parameter, not mutable shared field
+  - P1: `executeFlushRecoveryBuffer` rewritten to target recovery buffer nodes (was duplicating volatile graduation)
+  - P1: `executeCodifyConstraint`/`executeRetireCode` receive proper node ID/code parameters
+  - P1: Per-task `CriteriaMet` evaluation replaces cycle-level shared flag
+  - P2: Watchdog releases lock before I/O, resets decay counter only on trigger success
+  - P2: Safety validator fails closed on estimation error, blast radius LIMIT aligned with executor batch size
+  - P2: Orchestration status snapshot is atomic (single lock scope)
+  - P2: `ComputeOverallHealth` extracted as single source of truth (was duplicated in 2 files)
+  - P2: Synergy reader caches file reads with 60s TTL
+  - P2: Config cross-field validation warns on protected space conflicts
+  - P2: LLM reflector single action source, expanded whitelist (16→20), prompt injection sanitization
+  - P2: SSE job stream race fix (`Job.Snapshot()` for thread-safe reads)
+  - P2: `CleanupExpired()` wired to macro cron ticker, `CompleteCycle` skipped on timeout
+  - P3: Dead code cleanup (unreachable branch, cron parser documented)
+  - CI: `-race` flag added to test pipeline
+- **Training Data tab renders empty** — `helpSection()` in `training_data.js` passed string array instead of `{term, description}` objects to `helpPanel()`, causing `entries.map()` to throw silently.
+- **Form inputs show `[object HTMLInputElement]`** — `infoRow()` in `dom.js` used `String(value)` which stringified DOM Node elements. Added `instanceof Node` check to pass elements through directly.
+
+## [0.7.4] - 2026-04-08
+
+### Added
+
+- **Code comprehension feedback loop** (P1-15) — `CodeComprehensionTracker` monitors per-constraint-code comprehension scores in a sliding window. When average drops below threshold, triggers code regeneration via `ConstraintCodeGenerator`. Feature-gated off by default (`JIMINY_CODE_REGEN_ENABLED=false`). Config: `JIMINY_CODE_REGEN_THRESHOLD` (0.3), `JIMINY_CODE_REGEN_MIN_SAMPLES` (10). Includes cooldown timer + max-regen-per-hour cap.
+- **NLI bias alert consumer** (P2-15) — `RecordOutcome` now checks NLI calibration report after tracking and logs a warning when systematic NLI-vs-heuristic bias is detected.
+- **Embedding cache TTL** (P2-21) — `NodeEmbeddingCache` now supports TTL-based eviction. Config: `NODE_EMBEDDING_CACHE_TTL_SEC` (default: 3600, 0 = no TTL). Stale entries evicted on access.
+- **EdgeTypeStrategy validation** (P2-2) — `Config.Validate()` now rejects invalid `EDGE_TYPE_STRATEGY` values.
+- **TSDB schema version CI check** (P2-12) — CI now validates `TSDB_REQUIRED_SCHEMA_VERSION` matches migration file count.
+- **Goroutine semaphore** (P2-16) — RSIC task `Dispatcher` now bounds concurrent goroutines to 50 via channel semaphore.
+- **Synergy file reader** (`internal/ape/synergy_reader.go`) — implements the `SynergyFileReader` interface for RSIC health assessment. Reads CLAUDE.md and MEMORY.md line counts from disk with auto-detection of file paths. Wired in `server.go` when `SYNERGY_ASSESSMENT_ENABLED=true` (default). Fixes 4 dashboard panels (Synergy gauge, CLAUDE.md Lines, MEMORY.md Lines, Synergy Overflow & Buffer) that previously showed 0.
+- **Assessment confidence debug logging** — `computeConfidence()` now logs data point values when confidence drops below 0.3 threshold for faster diagnosis of low-confidence cycle bailouts.
+
+### Fixed
+
+- **Sequence counter not restored on resume** (P1-16) — `ResumeProtocol()` now calls `SetCounter(req.LastSeq)` after event replay, ensuring monotonic sequence continuity.
+- **Tier predictor timeout conflation** (P1-17) — `TierPredictResult` now carries `TimedOut` bool. Timeouts logged at `slog.Warn` with latency for distinct metrics recording.
+- **Training script TOCTOU** (P1-23) — `build_train_config()` now accepts manifest row count directly instead of re-counting file lines after manifest validation.
+- **Watchdog context race** (P1-13) — `Restart()` now holds `mu.Lock` when reassigning `ctx`/`cancel`, preventing concurrent `check()` from reading stale context.
+- **postReport lock upgrade race** (P1-12) — Replaced `RLock→RUnlock→Lock` gap with single write `Lock` for atomic read-then-write.
+- **Task cycle detection stale reads** (P1-10) — Added `stateVersion` counter to `Dispatcher`, incremented on every task state change. `WaitForCycle` detects stale reads by comparing versions between polls.
+- **TryLock skip not reported** (P1-22) — Consolidation handler now checks `result.Skipped` and returns a warning instead of counting skipped consolidation as success.
+- **Consolidation cascade on empty graph** (P1-9) — `RunConsolidation` now guards against empty graphs (zero hidden nodes created + zero forward pass updates) and returns early with `EmptyGraph: true`.
+- **Healthcheck port hardcoded** (P1-19) — Both `docker-compose.yml` files now use `CMD-SHELL` with `${MDEMG_PORT:-9999}` variable interpolation.
+- **Effectiveness TTL too short** (P2-1) — Default `JIMINY_EFFECTIVENESS_TTL_SEC` raised from 7200 to 86400 (24 hours).
+- **LISTEN_PORT dead code** (P2-3) — Removed unused `LISTEN_PORT` env var from both compose files.
+- **Missing stop_grace_period** (P2-5) — Added `stop_grace_period: 35s` to mdemg service (5s > graceful shutdown timeout).
+- **AUTH_API_KEYS naming** (P2-6) — Compose files now accept both `AUTH_API_KEYS` and `MDEMG_API_KEYS` via fallback interpolation.
+- **Decay formula NaN** (P2-7) — All 4 Cypher decay formulas now clamp the base to 0.01 when `(1 - decay/sqrt(evidence*surprise))` goes non-positive.
+- **CONFLICTS_WITH not idempotent** (P2-11) — Changed `CREATE` to `MERGE` with `ON CREATE SET`/`ON MATCH SET` for safe re-runs.
+- **LLM handler timeouts** (P2-10) — `handleJiminyGuide` and `handleRecall` now use `context.WithTimeout(30s)`.
+- **TSDB schema version stale** (P2-12) — Default `TSDB_REQUIRED_SCHEMA_VERSION` updated from 8 to 10.
+- **Trust store eventual consistency** (P1-10) — Documented that `feedbackCounts` may lag by up to 30s after crash recovery; impact is cosmetic (protocolStatus display only).
+- **Dashboard sparse-event panels** — Action Success Rate, Safety Blocks, Snapshots Created, and Trigger Rejections panels now display "None" instead of confusing "No data" when no events exist in the current time window.
+
+> **Validated 2026-04-08**: All 30+ DD-P1P2 fixes live-validated — 14 static checks, 8 unit/race suites, 15 live_validation.py tests, 379 UATS contract tests, 7 fix-specific API tests, 139 integration tests. Zero failures, zero regressions. See [`docs/testing/dd-p1p2-validation-report.md`](docs/testing/dd-p1p2-validation-report.md).
+
+## [0.7.3] - 2026-04-07
+
+### Added
+
+- **Server-native alert evaluator** (`internal/alert/evaluator.go`) — 13 TSDB-query alert rules migrated from Grafana to run natively on the server. Periodic evaluation with configurable interval (`ALERT_EVALUATOR_INTERVAL_SEC`, default: 30s), ForDuration state tracking to prevent flapping, and graceful degradation when TSDB is unavailable. Grafana is no longer required for alert evaluation.
+- **Goroutine supervisor** (`internal/supervisor/`) — monitors background goroutines (health prober, alert evaluator) with panic recovery, automatic restart with exponential backoff (5s base, max 3 retries), and alerts on restart (warning) and permanent failure (critical).
 - **LLM consecutive failure alert** — tracks consecutive LLM call failures per-client via shared atomic counter; fires high-severity alert through dispatcher when threshold reached (default: 3, configurable via `LLM_CONSECUTIVE_FAILURE_THRESHOLD`). Counter resets on success. Late-binding callback avoids init ordering issues.
 - **Alert dispatcher** (`internal/alert/`) — new package with file backend (atomic JSON writes, FIFO eviction at configurable cap), macOS notification backend (opt-in, `//go:build darwin`), per-(service,severity) cooldown dedup, and fire-and-forget dispatch to multiple backends
 - **Hook alert delivery** — `prompt-context.sh` shows all pending alerts per prompt; `session-start.sh` shows critical/high alerts at session start; both read from `~/.mdemg/alerts/current.json`
@@ -20,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Grafana contact point** — `provisioning/notifiers/` with webhook contact point routing alerts to `POST /v1/alerts/grafana`; notification policy with 30s group wait
 - **7 new Grafana alert rules** — TSDB writer overflow, LLM retry exhausted, probe down (API, Neo4j, TSDB, sidecar), Jiminy follow rate drop (total: 28 rules across 4 groups)
 
+### Fixed
+
+- **Trust persistence goroutine leak** — `StartTrustPersistence` now wraps context with `WithCancel`; new `StopTrustPersistence()` called during `Shutdown()` ensures final flush and clean goroutine exit.
+- **Dead startup code wired** — `StartContextCoolerProcessing` and `StartWeeklyGapInterviews` were fully implemented but never called; now wired behind opt-in config gates (`CONTEXT_COOLER_ENABLED`, `WEEKLY_GAP_INTERVIEWS_ENABLED`, both default: false).
+- **Grafana alert rules demoted to supplementary** — contact point and notification policy disabled; alert rules kept in `alerts.yml` with header comment for users who want redundant Grafana alerting. `/v1/alerts/grafana` endpoint preserved for backward compatibility.
+- **Hook alert banners broken on macOS** — `timeout` command (GNU coreutils) is not available on macOS. Both `session-start.sh` and `prompt-context.sh` used `timeout 2 jq ...` to parse the alert file, which failed silently and suppressed all alert banners. Removed the `timeout` wrapper — jq reads a small local JSON file and completes instantly.
+
 ### Changed
 
 - **`ALERT_COOLDOWN_SEC=0` means no cooldown** — previously defaulted to 300s. Zero is useful for testing; negative values still fall back to 300s default.
@@ -30,15 +115,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Default LLM model: gpt-5-nano → gpt-4.1-nano** — all 16 classification/evaluation tasks use prompt-engineered JSON (`json_object` mode), not tool-call schemas. gpt-4.1-nano is non-tool-use, 2x cheaper output tokens ($0.20/M vs $0.40/M), and has a 1M context window. Affects `LLM_MODEL`, `RECLASS_MODEL`, `RERANK_MODEL` defaults in config, compose templates, and CLI init prompts.
 - Fine-tuning plan documents updated from v3.0 to v4.0 — adds tool-use architectural constraint, curated dataset pipeline, Jiminy quality signals, and v0.7.1 classifier overhaul as a critical training data versioning boundary (Issues 20-28 in corrections log)
 
-### Fixed
-
-- **Hook alert banners broken on macOS** — `timeout` command (GNU coreutils) is not available on macOS. Both `session-start.sh` and `prompt-context.sh` used `timeout 2 jq ...` to parse the alert file, which failed silently and suppressed all alert banners. Removed the `timeout` wrapper — jq reads a small local JSON file and completes instantly.
-
 ### Added (UATS)
 
 - **`grafana_alert_webhook.uats.json`** — 3 variants: base firing alert (200), empty alerts (200), resolved alert (200)
 - **`healthz_enhanced.uats.json`** — 8 assertions validating enhanced `/healthz` response: `status` one_of `[ok, degraded]`, `checks` map exists with `neo4j`, `circuit_breakers`, `tsdb` keys
 - **`health.uats.json`** updated — added `$.checks` exists assertion for enhanced `/healthz` compatibility
+
+## [0.7.2] - 2026-04-06
 
 ### Fixed
 
@@ -51,6 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Investigation
 
 - **J17 tier promotion analysis** — tested full T3→T2→T1 chain; trust accrued 0.22→0.76 in 15 cycles. Found J8 synthesis overrides T1 compact encoding (P1). See `docs/development/J17_TIER_PROMOTION_ANALYSIS.md`.
+
+## [0.7.1] - 2026-04-06
 
 ### Fixed
 
@@ -653,3 +738,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Database migration framework (10 idempotent Cypher migrations)
 - Docker Compose configuration for Neo4j
 - Environment configuration via `.env` with example template
+
+[Unreleased]: https://github.com/reh3376/mdemg/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/reh3376/mdemg/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/reh3376/mdemg/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/reh3376/mdemg/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/reh3376/mdemg/compare/v0.7.0...v0.7.1

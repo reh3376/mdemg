@@ -83,7 +83,9 @@ func (w *Watchdog) Stop() {
 // Restart stops the watchdog and starts it again with a fresh context.
 func (w *Watchdog) Restart() {
 	w.Stop()
+	w.mu.Lock()
 	w.ctx, w.cancel = context.WithCancel(context.Background())
+	w.mu.Unlock()
 	w.Start()
 }
 
@@ -145,102 +147,148 @@ func (w *Watchdog) SetSignalProvider(sp WatchdogSignalProvider) {
 }
 
 func (w *Watchdog) check() {
+	// Read config and state under lock, release before I/O
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	hoursSinceCycle := time.Since(w.state.LastCycleTime).Hours()
-	w.state.DecayScore = hoursSinceCycle * w.cfg.RSICWatchdogDecayRate
-	w.state.NextDue = w.state.LastCycleTime.Add(time.Duration(w.cfg.RSICMesoPeriodHours) * time.Hour)
-
-	metrics.Metrics().RSICWatchdogDecay(w.spaceID).Set(w.state.DecayScore)
-
+	spaceID := w.spaceID
+	lastCycleTime := w.state.LastCycleTime
+	decayRate := w.cfg.RSICWatchdogDecayRate
+	mesoPeriodHours := w.cfg.RSICMesoPeriodHours
+	forceThreshold := w.cfg.RSICForceThreshold
+	warnThreshold := w.cfg.RSICWarnThreshold
+	nudgeThreshold := w.cfg.RSICNudgeThreshold
 	prevLevel := w.state.EscalationLevel
+	cycleTrigger := w.cycleTrigger
+	signalProvider := w.signalProvider
+	store := w.store
+	watchdogCtx := w.ctx
+	w.mu.Unlock()
 
+	hoursSinceCycle := time.Since(lastCycleTime).Hours()
+	decayScore := hoursSinceCycle * decayRate
+	nextDue := lastCycleTime.Add(time.Duration(mesoPeriodHours) * time.Hour)
+
+	metrics.Metrics().RSICWatchdogDecay(spaceID).Set(decayScore)
+
+	var escalationLevel EscalationLevel
 	switch {
-	case w.state.DecayScore >= w.cfg.RSICForceThreshold:
-		w.state.EscalationLevel = EscalationForce
-	case w.state.DecayScore >= w.cfg.RSICWarnThreshold:
-		w.state.EscalationLevel = EscalationWarn
-	case w.state.DecayScore >= w.cfg.RSICNudgeThreshold:
-		w.state.EscalationLevel = EscalationNudge
+	case decayScore >= forceThreshold:
+		escalationLevel = EscalationForce
+	case decayScore >= warnThreshold:
+		escalationLevel = EscalationWarn
+	case decayScore >= nudgeThreshold:
+		escalationLevel = EscalationNudge
 	default:
-		w.state.EscalationLevel = EscalationNominal
+		escalationLevel = EscalationNominal
 	}
 
-	metrics.Metrics().RSICWatchdogEscalation(w.spaceID).Set(float64(w.state.EscalationLevel))
+	metrics.Metrics().RSICWatchdogEscalation(spaceID).Set(float64(escalationLevel))
 
 	// Log on escalation level changes
-	if w.state.EscalationLevel != prevLevel {
-		switch w.state.EscalationLevel {
+	if escalationLevel != prevLevel {
+		switch escalationLevel {
 		case EscalationNudge:
-			slog.Info("RSIC watchdog: nudge", "decay_score", w.state.DecayScore, "hours_since_cycle", hoursSinceCycle)
+			slog.Info("RSIC watchdog: nudge", "decay_score", decayScore, "hours_since_cycle", hoursSinceCycle)
 		case EscalationWarn:
-			slog.Warn("RSIC watchdog: warning", "decay_score", w.state.DecayScore, "hours_since_cycle", hoursSinceCycle)
+			slog.Warn("RSIC watchdog: warning", "decay_score", decayScore, "hours_since_cycle", hoursSinceCycle)
 		case EscalationForce:
-			slog.Warn("RSIC watchdog: force, auto-triggering meso cycle", "decay_score", w.state.DecayScore)
+			slog.Warn("RSIC watchdog: force, auto-triggering meso cycle", "decay_score", decayScore)
 		}
 	}
 
-	// Auto-trigger at force level
-	if w.state.EscalationLevel == EscalationForce && w.cycleTrigger != nil {
+	// Auto-trigger at force level — build metadata before acquiring lock
+	var shouldTrigger bool
+	var triggerMeta TriggerMetadata
+	if escalationLevel == EscalationForce && cycleTrigger != nil {
 		metrics.Metrics().RSICWatchdogForce.Inc()
-		// Reset before triggering to avoid re-triggering
+		shouldTrigger = true
 		now := time.Now()
-		w.state.LastCycleTime = now
-		w.state.DecayScore = 0
-		w.state.EscalationLevel = EscalationNominal
-		w.state.LastTriggerSource = TriggerWatchdogForce
-
-		meta := TriggerMetadata{
+		triggerMeta = TriggerMetadata{
 			TriggerSource: TriggerWatchdogForce,
-			TriggerID:     fmt.Sprintf("watchdog_force:%s:%s", w.spaceID, now.Format("2006-01-02T15:04")),
+			TriggerID:     fmt.Sprintf("watchdog_force:%s:%s", spaceID, now.Format("2006-01-02T15:04")),
 			TriggeredAt:   now,
 			PolicyVersion: PolicyVersion,
 		}
-
-		go w.cycleTrigger(context.Background(), w.spaceID, meta)
 	}
 
-	// Phase 80: Multi-dimensional signal collection
-	if w.signalProvider != nil {
-		w.state.SessionHealthScore = w.signalProvider.GetSessionHealthScore("")
-		w.state.ObsRatePerHour = w.signalProvider.GetObservationRate(w.spaceID)
+	// Phase 80: Multi-dimensional signal collection (I/O without lock)
+	var sessionHealthScore float64
+	var obsRatePerHour float64
+	var consolidationAge int64
+	var consolidationAgeOK bool
+	var anomalies []string
+	if signalProvider != nil {
+		sessionHealthScore = signalProvider.GetSessionHealthScore("")
+		obsRatePerHour = signalProvider.GetObservationRate(spaceID)
 
-		consolidationAge, err := w.signalProvider.GetConsolidationAgeSec(w.ctx, w.spaceID)
-		if err == nil {
-			w.state.ConsolidationAge = consolidationAge
+		if age, err := signalProvider.GetConsolidationAgeSec(watchdogCtx, spaceID); err == nil {
+			consolidationAge = age
+			consolidationAgeOK = true
 		}
 
 		// Build active anomalies list
-		var anomalies []string
-		if w.state.SessionHealthScore < 0.3 {
+		if sessionHealthScore < 0.3 {
 			anomalies = append(anomalies, "low-session-health")
 		}
 		if consolidationAge > 48*3600 { // > 48 hours
 			anomalies = append(anomalies, "stale-consolidation")
 		}
-		if w.state.DecayScore >= w.cfg.RSICWarnThreshold {
+		if decayScore >= warnThreshold {
 			anomalies = append(anomalies, "high-decay-score")
 		}
-		if !w.signalProvider.IsJiminyHealthy(w.ctx) {
+		if !signalProvider.IsJiminyHealthy(watchdogCtx) {
 			anomalies = append(anomalies, "jiminy-unhealthy")
 		}
-		if !w.signalProvider.IsSidecarHealthy(w.ctx) {
+		if !signalProvider.IsSidecarHealthy(watchdogCtx) {
 			anomalies = append(anomalies, "sidecar-unhealthy")
 		}
-		w.state.ActiveAnomalies = anomalies
 
 		// Additional escalation: force cycle if session health is critically low AND decay is moderate
-		if w.state.SessionHealthScore < 0.2 && w.state.DecayScore >= w.cfg.RSICNudgeThreshold && w.cycleTrigger != nil {
+		if sessionHealthScore < 0.2 && decayScore >= nudgeThreshold && cycleTrigger != nil {
 			if prevLevel < EscalationWarn {
-				slog.Warn("RSIC watchdog: session health critical, escalating to warn level", "session_health_score", w.state.SessionHealthScore)
-				w.state.EscalationLevel = EscalationWarn
+				slog.Warn("RSIC watchdog: session health critical, escalating to warn level", "session_health_score", sessionHealthScore)
+				escalationLevel = EscalationWarn
 			}
 		}
 	}
 
-	// Phase 89: Persist watchdog state after check
-	if w.store != nil {
-		w.store.SaveWatchdogState(w.spaceID, w.state)
+	// Write computed state back under lock
+	w.mu.Lock()
+	w.state.DecayScore = decayScore
+	w.state.NextDue = nextDue
+	w.state.EscalationLevel = escalationLevel
+
+	if shouldTrigger {
+		// Don't reset consecutiveDecay here — wait for trigger success (4.7 fix)
+		w.state.LastTriggerSource = TriggerWatchdogForce
+	}
+
+	if signalProvider != nil {
+		w.state.SessionHealthScore = sessionHealthScore
+		w.state.ObsRatePerHour = obsRatePerHour
+		if consolidationAgeOK {
+			w.state.ConsolidationAge = consolidationAge
+		}
+		w.state.ActiveAnomalies = anomalies
+	}
+
+	stateCopy := w.state
+	w.mu.Unlock()
+
+	// Persist watchdog state (I/O without lock)
+	if store != nil {
+		store.SaveWatchdogState(spaceID, stateCopy)
+	}
+
+	// Fire trigger goroutine outside lock — reset decay on success (4.7 fix)
+	if shouldTrigger && cycleTrigger != nil {
+		go func() {
+			cycleTrigger(context.Background(), spaceID, triggerMeta)
+			// Reset decay counters only after successful trigger
+			w.mu.Lock()
+			w.state.LastCycleTime = triggerMeta.TriggeredAt
+			w.state.DecayScore = 0
+			w.state.EscalationLevel = EscalationNominal
+			w.mu.Unlock()
+		}()
 	}
 }

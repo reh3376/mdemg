@@ -43,7 +43,7 @@ type Config struct {
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
-	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-4.1-nano")
+	LLMModel    string // LLM_MODEL — top-level text-gen model (default: "gpt-4.1")
 
 	// Embedding provider settings
 	EmbeddingProvider   string // "openai", "ollama", or "" (disabled)
@@ -151,6 +151,7 @@ type Config struct {
 	QueryAwareExpansionEnabled bool    // Feature toggle (default: true)
 	QueryAwareAttentionWeight  float64 // Weight of query-node similarity vs edge weight (default: 0.5)
 	NodeEmbeddingCacheSize     int     // LRU cache size for node embeddings (default: 5000)
+	NodeEmbeddingCacheTTLSec   int     // NODE_EMBEDDING_CACHE_TTL_SEC — TTL for embedding cache entries in seconds (default: 3600, 0 = no TTL)
 
 	// Hybrid Edge Type Strategy settings (V0010) - different edge types at different hop depths
 	EdgeTypeStrategy    string   // Strategy: "all", "structural_first", "learned_only", "hybrid" (default: "hybrid")
@@ -235,7 +236,7 @@ type Config struct {
 	ReclassMaxIterations int     // RECLASS_MAX_ITERATIONS — max reclassification loops until convergence (default: 5, range: 1-10)
 	ReclassMaxDepth      int     // RECLASS_MAX_DEPTH — max dot-path taxonomy depth (default: 4, range: 1-10)
 	ReclassProvider      string  // RECLASS_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
-	ReclassModel         string  // RECLASS_MODEL — model name (default: gpt-4.1-nano)
+	ReclassModel         string  // RECLASS_MODEL — model name (default: gpt-4.1)
 	ReclassMaxTokens     int     // RECLASS_MAX_TOKENS — max response tokens (default: 2000, range: 500-8000)
 	ReclassTimeoutMs     int     // RECLASS_TIMEOUT_MS — LLM call timeout in ms (default: 30000, min: 5000)
 
@@ -313,6 +314,11 @@ type Config struct {
 	JiminyEscalationBlockAfter   int  // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
 	JiminyEscalationBlockEnabled bool // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
 	JiminyEscalationDecayMinutes int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+
+	// Jiminy Code Comprehension Feedback Loop
+	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
+	JiminyCodeRegenThreshold  float64 // JIMINY_CODE_REGEN_THRESHOLD — avg comprehension below this triggers regen (default: 0.3)
+	JiminyCodeRegenMinSamples int     // JIMINY_CODE_REGEN_MIN_SAMPLES — minimum samples before evaluating (default: 10)
 
 	// RSIC Jiminy Integration (J10)
 	RSICJiminyFollowRateThreshold           float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
@@ -429,10 +435,10 @@ type Config struct {
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 
 	// RSIC (Recursive Self-Improvement Cycle) settings (Phase 60b)
-	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: false)
+	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
 	RSICMesoPeriodHours    int     // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
 	RSICMesoPeriodSessions int     // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
-	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * 0")
+	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
 	RSICMaxNodePrunePct    float64 // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
 	RSICMaxEdgePrunePct    float64 // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
 	RSICRollbackWindow     int     // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
@@ -447,8 +453,11 @@ type Config struct {
 	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
 	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
 	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
-	RSICWatchdogSpaceID     string  // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
-	RSICPersistenceEnabled  bool    // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICWatchdogSpaceID     string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
+	RSICPersistenceEnabled  bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICProtectedSpaces      []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
+	RSICMacroCronSpace       string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
+	RSICMinActionConfidence  float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
 
 	// RSIC-SK1: Guidance self-calibration
 	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
@@ -457,10 +466,12 @@ type Config struct {
 	RSICGuidanceDecayThreshold     float64 // RSIC_GUIDANCE_DECAY_THRESHOLD — effectiveness rate below which confidence is decayed (default: 0.1)
 	RSICGuidanceDecayMinSurfaces   int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES — min surfaces before decay applies (default: 5)
 
-	SpacePruneIntervalHours int    // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+	SpacePruneIntervalHours       int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+	ContextCoolerEnabled          bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
+	WeeklyGapInterviewsEnabled    bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
 
 	// Phase AR-3: LLM-powered RSIC reflection
-	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: false)
+	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: true)
 	RSICLLMReflectProvider string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
 	RSICLLMReflectModel    string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
 	RSICLLMReflectCompress bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
@@ -796,7 +807,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 4)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 10)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -829,6 +840,10 @@ type Config struct {
 
 	// ===== LLM Consecutive Failure Alert =====
 	LLMConsecutiveFailureThreshold int // LLM_CONSECUTIVE_FAILURE_THRESHOLD — fires alert after N consecutive failures (default: 3)
+
+	// ===== Alert Evaluator =====
+	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
+	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
 
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
@@ -1273,7 +1288,7 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-4.1-nano")
+	llmModel := get("LLM_MODEL", "gpt-4.1")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
@@ -1465,6 +1480,10 @@ func FromEnv() (Config, error) {
 	}
 	if nodeEmbeddingCacheSize < 100 {
 		return Config{}, errors.New("NODE_EMBEDDING_CACHE_SIZE must be >= 100")
+	}
+	nodeEmbeddingCacheTTLSec, err := atoi("NODE_EMBEDDING_CACHE_TTL_SEC", 3600)
+	if err != nil {
+		return Config{}, err
 	}
 
 	// Hybrid Edge Type Strategy settings (V0010)
@@ -1845,7 +1864,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("RECLASS_MAX_DEPTH must be in range [1, 10]")
 	}
 	reclassProvider := get("RECLASS_PROVIDER", emergenceProvider)
-	reclassModel := get("RECLASS_MODEL", "gpt-4.1-nano")
+	reclassModel := get("RECLASS_MODEL", "gpt-4.1")
 	reclassMaxTokens, err := atoi("RECLASS_MAX_TOKENS", 2000)
 	if err != nil {
 		return Config{}, err
@@ -1915,7 +1934,7 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
-	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 7200)
+	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 86400)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2035,6 +2054,15 @@ func FromEnv() (Config, error) {
 	}
 	jiminyEscalationBlockEnabled := getBool("JIMINY_ESCALATION_BLOCK_ENABLED", false)
 	jiminyEscalationDecayMinutes, err := atoi("JIMINY_ESCALATION_DECAY_MINUTES", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCodeRegenEnabled := getBool("JIMINY_CODE_REGEN_ENABLED", false)
+	jiminyCodeRegenThreshold, err := atof("JIMINY_CODE_REGEN_THRESHOLD", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCodeRegenMinSamples, err := atoi("JIMINY_CODE_REGEN_MIN_SAMPLES", 10)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2242,7 +2270,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// RSIC settings (Phase 60b)
-	rsicMicroEnabled := getBool("RSIC_MICRO_ENABLED", false)
+	rsicMicroEnabled := getBool("RSIC_MICRO_ENABLED", true)
 	rsicMesoPeriodHours, err := atoi("RSIC_MESO_PERIOD_HOURS", 6)
 	if err != nil {
 		return Config{}, err
@@ -2251,7 +2279,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	rsicMacroCron := get("RSIC_MACRO_CRON", "0 3 * * 0")
+	rsicMacroCron := get("RSIC_MACRO_CRON", "0 3 * * *")
 	rsicMaxNodePrunePct, err := atof("RSIC_MAX_NODE_PRUNE_PCT", 0.05)
 	if err != nil {
 		return Config{}, err
@@ -2307,6 +2335,21 @@ func FromEnv() (Config, error) {
 	}
 	rsicWatchdogSpaceID := get("RSIC_WATCHDOG_SPACE_ID", "mdemg-dev")
 	rsicPersistenceEnabled := getBool("RSIC_PERSISTENCE_ENABLED", true)
+	rsicProtectedSpacesStr := get("RSIC_PROTECTED_SPACES", "")
+	var rsicProtectedSpaces []string
+	if rsicProtectedSpacesStr != "" {
+		for _, s := range strings.Split(rsicProtectedSpacesStr, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				rsicProtectedSpaces = append(rsicProtectedSpaces, s)
+			}
+		}
+	}
+	rsicMacroCronSpace := get("RSIC_MACRO_CRON_SPACE", "mdemg-dev")
+	rsicMinActionConfidence, err := atof("RSIC_MIN_ACTION_CONFIDENCE", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// RSIC-SK1: Guidance self-calibration
 	rsicGuidanceCalibrationEnabled := getBool("RSIC_GUIDANCE_CALIBRATION_ENABLED", true)
@@ -2331,9 +2374,11 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	contextCoolerEnabled := getBool("CONTEXT_COOLER_ENABLED", false)
+	weeklyGapInterviewsEnabled := getBool("WEEKLY_GAP_INTERVIEWS_ENABLED", false)
 
 	// Phase AR-3: LLM-powered intelligence
-	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", false)
+	rsicLLMReflectEnabled := getBool("RSIC_LLM_REFLECT_ENABLED", true)
 	rsicLLMReflectProvider := get("RSIC_LLM_REFLECT_PROVIDER", emergenceProvider)
 	rsicLLMReflectModel := get("RSIC_LLM_REFLECT_MODEL", emergenceModel)
 	rsicLLMReflectCompress := getBool("RSIC_LLM_REFLECT_COMPRESS", true)
@@ -3156,7 +3201,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 8)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 10)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3223,6 +3268,13 @@ func FromEnv() (Config, error) {
 
 	// LLM Consecutive Failure Alert
 	llmConsecutiveFailureThreshold, err := atoi("LLM_CONSECUTIVE_FAILURE_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Alert Evaluator
+	alertEvaluatorEnabled := getBool("ALERT_EVALUATOR_ENABLED", true)
+	alertEvaluatorIntervalSec, err := atoi("ALERT_EVALUATOR_INTERVAL_SEC", 30)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3334,6 +3386,7 @@ func FromEnv() (Config, error) {
 		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
 		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
 		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
+		NodeEmbeddingCacheTTLSec:     nodeEmbeddingCacheTTLSec,
 		EdgeTypeStrategy:             edgeTypeStrategy,
 		StructuralEdgeTypes:          structuralEdgeTypes,
 		LearnedEdgeTypes:             learnedEdgeTypes,
@@ -3475,6 +3528,9 @@ func FromEnv() (Config, error) {
 		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
 		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
 		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
+		JiminyCodeRegenEnabled:    jiminyCodeRegenEnabled,
+		JiminyCodeRegenThreshold:  jiminyCodeRegenThreshold,
+		JiminyCodeRegenMinSamples: jiminyCodeRegenMinSamples,
 		RSICJiminyFollowRateThreshold:           rsicJiminyFollowRateThreshold,
 		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
 		RSICJiminySourceImbalanceThreshold:      rsicJiminySourceImbalanceThreshold,
@@ -3627,12 +3683,17 @@ func FromEnv() (Config, error) {
 		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
 		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:         rsicPersistenceEnabled,
+		RSICProtectedSpaces:            rsicProtectedSpaces,
+		RSICMacroCronSpace:             rsicMacroCronSpace,
+		RSICMinActionConfidence:        rsicMinActionConfidence,
 		RSICGuidanceCalibrationEnabled: rsicGuidanceCalibrationEnabled,
 		RSICGuidanceMinSurfaces:        rsicGuidanceMinSurfaces,
 		RSICGuidanceBoostThreshold:     rsicGuidanceBoostThreshold,
 		RSICGuidanceDecayThreshold:     rsicGuidanceDecayThreshold,
 		RSICGuidanceDecayMinSurfaces:   rsicGuidanceDecayMinSurfaces,
 		SpacePruneIntervalHours:        spacePruneIntervalHours,
+		ContextCoolerEnabled:           contextCoolerEnabled,
+		WeeklyGapInterviewsEnabled:     weeklyGapInterviewsEnabled,
 
 		// Phase AR-3: LLM-powered intelligence
 		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,
@@ -3879,6 +3940,10 @@ func FromEnv() (Config, error) {
 		// LLM Consecutive Failure Alert
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
+		// Alert Evaluator
+		AlertEvaluatorEnabled:     alertEvaluatorEnabled,
+		AlertEvaluatorIntervalSec: alertEvaluatorIntervalSec,
+
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,
 	}, nil
@@ -3969,6 +4034,31 @@ func (c Config) Validate() (warnings []string, err error) {
 	}
 	if c.LearningWMin >= c.LearningWMax {
 		errs = append(errs, fmt.Errorf("LearningWMin (%.2f) must be < LearningWMax (%.2f)", c.LearningWMin, c.LearningWMax))
+	}
+
+	// EdgeTypeStrategy validation
+	validStrategies := map[string]bool{"all": true, "structural_first": true, "learned_only": true, "hybrid": true}
+	if c.EdgeTypeStrategy != "" && !validStrategies[c.EdgeTypeStrategy] {
+		errs = append(errs, fmt.Errorf("invalid EdgeTypeStrategy %q (valid: all, structural_first, learned_only, hybrid)", c.EdgeTypeStrategy))
+	}
+
+	// RSIC cross-field validation
+	if c.RSICMacroCron != "" || c.RSICMicroEnabled {
+		// Warn if macro cron space is in protected spaces (would silently block all macro cycles)
+		for _, ps := range c.RSICProtectedSpaces {
+			if ps == c.RSICMacroCronSpace {
+				warnings = append(warnings, fmt.Sprintf("RSICMacroCronSpace %q is in RSICProtectedSpaces — destructive macro cycle actions will be blocked", ps))
+				break
+			}
+		}
+		// Warn if watchdog space differs from macro cron space (likely misconfiguration)
+		if c.RSICWatchdogSpaceID != c.RSICMacroCronSpace && c.RSICWatchdogSpaceID != "" && c.RSICMacroCronSpace != "" {
+			warnings = append(warnings, fmt.Sprintf("RSICWatchdogSpaceID %q != RSICMacroCronSpace %q — watchdog monitors a different space than macro cron targets", c.RSICWatchdogSpaceID, c.RSICMacroCronSpace))
+		}
+		// Warn if no protected spaces configured with cycles enabled
+		if len(c.RSICProtectedSpaces) == 0 {
+			warnings = append(warnings, "RSICProtectedSpaces is empty with RSIC cycles enabled — destructive actions have no space protection")
+		}
 	}
 
 	if len(errs) > 0 {

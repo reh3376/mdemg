@@ -13,7 +13,7 @@ Before evaluating the plan, we need to be precise about what MDEMG's fine-tuning
 
 ### What the Fine-Tuned Model Does
 
-MDEMG uses external OpenAI models (default: `gpt-5-nano` for most tasks, `gpt-4o-mini` for reranking/summarization/synthesis/intent) routed through `llmclient` for 16 internal tasks — things like classifying whether a piece of code observation is a constraint, synthesizing guidance for the coding agent, evaluating whether the agent followed that guidance, and reflecting on system health.
+MDEMG uses external OpenAI models (default: `gpt-4.1-nano (non-tool-use; previously gpt-5-nano, migrated in v0.7.2)` for most tasks, `gpt-4o-mini` for reranking/summarization/synthesis/intent) routed through `llmclient` for 16 internal tasks — things like classifying whether a piece of code observation is a constraint, synthesizing guidance for the coding agent, evaluating whether the agent followed that guidance, and reflecting on system health.
 
 The fine-tuned Qwen3-30B-A3B MoE replaces this external LLM. It doesn't replace Claude Code (the coding agent). It doesn't write code, generate files, or interact with the developer. It's an internal intelligence layer — the brain that powers MDEMG's constraint detection, guidance synthesis, quality evaluation, and self-improvement systems.
 

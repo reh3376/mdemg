@@ -705,6 +705,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			return resp.StatusCode == http.StatusOK
 		})
 	}
+	// Synergy: Wire file reader for RSIC synergy health assessment
+	if cfg.SynergyAssessmentEnabled {
+		jiminyCheck := func() bool {
+			return cfg.JiminyEnabled && jiminySvc != nil
+		}
+		rsicAssessor.SetSynergyReader(ape.NewFileSynergyReader(
+			cfg.SynergyClaudeMDPath, cfg.SynergyMemoryMDPath, jiminyCheck,
+			cfg.SynergyMemoryLineThreshold, cfg.SynergyOverlapSampleSize,
+		))
+		slog.Info("rsic: synergy reader wired")
+	}
 	rsicReflector := ape.NewReflector(cfg, driver)
 	// J17: Wire protocol stats provider to reflector
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
@@ -727,6 +738,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	}
 	rsicMonitor := ape.NewMonitor(rsicDispatcher)
 	rsicCalibrator := ape.NewCalibrator(convAdapter, cfg.RSICMaxHistoryEntries)
+	rsicPlanner.SetCalibrator(rsicCalibrator)
 
 	// Phase AR-3: Wire LLM-powered reflector if enabled
 	if cfg.RSICLLMReflectEnabled {
@@ -745,11 +757,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		slog.Info("RSIC LLM reflection enabled", "provider", cfg.RSICLLMReflectProvider, "model", cfg.RSICLLMReflectModel)
 	}
 
-	// Watchdog and cycle orchestrator (watchdog trigger wired after cycle creation)
-	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, nil)
-	rsicCycle = ape.NewCycleOrchestrator(cfg, rsicAssessor, rsicReflector, rsicPlanner, rsicDispatcher, rsicMonitor, rsicCalibrator, rsicWatchdog)
-	// Wire the watchdog's force-trigger to the cycle orchestrator
-	// When force-triggered, also run consolidation deterministically (Phase 45.5)
+	// Watchdog and cycle orchestrator — closure captures rsicCycle variable (assigned below)
 	rsicWatchdog = ape.NewWatchdog(cfg, cfg.RSICWatchdogSpaceID, func(ctx context.Context, spaceID string, meta ape.TriggerMetadata) {
 		opts := &ape.RunCycleOpts{TriggerMeta: &meta}
 		if _, err := rsicCycle.RunCycle(ctx, spaceID, ape.TierMeso, opts); err != nil {
@@ -1312,6 +1320,9 @@ func (s *Server) Shutdown() {
 	if s.signalLearner != nil {
 		s.signalLearner.StopPersistence()
 	}
+	if s.jiminySvc != nil {
+		s.jiminySvc.StopTrustPersistence()
+	}
 
 	// Wait for all tracked background goroutines to exit
 	s.bgWg.Wait()
@@ -1361,6 +1372,11 @@ func (s *Server) StartMacroCronScheduler() {
 			case <-ctx.Done():
 				return
 			case now := <-ticker.C:
+				// Cleanup expired orchestration entries on every tick
+				if s.orchestrationPolicy != nil {
+					s.orchestrationPolicy.CleanupExpired()
+				}
+
 				if now.Before(s.macroNextRun) {
 					continue
 				}
@@ -1370,8 +1386,8 @@ func (s *Server) StartMacroCronScheduler() {
 					continue
 				}
 
-				// Fire macro cycle for mdemg-dev space
-				spaceID := "mdemg-dev"
+				// Fire macro cycle for configured space
+				spaceID := s.cfg.RSICMacroCronSpace
 				decision := s.orchestrationPolicy.EvaluateTrigger(ape.TriggerMacroCron, spaceID, ape.TierMacro, "")
 				if !decision.Allowed {
 					slog.Info("RSIC macro cron: skipped", "space_id", spaceID, "reason", decision.Reason)
@@ -1387,8 +1403,11 @@ func (s *Server) StartMacroCronScheduler() {
 						return
 					}
 					s.orchestrationPolicy.RecordTrigger(decision.Meta, spaceID, ape.TierMacro, outcome.CycleID)
-					s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
-					slog.Info("RSIC macro cron cycle complete", "cycle_id", outcome.CycleID)
+					// Skip CompleteCycle when timed out — let stale-cycle cleanup handle it
+					if !outcome.TimedOut {
+						s.orchestrationPolicy.CompleteCycle(spaceID, ape.TierMacro)
+					}
+					slog.Info("RSIC macro cron cycle complete", "cycle_id", outcome.CycleID, "timed_out", outcome.TimedOut)
 				}()
 			}
 		}

@@ -108,17 +108,19 @@ def build_train_config(
     lora_rank: int,
     lora_layers: int,
     max_seq_length: int,
+    train_rows: int = 0,
 ) -> dict[str, Any]:
     """Build the training configuration dict for mlx-lm."""
     train_path = os.path.join(dataset_dir, "train.jsonl")
     test_path = os.path.join(dataset_dir, "test.jsonl")
 
+    row_count = train_rows if train_rows > 0 else _count_lines(train_path)
     config = {
         "model": base_model,
         "data": train_path,
         "adapter_path": adapter_path,
         "train": True,
-        "iters": epochs * _count_lines(train_path) // batch_size,
+        "iters": epochs * row_count // batch_size,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "lora_layers": lora_layers,
@@ -177,6 +179,9 @@ def run_train(
     # Resolve LoRA rank
     resolved_rank = resolve_lora_rank(dataset_dir, lora_rank, ults_dir)
 
+    # Use manifest row count (authoritative) instead of re-counting file lines
+    train_rows = manifest.get("splits", {}).get("train", {}).get("rows", 0)
+
     # Build config
     config = build_train_config(
         dataset_dir=dataset_dir,
@@ -188,9 +193,8 @@ def run_train(
         lora_rank=resolved_rank,
         lora_layers=lora_layers,
         max_seq_length=max_seq_length,
+        train_rows=train_rows,
     )
-
-    train_rows = manifest.get("splits", {}).get("train", {}).get("rows", 0)
     summary = {
         "dataset_id": manifest.get("dataset_id"),
         "dataset_version": manifest.get("version"),

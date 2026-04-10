@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -62,6 +63,7 @@ type TierPredictResult struct {
 	Conf      float64
 	Err       error
 	LatencyMs float64
+	TimedOut  bool
 }
 
 // PredictTier returns the ML-predicted optimal tier for a constraint.
@@ -123,7 +125,11 @@ func (p *TierPredictor) PredictTier(ctx context.Context, constraintText, agentCo
 	latencyMs := float64(time.Since(start).Microseconds()) / 1000.0
 
 	if callErr != nil {
-		return TierPredictResult{Tier: 0, Conf: 0, Err: callErr, LatencyMs: latencyMs}
+		timedOut := ctx.Err() == context.DeadlineExceeded
+		if timedOut {
+			slog.Warn("j17: tier predictor timed out", "latency_ms", latencyMs, "error", callErr)
+		}
+		return TierPredictResult{Tier: 0, Conf: 0, Err: callErr, LatencyMs: latencyMs, TimedOut: timedOut}
 	}
 
 	// Only use prediction if confidence is above threshold

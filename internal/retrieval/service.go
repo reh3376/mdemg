@@ -123,16 +123,20 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 	if embCacheSize <= 0 {
 		embCacheSize = 5000
 	}
+	var embCacheTTL time.Duration
+	if cfg.NodeEmbeddingCacheTTLSec > 0 {
+		embCacheTTL = time.Duration(cfg.NodeEmbeddingCacheTTLSec) * time.Second
+	}
 
 	slog.Info("query cache initialized", "enabled", cfg.QueryCacheEnabled, "capacity", cacheCapacity, "ttl", cacheTTL)
-	slog.Info("node embedding cache initialized", "enabled", cfg.QueryAwareExpansionEnabled, "capacity", embCacheSize)
+	slog.Info("node embedding cache initialized", "enabled", cfg.QueryAwareExpansionEnabled, "capacity", embCacheSize, "ttl_sec", cfg.NodeEmbeddingCacheTTLSec)
 
 	svc := &Service{
 		cfg:               cfg,
 		driver:            driver,
 		reasoningProvider: &NoOpReasoningProvider{}, // Default: no reasoning modules
 		queryCache:        NewQueryCache(cacheCapacity, cacheTTL),
-		embeddingCache:    NewNodeEmbeddingCache(embCacheSize),
+		embeddingCache:    NewNodeEmbeddingCache(embCacheSize, embCacheTTL),
 	}
 
 	// Initialize neural re-ranker training data collector (NR-1)
@@ -1137,7 +1141,7 @@ CALL {
        coalesce(r.surprise_factor, 1.0) AS surpriseFactor
   WITH src, r, dst, relType, daysSinceActive, rawWeight, evidenceCount, surpriseFactor,
        CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
-         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
+         rawWeight * (CASE WHEN (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) <= 0 THEN 0.01 ELSE (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) END ^ daysSinceActive)
        ELSE rawWeight END AS decayedWeight
   WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
   RETURN src.node_id AS s, dst.node_id AS d, relType AS t,
@@ -1283,7 +1287,7 @@ CALL {
        // Evidence-based decay: stronger edges (more evidence) decay slower
        // effectiveDecay = baseDecay / sqrt(evidenceCount * surpriseFactor)
        CASE WHEN relType = 'CO_ACTIVATED_WITH' AND daysSinceActive > 0 THEN
-         rawWeight * ((1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) ^ daysSinceActive)
+         rawWeight * (CASE WHEN (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) <= 0 THEN 0.01 ELSE (1.0 - $decayPerDay / sqrt(toFloat(evidenceCount) * surpriseFactor)) END ^ daysSinceActive)
        ELSE rawWeight END AS decayedWeight
   WHERE NOT (relType = 'CO_ACTIVATED_WITH' AND decayedWeight < $pruneThreshold)
   RETURN src.node_id AS s, dst.node_id AS d, relType AS t,

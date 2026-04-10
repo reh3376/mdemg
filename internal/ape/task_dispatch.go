@@ -29,7 +29,6 @@ type Dispatcher struct {
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
 	snapshotStore   *SnapshotStore
-	dryRun          bool
 	safetySummary   *SafetySummary
 	deltas          []ActionDelta
 	safetyMu        sync.Mutex
@@ -37,6 +36,12 @@ type Dispatcher struct {
 	// B2: Background cleanup goroutine lifecycle
 	stopCleanup chan struct{}
 	cleanupDone chan struct{}
+
+	// DD-P1P2: Version counter for stale-read detection in WaitForCycle
+	stateVersion uint64
+
+	// DD-P2-16: Goroutine semaphore to bound concurrent RSIC task execution
+	sem chan struct{}
 
 	// SR-001: Alert delivery
 	alertDispatcher AlertDispatcher
@@ -46,6 +51,7 @@ type activeTask struct {
 	Spec      RSICTaskSpec
 	StartedAt time.Time
 	Status    string // "running" | "completed" | "failed"
+	DryRun    bool
 	cancel    context.CancelFunc
 }
 
@@ -58,6 +64,7 @@ func NewDispatcher(driver neo4j.DriverWithContext, learner LearningStatsProvider
 		convSvc:     convSvc,
 		hiddenSvc:   hiddenSvc,
 		driver:      driver,
+		sem:         make(chan struct{}, 50), // DD-P2-16: bound concurrent goroutines
 	}
 }
 
@@ -91,11 +98,6 @@ func (d *Dispatcher) SetAlertDispatcher(ad AlertDispatcher) {
 	d.alertDispatcher = ad
 }
 
-// SetDryRun puts the dispatcher in dry-run mode (estimate only, no mutations).
-func (d *Dispatcher) SetDryRun(dryRun bool) {
-	d.dryRun = dryRun
-}
-
 // ResetSafetySummary initializes a fresh safety summary for a cycle.
 func (d *Dispatcher) ResetSafetySummary() {
 	d.safetyMu.Lock()
@@ -123,7 +125,8 @@ func (d *Dispatcher) GetDeltas() []ActionDelta {
 }
 
 // Dispatch launches all tasks as background goroutines and returns immediately.
-func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
+// dryRun is stored per-task to avoid shared mutable state across goroutines.
+func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec, dryRun bool) error {
 	for i := range tasks {
 		task := tasks[i]
 		taskCtx, cancel := context.WithTimeout(ctx, task.Timeout) //nolint:gosec // G118: cancel stored in activeTask.cancel, called on completion
@@ -132,6 +135,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 			Spec:      task,
 			StartedAt: time.Now(),
 			Status:    "running",
+			DryRun:    dryRun,
 			cancel:    cancel,
 		}
 
@@ -141,7 +145,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, tasks []RSICTaskSpec) error {
 		d.mu.Unlock()
 
 		metrics.Metrics().RSICActionTotal(task.ActionType, "dispatched").Inc()
-		go d.executeTask(taskCtx, at)
+		d.sem <- struct{}{} // DD-P2-16: acquire semaphore
+		go func() {
+			defer func() { <-d.sem }() // release semaphore
+			d.executeTask(taskCtx, at)
+		}()
 	}
 	return nil
 }
@@ -154,7 +162,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	taskStart := time.Now()
 
 	// Phase 88: Dry-run mode — build delta, skip execution
-	if d.dryRun && d.safetyValidator != nil {
+	if at.DryRun && d.safetyValidator != nil {
 		delta := d.safetyValidator.BuildDelta(ctx, &at.Spec, actionType)
 		d.safetyMu.Lock()
 		d.deltas = append(d.deltas, delta)
@@ -178,6 +186,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 			fmt.Sprintf("Dry-run delta computed for %s", actionType), nil, "")
 		d.mu.Lock()
 		at.Status = "completed"
+		d.stateVersion++
 		d.mu.Unlock()
 		return
 	}
@@ -208,6 +217,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 				fmt.Sprintf("Rejected by safety validator: %s", decision.Reason), nil, decision.Reason)
 			d.mu.Lock()
 			at.Status = "failed"
+			d.stateVersion++
 			d.mu.Unlock()
 			return
 		}
@@ -216,8 +226,8 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	// Milestone: snapshot_taken
 	d.postReport(taskID, "running", 10, "snapshot_taken", "Baseline metrics captured", nil, "")
 
-	// Phase 88: Capture pre-mutation snapshot
-	if d.snapshotStore != nil {
+	// Phase 88: Capture pre-mutation snapshot (only for reversible actions)
+	if d.snapshotStore != nil && isReversibleAction(actionType) {
 		snap, err := d.snapshotStore.CaptureSnapshot(ctx, at.Spec.CycleID, actionType, at.Spec.TargetSpace)
 		if err != nil {
 			slog.Warn("RSIC snapshot: capture failed, continuing", "action", actionType, "error", err)
@@ -250,11 +260,19 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	case "refresh_stale_edges":
 		deliverables, execErr = d.executeRefreshStaleEdges(ctx, at.Spec.TargetSpace)
 	case "codify_constraint":
-		deliverables, execErr = d.executeCodifyConstraint(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+		nodeID := at.Spec.TargetNodeID
+		if nodeID == "" {
+			nodeID = at.Spec.Rationale // backward compat
+		}
+		deliverables, execErr = d.executeCodifyConstraint(ctx, at.Spec.TargetSpace, nodeID)
 	case "codify_all_constraints":
 		deliverables, execErr = d.executeCodifyAllConstraints(ctx, at.Spec.TargetSpace)
 	case "retire_code":
-		deliverables, execErr = d.executeRetireCode(ctx, at.Spec.TargetSpace, at.Spec.Rationale)
+		code := at.Spec.TargetCode
+		if code == "" {
+			code = at.Spec.Rationale // backward compat
+		}
+		deliverables, execErr = d.executeRetireCode(ctx, at.Spec.TargetSpace, code)
 	case "adjust_tier_threshold":
 		deliverables, execErr = d.executeAdjustTierThreshold(ctx, at.Spec.TargetSpace)
 	case "adjust_replay_buffer":
@@ -302,6 +320,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		metrics.Metrics().RSICActionDuration(actionType).ObserveDuration(taskStart)
 		d.mu.Lock()
 		at.Status = "failed"
+		d.stateVersion++
 		d.mu.Unlock()
 		d.postReport(taskID, "failed", 100, "execution_complete", "", nil, execErr.Error())
 		slog.Error("RSIC task failed", "task_id", taskID, "error", execErr)
@@ -319,6 +338,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 
 	d.mu.Lock()
 	at.Status = "completed"
+	d.stateVersion++
 	d.mu.Unlock()
 }
 
@@ -358,6 +378,9 @@ func (d *Dispatcher) executeConsolidation(ctx context.Context, spaceID string) (
 }
 
 func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	// Graduate volatile observations via Neo4j directly
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
@@ -389,6 +412,9 @@ func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string
 }
 
 func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -425,33 +451,87 @@ func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) 
 }
 
 func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Refresh stale edges by bumping their last_activated timestamp
-		cypher := `
+	type refreshResult struct {
+		Refreshed      int64
+		AvgWeightBefore float64
+		AvgWeightAfter  float64
+	}
+
+	res, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (refreshResult, error) {
+		// Capture avg weight before refresh
+		beforeRes, err := tx.Run(ctx, `
 			MATCH ()-[e:LEARNING_EDGE {space_id: $spaceId}]->()
 			WHERE e.last_activated < datetime() - duration('P30D')
 			WITH e LIMIT 100
-			SET e.last_activated = datetime()
-			RETURN count(e) AS refreshed
-		`
-		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+			RETURN avg(e.weight) AS avg_weight, collect(id(e)) AS ids
+		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
-			return nil, err
+			return refreshResult{}, err
 		}
-		if res.Next(ctx) {
-			if v, ok := res.Record().Get("refreshed"); ok {
-				return v, nil
+		var avgBefore float64
+		if beforeRes.Next(ctx) {
+			if v, ok := beforeRes.Record().Get("avg_weight"); ok && v != nil {
+				if f, ok := v.(float64); ok {
+					avgBefore = f
+				}
 			}
 		}
-		return int64(0), res.Err()
+		if err := beforeRes.Err(); err != nil {
+			return refreshResult{}, err
+		}
+
+		// Refresh stale edges: bump last_activated and recompute weight via co-activation decay
+		refreshCypher := `
+			MATCH ()-[e:LEARNING_EDGE {space_id: $spaceId}]->()
+			WHERE e.last_activated < datetime() - duration('P30D')
+			WITH e LIMIT 100
+			SET e.last_activated = datetime(),
+			    e.weight = CASE
+			        WHEN e.co_activation_count > 0
+			        THEN e.weight * (1.0 - 0.02 * duration.between(e.last_activated, datetime()).days / 30.0)
+			             + 0.1 * log(toFloat(e.co_activation_count) + 1)
+			        ELSE e.weight * 0.8
+			    END
+			RETURN count(e) AS refreshed, avg(e.weight) AS avg_weight_after
+		`
+		res, err := tx.Run(ctx, refreshCypher, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return refreshResult{AvgWeightBefore: avgBefore}, err
+		}
+		var refreshed int64
+		var avgAfter float64
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("refreshed"); ok {
+				if n, ok := v.(int64); ok {
+					refreshed = n
+				}
+			}
+			if v, ok := res.Record().Get("avg_weight_after"); ok && v != nil {
+				if f, ok := v.(float64); ok {
+					avgAfter = f
+				}
+			}
+		}
+		return refreshResult{
+			Refreshed:       refreshed,
+			AvgWeightBefore: avgBefore,
+			AvgWeightAfter:  avgAfter,
+		}, res.Err()
 	})
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"refreshed": result}, nil
+	return map[string]any{
+		"refreshed":         res.Refreshed,
+		"avg_weight_before": res.AvgWeightBefore,
+		"avg_weight_after":  res.AvgWeightAfter,
+	}, nil
 }
 
 // ─── J17 Protocol action executors ───
@@ -467,6 +547,9 @@ func (d *Dispatcher) executeCodifyConstraint(ctx context.Context, spaceID, ratio
 func (d *Dispatcher) executeCodifyAllConstraints(ctx context.Context, spaceID string) (map[string]any, error) {
 	if d.protoEvolver == nil {
 		return nil, fmt.Errorf("protocol evolver not available")
+	}
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
 	}
 
 	// Query Neo4j for all constraint nodes without constraint_code
@@ -665,6 +748,9 @@ func (d *Dispatcher) executeAlertSidecarDown(ctx context.Context, spaceID string
 }
 
 func (d *Dispatcher) executeAlertMemoryBloat(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
 	// Query total node count to assess bloat
 	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
@@ -720,51 +806,139 @@ func (d *Dispatcher) executeAlertSynergyOverlap(ctx context.Context, spaceID str
 }
 
 func (d *Dispatcher) executeFlushRecoveryBuffer(ctx context.Context, spaceID string) (map[string]any, error) {
-	// Query volatile observations that are stuck in recovery/buffer state
-	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
+	// Flush recovery buffer entries: re-classify recovery_buffer nodes as regular observations
+	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	bufferCount, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (int64, error) {
-		result, err := tx.Run(ctx,
-			`MATCH (n:MemoryNode {space_id: $spaceId}) WHERE n.volatile = true RETURN count(n) AS cnt`,
-			map[string]any{"spaceId": spaceID})
+	type flushResult struct {
+		Flushed   int64
+		Remaining int64
+	}
+
+	res, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (flushResult, error) {
+		// Re-classify recovery buffer nodes back to conversation_observation
+		flushed, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.obs_type = 'recovery_buffer' OR n.source = 'synergy_recovery'
+			WITH n LIMIT 100
+			SET n.obs_type = 'conversation_observation', n.recovered_at = datetime()
+			RETURN count(n) AS flushed
+		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
-			return 0, err
+			return flushResult{}, err
 		}
-		if result.Next(ctx) {
-			if v, ok := result.Record().Get("cnt"); ok {
-				if cnt, ok := v.(int64); ok {
-					return cnt, nil
+		var cnt int64
+		if flushed.Next(ctx) {
+			if v, ok := flushed.Record().Get("flushed"); ok {
+				if n, ok := v.(int64); ok {
+					cnt = n
 				}
 			}
 		}
-		return 0, result.Err()
+		if err := flushed.Err(); err != nil {
+			return flushResult{}, err
+		}
+
+		// Count remaining recovery buffer entries
+		remaining, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.obs_type = 'recovery_buffer' OR n.source = 'synergy_recovery'
+			RETURN count(n) AS cnt
+		`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return flushResult{Flushed: cnt}, err
+		}
+		var rem int64
+		if remaining.Next(ctx) {
+			if v, ok := remaining.Record().Get("cnt"); ok {
+				if c, ok := v.(int64); ok {
+					rem = c
+				}
+			}
+		}
+		return flushResult{Flushed: cnt, Remaining: rem}, remaining.Err()
 	})
 	if err != nil {
-		return nil, fmt.Errorf("query recovery buffer: %w", err)
+		return nil, fmt.Errorf("flush recovery buffer: %w", err)
 	}
 
-	slog.Info("RSIC: recovery buffer assessment", "space_id", spaceID, "volatile_count", bufferCount)
+	slog.Info("RSIC: recovery buffer flushed", "space_id", spaceID, "flushed", res.Flushed, "remaining", res.Remaining)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("flush_recovery_buffer", "success").Inc()
 	}
 	return map[string]any{
-		"action":         "flush_recovery_buffer",
-		"space_id":       spaceID,
-		"volatile_count": bufferCount,
+		"action":          "flush_recovery_buffer",
+		"space_id":        spaceID,
+		"entries_flushed": res.Flushed,
+		"remaining":       res.Remaining,
 	}, nil
 }
 
-func (d *Dispatcher) executeReviewNLICalibration(_ context.Context, spaceID string) (map[string]any, error) {
-	// NLI calibration data comes from protocol metrics if protoEvolver is available
-	slog.Info("RSIC: NLI calibration review", "space_id", spaceID)
+func (d *Dispatcher) executeReviewNLICalibration(ctx context.Context, spaceID string) (map[string]any, error) {
+	if d.driver == nil {
+		return nil, fmt.Errorf("neo4j driver not available")
+	}
+	// Query NLI calibration metrics from the graph
+	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	type nliStats struct {
+		TotalConstraints int64
+		ActiveConstraints int64
+		AvgConfidence    float64
+	}
+
+	stats, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (nliStats, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE n.obs_type = 'constraint' OR n.obs_type = 'correction'
+			RETURN count(n) AS total,
+			       count(CASE WHEN coalesce(n.archived, false) = false THEN 1 END) AS active,
+			       avg(coalesce(n.confidence, 0.5)) AS avg_confidence
+		`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nliStats{}, err
+		}
+		var s nliStats
+		if res.Next(ctx) {
+			if v, ok := res.Record().Get("total"); ok {
+				if n, ok := v.(int64); ok {
+					s.TotalConstraints = n
+				}
+			}
+			if v, ok := res.Record().Get("active"); ok {
+				if n, ok := v.(int64); ok {
+					s.ActiveConstraints = n
+				}
+			}
+			if v, ok := res.Record().Get("avg_confidence"); ok && v != nil {
+				if f, ok := v.(float64); ok {
+					s.AvgConfidence = f
+				}
+			}
+		}
+		return s, res.Err()
+	})
+	if err != nil {
+		return nil, fmt.Errorf("review NLI calibration: %w", err)
+	}
+
+	slog.Info("RSIC: NLI calibration review", "space_id", spaceID,
+		"total_constraints", stats.TotalConstraints,
+		"active_constraints", stats.ActiveConstraints,
+		"avg_confidence", stats.AvgConfidence)
 	if m := metrics.Metrics(); m != nil {
 		m.RSICActionTotal("review_nli_calibration", "success").Inc()
 	}
 	return map[string]any{
-		"action":   "review_nli_calibration",
-		"space_id": spaceID,
-		"message":  "NLI comprehension calibration reviewed — see protocol metrics for details",
+		"action":             "review_nli_calibration",
+		"space_id":           spaceID,
+		"total_constraints":  stats.TotalConstraints,
+		"active_constraints": stats.ActiveConstraints,
+		"avg_confidence":     stats.AvgConfidence,
 	}, nil
 }
 
@@ -849,14 +1023,14 @@ func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, s
 		Timestamp:    time.Now(),
 		Error:        errMsg,
 	}
-	// Find cycleID from active task
-	d.mu.RLock()
+	// Single write lock for both read and append to prevent race between RUnlock and Lock.
+	d.mu.Lock()
 	if at, ok := d.activeTasks[taskID]; ok {
 		report.CycleID = at.Spec.CycleID
+		if IsDiagnosticAction(at.Spec.ActionType) {
+			report.Diagnostic = true
+		}
 	}
-	d.mu.RUnlock()
-
-	d.mu.Lock()
 	d.reports[taskID] = append(d.reports[taskID], report)
 	d.mu.Unlock()
 }

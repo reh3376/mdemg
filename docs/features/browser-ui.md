@@ -1,7 +1,7 @@
 ---
 created: 2026-04-02
-updated: 2026-04-04
-version: v0.5.4
+updated: 2026-04-09
+version: v0.7.4
 author: reh3376
 status: active
 phase: "DOCKER-P2b"
@@ -204,4 +204,58 @@ internal/api/
       plugins.js          — Plugin cards with lifecycle controls
       features.js         — Service listing with lifecycle controls
       backup.js           — Backup trigger/list/restore/delete + status polling
+      training_data.js    — Training data export for LoRA fine-tuning
 ```
+
+## E2E Test Coverage (UI-AUDIT-2026-04-09)
+
+**Suite**: `tests/e2e/browser-ui/test_browser_ui.py` — 309 tests (306 pass, 3 skip)
+**Run**: `make test-e2e-browser-ui` (~40 min sequential)
+
+| Test Class | Tests | Type |
+|-----------|-------|------|
+| TestPageLoad | 5 | Read-only |
+| TestTabNavigation | 22 | Read-only (parametrized) |
+| TestStatusTab | 18 | Read-only |
+| TestMemoryTab | 15 | Read-only |
+| TestLearningTab | 12 | Read-only |
+| TestConfigTab | 14 | Read-only |
+| TestLogsTab | 4 | Read-only |
+| TestRsicTab | 14 | Read-only |
+| TestPluginsTab | 8 | Read-only |
+| TestFeaturesTab | 7 | Read-only |
+| TestBackupTab | 11 | Read-only |
+| TestTrainingDataTab | 10 | Read-only |
+| TestHelpPanels | 50 | Read-only (parametrized) |
+| TestTheme | 4 | Read-only |
+| TestInstanceSelector | 3 | Read-only |
+| TestScreenshots | 30 | Visual baselines (parametrized) |
+| TestInteractiveStatus | 1 | Functional |
+| TestInteractiveMemory | 3 | Functional |
+| TestInteractiveLearning | 3 | Functional |
+| TestInteractiveConfig | 3 | Functional |
+| TestInteractiveLogs | 2 | Functional |
+| TestInteractiveRsic | 3 | Functional |
+| TestInteractivePlugins | 1 | Functional |
+| TestInteractiveFeatures | 1 | Functional |
+| TestInteractiveBackup | 4 | Functional |
+| TestInteractiveTrainingData | 4 | Functional |
+| TestStatusAPI | 6 | API |
+| TestInstanceAPI | 5 | API |
+| TestTrainingDataAPI | 3 | API |
+
+### Interactive Test Patterns
+
+All `TestInteractive*` classes:
+- Register `page.on("dialog", handler)` in autouse fixture (handles `confirm()`, `alert()`, `prompt()`)
+- Restore state in `finally` blocks via direct `requests` API calls
+- Use `expect_request`/`expect_response` to verify API calls triggered by clicks
+
+## API Coverage Gap Analysis
+
+See `docs/features/ui-gap-analysis.md` for the full analysis.
+
+**Summary**: 48 of 125 server routes (38%) have corresponding `api.js` wrappers and UI representation.
+
+**Well-covered**: Backup (7/7), Config (2/2), Features (4/4), Plugins (6/6), RSIC (3/3), Training Data (3/3)
+**Uncovered**: Jiminy (15 routes), Conversation (13 routes), Memory operations (25 routes), Constraints (6 routes), Metrics (4 routes), Infrastructure (10+ routes)

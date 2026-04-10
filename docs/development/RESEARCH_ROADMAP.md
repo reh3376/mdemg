@@ -1,7 +1,7 @@
 # MDEMG Research Roadmap
 
-**Document Version:** 1.2
-**Last Updated:** 2026-01-21
+**Document Version:** 1.3
+**Last Updated:** 2026-04-09
 **Status:** Active Development - Phases 1 & 2 Implementation Complete
 
 ---
@@ -61,7 +61,7 @@ Transform MDEMG from an inference-time memory augmentation system into a **nativ
 |------------|--------|------------|
 | 1. Hidden Layer Architecture | **COMPLETE** | 100% |
 | 2. Interceptor Agent | **COMPLETE** | 100% |
-| 3. Training Data & Fine-Tuning | **LARGELY COMPLETE** | 85% |
+| 3. Training Data & Fine-Tuning | **LARGELY COMPLETE** | 92% |
 | 4. Research & Funding | In Progress | 10% |
 
 ---
@@ -215,6 +215,12 @@ See `docs/INTERCEPTOR_DESIGN.md` for full design specification.
 - Updated `internal/config/config.go` - Added interceptor configuration
 - Updated `internal/orchestrator/orchestrator.go` - Integrated interceptor into pipeline
 
+### Post v1.2 Updates (2026-04-09)
+
+- Jiminy effectiveness investigation completed (v0.7.0-v0.7.1): feedback loop restored, outcome classifier fixed, negation detection deferred to LLM
+- J17 tier promotion validated T3→T2→T1 in 15 cycles (v0.7.2)
+- Code comprehension feedback loop added (v0.7.4, feature-gated)
+
 ---
 
 ## Workstream 3: Training Data & Model Fine-Tuning ✅ LARGELY COMPLETE
@@ -247,6 +253,13 @@ Complete LoRA fine-tuning pipeline delivered in PRs #217-250:
 - Base model: Qwen3-30B-A3B MoE via vllm-mlx
 - Training: LoRA fine-tuning with MLX on Apple Silicon
 - Evaluation: per-task scoring, regression gate, deployment pipeline
+
+### Post v1.2 Updates (2026-04-09)
+
+- FT plan updated to v4.0: tool-use architectural constraint, curated dataset pipeline, Jiminy quality signals
+- LoRA training pipeline validated E2E (train, evaluate, gate, quantize, deploy)
+- Collection campaign running since v0.5.3
+- Default LLM migrated from gpt-5-nano to gpt-4.1-nano (v0.7.2)
 
 ---
 
@@ -289,3 +302,4 @@ See `docs/XAI_POST_DRAFTS.md` for prepared posts targeting xAI/Elon Musk for com
 | 2026-01-21 | 1.0 | Initial roadmap created |
 | 2026-01-21 | 1.1 | Updated with Phase 1 completion, added progress summary |
 | 2026-01-21 | 1.2 | Phase 2 (Interceptor) implementation complete in aci-claude-go |
+| 2026-04-09 | 1.3 | Post v1.2 updates: Jiminy arc, FT plan v4.0, LLM migration, WS3 progress to 92% |

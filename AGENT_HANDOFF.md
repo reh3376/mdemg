@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-07
+**Date:** 2026-04-09
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -40,6 +40,8 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Doc Consolidation — COMPLETE (4 user-facing docs centralized in docs/user/)
 - J17 Feedback Loop Closure — COMPLETE (state file bridge, hook feedback delivery, control char sanitization, bootstrap codification)
 - J17 Protocol Pipeline 12-Break Cascading Fix — COMPLETE (code lookup, trust persistence, cache bypass, threshold sync, live collector wiring, all gauges flowing)
+- RSIC Overhaul (RSIC-OVH-2026-04-09) — COMPLETE (configurable ProtectedSpaces, graph-relative blast radius, real executors, diagnostic classification, calibration-aware planner, 20-action LLM reflector, daily cycles)
+- RSIC Hardening (RSIC-HDN-2026-04-09) — COMPLETE (32 deep dive findings remediated: nil postReport, nil driver guards, dryRun race, per-task CriteriaMet, executor correctness, watchdog lock/reset, safety fail-closed, LLM sanitization, SSE race fix)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
@@ -51,7 +53,37 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-09) ===
+- ✅ RSIC-HDN-2026-04-09: RSIC Hardening — Deep Dive Remediation (2026-04-09):
+  - 32 findings remediated (2 P0, 9 P1, 19 P2, 2 P3) across 6 sequential epics
+  - P0: Nil postReport calibration corruption fix, nil driver guards (7 executors)
+  - P1: dryRun data race eliminated, per-task CriteriaMet, executor correctness (flush buffer, params, OOM)
+  - P2: Watchdog lock contention + reset timing, safety fail-closed, config cross-validation
+  - P2: LLM reflector single action source (20 actions), prompt injection sanitization
+  - P2: Orchestration atomic snapshot, synergy cache TTL, CompleteCycle timeout handling
+  - P2: SSE job stream race fix (Job.Snapshot()), health formula extraction
+  - P3: Dead code cleanup, cron parser documentation
+  - CI: -race flag added to test pipeline
+  - 0 lint issues, all tests pass with -race
+- ✅ UI-AUDIT-2026-04-09: Browser UI Comprehensive Audit & Testing (2026-04-09):
+  - E1: Screenshot baselines for all 10 tabs + JS error + API 5xx per-tab tests (30 new tests)
+  - E1: TestTrainingDataTab (10 read-only tests) + TestTrainingDataAPI (3 endpoint tests)
+  - E2: 10 TestInteractive* classes — all buttons/inputs/dropdowns/checkboxes tested (25 new tests)
+  - E3: 2 bug fixes — training_data.js helpPanel signature, dom.js infoRow Node handling
+  - E4: Gap analysis — 48/125 endpoints covered (38%), 77 uncovered routes documented
+  - Suite: 309 total tests (306 pass, 3 skip), zero failures
+  - Docs: CHANGELOG, AGENT_HANDOFF, ui-gap-analysis.md, browser-ui.md updated
+
 === COMPLETED SINCE LAST HANDOFF (2026-04-07) ===
+- ✅ SNA-001: Server-Native Alerting & Final Resilience Hardening (2026-04-07):
+  - E1: Trust persistence goroutine leak fixed — cancellable context, StopTrustPersistence() in Shutdown()
+  - E1: Dead startup code wired — StartContextCoolerProcessing and StartWeeklyGapInterviews behind config gates
+  - E2: Server-native alert evaluator — 13 TSDB-query rules migrated from Grafana, ForDuration state tracking
+  - E3: Goroutine supervisor — panic recovery, exponential backoff restart, warning/critical alerts
+  - E4: Grafana alert rules demoted to supplementary — contact point/policy disabled, endpoint preserved
+  - Config: 4 new env vars (ALERT_EVALUATOR_ENABLED, ALERT_EVALUATOR_INTERVAL_SEC, CONTEXT_COOLER_ENABLED, WEEKLY_GAP_INTERVIEWS_ENABLED)
+  - Tests: 7 evaluator + 6 supervisor tests, all passing
+  - Grafana no longer required for alert evaluation — all 28 rules evaluated server-natively
 - ✅ SR-001 Gap Closure Sprint (2026-04-07):
   - F-001: CooldownSec=0 now means "no cooldown" (was defaulting to 300s)
   - F-002: Health prober SetAlertCallback wired to alert dispatcher on transitions
@@ -547,6 +579,14 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 
 ## 5. Open Work Items
 
+### DASH-001: RSIC Dashboard Data Fix — COMPLETE as of 2026-04-08
+
+Fixes for RSIC Operations Grafana dashboard data issues (7 panels showing "No data" or 0):
+- **SynergyFileReader** implemented (`internal/ape/synergy_reader.go`) — reads CLAUDE.md/MEMORY.md line counts, wired via `SetSynergyReader()` in `server.go`. Fixed 4 panels (Synergy gauge, CLAUDE.md Lines, MEMORY.md Lines, Synergy Overflow & Buffer).
+- **Assessment confidence debug logging** — `computeConfidence()` logs data point values when confidence < 0.3 for faster diagnosis.
+- **Dashboard noValue display** — Action Success Rate, Safety Blocks, Snapshots Created, Trigger Rejections panels show "None" instead of "No data" when empty.
+- **Cycle completion** — Confirmed cycles complete normally (confidence=1.0) after clean server restart; previous low_confidence was transient from server bouncing during SNA-001 live testing.
+
 ### Gap Analysis Phase 4 — COMPLETE as of 2026-03-30
 
 Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
@@ -748,4 +788,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-04-02 — Training pipeline COMPLETE (PRs #243-250): PROD-READINESS, compose embed fix, export-auto LaunchAgent, vllm-mlx + train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py + 21 GRPO rewards, quantize_deploy.py. FT phases 3+4+ COMPLETE. Collection campaign running. Tag v0.4.2. CI: ALL GREEN.*
+*Last updated: 2026-04-08 — DD-P1P2 deep dive bug fix campaign COMPLETE (PR #301): 10 P1s + 21 P2s, all live-validated. Service alert system (SR-001/SNA-001), synergy reader, dashboard fixes. Tag v0.7.4. CI: ALL GREEN.*

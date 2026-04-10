@@ -109,6 +109,7 @@ Scoring factors:
 |------|---------|
 | `internal/api/handlers_synergy.go` | `/v1/synergy/status` endpoint |
 | `internal/cli/synergy.go` | `mdemg synergy` CLI commands |
+| `internal/ape/synergy_reader.go` | `FileSynergyReader` — reads CLAUDE.md/MEMORY.md from disk |
 | `internal/ape/self_assess.go` | `scoreSynergy()` RSIC dimension |
 | `internal/ape/self_reflect.go` | Patterns #17-19 |
 | `internal/ape/types_rsic.go` | `SynergyHealth` report fields |
@@ -122,6 +123,7 @@ Scoring factors:
 
 - 3 handler tests (`internal/api/handlers_synergy_test.go`)
 - 6 RSIC assess tests (`internal/ape/self_assess_synergy_test.go`)
+- 6 file reader tests (`internal/ape/synergy_reader_test.go`)
 - 8 CLI tests (`internal/cli/synergy_test.go`)
 - 1 UATS spec (9 assertions, all passing)
 
