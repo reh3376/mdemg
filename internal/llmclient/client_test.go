@@ -440,7 +440,7 @@ func TestClient_RecorderCalledOnComplete(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		resp := OpenAIChatResponse{
 			Choices: []OpenAIChoice{{Message: Message{Content: "recorded"}}},
-			Usage:   OpenAIUsage{TotalTokens: 10},
+			Usage:   OpenAIUsage{PromptTokens: 15, CompletionTokens: 8, TotalTokens: 23},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -487,6 +487,78 @@ func TestClient_RecorderCalledOnComplete(t *testing.T) {
 	}
 	if r.LatencyMs < 0 {
 		t.Errorf("LatencyMs: got %d, want >= 0", r.LatencyMs)
+	}
+	if r.TokensIn != 15 {
+		t.Errorf("TokensIn: got %d, want 15", r.TokensIn)
+	}
+	if r.TokensOut != 8 {
+		t.Errorf("TokensOut: got %d, want 8", r.TokensOut)
+	}
+}
+
+func TestComplete_RecordsTokensEndToEnd(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OpenAIChatResponse{
+			Choices: []OpenAIChoice{{Message: Message{Content: "token test"}}},
+			Usage:   OpenAIUsage{PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "openai", Model: "gpt-5.4", APIKey: "k", BaseURL: server.URL})
+	c.SetRecorder(rec)
+	c = c.WithContext("training.test", "mdemg-dev")
+
+	_, err := c.Complete(context.Background(), []Message{
+		{Role: "system", Content: "system"},
+		{Role: "user", Content: "user"},
+	}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.TokensIn != 100 {
+		t.Errorf("TokensIn: got %d, want 100 (prompt_tokens from OpenAI)", r.TokensIn)
+	}
+	if r.TokensOut != 50 {
+		t.Errorf("TokensOut: got %d, want 50 (completion_tokens from OpenAI)", r.TokensOut)
+	}
+	if r.TaskName != "training.test" {
+		t.Errorf("TaskName: got %q, want %q", r.TaskName, "training.test")
+	}
+}
+
+func TestComplete_OllamaRecordsZeroTokens(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := OllamaGenerateResponse{Response: "ollama token test", Done: true}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "ollama", Model: "llama3", BaseURL: server.URL})
+	c.SetRecorder(rec)
+
+	_, err := c.Complete(context.Background(), []Message{{Role: "user", Content: "hi"}}, CompleteOpts{})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	if len(rec.records) != 1 {
+		t.Fatalf("recorder calls: got %d, want 1", len(rec.records))
+	}
+	r := rec.records[0]
+	if r.TokensIn != 0 {
+		t.Errorf("TokensIn: got %d, want 0 (Ollama has no token reporting)", r.TokensIn)
+	}
+	if r.TokensOut != 0 {
+		t.Errorf("TokensOut: got %d, want 0 (Ollama has no token reporting)", r.TokensOut)
 	}
 }
 
