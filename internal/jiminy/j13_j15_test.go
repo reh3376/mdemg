@@ -156,7 +156,7 @@ func TestRevalidateResults_UnknownNodeDemoted(t *testing.T) {
 func TestEvalCache_HitAndMiss(t *testing.T) {
 	e := NewEvaluator(config.Config{}, nil, nil)
 
-	key := evalCacheKey("test output", "constraint-1")
+	key := evalCacheKey("test output", []string{"constraint-1"})
 	result := &llmEvalResult{
 		Violations: []llmEvalViolation{{ConstraintNodeID: "c1", Description: "test"}},
 		Warnings:   []llmEvalViolation{},
@@ -552,8 +552,8 @@ func TestCacheKey_FullContextHash(t *testing.T) {
 
 func TestEvalCacheKey_FullOutputHash(t *testing.T) {
 	base := strings.Repeat("x", 200)
-	k1 := evalCacheKey(base+"OUTPUT_A", "c1")
-	k2 := evalCacheKey(base+"OUTPUT_B", "c1")
+	k1 := evalCacheKey(base+"OUTPUT_A", []string{"c1"})
+	k2 := evalCacheKey(base+"OUTPUT_B", []string{"c1"})
 	if k1 == k2 {
 		t.Error("eval cache keys should differ for different outputs even with shared prefix")
 	}

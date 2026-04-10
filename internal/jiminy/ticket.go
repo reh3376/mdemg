@@ -1,6 +1,7 @@
 package jiminy
 
 import (
+	"container/list"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -12,19 +13,28 @@ import (
 	"time"
 )
 
+// ticketEntry holds a session ticket in the LRU list.
+type ticketEntry struct {
+	sessionID string
+	ticket    *SessionTicket
+}
+
 // TicketManager issues, validates, and restores session tickets.
 type TicketManager struct {
 	mu     sync.RWMutex
 	secret []byte
 	ttl    time.Duration
 
-	// Per-session last-issued ticket (for checkpoint retrieval)
-	lastTickets map[string]*SessionTicket // sessionID → ticket
+	// Per-session last-issued ticket with LRU eviction
+	lastTickets map[string]*list.Element // sessionID → list element
+	lruList     *list.List              // front = most recent
+	maxSize     int                     // maximum entries (0 = unlimited)
 }
 
 // NewTicketManager creates a new TicketManager.
 // If secret is empty, a random 32-byte key is generated and a warning is logged.
-func NewTicketManager(secret string, ttlHours int) *TicketManager {
+// maxSize limits the LRU cache; 0 or negative means default (1000).
+func NewTicketManager(secret string, ttlHours int, maxSize int) *TicketManager {
 	var key []byte
 	if secret != "" {
 		key = []byte(secret)
@@ -42,10 +52,16 @@ func NewTicketManager(secret string, ttlHours int) *TicketManager {
 		ttl = 4 * time.Hour
 	}
 
+	if maxSize <= 0 {
+		maxSize = 1000
+	}
+
 	return &TicketManager{
 		secret:      key,
 		ttl:         ttl,
-		lastTickets: make(map[string]*SessionTicket),
+		lastTickets: make(map[string]*list.Element),
+		lruList:     list.New(),
+		maxSize:     maxSize,
 	}
 }
 
@@ -67,9 +83,25 @@ func (tm *TicketManager) IssueTicket(payload TicketPayload) (*SessionTicket, err
 		Signature: sig,
 	}
 
-	// Store last ticket for this session
+	// Store last ticket for this session (LRU)
 	tm.mu.Lock()
-	tm.lastTickets[payload.SessionID] = ticket
+	if elem, ok := tm.lastTickets[payload.SessionID]; ok {
+		tm.lruList.MoveToFront(elem)
+		elem.Value.(*ticketEntry).ticket = ticket
+	} else {
+		entry := &ticketEntry{sessionID: payload.SessionID, ticket: ticket}
+		elem := tm.lruList.PushFront(entry)
+		tm.lastTickets[payload.SessionID] = elem
+
+		// Evict oldest if over capacity
+		for tm.maxSize > 0 && tm.lruList.Len() > tm.maxSize {
+			back := tm.lruList.Back()
+			if back != nil {
+				tm.lruList.Remove(back)
+				delete(tm.lastTickets, back.Value.(*ticketEntry).sessionID)
+			}
+		}
+	}
 	tm.mu.Unlock()
 
 	return ticket, nil
@@ -125,9 +157,13 @@ func (tm *TicketManager) RestoreFromTicket(ticket *SessionTicket, escalation *Es
 
 // GetLastTicket returns the most recently issued ticket for a session.
 func (tm *TicketManager) GetLastTicket(sessionID string) *SessionTicket {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
-	return tm.lastTickets[sessionID]
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	if elem, ok := tm.lastTickets[sessionID]; ok {
+		tm.lruList.MoveToFront(elem)
+		return elem.Value.(*ticketEntry).ticket
+	}
+	return nil
 }
 
 // sign computes HMAC-SHA256 of data and returns hex-encoded digest.

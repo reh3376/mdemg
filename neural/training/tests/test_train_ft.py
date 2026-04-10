@@ -3,6 +3,7 @@
 import json
 import os
 import tempfile
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -11,6 +12,7 @@ from training.train_ft import (
     build_train_config,
     load_manifest,
     resolve_lora_rank,
+    run_train,
     validate_manifest,
 )
 
@@ -316,3 +318,47 @@ class TestAntiCollapse:
         )
         errors = validate_manifest(manifest)
         assert any("anti-collapse" in e for e in errors)
+
+
+# ── run_train command construction ──
+
+
+class TestRunTrainingCommand:
+    """Verify that run_train passes --lora-rank (not --num-layers)."""
+
+    def test_lora_rank_in_command(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest = _valid_manifest()
+            _write_manifest(tmpdir, manifest)
+            _write_train_jsonl(tmpdir, rows=100)
+
+            import sys
+            # Mock mlx_lm so the import check passes
+            mock_mlx = MagicMock()
+            sys.modules["mlx_lm"] = mock_mlx
+            sys.modules["mlx_lm.lora"] = mock_mlx
+
+            try:
+                with patch("subprocess.run") as mock_run:
+                    mock_result = MagicMock()
+                    mock_result.returncode = 0
+                    mock_run.return_value = mock_result
+
+                    run_train(
+                        dataset_dir=tmpdir,
+                        base_model="test-model",
+                        adapter_path=os.path.join(tmpdir, "adapters"),
+                        epochs=1,
+                        batch_size=4,
+                        lora_rank=16,
+                        lora_layers=8,
+                    )
+
+                    cmd = mock_run.call_args[0][0]
+                    assert "--lora-rank" in cmd, f"--lora-rank not in command: {cmd}"
+                    assert "--num-layers" not in cmd, f"--num-layers should not be in command: {cmd}"
+                    rank_idx = cmd.index("--lora-rank")
+                    assert cmd[rank_idx + 1] == "16"
+            finally:
+                sys.modules.pop("mlx_lm", None)
+                sys.modules.pop("mlx_lm.lora", None)

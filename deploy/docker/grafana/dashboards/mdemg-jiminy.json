@@ -213,7 +213,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "WITH per_constraint AS ( SELECT constraint_id, COUNT(*) AS surfaced, SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed, SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) GROUP BY constraint_id HAVING COUNT(*) >= 5 ) SELECT now() AS time, CASE WHEN SUM(surfaced) > 0 THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float ELSE NULL END AS value FROM per_constraint",
+          "rawSql": "WITH per_constraint AS ( SELECT constraint_id, COUNT(*) AS surfaced, SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed, SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) GROUP BY constraint_id HAVING COUNT(*) >= 2 ) SELECT now() AS time, CASE WHEN SUM(surfaced) > 0 THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float ELSE NULL END AS value FROM per_constraint",
           "format": "time_series"
         }
       ],

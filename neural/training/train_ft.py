@@ -255,7 +255,7 @@ def run_train(
         "--batch-size", str(batch_size),
         "--learning-rate", str(learning_rate),
         "--lora-layers", str(lora_layers),
-        "--num-layers", str(resolved_rank),
+        "--lora-rank", str(resolved_rank),
     ]
 
     if config.get("test"):

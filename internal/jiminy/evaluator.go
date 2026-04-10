@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -144,21 +146,32 @@ func (e *Evaluator) Evaluate(ctx context.Context, req EvaluateRequest) (Evaluate
 
 // llmEvaluate runs the LLM Tier 2 evaluation with cache and circuit breaker.
 func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constraints, corrections []EvaluationItem) ([]EvaluationItem, error) {
-	// Build prompt
-	prompt := buildEvalPrompt(agentOutput, constraints, corrections, e.cfg.JiminyEvaluateOutputMaxChars, e.cfg.JiminyEvaluateItemMaxChars)
-
 	// Build constraint lookup map for revalidation
 	constraintMap := make(map[string]EvaluationItem)
+	var constraintIDs []string
 	for _, c := range constraints {
 		if c.SourceNode != "" {
 			constraintMap[c.SourceNode] = c
+			constraintIDs = append(constraintIDs, c.SourceNode)
 		}
 	}
 	for _, c := range corrections {
 		if c.SourceNode != "" {
 			constraintMap[c.SourceNode] = c
+			constraintIDs = append(constraintIDs, c.SourceNode)
 		}
 	}
+
+	// L1: Check eval cache before LLM call
+	cacheKey := evalCacheKey(agentOutput, constraintIDs)
+	if cached := e.evalCacheGet(cacheKey); cached != nil {
+		slog.Debug("jiminy evaluator: cache hit", "key", cacheKey)
+		items := revalidateResults(cached, constraintMap)
+		return items, nil
+	}
+
+	// Build prompt
+	prompt := buildEvalPrompt(agentOutput, constraints, corrections, e.cfg.JiminyEvaluateOutputMaxChars, e.cfg.JiminyEvaluateItemMaxChars)
 
 	maxTokens := e.cfg.JiminyEvaluateLLMMaxTokens
 	if maxTokens < 2000 {
@@ -211,6 +224,9 @@ func (e *Evaluator) llmEvaluate(ctx context.Context, agentOutput string, constra
 	if err != nil {
 		return nil, fmt.Errorf("parse LLM eval response: %w", err)
 	}
+
+	// L1: Cache successful parse result
+	e.evalCachePut(cacheKey, result)
 
 	// Revalidate: demote should/should_not violations to warnings
 	items := revalidateResults(result, constraintMap)
@@ -284,10 +300,13 @@ func revalidateResults(result *llmEvalResult, constraintMap map[string]Evaluatio
 
 // --- LRU Cache for LLM evaluation results ---
 
-// evalCacheKey builds a cache key from agent output + constraint node ID.
+// evalCacheKey builds a cache key from agent output + sorted constraint node IDs.
 // Hashes the full output to avoid collisions on shared prefixes.
-func evalCacheKey(agentOutput, constraintNodeID string) string {
-	h := sha256.Sum256([]byte(agentOutput + ":" + constraintNodeID))
+func evalCacheKey(agentOutput string, constraintIDs []string) string {
+	sorted := make([]string, len(constraintIDs))
+	copy(sorted, constraintIDs)
+	sort.Strings(sorted)
+	h := sha256.Sum256([]byte(agentOutput + ":" + strings.Join(sorted, ",")))
 	return fmt.Sprintf("%x", h[:16])
 }
 

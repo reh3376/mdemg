@@ -57,6 +57,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - P2: `CleanupExpired()` wired to macro cron ticker, `CompleteCycle` skipped on timeout
   - P3: Dead code cleanup (unreachable branch, cron parser documented)
   - CI: `-race` flag added to test pipeline
+- **Adversarial Codebase Analysis Bug Fix Campaign** (ACA-BFC-2026-04-10) — 14 bugs remediated from adversarial analysis with systematic refutation:
+  - C1: Docker healthcheck hardcoded to `:9999` (was using `${MDEMG_PORT}` inside container)
+  - C2: CI coverage generation wired (`-coverprofile=coverage.out` added to `go test`)
+  - C3: `train_ft.py` passes `resolved_rank` to `--lora-rank` (was `--num-layers`)
+  - H1: Config struct comments aligned with `FromEnv()` defaults (`gpt-5.4`, cascade)
+  - H2: Compose `TSDB_DBNAME` → `TSDB_DATABASE` (matches Go `FromEnv()`)
+  - H4: Real evaluation metrics replace `check_non_empty()` stubs (coherence, coverage, specificity, follow_rate)
+  - M1: Circuit breaker trip guard — `atomic.Bool` + `CompareAndSwap` fires alert once per trip, resets on recovery
+  - M2: 502 (Bad Gateway) added to LLM client retry set
+  - M3: Jiminy semantic dedup via embedding cosine similarity (fallback to exact-match)
+  - M4: Temporal decay on correction retrieval (`JIMINY_CORRECTION_DECAY_RATE`, default 0.01)
+  - M5: Dead `ScoringRho` config field removed (suffixed variants unaffected)
+  - M6: Bounded ticket map with LRU eviction (`J17_TICKET_CACHE_SIZE`, default 1000)
+  - L1: Eval cache wired into `llmEvaluate()` (was defined but never called)
+  - L2: Dead trust store goroutine removed (flush managed by `Service.StartTrustPersistence`)
 - **Training Data tab renders empty** — `helpSection()` in `training_data.js` passed string array instead of `{term, description}` objects to `helpPanel()`, causing `entries.map()` to throw silently.
 - **Form inputs show `[object HTMLInputElement]`** — `infoRow()` in `dom.js` used `String(value)` which stringified DOM Node elements. Added `instanceof Node` check to pass elements through directly.
 

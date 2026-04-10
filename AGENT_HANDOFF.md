@@ -44,6 +44,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - RSIC Hardening (RSIC-HDN-2026-04-09) — COMPLETE (32 deep dive findings remediated: nil postReport, nil driver guards, dryRun race, per-task CriteriaMet, executor correctness, watchdog lock/reset, safety fail-closed, LLM sanitization, SSE race fix)
 - Training Data Quality (TRAIN-DQ-2026-04-10) — COMPLETE (model standardization to gpt-5.4, token counting fix tokens_in=0, RAFT context wiring for 2 tasks, 2 feature gate activations)
 - UAITS Framework (UAITS-2026-04-10) — COMPLETE (Universal AI Training Specification: 10th UxTS framework for spec-driven training data curation with 4 paradigms SFT/DPO/RAFT/curriculum, DPO pair builder, paradigm router, 2 CLI commands, 260 Python tests, 41 runner checks)
+- Adversarial Bug Fix Campaign (ACA-BFC-2026-04-10) — COMPLETE (14 bugs from adversarial analysis: 3 critical, 3 high, 6 medium, 2 low — infra/training/LLM client/Jiminy)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
@@ -55,6 +56,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-10) ===
+- ✅ ACA-BFC-2026-04-10: Adversarial Codebase Analysis Bug Fix Campaign (2026-04-10):
+  - 14 bugs remediated from adversarial analysis with systematic refutation (3 critical, 3 high, 6 medium, 2 low)
+  - E1 (Infra): Docker healthcheck port fix, CI coverage wiring, config comment alignment, TSDB env var rename, dead ScoringRho removal
+  - E2 (Training): LoRA rank flag correction, real evaluation metrics (4 heuristic functions replace check_non_empty stubs)
+  - E3 (LLM Client): Circuit breaker trip guard (atomic CompareAndSwap, idempotent alert), 502 retry
+  - E4 (Jiminy): Semantic dedup, temporal correction decay, bounded ticket LRU, eval cache wiring, dead goroutine removal
+  - New config: JIMINY_DEDUP_SIMILARITY_THRESHOLD (0.85), JIMINY_CORRECTION_DECAY_RATE (0.01), J17_TICKET_CACHE_SIZE (1000)
+  - Removed: SCORING_RHO (dead field, suffixed variants unaffected)
+  - 0 lint issues, all Go + Python tests pass
+
 === COMPLETED SINCE LAST HANDOFF (2026-04-09) ===
 - ✅ RSIC-HDN-2026-04-09: RSIC Hardening — Deep Dive Remediation (2026-04-09):
   - 32 findings remediated (2 P0, 9 P1, 19 P2, 2 P3) across 6 sequential epics

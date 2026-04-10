@@ -11,13 +11,17 @@ from training.evaluate_ft import (
     check_non_empty,
     check_required_keys,
     check_type_conformance,
+    coherence,
+    coverage,
     evaluate_response,
     evaluate_task,
     extract_prompts,
     extract_response,
+    follow_rate,
     group_by_task,
     load_test_data,
     load_ults_specs,
+    specificity,
 )
 
 
@@ -161,12 +165,13 @@ class TestEvaluateResponse:
     def test_string_output(self):
         schema = {"type": "string"}
         metrics = self._metrics(
-            ("coherence", 0.5, 0.6),
-            ("coverage", 0.5, 0.5),
+            ("coherence", 0.5, 0.3),
+            ("coverage", 0.5, 0.1),
         )
+        # Real metrics: coherence scores sentence structure, coverage checks length
         result = evaluate_response("A clear summary of the code.", schema, metrics)
 
-        assert result["weighted_score"] == 1.0
+        assert result["weighted_score"] > 0.0
         assert result["all_thresholds_met"] is True
 
     def test_empty_string_output(self):
@@ -350,17 +355,17 @@ class TestEvaluateTask:
         spec = {
             "output_schema": {"type": "string"},
             "quality_metrics": [
-                {"name": "coherence", "weight": 1.0, "threshold": 0.6},
+                {"name": "coherence", "weight": 1.0, "threshold": 0.3},
             ],
             "performance": {},
         }
         records = [
-            {"response": "A clear explanation."},
-            {"response": "Another good answer."},
+            {"response": "A clear explanation of how the retrieval pipeline processes queries and returns ranked results."},
+            {"response": "The system uses a Hebbian learning approach to strengthen frequently co-activated connections."},
         ]
 
         result = evaluate_task("test.summarize", records, spec)
-        assert result["weighted_score"] == 1.0
+        assert result["weighted_score"] > 0.3
 
     def test_no_records(self):
         spec = {
@@ -396,7 +401,7 @@ class TestEvaluateTask:
         spec = {
             "output_schema": {"type": "string"},
             "quality_metrics": [
-                {"name": "coherence", "weight": 1.0, "threshold": 0.5},
+                {"name": "coherence", "weight": 1.0, "threshold": 0.3},
             ],
             "performance": {},
         }
@@ -406,10 +411,120 @@ class TestEvaluateTask:
                 "messages": [
                     {"role": "system", "content": "sys"},
                     {"role": "user", "content": "q"},
-                    {"role": "assistant", "content": "A good answer."},
+                    {"role": "assistant", "content": "The module handles retrieval scoring with configurable decay rates and semantic similarity weighting."},
                 ],
             },
         ]
 
         result = evaluate_task("test.chat", records, spec)
-        assert result["weighted_score"] == 1.0
+        assert result["weighted_score"] > 0.3
+
+
+# ── Heuristic metric tests ──
+
+_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {"type": "string"},
+        "summary": {"type": "string"},
+        "confidence": {"type": "number"},
+    },
+}
+_STRING_SCHEMA = {"type": "string"}
+
+
+class TestCoherence:
+    def test_empty_returns_zero(self):
+        assert coherence("", _STRING_SCHEMA) == 0.0
+        assert coherence("   ", _STRING_SCHEMA) == 0.0
+
+    def test_well_formed_json(self):
+        resp = '{"type": "architecture", "summary": "A detailed analysis of the codebase.", "confidence": 0.92}'
+        score = coherence(resp, _JSON_SCHEMA)
+        assert score > 0.7, f"Well-formed JSON scored {score}"
+
+    def test_invalid_json_for_object_schema(self):
+        score = coherence("just plain text", _JSON_SCHEMA)
+        assert score <= 0.2, f"Invalid JSON for object schema scored {score}"
+
+    def test_well_formed_text(self):
+        resp = "The retrieval pipeline processes queries through a multi-stage scoring system. Each candidate is evaluated using cosine similarity, BM25 matching, and configurable decay rates."
+        score = coherence(resp, _STRING_SCHEMA)
+        assert score > 0.5, f"Well-formed text scored {score}"
+
+    def test_fragment_text(self):
+        score = coherence("ok", _STRING_SCHEMA)
+        assert score < 0.3, f"Fragment scored {score}"
+
+
+class TestCoverage:
+    def test_empty_returns_zero(self):
+        assert coverage("", _JSON_SCHEMA) == 0.0
+
+    def test_all_properties_populated(self):
+        resp = '{"type": "architecture", "summary": "Detailed analysis of components.", "confidence": 0.85}'
+        score = coverage(resp, _JSON_SCHEMA)
+        assert score == pytest.approx(1.0), f"Full coverage scored {score}"
+
+    def test_partial_properties(self):
+        resp = '{"type": "architecture"}'
+        score = coverage(resp, _JSON_SCHEMA)
+        # Only 1 of 3 properties, and "architecture" is len=12 > 5
+        assert 0.2 < score < 0.5, f"Partial coverage scored {score}"
+
+    def test_empty_values_not_counted(self):
+        resp = '{"type": "", "summary": "", "confidence": 0}'
+        score = coverage(resp, _JSON_SCHEMA)
+        assert score == 0.0, f"Empty values scored {score}"
+
+    def test_free_text_with_property_keywords(self):
+        schema = {"type": "string", "properties": {"type": {"type": "string"}, "summary": {"type": "string"}}}
+        resp = "The type of architecture includes a summary of the main components."
+        score = coverage(resp, schema)
+        assert score > 0.5, f"Keyword coverage scored {score}"
+
+
+class TestSpecificity:
+    def test_empty_returns_zero(self):
+        assert specificity("", _STRING_SCHEMA) == 0.0
+
+    def test_concrete_response(self):
+        resp = "The function `build_train_config` at train_ft.py:186 accepts lora_rank=16 and returns config with iters=75."
+        score = specificity(resp, _STRING_SCHEMA)
+        assert score > 0.4, f"Concrete response scored {score}"
+
+    def test_vague_response(self):
+        resp = "Generally, the system typically handles various different things in several ways that are usually somewhat appropriate."
+        score = specificity(resp, _STRING_SCHEMA)
+        assert score < 0.4, f"Vague response scored {score}"
+
+    def test_mixed_specificity(self):
+        concrete = specificity("Use config.ScoringRhoL0 = 0.05 for file decay.", _STRING_SCHEMA)
+        vague = specificity("Generally some things are usually various.", _STRING_SCHEMA)
+        assert concrete > vague, f"concrete={concrete} should be > vague={vague}"
+
+
+class TestFollowRate:
+    def test_empty_returns_zero(self):
+        assert follow_rate("", _JSON_SCHEMA) == 0.0
+
+    def test_valid_json_conforming(self):
+        resp = '{"type": "architecture", "summary": "A deep analysis.", "confidence": 0.9}'
+        score = follow_rate(resp, _JSON_SCHEMA)
+        assert score > 0.7, f"Conforming JSON scored {score}"
+
+    def test_invalid_json_for_object_schema(self):
+        score = follow_rate("just text", _JSON_SCHEMA)
+        assert score == 0.0, f"Non-JSON for object schema scored {score}"
+
+    def test_well_formed_text(self):
+        resp = "The retrieval system uses multi-stage scoring with configurable decay rates and semantic matching."
+        score = follow_rate(resp, _STRING_SCHEMA)
+        assert score > 0.5, f"Good text scored {score}"
+
+    def test_refusal_text(self):
+        resp = "I cannot help with that request."
+        score = follow_rate(resp, _STRING_SCHEMA)
+        # Should score lower due to refusal pattern
+        good = follow_rate("The system handles queries through a pipeline.", _STRING_SCHEMA)
+        assert score < good, f"Refusal={score} should be < good={good}"

@@ -1354,6 +1354,7 @@ func TestShouldRetry(t *testing.T) {
 		want   bool
 	}{
 		{"429", &httpError{StatusCode: 429}, true},
+		{"502", &httpError{StatusCode: 502}, true},
 		{"503", &httpError{StatusCode: 503}, true},
 		{"400", &httpError{StatusCode: 400}, false},
 		{"401", &httpError{StatusCode: 401}, false},
@@ -1410,6 +1411,7 @@ func TestConsecutiveFailure_FiresAtThreshold(t *testing.T) {
 		taskName:            "test-task",
 		consecutiveFailures: new(atomic.Int32),
 		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
 	}
 
 	err := fmt.Errorf("connection refused")
@@ -1445,6 +1447,7 @@ func TestConsecutiveFailure_ResetsOnSuccess(t *testing.T) {
 		taskName:            "test-task",
 		consecutiveFailures: new(atomic.Int32),
 		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
 	}
 
 	err := fmt.Errorf("timeout")
@@ -1477,6 +1480,7 @@ func TestConsecutiveFailure_NoFireBelowThreshold(t *testing.T) {
 		taskName:            "test-task",
 		consecutiveFailures: new(atomic.Int32),
 		failureThreshold:    5,
+		tripped:             new(atomic.Bool),
 	}
 
 	err := fmt.Errorf("error")
@@ -1486,5 +1490,79 @@ func TestConsecutiveFailure_NoFireBelowThreshold(t *testing.T) {
 
 	if alertCount.Load() != 0 {
 		t.Errorf("expected 0 alerts (below threshold 5), got %d", alertCount.Load())
+	}
+}
+
+func TestConsecutiveFailure_TripGuardFiresOnce(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var alertCount atomic.Int32
+	defaultAlertCallback = func(_ string, _ int, _ error) {
+		alertCount.Add(1)
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
+	}
+
+	err := fmt.Errorf("connection refused")
+	// 5 consecutive failures: should fire exactly once at threshold, not on 4th and 5th
+	for range 5 {
+		c.trackResult(err)
+	}
+
+	if got := alertCount.Load(); got != 1 {
+		t.Errorf("expected exactly 1 alert (trip guard), got %d", got)
+	}
+}
+
+func TestConsecutiveFailure_RecoveryAndRetrip(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var alertCount atomic.Int32
+	defaultAlertCallback = func(_ string, _ int, _ error) {
+		alertCount.Add(1)
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
+	}
+
+	err := fmt.Errorf("connection refused")
+	// First trip
+	for range 3 {
+		c.trackResult(err)
+	}
+	if got := alertCount.Load(); got != 1 {
+		t.Fatalf("expected 1 alert after first trip, got %d", got)
+	}
+
+	// Recovery
+	c.trackResult(nil)
+
+	// Second trip
+	for range 3 {
+		c.trackResult(err)
+	}
+	if got := alertCount.Load(); got != 2 {
+		t.Errorf("expected 2 alerts (trip-recovery-trip), got %d", got)
 	}
 }

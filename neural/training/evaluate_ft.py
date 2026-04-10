@@ -24,7 +24,7 @@ Requirements:
 
 import argparse
 import json
-import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -107,6 +107,258 @@ def check_type_conformance(response: str, schema: dict[str, Any]) -> float:
     return passed / checks if checks > 0 else 1.0
 
 
+# ── Heuristic Metric Functions ──
+
+# Filler words that indicate vague, non-specific language
+_FILLER_WORDS = frozenset({
+    "generally", "typically", "usually", "various", "several", "many",
+    "some", "often", "sometimes", "perhaps", "maybe", "might", "could",
+    "approximately", "roughly", "basically", "essentially", "somewhat",
+})
+
+# Pattern for concrete identifiers (camelCase, snake_case, dotted paths, hex)
+_IDENTIFIER_RE = re.compile(
+    r"[a-z]+[A-Z]\w*"           # camelCase
+    r"|[a-z]\w*_\w+"            # snake_case
+    r"|[\w./\\]{2,}\.\w{1,6}"   # file paths / dotted names
+    r"|0x[0-9a-fA-F]+"          # hex literals
+    r"|\b\d+\.\d+\b"           # decimal numbers
+)
+
+# Sentence-ending pattern for checking structure
+_SENTENCE_END_RE = re.compile(r"[.!?]\s")
+
+
+def coherence(response: str, schema: dict[str, Any]) -> float:
+    """Score response coherence: sentence structure and content completeness.
+
+    For JSON responses: checks parseability and field population.
+    For free-text: checks sentence structure and minimum length.
+    Returns 0.0 for empty, 0.0-1.0 for partial, higher for well-formed.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    text = response.strip()
+    score = 0.0
+
+    # Check if schema expects JSON
+    if schema.get("type") == "object":
+        try:
+            parsed = json.loads(text)
+            if not isinstance(parsed, dict):
+                return 0.1
+            # Base score for valid JSON
+            score = 0.4
+            # Check field population
+            properties = schema.get("properties", {})
+            if properties:
+                populated = sum(
+                    1 for k in properties
+                    if k in parsed and parsed[k] is not None
+                    and str(parsed[k]).strip() not in ("", "null", "N/A")
+                )
+                score += 0.6 * (populated / len(properties))
+            else:
+                score += 0.3 if parsed else 0.0
+            return min(score, 1.0)
+        except (json.JSONDecodeError, TypeError):
+            return 0.1  # Expected JSON but got invalid
+
+    # Free-text coherence
+    words = text.split()
+    word_count = len(words)
+
+    if word_count < 3:
+        return 0.1
+
+    # Length component (up to 0.3)
+    score += min(word_count / 50.0, 0.3)
+
+    # Sentence structure: has sentence-ending punctuation (up to 0.3)
+    sentence_ends = len(_SENTENCE_END_RE.findall(text))
+    if text[-1] in ".!?":
+        sentence_ends += 1
+    if sentence_ends > 0:
+        score += min(sentence_ends / 3.0, 0.3)
+
+    # No self-contradiction marker (up to 0.2)
+    contradiction_markers = ["however", "but actually", "on the other hand"]
+    contradiction_count = sum(1 for m in contradiction_markers if m in text.lower())
+    score += 0.2 * max(0, 1.0 - contradiction_count * 0.3)
+
+    # Capitalization (first char uppercase = proper sentence) (up to 0.2)
+    if text[0].isupper() or text[0] in '{"[':
+        score += 0.2
+
+    return min(score, 1.0)
+
+
+def coverage(response: str, schema: dict[str, Any]) -> float:
+    """Score schema coverage: what fraction of expected content is present.
+
+    For JSON: fraction of properties present with substantive values.
+    For free-text: fraction of property-name keywords appearing in response.
+    Returns 0.0 for empty, 0.0-1.0 based on coverage fraction.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    text = response.strip()
+    properties = schema.get("properties", {})
+
+    # JSON response with schema properties
+    if schema.get("type") == "object" and properties:
+        try:
+            parsed = json.loads(text)
+            if not isinstance(parsed, dict):
+                return 0.0
+            substantive = 0
+            for key, prop in properties.items():
+                if key not in parsed:
+                    continue
+                val = parsed[key]
+                prop_type = prop.get("type", "string")
+                if prop_type == "string" and isinstance(val, str) and len(val) > 5:
+                    substantive += 1
+                elif prop_type in ("number", "integer") and isinstance(val, (int, float)) and val != 0:
+                    substantive += 1
+                elif prop_type == "boolean" and isinstance(val, bool):
+                    substantive += 1
+                elif prop_type == "array" and isinstance(val, list) and len(val) > 0:
+                    substantive += 1
+                elif prop_type == "object" and isinstance(val, dict) and len(val) > 0:
+                    substantive += 1
+            return substantive / len(properties)
+        except (json.JSONDecodeError, TypeError):
+            return 0.0
+
+    # Free-text: check if response mentions property-name keywords
+    if properties:
+        lower_text = text.lower()
+        mentioned = sum(
+            1 for key in properties
+            if key.lower().replace("_", " ") in lower_text
+            or key.lower() in lower_text
+        )
+        return mentioned / len(properties)
+
+    # No schema properties — score by response length as a proxy
+    words = len(text.split())
+    return min(words / 30.0, 1.0)
+
+
+def specificity(response: str, schema: dict[str, Any]) -> float:
+    """Score response specificity: concrete vs vague language.
+
+    Measures density of identifiers, numbers, and paths vs filler words.
+    Returns 0.0 for empty, low for vague, high for concrete responses.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    text = response.strip()
+    words = text.lower().split()
+    word_count = len(words)
+
+    if word_count < 3:
+        return 0.1
+
+    # Count concrete identifiers
+    identifiers = _IDENTIFIER_RE.findall(text)
+    identifier_density = len(identifiers) / word_count
+
+    # Count filler words
+    filler_count = sum(1 for w in words if w.strip(".,;:!?") in _FILLER_WORDS)
+    filler_density = filler_count / word_count
+
+    # Score: identifier density contributes positively, filler negatively
+    # Identifier component (up to 0.6): even 5% identifier density is good
+    id_score = min(identifier_density / 0.05, 1.0) * 0.6
+
+    # Anti-filler component (up to 0.4): lower filler = higher score
+    filler_score = max(0, 1.0 - filler_density * 10) * 0.4
+
+    return min(id_score + filler_score, 1.0)
+
+
+def follow_rate(response: str, schema: dict[str, Any]) -> float:
+    """Score instruction-following: schema adherence and format compliance.
+
+    For JSON: checks type constraints and enum adherence.
+    For free-text: checks structural compliance markers.
+    Returns 0.0 for empty, 0.0-1.0 based on adherence.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    text = response.strip()
+
+    # JSON schema adherence
+    if schema.get("type") == "object":
+        try:
+            parsed = json.loads(text)
+            if not isinstance(parsed, dict):
+                return 0.1
+
+            properties = schema.get("properties", {})
+            if not properties:
+                return 0.8  # Valid JSON, no schema to check against
+
+            checks = 0
+            passed = 0
+
+            for key, prop in properties.items():
+                if key not in parsed:
+                    continue
+                checks += 1
+                val = parsed[key]
+
+                # Enum check
+                if "enum" in prop:
+                    passed += 1 if val in prop["enum"] else 0
+                    continue
+
+                # Type check
+                expected = prop.get("type")
+                type_map = {
+                    "string": str, "number": (int, float),
+                    "integer": int, "boolean": bool,
+                    "array": list, "object": dict,
+                }
+                if expected and expected in type_map:
+                    passed += 1 if isinstance(val, type_map[expected]) else 0
+                else:
+                    passed += 1
+
+            return passed / checks if checks > 0 else 0.8
+        except (json.JSONDecodeError, TypeError):
+            return 0.0  # Schema expects JSON but response isn't
+
+    # Free-text: basic structural compliance
+    score = 0.3  # Base score for non-empty response
+
+    # Reasonable length (not too short, not repetitive)
+    words = text.split()
+    if len(words) >= 10:
+        score += 0.2
+    unique_ratio = len(set(w.lower() for w in words)) / len(words) if words else 0
+    if unique_ratio >= 0.5:
+        score += 0.2
+
+    # Ends with proper punctuation
+    if text[-1] in ".!?]})\"'":
+        score += 0.15
+
+    # Doesn't start with refusal patterns
+    lower = text.lower()
+    refusal_starts = ["i cannot", "i can't", "i'm unable", "as an ai"]
+    if not any(lower.startswith(r) for r in refusal_starts):
+        score += 0.15
+
+    return min(score, 1.0)
+
+
 # ── Metric Computation ──
 
 
@@ -116,10 +368,10 @@ METRIC_EVALUATORS: dict[str, Any] = {
     "json_valid": lambda resp, schema: check_json_valid(resp),
     "accuracy": lambda resp, schema: check_required_keys(resp, schema),
     "precision": lambda resp, schema: check_type_conformance(resp, schema),
-    "coherence": lambda resp, schema: check_non_empty(resp),
-    "coverage": lambda resp, schema: check_non_empty(resp),
-    "specificity": lambda resp, schema: check_non_empty(resp),
-    "follow_rate": lambda resp, schema: check_non_empty(resp),
+    "coherence": coherence,
+    "coverage": coverage,
+    "specificity": specificity,
+    "follow_rate": follow_rate,
 }
 
 
@@ -385,7 +637,7 @@ def evaluate_task(
             "mean_ms": round(sum(latencies) / len(latencies)),
             "max_ms": round(max(latencies)),
             "budget_ms": latency_budget,
-            "within_budget": sum(1 for l in latencies if l <= latency_budget) / len(latencies),
+            "within_budget": sum(1 for lat in latencies if lat <= latency_budget) / len(latencies),
         }
 
     return {

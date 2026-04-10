@@ -149,6 +149,23 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - P2: Config.Validate() cross-field checks, pool metrics, writeback timeout, sidecar confidence floor
 - Scheduled maintenance LaunchAgent (weekly decay + prune)
 
+## Adversarial Codebase Analysis Bug Fix Campaign (ACA-BFC — Complete)
+- C1: Docker healthcheck hardcoded to `:9999` (was using host-side `MDEMG_PORT` inside container)
+- C2: CI coverage wired (`-coverprofile=coverage.out`)
+- C3: `train_ft.py` corrected `--lora-rank` flag (was `--num-layers`)
+- H1/H2: Config struct comments aligned, compose `TSDB_DBNAME` → `TSDB_DATABASE`
+- H4: Real evaluation metrics (coherence, coverage, specificity, follow_rate) replace `check_non_empty()` stubs
+- M1: Circuit breaker trip guard (idempotent alert via `atomic.Bool` CompareAndSwap)
+- M2: 502 added to LLM retry set
+- M3: Jiminy semantic dedup (cosine similarity, fallback to exact-match)
+- M4: Temporal correction decay (`JIMINY_CORRECTION_DECAY_RATE`, default 0.01)
+- M5: Dead `ScoringRho` config field removed
+- M6: Bounded ticket LRU (`J17_TICKET_CACHE_SIZE`, default 1000)
+- L1: Eval cache wired into `llmEvaluate()`
+- L2: Dead trust store goroutine removed
+- New config: `JIMINY_DEDUP_SIMILARITY_THRESHOLD` (0.85), `JIMINY_CORRECTION_DECAY_RATE` (0.01), `J17_TICKET_CACHE_SIZE` (1000)
+- Removed config: `SCORING_RHO` (was dead; suffixed variants unaffected)
+
 ## Deep Dive Bug Fix Campaign (DD-P1P2 — Complete)
 - P1: Sequence counter restored on resume, tier predictor timeout differentiation, training TOCTOU fix
 - P1: Watchdog ctx race guard, postReport lock upgrade, task cycle version counter

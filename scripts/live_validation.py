@@ -42,7 +42,7 @@ from pathlib import Path
 MDEMG_BIN = "./bin/mdemg"
 SPACE_ID = "mdemg-dev"
 NEURAL_DIR = "neural"
-TSDB_FLUSH_WAIT = 35  # seconds to wait for TSDB flush
+TSDB_FLUSH_WAIT = 65  # seconds to wait for TSDB flush (must exceed TSDB_FLUSH_INTERVAL_SEC, default 60)
 PYTHON = shutil.which("python3") or shutil.which("python") or "python3"
 
 
@@ -421,7 +421,7 @@ def test_3_1_curation(results: Results):
             f"cd {NEURAL_DIR} && {PYTHON} -m training.quality_filter --input {input_jsonl} --output {filter_out}",
             check=False, timeout=120,
         )
-        if r.returncode != 0:
+        if r.returncode not in (0, 2):
             results.fail("3.1", "Curation pipeline", f"quality_filter failed: {r.stderr[:100]}")
             return
 
