@@ -26,8 +26,7 @@ type TrustStore struct {
 	mu     sync.Mutex
 	dirty  map[string]bool // sessionID → needs flush
 
-	flushTick *time.Ticker
-	cancel    context.CancelFunc
+	cancel context.CancelFunc
 
 	lastFlush   time.Time
 	flushErrors int64
@@ -41,31 +40,16 @@ func NewTrustStore(driver neo4j.DriverWithContext) *TrustStore {
 	}
 }
 
-// Start begins the background flush goroutine (every 30 seconds).
+// Start sets up the cancellation context for clean shutdown.
+// The actual flush loop lives in Service.StartTrustPersistence, which owns the ticker
+// and calls FlushTrust with access to scorer + feedbackCounts.
 func (ts *TrustStore) Start(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 	ts.cancel = cancel
-	ts.flushTick = time.NewTicker(30 * time.Second)
-
-	go func() { //nolint:gosec // flush uses Background() intentionally
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ts.flushTick.C:
-				// Flush is called by Service.FlushTrust which has access to scorer+feedbackCounts
-				// The tick just signals that a flush should happen — actual flush is delegated
-				// to the service via the onFlush callback.
-			}
-		}
-	}()
 }
 
-// Stop stops the flush goroutine.
+// Stop cancels the store context for clean shutdown.
 func (ts *TrustStore) Stop() {
-	if ts.flushTick != nil {
-		ts.flushTick.Stop()
-	}
 	if ts.cancel != nil {
 		ts.cancel()
 	}
