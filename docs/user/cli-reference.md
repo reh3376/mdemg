@@ -2462,7 +2462,6 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `SCORING_DELTA` | float64 | `0.05` | Confidence weight |
 | `SCORING_PHI` | float64 | `0.08` | Hub penalty coefficient |
 | `SCORING_KAPPA` | float64 | `0.12` | Redundancy penalty coefficient |
-| `SCORING_RHO` | float64 | `0.05` | Recency decay rate per day (legacy fallback) |
 | `SCORING_RHO_L0` | float64 | `0.05` | Layer 0 decay rate per day |
 | `SCORING_RHO_L1` | float64 | `0.02` | Layer 1 decay rate per day |
 | `SCORING_RHO_L2` | float64 | `0.01` | Layer 2+ decay rate per day |
@@ -2985,6 +2984,8 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `JIMINY_OUTCOME_LLM_MAX_TOKENS` | int | `100` | Max tokens for LLM classifier response |
 | `JIMINY_OUTCOME_CACHE_SIZE` | int | `256` | LRU cache size for classification results |
 | `JIMINY_CLASSIFY_COMPRESS` | bool | `true` | Compress prompts sent to LLM classifier |
+| `JIMINY_DEDUP_SIMILARITY_THRESHOLD` | float64 | `0.85` | Cosine similarity threshold for semantic deduplication |
+| `JIMINY_CORRECTION_DECAY_RATE` | float64 | `0.01` | Temporal decay rate for correction retrieval (half-life ~69 days) |
 
 ### J17 AI-to-AI Protocol (Phase J17)
 
@@ -2995,6 +2996,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `J17_CODEGEN_PROVIDER` | string | (from `LLM_PROVIDER`) | LLM provider for code generation |
 | `J17_CODEGEN_MODEL` | string | (from `LLM_MODEL`) | LLM model for code generation |
 | `NEURAL_TIER_MODEL` | string | `""` | Path or HuggingFace model name for ML tier prediction (empty = disabled, rule-based fallback) |
+| `J17_TICKET_CACHE_SIZE` | int | `1000` | Max entries in ticket LRU cache (0 = default 1000) |
 
 ### Dynamic Reclassification
 
