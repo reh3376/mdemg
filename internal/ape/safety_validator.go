@@ -47,12 +47,16 @@ func (sv *SafetyValidator) ValidateAction(ctx context.Context, spec *RSICTaskSpe
 		}
 	}
 
-	// Estimate blast radius
+	// Estimate blast radius — fail closed if estimation fails
 	estimated, err := sv.EstimateBlastRadius(ctx, actionType, spec.TargetSpace)
 	if err != nil {
-		slog.Warn("RSIC safety: blast radius estimation failed, allowing with caution", "action", actionType, "error", err)
-		// Allow on estimation failure — don't block cycles due to count query errors
-		return SafetyDecision{Allowed: true, Reason: "estimation_error", EstimatedAffected: -1}
+		slog.Warn("RSIC safety: blast radius estimation failed, blocking action", "action", actionType, "error", err)
+		metrics.Metrics().RSICSafetyBlocked(actionType, "estimation_error").Inc()
+		return SafetyDecision{
+			Allowed:           false,
+			Reason:            fmt.Sprintf("safety validation failed: cannot estimate blast radius: %v", err),
+			EstimatedAffected: -1,
+		}
 	}
 
 	// Determine applicable limit
@@ -188,6 +192,7 @@ func (sv *SafetyValidator) countQueryForAction(actionType string, spaceID string
 			RETURN sum(edgeCount - 50) AS affected`, params
 
 	case "tombstone_stale":
+		// Use same LIMIT 50 as the executor to avoid over-estimating blast radius
 		return `MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
 			WHERE correction.created_at > datetime() - duration('P7D')
 			WITH correction
@@ -196,7 +201,8 @@ func (sv *SafetyValidator) countQueryForAction(actionType string, spaceID string
 			  AND stale.obs_type <> 'correction'
 			  AND stale.created_at < correction.created_at
 			  AND NOT coalesce(stale.is_archived, false)
-			RETURN count(DISTINCT stale) AS affected`, params
+			WITH DISTINCT stale LIMIT 50
+			RETURN count(stale) AS affected`, params
 
 	default:
 		return "", nil

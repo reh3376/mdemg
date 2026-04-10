@@ -52,14 +52,13 @@ func (s *Supervisor) Register(name string, fn func(ctx context.Context) error) {
 // Start launches all registered workers and monitors them.
 // This method blocks until Stop is called.
 func (s *Supervisor) Start(ctx context.Context) {
-	s.ctx, s.cancel = context.WithCancel(ctx)
-
-	slog.Info("supervisor: started", "workers", len(s.workers))
-
 	s.mu.Lock()
+	s.ctx, s.cancel = context.WithCancel(ctx)
 	workers := make([]*workerState, len(s.workers))
 	copy(workers, s.workers)
 	s.mu.Unlock()
+
+	slog.Info("supervisor: started", "workers", len(workers))
 
 	for _, w := range workers {
 		s.wg.Add(1)
@@ -72,8 +71,11 @@ func (s *Supervisor) Start(ctx context.Context) {
 
 // Stop cancels all workers and waits for them to exit.
 func (s *Supervisor) Stop() {
-	if s.cancel != nil {
-		s.cancel()
+	s.mu.Lock()
+	cancel := s.cancel
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 }
 

@@ -115,8 +115,27 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 	// Phase AR-1: Evaluate success criteria per task
 	outcome.CriteriaMet = true // assume success unless proven otherwise
 	outcome.CriteriaDetail = make(map[string]string)
+	outcome.PerTaskCriteria = make(map[string]bool)
+
+	// P0 fix: If postReport is nil but tasks have criteria, we cannot
+	// verify success — fail safe rather than record false-positive.
+	if postReport == nil {
+		hasCriteria := false
+		for _, task := range tasks {
+			if len(task.SuccessCriteria) > 0 {
+				hasCriteria = true
+				break
+			}
+		}
+		if hasCriteria {
+			outcome.CriteriaMet = false
+			outcome.CriteriaDetail["_post_assessment"] = "failed"
+			return outcome
+		}
+	}
 
 	for _, task := range tasks {
+		taskMet := true // per-task criteria result
 		for _, criterion := range task.SuccessCriteria {
 			// Resolve metric key: criteria use names like "correction_rate_delta"
 			// but MetricsBefore/MetricsAfter use base names like "correction_rate".
@@ -130,12 +149,14 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 			delta := afterVal - beforeVal
 			met := evaluateCriterion(criterion, delta, afterVal)
 			if !met {
+				taskMet = false
 				outcome.CriteriaMet = false
 				outcome.CriteriaDetail[criterion.Metric] = fmt.Sprintf("not_met: delta=%.4f, threshold=%.4f, op=%s", delta, criterion.Threshold, criterion.Operator)
 			} else {
 				outcome.CriteriaDetail[criterion.Metric] = "met"
 			}
 		}
+		outcome.PerTaskCriteria[task.TaskID] = taskMet
 	}
 
 	return outcome
@@ -180,7 +201,12 @@ func (c *Calibrator) UpdateCalibration(outcome *CycleOutcome, tasks []RSICTaskSp
 		if diagnosticTasks[t.TaskID] || IsDiagnosticAction(t.ActionType) {
 			continue // diagnostic actions excluded from calibration history
 		}
-		success := taskFinal[t.TaskID] == "completed" && outcome.CriteriaMet
+		// Use per-task criteria when available; fall back to cycle-level CriteriaMet
+		criteriaMet := outcome.CriteriaMet
+		if ptc, ok := outcome.PerTaskCriteria[t.TaskID]; ok {
+			criteriaMet = ptc
+		}
+		success := taskFinal[t.TaskID] == "completed" && criteriaMet
 		c.actionHistory[t.ActionType] = append(c.actionHistory[t.ActionType], ActionOutcome{
 			ActionType: t.ActionType,
 			Success:    success,

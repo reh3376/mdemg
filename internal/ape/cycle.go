@@ -194,23 +194,20 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	}
 
 	// Phase 88: Configure dispatcher safety mode
-	c.dispatcher.SetDryRun(isDryRun)
 	c.dispatcher.ResetSafetySummary()
 
-	// Stage 4: Execute (dispatch + wait)
-	if err := c.dispatcher.Dispatch(ctx, tasks); err != nil {
+	// Stage 4: Execute (dispatch + wait, dryRun passed per-task)
+	if err := c.dispatcher.Dispatch(ctx, tasks, isDryRun); err != nil {
 		return nil, fmt.Errorf("dispatch failed: %w", err)
 	}
 
 	// Wait for completion with tier-dependent timeout
 	timeout := c.tierTimeout(tier)
 	completed := c.monitor.WaitForCycle(cycleID, timeout)
-	if !completed {
+	timedOut := !completed
+	if timedOut {
 		slog.Warn("RSIC cycle timed out", "cycle_id", cycleID, "timeout", timeout)
 	}
-
-	// Reset dry-run after dispatch completes
-	c.dispatcher.SetDryRun(false)
 
 	// Phase 88: Dry-run early return with deltas
 	if isDryRun {
@@ -257,6 +254,7 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	outcome.TriggeredAt = meta.TriggeredAt
 	outcome.PolicyVersion = meta.PolicyVersion
 	outcome.IdempotencyKey = idempotencyKey
+	outcome.TimedOut = timedOut
 
 	// Phase 88: Attach safety metadata
 	outcome.SafetyVersion = SafetyVersion

@@ -65,10 +65,7 @@ func (m *Monitor) WaitForCycle(cycleID string, timeout time.Duration) bool {
 			// Detect stale reads: if version hasn't changed, tasks may have been
 			// cleaned up between polls. Continue waiting only if version advances.
 			if ver > 0 && ver == lastVersion {
-				// No state changes since last poll — check if cycle still has tasks
-				if !done && ver == lastVersion {
-					continue
-				}
+				continue
 			}
 			lastVersion = ver
 		}

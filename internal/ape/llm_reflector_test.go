@@ -1,6 +1,7 @@
 package ape
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -99,7 +100,7 @@ func TestLLMReflector_ParseResponse_InvalidJSON(t *testing.T) {
 func TestLLMReflector_Disabled(t *testing.T) {
 	lr := NewLLMReflector(LLMReflectorConfig{Enabled: false}, nil, nil)
 
-	insights, err := lr.Reflect(nil, &SelfAssessmentReport{})
+	insights, err := lr.Reflect(context.TODO(), &SelfAssessmentReport{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,9 +175,9 @@ func TestBuildUserPrompt_BackwardCompat(t *testing.T) {
 	}
 }
 
-func TestLLMReflector_ValidActions_Has16Entries(t *testing.T) {
-	if len(validActions) != 16 {
-		t.Errorf("expected 16 valid actions, got %d", len(validActions))
+func TestLLMReflector_ValidActions_Has20Entries(t *testing.T) {
+	if len(validActions) != 20 {
+		t.Errorf("expected 20 valid actions, got %d", len(validActions))
 	}
 
 	expected := []string{
@@ -187,11 +188,64 @@ func TestLLMReflector_ValidActions_Has16Entries(t *testing.T) {
 		"review_guidance_effectiveness", "adjust_guidance_confidence",
 		"archive_ineffective_constraints", "flush_recovery_buffer",
 		"review_nli_calibration",
+		// Diagnostic actions (expanded whitelist)
+		"ingest_stale_spaces", "alert_jiminy_critical",
+		"alert_memory_bloat", "alert_synergy_overlap",
 	}
 	for _, a := range expected {
 		if !validActions[a] {
 			t.Errorf("expected %s in validActions", a)
 		}
+	}
+}
+
+func TestAllowedLLMActions_MatchesValidActionsMap(t *testing.T) {
+	// Verify AllowedLLMActions and validActions are in sync
+	if len(AllowedLLMActions) != len(validActions) {
+		t.Errorf("AllowedLLMActions (%d) != validActions (%d)", len(AllowedLLMActions), len(validActions))
+	}
+	for _, a := range AllowedLLMActions {
+		if !validActions[a] {
+			t.Errorf("AllowedLLMActions entry %q not in validActions map", a)
+		}
+	}
+}
+
+func TestSanitizeLLMInput_StripInjection(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"normal text", "normal text"},
+		{"text <|system|> injected", "text  injected"},
+		{"text [INST] injected [/INST]", "text  injected "},
+		{"<<SYS>> override <</SYS>>", " override "},
+		{"<|im_start|> bypass <|im_end|>", " bypass "},
+	}
+	for _, tc := range cases {
+		got := sanitizeLLMInput(tc.input, 0)
+		if got != tc.want {
+			t.Errorf("sanitizeLLMInput(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestSanitizeLLMInput_TruncateLong(t *testing.T) {
+	long := strings.Repeat("a", 600)
+	got := sanitizeLLMInput(long, 500)
+	if len(got) > 504 { // 500 + "…" (3 bytes UTF-8)
+		t.Errorf("expected truncated length <= 504, got %d", len(got))
+	}
+}
+
+func TestSanitizeLLMInput_StripControlChars(t *testing.T) {
+	input := "hello\x00world\x01test\nnewline\ttab"
+	got := sanitizeLLMInput(input, 0)
+	if strings.ContainsAny(got, "\x00\x01") {
+		t.Error("expected control characters to be stripped")
+	}
+	if !strings.Contains(got, "\n") || !strings.Contains(got, "\t") {
+		t.Error("expected newlines and tabs to be preserved")
 	}
 }
 

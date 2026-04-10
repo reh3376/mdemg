@@ -186,7 +186,10 @@ func (s *Server) handleSelfImproveCycle(w http.ResponseWriter, r *http.Request) 
 		}
 
 		s.orchestrationPolicy.RecordTrigger(decision.Meta, req.SpaceID, tier, outcome.CycleID)
-		s.orchestrationPolicy.CompleteCycle(req.SpaceID, tier)
+		// Skip CompleteCycle when timed out — let stale-cycle cleanup handle it
+		if !outcome.TimedOut {
+			s.orchestrationPolicy.CompleteCycle(req.SpaceID, tier)
+		}
 
 		// Phase 80: Record RSIC cycle for signal tracking
 		if s.sessionTracker != nil {

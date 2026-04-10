@@ -148,38 +148,8 @@ func (lc *LiveCollectors) CollectHealthMetrics() {
 		r.GuidanceHealth = lc.assessor.scoreGuidance(*freshGuidance)
 	}
 
-	// Recompute OverallHealth using the EXACT same weight formula from self_assess.go
-	if r.SynergyHealth > 0 && r.ProtocolHealth > 0 && r.GuidanceHealth > 0 {
-		// All 7 dimensions
-		r.OverallHealth = 0.18*r.RetrievalQuality +
-			0.18*r.MemoryHealth +
-			0.13*r.EdgeHealth +
-			0.13*r.TaskPerformance +
-			0.13*r.GuidanceHealth +
-			0.13*r.ProtocolHealth +
-			0.12*r.SynergyHealth
-	} else if r.ProtocolHealth > 0 && r.GuidanceHealth > 0 {
-		// 6 dimensions (no synergy)
-		r.OverallHealth = 0.20*r.RetrievalQuality +
-			0.20*r.MemoryHealth +
-			0.15*r.EdgeHealth +
-			0.15*r.TaskPerformance +
-			0.15*r.GuidanceHealth +
-			0.15*r.ProtocolHealth
-	} else if r.GuidanceHealth > 0 {
-		// 5 dimensions (no protocol)
-		r.OverallHealth = 0.25*r.RetrievalQuality +
-			0.25*r.MemoryHealth +
-			0.20*r.EdgeHealth +
-			0.15*r.TaskPerformance +
-			0.15*r.GuidanceHealth
-	} else {
-		// 4 dimensions (no guidance)
-		r.OverallHealth = 0.30*r.RetrievalQuality +
-			0.25*r.MemoryHealth +
-			0.25*r.EdgeHealth +
-			0.20*r.TaskPerformance
-	}
+	// Recompute OverallHealth (single source: ComputeOverallHealth)
+	r.OverallHealth = ComputeOverallHealth(&r)
 
 	// Publish all 9 health gauges
 	m := metrics.Metrics()

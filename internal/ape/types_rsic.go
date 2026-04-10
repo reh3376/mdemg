@@ -196,17 +196,21 @@ type ReflectionInsight struct {
 	Metric            string          `json:"metric"`
 	Value             float64         `json:"value"`
 	Threshold         float64         `json:"threshold"`
+	TargetNodeID      string          `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode        string          `json:"target_code,omitempty"`    // for retire_code: constraint code to retire
 }
 
 // ───────────── Improvement Actions ─────────────
 
 // ImprovementAction maps an insight to a concrete action.
 type ImprovementAction struct {
-	ActionType string    `json:"action_type"`
-	TargetSpace string   `json:"target_space"`
-	Scope       string   `json:"scope"` // "space" | "global"
-	Priority    int      `json:"priority"`
-	Rationale   string   `json:"rationale"`
+	ActionType   string `json:"action_type"`
+	TargetSpace  string `json:"target_space"`
+	Scope        string `json:"scope"` // "space" | "global"
+	Priority     int    `json:"priority"`
+	Rationale    string `json:"rationale"`
+	TargetNodeID string `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode   string `json:"target_code,omitempty"`    // for retire_code: constraint code
 }
 
 // ───────────── Task Spec ─────────────
@@ -276,6 +280,10 @@ type RSICTaskSpec struct {
 	Timeout         time.Duration  `json:"timeout"`
 	BaselineMetrics map[string]float64 `json:"baseline_metrics"`
 	Priority        int            `json:"priority"`
+
+	// Parameter routing for protocol mutation actions
+	TargetNodeID string `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
+	TargetCode   string `json:"target_code,omitempty"`    // for retire_code: constraint code
 }
 
 // ───────────── Progress & Outcome ─────────────
@@ -326,8 +334,12 @@ type CycleOutcome struct {
 	Deltas         []ActionDelta   `json:"deltas,omitempty"`
 
 	// Phase AR-1: Feedback loop — criteria evaluation
-	CriteriaMet    bool              `json:"criteria_met"`
-	CriteriaDetail map[string]string `json:"criteria_detail,omitempty"`
+	CriteriaMet     bool              `json:"criteria_met"`
+	CriteriaDetail  map[string]string `json:"criteria_detail,omitempty"`
+	PerTaskCriteria map[string]bool   `json:"per_task_criteria,omitempty"`
+
+	// Timeout handling
+	TimedOut bool `json:"timed_out,omitempty"`
 }
 
 // SafetySummary records safety enforcement results for a cycle.

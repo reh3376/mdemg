@@ -90,6 +90,34 @@ func (j *Job) Fail(err error) {
 	j.CompletedAt = &now
 }
 
+// Snapshot returns a read-safe copy of the job's mutable fields.
+// Use this when reading from a goroutine that doesn't hold the lock.
+type JobSnapshot struct {
+	Status   JobStatus
+	Progress JobProgress
+	Result   map[string]any
+	Error    string
+}
+
+func (j *Job) Snapshot() JobSnapshot {
+	j.mu.RLock()
+	defer j.mu.RUnlock()
+	// Deep copy Result map to avoid concurrent map read/write
+	var result map[string]any
+	if j.Result != nil {
+		result = make(map[string]any, len(j.Result))
+		for k, v := range j.Result {
+			result[k] = v
+		}
+	}
+	return JobSnapshot{
+		Status:   j.Status,
+		Progress: j.Progress,
+		Result:   result,
+		Error:    j.Error,
+	}
+}
+
 // Cancel cancels the job.
 func (j *Job) Cancel() {
 	j.mu.Lock()

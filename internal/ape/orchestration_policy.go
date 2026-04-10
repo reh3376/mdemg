@@ -361,15 +361,46 @@ func (p *OrchestrationPolicy) GetLastTriggers(limit int) []map[string]any {
 }
 
 // GetOrchestrationStatus returns the full orchestration block for the health endpoint.
+// Uses a single lock scope to return an atomic snapshot of triggers + counters.
 func (p *OrchestrationPolicy) GetOrchestrationStatus(macroNextRun time.Time) map[string]any {
+	p.mu.Lock()
+	// Snapshot triggers
+	var triggers []map[string]any
+	for _, rec := range p.lastTrigger {
+		triggers = append(triggers, map[string]any{
+			"space_id":       rec.SpaceID,
+			"tier":           rec.Tier,
+			"trigger_source": rec.Source,
+			"triggered_at":   rec.Timestamp.UTC().Format(time.RFC3339),
+		})
+		if len(triggers) >= 10 {
+			break
+		}
+	}
+	// Snapshot session counters
+	var counters []map[string]any
+	for spaceID, sc := range p.sessionCounters {
+		entry := map[string]any{
+			"space_id": spaceID,
+			"count":    sc.Count,
+		}
+		period := p.cfg.RSICMesoPeriodSessions
+		if period > 0 {
+			nextAt := ((sc.Count / period) + 1) * period
+			entry["next_meso_at"] = nextAt
+		}
+		counters = append(counters, entry)
+	}
+	p.mu.Unlock()
+
 	status := map[string]any{
 		"micro_enabled":        p.cfg.RSICMicroEnabled,
 		"meso_period_sessions": p.cfg.RSICMesoPeriodSessions,
 		"macro_cron":           p.cfg.RSICMacroCron,
 		"cooldown_sec":         p.cooldownSec,
 		"dedupe_sec":           p.dedupeSec,
-		"last_triggers":        p.GetLastTriggers(10),
-		"session_counters":     p.GetSessionCounters(),
+		"last_triggers":        triggers,
+		"session_counters":     counters,
 	}
 
 	scheduler := map[string]any{

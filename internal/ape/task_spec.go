@@ -21,6 +21,8 @@ func BuildTaskSpec(cfg config.Config, action ImprovementAction, cycleID string, 
 		TargetSpace:     action.TargetSpace,
 		Priority:        action.Priority,
 		BaselineMetrics: baseline,
+		TargetNodeID:    action.TargetNodeID,
+		TargetCode:      action.TargetCode,
 		Safety: SafetyBounds{
 			MaxNodesAffected: maxNodes,
 			MaxEdgesAffected: maxEdges,

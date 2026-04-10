@@ -4042,6 +4042,25 @@ func (c Config) Validate() (warnings []string, err error) {
 		errs = append(errs, fmt.Errorf("invalid EdgeTypeStrategy %q (valid: all, structural_first, learned_only, hybrid)", c.EdgeTypeStrategy))
 	}
 
+	// RSIC cross-field validation
+	if c.RSICMacroCron != "" || c.RSICMicroEnabled {
+		// Warn if macro cron space is in protected spaces (would silently block all macro cycles)
+		for _, ps := range c.RSICProtectedSpaces {
+			if ps == c.RSICMacroCronSpace {
+				warnings = append(warnings, fmt.Sprintf("RSICMacroCronSpace %q is in RSICProtectedSpaces — destructive macro cycle actions will be blocked", ps))
+				break
+			}
+		}
+		// Warn if watchdog space differs from macro cron space (likely misconfiguration)
+		if c.RSICWatchdogSpaceID != c.RSICMacroCronSpace && c.RSICWatchdogSpaceID != "" && c.RSICMacroCronSpace != "" {
+			warnings = append(warnings, fmt.Sprintf("RSICWatchdogSpaceID %q != RSICMacroCronSpace %q — watchdog monitors a different space than macro cron targets", c.RSICWatchdogSpaceID, c.RSICMacroCronSpace))
+		}
+		// Warn if no protected spaces configured with cycles enabled
+		if len(c.RSICProtectedSpaces) == 0 {
+			warnings = append(warnings, "RSICProtectedSpaces is empty with RSIC cycles enabled — destructive actions have no space protection")
+		}
+	}
+
 	if len(errs) > 0 {
 		err = errors.Join(errs...)
 	}

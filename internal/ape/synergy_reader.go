@@ -6,7 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// cachedFileContent holds a file's content with a read timestamp for TTL caching.
+type cachedFileContent struct {
+	content []byte
+	readAt  time.Time
+}
 
 // FileSynergyReader reads Claude Code integration files from disk to
 // supply synergy metrics for RSIC health assessment.
@@ -16,6 +23,11 @@ type FileSynergyReader struct {
 	jiminyCheck         func() bool
 	memoryLineThreshold int // from cfg.SynergyMemoryLineThreshold
 	overlapSampleSize   int // from cfg.SynergyOverlapSampleSize
+
+	// File content cache with 60s TTL to avoid redundant reads
+	cacheTTL   time.Duration
+	claudeCache *cachedFileContent
+	memoryCache *cachedFileContent
 }
 
 // NewFileSynergyReader creates a reader for Claude Code synergy files.
@@ -35,14 +47,28 @@ func NewFileSynergyReader(claudePath, memoryPath string, jiminyCheck func() bool
 		jiminyCheck:         jiminyCheck,
 		memoryLineThreshold: memoryLineThreshold,
 		overlapSampleSize:   overlapSampleSize,
+		cacheTTL:            60 * time.Second,
 	}
+}
+
+// readCached returns file content from cache if within TTL, otherwise reads from disk.
+func (r *FileSynergyReader) readCached(path string, cache **cachedFileContent) ([]byte, error) {
+	if *cache != nil && time.Since((*cache).readAt) < r.cacheTTL {
+		return (*cache).content, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	*cache = &cachedFileContent{content: data, readAt: time.Now()}
+	return data, nil
 }
 
 // ReadSynergyMetrics reads line counts and health status from synergy files.
 func (r *FileSynergyReader) ReadSynergyMetrics() SynergyMetrics {
 	sm := SynergyMetrics{
-		ClaudeMDLines: countFileLines(r.claudeMDPath),
-		MemoryMDLines: countFileLines(r.memoryMDPath),
+		ClaudeMDLines: r.countCachedLines(r.claudeMDPath, &r.claudeCache),
+		MemoryMDLines: r.countCachedLines(r.memoryMDPath, &r.memoryCache),
 	}
 	if r.memoryMDPath != "" {
 		sm.AutoMemoryFiles, sm.AutoMemoryLines = countAutoMemoryFiles(r.memoryMDPath)
@@ -59,17 +85,29 @@ func (r *FileSynergyReader) ReadSynergyMetrics() SynergyMetrics {
 	return sm
 }
 
+// countCachedLines counts newlines in a file using the cache.
+func (r *FileSynergyReader) countCachedLines(path string, cache **cachedFileContent) int {
+	if path == "" {
+		return 0
+	}
+	data, err := r.readCached(path, cache)
+	if err != nil {
+		return 0
+	}
+	return bytes.Count(data, []byte("\n"))
+}
+
 // computeOverlap samples content lines from MEMORY.md and checks what fraction
 // appear verbatim in CLAUDE.md. Returns 0 if either file is unreadable.
 func (r *FileSynergyReader) computeOverlap() float64 {
 	if r.claudeMDPath == "" || r.memoryMDPath == "" {
 		return 0
 	}
-	claudeData, err := os.ReadFile(r.claudeMDPath)
+	claudeData, err := r.readCached(r.claudeMDPath, &r.claudeCache)
 	if err != nil {
 		return 0
 	}
-	memData, err := os.ReadFile(r.memoryMDPath)
+	memData, err := r.readCached(r.memoryMDPath, &r.memoryCache)
 	if err != nil {
 		return 0
 	}
