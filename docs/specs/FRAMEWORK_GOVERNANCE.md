@@ -26,6 +26,9 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | pilot (setup-only runner) |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active (E1-E5 all enforced) |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active (11 specs, soft-fail CI) |
+| ULTS | Universal LLM Task Specification | LLM task contracts, quality metrics, training config | active (16 specs) |
+| UTDS | Universal Training Data Specification | Export manifests, privacy gates, archive integrity | active (3 specs) |
+| UAITS | Universal AI Training Specification | Training data curation governance across 4 paradigms (SFT, DPO, RAFT, curriculum) | active (1 spec, 41 checks) |
 
 ---
 
@@ -178,6 +181,42 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
   - `docs/tests/uets/schema/uets.schema.json`
   - `docs/tests/uets/specs/`
   - `docs/tests/uets/runners/uets_runner.py`
+
+### ULTS — LLM Task Contracts
+
+- Scope: machine-readable contracts for all 16 LLM tasks — system prompt hashes, output schemas, quality metrics, training config.
+- Status: **active** — schema, 16 specs, runner with full parity.
+- Policy: task contract changes must update ULTS specs and pass runner validation.
+- References:
+  - `docs/tests/ults/README.md`
+  - `docs/tests/ults/schema/ults.schema.json`
+  - `docs/tests/ults/specs/`
+  - `docs/tests/ults/runners/ults_runner.py`
+
+### UTDS — Training Data Export
+
+- Scope: training data export manifests, privacy scanning, archive integrity.
+- Status: **active** — schema, 3 specs, runner with privacy hard gate.
+- Policy: export format changes must update UTDS specs; privacy violations cause hard failure.
+- References:
+  - `docs/tests/utds/README.md`
+  - `docs/tests/utds/schema/utds.schema.json`
+  - `docs/tests/utds/specs/`
+  - `docs/tests/utds/runners/utds_runner.py`
+
+### UAITS — AI Training Data Curation
+
+- Scope: spec-driven governance for training data curation across 4 paradigms (SFT, DPO, RAFT, curriculum).
+- Status: **active** — schema, 1 spec (MDEMG, 4 datasets), runner with 41 validation checks, paradigm router pipeline.
+- Policy: new training datasets must be declared in a UAITS spec; runner validates schema structure and optionally data compliance. Quality gates, format rules, and versioning parameters are spec-driven.
+- Cross-application: designed for multi-application deployment (MDEMG, Forge hub, spoke modules).
+- References:
+  - `docs/tests/uaits/README.md`
+  - `docs/tests/uaits/schema/uaits.schema.json`
+  - `docs/tests/uaits/specs/mdemg.uaits.json`
+  - `docs/tests/uaits/runners/uaits_runner.py`
+  - `neural/training/paradigm_router.py`
+  - `neural/training/dpo_builder.py`
 
 ---
 

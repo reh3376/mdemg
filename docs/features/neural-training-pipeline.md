@@ -380,6 +380,12 @@ The full pipeline from data collection to deployment:
 - `reward_functions.py` — 21 GRPO reward functions for post-SFT reinforcement learning
 - `test_vllm_mlx.py` — smoke test all 16 ULTS tasks through vllm-mlx
 
+**Multi-paradigm curation** (UAITS framework, added 2026-04-10):
+- `paradigm_router.py` — spec-driven curation across SFT, DPO, RAFT, and curriculum paradigms
+- `dpo_builder.py` — DPO preference pair construction from `constraint_outcomes` + `llm_interactions`
+- `mdemg data curate` / `mdemg data validate` — CLI commands for curation and spec validation
+- See [UAITS Framework](uaits-framework.md) for full details
+
 **Embedding fine-tuning** uses contrastive learning on domain-specific text pairs. The hard-negative mining signal (high vector similarity + low rerank score) is captured in `retrieval_events`. See [Embedding & Retrieval Data Collection](embedding-retrieval-data-collection.md).
 
 ## Documents Accessed

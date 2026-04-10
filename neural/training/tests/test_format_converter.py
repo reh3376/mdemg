@@ -7,8 +7,11 @@ import tempfile
 import unittest
 
 from training.format_converter import (
+    convert_dpo_record,
     convert_record,
     run_converter,
+    run_dpo_converter,
+    validate_dpo_format,
     validate_mlx_format,
     _raft_include,
     _build_raft_context,
@@ -246,6 +249,77 @@ class TestRunConverter(unittest.TestCase):
         # With 100 samples at 0.8 ratio, expect roughly 80 included (allow variance)
         self.assertGreater(report["raft_included"], 50)
         self.assertGreater(report["raft_excluded"], 5)
+
+
+class TestDPOConversion(unittest.TestCase):
+    """Test DPO format conversion."""
+
+    def test_convert_dpo_record(self):
+        record = {
+            "prompt": "What is guidance?",
+            "chosen": "A good response.",
+            "rejected": "A bad response.",
+            "metadata": {"guidance_id": "g1"},
+        }
+        result = convert_dpo_record(record)
+        self.assertEqual(result["prompt"], "What is guidance?")
+        self.assertEqual(result["chosen"], "A good response.")
+        self.assertEqual(result["rejected"], "A bad response.")
+        self.assertEqual(result["metadata"]["guidance_id"], "g1")
+
+    def test_validate_dpo_format_valid(self):
+        record = {
+            "prompt": "Question?",
+            "chosen": "Good answer.",
+            "rejected": "Bad answer.",
+            "metadata": {},
+        }
+        errors = validate_dpo_format(record)
+        self.assertEqual(len(errors), 0)
+
+    def test_validate_dpo_format_missing_keys(self):
+        errors = validate_dpo_format({"prompt": "Q?"})
+        self.assertTrue(any("chosen" in e for e in errors))
+        self.assertTrue(any("rejected" in e for e in errors))
+
+    def test_validate_dpo_format_empty_values(self):
+        record = {"prompt": "", "chosen": "good", "rejected": "bad"}
+        errors = validate_dpo_format(record)
+        self.assertTrue(any("empty" in e and "prompt" in e for e in errors))
+
+    def test_dpo_pipeline(self):
+        """End-to-end DPO conversion pipeline."""
+        tmpdir = tempfile.mkdtemp()
+        input_path = os.path.join(tmpdir, "input.jsonl")
+        output_path = os.path.join(tmpdir, "output.jsonl")
+
+        records = [
+            {
+                "prompt": f"Question {i}?",
+                "chosen": f"Good answer {i}.",
+                "rejected": f"Bad answer {i}.",
+                "metadata": {"guidance_id": f"g{i}"},
+            }
+            for i in range(5)
+        ]
+        with open(input_path, "w") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+
+        report = run_dpo_converter(input_path, output_path)
+        self.assertEqual(report["input_rows"], 5)
+        self.assertEqual(report["output_rows"], 5)
+        self.assertEqual(report["validation_errors"], 0)
+
+        with open(output_path) as f:
+            for line in f:
+                rec = json.loads(line)
+                self.assertIn("prompt", rec)
+                self.assertIn("chosen", rec)
+                self.assertIn("rejected", rec)
+
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

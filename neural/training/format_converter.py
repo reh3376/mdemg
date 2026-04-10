@@ -30,7 +30,6 @@ import argparse
 import hashlib
 import json
 import os
-import sys
 from typing import Any
 
 
@@ -113,6 +112,81 @@ def convert_record(record: dict[str, Any], raft_ratio: float = 0.8) -> dict[str,
     messages.append({"role": "assistant", "content": assistant_content})
 
     return {"messages": messages}
+
+
+def convert_dpo_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Convert a DPO pair record to standard DPO format.
+
+    Input: {"prompt": ..., "chosen": ..., "rejected": ..., "metadata": ...}
+    Output: same structure with think_mode preservation applied.
+    """
+    return {
+        "prompt": record.get("prompt", ""),
+        "chosen": record.get("chosen", ""),
+        "rejected": record.get("rejected", ""),
+        "metadata": record.get("metadata", {}),
+    }
+
+
+def validate_dpo_format(record: dict[str, Any]) -> list[str]:
+    """Validate a DPO record has required keys and non-empty values.
+
+    Returns list of error strings (empty = valid).
+    """
+    errors = []
+    for key in ("prompt", "chosen", "rejected"):
+        if key not in record:
+            errors.append(f"missing '{key}' key")
+        elif not record[key]:
+            errors.append(f"empty '{key}' value")
+
+    if "metadata" in record and not isinstance(record["metadata"], dict):
+        errors.append("'metadata' must be a dict")
+
+    return errors
+
+
+def run_dpo_converter(
+    input_path: str,
+    output_path: str,
+) -> dict[str, Any]:
+    """Run DPO format conversion pipeline.
+
+    Reads DPO pair JSONL, validates, and writes clean output.
+    Returns a conversion report dict.
+    """
+    input_rows = 0
+    output_rows = 0
+    validation_errors = 0
+
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+    with open(input_path) as fin, open(output_path, "w") as fout:
+        for line in fin:
+            line = line.strip()
+            if not line:
+                continue
+            input_rows += 1
+
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            converted = convert_dpo_record(record)
+            errors = validate_dpo_format(converted)
+            if errors:
+                validation_errors += 1
+                continue
+
+            fout.write(json.dumps(converted) + "\n")
+            output_rows += 1
+
+    return {
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+        "validation_errors": validation_errors,
+    }
 
 
 def validate_mlx_format(record: dict[str, Any]) -> list[str]:
@@ -220,9 +294,17 @@ def main():
     parser.add_argument("--output", required=True, help="Output MLX chat JSONL file")
     parser.add_argument("--raft-ratio", type=float, default=0.8,
                         help="Fraction of RAFT-eligible records to include context (default: 0.8)")
-    parser.add_argument("--format", default="chat", choices=["chat"],
+    parser.add_argument("--format", default="chat", choices=["chat", "dpo"],
                         help="Output format (default: chat)")
     args = parser.parse_args()
+
+    if args.format == "dpo":
+        report = run_dpo_converter(args.input, args.output)
+        print(f"Input:  {report['input_rows']} rows")
+        print(f"Output: {report['output_rows']} rows")
+        if report["validation_errors"]:
+            print(f"Validation errors: {report['validation_errors']}")
+        return
 
     report = run_converter(args.input, args.output, args.raft_ratio)
 

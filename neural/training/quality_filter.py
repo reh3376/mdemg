@@ -120,12 +120,35 @@ def validate_output_schema(response: str, schema: dict[str, Any]) -> bool:
 DEDUP_MODES = {"prompt", "prompt-response", "trace"}
 
 
+def _load_uaits_gates(spec_path: str | None) -> dict[str, Any]:
+    """Load quality gate overrides from a UAITS spec.
+
+    Returns a dict of gate parameter overrides. Empty dict if no spec or no
+    matching dataset found.
+    """
+    if not spec_path or not os.path.exists(spec_path):
+        return {}
+    try:
+        with open(spec_path) as f:
+            spec = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    # Find the first dataset with quality_gates (preferring SFT, then any)
+    for ds in spec.get("datasets", []):
+        gates = ds.get("quality_gates")
+        if gates:
+            return gates
+    return {}
+
+
 def run_filter(
     input_path: str,
     output_path: str | None,
     ults_dir: str | None = None,
     dry_run: bool = False,
     dedup_key: str = "prompt",
+    uaits_spec_path: str | None = None,
 ) -> dict[str, Any]:
     """Run the quality filter pipeline.
 
@@ -134,8 +157,17 @@ def run_filter(
         prompt-response: SHA-256(system_prompt + user_prompt + response) — keeps diverse responses (DPO)
         trace: SHA-256(trace_id) — no dedup (debugging only)
 
+    When uaits_spec_path is provided, quality gate thresholds (min_response_length,
+    max_latency_ms, dedup_mode) are overridden from the spec. When omitted, behavior
+    is identical to pre-UAITS (backward compatible).
+
     Returns a filter report dict.
     """
+    # Spec-driven gate overrides
+    uaits_gates = _load_uaits_gates(uaits_spec_path)
+    min_response_length = uaits_gates.get("min_response_length", MIN_RESPONSE_LENGTH)
+    max_latency_ms = uaits_gates.get("max_latency_ms", MAX_LATENCY_MS)
+
     specs = load_ults_specs(ults_dir)
     known_hashes: set[str] = set()
     dynamic_prompt_tasks: set[str] = set()
@@ -187,7 +219,7 @@ def run_filter(
 
             # Gate 1: Non-empty response
             response = record.get("response", "") or ""
-            if len(response.strip()) <= MIN_RESPONSE_LENGTH:
+            if len(response.strip()) <= min_response_length:
                 excluded["empty_response"] += 1
                 continue
 
@@ -214,7 +246,7 @@ def run_filter(
 
             # Gate 4: Latency reasonable
             latency = record.get("latency_ms", 0) or 0
-            if isinstance(latency, (int, float)) and latency > MAX_LATENCY_MS:
+            if isinstance(latency, (int, float)) and latency > max_latency_ms:
                 excluded["latency_exceeded"] += 1
                 continue
 
@@ -279,6 +311,10 @@ def main():
         default="prompt",
         help="Dedup hash mode: prompt (SFT), prompt-response (DPO), trace (debug). Default: prompt",
     )
+    parser.add_argument(
+        "--uaits-spec",
+        help="UAITS spec file for spec-driven gate overrides",
+    )
     args = parser.parse_args()
 
     if not args.output and not args.dry_run:
@@ -290,15 +326,16 @@ def main():
         ults_dir=args.ults_dir,
         dry_run=args.dry_run,
         dedup_key=args.dedup_key,
+        uaits_spec_path=args.uaits_spec,
     )
 
     print(f"Input:  {report['input_rows']} rows")
     print(f"Output: {report['output_rows']} rows")
-    print(f"Excluded:")
+    print("Excluded:")
     for reason, count in report["excluded"].items():
         if count > 0:
             print(f"  {reason}: {count}")
-    print(f"Task distribution:")
+    print("Task distribution:")
     for task, count in sorted(report["task_distribution"].items()):
         print(f"  {task}: {count}")
 

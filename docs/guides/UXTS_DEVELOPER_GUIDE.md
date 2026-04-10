@@ -48,7 +48,7 @@ UxTS solves three compounding problems that emerge in every non-trivial codebase
 
 The solution is a single repeating pattern — **declarative specs validated by executable runners governed by explicit schemas** — applied uniformly across every concern domain. Each domain gets its own framework with its own schema and runner, but all frameworks share the same structural contract, lifecycle, governance rules, CI integration pattern, and canonical report format.
 
-This guide is the authoritative reference for understanding, adopting, and extending UxTS. It starts from high-level vision and progressively deepens into technical specifics. Every concept is illustrated with real examples from the MDEMG codebase, where 12 UxTS frameworks govern API contracts, parser conformance, benchmarks, security, observability, authentication, hash integrity, gRPC contracts, semantic validation, LLM emergence quality, and iterative-improvement encoding comprehension.
+This guide is the authoritative reference for understanding, adopting, and extending UxTS. It starts from high-level vision and progressively deepens into technical specifics. Every concept is illustrated with real examples from the MDEMG codebase, where 15 UxTS frameworks govern API contracts, parser conformance, benchmarks, security, observability, authentication, hash integrity, gRPC contracts, semantic validation, LLM emergence quality, iterative-improvement encoding comprehension, LLM task contracts, training data exports, and AI training data curation.
 
 After reading this guide, you will understand: why declarative test specifications outperform imperative test scripts at scale; how the four-layer architecture (schema, specs, runner, CI gate) works; how to write, run, and govern specs; how to create new frameworks; and how to adopt UxTS in an existing codebase.
 
@@ -250,7 +250,7 @@ Without a shared methodology, these cross-concern verifications live in differen
 
 ### 4.5 The Complete Framework Inventory
 
-UxTS currently defines 11 frameworks, each owning one verification concern:
+UxTS currently defines 15 frameworks, each owning one verification concern:
 
 | Acronym | Full Name | Domain | Status | Specs |
 |---------|-----------|--------|--------|-------|
@@ -265,6 +265,10 @@ UxTS currently defines 11 frameworks, each owning one verification concern:
 | **USTS** | Universal Security Test Specification | Security behavior and hardening | pilot | 3 |
 | **UAMS** | Universal Auth Method Specification | Auth method contracts | spec-only | 4 |
 | **UVTS** | Universal Validation Test Specification | Semantic retrieval quality | spec-only | 1 |
+| **UITS** | Universal Iterative-Improvement Test Specification | T1 encoding comprehension | active | 11 |
+| **ULTS** | Universal LLM Task Specification | LLM task contracts, quality metrics | active | 16 |
+| **UTDS** | Universal Training Data Specification | Export manifests, privacy gates | active | 3 |
+| **UAITS** | Universal AI Training Specification | Training data curation (SFT/DPO/RAFT/curriculum) | active | 1 (4 datasets) |
 
 The naming convention is `U<X>TS` where `<X>` identifies the domain. You are not limited to these letters — any recurring verification pattern can become a framework. The methodology is the pattern, not the specific letters.
 

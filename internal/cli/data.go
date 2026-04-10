@@ -38,6 +38,8 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataExportCmd())
 	cmd.AddCommand(newDataExportAutoCmd())
 	cmd.AddCommand(newDataCheckCmd())
+	cmd.AddCommand(newDataCurateCmd())
+	cmd.AddCommand(newDataValidateCmd())
 
 	return cmd
 }

@@ -1,0 +1,190 @@
+{
+  "uaits_version": "1.0.0",
+  "application": {
+    "name": "mdemg",
+    "version": "0.7.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-04-10",
+    "description": "MDEMG training data contract — 4 datasets across SFT, DPO, RAFT, and curriculum paradigms for Qwen3-30B-A3B fine-tuning"
+  },
+  "datasets": [
+    {
+      "name": "sft_interactions",
+      "paradigm": "sft",
+      "description": "Supervised fine-tuning pairs from all 16 LLM tasks. Each record is a (system_prompt, user_prompt, response) triple converted to HuggingFace chat format.",
+      "source": {
+        "primary_table": "llm_interactions",
+        "filter": {
+          "error_is_null": true,
+          "response_min_length": 10
+        }
+      },
+      "quality_gates": {
+        "privacy_scan": true,
+        "min_response_length": 10,
+        "max_latency_ms": 60000,
+        "require_model_name": true,
+        "require_non_error": true,
+        "dedup_mode": "prompt",
+        "model_exclude": ["gpt-5-nano", "gpt-5.3"]
+      },
+      "format": {
+        "output_type": "chat",
+        "raft_ratio": 0.8,
+        "think_mode_preservation": true
+      },
+      "versioning": {
+        "train_ratio": 0.8,
+        "test_ratio": 0.1,
+        "val_ratio": 0.1,
+        "temporal_split": true,
+        "min_per_task": 10,
+        "exogenous_ratio_min": 0.4
+      },
+      "training_config": {
+        "min_examples": 500,
+        "quality_gate": 0.7,
+        "ults_task_names": [
+          "ape.reflect",
+          "consulting.classify",
+          "consulting.synthesis",
+          "hidden.name_emergence",
+          "hidden.reclassify",
+          "hidden.summarize",
+          "jiminy.codegen",
+          "jiminy.evaluate",
+          "jiminy.evaluate_llm",
+          "jiminy.synthesize",
+          "metalearn.generalize",
+          "retrieval.intent_translate",
+          "retrieval.query_classify",
+          "retrieval.rerank_cross",
+          "retrieval.rerank_nli",
+          "summarize.generate"
+        ]
+      }
+    },
+    {
+      "name": "dpo_preferences",
+      "paradigm": "dpo",
+      "description": "Direct preference optimization pairs from Jiminy constraint outcomes. Joins constraint_outcomes with llm_interactions on guidance_id to construct (prompt, chosen, rejected) triples.",
+      "source": {
+        "primary_table": "constraint_outcomes",
+        "join_tables": ["llm_interactions"],
+        "filter": {
+          "outcome_types": ["followed", "contradicted"],
+          "join_key": "guidance_id"
+        }
+      },
+      "quality_gates": {
+        "privacy_scan": true,
+        "min_response_length": 10,
+        "max_latency_ms": 60000,
+        "require_model_name": true,
+        "require_non_error": true,
+        "dedup_mode": "prompt-response",
+        "custom_gates": [
+          {
+            "name": "min_pair_diversity",
+            "description": "Chosen and rejected responses must differ by more than 10 characters",
+            "type": "hard"
+          }
+        ]
+      },
+      "format": {
+        "output_type": "dpo",
+        "chosen_criteria": "outcome_type = 'followed'",
+        "rejected_criteria": "outcome_type = 'contradicted'",
+        "think_mode_preservation": true
+      },
+      "versioning": {
+        "train_ratio": 0.8,
+        "test_ratio": 0.1,
+        "val_ratio": 0.1,
+        "temporal_split": true,
+        "min_per_task": 5,
+        "exogenous_ratio_min": 0.3
+      },
+      "training_config": {
+        "min_examples": 200,
+        "quality_gate": 0.6
+      }
+    },
+    {
+      "name": "raft_retrieval",
+      "paradigm": "raft",
+      "description": "Retrieval-augmented fine-tuning triples from tasks with retrieval context. Records must have non-null retrieval_node_ids. Uses ids_only mode (document content not resolved from Neo4j).",
+      "source": {
+        "primary_table": "llm_interactions",
+        "filter": {
+          "retrieval_node_ids_not_null": true,
+          "task_names": [
+            "consulting.synthesis",
+            "retrieval.rerank_cross",
+            "jiminy.synthesize"
+          ]
+        }
+      },
+      "quality_gates": {
+        "privacy_scan": true,
+        "min_response_length": 10,
+        "max_latency_ms": 60000,
+        "require_model_name": true,
+        "require_non_error": true,
+        "dedup_mode": "prompt",
+        "model_exclude": ["gpt-5-nano", "gpt-5.3"]
+      },
+      "format": {
+        "output_type": "raft",
+        "raft_ratio": 0.8,
+        "think_mode_preservation": true
+      },
+      "versioning": {
+        "train_ratio": 0.8,
+        "test_ratio": 0.1,
+        "val_ratio": 0.1,
+        "temporal_split": true,
+        "min_per_task": 5,
+        "exogenous_ratio_min": 0.4
+      },
+      "training_config": {
+        "min_examples": 200,
+        "quality_gate": 0.6,
+        "ults_task_names": [
+          "consulting.synthesis",
+          "retrieval.rerank_cross",
+          "jiminy.synthesize"
+        ]
+      }
+    },
+    {
+      "name": "curriculum_health",
+      "paradigm": "curriculum",
+      "description": "Time-series health metrics used for quality weighting of other datasets. Not direct training data — provides curriculum scheduling signal.",
+      "source": {
+        "primary_table": "metric_samples",
+        "filter": {
+          "metric_name_prefix": ["rsic_health_", "jiminy_", "j17_"]
+        }
+      },
+      "quality_gates": {
+        "privacy_scan": false,
+        "dedup_mode": "trace"
+      },
+      "format": {
+        "output_type": "metadata"
+      },
+      "versioning": {
+        "train_ratio": 1.0,
+        "test_ratio": 0.0,
+        "val_ratio": 0.0,
+        "temporal_split": true
+      },
+      "training_config": {
+        "min_examples": 100
+      }
+    }
+  ]
+}

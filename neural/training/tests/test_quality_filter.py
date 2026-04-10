@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Tests for the training data quality filter."""
 
-import hashlib
 import json
 import os
 import tempfile
@@ -289,6 +288,66 @@ class TestQualityFilter(unittest.TestCase):
         self.assertEqual(report["output_rows"], 0)
         total_excluded = sum(report["excluded"].values())
         self.assertEqual(total_excluded, 5)
+
+
+class TestSpecDrivenGates(unittest.TestCase):
+    """Test UAITS spec-driven gate overrides."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.input_path = os.path.join(self.tmpdir, "input.jsonl")
+        self.output_path = os.path.join(self.tmpdir, "output.jsonl")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_spec_driven_gates(self):
+        """UAITS spec overrides min_response_length threshold."""
+        spec_path = os.path.join(self.tmpdir, "spec.json")
+        spec = {
+            "uaits_version": "1.0.0",
+            "application": {"name": "test"},
+            "datasets": [{
+                "name": "test_ds",
+                "paradigm": "sft",
+                "quality_gates": {
+                    "min_response_length": 50,
+                    "max_latency_ms": 30000,
+                },
+            }],
+        }
+        with open(spec_path, "w") as f:
+            json.dump(spec, f)
+
+        # Record with 20-char response: passes default (10) but fails spec (50)
+        records = [_valid_record(response="A" * 20, user_prompt="unique query here")]
+        _write_jsonl(records, self.input_path)
+
+        report = run_filter(
+            self.input_path, self.output_path,
+            uaits_spec_path=spec_path,
+        )
+        self.assertEqual(report["output_rows"], 0)
+        self.assertEqual(report["excluded"]["empty_response"], 1)
+
+    def test_no_spec_backward_compat(self):
+        """Omitting UAITS spec gives identical default behavior."""
+        records = [
+            _valid_record(trace_id=f"t{i}", user_prompt=f"Query {i}")
+            for i in range(5)
+        ]
+        _write_jsonl(records, self.input_path)
+
+        report_no_spec = run_filter(self.input_path, self.output_path)
+
+        output2 = os.path.join(self.tmpdir, "output2.jsonl")
+        report_with_none = run_filter(
+            self.input_path, output2, uaits_spec_path=None,
+        )
+
+        self.assertEqual(report_no_spec["output_rows"], report_with_none["output_rows"])
+        self.assertEqual(report_no_spec["excluded"], report_with_none["excluded"])
 
 
 class TestULTSSpecLoading(unittest.TestCase):

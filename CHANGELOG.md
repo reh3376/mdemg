@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **UAITS Framework** (UAITS-2026-04-10) — Universal AI Training Specification, the 10th UxTS framework. Spec-driven training data curation with 4 paradigms (SFT, DPO, RAFT, curriculum):
+  - UAITS JSON Schema (`docs/tests/uaits/schema/uaits.schema.json`) and MDEMG spec with 4 datasets
+  - UAITS runner with 41 schema + data compliance checks
+  - DPO pair builder: constructs preference pairs from `constraint_outcomes` + `llm_interactions` on `guidance_id`
+  - Paradigm router: spec-driven pipeline dispatch across all 4 paradigms
+  - DPO format support in `format_converter.py` (`convert_dpo_record`, `run_dpo_converter`)
+  - Spec-driven gate overrides in `quality_filter.py` (`uaits_spec_path` parameter)
+  - Paradigm metadata in `dataset_versioner.py` manifest
+  - CLI: `mdemg data curate` and `mdemg data validate` commands
 - **RSIC overhaul** (RSIC-OVH-2026-04-09) — transforms RSIC from zero-value to high-value recursive self-improvement:
   - `RSIC_PROTECTED_SPACES` env var replaces hardcoded `mdemg-dev` protection (default: empty = no spaces blocked)
   - Graph-relative blast radius computed from actual node count (was hardcoded 1000)

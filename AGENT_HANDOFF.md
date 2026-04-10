@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-09
+**Date:** 2026-04-10
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -43,6 +43,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - RSIC Overhaul (RSIC-OVH-2026-04-09) — COMPLETE (configurable ProtectedSpaces, graph-relative blast radius, real executors, diagnostic classification, calibration-aware planner, 20-action LLM reflector, daily cycles)
 - RSIC Hardening (RSIC-HDN-2026-04-09) — COMPLETE (32 deep dive findings remediated: nil postReport, nil driver guards, dryRun race, per-task CriteriaMet, executor correctness, watchdog lock/reset, safety fail-closed, LLM sanitization, SSE race fix)
 - Training Data Quality (TRAIN-DQ-2026-04-10) — COMPLETE (model standardization to gpt-5.4, token counting fix tokens_in=0, RAFT context wiring for 2 tasks, 2 feature gate activations)
+- UAITS Framework (UAITS-2026-04-10) — COMPLETE (Universal AI Training Specification: 10th UxTS framework for spec-driven training data curation with 4 paradigms SFT/DPO/RAFT/curriculum, DPO pair builder, paradigm router, 2 CLI commands, 260 Python tests, 41 runner checks)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)
@@ -548,6 +549,8 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | TEARDOWN-TSDB | Teardown TSDB Backup | ✅ | 2026-04-03 | PR #258: Phase 0b — pg_dump via docker compose exec BEFORE volume destruction. Non-fatal on failure |
 | SUBMOD-054 | Submodule Update v0.5.4 | ✅ | 2026-04-03 | PR #259: homebrew-mdemg submodule pointer to v0.5.4 |
 | UPGRADE-AUTO | Upgrade Automation | ✅ | 2026-04-04 | PR #260: `mdemg upgrade` + `brew upgrade mdemg` now auto-update Docker instances. New flags: `--no-docker`, `--docker-only`. GoReleaser `post_install` hook. |
+| TRAIN-DQ | Training Data Quality | ✅ | 2026-04-10 | Model standardization to gpt-5.4, token counting fix (tokens_in=0), RAFT context wiring (consulting.synthesis, retrieval.rerank_cross), 2 feature gate activations |
+| UAITS | UAITS Framework Sprint | ✅ | 2026-04-10 | Universal AI Training Specification — 10th UxTS framework. 6 epics: UAITS schema + MDEMG spec (4 datasets), UAITS runner (41 checks), DPO pair builder, paradigm router + pipeline mods, CLI (`data curate`/`data validate`), docs. 260 Python tests, ruff clean, golangci-lint clean |
 
 ### Phase Numbering Convention
 
@@ -570,6 +573,8 @@ Every completed phase has a spec doc — see the Spec column for details. Phase 
 | DDR | — | Deep-Dive Remediation Sprint |
 | TD-SPRINT | — | Training Data Collection Sprint (7 sub-phases: TD-ENRICH, TD-CORR, TD-SRC, TD-SCRUB, TD-QUAL, TD-CLI, TD-BACKUP) |
 | TD-VERIFY | — | Training Data Capture Verification (17 tests: column positions, privacy scrub, response sanitization, metadata completeness) |
+| TRAIN-DQ | — | Training Data Quality (model standardization, token counting fix, RAFT context wiring, feature gate activations) |
+| UAITS | — | UAITS Framework Sprint (schema, spec, runner, DPO builder, paradigm router, CLI, docs — 6 epics) |
 | DOCKER-P1/P2/P2b/P3 | — | Docker Deployment Phases 1-3 (compose, browser UI, UI/UX overhaul, backup tab + distribution) |
 | FT-INFRA | — | FT Infrastructure Sprint (SanitizeResponse, RAFT context, ULTS specs, embedding/retrieval collection) |
 | DATA-GOV-S0/S1/S2 | — | Data Governance Sprints 0-2 (TSDB_ENABLED fix, pipeline gaps, diagnostic script) |
@@ -789,4 +794,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-04-08 — DD-P1P2 deep dive bug fix campaign COMPLETE (PR #301): 10 P1s + 21 P2s, all live-validated. Service alert system (SR-001/SNA-001), synergy reader, dashboard fixes. Tag v0.7.4. CI: ALL GREEN.*
+*Last updated: 2026-04-10 — UAITS Framework sprint COMPLETE: Universal AI Training Specification (10th UxTS framework), 4 paradigms (SFT/DPO/RAFT/curriculum), DPO pair builder, paradigm router, `mdemg data curate`/`data validate` CLI. 260 Python tests, 41 runner checks. CI: ALL GREEN.*
