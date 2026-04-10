@@ -374,7 +374,7 @@ All collaborator branches must follow the pattern: `<github_handle>_dev<01-09>` 
 
 - **One branch per category per collaborator** — merge or close your existing branch in a category before starting another in the same category
 - **`main` is always protected** — changes reach it only via PR
-- **Automation exemptions:** `dependabot/*`, `release/*`, and `gh-pages` branches are exempt from this naming convention
+- **Automation exemptions:** `dependabot/*`, `deps/*`, `release/*`, and `gh-pages` branches are exempt from this naming convention
 - A GitHub Actions workflow (`.github/workflows/branch-naming.yml`) enforces this convention on push
 
 > **Migration note:** The original development branch `mdemg-dev01` has been renamed to `reh3376_dev01` to comply with this convention.
