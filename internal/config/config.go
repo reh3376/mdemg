@@ -3201,7 +3201,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 10)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 11)
 	if err != nil {
 		return Config{}, err
 	}

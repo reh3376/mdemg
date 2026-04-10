@@ -261,7 +261,6 @@ func (lc *LiveCollectors) LastGaugeValues() map[string]float64 {
 	if jiminy != nil {
 		gauges["jiminy_follow_rate"] = jiminy.FollowRate
 		gauges["jiminy_constraint_effectiveness"] = jiminy.ConstraintEffRate
-		gauges["jiminy_constraint_effectiveness_30d"] = jiminy.ConstraintEffRate30d
 		gauges["jiminy_source_diversity"] = jiminy.SourceDiversity
 		gauges["jiminy_total_issued"] = float64(jiminy.TotalGuidanceIssued)
 		gauges["jiminy_total_followed"] = float64(jiminy.TotalFollowed)
@@ -293,7 +292,6 @@ func (lc *LiveCollectors) publishGuidanceGauges(stats JiminyStatsResult) {
 
 	m.JiminyFollowRate(sid).Set(stats.FollowRate)
 	m.JiminyConstraintEffectiveness(sid).Set(stats.ConstraintEffRate)
-	m.JiminyConstraintEffectiveness30d(sid).Set(stats.ConstraintEffRate30d)
 	m.JiminySourceDiversity(sid).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(sid).Set(float64(stats.TotalGuidanceIssued))
 	m.JiminyTotalFollowed(sid).Set(float64(stats.TotalFollowed))

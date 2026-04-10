@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
@@ -79,18 +78,13 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 
 	stats := result.(JiminyStats)
 
-	// Compute constraint effectiveness rate (all-time)
-	effRate, hasData, err := sc.computeConstraintEffectivenessRate(ctx, spaceID, "")
+	// Compute constraint effectiveness rate (all-time, from Neo4j)
+	// The 30d/windowed metric is now computed dynamically by Grafana from the
+	// constraint_outcomes TSDB table, respecting the user's selected time range.
+	effRate, hasData, err := sc.computeConstraintEffectivenessRate(ctx, spaceID)
 	if err == nil {
 		stats.ConstraintEffRate = effRate
 		stats.ConstraintDataAvail = hasData
-	}
-
-	// Compute constraint effectiveness rate (30-day rolling window)
-	since30d := time.Now().UTC().Add(-30 * 24 * time.Hour).Format(time.RFC3339)
-	effRate30d, _, err := sc.computeConstraintEffectivenessRate(ctx, spaceID, since30d)
-	if err == nil {
-		stats.ConstraintEffRate30d = effRate30d
 	}
 
 	// Compute source diversity
@@ -104,45 +98,25 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 // constraints are excluded to reduce noise. Each qualifying constraint contributes
 // proportionally to its surfaced count.
 //
-// If sinceRFC3339 is non-empty, only GUIDANCE_OUTCOME edges with created_at >= that
-// timestamp are included (rolling time window). Returns (rate, hasData, error) where
-// hasData distinguishes "no qualifying constraints" from "0% effective".
-func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context, spaceID, sinceRFC3339 string) (float64, bool, error) {
+// Returns (rate, hasData, error) where hasData distinguishes "no qualifying
+// constraints" from "0% effective". Time-windowed effectiveness is computed
+// dynamically by Grafana from the constraint_outcomes TSDB table.
+func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context, spaceID string) (float64, bool, error) {
 	sess := sc.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
-	// Build Cypher with optional time filter on the relationship's created_at property
-	var cypher string
-	if sinceRFC3339 != "" {
-		cypher = `
-		MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})-[r:GUIDANCE_OUTCOME]-()
-		WHERE r.created_at >= $since
-		WITH c, count(r) AS surfaced,
-		     sum(CASE WHEN r.outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,
-		     sum(CASE WHEN r.outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half
-		WHERE surfaced >= 5
-		WITH sum(followed) + sum(partial_half) AS effective, toFloat(sum(surfaced)) AS total
-		WHERE total > 0
-		RETURN effective / total AS weighted_effectiveness`
-	} else {
-		cypher = `
-		MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})-[r:GUIDANCE_OUTCOME]-()
-		WITH c, count(r) AS surfaced,
-		     sum(CASE WHEN r.outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,
-		     sum(CASE WHEN r.outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half
-		WHERE surfaced >= 5
-		WITH sum(followed) + sum(partial_half) AS effective, toFloat(sum(surfaced)) AS total
-		WHERE total > 0
-		RETURN effective / total AS weighted_effectiveness`
-	}
-
-	params := map[string]any{"spaceId": spaceID}
-	if sinceRFC3339 != "" {
-		params["since"] = sinceRFC3339
-	}
+	cypher := `
+	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})-[r:GUIDANCE_OUTCOME]-()
+	WITH c, count(r) AS surfaced,
+	     sum(CASE WHEN r.outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,
+	     sum(CASE WHEN r.outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half
+	WHERE surfaced >= 5
+	WITH sum(followed) + sum(partial_half) AS effective, toFloat(sum(surfaced)) AS total
+	WHERE total > 0
+	RETURN effective / total AS weighted_effectiveness`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, txErr := tx.Run(ctx, cypher, params)
+		res, txErr := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
 		if txErr != nil {
 			return nil, txErr
 		}

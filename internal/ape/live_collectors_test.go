@@ -224,10 +224,9 @@ func TestLiveCollectors_LastGaugeValues_Full(t *testing.T) {
 			TotalIgnored:        15,
 			TotalContradicted:   5,
 			FollowRate:          0.80,
-			ConstraintEffRate:    0.75,
-			ConstraintEffRate30d: 0.80,
-			ConstraintDataAvail:  true,
-			SourceDiversity:      0.65,
+			ConstraintEffRate:   0.75,
+			ConstraintDataAvail: true,
+			SourceDiversity:     0.65,
 		},
 	}
 	lc := NewLiveCollectors(mockJ, mock, nil, "test-space", 60*time.Second)
@@ -262,10 +261,9 @@ func TestLiveCollectors_LastGaugeValues_Full(t *testing.T) {
 		}
 	}
 
-	// jiminy_ keys (8 expected)
+	// jiminy_ keys (7 expected)
 	jiminyKeys := []string{
-		"jiminy_follow_rate", "jiminy_constraint_effectiveness", "jiminy_constraint_effectiveness_30d",
-		"jiminy_source_diversity",
+		"jiminy_follow_rate", "jiminy_constraint_effectiveness", "jiminy_source_diversity",
 		"jiminy_total_issued", "jiminy_total_followed", "jiminy_total_ignored", "jiminy_total_contradicted",
 	}
 	for _, k := range jiminyKeys {

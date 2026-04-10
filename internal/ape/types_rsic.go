@@ -437,9 +437,8 @@ type JiminyStatsResult struct {
 	TotalIgnored           int     `json:"total_ignored"`
 	TotalContradicted      int     `json:"total_contradicted"`
 	FollowRate             float64 `json:"follow_rate"`
-	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
-	ConstraintEffRate30d   float64 `json:"constraint_effectiveness_rate_30d"`
-	ConstraintDataAvail    bool    `json:"constraint_data_available"`
+	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
+	ConstraintDataAvail bool    `json:"constraint_data_available"`
 	SourceDiversity        float64 `json:"source_diversity"`
 }
 
