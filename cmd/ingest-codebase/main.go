@@ -46,7 +46,13 @@ var (
 	includePy      = flag.Bool("include-py", true, "Include Python files (*.py)")
 	includeJava    = flag.Bool("include-java", true, "Include Java files (*.java)")
 	includeRust    = flag.Bool("include-rust", true, "Include Rust files (*.rs)")
-	limitElements  = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
+	includePHP      = flag.Bool("include-php", true, "Include PHP files (*.php)")
+	includeGraphQL  = flag.Bool("include-graphql", true, "Include GraphQL files (*.graphql, *.gql)")
+	includeLua      = flag.Bool("include-lua", true, "Include Lua files (*.lua)")
+	includeProtobuf = flag.Bool("include-protobuf", true, "Include Protocol Buffer files (*.proto)")
+	includeOpenAPI  = flag.Bool("include-openapi", true, "Include OpenAPI/Swagger files")
+	includeScraper  = flag.Bool("include-scraper-markdown", true, "Include scraper markdown files")
+	limitElements   = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
 	extractSymbols = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
 	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
 	sinceCommit    = flag.String("since", "HEAD~1", "Git commit to compare against for incremental mode (default: HEAD~1)")
@@ -809,10 +815,16 @@ func getEnabledLanguages() map[string]bool {
 		"cuda":       true,
 		"cypher":     true,
 		// New parsers
-		"csharp":     true,
-		"kotlin":     true,
-		"terraform":  true,
-		"makefile":   true,
+		"csharp":           true,
+		"kotlin":           true,
+		"terraform":        true,
+		"makefile":         true,
+		"php":              *includePHP,
+		"graphql":          *includeGraphQL,
+		"lua":              *includeLua,
+		"protobuf":         *includeProtobuf,
+		"openapi":          *includeOpenAPI,
+		"scraper-markdown": *includeScraper,
 	}
 }
 
