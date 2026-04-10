@@ -42,6 +42,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - J17 Protocol Pipeline 12-Break Cascading Fix — COMPLETE (code lookup, trust persistence, cache bypass, threshold sync, live collector wiring, all gauges flowing)
 - RSIC Overhaul (RSIC-OVH-2026-04-09) — COMPLETE (configurable ProtectedSpaces, graph-relative blast radius, real executors, diagnostic classification, calibration-aware planner, 20-action LLM reflector, daily cycles)
 - RSIC Hardening (RSIC-HDN-2026-04-09) — COMPLETE (32 deep dive findings remediated: nil postReport, nil driver guards, dryRun race, per-task CriteriaMet, executor correctness, watchdog lock/reset, safety fail-closed, LLM sanitization, SSE race fix)
+- Training Data Quality (TRAIN-DQ-2026-04-10) — COMPLETE (model standardization to gpt-5.4, token counting fix tokens_in=0, RAFT context wiring for 2 tasks, 2 feature gate activations)
 - Prometheus Observability Monitoring — COMPLETE (cache hit metrics, bootstrap RSIC assessment, self-monitoring probe, 4 alert rules)
 - Gap Analysis — COMPLETE (Phases 1-4; GAP-13/14 deferred to future sprints)
 - PR #215 Remediation Sprint — COMPLETE (gauge dirty flag, TSDB backup service, compose standardization, alert validation, 70/70 Playwright e2e)

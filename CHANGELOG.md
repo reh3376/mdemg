@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Browser UI audit tests** (UI-AUDIT-2026-04-09) — 76 new Playwright tests: 30 screenshot/JS-error/API-5xx baselines (10 tabs), 10 Training Data tab read-only tests, 3 Training Data API tests, 25 interactive/functional tests across all 10 tabs, 8 new test classes. Total suite: 309 tests (306 pass, 3 skip).
 - **UI gap analysis** (`docs/features/ui-gap-analysis.md`) — documents 48/125 API endpoints with UI coverage (38%), identifies 77 uncovered routes across Jiminy, conversation, constraints, ingestion, metrics, and infrastructure.
 
+### Changed
+
+- **LLM Model Config** (TRAIN-DQ-2026-04-10) — standardized all LLM tasks to gpt-5.4 (from mixed gpt-4.1/gpt-4o-mini) for training data quality during distillation campaign
+- **Token Counting** — fixed `tokens_in` always recording 0 in TSDB; now properly captures `prompt_tokens` and `completion_tokens` from OpenAI API response as separate fields
+- **RAFT Context** — wired `retrieval_node_ids` for `consulting.synthesis` and `retrieval.rerank_cross` (enables retrieval-augmented fine-tuning)
+- **Task Activation** — enabled `CONSULTING_LLM_CONSTRAINTS_ENABLED` and `JIMINY_EVALUATE_LLM_ENABLED` in .env, .env.example, and compose template for training data collection
+
 ### Fixed
 
 - **RSIC hardening** (RSIC-HDN-2026-04-09) — 32 findings from deep dive remediated across 6 epics:

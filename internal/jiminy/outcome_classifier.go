@@ -251,7 +251,7 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		cb := oc.cbRegistry.Get(cbName)
 		err := cb.Execute(ctx, func(cbCtx context.Context) error {
 			var innerErr error
-			response, _, innerErr = oc.llm.CompleteWithUsage(cbCtx, msgs, opts)
+			response, _, _, innerErr = oc.llm.CompleteWithUsage(cbCtx, msgs, opts)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -264,7 +264,7 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 		}
 	} else {
 		var err error
-		response, _, err = oc.llm.CompleteWithUsage(ctx, msgs, opts)
+		response, _, _, err = oc.llm.CompleteWithUsage(ctx, msgs, opts)
 		if err != nil {
 			slog.Error("jiminy classifier: LLM classification failed", "error", err)
 			return ClassificationResult{Outcome: OutcomeUnknown, Confidence: baseSimilarity}

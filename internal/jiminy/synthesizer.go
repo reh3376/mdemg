@@ -106,7 +106,7 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 		cb := gs.cbRegistry.Get(cbName)
 		err := cb.Execute(timeoutCtx, func(ctx context.Context) error {
 			var innerErr error
-			narrative, _, innerErr = gs.llm.CompleteWithUsage(ctx, msgs, opts)
+			narrative, _, _, innerErr = gs.llm.CompleteWithUsage(ctx, msgs, opts)
 			return innerErr
 		})
 		if err == circuitbreaker.ErrCircuitOpen {
@@ -117,7 +117,7 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 		}
 	} else {
 		var err error
-		narrative, _, err = gs.llm.CompleteWithUsage(timeoutCtx, msgs, opts)
+		narrative, _, _, err = gs.llm.CompleteWithUsage(timeoutCtx, msgs, opts)
 		if err != nil {
 			return "", fmt.Errorf("synthesis failed: %w", err)
 		}

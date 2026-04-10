@@ -35,7 +35,9 @@ type OpenAIChoice struct {
 
 // OpenAIUsage contains token usage information.
 type OpenAIUsage struct {
-	TotalTokens int `json:"total_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 // OpenAIError is the error object in an OpenAI response.

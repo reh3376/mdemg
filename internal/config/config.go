@@ -1288,7 +1288,7 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-4.1")
+	llmModel := get("LLM_MODEL", "gpt-5.4")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
@@ -1864,7 +1864,7 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("RECLASS_MAX_DEPTH must be in range [1, 10]")
 	}
 	reclassProvider := get("RECLASS_PROVIDER", emergenceProvider)
-	reclassModel := get("RECLASS_MODEL", "gpt-4.1")
+	reclassModel := get("RECLASS_MODEL", "gpt-5.4")
 	reclassMaxTokens, err := atoi("RECLASS_MAX_TOKENS", 2000)
 	if err != nil {
 		return Config{}, err

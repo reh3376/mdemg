@@ -15,7 +15,10 @@ Add these to your `.env` file for maximum task coverage:
 QUERY_CLASSIFY_ENABLED=true
 INTENT_ENABLED=true
 JIMINY_ENABLED=true
+JIMINY_EVALUATE_LLM_ENABLED=true
 EMERGENCE_ENABLED=true
+CONSULTING_LLM_CONSTRAINTS_ENABLED=true
+METALEARN_ENABLED=true
 ```
 
 ## Task Categories
@@ -51,7 +54,7 @@ These tasks require specific features to be used during development.
 | `hidden.summarize` | Consolidation pipeline | Runs automatically as observations accumulate |
 | `hidden.reclassify` | Reclassification cycles | Runs automatically during consolidation |
 | `summarize.generate` | Summarization requests | Runs during consolidation |
-| `metalearn.generalize` | Cross-space meta-learning | Requires `META_LEARN_ENABLED=true` + multi-space operation |
+| `metalearn.generalize` | Cross-space meta-learning | Requires `METALEARN_ENABLED=true` + multi-space operation |
 | `retrieval.rerank_cross` | Cross-encoder reranking | Already active — fires on every retrieval query |
 | `retrieval.rerank_nli` | NLI fallback reranking | Only fires when cross-encoder fails |
 

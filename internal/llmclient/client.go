@@ -254,37 +254,38 @@ type CompleteOpts struct {
 func (c *Client) Complete(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
 	start := time.Now()
 	var text string
+	var tokensIn, tokensOut int
 	var err error
 
 	switch c.provider {
 	case "ollama":
 		text, err = c.completeOllama(ctx, messages, opts)
 	default:
-		text, err = c.completeOpenAI(ctx, messages, opts)
+		text, tokensIn, tokensOut, err = c.completeOpenAI(ctx, messages, opts)
 	}
 
-	c.recordInteraction(ctx, messages, text, 0, int(time.Since(start).Milliseconds()), err)
+	c.recordInteraction(ctx, messages, text, tokensIn, tokensOut, int(time.Since(start).Milliseconds()), err)
 	c.trackResult(err)
 	return text, err
 }
 
 // CompleteWithUsage is like Complete but also returns token usage (OpenAI only; Ollama returns 0).
-func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
+func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, int, error) {
 	start := time.Now()
 	var text string
-	var tokens int
+	var tokensIn, tokensOut int
 	var err error
 
 	switch c.provider {
 	case "ollama":
 		text, err = c.completeOllama(ctx, messages, opts)
 	default:
-		text, tokens, err = c.completeOpenAIWithUsage(ctx, messages, opts)
+		text, tokensIn, tokensOut, err = c.completeOpenAIWithUsage(ctx, messages, opts)
 	}
 
-	c.recordInteraction(ctx, messages, text, tokens, int(time.Since(start).Milliseconds()), err)
+	c.recordInteraction(ctx, messages, text, tokensIn, tokensOut, int(time.Since(start).Milliseconds()), err)
 	c.trackResult(err)
-	return text, tokens, err
+	return text, tokensIn, tokensOut, err
 }
 
 // trackResult updates the consecutive failure counter and fires the alert callback
@@ -306,7 +307,7 @@ func (c *Client) trackResult(err error) {
 }
 
 // recordInteraction sends an interaction record to the recorder if one is set.
-func (c *Client) recordInteraction(ctx context.Context, messages []Message, response string, tokens, latencyMs int, callErr error) {
+func (c *Client) recordInteraction(ctx context.Context, messages []Message, response string, tokensIn, tokensOut, latencyMs int, callErr error) {
 	if c.recorder == nil {
 		return
 	}
@@ -330,7 +331,8 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 		UserPrompt:   user,
 		Response:     response,
 		LatencyMs:    latencyMs,
-		TokensOut:    tokens,
+		TokensIn:     tokensIn,
+		TokensOut:    tokensOut,
 		ModelName:    c.model,
 		Provider:     c.provider,
 	}
@@ -489,18 +491,21 @@ func parseRetryAfter(resp *http.Response) time.Duration {
 
 // --- OpenAI ---
 
-func (c *Client) completeOpenAI(ctx context.Context, messages []Message, opts CompleteOpts) (string, error) {
-	text, _, err := c.completeOpenAIWithUsage(ctx, messages, opts)
-	return text, err
+func (c *Client) completeOpenAI(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, int, error) {
+	return c.completeOpenAIWithUsage(ctx, messages, opts)
 }
 
-func (c *Client) completeOpenAIWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
-	return c.doWithRetry(ctx, func() (string, int, error) {
-		return c.doOpenAIRequest(ctx, messages, opts)
+func (c *Client) completeOpenAIWithUsage(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, int, error) {
+	var promptTokens int
+	text, completionTokens, err := c.doWithRetry(ctx, func() (string, int, error) {
+		t, pt, ct, e := c.doOpenAIRequest(ctx, messages, opts)
+		promptTokens = pt
+		return t, ct, e
 	})
+	return text, promptTokens, completionTokens, err
 }
 
-func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, error) {
+func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts CompleteOpts) (string, int, int, error) {
 	maxTokens := opts.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = 2000
@@ -515,13 +520,13 @@ func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts C
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", 0, fmt.Errorf("marshal request: %w", err)
+		return "", 0, 0, fmt.Errorf("marshal request: %w", err)
 	}
 
 	endpoint := c.baseURL + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
 	if err != nil {
-		return "", 0, fmt.Errorf("create request: %w", err)
+		return "", 0, 0, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -529,13 +534,13 @@ func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts C
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", 0, fmt.Errorf("http request: %w", err)
+		return "", 0, 0, fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", 0, &httpError{
+		return "", 0, 0, &httpError{
 			StatusCode: resp.StatusCode,
 			Body:       string(body),
 			RetryAfter: parseRetryAfter(resp),
@@ -544,18 +549,18 @@ func (c *Client) doOpenAIRequest(ctx context.Context, messages []Message, opts C
 
 	var chatResp OpenAIChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", 0, fmt.Errorf("decode response: %w", err)
+		return "", 0, 0, fmt.Errorf("decode response: %w", err)
 	}
 
 	if chatResp.Error != nil {
-		return "", 0, fmt.Errorf("openai error: %s", chatResp.Error.Message)
+		return "", 0, 0, fmt.Errorf("openai error: %s", chatResp.Error.Message)
 	}
 
 	if len(chatResp.Choices) == 0 {
-		return "", 0, fmt.Errorf("no choices in response")
+		return "", 0, 0, fmt.Errorf("no choices in response")
 	}
 
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), chatResp.Usage.TotalTokens, nil
+	return strings.TrimSpace(chatResp.Choices[0].Message.Content), chatResp.Usage.PromptTokens, chatResp.Usage.CompletionTokens, nil
 }
 
 // --- Ollama ---
