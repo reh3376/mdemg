@@ -106,7 +106,7 @@ func (cc *ConstraintClassifier) Classify(ctx context.Context, nodeID, text strin
 
 	timeoutMs := cc.cfg.TimeoutMs
 	if timeoutMs <= 0 {
-		timeoutMs = 5000
+		timeoutMs = 15000
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()

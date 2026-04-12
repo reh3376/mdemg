@@ -46,6 +46,12 @@
       "training_config": {
         "min_examples": 500,
         "quality_gate": 0.7,
+        "task_balance": {
+          "strategy": "cap_and_upsample",
+          "max_per_task_ratio": 0.25,
+          "upsample_minority": true,
+          "upsample_min": 50
+        },
         "ults_task_names": [
           "ape.reflect",
           "consulting.classify",
@@ -74,7 +80,7 @@
         "primary_table": "constraint_outcomes",
         "join_tables": ["llm_interactions"],
         "filter": {
-          "outcome_types": ["followed", "contradicted"],
+          "outcome_types": ["followed", "ignored", "contradicted"],
           "join_key": "guidance_id"
         }
       },
@@ -96,7 +102,7 @@
       "format": {
         "output_type": "dpo",
         "chosen_criteria": "outcome_type = 'followed'",
-        "rejected_criteria": "outcome_type = 'contradicted'",
+        "rejected_criteria": "outcome_type IN ('ignored', 'contradicted')",
         "think_mode_preservation": true
       },
       "versioning": {
