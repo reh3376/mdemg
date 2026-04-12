@@ -263,7 +263,22 @@ See existing specs for examples of the full schema.
 
 ### Step 6: Register in the Ingester
 
-The parser auto-registers in the parser registry via `init()`, but the ingester has a separate enabled-languages gate. Add a CLI flag and wire it into `getEnabledLanguages()` in `cmd/ingest-codebase/main.go`:
+The parser auto-registers in the parser registry via `init()`, but the ingester has a separate enabled-languages gate. You must register in **both** ingester implementations:
+
+**`internal/cli/ingest.go`** (shipped `mdemg` binary — this is what matters for releases):
+
+```go
+// In the ingestConfig struct:
+includeMyLang bool
+
+// In the cobra flag registration:
+cmd.Flags().BoolVar(&cfg.includeMyLang, "include-mylang", true, "Include MyLang files (*.ml)")
+
+// In getEnabledLanguages():
+"mylang": cfg.includeMyLang,
+```
+
+**`cmd/ingest-codebase/main.go`** (standalone dev tool):
 
 ```go
 // At the top with other flags:
@@ -280,7 +295,7 @@ All languages must use CLI flags (no hardcoded `true` entries). Without this ste
 After adding your parser:
 
 ```bash
-go build ./cmd/ingest-codebase/
+go build -o bin/mdemg ./cmd/mdemg
 ```
 
 ## Architecture
