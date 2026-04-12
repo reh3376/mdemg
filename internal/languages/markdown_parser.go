@@ -23,6 +23,10 @@ func (p *MarkdownParser) Extensions() []string {
 
 func (p *MarkdownParser) CanParse(path string) bool {
 	pathLower := strings.ToLower(path)
+	// Skip scraped markdown - it has its own parser
+	if strings.HasSuffix(pathLower, ".scraped.md") {
+		return false
+	}
 	return strings.HasSuffix(pathLower, ".md") || strings.HasSuffix(pathLower, ".markdown")
 }
 
