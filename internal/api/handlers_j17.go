@@ -8,8 +8,13 @@ import (
 )
 
 // handleJ17ProtocolMetrics returns a J17 protocol metrics snapshot.
-// GET /v1/jiminy/protocol/metrics?space_id=...
+// GET /v1/jiminy/protocol/metrics — read snapshot
+// POST /v1/jiminy/protocol/metrics — reset metrics (for testing)
 func (s *Server) handleJ17ProtocolMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		s.handleJ17ProtocolMetricsReset(w, r)
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
@@ -31,6 +36,19 @@ func (s *Server) handleJ17ProtocolMetrics(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": snapshot})
+}
+
+// POST /v1/jiminy/protocol/metrics — reset protocol metrics (testing/benchmarking)
+func (s *Server) handleJ17ProtocolMetricsReset(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
+		return
+	}
+
+	s.jiminySvc.ResetProtocolMetrics()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]string{"message": "protocol metrics reset"},
+	})
 }
 
 // handleJ17TierEffectiveness returns a tier effectiveness report with optional NLI calibration.

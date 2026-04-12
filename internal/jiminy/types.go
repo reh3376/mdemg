@@ -262,3 +262,37 @@ type EscalationEntry struct {
 	IgnoreCount   int             `json:"ignore_count"`
 	LastSurfaced  time.Time       `json:"last_surfaced"`
 }
+
+// ClassifyRequest is the input to the /strict classification endpoint.
+type ClassifyRequest struct {
+	SpaceID     string `json:"space_id"`
+	SessionID   string `json:"session_id"`
+	AgentOutput string `json:"agent_output"`
+	ToolName    string `json:"tool_name"`
+	FilePath    string `json:"file_path,omitempty"`
+}
+
+// ClassifyResponse is the output from the /strict classification endpoint.
+type ClassifyResponse struct {
+	Verdict         string          `json:"verdict"`                    // "pass" or "deny"
+	DenialReason    string          `json:"denial_reason,omitempty"`
+	ViolatedCodes   []string        `json:"violated_codes,omitempty"`
+	Confidence      float64         `json:"confidence"`
+	EscalationLevel EscalationLevel `json:"escalation_level,omitempty"`
+}
+
+// StrictReformulationResponse is the output from the /strict reformulation endpoint.
+type StrictReformulationResponse struct {
+	GuidanceID string  `json:"guidance_id"`
+	Directive  string  `json:"directive"`
+	ItemCount  int     `json:"item_count"`
+	BlockedAny bool    `json:"blocked_any"`
+	Confidence float64 `json:"confidence"`
+}
+
+// EscalationSnapshot holds serializable escalation state for a session.
+type EscalationSnapshot struct {
+	SessionID string                     `json:"session_id"`
+	States    map[string]EscalationEntry `json:"states"`
+	UpdatedAt time.Time                  `json:"updated_at"`
+}

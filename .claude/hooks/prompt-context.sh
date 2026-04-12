@@ -83,42 +83,87 @@ echo "$RECALL" | jq -r '
 
 echo "═══ END CMS RECALL ═══"
 
-# --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
-# Reads pre-computed guidance instantly (<100ms) from warm store.
-# Then triggers async warm-up for NEXT prompt with current context.
-# NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
-# string values. Shell variable expansion + echo corrupts these bytes, so we write
-# to a temp file and parse with jq directly from the file.
-GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
-curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
-  --connect-timeout 1 --max-time 2 2>/dev/null | \
-  perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
+# --- Jiminy inner voice guidance ---
+GUIDANCE_BYTES=0
 
-if [ -s "$GUIDANCE_TMP" ]; then
-  WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
-  AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
-  AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
+if [ -f "$HOME/.mdemg/.jiminy-strict-mode" ]; then
+  # /strict mode: call /v1/jiminy/reformulate for imperative directives
+  REFORM_TMP=$(mktemp /tmp/jiminy-reform-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-reform-$$.json")
+  curl -sf -X POST "${MDEMG_URL}/v1/jiminy/reformulate" \
+    -H "Content-Type: application/json" \
+    -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"claude-core\"}" \
+    --connect-timeout 2 --max-time 8 > "$REFORM_TMP" 2>/dev/null || true
 
-  # J17: Capture guidance_id for feedback loop closure
-  GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
-  if [ -n "$GUIDANCE_ID" ]; then
-    mkdir -p ~/.mdemg 2>/dev/null || true
-    printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
-      "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
-  else
-    rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
-  fi
-
-  if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
-    echo ""
-    printf '%s\n' "$AUGMENTATION"
-    if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
-      echo "[guidance age: ${AGE_MS}ms — may be stale]"
+  if [ -s "$REFORM_TMP" ]; then
+    DIRECTIVE=$(jq -r '.data.directive // empty' "$REFORM_TMP" 2>/dev/null)
+    GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$REFORM_TMP" 2>/dev/null)
+    if [ -n "$GUIDANCE_ID" ]; then
+      mkdir -p ~/.mdemg 2>/dev/null || true
+      printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
+        "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+    fi
+    if [ -n "$DIRECTIVE" ]; then
+      echo ""
+      printf '%s\n' "$DIRECTIVE"
     fi
   fi
+  GUIDANCE_BYTES=$(wc -c < "$REFORM_TMP" 2>/dev/null | tr -d ' ' || echo "0")
+  rm -f "$REFORM_TMP" 2>/dev/null || true
+else
+  # Advisory mode: event-driven warm/latest pattern
+  # Reads pre-computed guidance instantly (<100ms) from warm store.
+  # Then triggers async warm-up for NEXT prompt with current context.
+  # NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
+  # string values. Shell variable expansion + echo corrupts these bytes, so we write
+  # to a temp file and parse with jq directly from the file.
+  GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
+  curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
+    --connect-timeout 1 --max-time 2 2>/dev/null | \
+    perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
+
+  if [ -s "$GUIDANCE_TMP" ]; then
+    WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
+    AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
+    AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
+
+    # J17: Capture guidance_id for feedback loop closure
+    GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
+    if [ -n "$GUIDANCE_ID" ]; then
+      mkdir -p ~/.mdemg 2>/dev/null || true
+      printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
+        "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+    else
+      rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+    fi
+
+    if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
+      # Detect T1/T2 tiers in guidance items — if present, prepend bootstrap header
+      # so the agent can decode compact formats. Bootstrap is ~50 tokens.
+      MAX_TIER=$(jq -r '[.data.guidance[]?.tier // 3] | min' "$GUIDANCE_TMP" 2>/dev/null || echo "3")
+      if [ "$MAX_TIER" = "1" ] || [ "$MAX_TIER" = "2" ]; then
+        BOOTSTRAP=$(curl -sf "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
+          --connect-timeout 1 --max-time 2 2>/dev/null | jq -r '.data.bootstrap // empty' 2>/dev/null) || true
+        if [ -n "$BOOTSTRAP" ]; then
+          echo ""
+          printf '%s\n' "$BOOTSTRAP"
+        fi
+        if [ "$MAX_TIER" = "1" ]; then
+          printf 'ACTIVE CONSTRAINTS (T1 coded format — apply these before responding):\n'
+        else
+          printf 'ACTIVE CONSTRAINTS (telegraphic — apply these before responding):\n'
+        fi
+      fi
+
+      echo ""
+      printf '%s\n' "$AUGMENTATION"
+      if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
+        echo "[guidance age: ${AGE_MS}ms — may be stale]"
+      fi
+    fi
+  fi
+  GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
+  rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 fi
-GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
-rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 
 # Fire-and-forget: warm guidance for NEXT prompt with current context
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \

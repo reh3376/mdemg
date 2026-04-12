@@ -56,6 +56,10 @@ type Service struct {
 	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
 	warmStore               *WarmStore               // B7: WarmStore reference for trust-based invalidation
 	trustStore              *TrustStore              // J17: write-behind trust persistence to Neo4j
+	escalationStore         *EscalationStore         // J12: write-behind escalation persistence to Neo4j
+	strictMode              *StrictModeManager       // /strict: per-session strict mode toggle
+	reformulator            *StrictReformulator      // /strict: prompt reformulation
+	strictClassifier        *StrictClassifier        // /strict: response classification for PreToolUse
 	trustCancel             context.CancelFunc       // cancels trust persistence goroutine
 	codeComprehensionTracker *CodeComprehensionTracker // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter              // TSDB writer for constraint outcomes
@@ -189,6 +193,35 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		slog.Info("jiminy: J17 trust persistence enabled")
 	}
 
+	// J12: Escalation persistence store
+	var escalationStore *EscalationStore
+	if cfg.JiminyEscalationEnabled && cfg.JiminyEscalationPersistEnabled && driver != nil && escalation != nil {
+		escalationStore = NewEscalationStore(driver)
+		escalation.SetOnDirty(escalationStore.MarkDirty)
+		slog.Info("jiminy: J12 escalation persistence enabled")
+	}
+
+	// /strict: Strict mode manager (always created, session-level toggle)
+	var strictMode *StrictModeManager
+	if cfg.JiminyStrictStatePath != "" {
+		strictMode = NewStrictModeManager(cfg.JiminyStrictStatePath)
+		if err := strictMode.LoadFromFile(); err != nil {
+			slog.Warn("jiminy: strict mode file load failed", "error", err)
+		}
+	}
+
+	// /strict: Reformulator for imperative directive generation
+	var reformulator *StrictReformulator
+	if encoder != nil {
+		reformulator = NewStrictReformulator(encoder)
+	}
+
+	// /strict: Response classifier for PreToolUse enforcement
+	var strictClassifier *StrictClassifier
+	if evaluator != nil && escalation != nil {
+		strictClassifier = NewStrictClassifier(evaluator, escalation)
+	}
+
 	// NS-01: ML components with sidecar arbitration (shadow → causal promotion)
 	var tierPredictor *TierPredictor
 	var nliScorer *NLIComprehensionScorer
@@ -281,6 +314,10 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		dataCollector:       dataCollector,
 		calibrationTracker:  calibrationTracker,
 		trustStore:          trustStore,
+		escalationStore:     escalationStore,
+		strictMode:          strictMode,
+		reformulator:        reformulator,
+		strictClassifier:    strictClassifier,
 		feedbackCounts:      make(map[string]*sessionFeedback),
 	}
 }
@@ -293,14 +330,19 @@ func (s *Service) SetSignalLearner(sl SignalLearnerProvider) {
 // StartTrustPersistence begins the background trust flush loop.
 // Must be called after NewService from server.go to provide context.
 func (s *Service) StartTrustPersistence(ctx context.Context) {
-	if s.trustStore == nil {
+	if s.trustStore == nil && s.escalationStore == nil {
 		return
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	s.trustCancel = cancel
-	s.trustStore.Start(ctx)
+	if s.trustStore != nil {
+		s.trustStore.Start(ctx)
+	}
+	if s.escalationStore != nil {
+		s.escalationStore.Start(ctx)
+	}
 
-	// Background flush goroutine — reads trust scores and feedback counts, writes to Neo4j
+	// Background flush goroutine — trust + escalation, writes to Neo4j
 	go func() { //nolint:gosec // flush uses Background() intentionally
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -309,17 +351,21 @@ func (s *Service) StartTrustPersistence(ctx context.Context) {
 			case <-ctx.Done():
 				// Final flush
 				_ = s.FlushTrust(context.Background())
+				_ = s.FlushEscalation(context.Background())
 				return
 			case <-ticker.C:
 				if err := s.FlushTrust(context.Background()); err != nil {
 					slog.Warn("j17: trust persistence flush failed", "error", err)
+				}
+				if err := s.FlushEscalation(context.Background()); err != nil {
+					slog.Warn("j12: escalation persistence flush failed", "error", err)
 				}
 			}
 		}
 	}()
 }
 
-// StopTrustPersistence stops the background trust flush loop and performs a final flush.
+// StopTrustPersistence stops the background trust + escalation flush loop and performs a final flush.
 func (s *Service) StopTrustPersistence() {
 	if s.trustCancel != nil {
 		s.trustCancel()
@@ -391,6 +437,58 @@ func (s *Service) HydrateTrust(ctx context.Context) error {
 	return nil
 }
 
+// FlushEscalation writes all dirty escalation state to Neo4j.
+func (s *Service) FlushEscalation(ctx context.Context) error {
+	if s.escalationStore == nil || s.escalation == nil {
+		return nil
+	}
+
+	dirtyIDs := s.escalationStore.DrainDirty()
+	if len(dirtyIDs) == 0 {
+		return nil
+	}
+
+	snapshots := make([]EscalationSnapshot, 0, len(dirtyIDs))
+	for _, sessionID := range dirtyIDs {
+		states := s.escalation.ExportState(sessionID)
+		if len(states) == 0 {
+			continue
+		}
+		snapshots = append(snapshots, EscalationSnapshot{
+			SessionID: sessionID,
+			States:    states,
+			UpdatedAt: time.Now(),
+		})
+	}
+
+	return s.escalationStore.FlushSnapshots(ctx, snapshots)
+}
+
+// HydrateEscalation loads persisted escalation state from Neo4j.
+func (s *Service) HydrateEscalation(ctx context.Context) error {
+	if s.escalationStore == nil || s.escalation == nil {
+		return nil
+	}
+
+	snapshots, err := s.escalationStore.LoadAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	hydrated := 0
+	for _, snap := range snapshots {
+		if len(snap.States) > 0 {
+			s.escalation.ImportState(snap.SessionID, snap.States)
+			hydrated++
+		}
+	}
+
+	if hydrated > 0 {
+		slog.Info("j12: escalation state hydrated from Neo4j", "sessions", hydrated)
+	}
+	return nil
+}
+
 // RefreshTrackedGuidance re-registers guidance items in the EffectivenessTracker,
 // resetting their TTL. Called on warm store reads and cache hits to prevent
 // tracker entries from expiring while guidance_ids are still in active use.
@@ -436,6 +534,48 @@ func (s *Service) GetEvaluator() *Evaluator {
 // GetOutcomeClassifier returns the outcome classifier for CB wiring (G8).
 func (s *Service) GetOutcomeClassifier() *OutcomeClassifier {
 	return s.classifier
+}
+
+// GetStrictMode returns the strict mode manager.
+func (s *Service) GetStrictMode() *StrictModeManager {
+	return s.strictMode
+}
+
+// Reformulate runs Guide() and then transforms the result into an imperative directive.
+// Used by /strict mode to replace multi-section advisory guidance with a single directive block.
+func (s *Service) Reformulate(ctx context.Context, req GuidanceRequest) (StrictReformulationResponse, error) {
+	if s.reformulator == nil {
+		return StrictReformulationResponse{}, fmt.Errorf("reformulator not initialized")
+	}
+
+	resp, err := s.Guide(ctx, req)
+	if err != nil {
+		return StrictReformulationResponse{}, err
+	}
+
+	// Get escalation state for the session
+	var escState map[string]EscalationEntry
+	if s.escalation != nil && req.SessionID != "" {
+		escState = s.escalation.ExportState(req.SessionID)
+	}
+
+	directive, blockedAny := s.reformulator.Reformulate(resp.Guidance, escState)
+
+	return StrictReformulationResponse{
+		GuidanceID: resp.GuidanceID,
+		Directive:  directive,
+		ItemCount:  len(resp.Guidance),
+		BlockedAny: blockedAny,
+		Confidence: resp.Confidence,
+	}, nil
+}
+
+// Classify determines whether an agent action should pass or be denied in /strict mode.
+func (s *Service) Classify(ctx context.Context, req ClassifyRequest) (ClassifyResponse, error) {
+	if s.strictClassifier == nil {
+		return ClassifyResponse{Verdict: "pass"}, nil
+	}
+	return s.strictClassifier.Classify(ctx, req)
 }
 
 // GetGuidanceStats returns aggregated guidance stats for RSIC integration (J10).
@@ -865,6 +1005,25 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// T1 comprehension gate: if per-tier T1 follow rate is below the configured
+	// threshold, downgrade T1 items to T2 to prevent the negative feedback loop
+	// where low comprehension → code regen → tier confusion.
+	// Requires at least 5 T1 outcomes to avoid triggering on cold-start (0.0 default).
+	if s.protocolMetrics != nil && s.cfg.J17T1ComprehensionGate > 0 {
+		snap := s.protocolMetrics.Snapshot()
+		if snap.TierOutcomeCount[0] >= 5 && snap.TierComprehension[0] < s.cfg.J17T1ComprehensionGate {
+			for i := range filtered {
+				if filtered[i].Tier == TierCoded {
+					filtered[i].Tier = TierTelegraphic
+					slog.Debug("j17: T1→T2 downgrade (comprehension gate)",
+						"code", filtered[i].ConstraintCode,
+						"t1_comprehension", snap.TierComprehension[0],
+						"gate", s.cfg.J17T1ComprehensionGate)
+				}
+			}
+		}
+	}
+
 	// Format prompt augmentation
 	var augmentation string
 	if s.encoder != nil && s.cfg.J17Enabled {
@@ -1247,12 +1406,17 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			}
 		}
 
-		// J17-4: Record outcome for protocol metrics and data collection
-		// NLI feedback loop: when NLI scorer is available, defer recording to the NLI block
-		// to avoid double-counting — but ONLY for GuidanceConstraint items (which the NLI
-		// block processes). Non-constraint items (corrections, patterns, etc.) always use
-		// heuristic scores since the NLI block only handles GuidanceConstraint.
-		if s.protocolMetrics != nil && item.ConstraintCode != "" && outcome != OutcomeNotApplicable && (s.nliScorer == nil || item.Type != GuidanceConstraint) {
+		// J17-4: Record outcome for protocol metrics — COMPREHENSION, not compliance.
+		// Comprehension = "did the agent understand the encoded format?"
+		// Compliance = "did the agent follow the guidance?" (tracked separately via trust/escalation)
+		//
+		// Key distinction: OutcomeIgnored with high similarity means the agent understood
+		// the guidance but chose not to follow it — that's full comprehension, zero compliance.
+		// OutcomeIgnored with low similarity means the action was unrelated — unclear comprehension.
+		//
+		// Per-tier tracking includes ALL items regardless of constraint code.
+		// NLI feedback loop: defer constraint items to NLI block to avoid double-counting.
+		if s.protocolMetrics != nil && outcome != OutcomeNotApplicable && (s.nliScorer == nil || item.Type != GuidanceConstraint) {
 			var compScore float64
 			switch outcome {
 			case OutcomeFollowed:
@@ -1260,9 +1424,17 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			case OutcomePartialCompliance:
 				compScore = 0.7
 			case OutcomeContradicted:
-				compScore = 1.0 // understood but violated
+				compScore = 1.0 // understood but violated — full comprehension
 			case OutcomeIgnored:
-				compScore = 0.0
+				// Comprehension depends on whether the action was related to the guidance.
+				// High similarity (>0.3) means the agent's action referenced the guidance
+				// topic — it understood the format but chose not to comply.
+				// Low similarity means the action was unrelated — ambiguous comprehension.
+				if cr.Confidence > 0.3 {
+					compScore = cr.Confidence // understood but non-compliant
+				} else {
+					compScore = 0.0 // action unrelated — no evidence of comprehension
+				}
 			default:
 				compScore = 0.5
 			}
@@ -1282,7 +1454,11 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				}
 			}
 		}
-		// Record constraint outcome to TSDB for dynamic Grafana effectiveness queries
+		// Record constraint outcome to TSDB for dynamic Grafana effectiveness queries.
+		// NOTE: cr.Confidence is text similarity (action vs guidance), not comprehension.
+		// Per-tier comprehension is computed separately below (protocolMetrics.RecordOutcomeWithTier)
+		// and flows to protocol metrics, not TSDB. This value is used for outcome classification
+		// threshold tuning in Grafana dashboards.
 		if s.outcomeWriter != nil && outcome != OutcomeUnknown && outcome != OutcomeNotApplicable {
 			constraintID := ""
 			if len(item.SourceNodes) > 0 {
@@ -1826,6 +2002,14 @@ func (s *Service) BootstrapCodes(ctx context.Context, spaceID string) (int, erro
 	}
 
 	return codified, nil
+}
+
+// ResetProtocolMetrics clears the protocol metrics window.
+// Used for testing/benchmarking to isolate measurements between phases.
+func (s *Service) ResetProtocolMetrics() {
+	if s.protocolMetrics != nil {
+		s.protocolMetrics.Reset()
+	}
 }
 
 // GetProtocolMetricsSnapshot returns an immutable snapshot of J17 protocol metrics.

@@ -175,10 +175,17 @@ func (pe *ProtocolEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 		}
 	}
 
-	// Clamp: high in [0.3, 0.95], low >= 0.1 and low < high - 0.1
-	if newHigh < 0.3 {
-		newHigh = 0.3
+	// Floor: high threshold must never drop below initial trust score.
+	// Otherwise all new sessions start in T1 and T2 becomes unreachable.
+	initialTrust := 0.65
+	if pe.trustScorer != nil {
+		initialTrust = pe.trustScorer.Initial()
 	}
+	if newHigh < initialTrust+0.05 {
+		newHigh = initialTrust + 0.05
+	}
+
+	// Clamp: high in [initialTrust+0.05, 0.95], low >= 0.1 and low < high - 0.1
 	if newHigh > 0.95 {
 		newHigh = 0.95
 	}

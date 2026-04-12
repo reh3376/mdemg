@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -476,5 +477,145 @@ func (s *Server) handleJiminyProtocolStatus(w http.ResponseWriter, r *http.Reque
 	status := s.jiminySvc.GetProtocolStatus(sessionID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": status,
+	})
+}
+
+// handleJiminyClassify handles POST /v1/jiminy/classify — strict mode response classification.
+func (s *Server) handleJiminyClassify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled",
+		})
+		return
+	}
+
+	var req jiminy.ClassifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if req.SpaceID == "" || req.AgentOutput == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id and agent_output are required"})
+		return
+	}
+
+	// 5-second deadline for PreToolUse hook timeout budget
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	resp, err := s.jiminySvc.Classify(ctx, req)
+	if err != nil {
+		// Fail open on error
+		writeJSON(w, http.StatusOK, map[string]any{
+			"data": jiminy.ClassifyResponse{Verdict: "pass", Confidence: 0},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": resp,
+	})
+}
+
+// handleJiminyReformulate handles POST /v1/jiminy/reformulate — strict mode directive generation.
+func (s *Server) handleJiminyReformulate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil || !s.cfg.JiminyEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled",
+		})
+		return
+	}
+
+	var req jiminy.GuidanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	resp, err := s.jiminySvc.Reformulate(ctx, req)
+	if err != nil {
+		writeInternalError(w, err, "jiminy.reformulate")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": resp,
+	})
+}
+
+// handleJiminyStrict handles POST /v1/jiminy/strict — toggle strict mode.
+func (s *Server) handleJiminyStrict(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+
+	if s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "jiminy guidance is not enabled",
+		})
+		return
+	}
+
+	mgr := s.jiminySvc.GetStrictMode()
+	if mgr == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "strict mode manager not initialized",
+		})
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		Enabled   bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if req.SessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id is required"})
+		return
+	}
+
+	var err error
+	var msg string
+	if req.Enabled {
+		err = mgr.Enable(req.SessionID)
+		msg = "strict mode enabled"
+	} else {
+		err = mgr.Disable(req.SessionID)
+		msg = "strict mode disabled"
+	}
+	if err != nil {
+		writeInternalError(w, err, "jiminy.strict")
+		return
+	}
+
+	slog.Info("jiminy: strict mode toggled", "session_id", req.SessionID, "enabled", req.Enabled)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"session_id": req.SessionID,
+			"strict":     req.Enabled,
+			"message":    msg,
+		},
 	})
 }

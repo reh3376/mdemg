@@ -806,4 +806,4 @@ protoc --go_out=. --go-grpc_out=. api/proto/mdemg-module.proto
 
 ---
 
-*Last updated: 2026-04-10 — UAITS Framework sprint COMPLETE: Universal AI Training Specification (10th UxTS framework), 4 paradigms (SFT/DPO/RAFT/curriculum), DPO pair builder, paradigm router, `mdemg data curate`/`data validate` CLI. 260 Python tests, 41 runner checks. CI: ALL GREEN.*
+*Last updated: 2026-04-11 — STRICT-P0P1 sprint: /strict mode foundation for deterministic agent governance. T1/T2 comprehension regression fix (P0), escalation persistence to Neo4j, strict mode toggle + state file, prompt reformulation endpoint, response classification + PreToolUse Write/Edit enforcement. New endpoints: /strict, /reformulate, /classify. New hook: pre-write-check.py. Graduated enforcement (SURFACED=advisory, WARNED+=blocking). Fail-open design.*

@@ -119,6 +119,15 @@ func (e *ProtocolEncoder) GetTierThresholds() (high, low float64) {
 	return e.tierHighThreshold, e.tierLowThreshold
 }
 
+// GetBootstrap returns the J17 protocol bootstrap header including glossary entries.
+// Used by the bootstrap endpoint to return the current encoder's glossary state.
+func (e *ProtocolEncoder) GetBootstrap() string {
+	if len(e.glossary) > 0 {
+		return FormatBootstrapWithGlossary(e.glossary)
+	}
+	return FormatBootstrap()
+}
+
 // selectTier determines the encoding tier for an item.
 func (e *ProtocolEncoder) selectTier(item GuidanceItem, trustScore float64) int {
 	// Items with a constraint code can use T1
