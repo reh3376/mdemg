@@ -170,6 +170,11 @@ func (ts *TrustScorer) SetScore(sessionID string, score float64) {
 	}
 }
 
+// Initial returns the initial trust score assigned to new sessions.
+func (ts *TrustScorer) Initial() float64 {
+	return ts.initial
+}
+
 // HighThreshold returns the configured high trust threshold.
 func (ts *TrustScorer) HighThreshold() float64 {
 	return ts.highThreshold

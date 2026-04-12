@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **/strict Mode Foundation** (STRICT-P0P1-2026-04-11) — Deterministic agent governance via escalation persistence and /strict mode enforcement:
+  - **T1/T2 comprehension fix (P0)**: Bootstrap header + decoding instruction injected with T1/T2 guidance; comprehension gate auto-downgrades T1 to T2 when follow rate < 50% (`J17_T1_COMPREHENSION_GATE`)
+  - **Escalation persistence**: Write-behind `EscalationStore` persists J12 state to Neo4j (`J12EscalationState` label), survives server restarts, piggybacked on trust flush ticker
+  - **Strict mode toggle**: `POST /v1/jiminy/strict` enables per-session strict mode; state file at `~/.mdemg/.jiminy-strict-mode` readable by hooks without HTTP
+  - **Prompt reformulation**: `POST /v1/jiminy/reformulate` replaces multi-section advisory guidance (~430 tokens) with imperative directives (~200-350 tokens); BLOCKED items emit "STOP." prefix
+  - **Response classification**: `POST /v1/jiminy/classify` evaluates agent output against constraints; graduated enforcement (SURFACED=pass, WARNED+=deny); 5s timeout budget
+  - **PreToolUse enforcement**: `pre-write-check.py` hook blocks Write/Edit when strict-mode active + escalated constraint violated; fail-open when server unreachable
+  - New config: `JIMINY_ESCALATION_PERSIST_ENABLED`, `JIMINY_STRICT_STATE_PATH`, `J17_T1_COMPREHENSION_GATE`
+  - New endpoints: `/v1/jiminy/strict`, `/v1/jiminy/reformulate`, `/v1/jiminy/classify`
 - **UAITS Framework** (UAITS-2026-04-10) — Universal AI Training Specification, the 10th UxTS framework. Spec-driven training data curation with 4 paradigms (SFT, DPO, RAFT, curriculum):
   - UAITS JSON Schema (`docs/tests/uaits/schema/uaits.schema.json`) and MDEMG spec with 4 datasets
   - UAITS runner with 41 schema + data compliance checks

@@ -315,7 +315,9 @@ type Config struct {
 	JiminyEscalationEscalateAfter int // JIMINY_ESCALATION_ESCALATE_AFTER — ignores before ESCALATED (default: 4)
 	JiminyEscalationBlockAfter   int  // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
 	JiminyEscalationBlockEnabled bool // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
-	JiminyEscalationDecayMinutes int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+	JiminyEscalationDecayMinutes   int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+	JiminyEscalationPersistEnabled bool   // JIMINY_ESCALATION_PERSIST_ENABLED — persist escalation to Neo4j (default: true)
+	JiminyStrictStatePath          string // JIMINY_STRICT_STATE_PATH — path to strict-mode state file (default: ~/.mdemg/.jiminy-strict-mode)
 
 	// Jiminy Code Comprehension Feedback Loop
 	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
@@ -381,6 +383,9 @@ type Config struct {
 	J17SidecarCBEnabled          bool    // J17_SIDECAR_CB_ENABLED — enable circuit breaker for sidecar calls (default: true)
 	J17SidecarCBFailureThreshold int     // J17_SIDECAR_CB_FAILURE_THRESHOLD — failures before opening circuit (default: 3)
 	J17SidecarCBTimeoutSec       int     // J17_SIDECAR_CB_TIMEOUT_SEC — seconds before half-open retry (default: 15)
+
+	// J17: T1 Comprehension Gate
+	J17T1ComprehensionGate float64 // J17_T1_COMPREHENSION_GATE — minimum T1 follow rate to continue using T1 (default: 0.5)
 
 	// NLI Feedback Loop: Per-Tier Effectiveness + Calibration
 	J17NLIObservationalEnabled        bool    // J17_NLI_OBSERVATIONAL_ENABLED — NLI scores flow to metrics in all modes (default: true)
@@ -2064,6 +2069,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyEscalationPersistEnabled := getBool("JIMINY_ESCALATION_PERSIST_ENABLED", true)
+	jiminyStrictStatePath := get("JIMINY_STRICT_STATE_PATH", "")
+	if jiminyStrictStatePath == "" {
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			jiminyStrictStatePath = home + "/.mdemg/.jiminy-strict-mode"
+		}
+	}
 	jiminyCodeRegenEnabled := getBool("JIMINY_CODE_REGEN_ENABLED", false)
 	jiminyCodeRegenThreshold, err := atof("JIMINY_CODE_REGEN_THRESHOLD", 0.3)
 	if err != nil {
@@ -2164,6 +2177,10 @@ func FromEnv() (Config, error) {
 	}
 	j17NLIComprehensionEnabled := getBool("J17_NLI_COMPREHENSION_ENABLED", false)
 	j17ProtocolDataCollection := getBool("J17_PROTOCOL_DATA_COLLECTION", false)
+	j17T1ComprehensionGate, err := atof("J17_T1_COMPREHENSION_GATE", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// J17-5: Extensions + System-Wide Encoding + ML Tier Selection
 	j17ExtensionsEnabled := getBool("J17_EXTENSIONS_ENABLED", j17Enabled)
@@ -3536,7 +3553,9 @@ func FromEnv() (Config, error) {
 		JiminyEscalationEscalateAfter:   jiminyEscalationEscalateAfter,
 		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
 		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
-		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
+		JiminyEscalationDecayMinutes:      jiminyEscalationDecayMinutes,
+		JiminyEscalationPersistEnabled:   jiminyEscalationPersistEnabled,
+		JiminyStrictStatePath:            jiminyStrictStatePath,
 		JiminyCodeRegenEnabled:    jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:  jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples: jiminyCodeRegenMinSamples,
@@ -3571,6 +3590,7 @@ func FromEnv() (Config, error) {
 		J17ReplayFrequencyMax:            j17ReplayFrequencyMax,
 		J17NLIComprehensionEnabled:       j17NLIComprehensionEnabled,
 		J17ProtocolDataCollection:        j17ProtocolDataCollection,
+		J17T1ComprehensionGate:           j17T1ComprehensionGate,
 		J17ExtensionsEnabled:             j17ExtensionsEnabled,
 		J17AllowedExtensions:             j17AllowedExtensions,
 		J17MLTierPredictionEnabled:       j17MLTierPredictionEnabled,

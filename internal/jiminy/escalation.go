@@ -30,6 +30,7 @@ type EscalationTracker struct {
 	blockAfter      int           // ignores before BLOCKED
 	blockEnabled    bool          // whether BLOCKED state is allowed
 	decayDuration   time.Duration // reset if not surfaced within this duration
+	onDirty         func(sessionID string) // callback when state changes (for persistence)
 }
 
 // NewEscalationTracker creates a new EscalationTracker from config.
@@ -61,6 +62,14 @@ func NewEscalationTracker(cfg config.Config) *EscalationTracker {
 	}
 }
 
+// SetOnDirty sets a callback invoked when escalation state changes for a session.
+// Used by EscalationStore to mark sessions for persistence flushing.
+func (et *EscalationTracker) SetOnDirty(fn func(sessionID string)) {
+	et.mu.Lock()
+	defer et.mu.Unlock()
+	et.onDirty = fn
+}
+
 // RecordSurface records that a constraint was surfaced to the agent.
 // Returns the current escalation level after recording.
 func (et *EscalationTracker) RecordSurface(sessionID, nodeID string) EscalationLevel {
@@ -75,15 +84,21 @@ func (et *EscalationTracker) RecordSurface(sessionID, nodeID string) EscalationL
 			LastSurfaced: time.Now(),
 		}
 		et.states[key] = state
+		if et.onDirty != nil {
+			et.onDirty(sessionID)
+		}
 		return EscalationSurfaced
 	}
 
 	// Check decay
 	if time.Since(state.LastSurfaced) > et.decayDuration {
-		// Reset — constraint hasn't been relevant for a while
+		// Reset �� constraint hasn't been relevant for a while
 		state.Level = EscalationSurfaced
 		state.IgnoreCount = 0
 		state.LastSurfaced = time.Now()
+		if et.onDirty != nil {
+			et.onDirty(sessionID)
+		}
 		return EscalationSurfaced
 	}
 
@@ -102,10 +117,15 @@ func (et *EscalationTracker) RecordOutcome(sessionID, nodeID string, outcome Gui
 		return EscalationInactive
 	}
 
+	prevLevel := state.Level
+
 	switch outcome {
 	case OutcomeFollowed:
 		state.Level = EscalationResolved
 		state.IgnoreCount = 0
+		if prevLevel != EscalationResolved && et.onDirty != nil {
+			et.onDirty(sessionID)
+		}
 		return EscalationResolved
 
 	case OutcomeIgnored, OutcomeContradicted:
@@ -117,6 +137,9 @@ func (et *EscalationTracker) RecordOutcome(sessionID, nodeID string, outcome Gui
 			state.Level = EscalationEscalated
 		} else if state.IgnoreCount >= et.warnAfter {
 			state.Level = EscalationWarned
+		}
+		if state.Level != prevLevel && et.onDirty != nil {
+			et.onDirty(sessionID)
 		}
 		return state.Level
 	}

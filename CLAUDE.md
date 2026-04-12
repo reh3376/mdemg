@@ -215,6 +215,27 @@ These env vars are forwarded in the compose template. Set in `.env`, or enable v
 - `LLM_INTERACTION_LOGGING` — TSDB LLM interaction recording (default: true)
 - `AUTO_MIGRATE` — unified Neo4j + TSDB schema migration on startup (default: true in Docker)
 
+## /strict Mode (Deterministic Governance)
+
+Toggle: `POST /v1/jiminy/strict` `{"session_id":"claude-core","enabled":true}`
+State file: `~/.mdemg/.jiminy-strict-mode` (hooks check without HTTP)
+
+When active:
+- `prompt-context.sh` calls `/v1/jiminy/reformulate` instead of `/v1/jiminy/latest` — imperative directives replace advisory guidance
+- `pre-write-check.py` hook calls `/v1/jiminy/classify` before Write/Edit — denies if escalated constraint violated
+- Graduated enforcement: SURFACED constraints = advisory, WARNED+ = blocking
+- Fail-open: if MDEMG server unreachable, all actions allowed
+
+Config:
+- `JIMINY_ESCALATION_PERSIST_ENABLED` (default: true) — persist escalation state to Neo4j
+- `JIMINY_STRICT_STATE_PATH` (default: `~/.mdemg/.jiminy-strict-mode`) — strict mode state file
+- `J17_T1_COMPREHENSION_GATE` (default: 0.5) — minimum T1 follow rate to continue using T1 encoding
+
+Endpoints:
+- `POST /v1/jiminy/strict` — toggle strict mode
+- `POST /v1/jiminy/reformulate` — imperative directive generation
+- `POST /v1/jiminy/classify` — response classification (pass/deny)
+
 ## Architecture Notes
 
 - **Compose embed:** `mdemg init` writes `docker-compose.yml` from `internal/cli/compose_templates/` (both files must stay in sync — CI checks this)
@@ -243,6 +264,7 @@ Hooks in `.claude/hooks/` run automatically — they are not optional.
 - **`post-tool-observe.py`**: Auto-captures decisions, errors, progress, MEMORY.md overflow
 - **`pre-compact.sh`**: Saves context snapshot to CMS, Jiminy health check, J17 ticket
 - **`pre-bash-check.py`**: Blocks destructive operations (DB destruction, rm -rf, force push, Cypher deletes). Must ask user for confirmation if blocked.
+- **`pre-write-check.py`**: (/strict only) Blocks Write/Edit when escalated constraint violated. Fail-open when server unreachable.
 
 ### Decision Protocol: irreversible → ask user. Reversible → check CMS preferences. Always observe decisions.
 ### Communication Protocol: state what + why before every action. Confirm data modifications.
