@@ -8,15 +8,27 @@ import (
 	"mdemg/internal/config"
 )
 
-// TestJ17ProtocolMetrics_MethodNotAllowed verifies POST returns 405.
+// TestJ17ProtocolMetrics_MethodNotAllowed verifies PUT returns 405 (GET and POST are allowed).
 func TestJ17ProtocolMetrics_MethodNotAllowed(t *testing.T) {
 	s := &Server{cfg: config.Config{}}
-	req := httptest.NewRequest(http.MethodPost, "/v1/jiminy/protocol/metrics", nil)
+	req := httptest.NewRequest(http.MethodPut, "/v1/jiminy/protocol/metrics", nil)
 	w := httptest.NewRecorder()
 	s.handleJ17ProtocolMetrics(w, req)
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", w.Code)
+	}
+}
+
+// TestJ17ProtocolMetrics_ResetDisabled verifies POST returns 503 when J17 is disabled.
+func TestJ17ProtocolMetrics_ResetDisabled(t *testing.T) {
+	s := &Server{cfg: config.Config{J17Enabled: false}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/jiminy/protocol/metrics", nil)
+	w := httptest.NewRecorder()
+	s.handleJ17ProtocolMetrics(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", w.Code)
 	}
 }
 
