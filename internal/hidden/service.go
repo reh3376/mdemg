@@ -303,6 +303,7 @@ func (s *Service) buildPipeline() *Pipeline {
 	p.Register(&constraintStep{svc: s})         // phase 20
 	p.Register(&dynamicEmergenceStep{svc: s})   // phase 22 — LLM-driven concept naming (Phase 103)
 	p.Register(&dynamicEdgesStep{svc: s})       // phase 25 — dynamic edges (after clustering)
+	p.Register(&clusterSummaryStep{svc: s})    // phase 28 — LLM summary enhancement (L1-L4)
 	p.Register(&emergentL5Step{svc: s})         // phase 30 — post-processing
 	return p
 }
