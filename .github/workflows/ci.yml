@@ -252,7 +252,7 @@ jobs:
             --spec-dir docs/tests/uams/specs/
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.out
           fail_ci_if_error: false
