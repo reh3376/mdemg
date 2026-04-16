@@ -469,13 +469,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			Provider:  cfg.ConsultingLLMConstraintsProvider,
 			Model:     cfg.ConsultingLLMConstraintsModel,
 			MaxTokens: 500,
-			TimeoutMs: cfg.EmergenceTimeoutMs,
+			TimeoutMs: cfg.ConsultingClassifyTimeoutMs,
 			OpenAIKey: cfg.OpenAIAPIKey,
 			OpenAIURL: cfg.OpenAIEndpoint,
 			OllamaURL: cfg.OllamaEndpoint,
 		}, cbRegistry)
 		cons.SetConstraintClassifier(sharedConstraintClassifier)
-		slog.Info("consulting LLM constraint classification enabled", "provider", cfg.ConsultingLLMConstraintsProvider, "model", cfg.ConsultingLLMConstraintsModel)
+		slog.Info("consulting LLM constraint classification enabled", "provider", cfg.ConsultingLLMConstraintsProvider, "model", cfg.ConsultingLLMConstraintsModel, "timeout_ms", cfg.ConsultingClassifyTimeoutMs)
 	}
 
 	// F6a: Wire LLM classifier gate into conversation service if enabled.
@@ -748,14 +748,14 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			Provider:        cfg.RSICLLMReflectProvider,
 			Model:           cfg.RSICLLMReflectModel,
 			MaxTokens:       cfg.EmergenceMaxTokens,
-			TimeoutMs:       cfg.EmergenceTimeoutMs,
+			TimeoutMs:       cfg.RSICLLMReflectTimeoutMs,
 			OpenAIKey:       cfg.OpenAIAPIKey,
 			OpenAIURL:       cfg.OpenAIEndpoint,
 			OllamaURL:       cfg.OllamaEndpoint,
 			CompressPrompts: cfg.RSICLLMReflectCompress,
 		}, cbRegistry, rsicCalibrator)
 		rsicReflector.SetLLMReflector(llmReflector)
-		slog.Info("RSIC LLM reflection enabled", "provider", cfg.RSICLLMReflectProvider, "model", cfg.RSICLLMReflectModel)
+		slog.Info("RSIC LLM reflection enabled", "provider", cfg.RSICLLMReflectProvider, "model", cfg.RSICLLMReflectModel, "timeout_ms", cfg.RSICLLMReflectTimeoutMs)
 	}
 
 	// Watchdog and cycle orchestrator — closure captures rsicCycle variable (assigned below)
