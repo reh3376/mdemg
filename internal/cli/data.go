@@ -40,6 +40,7 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataCheckCmd())
 	cmd.AddCommand(newDataCurateCmd())
 	cmd.AddCommand(newDataValidateCmd())
+	cmd.AddCommand(newDataCleanCmd())
 
 	return cmd
 }
