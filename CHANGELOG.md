@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DH-004: J17 Protocol & Jiminy Dashboard Remediation** (2026-04-17) — Grafana dashboard hygiene + metric integrity fixes:
+  - New admin endpoints: `GET /v1/admin/breakers` (list state of all circuit breakers) and `POST /v1/admin/breakers/reset` (force a named breaker to `StateClosed`). Gated by `AUTH_API_KEYS`. Operator escape hatch when a breaker trips on a transient incident but hasn't auto-recovered.
+  - New env var `LLM_RETRY_DEADLINE_ENABLED` (default: `true`) — retry once on `context.DeadlineExceeded` from OpenAI iff remaining context budget > 2× base delay. Prevents a single slow upstream response from tripping `openai-constraint-classify` / `jiminy-synthesis` breakers.
+  - New field `TicketRestoreTotal` on `ProtocolStats` — distinguishes "no data" (total=0) from "true 100%" (total>0 && ok==total) for downstream dashboard/alert consumers.
+  - Compose templates (`internal/cli/compose_templates/docker-compose.yml`, root `docker-compose.yml`, `deploy/docker/docker-compose.prod.yml`) now expose 7 J17 sidecar env vars: `J17_SIDECAR_URL`, `J17_SIDECAR_TIMEOUT_MS`, `J17_SIDECAR_MODE`, `J17_SIDECAR_CONFIDENCE_FLOOR`, `J17_SIDECAR_CB_FAILURE_THRESHOLD`, `J17_SIDECAR_CB_TIMEOUT_SEC`, `J17_NLI_COMPREHENSION_ENABLED`, `J17_NLI_CALIBRATION_BIAS_THRESHOLD`.
 - **/strict Mode Foundation** (STRICT-P0P1-2026-04-11) — Deterministic agent governance via escalation persistence and /strict mode enforcement:
   - **T1/T2 comprehension fix (P0)**: Bootstrap header + decoding instruction injected with T1/T2 guidance; comprehension gate auto-downgrades T1 to T2 when follow rate < 50% (`J17_T1_COMPREHENSION_GATE`)
   - **Escalation persistence**: Write-behind `EscalationStore` persists J12 state to Neo4j (`J12EscalationState` label), survives server restarts, piggybacked on trust flush ticker
@@ -41,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **DH-004 config defaults** (2026-04-17):
+  - `CONSULTING_CLASSIFY_TIMEOUT_MS` default bumped 15000 → 30000 (matches `JIMINY_SYNTHESIS_TIMEOUT_MS`; survives typical `gpt-5.4-mini` latency without tripping the circuit breaker on one slow call).
+  - `J17_SIDECAR_TIMEOUT_MS` default bumped 200 → 1000, with a 100ms floor enforced in `FromEnv()`. NLI primary-path calls were timing out at 200ms ~56% of the time, inflating `j17_nli_mean_bias`.
 - **LLM Model Config** (TRAIN-DQ-2026-04-10) — standardized all LLM tasks to gpt-5.4 (from mixed gpt-4.1/gpt-4o-mini) for training data quality during distillation campaign
 - **Token Counting** — fixed `tokens_in` always recording 0 in TSDB; now properly captures `prompt_tokens` and `completion_tokens` from OpenAI API response as separate fields
 - **RAFT Context** — wired `retrieval_node_ids` for `consulting.synthesis` and `retrieval.rerank_cross` (enables retrieval-augmented fine-tuning)
@@ -48,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **DH-004 dashboard & metric fixes** (2026-04-17):
+  - **J17 Protocol Health null-tolerance**: `TicketRestoreSuccessRate` now defaults to `1.0` when `ticketRestoreTotal == 0` (matches the existing `codeCoverage` null-tolerance pattern at `protocol_metrics.go:307`). A healthy system with no restore events no longer drags the 15% stability weight to zero. Lifts `rsic_health_protocol` from 0.432 toward ≥ 0.7.
+  - **NLI fallback counting (gate-aware)**: `RecordNLIFallback` now only fires when `nliScorer.IsOperational()` (enabled AND sidecar URL set). A gated-off scorer no longer inflates `j17_nli_mean_bias` when `J17_NLI_COMPREHENSION_ENABLED=false`.
+  - **Alert cooldown TOCTOU race**: `cooldown.Allow` + `cooldown.Record` were separate lock acquisitions; concurrent `Dispatcher.Send()` calls could both pass the gate. New atomic `TryRecord()` closes the race — at most one caller wins per (service, severity) cooldown window. Fixes repeating "Jiminy Pipeline Critical" alerts.
+  - **Context Cooler graduation**: `CoactivateSession` now reinforces `stability_score` for every session observation via `reinforceSessionObservations`. Previously only created `CO_ACTIVATED_WITH` edges, never raising stability — so 99.7% of conversation observations stayed volatile forever (`rsic_health_task` = 0.019). Forward-only fix; existing volatile data self-heals via ongoing session activity.
+  - **LLM retry budget-aware DeadlineExceeded**: `shouldRetry()` gains retry-on-deadline path gated by remaining context budget (`time.Until(deadline) > 2*baseDelay`). Avoids doubling OpenAI spend under sustained slowness while recovering from transient timeouts.
+  - **Dashboard panel overlap** (`deploy/docker/grafana/dashboards/mdemg-j17.json`): "Ticket Restore Rate" and "Total Events" were both rendered at `{x:6, y:24, w:6, h:4}`. Relocated Total Events to full-width summary at `{x:0, y:28, w:24, h:4}`; bumped subsequent panels down. Added panel description to `jiminy_latest_age_ms` in `mdemg-jiminy.json` documenting expected /strict-mode staleness.
 - **RSIC hardening** (RSIC-HDN-2026-04-09) — 32 findings from deep dive remediated across 6 epics:
   - P0: Nil postReport no longer silently inflates calibration — `CriteriaMet=false` when post-assessment fails
   - P0: Nil driver guards added to 7 executor methods (prevents nil-pointer panics)

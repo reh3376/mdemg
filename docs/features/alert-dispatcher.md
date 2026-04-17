@@ -68,6 +68,8 @@ Location: `~/.mdemg/alerts/current.json` (configurable via `ALERT_FILE_PATH`)
 
 Per-(service, severity) cooldown prevents alert storms. Same service+severity combination is suppressed for `ALERT_COOLDOWN_SEC` seconds after the first delivery. Different severities from the same service are not suppressed.
 
+**Atomic check-and-record (DH-004, 2026-04-17):** The cooldown tracker exposes `TryRecord(service, severity)` which checks the cooldown and stamps the entry under a single lock acquisition. The dispatcher uses this atomic path instead of separate `Allow()` + `Record()` calls — closing a TOCTOU race where concurrent `Dispatcher.Send()` calls could both pass `Allow()` before either recorded. Under concurrent load exactly one caller wins per cooldown window.
+
 ## Hook Delivery
 
 ### prompt-context.sh (every prompt)

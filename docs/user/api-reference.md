@@ -3034,6 +3034,79 @@ curl -s -X POST http://localhost:9999/v1/admin/spaces/prune \
 
 ---
 
+## Admin — Circuit Breakers
+
+Operator endpoints for inspecting and resetting the LLM circuit breakers registered in `internal/llmclient/breaker.go`. Useful when a breaker trips on a transient incident and hasn't auto-recovered by the half-open probe cycle. All endpoints are gated by `AUTH_API_KEYS`.
+
+### GET /v1/admin/breakers
+
+List every registered breaker with current state and counts.
+
+**Response (200):**
+```json
+{
+  "breakers": [
+    {
+      "name": "openai-constraint-classify",
+      "state": "closed",
+      "consecutive_failures": 0,
+      "consecutive_successes": 0,
+      "last_failure_time": "0001-01-01T00:00:00Z",
+      "failure_threshold": 5,
+      "timeout_sec": 60
+    },
+    {
+      "name": "jiminy-synthesis",
+      "state": "open",
+      "consecutive_failures": 5,
+      "consecutive_successes": 0,
+      "last_failure_time": "2026-04-17T18:03:12Z",
+      "failure_threshold": 5,
+      "timeout_sec": 60
+    }
+  ]
+}
+```
+
+```bash
+curl -s http://localhost:9999/v1/admin/breakers \
+  -H "X-API-Key: $MDEMG_API_KEY" | jq
+```
+
+**Status Codes:** `200 OK`, `401 Unauthorized` (missing/invalid API key).
+
+---
+
+### POST /v1/admin/breakers/reset
+
+Force a named breaker to `StateClosed`. Clears failure counters and allows the next call through. Does not modify breaker configuration.
+
+**Request Body:**
+```json
+{ "name": "openai-constraint-classify" }
+```
+
+**Response (200):**
+```json
+{
+  "name": "openai-constraint-classify",
+  "previous_state": "open",
+  "state": "closed",
+  "reset_at": "2026-04-17T18:04:22Z"
+}
+```
+
+```bash
+curl -s -X POST http://localhost:9999/v1/admin/breakers/reset \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $MDEMG_API_KEY" \
+  -d '{"name":"openai-constraint-classify"}' | jq
+```
+
+**Status Codes:** `200 OK`, `400 Bad Request` (missing/empty name), `401 Unauthorized`, `404 Not Found` (unknown breaker name).
+
+---
+
 ## Space Transfer (Export/Import)
 
 HTTP API for exporting and importing space data. Supports profile-based filtering and conflict-aware import.

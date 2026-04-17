@@ -368,6 +368,15 @@ Requires `UNTS_ENABLED=true` and `UNTS_BASE_PATH` (default: `.`). Returns 503 wh
 
 A background auto-prune scheduler runs every 24 hours by default (`SPACE_PRUNE_INTERVAL_HOURS`, 0 to disable).
 
+### Admin — Circuit Breakers
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/admin/breakers` | GET | List all registered circuit breakers with state (closed/open/half-open) and counts |
+| `/v1/admin/breakers/reset` | POST | Force a named breaker to `StateClosed` (body: `{"name":"<breaker-name>"}`) |
+
+Requires `AUTH_API_KEYS`. Operator escape hatch when a breaker trips on a transient incident but hasn't auto-recovered. See `docs/user/api-reference.md#admin-circuit-breakers`.
+
 ### Conversation Memory System (CMS)
 
 | Endpoint | Method | Description |

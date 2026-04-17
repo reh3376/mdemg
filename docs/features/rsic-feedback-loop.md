@@ -127,6 +127,24 @@ curl -s http://localhost:9999/v1/self-improve/rollback | jq
 | `internal/ape/calibration_test.go` | 8 unit tests (post-report, criteria met/not-met/missing, operators, calibration) |
 | `tests/integration/autoresearch_test.go` | 3 integration tests (metrics_after, criteria fields, dry-run) |
 
+## Protocol Health Null-Tolerance (DH-004)
+
+`ProtocolStats` fields that can be zero because a feature is rarely exercised (not because it's failing) must be null-tolerant in the scoring formula:
+
+| Field | Pattern | Behavior when zero |
+|-------|---------|--------------------|
+| `CodeCoverage` | Null-tolerant | Returns 1.0 when no constraints defined |
+| `TicketRestoreSuccessRate` | Null-tolerant (DH-004) | Returns 1.0 when `TicketRestoreTotal == 0` |
+| `ReplayFrequencyPerHour` | Null-tolerant (inherent) | Lower is better — 0 replays yields 0 penalty |
+
+`TicketRestoreTotal` was added to `ProtocolStats` so downstream dashboard consumers can distinguish "no data" (total=0) from "true 100%" (total>0 && ok==total). The change lifts `rsic_health_protocol` for healthy systems with no restore events — previously returning 0.0 indistinguishably from "100% of restores failed," dragging the 15% stability weight.
+
+## Context Cooler Graduation Fix (DH-004)
+
+`rsic_health_task` was stuck at 0.019 in `mdemg-dev` because 99.7% of conversation observations stayed volatile forever. Root cause: `CoactivateSession` in `internal/learning/service.go` created `CO_ACTIVATED_WITH` edges between session-observation pairs but never called `UpdateStabilityOnReinforcement`, so `stability_score` never crossed the `COOLER_GRADUATION_THRESHOLD` (0.8).
+
+The DH-004 fix adds `reinforceSessionObservations()` which runs after edge creation and reinforces every observation in the session (`+0.15` stability per coactivation). Forward-only fix — existing volatile data self-heals as ongoing sessions reinforce their constituents. Operators can also backfill via `POST /v1/conversation/graduate`.
+
 ## Dependencies
 
 - **RSIC core (Phase 60b)** — assess/reflect/plan/dispatch pipeline

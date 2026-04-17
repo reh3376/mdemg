@@ -536,7 +536,9 @@ The `j17_low_code_coverage` reflection pattern (fires when coverage < 80%) was t
 |----------|---------|---------|
 | `JIMINY_CACHE_J17_BYPASS` | `true` | Bypass guidance cache for both Get and Put (ensures tier assignments always reflect current trust) |
 | `J17_SIDECAR_URL` | `""` (disabled) | Neural sidecar URL for shadow ML predictions (tier + NLI comprehension) |
-| `J17_SIDECAR_TIMEOUT_MS` | `200` | Timeout for sidecar shadow calls in ms |
+| `J17_SIDECAR_TIMEOUT_MS` | `1000` | Timeout for sidecar shadow calls in ms (100ms floor enforced; default raised from 200→1000 in DH-004 to eliminate ~56% fallback rate) |
+
+> **DH-004 (2026-04-17):** `RecordNLIFallback` is now gated on `nliScorer.IsOperational()` (enabled AND sidecar URL set). A gated-off scorer returning the heuristic 0.5 no longer inflates `j17_nli_mean_bias`. 7 J17 sidecar env vars are exposed in all compose templates (root, compose_templates, prod).
 
 ### 7.4 New Tests (11 total)
 
@@ -742,7 +744,7 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 | `J17_EXTENSIONS_ENABLED` | `true` | Allow agent extension negotiation |
 | `J17_ALLOWED_EXTENSIONS` | `tier_preference,abbreviated_ids,batch_mode,density_boost` | Permitted extensions |
 | `J17_SIDECAR_URL` | `""` | Neural sidecar URL for shadow ML predictions |
-| `J17_SIDECAR_TIMEOUT_MS` | `200` | Timeout for sidecar shadow calls in ms |
+| `J17_SIDECAR_TIMEOUT_MS` | `1000` | Timeout for sidecar shadow calls in ms (100ms floor; raised from 200 in DH-004) |
 
 ### Cache Session Safety
 
