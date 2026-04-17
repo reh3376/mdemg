@@ -301,6 +301,7 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+		ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 		start := time.Now()
 		resp, err := s.jiminySvc.Guide(ctx, jiminy.GuidanceRequest{
@@ -438,6 +439,7 @@ func (s *Server) handleJiminyEvaluate(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
+	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 	resp, err := evaluator.Evaluate(ctx, req)
 	if err != nil {
@@ -507,6 +509,7 @@ func (s *Server) handleJiminyClassify(w http.ResponseWriter, r *http.Request) {
 	// 5-second deadline for PreToolUse hook timeout budget
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 	resp, err := s.jiminySvc.Classify(ctx, req)
 	if err != nil {
@@ -548,6 +551,7 @@ func (s *Server) handleJiminyReformulate(w http.ResponseWriter, r *http.Request)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 	resp, err := s.jiminySvc.Reformulate(ctx, req)
 	if err != nil {

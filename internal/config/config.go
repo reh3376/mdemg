@@ -478,15 +478,17 @@ type Config struct {
 	WeeklyGapInterviewsEnabled    bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
 
 	// Phase AR-3: LLM-powered RSIC reflection
-	RSICLLMReflectEnabled  bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: true)
-	RSICLLMReflectProvider string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
-	RSICLLMReflectModel    string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
-	RSICLLMReflectCompress bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
+	RSICLLMReflectEnabled   bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: true)
+	RSICLLMReflectProvider  string // RSIC_LLM_REFLECT_PROVIDER — LLM provider (openai/ollama, default: from EMERGENCE_PROVIDER)
+	RSICLLMReflectModel     string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
+	RSICLLMReflectCompress  bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
+	RSICLLMReflectTimeoutMs int    // RSIC_LLM_REFLECT_TIMEOUT_MS — timeout for reflection LLM call in ms (default: 15000, min 5000)
 
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
 	ConsultingLLMConstraintsModel    string // CONSULTING_LLM_CONSTRAINTS_MODEL — model for classification (default: from EMERGENCE_MODEL)
+	ConsultingClassifyTimeoutMs      int    // CONSULTING_CLASSIFY_TIMEOUT_MS — timeout for constraint classification LLM call in ms (default: 15000, min 5000)
 
 	// Phase AR-3: LLM-powered query classification
 	RetrievalLLMClassifyEnabled  bool   // RETRIEVAL_LLM_CLASSIFY_ENABLED — enable LLM query classification (default: false)
@@ -839,9 +841,9 @@ type Config struct {
 
 	// ===== LLM Client Retry =====
 	LLMRetryEnabled     bool    // LLM_RETRY_ENABLED — enable retry for transient LLM errors (default: true)
-	LLMRetryMaxAttempts int     // LLM_RETRY_MAX_ATTEMPTS — max retry attempts (default: 3)
+	LLMRetryMaxAttempts int     // LLM_RETRY_MAX_ATTEMPTS — max retry attempts (default: 5)
 	LLMRetryBaseDelayMs int     // LLM_RETRY_BASE_DELAY_MS — initial backoff delay in ms (default: 500)
-	LLMRetryMaxDelayMs  int     // LLM_RETRY_MAX_DELAY_MS — max backoff delay in ms (default: 10000)
+	LLMRetryMaxDelayMs  int     // LLM_RETRY_MAX_DELAY_MS — max backoff delay in ms (default: 60000)
 	LLMRetryMultiplier  float64 // LLM_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
 	LLMRetryJitter      float64 // LLM_RETRY_JITTER — jitter factor 0-1 (default: 0.2)
 
@@ -2406,10 +2408,24 @@ func FromEnv() (Config, error) {
 	rsicLLMReflectProvider := get("RSIC_LLM_REFLECT_PROVIDER", emergenceProvider)
 	rsicLLMReflectModel := get("RSIC_LLM_REFLECT_MODEL", emergenceModel)
 	rsicLLMReflectCompress := getBool("RSIC_LLM_REFLECT_COMPRESS", true)
+	rsicLLMReflectTimeoutMs, err := atoi("RSIC_LLM_REFLECT_TIMEOUT_MS", 15000)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicLLMReflectTimeoutMs < 5000 {
+		return Config{}, fmt.Errorf("RSIC_LLM_REFLECT_TIMEOUT_MS must be >= 5000")
+	}
 
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
+	consultingClassifyTimeoutMs, err := atoi("CONSULTING_CLASSIFY_TIMEOUT_MS", 15000)
+	if err != nil {
+		return Config{}, err
+	}
+	if consultingClassifyTimeoutMs < 5000 {
+		return Config{}, fmt.Errorf("CONSULTING_CLASSIFY_TIMEOUT_MS must be >= 5000")
+	}
 
 	retrievalLLMClassifyEnabled := getBool("RETRIEVAL_LLM_CLASSIFY_ENABLED", false)
 	retrievalLLMClassifyProvider := get("RETRIEVAL_LLM_CLASSIFY_PROVIDER", emergenceProvider)
@@ -3269,7 +3285,7 @@ func FromEnv() (Config, error) {
 
 	// LLM Client Retry
 	llmRetryEnabled := getBool("LLM_RETRY_ENABLED", true)
-	llmRetryMaxAttempts, err := atoi("LLM_RETRY_MAX_ATTEMPTS", 3)
+	llmRetryMaxAttempts, err := atoi("LLM_RETRY_MAX_ATTEMPTS", 5)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3277,7 +3293,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	llmRetryMaxDelayMs, err := atoi("LLM_RETRY_MAX_DELAY_MS", 10000)
+	llmRetryMaxDelayMs, err := atoi("LLM_RETRY_MAX_DELAY_MS", 60000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3729,9 +3745,11 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectProvider:           rsicLLMReflectProvider,
 		RSICLLMReflectModel:              rsicLLMReflectModel,
 		RSICLLMReflectCompress:           rsicLLMReflectCompress,
+		RSICLLMReflectTimeoutMs:          rsicLLMReflectTimeoutMs,
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
+		ConsultingClassifyTimeoutMs:      consultingClassifyTimeoutMs,
 		RetrievalLLMClassifyEnabled:      retrievalLLMClassifyEnabled,
 		RetrievalLLMClassifyProvider:     retrievalLLMClassifyProvider,
 		RetrievalLLMClassifyModel:        retrievalLLMClassifyModel,

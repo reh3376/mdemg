@@ -116,6 +116,7 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - `mdemg data check --pre-campaign` — 8 validation checks (schema, instance ID, task coverage, etc.)
 - `mdemg data curate` — UAITS spec-driven training data curation (SFT/DPO/RAFT/curriculum paradigms)
 - `mdemg data validate` — UAITS spec schema validation + optional data compliance
+- `mdemg data clean --space-id <id>` — remove error records and silent failures from TSDB (dry-run by default, `--dry-run=false --force` to delete)
 - `mdemg tsdb status` — TimescaleDB connection and schema version
 - `mdemg tsdb migrate` — apply pending TSDB schema migrations
 - `mdemg synergy status` — Claude Code ↔ MDEMG synergy health
@@ -195,7 +196,8 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
   - Rules: latency SLO, error rate, graph health, orphans, Neo4j resources, rate limiting, cache hit ratio, Jiminy follow rate
   - ForDuration state tracking prevents alert flapping; graceful degradation when TSDB unavailable
 - **Goroutine supervisor** (`internal/supervisor/`): monitors health prober and alert evaluator with panic recovery, auto-restart (3 max, exponential backoff), alerts on restart/failure
-- LLM retry: `LLM_RETRY_ENABLED` (default: true), `LLM_RETRY_MAX_ATTEMPTS` (default: 3), retries on 429/503 only
+- LLM retry: `LLM_RETRY_ENABLED` (default: true), `LLM_RETRY_MAX_ATTEMPTS` (default: 5), `LLM_RETRY_MAX_DELAY_MS` (default: 60000), retries on 429/502/503 + network errors
+- Task-specific timeouts: `CONSULTING_CLASSIFY_TIMEOUT_MS` (default: 15000), `RSIC_LLM_REFLECT_TIMEOUT_MS` (default: 15000) — decoupled from `EMERGENCE_TIMEOUT_MS`
 - LLM consecutive failure alert: `LLM_CONSECUTIVE_FAILURE_THRESHOLD` (default: 3), fires high-severity alert after N consecutive failures per task
 - Health prober: `HEALTH_PROBE_ENABLED` (default: true), `HEALTH_PROBE_INTERVAL_SEC` (default: 60), probes API/Neo4j/TSDB/sidecar
 - Enhanced `/healthz`: returns `status: "degraded"` with `checks` map when subsystems unhealthy; CMS check is live Ping (not nil guard)

@@ -291,6 +291,13 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 		}
 	}
 
+	// Remove JSONL files for tables with 0 rows (not in manifest)
+	for _, tableName := range cfg.Tables {
+		if _, inManifest := manifest.Tables[tableName]; !inManifest {
+			_ = os.Remove(filepath.Join(tmpDir, tableName+".jsonl"))
+		}
+	}
+
 	// Write manifest
 	manifestPath := filepath.Join(tmpDir, "manifest.json")
 	mf, err := os.Create(manifestPath)
