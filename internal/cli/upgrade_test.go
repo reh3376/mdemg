@@ -1,11 +1,16 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestEdgeBinaryName(t *testing.T) {
@@ -140,21 +145,25 @@ func TestUpgradeDockerInstances_NoDocker(t *testing.T) {
 		t.Skip("Docker is available — this test validates the no-Docker path")
 	}
 	// Should not panic, should not produce errors
-	upgradeDockerInstances("test-version")
+	upgradeDockerInstances(context.Background(), "test-version")
 }
 
 func TestUpgradeDockerInstances_NoContainers(t *testing.T) {
 	if !DockerAvailable() {
 		t.Skip("Docker not available")
 	}
-	// With Docker available but no mdemg containers running in a fake project,
-	// function should return silently (no "Updating..." output).
-	// Note: if real mdemg containers are running, this still exercises the
-	// discovery + dedup logic safely (pull is non-fatal).
-	upgradeDockerInstances("test-version")
+	// 30s timeout prevents hanging if docker compose pull stalls in CI.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	upgradeDockerInstances(ctx, "test-version")
 }
 
 func TestRunUpgrade_DockerOnlyFlag(t *testing.T) {
+	// Short timeout prevents hanging when real mdemg containers are running.
+	oldTimeout := dockerUpgradeTimeout
+	dockerUpgradeTimeout = 30 * time.Second
+	defer func() { dockerUpgradeTimeout = oldTimeout }()
+
 	// --docker-only should skip binary download entirely
 	// and only call upgradeDockerInstances
 	err := runUpgrade(false, false, false, false, true) // dockerOnly=true
@@ -164,6 +173,17 @@ func TestRunUpgrade_DockerOnlyFlag(t *testing.T) {
 }
 
 func TestRunUpgrade_NoDockerDryRun(t *testing.T) {
+	// Mock GitHub API to avoid rate limiting in CI.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(githubRelease{TagName: "v99.0.0", Name: "v99.0.0"})
+	}))
+	defer srv.Close()
+
+	old := upgradeGitHubAPIURL
+	upgradeGitHubAPIURL = srv.URL
+	defer func() { upgradeGitHubAPIURL = old }()
+
 	// --no-docker --dry-run should check for updates but skip Docker
 	err := runUpgrade(true, false, false, true, false) // dryRun=true, noDocker=true
 	if err != nil {
