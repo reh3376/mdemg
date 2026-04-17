@@ -527,6 +527,53 @@ func TestScoreProtocol_WeightsSumToOne(t *testing.T) {
 	assertClose(t, sum, 1.0, 0.001, "protocol sub-weights")
 }
 
+// TestScoreProtocol_NoTicketRestoreData verifies that a healthy system with
+// zero ticket-restore events doesn't get penalized on the stability component.
+// Once the collector defaults TicketRestoreSuccessRate to 1.0 on no data, and
+// ReplayFrequencyPerHour is 0 (no replays), the 15% stability weight should be
+// full — not the 0.075 the old 0.0 default produced.
+// Scenario: healthy comprehension + coverage + compression, zero ticket data.
+func TestScoreProtocol_NoTicketRestoreData(t *testing.T) {
+	a := newTestAssessor()
+	stats := ProtocolStatsResult{
+		AvgComprehension:         0.9,
+		NLIBiasAlert:             false, // calibration = 1.0
+		CompressionRatio:         3.0,   // (3.0-1.0)/4.0 = 0.5
+		CodeCoverage:             1.0,
+		TicketRestoreSuccessRate: 1.0, // null-tolerant default (set by collector when total==0)
+		TicketRestoreTotal:       0,
+		ReplayFrequencyPerHour:   0.0, // no replays — stability = 0.5*1.0 + 0.5*1.0 = 1.0
+	}
+	got := a.scoreProtocol(stats)
+	// 0.35*0.9 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*1.0
+	// = 0.315 + 0.05 + 0.125 + 0.20 + 0.15 = 0.84
+	assertClose(t, got, 0.84, 0.001, "scoreProtocol with no ticket restore data")
+	if got < 0.75 {
+		t.Errorf("protocolScore = %f, want >= 0.75 (null-tolerant stability lift)", got)
+	}
+}
+
+// TestScoreProtocol_RegressionFromBugReport reproduces the Grafana dashboard
+// scenario where Protocol Health read 0.432. With the null-tolerance fix
+// (TicketRestoreSuccessRate=1.0 on zero data), the same healthy inputs should
+// now yield >= 0.7, matching the verification gate in the DH-004 sprint plan.
+func TestScoreProtocol_RegressionFromBugReport(t *testing.T) {
+	a := newTestAssessor()
+	stats := ProtocolStatsResult{
+		AvgComprehension:         0.8,
+		NLIBiasAlert:             false,
+		CompressionRatio:         2.5, // modest compression
+		CodeCoverage:             0.9,
+		TicketRestoreSuccessRate: 1.0, // post-fix default
+		TicketRestoreTotal:       0,
+		ReplayFrequencyPerHour:   0.0,
+	}
+	got := a.scoreProtocol(stats)
+	if got < 0.7 {
+		t.Errorf("Protocol Health = %f, want >= 0.7 (post-fix target)", got)
+	}
+}
+
 // ─── computeConfidence tests ───
 
 func TestComputeConfidence_AllProviders(t *testing.T) {

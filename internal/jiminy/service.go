@@ -1496,8 +1496,12 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 					slog.Debug("j17-sidecar: NLI fallback, using heuristic for comprehension",
 						"constraint", item.ConstraintCode, "followed", followed)
 
-					// Track fallback rate for RSIC awareness
-					if s.protocolMetrics != nil {
+					// Track fallback rate for RSIC awareness — but ONLY when the feature
+					// is genuinely enabled AND has a URL configured (DH-004 E3). A scorer
+					// that's gated off or misconfigured (empty URL) is not a degraded-
+					// state signal; it's an operator choice. Counting those inflates
+					// nli_mean_bias with noise that never clears.
+					if s.protocolMetrics != nil && s.nliScorer.IsOperational() {
 						s.protocolMetrics.RecordNLIFallback()
 					}
 

@@ -62,12 +62,13 @@ func (d *Dispatcher) Send(ctx context.Context, a Alert) {
 		return
 	}
 
-	if !d.cooldown.Allow(a.Service, a.Severity) {
+	// DH-004 E4.4: atomic check-and-record to close TOCTOU race that allowed
+	// duplicate alerts when concurrent Send() calls raced past Allow().
+	if !d.cooldown.TryRecord(a.Service, a.Severity) {
 		slog.Debug("alert: suppressed by cooldown",
 			"service", a.Service, "severity", a.Severity)
 		return
 	}
-	d.cooldown.Record(a.Service, a.Severity)
 
 	// Fill defaults.
 	if a.ID == "" {

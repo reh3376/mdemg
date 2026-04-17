@@ -14,6 +14,7 @@ type ProtocolMetrics struct {
 	AvgComprehension         float64            `json:"avg_comprehension"`
 	ReplayFrequencyPerHour   float64            `json:"replay_frequency_per_hour"`
 	TicketRestoreSuccessRate float64            `json:"ticket_restore_success_rate"`
+	TicketRestoreTotal       int64              `json:"ticket_restore_total"` // disambiguates "no data" (0) from "100% pass" (>0 && ok==total)
 	CodeCoverage             float64            `json:"code_coverage"`
 	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
 	Sidecar                  *SidecarMetrics    `json:"sidecar_metrics,omitempty"` // NS-07
@@ -293,9 +294,15 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 	}
 
 	// Ticket restore success rate
+	// When no ticket restore events have been recorded, the system is healthy by
+	// default — there's nothing to restore. Defaulting to 0.0 would conflate "no
+	// data" with "100% of restores failed" and unfairly drag Protocol Health.
+	// Matches the pattern used for codeCoverage below.
 	var ticketRate float64
 	if c.ticketRestoreTotal > 0 {
 		ticketRate = float64(c.ticketRestoreOK) / float64(c.ticketRestoreTotal)
+	} else {
+		ticketRate = 1.0
 	}
 
 	// Code coverage: fraction of constraint items that have a code assigned
@@ -381,6 +388,7 @@ func (c *ProtocolMetricsCollector) Snapshot() *ProtocolMetrics {
 		AvgComprehension:         avgComp,
 		ReplayFrequencyPerHour:   replayFreq,
 		TicketRestoreSuccessRate: ticketRate,
+		TicketRestoreTotal:       c.ticketRestoreTotal,
 		CodeCoverage:             codeCoverage,
 		T2FrequencyByConstraint:  t2Freq,
 		Sidecar:                  sidecar,

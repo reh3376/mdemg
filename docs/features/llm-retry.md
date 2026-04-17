@@ -18,6 +18,7 @@ Request → Fail (429/503) → Wait (backoff) → Retry → Fail → Wait (longe
 | `LLM_RETRY_MAX_ATTEMPTS` | `3` | Maximum retry attempts (0 = no retries) |
 | `LLM_RETRY_BASE_DELAY_MS` | `500` | Base delay before first retry |
 | `LLM_RETRY_MAX_DELAY_MS` | `10000` | Maximum backoff delay cap |
+| `LLM_RETRY_DEADLINE_ENABLED` | `true` | Retry once on `context.DeadlineExceeded` when remaining context budget > 2× base delay (DH-004) |
 
 Set `LLM_RETRY_ENABLED=false` to restore single-attempt behaviour.
 
@@ -35,7 +36,7 @@ Set `LLM_RETRY_ENABLED=false` to restore single-attempt behaviour.
 | HTTP 422 (Unprocessable Entity) | No | Invalid payload |
 | HTTP 500 (Internal Server Error) | No | Server bug — conservative |
 | `context.Canceled` | No | Caller cancelled |
-| `context.DeadlineExceeded` | No | Caller timeout |
+| `context.DeadlineExceeded` | Conditional | When `LLM_RETRY_DEADLINE_ENABLED=true` AND remaining context budget > 2× base delay, retried once. Otherwise not retried (would certainly re-fail). Prevents single slow OpenAI responses from tripping circuit breakers while avoiding doubled spend under sustained slowness (DH-004). |
 
 ## Retry-After Header
 

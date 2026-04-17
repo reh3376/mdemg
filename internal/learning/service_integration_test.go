@@ -873,3 +873,103 @@ func TestApplyCoactivationWeightBounds(t *testing.T) {
 
 	t.Logf("Final weight after 20 iterations with high learning rate: %f (max: %f)", weight, cfg.LearningWMax)
 }
+
+// mockStabilityReinforcer captures the node IDs it was called with.
+type mockStabilityReinforcer struct {
+	called []string
+}
+
+func (m *mockStabilityReinforcer) UpdateStabilityOnReinforcement(_ context.Context, _, nodeID string) error {
+	m.called = append(m.called, nodeID)
+	return nil
+}
+
+// TestCoactivateSession_ReinforcesStability verifies that session coactivation
+// reinforces stability for every conversation observation in the session.
+//
+// DH-004 E5: prior to this fix, CoactivateSession only created CO_ACTIVATED_WITH
+// edges — it never called UpdateStabilityOnReinforcement, so volatile
+// observations never graduated. Investigation on mdemg-dev found 4991 volatile
+// observations with p99 stability = 0.048 (threshold = 0.8), only 4 ever
+// reinforced.
+func TestCoactivateSession_ReinforcesStability(t *testing.T) {
+	driver := setupTestDriver(t)
+	defer driver.Close(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spaceID := "test-coactivate-session-reinforce"
+	sessionID := "test-session-reinforce"
+	nodeIDs := []string{"obs-reinforce-1", "obs-reinforce-2", "obs-reinforce-3"}
+
+	// Create observation nodes with the exact shape CoactivateSession expects.
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		for i, id := range nodeIDs {
+			cypher := `
+				MERGE (n:MemoryNode {space_id: $spaceId, node_id: $nodeId})
+				ON CREATE SET n.created_at = datetime(),
+				              n.role_type = 'conversation_observation',
+				              n.session_id = $sessionId,
+				              n.volatile = true,
+				              n.stability_score = 0.1,
+				              n.surprise_score = 0.5
+				RETURN n.node_id
+			`
+			_, err := tx.Run(ctx, cypher, map[string]any{
+				"spaceId":   spaceID,
+				"nodeId":    id,
+				"sessionId": sessionID,
+				"idx":       i,
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	})
+	sess.Close(ctx)
+	if err != nil {
+		t.Fatalf("failed to seed observations: %v", err)
+	}
+
+	// Cleanup
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cleanup := driver.NewSession(cleanupCtx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		defer cleanup.Close(cleanupCtx)
+		_, _ = cleanup.ExecuteWrite(cleanupCtx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(cleanupCtx,
+				`MATCH (n:MemoryNode {space_id: $spaceId}) DETACH DELETE n`,
+				map[string]any{"spaceId": spaceID})
+			return nil, err
+		})
+	}()
+
+	// Run CoactivateSession with a mock reinforcer.
+	cfg := testConfig()
+	s := NewService(cfg, driver)
+	reinforcer := &mockStabilityReinforcer{}
+	s.SetStabilityReinforcer(reinforcer)
+
+	if err := s.CoactivateSession(ctx, spaceID, sessionID); err != nil {
+		t.Fatalf("CoactivateSession: %v", err)
+	}
+
+	// Each session observation must have been reinforced exactly once.
+	if len(reinforcer.called) != len(nodeIDs) {
+		t.Errorf("reinforcer called %d times, want %d; called=%v",
+			len(reinforcer.called), len(nodeIDs), reinforcer.called)
+	}
+	seen := map[string]bool{}
+	for _, id := range reinforcer.called {
+		seen[id] = true
+	}
+	for _, want := range nodeIDs {
+		if !seen[want] {
+			t.Errorf("expected reinforcer called for %q, got %v", want, reinforcer.called)
+		}
+	}
+}

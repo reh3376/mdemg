@@ -12,6 +12,38 @@ import (
 	"mdemg/internal/circuitbreaker"
 )
 
+// TestNLIComprehensionScorer_IsOperational asserts the gate used by the
+// service layer to decide whether a fallback is a genuine degraded-state
+// signal (count it) or operator choice (don't count it, DH-004 E3).
+func TestNLIComprehensionScorer_IsOperational(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		enabled bool
+		want    bool
+	}{
+		{name: "enabled with URL", url: "http://sidecar:8000", enabled: true, want: true},
+		{name: "enabled no URL (misconfigured)", url: "", enabled: true, want: false},
+		{name: "disabled with URL (gated off)", url: "http://sidecar:8000", enabled: false, want: false},
+		{name: "disabled no URL", url: "", enabled: false, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scorer := NewNLIComprehensionScorer(tt.url, 100, tt.enabled)
+			if got := scorer.IsOperational(); got != tt.want {
+				t.Errorf("IsOperational() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	// Nil scorer must safely return false (service checks `s.nliScorer != nil`
+	// before calling this, but defense-in-depth).
+	var nilScorer *NLIComprehensionScorer
+	if nilScorer.IsOperational() {
+		t.Error("nil scorer IsOperational() = true, want false")
+	}
+}
+
 func TestNLIComprehensionScorer_DisabledFallback(t *testing.T) {
 	scorer := NewNLIComprehensionScorer("", 100, false)
 

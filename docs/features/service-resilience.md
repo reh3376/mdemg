@@ -198,6 +198,23 @@ Grafana remains for dashboards only. Grafana alert rules are supplementary.
 | `ALERT_EVALUATOR_ENABLED` | `true` | Enable server-native rule evaluation |
 | `ALERT_EVALUATOR_INTERVAL_SEC` | `30` | Base evaluation tick interval |
 
+## Circuit Breaker Admin Endpoints (DH-004)
+
+Each LLM task is wrapped in a registered circuit breaker (`openai-constraint-classify`, `jiminy-synthesis`, etc.). A breaker opens after `failure_threshold` consecutive failures and refuses calls for `timeout_sec` before entering half-open probe.
+
+Two admin endpoints let operators inspect and reset breakers manually (gated by `AUTH_API_KEYS`):
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/admin/breakers` | GET | List all breakers with state, consecutive failures, last failure time |
+| `/v1/admin/breakers/reset` | POST | Force a named breaker to `StateClosed` (`{"name":"<breaker>"}`) |
+
+Use these when a breaker has tripped on a transient incident and auto-recovery via half-open probe hasn't happened yet. Complementary behavior:
+- `LLM_RETRY_DEADLINE_ENABLED=true` (default) retries once on `context.DeadlineExceeded` when budget permits, preventing a single slow OpenAI call from tripping the breaker.
+- `CONSULTING_CLASSIFY_TIMEOUT_MS` default is 30000 (was 15000), giving `gpt-5.4-mini` enough headroom under load.
+
+See `docs/user/api-reference.md#admin-circuit-breakers` for request/response details.
+
 ## Goroutine Supervisor (SNA-001)
 
 Background goroutines (health prober, alert evaluator) are monitored by a supervisor (`internal/supervisor/`) that provides:

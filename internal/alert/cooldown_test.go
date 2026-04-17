@@ -50,3 +50,65 @@ func TestCooldownTracker_ConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// DH-004 E4.4: TryRecord must return true exactly once per cooldown window,
+// even under concurrent access. Allow+Record as separate calls had a TOCTOU
+// race where multiple goroutines could all pass Allow() before any recorded.
+func TestCooldownTracker_TryRecord_AtomicUnderRace(t *testing.T) {
+	ct := newCooldownTracker(500 * time.Millisecond)
+
+	const goroutines = 100
+	var wins int64
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+
+	for range goroutines {
+		wg.Go(func() {
+			<-start
+			if ct.TryRecord("jiminy", SeverityCritical) {
+				mu.Lock()
+				wins++
+				mu.Unlock()
+			}
+		})
+	}
+	close(start) // release all goroutines at once
+	wg.Wait()
+
+	if wins != 1 {
+		t.Errorf("TryRecord allowed %d goroutines past cooldown, want exactly 1", wins)
+	}
+}
+
+func TestCooldownTracker_TryRecord_ReAllowsAfterTTL(t *testing.T) {
+	ct := newCooldownTracker(50 * time.Millisecond)
+
+	if !ct.TryRecord("jiminy", SeverityCritical) {
+		t.Fatal("first TryRecord should succeed")
+	}
+	if ct.TryRecord("jiminy", SeverityCritical) {
+		t.Fatal("second TryRecord within cooldown should be suppressed")
+	}
+	time.Sleep(60 * time.Millisecond)
+	if !ct.TryRecord("jiminy", SeverityCritical) {
+		t.Fatal("TryRecord after cooldown expires should succeed")
+	}
+}
+
+func TestCooldownTracker_TryRecord_PerServiceSeverity(t *testing.T) {
+	ct := newCooldownTracker(500 * time.Millisecond)
+
+	if !ct.TryRecord("jiminy", SeverityCritical) {
+		t.Fatal("jiminy critical should succeed")
+	}
+	if !ct.TryRecord("jiminy", SeverityHigh) {
+		t.Fatal("jiminy high is a separate cooldown key, should succeed")
+	}
+	if !ct.TryRecord("openai", SeverityCritical) {
+		t.Fatal("openai critical is a separate cooldown key, should succeed")
+	}
+	if ct.TryRecord("jiminy", SeverityCritical) {
+		t.Fatal("jiminy critical repeat should be suppressed")
+	}
+}

@@ -87,6 +87,41 @@ func TestProtocolMetricsCollector_TicketRestore(t *testing.T) {
 	if snapshot.TicketRestoreSuccessRate < 0.6 || snapshot.TicketRestoreSuccessRate > 0.7 {
 		t.Errorf("ticket restore rate = %f, want ~0.667", snapshot.TicketRestoreSuccessRate)
 	}
+	if snapshot.TicketRestoreTotal != 3 {
+		t.Errorf("ticket restore total = %d, want 3", snapshot.TicketRestoreTotal)
+	}
+}
+
+// TestSnapshot_TicketRestoreDefaultWhenNoData asserts that with zero
+// RecordTicketRestore calls, TicketRestoreSuccessRate defaults to 1.0 (healthy
+// "nothing to restore") rather than 0.0 (which would look like "100% failures").
+// Matches the existing pattern for CodeCoverage with no constraints.
+func TestSnapshot_TicketRestoreDefaultWhenNoData(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	snap := c.Snapshot()
+
+	if snap.TicketRestoreSuccessRate != 1.0 {
+		t.Errorf("TicketRestoreSuccessRate with no data = %f, want 1.0 (neutral-healthy)", snap.TicketRestoreSuccessRate)
+	}
+	if snap.TicketRestoreTotal != 0 {
+		t.Errorf("TicketRestoreTotal with no data = %d, want 0", snap.TicketRestoreTotal)
+	}
+}
+
+// TestSnapshot_TicketRestoreWithFailures confirms the 1.0-when-empty default does
+// not mask real failures: once any Record call arrives, the computed rate is used.
+func TestSnapshot_TicketRestoreWithFailures(t *testing.T) {
+	c := NewProtocolMetricsCollector()
+	c.RecordTicketRestore(false)
+	c.RecordTicketRestore(false)
+
+	snap := c.Snapshot()
+	if snap.TicketRestoreSuccessRate != 0.0 {
+		t.Errorf("TicketRestoreSuccessRate with all failures = %f, want 0.0", snap.TicketRestoreSuccessRate)
+	}
+	if snap.TicketRestoreTotal != 2 {
+		t.Errorf("TicketRestoreTotal = %d, want 2", snap.TicketRestoreTotal)
+	}
 }
 
 func TestProtocolMetricsCollector_Reset(t *testing.T) {

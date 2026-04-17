@@ -1348,10 +1348,13 @@ func TestRetry_ContextCanceled(t *testing.T) {
 }
 
 func TestShouldRetry(t *testing.T) {
+	// Default: RetryOnDeadline = false. Matches the pre-DH-004 behavior.
+	rc := RetryConfig{BaseDelayMs: 500}
+	ctx := context.Background()
 	tests := []struct {
-		name   string
-		err    error
-		want   bool
+		name string
+		err  error
+		want bool
 	}{
 		{"429", &httpError{StatusCode: 429}, true},
 		{"502", &httpError{StatusCode: 502}, true},
@@ -1360,17 +1363,69 @@ func TestShouldRetry(t *testing.T) {
 		{"401", &httpError{StatusCode: 401}, false},
 		{"500", &httpError{StatusCode: 500}, false},
 		{"context.Canceled", context.Canceled, false},
-		{"context.DeadlineExceeded", context.DeadlineExceeded, false},
+		{"context.DeadlineExceeded (default off)", context.DeadlineExceeded, false},
 		{"network error", fmt.Errorf("http request: connection refused"), true},
 		{"non-retryable", fmt.Errorf("marshal request: invalid"), false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := shouldRetry(tt.err); got != tt.want {
+			if got := shouldRetry(ctx, rc, tt.err); got != tt.want {
 				t.Errorf("shouldRetry(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+// DH-004 E4.2: opt-in retry on context.DeadlineExceeded when budget allows.
+
+func TestShouldRetry_DeadlineExceededWithBudget(t *testing.T) {
+	rc := RetryConfig{BaseDelayMs: 500, RetryOnDeadline: true}
+	// 10s of budget remaining — far more than 2×500ms.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if !shouldRetry(ctx, rc, context.DeadlineExceeded) {
+		t.Error("expected retry when budget >> 2×BaseDelayMs, got false")
+	}
+}
+
+func TestShouldRetry_DeadlineExceededNoBudget(t *testing.T) {
+	rc := RetryConfig{BaseDelayMs: 500, RetryOnDeadline: true}
+	// Only 100ms of budget — less than 2×500ms, so a retry would certainly fail.
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	if shouldRetry(ctx, rc, context.DeadlineExceeded) {
+		t.Error("expected no retry when budget < 2×BaseDelayMs, got true")
+	}
+}
+
+func TestShouldRetry_DeadlineExceededNoParentDeadline(t *testing.T) {
+	// No parent deadline → the error came from the per-request HTTP client
+	// timeout, not the caller. Retry is safe.
+	rc := RetryConfig{BaseDelayMs: 500, RetryOnDeadline: true}
+	if !shouldRetry(context.Background(), rc, context.DeadlineExceeded) {
+		t.Error("expected retry when parent ctx has no deadline, got false")
+	}
+}
+
+func TestShouldRetry_DeadlineDisabled(t *testing.T) {
+	// Feature explicitly off — never retry on DeadlineExceeded.
+	rc := RetryConfig{BaseDelayMs: 500, RetryOnDeadline: false}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if shouldRetry(ctx, rc, context.DeadlineExceeded) {
+		t.Error("expected no retry when RetryOnDeadline=false, got true")
+	}
+}
+
+func TestShouldRetry_CanceledIgnoresDeadlineFlag(t *testing.T) {
+	// Canceled is always non-retryable, regardless of RetryOnDeadline.
+	rc := RetryConfig{BaseDelayMs: 500, RetryOnDeadline: true}
+	if shouldRetry(context.Background(), rc, context.Canceled) {
+		t.Error("context.Canceled must never be retried")
 	}
 }
 

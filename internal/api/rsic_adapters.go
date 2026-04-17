@@ -268,6 +268,7 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 		AvgComprehension:         snapshot.AvgComprehension,
 		ReplayFrequencyPerHour:   snapshot.ReplayFrequencyPerHour,
 		TicketRestoreSuccessRate: snapshot.TicketRestoreSuccessRate,
+		TicketRestoreTotal:       snapshot.TicketRestoreTotal,
 		CodeCoverage:             snapshot.CodeCoverage,
 		TotalEvents:              snapshot.TotalEvents,
 		T2FrequencyByConstraint:  snapshot.T2FrequencyByConstraint,

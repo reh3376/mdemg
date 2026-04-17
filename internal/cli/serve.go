@@ -225,12 +225,13 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 
 	// SR-001: Set LLM retry defaults BEFORE NewServer creates LLM clients.
 	llmclient.SetDefaultRetryConfig(llmclient.RetryConfig{
-		Enabled:     cfg.LLMRetryEnabled,
-		MaxAttempts: cfg.LLMRetryMaxAttempts,
-		BaseDelayMs: cfg.LLMRetryBaseDelayMs,
-		MaxDelayMs:  cfg.LLMRetryMaxDelayMs,
-		Multiplier:  cfg.LLMRetryMultiplier,
-		Jitter:      cfg.LLMRetryJitter,
+		Enabled:         cfg.LLMRetryEnabled,
+		MaxAttempts:     cfg.LLMRetryMaxAttempts,
+		BaseDelayMs:     cfg.LLMRetryBaseDelayMs,
+		MaxDelayMs:      cfg.LLMRetryMaxDelayMs,
+		Multiplier:      cfg.LLMRetryMultiplier,
+		Jitter:          cfg.LLMRetryJitter,
+		RetryOnDeadline: cfg.LLMRetryOnDeadline,
 	})
 
 	// Set package-level LLM recording defaults BEFORE NewServer creates LLM clients.

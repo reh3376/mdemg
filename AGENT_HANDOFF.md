@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-10
+**Date:** 2026-04-17
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -56,6 +56,16 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-17) ===
+- ✅ DH-004: J17 Protocol & Jiminy Dashboard Remediation (2026-04-17):
+  - E1: Resolved `mdemg-j17.json` panel overlap at {x:6,y:24}; relocated Total Events to full-width {x:0,y:28,w:24,h:4}; annotated `jiminy_latest_age_ms` panel for /strict-mode expected staleness
+  - E2: `TicketRestoreSuccessRate` defaults to 1.0 when `ticketRestoreTotal == 0` (matches codeCoverage null-tolerance pattern); new `TicketRestoreTotal` field distinguishes "no data" from "100% pass"
+  - E3: `J17_SIDECAR_TIMEOUT_MS` default 200→1000 w/100ms floor; NLI fallback counting gated on `nliScorer.IsOperational()`; 8 J17 env vars exposed in all compose templates
+  - E4: `CONSULTING_CLASSIFY_TIMEOUT_MS` default 15000→30000; new `LLM_RETRY_DEADLINE_ENABLED` (default true) adds budget-aware retry on `context.DeadlineExceeded`; new admin endpoints `GET/POST /v1/admin/breakers[/reset]`; closed cooldown TOCTOU race via atomic `TryRecord()`
+  - E5: Context cooler graduation fix — `CoactivateSession` now calls `reinforceSessionObservations` to raise `stability_score` per session (was 0 before, kept 99.7% of obs volatile forever)
+  - E6: CLAUDE.md + docs/user/cms-rsic-guide.md updated; 3-tier tests (unit + integration + concurrency + live dashboard validation)
+  - 8 commits pushed; PR #325 with sprint summary
+
 === COMPLETED SINCE LAST HANDOFF (2026-04-10) ===
 - ✅ ACA-BFC-2026-04-10: Adversarial Codebase Analysis Bug Fix Campaign (2026-04-10):
   - 14 bugs remediated from adversarial analysis with systematic refutation (3 critical, 3 high, 6 medium, 2 low)

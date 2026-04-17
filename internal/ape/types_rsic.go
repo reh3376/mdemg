@@ -454,6 +454,7 @@ type ProtocolStatsResult struct {
 	AvgComprehension         float64                    `json:"avg_comprehension"`
 	ReplayFrequencyPerHour   float64                    `json:"replay_frequency_per_hour"`
 	TicketRestoreSuccessRate float64                    `json:"ticket_restore_success_rate"`
+	TicketRestoreTotal       int64                      `json:"ticket_restore_total"` // disambiguates "no data" (0) from "100% pass" (>0 && rate==1.0)
 	CodeCoverage             float64                    `json:"code_coverage"`
 	TotalEvents              int64                      `json:"total_events"`
 	T2FrequencyByConstraint  map[string]int             `json:"t2_frequency_by_constraint,omitempty"`

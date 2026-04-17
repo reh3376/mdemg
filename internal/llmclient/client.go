@@ -101,6 +101,12 @@ type RetryConfig struct {
 	MaxDelayMs  int     // cap on computed backoff delay
 	Multiplier  float64 // exponential growth factor (default: 2.0)
 	Jitter      float64 // jitter fraction in [0, 1] (default: 0.2)
+	// RetryOnDeadline: when true, context.DeadlineExceeded errors are eligible
+	// for retry iff the parent context still has > 2×BaseDelayMs remaining
+	// (i.e., the retry would have time to complete). Default true.
+	// DH-004 E4.2: prevents a single slow OpenAI response from tripping the
+	// circuit breaker on the first failure.
+	RetryOnDeadline bool
 }
 
 // Config holds the configuration for creating an LLM client.
@@ -393,10 +399,31 @@ func (e *httpError) Error() string {
 }
 
 // shouldRetry returns true if the error is transient and the request should be retried.
-func shouldRetry(err error) bool {
-	// Context cancellation/deadline — never retry
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+// ctx and rc control the DH-004 E4.2 deadline-retry path: DeadlineExceeded is
+// retryable iff rc.RetryOnDeadline is enabled AND the parent context still has
+// more than 2×BaseDelayMs of budget remaining (enough for the backoff sleep
+// plus at least a minimal attempt).
+func shouldRetry(ctx context.Context, rc RetryConfig, err error) bool {
+	// Context cancellation — never retry (intentional abort)
+	if errors.Is(err, context.Canceled) {
 		return false
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		if !rc.RetryOnDeadline {
+			return false
+		}
+		dl, ok := ctx.Deadline()
+		if !ok {
+			// No deadline on parent ctx — the error came from the per-request
+			// HTTP client timeout, not the caller. Safe to retry.
+			return true
+		}
+		baseDelay := time.Duration(rc.BaseDelayMs) * time.Millisecond
+		if baseDelay <= 0 {
+			baseDelay = 500 * time.Millisecond
+		}
+		return time.Until(dl) > 2*baseDelay
 	}
 
 	var he *httpError
@@ -468,7 +495,7 @@ func (c *Client) doWithRetry(ctx context.Context, fn func() (string, int, error)
 		if err == nil {
 			return text, tokens, nil
 		}
-		if !shouldRetry(err) {
+		if !shouldRetry(ctx, c.retryCfg, err) {
 			return "", 0, err
 		}
 		lastErr = err

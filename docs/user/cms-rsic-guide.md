@@ -1721,3 +1721,30 @@ Write-Host "Snapshots held: $($Health.safety.rollback.snapshots_held)"
 | GET | `/v1/learning/freeze/status` | Check freeze state |
 | GET | `/v1/learning/stats` | Learning edge statistics |
 | POST | `/v1/learning/prune` | Manually prune edges |
+
+## Interpreting J17 / Jiminy Dashboards
+
+Several panels on `mdemg-j17.json` and `mdemg-jiminy.json` legitimately read zero or stale under normal operation. Before filing an incident, check the list below.
+
+### Expected-zero metrics
+
+| Metric | Why it can legitimately be zero |
+|--------|--------------------------------|
+| `j17_ticket_restore_success_rate` | J17 tickets are restored only when a prior session lost context and the agent opts to resume it. Most sessions never trigger a restore. With DH-004 (v0.7.1) this metric no longer drags Protocol Health when the event count is zero — `TicketRestoreSuccessRate` defaults to 1.0 and `TicketRestoreTotal` distinguishes "no data" from "100% pass." |
+| `j17_replay_frequency_per_hour` | Replay only fires when the cooler detects context drift severe enough to warrant a replay. Stable conversations drive this to 0 by design — the health formula already treats 0 replays as a *good* signal (no penalty). |
+| `j17_sidecar_*` (inference counts, NLI bias, etc.) | Zero when `J17_NLI_COMPREHENSION_ENABLED=false` or `J17_SIDECAR_URL` is unreachable. Check `mdemg-neural-sidecar-1` container health first. With DH-004 the sidecar timeout was raised 200 → 1000ms; calls that previously fell back now complete. |
+| `mdemg_jiminy_latest_age_ms` | Under `/strict` mode (claude-core session), `prompt-context.sh` calls `/v1/jiminy/reformulate` not `/v1/jiminy/latest`, so this metric stops updating. The panel reading "stale" is expected; it is *not* an alert condition under `/strict`. |
+| `rsic_health_task` | Ratio of permanent / (volatile + permanent) conversation observations. Low ratio means volatile observations haven't graduated via the Context Cooler. With DH-004 the session-coactivation path now reinforces stability; a new space will take ~5 reinforcements per observation to graduate. |
+
+### Alerts worth investigating
+
+- **"Jiminy Pipeline Critical" repeating** — with DH-004 (v0.7.1), alert dedup is now TOCTOU-safe via `cooldown.TryRecord()`. If you still see entries closer together than `ALERT_COOLDOWN_SEC` (default 300s), `~/.mdemg/alerts/current.json` keeps up to `ALERT_MAX_ENTRIES` (default 50) historical entries — multiple timestamped rows over an hour+ is expected file content, not duplicate alerts.
+- **`openai-*` breaker stuck open** — check `GET /v1/admin/breakers`. A single transient timeout used to trip these; DH-004 adds `LLM_RETRY_DEADLINE_ENABLED=true` so one retry is allowed when budget permits. If a breaker is wedged open after the incident, force-close with:
+
+  ```bash
+  curl -X POST http://localhost:9999/v1/admin/breakers/reset \
+    -H 'X-API-Key: <your-key>' \
+    -d '{"name":"openai-constraint-classify"}'
+  ```
+
+- **`j17_nli_mean_bias` > threshold** — if the sidecar is running, confirm `J17_SIDECAR_URL` points at it and `J17_SIDECAR_TIMEOUT_MS` ≥ 1000. If you see a high fallback rate with the feature disabled, DH-004 gates fallback counting on `NLIComprehensionScorer.IsOperational()` — a disabled scorer no longer pollutes the bias metric.
