@@ -2186,6 +2186,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/admin/features/stop", s.handleFeatureLifecycle)
 	mux.HandleFunc("/v1/admin/features/restart", s.handleFeatureLifecycle)
 	mux.HandleFunc("/v1/admin/instances", s.handleAdminInstances)
+	// DH-004 E4.3: circuit breaker inspection + manual reset
+	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
+	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
