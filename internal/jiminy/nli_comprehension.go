@@ -38,6 +38,14 @@ func (s *NLIComprehensionScorer) SetCircuitBreaker(b *circuitbreaker.Breaker) {
 	s.breaker = b
 }
 
+// IsOperational reports whether the scorer is enabled AND has a sidecar URL
+// configured. Only fallbacks from an operational scorer are genuine
+// degraded-state signals — fallbacks from a gated-off or misconfigured scorer
+// are operator-driven, not runtime failures.
+func (s *NLIComprehensionScorer) IsOperational() bool {
+	return s != nil && s.enabled && s.sidecarURL != ""
+}
+
 type nliRequest struct {
 	Premise    string `json:"premise"`
 	Hypothesis string `json:"hypothesis"`

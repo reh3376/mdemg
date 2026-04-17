@@ -89,3 +89,62 @@ func TestLLMRetryMaxDelayMs_NewDefault(t *testing.T) {
 		t.Errorf("LLMRetryMaxDelayMs = %d, want 60000", cfg.LLMRetryMaxDelayMs)
 	}
 }
+
+// DH-004 E3: J17 sidecar timeout default raised 200→1000ms and given a
+// 100ms floor.
+func TestJ17SidecarTimeoutMs_Default(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_SIDECAR_TIMEOUT_MS", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17SidecarTimeoutMs != 1000 {
+		t.Errorf("J17SidecarTimeoutMs = %d, want 1000 (DH-004 raised from 200)", cfg.J17SidecarTimeoutMs)
+	}
+}
+
+func TestJ17SidecarTimeoutMs_EnvOverride(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_SIDECAR_TIMEOUT_MS", "2500")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17SidecarTimeoutMs != 2500 {
+		t.Errorf("J17SidecarTimeoutMs = %d, want 2500", cfg.J17SidecarTimeoutMs)
+	}
+}
+
+func TestJ17SidecarTimeoutMs_FloorEnforced(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	// Values below 100ms are almost certainly misconfigurations — clamp, not error.
+	t.Setenv("J17_SIDECAR_TIMEOUT_MS", "50")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17SidecarTimeoutMs != 100 {
+		t.Errorf("J17SidecarTimeoutMs = %d, want 100 (floor)", cfg.J17SidecarTimeoutMs)
+	}
+}
+
+func TestJ17SidecarTimeoutMs_FloorBoundaryValuesAllowed(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_SIDECAR_TIMEOUT_MS", "100")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17SidecarTimeoutMs != 100 {
+		t.Errorf("J17SidecarTimeoutMs = %d, want 100 (exactly at floor, no clamp)", cfg.J17SidecarTimeoutMs)
+	}
+}

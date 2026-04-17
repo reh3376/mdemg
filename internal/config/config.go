@@ -369,7 +369,7 @@ type Config struct {
 	J17MLTierPredictionEnabled   bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
 	J17TierModelMinSamples       int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
 	J17SidecarURL                string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
-	J17SidecarTimeoutMs          int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 200)
+	J17SidecarTimeoutMs          int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 1000, floor: 100)
 
 	// J17-NS: Neural Sidecar Promotion (shadow → causal)
 	J17SidecarMode               string  // J17_SIDECAR_MODE — arbitration mode: shadow, compare, canary, active (default: "shadow")
@@ -2200,9 +2200,18 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	j17SidecarURL := get("J17_SIDECAR_URL", "")
-	j17SidecarTimeoutMs, err := atoi("J17_SIDECAR_TIMEOUT_MS", 200)
+	// Default raised 200→1000ms (DH-004 E3): 200ms was too tight under typical
+	// sidecar latency, causing ~56% NLI fallback rate observed in production.
+	// 1000ms is a ceiling, not a floor — healthy calls remain fast.
+	j17SidecarTimeoutMs, err := atoi("J17_SIDECAR_TIMEOUT_MS", 1000)
 	if err != nil {
 		return Config{}, err
+	}
+	// Enforce a minimum of 100ms — values below are almost certainly misconfigurations.
+	if j17SidecarTimeoutMs < 100 {
+		slog.Warn("J17_SIDECAR_TIMEOUT_MS below 100ms floor, clamping to 100",
+			"requested_ms", j17SidecarTimeoutMs)
+		j17SidecarTimeoutMs = 100
 	}
 
 	// J17-NS: Neural Sidecar Promotion
