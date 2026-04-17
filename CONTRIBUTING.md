@@ -133,7 +133,7 @@ When adding a new language parser or modifying an existing one:
 1. **Create the parser** in `internal/languages/<language>_parser.go` (see that directory's README for the interface)
 2. **Create a fixture** — a representative source file covering all symbol types the parser should extract
 3. **Create a UPTS spec** — JSON file declaring expected symbols with name, type, line number, and export status
-4. **Register in the ingester** — add the language to `getEnabledLanguages()` in `cmd/ingest-codebase/main.go` (without this, files are silently skipped during ingestion)
+4. **Register in the ingester** — add the language to `getEnabledLanguages()` in **both** `internal/cli/ingest.go` (the shipped `mdemg` binary) and `cmd/ingest-codebase/main.go` (standalone dev tool). The `internal/cli/ingest.go` registration is what matters for released builds. Without this, files are silently skipped during ingestion.
 5. **Validate** — run `go test ./internal/languages/ -run TestUPTS/<language> -v` until all assertions pass
 6. **Key spec fields:**
    - `line_tolerance`: how far actual line can be from expected (default ±2)

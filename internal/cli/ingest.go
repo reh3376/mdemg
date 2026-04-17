@@ -99,6 +99,12 @@ func newIngestCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&cfg.includePy, "include-py", true, "Include Python files (*.py)")
 	cmd.Flags().BoolVar(&cfg.includeJava, "include-java", true, "Include Java files (*.java)")
 	cmd.Flags().BoolVar(&cfg.includeRust, "include-rust", true, "Include Rust files (*.rs)")
+	cmd.Flags().BoolVar(&cfg.includePHP, "include-php", true, "Include PHP files (*.php)")
+	cmd.Flags().BoolVar(&cfg.includeGraphQL, "include-graphql", true, "Include GraphQL files (*.graphql, *.gql)")
+	cmd.Flags().BoolVar(&cfg.includeLua, "include-lua", true, "Include Lua files (*.lua)")
+	cmd.Flags().BoolVar(&cfg.includeProto, "include-protobuf", true, "Include Protocol Buffer files (*.proto)")
+	cmd.Flags().BoolVar(&cfg.includeOpenAPI, "include-openapi", true, "Include OpenAPI/Swagger files")
+	cmd.Flags().BoolVar(&cfg.includeScraper, "include-scraper-markdown", true, "Include scraper markdown files")
 	cmd.Flags().IntVar(&cfg.limitElements, "limit", 0, "Limit number of elements to ingest (0 = no limit)")
 	cmd.Flags().BoolVar(&cfg.extractSymbols, "extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
 
@@ -156,6 +162,12 @@ type ingestConfig struct {
 	includePy      bool
 	includeJava    bool
 	includeRust    bool
+	includePHP     bool
+	includeGraphQL bool
+	includeLua     bool
+	includeProto   bool
+	includeOpenAPI bool
+	includeScraper bool
 	limitElements  int
 	extractSymbols bool
 
@@ -955,8 +967,14 @@ func getEnabledLanguages(cfg *ingestConfig) map[string]bool {
 		"cypher":     true,
 		"csharp":     true,
 		"kotlin":     true,
-		"terraform":  true,
-		"makefile":   true,
+		"terraform":       true,
+		"makefile":        true,
+		"php":              cfg.includePHP,
+		"graphql":          cfg.includeGraphQL,
+		"lua":              cfg.includeLua,
+		"protobuf":         cfg.includeProto,
+		"openapi":          cfg.includeOpenAPI,
+		"scraper-markdown": cfg.includeScraper,
 	}
 }
 
