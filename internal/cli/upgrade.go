@@ -2,6 +2,7 @@ package cli
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +22,13 @@ const (
 	upgradeGitHubAPI    = "https://api.github.com/repos/" + upgradeRepo + "/releases/latest"
 	edgeReleaseAPI      = "https://api.github.com/repos/" + upgradeRepo + "/releases/tags/edge"
 	upgradeDownloadBase = "https://github.com/" + upgradeRepo + "/releases/download"
+)
+
+// Injectable URLs and timeouts for testing — overridden in tests.
+var (
+	upgradeGitHubAPIURL    = upgradeGitHubAPI
+	edgeReleaseAPIURL      = edgeReleaseAPI
+	dockerUpgradeTimeout   = 5 * time.Minute
 )
 
 func newUpgradeCmd() *cobra.Command {
@@ -73,7 +81,9 @@ type githubRelease struct {
 func runUpgrade(dryRun, force, edge, noDocker, dockerOnly bool) error {
 	// Docker-only mode: skip binary download, just update containers
 	if dockerOnly {
-		upgradeDockerInstances("current")
+		ctx, cancel := context.WithTimeout(context.Background(), dockerUpgradeTimeout)
+		defer cancel()
+		upgradeDockerInstances(ctx, "current")
 		return nil
 	}
 
@@ -327,7 +337,9 @@ func runUpgrade(dryRun, force, edge, noDocker, dockerOnly bool) error {
 
 	// Update running Docker Compose instances
 	if !noDocker {
-		upgradeDockerInstances(release.TagName)
+		ctx, cancel := context.WithTimeout(context.Background(), dockerUpgradeTimeout)
+		defer cancel()
+		upgradeDockerInstances(ctx, release.TagName)
 	}
 
 	fmt.Printf("\nUpgraded mdemg to %s\n", release.TagName)
@@ -337,12 +349,13 @@ func runUpgrade(dryRun, force, edge, noDocker, dockerOnly bool) error {
 // upgradeDockerInstances discovers running MDEMG Docker Compose projects
 // via container labels and pulls latest images + restarts containers.
 // Non-fatal — prints warnings on failure, never blocks the upgrade.
-func upgradeDockerInstances(version string) {
+// The context controls timeout for all Docker subprocess calls.
+func upgradeDockerInstances(ctx context.Context, version string) {
 	if !DockerAvailable() {
 		return
 	}
 
-	out, err := exec.Command("docker", "ps",
+	out, err := exec.CommandContext(ctx, "docker", "ps",
 		"--filter", "label=com.docker.compose.project",
 		"--format", `{{.Label "com.docker.compose.project"}}|{{.Label "com.docker.compose.project.working_dir"}}`,
 	).Output()
@@ -371,7 +384,7 @@ func upgradeDockerInstances(version string) {
 	for project, dir := range seen {
 		fmt.Printf("  %s: pulling images... ", project)
 
-		pull := exec.Command("docker", "compose", "--project-directory", dir, "pull")
+		pull := exec.CommandContext(ctx, "docker", "compose", "--project-directory", dir, "pull")
 		pull.Stderr = io.Discard
 		if err := pull.Run(); err != nil {
 			fmt.Printf("FAILED (%v)\n", err)
@@ -379,7 +392,7 @@ func upgradeDockerInstances(version string) {
 		}
 
 		fmt.Print("restarting... ")
-		up := exec.Command("docker", "compose", "--project-directory", dir, "up", "-d")
+		up := exec.CommandContext(ctx, "docker", "compose", "--project-directory", dir, "up", "-d")
 		up.Stderr = io.Discard
 		if err := up.Run(); err != nil {
 			fmt.Printf("FAILED (%v)\n", err)
@@ -391,7 +404,7 @@ func upgradeDockerInstances(version string) {
 
 func fetchEdgeRelease() (*githubRelease, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(edgeReleaseAPI)
+	resp, err := client.Get(edgeReleaseAPIURL)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +423,7 @@ func fetchEdgeRelease() (*githubRelease, error) {
 
 func fetchLatestRelease() (*githubRelease, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(upgradeGitHubAPI)
+	resp, err := client.Get(upgradeGitHubAPIURL)
 	if err != nil {
 		return nil, err
 	}
