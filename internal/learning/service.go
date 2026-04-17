@@ -735,7 +735,67 @@ RETURN count(*) AS edges_created
 		return int64(0), res.Err()
 	})
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	// DH-004 E5: reinforce stability of all session observations. Previously
+	// CoactivateSession only created edges — it never raised stability_score,
+	// so 99.97% of mdemg-dev observations stayed volatile (4/5005 ever
+	// reinforced, p99 stability 0.048 vs 0.8 threshold) and graduation
+	// effectively never happened. Retrieval-triggered reinforcement rarely
+	// fires for conversation observations because they seldom appear in
+	// retrieval results alongside code nodes.
+	if s.stabilityReinforcer != nil {
+		s.reinforceSessionObservations(ctx, spaceID, sessionID)
+	}
+
+	return nil
+}
+
+// reinforceSessionObservations finds every conversation_observation in the
+// given session and calls the stability reinforcer on each. Best-effort —
+// failures are logged but don't propagate.
+func (s *Service) reinforceSessionObservations(ctx context.Context, spaceID, sessionID string) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		cypher := `
+			MATCH (n:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
+			WHERE n.session_id = $sessionId AND coalesce(n.volatile, true) = true
+			RETURN n.node_id AS nodeId
+		`
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":   spaceID,
+			"sessionId": sessionID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var ids []string
+		for res.Next(ctx) {
+			if v, ok := res.Record().Get("nodeId"); ok {
+				if s, ok := v.(string); ok {
+					ids = append(ids, s)
+				}
+			}
+		}
+		return ids, res.Err()
+	})
+	if err != nil {
+		slog.Warn("session reinforcement query failed",
+			"space_id", spaceID, "session_id", sessionID, "error", err)
+		return
+	}
+	ids, _ := result.([]string)
+	for _, id := range ids {
+		if err := s.stabilityReinforcer.UpdateStabilityOnReinforcement(ctx, spaceID, id); err != nil {
+			slog.Warn("session stability reinforcement failed",
+				"node_id", id, "error", err)
+			metrics.Metrics().CMSStabilityUpdateFails.Inc()
+		}
+	}
 }
 
 func pairsToMaps(pairs []pair) []map[string]any {
