@@ -267,10 +267,12 @@ func checkTaskAccumulation(ctx context.Context, pool *pgxpool.Pool) checkResult 
 
 func checkSessionIDPopulated(ctx context.Context, pool *pgxpool.Pool) checkResult {
 	var withSession, total int64
+	// Exclude background-only tasks (no HTTP context → no session_id by design).
 	err := pool.QueryRow(ctx,
 		`SELECT COUNT(*), COUNT(CASE WHEN session_id != '' THEN 1 END)
 		 FROM llm_interactions
-		 WHERE time > now() - interval '24 hours'`).Scan(&total, &withSession)
+		 WHERE time > now() - interval '24 hours'
+		   AND task_name NOT IN ('ape.reflect', 'hidden.name_emergence', 'hidden.reclassify', 'hidden.summarize')`).Scan(&total, &withSession)
 	if err != nil {
 		return checkResult{
 			Name:     "Session ID",
@@ -301,7 +303,7 @@ func checkSessionIDPopulated(ctx context.Context, pool *pgxpool.Pool) checkResul
 		Name:     "Session ID",
 		Status:   status,
 		Detail:   fmt.Sprintf("%d/%d records (%.0f%%) have session_id in last 24h", withSession, total, pct),
-		NextStep: "Ensure MDEMG server has session_id propagation (v0.5.0+)",
+		NextStep: "Ensure MDEMG server has session_id propagation (v0.5.0+). Background tasks excluded.",
 	}
 }
 
