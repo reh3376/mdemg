@@ -5,13 +5,46 @@ import "testing"
 func TestConsultingClassifyTimeoutMs_Default(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
+	// DH-004 E4.1: bumped 15000 -> 30000 to match JIMINY_SYNTHESIS_TIMEOUT_MS
+	// and survive typical gpt-5.4-mini latency under load without tripping the
+	// circuit breaker on a single slow call.
+	t.Setenv("CONSULTING_CLASSIFY_TIMEOUT_MS", "")
 
 	cfg, err := FromEnv()
 	if err != nil {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
-	if cfg.ConsultingClassifyTimeoutMs != 15000 {
-		t.Errorf("ConsultingClassifyTimeoutMs = %d, want 15000", cfg.ConsultingClassifyTimeoutMs)
+	if cfg.ConsultingClassifyTimeoutMs != 30000 {
+		t.Errorf("ConsultingClassifyTimeoutMs = %d, want 30000 (DH-004 raised from 15000)", cfg.ConsultingClassifyTimeoutMs)
+	}
+}
+
+// DH-004 E4.2: LLM_RETRY_DEADLINE_ENABLED defaults true.
+func TestLLMRetryOnDeadline_Default(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("LLM_RETRY_DEADLINE_ENABLED", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if !cfg.LLMRetryOnDeadline {
+		t.Error("LLMRetryOnDeadline default = false, want true")
+	}
+}
+
+func TestLLMRetryOnDeadline_EnvOverride(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("LLM_RETRY_DEADLINE_ENABLED", "false")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.LLMRetryOnDeadline {
+		t.Error("LLMRetryOnDeadline = true after env override to false, want false")
 	}
 }
 

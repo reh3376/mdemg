@@ -488,7 +488,7 @@ type Config struct {
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
 	ConsultingLLMConstraintsModel    string // CONSULTING_LLM_CONSTRAINTS_MODEL — model for classification (default: from EMERGENCE_MODEL)
-	ConsultingClassifyTimeoutMs      int    // CONSULTING_CLASSIFY_TIMEOUT_MS — timeout for constraint classification LLM call in ms (default: 15000, min 5000)
+	ConsultingClassifyTimeoutMs      int    // CONSULTING_CLASSIFY_TIMEOUT_MS — timeout for constraint classification LLM call in ms (default: 30000, min 5000)
 
 	// Phase AR-3: LLM-powered query classification
 	RetrievalLLMClassifyEnabled  bool   // RETRIEVAL_LLM_CLASSIFY_ENABLED — enable LLM query classification (default: false)
@@ -846,6 +846,7 @@ type Config struct {
 	LLMRetryMaxDelayMs  int     // LLM_RETRY_MAX_DELAY_MS — max backoff delay in ms (default: 60000)
 	LLMRetryMultiplier  float64 // LLM_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
 	LLMRetryJitter      float64 // LLM_RETRY_JITTER — jitter factor 0-1 (default: 0.2)
+	LLMRetryOnDeadline  bool    // LLM_RETRY_DEADLINE_ENABLED — retry on context.DeadlineExceeded when budget allows (default: true, DH-004 E4.2)
 
 	// ===== LLM Consecutive Failure Alert =====
 	LLMConsecutiveFailureThreshold int // LLM_CONSECUTIVE_FAILURE_THRESHOLD — fires alert after N consecutive failures (default: 3)
@@ -2428,7 +2429,7 @@ func FromEnv() (Config, error) {
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
-	consultingClassifyTimeoutMs, err := atoi("CONSULTING_CLASSIFY_TIMEOUT_MS", 15000)
+	consultingClassifyTimeoutMs, err := atoi("CONSULTING_CLASSIFY_TIMEOUT_MS", 30000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3314,6 +3315,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// DH-004 E4.2: retry on context.DeadlineExceeded when the parent context
+	// still has enough budget for another attempt. Default true — single slow
+	// OpenAI responses should not trip circuit breakers on the first failure.
+	llmRetryOnDeadline := getBool("LLM_RETRY_DEADLINE_ENABLED", true)
 
 	// LLM Consecutive Failure Alert
 	llmConsecutiveFailureThreshold, err := atoi("LLM_CONSECUTIVE_FAILURE_THRESHOLD", 3)
@@ -3992,6 +3997,7 @@ func FromEnv() (Config, error) {
 		LLMRetryMaxDelayMs:  llmRetryMaxDelayMs,
 		LLMRetryMultiplier:  llmRetryMultiplier,
 		LLMRetryJitter:      llmRetryJitter,
+		LLMRetryOnDeadline:  llmRetryOnDeadline,
 
 		// LLM Consecutive Failure Alert
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
