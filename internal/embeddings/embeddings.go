@@ -199,6 +199,13 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 		}
 	}
 
+	// Record cache hits.
+	for i, text := range texts {
+		if _, isMiss := misses[i]; !isMiss {
+			c.recordEvent(ctx, text, true, 0)
+		}
+	}
+
 	// If all were cached, return immediately
 	if len(misses) == 0 {
 		if c.debug {
@@ -220,9 +227,17 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 	}
 
 	// Get embeddings for cache misses
+	start := time.Now()
 	missEmbeddings, err := c.embedder.EmbedBatch(ctx, missTexts)
+	batchLatencyMs := int(time.Since(start).Milliseconds())
 	if err != nil {
 		return nil, err
+	}
+
+	// Amortize batch latency across miss texts for per-record recording.
+	perTextLatencyMs := 0
+	if len(missTexts) > 0 {
+		perTextLatencyMs = batchLatencyMs / len(missTexts)
 	}
 
 	// Store results and cache them
@@ -232,6 +247,7 @@ func (c *CachedEmbedder) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 			results[idx] = embedding
 			cacheKey := c.embedder.Name() + ":" + missTexts[i]
 			c.cache.Put(cacheKey, embedding)
+			c.recordEvent(ctx, missTexts[i], false, perTextLatencyMs)
 		}
 	}
 
