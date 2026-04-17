@@ -217,6 +217,24 @@ These env vars are forwarded in the compose template. Set in `.env`, or enable v
 - `LLM_INTERACTION_LOGGING` — TSDB LLM interaction recording (default: true)
 - `AUTO_MIGRATE` — unified Neo4j + TSDB schema migration on startup (default: true in Docker)
 
+### DH-004 Dashboard Remediation (v0.7.1)
+
+Config changes:
+- `CONSULTING_CLASSIFY_TIMEOUT_MS` default bumped 15000 → 30000 (matches `JIMINY_SYNTHESIS_TIMEOUT_MS`; survives typical `gpt-5.4-mini` latency without tripping the circuit breaker on one slow call)
+- `J17_SIDECAR_TIMEOUT_MS` default bumped 200 → 1000, with a 100ms floor. NLI primary-path calls were timing out at 200ms ~56% of the time, inflating `j17_nli_mean_bias`
+- `LLM_RETRY_DEADLINE_ENABLED` (NEW, default: true) — retry once on `context.DeadlineExceeded` from OpenAI iff remaining context budget > 2× base delay. Prevents a single slow upstream response from tripping `openai-constraint-classify` / `jiminy-synthesis` breakers.
+- Compose templates now expose 7 J17 sidecar env vars (`J17_SIDECAR_URL`, `_TIMEOUT_MS`, `_MODE`, `_CONFIDENCE_FLOOR`, `_CB_FAILURE_THRESHOLD`, `_CB_TIMEOUT_SEC`, plus `J17_NLI_COMPREHENSION_ENABLED`, `_CALIBRATION_BIAS_THRESHOLD`)
+
+New admin endpoints (gated by `AUTH_API_KEYS`):
+- `GET /v1/admin/breakers` — list all registered circuit breakers with state + counts
+- `POST /v1/admin/breakers/reset` `{"name":"<breaker-name>"}` — force a named breaker to StateClosed. Operator escape hatch when a breaker trips on a transient incident but hasn't auto-recovered yet.
+
+Behavior fixes:
+- J17 Protocol Health: `TicketRestoreSuccessRate` now defaults to 1.0 when `ticketRestoreTotal == 0` (matches the existing `codeCoverage` null-tolerance pattern). A healthy system with no restore events no longer drags the stability weight to zero. New field `TicketRestoreTotal` on `ProtocolStats` distinguishes "no data" from "true 100%".
+- NLI fallback counting: `RecordNLIFallback` now only fires when `nliScorer.IsOperational()` (enabled AND sidecar URL set). A gated-off scorer no longer inflates `j17_nli_mean_bias`.
+- Alert cooldown: closed TOCTOU race in `cooldown.Allow` + `cooldown.Record` that allowed concurrent `Send()` calls to both pass the gate. New atomic `TryRecord()` fixes repeating-alert symptom.
+- Context Cooler graduation: `CoactivateSession` now reinforces stability for every session observation (was only creating edges, never raising `stability_score` — so 99.7% of conversation observations stayed volatile forever). Forward-only fix; existing volatile data self-heals via ongoing session activity.
+
 ## /strict Mode (Deterministic Governance)
 
 Toggle: `POST /v1/jiminy/strict` `{"session_id":"claude-core","enabled":true}`
