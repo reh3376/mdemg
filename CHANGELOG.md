@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **DOC-UPDATE-01 docs staleness remediation** (2026-04-20) — aligned `docs/user/cli-reference.md`, `docs/architecture/06_Retrieval_API_and_Scoring.md`, `docs/development/ft-lora/{05_DATA_COLLECTION,06_CORRECTIONS_APPLIED}_v2.md`, and `.env.example` with post-DH-004/DH-005 config defaults. Added docs for `RSIC_HEALTH_WEIGHT_*` × 7, `LLM_RETRY_DEADLINE_ENABLED`, updated `CONSULTING_CLASSIFY_TIMEOUT_MS` (15000→30000) and `J17_SIDECAR_TIMEOUT_MS` (200→1000). Corrected retrieval scoring hyperparameter table (α 0.55→0.60, β 0.30→0.20, γ 0.10→0.15, single-row ρ split into layered `ρ_L0`/`ρ_L1`/`ρ_L2`). Fixed stale `LLM_MODEL` default (`gpt-4.1-nano`→`gpt-5.4-mini`) in cli-reference and ft-lora Issue 21. Bumped batch ingest limit mention from 100 to 500. No code changes.
 - **DH-004 dashboard & metric fixes** (2026-04-17):
   - **J17 Protocol Health null-tolerance**: `TicketRestoreSuccessRate` now defaults to `1.0` when `ticketRestoreTotal == 0` (matches the existing `codeCoverage` null-tolerance pattern at `protocol_metrics.go:307`). A healthy system with no restore events no longer drags the 15% stability weight to zero. Lifts `rsic_health_protocol` from 0.432 toward ≥ 0.7.
   - **NLI fallback counting (gate-aware)**: `RecordNLIFallback` now only fires when `nliScorer.IsOperational()` (enabled AND sidecar URL set). A gated-off scorer no longer inflates `j17_nli_mean_bias` when `J17_NLI_COMPREHENSION_ENABLED=false`.
