@@ -121,7 +121,7 @@
 
 `POST /v1/memory/ingest/batch`
 
-Bulk ingest up to 100 observations in a single request.
+Bulk ingest up to 500 observations in a single request (configurable via `BATCH_INGEST_MAX_ITEMS`).
 
 ### Request Body
 
@@ -544,13 +544,15 @@ Where `γ_eff` depends on temporal mode:
 
 | Symbol | Name | Default | Description |
 |--------|------|---------|-------------|
-| α | vector weight | 0.55 | Vector similarity contribution |
-| β | activation weight | 0.30 | Activation score contribution |
-| γ | recency weight | 0.10 | Recency boost |
+| α | vector weight | 0.60 | Vector similarity contribution |
+| β | activation weight | 0.20 | Activation score contribution |
+| γ | recency weight | 0.15 | Recency boost |
 | δ | confidence weight | 0.05 | Confidence contribution |
 | φ | hub penalty | 0.08 | Penalty for high-degree nodes |
 | κ | redundancy penalty | 0.12 | Penalty for path-prefix duplicates |
-| ρ | recency decay | 0.05 | Decay rate per day |
+| ρ_L0 | recency decay (L0) | 0.05 | Decay rate per day for Layer 0 (concrete observations) |
+| ρ_L1 | recency decay (L1) | 0.02 | Decay rate per day for Layer 1 (patterns) |
+| ρ_L2 | recency decay (L2) | 0.01 | Decay rate per day for Layer 2+ (concepts, principles) |
 
 **Penalties:**
 
