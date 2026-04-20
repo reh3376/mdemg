@@ -57,6 +57,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-20) ===
+- ✅ RELEASE-v0.8.5: Homebrew Doc Sync + v0.8.5 Release Tag (2026-04-20):
+  - Context: tag v0.8.5 (4-patch intentional skip from v0.8.1) covering DH-004 + DH-005 + /strict Mode + UAITS + RSIC overhaul + DOC-UPDATE-01 + ACA-BFC + DD-P1P2 + browser UI audit + 32-finding RSIC hardening.
+  - E1: `.goreleaser.yaml:264` caveat `gpt-5.4-nano` → `gpt-5.4-mini` (prior run would have propagated the stale string into the auto-generated formula).
+  - E2: Parent `CHANGELOG.md` rolled `[Unreleased]` → `[0.8.5] - 2026-04-20` with a fresh empty `[Unreleased]` opened above.
+  - E3: `AGENT_HANDOFF.md:56` "Latest releases" bumped CLI v0.5.4 → v0.8.5; GHCR refs switched to `:latest` (floating, tracks main via `docker-publish.yml`).
+  - E4: Submodule `packaging/homebrew-mdemg/` (separate tap repo) — new `[0.8.5]` CHANGELOG block (DH-005/DH-004/UAITS/strict/hardening), `README.md` "What's New in v0.8.5" subsection + default-LLM rotation history (v0.7.2 `gpt-5-nano`→`gpt-4.1-nano`; v0.8.0 `gpt-4.1-nano`→`gpt-5.4-mini`), `mdemg_beta_testing.md:3` "Version under test" v0.7.4 → v0.8.5. Submodule commit `a235977` pushed to `reh3376/homebrew-mdemg` `main` **before** tag push, so GoReleaser's auto-commit (`f9358cd`) of the regenerated `mdemg.rb` landed on top of current docs.
+  - E5: Release-prep PR #328 (parent submodule pointer bump to `a235977` + E1/E2/E3 edits) — merged to `main` as `fe8dc49`. CI was all-green after one transient Security-Scan rerun (GitHub Actions tarball-download 404 on `gitleaks-action@v2.3.9`; identical ref passed on `main` 8 min earlier — not a code issue).
+  - E6: Annotated tag `v0.8.5` pushed from `main` @ `c2fd464`; fired `release.yml` run [24673281806](https://github.com/reh3376/mdemg/actions/runs/24673281806) (6 min total).
+  - E7 validation — all green: GitHub Release v0.8.5 published `14:56:35Z` with 5 assets (`mdemg_0.8.5_{darwin,linux}_{amd64,arm64}.tar.gz` + `checksums.txt`); tap auto-commit `f9358cd` "Brew formula update for mdemg version v0.8.5"; formula contents verified — `version "0.8.5"`, 4 URLs point to v0.8.5 artifacts, caveat reads `Default model: gpt-5.4-mini`.
+  - Sprint summary posted to PR #328: https://github.com/reh3376/mdemg/pull/328#issuecomment-4281841358
+  - Scope exclusions (per plan): `mdemg.rb` hand-edits (GoReleaser-owned), 4 submodule `docs/` stub redirects (correct, unchanged).
 - ✅ DOC-UPDATE-01: Documentation Staleness Remediation (2026-04-20):
   - Follow-up cleanup sweep after DH-004 (PR #325) and DH-005 (PR #326) merged. Four-agent parallel audit of 18 target docs found 4 drifted files + `.env.example`; 14 were already current.
   - E1: `docs/user/cli-reference.md` — added new "LLM Retry & Resilience" subsection with 8 retry/timeout vars (`LLM_RETRY_*`, `CONSULTING_CLASSIFY_TIMEOUT_MS`, `RSIC_LLM_REFLECT_TIMEOUT_MS`, new `LLM_RETRY_DEADLINE_ENABLED`); added 7 J17 sidecar vars (including `J17_SIDECAR_TIMEOUT_MS` at new default 1000); added new "Health Weighting (DH-005)" section with 7 `RSIC_HEALTH_WEIGHT_*` knobs. Corrected stale `LLM_MODEL` default (gpt-4.1-nano → gpt-5.4-mini).
