@@ -53,7 +53,7 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - FT-DATA Sprint — COMPLETE (8 phases: UTDS spec framework, TSDB exporter+CLI+API, browser UI tab, quality_filter.py, format_converter.py, dataset_versioner.py, round-trip verification, documentation)
 - FT Training Pipeline — COMPLETE (PRs #243-250: PROD-READINESS, compose embed, export-auto LaunchAgent, vllm-mlx/train_ft.py, evaluate_ft.py, regression_gate.py, teacher_distill.py/21 GRPO rewards, quantize_deploy.py)
 - CI: ALL GREEN (push + pull_request + release) as of 2026-04-03
-- Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
+- Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-20) ===

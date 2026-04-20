@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-04-20
+
 ### Added
 
 - **DH-005: Health Formula Reweighting & Confidence-Adaptive Scoring** (2026-04-17) — Follow-up to DH-004 (previously carved out as an exception). Restructures `ComputeOverallHealth` from a near-uniform weight table (0.12–0.18, inversely correlated with dimension reliability) to a principled hybrid reliability × user-impact prior, with automatic exclusion of dimensions that lack data:
