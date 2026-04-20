@@ -797,6 +797,19 @@ type Config struct {
 	SynergyCronInterval        string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
 	SynergyCronEnabled         bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
 
+	// ===== RSIC Overall-Health Weights (DH-005) =====
+	// Base priors for ComputeOverallHealth's 7 sub-dimensions. Values need not
+	// sum to 1.0 — the formula normalises. Zero or negative disables a dim.
+	// Defaults mirror DefaultHealthWeights() in internal/ape/health_formula.go.
+
+	RSICHealthWeightRetrieval float64 // RSIC_HEALTH_WEIGHT_RETRIEVAL — overall-health weight for RetrievalQuality (default: 0.08)
+	RSICHealthWeightMemory    float64 // RSIC_HEALTH_WEIGHT_MEMORY    — overall-health weight for MemoryHealth (default: 0.15)
+	RSICHealthWeightEdge      float64 // RSIC_HEALTH_WEIGHT_EDGE      — overall-health weight for EdgeHealth (default: 0.15)
+	RSICHealthWeightTask      float64 // RSIC_HEALTH_WEIGHT_TASK      — overall-health weight for TaskPerformance (default: 0.20)
+	RSICHealthWeightGuidance  float64 // RSIC_HEALTH_WEIGHT_GUIDANCE  — overall-health weight for GuidanceHealth (default: 0.17)
+	RSICHealthWeightProtocol  float64 // RSIC_HEALTH_WEIGHT_PROTOCOL  — overall-health weight for ProtocolHealth (default: 0.20)
+	RSICHealthWeightSynergy   float64 // RSIC_HEALTH_WEIGHT_SYNERGY   — overall-health weight for SynergyHealth (default: 0.05)
+
 	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
 	SynergyRecoveryBufferSpace      string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
 	SynergyRecoveryBufferPath       string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
@@ -3224,6 +3237,69 @@ func FromEnv() (Config, error) {
 	}
 	synergyRecoveryAutoFlush := getBool("SYNERGY_RECOVERY_AUTO_FLUSH", true)
 
+	// RSIC overall-health weights (DH-005). Defaults mirror
+	// ape.DefaultHealthWeights(); negative values fall back to the default
+	// (warning logged) because negative weights are nonsensical.
+	rsicHealthWeightRetrieval, err := atof("RSIC_HEALTH_WEIGHT_RETRIEVAL", 0.08)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightMemory, err := atof("RSIC_HEALTH_WEIGHT_MEMORY", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightEdge, err := atof("RSIC_HEALTH_WEIGHT_EDGE", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightTask, err := atof("RSIC_HEALTH_WEIGHT_TASK", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightGuidance, err := atof("RSIC_HEALTH_WEIGHT_GUIDANCE", 0.17)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightProtocol, err := atof("RSIC_HEALTH_WEIGHT_PROTOCOL", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicHealthWeightSynergy, err := atof("RSIC_HEALTH_WEIGHT_SYNERGY", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	// Negative values → fall back to default with a warning log. The formula
+	// treats zero as "disable this dimension" (legitimate operator choice);
+	// negatives are almost certainly typos.
+	if rsicHealthWeightRetrieval < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_RETRIEVAL is negative; using default", "value", rsicHealthWeightRetrieval, "default", 0.08)
+		rsicHealthWeightRetrieval = 0.08
+	}
+	if rsicHealthWeightMemory < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_MEMORY is negative; using default", "value", rsicHealthWeightMemory, "default", 0.15)
+		rsicHealthWeightMemory = 0.15
+	}
+	if rsicHealthWeightEdge < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_EDGE is negative; using default", "value", rsicHealthWeightEdge, "default", 0.15)
+		rsicHealthWeightEdge = 0.15
+	}
+	if rsicHealthWeightTask < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_TASK is negative; using default", "value", rsicHealthWeightTask, "default", 0.20)
+		rsicHealthWeightTask = 0.20
+	}
+	if rsicHealthWeightGuidance < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_GUIDANCE is negative; using default", "value", rsicHealthWeightGuidance, "default", 0.17)
+		rsicHealthWeightGuidance = 0.17
+	}
+	if rsicHealthWeightProtocol < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_PROTOCOL is negative; using default", "value", rsicHealthWeightProtocol, "default", 0.20)
+		rsicHealthWeightProtocol = 0.20
+	}
+	if rsicHealthWeightSynergy < 0 {
+		slog.Warn("RSIC_HEALTH_WEIGHT_SYNERGY is negative; using default", "value", rsicHealthWeightSynergy, "default", 0.05)
+		rsicHealthWeightSynergy = 0.05
+	}
+
 	// TimescaleDB settings
 	tsdbEnabled := getBool("TSDB_ENABLED", false)
 	tsdbHost := get("TSDB_HOST", "localhost")
@@ -3955,6 +4031,15 @@ func FromEnv() (Config, error) {
 		SynergyRecoveryBufferMaxEntries: synergyRecoveryBufferMaxEntries,
 		SynergyRecoveryAutoFlush:        synergyRecoveryAutoFlush,
 
+		// RSIC overall-health weights (DH-005)
+		RSICHealthWeightRetrieval: rsicHealthWeightRetrieval,
+		RSICHealthWeightMemory:    rsicHealthWeightMemory,
+		RSICHealthWeightEdge:      rsicHealthWeightEdge,
+		RSICHealthWeightTask:      rsicHealthWeightTask,
+		RSICHealthWeightGuidance:  rsicHealthWeightGuidance,
+		RSICHealthWeightProtocol:  rsicHealthWeightProtocol,
+		RSICHealthWeightSynergy:   rsicHealthWeightSynergy,
+
 		// TimescaleDB
 		TSDBEnabled:               tsdbEnabled,
 		TSDBHost:                  tsdbHost,
@@ -4085,6 +4170,18 @@ func (c Config) Validate() (warnings []string, err error) {
 	if c.HybridRetrievalEnabled {
 		checkWeightSum("HybridRetrieval(BM25+Vector)",
 			c.BM25Weight, c.VectorWeight)
+	}
+
+	// DH-005: RSIC overall-health weights. No sum constraint — the formula
+	// normalises — but all-zero is meaningless (overall_health would always
+	// be 0). Warn loudly so the operator knows the RSIC signal is disabled.
+	rsicSum := c.RSICHealthWeightRetrieval + c.RSICHealthWeightMemory +
+		c.RSICHealthWeightEdge + c.RSICHealthWeightTask +
+		c.RSICHealthWeightGuidance + c.RSICHealthWeightProtocol +
+		c.RSICHealthWeightSynergy
+	if rsicSum <= 0 {
+		warnings = append(warnings, "All RSIC_HEALTH_WEIGHT_* are zero; overall_health will always be 0. "+
+			"Either set at least one weight or unset the env vars to use defaults.")
 	}
 
 	// Bound checks

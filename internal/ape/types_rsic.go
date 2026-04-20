@@ -137,6 +137,16 @@ type SelfAssessmentReport struct {
 	GuidanceHealth   float64 `json:"guidance_health"` // J10: Jiminy guidance effectiveness
 	ProtocolHealth   float64 `json:"protocol_health"` // J17: protocol encoding effectiveness
 
+	// Per-dimension confidence (0–1, data sufficiency). Dimensions with
+	// confidence = 0 are excluded from ComputeOverallHealth. DH-005.
+	RetrievalConfidence float64 `json:"retrieval_confidence"`
+	MemoryConfidence    float64 `json:"memory_confidence"`
+	EdgeConfidence      float64 `json:"edge_confidence"`
+	TaskConfidence      float64 `json:"task_confidence"`
+	GuidanceConfidence  float64 `json:"guidance_confidence"`
+	ProtocolConfidence  float64 `json:"protocol_confidence"`
+	SynergyConfidence   float64 `json:"synergy_confidence"`
+
 	// Derived
 	OverallHealth float64 `json:"overall_health"`
 	Confidence    float64 `json:"confidence"`

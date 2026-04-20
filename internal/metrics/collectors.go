@@ -116,6 +116,19 @@ type StandardMetrics struct {
 	RSICHealthSynergy    func(spaceID string) *Gauge
 	RSICHealthConfidence func(spaceID string) *Gauge
 
+	// RSIC per-dimension data-sufficiency confidence (DH-005). Published
+	// alongside the score gauges above so operators can distinguish "this
+	// dimension scored 0.0 because the system is broken" from "this dimension
+	// scored 0.0 because we have no data." Feeds the dimension-confidence row
+	// on the mdemg-rsic Grafana dashboard.
+	RSICHealthRetrievalConfidence func(spaceID string) *Gauge
+	RSICHealthMemoryConfidence    func(spaceID string) *Gauge
+	RSICHealthEdgeConfidence      func(spaceID string) *Gauge
+	RSICHealthTaskConfidence      func(spaceID string) *Gauge
+	RSICHealthGuidanceConfidence  func(spaceID string) *Gauge
+	RSICHealthProtocolConfidence  func(spaceID string) *Gauge
+	RSICHealthSynergyConfidence   func(spaceID string) *Gauge
+
 	// RSIC synergy metrics (published after each assessment)
 	RSICSynergyClaudeLines   func(spaceID string) *Gauge
 	RSICSynergyMemoryLines   func(spaceID string) *Gauge
@@ -383,6 +396,36 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.RSICHealthConfidence = func(spaceID string) *Gauge {
 		return r.NewGauge("rsic_health_confidence", "Assessment confidence (0.1-1.0)",
+			map[string]string{"space_id": spaceID})
+	}
+
+	// RSIC per-dimension data-sufficiency confidence (DH-005)
+	m.RSICHealthRetrievalConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_retrieval_confidence", "Retrieval score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthMemoryConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_memory_confidence", "Memory score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthEdgeConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_edge_confidence", "Edge score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthTaskConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_task_confidence", "Task score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthGuidanceConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_guidance_confidence", "Guidance score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthProtocolConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_protocol_confidence", "Protocol score data-sufficiency confidence (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICHealthSynergyConfidence = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_health_synergy_confidence", "Synergy score data-sufficiency confidence (0-1)",
 			map[string]string{"space_id": spaceID})
 	}
 

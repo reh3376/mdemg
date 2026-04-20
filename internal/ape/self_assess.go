@@ -53,6 +53,27 @@ func NewAssessor(cfg config.Config, driver neo4j.DriverWithContext, learner Lear
 	return &Assessor{cfg: cfg, driver: driver, learner: learner, convSvc: convSvc}
 }
 
+// healthWeights builds a HealthWeights struct from the Assessor's config.
+// When all weights are zero (operator error or unset in a test Config),
+// DefaultHealthWeights is returned so overall_health stays meaningful.
+// DH-005.
+func (a *Assessor) healthWeights() HealthWeights {
+	w := HealthWeights{
+		Retrieval: a.cfg.RSICHealthWeightRetrieval,
+		Memory:    a.cfg.RSICHealthWeightMemory,
+		Edge:      a.cfg.RSICHealthWeightEdge,
+		Task:      a.cfg.RSICHealthWeightTask,
+		Guidance:  a.cfg.RSICHealthWeightGuidance,
+		Protocol:  a.cfg.RSICHealthWeightProtocol,
+		Synergy:   a.cfg.RSICHealthWeightSynergy,
+	}
+	sum := w.Retrieval + w.Memory + w.Edge + w.Task + w.Guidance + w.Protocol + w.Synergy
+	if sum <= 0 {
+		return DefaultHealthWeights()
+	}
+	return w
+}
+
 // SetJiminyProvider attaches a Jiminy stats provider for guidance health assessment (J10).
 func (a *Assessor) SetJiminyProvider(p JiminyStatsProvider) {
 	a.jiminyProvider = p
@@ -131,17 +152,17 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		return report, err // return partial report + error
 	}
 
-	// 5. Compute sub-scores
-	report.RetrievalQuality = a.scoreRetrieval(report)
-	report.MemoryHealth = a.scoreMemory(report)
-	report.EdgeHealth = a.scoreEdge(report)
-	report.TaskPerformance = a.scoreTask(report)
+	// 5. Compute sub-scores + confidences (DH-005)
+	report.RetrievalQuality, report.RetrievalConfidence = a.scoreRetrieval(report)
+	report.MemoryHealth, report.MemoryConfidence = a.scoreMemory(report)
+	report.EdgeHealth, report.EdgeConfidence = a.scoreEdge(report)
+	report.TaskPerformance, report.TaskConfidence = a.scoreTask(report)
 
 	// 5b. J10: Compute guidance health if Jiminy stats available
 	if a.jiminyProvider != nil {
 		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
 		if jErr == nil && js.TotalGuidanceIssued > 0 {
-			report.GuidanceHealth = a.scoreGuidance(js)
+			report.GuidanceHealth, report.GuidanceConfidence = a.scoreGuidance(js)
 			a.publishGuidanceMetrics(spaceID, js)
 		} else if jErr != nil {
 			slog.Warn("rsic: guidance stats unavailable, retaining previous metrics", "error", jErr)
@@ -154,7 +175,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		ps, pErr := a.protocolProvider.GetProtocolStats(ctx, spaceID)
 		if pErr == nil && ps.TotalEvents > 0 {
 			protoStats = ps
-			report.ProtocolHealth = a.scoreProtocol(protoStats)
+			report.ProtocolHealth, report.ProtocolConfidence = a.scoreProtocol(protoStats)
 			a.publishProtocolMetrics(spaceID, protoStats)
 		} else if pErr != nil {
 			slog.Warn("rsic: protocol stats unavailable, retaining previous metrics", "error", pErr)
@@ -169,7 +190,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyOverflowRate = sm.OverflowRate
 		report.SynergyOverlapScore = sm.OverlapScore
 		report.JiminyHealthy = sm.JiminyHealthy
-		report.SynergyHealth = a.scoreSynergy(report)
+		report.SynergyHealth, report.SynergyConfidence = a.scoreSynergy(report)
 
 		// Recovery buffer: count pending entries (CMS space + local JSONL)
 		report.SynergyRecoveryBufferEntries = countBufferSpaceEntries(ctx, a.driver, a.cfg.SynergyRecoveryBufferSpace) +
@@ -218,8 +239,8 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 	}
 
-	// 6. Weighted overall (single source: ComputeOverallHealth)
-	report.OverallHealth = ComputeOverallHealth(report)
+	// 6. Weighted overall (single source: ComputeOverallHealthWith + cfg weights)
+	report.OverallHealth = ComputeOverallHealthWith(report, a.healthWeights())
 
 	report.Confidence = a.computeConfidence(report)
 
@@ -247,6 +268,14 @@ func (a *Assessor) publishHealthMetrics(r *SelfAssessmentReport) {
 	m.RSICHealthProtocol(sid).Set(r.ProtocolHealth)
 	m.RSICHealthSynergy(sid).Set(r.SynergyHealth)
 	m.RSICHealthConfidence(sid).Set(r.Confidence)
+	// DH-005: per-dimension data-sufficiency confidence gauges
+	m.RSICHealthRetrievalConfidence(sid).Set(r.RetrievalConfidence)
+	m.RSICHealthMemoryConfidence(sid).Set(r.MemoryConfidence)
+	m.RSICHealthEdgeConfidence(sid).Set(r.EdgeConfidence)
+	m.RSICHealthTaskConfidence(sid).Set(r.TaskConfidence)
+	m.RSICHealthGuidanceConfidence(sid).Set(r.GuidanceConfidence)
+	m.RSICHealthProtocolConfidence(sid).Set(r.ProtocolConfidence)
+	m.RSICHealthSynergyConfidence(sid).Set(r.SynergyConfidence)
 	m.RSICSynergyClaudeLines(sid).Set(float64(r.SynergyLinesClaude))
 	m.RSICSynergyMemoryLines(sid).Set(float64(r.SynergyLinesMemory))
 	m.RSICSynergyOverflowRate(sid).Set(r.SynergyOverflowRate)
@@ -329,23 +358,37 @@ func (a *Assessor) queryGraphMetrics(ctx context.Context, spaceID string, r *Sel
 
 // ─── Scoring helpers ───
 
-func (a *Assessor) scoreRetrieval(r *SelfAssessmentReport) float64 {
+// Data-sufficiency thresholds for per-dimension confidence (DH-005).
+// At or above these counts, the dimension is treated as fully confident (1.0).
+// Below, confidence scales linearly. Rationale in sprint DH-005 plan.
+const (
+	confidenceThresholdMemoryNodes    = 100 // TotalNodes
+	confidenceThresholdEdges          = 50  // EdgeCount
+	confidenceThresholdTaskObs        = 50  // VolatileCount+PermanentCount
+	confidenceThresholdGuidanceEvents = 30  // TotalGuidanceIssued
+	confidenceThresholdProtocolEvents = 30  // TotalEvents
+)
+
+// scoreRetrieval returns (score, confidence). Confidence is derived from
+// LearningPhase maturity: warm/saturated phases reflect enough edge history
+// to trust the retrieval signal; cold reflects minimal data.
+func (a *Assessor) scoreRetrieval(r *SelfAssessmentReport) (float64, float64) {
 	// Based on learning phase: cold=0.3, learning=0.6, warm=0.9, saturated=0.7
 	switch r.LearningPhase {
 	case "cold":
-		return 0.3
+		return 0.3, 0.4
 	case "learning":
-		return 0.6
+		return 0.6, 0.7
 	case "warm":
-		return 0.9
+		return 0.9, 1.0
 	case "saturated":
-		return 0.7
+		return 0.7, 1.0
 	default:
-		return 0.5
+		return 0.5, 0.1
 	}
 }
 
-func (a *Assessor) scoreMemory(r *SelfAssessmentReport) float64 {
+func (a *Assessor) scoreMemory(r *SelfAssessmentReport) (float64, float64) {
 	score := 1.0
 	// Penalise high orphan ratio
 	if r.OrphanRatio > 0.2 {
@@ -364,10 +407,11 @@ func (a *Assessor) scoreMemory(r *SelfAssessmentReport) float64 {
 	if score < 0 {
 		score = 0
 	}
-	return score
+	conf := math.Min(1.0, float64(r.TotalNodes)/float64(confidenceThresholdMemoryNodes))
+	return score, conf
 }
 
-func (a *Assessor) scoreEdge(r *SelfAssessmentReport) float64 {
+func (a *Assessor) scoreEdge(r *SelfAssessmentReport) (float64, float64) {
 	score := 1.0
 	if r.EdgeCount > 0 {
 		belowRatio := float64(r.EdgesBelowThreshold) / float64(r.EdgeCount)
@@ -381,38 +425,50 @@ func (a *Assessor) scoreEdge(r *SelfAssessmentReport) float64 {
 	if score < 0 {
 		score = 0
 	}
-	return score
+	// No edges → no signal; exclude from formula via conf=0.
+	if r.EdgeCount == 0 {
+		return score, 0
+	}
+	conf := math.Min(1.0, float64(r.EdgeCount)/float64(confidenceThresholdEdges))
+	return score, conf
 }
 
-func (a *Assessor) scoreTask(r *SelfAssessmentReport) float64 {
+func (a *Assessor) scoreTask(r *SelfAssessmentReport) (float64, float64) {
 	// Without external task success tracking, use volatile backlog as proxy
 	total := r.VolatileCount + r.PermanentCount
 	if total == 0 {
-		return 0.5
+		return 0.5, 0
 	}
 	permanentRatio := float64(r.PermanentCount) / float64(total)
-	return clamp(permanentRatio, 0, 1)
+	conf := math.Min(1.0, float64(total)/float64(confidenceThresholdTaskObs))
+	return clamp(permanentRatio, 0, 1), conf
 }
 
 // scoreGuidance computes guidance health from Jiminy stats (J10).
-func (a *Assessor) scoreGuidance(stats JiminyStatsResult) float64 {
+func (a *Assessor) scoreGuidance(stats JiminyStatsResult) (float64, float64) {
 	// Weighted combination: follow rate (50%), effectiveness (30%), diversity (20%)
 	followScore := clamp(stats.FollowRate, 0, 1)
 	effScore := clamp(stats.ConstraintEffRate, 0, 1)
 	diversityScore := clamp(stats.SourceDiversity, 0, 1)
-	return 0.5*followScore + 0.3*effScore + 0.2*diversityScore
+	score := 0.5*followScore + 0.3*effScore + 0.2*diversityScore
+	if stats.TotalGuidanceIssued <= 0 {
+		return score, 0
+	}
+	conf := math.Min(1.0, float64(stats.TotalGuidanceIssued)/float64(confidenceThresholdGuidanceEvents))
+	return score, conf
 }
 
 // scoreSynergy computes Claude Code ↔ MDEMG synergy health.
 // Jiminy must be healthy — without it, synergy pruning is dangerous.
-// Returns 0.0 (excluded from OverallHealth formula) when both files are missing.
-func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) float64 {
+// Returns confidence 0 (excluded from OverallHealth formula) when both
+// files are missing or Jiminy is unhealthy.
+func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) (float64, float64) {
 	// G3: Files not found → cannot assess, exclude from formula
 	if r.SynergyLinesClaude == 0 && r.SynergyLinesMemory == 0 {
-		return 0.0
+		return 0.0, 0
 	}
 	if !r.JiminyHealthy {
-		return 0.0
+		return 0.0, 0
 	}
 	score := 1.0
 	// Penalise bloated CLAUDE.md
@@ -437,11 +493,11 @@ func (a *Assessor) scoreSynergy(r *SelfAssessmentReport) float64 {
 	if r.SynergyOverlapScore > 0.5 {
 		score -= 0.2
 	}
-	return clamp(score, 0, 1)
+	return clamp(score, 0, 1), 1.0
 }
 
 // scoreProtocol computes protocol health from J17 metrics.
-func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) float64 {
+func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) (float64, float64) {
 	// 35% comprehension (are codes being understood?)
 	comprehensionScore := clamp(stats.AvgComprehension, 0, 1)
 
@@ -462,8 +518,13 @@ func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) float64 {
 	restoreScore := clamp(stats.TicketRestoreSuccessRate, 0, 1)
 	stabilityScore := 0.5*restoreScore + 0.5*(1.0-replayPenalty)
 
-	return 0.35*comprehensionScore + 0.05*calibrationScore + 0.25*compressionScore +
+	score := 0.35*comprehensionScore + 0.05*calibrationScore + 0.25*compressionScore +
 		0.20*coverageScore + 0.15*stabilityScore
+	if stats.TotalEvents <= 0 {
+		return score, 0
+	}
+	conf := math.Min(1.0, float64(stats.TotalEvents)/float64(confidenceThresholdProtocolEvents))
+	return score, conf
 }
 
 func (a *Assessor) computeConfidence(r *SelfAssessmentReport) float64 {

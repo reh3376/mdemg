@@ -142,14 +142,14 @@ func (lc *LiveCollectors) CollectHealthMetrics() {
 	lc.mu.Unlock()
 
 	if freshProto != nil && lc.assessor != nil {
-		r.ProtocolHealth = lc.assessor.scoreProtocol(*freshProto)
+		r.ProtocolHealth, r.ProtocolConfidence = lc.assessor.scoreProtocol(*freshProto)
 	}
 	if freshGuidance != nil && freshGuidance.TotalGuidanceIssued > 0 && lc.assessor != nil {
-		r.GuidanceHealth = lc.assessor.scoreGuidance(*freshGuidance)
+		r.GuidanceHealth, r.GuidanceConfidence = lc.assessor.scoreGuidance(*freshGuidance)
 	}
 
-	// Recompute OverallHealth (single source: ComputeOverallHealth)
-	r.OverallHealth = ComputeOverallHealth(&r)
+	// Recompute OverallHealth (single source: ComputeOverallHealthWith + cfg weights)
+	r.OverallHealth = ComputeOverallHealthWith(&r, lc.assessor.healthWeights())
 
 	// Publish all 9 health gauges
 	m := metrics.Metrics()
@@ -163,6 +163,14 @@ func (lc *LiveCollectors) CollectHealthMetrics() {
 	m.RSICHealthProtocol(sid).Set(r.ProtocolHealth)
 	m.RSICHealthSynergy(sid).Set(r.SynergyHealth)
 	m.RSICHealthConfidence(sid).Set(r.Confidence)
+	// DH-005: per-dimension data-sufficiency confidence gauges
+	m.RSICHealthRetrievalConfidence(sid).Set(r.RetrievalConfidence)
+	m.RSICHealthMemoryConfidence(sid).Set(r.MemoryConfidence)
+	m.RSICHealthEdgeConfidence(sid).Set(r.EdgeConfidence)
+	m.RSICHealthTaskConfidence(sid).Set(r.TaskConfidence)
+	m.RSICHealthGuidanceConfidence(sid).Set(r.GuidanceConfidence)
+	m.RSICHealthProtocolConfidence(sid).Set(r.ProtocolConfidence)
+	m.RSICHealthSynergyConfidence(sid).Set(r.SynergyConfidence)
 }
 
 // ─── Private helpers ───
@@ -280,6 +288,14 @@ func (lc *LiveCollectors) LastGaugeValues() map[string]float64 {
 		gauges["rsic_health_protocol"] = report.ProtocolHealth
 		gauges["rsic_health_synergy"] = report.SynergyHealth
 		gauges["rsic_health_confidence"] = report.Confidence
+		// DH-005: per-dimension data-sufficiency confidence for TSDB
+		gauges["rsic_health_retrieval_confidence"] = report.RetrievalConfidence
+		gauges["rsic_health_memory_confidence"] = report.MemoryConfidence
+		gauges["rsic_health_edge_confidence"] = report.EdgeConfidence
+		gauges["rsic_health_task_confidence"] = report.TaskConfidence
+		gauges["rsic_health_guidance_confidence"] = report.GuidanceConfidence
+		gauges["rsic_health_protocol_confidence"] = report.ProtocolConfidence
+		gauges["rsic_health_synergy_confidence"] = report.SynergyConfidence
 	}
 
 	return gauges

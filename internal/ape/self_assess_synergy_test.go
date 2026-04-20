@@ -31,7 +31,7 @@ func TestScoreSynergy_AllHealthy(t *testing.T) {
 		SynergyOverlapScore: 0,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	if !synergyAlmostEqual(got, 1.0) {
 		t.Errorf("expected 1.0, got %f", got)
 	}
@@ -45,7 +45,7 @@ func TestScoreSynergy_JiminyUnhealthy(t *testing.T) {
 		SynergyLinesMemory: 80,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	if !synergyAlmostEqual(got, 0.0) {
 		t.Errorf("expected 0.0, got %f", got)
 	}
@@ -62,7 +62,7 @@ func TestScoreSynergy_BloatedClaude(t *testing.T) {
 		SynergyOverlapScore: 0,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	want := 0.7 // 1.0 - 0.3
 	if !synergyAlmostEqual(got, want) {
 		t.Errorf("expected %f, got %f", want, got)
@@ -80,7 +80,7 @@ func TestScoreSynergy_BloatedMemory(t *testing.T) {
 		SynergyOverlapScore: 0,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	want := 0.7 // 1.0 - 0.3
 	if !synergyAlmostEqual(got, want) {
 		t.Errorf("expected %f, got %f", want, got)
@@ -98,7 +98,7 @@ func TestScoreSynergy_HighOverlap(t *testing.T) {
 		SynergyOverlapScore: 0.6,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	want := 0.8 // 1.0 - 0.2
 	if !synergyAlmostEqual(got, want) {
 		t.Errorf("expected %f, got %f", want, got)
@@ -116,7 +116,7 @@ func TestScoreSynergy_HighOverflow(t *testing.T) {
 		SynergyOverlapScore: 0,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	want := 0.7 // 1.0 - 0.3
 	if !synergyAlmostEqual(got, want) {
 		t.Errorf("expected %f, got %f", want, got)
@@ -131,7 +131,7 @@ func TestScoreSynergy_BothFilesZero(t *testing.T) {
 		SynergyLinesMemory: 0,
 	}
 
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	if !synergyAlmostEqual(got, 0.0) {
 		t.Errorf("expected 0.0 (excluded from formula), got %f", got)
 	}

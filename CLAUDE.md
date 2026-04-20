@@ -235,6 +235,26 @@ Behavior fixes:
 - Alert cooldown: closed TOCTOU race in `cooldown.Allow` + `cooldown.Record` that allowed concurrent `Send()` calls to both pass the gate. New atomic `TryRecord()` fixes repeating-alert symptom.
 - Context Cooler graduation: `CoactivateSession` now reinforces stability for every session observation (was only creating edges, never raising `stability_score` — so 99.7% of conversation observations stayed volatile forever). Forward-only fix; existing volatile data self-heals via ongoing session activity.
 
+### DH-005 Health Formula Reweighting (v0.7.2)
+
+`ComputeOverallHealth` rewritten as a normalised weighted-confidence sum: `overall = Σ(w_i·c_i·s_i) / Σ(w_i·c_i)`. Replaces the 4/5/6/7-dimension branch table with one formula. Dimensions without data (confidence=0) are excluded automatically, not penalised. See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact derivation.
+
+New defaults (hybrid priors, sum=1.00):
+- `RSIC_HEALTH_WEIGHT_RETRIEVAL=0.08` (LOW reliability — static LearningPhase lookup)
+- `RSIC_HEALTH_WEIGHT_MEMORY=0.15` (MODERATE reliability, HIGH impact)
+- `RSIC_HEALTH_WEIGHT_EDGE=0.15` (HIGH reliability, MEDIUM impact)
+- `RSIC_HEALTH_WEIGHT_TASK=0.20` (MOD-HIGH post-DH-004, HIGH impact)
+- `RSIC_HEALTH_WEIGHT_GUIDANCE=0.17` (MODERATE reliability, HIGH user-observable impact)
+- `RSIC_HEALTH_WEIGHT_PROTOCOL=0.20` (HIGH reliability — 5-component J17 composite)
+- `RSIC_HEALTH_WEIGHT_SYNERGY=0.05` (LOW reliability — file-size proxy)
+
+Rules: `0` disables a dimension; negative values fall back to default with a warning log; all-zero triggers a `Validate()` warning. Values need not sum to 1.0 — the formula normalises.
+
+Per-dimension data-sufficiency confidence exposed as 7 new Prometheus gauges:
+- `mdemg_rsic_health_{retrieval,memory,edge,task,guidance,protocol,synergy}_confidence{space_id}`
+
+Confidence thresholds: 100 nodes (Memory), 50 edges (Edge), 50 observations (Task), 30 events (Guidance, Protocol), LearningPhase map (Retrieval), binary (Synergy). New "Dimension Confidence (DH-005)" row on the `mdemg-rsic` Grafana dashboard.
+
 ## /strict Mode (Deterministic Governance)
 
 Toggle: `POST /v1/jiminy/strict` `{"session_id":"claude-core","enabled":true}`

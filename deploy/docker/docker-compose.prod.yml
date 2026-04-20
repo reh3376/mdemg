@@ -55,6 +55,17 @@ services:
       J17_NLI_COMPREHENSION_ENABLED: "${J17_NLI_COMPREHENSION_ENABLED:-false}"
       J17_NLI_CALIBRATION_BIAS_THRESHOLD: "${J17_NLI_CALIBRATION_BIAS_THRESHOLD:-0.15}"
 
+      # RSIC overall-health weights (DH-005). Hybrid reliability × user-impact
+      # priors. Formula normalises — values need not sum to 1.0. Zero disables
+      # a dimension. See docs/features/rsic-feedback-loop.md for derivation.
+      RSIC_HEALTH_WEIGHT_RETRIEVAL: "${RSIC_HEALTH_WEIGHT_RETRIEVAL:-0.08}"
+      RSIC_HEALTH_WEIGHT_MEMORY: "${RSIC_HEALTH_WEIGHT_MEMORY:-0.15}"
+      RSIC_HEALTH_WEIGHT_EDGE: "${RSIC_HEALTH_WEIGHT_EDGE:-0.15}"
+      RSIC_HEALTH_WEIGHT_TASK: "${RSIC_HEALTH_WEIGHT_TASK:-0.20}"
+      RSIC_HEALTH_WEIGHT_GUIDANCE: "${RSIC_HEALTH_WEIGHT_GUIDANCE:-0.17}"
+      RSIC_HEALTH_WEIGHT_PROTOCOL: "${RSIC_HEALTH_WEIGHT_PROTOCOL:-0.20}"
+      RSIC_HEALTH_WEIGHT_SYNERGY: "${RSIC_HEALTH_WEIGHT_SYNERGY:-0.05}"
+
       # Graceful shutdown
       GRACEFUL_SHUTDOWN_TIMEOUT: "30"
     healthcheck:
