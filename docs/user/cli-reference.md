@@ -2487,8 +2487,21 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `LLM_PROVIDER` | string | `"openai"` | Top-level text-gen LLM provider |
-| `LLM_MODEL` | string | `"gpt-4.1-nano"` | Top-level text-gen LLM model |
+| `LLM_MODEL` | string | `"gpt-5.4-mini"` | Top-level text-gen LLM model |
 | `LLM_ENDPOINT` | string | (uses OpenAI endpoint) | Override endpoint for LLM text-generation |
+
+### LLM Retry & Resilience
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `LLM_RETRY_ENABLED` | bool | `true` | Enable LLM call retry |
+| `LLM_RETRY_MAX_ATTEMPTS` | int | `5` | Max retry attempts |
+| `LLM_RETRY_BASE_DELAY_MS` | int | `500` | Initial backoff delay in ms |
+| `LLM_RETRY_MAX_DELAY_MS` | int | `60000` | Max backoff delay in ms (respects `Retry-After` headers up to this cap) |
+| `LLM_RETRY_DEADLINE_ENABLED` | bool | `true` | Retry once on `context.DeadlineExceeded` iff remaining context budget > 2× base delay. Added in DH-004 to prevent single slow upstream responses from tripping `openai-constraint-classify` / `jiminy-synthesis` breakers. |
+| `LLM_CONSECUTIVE_FAILURE_THRESHOLD` | int | `3` | Consecutive failures per task before high-severity alert fires |
+| `CONSULTING_CLASSIFY_TIMEOUT_MS` | int | `30000` | Timeout for consulting classify LLM call in ms (min: 5000). Bumped from 15000 in DH-004 to match `JIMINY_SYNTHESIS_TIMEOUT_MS`. |
+| `RSIC_LLM_REFLECT_TIMEOUT_MS` | int | `15000` | Timeout for RSIC reflection LLM call in ms (decoupled from `EMERGENCE_TIMEOUT_MS`) |
 
 ### Embedding Provider
 
@@ -2794,6 +2807,22 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `RSIC_GUIDANCE_DECAY_MIN_SURFACES` | int | `5` | Min surfaces before decay applies |
 | `SPACE_PRUNE_INTERVAL_HOURS` | int | `24` | Auto-prune interval (0 = disabled) |
 
+### Health Weighting (DH-005)
+
+Per-dimension base priors for `ComputeOverallHealth`. Values need not sum to 1.0 — the formula normalises. `0` disables a dimension; negative values fall back to default with a warning log. The formula is `overall = Σ(w_i · c_i · s_i) / Σ(w_i · c_i)` — dimensions with zero confidence are excluded automatically, not penalised.
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `RSIC_HEALTH_WEIGHT_RETRIEVAL` | float64 | `0.08` | LOW reliability — static `LearningPhase` lookup |
+| `RSIC_HEALTH_WEIGHT_MEMORY` | float64 | `0.15` | MODERATE reliability, HIGH impact |
+| `RSIC_HEALTH_WEIGHT_EDGE` | float64 | `0.15` | HIGH reliability, MEDIUM impact |
+| `RSIC_HEALTH_WEIGHT_TASK` | float64 | `0.20` | MOD-HIGH reliability (post-DH-004), HIGH impact |
+| `RSIC_HEALTH_WEIGHT_GUIDANCE` | float64 | `0.17` | MODERATE reliability, HIGH user-observable impact |
+| `RSIC_HEALTH_WEIGHT_PROTOCOL` | float64 | `0.20` | HIGH reliability — 5-component J17 composite |
+| `RSIC_HEALTH_WEIGHT_SYNERGY` | float64 | `0.05` | LOW reliability — file-size proxy |
+
+See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact derivation.
+
 ### Backup & Restore
 
 | Variable | Type | Default | Description |
@@ -2997,6 +3026,14 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | `J17_CODEGEN_MODEL` | string | (from `LLM_MODEL`) | LLM model for code generation |
 | `NEURAL_TIER_MODEL` | string | `""` | Path or HuggingFace model name for ML tier prediction (empty = disabled, rule-based fallback) |
 | `J17_TICKET_CACHE_SIZE` | int | `1000` | Max entries in ticket LRU cache (0 = default 1000) |
+| `J17_SIDECAR_URL` | string | `""` | Neural sidecar URL for shadow ML predictions (empty = disabled) |
+| `J17_SIDECAR_TIMEOUT_MS` | int | `1000` | Timeout for J17 sidecar shadow calls in ms (min: 100). Bumped from 200 in DH-004 — prior value caused ~56% timeout rate on the NLI primary path. |
+| `J17_SIDECAR_MODE` | string | `"shadow"` | Sidecar arbitration mode: `shadow`, `compare`, `canary`, `active` |
+| `J17_SIDECAR_CONFIDENCE_FLOOR` | float64 | `0.6` | ML confidence below this falls back to rule-based |
+| `J17_SIDECAR_CB_FAILURE_THRESHOLD` | int | `3` | Consecutive failures before sidecar circuit opens |
+| `J17_SIDECAR_CB_TIMEOUT_SEC` | int | `15` | Seconds before half-open probe after circuit opens |
+| `J17_NLI_COMPREHENSION_ENABLED` | bool | `false` | Enable NLI-based comprehension scoring (requires sidecar) |
+| `J17_NLI_CALIBRATION_BIAS_THRESHOLD` | float64 | `0.1` | Mean bias threshold for NLI calibration alerts |
 
 ### Dynamic Reclassification
 
