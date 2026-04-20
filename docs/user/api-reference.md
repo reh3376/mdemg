@@ -3420,10 +3420,28 @@ Run an assessment of memory quality for a space.
 
 **Response (200):** Assessment report with quality metrics and recommendations.
 
+The response embeds a `SelfAssessmentReport` with 7 sub-dimension scores plus — as of DH-005 (2026-04-17) — 7 per-dimension **data-sufficiency confidences**. Confidence tells you whether a `0.0` score means "broken" or "no data." Dimensions with `confidence == 0` are excluded from `overall_health`, not penalised.
+
+| Score field | Confidence field | Confidence meaning |
+|-------------|------------------|--------------------|
+| `retrieval_quality` | `retrieval_confidence` | `LearningPhase` lookup: cold=0.4, learning=0.7, warm/saturated=1.0 |
+| `memory_health` | `memory_confidence` | `min(1, TotalNodes/100)` |
+| `edge_health` | `edge_confidence` | `min(1, EdgeCount/50)`; 0 when graph has no edges |
+| `task_performance` | `task_confidence` | `min(1, (Volatile+Permanent)/50)`; 0 when no observations |
+| `guidance_health` | `guidance_confidence` | `min(1, TotalGuidanceIssued/30)`; 0 when Jiminy has issued none |
+| `protocol_health` | `protocol_confidence` | `min(1, TotalEvents/30)`; 0 when none recorded |
+| `synergy_health` | `synergy_confidence` | Binary: 1 when Jiminy healthy AND files present, else 0 |
+
+`overall_health` is a normalised weighted-confidence sum: `Σ(w·c·s) / Σ(w·c)`. Default weights are returned by `DefaultHealthWeights` (Protocol 0.20, Task 0.20, Guidance 0.17, Memory 0.15, Edge 0.15, Retrieval 0.08, Synergy 0.05) and can be overridden via `RSIC_HEALTH_WEIGHT_<DIM>` env vars. See `docs/features/rsic-feedback-loop.md` for derivation.
+
 ```bash
 curl -s -X POST http://localhost:9999/v1/self-improve/assess \
   -H "Content-Type: application/json" \
-  -d '{"space_id":"demo","tier":"meso"}'
+  -d '{"space_id":"demo","tier":"meso"}' | jq '{
+    overall_health,
+    scores: {retrieval_quality, memory_health, edge_health, task_performance, guidance_health, protocol_health, synergy_health},
+    confidences: {retrieval_confidence, memory_confidence, edge_confidence, task_confidence, guidance_confidence, protocol_confidence, synergy_confidence}
+  }'
 ```
 
 ---

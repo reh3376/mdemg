@@ -57,6 +57,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-17) ===
+- ✅ DH-005: Health Formula Reweighting & Confidence-Adaptive Scoring (2026-04-17):
+  - Follow-up to DH-004 (previously carved out as an exception). Retires the 4/5/6/7-dimension branch table in `ComputeOverallHealth`.
+  - E1: Per-dimension confidence — each `score*` returns `(score, confidence)`; 7 new `<Dim>Confidence` fields on `SelfAssessmentReport`; confidence ramps (100 nodes, 50 edges, 50 obs, 30 events, LearningPhase map, binary Synergy)
+  - E2: New formula — `overall = Σ(w_i·c_i·s_i) / Σ(w_i·c_i)` with `HealthWeights` struct + `DefaultHealthWeights()` (hybrid reliability × user-impact priors: Protocol 0.20, Task 0.20, Guidance 0.17, Memory 0.15, Edge 0.15, Retrieval 0.08, Synergy 0.05; sum=1.00). `ComputeOverallHealthWith(r, w)` exposed for operator overrides.
+  - E3: Operator knobs — `RSIC_HEALTH_WEIGHT_<DIM>` env vars (7 total); negative → default + warn; zero honoured as disable; all-zero triggers `Validate()` warning. Exposed in all 3 compose templates.
+  - E4: 7 new Prometheus gauges `mdemg_rsic_health_{retrieval,memory,edge,task,guidance,protocol,synergy}_confidence` + TSDB writeback.
+  - E5: Grafana `mdemg-rsic.json` — annotated Overall Health panel description; new "Dimension Confidence (DH-005)" row with 7 stat panels.
+  - E6: Docs — CLAUDE.md DH-005 subsection, CHANGELOG Added+Changed, `docs/features/rsic-feedback-loop.md` new "Health Weighting & Confidence" section with derivation table, AGENT_HANDOFF.md (this block), `docs/user/api-reference.md` schema update.
+  - Tests: 9 unit (health_formula_test.go), 5 config (config_health_weights_test.go), TSDB writeback assertion.
 - ✅ DH-004: J17 Protocol & Jiminy Dashboard Remediation (2026-04-17):
   - E1: Resolved `mdemg-j17.json` panel overlap at {x:6,y:24}; relocated Total Events to full-width {x:0,y:28,w:24,h:4}; annotated `jiminy_latest_age_ms` panel for /strict-mode expected staleness
   - E2: `TicketRestoreSuccessRate` defaults to 1.0 when `ticketRestoreTotal == 0` (matches codeCoverage null-tolerance pattern); new `TicketRestoreTotal` field distinguishes "no data" from "100% pass"
