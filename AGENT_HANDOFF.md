@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-17
+**Date:** 2026-04-20
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -56,7 +56,15 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.5.4, GHCR mdemg:v0.5.4, GHCR neural-sidecar:v0.5.4, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-04-17) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-04-20) ===
+- ✅ DOC-UPDATE-01: Documentation Staleness Remediation (2026-04-20):
+  - Follow-up cleanup sweep after DH-004 (PR #325) and DH-005 (PR #326) merged. Four-agent parallel audit of 18 target docs found 4 drifted files + `.env.example`; 14 were already current.
+  - E1: `docs/user/cli-reference.md` — added new "LLM Retry & Resilience" subsection with 8 retry/timeout vars (`LLM_RETRY_*`, `CONSULTING_CLASSIFY_TIMEOUT_MS`, `RSIC_LLM_REFLECT_TIMEOUT_MS`, new `LLM_RETRY_DEADLINE_ENABLED`); added 7 J17 sidecar vars (including `J17_SIDECAR_TIMEOUT_MS` at new default 1000); added new "Health Weighting (DH-005)" section with 7 `RSIC_HEALTH_WEIGHT_*` knobs. Corrected stale `LLM_MODEL` default (gpt-4.1-nano → gpt-5.4-mini).
+  - E2: `docs/architecture/06_Retrieval_API_and_Scoring.md` — hyperparameters table aligned with `config.go:104-112` (α 0.55→0.60, β 0.30→0.20, γ 0.10→0.15). Single-row ρ split into layered ρ_L0 (0.05), ρ_L1 (0.02), ρ_L2 (0.01). Batch ingest note corrected 100→500 with `BATCH_INGEST_MAX_ITEMS` reference.
+  - E3: `docs/development/ft-lora/06_CORRECTIONS_APPLIED_v2.md` — Issue 21 default-LLM label corrected to `gpt-5.4-mini` (historical `gpt-4.1-nano` reference preserved as transitional-target audit trail). `05_DATA_COLLECTION_v2.md` — migration table extended to include migration 011 (`constraint_outcomes` hypertable).
+  - E4: `.env.example` — synced to DH-004 timeouts (CONSULTING_CLASSIFY_TIMEOUT_MS=30000, J17_SIDECAR_TIMEOUT_MS=1000) and inserted `LLM_RETRY_DEADLINE_ENABLED=true`.
+  - E5: Verified — 7/7 `RSIC_HEALTH_WEIGHT_*` doc defaults match `health_formula.go:36-42` exactly; architecture hyperparameters match `config.go:104-112` exactly; `go build ./...` passes.
+  - Scope exclusions (verified current, untouched): README.md, VISION.md, api-reference.md, architecture 00–05 & 07, ai2ai research 02/05/06, ft-lora 03/04.
 - ✅ DH-005: Health Formula Reweighting & Confidence-Adaptive Scoring (2026-04-17):
   - Follow-up to DH-004 (previously carved out as an exception). Retires the 4/5/6/7-dimension branch table in `ComputeOverallHealth`.
   - E1: Per-dimension confidence — each `score*` returns `(score, confidence)`; 7 new `<Dim>Confidence` fields on `SelfAssessmentReport`; confidence ramps (100 nodes, 50 edges, 50 obs, 30 events, LearningPhase map, binary Synergy)
