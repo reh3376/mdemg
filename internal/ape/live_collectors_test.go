@@ -340,3 +340,44 @@ func TestLiveCollectors_LastGaugeValues_RSICSubDimensions(t *testing.T) {
 		t.Errorf("expected 9 RSIC dimensions, defined %d", len(wantKeys))
 	}
 }
+
+// TestLiveCollectors_LastGaugeValues_PerDimensionConfidence (DH-005): the
+// 7 new per-dimension confidence keys must flow through LastGaugeValues so
+// TSDB snapshots include them.
+func TestLiveCollectors_LastGaugeValues_PerDimensionConfidence(t *testing.T) {
+	lc := NewLiveCollectors(nil, nil, nil, "test-space", 60*time.Second)
+	lc.StoreReport(&SelfAssessmentReport{
+		RetrievalConfidence: 0.70,
+		MemoryConfidence:    0.60,
+		EdgeConfidence:      0.50,
+		TaskConfidence:      0.80,
+		GuidanceConfidence:  0.40,
+		ProtocolConfidence:  0.95,
+		SynergyConfidence:   1.00,
+	})
+
+	gauges := lc.LastGaugeValues()
+
+	wantKeys := map[string]float64{
+		"rsic_health_retrieval_confidence": 0.70,
+		"rsic_health_memory_confidence":    0.60,
+		"rsic_health_edge_confidence":      0.50,
+		"rsic_health_task_confidence":      0.80,
+		"rsic_health_guidance_confidence":  0.40,
+		"rsic_health_protocol_confidence":  0.95,
+		"rsic_health_synergy_confidence":   1.00,
+	}
+	for k, want := range wantKeys {
+		got, ok := gauges[k]
+		if !ok {
+			t.Errorf("missing per-dim confidence key %q", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s: got %f, want %f", k, got, want)
+		}
+	}
+	if len(wantKeys) != 7 {
+		t.Errorf("expected 7 per-dim confidence keys, got %d", len(wantKeys))
+	}
+}

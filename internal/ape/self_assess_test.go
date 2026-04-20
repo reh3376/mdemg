@@ -63,7 +63,7 @@ func TestScoreRetrieval_AllPhases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.phase, func(t *testing.T) {
 			r := &SelfAssessmentReport{LearningPhase: tt.phase}
-			got := a.scoreRetrieval(r)
+			got, _ := a.scoreRetrieval(r)
 			assertClose(t, got, tt.want, 0.001, "scoreRetrieval("+tt.phase+")")
 		})
 	}
@@ -78,7 +78,7 @@ func TestScoreMemory_Perfect(t *testing.T) {
 		CorrectionRate:      0.0,
 		ConsolidationAgeSec: 0,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	assertClose(t, got, 1.0, 0.001, "scoreMemory perfect")
 }
 
@@ -89,7 +89,7 @@ func TestScoreMemory_HighOrphans(t *testing.T) {
 		CorrectionRate:      0.0,
 		ConsolidationAgeSec: 0,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	// OrphanRatio > 0.2 → -0.3, no other penalties → 0.7
 	assertClose(t, got, 0.7, 0.001, "scoreMemory high orphans")
 }
@@ -101,7 +101,7 @@ func TestScoreMemory_MediumOrphans(t *testing.T) {
 		CorrectionRate:      0.0,
 		ConsolidationAgeSec: 0,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	// OrphanRatio > 0.1 → -0.1 → 0.9
 	assertClose(t, got, 0.9, 0.001, "scoreMemory medium orphans")
 }
@@ -113,7 +113,7 @@ func TestScoreMemory_AllPenalties(t *testing.T) {
 		CorrectionRate:      0.20, // > 0.15 → -0.2
 		ConsolidationAgeSec: 90000, // > 86400 → -0.2
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	// 1.0 - 0.1 - 0.2 - 0.2 = 0.5
 	assertClose(t, got, 0.5, 0.001, "scoreMemory all penalties (medium orphans)")
 }
@@ -125,7 +125,7 @@ func TestScoreMemory_AllPenaltiesMax(t *testing.T) {
 		CorrectionRate:      0.20, // > 0.15 → -0.2
 		ConsolidationAgeSec: 90000, // > 86400 → -0.2
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	// 1.0 - 0.3 - 0.2 - 0.2 = 0.3
 	assertClose(t, got, 0.3, 0.001, "scoreMemory all penalties max")
 }
@@ -140,7 +140,7 @@ func TestScoreMemory_ClampToZero(t *testing.T) {
 		CorrectionRate:      0.99,  // > 0.15 → -0.2
 		ConsolidationAgeSec: 999999, // > 86400 → -0.2
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	// 1.0 - 0.3 - 0.2 - 0.2 = 0.3 (not negative, clamp not needed)
 	if got < 0 {
 		t.Errorf("scoreMemory returned negative: %f", got)
@@ -157,7 +157,7 @@ func TestScoreEdge_NoEdges(t *testing.T) {
 		EdgesBelowThreshold: 0,
 		EdgeWeightEntropy:   0.0, // < 0.5 → -0.2
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	// No edges: below-ratio branch skipped. Entropy < 0.5 → -0.2. Result: 0.8
 	assertClose(t, got, 0.8, 0.001, "scoreEdge no edges")
 }
@@ -169,7 +169,7 @@ func TestScoreEdge_HealthyEdges(t *testing.T) {
 		EdgesBelowThreshold: 10, // 10% < 30%, no penalty
 		EdgeWeightEntropy:   0.8, // >= 0.5, no penalty
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 1.0, 0.001, "scoreEdge healthy edges")
 }
 
@@ -180,7 +180,7 @@ func TestScoreEdge_HighBelowRatio(t *testing.T) {
 		EdgesBelowThreshold: 40, // 40% > 30% → -0.3
 		EdgeWeightEntropy:   0.8, // >= 0.5, no penalty
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 0.7, 0.001, "scoreEdge high below ratio")
 }
 
@@ -191,7 +191,7 @@ func TestScoreEdge_LowEntropy(t *testing.T) {
 		EdgesBelowThreshold: 10, // 10% < 30%, no penalty
 		EdgeWeightEntropy:   0.3, // < 0.5 → -0.2
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 0.8, 0.001, "scoreEdge low entropy")
 }
 
@@ -202,7 +202,7 @@ func TestScoreEdge_BothPenalties(t *testing.T) {
 		EdgesBelowThreshold: 50, // 50% > 30% → -0.3
 		EdgeWeightEntropy:   0.2, // < 0.5 → -0.2
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	// 1.0 - 0.3 - 0.2 = 0.5
 	assertClose(t, got, 0.5, 0.001, "scoreEdge both penalties")
 }
@@ -216,7 +216,7 @@ func TestScoreEdge_ClampToZero(t *testing.T) {
 		EdgesBelowThreshold: 10, // 100% > 30% → -0.3
 		EdgeWeightEntropy:   0.0, // < 0.5 → -0.2
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	if got < 0 {
 		t.Errorf("scoreEdge returned negative: %f", got)
 	}
@@ -231,7 +231,7 @@ func TestScoreTask_NoTasks(t *testing.T) {
 		VolatileCount:  0,
 		PermanentCount: 0,
 	}
-	got := a.scoreTask(r)
+	got, _ := a.scoreTask(r)
 	assertClose(t, got, 0.5, 0.001, "scoreTask no tasks")
 }
 
@@ -241,7 +241,7 @@ func TestScoreTask_AllPermanent(t *testing.T) {
 		VolatileCount:  0,
 		PermanentCount: 50,
 	}
-	got := a.scoreTask(r)
+	got, _ := a.scoreTask(r)
 	assertClose(t, got, 1.0, 0.001, "scoreTask all permanent")
 }
 
@@ -251,7 +251,7 @@ func TestScoreTask_AllVolatile(t *testing.T) {
 		VolatileCount:  100,
 		PermanentCount: 0,
 	}
-	got := a.scoreTask(r)
+	got, _ := a.scoreTask(r)
 	assertClose(t, got, 0.0, 0.001, "scoreTask all volatile")
 }
 
@@ -261,7 +261,7 @@ func TestScoreTask_Mixed(t *testing.T) {
 		VolatileCount:  30,
 		PermanentCount: 70,
 	}
-	got := a.scoreTask(r)
+	got, _ := a.scoreTask(r)
 	// 70/100 = 0.7
 	assertClose(t, got, 0.7, 0.001, "scoreTask mixed 70/30")
 }
@@ -272,7 +272,7 @@ func TestScoreTask_HalfAndHalf(t *testing.T) {
 		VolatileCount:  50,
 		PermanentCount: 50,
 	}
-	got := a.scoreTask(r)
+	got, _ := a.scoreTask(r)
 	assertClose(t, got, 0.5, 0.001, "scoreTask 50/50")
 }
 
@@ -285,7 +285,7 @@ func TestScoreGuidance_Perfect(t *testing.T) {
 		ConstraintEffRate: 1.0,
 		SourceDiversity: 1.0,
 	}
-	got := a.scoreGuidance(stats)
+	got, _ := a.scoreGuidance(stats)
 	// 0.5*1.0 + 0.3*1.0 + 0.2*1.0 = 1.0
 	assertClose(t, got, 1.0, 0.001, "scoreGuidance perfect")
 }
@@ -297,7 +297,7 @@ func TestScoreGuidance_Zero(t *testing.T) {
 		ConstraintEffRate: 0.0,
 		SourceDiversity: 0.0,
 	}
-	got := a.scoreGuidance(stats)
+	got, _ := a.scoreGuidance(stats)
 	assertClose(t, got, 0.0, 0.001, "scoreGuidance zero")
 }
 
@@ -308,7 +308,7 @@ func TestScoreGuidance_Mixed(t *testing.T) {
 		ConstraintEffRate: 0.6,
 		SourceDiversity: 0.4,
 	}
-	got := a.scoreGuidance(stats)
+	got, _ := a.scoreGuidance(stats)
 	// 0.5*0.8 + 0.3*0.6 + 0.2*0.4 = 0.40 + 0.18 + 0.08 = 0.66
 	assertClose(t, got, 0.66, 0.001, "scoreGuidance mixed")
 }
@@ -320,7 +320,7 @@ func TestScoreGuidance_ClampInputs(t *testing.T) {
 		ConstraintEffRate: -0.5, // clamped to 0.0
 		SourceDiversity: 1.5, // clamped to 1.0
 	}
-	got := a.scoreGuidance(stats)
+	got, _ := a.scoreGuidance(stats)
 	// 0.5*1.0 + 0.3*0.0 + 0.2*1.0 = 0.50 + 0.00 + 0.20 = 0.70
 	assertClose(t, got, 0.70, 0.001, "scoreGuidance clamped inputs")
 }
@@ -332,7 +332,7 @@ func TestScoreSynergy_NotHealthy(t *testing.T) {
 	r := &SelfAssessmentReport{
 		JiminyHealthy: false,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.0, 0.001, "scoreSynergy not healthy")
 }
 
@@ -346,7 +346,7 @@ func TestScoreSynergy_Perfect(t *testing.T) {
 		SynergyOverflowRate: 2.0, // < 5, no penalty
 		SynergyOverlapScore: 0.3, // < 0.5, no penalty
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 1.0, 0.001, "scoreSynergy perfect")
 }
 
@@ -359,7 +359,7 @@ func TestScoreSynergy_SlightlyBloatedClaude(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.9, 0.001, "scoreSynergy slightly bloated claude")
 }
 
@@ -372,7 +372,7 @@ func TestScoreSynergy_VeryBloatedClaude(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.7, 0.001, "scoreSynergy very bloated claude")
 }
 
@@ -385,7 +385,7 @@ func TestScoreSynergy_BloatedMemoryV2(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.7, 0.001, "scoreSynergy bloated memory")
 }
 
@@ -398,7 +398,7 @@ func TestScoreSynergy_HighOverflowV2(t *testing.T) {
 		SynergyOverflowRate: 15.0, // > 10 → -0.3
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.7, 0.001, "scoreSynergy high overflow")
 }
 
@@ -411,7 +411,7 @@ func TestScoreSynergy_MediumOverflow(t *testing.T) {
 		SynergyOverflowRate: 7.0, // > 5 but <= 10 → -0.1
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.9, 0.001, "scoreSynergy medium overflow")
 }
 
@@ -424,7 +424,7 @@ func TestScoreSynergy_HighOverlapV2(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.6, // > 0.5 → -0.2
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 0.8, 0.001, "scoreSynergy high overlap")
 }
 
@@ -437,7 +437,7 @@ func TestScoreSynergy_AllPenalties(t *testing.T) {
 		SynergyOverflowRate: 15.0, // > 10 → -0.3
 		SynergyOverlapScore: 0.8, // > 0.5 → -0.2
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	// 1.0 - 0.3 - 0.3 - 0.3 - 0.2 = -0.1 → clamped to 0.0
 	assertClose(t, got, 0.0, 0.001, "scoreSynergy all penalties clamp to zero")
 }
@@ -454,7 +454,7 @@ func TestScoreProtocol_Perfect(t *testing.T) {
 		TicketRestoreSuccessRate: 1.0,
 		ReplayFrequencyPerHour:  0.0, // penalty = 0, stability = 0.5*1.0 + 0.5*1.0 = 1.0
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*1.0 + 0.25*1.0 + 0.20*1.0 + 0.15*1.0 = 1.0
 	assertClose(t, got, 1.0, 0.001, "scoreProtocol perfect")
 }
@@ -469,7 +469,7 @@ func TestScoreProtocol_Zero(t *testing.T) {
 		TicketRestoreSuccessRate: 0.0,
 		ReplayFrequencyPerHour:  0.0, // stability = 0.5*0.0 + 0.5*1.0 = 0.5
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.0 + 0.05*1.0 + 0.25*0.0 + 0.20*0.0 + 0.15*0.5 = 0.05 + 0.075 = 0.125
 	assertClose(t, got, 0.125, 0.001, "scoreProtocol mostly zero")
 }
@@ -484,7 +484,7 @@ func TestScoreProtocol_NLIBiasAlert(t *testing.T) {
 		TicketRestoreSuccessRate: 1.0,
 		ReplayFrequencyPerHour:  0.0, // stability = 1.0
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*0.3 + 0.25*1.0 + 0.20*1.0 + 0.15*1.0 = 0.35+0.015+0.25+0.20+0.15 = 0.965
 	assertClose(t, got, 0.965, 0.001, "scoreProtocol NLI bias alert")
 }
@@ -499,7 +499,7 @@ func TestScoreProtocol_CompressionBelow1(t *testing.T) {
 		TicketRestoreSuccessRate: 0.9,
 		ReplayFrequencyPerHour:  2.0, // penalty = 2.0/10.0 = 0.2, stability = 0.5*0.9 + 0.5*0.8 = 0.85
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.8 + 0.05*1.0 + 0.25*0.0 + 0.20*0.8 + 0.15*0.85
 	// = 0.28 + 0.05 + 0.0 + 0.16 + 0.1275 = 0.6175
 	assertClose(t, got, 0.6175, 0.001, "scoreProtocol compression below 1")
@@ -515,7 +515,7 @@ func TestScoreProtocol_HighReplayFrequency(t *testing.T) {
 		TicketRestoreSuccessRate: 1.0,
 		ReplayFrequencyPerHour:  20.0, // penalty = 20/10 = 2.0 → clamped to 1.0, stability = 0.5*1.0 + 0.5*0.0 = 0.5
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*0.5
 	// = 0.35 + 0.05 + 0.125 + 0.20 + 0.075 = 0.8
 	assertClose(t, got, 0.8, 0.001, "scoreProtocol high replay frequency")
@@ -544,7 +544,7 @@ func TestScoreProtocol_NoTicketRestoreData(t *testing.T) {
 		TicketRestoreTotal:       0,
 		ReplayFrequencyPerHour:   0.0, // no replays — stability = 0.5*1.0 + 0.5*1.0 = 1.0
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.9 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*1.0
 	// = 0.315 + 0.05 + 0.125 + 0.20 + 0.15 = 0.84
 	assertClose(t, got, 0.84, 0.001, "scoreProtocol with no ticket restore data")
@@ -568,7 +568,7 @@ func TestScoreProtocol_RegressionFromBugReport(t *testing.T) {
 		TicketRestoreTotal:       0,
 		ReplayFrequencyPerHour:   0.0,
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	if got < 0.7 {
 		t.Errorf("Protocol Health = %f, want >= 0.7 (post-fix target)", got)
 	}
@@ -718,7 +718,7 @@ func TestOverallHealth_4Dim_AllOnes(t *testing.T) {
 func TestScoreRetrieval_EmptyPhase(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{LearningPhase: ""}
-	got := a.scoreRetrieval(r)
+	got, _ := a.scoreRetrieval(r)
 	assertClose(t, got, 0.5, 0.001, "scoreRetrieval empty phase defaults to 0.5")
 }
 
@@ -730,7 +730,7 @@ func TestScoreMemory_BoundaryOrphanRatio(t *testing.T) {
 		CorrectionRate:      0.0,
 		ConsolidationAgeSec: 0,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	assertClose(t, got, 1.0, 0.001, "scoreMemory orphan ratio at boundary 0.1")
 }
 
@@ -742,7 +742,7 @@ func TestScoreMemory_BoundaryCorrectionRate(t *testing.T) {
 		CorrectionRate:      0.15,
 		ConsolidationAgeSec: 0,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	assertClose(t, got, 1.0, 0.001, "scoreMemory correction rate at boundary 0.15")
 }
 
@@ -754,7 +754,7 @@ func TestScoreMemory_BoundaryConsolidationAge(t *testing.T) {
 		CorrectionRate:      0.0,
 		ConsolidationAgeSec: 86400,
 	}
-	got := a.scoreMemory(r)
+	got, _ := a.scoreMemory(r)
 	assertClose(t, got, 1.0, 0.001, "scoreMemory consolidation age at boundary 86400")
 }
 
@@ -766,7 +766,7 @@ func TestScoreEdge_BoundaryBelowRatio(t *testing.T) {
 		EdgesBelowThreshold: 30,
 		EdgeWeightEntropy:   0.8,
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 1.0, 0.001, "scoreEdge below ratio at boundary 0.3")
 }
 
@@ -778,7 +778,7 @@ func TestScoreEdge_BoundaryEntropy(t *testing.T) {
 		EdgesBelowThreshold: 10,
 		EdgeWeightEntropy:   0.5,
 	}
-	got := a.scoreEdge(r)
+	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 1.0, 0.001, "scoreEdge entropy at boundary 0.5")
 }
 
@@ -792,7 +792,7 @@ func TestScoreSynergy_BoundaryClaudeLines(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 1.0, 0.001, "scoreSynergy claude lines at boundary")
 }
 
@@ -806,7 +806,7 @@ func TestScoreSynergy_BoundaryOverflowRate(t *testing.T) {
 		SynergyOverflowRate: 5.0,
 		SynergyOverlapScore: 0.3,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 1.0, 0.001, "scoreSynergy overflow rate at boundary 5.0")
 }
 
@@ -820,7 +820,7 @@ func TestScoreSynergy_BoundaryOverlapScore(t *testing.T) {
 		SynergyOverflowRate: 2.0,
 		SynergyOverlapScore: 0.5,
 	}
-	got := a.scoreSynergy(r)
+	got, _ := a.scoreSynergy(r)
 	assertClose(t, got, 1.0, 0.001, "scoreSynergy overlap score at boundary 0.5")
 }
 
@@ -835,7 +835,7 @@ func TestScoreProtocol_StabilityWeighting(t *testing.T) {
 		TicketRestoreSuccessRate: 0.6,
 		ReplayFrequencyPerHour:  5.0, // penalty = 0.5, stability = 0.5*0.6 + 0.5*0.5 = 0.55
 	}
-	got := a.scoreProtocol(stats)
+	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.0 + 0.05*0.3 + 0.25*0.0 + 0.20*0.0 + 0.15*0.55
 	// = 0.0 + 0.015 + 0.0 + 0.0 + 0.0825 = 0.0975
 	assertClose(t, got, 0.0975, 0.001, "scoreProtocol stability weighting")
