@@ -56,6 +56,7 @@ Both are fully built and tested. They write timestamped JSONL with automatic 50M
 | Migration 008 (instance_id column on training tables) | DATA-GOV | ✅ Built (PR #241) |
 | Migration 009 (space_id backfill for existing TSDB records) | DATA-GOV | ✅ Built (PR #242) |
 | Migration 010 (schema version correction to 10) | DATA-GOV | ✅ Built (PR #254) |
+| Migration 011 (constraint_outcomes hypertable — current max) | DH-004 | ✅ Built (`internal/tsdb/migrations/011_constraint_outcomes.sql`) |
 | Instance ID resolution (`{hostname}-{space_id}` via `resolveInstanceID()`) | DATA-GOV | ✅ Built (PR #241) |
 | UTDS archive export (`mdemg data export`) | DATA-GOV | ✅ Built (PR #241) |
 | UTDS validation runner (utds_runner.py, 36 checks) | DATA-GOV | ✅ Built (PR #241) |
@@ -355,7 +356,7 @@ mdemg data manifest --version v3      # Show dataset manifest with provenance
 | **P1 (DONE)** | ULTS spec framework (16 specs) | FT Sprint C | M | ✅ COMPLETE |
 | **P1 (DONE)** | System prompt hash in InteractionRecord | FT Sprint A | S | ✅ COMPLETE |
 | **P1 (DONE)** | UTDS export pipeline (export, export-auto, check) | DATA-GOV | M | ✅ COMPLETE |
-| **P1 (DONE)** | Migrations 008-010 (instance_id, space_id, schema fix) | DATA-GOV | M | ✅ COMPLETE |
+| **P1 (DONE)** | Migrations 008-011 (instance_id, space_id, schema fix, constraint_outcomes) | DATA-GOV + DH-004 | M | ✅ COMPLETE |
 | **P1 (DONE)** | Quality filter + format converter + dataset versioner | DATA-GOV | M | ✅ COMPLETE |
 | **P2 (DONE)** | Teacher distillation | DATA-GOV | M | ✅ COMPLETE |
 | **P3** | Entropy monitor | Before second cycle | S | ⬜ |

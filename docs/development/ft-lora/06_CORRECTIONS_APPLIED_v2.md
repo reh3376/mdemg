@@ -126,9 +126,9 @@ Source: Codebase audit at PR #277 (v0.7.2), Jiminy effectiveness investigation, 
 
 gpt-5-nano (default LLM) is a tool-use model. When MDEMG sends classification prompts expecting `{"is_constraint": true}`, gpt-5-nano may emit tool-call structures instead of plain JSON, breaking `json.Unmarshal` across all 16 consumers. Added architectural constraint: target model must NOT be a tool-use variant. Applies to both fine-tuned Qwen3-30B-A3B (already non-tool) and external fallback LLM.
 
-**ISSUE 21: Default LLM Changed gpt-5-nano → gpt-4.1-nano ✅ RESOLVED**
+**ISSUE 21: Default LLM Changed gpt-5-nano → gpt-5.4-mini ✅ RESOLVED**
 
-Switched default `LLM_MODEL` from gpt-5-nano (tool-use, $0.40/M output) to gpt-4.1-nano (non-tool-use, $0.20/M output, 1M context). Updated in config.go, yaml_config.go, compose template, CLI init, and all documentation. Users with explicit `LLM_MODEL=gpt-5-nano` in .env are unaffected (env overrides defaults).
+Switched default `LLM_MODEL` from gpt-5-nano (tool-use) to `gpt-5.4-mini` (non-tool-use). Confirmed in `internal/config/config.go:1307` — `llmModel := get("LLM_MODEL", "gpt-5.4-mini")`. Propagated through yaml_config.go, compose templates, CLI init, and documentation. Users with explicit `LLM_MODEL=gpt-5-nano` (or any other value) in `.env` are unaffected — env overrides defaults. (An earlier draft of this sprint referenced `gpt-4.1-nano` as a transitional target; the final resolved default is `gpt-5.4-mini`.)
 
 ### Medium Issues (5)
 
