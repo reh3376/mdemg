@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **FT-OAI-001: OpenAI Fine-Tuning Pipeline** (2026-04-21) — First in-house fine-tune closes the write→train→eval→promote loop for hosted models:
+  - **New post-processor**: `neural/training/openai_ft_adapter.py` — converts MLX chat JSONL (from `mdemg data curate --paradigm sft`) into OpenAI-shaped `combined_{train,val}.jsonl` plus `manifest.json` + `rejection_log.jsonl`. Strips `<think>` blocks, validates message schema, counts tokens via `tiktoken.encoding_for_model()` (resolves to `o200k_base` for gpt-4o/4.1 families — **not** hard-coded `cl100k_base`), gates per-record context at 65,536 tokens, emits optional per-task specialists under `by_task/`. Does not duplicate the temporal split — remains a pure post-processor on `dataset_versioner.py` output.
+  - **New tooling**: `scripts/openai_ft_upload_and_launch.py` (cost-gated via `--max-cost-usd` before any network call), `scripts/openai_ft_check.py` (job poller with `--watch`), `scripts/openai_ft_baseline_eval.py` (seeded deterministic eval — `--seed` + `--sample-size` produce identical records across base and FT runs), `scripts/openai_ft_compare.py` (side-by-side comparator → `eval_comparison.md` with per-task W/L/T, 5 worst regressions, 5 best gains).
+  - **First FT delivered**: `ft:gpt-4.1-mini-2025-04-14:whiskey-house:mdemg-ftoai001:DX9KJuuq`. Training: 31M tokens, 3 epochs (auto), final train loss 0.623, best val loss 0.684 at step 1200/1500.
+  - **Held-out eval** (300 records, seed=42, 10 tasks): mean cosine +0.032 (0.832 → 0.864), parse-pass rate unchanged at 0.973 (no JSON format regression), W/L/T = 133/17/150 (7.8:1 win ratio). Verdict: **MARGINAL** (mean Δ below the +0.05 bar but strong W/L and no regression). Per-task gains: `hidden.reclassify` +0.087, `retrieval.rerank_cross` +0.075, `consulting.classify` +0.057. Flagged regression: `retrieval.intent_translate` −0.079 (n=4).
+  - **Full feature doc**: `docs/features/fine-tuning-pipeline.md` (architecture, workflow, config, known limitations, FT-OAI-002 follow-ups).
+  - **Artifacts**: `training_data/openai_ft/20260420/` — `run_notes.md` (run log across 3 job attempts: quota-exceeded, queue-stuck-cancelled, succeeded), `eval_comparison.md`, `ft_training_metrics.csv`, `manifest.json`, `eval/{baseline,ft}/{results.jsonl,summary.json}`.
+  - **Known gaps** (carried into FT-OAI-002): per-record `parse_ok` field always `False` in `results.jsonl` (aggregate in `summary.json` is correct), `finish_reason` always null, token counts not persisted per record, baseline/FT `--max-output-tokens` asymmetric (1024 vs 4096) due to FT response verbosity.
+
 ## [0.8.5] - 2026-04-20
 
 ### Added

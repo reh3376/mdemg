@@ -693,19 +693,23 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 | InteractionRecord enrichment | `internal/llmclient/recorder.go` | 6 new fields: GuidanceID, SourcePath, ThinkContent, ThinkMode, Quality (*float64), QualitySource. TSDB writer expanded to 22 columns |
 | TSDB migration 005 | `internal/tsdb/migrations/005_interaction_enrichment.sql` | Adds `guidance_id` + `source_path` columns with conditional indexes. Schema version 4 → 5 |
 
-### Fine-Tuning Pipeline (ft-lora) — Status as of 2026-03-30
+### Fine-Tuning Pipeline — Status as of 2026-04-21
 
-Source plan: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md`
+Source plans: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md` (local LoRA), `/Users/reh3376/Downloads/sprint_plan_openai_ft_data_generation.md` (FT-OAI-001, hosted OpenAI).
+Feature doc: `docs/features/fine-tuning-pipeline.md`.
 
 | Phase | Title | Status | Notes |
 |-------|-------|--------|-------|
 | 1 | LLM Interaction Logger | ✅ COMPLETE | PRs #217-#219. 16 consumers, TSDB writer, scrubber, quality pipeline, data CLI |
 | 2 | Think Mode + Response Sanitization | ✅ COMPLETE | FT-INFRA Phase A: `SanitizeResponse(StripThinkBlock + StripCodeFence)`, 11 call sites, system prompt hash |
 | 3 | vllm-mlx Integration | ✅ COMPLETE | PR #246 |
-| 4+ | SFT/GRPO/DPO training | ✅ COMPLETE | PRs #246-250 |
+| 4+ | SFT/GRPO/DPO local-LoRA training | ✅ COMPLETE | PRs #246-250 |
+| **FT-OAI-001** | **Hosted OpenAI fine-tune** | ✅ **COMPLETE (2026-04-21)** | First production FT. `openai_ft_adapter.py` post-processor + upload/monitor/eval/compare scripts. Model: `ft:gpt-4.1-mini-2025-04-14:whiskey-house:mdemg-ftoai001:DX9KJuuq`. Held-out eval: +0.032 mean cosine, 7.8:1 W/L, parse-pass preserved at 0.973. Verdict: MARGINAL. |
 
-**Next actionable step**: Collection Campaign running. Training pipeline complete (export → filter → convert → version → train → evaluate → gate → deploy). First training cycle pending sufficient data accumulation (~500+ records per task).
-**Data collection**: Activated 2026-03-30. Accumulating since — expect sufficient volume by mid-April 2026.
+**FT-OAI-001 run artifacts**: `training_data/openai_ft/20260420/` (run_notes.md, eval_comparison.md, ft_training_metrics.csv, manifest.json, eval/{baseline,ft}/).
+
+**Next actionable step**: FT-OAI-002 sprint — address eval harness gaps (per-record `parse_ok` bug, missing `finish_reason`, missing token counts), add per-epoch cost envelope for OpenAI auto hyperparameters, investigate `retrieval.intent_translate` regression (Δ=−0.079). Tracked as task #142.
+**Data collection**: Active and accumulating. FT-OAI-001 consumed one curated version; subsequent batches will rotate in fresh data.
 
 ---
 
