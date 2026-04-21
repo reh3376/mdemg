@@ -695,7 +695,12 @@ Source plan: `.claude/plans/mellow-crunching-hopcroft.md`
 
 ### Fine-Tuning Pipeline — Status as of 2026-04-21
 
-Source plans: `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md` (local LoRA), `/Users/reh3376/Downloads/sprint_plan_openai_ft_data_generation.md` (FT-OAI-001, hosted OpenAI).
+Source plans:
+- `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md` (local LoRA)
+- `docs/development/ft-oai/sprint_plan_openai_ft_data_generation.md` (FT-OAI-001, hosted OpenAI — ✅ complete)
+- **`docs/development/ft-oai/sprint_plan_ft_oai_002.md` (FT-OAI-002, harness hardening — 📋 planned, task #142)**
+- **`docs/development/ft-oai/sprint_plan_ft_oai_003.md` (FT-OAI-003, close-the-gap / north-star — 📋 planned, task #143)**
+
 Feature doc: `docs/features/fine-tuning-pipeline.md`.
 
 | Phase | Title | Status | Notes |
@@ -704,11 +709,14 @@ Feature doc: `docs/features/fine-tuning-pipeline.md`.
 | 2 | Think Mode + Response Sanitization | ✅ COMPLETE | FT-INFRA Phase A: `SanitizeResponse(StripThinkBlock + StripCodeFence)`, 11 call sites, system prompt hash |
 | 3 | vllm-mlx Integration | ✅ COMPLETE | PR #246 |
 | 4+ | SFT/GRPO/DPO local-LoRA training | ✅ COMPLETE | PRs #246-250 |
-| **FT-OAI-001** | **Hosted OpenAI fine-tune** | ✅ **COMPLETE (2026-04-21)** | First production FT. `openai_ft_adapter.py` post-processor + upload/monitor/eval/compare scripts. Model: `ft:gpt-4.1-mini-2025-04-14:whiskey-house:mdemg-ftoai001:DX9KJuuq`. Held-out eval: +0.032 mean cosine, 7.8:1 W/L, parse-pass preserved at 0.973. Verdict: MARGINAL. |
+| **FT-OAI-001** | **Hosted OpenAI fine-tune** | ✅ **COMPLETE (2026-04-21)** — HOLD deploy | First production FT. `openai_ft_adapter.py` post-processor + upload/monitor/eval/compare scripts. Model: `ft:gpt-4.1-mini-2025-04-14:whiskey-house:mdemg-ftoai001:DX9KJuuq`. In-frame eval (vs training base `gpt-4.1-mini`): +0.032 mean cosine, 7.8:1 W/L, parse-pass preserved at 0.973 — verdict MARGINAL. **Cross-base bench (vs prod base `gpt-5.4-mini`, 2026-04-21)**: quality-only Δ=−0.034 (W/L/T 14/61/225). **Strategic read: FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini gap** (stock-4.1-mini 0.832 → FT 0.864 → stock-5.4-mini 0.898; 0.0319 of 0.0658). North star: `FT(cheap-base) ≈ prod(prod-base)` at the cheap base's inference cost. Deploy deferred pending the actual `gpt-4.1-mini` / `gpt-5.4-mini` per-token cost ratio; `.env` unchanged. PR #332. |
+| **FT-OAI-002** | **v2 data capture + harness hardening** | 📋 **PLANNED** | Plan: `docs/development/ft-oai/sprint_plan_ft_oai_002.md` (v1.0, 9 epics, 3 testing tiers). Scope: eval harness bug fixes (`parse_ok`, `finish_reason`, token counts), per-record metric fields (latency, retries, truncation, hallucination indicator), cap-symmetric baseline re-eval, `__unattributed__` attribution investigation, `retrieval.intent_translate` regression deep-dive, training signal persistence, `--n-epochs` + `--task-weights` flags, operational telemetry. **Excludes a new FT launch** — gated to FT-OAI-003. Task #142. |
+| **FT-OAI-003** | **Close the gap to production base** (north star) | 📋 **PLANNED** | Plan: `docs/development/ft-oai/sprint_plan_ft_oai_003.md` (v1.0, 10 epics + rollback, 3 testing tiers). Goal: close the remaining ~52% of the stock-4.1-mini → stock-5.4-mini gap so `FT(cheap-base) ≈ prod(gpt-5.4-mini)` at the cheaper base's inference cost. **Prereqs**: FT-OAI-002 complete + economic cost-ratio analysis. **Levers**: L1 `__unattributed__` cleanup, L2 `n_epochs=2`, L3 task reweighting (`retrieval.intent_translate`, `hidden.name_emergence`), L4 optional base switch to `gpt-4o-mini`. Cost cap ≤ $250. Quality floor ≥ 0.8322 cross-base. Task #143. |
 
-**FT-OAI-001 run artifacts**: `training_data/openai_ft/20260420/` (run_notes.md, eval_comparison.md, ft_training_metrics.csv, manifest.json, eval/{baseline,ft}/).
+**FT-OAI-001 run artifacts**: `training_data/openai_ft/20260420/` (run_notes.md, eval_comparison.md, ft_training_metrics.csv, manifest.json, eval/{baseline,ft}/). Local-only per `.gitignore` rules.
 
-**Next actionable step**: FT-OAI-002 sprint — address eval harness gaps (per-record `parse_ok` bug, missing `finish_reason`, missing token counts), add per-epoch cost envelope for OpenAI auto hyperparameters, investigate `retrieval.intent_translate` regression (Δ=−0.079). Tracked as task #142.
+**Next actionable step**: Execute **FT-OAI-002** per the plan at `docs/development/ft-oai/sprint_plan_ft_oai_002.md`. Sequential epics E0 → E9, cost budget ≤ $5.50 (baseline re-eval + smoke verification only — no new FT launch). On completion, outcomes inform whether to authorise **FT-OAI-003** — the north-star sprint aimed at closing the remaining ~52% of the `gpt-4.1-mini` → `gpt-5.4-mini` gap (candidate levers: fix `__unattributed__` training-data noise, force `n_epochs=2` per the best-val-step signal, upweight regressed tasks, consider `gpt-4o-mini` as an even cheaper training base). Parallel workstream: quantify the actual OpenAI-bill per-token cost ratio of `gpt-4.1-mini` vs `gpt-5.4-mini` — feeds the deploy decision.
+
 **Data collection**: Active and accumulating. FT-OAI-001 consumed one curated version; subsequent batches will rotate in fresh data.
 
 ---

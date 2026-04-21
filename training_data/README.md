@@ -40,6 +40,6 @@ mdemg data clean --space-id mdemg-dev --dry-run=false --force
 
 ## Related docs
 
-- Sprint plan: `/Users/reh3376/Downloads/sprint_plan_openai_ft_data_generation.md` (FT-OAI-001)
+- Sprint plans: `docs/development/ft-oai/sprint_plan_openai_ft_data_generation.md` (FT-OAI-001 ✅), `docs/development/ft-oai/sprint_plan_ft_oai_002.md` (FT-OAI-002 📋), `docs/development/ft-oai/sprint_plan_ft_oai_003.md` (FT-OAI-003 📋)
 - UAITS spec: `docs/tests/uaits/specs/mdemg.uaits.json`
 - Neural training modules: `neural/training/`

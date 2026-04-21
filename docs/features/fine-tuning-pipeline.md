@@ -38,7 +38,21 @@ First production fine-tune delivered. Held-out eval (300 records, seed=42, 10 ta
 | JSON parse-pass rate | 0.973 | 0.973 | **±0.000** |
 | Win / Loss / Tie (±0.05) | — | 133 / 17 / 150 | **7.8:1 ratio** |
 
-Verdict: **MARGINAL** (mean Δ below the +0.05 bar, but W/L ratio strong and no format regression). Run logged at `training_data/openai_ft/20260420/run_notes.md`.
+Verdict (vs `gpt-4.1-mini` base, in-frame): **MARGINAL** on mean cosine (+0.032, below the +0.05 bar), but W/L ratio 7.8:1 with no format regression.
+
+**Verdict (vs production base `gpt-5.4-mini`, cross-base bench 2026-04-21):** **HOLD deploy — quality regression vs prod, but a meaningful step toward a cost-saving win.** Stock `gpt-5.4-mini` scored 0.898 vs FT's 0.864 (Δ = −0.034, W/L/T = 14/61/225). The headline framing is "regression vs prod on quality alone." The strategic framing is different:
+
+| Anchor | Mean cosine | Distance from prod |
+|---|---|---|
+| Stock `gpt-4.1-mini` (training base) | 0.8322 | −0.0658 |
+| **FT-OAI-001 (this run)** | **0.8641** | **−0.0339** |
+| Stock `gpt-5.4-mini` (prod target) | 0.8980 | 0.0000 |
+
+**FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini quality gap** (0.0319 / 0.0658). The north star is not "FT beats prod on quality" — it is **`FT(gpt-4.1-mini) ≈ prod(gpt-5.4-mini)` quality at `gpt-4.1-mini` inference cost.** `gpt-4.1-mini` is materially cheaper per token than `gpt-5.4-mini`; if FT-OAI-003 closes the remaining ~52% of the gap, we get prod-level responses at the cheaper base's cost envelope — a significant economic win at scale.
+
+**Deploy decision:** deferred pending the actual per-token cost ratio of `gpt-4.1-mini` vs `gpt-5.4-mini` on recent OpenAI billing. `.env` / `.env.example` remain unchanged. Calling deploy now would be premature. Worst regressions to address in FT-OAI-003: `retrieval.intent_translate` −0.149, `hidden.name_emergence` −0.114, `__unattributed__` −0.113.
+
+Full run log: `training_data/openai_ft/20260420/run_notes.md`. Cross-base comparator: `training_data/openai_ft/20260420/eval_comparison_vs_gpt54mini.md`.
 
 ### Architecture
 
@@ -157,6 +171,7 @@ python scripts/openai_ft_compare.py \
 
 ### Known Limitations
 
+- **Base-model mismatch (FT-OAI-001 training base ≠ production base)**: the FT was trained against `gpt-4.1-mini-2025-04-14`, but `.env` runs `gpt-5.4-mini`. Quality-only, FT lags prod by Δ=−0.034 (0.898 vs 0.864). Strategically, FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini gap (0.0319 / 0.0658) — meaningful progress toward `FT(cheap-base) ≈ stock(prod-base)` at the cheaper base's inference cost. FT-OAI-001 is **not deployed** until the `gpt-4.1-mini` / `gpt-5.4-mini` cost ratio is quantified and the remaining ~52% of the gap is evaluated in FT-OAI-003. See `training_data/openai_ft/20260420/eval_comparison_vs_gpt54mini.md`.
 - **Baseline/FT eval asymmetry (FT-OAI-001 run)**: baseline was first eval'd with `--max-output-tokens 1024`; when ~60% of FT responses exceeded that, the FT re-eval was run at 4096. The FT win of +0.032 was measured with this asymmetric cap. Strict apples-to-apples requires re-running the baseline at 4096 (captured as an item for FT-OAI-002).
 - **Per-record `parse_ok` bug**: the aggregate `parse_pass_rate` in `summary.json` is computed correctly (97.3%), but the per-record `parse_ok` column in `results.jsonl` is always `False`. Cosmetic — does not affect aggregate or the comparator — but blocks per-record forensics. FT-OAI-002 G1.
 - **`finish_reason` not populated**: all records carry `finish_reason: null`. Eval script reads the wrong attribute off the OpenAI response object. FT-OAI-002 G1.
@@ -172,11 +187,24 @@ python scripts/openai_ft_compare.py \
 
 ### Future Improvements
 
-Tracked as Sprint **FT-OAI-002** (see `scripts/tsdb_data_review_2026-04-01.json` and follow-up task):
-- **G1** — fix `parse_ok` / `finish_reason` / token-count recording in eval harness
-- **A1–A7** — add per-record fields: input_tokens, output_tokens, latency_ms, retry_count, truncation_flag, embedding_model_version, hallucination_indicator
-- **T1–T5** — training signal capture: per-epoch val loss curves persisted locally (not just the one OpenAI CSV), n_epochs override, `best_val_loss` step tracked, per-task sample weights, RAFT ratio >0 experiment
-- **O1–O4** — operational: queue-wait telemetry, automatic re-submit on queue-stuck, project-quota pre-check, cost envelope for auto hyperparameters
+**FT-OAI-003 (north star)** — close the remaining ~52% of the `gpt-4.1-mini` → `gpt-5.4-mini` gap so `FT(cheap-base) ≈ stock(prod-base)` on quality. Candidate levers (ordered roughly by expected ROI):
+1. Fix training-data noise in `__unattributed__` (largest per-task delta to recover — FT showed −0.113 on this slice) — requires the FT-OAI-002 Epic 4 investigation first
+2. Tune hyperparameters: force `n_epochs=2` per the step 1200/1500 best-val signal (FT-OAI-001 mildly overfit past 1200)
+3. Upweight regressed tasks via `--task-weights`: `retrieval.intent_translate` (−0.149), `hidden.name_emergence` (−0.114)
+4. Consider `gpt-4o-mini` as an even cheaper training base (requires its own bench first)
+
+**FT-OAI-002 (immediate prerequisite)** — **plan: `docs/development/ft-oai/sprint_plan_ft_oai_002.md`** (v1.0 12-section format, 9 sequential epics, 3 testing tiers, cost budget ≤ $5.50, task #142):
+
+- **G1** — fix `parse_ok` / `finish_reason` / token-count recording in eval harness (Epic 1)
+- **A1–A7** — add per-record fields: input_tokens, output_tokens, latency_ms, retry_count, truncation_flag, embedding_model_version, hallucination_indicator (Epic 2)
+- **G2** — cap-symmetric baseline re-eval at 4096 tokens (Epic 3)
+- **G3** — `__unattributed__` task-attribution investigation (Epic 4)
+- **R1** — `retrieval.intent_translate` regression deep-dive (Epic 5)
+- **T1–T4** — training signal capture: per-epoch val loss curves persisted locally (not just the one OpenAI CSV), `--n-epochs` override, `best_val_loss` step tracked, per-task sample weights via `--task-weights` (Epic 6)
+- **O1–O4** — operational: queue-wait telemetry, automatic re-submit alert on queue-stuck, project-quota pre-check, cost envelope for auto hyperparameters (Epic 7)
+- **T5** (RAFT ratio >0 experiment) — deferred out of FT-OAI-002 scope
+
+**A second FT launch is NOT part of FT-OAI-002** — gated to FT-OAI-003 pending this sprint's completion, the cost-ratio economic analysis, plus explicit user authorisation.
 
 ## API Endpoints
 

@@ -64,12 +64,15 @@ _PRICING_INPUT_PER_1M: dict[str, float] = {
     "gpt-4.1-mini-2025-04-14": 0.40,
     "gpt-4o-mini": 0.15,
     "gpt-4o-mini-2024-07-18": 0.15,
+    # Conservative overestimate for gpt-5.4-mini — tune once billing confirms.
+    "gpt-5.4-mini": 0.80,
 }
 _PRICING_OUTPUT_PER_1M: dict[str, float] = {
     "gpt-4.1-mini": 1.60,
     "gpt-4.1-mini-2025-04-14": 1.60,
     "gpt-4o-mini": 0.60,
     "gpt-4o-mini-2024-07-18": 0.60,
+    "gpt-5.4-mini": 3.20,
 }
 # Fine-tuned variants: use the base model's pricing key after the "ft:" prefix
 # is stripped; OpenAI bills fine-tuned inference at ~3× the base rate.
