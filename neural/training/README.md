@@ -6,6 +6,8 @@ Python tools for processing TSDB exports into MLX-ready fine-tuning datasets.
 
 ```
 TSDB → mdemg data export → quality_filter.py → format_converter.py → dataset_versioner.py → MLX LoRA
+                                                                                      │
+                                                                                      └─► openai_ft_adapter.py → OpenAI FT
 ```
 
 ## Tools
@@ -84,3 +86,30 @@ cd /path/to/mdemg && python3 -m pytest neural/training/tests/ -v
 ```
 
 66 tests across 3 test files (quality_filter: 25, format_converter: 21, dataset_versioner: 20).
+
+### openai_ft_adapter.py
+
+Post-processor that converts the curated MLX chat JSONL into OpenAI fine-tuning files. Does **not** split data — `dataset_versioner.py` owns the temporal split; this adapter consumes `train.jsonl`/`val.jsonl` and emits OpenAI-shaped `combined_{train,val}.jsonl` + manifest.
+
+Responsibilities:
+
+- Strip `<think>...</think>` blocks from assistant content
+- Validate message schema (system/user/assistant, non-empty, str content)
+- Count tokens via `tiktoken.encoding_for_model(<model>)` — **not** a hard-coded encoding (gpt-4o/4.1 families use `o200k_base`, not `cl100k_base`)
+- Reject records exceeding per-record context limit (65,536 for gpt-4.1-mini/gpt-4o-mini FT)
+- Optional per-task specialist files under `by_task/`
+- Cost estimate from token totals + model price profile
+- `manifest.json` with SHA256 digests, row/token stats, per-task breakdown
+- `rejection_log.jsonl` with dropped records and reasons
+
+```bash
+PYTHONPATH=. python3 -m training.openai_ft_adapter \
+  --input-dir training_data/curated/sft_interactions/versioned \
+  --output-dir training_data/openai_ft/20260420 \
+  --model gpt-4.1-mini-2025-04-14 \
+  --by-task
+```
+
+Adding a new model (e.g. `qwen-3.5-chat`) only requires appending a profile entry to `_MODEL_PROFILES` with the correct tokenizer resolver, context limit, and price.
+
+See also: `docs/features/fine-tuning-pipeline.md` for the full upload → launch → monitor → eval → compare workflow.

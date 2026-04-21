@@ -20,6 +20,12 @@ docs/internal/
 # Investigation working data (raw query outputs)
 investigation-data/
 
+# Training data exports (TSDB exports, filtered/converted JSONL, OpenAI/MLX outputs)
+# — never committed; regenerated per run. README and .gitkeep tracked.
+training_data/*
+!training_data/README.md
+!training_data/.gitkeep
+
 # GoReleaser build artifacts
 dist/
 
