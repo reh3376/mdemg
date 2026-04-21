@@ -278,6 +278,10 @@ export → quality filter → format converter → dataset versioner → train �
 
 All scripts in `neural/training/`. See `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md`.
 
+**Fine-tuning target (Sprint FT-LORA onwards, 2026-04-21):** Qwen3.6-35B-A3B MoE (Apache 2.0, 35B total / 3B active, 256 experts = 8 routed + 1 shared, 262K context). Fallback: Qwen3.5-35B-A3B. Strategy: **two-tier MoE-Sieve LoRA** — Tier 1 universal (attention + shared expert) + Tier 2 per-family (top-25% routed experts). See `docs/development/ft-lora/00_README_v2.md` for the full v5.0 plan.
+
+**No-tool-calling architectural policy:** all 16 MDEMG LLM call sites are single-shot structured-output or reasoning. Tool-calling is explicitly banned across the stack — nine banned patterns (`tool_use`, `tool_call`, `function_call`, `--tool-call-parser`, `enable-auto-tool-choice`, `preserve_thinking`, etc.) are grep-audited each sprint. See `docs/development/ft-lora/01_RESEARCH_v2.md §2.8`.
+
 ### Multi-Instance Support
 
 Each project directory gets an isolated MDEMG stack via COMPOSE_PROJECT_NAME scoping. Resource profile: ~2.3 GiB per fresh instance, ~5.7 GiB per mature instance. See `docs/user/multi-instance.md`.

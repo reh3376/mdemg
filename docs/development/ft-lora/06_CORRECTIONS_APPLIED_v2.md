@@ -1,8 +1,8 @@
 # Corrections Applied: Deep-Dive Analysis Resolution
 
-**Date:** 2026-04-07
-**Versions covered:** v1.0 → v2.0 → v3.0 → v4.0
-**Status:** All corrections applied. 31 total issues, 31 resolved, 0 open.
+**Date:** 2026-04-21
+**Versions covered:** v1.0 → v2.0 → v3.0 → v4.0 → v5.0
+**Status:** All corrections applied. 31 (v1→v4) + 3 (v5) = **34 total issues, 34 resolved, 0 open.**
 
 ---
 
@@ -176,6 +176,55 @@ The v0.7.1 classifier overhaul (thresholds 0.7/0.3 → 0.55/0.20, 5th outcome ty
 | v3.0 → v4.0 | Critical | 2 | 2 | 0 |
 | v3.0 → v4.0 | Medium | 5 | 5 | 0 |
 | v3.0 → v4.0 | Low | 2 | 2 | 0 |
-| **Total** | | **31** | **31** | **0** |
+| v4.0 → v5.0 | Strategic (model + policy + LoRA topology) | 3 | 3 | 0 |
+| **Total** | | **34** | **34** | **0** |
+
+---
+
+## v4.0 → v5.0 Corrections (2026-04-21)
+
+**Source:** Memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1 (2026-04-21), reflecting the Qwen3.6-35B-A3B release (2026-04-16) and a consolidated architectural decision on MoE-aware LoRA + tool-use posture.
+
+### Strategic Issues (3)
+
+**ISSUE 1: Base model — Qwen3-30B-A3B superseded by Qwen3.6-35B-A3B ✅ RESOLVED**
+
+v4.0 targeted Qwen3-30B-A3B (128 experts, pure Transformer MoE, 131K context). Qwen3.6-35B-A3B (256 experts = 1 shared + 255 routed, Hybrid Gated DeltaNet + Gated Attention + MoE, MTP speculative decoding, 262K native context, Apache 2.0) ships the architectural features the two-tier LoRA strategy needs. Fallback is **Qwen3.5-35B-A3B**, NOT Qwen3-30B-A3B.
+
+- Superseded: all prior `Qwen3-30B-A3B` references in §1–§4 of every `ft-lora/` doc. Historical mentions (benchmark-rationale contrast) preserved.
+- Applied: [`01_RESEARCH_v2.md §3`](01_RESEARCH_v2.md), [`02_M5MAX_HARDWARE_v2.md`](02_M5MAX_HARDWARE_v2.md), [`03_IMPLEMENTATION_PLAN_v2.md`](03_IMPLEMENTATION_PLAN_v2.md), [`04_BENCHMARK_RL_v2.md`](04_BENCHMARK_RL_v2.md), [`00_README_v2.md`](00_README_v2.md).
+- Validation: Sprint FT-LORA-C three gates (mlx-lm-lora convergence on 500 examples, JSON ≥95% on 9 structured tasks, ≥60 tok/s) decide whether Qwen3.6 ships or fallback is invoked.
+
+**ISSUE 2: No-tool-calling architectural policy — previously implicit, now explicit ✅ RESOLVED**
+
+All 16 MDEMG LLM call sites are single-shot structured-output / reasoning. v1.0–v4.0 documented this only inline ("tool-use exclusion" paragraph in `02_M5MAX`). v5.0 makes it a formal architectural policy with enforcement scope.
+
+- Nine banned patterns (memo §2.5): `tool_use`, `tool_call`, `tool_response`, `toolCalls`, `function_call`, `--tool-call-parser`, `enable-auto-tool-choice`, `tools: [`, **`preserve_thinking`** (Qwen3.6 multi-turn agent hook — must remain at default).
+- Canonical location: [`01_RESEARCH_v2.md §2.8`](01_RESEARCH_v2.md) — with 5 explicit rules.
+- Repo-level refs: `CLAUDE.md`, `VISION.md`, `AGENT_HANDOFF.md`.
+- Guardrail exception: `internal/guardrail/llm_evaluator.go` bypasses `llmclient` and therefore the policy enforcement; migration queued for Sprint FT-LORA-B (see [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md) guardrail note).
+- Enforcement: Sprint FT-LORA-A Epic 10 runs the repo-wide grep baseline; Sprint FT-LORA-B remediates code/config; all ULTS specs + inference launch commands audited.
+
+**ISSUE 3: LoRA topology — monolithic r=16 replaced by two-tier MoE-Sieve ✅ RESOLVED**
+
+v1.0–v4.0 planned a monolithic LoRA touching every MLP. Qwen3.6's 1-shared + 255-routed expert topology makes this wasteful — most experts rarely fire for MDEMG traffic. v5.0 introduces the two-tier scheme (memo §3):
+
+- **Tier 1:** attention (q/k/v/o_proj) + shared-expert MLP, r=32 α=64, all 16 tasks balanced. Trained first.
+- **Tier 2 per family:** top-25% routed experts (identified by Sprint D profiling), r=8 α=16, per-family datasets. Trained after Tier 1 merge.
+- **Three families (provisional):** `reasoning-think` (T, 7 tasks), `classify-notink` (C, 6), `structured-notink` (J, 3). Validated by Sprint D per [`01_RESEARCH_v2.md §5.3`](01_RESEARCH_v2.md) criteria (80% overlap merge / bimodal split).
+- **Load-balancing aux coef:** 0.002 (memo §3.5) during both tiers.
+- **Asymmetric quantization:** shared expert + attention BF16, routed experts MXFP4_MOE (memo §3.7).
+- Canonical location: [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md), applied in [`03_IMPLEMENTATION_PLAN_v2.md §Phase 5`](03_IMPLEMENTATION_PLAN_v2.md).
+- **Two planner-introduced overfitting-prevention policies** (Sprint FT-LORA-A addition; flagged for user sign-off via commit + PR):
+  1. Epoch cap = 3, early-stop on `val_loss > best × 1.05` for 2 consecutive evals. Forcing function: FT-OAI-001 overfitting at step 1200 (val 0.684 → 0.792 = +16%, 2 evals past best).
+  2. `n_epochs=auto` disallowed on all LoRA runs.
+  - Mirror RL policy: `val_reward < best × 0.95` for 2 consecutive evals ([`04_BENCHMARK_RL_v2.md §11.6`](04_BENCHMARK_RL_v2.md)).
+- Enforcement: Sprint FT-LORA-E adds CLI validation; Sprint FT-LORA-C verifies on first Qwen3.6 run.
+
+### Supersession notes
+
+- The phrase "single LoRA adapter" in any v1–v4 doc is superseded: training now produces **Tier 1 + 3 × Tier 2 adapters** (4 safetensors files per model version). Inference stacks them; storage budget updated in [`02_M5MAX_HARDWARE_v2.md §5`](02_M5MAX_HARDWARE_v2.md).
+- The "tool-use exclusion" paragraph that appeared inline in `01_RESEARCH_v2.md` §1 and `02_M5MAX_HARDWARE_v2.md` header is replaced by pointers to [`01_RESEARCH_v2.md §2.8`](01_RESEARCH_v2.md).
+- The `retrieval.rerank_nli` think-mode assignment flipped from ❌ (v4.0) to ✅ (v5.0) to match Group T (memo §3.3 reasoning-think sampling recipe). Old GRPO `NOTHINK_TASKS` list updated in [`04_BENCHMARK_RL_v2.md §11.2`](04_BENCHMARK_RL_v2.md).
 
 All v4.0 documents are internally consistent and cross-referenced. Task names, consumer counts, data storage locations, embedding dimensions, LLM provider details, default model selection, classifier versioning boundaries, and implementation status reflect the actual codebase state as of PR #277 (v0.7.2).

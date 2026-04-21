@@ -109,6 +109,22 @@ Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destruct
 - `internal/jiminy/` - Jiminy inner voice guidance
 - `internal/cli/` - Unified CLI commands
 
+## MDEMG Fine-Tuning Target & Policies (Sprint FT-LORA onwards, 2026-04-21)
+
+Canonical plan: `docs/development/ft-lora/00_README_v2.md` (v5.0). Three locked-in decisions per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1:
+
+1. **Base model: Qwen3.6-35B-A3B MoE** (Apache 2.0, released 2026-04-16; 35B total / 3B active, 256 experts = 8 routed + 1 shared, Hybrid Gated DeltaNet + Gated Attention + MoE, MTP speculative decoding, 262K native context). Fallback: **Qwen3.5-35B-A3B** — NOT Qwen3-30B-A3B (superseded). See `docs/development/ft-lora/01_RESEARCH_v2.md §3`.
+
+2. **No-tool-calling architectural policy.** All 16 MDEMG LLM call sites are single-shot structured-output / reasoning. Nine banned patterns grep-audited every sprint: `tool_use`, `tool_call`, `tool_response`, `toolCalls`, `function_call`, `--tool-call-parser`, `enable-auto-tool-choice`, `tools: [`, **`preserve_thinking`** (Qwen3.6 multi-turn agent hook — must remain at default). See `docs/development/ft-lora/01_RESEARCH_v2.md §2.8`. **Exception:** `internal/guardrail/llm_evaluator.go` bypasses `llmclient` and is therefore outside this policy's enforcement; migration to `llmclient` is queued for Sprint FT-LORA-B.
+
+3. **Two-tier MoE-Sieve LoRA strategy.** Tier 1 (attention + shared expert, r=32 α=64, all 16 tasks balanced) trained first; Tier 2 (top-25% routed experts per family via Sprint D activation profiling, r=8 α=16) per family (`reasoning-think` / `classify-notink` / `structured-notink` — provisional). `router_aux_loss_coef=0.002`. Asymmetric quant: shared + attention BF16, routed experts MXFP4_MOE. See `docs/development/ft-lora/01_RESEARCH_v2.md §5`.
+
+**Sprint sequence:** FT-LORA-A (docs, in progress) → B (code/config audit remediation) → C (Qwen3.6 MLX validation, 3 gates) → D (expert profiling) → E (training infra patches). Phase 5 SFT unblocks only after Sprint C passes.
+
+**⚠️ Overfitting-prevention policies (Sprint A planner-introduced, forcing function: FT-OAI-001 step-1200 overfit in `training_data/openai_ft/20260420/run_notes.md`):**
+- Epoch cap = 3 on all LoRA runs; early-stop on `val_loss > best × 1.05` for 2 consecutive evals (SFT) or `val_reward < best × 0.95` for 2 consecutive evals (RL).
+- `n_epochs=auto` **disallowed** — every LoRA run must specify an explicit integer epoch count.
+
 ## Additional CLI Commands
 
 - `mdemg data export` — UTDS archive export; auto-generates `instance_id` as `{hostname}-{space_id}` when `MDEMG_INSTANCE_ID` not set

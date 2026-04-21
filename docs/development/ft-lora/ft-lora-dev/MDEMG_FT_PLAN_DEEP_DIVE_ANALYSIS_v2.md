@@ -1,9 +1,11 @@
 # MDEMG LoRA Training Strategy: Deep-Dive Analysis
 
-**Date:** 2026-03-30
+**Date:** 2026-03-30 (original) — partial supersession 2026-04-21
 **Documents reviewed:** 00_README.md through 06_CORRECTIONS_APPLIED.md (v2.0 suite)
 **Context:** Full codebase audit (PR #210–#219), 2026 LoRA/GRPO/RAFT research, MDEMG VISION.md goals
 **Purpose:** Answer fundamental strategic questions about MDEMG's fine-tuning trajectory
+
+> ⚠️ **Superseded in part (2026-04-21) — see `../01_RESEARCH_v2.md §5` for current MoE strategy.** Per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1, base model is now **Qwen3.6-35B-A3B** (MoE, 35B/3B-active, 256 experts = 8 routed + 1 shared; Apache 2.0 2026-04-16; fallback Qwen3.5-35B-A3B — **not** Qwen3-30B-A3B). The single-LoRA approach analyzed below has been replaced by a **two-tier MoE-Sieve LoRA** (Tier 1 attention + shared expert r=32 α=64 all tasks balanced; Tier 2 top-25% routed experts r=8 α=16 per-family reasoning-think / classify-notink / structured-notink). Architectural no-tool-calling policy added (see `../01_RESEARCH_v2.md §2.8`). This deep-dive remains valid for its analysis of the 16 generative tasks, RAFT-by-architecture insight, and strategic framing — only the **model name** and **LoRA topology** are superseded.
 
 ---
 
@@ -15,7 +17,7 @@ Before evaluating the plan, we need to be precise about what MDEMG's fine-tuning
 
 MDEMG uses external OpenAI models (default: `gpt-4.1-nano (non-tool-use; previously gpt-5-nano, migrated in v0.7.2)` for most tasks, `gpt-4o-mini` for reranking/summarization/synthesis/intent) routed through `llmclient` for 16 internal tasks — things like classifying whether a piece of code observation is a constraint, synthesizing guidance for the coding agent, evaluating whether the agent followed that guidance, and reflecting on system health.
 
-The fine-tuned Qwen3-30B-A3B MoE replaces this external LLM. It doesn't replace Claude Code (the coding agent). It doesn't write code, generate files, or interact with the developer. It's an internal intelligence layer — the brain that powers MDEMG's constraint detection, guidance synthesis, quality evaluation, and self-improvement systems.
+The fine-tuned Qwen3.6-35B-A3B MoE (per memo 07 v3.1, 2026-04-21; was Qwen3-30B-A3B in v2.0) replaces this external LLM. It doesn't replace Claude Code (the coding agent). It doesn't write code, generate files, or interact with the developer. It's an internal intelligence layer — the brain that powers MDEMG's constraint detection, guidance synthesis, quality evaluation, and self-improvement systems.
 
 This distinction matters enormously for training strategy.
 
@@ -133,7 +135,7 @@ Training all of these jointly with the same rank and learning rate is suboptimal
 
 LoRA is the right technique for MDEMG's fine-tuning because:
 
-1. **Memory fits:** bf16 LoRA on Qwen3-30B-A3B requires ~74GB — fits in 128GB with headroom
+1. **Memory fits:** bf16 LoRA on Qwen3-30B-A3B requires ~74GB — fits in 128GB with headroom. (Post-2026-04-21: Qwen3.6-35B-A3B two-tier LoRA requires ~105-115GB for Tier 1 / ~67-75GB for Tier 2 — see `../02_M5MAX_HARDWARE_v2.md §3`.)
 2. **Adapters are small:** ~200-400MB per version, enabling version management and rollback
 3. **Training is fast:** ~6-10 hours on M5 Max for a full cycle, enabling iterative improvement
 4. **No catastrophic forgetting:** The base model's general capabilities are preserved
@@ -377,6 +379,6 @@ The most important changes are:
 5. **Design for routine retraining** (it's not a one-time project, it's an ongoing capability)
 6. **Keep the Python training stack thin** (use existing tools, don't rebuild them)
 
-The plan has two distinct workstreams: **generative LoRA** (Qwen3-30B-A3B, 16 tasks, SFT → GRPO/DPO) and **embedding fine-tuning** (contrastive learning, 3072-dim target, hard-negative mining from recall/rerank gap). Both share the same data collection principle: collect now, curate later, train when ready.
+The plan has two distinct workstreams: **generative LoRA** (Qwen3.6-35B-A3B two-tier MoE-Sieve per memo 07 v3.1, 16 tasks, SFT → GRPO/DPO; was Qwen3-30B-A3B monolithic in v2.0) and **embedding fine-tuning** (contrastive learning, 3072-dim target, hard-negative mining from recall/rerank gap). Both share the same data collection principle: collect now, curate later, train when ready.
 
 The vision is achievable. The infrastructure is largely built. The remaining work is collecting enough data, curating it well, and running the first training cycle. At current development velocity (~4-5 PRs/day generating ~50-100 LLM interactions/day), you'll have enough data for a meaningful first generative SFT cycle in about 2-3 months. Embedding training data accumulates in parallel through the same development activity.

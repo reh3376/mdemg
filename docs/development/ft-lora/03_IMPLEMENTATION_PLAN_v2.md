@@ -1,8 +1,20 @@
 # MDEMG Fine-Tuned LLM: Implementation Plan
 
-**Date:** 2026-04-07 (v4.0 — reconciled through PR #243, 13 phases) | **Last verified:** 2026-04-07
-**Model:** Qwen3-30B-A3B MoE via vllm-mlx
-**Scope:** 13 phases, 16 LLM consumers, ~70 files
+**Date:** 2026-04-21 (v5.0 — Qwen3.6-35B-A3B + two-tier MoE LoRA per memo 07 v3.1) | **Last verified:** 2026-04-21
+**Model:** Qwen3.6-35B-A3B MoE via vllm-mlx (fallback Qwen3.5-35B-A3B)
+**Scope:** 13 phases + Phase 5.X expert activation profiling, 16 LLM consumers, ~70 files
+
+---
+
+## Changes in v5.0 (per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1 — 2026-04-21)
+
+1. **Base model**: Qwen3-30B-A3B → **Qwen3.6-35B-A3B** (see [`01_RESEARCH_v2.md §3`](01_RESEARCH_v2.md)).
+2. **Phase 5 rewritten** (§Phase 5) — two-tier SFT (Tier 1 universal, then per-family Tier 2). Replaces the single-LoRA ✅ COMPLETE marker; the pipeline code still works, but the training loop needs the two-tier orchestration and must be re-run against Qwen3.6 during Sprint FT-LORA-C.
+3. **New Phase 5.X — Expert Activation Profiling** — Sprint FT-LORA-D deliverable that validates or revises the family partition before Tier 2 training.
+4. **⚠️ Two planner-introduced engineering policies** (Sprint FT-LORA-A addition, not in memo 07 — flagged for user sign-off via commit body + PR summary):
+   - **Epoch cap + early-stop**: `val_loss > best_val_loss × 1.05` for 2 consecutive evals triggers early-stop. Max 3 epochs. Closes memo §6.1 open question.
+   - **`n_epochs=auto` disallowed** on all LoRA runs. Explicit cap required.
+   - **Forcing function:** FT-OAI-001 crossed the 1.05× threshold between step 1250 and step 1300 (val 0.684 → 0.792 = +16%), 2 evals past best. See `training_data/openai_ft/20260420/run_notes.md`.
 
 ---
 
@@ -29,29 +41,32 @@ Implementation diverged from the v2.0 plan in a better direction:
 - Migration 005: `guidance_id` + `source_path` columns with partial indexes
 - TSDB schema version 4 → 5
 
-**16 Consumer Task Labels (all WithContext wired):**
+**16 Consumer Task Labels (all WithContext wired; re-audited 2026-04-21 — canonical source is [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md)):**
 
-| # | File | Task Label | Think Mode |
-|---|---|---|---|
-| 1 | `ape/llm_reflector.go` | `ape.reflect` | ✅ |
-| 2 | `consulting/llm_classifier.go` | `consulting.classify` | ❌ |
-| 3 | `consulting/synthesis.go` | `consulting.synthesis` | ✅ |
-| 4 | `hidden/cluster_summarizer.go` | `hidden.summarize` | ✅ |
-| 5 | `hidden/emergence_namer.go` | `hidden.name_emergence` | ❌ |
-| 6 | `hidden/reclassifier.go` | `hidden.reclassify` | ❌ |
-| 7 | `jiminy/evaluator.go` | `jiminy.evaluate` | ✅ |
-| 8 | `jiminy/evaluator.go` (LLM tier) | `jiminy.evaluate_llm` | ✅ |
-| 9 | `jiminy/outcome_classifier.go` | `jiminy.evaluate` (outcome) | ❌ |
-| 10 | `jiminy/synthesizer.go` | `jiminy.synthesize` | ✅ |
-| 11 | `jiminy/codegen.go` | `jiminy.codegen` | ❌ |
-| 12 | `metalearn/generalizer.go` | `metalearn.generalize` | ✅ |
-| 13 | `retrieval/intent_translator.go` | `retrieval.intent_translate` | ❌ |
-| 14 | `retrieval/query_classifier.go` | `retrieval.query_classify` | ❌ |
-| 15 | `retrieval/rerank.go` | `retrieval.rerank_cross` | ✅ |
-| 16 | `retrieval/rerank.go` | `retrieval.rerank_nli` | ❌ |
-| 17 | `summarize/service.go` | `summarize.generate` | ✅ |
+| # | File | Task Label | Think Mode | Group (§5 family) |
+|---|---|---|---|---|
+| 1 | `ape/llm_reflector.go` | `ape.reflect` | ✅ | **T** (reasoning-think) |
+| 2 | `consulting/llm_classifier.go` | `consulting.classify` | ❌ | **C** (classify-notink) |
+| 3 | `consulting/synthesis.go` | `consulting.synthesis` | ✅ | **T** |
+| 4 | `hidden/cluster_summarizer.go` | `hidden.summarize` | ✅ | **T** |
+| 5 | `hidden/emergence_namer.go` | `hidden.name_emergence` | ❌ | **J** (structured-notink) |
+| 6 | `hidden/reclassifier.go` | `hidden.reclassify` | ❌ | **C** |
+| 7 | `api/server.go` (wraps `jiminy/evaluator.go`) | `jiminy.evaluate_llm` | ✅ | **J** |
+| 8 | `jiminy/outcome_classifier.go` | `jiminy.evaluate` | ❌ | **C** |
+| 9 | `jiminy/synthesizer.go` | `jiminy.synthesize` | ✅ | **T** |
+| 10 | `api/server.go` (wraps `jiminy/codegen.go`) | `jiminy.codegen` | ❌ | **C** |
+| 11 | `metalearn/generalizer.go` | `metalearn.generalize` | ✅ | **T** |
+| 12 | `retrieval/intent_translator.go` | `retrieval.intent_translate` | ❌ | **C** |
+| 13 | `retrieval/query_classifier.go` | `retrieval.query_classify` | ❌ | **C** |
+| 14 | `retrieval/rerank.go` | `retrieval.rerank_cross` | ✅ | **J** |
+| 15 | `retrieval/rerank.go` | `retrieval.rerank_nli` | ✅ | **T** |
+| 16 | `summarize/service.go` | `summarize.generate` | ✅ | **T** |
 
-**Note:** The Jiminy outcome classifier (`outcome_classifier.go:llmClassify`) uses the `jiminy.evaluate` task label for its LLM calls. This shares the label with the existing evaluator. Training data for both paths is currently mixed under the same task_name. Consider splitting to `jiminy.outcome_classify` for cleaner per-task training data if the two tasks show divergent quality requirements.
+Group totals: **T**=7, **C**=6, **J**=3. These drive the Sprint D family-partition validation — see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md).
+
+**v5.0 drift correction vs v4.0:** v4.0 listed 17 rows because `jiminy/evaluator.go` appeared twice (once as `jiminy.evaluate` reasoning, once as `jiminy.evaluate_llm`). Re-audit confirms `evaluate.go` retains a `CallSite: "jiminy.evaluate"` string for the **embedding recorder** (no llmclient generative call); the llmclient generative call for `jiminy.evaluate` lives in `outcome_classifier.go`, and the `jiminy.evaluate_llm` + `jiminy.codegen` llmclient calls live in `api/server.go`. Table is now **16 rows = 16 distinct task labels** (no double-counting).
+
+**Guardrail consumer (17th call site, not shown above):** `internal/guardrail/llm_evaluator.go` bypasses `llmclient` and is therefore absent from both this table and every training dataset. Migration to `llmclient` is queued for Sprint FT-LORA-B — see [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md) guardrail note.
 
 ---
 
@@ -78,7 +93,7 @@ Since vllm-mlx is OpenAI-compatible, think mode is controlled via the system pro
 
 ### 2C. Modify: All 16 Call Sites — Set Think Mode
 
-7 no-think tasks (classification, codegen, query rewriting) and 9 think tasks (reflection, synthesis, evaluation). See consumer table above.
+Per the v5.0 re-audit (see [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md) and Phase 1 Group column above): **7 think tasks (Group T)** and **9 no-think tasks (6 Group C + 3 Group J)**. See consumer table above.
 
 ### 2D. New File: `internal/llmclient/sanitize.go` *(CRITICAL)*
 
@@ -258,16 +273,99 @@ Example (`consulting.classify`):
 
 ---
 
-## Phase 5: Training Pipeline (Python + MLX) ✅ COMPLETE
+## Phase 5: Training Pipeline — Two-Tier SFT (Python + MLX) 🔄 REWORKED for v5.0
 
-### 5A. `neural/training/train_ft.py` — LoRA fine-tuning via `mlx-lm-lora` ✅ COMPLETE (PR #246)
-### 5B. `neural/training/evaluate_ft.py` — Per-task evaluation against held-out test set ✅ COMPLETE (PR #247)
-### 5C. `neural/training/regression_gate.py` — Version comparison (no task regresses >5%, at least 2 improve ≥2%) ✅ COMPLETE (PR #248)
-### 5D. `neural/training/quantize_deploy.py` — Fuse LoRA adapter and quantize for production ✅ COMPLETE (PR #250)
-### `neural/training/teacher_distill.py` — Teacher distillation for anchor dataset generation ✅ COMPLETE (PR #249)
-### `neural/training/reward_functions.py` — Per-task reward functions for RLHF/DPO ✅ COMPLETE (PR #249)
+**v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E implements the config/flag additions; Sprint FT-LORA-C validates convergence on Qwen3.6.
 
-**Effort:** M-L — 4 Python scripts with evaluation logic.
+### 5A. Tier 1 — Universal LoRA (attention + shared expert, r=32, all 16 tasks balanced)
+
+**Script:** `neural/training/train_ft.py` (existing; needs new flags per Sprint E)
+
+**New flags (Sprint E adds):**
+- `--tier=1` (default `monolithic` for v4.0 back-compat)
+- `--target-modules=attention,shared_expert` (Tier 1 scope)
+- `--rank=32 --alpha=64`
+- `--router-aux-loss-coef=0.002` (memo §3.5; Sprint E exposes in `mlx-lm-lora`)
+- `--n-epochs=<int>` (REQUIRED — no `auto`; see §5F below)
+- `--early-stop-ratio=1.05 --early-stop-patience=2` (see §5F)
+
+**Data:** balanced 16-task mix — each task weighted **equally** regardless of row count (see `05_DATA_COLLECTION_v2.md` balanced-sampling appendix).
+
+**Output:** `tier1_universal.safetensors` (Tier 1 adapter).
+
+### 5B. Phase 5.X — Expert Activation Profiling ⏩ Sprint FT-LORA-D
+
+**Script:** `neural/training/profile_expert_routing.py` (NEW — Sprint D builds)
+
+**Input:** Tier 1-adapted model (from 5A) + held-out eval set per task.
+
+**Output per family (reasoning-think / classify-notink / structured-notink):**
+- `profile_routing_{family}.json` — top-25% routed experts per layer, activation counts, KL divergence of routing distribution vs uniform
+- Heatmap artifact (experts × layers) — visual check for bimodal routing
+
+**Decision criteria (memo §3 + [`01_RESEARCH_v2.md §5.3`](01_RESEARCH_v2.md) provisional-partition clause):**
+- **Cross-family expert overlap > 80%** → partition is merged (reduce to two or one family).
+- **Bimodal routing within a family** (KL divergence between two activation clusters < 0.3 is "unimodal"; > 0.3 = bimodal) → that family is split.
+- Otherwise → proceed with the provisional three-family partition into 5C.
+
+Sprint D's output is a decision doc (`docs/development/ft-lora/sprint_c_d_profile_results.md`, projected) that either confirms the three-family partition or revises it before Tier 2 training begins.
+
+### 5C. Tier 2 — Per-Family LoRA (top-25% routed experts, r=8, per family)
+
+**Script:** `neural/training/train_ft.py` with new Tier 2 flags
+
+**New flags (Sprint E adds):**
+- `--tier=2`
+- `--family={reasoning-think,classify-notink,structured-notink}`
+- `--target-modules=routed_experts --expert-selection-path=profile_routing_{family}.json`
+- `--rank=8 --alpha=16`
+- `--base-adapter=tier1_universal.safetensors` (Tier 1 merged or stacked; Tier 2 trains on top)
+- `--router-aux-loss-coef=0.002` (continue regularization)
+- `--n-epochs=<int>` (REQUIRED) and `--early-stop-*` flags (same as Tier 1)
+
+**Data:** per-family subset of the curated dataset (tasks filtered to the family's Group-column membership from §Phase 1 table).
+
+**Output per family:** `tier2_{family}.safetensors` × 3 families.
+
+### 5D. Asymmetric quantization and deployment
+
+**Script:** `neural/training/quantize_deploy.py` (existing; needs Sprint E patch per memo §3.8)
+
+**Sprint E patch:** `mlx_lm.convert` must accept per-module-class quantization selectors:
+- Attention (q/k/v/o_proj): **BF16**
+- Shared expert MLP: **BF16**
+- Routed expert MLPs: **MXFP4_MOE** (4-bit MoE-aware)
+- Router/gate weights: **BF16**
+
+Existing pipeline (Tier 1 merge → quantize → deploy) extended to stack Tier 2 adapters post-quantization for inference.
+
+### 5E. Evaluation + regression gate (existing pipeline, Qwen3.6-ready)
+
+- `neural/training/evaluate_ft.py` ✅ COMPLETE (PR #247) — per-task eval runs after **each** tier (Tier 1 alone, Tier 1+Tier 2 per family, Tier 1+all Tier 2s)
+- `neural/training/regression_gate.py` ✅ COMPLETE (PR #248) — no task regresses >5%, at least 2 improve ≥2% — applies at each tier boundary
+- `neural/training/teacher_distill.py` ✅ COMPLETE (PR #249)
+- `neural/training/reward_functions.py` ✅ COMPLETE (PR #249) — used in Phase 6 GRPO, not SFT
+
+### 5F. ⚠️ Overfitting-prevention policy (Sprint A NEW — planner-introduced)
+
+> **Policies 1 and 2 below are Sprint FT-LORA-A additions, not in memo 07 v3.1. Flagged for user sign-off via the Sprint A commit message body and PR summary. Forcing function: FT-OAI-001 (OpenAI FT) crossed the `val_loss > best × 1.05` threshold between step 1250 and 1300 (val 0.684 → 0.792 = +16%, 2 evals past best) — see `training_data/openai_ft/20260420/run_notes.md`.**
+
+**Policy 1 — Epoch cap + early-stop threshold:**
+- **Max 3 epochs** on every LoRA run (Tier 1 and each Tier 2).
+- **Early-stop trigger:** `val_loss > best_val_loss × 1.05` for **2 consecutive evals**.
+- **Rationale for 1.05× / 2-evals:** the 5% band tolerates expected noise; 2-eval patience avoids single-eval transient trips. FT-OAI-001 showed this threshold would have stopped training exactly at the onset of overfitting without false positives on the stable steps 500-1200. If Sprint C validation shows this is too tight (false positives on healthy training) or too loose (late stops), revise in a Sprint C addendum to this doc — not silently.
+
+**Policy 2 — `n_epochs=auto` is disallowed.**
+- Every LoRA run **must** specify an explicit `--n-epochs` integer value.
+- **Rationale:** FT-OAI-001 was configured with `n_epochs=auto`, which OpenAI inflated to 3 epochs and the model overfit past step 1200. MLX `mlx-lm-lora` does not have an `auto` mode today, but any future equivalent (schedule-based or heuristic) must be rejected at the CLI layer.
+
+**Enforcement:** Sprint E adds a CLI validator in `train_ft.py` that rejects `--n-epochs=auto` or a missing `--n-epochs` argument. Sprint C verifies both policies are active on the first Qwen3.6 training run.
+
+**Open questions (memo §6.1):**
+- Shared-expert epochs: default 3 (matches Tier 2). If Tier 1 Sprint C eval shows underconvergence, raise to 5 — but always subject to the early-stop trigger above.
+- Per-family epoch differentiation: Tier 2 runs independently per family; same cap (3) each but early-stop evaluates per-family.
+
+**Effort:** M — orchestration rework + CLI flag additions; evaluation/regression/quantize scripts reused.
 
 ---
 
