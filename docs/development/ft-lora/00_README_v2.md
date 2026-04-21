@@ -1,7 +1,18 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
-**Date:** 2026-04-07
-**Version:** 4.0 (aligned to codebase state PRs #210-#219 + deep-dive strategic analysis)
+**Date:** 2026-04-21
+**Version:** 5.0 (Qwen3.6-35B-A3B upgrade + two-tier MoE-Sieve LoRA + no-tool-calling architectural policy per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1)
+
+> **Changes in v5.0 (per memo 07 v3.1 — 2026-04-21)**
+>
+> 1. **Base model**: Qwen3-30B-A3B → **Qwen3.6-35B-A3B** (Apache 2.0, 35B/3B active, 256 experts = 8 routed + 1 shared, 262K native context, MTP speculative decoding). Fallback: Qwen3.5-35B-A3B — **not** Qwen3-30B-A3B. See [`01_RESEARCH_v2.md §3`](01_RESEARCH_v2.md).
+> 2. **No-tool-calling architectural policy** — all 16 MDEMG LLM call sites are single-shot structured-output/reasoning. Previously implicit, now explicit with 9 banned patterns including `preserve_thinking`. See [`01_RESEARCH_v2.md §2.8`](01_RESEARCH_v2.md).
+> 3. **Two-tier MoE-Sieve LoRA** — Tier 1 (attention + shared expert, r=32 α=64, all 16 tasks balanced) + Tier 2 (top-25% routed experts, r=8 α=16, per-family: reasoning-think / classify-notink / structured-notink). Load-balancing `router_aux_loss_coef=0.002`. Asymmetric quant (shared BF16 / routed MXFP4_MOE / attention BF16). See [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md).
+>
+> **⚠️ Two Sprint A planner-introduced policies (new in v5.0, flagged for user sign-off):**
+> - Epoch cap + early-stop: `val_loss > best × 1.05` for 2 consecutive evals, max 3 epochs. Closes memo §6.1 open question.
+> - `n_epochs=auto` disallowed on all LoRA runs.
+> - Forcing function: FT-OAI-001 overfitting at step 1200 (`training_data/openai_ft/20260420/run_notes.md`).
 
 ---
 
@@ -11,35 +22,65 @@ Read in order. Each document builds on the previous.
 
 | # | File | Purpose | Pages |
 |---|---|---|---|
-| 1 | `01_RESEARCH.md` | Strategic rationale — why fine-tune, what tasks, recursive loop architecture, RAFT pattern | ~18 |
-| 2 | `02_M5MAX_HARDWARE.md` | Hardware-specific model selection, memory math, inference/training estimates | ~9 |
-| 3 | `03_IMPLEMENTATION_PLAN.md` | The build plan — 11 phases, all files, code-level specs (Phase 1 COMPLETE) | ~25 |
-| 4 | `04_BENCHMARK_RL.md` | Phases 10-12 — automated benchmarks, GRPO/DPO, human-in-the-loop | ~18 |
-| 5 | `05_DATA_COLLECTION.md` | Training data collection, governance, storage, curation pipeline | ~18 |
-| 6 | `06_CORRECTIONS_APPLIED.md` | All corrections from v1.0→v2.0→v3.0, consolidated with resolution status | ~8 |
+| 1 | `01_RESEARCH_v2.md` | Strategic rationale — why fine-tune, the 16 call sites (§1.1), no-tool-calling policy (§2.8), model selection (§3), **two-tier MoE LoRA strategy (§5)** | ~22 |
+| 2 | `02_M5MAX_HARDWARE_v2.md` | Hardware-specific model selection, asymmetric-quant memory math, inference/training estimates (Tier 1 + Tier 2) | ~11 |
+| 3 | `03_IMPLEMENTATION_PLAN_v2.md` | The build plan — 13 phases + **Phase 5.X expert activation profiling** (Sprint D), code-level specs, ⚠️ overfitting-prevention policies | ~27 |
+| 4 | `04_BENCHMARK_RL_v2.md` | Phases 10-12 — three-group sampling recipes, automated benchmarks, GRPO/DPO, **router-entropy monitoring + val-reward early-stop** | ~20 |
+| 5 | `05_DATA_COLLECTION_v2.md` | Training data collection, governance, storage, curation pipeline, **Appendix A (balanced sampling) + Appendix B (routing profile artifact)** | ~22 |
+| 6 | `06_CORRECTIONS_APPLIED_v2.md` | All corrections v1.0→v5.0 consolidated with resolution status | ~10 |
+| 7 | `SPRINT_A_GREP_AUDIT.md` | Sprint FT-LORA-A Epic 10 output — repo-wide grep of stale model names and banned tool-calling patterns; remediation queue for Sprint B | ~3 |
+| 8 | `sprint_plan_ft_lora_a.md` | Sprint FT-LORA-A v1.0-format plan (as executed) — 11 epics, 3-tier testing, commit strategy, Documents Accessed appendix | ~7 |
 
 ---
 
-## Key Decisions (v4.0)
+## Key Decisions (v5.0)
 
-| Decision | Rationale |
-|---|---|
-| **Model: Qwen3-30B-A3B MoE** | 4-5x faster than Qwen3-32B dense at identical quality (82.20% MMLU-Pro CS). Apache 2.0. ~80 tok/s on M5 Max vs ~15 tok/s for dense 32B. |
-| **Inference: vllm-mlx** | Production-grade OpenAI-compatible server with prefix caching, continuous batching, reasoning parser. Eliminates 3 custom files. |
-| **LLM consumers: 16** (not 11 or 15) | Codebase audit: rerank split into cross-encoder + NLI (2 tasks). jiminy.evaluate_llm is separate from jiminy.evaluate. |
-| **Training: MLX bf16 LoRA** | M5 Max 128GB has no production traffic constraint. Full bf16 LoRA quality from day one. |
-| **Anti-collapse: α ≥ 0.4** | Peer-reviewed research proves model collapse occurs when exogenous signal vanishes. Minimum 40% non-model-generated data per batch. |
-| **Think block stripping** | 9 of 16 consumers parse JSON from LLM response. Think blocks break json.Unmarshal. SanitizeResponse() function required. |
-| **Data storage: TimescaleDB** | LLM interactions stored in `llm_interactions` hypertable (not JSONL files). pgx CopyFrom batch inserts, 7-day chunking. |
-| **RAFT training pattern** | MDEMG operates in open-book mode (retrieval context in prompts). Training data must include retrieval context for optimal quality. |
-| **ULTS spec framework** | Formalize all 16 LLM call contracts as machine-readable specs for validation, curation, and benchmark automation. |
-| **Routine retraining** | System prompts evolve, tasks are added, domains shift. Training infrastructure designed for monthly SFT refreshes, not one-time use. |
-| **Embedding: separate workstream** | Embedding fine-tuning uses contrastive learning on encoder models (not LoRA). Target: 3072-dim vectors (Neo4j + OpenAI + Ollama standard). Data collection starts now; training later. |
-| **No tool-use models** | All 16 tasks are text-in/JSON-out. Tool-use models emit tool-call structures that break json.Unmarshal. Target model must be base or instruct variant, not tool-use. |
-| **Default LLM: gpt-4.1-nano** | gpt-5-nano (tool-use) breaks JSON tasks. Switched to gpt-4.1-nano (non-tool-use, 2x cheaper output, 1M context). LoRA target remains Qwen3-30B-A3B. |
-| **Curated dataset pipeline** | export → UTDS validate → quality_filter → format_converter → dataset_versioner → train_ft. Validated E2E (10/10 PASS). |
-| **Jiminy outcomes as quality signal** | GUIDANCE_OUTCOME edges (followed/partial/ignored/not_applicable) provide direct training quality labels for Jiminy tasks. |
-| **Training data version boundary** | v0.7.1 classifier overhaul creates hard boundary. Pre-v0.7.1 Jiminy data is measurement error, not ground truth. Filter by MDEMG version >= v0.7.1. |
+| Decision | Rationale | Canonical ref |
+|---|---|---|
+| **Model: Qwen3.6-35B-A3B MoE** | Apache 2.0 (released 2026-04-16). 35B/3B active, 256 experts = 8 routed + 1 shared, Hybrid Gated DeltaNet + Gated Attention + MoE, MTP speculative decoding, 262K native context. **Fallback Qwen3.5-35B-A3B — NOT Qwen3-30B-A3B** (lacks shared expert needed for Tier 1). Sprint C three-gate validation decides ship vs fallback. | [`01_RESEARCH_v2.md §3`](01_RESEARCH_v2.md) |
+| **No-tool-calling architectural policy** | All 16 LLM call sites are single-shot structured-output/reasoning. Nine banned patterns (incl. `preserve_thinking`). Sprint B grep-audits all code/config. | [`01_RESEARCH_v2.md §2.8`](01_RESEARCH_v2.md) |
+| **Two-tier MoE-Sieve LoRA** | Tier 1: attention + shared expert, r=32 α=64, all 16 tasks balanced. Tier 2: top-25% routed experts per family (Sprint D profiling), r=8 α=16, 3 families (reasoning-think / classify-notink / structured-notink — provisional). | [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md) |
+| **Asymmetric quantization** | Shared expert + attention BF16 (quality-sensitive); routed experts MXFP4_MOE (4-bit MoE-aware); router/gate BF16. `mlx_lm.convert` patched in Sprint E. | [`01_RESEARCH_v2.md §5.4`](01_RESEARCH_v2.md) |
+| **Load-balancing `router_aux_loss_coef=0.002`** | Prevents expert collapse during Tier 1/2 training and GRPO. Layer-level routing entropy gate ≥ 1.5 nats. | [`04_BENCHMARK_RL_v2.md §11.2.1`](04_BENCHMARK_RL_v2.md) |
+| **Three-group sampling recipes** | T (think, temp=0.6), C (no-think classify, temp=0.3 max_tokens=64), J (no-think JSON, temp=0.7, **`presence_penalty=1.5`**, max_tokens=2048). All 16 tasks mapped. | [`04_BENCHMARK_RL_v2.md §10.0`](04_BENCHMARK_RL_v2.md) |
+| **⚠️ Overfitting-prevention policies (Sprint A NEW)** | Epoch cap = 3, SFT early-stop `val_loss > best × 1.05` for 2 consec. evals; RL mirror `val_reward < best × 0.95`. `n_epochs=auto` disallowed. Forcing function: FT-OAI-001 step-1200 overfit. | [`03_IMPLEMENTATION_PLAN_v2.md §Phase 5F`](03_IMPLEMENTATION_PLAN_v2.md), [`04_BENCHMARK_RL_v2.md §11.6`](04_BENCHMARK_RL_v2.md) |
+| **Inference: vllm-mlx** | OpenAI-compatible, prefix caching, continuous batching, Qwen3 reasoning parser, adapter-stack support for Tier 1 + Tier 2. No `--tool-call-parser`, no `--enable-auto-tool-choice`. | [`02_M5MAX_HARDWARE_v2.md §4`](02_M5MAX_HARDWARE_v2.md) |
+| **LLM consumers: 16 (re-audited 2026-04-21)** | 16 rows = 16 distinct task labels. v4.0 "17 rows" corrected (jiminy.evaluate double-count removed). Guardrail is a 17th call site that bypasses llmclient — Sprint B migration queued. | [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md) |
+| **Training: MLX bf16 LoRA** | M5 Max 128GB has no production traffic constraint during offline training. Tier 1 ~105–115GB; Tier 2 ~67–75GB (inference can run alongside Tier 2). | [`02_M5MAX_HARDWARE_v2.md §3`](02_M5MAX_HARDWARE_v2.md) |
+| **Balanced sampling for Tier 1** | Equal records per task label (`per_task=500` default) prevents 223× skew (FT-OAI-001 R1 finding). Integer up-sampling via duplication; deterministic seed. | [`05_DATA_COLLECTION_v2.md Appendix A`](05_DATA_COLLECTION_v2.md) |
+| **Anti-collapse: α ≥ 0.4 exogenous ratio** | Peer-reviewed. Minimum 40% non-model-generated data per batch. | — |
+| **Think block stripping** | 9 of 16 consumers parse JSON. `SanitizeResponse()` strips `<think>...</think>`. | [`03_IMPLEMENTATION_PLAN_v2.md Phase 2D`](03_IMPLEMENTATION_PLAN_v2.md) |
+| **Data storage: TimescaleDB** | `llm_interactions` hypertable, 7-day chunking, 180-day retention, 14-day compression. | [`05_DATA_COLLECTION_v2.md §1`](05_DATA_COLLECTION_v2.md) |
+| **RAFT training pattern** | 80% of records include retrieval context; 20% stripped (parametric recall). Deterministic via SHA-256(trace_id). | [`03_IMPLEMENTATION_PLAN_v2.md Phase 4A`](03_IMPLEMENTATION_PLAN_v2.md) |
+| **ULTS spec framework** | 16 specs (one per task); Sprint B adds `sampling_group` field per task. Single source of truth for contracts + sampling. | [`03_IMPLEMENTATION_PLAN_v2.md Phase 4B`](03_IMPLEMENTATION_PLAN_v2.md) |
+| **Routing profile artifacts** | Phase 5.X emits `profile_routing_{family}.json` per family; location `training_data/routing_profiles/`. Sprint D validates family partition. | [`05_DATA_COLLECTION_v2.md Appendix B`](05_DATA_COLLECTION_v2.md) |
+| **Embedding: separate workstream** | Contrastive learning on encoder models (not LoRA). Target: 3072-dim vectors. Data collection starts now; training later. | [`01_RESEARCH_v2.md §1.4`](01_RESEARCH_v2.md) |
+| **Default external LLM: gpt-4.1-nano** | Non-tool-use, 1M context. LoRA target is **Qwen3.6-35B-A3B** (switches external + local to single model after Phase 5 SFT lands). | [`01_RESEARCH_v2.md §3`](01_RESEARCH_v2.md) |
+| **Curated dataset pipeline (unchanged)** | export → UTDS validate → quality_filter → format_converter → dataset_versioner → train_ft. Validated E2E (10/10 PASS). | [`05_DATA_COLLECTION_v2.md §1.3`](05_DATA_COLLECTION_v2.md) |
+| **Jiminy outcomes as quality signal** | GUIDANCE_OUTCOME edges provide direct training quality labels for Jiminy tasks. | [`05_DATA_COLLECTION_v2.md §5`](05_DATA_COLLECTION_v2.md) |
+| **Training data version boundary: v0.7.1** | Pre-v0.7.1 Jiminy classifier data is measurement error. Filter by MDEMG version ≥ v0.7.1 for `jiminy.evaluate` and `jiminy.evaluate_llm` only. | [`05_DATA_COLLECTION_v2.md §12`](05_DATA_COLLECTION_v2.md) |
+
+---
+
+## Changes from v4.0 (memo 07 v3.1 — 2026-04-21)
+
+| Change | Affected Documents | Status |
+|---|---|---|
+| Base model: Qwen3-30B-A3B → Qwen3.6-35B-A3B | 00, 01, 02, 03, 04, 06 | ✅ Applied |
+| No-tool-calling architectural policy (§2.8) + 9 banned patterns (incl. `preserve_thinking`) | 00, 01, 02, 06 + CLAUDE, VISION, AGENT_HANDOFF | ✅ Applied (repo-level: Epic 8) |
+| Two-tier MoE-Sieve LoRA (§5) + three-family provisional partition | 01, 02, 03, 04, 05, 06 | ✅ Applied |
+| Asymmetric quantization (shared BF16 / routed MXFP4_MOE / attention BF16) | 01, 02, 03 | ✅ Applied |
+| `router_aux_loss_coef=0.002` + layer-level entropy ≥ 1.5 nats gate | 03, 04 | ✅ Applied |
+| Three-group sampling recipes + all-16-task mapping (`presence_penalty=1.5` on J group) | 04 | ✅ Applied |
+| Phase 5.X expert activation profiling (Sprint D) | 03, 05 | ✅ Applied |
+| Balanced sampling for Tier 1 (FT-OAI-001 R1 fix) | 05 | ✅ Applied |
+| §1.1 16-task roster re-audit (drift fix for `jiminy.evaluate_llm`, `jiminy.codegen`) | 01, 03 | ✅ Applied |
+| Guardrail consumer flagged as 17th call site (Sprint B migration) | 01, 03 | ✅ Applied |
+| ⚠️ Epoch cap + `val_loss > best × 1.05` early-stop (SFT) | 03 | ✅ Applied (policy is Sprint A addition) |
+| ⚠️ `val_reward < best × 0.95` early-stop (RL mirror) | 04 | ✅ Applied (policy is Sprint A addition) |
+| ⚠️ `n_epochs=auto` disallowed | 03 | ✅ Applied (policy is Sprint A addition) |
+| Routing profile artifact schema + pipeline location | 05 | ✅ Applied |
+| Fallback chain: Qwen3.5-35B-A3B (NOT Qwen3-30B-A3B) | 00, 01, 02 | ✅ Applied |
 
 ---
 
@@ -80,7 +121,18 @@ Read in order. Each document builds on the previous.
 
 ---
 
-## Implementation Status (as of 2026-03-30)
+## Sprint Plan (Sprint FT-LORA-A → E; memo 07 §4)
+
+| Sprint | Scope | Duration | Status |
+|---|---|---|---|
+| **FT-LORA-A** | Documentation update pass (this sprint) | ~3 days | 🔄 In progress |
+| **FT-LORA-B** | Code/config: grep audit remediation, `.env.example`, inference launch commands, 16 ULTS sampling-group fields, guardrail llmclient migration | ~2 days | ⬜ Queued |
+| **FT-LORA-C** | Qwen3.6 MLX validation — 3 gates (mlx-lm-lora convergence on 500 ex, JSON ≥95%, ≥60 tok/s) | ~1 week | ⬜ Queued |
+| **FT-LORA-D** | Expert activation profiling (Phase 5.X) — `profile_routing_{family}.json` × 3, family-partition decision | ~3 days | ⬜ Queued |
+| **FT-LORA-E** | Training infra patches — `router_aux_loss_coef` exposure, `mlx_lm.convert` asymmetric quant selectors, Tier 1/Tier 2 flags, router-entropy + val-loss/reward early-stop CLI gates | ~3–5 days | ⬜ Queued |
+| **Phase 5 SFT unblocks** | Two-tier SFT on real data | — | Gated on Sprint C pass |
+
+## Implementation Status (as of 2026-04-21)
 
 | Phase | Status | PRs |
 |---|---|---|

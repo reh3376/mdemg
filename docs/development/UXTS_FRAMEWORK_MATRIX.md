@@ -2,7 +2,9 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
+
+> **Architectural constraint (Sprint FT-LORA onwards, 2026-04-21):** MDEMG operates under a **no-tool-calling policy** — all 16 MDEMG LLM call sites are single-shot structured-output / reasoning. ULTS specs and ULTS-derived training data must not introduce `tool_use`, `function_call`, `toolCalls`, `tools: [`, `preserve_thinking`, `--tool-call-parser`, `enable-auto-tool-choice`, `tool_call`, or `tool_response` patterns. Any future UxTS framework that adds LLM contracts inherits this constraint. See `ft-lora/01_RESEARCH_v2.md §2.8`.
 
 ---
 

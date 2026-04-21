@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **FT-LORA-A: ft-lora plan suite aligned to memo 07 v3.1** (2026-04-21) — docs-only sprint (zero code / zero behavior change) propagating three locked-in decisions across 14 files: base model Qwen3-30B-A3B → **Qwen3.6-35B-A3B** (fallback Qwen3.5-35B-A3B; Apache 2.0 2026-04-16; 35B/3B-active MoE, 256 experts = 8 routed + 1 shared, 262K native context, MTP speculative decoding); **no-tool-calling architectural policy** (all 16 MDEMG LLM call sites are single-shot; 9 banned patterns including `preserve_thinking`); **two-tier MoE-Sieve LoRA** (Tier 1 attention + shared expert r=32 α=64 all tasks balanced; Tier 2 top-25% routed experts r=8 α=16 per-family reasoning-think/classify-notink/structured-notink; `router_aux_loss_coef=0.002`; asymmetric quant shared BF16 / routed MXFP4_MOE / attention BF16). Files updated: `docs/development/ft-lora/{00_README,01_RESEARCH,02_M5MAX_HARDWARE,03_IMPLEMENTATION_PLAN,04_BENCHMARK_RL,05_DATA_COLLECTION,06_CORRECTIONS_APPLIED}_v2.md`, `docs/development/ft-lora/ft-lora-dev/{MDEMG_FT_PLAN_DEEP_DIVE_ANALYSIS,SPRINT_EMBEDDING_DATA_COLLECTION}_v2.md`, `docs/development/UXTS_FRAMEWORK_MATRIX.md`, plus new `docs/development/ft-lora/{SPRINT_A_GREP_AUDIT,sprint_plan_ft_lora_a}.md`; repo-level `VISION.md` / `CLAUDE.md` / `AGENT_HANDOFF.md`. **Two planner-introduced engineering policies** (flagged for audit trail, not in memo): (1) epoch cap 3 per tier with early-stop on `val_loss > best × 1.05` for 2 consecutive evals (SFT) / `val_reward < best × 0.95` (RL); (2) `n_epochs=auto` disallowed on all LoRA runs. Forcing function: FT-OAI-001 overfit at step 1200. Sprint sequence: **A (docs, done) → B (code/config) → C (Qwen3.6 MLX validation) → D (expert profiling) → E (training infra patches)** — Phase 5 SFT unblocks only after Sprint C passes.
+
 ### Added
 
 - **FT-OAI-001: OpenAI Fine-Tuning Pipeline** (2026-04-21) — First in-house fine-tune closes the write→train→eval→promote loop for hosted models:

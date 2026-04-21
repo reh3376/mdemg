@@ -1,7 +1,18 @@
 # MDEMG Training Data Collection, Governance, Storage & Curation Plan
 
-**Date:** 2026-04-07 (v4.0 — curated dataset pipeline validated, Jiminy classifier quality signals, training data versioning boundary)
-**Purpose:** Define the complete data infrastructure needed to support the fine-tuning pipeline (Phases 1-12) and ensure high-quality training data collection.
+**Date:** 2026-04-21 (v5.0 — adds balanced-sampling + routing-profile appendices per memo 07 v3.1)
+**Purpose:** Define the complete data infrastructure needed to support the fine-tuning pipeline (Phases 1-12 + Phase 5.X expert activation profiling) and ensure high-quality training data collection.
+
+---
+
+## Changes in v5.0 (per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1 — 2026-04-21)
+
+Two appendix additions (§A, §B below) to support the two-tier MoE LoRA strategy:
+
+1. **Appendix A — Balanced sampling for Tier 1 training** — Tier 1 weights all 16 tasks equally regardless of row count, to prevent high-volume tasks (e.g. `ape.reflect`) from dominating.
+2. **Appendix B — Routing profile artifact** — output format and pipeline location for `profile_routing_{family}.json` produced by Phase 5.X (Sprint FT-LORA-D).
+
+No changes to §1–§13 collection mechanics. Existing TSDB → `mdemg data export` → `quality_filter.py` → `format_converter.py` → `dataset_versioner.py` pipeline is reused.
 
 ---
 
@@ -453,3 +464,109 @@ The v0.7.1 classifier changes create a **hard boundary** in the training data. P
 - First LoRA cycle target: Day 30 (~2026-04-29)
 - Export pipeline: Validated (10/10 PASS)
 - Daily automated export: Active via `mdemg data export-auto`
+
+---
+
+## Appendix A — Balanced Sampling for Tier 1 Training (v5.0, memo §3.4)
+
+**Context:** Tier 1 LoRA (attention + shared expert; see [`01_RESEARCH_v2.md §5.1`](01_RESEARCH_v2.md)) trains on all 16 tasks simultaneously. FT-OAI-001 (OpenAI FT, 2026-03) showed severe per-task imbalance: `ape.reflect` contributed 28,324 records vs `retrieval.intent_translate` at 127 — a **223×** skew. The under-represented tasks regressed heavily after fine-tuning (R1 finding, FT-OAI-002 Epic 5).
+
+**Tier 1 sampling rule:** each of the 16 task labels contributes an **equal number** of records per epoch, regardless of TSDB row count. The rule applies **after** `quality_filter.py` and **before** `dataset_versioner.py` temporal split.
+
+**Implementation (Sprint FT-LORA-E, extends existing pipeline):**
+
+```python
+# Pseudo-code for neural/training/balanced_sampler.py (NEW)
+def balanced_sample_for_tier1(records, task_label_field="task_name", per_task=500):
+    by_task = group_by(records, task_label_field)
+    out = []
+    for task, rows in by_task.items():
+        if len(rows) >= per_task:
+            out.extend(random.sample(rows, per_task))           # downsample
+        else:
+            out.extend(rows * (per_task // len(rows)))           # upsample (integer duplication)
+            out.extend(random.sample(rows, per_task % len(rows)))
+    return shuffle(out, seed=deterministic)
+```
+
+- **Default `per_task`:** 500 (matches ULTS `training_config.min_examples` — see Phase 4B).
+- **Determinism:** seeded shuffle; `per_task` + seed recorded in Tier 1 training manifest.
+- **Up-sampling method:** integer record duplication (matches `openai_ft_adapter.py --task-weights` pattern from FT-OAI-002 Epic 6). Fractional weights rejected.
+- **Deduplication interaction:** `dataset_versioner.py` cross-source dedup (SHA-256 of `system_prompt + user_prompt`) runs **before** balancing. Duplicates from the same prompt/response are collapsed first, then the balancer fills up to `per_task`.
+
+**Tier 2 data (per family) uses the same balancer** with `per_task` scoped to that family's member tasks only. For the 3-task J family, `per_task=500` gives 1,500 total records per epoch; for the 7-task T family, `per_task=500` gives 3,500 per epoch.
+
+**Gate:** Tier 1 training manifest must show `effective_per_task_count` matching `per_task` within ±1 for all 16 tasks. CI check added in Sprint FT-LORA-E.
+
+Cross-ref: [`03_IMPLEMENTATION_PLAN_v2.md §Phase 5A`](03_IMPLEMENTATION_PLAN_v2.md) — Tier 1 universal LoRA.
+
+---
+
+## Appendix B — Routing Profile Artifact (v5.0, Phase 5.X output)
+
+**Context:** Phase 5.X (Sprint FT-LORA-D) runs `neural/training/profile_expert_routing.py` against the Tier 1-adapted Qwen3.6-35B-A3B to identify top-25% routed experts per family. The output is the authoritative input to Tier 2 training. See [`03_IMPLEMENTATION_PLAN_v2.md §5B`](03_IMPLEMENTATION_PLAN_v2.md) and [`01_RESEARCH_v2.md §5.2`](01_RESEARCH_v2.md).
+
+**Artifact name:** `profile_routing_{family}.json` — one file per family, three files total (`reasoning-think`, `classify-notink`, `structured-notink`). Family partition is provisional; see [`01_RESEARCH_v2.md §5.3`](01_RESEARCH_v2.md).
+
+**Artifact location in data pipeline:**
+
+```
+training_data/
+├── curated/
+│   └── sft_interactions/
+│       └── versioned/
+│           ├── v1/                        # Existing — Tier 1 training data
+│           │   ├── train.jsonl
+│           │   ├── val.jsonl
+│           │   └── manifest.json
+│           └── v1-tier2-{family}/         # NEW per Sprint D — family subsets
+│               ├── train.jsonl
+│               ├── val.jsonl
+│               └── manifest.json
+├── routing_profiles/                      # NEW per Sprint D
+│   ├── profile_routing_reasoning-think.json
+│   ├── profile_routing_classify-notink.json
+│   ├── profile_routing_structured-notink.json
+│   └── profile_routing_heatmap_{family}.png  # optional visual
+└── openai_ft/                             # Existing FT-OAI-* artifacts
+    └── ...
+```
+
+**Schema (JSON):**
+
+```jsonc
+{
+  "family": "reasoning-think",
+  "generated_at": "2026-05-10T14:22:00Z",
+  "sprint": "FT-LORA-D",
+  "base_model": "Qwen3.6-35B-A3B",
+  "tier1_adapter_sha256": "abc123...",          // Tier 1 adapter used for profiling
+  "eval_batch_size": 512,
+  "eval_task_labels": ["ape.reflect", "consulting.synthesis", "..."],
+  "router_aux_loss_coef": 0.002,
+  "layers": [
+    {
+      "layer_index": 0,
+      "routing_entropy_nats": 1.87,              // §11.2.1 gate: ≥ 1.5 nats
+      "top_25pct_experts": [12, 47, 89, ..., 201],  // expert indices (64 experts for top-25% of 256)
+      "expert_activation_counts": {
+        "0": 43, "1": 128, "...": 0
+      },
+      "bimodality_kl": 0.12                       // §5.3 clause: < 0.3 = unimodal
+    },
+    // ... one entry per transformer layer
+  ],
+  "summary": {
+    "cross_family_overlap_fraction": 0.42,        // §5.3 clause: > 0.80 = partition merges
+    "layers_with_entropy_below_1_5_nats": 0,
+    "layers_bimodal": 0,
+    "decision": "proceed_with_provisional_partition"  // or: "merge_partition" | "split_family"
+  }
+}
+```
+
+**Consumer:** `neural/training/train_ft.py --tier=2 --expert-selection-path=routing_profiles/profile_routing_{family}.json` — Tier 2 LoRA is applied only to the `top_25pct_experts` per layer.
+
+**Privacy:** no raw prompt/response content; only task labels + routing metadata. Safe to commit to the repo (small — ~50KB per family).
+
+**Retention:** keep per LoRA model version; old profiles archived alongside model weights (see [`02_M5MAX_HARDWARE_v2.md §5`](02_M5MAX_HARDWARE_v2.md) storage table — ~5MB × 3 families per profile set).

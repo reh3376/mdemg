@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-20
+**Date:** 2026-04-21
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -56,6 +56,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
+=== COMPLETED SINCE LAST HANDOFF (2026-04-21) ===
+- ✅ FT-LORA-A: Documentation Update Pass — Qwen3.6-35B-A3B + MoE Two-Tier LoRA + No-Tool-Calling (2026-04-21):
+  - Docs-only sprint (zero code, zero behavior change) aligning the ft-lora plan suite to memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1. Three decisions propagated across 14 files: (1) base model Qwen3-30B-A3B → **Qwen3.6-35B-A3B** (Apache 2.0 2026-04-16, 35B/3B-active MoE, 256 experts = 8 routed + 1 shared, 262K native context, MTP speculative decoding), fallback Qwen3.5-35B-A3B (not Qwen3-30B-A3B); (2) **no-tool-calling architectural policy** — all 16 MDEMG LLM sites are single-shot structured-output / reasoning (9 banned patterns including `preserve_thinking`); (3) **two-tier MoE-Sieve LoRA** — Tier 1 attention + shared expert r=32 α=64 on all 16 tasks balanced, Tier 2 top-25% routed experts r=8 α=16 per-family (reasoning-think / classify-notink / structured-notink), `router_aux_loss_coef=0.002`, asymmetric quant (shared BF16 / routed MXFP4_MOE / attention BF16).
+  - Sprint chain: **A (docs, done) → B (code/config) → C (Qwen3.6 MLX validation, 3 gates) → D (expert activation profiling) → E (training infra patches)**. Phase 5 SFT unblocks only after Sprint C passes.
+  - E1: `01_RESEARCH_v2.md` — §1.1 16-task table re-audited against current codebase (added Group column T/C/J; guardrail `internal/guardrail/llm_evaluator.go` flagged as 17th call site bypassing llmclient, Sprint B migration queued); §2.8 No-Tool-Calling policy with verbatim `preserve_thinking` sentence (exactly once); new §5 MoE Two-Tier LoRA Strategy with provisional-partition clause (80% overlap → merge / bimodal → split, Sprint D decides).
+  - E2–E7: `02_M5MAX_HARDWARE_v2.md` (asymmetric quant memory table ~20.9GB; Tier 1 ~105-115GB / Tier 2 ~67-75GB budgets; vllm-mlx launch with 9 banned-pattern inline comments), `03_IMPLEMENTATION_PLAN_v2.md` (Phase 5 rewritten: 5A Tier 1 + 5B profile_expert_routing.py + 5C Tier 2 + 5D asymmetric quant + 5E eval + **5F ⚠️ overfitting-prevention policy**), `04_BENCHMARK_RL_v2.md` (new §10.0 sampling recipes — all 16 tasks grouped; `presence_penalty=1.5` mandatory on 3 J-group tasks; new §11.2.1 router-entropy ≥1.5 nats gate; **§11.6 val-reward-divergence early-stop**), `05_DATA_COLLECTION_v2.md` (Appendix A balanced sampling, Appendix B routing-profile artifact schema), `06_CORRECTIONS_APPLIED_v2.md` (v4.0 → v5.0 Strategic: 3 new issues, 34 total), `00_README_v2.md` (Version 4.0 → 5.0, Key Decisions rewritten, Sprint A→E table).
+  - E8: Repo-level propagation — `VISION.md` (fine-tuning target + no-tool-calling paragraphs), `CLAUDE.md` (new "MDEMG Fine-Tuning Target & Policies" section), `AGENT_HANDOFF.md` (this entry), `CHANGELOG.md` (queued `[Unreleased]`), `docs/development/UXTS_FRAMEWORK_MATRIX.md` (annotated no-tool-calling policy).
+  - E9: `ft-lora-dev/` subdirectory model-name refresh (`MDEMG_FT_PLAN_DEEP_DIVE_ANALYSIS_v2.md`, `SPRINT_EMBEDDING_DATA_COLLECTION_v2.md`).
+  - E10: Grep audit → `docs/development/ft-lora/SPRINT_A_GREP_AUDIT.md` — categorizes remaining `Qwen3-30B-A3B` / tool-calling pattern refs into (a) docs needing edits / (b) code-config queued for Sprint B / (c) historical preserved.
+  - E11: Sprint plan committed to `docs/development/ft-lora/sprint_plan_ft_lora_a.md`; cross-ref check clean.
+  - ⚠️ **Two planner-introduced engineering policies (not in memo; flagged for user sign-off via commit body + PR summary):**
+    1. **Epoch cap + early-stop threshold** (closes memo §6.1 open question): max 3 epochs per tier; early-stop trigger SFT `val_loss > best × 1.05` for 2 consecutive evals; RL mirror `val_reward < best × 0.95` for 2 consecutive evals. Forcing function: FT-OAI-001 overfit at step 1200 (val 0.684 → 0.792 = +16%, 2 evals past best) documented in `training_data/openai_ft/20260420/run_notes.md`.
+    2. **`n_epochs=auto` disallowed on all LoRA runs** — explicit cap required. FT-OAI-001's 3-epoch auto-inflation is the forcing function.
+  - Scope exclusions (Sprint A is docs-only): no code changes, no `.env.example`, no compose edits, no Python module edits, no grep-audit remediation of code files (queued for Sprint B), no Qwen3.6 MLX validation runs (Sprint C).
+
 === COMPLETED SINCE LAST HANDOFF (2026-04-20) ===
 - ✅ RELEASE-v0.8.5: Homebrew Doc Sync + v0.8.5 Release Tag (2026-04-20):
   - Context: tag v0.8.5 (4-patch intentional skip from v0.8.1) covering DH-004 + DH-005 + /strict Mode + UAITS + RSIC overhaul + DOC-UPDATE-01 + ACA-BFC + DD-P1P2 + browser UI audit + 32-finding RSIC hardening.

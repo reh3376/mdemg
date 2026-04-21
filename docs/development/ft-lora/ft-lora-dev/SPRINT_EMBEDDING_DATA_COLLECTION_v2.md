@@ -10,7 +10,7 @@
 
 MDEMG uses a dedicated embedding model (`text-embedding-3-large` via OpenAI or `qwen3-embedding:8b` via Ollama) for vector search. This is architecturally separate from the generative LLM calls (OpenAI `gpt-4.1-nano` / `gpt-4o-mini`) targeted by the LoRA fine-tuning plan. Embedding models are trained via contrastive learning (not SFT/GRPO) — a fundamentally different technique.
 
-The generative LoRA plan (Qwen3-30B-A3B, 16 tasks) is the primary fine-tuning workstream. Embedding fine-tuning is a future optimization. But the training data for embedding fine-tuning must be collected NOW — the same "every day without collection is lost data" principle applies.
+The generative LoRA plan (Qwen3.6-35B-A3B two-tier MoE-Sieve per memo 07 v3.1 2026-04-21 — was Qwen3-30B-A3B in v2.0, 16 tasks) is the primary fine-tuning workstream. Embedding fine-tuning is a future optimization. But the training data for embedding fine-tuning must be collected NOW — the same "every day without collection is lost data" principle applies.
 
 ### Why Fine-Tune the Embedding Model Later?
 
