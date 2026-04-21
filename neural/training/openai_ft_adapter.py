@@ -200,6 +200,7 @@ def process_record(
     record: dict,
     profile: ModelProfile,
     encoder: Any,
+    sys_prompt_map: dict[str, str] | None = None,
 ) -> RecordResult:
     """Transform a single curated record → OpenAI-ready record.
 
@@ -238,22 +239,39 @@ def process_record(
             tokens=tokens,
         )
 
-    task = _infer_task(record, msgs_out)
+    task = _infer_task(record, msgs_out, sys_prompt_map=sys_prompt_map)
     return RecordResult(ok=True, record=new, tokens=tokens, task=task)
 
 
-def _infer_task(original_record: dict, _messages: list[dict]) -> str:
-    """Best-effort task attribution (for by-task specialist files).
+def _infer_task(
+    original_record: dict,
+    messages: list[dict],
+    sys_prompt_map: dict[str, str] | None = None,
+) -> str:
+    """Best-effort task attribution (for by-task specialist files & weights).
 
     `mdemg data curate` does not carry `task_name` into the MLX chat record;
-    the field is stripped in format_converter.py. If an outer key is present
-    (e.g. passed through by a custom pipeline) we use it; otherwise return
-    empty string and callers treat the record as unattributed.
+    the field is stripped in format_converter.py. Attribution priority:
+        1. Outer `task` / `task_name` key (pass-through from custom pipelines)
+        2. ``sys_prompt_map`` lookup by sha256 of the first system message
+           content. Map is built once from ``filtered.jsonl``; per FT-OAI-002
+           Epic 4, MDEMG has 14 unique system_prompts with 1:1 task mapping.
+        3. Empty string (unattributed).
     """
     for key in ("task", "task_name"):
         v = original_record.get(key)
         if isinstance(v, str) and v.strip():
             return v.strip()
+    if sys_prompt_map and messages:
+        for m in messages:
+            if isinstance(m, dict) and m.get("role") == "system":
+                content = m.get("content") or ""
+                if isinstance(content, str) and content:
+                    sp_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                    task = sys_prompt_map.get(sp_hash)
+                    if task:
+                        return task
+                break
     return ""
 
 
@@ -318,6 +336,17 @@ def build_manifest(
     cost_estimate_usd = round(
         (train_tokens_epochs / 1_000_000) * profile.price_per_1m_train_usd, 4
     )
+    # Epic 7 O4 — auto-epoch cost envelope. OpenAI's auto-epoch picker has
+    # been observed to select up to 3 epochs (FT-OAI-001 attempt 3 actual
+    # billing was 1.66× our single-epoch estimate). Surface the envelope so
+    # callers (upload_and_launch --quota-buffer) can plan against the high
+    # side while cap-gating on the midpoint.
+    cost_estimate_low_usd = round(
+        (train.tokens / 1_000_000) * profile.price_per_1m_train_usd, 4
+    )
+    cost_estimate_high_usd = round(
+        (train.tokens * 3 / 1_000_000) * profile.price_per_1m_train_usd, 4
+    )
 
     return {
         "schema_version": 1,
@@ -357,6 +386,14 @@ def build_manifest(
             "rejected": train.rejected + val.rejected,
             "train_tokens_epochs": train_tokens_epochs,
             "cost_estimate_usd": cost_estimate_usd,
+            "cost_estimate_low_usd": cost_estimate_low_usd,
+            "cost_estimate_high_usd": cost_estimate_high_usd,
+            "cost_estimate_note": (
+                "low = 1 epoch; mid (cost_estimate_usd) = --epochs arg; "
+                "high = 3 epochs (observed auto-epoch ceiling per FT-OAI-001). "
+                "upload_and_launch cap-gates on mid; quota-precheck uses "
+                "mid × --quota-buffer to cover auto-epoch overshoot."
+            ),
         },
         "by_task_files": by_task_files,
         "rejection_log": rejection_log_path,
@@ -385,6 +422,8 @@ def process_split(
     rejection_source: str,
     max_rows: int | None = None,
     sample_seed: int = 42,
+    task_weights: dict[str, int] | None = None,
+    sys_prompt_map: dict[str, str] | None = None,
 ) -> SplitStats:
     """Process one split file (train or val) → OpenAI-shaped output.
 
@@ -396,6 +435,13 @@ def process_split(
     reproducible on re-run. At large sample fractions (≥ a few %) random
     sampling converges to the population task distribution, giving
     approximately proportional-by-task sampling without requiring task labels.
+
+    If ``task_weights`` is provided (e.g. ``{"retrieval.intent_translate": 8}``),
+    matching records are written ``N`` times back-to-back (deterministic
+    duplication). Requires ``sys_prompt_map`` (or outer ``task_name``) for
+    task attribution — records whose task can't be resolved get weight 1.
+    ``stats.task_breakdown`` counts the *post-weight* effective rows so the
+    manifest reflects what OpenAI will actually train on.
     """
     stats = SplitStats(path=output_path)
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -405,9 +451,11 @@ def process_split(
     if max_rows is not None and max_rows > 0:
         record_source = _sampled(record_source, max_rows, sample_seed)
 
+    weights = task_weights or {}
+
     with open(output_path, "w", encoding="utf-8") as out:
         for rec in record_source:
-            result = process_record(rec, profile, encoder)
+            result = process_record(rec, profile, encoder, sys_prompt_map=sys_prompt_map)
             if not result.ok:
                 stats.rejected += 1
                 rejection_log_fp.write(
@@ -423,15 +471,21 @@ def process_split(
                     + "\n"
                 )
                 continue
+
+            multiplier = int(weights.get(result.task, 1)) if result.task else 1
+            if multiplier < 1:
+                multiplier = 1
+
             line = json.dumps(result.record, ensure_ascii=False) + "\n"
-            out.write(line)
-            h.update(line.encode("utf-8"))
-            stats.rows += 1
-            stats.tokens += result.tokens
-            if result.task:
-                stats.task_breakdown[result.task] = (
-                    stats.task_breakdown.get(result.task, 0) + 1
-                )
+            for _ in range(multiplier):
+                out.write(line)
+                h.update(line.encode("utf-8"))
+                stats.rows += 1
+                stats.tokens += result.tokens
+                if result.task:
+                    stats.task_breakdown[result.task] = (
+                        stats.task_breakdown.get(result.task, 0) + 1
+                    )
 
     stats.sha256 = h.hexdigest()
     return stats
@@ -479,6 +533,8 @@ def run(
     max_train_rows: int | None = None,
     max_val_rows: int | None = None,
     sample_seed: int = 42,
+    task_weights: dict[str, int] | None = None,
+    sys_prompt_map: dict[str, str] | None = None,
 ) -> dict:
     """Run the adapter. Returns the manifest dict.
 
@@ -505,10 +561,12 @@ def run(
         train_stats = process_split(
             train_in, train_out, profile, encoder, rej_fp, "train",
             max_rows=max_train_rows, sample_seed=sample_seed,
+            task_weights=task_weights, sys_prompt_map=sys_prompt_map,
         )
         val_stats = process_split(
             val_in, val_out, profile, encoder, rej_fp, "val",
             max_rows=max_val_rows, sample_seed=sample_seed,
+            task_weights=task_weights, sys_prompt_map=sys_prompt_map,
         )
 
     by_task_files: list[str] = []
@@ -531,6 +589,17 @@ def run(
         "seed": sample_seed,
         "applied": max_train_rows is not None or max_val_rows is not None,
     }
+    if task_weights:
+        manifest["task_weights"] = {
+            "applied": True,
+            "weights": dict(task_weights),
+            "note": (
+                "Matching records duplicated N× before write. "
+                "task_breakdown reflects post-weight effective counts."
+            ),
+        }
+    else:
+        manifest["task_weights"] = {"applied": False}
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
@@ -571,6 +640,59 @@ def _emit_by_task_files(combined_train_path: str, output_dir: str) -> list[str]:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
         written.append(os.path.relpath(path, output_dir))
     return written
+
+
+def _load_task_weights(spec: str) -> dict[str, int]:
+    """Load task weights from either a @path or an inline JSON string.
+
+    Accepted forms:
+        --task-weights '{"retrieval.intent_translate": 8}'
+        --task-weights @path/to/weights.json
+    Values are coerced to ``int`` (fractional weights are rejected — the
+    duplication model is deterministic integer copy).
+    """
+    if spec.startswith("@"):
+        with open(spec[1:], encoding="utf-8") as f:
+            raw = json.load(f)
+    else:
+        raw = json.loads(spec)
+    if not isinstance(raw, dict):
+        raise ValueError("task-weights must be a JSON object {task: weight}")
+    out: dict[str, int] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str):
+            raise ValueError(f"task-weight key must be str, got {type(k).__name__}")
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError(f"task-weight for {k!r} must be numeric, got {v!r}")
+        if float(v) != int(v):
+            raise ValueError(
+                f"task-weight for {k!r} must be integer (got {v}); "
+                f"fractional weights are not supported"
+            )
+        iv = int(v)
+        if iv < 1:
+            raise ValueError(f"task-weight for {k!r} must be ≥ 1 (got {iv})")
+        out[k] = iv
+    return out
+
+
+def _load_sys_prompt_map(path: str) -> dict[str, str]:
+    """Load sha256(system_prompt) → task_name map from a JSON file.
+
+    Build this once from ``training_data/curated/sft_interactions/filtered.jsonl``:
+        map = {}
+        for rec in read_jsonl(filtered):
+            sp = rec["system_prompt"]
+            h = sha256(sp.encode()).hexdigest()
+            map[h] = rec["task_name"]
+    Per FT-OAI-002 Epic 4, the mapping is 1:1 (14 unique system_prompts, zero
+    cross-task collisions), so a simple dict is safe.
+    """
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    if not isinstance(raw, dict):
+        raise ValueError("sys-prompt-map must be a JSON object {sha256: task}")
+    return {str(k): str(v) for k, v in raw.items()}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -621,6 +743,26 @@ def main(argv: list[str] | None = None) -> int:
         default=42,
         help="Seed for subsampling (recorded in manifest for reproducibility).",
     )
+    parser.add_argument(
+        "--task-weights",
+        default=None,
+        help=(
+            "Per-task duplication weights. Inline JSON "
+            "('{\"retrieval.intent_translate\": 8}') or @path to JSON file. "
+            "Integer weights ≥ 1; matching records written N× back-to-back. "
+            "Requires --sys-prompt-map (or outer task_name) for attribution."
+        ),
+    )
+    parser.add_argument(
+        "--sys-prompt-map",
+        default=None,
+        help=(
+            "Path to JSON file mapping sha256(system_prompt) → task_name. "
+            "Enables task attribution for MLX chat records (where task_name "
+            "is stripped by format_converter). Required when --task-weights "
+            "is set unless records carry an outer task_name key."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -628,6 +770,15 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+
+    task_weights = _load_task_weights(args.task_weights) if args.task_weights else None
+    sys_prompt_map = _load_sys_prompt_map(args.sys_prompt_map) if args.sys_prompt_map else None
+    if task_weights and not sys_prompt_map:
+        logger.warning(
+            "--task-weights set without --sys-prompt-map; attribution will "
+            "fall back to outer task_name key only, and curated MLX records "
+            "(which strip task_name) will receive weight 1."
+        )
 
     manifest = run(
         input_dir=args.input_dir,
@@ -638,6 +789,8 @@ def main(argv: list[str] | None = None) -> int:
         max_train_rows=args.max_train_rows,
         max_val_rows=args.max_val_rows,
         sample_seed=args.sample_seed,
+        task_weights=task_weights,
+        sys_prompt_map=sys_prompt_map,
     )
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     return 0
