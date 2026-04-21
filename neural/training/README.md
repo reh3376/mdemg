@@ -110,6 +110,31 @@ PYTHONPATH=. python3 -m training.openai_ft_adapter \
   --by-task
 ```
 
+#### Per-task upsampling (`--task-weights`, FT-OAI-002 Epic 6 T4)
+
+For tasks that regress due to under-representation in training (e.g. FT-OAI-001 showed `retrieval.intent_translate` at 127 train records vs 28,324 for `ape.reflect`), pass a JSON map of integer duplication weights:
+
+```bash
+PYTHONPATH=. python3 -m training.openai_ft_adapter \
+  --input-dir training_data/curated/sft_interactions/versioned \
+  --output-dir training_data/openai_ft/20260421 \
+  --task-weights '{"retrieval.intent_translate": 8}' \
+  --sys-prompt-map path/to/sys_prompt_to_task.json
+```
+
+Matching records are written N× back-to-back (deterministic, byte-wise reproducible). Because curated MLX records don't carry a `task_name` field (stripped by `format_converter.py`), you must provide `--sys-prompt-map` — a JSON file mapping `sha256(system_prompt)` → `task_name`, built once from `filtered.jsonl`. Per FT-OAI-002 Epic 4, the mapping is 1:1 (14 unique system_prompts, zero cross-task collisions), so a simple dict is safe.
+
+Records whose task can't be resolved get weight 1 (no duplication). Fractional weights are rejected — the duplication model is integer-only for determinism. The manifest records the weights map and `task_breakdown` reflects post-weight effective counts.
+
+#### Cost envelope (FT-OAI-002 Epic 7 O4)
+
+`manifest.json:totals` now surfaces three cost figures:
+- `cost_estimate_low_usd` — 1 epoch
+- `cost_estimate_usd` — midpoint (from `--epochs` arg; default 3)
+- `cost_estimate_high_usd` — 3 epochs (observed OpenAI auto-epoch ceiling per FT-OAI-001 billing)
+
+`scripts/openai_ft_upload_and_launch.py` cap-gates on the midpoint; its `--quota-buffer 1.66` default pre-checks against `mid × 1.66` to cover auto-epoch overshoot.
+
 Adding a new model (e.g. `qwen-3.5-chat`) only requires appending a profile entry to `_MODEL_PROFILES` with the correct tokenizer resolver, context limit, and price.
 
 See also: `docs/features/fine-tuning-pipeline.md` for the full upload → launch → monitor → eval → compare workflow.

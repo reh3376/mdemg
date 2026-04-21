@@ -314,6 +314,204 @@ class TestBuildManifest(unittest.TestCase):
             places=4,
         )
 
+    def test_cost_envelope_low_mid_high(self):
+        """FT-OAI-002 Epic 7 O4 — manifest surfaces 1-epoch / mid / 3-epoch costs."""
+        from training.openai_ft_adapter import SplitStats
+
+        profile = _MODEL_PROFILES["gpt-4.1-mini-2025-04-14"]
+        train = SplitStats(path="t", rows=100, tokens=1_000_000, sha256="x")
+        val = SplitStats(path="v", rows=20, tokens=200_000, sha256="y")
+        m2 = build_manifest(profile, train, val, [], "r", "src", "out", epochs=2)
+        t = m2["totals"]
+        # Low == mid at epochs=1; at epochs=2, low should be half of mid.
+        self.assertAlmostEqual(t["cost_estimate_low_usd"], t["cost_estimate_usd"] / 2, places=4)
+        # High = 3× single-epoch cost
+        self.assertAlmostEqual(t["cost_estimate_high_usd"], t["cost_estimate_low_usd"] * 3, places=4)
+        self.assertIn("cost_estimate_note", t)
+
+
+class TestTaskWeights(unittest.TestCase):
+    """FT-OAI-002 Epic 6 T4 — deterministic per-task upsampling."""
+
+    def _write_jsonl(self, path, records):
+        with open(path, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+
+    def _prepare(self, tmp, train_records, val_records):
+        import training.openai_ft_adapter as mod
+
+        in_dir = os.path.join(tmp, "in")
+        out_dir = os.path.join(tmp, "out")
+        os.makedirs(in_dir)
+        self._write_jsonl(os.path.join(in_dir, "train.jsonl"), train_records)
+        self._write_jsonl(os.path.join(in_dir, "val.jsonl"), val_records)
+        mod._MODEL_PROFILES["test-model"] = mod.ModelProfile(
+            name="test-model",
+            encoder_resolver=lambda: _FakeEncoder(),
+            context_limit=1000,
+            price_per_1m_train_usd=3.00,
+        )
+        return in_dir, out_dir
+
+    def test_load_task_weights_inline_json(self):
+        from training.openai_ft_adapter import _load_task_weights
+
+        weights = _load_task_weights('{"retrieval.intent_translate": 8}')
+        self.assertEqual(weights, {"retrieval.intent_translate": 8})
+
+    def test_load_task_weights_from_file(self):
+        from training.openai_ft_adapter import _load_task_weights
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "w.json")
+            with open(path, "w") as f:
+                json.dump({"a.task": 5, "b.task": 2}, f)
+            weights = _load_task_weights(f"@{path}")
+        self.assertEqual(weights, {"a.task": 5, "b.task": 2})
+
+    def test_load_task_weights_rejects_fractional(self):
+        from training.openai_ft_adapter import _load_task_weights
+
+        with self.assertRaises(ValueError):
+            _load_task_weights('{"a.task": 1.5}')
+
+    def test_load_task_weights_rejects_zero_or_negative(self):
+        from training.openai_ft_adapter import _load_task_weights
+
+        with self.assertRaises(ValueError):
+            _load_task_weights('{"a.task": 0}')
+        with self.assertRaises(ValueError):
+            _load_task_weights('{"a.task": -3}')
+
+    def test_load_task_weights_rejects_non_numeric(self):
+        from training.openai_ft_adapter import _load_task_weights
+
+        with self.assertRaises(ValueError):
+            _load_task_weights('{"a.task": "eight"}')
+
+    def test_sys_prompt_map_attribution(self):
+        """Records with matching system_prompt hash attribute to the task."""
+        import hashlib as _h
+
+        import training.openai_ft_adapter as mod
+
+        sys_prompt_a = "You are task A's system prompt."
+        sys_prompt_b = "You are task B's system prompt."
+        h_a = _h.sha256(sys_prompt_a.encode()).hexdigest()
+        h_b = _h.sha256(sys_prompt_b.encode()).hexdigest()
+        sys_map = {h_a: "task.a", h_b: "task.b"}
+
+        # Use a fake profile to avoid tiktoken dependency.
+        fake_profile = mod.ModelProfile(
+            name="fake", encoder_resolver=lambda: _FakeEncoder(),
+            context_limit=1000, price_per_1m_train_usd=1.0,
+        )
+        rec_a = _record(system=sys_prompt_a, user="u1", assistant="a1")
+        result = mod.process_record(
+            rec_a, fake_profile, _FakeEncoder(), sys_prompt_map=sys_map,
+        )
+        self.assertEqual(result.task, "task.a")
+
+    def test_duplication_applies_per_task_weights_deterministically(self):
+        """Weight=3 for task.a → 3× rows; weight unspecified → 1× rows."""
+        import hashlib as _h
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sp_a = "prompt.A"
+            sp_b = "prompt.B"
+            h_a = _h.sha256(sp_a.encode()).hexdigest()
+            h_b = _h.sha256(sp_b.encode()).hexdigest()
+            sys_map = {h_a: "task.a", h_b: "task.b"}
+
+            # 2 task.a records, 3 task.b records in train
+            train = [
+                _record(system=sp_a, assistant="a1"),
+                _record(system=sp_a, assistant="a2"),
+                _record(system=sp_b, assistant="b1"),
+                _record(system=sp_b, assistant="b2"),
+                _record(system=sp_b, assistant="b3"),
+            ]
+            val = [_record(system=sp_a, assistant="va")]
+
+            in_dir, out_dir = self._prepare(tmp, train, val)
+
+            import training.openai_ft_adapter as mod
+            try:
+                manifest = mod.run(
+                    input_dir=in_dir,
+                    output_dir=out_dir,
+                    model="test-model",
+                    task_weights={"task.a": 3},
+                    sys_prompt_map=sys_map,
+                )
+            finally:
+                mod._MODEL_PROFILES.pop("test-model", None)
+
+            with open(os.path.join(out_dir, "combined_train.jsonl")) as f:
+                lines = [json.loads(line) for line in f if line.strip()]
+
+        # 2 × 3 (task.a) + 3 × 1 (task.b) = 9
+        self.assertEqual(len(lines), 9)
+        self.assertEqual(manifest["splits"]["train"]["rows"], 9)
+        self.assertEqual(
+            manifest["splits"]["train"]["task_breakdown"],
+            {"task.a": 6, "task.b": 3},
+        )
+        # Val (1 task.a) × 3 = 3
+        self.assertEqual(manifest["splits"]["val"]["rows"], 3)
+        self.assertEqual(manifest["task_weights"]["applied"], True)
+        self.assertEqual(manifest["task_weights"]["weights"], {"task.a": 3})
+
+    def test_duplication_is_bytewise_deterministic(self):
+        """Same inputs + weights → same combined_train.jsonl sha256."""
+        import hashlib as _h
+
+        sp = "the.only.prompt"
+        h = _h.sha256(sp.encode()).hexdigest()
+        sys_map = {h: "task.x"}
+        train = [_record(system=sp, assistant=f"out{i}") for i in range(5)]
+        val = [_record(system=sp, assistant="v")]
+
+        shas = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as tmp:
+                in_dir, out_dir = self._prepare(tmp, train, val)
+                import training.openai_ft_adapter as mod
+                try:
+                    mod.run(
+                        input_dir=in_dir,
+                        output_dir=out_dir,
+                        model="test-model",
+                        task_weights={"task.x": 4},
+                        sys_prompt_map=sys_map,
+                    )
+                finally:
+                    mod._MODEL_PROFILES.pop("test-model", None)
+                with open(os.path.join(out_dir, "combined_train.jsonl"), "rb") as f:
+                    shas.append(_h.sha256(f.read()).hexdigest())
+        self.assertEqual(shas[0], shas[1])
+
+    def test_unattributed_records_get_weight_one(self):
+        """Records whose task can't be resolved are written once (no duplication)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            train = [_record(system="unmapped", assistant=f"r{i}") for i in range(3)]
+            val = [_record(system="unmapped", assistant="v")]
+            in_dir, out_dir = self._prepare(tmp, train, val)
+            import training.openai_ft_adapter as mod
+            try:
+                manifest = mod.run(
+                    input_dir=in_dir,
+                    output_dir=out_dir,
+                    model="test-model",
+                    task_weights={"task.a": 5},  # no matching task
+                    sys_prompt_map={},  # empty map → no attribution
+                )
+            finally:
+                mod._MODEL_PROFILES.pop("test-model", None)
+        self.assertEqual(manifest["splits"]["train"]["rows"], 3)
+        self.assertEqual(manifest["splits"]["val"]["rows"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

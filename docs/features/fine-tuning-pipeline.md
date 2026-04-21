@@ -169,14 +169,30 @@ python scripts/openai_ft_compare.py \
 
 ## Notes
 
+### Resolved in FT-OAI-002
+
+These limitations from the FT-OAI-001 run have been addressed. The sprint did not re-train — no second FT launch is part of FT-OAI-002 — so the quality number (0.8641) is unchanged. Everything below is harness / tooling / telemetry:
+
+- **G1a — per-record `parse_ok`**: `scripts/openai_ft_baseline_eval.py` now writes a canonical `parse_ok: bool` field on every non-error row, alongside the legacy `parses_as_json` alias for back-compat. `scripts/openai_ft_results_backfill.py` retroactively populates archived `results.jsonl` (confirmed: FT-OAI-001 baseline and FT both backfill to 0.9733, matching `summary.json:parse_pass_rate`).
+- **G1b — `finish_reason` captured**: eval harness now reads `resp.choices[0].finish_reason` and writes the value (`stop`, `length`, etc.) into every row.
+- **G1c — token counts**: `prompt_tokens` and `completion_tokens` captured from `resp.usage` into every row.
+- **A1–A7 per-record metrics**: rows now also carry `latency_ms` (from `time.perf_counter()` wall-clock on the completion call), `retry_count`, `truncation_flag` (derived from `finish_reason == "length"`), `embedding_model_version`, `request_id`, `hallucination_indicator` (fires when GT is `{"type":"none","summary":""}` and response is not), `input_chars`, `output_chars`. `summary.json` gained `latency_stats` (mean / p50 / p95 / p99), `truncation_rate`, `mean_retries`, and `hallucination_rate_on_none_gt`.
+- **G3 — `__unattributed__` attribution**: investigation at `training_data/openai_ft/20260420/unattributed_investigation.md` showed the bucket is 100% recoverable by a sys-prompt-only fallback (14 unique system_prompts in `filtered.jsonl`, zero cross-task collisions, 605/605 test records recoverable). The fix itself lands in FT-OAI-003 per Epic 4 gate (no mid-sprint heuristic changes).
+- **R1 — `retrieval.intent_translate` regression**: investigation at `training_data/openai_ft/20260420/intent_translate_investigation.md` traces Δ=−0.079 to under-representation (127 train records vs 28,324 for `ape.reflect`, 223× less) plus one confabulation tail. Mitigation (8× upweight) lands in FT-OAI-003 via `--task-weights`.
+- **T1 — training-metrics harvest**: `scripts/openai_ft_check.py --on-complete --job-id <id>` parses OpenAI's result_file CSV into `training_metrics.json` with `best_val_loss_step`, `best_val_loss`, `final_train_loss`, `final_valid_loss`, and full per-step `train_loss_series` / `valid_loss_series`.
+- **T2 — `--n-epochs` override**: `scripts/openai_ft_upload_and_launch.py --n-epochs <int|auto> --n-epochs-rationale "<reason>"` passes `hyperparameters={"n_epochs": int}` to `fine_tuning.jobs.create()`. Rationale is required when `--n-epochs != auto` and is recorded in `run_notes.md`.
+- **T3 — `best_val_loss_step` in run notes**: `run_notes.md` template now includes `best_val_loss_step`, `n_epochs_requested`, and an explicit "poll metrics" command block.
+- **T4 — `--task-weights` per-task upsampling**: `python -m training.openai_ft_adapter --task-weights '{"retrieval.intent_translate": 8}' --sys-prompt-map <path>` deterministically duplicates matching records N× before writing `combined_train.jsonl`. Requires a sha256(system_prompt)→task_name lookup (built once from `filtered.jsonl`); records with unresolved tasks get weight 1.
+- **O1 — job lifecycle telemetry**: `--on-complete` writes `job_lifecycle.json` with `created_at`, `running_at` (derived from events stream), `finished_at`, `queue_seconds`, `train_seconds`, `trained_tokens`, `n_epochs_actual`.
+- **O2 — queue-stuck alert**: `--queue-timeout-minutes 180` emits an entry to `alert.log` if the job has been queued longer than N minutes with no transition to `running`. **By explicit design, does not auto-cancel** — a human decides whether to kill.
+- **O3 — quota pre-check**: `openai_ft_upload_and_launch.py` now probes OpenAI's billing endpoint before upload. On success, proceeds with an informative note; on any failure (non-admin key tier, network, 404), degrades to a warning and continues — does not block. `--skip-quota-check` for known-unavailable tiers; `--quota-buffer 1.66` defaults to the observed auto-epoch multiplier.
+- **O4 — cost envelope in manifest**: `totals.cost_estimate_low_usd` (1 epoch) and `totals.cost_estimate_high_usd` (3 epochs — observed auto-epoch ceiling) now flank the existing `cost_estimate_usd` (midpoint). Upload cap-gates on mid; quota pre-check uses `mid × --quota-buffer` to cover the high-side overshoot.
+
 ### Known Limitations
 
 - **Base-model mismatch (FT-OAI-001 training base ≠ production base)**: the FT was trained against `gpt-4.1-mini-2025-04-14`, but `.env` runs `gpt-5.4-mini`. Quality-only, FT lags prod by Δ=−0.034 (0.898 vs 0.864). Strategically, FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini gap (0.0319 / 0.0658) — meaningful progress toward `FT(cheap-base) ≈ stock(prod-base)` at the cheaper base's inference cost. FT-OAI-001 is **not deployed** until the `gpt-4.1-mini` / `gpt-5.4-mini` cost ratio is quantified and the remaining ~52% of the gap is evaluated in FT-OAI-003. See `training_data/openai_ft/20260420/eval_comparison_vs_gpt54mini.md`.
-- **Baseline/FT eval asymmetry (FT-OAI-001 run)**: baseline was first eval'd with `--max-output-tokens 1024`; when ~60% of FT responses exceeded that, the FT re-eval was run at 4096. The FT win of +0.032 was measured with this asymmetric cap. Strict apples-to-apples requires re-running the baseline at 4096 (captured as an item for FT-OAI-002).
-- **Per-record `parse_ok` bug**: the aggregate `parse_pass_rate` in `summary.json` is computed correctly (97.3%), but the per-record `parse_ok` column in `results.jsonl` is always `False`. Cosmetic — does not affect aggregate or the comparator — but blocks per-record forensics. FT-OAI-002 G1.
-- **`finish_reason` not populated**: all records carry `finish_reason: null`. Eval script reads the wrong attribute off the OpenAI response object. FT-OAI-002 G1.
-- **Auto-hyperparameters**: OpenAI picked `n_epochs=3`, `batch_size=4`, `lr_multiplier=2` for the FT-OAI-001 run. Actual billed cost (~$155) ran ~1.66× the single-epoch estimate ($93.13). The adapter's cost estimator does not model auto-epoch multipliers; FT-OAI-002 will add an `--epochs auto` cost envelope.
-- **Mild overfitting after step 1200**: `best_val_loss=0.68360` at step 1200 vs `final_val_loss=0.81301` at step 1500. Future runs should consider `n_epochs=2` when the loss curve confirms this pattern.
+- **Cap-symmetric baseline re-eval (G2)**: FT-OAI-002 Epic 3 is staged but blocked on user auth (~$4.05 live OpenAI cost). Until run, the headline FT win of +0.032 is still measured against a 1024-cap baseline vs a 4096-cap FT. The harness + command are ready; see run_notes.md.
+- **Mild overfitting after step 1200**: `best_val_loss=0.68360` at step 1200 vs `final_val_loss=0.81301` at step 1500. Future runs should consider `n_epochs=2` when the loss curve confirms this pattern. FT-OAI-002 T2 exposes `--n-epochs 2` with mandatory rationale.
 
 ### Risks & Gaps
 
