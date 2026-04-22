@@ -76,9 +76,11 @@ func TestGuardrailValidate_CapturesInteractionInTSDB(t *testing.T) {
 		t.Fatalf("guardrail validate: status %d, want 200", resp.StatusCode)
 	}
 
-	// TSDB flush is asynchronous (batched by llm_writer). Poll up to 10s for
-	// at least one new row to appear.
-	deadline := time.Now().Add(10 * time.Second)
+	// TSDB flush is asynchronous (batched by llm_writer). Default flush interval
+	// is 60s (TSDB_FLUSH_INTERVAL_SEC), so poll up to 90s to tolerate a default-
+	// config server. For faster local iteration, start the server with
+	// TSDB_FLUSH_INTERVAL_SEC=5 — the test will still pass, just exit sooner.
+	deadline := time.Now().Add(90 * time.Second)
 	var after int
 	for time.Now().Before(deadline) {
 		after = countGuardrailRows(t, pool, spaceID, taskName)
