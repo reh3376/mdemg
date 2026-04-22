@@ -82,10 +82,21 @@ Without a runbook that a future session can execute autonomously, each of these 
 - Merged `101cacb` (PR #336) on `main` — Sprint B canonical state including `sampling_group` on all 17 ULTS specs and guardrail `task_name='guardrail.evaluate'` llmclient migration.
 - **Hardware (execution-time prerequisite, not Sprint C prerequisite):** Apple M5 Max, 128GB unified memory, macOS (Darwin 25.3.0 per current `uname -a` on user's machine), ≥200GB free on internal SSD (model cache + logs + evidence artifacts).
 - **Software (execution-time):**
-  - Python 3.11+ (current repo default).
-  - `mlx-lm` (via `uv tool install mlx-lm` or `pip install mlx-lm`). **Version pinned at execution-time Epic 1 pre-gate** — runbook step captures `mlx_lm --version` output to the cross-gate `versions.json`. If the Sprint E MR adds a pin to `requirements.txt` before Sprint C runs, runbook reads that pin; if not, runbook pins the observed version into the evidence file.
-  - `vllm-mlx` (per `docs/operations/vllm-mlx-setup.md` — `uv tool install git+https://github.com/waybarrios/vllm-mlx.git`). Version captured same way.
-  - `huggingface-cli` for downloads and API queries.
+  - **Dedicated venv: `~/.venv/mdemg-ft-lora`** (Python 3.12.x — not 3.13 per user directive; mlx-lm stability on 3.13 not yet reliable). Created 2026-04-22 by:
+    ```bash
+    uv venv ~/.venv/mdemg-ft-lora --python 3.12
+    VIRTUAL_ENV=~/.venv/mdemg-ft-lora uv pip install mlx mlx-lm "huggingface_hub[cli]"
+    ```
+    **Activation per Gate session (every future Claude Code session starting a gate MUST do this first):**
+    ```bash
+    source ~/.venv/mdemg-ft-lora/bin/activate
+    python --version   # expect 3.12.x
+    ```
+    Or invoke binaries by absolute path: `~/.venv/mdemg-ft-lora/bin/python`, `~/.venv/mdemg-ft-lora/bin/hf`.
+  - **Lockfile: `docs/development/ft-lora/sprint_c_mlx_venv.lock`** (committed). Captures the exact toolchain state (mlx_lm, huggingface_hub, transformers, etc.) that produced Gate 1/2/3 evidence. Sprint F may re-hydrate this venv months later via `VIRTUAL_ENV=<path> uv pip install -r sprint_c_mlx_venv.lock`.
+  - `mlx-lm` — installed in venv above. Runbook captures `python -c "import mlx_lm; print(mlx_lm.__version__)"` to `versions.json` at Gate-start.
+  - `vllm-mlx` (per `docs/operations/vllm-mlx-setup.md` — `uv tool install git+https://github.com/waybarrios/vllm-mlx.git`). Version captured same way. **Optional for Gate 1** (direct `mlx_lm.load` suffices); **required for Gate 2+** (OpenAI-compatible endpoint for prompt batching).
+  - `hf` CLI for downloads and API queries. **Note:** `huggingface-cli` is deprecated as of `huggingface_hub` 1.x (replaced by `hf`). Runbook uses `hf download ...` not `huggingface-cli download ...`.
   - `jq` for JSON manipulation (commonly already installed; runbook's resume-check asserts it).
 - **Hosted API access (Gate 3 only):** `gpt-5.4-mini` via user's existing `OPENAI_API_KEY`. **Hard budget cap: $25 for the Gate 3 baseline capture** (covers the 120-question benchmark × 1 run at typical `gpt-5.4-mini` rates + a ≤20% headroom for token-count estimation error). The runbook enforces this by (a) estimating cost pre-run via `tiktoken` on the prompt set and halting with a user-approval prompt if the estimate exceeds $25, and (b) tracking cumulative spend in `~/.mdemg-sprint-c/gate3/openai_cost.json` during execution and aborting if the running total crosses $25 regardless of remaining questions.
 - **24h same-window constraint (Gate 3 baseline ↔ Qwen3.6 runs):** the hosted `gpt-5.4-mini` baseline capture and the Qwen3.6 benchmark pass **must complete within a rolling 24h window** of each other to avoid OpenAI model-revision drift contaminating the quality-gap measurement. Runbook step at Gate 3 start reads the prior baseline stamp (if any) and: (a) if baseline `timestamp_iso8601` is ≤24h old and `openai_model_id` matches, reuse it; (b) else re-capture the baseline fresh. Qwen3.6 benchmark stamp records a `baseline_age_hours` field; >24h at comparison time = re-run baseline before computing the gap. Gate 3 remains resumable across arbitrary pauses *between* gates (week-long inter-gate pauses are fine), but the two halves of Gate 3 itself (baseline + Qwen runs) must pair up within a 24h rolling window; if the pause between them exceeds 24h, resume = re-capture baseline before computing the gap.
