@@ -76,10 +76,13 @@ func TestLimiter_Concurrent(t *testing.T) {
 	close(start)
 	wg.Wait()
 
-	// Should have allowed at most burst size (100), possibly slightly more due to refill
-	// during execution window
-	if allowed < 100 || allowed > 105 {
-		t.Errorf("expected ~100 allowed (burst + small refill), got %d", allowed)
+	// Should have allowed at most burst size (100), possibly more due to refill
+	// during execution window. At 1000 tokens/sec, each millisecond of dispatch
+	// spread adds 1 token; under -race on a contended CI runner, 15ms+ of spread
+	// is realistic. Upper bound 120 catches genuine limit breakage while
+	// tolerating timing variance. (Observed CI flake at 107 with prior bound 105.)
+	if allowed < 100 || allowed > 120 {
+		t.Errorf("expected 100..120 allowed (burst + refill during dispatch), got %d", allowed)
 	}
 }
 
