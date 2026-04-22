@@ -5,7 +5,7 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1.svg)](https://neo4j.com/)
 [![CI](https://github.com/reh3376/mdemg/actions/workflows/ci.yml/badge.svg)](https://github.com/reh3376/mdemg/actions/workflows/ci.yml)
 
-A persistent memory system for AI coding agents built on Neo4j with native vector indexes. Implements semantic retrieval with hidden layer concept abstraction and Hebbian learning.
+A persistent memory system for AI coding agents built on Neo4j with native vector indexes. Implements semantic retrieval with hidden layer concept abstraction, recursive self-improvement and Hebbian learning.
 
 > **Key insight**: The critical metric isn't average retrieval score—it's **state survival under context compaction**. Baseline agents forget architectural decisions after compactions. MDEMG maintains decision persistence indefinitely.  If you do a quick review and come to the conclusion that this is just another tool built for small dev teams, please look closer.  I would be happy to engage in discussion related to the mdemg framework, how it works, the problems it solves, and most importantly how can WE make it better.  
 
