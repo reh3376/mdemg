@@ -316,7 +316,7 @@ def distill_task(
     think_mode = prompt_config.get("think_mode", False)
     schema = spec.get("output_schema", {})
     perf = spec.get("performance", {})
-    max_tokens = perf.get("max_tokens", 500)
+    max_tokens = perf.get("max_tokens", 3000)
 
     system_prompt = None
     if source_ref:

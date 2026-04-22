@@ -9,7 +9,7 @@
     "author": "Sprint FT-LORA-B",
     "created": "2026-04-21",
     "priority": "high",
-    "notes": "17th call site — migrated from direct-HTTP to llmclient in Sprint FT-LORA-B (2026-04-21). See 01_RESEARCH_v2.md §1.1 footnote: spec exists for interaction-capture parity but is excluded from the Phase 5 SFT training target (which remains 16 tasks × 500-1000 anchor examples). Guardrail is opt-in (GUARDRAIL_ENABLED=false by default); enabling it adds this 17th captured task to llm_interactions."
+    "notes": "17th call site \u2014 migrated from direct-HTTP to llmclient in Sprint FT-LORA-B (2026-04-21). See 01_RESEARCH_v2.md \u00a71.1 footnote: spec exists for interaction-capture parity but is excluded from the Phase 5 SFT training target (which remains 16 tasks \u00d7 500-1000 anchor examples). Guardrail is opt-in (GUARDRAIL_ENABLED=false by default); enabling it adds this 17th captured task to llm_interactions."
   },
   "sampling_group": "J",
   "prompt": {
@@ -25,22 +25,35 @@
     "dynamic_prompt": false
   },
   "performance": {
-    "latency_budget_ms": 5000,
-    "max_tokens": 2000
+    "latency_budget_ms": 15000,
+    "max_tokens": 3000
   },
   "output_schema": {
     "type": "object",
-    "required": ["violations", "warnings"],
+    "required": [
+      "violations",
+      "warnings"
+    ],
     "properties": {
       "violations": {
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["constraint_node_id", "description", "rationale"],
+          "required": [
+            "constraint_node_id",
+            "description",
+            "rationale"
+          ],
           "properties": {
-            "constraint_node_id": { "type": "string" },
-            "description": { "type": "string" },
-            "rationale": { "type": "string" }
+            "constraint_node_id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            }
           }
         }
       },
@@ -48,11 +61,21 @@
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["constraint_node_id", "description", "rationale"],
+          "required": [
+            "constraint_node_id",
+            "description",
+            "rationale"
+          ],
           "properties": {
-            "constraint_node_id": { "type": "string" },
-            "description": { "type": "string" },
-            "rationale": { "type": "string" }
+            "constraint_node_id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "rationale": {
+              "type": "string"
+            }
           }
         }
       }

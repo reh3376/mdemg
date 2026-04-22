@@ -1,0 +1,84 @@
+{
+  "ape_reflect_target": 500,
+  "base_dataset_ver": "sprint_ft_lora_data_v1",
+  "duplication_factors": {
+    "ape.reflect": 1.0,
+    "consulting.synthesis": 1.0,
+    "hidden.summarize": 1.0,
+    "jiminy.synthesize": 1.282,
+    "metalearn.generalize": 1.0,
+    "retrieval.rerank_nli": 1.0,
+    "summarize.generate": 1.0
+  },
+  "family_name": "reasoning_think",
+  "file_sha256": {
+    "train.jsonl": "c170fcd0f3b24f07771a9b9e99b939d9297f8be82041764e0e78e124165fefde",
+    "valid.jsonl": "f70748246b5d4d87831ac5a2cb3699c987aa72c3df485bb65281722c43a86f68"
+  },
+  "generator_sha": "aaa646ee692dc26cbd8af2296f8486d0d05c3dd9",
+  "meta_placement": "embedded",
+  "per_task_counts": {
+    "ape.reflect": {
+      "total": 500,
+      "train": 450,
+      "valid": 50
+    },
+    "consulting.synthesis": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "hidden.summarize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.synthesize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "metalearn.generalize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.rerank_nli": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "summarize.generate": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    }
+  },
+  "raw_dataset_sha_pin": "7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988",
+  "row_counts": {
+    "total": 1700,
+    "train": 1530,
+    "valid": 170
+  },
+  "seed": 42,
+  "source_composition": {
+    "real": 701,
+    "synth-gpt-5.4-mini": 599,
+    "synth-qwen3.6-local": 400
+  },
+  "sprint": "FT-LORA-DATA",
+  "synthesis_non_determinism_note": "Teacher temp=0.7; Epic 2 outputs are non-reproducible bit-identical. Determinism applies from balanced_sampler onward given fixed Epic 2 outputs.",
+  "synthesis_version": "v1-aaa646e",
+  "tier": "T",
+  "trained_against_model_sha": "cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734",
+  "ults_spec_versions": {
+    "ape.reflect": "1.0.0-task-1.0.0",
+    "consulting.synthesis": "1.0.0-task-1.0.0",
+    "hidden.summarize": "1.0.0-task-1.0.0",
+    "jiminy.synthesize": "1.0.0-task-1.0.0",
+    "metalearn.generalize": "1.0.0-task-1.0.0",
+    "retrieval.rerank_nli": "1.0.0-task-1.0.0",
+    "summarize.generate": "1.0.0-task-1.0.0"
+  },
+  "weak_signal_rows": 200
+}

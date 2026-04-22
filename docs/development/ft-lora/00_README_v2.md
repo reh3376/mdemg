@@ -1,7 +1,22 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
 **Date:** 2026-04-22
-**Version:** 5.4 (Sprint FT-LORA-E — Training infrastructure patched; Phase 5 SFT unblocked)
+**Version:** 5.5 (Sprint FT-LORA-DATA — Phase 5 datasets curated, balanced, split, SHA-pinned; runbook unblocks)
+
+> **Changes in v5.5 (Sprint FT-LORA-DATA — 2026-04-22):**
+> - **4 curated SFT datasets written**: `training_data/sft/tier1/` (3,500 rows = 3,150 train + 350 valid), `family_reasoning_think/` (1,700), `family_classify_notink/` (1,200), `family_structured_notink/` (600). Each directory has `train.jsonl` + `valid.jsonl` + `manifest.json` with per-file SHA256, per-task counts, duplication factors, source composition, synthesis version. Total 7,000 rows across 4 datasets.
+> - **4 originally-absent T-family tasks synthesized** (consulting.synthesis, metalearn.generalize, retrieval.rerank_nli, summarize.generate) via `neural/training/distill_driver.py` mixed teacher routing: `gpt-5.4-mini` for consulting.synthesis + metalearn.generalize + hidden.summarize (600 rows, ~$0.35–$0.50 actual spend against $100 hard-abort cap); Qwen3.6-35B-A3B-mxfp4 MLX-local for retrieval.rerank_nli + summarize.generate (400 rows, $0). Synthesis version `v1-aaa646e` stamped per-row.
+> - **New modules**: `recurate.py` (provenance-preserving re-curation with `--expected-raw-sha256` pin assertion), `distill_driver.py` (teacher-routing orchestrator with budget-cap abort + Epic-6.0 observability: per-row structured log, `fout.flush()`, `/models` preflight, single-instance MLX guard, `--debug-log`, `--http-timeout-s` + retry, `--count` override, `--strict` mode), `balanced_sampler.py` (per-tier pre-processing sampler, 200-row floor, 500 ape.reflect cap, 5× duplication ceiling), `stratified_split.py` (90/10 per-task split + manifest emission).
+> - **Raw dataset SHA pin**: `7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988` (21-day window `llm_interactions.jsonl`, 42,727 rows). Asserted by all 4 modules on every invocation; drift aborts.
+> - **Post-pre-flight verdict CLEAR**: `phase_5_dataset_preflight_post.md` — all 7 baseline checks now pass. Phase 5 SFT runbook unblocked.
+> - **Two durable guardrails** surfaced during execution and persisted as MEMORY rules:
+>   - Never set `max_tokens < 3000` on any LLM call (forcing function: summarize.generate lost 7.5% of rows to truncation when max_tokens=1500 + Qwen3.6 think_mode consumed the token budget).
+>   - Never set `latency_budget_ms < 15000` on any LLM call (longest observed valid row = 12.7s; 10s budget would have caused catastrophic timeouts on the tail).
+> - **All 16 ULTS specs audited + fixed**: `max_tokens` floored at 3000, `latency_budget_ms` floored at 15000. Code defaults in `distill_driver.py`, `teacher_distill.py`, `evaluate_ft.py` updated to the new floors.
+> - **Epic 6.0 Execution Stabilization** (added mid-sprint after observability failure): per-row stderr logging, pre-flight `/models` ping, single-instance MLX guard, response-payload debug capture, HTTP retry policy, `--count` / `--strict` flags, CMS constraint observations pinning `:8101` MLX endpoint + `mdemg/qwen3.6-35b-a3b-mdemg-v{N}` post-FT namespace.
+> - **Policy change — FT-OAI-003 DROPPED** (user directive 2026-04-22): no further OpenAI fine-tuning deliverables. All future fine-tuning targets local MLX LoRA on Qwen3.6-35B-A3B. OpenAI API remains usable as a **teacher** for synthesis only. Memory entry `memory/project_ft_oai_003_deferred.md` to be removed post-sprint-approval.
+> - **Tests (3 tiers)**: 4 new unit-test files + integration test + E2E script. All green. Full-scale `mlx_lm.tuner.datasets.load_local_dataset` schema check on all 4 datasets passes (no `--dry-run` flag exists on mlx_lm.lora 0.31.2; using the internal loader path is the authoritative check).
+> - **Pre-flight automation deferred** to a future cleanup sprint (~200-300 LOC, outside this sprint's budget).
 
 > **Changes in v5.4 (Sprint FT-LORA-E — 2026-04-22):**
 > - **Tier-aware CLI on `neural/training/train_ft.py`**: 13 new flags (`--tier {1,2}`, `--family`, `--expert-selection-path`, `--expected-sha256`, `--mode {sft,rl}`, `--base-adapter`, `--rank`, `--alpha`, `--target-modules`, `--router-aux-loss-coef`, `--early-stop-ratio`, `--early-stop-patience`, `--n-epochs`). Tier 1 = attention + shared expert, r=32 α=64, 7 modules × 40 layers. Tier 2 = top-25% routed experts per family, r=8 α=16, 7,680 modules (40 × 64 × 3).
@@ -70,6 +85,9 @@ Read in order. Each document builds on the previous.
 | 11 | `sprint_plan_ft_lora_d.md` | Sprint FT-LORA-D v1.0-format plan (as executed) — 5 epics, expert activation profiling script + anchor prompt set + family-partition decision | ~8 |
 | 12 | `sprint_c_d_profile_results.md` | Sprint D Epic 3 decision doc — verdict code (3-family-confirmed / 2-family-merged / 1-family-collapsed), cross-family overlap + task-cohesion tables, Sprint E recommendation | ~4 |
 | 13 | `sprint_plan_ft_lora_e.md` | Sprint FT-LORA-E v1.0-format plan (as executed) — 7 epics, tier-aware train_ft.py CLI + `expert_selection.py` + `quantize_asymmetric.py` + `early_stop.py` + env-var activation + atomic `router_aux_loss_coef` injection. Post-execution notes record dual-path injection strategy + deferred checkpoint-behavior verification. | ~15 |
+| 14 | `phase_5_dataset_preflight.md` | Phase 5 dataset pre-flight **baseline** report (`aaa646e`) — verdict **BLOCKED**; enumerates 4 structural blockers in the existing curated corpus that motivated Sprint FT-LORA-DATA. | ~8 |
+| 15 | `sprint_plan_ft_lora_data.md` | Sprint FT-LORA-DATA v1.0-format plan (as executed) — 7 epics + Epic 6.0 Execution Stabilization, 4 new modules, 4 curated datasets, mixed-teacher synthesis, 90/10 split, $100 hard-abort cap, post-pre-flight gate. | ~14 |
+| 16 | `phase_5_dataset_preflight_post.md` | Phase 5 dataset pre-flight **post-run** report (FT-LORA-DATA result) — verdict **CLEAR**; all 7 baseline checks resolved. Phase 5 SFT runbook unblocked. | ~8 |
 
 ---
 
