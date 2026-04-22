@@ -1,7 +1,15 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
 **Date:** 2026-04-21
-**Version:** 5.1 (Sprint FT-LORA-B — code/config alignment + guardrail llmclient migration + ULTS `sampling_group`)
+**Version:** 5.2 (Sprint FT-LORA-C — Qwen3.6-35B-A3B MLX validation runbook committed; planning-only)
+
+> **Changes in v5.2 (Sprint FT-LORA-C — 2026-04-21):**
+> - **Runbook committed**: `sprint_plan_ft_lora_c.md` — 3-gate MLX validation designed for non-continuous execution (week-long pauses between gates survive via `~/.mdemg-sprint-c/` disk stamps). No execution artifacts in Sprint C itself ($0 spend).
+> - **Gate 1**: asymmetric-quant load ceilings — peak RAM ≤24 GB pass / 24-30 GB flag / >30 GB halt; load time ≤90 s (first-load from cold page cache, SSD-tier normalized), forward-pass ≤30 s. Three path options (A=published asymmetric, B=`mlx_lm.convert` attempt, C=symmetric 4-bit with Sprint-E deviation).
+> - **Gate 2**: ≥95% JSON validity on 100 synthetic J-group prompts; fallback 12-cell sweep concentrated on `presence_penalty` (5) × `temperature` (2) + 2 controls (no-chat-template, json_mode_on).
+> - **Gate 3**: throughput ≥60 tok/s (halt if <60) + quality bands vs `gpt-5.4-mini`: ≤10% clear pass / 10-30% middle band (Sprint F) / >30% halt. Hard $25 baseline budget cap; 24h same-window constraint between baseline and Qwen runs.
+> - **Sprint F registered** (new): post-SFT commit-or-fallback checkpoint, triggered only by Gate 3 middle-band stamp. Skeleton only — full 12-section plan drafted at Sprint F start if triggered.
+> - **Version 5.1 content unchanged**; v5.2 adds the runbook doc + Sprint F registration.
 
 > **Changes in v5.1 (Sprint FT-LORA-B — 2026-04-21):**
 > - **Guardrail migration**: `internal/guardrail/llm_evaluator.go` now routes through `llmclient` (17th captured call site, `task_name='guardrail.evaluate'`). Hard cutover renamed circuit breakers `openai-guardrail` → `openai-guardrail.evaluate` / `ollama-guardrail` → `ollama-guardrail.evaluate` — breaking change on the admin surface, see CHANGELOG.
@@ -40,6 +48,7 @@ Read in order. Each document builds on the previous.
 | 7 | `SPRINT_A_GREP_AUDIT.md` | Sprint FT-LORA-A Epic 10 output — repo-wide grep of stale model names and banned tool-calling patterns; remediation queue for Sprint B | ~3 |
 | 8 | `sprint_plan_ft_lora_a.md` | Sprint FT-LORA-A v1.0-format plan (as executed) — 11 epics, 3-tier testing, commit strategy, Documents Accessed appendix | ~7 |
 | 9 | `sprint_plan_ft_lora_b.md` | Sprint FT-LORA-B v1.0-format plan (as executed) — 7 epics, ULTS `sampling_group`, guardrail llmclient migration, grep-audit remediation, placeholder env knobs | ~9 |
+| 10 | `sprint_plan_ft_lora_c.md` | Sprint FT-LORA-C v1.0-format plan (planning-only, runbook) — 3-gate Qwen3.6-35B-A3B MLX validation + Sprint F registration | ~14 |
 
 ---
 
