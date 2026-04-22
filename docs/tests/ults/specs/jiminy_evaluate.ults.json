@@ -25,25 +25,57 @@
   "output_schema": {
     "type": "object",
     "required": [
-      "evaluations"
+      "violations",
+      "warnings"
     ],
     "properties": {
-      "evaluations": {
+      "violations": {
         "type": "array",
         "items": {
           "type": "object",
           "required": [
-            "constraint_id",
-            "followed"
+            "constraint_node_id",
+            "description",
+            "reasoning",
+            "remediation"
           ],
           "properties": {
-            "constraint_id": {
+            "constraint_node_id": {
               "type": "string"
             },
-            "followed": {
-              "type": "boolean"
+            "description": {
+              "type": "string"
             },
-            "explanation": {
+            "reasoning": {
+              "type": "string"
+            },
+            "remediation": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "constraint_node_id",
+            "description",
+            "reasoning",
+            "remediation"
+          ],
+          "properties": {
+            "constraint_node_id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "reasoning": {
+              "type": "string"
+            },
+            "remediation": {
               "type": "string"
             }
           }
