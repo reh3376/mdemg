@@ -7,7 +7,7 @@ task's output_schema.
 
 Usage:
     python3 scripts/test_vllm_mlx.py --base-url http://localhost:8100/v1
-    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8100/v1 --model Qwen/Qwen3-30B-A3B
+    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8100/v1 --model Qwen/Qwen3.6-35B-A3B
     python3 scripts/test_vllm_mlx.py --report /tmp/vllm-smoke-report.json
 """
 
@@ -233,8 +233,8 @@ def main():
         help="vllm-mlx base URL (default: $LLM_BASE_URL or http://localhost:8100/v1)",
     )
     parser.add_argument(
-        "--model", default=os.environ.get("LLM_MODEL", "mlx-community/Qwen3-30B-A3B-4bit"),
-        help="Model name (default: $LLM_MODEL or mlx-community/Qwen3-30B-A3B-4bit)",
+        "--model", default=os.environ.get("LLM_MODEL", "mlx-community/Qwen3.6-35B-A3B-4bit"),
+        help="Model name (default: $LLM_MODEL or mlx-community/Qwen3.6-35B-A3B-4bit)",
     )
     parser.add_argument("--report", help="Write JSON report to file")
     parser.add_argument("--verbose", action="store_true", help="Include response previews")
@@ -247,7 +247,7 @@ def main():
             resp.read()
     except Exception as e:
         print(f"ERROR: Cannot reach vllm-mlx at {args.base_url}: {e}")
-        print("Start the server: vllm-mlx --model mlx-community/Qwen3-30B-A3B-4bit --port 8100")
+        print("Start the server: vllm-mlx --model mlx-community/Qwen3.6-35B-A3B-4bit --port 8100")
         sys.exit(1)
 
     results = run_smoke_test(args.base_url, args.model, verbose=args.verbose)

@@ -354,7 +354,7 @@ MDEMG's fine-tuning infrastructure now supports three distinct training workstre
 | Workstream | Technique | Model | Data Source | Status |
 |---|---|---|---|---|
 | **Cross-encoder reranker** (NR-4) | MSE regression | ms-marco-MiniLM-L-6-v2 | Rerank JSONL collector | Built |
-| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3-30B-A3B | `llm_interactions` hypertable (16 tasks) | Pipeline complete |
+| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3.6-35B-A3B | `llm_interactions` hypertable (16 tasks) | Pipeline complete |
 | **Embedding fine-tuning** (Phase D) | Contrastive learning | Domain-tuned 3072-dim model | `embedding_events` + `retrieval_events` hypertables | Collecting data |
 
 **Generative LoRA** trains the generative model on LLM I/O from all 16 tasks. RAFT context enrichment ensures training data includes retrieval context (open-book mode). ULTS specs define quality thresholds for curation. See [RAFT Retrieval Context](raft-retrieval-context.md) and [ULTS Framework](ults-framework.md).

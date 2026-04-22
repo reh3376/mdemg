@@ -2,15 +2,16 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "consulting.synthesis",
-    "description": "SME synthesis — generates expert analysis from retrieved constraints and context",
+    "description": "SME synthesis \u2014 generates expert analysis from retrieved constraints and context",
     "version": "1.0.0"
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "high",
-    "notes": "Dynamic prompt — system framing embedded in user message. Think mode benefits synthesis quality. Prompt built by buildSynthesisPrompt() in consulting/synthesis.go."
+    "notes": "Dynamic prompt \u2014 system framing embedded in user message. Think mode benefits synthesis quality. Prompt built by buildSynthesisPrompt() in consulting/synthesis.go."
   },
+  "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "dynamic",
     "system_prompt_source": "internal/consulting/synthesis.go:161",
@@ -24,17 +25,45 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "analysis": { "type": "string" },
-      "recommendations": { "type": "array", "items": { "type": "string" } },
-      "confidence": { "type": "number" }
+      "analysis": {
+        "type": "string"
+      },
+      "recommendations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "confidence": {
+        "type": "number"
+      }
     }
   },
   "quality_metrics": [
-    { "name": "coherence", "weight": 0.35, "threshold": 0.6, "description": "Logical flow and clarity of synthesis" },
-    { "name": "coverage", "weight": 0.35, "threshold": 0.5, "description": "Covers relevant constraints from retrieval context" },
-    { "name": "actionability", "weight": 0.3, "threshold": 0.5, "description": "Recommendations are specific and implementable" }
+    {
+      "name": "coherence",
+      "weight": 0.35,
+      "threshold": 0.6,
+      "description": "Logical flow and clarity of synthesis"
+    },
+    {
+      "name": "coverage",
+      "weight": 0.35,
+      "threshold": 0.5,
+      "description": "Covers relevant constraints from retrieval context"
+    },
+    {
+      "name": "actionability",
+      "weight": 0.3,
+      "threshold": 0.5,
+      "description": "Recommendations are specific and implementable"
+    }
   ],
-  "reward_functions": ["coherence_score", "coverage_score", "actionability_score"],
+  "reward_functions": [
+    "coherence_score",
+    "coverage_score",
+    "actionability_score"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 500,

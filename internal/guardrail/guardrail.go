@@ -12,7 +12,13 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/llmclient"
 )
+
+// TaskName is the canonical ULTS task-name attribution for guardrail LLM calls.
+// Interactions captured via llmclient.Complete are tagged with this name in
+// the llm_interactions TSDB hypertable. See docs/tests/ults/specs/guardrail_evaluate.ults.json.
+const TaskName = "guardrail.evaluate"
 
 // GuardrailConfig holds configuration for the guardrail validation service.
 type GuardrailConfig struct {
@@ -84,15 +90,22 @@ type GuardrailService struct {
 	driver     neo4j.DriverWithContext
 	embedder   embeddings.Embedder
 	cbRegistry *circuitbreaker.Registry
+	llm        llmclient.Completer // Sprint FT-LORA-B: routes guardrail LLM calls through llmclient for interaction capture + unified retry/timeout/recording.
 }
 
 // NewGuardrailService creates a new guardrail validation service.
-func NewGuardrailService(cfg GuardrailConfig, driver neo4j.DriverWithContext, embedder embeddings.Embedder, cbRegistry *circuitbreaker.Registry) *GuardrailService {
+// Sprint FT-LORA-B: the caller is responsible for constructing an llmclient
+// (typically llmclient.New(...).WithContext(guardrail.TaskName, "")) and
+// passing it in. Pass nil when Enabled=false to skip construction. The
+// llm argument satisfies the llmclient.Completer interface so tests can
+// inject an llmclient.TestClient.
+func NewGuardrailService(cfg GuardrailConfig, driver neo4j.DriverWithContext, embedder embeddings.Embedder, cbRegistry *circuitbreaker.Registry, llm llmclient.Completer) *GuardrailService {
 	return &GuardrailService{
 		cfg:        cfg,
 		driver:     driver,
 		embedder:   embedder,
 		cbRegistry: cbRegistry,
+		llm:        llm,
 	}
 }
 

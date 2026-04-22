@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "retrieval.intent_translate",
-    "description": "Query rewriter — translates natural language queries into knowledge-graph-optimized search queries",
+    "description": "Query rewriter \u2014 translates natural language queries into knowledge-graph-optimized search queries",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "high",
     "notes": "Phase 102 feature. Rewrites user queries before vector embedding to improve retrieval recall. Critical for bridging vocabulary gap between user language and graph content."
   },
+  "sampling_group": "C",
   "prompt": {
     "system_prompt_hash": "fe1c14a2c1504ae7833f5cf58c22063db0d069dca823ed8e7e751eea8cf697e5",
     "system_prompt_source": "internal/retrieval/intent_translator.go:81",
@@ -26,9 +27,16 @@
     "description": "Rewritten query optimized for knowledge graph retrieval"
   },
   "quality_metrics": [
-    { "name": "query_quality", "weight": 1.0, "threshold": 0.6, "description": "Rewritten query improves retrieval recall vs. original" }
+    {
+      "name": "query_quality",
+      "weight": 1.0,
+      "threshold": 0.6,
+      "description": "Rewritten query improves retrieval recall vs. original"
+    }
   ],
-  "reward_functions": ["recall_improvement"],
+  "reward_functions": [
+    "recall_improvement"
+  ],
   "training_config": {
     "rank": 8,
     "min_examples": 500,

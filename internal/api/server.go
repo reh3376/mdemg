@@ -437,7 +437,23 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			ConstraintDefaultAuthority: cfg.ConstraintDefaultAuthority,
 			CompressPrompts:            cfg.GuardrailCompress,
 		}
-		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry)
+		// Sprint FT-LORA-B: build an llmclient for the guardrail service.
+		// Pre-bound with the canonical ULTS task name so all interactions are
+		// captured in the llm_interactions hypertable with task_name="guardrail.evaluate".
+		guardrailBaseURL := cfg.EffectiveLLMEndpoint()
+		guardrailAPIKey := cfg.OpenAIAPIKey
+		if cfg.GuardrailProvider == "ollama" {
+			guardrailBaseURL = cfg.OllamaEndpoint
+			guardrailAPIKey = ""
+		}
+		guardrailLLM := llmclient.New(llmclient.Config{
+			Provider:  cfg.GuardrailProvider,
+			Model:     cfg.GuardrailModel,
+			APIKey:    guardrailAPIKey,
+			BaseURL:   guardrailBaseURL,
+			TimeoutMs: cfg.GuardrailTimeoutMs,
+		}).WithContext(guardrail.TaskName, "")
+		guardrailVal = guardrail.NewGuardrailService(guardrailCfg, driver, emb, cbRegistry, guardrailLLM)
 		slog.Info("active MCP guardrails enabled", "provider", cfg.GuardrailProvider, "model", cfg.GuardrailModel, "max_constraints", cfg.GuardrailMaxConstraints)
 	}
 

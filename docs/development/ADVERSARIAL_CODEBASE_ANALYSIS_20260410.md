@@ -10,7 +10,7 @@ Corrected and invalidated claims are documented explicitly to prevent confirmati
 **Reference documents:**
 - `VISION.md` — architectural philosophy and long-term goals
 - `docs/development/AUTORESEARCH_INTEGRATION_ANALYSIS.md` — 28 gaps across RSIC/CMS/Jiminy
-- `neural/training/` — LLM training pipeline (MLX LoRA, GRPO, Qwen3-30B-A3B target)
+- `neural/training/` — LLM training pipeline (MLX LoRA, GRPO, Qwen3.6-35B-A3B target)
 
 ---
 

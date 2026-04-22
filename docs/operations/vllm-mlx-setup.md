@@ -11,10 +11,10 @@ vllm-mlx is the inference server for serving the LoRA fine-tuned model. It expos
 uv tool install vllm-mlx
 
 # Download the quantized base model (~17GB)
-huggingface-cli download mlx-community/Qwen3-30B-A3B-4bit
+huggingface-cli download mlx-community/Qwen3.6-35B-A3B-4bit
 
 # Start the server
-vllm-mlx --model mlx-community/Qwen3-30B-A3B-4bit --port 8100
+vllm-mlx --model mlx-community/Qwen3.6-35B-A3B-4bit --port 8100
 ```
 
 ## MDEMG Configuration
@@ -25,11 +25,11 @@ Point MDEMG at the vllm-mlx server by setting these environment variables in `.e
 # Use the OpenAI-compatible provider
 LLM_PROVIDER=openai
 LLM_BASE_URL=http://localhost:8100/v1
-LLM_MODEL=mlx-community/Qwen3-30B-A3B-4bit
+LLM_MODEL=mlx-community/Qwen3.6-35B-A3B-4bit
 
 # Optional: dedicated provider for query classification
 QUERY_CLASSIFY_PROVIDER=openai
-QUERY_CLASSIFY_MODEL=mlx-community/Qwen3-30B-A3B-4bit
+QUERY_CLASSIFY_MODEL=mlx-community/Qwen3.6-35B-A3B-4bit
 ```
 
 After updating `.env`, restart the MDEMG server:
@@ -40,11 +40,12 @@ docker compose restart mdemg
 ./bin/mdemg start --auto-migrate
 ```
 
+<!-- TODO (Sprint E): Update RAM estimate for asymmetric-quant footprint (shared+attention BF16, routed experts MXFP4_MOE per memo 07 v3.1 §3.8); current ~22 GB figure is a carry-over from Qwen3-30B-A3B Q4 symmetric quant. -->
 ## Memory Budget (M5 Max 128GB)
 
 | Component | RAM Usage |
 |-----------|----------|
-| Qwen3-30B-A3B Q4 inference | ~22 GB |
+| Qwen3.6-35B-A3B Q4 inference | ~22 GB |
 | MDEMG server + Neo4j + TSDB | ~8 GB |
 | Prefix cache (dynamic) | ~4 GB |
 | **Inference total** | **~34 GB** |
@@ -80,7 +81,7 @@ This sends one test prompt per ULTS task and validates responses against each ta
 curl -s http://localhost:8100/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mlx-community/Qwen3-30B-A3B-4bit",
+    "model": "mlx-community/Qwen3.6-35B-A3B-4bit",
     "messages": [
       {"role": "system", "content": "You are a query classifier. Respond in JSON with a types array."},
       {"role": "user", "content": "How does the authentication middleware work?"}
@@ -93,9 +94,10 @@ curl -s http://localhost:8100/v1/chat/completions \
 
 After training produces a LoRA adapter (Phase B.2), fuse and quantize it:
 
+<!-- TODO (Sprint E): Rename output path to reflect asymmetric-quant strategy (mdemg-qwen3.6-35b-v1-asym/); path naming convention finalized by Sprint E's per-module quant selectors. -->
 ```bash
 python -m training.quantize_deploy \
-  --base-model Qwen/Qwen3-30B-A3B \
+  --base-model Qwen/Qwen3.6-35B-A3B \
   --adapter-path adapters/v1/ \
   --output-path models/mdemg-qwen3-30b-v1-q4/ \
   --quantize 4bit

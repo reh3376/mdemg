@@ -6,7 +6,7 @@ before training, enforces anti-collapse constraints, and logs metrics.
 Usage:
     python -m training.train_ft \\
         --dataset curated/v1/ \\
-        --base-model mlx-community/Qwen3-30B-A3B-4bit \\
+        --base-model mlx-community/Qwen3.6-35B-A3B-4bit \\
         --adapter-path adapters/v1/ \\
         --epochs 3 --batch-size 4 --lora-rank 16
 

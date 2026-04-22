@@ -15,7 +15,7 @@ Usage:
         --test-data curated/v1/test.jsonl \
         --ults-dir docs/tests/ults/specs/ \
         --base-url http://localhost:8100/v1 \
-        --model mlx-community/Qwen3-30B-A3B-4bit \
+        --model mlx-community/Qwen3.6-35B-A3B-4bit \
         --report eval_report.json
 
 Requirements:

@@ -42,7 +42,7 @@ Every `llmclient.Complete()` / `CompleteWithUsage()` call produces one row.
 | 10 | `latency_ms` | `INTEGER` | Wall-clock LLM call duration | Performance filtering |
 | 11 | `tokens_in` | `INTEGER` | Input token count | Cost analysis |
 | 12 | `tokens_out` | `INTEGER` | Output token count | Cost analysis |
-| 13 | `model_name` | `TEXT` | e.g. `gpt-4o`, `qwen3-30b-a3b` | Model-specific curation |
+| 13 | `model_name` | `TEXT` | e.g. `gpt-4o`, `qwen3.6-35b-a3b` | Model-specific curation |
 | 14 | `provider` | `TEXT` | `openai` or `ollama` | Provider filtering |
 | 15 | `error` | `TEXT` | Error string if call failed | Error exclusion |
 | 16 | `quality` | `DOUBLE PRECISION` | 0.0–1.0, `NULL` if not annotated | GRPO/DPO reward signal |

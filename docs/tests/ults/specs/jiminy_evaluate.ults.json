@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "jiminy.evaluate",
-    "description": "Constraint compliance evaluator — checks whether agent output follows Jiminy guidance constraints",
+    "description": "Constraint compliance evaluator \u2014 checks whether agent output follows Jiminy guidance constraints",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "critical",
     "notes": "Core feedback loop task. Evaluates agent adherence to surfaced constraints. Think mode enables deeper comprehension of complex constraint interactions. Shares system prompt with jiminy.evaluate_llm."
   },
+  "sampling_group": "C",
   "prompt": {
     "system_prompt_hash": "caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773",
     "system_prompt_source": "internal/jiminy/eval_prompt.go:12",
@@ -23,27 +24,52 @@
   },
   "output_schema": {
     "type": "object",
-    "required": ["evaluations"],
+    "required": [
+      "evaluations"
+    ],
     "properties": {
       "evaluations": {
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["constraint_id", "followed"],
+          "required": [
+            "constraint_id",
+            "followed"
+          ],
           "properties": {
-            "constraint_id": { "type": "string" },
-            "followed": { "type": "boolean" },
-            "explanation": { "type": "string" }
+            "constraint_id": {
+              "type": "string"
+            },
+            "followed": {
+              "type": "boolean"
+            },
+            "explanation": {
+              "type": "string"
+            }
           }
         }
       }
     }
   },
   "quality_metrics": [
-    { "name": "json_valid", "weight": 0.2, "threshold": 1.0, "description": "Output parses as valid JSON" },
-    { "name": "comprehension_accuracy", "weight": 0.8, "threshold": 0.7, "description": "Correct assessment of constraint adherence" }
+    {
+      "name": "json_valid",
+      "weight": 0.2,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON"
+    },
+    {
+      "name": "comprehension_accuracy",
+      "weight": 0.8,
+      "threshold": 0.7,
+      "description": "Correct assessment of constraint adherence"
+    }
   ],
-  "reward_functions": ["json_valid", "evaluation_accuracy", "explanation_quality"],
+  "reward_functions": [
+    "json_valid",
+    "evaluation_accuracy",
+    "explanation_quality"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 500,

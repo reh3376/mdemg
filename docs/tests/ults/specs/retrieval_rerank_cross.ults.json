@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "retrieval.rerank_cross",
-    "description": "Cross-encoder reranker — scores retrieval candidates for relevance using detailed prompt with full context",
+    "description": "Cross-encoder reranker \u2014 scores retrieval candidates for relevance using detailed prompt with full context",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "high",
     "notes": "Static system prompt defines relevance judging task. User message contains query + formatted candidates. Think mode benefits careful relevance reasoning."
   },
+  "sampling_group": "J",
   "prompt": {
     "system_prompt_hash": "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
     "system_prompt_source": "internal/retrieval/rerank.go:20",
@@ -31,10 +32,24 @@
     }
   },
   "quality_metrics": [
-    { "name": "json_valid", "weight": 0.2, "threshold": 1.0, "description": "Output parses as valid JSON array" },
-    { "name": "ndcg_improvement", "weight": 0.8, "threshold": 0.5, "description": "Reranking improves NDCG vs. original vector recall order" }
+    {
+      "name": "json_valid",
+      "weight": 0.2,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON array"
+    },
+    {
+      "name": "ndcg_improvement",
+      "weight": 0.8,
+      "threshold": 0.5,
+      "description": "Reranking improves NDCG vs. original vector recall order"
+    }
   ],
-  "reward_functions": ["json_valid", "ndcg_delta", "score_calibration"],
+  "reward_functions": [
+    "json_valid",
+    "ndcg_delta",
+    "score_calibration"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 500,

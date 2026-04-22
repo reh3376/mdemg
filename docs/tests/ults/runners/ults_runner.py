@@ -54,14 +54,18 @@ EXPECTED_TASKS = {
 }
 
 # Required top-level fields
-REQUIRED_TOP_FIELDS = {"ults_version", "task", "metadata"}
+REQUIRED_TOP_FIELDS = {"ults_version", "task", "metadata", "sampling_group"}
 REQUIRED_TASK_FIELDS = {"name", "description"}
 REQUIRED_METADATA_FIELDS = {"author", "created"}
+
+# Valid sampling_group values (Sprint FT-LORA-B — memo 07 v3.1 §3.3)
+VALID_SAMPLING_GROUPS = {"T", "C", "J"}
 
 # Known fields for parity check
 KNOWN_TOP_FIELDS = {
     "ults_version", "task", "metadata", "prompt", "performance",
     "output_schema", "quality_metrics", "reward_functions", "training_config",
+    "sampling_group",  # Sprint FT-LORA-B — memo 07 v3.1 §3.3 group (T/C/J)
 }
 KNOWN_TASK_FIELDS = {"name", "description", "version"}
 KNOWN_PROMPT_FIELDS = {
@@ -141,6 +145,38 @@ def validate_schema(spec: Dict[str, Any], spec_path: str) -> List[CheckResult]:
             passed=True,
             message="No unknown top-level fields",
         ))
+
+    # Sprint FT-LORA-B — sampling_group parity check (memo 07 v3.1 §3.3)
+    task_name_for_msg = spec.get("task", {}).get("name", "<unknown>")
+    if "sampling_group" not in spec:
+        results.append(CheckResult(
+            name="parity_sampling_group",
+            passed=False,
+            message=(
+                f"Spec '{task_name_for_msg}' is missing required field "
+                f"'sampling_group' (must be one of T/C/J per memo 07 v3.1 §3.3 "
+                f"— see docs/development/ft-lora/04_BENCHMARK_RL_v2.md §10.0 "
+                f"for task mapping)"
+            ),
+        ))
+    else:
+        group_value = spec["sampling_group"]
+        if group_value in VALID_SAMPLING_GROUPS:
+            results.append(CheckResult(
+                name="parity_sampling_group",
+                passed=True,
+                message=f"sampling_group: {group_value}",
+            ))
+        else:
+            results.append(CheckResult(
+                name="parity_sampling_group",
+                passed=False,
+                message=(
+                    f"Spec '{task_name_for_msg}' has invalid sampling_group "
+                    f"'{group_value}' (must be T=reasoning-think, "
+                    f"C=no-think classify, J=no-think JSON)"
+                ),
+            ))
 
     # Check ults_version format
     version = spec.get("ults_version", "")

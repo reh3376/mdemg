@@ -2,15 +2,16 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "hidden.reclassify",
-    "description": "Code reclassifier — assigns sub-categories to ingested source files based on content analysis",
+    "description": "Code reclassifier \u2014 assigns sub-categories to ingested source files based on content analysis",
     "version": "1.0.0"
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "medium",
-    "notes": "Dynamic prompt — threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25."
+    "notes": "Dynamic prompt \u2014 threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25."
   },
+  "sampling_group": "C",
   "prompt": {
     "system_prompt_hash": "dynamic",
     "system_prompt_source": "internal/hidden/reclassifier.go:319",
@@ -25,19 +26,43 @@
     "type": "array",
     "items": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "keywords": { "type": "array", "items": { "type": "string" } },
-        "description": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
       }
     }
   },
   "quality_metrics": [
-    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
-    { "name": "accuracy", "weight": 0.7, "threshold": 0.6, "description": "Correct sub-category assignment" }
+    {
+      "name": "json_valid",
+      "weight": 0.3,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON"
+    },
+    {
+      "name": "accuracy",
+      "weight": 0.7,
+      "threshold": 0.6,
+      "description": "Correct sub-category assignment"
+    }
   ],
-  "reward_functions": ["json_valid", "classification_accuracy"],
+  "reward_functions": [
+    "json_valid",
+    "classification_accuracy"
+  ],
   "training_config": {
     "rank": 8,
     "min_examples": 500,

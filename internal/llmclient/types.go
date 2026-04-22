@@ -3,12 +3,23 @@
 // that existed across summarize, hidden, consulting, metalearn, ape, and retrieval.
 package llmclient
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 // Message represents a chat message with a role and content.
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+// Completer is the minimum interface consumers depend on for LLM completions.
+// *Client satisfies this interface; tests can provide a TestClient stub.
+// Introduced for Sprint FT-LORA-B to make the guardrail migration unit-testable
+// without standing up an httptest server.
+type Completer interface {
+	Complete(ctx context.Context, messages []Message, opts CompleteOpts) (string, error)
 }
 
 // --- OpenAI-compatible types ---

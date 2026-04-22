@@ -1,15 +1,13 @@
 package guardrail
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"mdemg/internal/circuitbreaker"
+	"mdemg/internal/llmclient"
 )
 
 // llmEvalResult holds the parsed LLM evaluation output.
@@ -25,51 +23,67 @@ type llmViolation struct {
 	Rationale        string `json:"rationale"`
 }
 
-// Local copies of request/response types (follows established duplication pattern in rerank.go/synthesis.go)
-type guardrailOpenAIChatRequest struct {
-	Model     string                   `json:"model"`
-	Messages  []guardrailOpenAIMessage `json:"messages"`
-	MaxTokens int                      `json:"max_completion_tokens"`
-}
+// Per-task circuit breaker names — Sprint FT-LORA-B hard cutover.
+// Previous names ("openai-guardrail", "ollama-guardrail") are REMOVED.
+// POST /v1/admin/breakers/reset with the old names returns 404; operators
+// must discover current names via GET /v1/admin/breakers. See CHANGELOG.
+const (
+	breakerNameOpenAI = "openai-guardrail.evaluate"
+	breakerNameOllama = "ollama-guardrail.evaluate"
+)
 
-type guardrailOpenAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type guardrailOpenAIChatResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Usage struct {
-		TotalTokens int `json:"total_tokens"`
-	} `json:"usage"`
-}
-
-type guardrailOllamaGenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-type guardrailOllamaGenerateResponse struct {
-	Response string `json:"response"`
-}
-
-// evaluateWithLLM dispatches to OpenAI or Ollama for constraint evaluation.
+// evaluateWithLLM dispatches to llmclient for constraint evaluation.
+// Both OpenAI and Ollama paths now go through the same llmclient.Completer;
+// provider selection happened at GuardrailService construction time (in server.go).
+// Circuit breaker name is per-task (guardrail.evaluate) and per-provider.
 func (g *GuardrailService) evaluateWithLLM(ctx context.Context, diffCtx DiffContext, constraints []constraintMatch) (*llmEvalResult, error) {
+	if g.llm == nil {
+		return nil, fmt.Errorf("guardrail: llm client not configured")
+	}
+
 	prompt := buildEvalPrompt(diffCtx, constraints, g.cfg.CompressPrompts)
+
+	sysPrompt := guardrailSystemPrompt
+	if g.cfg.CompressPrompts {
+		sysPrompt = guardrailSystemPromptCompact
+	}
+
+	maxTokens := g.cfg.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 1000
+	}
+	if maxTokens < 2000 {
+		maxTokens = 2000 // reasoning models consume tokens for internal thought
+	}
+
+	messages := []llmclient.Message{
+		{Role: "system", Content: sysPrompt},
+		{Role: "user", Content: prompt},
+	}
+	opts := llmclient.CompleteOpts{MaxTokens: maxTokens}
+
+	// Select the per-task circuit breaker name by provider. When no registry
+	// is configured, bypass the breaker entirely (matches the pattern in
+	// consulting/llm_classifier.go:138-150).
+	breakerName := breakerNameOpenAI
+	if g.cfg.Provider == "ollama" {
+		breakerName = breakerNameOllama
+	}
 
 	var rawJSON string
 	var err error
-
-	switch g.cfg.Provider {
-	case "ollama":
-		rawJSON, err = g.evaluateWithOllama(ctx, prompt)
-	default: // "openai" or unset
-		rawJSON, err = g.evaluateWithOpenAI(ctx, prompt)
+	if g.cbRegistry != nil {
+		cb := g.cbRegistry.Get(breakerName)
+		err = cb.Execute(ctx, func(ctx context.Context) error {
+			var innerErr error
+			rawJSON, innerErr = g.llm.Complete(ctx, messages, opts)
+			return innerErr
+		})
+		if err == circuitbreaker.ErrCircuitOpen {
+			return nil, fmt.Errorf("%s circuit breaker open", breakerName)
+		}
+	} else {
+		rawJSON, err = g.llm.Complete(ctx, messages, opts)
 	}
 
 	if err != nil {
@@ -93,149 +107,6 @@ func (g *GuardrailService) evaluateWithLLM(ctx context.Context, diffCtx DiffCont
 	}
 
 	return &result, nil
-}
-
-// evaluateWithOpenAI calls OpenAI with circuit breaker protection.
-func (g *GuardrailService) evaluateWithOpenAI(ctx context.Context, prompt string) (string, error) {
-	if g.cbRegistry != nil {
-		cb := g.cbRegistry.Get("openai-guardrail")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = g.doEvaluateWithOpenAI(ctx, prompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("openai guardrail circuit breaker open")
-		}
-		return result, err
-	}
-	return g.doEvaluateWithOpenAI(ctx, prompt)
-}
-
-func (g *GuardrailService) doEvaluateWithOpenAI(ctx context.Context, prompt string) (string, error) {
-	maxTokens := g.cfg.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 1000
-	}
-
-	if maxTokens < 2000 {
-		maxTokens = 2000 // Reasoning models consume tokens for internal thought
-	}
-
-	sysPrompt := guardrailSystemPrompt
-	if g.cfg.CompressPrompts {
-		sysPrompt = guardrailSystemPromptCompact
-	}
-
-	reqBody := guardrailOpenAIChatRequest{
-		Model: g.cfg.Model,
-		Messages: []guardrailOpenAIMessage{
-			{Role: "system", Content: sysPrompt},
-			{Role: "user", Content: prompt},
-		},
-		MaxTokens: maxTokens,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := g.cfg.OpenAIURL + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+g.cfg.OpenAIKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var chatResp guardrailOpenAIChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
-}
-
-// evaluateWithOllama calls Ollama with circuit breaker protection.
-func (g *GuardrailService) evaluateWithOllama(ctx context.Context, prompt string) (string, error) {
-	if g.cbRegistry != nil {
-		cb := g.cbRegistry.Get("ollama-guardrail")
-		var result string
-		err := cb.Execute(ctx, func(ctx context.Context) error {
-			var innerErr error
-			result, innerErr = g.doEvaluateWithOllama(ctx, prompt)
-			return innerErr
-		})
-		if err == circuitbreaker.ErrCircuitOpen {
-			return "", fmt.Errorf("ollama guardrail circuit breaker open")
-		}
-		return result, err
-	}
-	return g.doEvaluateWithOllama(ctx, prompt)
-}
-
-func (g *GuardrailService) doEvaluateWithOllama(ctx context.Context, prompt string) (string, error) {
-	// Combine system prompt + user prompt for Ollama (no chat endpoint)
-	sysPrompt := guardrailSystemPrompt
-	if g.cfg.CompressPrompts {
-		sysPrompt = guardrailSystemPromptCompact
-	}
-	fullPrompt := sysPrompt + "\n\n" + prompt
-
-	reqBody := guardrailOllamaGenerateRequest{
-		Model:  g.cfg.Model,
-		Prompt: fullPrompt,
-		Stream: false,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
-	}
-
-	endpoint := g.cfg.OllamaURL + "/api/generate"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var ollamaResp guardrailOllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	return strings.TrimSpace(ollamaResp.Response), nil
 }
 
 // cleanJSONResponse strips markdown code fences and extracts the first valid

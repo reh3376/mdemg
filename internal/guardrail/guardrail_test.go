@@ -814,7 +814,7 @@ func TestNewGuardrailService(t *testing.T) {
 		MaxTokens: 2048,
 		TimeoutMs: 5000,
 	}
-	svc := NewGuardrailService(cfg, nil, nil, nil)
+	svc := NewGuardrailService(cfg, nil, nil, nil, nil)
 	if svc == nil {
 		t.Fatal("NewGuardrailService returned nil")
 	}
@@ -830,7 +830,7 @@ func TestNewGuardrailService(t *testing.T) {
 }
 
 func TestNewGuardrailService_DisabledConfig(t *testing.T) {
-	svc := NewGuardrailService(GuardrailConfig{Enabled: false}, nil, nil, nil)
+	svc := NewGuardrailService(GuardrailConfig{Enabled: false}, nil, nil, nil, nil)
 	if svc == nil {
 		t.Fatal("NewGuardrailService returned nil")
 	}
