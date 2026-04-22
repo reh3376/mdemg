@@ -293,22 +293,30 @@ Example (`consulting.classify`):
 
 **Output:** `tier1_universal.safetensors` (Tier 1 adapter).
 
-### 5B. Phase 5.X — Expert Activation Profiling ⏩ Sprint FT-LORA-D
+### 5B. Phase 5.X — Expert Activation Profiling ⏩ Sprint FT-LORA-D ✅ EXECUTED 2026-04-22
 
-**Script:** `neural/training/profile_expert_routing.py` (NEW — Sprint D builds)
+**Script:** `neural/training/profile_expert_routing.py` ✅ (Sprint D shipped)
 
-**Input:** Tier 1-adapted model (from 5A) + held-out eval set per task.
+**Input:** Sprint C-validated Qwen3.6-35B-A3B-mxfp4 base model (SHA `cdc167566e54…`) + 320-prompt anchor set (20/task × 16 tasks) at `training_data/routing_profiles/anchor_prompts.jsonl`.
 
 **Output per family (reasoning-think / classify-notink / structured-notink):**
-- `profile_routing_{family}.json` — top-25% routed experts per layer, activation counts, KL divergence of routing distribution vs uniform
-- Heatmap artifact (experts × layers) — visual check for bimodal routing
+- `training_data/routing_profiles/profile_routing_{family}.json` — top-25% routed experts per layer (64 of 256), activation counts, KL divergence of routing distribution vs uniform, per-layer breakdown
+- `training_data/routing_profiles/raw_activation_counts.json` — per-(task, layer, expert) counts for post-hoc re-analysis
+- `docs/development/ft-lora/sprint_c_d_profile_results.md` — decision doc (verdict + tables + Sprint E recommendation)
 
-**Decision criteria (memo §3 + [`01_RESEARCH_v2.md §5.3`](01_RESEARCH_v2.md) provisional-partition clause):**
-- **Cross-family expert overlap > 80%** → partition is merged (reduce to two or one family).
-- **Bimodal routing within a family** (KL divergence between two activation clusters < 0.3 is "unimodal"; > 0.3 = bimodal) → that family is split.
-- Otherwise → proceed with the provisional three-family partition into 5C.
+**Decision criteria (sprint_plan_ft_lora_d.md §5 Epic 3):**
+- **Cross-family Jaccard overlap > 0.80** applied per-pair:
+  - 0 pairs exceed → `3-family-confirmed` (proceed as planned)
+  - 1 pair exceeds → `2-family-merged-<pair>` (merge, 2 Tier 2 adapters)
+  - ≥ 2 pairs exceed → `1-family-collapsed` (single Tier 2 over union)
+- **Per-family task-cohesion (within-family pairwise Jaccard of per-task top-25% sets):**
+  - ≥ 0.70 → cohesive (no split)
+  - 0.40-0.70 → ambiguous (report only)
+  - < 0.40 → split-candidate (emit hierarchical cluster boundary; Sprint E decides)
 
-Sprint D's output is a decision doc (`docs/development/ft-lora/sprint_c_d_profile_results.md`, projected) that either confirms the three-family partition or revises it before Tier 2 training begins.
+Bimodality coefficient (BC = (skew²+1)/kurt) was considered and rejected as methodologically unsound for discrete 256-bin distributions with n=60-140 prompts; replaced with direct task-cohesion analysis using real per-task top-64 expert sets.
+
+**Sprint E consumer:** `neural/training/train_ft.py --expert-selection-path=training_data/routing_profiles/profile_routing_{family}.json` — reads `per_layer[*].top_experts` to gate Tier 2 LoRA adapter instantiation.
 
 ### 5C. Tier 2 — Per-Family LoRA (top-25% routed experts, r=8, per family)
 

@@ -1,7 +1,15 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
-**Date:** 2026-04-21
-**Version:** 5.2 (Sprint FT-LORA-C — Qwen3.6-35B-A3B MLX validation runbook committed; planning-only)
+**Date:** 2026-04-22
+**Version:** 5.3 (Sprint FT-LORA-D — Expert activation profiling executed; family partition decision locked)
+
+> **Changes in v5.3 (Sprint FT-LORA-D — 2026-04-22):**
+> - **Expert activation profiler committed**: `neural/training/profile_expert_routing.py` — context-manager monkey-patch of `Qwen3NextSparseMoeBlock.__call__` captures top-k routing decisions across prompt and generated tokens. Single-pass inline forward (no double-compute). Determinism verified bit-identical across runs.
+> - **Anchor prompt set**: `training_data/routing_profiles/anchor_prompts.jsonl` — 320 prompts (20 per task × 16 tasks, T=140 / C=120 / J=60). Primary source: `training_data/raw/extracted/llm_interactions.jsonl` filtered by `task_name` (11 tasks have ≥20 unique production prompts). Backfill source: same-shape donor tasks' production prompts for 5 T-family tasks with zero production traffic at profiling time (hidden.summarize, consulting.synthesis, metalearn.generalize, retrieval.rerank_nli, summarize.generate). Deviation from runbook's whk-wms-category backfill — repurposing real production traces from related tasks preserves the task-family routing signal better than generic codebase questions.
+> - **Artifacts (consumed by Sprint E)**: `training_data/routing_profiles/profile_routing_{reasoning_think,classify_notink,structured_notink}.json` + `raw_activation_counts.json` + decision doc `docs/development/ft-lora/sprint_c_d_profile_results.md`.
+> - **Analyzer**: `neural/training/sprint_d_analyze.py` — cross-family Jaccard overlap (3 pair averages across 40 layers), per-family task-cohesion (within-family pairwise Jaccard + agglomerative hierarchical clustering for split-candidate boundaries), KL divergence vs uniform. Explicit verdict codes: `3-family-confirmed` / `2-family-merged-<pair>` / `1-family-collapsed`.
+> - **Sprint E unblocks**: `neural/training/train_ft.py --expert-selection-path=profile_routing_{family}.json` is now backed by real artifacts.
+> - **Version 5.2 content unchanged**; v5.3 adds Sprint D plan + decision doc + profile artifacts.
 
 > **Changes in v5.2 (Sprint FT-LORA-C — 2026-04-21):**
 > - **Runbook committed**: `sprint_plan_ft_lora_c.md` — 3-gate MLX validation designed for non-continuous execution (week-long pauses between gates survive via `~/.mdemg-sprint-c/` disk stamps). No execution artifacts in Sprint C itself ($0 spend).
@@ -49,6 +57,8 @@ Read in order. Each document builds on the previous.
 | 8 | `sprint_plan_ft_lora_a.md` | Sprint FT-LORA-A v1.0-format plan (as executed) — 11 epics, 3-tier testing, commit strategy, Documents Accessed appendix | ~7 |
 | 9 | `sprint_plan_ft_lora_b.md` | Sprint FT-LORA-B v1.0-format plan (as executed) — 7 epics, ULTS `sampling_group`, guardrail llmclient migration, grep-audit remediation, placeholder env knobs | ~9 |
 | 10 | `sprint_plan_ft_lora_c.md` | Sprint FT-LORA-C v1.0-format plan (planning-only, runbook) — 3-gate Qwen3.6-35B-A3B MLX validation + Sprint F registration | ~14 |
+| 11 | `sprint_plan_ft_lora_d.md` | Sprint FT-LORA-D v1.0-format plan (as executed) — 5 epics, expert activation profiling script + anchor prompt set + family-partition decision | ~8 |
+| 12 | `sprint_c_d_profile_results.md` | Sprint D Epic 3 decision doc — verdict code (3-family-confirmed / 2-family-merged / 1-family-collapsed), cross-family overlap + task-cohesion tables, Sprint E recommendation | ~4 |
 
 ---
 
