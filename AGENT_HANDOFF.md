@@ -57,6 +57,21 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-21) ===
+- ✅ FT-LORA-D: Expert Activation Profiling + Family Partition Decision (2026-04-22):
+  - **Scope:** Read-only MoE routing profiler over 320 anchor prompts (20/task × 16 tasks) → per-family top-25% expert mask per layer (64 of 256 experts × 40 layers × 3 families) → cross-family Jaccard + per-family task-cohesion analysis → go/no-go verdict on the provisional 3-family partition (`reasoning-think` / `classify-notink` / `structured-notink`). Zero training spend ($0); no weight changes; artifacts consumed by Sprint E Tier 2 LoRA training via `--expert-selection-path`.
+  - **Script:** `neural/training/profile_expert_routing.py` — context-manager class-level monkey-patch of `Qwen3NextSparseMoeBlock.__call__` (inline single-pass forward, no double-compute; monkey-patch restored in `finally`). Capture points: `inds` (top-k expert indices) + `scores` (routing weights). Full-generation mode profiling (prompt + generated tokens via `mlx_lm.stream_generate`). CLI: `--model-path --expected-sha256 --anchor-prompts --output-dir --top-pct --max-prompt-tokens --max-gen-tokens --limit --task --force --verbose`. Aborts on config.json SHA mismatch (Sprint C pin: `cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734`).
+  - **Anchor prompt set:** `training_data/routing_profiles/anchor_prompts.jsonl` (320 records, SHA256 `7eddeccafa9ffcdd4098a2f762afce6522f65b28ab96c87d5faeb96b0acd7087`). Primary source: `training_data/raw/extracted/llm_interactions.jsonl` production traces (221/320 records). Backfill from same-shape donor tasks for 5 tasks with 0-1 production records (99/320 records) — documented deviation from plan's whk-wms backfill, chosen to preserve task-family routing signal over category diversity. Family counts: T=140 / C=120 / J=60.
+  - **Artifacts** (committed under `training_data/routing_profiles/`):
+    - `profile_routing_reasoning_think.json` — 40-layer × top-64 expert mask for T-family
+    - `profile_routing_classify_notink.json` — 40-layer × top-64 expert mask for C-family
+    - `profile_routing_structured_notink.json` — 40-layer × top-64 expert mask for J-family
+    - `raw_activation_counts.json` — per-(task, layer, expert) counts for post-hoc analysis
+    - `anchor_prompts.sha256` — reproducibility stamp
+  - **Decision doc:** `docs/development/ft-lora/sprint_c_d_profile_results.md` — verdict code, cross-family overlap table (3 pair averages + per-layer breakdown), per-family task-cohesion table, KL divergence summary, Sprint E recommendation, artifact SHAs.
+  - **Tests:** 22 unit tests passing in `neural/training/tests/test_profile_expert_routing.py` (0.03s runtime) — anchor-prompts loader, top-k aggregation, top-pct mask + tie-break + KL=0 uniformity, Jaccard overlap, task-cohesion verdicts, hierarchical clustering boundary, SHA256 guard. Tier 2 integration: `--limit 10` real-model run with artifact schema validation + monkey-patch cleanup verified. Tier 3 E2E: full 320-prompt run; determinism confirmed **bit-identical** for MLX + mxfp4 (A/B run SHA256 match, 1.0 Jaccard on all 40 layers).
+  - **Sprint E unblocked** — Tier 2 LoRA adapter instantiation consumes `per_layer[*].top_experts` from the 3 profile_routing_*.json artifacts. Family partition verdict recorded in commit body + PR summary.
+  - Sprint chain: **A (#335) → B (#336) → C (all 3 gates, PR #342 merged `bf5f9c6`) → D (this sprint) → E (training infra patches) → Phase 5 SFT → F (commit-or-fallback — Gate 3 middle band not triggered, F inactive)**.
+
 - ✅ FT-LORA-C Gate 3 — throughput + benchmark parity vs `gpt-5.4-mini` (2026-04-22):
   - **Both sub-gates PASS.** Sprint C is now fully green across all three gates; FT-LORA line unblocked through Sprint D. Phase 5 SFT pre-Gate-3 blocker cleared.
   - **Throughput sub-gate:** median **126.65 tok/s** over 5×500-token measurements at canonical T recipe (temp=0.6, top_p=0.95, top_k=20) after a discarded 200-token warm-up. 2.1× the ≥60 tok/s floor. Per-run spread: 122.75 / 126.65 / 128.91 / 124.38 / 126.74 (mean 125.85; all runs `finish_reason=length` at exactly 500 tokens — no early stops). Hardware: M5 Max, 128 GB unified, macOS 26.3.2, `mlx_lm.server` on :8200 (port 8100 Docker-shadowed; zero-impact deviation carried from Gate 2).

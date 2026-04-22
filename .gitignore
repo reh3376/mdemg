@@ -25,6 +25,16 @@ investigation-data/
 training_data/*
 !training_data/README.md
 !training_data/.gitkeep
+# Sprint FT-LORA-D expert activation profiling artifacts — per-family profile
+# JSONs + anchor prompt corpus ARE deliverables (consumed by Sprint E Tier 2
+# training). raw_activation_counts.json is a debug dump — not committed.
+!training_data/routing_profiles/
+training_data/routing_profiles/*
+!training_data/routing_profiles/anchor_prompts.jsonl
+!training_data/routing_profiles/anchor_prompts.sha256
+!training_data/routing_profiles/profile_routing_reasoning_think.json
+!training_data/routing_profiles/profile_routing_classify_notink.json
+!training_data/routing_profiles/profile_routing_structured_notink.json
 
 # GoReleaser build artifacts
 dist/
