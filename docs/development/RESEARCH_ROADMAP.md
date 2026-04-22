@@ -250,7 +250,7 @@ Complete LoRA fine-tuning pipeline delivered in PRs #217-250:
 
 **Phase 3.3: Fine-Tuning Pipeline** - COMPLETE (PRs #246-250)
 
-- Base model: Qwen3-30B-A3B MoE via vllm-mlx
+- Base model: Qwen3.6-35B-A3B MoE via vllm-mlx
 - Training: LoRA fine-tuning with MLX on Apple Silicon
 - Evaluation: per-task scoring, regression gate, deployment pipeline
 

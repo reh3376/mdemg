@@ -5,15 +5,17 @@ to 4-bit for inference, and optionally verifies the fused model with
 a single test prompt.
 
 Usage:
+    # TODO (Sprint E): Asymmetric-quant output-path naming (mdemg-qwen3.6-35b-v1-asym/);
+    # path convention finalized when per-module quant selectors land via mlx_lm.convert.
     python -m training.quantize_deploy \
-        --base-model Qwen/Qwen3-30B-A3B \
+        --base-model Qwen/Qwen3.6-35B-A3B \
         --adapter-path adapters/v1/ \
         --output-path models/mdemg-qwen3-30b-v1-q4/ \
         --quantize 4bit
 
     # With verification:
     python -m training.quantize_deploy \
-        --base-model Qwen/Qwen3-30B-A3B \
+        --base-model Qwen/Qwen3.6-35B-A3B \
         --adapter-path adapters/v1/ \
         --output-path models/mdemg-qwen3-30b-v1-q4/ \
         --quantize 4bit \

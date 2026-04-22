@@ -1,0 +1,91 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "guardrail.evaluate",
+    "description": "Evaluate a diff for constraint violations and warnings against MDEMG guardrail policies.",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "Sprint FT-LORA-B",
+    "created": "2026-04-21",
+    "priority": "high",
+    "notes": "17th call site — migrated from direct-HTTP to llmclient in Sprint FT-LORA-B (2026-04-21). See 01_RESEARCH_v2.md §1.1 footnote: spec exists for interaction-capture parity but is excluded from the Phase 5 SFT training target (which remains 16 tasks × 500-1000 anchor examples). Guardrail is opt-in (GUARDRAIL_ENABLED=false by default); enabling it adds this 17th captured task to llm_interactions."
+  },
+  "sampling_group": "J",
+  "prompt": {
+    "system_prompt_hash": [
+      "6432d4ec634337cd9a176f74b367030cad8925e14a83ca448abcbf78a58f41f1",
+      "d73a725d8781f570b26af3804c20bd1c5e8998ba0a501a7be92ba43c07c183f2"
+    ],
+    "system_prompt_source": [
+      "internal/guardrail/prompt.go:10",
+      "internal/guardrail/prompt.go:30"
+    ],
+    "think_mode": false,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 5000,
+    "max_tokens": 2000
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["violations", "warnings"],
+    "properties": {
+      "violations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["constraint_node_id", "description", "rationale"],
+          "properties": {
+            "constraint_node_id": { "type": "string" },
+            "description": { "type": "string" },
+            "rationale": { "type": "string" }
+          }
+        }
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["constraint_node_id", "description", "rationale"],
+          "properties": {
+            "constraint_node_id": { "type": "string" },
+            "description": { "type": "string" },
+            "rationale": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "quality_metrics": [
+    {
+      "name": "json_valid",
+      "weight": 0.3,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON"
+    },
+    {
+      "name": "violation_recall",
+      "weight": 0.4,
+      "threshold": 0.7,
+      "description": "Correctly identifies genuine must/must_not constraint violations in the diff"
+    },
+    {
+      "name": "false_positive_rate",
+      "weight": 0.3,
+      "threshold": 0.15,
+      "description": "Upper bound on false-positive violation flags (lower is better; system prompt biases toward Pass)"
+    }
+  ],
+  "reward_functions": [
+    "json_valid",
+    "violation_detection_accuracy",
+    "false_positive_penalty"
+  ],
+  "training_config": {
+    "rank": 8,
+    "min_examples": 500,
+    "quality_gate": 0.7
+  }
+}

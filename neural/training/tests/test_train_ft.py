@@ -208,7 +208,7 @@ class TestBuildTrainConfig:
 
             config = build_train_config(
                 dataset_dir=tmpdir,
-                base_model="mlx-community/Qwen3-30B-A3B-4bit",
+                base_model="mlx-community/Qwen3.6-35B-A3B-4bit",
                 adapter_path="/tmp/adapters",
                 epochs=3,
                 batch_size=4,
@@ -218,7 +218,7 @@ class TestBuildTrainConfig:
                 max_seq_length=2048,
             )
 
-            assert config["model"] == "mlx-community/Qwen3-30B-A3B-4bit"
+            assert config["model"] == "mlx-community/Qwen3.6-35B-A3B-4bit"
             assert config["adapter_path"] == "/tmp/adapters"
             assert config["batch_size"] == 4
             assert config["learning_rate"] == 1e-5

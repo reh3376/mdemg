@@ -10,7 +10,7 @@ Usage:
         --ults-dir docs/tests/ults/specs/ \
         --task consulting.classify \
         --teacher-url http://localhost:8100/v1 \
-        --teacher-model mlx-community/Qwen3-30B-A3B-4bit \
+        --teacher-model mlx-community/Qwen3.6-35B-A3B-4bit \
         --count 50 \
         --output distilled/consulting_classify.jsonl
 
@@ -19,7 +19,7 @@ Usage:
         --ults-dir docs/tests/ults/specs/ \
         --task metalearn.generalize --task jiminy.evaluate_llm \
         --teacher-url http://localhost:8100/v1 \
-        --teacher-model mlx-community/Qwen3-30B-A3B-4bit \
+        --teacher-model mlx-community/Qwen3.6-35B-A3B-4bit \
         --count 30 \
         --output distilled/multi_task.jsonl
 

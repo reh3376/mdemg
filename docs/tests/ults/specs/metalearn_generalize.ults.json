@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "metalearn.generalize",
-    "description": "Knowledge generalizer — abstracts space-specific concepts into cross-space generalizations",
+    "description": "Knowledge generalizer \u2014 abstracts space-specific concepts into cross-space generalizations",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "medium",
     "notes": "Part of the meta-learning pipeline. Takes domain-specific concepts and produces generalized abstractions that apply across spaces. Think mode aids abstraction reasoning."
   },
+  "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "3f44c1ae2583659b84937846392c2cd69303e9eacc9c6745530a6cddeedea5f2",
     "system_prompt_source": "internal/metalearn/generalizer.go:62",
@@ -23,18 +24,44 @@
   },
   "output_schema": {
     "type": "object",
-    "required": ["generalization"],
+    "required": [
+      "generalization"
+    ],
     "properties": {
-      "generalization": { "type": "string" },
-      "applicability": { "type": "array", "items": { "type": "string" } },
-      "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      "generalization": {
+        "type": "string"
+      },
+      "applicability": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
     }
   },
   "quality_metrics": [
-    { "name": "json_valid", "weight": 0.2, "threshold": 1.0, "description": "Output parses as valid JSON" },
-    { "name": "generalization_quality", "weight": 0.8, "threshold": 0.5, "description": "Abstraction is meaningful, non-trivial, and cross-domain applicable" }
+    {
+      "name": "json_valid",
+      "weight": 0.2,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON"
+    },
+    {
+      "name": "generalization_quality",
+      "weight": 0.8,
+      "threshold": 0.5,
+      "description": "Abstraction is meaningful, non-trivial, and cross-domain applicable"
+    }
   ],
-  "reward_functions": ["json_valid", "generalization_quality_score"],
+  "reward_functions": [
+    "json_valid",
+    "generalization_quality_score"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 300,

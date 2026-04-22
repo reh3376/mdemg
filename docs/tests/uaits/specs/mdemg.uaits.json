@@ -7,7 +7,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-04-10",
-    "description": "MDEMG training data contract — 4 datasets across SFT, DPO, RAFT, and curriculum paradigms for Qwen3-30B-A3B fine-tuning"
+    "description": "MDEMG training data contract — 4 datasets across SFT, DPO, RAFT, and curriculum paradigms for Qwen3.6-35B-A3B fine-tuning"
   },
   "datasets": [
     {

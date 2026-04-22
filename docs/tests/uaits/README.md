@@ -26,7 +26,7 @@ docs/tests/uaits/
 
 ## MDEMG Spec
 
-`specs/mdemg.uaits.json` declares 4 datasets for Qwen3-30B-A3B fine-tuning:
+`specs/mdemg.uaits.json` declares 4 datasets for Qwen3.6-35B-A3B fine-tuning:
 
 | Dataset | Paradigm | Source Table | Key Properties |
 |---------|----------|-------------|----------------|

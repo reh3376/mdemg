@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "retrieval.rerank_nli",
-    "description": "NLI-style reranker — compressed scoring of retrieval candidates optimized for local model latency",
+    "description": "NLI-style reranker \u2014 compressed scoring of retrieval candidates optimized for local model latency",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "medium",
     "notes": "Compact static system prompt for NLI-style scoring. User message contains query + compressed candidates. Designed for fast Ollama inference."
   },
+  "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb",
     "system_prompt_source": "internal/retrieval/rerank.go:22",
@@ -31,9 +32,17 @@
     }
   },
   "quality_metrics": [
-    { "name": "score_accuracy", "weight": 1.0, "threshold": 0.5, "description": "Score ordering correlates with actual relevance" }
+    {
+      "name": "score_accuracy",
+      "weight": 1.0,
+      "threshold": 0.5,
+      "description": "Score ordering correlates with actual relevance"
+    }
   ],
-  "reward_functions": ["score_correlation", "ndcg_delta"],
+  "reward_functions": [
+    "score_correlation",
+    "ndcg_delta"
+  ],
   "training_config": {
     "rank": 8,
     "min_examples": 500,

@@ -2,15 +2,16 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "summarize.generate",
-    "description": "Code summarization — generates structured JSON summaries of source code elements for graph ingestion",
+    "description": "Code summarization \u2014 generates structured JSON summaries of source code elements for graph ingestion",
     "version": "1.0.0"
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "high",
-    "notes": "High-volume task — called for every ingested code element. System prompt is a descriptive const shared by OpenAI and Ollama paths. Output must be valid JSON."
+    "notes": "High-volume task \u2014 called for every ingested code element. System prompt is a descriptive const shared by OpenAI and Ollama paths. Output must be valid JSON."
   },
+  "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "6f5be281b9d99b9bfd396e626c51e6507df7f5423ecd9a3cfa84ca0e2adeaeb7",
     "system_prompt_source": "internal/summarize/service.go:20",
@@ -23,18 +24,43 @@
   },
   "output_schema": {
     "type": "object",
-    "required": ["summary"],
+    "required": [
+      "summary"
+    ],
     "properties": {
-      "summary": { "type": "string" },
-      "purpose": { "type": "string" },
-      "key_concepts": { "type": "array", "items": { "type": "string" } }
+      "summary": {
+        "type": "string"
+      },
+      "purpose": {
+        "type": "string"
+      },
+      "key_concepts": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
     }
   },
   "quality_metrics": [
-    { "name": "coherence", "weight": 0.5, "threshold": 0.6, "description": "Summary is clear, accurate, and well-structured" },
-    { "name": "coverage", "weight": 0.5, "threshold": 0.5, "description": "Summary captures key functionality and purpose" }
+    {
+      "name": "coherence",
+      "weight": 0.5,
+      "threshold": 0.6,
+      "description": "Summary is clear, accurate, and well-structured"
+    },
+    {
+      "name": "coverage",
+      "weight": 0.5,
+      "threshold": 0.5,
+      "description": "Summary captures key functionality and purpose"
+    }
   ],
-  "reward_functions": ["json_valid", "coherence_score", "coverage_score"],
+  "reward_functions": [
+    "json_valid",
+    "coherence_score",
+    "coverage_score"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 1000,

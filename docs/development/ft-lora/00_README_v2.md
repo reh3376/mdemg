@@ -1,6 +1,15 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
 **Date:** 2026-04-21
+**Version:** 5.1 (Sprint FT-LORA-B — code/config alignment + guardrail llmclient migration + ULTS `sampling_group`)
+
+> **Changes in v5.1 (Sprint FT-LORA-B — 2026-04-21):**
+> - **Guardrail migration**: `internal/guardrail/llm_evaluator.go` now routes through `llmclient` (17th captured call site, `task_name='guardrail.evaluate'`). Hard cutover renamed circuit breakers `openai-guardrail` → `openai-guardrail.evaluate` / `ollama-guardrail` → `ollama-guardrail.evaluate` — breaking change on the admin surface, see CHANGELOG.
+> - **ULTS schema**: required `sampling_group` enum (T/C/J) added; all 16 canonical specs + new `guardrail_evaluate.ults.json` (17th) carry the field.
+> - **Grep-audit remediation**: 15 files refreshed from `Qwen3-30B-A3B` → `Qwen3.6-35B-A3B`; `scripts/test_vllm_mlx.py` argparse default updated (functional change when `$LLM_MODEL` unset). `mlx-community/Qwen3.6-35B-A3B-4bit` confirmed on HuggingFace at execution time (not `-Q4`).
+> - **.env + compose**: seeded Sprint-E placeholder knobs (`ROUTER_AUX_LOSS_COEF`, `LORA_TIER1/2_*`, `ASYMMETRIC_QUANT_*`) commented out.
+> - **Version 5.0 memo-alignment unchanged**; v5.1 is a patch-level execution pass of what Sprint A queued.
+
 **Version:** 5.0 (Qwen3.6-35B-A3B upgrade + two-tier MoE-Sieve LoRA + no-tool-calling architectural policy per memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md` v3.1)
 
 > **Changes in v5.0 (per memo 07 v3.1 — 2026-04-21)**
@@ -30,6 +39,7 @@ Read in order. Each document builds on the previous.
 | 6 | `06_CORRECTIONS_APPLIED_v2.md` | All corrections v1.0→v5.0 consolidated with resolution status | ~10 |
 | 7 | `SPRINT_A_GREP_AUDIT.md` | Sprint FT-LORA-A Epic 10 output — repo-wide grep of stale model names and banned tool-calling patterns; remediation queue for Sprint B | ~3 |
 | 8 | `sprint_plan_ft_lora_a.md` | Sprint FT-LORA-A v1.0-format plan (as executed) — 11 epics, 3-tier testing, commit strategy, Documents Accessed appendix | ~7 |
+| 9 | `sprint_plan_ft_lora_b.md` | Sprint FT-LORA-B v1.0-format plan (as executed) — 7 epics, ULTS `sampling_group`, guardrail llmclient migration, grep-audit remediation, placeholder env knobs | ~9 |
 
 ---
 

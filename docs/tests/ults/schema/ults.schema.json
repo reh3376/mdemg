@@ -4,7 +4,7 @@
   "title": "ULTS - Universal LLM Task Specification",
   "description": "Schema for defining LLM task contracts: prompts, output schemas, quality metrics, and training configuration",
   "type": "object",
-  "required": ["ults_version", "task", "metadata"],
+  "required": ["ults_version", "task", "metadata", "sampling_group"],
   "properties": {
     "ults_version": {
       "type": "string",
@@ -138,6 +138,11 @@
       "items": {
         "type": "string"
       }
+    },
+    "sampling_group": {
+      "type": "string",
+      "enum": ["T", "C", "J"],
+      "description": "Memo 07 v3.1 §3.3 sampling group — T=reasoning-think, C=no-think classify, J=no-think JSON. Consumed by Sprint C inference harness to apply per-group recipe (temp/top_p/top_k/presence_penalty)."
     },
     "training_config": {
       "type": "object",

@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "ape.reflect",
-    "description": "RSIC reflection engine — analyzes graph topology, detects patterns/gaps/clusters, produces actionable improvement insights",
+    "description": "RSIC reflection engine \u2014 analyzes graph topology, detects patterns/gaps/clusters, produces actionable improvement insights",
     "version": "1.0.0"
   },
   "metadata": {
@@ -11,6 +11,7 @@
     "priority": "high",
     "notes": "Core RSIC self-improvement task. Think mode enables deeper structural analysis of graph topology. Output drives APE task dispatch."
   },
+  "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "64d528cc23dfed0c75ccdddeecf507e671b8f8f85f2fc679226b6e1caf13cc33",
     "system_prompt_source": "internal/ape/llm_reflector.go:62",
@@ -23,30 +24,73 @@
   },
   "output_schema": {
     "type": "object",
-    "required": ["insights"],
+    "required": [
+      "insights"
+    ],
     "properties": {
       "insights": {
         "type": "array",
         "items": {
           "type": "object",
-          "required": ["type", "description", "priority"],
+          "required": [
+            "type",
+            "description",
+            "priority"
+          ],
           "properties": {
-            "type": { "type": "string" },
-            "description": { "type": "string" },
-            "priority": { "type": "string", "enum": ["high", "medium", "low"] },
-            "affected_nodes": { "type": "array", "items": { "type": "string" } },
-            "suggested_action": { "type": "string" }
+            "type": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "affected_nodes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "suggested_action": {
+              "type": "string"
+            }
           }
         }
       }
     }
   },
   "quality_metrics": [
-    { "name": "json_valid", "weight": 0.3, "threshold": 1.0, "description": "Output parses as valid JSON" },
-    { "name": "actionability", "weight": 0.4, "threshold": 0.6, "description": "Insights contain actionable suggestions" },
-    { "name": "insight_quality", "weight": 0.3, "threshold": 0.5, "description": "Insights are non-trivial and graph-aware" }
+    {
+      "name": "json_valid",
+      "weight": 0.3,
+      "threshold": 1.0,
+      "description": "Output parses as valid JSON"
+    },
+    {
+      "name": "actionability",
+      "weight": 0.4,
+      "threshold": 0.6,
+      "description": "Insights contain actionable suggestions"
+    },
+    {
+      "name": "insight_quality",
+      "weight": 0.3,
+      "threshold": 0.5,
+      "description": "Insights are non-trivial and graph-aware"
+    }
   ],
-  "reward_functions": ["json_valid", "insight_count", "actionability_score"],
+  "reward_functions": [
+    "json_valid",
+    "insight_count",
+    "actionability_score"
+  ],
   "training_config": {
     "rank": 16,
     "min_examples": 500,
