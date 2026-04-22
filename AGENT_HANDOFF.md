@@ -57,6 +57,13 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-21) ===
+- ✅ FT-LORA-C Gate 1 — Qwen3.6-35B-A3B MLX asymmetric-quant load (2026-04-22):
+  - **All 4 numeric criteria passed.** Model: `mlx-community/Qwen3.6-35B-A3B-mxfp4` (Path A with deviation: attention MXFP4 not BF16 — flagged to Sprint E `mlx_lm.convert` per-module patch). SHA256(config.json): `cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734`.
+  - Measured: peak RAM **19.03 GB** (ceiling 24 GB, band=normal — Tier 2 concurrent-inference headroom intact); cold-load wall time **3.34 s** (ceiling 90 s — 27× headroom; much faster than ~52 s estimate, logged as calibration telemetry for Gates 2/3 sizing); forward-pass **0.84 s** (ceiling 30 s); `LOADED_OK` + `FORWARD_OK` both present, exit 0.
+  - Venv: `~/.venv/mdemg-ft-lora` (Python 3.12.13, mlx_lm 0.31.2, huggingface_hub 1.11.0, lockfile at `docs/development/ft-lora/sprint_c_mlx_venv.lock`). Hardware: M5 Max, 128 GB unified, macOS 26.3.2, internal Apple Fabric NVMe.
+  - Stamp: `~/.mdemg-sprint-c/gate1/passed_20260422T034121Z.json` (execution-time artifact, not in repo per runbook design).
+  - Path A/B/C decision recorded at `~/.mdemg-sprint-c/gate1/path_decision.json`: rejected `-4bit` (no MXFP4 mode), `-4.4bit-msq` (experimental, 128 downloads, mixed 4/8-bit not memo scheme), `-8bit` (no MXFP4 mode). `-mxfp4` is closest memo-07-v3.1-§3.8 match of any published HF artifact. Gate 1 → Gate 2 unblocked.
+
 - ✅ FT-LORA-C: Qwen3.6-35B-A3B MLX Validation Runbook (planning-only, 2026-04-21):
   - Planning-only sprint — deliverable is one committed doc (`docs/development/ft-lora/sprint_plan_ft_lora_c.md`, ~14 pages) designed to be executed by a future Claude Code session after arbitrary pauses (week-long inter-gate pauses survive via disk-stamp resume protocol under `~/.mdemg-sprint-c/`). Zero execution artifacts in Sprint C itself ($0 spend).
   - **Gate 1 (MLX asymmetric-quant load)** — 4 numeric acceptance criteria: no-OOM, peak RAM ≤24 GB (24-30 GB flag, >30 GB halt), load time ≤90 s (first-load from cold page cache; normalized for SSD tier — internal NVMe baseline, USB 3.2 ≤180 s, TB3/4 ≤135 s), forward-pass ≤30 s. Three path options (A=published asymmetric if available, B=`mlx_lm.convert` selector attempt, C=symmetric 4-bit fallback with Sprint-E deviation recorded). Fail → halt FT-LORA line; replan Sprint C' with Qwen3.5-35B-A3B.
