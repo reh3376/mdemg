@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"mdemg/internal/guardrail"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
 )
 
@@ -40,7 +41,15 @@ func (s *Server) handleGuardrailValidate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := s.guardrailValidator.Validate(r.Context(), guardrail.ValidateRequest{
+	// Sprint FT-LORA-B: propagate the per-request space_id through the llmclient
+	// context so llm_interactions rows are tagged with the caller's space_id
+	// (not the server default). Matches the pattern at handlers.go:482 / :2250.
+	ctx := r.Context()
+	if req.SpaceID != "" {
+		ctx = llmclient.WithSpaceID(ctx, req.SpaceID)
+	}
+
+	result, err := s.guardrailValidator.Validate(ctx, guardrail.ValidateRequest{
 		SpaceID:         req.SpaceID,
 		FilesChanged:    req.FilesChanged,
 		Diff:            req.Diff,
