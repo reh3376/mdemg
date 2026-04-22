@@ -273,9 +273,46 @@ Example (`consulting.classify`):
 
 ---
 
-## Phase 5: Training Pipeline — Two-Tier SFT (Python + MLX) 🔄 REWORKED for v5.0
+## Phase 5: Training Pipeline — Two-Tier SFT (Python + MLX) 🔄 REWORKED for v5.0 — **UNBLOCKED 2026-04-22**
 
-**v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E implements the config/flag additions; Sprint FT-LORA-C validates convergence on Qwen3.6.
+**v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E ✅ shipped the config/flag additions 2026-04-22 (see [`sprint_plan_ft_lora_e.md`](sprint_plan_ft_lora_e.md)); Sprint FT-LORA-C ✅ validated convergence on Qwen3.6 (all 3 gates green).
+
+**Phase 5 pre-reqs complete.** Ready-to-invoke cheat-sheet:
+
+```bash
+# Tier 1 — universal adapter (one run, all 16 tasks balanced)
+python -m neural.training.train_ft \
+  --tier 1 --mode sft \
+  --base-model <sprint-c-mxfp4-path> \
+  --expected-sha256 cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734 \
+  --dataset training_data/sft/mdemg_sft.jsonl \
+  --adapter-path adapters/tier1_attn_shared/ \
+  --rank 32 --alpha 64 \
+  --n-epochs 3 \
+  --router-aux-loss-coef 0.002 \
+  --early-stop-ratio 1.05 --early-stop-patience 2
+
+# Tier 2 — per family (3 runs; reasoning-think shown; substitute family + profile + dataset + output)
+python -m neural.training.train_ft \
+  --tier 2 --family reasoning-think \
+  --expert-selection-path training_data/routing_profiles/profile_routing_reasoning_think.json \
+  --expected-sha256 cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734 \
+  --base-adapter adapters/tier1_attn_shared/ \
+  --base-model <sprint-c-mxfp4-path> \
+  --dataset training_data/sft/family_reasoning_think.jsonl \
+  --adapter-path adapters/tier2_reasoning_think/ \
+  --rank 8 --alpha 16 --n-epochs 3 \
+  --router-aux-loss-coef 0.002 \
+  --early-stop-ratio 1.05 --early-stop-patience 2
+
+# Asymmetric quant classification (after all adapters merged)
+python -m neural.training.quantize_asymmetric \
+  --input-model adapters/merged_final/ \
+  --output-model adapters/merged_final_mxfp4/ \
+  --shared-bits bf16 --routed-spec mxfp4 --attn-bits bf16
+```
+
+**Gating reminder:** Tier 2 cannot start until Tier 1 adapter exists (composition via `--base-adapter`). Phase 5 runbook owns sequencing + checkpoint-behavior empirical verification (Sprint E deferred this because it never launches training).
 
 ### 5A. Tier 1 — Universal LoRA (attention + shared expert, r=32, all 16 tasks balanced)
 

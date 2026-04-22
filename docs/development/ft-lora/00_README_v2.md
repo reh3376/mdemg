@@ -1,7 +1,17 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
 **Date:** 2026-04-22
-**Version:** 5.3 (Sprint FT-LORA-D — Expert activation profiling executed; family partition decision locked)
+**Version:** 5.4 (Sprint FT-LORA-E — Training infrastructure patched; Phase 5 SFT unblocked)
+
+> **Changes in v5.4 (Sprint FT-LORA-E — 2026-04-22):**
+> - **Tier-aware CLI on `neural/training/train_ft.py`**: 13 new flags (`--tier {1,2}`, `--family`, `--expert-selection-path`, `--expected-sha256`, `--mode {sft,rl}`, `--base-adapter`, `--rank`, `--alpha`, `--target-modules`, `--router-aux-loss-coef`, `--early-stop-ratio`, `--early-stop-patience`, `--n-epochs`). Tier 1 = attention + shared expert, r=32 α=64, 7 modules × 40 layers. Tier 2 = top-25% routed experts per family, r=8 α=16, 7,680 modules (40 × 64 × 3).
+> - **New modules**: `neural/training/expert_selection.py` (Sprint D profile JSON → mlx_lm `keys` list), `neural/training/quantize_asymmetric.py` (BF16 attn + shared + router / MXFP4 routed experts predicate + `--dry-run` classifier CLI), `neural/training/early_stop.py` (subprocess stdout monitor: SFT `val_loss > best × 1.05` for 2 consecutive evals, RL mirror `val_reward < best × 0.95`).
+> - **Dual-path `router_aux_loss_coef=0.002` injection**: primary `--config train_config.yaml` + fallback atomic copy-on-write `config.json` replacement with SIGTERM/SIGINT/SIGHUP + atexit restoration and SHA256 re-match on exit. Catches the "crashed training drifts base model config" failure mode.
+> - **Sprint C SHA pin (`cdc167566e…`) enforced for BOTH tiers** via `--expected-sha256` flag. Drift aborts before any training starts.
+> - **Epoch cap = 3 enforced as rejection, not silent clamp**; `--n-epochs auto` rejected citing FT-OAI-001 forcing function.
+> - **Env vars activated (11 total)**: `ROUTER_AUX_LOSS_COEF`, `LORA_TIER{1,2}_{RANK,ALPHA}`, `LORA_N_EPOCHS_CAP`, `LORA_EARLY_STOP_{SFT,RL}_THRESHOLD`, `ASYMMETRIC_QUANT_{SHARED,ROUTED,ATTN}`. 3 files modified (`.env.example`, `docker-compose.yml`, `internal/cli/compose_templates/docker-compose.yml`).
+> - **Tests (3 tiers)**: 89 unit + 5 integration + 1 E2E script (`scripts/sprint_e_e2e_dry_run.sh`). All green.
+> - **Phase 5 SFT unblocks**: Tier 1 universal adapter + 3× Tier 2 family adapters + asymmetric quant can now be launched from `train_ft.py` + `quantize_asymmetric.py`.
 
 > **Changes in v5.3 (Sprint FT-LORA-D — 2026-04-22):**
 > - **Expert activation profiler committed**: `neural/training/profile_expert_routing.py` — context-manager monkey-patch of `Qwen3NextSparseMoeBlock.__call__` captures top-k routing decisions across prompt and generated tokens. Single-pass inline forward (no double-compute). Determinism verified bit-identical across runs.
@@ -59,6 +69,7 @@ Read in order. Each document builds on the previous.
 | 10 | `sprint_plan_ft_lora_c.md` | Sprint FT-LORA-C v1.0-format plan (planning-only, runbook) — 3-gate Qwen3.6-35B-A3B MLX validation + Sprint F registration | ~14 |
 | 11 | `sprint_plan_ft_lora_d.md` | Sprint FT-LORA-D v1.0-format plan (as executed) — 5 epics, expert activation profiling script + anchor prompt set + family-partition decision | ~8 |
 | 12 | `sprint_c_d_profile_results.md` | Sprint D Epic 3 decision doc — verdict code (3-family-confirmed / 2-family-merged / 1-family-collapsed), cross-family overlap + task-cohesion tables, Sprint E recommendation | ~4 |
+| 13 | `sprint_plan_ft_lora_e.md` | Sprint FT-LORA-E v1.0-format plan (as executed) — 7 epics, tier-aware train_ft.py CLI + `expert_selection.py` + `quantize_asymmetric.py` + `early_stop.py` + env-var activation + atomic `router_aux_loss_coef` injection. Post-execution notes record dual-path injection strategy + deferred checkpoint-behavior verification. | ~15 |
 
 ---
 
@@ -76,6 +87,7 @@ Read in order. Each document builds on the previous.
 | **Inference: vllm-mlx** | OpenAI-compatible, prefix caching, continuous batching, Qwen3 reasoning parser, adapter-stack support for Tier 1 + Tier 2. No `--tool-call-parser`, no `--enable-auto-tool-choice`. | [`02_M5MAX_HARDWARE_v2.md §4`](02_M5MAX_HARDWARE_v2.md) |
 | **LLM consumers: 16 (re-audited 2026-04-21)** | 16 rows = 16 distinct task labels. v4.0 "17 rows" corrected (jiminy.evaluate double-count removed). Guardrail is a 17th call site that bypasses llmclient — Sprint B migration queued. | [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md) |
 | **Training: MLX bf16 LoRA** | M5 Max 128GB has no production traffic constraint during offline training. Tier 1 ~105–115GB; Tier 2 ~67–75GB (inference can run alongside Tier 2). | [`02_M5MAX_HARDWARE_v2.md §3`](02_M5MAX_HARDWARE_v2.md) |
+| **Training infra patched: Phase 5 unblocked (Sprint E)** | Tier-aware `train_ft.py` CLI + `expert_selection.py` (Sprint D → 7,680 mlx_lm keys) + `quantize_asymmetric.py` (BF16 attn/shared + MXFP4 routed predicate) + `early_stop.py` (val_loss/val_reward monitor with patience=2) + dual-path atomic `router_aux_loss_coef` injection + Sprint C SHA gating for both tiers. | [`sprint_plan_ft_lora_e.md`](sprint_plan_ft_lora_e.md) |
 | **Balanced sampling for Tier 1** | Equal records per task label (`per_task=500` default) prevents 223× skew (FT-OAI-001 R1 finding). Integer up-sampling via duplication; deterministic seed. | [`05_DATA_COLLECTION_v2.md Appendix A`](05_DATA_COLLECTION_v2.md) |
 | **Anti-collapse: α ≥ 0.4 exogenous ratio** | Peer-reviewed. Minimum 40% non-model-generated data per batch. | — |
 | **Think block stripping** | 9 of 16 consumers parse JSON. `SanitizeResponse()` strips `<think>...</think>`. | [`03_IMPLEMENTATION_PLAN_v2.md Phase 2D`](03_IMPLEMENTATION_PLAN_v2.md) |
