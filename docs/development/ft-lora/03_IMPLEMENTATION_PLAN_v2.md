@@ -275,31 +275,31 @@ Example (`consulting.classify`):
 
 ## Phase 5: Training Pipeline — Two-Tier SFT (Python + MLX) 🔄 REWORKED for v5.0 — **UNBLOCKED 2026-04-22**
 
-**v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E ✅ shipped the config/flag additions 2026-04-22 (see [`sprint_plan_ft_lora_e.md`](sprint_plan_ft_lora_e.md)); Sprint FT-LORA-C ✅ validated convergence on Qwen3.6 (all 3 gates green).
+**v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E ✅ shipped the config/flag additions 2026-04-22 (see [`sprint_plan_ft_lora_e.md`](sprint_plan_ft_lora_e.md)); Sprint FT-LORA-C ✅ validated convergence on Qwen3.6 (all 3 gates green); **Sprint FT-LORA-DATA ✅ shipped the curated datasets 2026-04-22** (see [`sprint_plan_ft_lora_data.md`](sprint_plan_ft_lora_data.md)); pre-flight verdict **CLEAR** (see [`phase_5_dataset_preflight_post.md`](phase_5_dataset_preflight_post.md) with baseline [`phase_5_dataset_preflight.md`](phase_5_dataset_preflight.md)).
 
-**Phase 5 pre-reqs complete.** Ready-to-invoke cheat-sheet:
+**Phase 5 pre-reqs complete.** Ready-to-invoke cheat-sheet (directory-based; mlx_lm 0.31.2 consumes a directory containing `train.jsonl` + `valid.jsonl` via `--data`, **not** a file via `--dataset`):
 
 ```bash
-# Tier 1 — universal adapter (one run, all 16 tasks balanced)
+# Tier 1 — universal adapter (one run, all 16 tasks balanced; 3,500 rows = 3,150 train + 350 valid)
 python -m neural.training.train_ft \
   --tier 1 --mode sft \
   --base-model <sprint-c-mxfp4-path> \
   --expected-sha256 cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734 \
-  --dataset training_data/sft/mdemg_sft.jsonl \
+  --data training_data/sft/tier1/ \
   --adapter-path adapters/tier1_attn_shared/ \
   --rank 32 --alpha 64 \
   --n-epochs 3 \
   --router-aux-loss-coef 0.002 \
   --early-stop-ratio 1.05 --early-stop-patience 2
 
-# Tier 2 — per family (3 runs; reasoning-think shown; substitute family + profile + dataset + output)
+# Tier 2 — per family (3 runs; reasoning-think shown; substitute family + profile + data dir + output)
 python -m neural.training.train_ft \
   --tier 2 --family reasoning-think \
   --expert-selection-path training_data/routing_profiles/profile_routing_reasoning_think.json \
   --expected-sha256 cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734 \
   --base-adapter adapters/tier1_attn_shared/ \
   --base-model <sprint-c-mxfp4-path> \
-  --dataset training_data/sft/family_reasoning_think.jsonl \
+  --data training_data/sft/family_reasoning_think/ \
   --adapter-path adapters/tier2_reasoning_think/ \
   --rank 8 --alpha 16 --n-epochs 3 \
   --router-aux-loss-coef 0.002 \
@@ -312,7 +312,40 @@ python -m neural.training.quantize_asymmetric \
   --shared-bits bf16 --routed-spec mxfp4 --attn-bits bf16
 ```
 
+**Directory-vs-file guidance (authoritative, supersedes Sprint E cheat-sheet):**
+- mlx_lm `--data <dir>` points at a directory; loader expects `train.jsonl` + `valid.jsonl` siblings.
+- Sprint FT-LORA-DATA produces the 4 directories consumed by Phase 5:
+  - `training_data/sft/tier1/` — 3,150 train + 350 valid (all 16 tasks balanced)
+  - `training_data/sft/family_reasoning_think/` — 1,530 train + 170 valid (7 T tasks; ape.reflect target=500)
+  - `training_data/sft/family_classify_notink/` — 1,080 train + 120 valid (6 C tasks)
+  - `training_data/sft/family_structured_notink/` — 540 train + 60 valid (3 J tasks)
+- Each directory also contains a `manifest.json` pinning: `generator_sha`, `trained_against_model_sha` (Sprint C `cdc167566e…`), `raw_dataset_sha_pin` (`7caebf75fd59da37…`), per-task counts, source composition, duplication factors, seed, `file_sha256`, and `synthesis_version` (`v1-aaa646e`).
+
 **Gating reminder:** Tier 2 cannot start until Tier 1 adapter exists (composition via `--base-adapter`). Phase 5 runbook owns sequencing + checkpoint-behavior empirical verification (Sprint E deferred this because it never launches training).
+
+### 5.X-Data. Sprint FT-LORA-DATA — Dataset Curation ✅ EXECUTED 2026-04-22
+
+**Scripts (all shipped this sprint):**
+- `neural/training/recurate.py` — provenance-preserving re-curation with raw-SHA pin assertion.
+- `neural/training/distill_driver.py` — mixed-teacher orchestrator (`gpt-5.4-mini` for 3 OpenAI-teacher tasks + Qwen3.6 MLX local for 2 MLX-teacher tasks); per-row structured logging with flush, endpoint pre-flight, MLX single-instance guard, debug log, HTTP retry policy (Epic 6.0 stabilization).
+- `neural/training/balanced_sampler.py` — per-tier pre-processing sampler (upsample/downsample/passthrough, duplication ceiling = 5×, seed=42).
+- `neural/training/stratified_split.py` — 90/10 stratified splitter + SHA256-stamped `manifest.json` writer.
+
+**Tests (Epic 5, 3 tiers):**
+- Unit: `neural/training/tests/{test_recurate.py, test_distill_driver.py, test_balanced_sampler.py, test_stratified_split.py}`
+- Integration: `neural/training/tests/test_data_pipeline_integration.py`
+- E2E: `scripts/sprint_ft_lora_data_e2e.sh`
+- Live (gated): `neural/training/tests/test_distill_driver_live.py` (`MDEMG_LIVE_MLX=1`)
+
+**Absent-task synthesis** (4 tasks had 0 rows in 21-day window):
+- `consulting.synthesis`, `metalearn.generalize`, `hidden.summarize` → `gpt-5.4-mini` teacher (3 × 200 rows, ~$0.35–0.50 OpenAI spend; `metalearn.generalize` rows carry `weak_signal: True`).
+- `retrieval.rerank_nli`, `summarize.generate` → Qwen3.6 MLX local teacher ($0, 2 × 200 rows).
+
+**Pre-flight results:** baseline (`aaa646e`) = BLOCKED with 5 reasons; post-run verdict = **CLEAR** (see [`phase_5_dataset_preflight_post.md`](phase_5_dataset_preflight_post.md)).
+
+**Highest duplication factor:** `jiminy.evaluate_llm` at 4.348× (45 real rows → 200-row floor), inside the 5× ceiling. Tier 1 `manifest.json` records this explicitly.
+
+**Pinning:** raw dataset SHA `7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988`; model config SHA `cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734`; all 4 tools assert both on every invocation.
 
 ### 5A. Tier 1 — Universal LoRA (attention + shared expert, r=32, all 16 tasks balanced)
 

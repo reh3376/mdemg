@@ -1,0 +1,54 @@
+{
+  "ape_reflect_target": 500,
+  "base_dataset_ver": "sprint_ft_lora_data_v1",
+  "duplication_factors": {
+    "hidden.name_emergence": 1.0,
+    "jiminy.evaluate_llm": 4.348,
+    "retrieval.rerank_cross": 1.0
+  },
+  "family_name": "structured_notink",
+  "file_sha256": {
+    "train.jsonl": "5933678b92309c030646d0bdad33a022096b5e6c151ae598eb9277ef9972937e",
+    "valid.jsonl": "a5a0534b1fdb9220e1439357ab92e6857b8d5f15d029e68c9dd7e28031b0f804"
+  },
+  "generator_sha": "aaa646ee692dc26cbd8af2296f8486d0d05c3dd9",
+  "meta_placement": "embedded",
+  "per_task_counts": {
+    "hidden.name_emergence": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.evaluate_llm": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.rerank_cross": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    }
+  },
+  "raw_dataset_sha_pin": "7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988",
+  "row_counts": {
+    "total": 600,
+    "train": 540,
+    "valid": 60
+  },
+  "seed": 42,
+  "source_composition": {
+    "real": 600
+  },
+  "sprint": "FT-LORA-DATA",
+  "synthesis_non_determinism_note": "Teacher temp=0.7; Epic 2 outputs are non-reproducible bit-identical. Determinism applies from balanced_sampler onward given fixed Epic 2 outputs.",
+  "synthesis_version": "v1-aaa646e",
+  "tier": "J",
+  "trained_against_model_sha": "cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734",
+  "ults_spec_versions": {
+    "hidden.name_emergence": "1.0.0-task-1.0.0",
+    "jiminy.evaluate_llm": "1.0.0-task-1.0.0",
+    "retrieval.rerank_cross": "1.0.0-task-1.0.0"
+  },
+  "weak_signal_rows": 0
+}

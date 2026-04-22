@@ -35,6 +35,28 @@ training_data/routing_profiles/*
 !training_data/routing_profiles/profile_routing_reasoning_think.json
 !training_data/routing_profiles/profile_routing_classify_notink.json
 !training_data/routing_profiles/profile_routing_structured_notink.json
+# Sprint FT-LORA-DATA Phase 5 curated datasets — tier1 + 3 families ARE
+# deliverables (consumed by Phase 5 SFT `mlx_lm.lora --data <dir>`). Manifests
+# pin raw-SHA + model-SHA + per-task counts. Intermediate recurated.jsonl
+# (~709 MB) is NOT committed — regeneratable from pinned raw-SHA.
+!training_data/sft/
+training_data/sft/*
+!training_data/sft/tier1/
+!training_data/sft/family_reasoning_think/
+!training_data/sft/family_classify_notink/
+!training_data/sft/family_structured_notink/
+!training_data/sft/**/train.jsonl
+!training_data/sft/**/valid.jsonl
+!training_data/sft/**/manifest.json
+!training_data/curated/
+training_data/curated/*
+!training_data/curated/sft_synth_v1/
+training_data/curated/sft_synth_v1/*
+!training_data/curated/sft_synth_v1/consulting_synthesis.jsonl
+!training_data/curated/sft_synth_v1/metalearn_generalize.jsonl
+!training_data/curated/sft_synth_v1/hidden_summarize.jsonl
+!training_data/curated/sft_synth_v1/rerank_nli.jsonl
+!training_data/curated/sft_synth_v1/summarize_generate.jsonl
 
 # GoReleaser build artifacts
 dist/

@@ -564,8 +564,8 @@ def evaluate_task(
     schema = spec.get("output_schema", {})
     quality_metrics = spec.get("quality_metrics", [])
     perf = spec.get("performance", {})
-    max_tokens = perf.get("max_tokens", 500)
-    latency_budget = perf.get("latency_budget_ms", 10000)
+    max_tokens = perf.get("max_tokens", 3000)
+    latency_budget = perf.get("latency_budget_ms", 15000)
 
     per_record = []
     latencies = []

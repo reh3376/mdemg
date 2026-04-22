@@ -1,0 +1,147 @@
+{
+  "ape_reflect_target": 500,
+  "base_dataset_ver": "sprint_ft_lora_data_v1",
+  "duplication_factors": {
+    "ape.reflect": 1.0,
+    "consulting.classify": 1.0,
+    "consulting.synthesis": 1.0,
+    "hidden.name_emergence": 1.0,
+    "hidden.reclassify": 1.0,
+    "hidden.summarize": 1.0,
+    "jiminy.codegen": 1.0,
+    "jiminy.evaluate": 1.0,
+    "jiminy.evaluate_llm": 4.348,
+    "jiminy.synthesize": 1.282,
+    "metalearn.generalize": 1.0,
+    "retrieval.intent_translate": 1.0,
+    "retrieval.query_classify": 1.0,
+    "retrieval.rerank_cross": 1.0,
+    "retrieval.rerank_nli": 1.0,
+    "summarize.generate": 1.0
+  },
+  "family_name": "tier1",
+  "file_sha256": {
+    "train.jsonl": "d739a69c54da9f5de1a83d11181f84740b4817e044bd94ae0f60a87afb628aa6",
+    "valid.jsonl": "031d1c08b95d8efb2fb29d72de4dcf4954f86d5d4bec905f1895e3a28da003f6"
+  },
+  "generator_sha": "aaa646ee692dc26cbd8af2296f8486d0d05c3dd9",
+  "meta_placement": "embedded",
+  "per_task_counts": {
+    "ape.reflect": {
+      "total": 500,
+      "train": 450,
+      "valid": 50
+    },
+    "consulting.classify": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "consulting.synthesis": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "hidden.name_emergence": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "hidden.reclassify": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "hidden.summarize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.codegen": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.evaluate": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.evaluate_llm": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "jiminy.synthesize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "metalearn.generalize": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.intent_translate": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.query_classify": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.rerank_cross": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "retrieval.rerank_nli": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    },
+    "summarize.generate": {
+      "total": 200,
+      "train": 180,
+      "valid": 20
+    }
+  },
+  "raw_dataset_sha_pin": "7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988",
+  "row_counts": {
+    "total": 3500,
+    "train": 3150,
+    "valid": 350
+  },
+  "seed": 42,
+  "source_composition": {
+    "real": 2501,
+    "synth-gpt-5.4-mini": 599,
+    "synth-qwen3.6-local": 400
+  },
+  "sprint": "FT-LORA-DATA",
+  "synthesis_non_determinism_note": "Teacher temp=0.7; Epic 2 outputs are non-reproducible bit-identical. Determinism applies from balanced_sampler onward given fixed Epic 2 outputs.",
+  "synthesis_version": "v1-aaa646e",
+  "tier": "tier1",
+  "trained_against_model_sha": "cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734",
+  "ults_spec_versions": {
+    "ape.reflect": "1.0.0-task-1.0.0",
+    "consulting.classify": "1.0.0-task-1.0.0",
+    "consulting.synthesis": "1.0.0-task-1.0.0",
+    "hidden.name_emergence": "1.0.0-task-1.0.0",
+    "hidden.reclassify": "1.0.0-task-1.0.0",
+    "hidden.summarize": "1.0.0-task-1.0.0",
+    "jiminy.codegen": "1.0.0-task-1.0.0",
+    "jiminy.evaluate": "1.0.0-task-1.0.0",
+    "jiminy.evaluate_llm": "1.0.0-task-1.0.0",
+    "jiminy.synthesize": "1.0.0-task-1.0.0",
+    "metalearn.generalize": "1.0.0-task-1.0.0",
+    "retrieval.intent_translate": "1.0.0-task-1.0.0",
+    "retrieval.query_classify": "1.0.0-task-1.0.0",
+    "retrieval.rerank_cross": "1.0.0-task-1.0.0",
+    "retrieval.rerank_nli": "1.0.0-task-1.0.0",
+    "summarize.generate": "1.0.0-task-1.0.0"
+  },
+  "weak_signal_rows": 200
+}

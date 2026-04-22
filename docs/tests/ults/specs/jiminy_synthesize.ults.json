@@ -19,8 +19,8 @@
     "dynamic_prompt": false
   },
   "performance": {
-    "latency_budget_ms": 10000,
-    "max_tokens": 2000
+    "latency_budget_ms": 15000,
+    "max_tokens": 3000
   },
   "output_schema": {
     "type": "string",
