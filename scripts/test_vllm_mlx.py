@@ -6,9 +6,14 @@ vllm-mlx OpenAI-compatible API, and validates the response against the
 task's output_schema.
 
 Usage:
-    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8100/v1
-    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8100/v1 --model Qwen/Qwen3.6-35B-A3B
+    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8101/v1
+    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8101/v1 --model mlx-community/Qwen3-14B-4bit
+    python3 scripts/test_vllm_mlx.py --base-url http://localhost:8101/v1 --model .local-models/qwen3-14b-mdemg-v1
     python3 scripts/test_vllm_mlx.py --report /tmp/vllm-smoke-report.json
+
+Note: Post-Phase-5 pivot (2026-04-22) — MLX port moved 8100 → 8101
+(CMS-pinned); MoE Qwen3.6-35B-A3B abandoned → dense Qwen3-14B-4bit baseline
+plus merged MDEMG fine-tuned model at .local-models/qwen3-14b-mdemg-v1/.
 """
 
 import argparse
@@ -229,12 +234,14 @@ def main():
         description="Smoke test MDEMG tasks through vllm-mlx",
     )
     parser.add_argument(
-        "--base-url", default=os.environ.get("LLM_BASE_URL", "http://localhost:8100/v1"),
-        help="vllm-mlx base URL (default: $LLM_BASE_URL or http://localhost:8100/v1)",
+        "--base-url", default=os.environ.get("LLM_BASE_URL", "http://localhost:8101/v1"),
+        help="mlx_lm.server base URL (default: $LLM_BASE_URL or http://localhost:8101/v1)",
     )
     parser.add_argument(
-        "--model", default=os.environ.get("LLM_MODEL", "mlx-community/Qwen3.6-35B-A3B-4bit"),
-        help="Model name (default: $LLM_MODEL or mlx-community/Qwen3.6-35B-A3B-4bit)",
+        "--model", default=os.environ.get("MLX_BASE_MODEL", "mlx-community/Qwen3-14B-4bit"),
+        help="Model name (default: $MLX_BASE_MODEL or mlx-community/Qwen3-14B-4bit). "
+             "For merged MDEMG fine-tuned model, pass $MLX_MERGED_MODEL_PATH "
+             "(.local-models/qwen3-14b-mdemg-v1).",
     )
     parser.add_argument("--report", help="Write JSON report to file")
     parser.add_argument("--verbose", action="store_true", help="Include response previews")
@@ -246,8 +253,8 @@ def main():
         with urlopen(req, timeout=5) as resp:
             resp.read()
     except Exception as e:
-        print(f"ERROR: Cannot reach vllm-mlx at {args.base_url}: {e}")
-        print("Start the server: vllm-mlx --model mlx-community/Qwen3.6-35B-A3B-4bit --port 8100")
+        print(f"ERROR: Cannot reach mlx_lm.server at {args.base_url}: {e}")
+        print("Start the server: python -m mlx_lm.server --model mlx-community/Qwen3-14B-4bit --port 8101")
         sys.exit(1)
 
     results = run_smoke_test(args.base_url, args.model, verbose=args.verbose)

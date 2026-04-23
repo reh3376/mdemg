@@ -1,0 +1,158 @@
+{
+  "sprint": "FT-LORA-PHASE5",
+  "tier": 1,
+  "mode": "sft",
+  "pivot_note": "Phase 5 pivoted from MoE-Sieve (Qwen3.6-35B-A3B-mxfp4) to dense Qwen3-14B-4bit on 2026-04-22 after the Metal 499K MTLResource ceiling proved architectural (not quant-specific). Dense is the final Phase 5 SFT path; MoE Tier 2 family adapters are abandoned.",
+
+  "base_model": {
+    "name": "mlx-community/Qwen3-14B-4bit",
+    "snapshot_path": "/Users/reh3376/hf_cache/hub/models--mlx-community--Qwen3-14B-4bit/snapshots/a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+    "config_sha256": "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5",
+    "architecture": "dense",
+    "hidden_size": 5120,
+    "num_layers": 40,
+    "quantization": "4-bit"
+  },
+
+  "dataset": {
+    "family": "tier1",
+    "path": "training_data/sft/tier1",
+    "sprint": "FT-LORA-DATA",
+    "raw_dataset_sha_pin": "7caebf75fd59da37221acef887dc822ac9b80d04e19c19b750dd9a4e5eceb988",
+    "train_jsonl_sha256": "d739a69c54da9f5de1a83d11181f84740b4817e044bd94ae0f60a87afb628aa6",
+    "valid_jsonl_sha256": "031d1c08b95d8efb2fb29d72de4dcf4954f86d5d4bec905f1895e3a28da003f6",
+    "row_counts": {"total": 3500, "train": 3150, "valid": 350},
+    "tasks_covered": 16,
+    "source_composition": {"real": 2501, "synth-gpt-5.4-mini": 599, "synth-qwen3.6-local": 400}
+  },
+
+  "hyperparameters": {
+    "lora_rank": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.0,
+    "lora_scale": 20.0,
+    "lora_layers": 40,
+    "target_modules": ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj", "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"],
+    "target_modules_count": 7,
+    "target_modules_source": "--target-modules (overrides MoE default to drop shared_expert for dense)",
+    "learning_rate": 5.0e-05,
+    "batch_size": 1,
+    "grad_accumulation_steps": 1,
+    "max_seq_length": 8192,
+    "grad_checkpoint": true,
+    "optimizer": "adam",
+    "seed": 0,
+    "epochs_configured": 3,
+    "epoch_cap": 3,
+    "iters_configured": 9450,
+    "router_aux_loss_coef": 0.0
+  },
+
+  "early_stop_policy": {
+    "mode": "sft",
+    "ratio": 1.05,
+    "patience": 2,
+    "fired": true,
+    "reason": "SFT early-stop fired at iter 3000: val_loss=0.4340 crossed threshold (0.2460 \u00d7 1.05 = 0.2583) for 2 consecutive evals (patience=2). Best was iter 2400 at 0.2460."
+  },
+
+  "training_outcome": {
+    "iters_completed": 3000,
+    "iters_configured": 9450,
+    "stop_reason": "early_stopped (val-loss divergence, patience=2)",
+    "exit_code": -15,
+    "elapsed_seconds": 32992.2,
+    "elapsed_human": "9h 7m",
+    "peak_memory_gb": 36.027,
+    "tokens_per_sec_range": "180-220",
+    "best_iter": 2400,
+    "best_val_loss": 0.246,
+    "final_iter": 3000,
+    "final_val_loss": 0.434,
+    "val_loss_history": [
+      {"iter": 1, "value": 1.679},
+      {"iter": 200, "value": 0.908},
+      {"iter": 400, "value": 0.597},
+      {"iter": 600, "value": 0.592},
+      {"iter": 800, "value": 0.45},
+      {"iter": 1000, "value": 0.553},
+      {"iter": 1200, "value": 0.437},
+      {"iter": 1400, "value": 0.461},
+      {"iter": 1600, "value": 0.292},
+      {"iter": 1800, "value": 0.387},
+      {"iter": 2000, "value": 0.26},
+      {"iter": 2200, "value": 0.57},
+      {"iter": 2400, "value": 0.246},
+      {"iter": 2600, "value": 0.254},
+      {"iter": 2800, "value": 0.39},
+      {"iter": 3000, "value": 0.434}
+    ]
+  },
+
+  "adapter_artifacts": {
+    "active_adapter_sha256": "aafd4b9f264fe4f09fb9f7ccc5e312f64d4ed5fd160af89e4a490063f1bed823",
+    "active_adapter_source_iter": 2400,
+    "active_adapter_file": "adapters/tier1/adapters.safetensors",
+    "active_adapter_rationale": "Best val_loss (0.246) across the run; restored from checkpoint 0002400_adapters.safetensors after training stopped at iter 3000 with worse val_loss (0.434).",
+    "final_iter_backup_sha256": "cf57acd06a6724081e6a33808241a12834dc2e95c06ad39d2515614e817a37f8",
+    "final_iter_backup_file": "adapters/tier1/adapters_iter3000_final.safetensors.bak"
+  },
+
+  "merged_model": {
+    "path": "/Users/reh3376/mdemg/.local-models/qwen3-14b-mdemg-v1",
+    "notes": "mlx_lm fuse of adapters/tier1/adapters.safetensors (Iter 2400 best) into dense Qwen3-14B-4bit base. Landed in .local-models/ (gitignored) because /Users/reh3376/mdemg/mdemg is the CLI binary, colliding with the original plan's namespace path.",
+    "shards": ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"],
+    "total_size_gb": 7.8,
+    "quantization_preserved": "4-bit (base quantization; LoRA folded without re-quantization)"
+  },
+
+  "evaluation": {
+    "test_set": "training_data/sft/tier1/valid.jsonl (350 records \u00d7 16 tasks)",
+    "ults_specs_dir": "docs/tests/ults/specs/",
+    "results": {
+      "moe_35b_untuned_baseline": {"report": "training_data/eval/baseline_qwen3.6_untuned.json", "weighted_score": 0.9805, "tasks_passing_80pct": 15},
+      "dense_14b_untuned_baseline": {"report": "training_data/eval/baseline_qwen3_14b_untuned.json", "weighted_score": 0.9505, "tasks_passing_80pct": 15},
+      "merged_fine_tuned": {"report": "training_data/eval/post_tier1.json", "weighted_score": 0.9856, "tasks_passing_80pct": 16}
+    }
+  },
+
+  "regression_gates": {
+    "vs_moe_35b_confounded": {
+      "report": "training_data/eval/regression_tier1_vs_moe35b.json",
+      "verdict": "PASS",
+      "exit_code": 0,
+      "overall_delta": 0.0051,
+      "regressions_count": 0,
+      "improvements": [
+        {"task": "metalearn.generalize", "delta_pct": 0.053},
+        {"task": "retrieval.rerank_cross", "delta_pct": 0.084}
+      ],
+      "note": "Measures architecture downgrade (MoE-35B \u2192 dense-14B) + training gain together. PASS means fine-tuned dense beats untuned MoE despite being 40% the parameter count."
+    },
+    "vs_dense_14b_clean": {
+      "report": "training_data/eval/regression_tier1_vs_dense14b.json",
+      "verdict": "PASS",
+      "exit_code": 0,
+      "overall_delta": 0.0351,
+      "regressions_count": 0,
+      "improvements": [
+        {"task": "ape.reflect", "delta_pct": 0.351},
+        {"task": "consulting.classify", "delta_pct": 0.111},
+        {"task": "hidden.reclassify", "delta_pct": 0.176},
+        {"task": "retrieval.rerank_cross", "delta_pct": 0.059}
+      ],
+      "note": "Same architecture both sides; measures training gain only. Clean training signal."
+    }
+  },
+
+  "policy_compliance": {
+    "epoch_cap_3": true,
+    "explicit_integer_epochs": true,
+    "early_stop_fired_as_designed": true,
+    "router_aux_loss_coef_0_dense": true,
+    "no_hardcoded_values": true,
+    "base_model_read_only": true,
+    "dataset_sha_pinned": true,
+    "single_instance_mlx": true
+  }
+}

@@ -20,7 +20,10 @@
   },
   "performance": {
     "latency_budget_ms": 15000,
-    "max_tokens": 3000
+    "max_tokens": 3000,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
   },
   "output_schema": {
     "type": "array",

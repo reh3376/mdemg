@@ -273,7 +273,9 @@ Example (`consulting.classify`):
 
 ---
 
-## Phase 5: Training Pipeline — Two-Tier SFT (Python + MLX) 🔄 REWORKED for v5.0 — **UNBLOCKED 2026-04-22**
+## Phase 5: Training Pipeline — SFT (Python + MLX) ✅ **EXECUTED 2026-04-22 → 2026-04-23** (mid-sprint MoE → dense pivot)
+
+> **§5A / §5B / §5C / §5D — EXECUTED on the dense path.** Sprint FT-LORA-PHASE5 pivoted mid-sprint from MoE-Sieve two-tier to single-tier LoRA on `mlx-community/Qwen3-14B-4bit` after the Metal 499K MTLResource cap on M5 Max / macOS 26 blocked every non-trivial MoE backward pass. **§5A (Tier 1 universal)** held on the dense baseline (rank=32 α=64, epoch cap 3, early-stop patience=2, seq 8192). **§5B (Sprint D expert profiling)** + **§5C (Tier 2 × 3 family adapters)** + **§5D (asymmetric quant)** are no-ops on the dense path — no shared expert, no routed experts, no router. Sprint D profile artifacts + `quantize_asymmetric.py` + `expert_selection.py` retained in-repo for provenance. Merged model: `.local-models/qwen3-14b-mdemg-v1/` (7.8 GB, 4-bit preserved via `mlx_lm fuse`). Dual regression gate **PASS**, 16/16 ULTS tasks post-tune. Authoritative post-execution docs: [`phase_5_sft_post.md`](phase_5_sft_post.md), [`phase_5_sft_summary.md`](phase_5_sft_summary.md), [`sprint_plan_ft_lora_phase5.md`](sprint_plan_ft_lora_phase5.md). Planning-phase content below is preserved as the MoE-era intent.
 
 **v4.0 status:** single-LoRA pipeline shipped ✅. **v5.0 status:** pipeline code largely reusable; the **training orchestration** is reworked into two sequential tiers (memo 07 v3.1 §3; see [`01_RESEARCH_v2.md §5`](01_RESEARCH_v2.md)). Sprint FT-LORA-E ✅ shipped the config/flag additions 2026-04-22 (see [`sprint_plan_ft_lora_e.md`](sprint_plan_ft_lora_e.md)); Sprint FT-LORA-C ✅ validated convergence on Qwen3.6 (all 3 gates green); **Sprint FT-LORA-DATA ✅ shipped the curated datasets 2026-04-22** (see [`sprint_plan_ft_lora_data.md`](sprint_plan_ft_lora_data.md)); pre-flight verdict **CLEAR** (see [`phase_5_dataset_preflight_post.md`](phase_5_dataset_preflight_post.md) with baseline [`phase_5_dataset_preflight.md`](phase_5_dataset_preflight.md)).
 

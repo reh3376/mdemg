@@ -58,6 +58,17 @@ training_data/curated/sft_synth_v1/*
 !training_data/curated/sft_synth_v1/rerank_nli.jsonl
 !training_data/curated/sft_synth_v1/summarize_generate.jsonl
 
+# Sprint FT-LORA-PHASE5 adapter + merged-model artifacts
+# Safetensors files exceed GitHub's 100MB/file limit; SHAs + hyperparams live
+# in adapters/*/manifest.json + .earlystop.json + train_report.json (tracked).
+adapters/*/*.safetensors
+adapters/*/*.safetensors.bak
+adapters/*/train.log
+adapters/*/training_log.jsonl
+adapters/_archive_*
+# Merged fine-tuned model produced by `mlx_lm fuse` (7.8 GB, local-only).
+.local-models/
+
 # GoReleaser build artifacts
 dist/
 

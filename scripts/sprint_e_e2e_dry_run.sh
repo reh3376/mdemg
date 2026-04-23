@@ -22,8 +22,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-MODEL="${SPRINT_C_MODEL_PATH:-$HOME/.cache/huggingface/hub/models--mlx-community--Qwen3.6-35B-A3B-mxfp4}"
-PIN="cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734"
+# Post-Phase-5 pivot (2026-04-22): default swapped from Qwen3.6-35B-A3B-mxfp4
+# (MoE, abandoned — Metal 499K ceiling) to dense Qwen3-14B-4bit. Set
+# SPRINT_C_MODEL_PATH to override (MoE model may be deleted from HF cache).
+MODEL="${SPRINT_C_MODEL_PATH:-$HOME/hf_cache/hub/models--mlx-community--Qwen3-14B-4bit}"
+PIN="${SPRINT_C_MODEL_SHA:-a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5}"
 PROFILES="$REPO_ROOT/training_data/routing_profiles"
 OUT_ROOT="$(mktemp -d -t sprint-e-e2e-XXXXXX)"
 DATASET="$OUT_ROOT/tiny-dataset"

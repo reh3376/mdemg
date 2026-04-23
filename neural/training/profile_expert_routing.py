@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Sprint FT-LORA-D Epic 2 — Expert activation profiler.
 
+**STATUS (2026-04-22): MoE-Sieve path abandoned — Phase 5 pivoted to dense
+Qwen3-14B-4bit after Metal 499K MTLResource ceiling proved architectural.
+This profiler remains historical reference only; profiles at
+`training_data/routing_profiles/*.json` are NOT consumed by the active
+training pipeline. Retained for provenance of Sprint D deliverables.**
+
 Runs forward passes (generation mode) over a per-task anchor prompt set against
 the Sprint C MLX-loaded Qwen3.6-35B-A3B-mxfp4 checkpoint, capturing top-k routing
 decisions at every MoE layer. Emits one JSON artifact per task family plus a raw

@@ -9,8 +9,8 @@ Usage:
     python -m training.teacher_distill \
         --ults-dir docs/tests/ults/specs/ \
         --task consulting.classify \
-        --teacher-url http://localhost:8100/v1 \
-        --teacher-model mlx-community/Qwen3.6-35B-A3B-4bit \
+        --teacher-url http://localhost:8101/v1 \
+        --teacher-model mlx-community/Qwen3-14B-4bit \
         --count 50 \
         --output distilled/consulting_classify.jsonl
 
@@ -18,10 +18,14 @@ Usage:
     python -m training.teacher_distill \
         --ults-dir docs/tests/ults/specs/ \
         --task metalearn.generalize --task jiminy.evaluate_llm \
-        --teacher-url http://localhost:8100/v1 \
-        --teacher-model mlx-community/Qwen3.6-35B-A3B-4bit \
+        --teacher-url http://localhost:8101/v1 \
+        --teacher-model mlx-community/Qwen3-14B-4bit \
         --count 30 \
         --output distilled/multi_task.jsonl
+
+    # Post-Phase-5 pivot (2026-04-22): teacher swapped from Qwen3.6-35B-A3B
+    # (MoE, abandoned) to dense Qwen3-14B-4bit. Port moved 8100 → 8101 per
+    # CMS pinned constraint.
 
 Requirements:
     pip install -e ".[training]"
