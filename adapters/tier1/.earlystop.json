@@ -1,0 +1,76 @@
+{
+  "mode": "sft",
+  "ratio": 1.05,
+  "patience": 2,
+  "fired": true,
+  "fired_reason": "SFT early-stop fired at iter 3000: val_loss=0.4340 crossed threshold (0.2460 \u00d7 1.05 = 0.2583) for 2 consecutive evals (patience=2). Best was iter 2400 at 0.2460.",
+  "best_value": 0.246,
+  "best_iter": 2400,
+  "final_consecutive_bad": 2,
+  "history": [
+    {
+      "iter": 1,
+      "value": 1.679
+    },
+    {
+      "iter": 200,
+      "value": 0.908
+    },
+    {
+      "iter": 400,
+      "value": 0.597
+    },
+    {
+      "iter": 600,
+      "value": 0.592
+    },
+    {
+      "iter": 800,
+      "value": 0.45
+    },
+    {
+      "iter": 1000,
+      "value": 0.553
+    },
+    {
+      "iter": 1200,
+      "value": 0.437
+    },
+    {
+      "iter": 1400,
+      "value": 0.461
+    },
+    {
+      "iter": 1600,
+      "value": 0.292
+    },
+    {
+      "iter": 1800,
+      "value": 0.387
+    },
+    {
+      "iter": 2000,
+      "value": 0.26
+    },
+    {
+      "iter": 2200,
+      "value": 0.57
+    },
+    {
+      "iter": 2400,
+      "value": 0.246
+    },
+    {
+      "iter": 2600,
+      "value": 0.254
+    },
+    {
+      "iter": 2800,
+      "value": 0.39
+    },
+    {
+      "iter": 3000,
+      "value": 0.434
+    }
+  ]
+}

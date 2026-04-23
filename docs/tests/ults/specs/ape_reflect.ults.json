@@ -19,49 +19,43 @@
     "dynamic_prompt": false
   },
   "performance": {
-    "latency_budget_ms": 15000,
-    "max_tokens": 3000
+    "latency_budget_ms": 60000,
+    "max_tokens": 12000,
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    }
   },
   "output_schema": {
-    "type": "object",
-    "required": [
-      "insights"
-    ],
-    "properties": {
-      "insights": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "required": [
-            "type",
-            "description",
-            "priority"
-          ],
-          "properties": {
-            "type": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "priority": {
-              "type": "string",
-              "enum": [
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "affected_nodes": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "suggested_action": {
-              "type": "string"
-            }
-          }
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": [
+        "pattern_id",
+        "severity",
+        "description",
+        "recommended_action",
+        "reasoning"
+      ],
+      "properties": {
+        "pattern_id": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "recommended_action": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
         }
       }
     }

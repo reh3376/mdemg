@@ -1,0 +1,52 @@
+{
+    "adapter_path": "adapters/tier1",
+    "batch_size": 1,
+    "clear_cache_threshold": 0,
+    "config": "adapters/tier1/train_config.yaml",
+    "data": "training_data/sft/tier1",
+    "fine_tune_type": "lora",
+    "grad_accumulation_steps": 1,
+    "grad_checkpoint": true,
+    "iters": 9450,
+    "learning_rate": 5e-05,
+    "lora_parameters": {
+        "rank": 32,
+        "alpha": 64,
+        "dropout": 0.0,
+        "scale": 20.0,
+        "keys": [
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.o_proj",
+            "mlp.gate_proj",
+            "mlp.up_proj",
+            "mlp.down_proj"
+        ]
+    },
+    "lr_schedule": null,
+    "mask_prompt": false,
+    "max_seq_length": 8192,
+    "model": "/Users/reh3376/hf_cache/hub/models--mlx-community--Qwen3-14B-4bit/snapshots/a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+    "num_layers": 40,
+    "optimizer": "adam",
+    "optimizer_config": {
+        "adam": {},
+        "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {}
+    },
+    "project_name": null,
+    "report_to": null,
+    "resume_adapter_file": null,
+    "router_aux_loss_coef": 0.0,
+    "save_every": 100,
+    "seed": 0,
+    "steps_per_eval": 200,
+    "steps_per_report": 10,
+    "test": false,
+    "test_batches": 500,
+    "train": true,
+    "val_batches": 25
+}

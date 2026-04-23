@@ -120,19 +120,23 @@ DEFAULT_TEACHER_CONFIG: dict[str, TeacherTask] = {
         weak_signal=True,  # plan §10 row — propagated to downstream eval
         model="gpt-5.4-mini",
     ),
+    # Post-Phase-5 pivot (2026-04-22): MoE Qwen3.6-35B-A3B-mxfp4 abandoned
+    # (Metal 499K MTLResource architectural cap). Dense Qwen3-14B-4bit is the
+    # current local teacher. Original FT-LORA-DATA runs used Qwen3.6 — see
+    # JSONL provenance for historical attribution.
     "retrieval.rerank_nli": TeacherTask(
-        teacher_id="qwen3.6-local",
+        teacher_id="qwen3-14b-local",
         endpoint="mlx_local",
         count=200,
         weak_signal=False,
-        model="mlx-community/Qwen3.6-35B-A3B-mxfp4",
+        model="mlx-community/Qwen3-14B-4bit",
     ),
     "summarize.generate": TeacherTask(
-        teacher_id="qwen3.6-local",
+        teacher_id="qwen3-14b-local",
         endpoint="mlx_local",
         count=200,
         weak_signal=False,
-        model="mlx-community/Qwen3.6-35B-A3B-mxfp4",
+        model="mlx-community/Qwen3-14B-4bit",
     ),
     # Added 2026-04-22: hidden.summarize has 1 row in raw (would force
     # 200× duplication, far exceeding 5× ceiling). Synthesized as a 5th

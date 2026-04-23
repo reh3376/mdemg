@@ -5,19 +5,22 @@ to 4-bit for inference, and optionally verifies the fused model with
 a single test prompt.
 
 Usage:
-    # TODO (Sprint E): Asymmetric-quant output-path naming (mdemg-qwen3.6-35b-v1-asym/);
-    # path convention finalized when per-module quant selectors land via mlx_lm.convert.
+    # Post-Phase-5 pivot (2026-04-22): dense Qwen3-14B-4bit replaces abandoned
+    # Qwen3.6-35B-A3B MoE. Merged MDEMG model is 4-bit preserved (no re-quant
+    # needed — base is already 4-bit, LoRA folds without re-quantization).
+    # Use `python -m mlx_lm fuse` directly for the dense path; this module
+    # remains for future symmetric re-quant needs.
     python -m training.quantize_deploy \
-        --base-model Qwen/Qwen3.6-35B-A3B \
-        --adapter-path adapters/v1/ \
-        --output-path models/mdemg-qwen3-30b-v1-q4/ \
+        --base-model mlx-community/Qwen3-14B-4bit \
+        --adapter-path adapters/tier1/ \
+        --output-path .local-models/qwen3-14b-mdemg-v1/ \
         --quantize 4bit
 
     # With verification:
     python -m training.quantize_deploy \
-        --base-model Qwen/Qwen3.6-35B-A3B \
-        --adapter-path adapters/v1/ \
-        --output-path models/mdemg-qwen3-30b-v1-q4/ \
+        --base-model mlx-community/Qwen3-14B-4bit \
+        --adapter-path adapters/tier1/ \
+        --output-path .local-models/qwen3-14b-mdemg-v1/ \
         --quantize 4bit \
         --verify
 

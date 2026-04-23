@@ -10,12 +10,21 @@ Usage:
         --ults-dir docs/tests/ults/specs/ \
         --report eval_report.json
 
-    # With live inference (sends prompts to vllm-mlx):
+    # With live inference (sends prompts to mlx_lm.server):
+    #   Baseline (untuned dense base):
     python -m training.evaluate_ft \
         --test-data curated/v1/test.jsonl \
         --ults-dir docs/tests/ults/specs/ \
-        --base-url http://localhost:8100/v1 \
-        --model mlx-community/Qwen3.6-35B-A3B-4bit \
+        --base-url http://localhost:8101/v1 \
+        --model mlx-community/Qwen3-14B-4bit \
+        --report eval_report.json
+
+    #   Merged MDEMG fine-tuned (post-Phase-5):
+    python -m training.evaluate_ft \
+        --test-data curated/v1/test.jsonl \
+        --ults-dir docs/tests/ults/specs/ \
+        --base-url http://localhost:8101/v1 \
+        --model .local-models/qwen3-14b-mdemg-v1 \
         --report eval_report.json
 
 Requirements:
@@ -36,13 +45,43 @@ from urllib.request import Request, urlopen
 # ── Schema Validation ──
 
 
-def check_json_valid(response: str) -> float:
-    """Return 1.0 if response is valid JSON object, 0.0 otherwise."""
+def check_json_valid(response: str, schema: dict[str, Any] | None = None) -> float:
+    """Return 1.0 if response is structurally valid against the ULTS schema.
+
+    Schema-aware semantics (``schema.type``):
+      * ``"object"`` (default if unspecified): response must parse to a dict.
+      * ``"array"``:                          response must parse to a list.
+      * ``"string"``:                         response must be non-empty and,
+                                              if ``schema.pattern`` is set,
+                                              match the regex. The string is
+                                              taken as-is (no JSON decoding)
+                                              because specs like jiminy.codegen
+                                              instruct the model to emit a bare
+                                              token with no quoting.
+      * ``"number"``/``"integer"``/``"boolean"``: response must parse as that
+                                              primitive.
+    """
+    stype = (schema or {}).get("type", "object")
+    if stype == "string":
+        if not response or not response.strip():
+            return 0.0
+        pattern = (schema or {}).get("pattern")
+        if pattern:
+            import re
+            return 1.0 if re.match(pattern, response.strip()) else 0.0
+        return 1.0
     try:
         parsed = json.loads(response)
-        return 1.0 if isinstance(parsed, dict) else 0.0
     except (json.JSONDecodeError, TypeError):
         return 0.0
+    if stype == "array":
+        return 1.0 if isinstance(parsed, list) else 0.0
+    if stype in ("number", "integer"):
+        return 1.0 if isinstance(parsed, (int, float)) and not isinstance(parsed, bool) else 0.0
+    if stype == "boolean":
+        return 1.0 if isinstance(parsed, bool) else 0.0
+    # default: object
+    return 1.0 if isinstance(parsed, dict) else 0.0
 
 
 def check_required_keys(response: str, schema: dict[str, Any]) -> float:
@@ -365,7 +404,7 @@ def follow_rate(response: str, schema: dict[str, Any]) -> float:
 # Maps metric names to evaluation functions.
 # Each function: (response, schema) -> float in [0.0, 1.0]
 METRIC_EVALUATORS: dict[str, Any] = {
-    "json_valid": lambda resp, schema: check_json_valid(resp),
+    "json_valid": lambda resp, schema: check_json_valid(resp, schema),
     "accuracy": lambda resp, schema: check_required_keys(resp, schema),
     "precision": lambda resp, schema: check_type_conformance(resp, schema),
     "coherence": coherence,
@@ -397,7 +436,7 @@ def evaluate_response(
             score = evaluator(response, schema)
         elif schema_type == "object":
             # Default for unknown metrics on structured output: JSON validity
-            score = check_json_valid(response)
+            score = check_json_valid(response, schema)
         else:
             # Default for unknown metrics on string output: non-empty
             score = check_non_empty(response)
@@ -460,10 +499,14 @@ def load_test_data(test_path: str) -> list[dict[str, Any]]:
 
 
 def group_by_task(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """Group test records by task_name."""
+    """Group test records by task_name.
+
+    Supports both top-level ``task_name`` (legacy TSDB export format) and
+    ``meta.task_name`` (FT-LORA-DATA curated format).
+    """
     groups: dict[str, list[dict[str, Any]]] = {}
     for record in records:
-        task = record.get("task_name", "unknown")
+        task = record.get("task_name") or record.get("meta", {}).get("task_name", "unknown")
         groups.setdefault(task, []).append(record)
     return groups
 
@@ -477,8 +520,17 @@ def run_inference(
     system_prompt: str,
     user_prompt: str,
     max_tokens: int,
+    chat_template_kwargs: dict[str, Any] | None = None,
 ) -> tuple[str | None, float, str | None]:
-    """Send a completion request. Returns (content, latency_ms, error)."""
+    """Send a completion request. Returns (content, latency_ms, error).
+
+    ``chat_template_kwargs`` is forwarded verbatim to the MLX chat completions
+    endpoint. For Qwen3.6 / Qwen3-14B this accepts ``{"enable_thinking": false}``
+    to disable the ``<think>`` scratchpad on tasks where a JSON-structured
+    final answer is expected (prevents scratchpad-pollution + max_tokens
+    cutoffs that empty the ``content`` field). Dense Qwen3-14B is the post-
+    2026-04-22 baseline; Qwen3.6 MoE is abandoned.
+    """
     body = {
         "model": model,
         "messages": [
@@ -488,6 +540,8 @@ def run_inference(
         "max_tokens": max_tokens,
         "temperature": 0.1,
     }
+    if chat_template_kwargs:
+        body["chat_template_kwargs"] = chat_template_kwargs
 
     data = json.dumps(body).encode()
     req = Request(
@@ -507,7 +561,11 @@ def run_inference(
         return None, 0, "timeout (60s)"
 
     elapsed_ms = (time.monotonic() - start) * 1000
-    content = result["choices"][0]["message"]["content"]
+    message = result["choices"][0]["message"]
+    # MLX 0.31.2 returns ``reasoning`` (think-mode scratchpad) and/or ``content``
+    # (final answer). Prefer ``content`` when present; fall back to ``reasoning``
+    # if the model was truncated before emitting an answer block.
+    content = message.get("content") or message.get("reasoning") or ""
     return content, elapsed_ms, None
 
 
@@ -566,6 +624,7 @@ def evaluate_task(
     perf = spec.get("performance", {})
     max_tokens = perf.get("max_tokens", 3000)
     latency_budget = perf.get("latency_budget_ms", 15000)
+    chat_template_kwargs = perf.get("chat_template_kwargs") or None
 
     per_record = []
     latencies = []
@@ -575,6 +634,7 @@ def evaluate_task(
             system_prompt, user_prompt = extract_prompts(record)
             response, latency_ms, error = run_inference(
                 base_url, model, system_prompt, user_prompt, max_tokens,
+                chat_template_kwargs=chat_template_kwargs,
             )
             if error:
                 per_record.append({
