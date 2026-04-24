@@ -1,0 +1,110 @@
+# Phase 10 automated benchmark framework config
+# Referenced by neural/benchmarks/run_benchmark.py + preflight.py + llm_judge.py
+# Sprint FT-LORA-PHASE10 (2026-04-23)
+#
+# MEMORY:
+#   - never max_tokens < 3000 (judge_max_tokens below)
+#   - never latency_budget_ms < 15000 (judge_latency_budget_ms below)
+#   - never hardcoded values (everything here is config + CLI-overridable)
+#   - CUIDv2 for run_id
+
+version: "1.0.0"
+
+# How many times to run each task (for reward variance estimation).
+# Phase 11 GRPO reads stddev across these as advantage-normalization denominator.
+n_runs: 5
+
+# Stagnation detection: compare last 3 benchmark_runs rows.
+# If |aggregate_delta| < aggregate_delta_threshold across all 3
+#   OR any single task regresses by more than per_task_regression_threshold,
+# raise stagnation flag (informational in Phase 10, blocking in Phase 11).
+stagnation:
+  min_history: 3
+  aggregate_delta_threshold: 0.005   # 0.5 %
+  per_task_regression_threshold: 0.02 # 2 %
+
+# Sampling-group weights for the aggregate weighted score.
+# Mirrors Phase 5's regression_gate aggregator.
+#   T (reasoning-think) = 7 tasks
+#   C (classify-notink) = 6 tasks
+#   J (structured-notink) = 3 tasks
+sampling_groups:
+  T:
+    weight: 0.50
+    temperature: 0.6
+    top_p: 0.95
+    top_k: 20
+  C:
+    weight: 0.35
+    temperature: 0.7
+    top_p: 0.8
+    top_k: 20
+  J:
+    weight: 0.15
+    temperature: 0.0
+    top_p: 1.0
+    top_k: -1
+    presence_penalty: 1.5   # MANDATORY per ULTS J-group recipe
+
+# Model under test (Phase 5 dense pivot outcome).
+model_under_test:
+  path: ".local-models/qwen3-14b-mdemg-v1"
+  base_sha: "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
+  adapter_manifest: "adapters/tier1/manifest.json"
+  mlx_host: "127.0.0.1"
+  mlx_port: 8101
+
+# LLM judge for subjective metrics not covered by reward_functions.py.
+# Uses OWN fixed sampling — NEVER inherits task inference config
+# (prevents J-group presence_penalty=1.5 from leaking into judge).
+judge:
+  model: "gpt-5.4-mini"
+  temperature: 0.0         # determinism (MEMORY: seed logged per row)
+  seed_source: "run_idx"   # alternative: "run_id_hash"
+  max_tokens: 4000         # MEMORY: never < 3000
+  latency_budget_ms: 30000 # MEMORY: never < 15000
+  metrics:
+    - coherence
+    - depth
+    - relevance
+    - naturalness
+  prompt_dir: "neural/benchmarks/judge_prompts"
+
+# ULTS spec discovery.
+ults:
+  specs_dir: "docs/tests/ults/specs"
+  required_spec_fields:
+    - "sampling_group"
+    - "reward_functions"
+    - "quality_metrics"
+    - "task.name"
+  allowed_sampling_groups: ["T", "C", "J"]
+  # Performance floors — preflight fails any spec that under-budgets its class.
+  # Think-mode tasks must reserve enough tokens/latency for chain-of-thought;
+  # tight budgets truncate responses and silently zero-credit rewards.
+  # MEMORY: never max_tokens < 3000, never latency_budget_ms < 15000.
+  performance_floors:
+    default:
+      max_tokens: 3000
+      latency_budget_ms: 15000
+    think_mode:
+      max_tokens: 10000
+      latency_budget_ms: 60000
+
+# Golden validation holdout — carved from Phase 5 valid splits.
+golden_holdout:
+  out_path: "training_data/eval/valid_golden.jsonl"
+  source_glob: "training_data/sft/*/valid.jsonl"
+  fraction: 0.15
+  seed: 0
+
+# Output paths.
+output:
+  baseline_path: "training_data/eval/benchmark_qwen3_14b_v1_baseline.json"
+  preflight_report: "training_data/eval/preflight_report.json"
+  shadow_run_report: "training_data/eval/shadow_run_report.json"
+
+# Budget cap — sprint fails if exceeded (MEMORY: only flag if > $100).
+budget:
+  max_usd_per_benchmark: 10.0
+  max_usd_total_sprint: 100.0

@@ -115,6 +115,36 @@ class TestClassificationAccuracy:
         # Without ground truth, falls back to json_valid
         assert classification_accuracy('{"type": "x"}') == 1.0
 
+    def test_expected_as_json_string_same_shape(self):
+        """Regression: golden-row assistant message is the full JSON payload,
+        not the bare label. `expected` of `{"type":"none","summary":""}` must
+        match a model response producing the same JSON (including whitespace).
+        """
+        expected_json = '{"type":"none","summary":""}'
+        assert classification_accuracy(
+            '\n\n{"type":"none","summary":""}', expected=expected_json
+        ) == 1.0
+
+    def test_expected_json_mismatch_scores_zero(self):
+        expected_json = '{"type":"architecture","summary":""}'
+        assert classification_accuracy(
+            '{"type":"security","summary":""}', expected=expected_json
+        ) == 0.0
+
+    def test_plural_types_list_extracts_first(self):
+        """retrieval.query_classify uses {"types": ["symbol_lookup"], ...}."""
+        expected_json = '{"types":["symbol_lookup"],"temporal":"none"}'
+        assert classification_accuracy(
+            '{"types":["symbol_lookup"],"temporal":"none"}',
+            expected=expected_json,
+        ) == 1.0
+        assert classification_accuracy(
+            '{"types":["generic"],"temporal":"none"}', expected=expected_json
+        ) == 0.0
+
+    def test_empty_expected_falls_back_to_json_valid(self):
+        assert classification_accuracy('{"type": "x"}', expected="") == 1.0
+
 
 class TestEvaluationAccuracy:
     def test_correct_verdict(self):
@@ -126,6 +156,21 @@ class TestEvaluationAccuracy:
         assert evaluation_accuracy(
             '{"verdict": "negative"}', expected_verdict="positive"
         ) == 0.0
+
+    def test_expected_kwarg_alias_as_json_string(self):
+        """Regression: runner passes `expected=<assistant_json>`, not
+        `expected_verdict=<bare_label>`. Both paths must work.
+        """
+        expected_json = '{"outcome":"ignored","confidence":0.9}'
+        assert evaluation_accuracy(
+            '{"outcome":"ignored","confidence":0.8}', expected=expected_json
+        ) == 1.0
+        assert evaluation_accuracy(
+            '{"outcome":"followed","confidence":0.8}', expected=expected_json
+        ) == 0.0
+
+    def test_empty_expected_falls_back_to_json_valid(self):
+        assert evaluation_accuracy('{"verdict": "x"}', expected="") == 1.0
 
 
 # ── Quality Rewards ──

@@ -414,16 +414,75 @@ METRIC_EVALUATORS: dict[str, Any] = {
 }
 
 
+# Maps ULTS quality_metric names → reward_functions.REWARD_REGISTRY names.
+# Used by the `--scorer=registry` path (Sprint FT-LORA-PHASE10 Epic 4).
+# Unmapped metric names fall back to the heuristic evaluator for registry mode
+# so new ULTS metrics don't break the registry path.
+REGISTRY_NAME_MAP: dict[str, str] = {
+    "json_valid": "json_valid",
+    "accuracy": "classification_accuracy",
+    "precision": "schema_match",
+    "coherence": "coherence_score",
+    "coverage": "coverage_score",
+    "specificity": "specificity_score",
+    "follow_rate": "follow_rate",
+}
+
+
+def _score_via_registry(
+    response: str, schema: dict[str, Any], metric_name: str
+) -> float | None:
+    """Return registry score for metric, or None if unmapped.
+
+    Imports lazily so that evaluate_ft.py does not hard-depend on the
+    registry until the operator opts into --scorer={registry,dual}.
+    """
+    reg_name = REGISTRY_NAME_MAP.get(metric_name)
+    if reg_name is None:
+        return None
+    try:
+        from neural.training.reward_functions import compute_reward
+    except ImportError:
+        return None
+    out = compute_reward(response, [reg_name], schema=schema)
+    v = out.get(reg_name)
+    if v is None:
+        return None
+    return float(v)
+
+
+def _heuristic_score(
+    response: str, schema: dict[str, Any], metric_name: str
+) -> float:
+    """Phase 5 heuristic path — bit-identical with the pre-Phase-10 logic."""
+    schema_type = schema.get("type", "string")
+    evaluator = METRIC_EVALUATORS.get(metric_name)
+    if evaluator:
+        return evaluator(response, schema)
+    if schema_type == "object":
+        return check_json_valid(response, schema)
+    return check_non_empty(response)
+
+
 def evaluate_response(
     response: str,
     schema: dict[str, Any],
     quality_metrics: list[dict[str, Any]],
+    scorer: str = "heuristic",
 ) -> dict[str, Any]:
     """Evaluate a single response against ULTS quality_metrics.
 
+    ``scorer`` is one of:
+      * ``"heuristic"`` (default) — Phase 5 bit-identical path.
+      * ``"registry"``  — score via ``reward_functions.REWARD_REGISTRY``
+                          (mapping in ``REGISTRY_NAME_MAP``). Falls back to
+                          heuristic for unmapped metrics.
+      * ``"dual"``      — runs both; reports heuristic as the authoritative
+                          score, attaches registry_score + delta for
+                          shadow-parity diagnosis.
+
     Returns dict with per-metric scores, weighted aggregate, and pass/fail.
     """
-    schema_type = schema.get("type", "string")
     metric_results = {}
 
     for metric in quality_metrics:
@@ -431,15 +490,25 @@ def evaluate_response(
         weight = metric.get("weight", 0)
         threshold = metric.get("threshold", 0)
 
-        evaluator = METRIC_EVALUATORS.get(name)
-        if evaluator:
-            score = evaluator(response, schema)
-        elif schema_type == "object":
-            # Default for unknown metrics on structured output: JSON validity
-            score = check_json_valid(response, schema)
+        h_score = _heuristic_score(response, schema, name)
+        if scorer == "heuristic":
+            score = h_score
+            shadow: dict[str, Any] = {}
+        elif scorer == "registry":
+            r = _score_via_registry(response, schema, name)
+            score = h_score if r is None else r
+            shadow = {"registry_unmapped": r is None} if r is None else {}
+        elif scorer == "dual":
+            r = _score_via_registry(response, schema, name)
+            score = h_score  # heuristic remains authoritative in dual
+            shadow = {
+                "heuristic_score": h_score,
+                "registry_score": r,
+                "delta": abs(h_score - r) if r is not None else None,
+                "registry_unmapped": r is None,
+            }
         else:
-            # Default for unknown metrics on string output: non-empty
-            score = check_non_empty(response)
+            raise ValueError(f"unknown scorer: {scorer!r}")
 
         metric_results[name] = {
             "score": score,
@@ -447,6 +516,8 @@ def evaluate_response(
             "threshold": threshold,
             "met": score >= threshold,
         }
+        if shadow:
+            metric_results[name]["shadow"] = shadow
 
     # Weighted aggregate
     total_weight = sum(m.get("weight", 0) for m in quality_metrics)
@@ -613,6 +684,7 @@ def evaluate_task(
     spec: dict[str, Any],
     base_url: str | None = None,
     model: str | None = None,
+    scorer: str = "heuristic",
 ) -> dict[str, Any]:
     """Evaluate all records for a single ULTS task.
 
@@ -650,7 +722,7 @@ def evaluate_task(
             if latency_ms:
                 latencies.append(latency_ms)
 
-        result = evaluate_response(response, schema, quality_metrics)
+        result = evaluate_response(response, schema, quality_metrics, scorer=scorer)
         per_record.append(result)
 
     # Aggregate
@@ -700,7 +772,7 @@ def evaluate_task(
             "within_budget": sum(1 for lat in latencies if lat <= latency_budget) / len(latencies),
         }
 
-    return {
+    out: dict[str, Any] = {
         "task": task_name,
         "count": n,
         "weighted_score": round(avg_score, 4),
@@ -710,12 +782,47 @@ def evaluate_task(
         "status": "evaluated",
     }
 
+    # Epic 4 shadow diagnostic: when scorer=dual, compute per-metric mean delta
+    # between heuristic and registry paths across records. Operator gate is
+    # |delta| < 0.01 per metric (1% per plan §Epic 4).
+    if scorer == "dual":
+        shadow_agg: dict[str, Any] = {}
+        for metric in quality_metrics:
+            m = metric["name"]
+            deltas: list[float] = []
+            unmapped = 0
+            for r in per_record:
+                shadow = (r.get("metrics", {}).get(m, {}) or {}).get("shadow", {})
+                if shadow.get("registry_unmapped"):
+                    unmapped += 1
+                    continue
+                d = shadow.get("delta")
+                if d is not None:
+                    deltas.append(float(d))
+            if deltas:
+                shadow_agg[m] = {
+                    "n_compared": len(deltas),
+                    "n_unmapped": unmapped,
+                    "mean_abs_delta": round(sum(deltas) / len(deltas), 6),
+                    "max_abs_delta": round(max(deltas), 6),
+                    "within_1pct": all(d < 0.01 for d in deltas),
+                }
+            else:
+                shadow_agg[m] = {
+                    "n_compared": 0,
+                    "n_unmapped": unmapped,
+                    "within_1pct": True,  # vacuously (no mapping)
+                }
+        out["shadow_parity"] = shadow_agg
+    return out
+
 
 def run_evaluation(
     test_path: str,
     ults_dir: str,
     base_url: str | None = None,
     model: str | None = None,
+    scorer: str = "heuristic",
 ) -> dict[str, Any]:
     """Run full evaluation across all tasks.
 
@@ -763,7 +870,9 @@ def run_evaluation(
             })
             continue
 
-        result = evaluate_task(task_name, task_records, spec, base_url, model)
+        result = evaluate_task(
+            task_name, task_records, spec, base_url, model, scorer=scorer,
+        )
         score_str = f"{result['weighted_score']:.4f}"
         pass_str = f"{result.get('threshold_pass_rate', 0):.1%}"
         print(f"{task_name:<35} {score_str:>7} {pass_str:>7} {result['count']:>5} evaluated")
@@ -793,10 +902,37 @@ def run_evaluation(
     print(f"Overall: {overall_score:.4f} weighted score, "
           f"{tasks_passing}/{len(evaluated)} tasks >= 80% threshold pass rate")
 
-    return {
+    report: dict[str, Any] = {
         "task_results": task_results,
         "summary": summary,
+        "scorer": scorer,
     }
+
+    # Epic 4: aggregate shadow parity across tasks when scorer=dual.
+    # Exit status for the CLI is derived from this block (see main()).
+    if scorer == "dual":
+        shadow_summary: dict[str, Any] = {
+            "divergences_gt_1pct": [],
+            "all_metrics_compared": 0,
+            "all_metrics_unmapped": 0,
+        }
+        for r in task_results:
+            tname = r.get("task")
+            sp = r.get("shadow_parity") or {}
+            for metric_name, stats in sp.items():
+                if stats.get("n_compared", 0) == 0:
+                    shadow_summary["all_metrics_unmapped"] += 1
+                    continue
+                shadow_summary["all_metrics_compared"] += 1
+                if not stats.get("within_1pct", False):
+                    shadow_summary["divergences_gt_1pct"].append({
+                        "task": tname,
+                        "metric": metric_name,
+                        "mean_abs_delta": stats.get("mean_abs_delta"),
+                        "max_abs_delta": stats.get("max_abs_delta"),
+                    })
+        report["shadow_summary"] = shadow_summary
+    return report
 
 
 def main():
@@ -821,6 +957,17 @@ def main():
         help="Model name for live inference (required if --base-url set)",
     )
     parser.add_argument("--report", help="Write JSON report to file")
+    parser.add_argument(
+        "--scorer",
+        choices=["heuristic", "registry", "dual"],
+        default="heuristic",
+        help=(
+            "Evaluation scorer path (Sprint FT-LORA-PHASE10 Epic 4). "
+            "'heuristic' = Phase 5 bit-identical default. "
+            "'registry' = reward_functions.REWARD_REGISTRY path. "
+            "'dual' = shadow-compare both; exit 2 on any |delta| >= 1% per metric."
+        ),
+    )
     args = parser.parse_args()
 
     if args.base_url and not args.model:
@@ -831,12 +978,32 @@ def main():
         ults_dir=args.ults_dir,
         base_url=args.base_url,
         model=args.model,
+        scorer=args.scorer,
     )
 
     if args.report:
         with open(args.report, "w") as f:
             json.dump(report, f, indent=2)
         print(f"\nReport written to {args.report}")
+
+    # Epic 4 shadow gate: in dual mode, any per-metric divergence > 1% is a
+    # non-zero exit so the registry path can't silently become a new default
+    # until parity is confirmed.
+    if args.scorer == "dual":
+        divs = (report.get("shadow_summary") or {}).get("divergences_gt_1pct", [])
+        if divs:
+            print(
+                f"\nSHADOW PARITY FAIL: {len(divs)} metric(s) diverge by > 1%:",
+                file=sys.stderr,
+            )
+            for d in divs:
+                print(
+                    f"  {d['task']}/{d['metric']}: "
+                    f"mean|Δ|={d['mean_abs_delta']:.4f} "
+                    f"max|Δ|={d['max_abs_delta']:.4f}",
+                    file=sys.stderr,
+                )
+            sys.exit(2)
 
 
 if __name__ == "__main__":

@@ -302,8 +302,10 @@ Endpoints:
 
 ## Testing
 
-- Benchmark: `python docs/benchmarks/run_benchmark_v4.py` / `grader_v4.py`
-- Question set: `test_questions_120.json` (120 questions)
+- Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
+  - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
+  - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)
+  - Golden holdout: `training_data/eval/valid_golden.jsonl` (seeded carve from Phase 5 valid splits)
 - Live validation: `python3 scripts/live_validation.py` (19 end-to-end tests)
 - Synergy: `mdemg synergy status` | `mdemg synergy check --auto` | `mdemg synergy migrate --dry-run`
 - Synergy API: `GET /v1/synergy/status?space_id=mdemg-dev`

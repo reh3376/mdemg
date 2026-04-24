@@ -9,7 +9,7 @@
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "medium",
-    "notes": "Dynamic prompt \u2014 threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25."
+    "notes": "Dynamic prompt \u2014 threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25. Output is an array of cluster objects (not a single classification); classification_accuracy reward is structurally inapplicable and was removed in Phase 10. A cluster-overlap reward function is tracked for Phase 10.5 UBENCH (#215)."
   },
   "sampling_group": "C",
   "prompt": {
@@ -63,8 +63,7 @@
     }
   ],
   "reward_functions": [
-    "json_valid",
-    "classification_accuracy"
+    "json_valid"
   ],
   "training_config": {
     "rank": 8,

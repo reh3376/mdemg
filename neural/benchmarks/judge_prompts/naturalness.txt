@@ -1,0 +1,22 @@
+You are evaluating the NATURALNESS of a model response.
+
+Naturalness = the response reads as fluent, idiomatic English (or the response's target language) — not stilted, not machine-translated, not obviously templated. A natural response sounds like competent human prose.
+
+Naturalness is NOT about correctness or depth — only about the feel of the writing.
+
+## Task description
+{task_description}
+
+## Response to evaluate
+{task_response}
+
+## Scoring rubric
+- 1.0: indistinguishable from well-edited human writing.
+- 0.8: fluent with one or two mildly awkward phrasings.
+- 0.6: clearly readable but detectably machine-produced (repetition, templated transitions).
+- 0.4: stilted — multiple unnatural constructions or redundant hedging.
+- 0.2: robotic — reads as mechanical output.
+- 0.0: broken grammar, dropped pronouns, or incoherent word order.
+
+Respond ONLY with a JSON object:
+{{"score": <0..1 float>, "rationale": "<one-sentence explanation>"}}

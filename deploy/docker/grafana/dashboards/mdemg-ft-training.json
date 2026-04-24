@@ -237,6 +237,178 @@
       }
     },
     {
+      "id": 10,
+      "title": "Phase 10 Benchmark — Per-Task Pass Rate (latest run)",
+      "type": "table",
+      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "WITH latest AS (\n  SELECT run_id FROM benchmark_runs\n  ORDER BY started_at DESC LIMIT 1\n),\nper_row AS (\n  SELECT\n    br.task_id,\n    br.sampling_group,\n    br.run_idx,\n    (\n      SELECT AVG((v)::float)\n      FROM jsonb_each_text(br.reward_vector) AS kv(k, v)\n      WHERE v ~ '^-?[0-9]+(\\.[0-9]+)?$'\n    ) AS row_scalar\n  FROM benchmark_results br\n  JOIN latest l ON br.run_id = l.run_id\n)\nSELECT\n  task_id,\n  MAX(sampling_group) AS sampling_group,\n  COUNT(*) AS n_runs,\n  ROUND(AVG(row_scalar)::numeric, 4) AS mean_score,\n  ROUND(MIN(row_scalar)::numeric, 4) AS min_score,\n  ROUND(MAX(row_scalar)::numeric, 4) AS max_score\nFROM per_row\nGROUP BY task_id\nORDER BY task_id",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.6},
+              {"color": "green", "value": 0.8}
+            ]
+          },
+          "noValue": "Waiting for Phase 10 baseline"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "mean_score"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"type": "color-background"}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "Phase 10 Benchmark — Per-Task Reward Variance (stddev)",
+      "type": "bargauge",
+      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark — Phase 11 GRPO uses this as advantage-normalization denominator.",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "WITH latest AS (\n  SELECT run_id FROM benchmark_runs\n  ORDER BY started_at DESC LIMIT 1\n),\nper_row AS (\n  SELECT\n    br.task_id,\n    br.run_idx,\n    (\n      SELECT AVG((v)::float)\n      FROM jsonb_each_text(br.reward_vector) AS kv(k, v)\n      WHERE v ~ '^-?[0-9]+(\\.[0-9]+)?$'\n    ) AS row_scalar\n  FROM benchmark_results br\n  JOIN latest l ON br.run_id = l.run_id\n)\nSELECT\n  task_id AS metric,\n  ROUND(COALESCE(STDDEV_POP(row_scalar), 0)::numeric, 4) AS value\nFROM per_row\nGROUP BY task_id\nORDER BY task_id",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "lcd",
+        "valueMode": "color",
+        "showUnfilled": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 0.3,
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.08},
+              {"color": "red", "value": 0.20}
+            ]
+          },
+          "noValue": "Waiting for Phase 10 baseline"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Phase 10 Benchmark — Stagnation Flag (latest)",
+      "type": "stat",
+      "description": "Reads benchmark_runs.stagnation_flag for the most recent run. Phase 10 informational-only; becomes blocking in Phase 11 once benchmark_runs count >= 3.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT\n  started_at AS time,\n  CASE WHEN stagnation_flag THEN 1 ELSE 0 END AS value\nFROM benchmark_runs\nORDER BY started_at DESC\nLIMIT 1",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "OK", "color": "green"}}},
+            {"type": "value", "options": {"1": {"text": "STAGNATION", "color": "red"}}}
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          },
+          "noValue": "Waiting for Phase 10 baseline"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Phase 10 Benchmark — Aggregate Weighted Score (history)",
+      "type": "timeseries",
+      "description": "Reads benchmark_runs.aggregate_weighted_score over time. Group-weighted score (T:0.50 / C:0.35 / J:0.15). Stagnation threshold = |delta| < 0.005 across last 3.",
+      "gridPos": {
+        "h": 5,
+        "w": 18,
+        "x": 6,
+        "y": 36
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT\n  started_at AS time,\n  aggregate_weighted_score AS value,\n  model_path AS metric\nFROM benchmark_runs\nWHERE $__timeFilter(started_at)\nORDER BY started_at",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 6,
+            "showPoints": "always"
+          },
+          "noValue": "Waiting for Phase 10 baseline"
+        }
+      }
+    },
+    {
       "id": 7,
       "title": "Entropy Health",
       "type": "gauge",

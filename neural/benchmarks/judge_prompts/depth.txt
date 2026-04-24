@@ -1,0 +1,22 @@
+You are evaluating the DEPTH of a model response.
+
+Depth = the response engages substantively with the task: it considers mechanisms, constraints, edge cases, or trade-offs — not just a surface-level restatement of the prompt. A deep response makes the reader say "I hadn't thought about X."
+
+Depth is NOT about length. A terse response that names the right constraint scores high; a long response that only paraphrases scores low.
+
+## Task description
+{task_description}
+
+## Response to evaluate
+{task_response}
+
+## Scoring rubric
+- 1.0: names a non-obvious constraint / edge case / mechanism that the task does not spell out.
+- 0.8: engages with implicit structure — addresses the "why" or "under what conditions".
+- 0.6: correct, complete, and shows some reasoning, but stays on the surface.
+- 0.4: restates the prompt with minor elaboration.
+- 0.2: restates the prompt with no elaboration.
+- 0.0: response is off-topic or refuses.
+
+Respond ONLY with a JSON object:
+{{"score": <0..1 float>, "rationale": "<one-sentence explanation>"}}
