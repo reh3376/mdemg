@@ -108,7 +108,7 @@ def test_full_step_loop_runs_max_steps_without_early_stop(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda loss_v: optimizer_calls.append(loss_v),
+        optimizer_step_fn=lambda loss_v, **_: optimizer_calls.append(loss_v),
         eval_fn=lambda step: next(eval_scores),
         checkpoint_fn=lambda path, step: checkpoint_calls.append((path, step)),
     )
@@ -131,7 +131,7 @@ def test_sidecar_file_written_with_run_and_step_inserts(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda v: None,
+        optimizer_step_fn=lambda v, **_: None,
         eval_fn=lambda step: 0.5,
         checkpoint_fn=None,
     )
@@ -158,7 +158,7 @@ def test_early_stop_fires_on_degrading_val_reward(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda v: None,
+        optimizer_step_fn=lambda v, **_: None,
         eval_fn=lambda step: next(eval_scores),
         checkpoint_fn=None,
     )
@@ -193,7 +193,7 @@ def test_drop_policy_handles_zero_batch(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda v: optimizer_calls.append(v),
+        optimizer_step_fn=lambda v, **_: optimizer_calls.append(v),
         eval_fn=lambda step: 0.5,
         checkpoint_fn=None,
     )
@@ -218,7 +218,7 @@ def test_rollout_length_mismatch_raises(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=bad_rollout,
-        optimizer_step_fn=lambda v: None,
+        optimizer_step_fn=lambda v, **_: None,
         eval_fn=lambda step: 0.5,
     )
     with pytest.raises(RuntimeError, match="rollout_fn returned"):
@@ -234,7 +234,7 @@ def test_step_diagnostics_populated(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda v: None,
+        optimizer_step_fn=lambda v, **_: None,
         eval_fn=lambda step: 0.5,
     )
     result = trainer.train()
@@ -257,7 +257,7 @@ def test_run_id_from_external_source_respected(tmp_path):
         config=cfg,
         sampler=sampler,
         rollout_fn=_mk_rollout_fn(),
-        optimizer_step_fn=lambda v: None,
+        optimizer_step_fn=lambda v, **_: None,
         eval_fn=lambda step: 0.5,
         run_id="externally_supplied_id",
     )

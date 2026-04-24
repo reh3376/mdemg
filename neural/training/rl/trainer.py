@@ -69,11 +69,26 @@ class RolloutFn(Protocol):
 
 
 class OptimizerStepFn(Protocol):
-    """Callable: given scalar loss, performs one optimizer step.
+    """Callable: given scalar loss + step context, performs one optimizer step.
 
-    Real implementation wraps mlx.optimizers.AdamW. Mock is a no-op.
+    Real implementation (``MLXGRPOAdapter``) rebuilds the GRPO loss in MLX space
+    using ``advantages`` + ``keep_mask`` + the tokenized tensors it stashed during
+    ``rollout_fn``, then runs ``mx.value_and_grad`` + ``optimizer.update``.
+
+    The ``loss_value`` scalar is the numpy-computed loss from
+    ``compute_grpo_loss`` — real adapters cross-check it against the MLX-space
+    recomputation; mocks simply record it.
+
+    Mocks accept the extra kwargs with ``**_`` to stay single-line.
     """
-    def __call__(self, loss_value: float) -> None: ...
+    def __call__(
+        self,
+        loss_value: float,
+        *,
+        advantages: "np.ndarray | None" = None,
+        keep_mask: "np.ndarray | None" = None,
+        rollouts: "list[RolloutResult] | None" = None,
+    ) -> None: ...
 
 
 class EvalFn(Protocol):
@@ -344,7 +359,12 @@ class GRPOTrainer:
                 kl_coef=self.cfg.kl_coef,
                 entropy_coef=self.cfg.entropy_coef,
             )
-            self.optimizer_step_fn(loss.total)
+            self.optimizer_step_fn(
+                loss.total,
+                advantages=adv.advantages,
+                keep_mask=adv.keep_mask,
+                rollouts=rollouts,
+            )
             diag = {
                 "step_idx": step,
                 "policy_loss": loss.policy_loss,

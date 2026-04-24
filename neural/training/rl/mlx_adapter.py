@@ -1,0 +1,504 @@
+"""MLX adapter — real implementation of the Phase 11 GRPO trainer callables.
+
+Stateful class implementing the four Protocol types from ``trainer.py``
+(:class:`RolloutFn`, :class:`OptimizerStepFn`, :class:`EvalFn`,
+:class:`CheckpointFn`) against ``mlx_lm==0.31.2``.
+
+Why stateful: :class:`OptimizerStepFn` receives advantages + keep_mask + the
+rollout results, but *not* MLX tensors — the real backprop needs the tokenized
+prompt+response tensors that were produced during :meth:`rollout_fn`. This
+class stashes those tensors on ``self._stash`` between calls so
+:meth:`optimizer_step_fn` can rebuild the GRPO loss in MLX-space and take a
+real gradient step. Stash lifetime is one rollout/step pair; it is cleared
+after each optimizer update.
+
+Design boundaries:
+  * Prompt rendering is *delegated* to ``prompt_provider(task_id, run_idx) ->
+    str``. The in-repo rendering logic lives in Go (the 16 live call sites); a
+    future follow-up can wire a Python shim. This keeps the adapter focused on
+    MLX mechanics and lets the operator plug in whatever prompt source they
+    want (live Go codepath, cached ``llm_interactions`` rows, spec fixtures).
+  * Reward scoring is delegated to ``reward_fn(RewardSample, response) ->
+    float``. Default: wire ``neural.training.reward_functions.REWARD_REGISTRY``
+    plus ``scalarize_reward`` at the call site.
+  * Evaluation (:meth:`eval_fn`) wraps the Phase 10 benchmark runner as a
+    subprocess call — cheapest path to reusing the full scorer pipeline.
+  * Checkpointing (:meth:`checkpoint_fn`) saves LoRA-only trainable params via
+    ``mx.save_safetensors`` (matches ``mlx_lm.tuner`` convention).
+
+This file imports ``mlx_lm`` lazily inside :meth:`__init__` so unit tests can
+construct a ``_StashedSample`` and call the logprob helper with a mocked module
+without paying the MLX import cost.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Optional
+
+import numpy as np
+
+from .reward_sampler import RewardSample
+from .trainer import RolloutResult
+
+logger = logging.getLogger(__name__)
+
+# Clamp matches grpo_loss._MAX_LOG_RATIO (kept local to avoid cross-module
+# coupling; both use 20.0 per the numerical-stability policy in grpo_loss.py).
+_MAX_LOG_RATIO = 20.0
+
+
+# ── stash type ──────────────────────────────────────────────────────────────
+
+
+@dataclass
+class _StashedSample:
+    """Per-sample tensors preserved across rollout→optimizer-step.
+
+    ``full_ids`` is the tokenization of prompt+response (len L, dtype int32).
+    ``prompt_len`` is the number of prompt tokens — response targets start at
+    index ``prompt_len - 1`` in the targets array (positions predicting the
+    first response token and beyond).
+
+    ``lp_old_frozen`` and ``lp_ref_frozen`` are the sum-of-response-logprobs
+    under the rollout-time policy + frozen reference policy respectively.
+    Both are captured once at rollout time and reused in the loss closure.
+    """
+    full_ids: list[int]
+    prompt_len: int
+    lp_old_frozen: float
+    lp_ref_frozen: float
+
+
+# ── per-token logprob helper (pure function, exported for tests) ────────────
+
+
+def sum_response_logprobs(model: Any, mx_mod: Any, full_ids: list[int],
+                           prompt_len: int) -> Any:
+    """Sum-of-token logprobs under ``model`` for response positions only.
+
+    Parameters
+    ----------
+    model       : mlx.nn.Module (policy or reference).
+    mx_mod      : the ``mlx.core`` module (passed in so this helper can be
+                  unit-tested with a stub module).
+    full_ids    : tokenization of prompt + response.
+    prompt_len  : number of prompt tokens. The first target index predicting a
+                  response token is ``prompt_len - 1``.
+
+    Returns
+    -------
+    MLX scalar (0-d mx.array) — sum of per-token logprobs over response tokens.
+    """
+    if len(full_ids) < 2:
+        return mx_mod.zeros(())
+    if prompt_len < 1 or prompt_len >= len(full_ids):
+        # No response tokens to score; return 0 so the caller treats this
+        # sample as neutral (no gradient signal).
+        return mx_mod.zeros(())
+
+    full_arr = mx_mod.array([full_ids])          # (1, L)
+    inputs = full_arr[:, :-1]                    # (1, L-1)
+    targets = full_arr[:, 1:]                    # (1, L-1)
+
+    # Forward pass. mlx_lm Qwen3 expects int ids directly.
+    logits = model(inputs)                       # (1, L-1, V)
+
+    # Import mlx.nn lazily to keep the fn testable with stubs.
+    import mlx.nn as nn  # noqa: PLC0415
+    log_probs = nn.log_softmax(logits, axis=-1)  # (1, L-1, V)
+
+    # Gather logprob at each target token id.
+    target_lp = mx_mod.take_along_axis(
+        log_probs, targets[:, :, None], axis=-1
+    ).squeeze(-1)                                # (1, L-1)
+
+    # Mask: response targets are at positions >= prompt_len - 1.
+    seq_len = target_lp.shape[-1]
+    positions = mx_mod.arange(seq_len)
+    mask = (positions >= (prompt_len - 1)).astype(target_lp.dtype)
+    return (target_lp * mask).sum()
+
+
+# ── adapter ─────────────────────────────────────────────────────────────────
+
+
+PromptProvider = Callable[[str, int], str]
+RewardFn = Callable[[RewardSample, str], float]
+
+
+class MLXGRPOAdapter:
+    """Real MLX wiring for the Phase 11 GRPO trainer's four callables.
+
+    Construction is eager on ``base_model_path`` + ``adapter_path`` (loads both
+    policy and reference into memory — roughly 2x model size in unified VRAM).
+    For dense Qwen3-14B-4bit this is the validated Phase 5 Metal footprint; no
+    special quantization is needed.
+
+    Usage::
+
+        adapter = MLXGRPOAdapter(
+            base_model_path=cfg.base_model_path,
+            adapter_path="adapters/phase5",
+            prompt_provider=my_provider,
+            reward_fn=my_scorer,
+            clip_ratio=cfg.clip_ratio, kl_coef=cfg.kl_coef,
+            entropy_coef=cfg.entropy_coef,
+            lr=1e-5,
+            generation_kwargs={"max_tokens": 4000, "temp": 0.7},
+        )
+        trainer = GRPOTrainer(
+            config=cfg, sampler=sampler,
+            rollout_fn=adapter.rollout_fn,
+            optimizer_step_fn=adapter.optimizer_step_fn,
+            eval_fn=adapter.eval_fn,
+            checkpoint_fn=adapter.checkpoint_fn,
+        )
+        trainer.train()
+    """
+
+    def __init__(
+        self,
+        *,
+        base_model_path: str,
+        adapter_path: str | None,
+        prompt_provider: PromptProvider,
+        reward_fn: RewardFn,
+        clip_ratio: float,
+        kl_coef: float,
+        entropy_coef: float,
+        lr: float,
+        weight_decay: float = 0.01,
+        betas: tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        generation_kwargs: dict[str, Any] | None = None,
+        eval_cmd: list[str] | None = None,
+    ) -> None:
+        # Lazy imports so unit tests can exercise the class without a Metal
+        # backend. Any real instantiation in a Mac env pulls these in once.
+        import mlx.core as mx  # noqa: PLC0415
+        import mlx.optimizers as optim  # noqa: PLC0415
+        import mlx_lm  # noqa: PLC0415
+
+        self._mx = mx
+
+        logger.info("MLXGRPOAdapter loading policy: base=%s adapter=%s",
+                    base_model_path, adapter_path)
+        self.model, self.tokenizer = mlx_lm.load(
+            base_model_path, adapter_path=adapter_path
+        )
+        logger.info("MLXGRPOAdapter loading frozen reference (same SHA)")
+        self.ref_model, _ = mlx_lm.load(
+            base_model_path, adapter_path=adapter_path
+        )
+        # Reference is never trained. Freezing avoids wasted grad computation.
+        self.ref_model.freeze()
+
+        self.optimizer = optim.AdamW(
+            learning_rate=lr,
+            betas=list(betas),
+            eps=eps,
+            weight_decay=weight_decay,
+        )
+
+        self.prompt_provider = prompt_provider
+        self.reward_fn = reward_fn
+        self.clip_ratio = float(clip_ratio)
+        self.kl_coef = float(kl_coef)
+        self.entropy_coef = float(entropy_coef)
+        self.generation_kwargs = dict(generation_kwargs or {})
+        self.eval_cmd = list(eval_cmd) if eval_cmd else None
+
+        self._stash: Optional[list[Optional[_StashedSample]]] = None
+
+    # ── RolloutFn ───────────────────────────────────────────────────────────
+
+    def rollout_fn(self, batch: list[RewardSample]) -> list[RolloutResult]:
+        """Generate a response per sample, score it, stash tokenized tensors."""
+        import mlx_lm  # noqa: PLC0415
+
+        results: list[RolloutResult] = []
+        stash: list[Optional[_StashedSample]] = []
+
+        for sample in batch:
+            prompt = self.prompt_provider(sample.task_id, sample.run_idx)
+            response = mlx_lm.generate(
+                self.model, self.tokenizer, prompt,
+                **self.generation_kwargs,
+            )
+
+            prompt_ids = self.tokenizer.encode(prompt)
+            full_ids = self.tokenizer.encode(prompt + response)
+            prompt_len = len(prompt_ids)
+            response_len = len(full_ids) - prompt_len
+
+            if response_len <= 0:
+                # Degenerate generation; emit a zero-logprob result so the
+                # trainer keeps rolling. Will contribute 0 advantage if the
+                # reward is also 0.
+                reward = self.reward_fn(sample, response)
+                results.append(RolloutResult(
+                    task_id=sample.task_id,
+                    response_text=response,
+                    scalar_reward=reward,
+                    logprob_new=0.0, logprob_old=0.0, logprob_ref=0.0,
+                ))
+                stash.append(None)
+                continue
+
+            lp_new = sum_response_logprobs(self.model, self._mx,
+                                            full_ids, prompt_len)
+            lp_ref = sum_response_logprobs(self.ref_model, self._mx,
+                                            full_ids, prompt_len)
+            # Materialize to Python floats — the MLX-space recomputation will
+            # re-run the forward pass under the current policy from scratch.
+            lp_new_f = float(lp_new)
+            lp_ref_f = float(lp_ref)
+
+            reward = self.reward_fn(sample, response)
+            results.append(RolloutResult(
+                task_id=sample.task_id,
+                response_text=response,
+                scalar_reward=reward,
+                logprob_new=lp_new_f,
+                logprob_old=lp_new_f,   # same at rollout time (on-policy)
+                logprob_ref=lp_ref_f,
+            ))
+            stash.append(_StashedSample(
+                full_ids=full_ids,
+                prompt_len=prompt_len,
+                lp_old_frozen=lp_new_f,
+                lp_ref_frozen=lp_ref_f,
+            ))
+
+        self._stash = stash
+        return results
+
+    # ── OptimizerStepFn ─────────────────────────────────────────────────────
+
+    def optimizer_step_fn(
+        self,
+        loss_value: float,
+        *,
+        advantages: np.ndarray | None = None,
+        keep_mask: np.ndarray | None = None,
+        rollouts: list[RolloutResult] | None = None,  # unused; see below
+    ) -> None:
+        """One optimizer step: rebuild GRPO loss in MLX, backprop, update.
+
+        ``loss_value`` (numpy-computed scalar from ``compute_grpo_loss``) is
+        used as a sanity check — after the MLX-space recomputation we log the
+        delta as a diagnostic. Divergence beyond ~1e-3 indicates either a
+        policy drift between rollout and this step (shouldn't happen within
+        one step because we update AFTER rollout) or a bug in the logprob
+        pipeline.
+
+        ``rollouts`` is accepted for Protocol conformance but unused — we rely
+        on the stashed tensors (already tokenized) instead of re-tokenizing.
+        """
+        import mlx.core as mx  # noqa: PLC0415
+        import mlx.nn as nn  # noqa: PLC0415
+
+        if self._stash is None:
+            raise RuntimeError(
+                "optimizer_step_fn invoked before rollout_fn — no tensors "
+                "stashed. The trainer must call rollout_fn first."
+            )
+        if advantages is None or keep_mask is None:
+            raise RuntimeError(
+                "optimizer_step_fn requires advantages + keep_mask kwargs "
+                "from the trainer. Protocol signature mismatch?"
+            )
+
+        # Indices into the *original* batch that survived both keep_mask AND
+        # had a non-None stash (None means degenerate generation).
+        keep_arr = np.asarray(keep_mask, dtype=bool)
+        kept_indices = [
+            i for i, keep in enumerate(keep_arr)
+            if keep and self._stash[i] is not None
+        ]
+        if not kept_indices:
+            logger.warning("optimizer_step_fn: all samples dropped; skipping")
+            self._stash = None
+            return
+        if len(kept_indices) != len(advantages):
+            # `keep_mask` has ALL-batch positions; `advantages` is already
+            # restricted to kept-advantage entries by estimate_advantage.
+            # But we may have stash=None samples that the mask thinks are kept
+            # (very rare — only when generation succeeded enough to set
+            # keep=True but then produced 0-len response). Re-align.
+            adv_full = _expand_advantages_to_batch(
+                advantages, keep_arr, len(self._stash)
+            )
+            kept_adv = np.array(
+                [adv_full[i] for i in kept_indices], dtype=np.float32
+            )
+        else:
+            kept_adv = advantages.astype(np.float32)
+
+        adv_mx = mx.array(kept_adv)
+        lp_old_frozen = mx.array(
+            [self._stash[i].lp_old_frozen for i in kept_indices],
+            dtype=mx.float32,
+        )
+        lp_ref_frozen = mx.array(
+            [self._stash[i].lp_ref_frozen for i in kept_indices],
+            dtype=mx.float32,
+        )
+
+        clip = self.clip_ratio
+        kl_coef = self.kl_coef
+        entropy_coef = self.entropy_coef
+
+        def loss_fn(model: Any) -> Any:
+            # Recompute lp_new under the current (trainable) policy.
+            lp_new_list = [
+                sum_response_logprobs(
+                    model, mx,
+                    self._stash[i].full_ids,   # type: ignore[union-attr]
+                    self._stash[i].prompt_len,  # type: ignore[union-attr]
+                )
+                for i in kept_indices
+            ]
+            lp_new = mx.stack(lp_new_list)
+
+            log_ratio = mx.clip(lp_new - lp_old_frozen,
+                                 -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
+            ratio = mx.exp(log_ratio)
+            clipped = mx.clip(ratio, 1.0 - clip, 1.0 + clip)
+            policy_loss = -mx.mean(
+                mx.minimum(ratio * adv_mx, clipped * adv_mx)
+            )
+            log_diff = mx.clip(lp_new - lp_ref_frozen,
+                                -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
+            kl = mx.mean(log_diff)
+            entropy = -mx.mean(lp_new)
+
+            return policy_loss + kl_coef * kl - entropy_coef * entropy
+
+        # value_and_grad returns (loss, grads) where grads is a tree matching
+        # the trainable parameter tree.
+        loss_and_grad = nn.value_and_grad(self.model, loss_fn)
+        mlx_loss, grads = loss_and_grad(self.model)
+        self.optimizer.update(self.model, grads)
+        # Force evaluation so subsequent rollout_fn sees updated weights.
+        mx.eval(self.model.parameters(), self.optimizer.state)
+
+        mlx_loss_f = float(mlx_loss)
+        delta = abs(mlx_loss_f - loss_value)
+        if delta > 1e-2:
+            logger.warning(
+                "GRPO loss disagreement: numpy=%.6f mlx=%.6f delta=%.4f",
+                loss_value, mlx_loss_f, delta,
+            )
+
+        self._stash = None  # consume
+
+    # ── EvalFn ──────────────────────────────────────────────────────────────
+
+    def eval_fn(self, step: int) -> float:
+        """Run the Phase 10 benchmark runner as a subprocess, return aggregate.
+
+        Config expects ``eval_cmd`` to be a ready-to-spawn command like::
+
+            ["python", "-m", "neural.benchmarks.run_benchmark",
+             "--config", "configs/benchmark_phase10_rl_eval.yaml",
+             "--out", "/tmp/rl_eval.json"]
+
+        The runner writes the aggregate to the ``--out`` path's JSON, which
+        this method parses and returns.
+
+        If ``eval_cmd`` is ``None``, returns ``float("nan")`` — the trainer's
+        early-stop wrapper treats NaN as "no signal" and keeps going. Operator
+        should supply a real command for the full compute pass.
+        """
+        if self.eval_cmd is None:
+            logger.warning(
+                "eval_fn: no eval_cmd configured; returning NaN (trainer "
+                "early-stop will skip this iteration)"
+            )
+            return float("nan")
+
+        # Convention: the last arg pair is ``--out <path>``. We parse the
+        # aggregate from that JSON after the subprocess completes.
+        try:
+            out_idx = self.eval_cmd.index("--out")
+            out_path = Path(self.eval_cmd[out_idx + 1])
+        except (ValueError, IndexError) as exc:
+            raise RuntimeError(
+                "eval_cmd must include '--out <path>'; got "
+                f"{self.eval_cmd!r}"
+            ) from exc
+
+        logger.info("eval_fn step=%d invoking: %s", step, self.eval_cmd)
+        result = subprocess.run(
+            self.eval_cmd, capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            logger.error(
+                "eval_fn subprocess failed (rc=%d): %s",
+                result.returncode, result.stderr[-500:],
+            )
+            return float("nan")
+
+        try:
+            payload = json.loads(out_path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            logger.error("eval_fn: cannot parse %s: %s", out_path, exc)
+            return float("nan")
+
+        # Phase 10 runner writes {"aggregate_weighted_score": 0.x, ...}
+        agg = payload.get("aggregate_weighted_score")
+        if agg is None:
+            logger.error("eval_fn: missing aggregate_weighted_score in %s",
+                         out_path)
+            return float("nan")
+        return float(agg)
+
+    # ── CheckpointFn ────────────────────────────────────────────────────────
+
+    def checkpoint_fn(self, path: Path, step: int) -> None:
+        """Save LoRA-only trainable parameters as safetensors.
+
+        Matches ``mlx_lm.tuner.utils.load_adapters`` load convention so the
+        resulting directory can be passed back into ``mlx_lm.load(adapter_path=...)``.
+        """
+        import mlx.core as mx  # noqa: PLC0415
+        from mlx.utils import tree_flatten  # noqa: PLC0415
+
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        trainable = dict(tree_flatten(self.model.trainable_parameters()))
+        target = path / "adapters.safetensors"
+        mx.save_safetensors(str(target), trainable)
+        logger.info("checkpoint_fn step=%d wrote %d params to %s",
+                    step, len(trainable), target)
+
+
+# ── helper ──────────────────────────────────────────────────────────────────
+
+
+def _expand_advantages_to_batch(
+    kept_adv: np.ndarray,
+    keep_mask: np.ndarray,
+    batch_size: int,
+) -> np.ndarray:
+    """Map ``kept_adv`` (len N_kept) back onto a batch-sized array.
+
+    Entries where ``keep_mask`` is False get 0.0. Only used for the rare
+    stash=None edge case inside :meth:`optimizer_step_fn`.
+    """
+    out = np.zeros(batch_size, dtype=np.float64)
+    kept_positions = np.where(keep_mask)[0]
+    if len(kept_positions) != len(kept_adv):
+        # keep_mask and kept_adv are supposed to be aligned by construction
+        # in estimate_advantage; a mismatch means an upstream bug.
+        raise RuntimeError(
+            f"keep_mask has {len(kept_positions)} True entries but "
+            f"advantages has {len(kept_adv)}"
+        )
+    out[kept_positions] = kept_adv
+    return out
