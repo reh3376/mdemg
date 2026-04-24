@@ -14,6 +14,7 @@ from training.reward_functions import (
     coverage_score,
     evaluation_accuracy,
     explanation_quality,
+    false_positive_penalty,
     format_valid,
     get_reward_function,
     insight_count,
@@ -24,6 +25,7 @@ from training.reward_functions import (
     score_calibration,
     specificity_score,
     uniqueness_check,
+    violation_detection_accuracy,
 )
 
 
@@ -278,6 +280,104 @@ class TestScoreCalibration:
         assert score_calibration("not scores") == 0.0
 
 
+# ── Guardrail Rewards ──
+
+
+class TestViolationDetectionAccuracy:
+    def _mk(self, ids: list[str]) -> str:
+        violations = [
+            {"constraint_node_id": i, "description": "d", "rationale": "r"}
+            for i in ids
+        ]
+        return json.dumps({"violations": violations, "warnings": []})
+
+    def test_exact_match(self):
+        resp = self._mk(["c1", "c2"])
+        exp = self._mk(["c2", "c1"])
+        assert violation_detection_accuracy(resp, expected=exp) == 1.0
+
+    def test_both_clean(self):
+        resp = self._mk([])
+        exp = self._mk([])
+        assert violation_detection_accuracy(resp, expected=exp) == 1.0
+
+    def test_missed_violation(self):
+        resp = self._mk([])
+        exp = self._mk(["c1"])
+        assert violation_detection_accuracy(resp, expected=exp) == 0.0
+
+    def test_fabricated_violation(self):
+        resp = self._mk(["c1"])
+        exp = self._mk([])
+        assert violation_detection_accuracy(resp, expected=exp) == 0.0
+
+    def test_partial_overlap_f1(self):
+        # pred={c1,c2,c3}, gold={c2,c3,c4} → tp=2, fp=1, fn=1 → F1 = 2/3
+        resp = self._mk(["c1", "c2", "c3"])
+        exp = self._mk(["c2", "c3", "c4"])
+        assert violation_detection_accuracy(resp, expected=exp) == pytest.approx(
+            2 / 3
+        )
+
+    def test_invalid_json_response(self):
+        exp = self._mk(["c1"])
+        assert violation_detection_accuracy("not json", expected=exp) == 0.0
+
+    def test_invalid_json_expected(self):
+        resp = self._mk(["c1"])
+        assert violation_detection_accuracy(resp, expected="not json") == 0.0
+
+    def test_no_expected_falls_back_to_json_valid(self):
+        resp = self._mk(["c1"])
+        # Valid JSON object → json_valid fallback returns 1.0
+        assert violation_detection_accuracy(resp, expected=None) == 1.0
+
+    def test_malformed_violations_treated_as_empty(self):
+        # violations is not a list → treat as empty; gold has one → 0.0
+        resp = json.dumps({"violations": "oops", "warnings": []})
+        exp = self._mk(["c1"])
+        assert violation_detection_accuracy(resp, expected=exp) == 0.0
+
+
+class TestFalsePositivePenalty:
+    def _mk(self, ids: list[str]) -> str:
+        violations = [
+            {"constraint_node_id": i, "description": "d", "rationale": "r"}
+            for i in ids
+        ]
+        return json.dumps({"violations": violations, "warnings": []})
+
+    def test_no_false_positives(self):
+        resp = self._mk(["c1", "c2"])
+        exp = self._mk(["c1", "c2"])
+        assert false_positive_penalty(resp, expected=exp) == 1.0
+
+    def test_no_predictions_no_penalty(self):
+        resp = self._mk([])
+        exp = self._mk(["c1"])  # missed violation, but no FPs
+        assert false_positive_penalty(resp, expected=exp) == 1.0
+
+    def test_all_false_positives(self):
+        # pred={c1,c2}, gold={} → 2 FPs / 2 preds → 1 - 1.0 = 0.0
+        resp = self._mk(["c1", "c2"])
+        exp = self._mk([])
+        assert false_positive_penalty(resp, expected=exp) == 0.0
+
+    def test_half_false_positives(self):
+        # pred={c1,c2}, gold={c1} → 1 FP / 2 preds → 0.5
+        resp = self._mk(["c1", "c2"])
+        exp = self._mk(["c1"])
+        assert false_positive_penalty(resp, expected=exp) == pytest.approx(0.5)
+
+    def test_invalid_json_response(self):
+        exp = self._mk(["c1"])
+        assert false_positive_penalty("not json", expected=exp) == 0.0
+
+    def test_no_expected_falls_back_to_json_valid(self):
+        resp = self._mk(["c1"])
+        assert false_positive_penalty(resp, expected=None) == 1.0
+
+
 # ── Performance Reward ──
 
 
@@ -305,8 +405,13 @@ class TestLatencyReward:
 
 
 class TestRegistry:
-    def test_all_18_functions_registered(self):
-        assert len(REWARD_REGISTRY) >= 18
+    def test_all_20_functions_registered(self):
+        # 18 original + violation_detection_accuracy + false_positive_penalty
+        assert len(REWARD_REGISTRY) >= 20
+
+    def test_guardrail_rewards_registered(self):
+        assert "violation_detection_accuracy" in REWARD_REGISTRY
+        assert "false_positive_penalty" in REWARD_REGISTRY
 
     def test_get_known(self):
         fn = get_reward_function("json_valid")
