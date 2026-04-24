@@ -57,6 +57,20 @@ def stub_mlx(monkeypatch):
     mx_stub.save_safetensors = MagicMock()
     mx_stub.float32 = np.float32
 
+    # ── Tier 1 memory-hygiene API stubs ─────────────────────────────────────
+    # MLXGRPOAdapter calls these at init + per-step. Real mlx.core exposes
+    # them on Metal builds; stubs just need to be callable and return plausible
+    # values so the adapter logic keeps flowing.
+    mx_stub.clear_cache = MagicMock()
+    mx_stub.set_wired_limit = MagicMock()
+    mx_stub.reset_peak_memory = MagicMock()
+    mx_stub.device_info = MagicMock(
+        return_value={"max_recommended_working_set_size": 64 * (1024 ** 3)}
+    )
+    mx_stub.get_peak_memory = MagicMock(return_value=1.0 * (1024 ** 3))
+    mx_stub.get_cache_memory = MagicMock(return_value=0.5 * (1024 ** 3))
+    mx_stub.get_active_memory = MagicMock(return_value=0.25 * (1024 ** 3))
+
     # ── mlx.nn stub ─────────────────────────────────────────────────────────
     nn_stub = types.SimpleNamespace()
 
@@ -181,13 +195,16 @@ def _build_adapter(stub_mlx):
 # ── init / wiring ───────────────────────────────────────────────────────────
 
 
-def test_init_loads_policy_and_reference(stub_mlx):
+def test_init_loads_policy_only(stub_mlx):
+    """One mlx_lm.load call — reference uses the same weights with LoRA scales
+    zeroed in-forward (see :func:`_lora_disabled`). Second load was dropped
+    to stay under Metal's MTLResource descriptor ceiling on Qwen3-14B."""
     adapter = _build_adapter(stub_mlx)
-    # 2 loads: policy + reference
-    assert len(stub_mlx["load_calls"]) == 2
+    # Exactly 1 load: policy; reference is the same model w/ LoRA disabled.
+    assert len(stub_mlx["load_calls"]) == 1
     assert stub_mlx["load_calls"][0]["adapter_path"] == "/fake/adapter"
-    # ref_model.freeze was called
-    adapter.ref_model.freeze.assert_called_once()
+    # No ref_model attribute — removed with the single-load fix.
+    assert not hasattr(adapter, "ref_model")
     # AdamW constructed with lr=1e-5
     assert stub_mlx["adamw_calls"][0]["learning_rate"] == 1e-5
 
@@ -374,3 +391,115 @@ def test_expand_advantages_mismatch_raises():
     adv = np.array([0.5])  # length 1 but 2 kept
     with pytest.raises(RuntimeError, match="True entries"):
         _expand_advantages_to_batch(adv, keep, batch_size=3)
+
+
+# ── _lora_disabled context manager ────────────────────────────────────────
+
+
+def test_lora_disabled_is_noop_on_stub_model(stub_mlx):
+    """With the stub mlx_lm (no tuner.lora submodule), _lora_disabled must
+    degrade to a no-op rather than raising."""
+    from neural.training.rl.mlx_adapter import _lora_disabled
+
+    class _Bare:
+        pass
+    model = _Bare()
+    with _lora_disabled(model):
+        pass  # must not raise
+
+
+def test_lora_disabled_toggles_scale_when_lora_types_available(monkeypatch):
+    """When mlx_lm.tuner.lora IS importable, _lora_disabled must zero every
+    LoRA module's scale inside the ``with`` block and restore on exit."""
+    import sys
+    import types
+
+    # Fake LoRA classes matching mlx_lm's structure (just the duck-type that
+    # _lora_disabled needs: an ``isinstance`` match plus ``.scale``).
+    class _FakeLoRALinear:
+        def __init__(self, scale):
+            self.scale = scale
+
+    class _FakeLoRASwitchLinear:
+        def __init__(self, scale):
+            self.scale = scale
+
+    class _FakeLoRAEmbedding:
+        def __init__(self, scale):
+            self.scale = scale
+
+    # Build a mlx_lm.tuner.lora stub. Must chain the package path so
+    # `from mlx_lm.tuner.lora import ...` resolves.
+    mlx_lm_mod = types.ModuleType("mlx_lm")
+    tuner_mod = types.ModuleType("mlx_lm.tuner")
+    lora_mod = types.ModuleType("mlx_lm.tuner.lora")
+    lora_mod.LoRALinear = _FakeLoRALinear
+    lora_mod.LoRASwitchLinear = _FakeLoRASwitchLinear
+    lora_mod.LoRAEmbedding = _FakeLoRAEmbedding
+    mlx_lm_mod.tuner = tuner_mod
+    tuner_mod.lora = lora_mod
+    monkeypatch.setitem(sys.modules, "mlx_lm", mlx_lm_mod)
+    monkeypatch.setitem(sys.modules, "mlx_lm.tuner", tuner_mod)
+    monkeypatch.setitem(sys.modules, "mlx_lm.tuner.lora", lora_mod)
+
+    # Re-import to pick up the freshly-stubbed import inside _lora_disabled.
+    from neural.training.rl.mlx_adapter import _lora_disabled
+
+    lora_a = _FakeLoRALinear(scale=20.0)
+    lora_b = _FakeLoRAEmbedding(scale=15.0)
+    non_lora = object()  # must be ignored
+
+    class _Model:
+        def named_modules(self):
+            yield "layers.0.q_proj", lora_a
+            yield "layers.0.embed", lora_b
+            yield "layers.0.ln", non_lora
+
+    model = _Model()
+
+    # Inside the block, scales are 0.
+    with _lora_disabled(model):
+        assert lora_a.scale == 0.0
+        assert lora_b.scale == 0.0
+    # After exit, scales are restored.
+    assert lora_a.scale == 20.0
+    assert lora_b.scale == 15.0
+
+
+def test_lora_disabled_restores_scale_on_exception(monkeypatch):
+    """Exception inside the ``with`` block must still restore scales."""
+    import sys
+    import types
+
+    class _FakeLoRALinear:
+        def __init__(self, scale):
+            self.scale = scale
+
+    mlx_lm_mod = types.ModuleType("mlx_lm")
+    tuner_mod = types.ModuleType("mlx_lm.tuner")
+    lora_mod = types.ModuleType("mlx_lm.tuner.lora")
+    lora_mod.LoRALinear = _FakeLoRALinear
+    # Provide the other two names so the import doesn't fail.
+    lora_mod.LoRASwitchLinear = type("S", (), {})
+    lora_mod.LoRAEmbedding = type("E", (), {})
+    mlx_lm_mod.tuner = tuner_mod
+    tuner_mod.lora = lora_mod
+    monkeypatch.setitem(sys.modules, "mlx_lm", mlx_lm_mod)
+    monkeypatch.setitem(sys.modules, "mlx_lm.tuner", tuner_mod)
+    monkeypatch.setitem(sys.modules, "mlx_lm.tuner.lora", lora_mod)
+
+    from neural.training.rl.mlx_adapter import _lora_disabled
+
+    lora = _FakeLoRALinear(scale=42.0)
+
+    class _Model:
+        def named_modules(self):
+            yield "q", lora
+
+    model = _Model()
+    with pytest.raises(ValueError, match="boom"):
+        with _lora_disabled(model):
+            assert lora.scale == 0.0
+            raise ValueError("boom")
+    # Restored despite the raise.
+    assert lora.scale == 42.0

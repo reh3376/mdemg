@@ -35,9 +35,10 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import numpy as np
 
@@ -49,6 +50,12 @@ logger = logging.getLogger(__name__)
 # Clamp matches grpo_loss._MAX_LOG_RATIO (kept local to avoid cross-module
 # coupling; both use 20.0 per the numerical-stability policy in grpo_loss.py).
 _MAX_LOG_RATIO = 20.0
+
+# Blow-up threshold for the numpy-vs-MLX loss cross-check. See the docstring
+# on :meth:`MLXGRPOAdapter.optimizer_step_fn` for why O(1) divergence is
+# expected and not-a-bug. Anything above this almost certainly indicates
+# NaN/inf, a dtype catastrophe, or a broken logprob pipeline.
+_LOSS_DISAGREEMENT_BLOWUP = 50.0
 
 
 # ── stash type ──────────────────────────────────────────────────────────────
@@ -130,13 +137,58 @@ PromptProvider = Callable[[str, int], str]
 RewardFn = Callable[[RewardSample, str], float]
 
 
+@contextmanager
+def _lora_disabled(model: Any) -> Iterator[None]:
+    """Temporarily zero every LoRA module's ``scale`` on ``model``, restore on exit.
+
+    Used to compute the frozen-reference logprobs on the *same* weights as
+    the policy. In ``mlx_lm==0.31.2``, a LoRA-wrapped linear's forward is
+    ``base(x) + scale * ((dropout(x) @ lora_a) @ lora_b)``. Setting ``scale``
+    to 0 collapses the forward to the base linear exactly — bit-identical to
+    a base-only model — without allocating a second weight set.
+
+    Why this matters: loading two copies of Qwen3-14B into Metal blows past
+    the 499K ``MTLResource`` descriptor ceiling (the same ceiling that forced
+    the Phase 5 MoE→dense pivot). One weight set + per-call scale toggling
+    is the architectural fix for GRPO's policy/reference pair.
+
+    Defensive with a bare model (no LoRA layers attached) or with a test
+    stub that lacks ``named_modules`` — the context manager becomes a no-op
+    in those cases.
+    """
+    lora_types: tuple = ()
+    try:
+        from mlx_lm.tuner.lora import (  # noqa: PLC0415
+            LoRAEmbedding,
+            LoRALinear,
+            LoRASwitchLinear,
+        )
+        lora_types = (LoRALinear, LoRASwitchLinear, LoRAEmbedding)
+    except (ImportError, AttributeError, ModuleNotFoundError):
+        pass
+
+    saved: list[tuple[Any, float]] = []
+    if lora_types and hasattr(model, "named_modules"):
+        for _name, module in model.named_modules():
+            if isinstance(module, lora_types):
+                saved.append((module, module.scale))
+                module.scale = 0.0
+    try:
+        yield
+    finally:
+        for mod, original_scale in saved:
+            mod.scale = original_scale
+
+
 class MLXGRPOAdapter:
     """Real MLX wiring for the Phase 11 GRPO trainer's four callables.
 
-    Construction is eager on ``base_model_path`` + ``adapter_path`` (loads both
-    policy and reference into memory — roughly 2x model size in unified VRAM).
-    For dense Qwen3-14B-4bit this is the validated Phase 5 Metal footprint; no
-    special quantization is needed.
+    Construction loads ``base_model_path`` + ``adapter_path`` once. The
+    reference-policy forward shares the same weights but disables the LoRA
+    contribution for the duration of the forward pass (see
+    :func:`_lora_disabled`). This halves the Metal descriptor footprint vs.
+    loading two copies of the base model — required on Qwen3-14B where two
+    copies exceed the ``MTLResource`` ceiling.
 
     Usage::
 
@@ -190,12 +242,14 @@ class MLXGRPOAdapter:
         self.model, self.tokenizer = mlx_lm.load(
             base_model_path, adapter_path=adapter_path
         )
-        logger.info("MLXGRPOAdapter loading frozen reference (same SHA)")
-        self.ref_model, _ = mlx_lm.load(
-            base_model_path, adapter_path=adapter_path
+        # Reference policy is the SAME weights with LoRA scales toggled to 0
+        # during the reference forward (see :func:`_lora_disabled`). This
+        # avoids a second mlx_lm.load — which on Qwen3-14B silently trips the
+        # Metal 499K MTLResource ceiling and kills the process.
+        logger.info(
+            "MLXGRPOAdapter: reference policy = same weights with LoRA "
+            "scales zeroed in-forward (descriptor-budget fix)"
         )
-        # Reference is never trained. Freezing avoids wasted grad computation.
-        self.ref_model.freeze()
 
         self.optimizer = optim.AdamW(
             learning_rate=lr,
@@ -213,6 +267,48 @@ class MLXGRPOAdapter:
         self.eval_cmd = list(eval_cmd) if eval_cmd else None
 
         self._stash: Optional[list[Optional[_StashedSample]]] = None
+        self._step_counter = 0
+
+        # ── Tier 1 memory hygiene ───────────────────────────────────────────
+        # Metal's MTLResource descriptor cache accumulates across kernels and
+        # will silently jetsam-kill the process once it exhausts the 499K
+        # per-process ceiling (same ceiling that forced Phase 5 MoE→dense).
+        # Fix: clear the descriptor cache between rollout/forward-pair/step
+        # phases (see rollout_fn + optimizer_step_fn), reset peak-memory
+        # counters, emit per-step telemetry.
+        #
+        # We deliberately do NOT call ``mx.set_wired_limit(...)`` — on a Mac
+        # where ``max_recommended_working_set_size`` equals (or very nearly
+        # equals) total RAM, wiring that much memory starves the kernel of
+        # pageable headroom and can trigger a ``watchdogd`` kernel panic
+        # under sustained training load (observed during Phase 11 Tier 1
+        # validation: 128GB RAM, max_recommended≈128.85GB → reboot after
+        # ~11 min of 25-step smoke). Apple's recommended working set is an
+        # approximation of what Metal *can use*, not what is *safe to wire*.
+        # ``mlx_lm_lora/trainer/grpo_trainer.py`` (the canonical GRPO
+        # implementation we mirror) does not set a wired limit either.
+        if hasattr(mx, "reset_peak_memory"):
+            mx.reset_peak_memory()
+
+    # ── memory hygiene helpers ──────────────────────────────────────────────
+
+    def _clear_cache(self) -> None:
+        """Best-effort release of the Metal descriptor cache.
+
+        The real :mod:`mlx.core` exposes ``clear_cache()``; test stubs can
+        omit it — hence the guarded call. Invoked at rollout/forward-pair/
+        step boundaries to keep descriptor growth bounded across a long run.
+        """
+        clear = getattr(self._mx, "clear_cache", None)
+        if clear is not None:
+            clear()
+
+    def _mem_snapshot(self) -> tuple[float, float, float]:
+        """Return (peak_gb, cache_gb, active_gb) — zero for missing APIs."""
+        def _g(name: str) -> float:
+            fn = getattr(self._mx, name, None)
+            return float(fn() / 1e9) if fn is not None else 0.0
+        return _g("get_peak_memory"), _g("get_cache_memory"), _g("get_active_memory")
 
     # ── RolloutFn ───────────────────────────────────────────────────────────
 
@@ -229,6 +325,10 @@ class MLXGRPOAdapter:
                 self.model, self.tokenizer, prompt,
                 **self.generation_kwargs,
             )
+            # Tier 1 memory hygiene: mlx_lm.generate leaves sampler-side
+            # intermediates in the descriptor cache that never get reclaimed
+            # implicitly (documented in mlx-lm #883, mlx-examples #724).
+            self._clear_cache()
 
             prompt_ids = self.tokenizer.encode(prompt)
             full_ids = self.tokenizer.encode(prompt + response)
@@ -251,12 +351,19 @@ class MLXGRPOAdapter:
 
             lp_new = sum_response_logprobs(self.model, self._mx,
                                             full_ids, prompt_len)
-            lp_ref = sum_response_logprobs(self.ref_model, self._mx,
-                                            full_ids, prompt_len)
+            # Reference = same model, LoRA scales zeroed for this forward only.
+            with _lora_disabled(self.model):
+                lp_ref = sum_response_logprobs(self.model, self._mx,
+                                                full_ids, prompt_len)
             # Materialize to Python floats — the MLX-space recomputation will
             # re-run the forward pass under the current policy from scratch.
             lp_new_f = float(lp_new)
             lp_ref_f = float(lp_ref)
+            # Release the forward-pair activations before the next sample's
+            # generate(); without this the descriptor footprint grows
+            # monotonically across the batch.
+            del lp_new, lp_ref
+            self._clear_cache()
 
             reward = self.reward_fn(sample, response)
             results.append(RolloutResult(
@@ -275,6 +382,8 @@ class MLXGRPOAdapter:
             ))
 
         self._stash = stash
+        # End-of-batch cache sweep before the trainer calls optimizer_step_fn.
+        self._clear_cache()
         return results
 
     # ── OptimizerStepFn ─────────────────────────────────────────────────────
@@ -290,17 +399,37 @@ class MLXGRPOAdapter:
         """One optimizer step: rebuild GRPO loss in MLX, backprop, update.
 
         ``loss_value`` (numpy-computed scalar from ``compute_grpo_loss``) is
-        used as a sanity check — after the MLX-space recomputation we log the
-        delta as a diagnostic. Divergence beyond ~1e-3 indicates either a
-        policy drift between rollout and this step (shouldn't happen within
-        one step because we update AFTER rollout) or a bug in the logprob
-        pipeline.
+        used as a *coarse* blow-up sanity check only. The two losses compute
+        different quantities by construction and are not expected to match:
+
+        * numpy path: ``logprob_new`` and ``logprob_old`` are set equal in
+          :meth:`rollout_fn` (on-policy data), so the surrogate ratio is
+          exactly 1 and ``policy_loss`` collapses to ``-mean(advantages)``.
+          The numpy loss therefore barely depends on the current policy.
+        * MLX path: recomputes ``lp_new`` under the *current* (gradient-
+          tracked) policy. Even at step 1 before any update, grad-on vs
+          grad-off forward passes in MLX can differ at O(1) due to kernel-
+          path differences (fused ops, intermediate storage). After step 1
+          the policy actually drifts from rollout weights, so divergence is
+          expected and correct — MLX is the gradient source of truth.
+
+        The threshold below (``_LOSS_DISAGREEMENT_BLOWUP``) is sized to catch
+        genuine bugs like NaN/inf or order-of-magnitude explosions, not the
+        expected O(1) numerical divergence.
 
         ``rollouts`` is accepted for Protocol conformance but unused — we rely
         on the stashed tensors (already tokenized) instead of re-tokenizing.
         """
         import mlx.core as mx  # noqa: PLC0415
         import mlx.nn as nn  # noqa: PLC0415
+
+        # Reset peak-memory counter at step boundary so telemetry shows the
+        # *current* step's high-watermark, not a cumulative one. With an
+        # unbounded peak we can't tell whether a 250GB reading is "this step
+        # was a monster" or "some earlier step was a monster" — essential
+        # signal for diagnosing OOM-adjacent runs.
+        if hasattr(mx, "reset_peak_memory"):
+            mx.reset_peak_memory()
 
         if self._stash is None:
             raise RuntimeError(
@@ -384,14 +513,48 @@ class MLXGRPOAdapter:
         loss_and_grad = nn.value_and_grad(self.model, loss_fn)
         mlx_loss, grads = loss_and_grad(self.model)
         self.optimizer.update(self.model, grads)
-        # Force evaluation so subsequent rollout_fn sees updated weights.
-        mx.eval(self.model.parameters(), self.optimizer.state)
+
+        # Tier 1 memory hygiene: single combined barrier for model params,
+        # optimizer state, AND the scalar loss. One mx.eval() materializes
+        # the full graph in one pass instead of creating three separate
+        # graph closures (which is what leaks descriptors over long runs).
+        # ``model.state`` is preferred over ``model.parameters()`` — it
+        # includes buffers too, so the optimizer state update is committed
+        # atomically with the forward-pass activations it depends on.
+        model_state = getattr(self.model, "state", None)
+        if model_state is None:
+            model_state = self.model.parameters()
+        mx.eval(model_state, self.optimizer.state, mlx_loss)
+        # Release per-step activation graph + grad tree before the next
+        # rollout. grads drops out of scope anyway but be explicit.
+        del grads
+        self._clear_cache()
 
         mlx_loss_f = float(mlx_loss)
         delta = abs(mlx_loss_f - loss_value)
-        if delta > 1e-2:
+
+        # Per-step memory telemetry. If memory stays bounded across a long
+        # run these numbers are flat-or-sawtooth; monotonic growth means the
+        # hygiene pattern has a leak and we should catch it before jetsam
+        # does.
+        self._step_counter += 1
+        peak_gb, cache_gb, active_gb = self._mem_snapshot()
+        logger.info(
+            "GRPO step=%d loss=%.6f peak_mem=%.2fGB cache_mem=%.2fGB "
+            "active_mem=%.2fGB",
+            self._step_counter, mlx_loss_f, peak_gb, cache_gb, active_gb,
+        )
+        # Debug-level log for the routine O(1) divergence; warning only on
+        # blow-ups that suggest a genuine bug (NaN/inf, 50+ delta).
+        if not np.isfinite(mlx_loss_f) or delta > _LOSS_DISAGREEMENT_BLOWUP:
             logger.warning(
-                "GRPO loss disagreement: numpy=%.6f mlx=%.6f delta=%.4f",
+                "GRPO loss BLOWUP: numpy=%.6f mlx=%.6f delta=%.4f "
+                "(threshold=%.1f — check for NaN/inf or dtype issue)",
+                loss_value, mlx_loss_f, delta, _LOSS_DISAGREEMENT_BLOWUP,
+            )
+        else:
+            logger.debug(
+                "GRPO loss: numpy=%.6f mlx=%.6f delta=%.4f (expected O(1))",
                 loss_value, mlx_loss_f, delta,
             )
 

@@ -75,3 +75,139 @@ Total Phase 11 suite: 73 → **89 tests** passing in 0.12s. No Metal dependency 
 - `/Users/reh3376/mdemg/configs/rl_phase11.yaml` — knobs the adapter consumes
 - `/Users/reh3376/mdemg/docs/tests/ults/specs/consulting_classify.ults.json` — ULTS prompt shape (referenced for `prompt_provider` interface)
 - `mlx_lm==0.31.2` API via `inspect.signature`: `mlx_lm.load`, `mlx_lm.generate`, `mlx_lm.tuner.utils.{linear_to_lora_layers, load_adapters}`, `mlx_lm.tuner.trainer.default_loss`
+
+---
+
+# Follow-up — Option A single-model + Tier 1 memory hygiene
+
+**Status:** EXECUTED (2026-04-24); full compute pass **operator-gated**.
+
+## What happened
+
+The initial MLX adapter (above) loaded both the policy and a frozen reference
+copy of Qwen3-14B via two `mlx_lm.load(...)` calls. On Apple Silicon that
+silently trips the Metal **MTLResource descriptor ceiling** (~499K per
+process — the same ceiling that forced the Phase 5 MoE→dense pivot); the
+process is jetsam-killed at the second load with no Python traceback.
+
+Two follow-up tracks:
+
+### 1. Option A — single model, LoRA scale toggling for the reference forward
+
+`_lora_disabled(model)` context manager in `mlx_adapter.py`:
+
+- On enter, walks `model.named_modules()` and saves+zeroes `.scale` on every
+  `LoRALinear` / `LoRASwitchLinear` / `LoRAEmbedding` instance.
+- `LoRALinear.__call__` is `base(x) + scale * ((dropout(x) @ lora_a) @ lora_b)`
+  in `mlx_lm==0.31.2` — `scale=0` collapses the forward to the base linear
+  exactly, bit-identical to a base-only model.
+- On exit, restores every saved scale. Defensive with bare models or test
+  stubs lacking `named_modules` → no-op in those cases.
+
+Result: a single loaded weight set serves as both policy (LoRA on) and
+frozen reference (LoRA off, Python-scalar toggle, no graph recompile).
+The second `mlx_lm.load` is removed; init log reads `reference policy =
+same weights with LoRA scales zeroed in-forward (descriptor-budget fix)`.
+
+### 2. Tier 1 memory hygiene — descriptor cache + per-step telemetry
+
+`mlx_adapter.py` additions:
+
+- `_clear_cache()` helper calling `mx.clear_cache()` after each
+  `mlx_lm.generate()`, after each policy+reference forward pair, at
+  end-of-batch in `rollout_fn`, and after the optimizer barrier in
+  `optimizer_step_fn`. Guards with `getattr` so test stubs stay wireable.
+- Combined `mx.eval(model.state, optimizer.state, mlx_loss)` barrier —
+  one graph materialization per step instead of three separate closures.
+- `mx.reset_peak_memory()` at step entry so the per-step log line shows
+  the *current* step's high-watermark, not a cumulative figure.
+- Per-step telemetry:
+  `step=N loss=%.6f peak_mem=%.2fGB cache_mem=%.2fGB active_mem=%.2fGB`.
+
+`_mem_snapshot()` reads `mx.get_peak_memory`, `mx.get_cache_memory`,
+`mx.get_active_memory`; missing APIs return 0.0 (test stubs).
+
+**Deliberately NOT done: `mx.set_wired_limit(...)`.** On a Mac where
+`max_recommended_working_set_size` equals (or very nearly equals) total RAM
+— as on the 128 GB validation machine — wiring that much memory starves
+the kernel of pageable headroom and can trigger a `watchdogd` panic under
+sustained training load. Observed during Phase 11 Tier 1 validation: 128 GB
+RAM, `max_recommended≈128.85 GB` → kernel panic after ~11 min of 25-step
+smoke. Apple's recommended working set is an approximation of what Metal
+*can use*, not what is *safe to wire*. Comment in `__init__` documents this
+for future readers. The canonical `mlx_lm_lora/trainer/grpo_trainer.py` we
+mirror does not set a wired limit either.
+
+## Validation
+
+- 19/19 `test_mlx_adapter.py` tests green (3 new `_lora_disabled` tests +
+  `test_init_loads_policy_only`).
+- 106/106 full Phase 11 suite green (`pytest neural/training/rl/tests/
+  neural/training/dpo/tests/`).
+- 5-step smoke against the real Phase 5 dense adapter: **PASS**. Losses
+  `2.249 / 1.015 / 3.271 / 3.188 / 3.423`; `cache_mem=0.00 GB` on every
+  step post-barrier; `active_mem=8.31 GB` flat; checkpoint + sidecar
+  written cleanly. Result reproduced across successive 5-step runs with
+  bit-identical losses (same seed).
+
+## Full compute pass (100-step): operator-gated
+
+Rationale: two 25-step extended smoke attempts on the validation Mac (128 GB
+unified memory) surfaced hardware-level constraints distinct from the
+descriptor-cache issue:
+
+| Config | Outcome | Cause |
+|---|---|---|
+| `--batch-size 4` | died step 13 | jetsam (peak 253 GB — 4 parallel backward graphs × seq_len=3000 on Qwen3-14B) |
+| `--batch-size 1` | died step 6 | silent (no jetsam event, no Python traceback, no crash dump) |
+
+Peak memory per step at batch_size=1 was fine (15-35 GB steady-state, 87 GB
+first-step compile); the batch_size=4 jetsam was activation memory during
+backward, not descriptor leak. The batch_size=1 silent death cause is
+undiagnosed — likely Metal-level allocation failure that bypasses the usual
+VM jetsam path. System-side swap was 80% full by the time of both deaths.
+
+The sprint-plan predecessor (`87f69fc`) already flagged this ("compute pass
+operator-gated"). The full 100-step run is deferred to a dedicated operator
+session:
+
+1. Fresh reboot (clears any Metal orphan allocations).
+2. No other GPU/ANE consumers (close Chrome/Teams/Docker).
+3. `--batch-size 1` initially; attempt batch-size 2 only after 50+ steps
+   prove stable.
+4. Monitor `cache_mem` in the per-step telemetry; any non-zero value is
+   the signal to kill.
+
+Phase 12 (HITL DPO) is **not blocked** by the deferred full run — the DPO
+pair generator consumed the same Phase 10 benchmark rows and shipped with
+its manifest in PR #349. The regression gate (Epic 5) can consume the
+Phase 11 adapter once it exists.
+
+## Architectural follow-ups worth considering before Phase 12
+
+Neither is a blocker, but both would materially reduce the compute-pass
+memory budget:
+
+- **Gradient checkpointing** on the LoRA-targeted transformer layers.
+  `mlx_lm` does not expose this natively; implementing it requires a
+  thin forward-hook wrapper. ~10× reduction in backward-activation memory.
+- **Per-sample gradient accumulation in the optimizer step.** Today
+  `optimizer_step_fn` rebuilds the loss over all kept samples
+  simultaneously; reshaping to accumulate per-sample gradients would
+  bound peak memory to 1 sample regardless of batch size, at the cost
+  of N forward passes serialized.
+
+## Artifacts (delta over preceding commit)
+
+- `neural/training/rl/mlx_adapter.py` — `_lora_disabled` CM + Tier 1 hygiene
+  + `reset_peak_memory` step boundary + telemetry (~90 LOC added)
+- `neural/training/rl/tests/test_mlx_adapter.py` — 3 new `_lora_disabled`
+  tests; `test_init_loads_policy_and_reference` renamed and rewritten to
+  assert single load
+- `neural/training/rl/trainer.py` — `main()` rewritten from stub to live
+  MLX wiring (loads MLXGRPOAdapter, wires prompt_provider/reward_fn,
+  builds registry eval_cmd)
+- `neural/training/rl/live_wiring.py` (new, ~400 LOC) —
+  `ChatTemplatedPromptProvider` + `SpecDrivenRewardFn` + `InProcessEvaluator`
+- `neural/training/rl/tests/test_live_wiring.py` (new, ~380 LOC)
+- This doc (Follow-up section appended)
