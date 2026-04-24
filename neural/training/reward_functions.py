@@ -484,6 +484,122 @@ def recall_improvement(response: str, **kwargs: Any) -> float:
     return 0.3
 
 
+# ── Guardrail Rewards (Sprint FT-LORA-PHASE10.5a) ──
+
+
+def _extract_violation_ids(value: Any) -> set[str]:
+    """Extract the set of constraint_node_id strings from a guardrail.evaluate
+    response or golden (per ULTS spec ``guardrail_evaluate.ults.json``).
+
+    The spec's output_schema requires ``violations: [{constraint_node_id,
+    description, rationale}, ...]``. Returns empty set when the structure
+    is missing or malformed — callers distinguish "clean" from "malformed"
+    via the surrounding json_valid path.
+    """
+    if not isinstance(value, dict):
+        return set()
+    violations = value.get("violations", [])
+    if not isinstance(violations, list):
+        return set()
+    ids: set[str] = set()
+    for v in violations:
+        if isinstance(v, dict) and "constraint_node_id" in v:
+            ids.add(str(v["constraint_node_id"]).strip())
+    return ids
+
+
+def violation_detection_accuracy(
+    response: str,
+    expected: str | None = None,
+    **kwargs: Any,
+) -> float:
+    """F1 reward for correctly identifying guardrail constraint violations.
+
+    Compares the set of ``constraint_node_id`` values under ``violations``
+    in ``response`` against those in ``expected`` (golden). Returns F1 over
+    those sets.
+
+    Edge cases:
+      * Both sets empty → 1.0 (correctly reported "no violations").
+      * Exactly one side empty → 0.0 (missed or fabricated).
+      * Invalid JSON → 0.0.
+      * ``expected`` missing → fallback to json_valid (consistent with
+        ``classification_accuracy`` / ``evaluation_accuracy``).
+    """
+    if expected is None or expected == "":
+        return json_valid(response, schema={"type": "object"})
+
+    try:
+        parsed_response = json.loads(response)
+    except (json.JSONDecodeError, TypeError):
+        return 0.0
+
+    try:
+        parsed_expected = json.loads(expected)
+    except (json.JSONDecodeError, TypeError):
+        return 0.0
+
+    pred_ids = _extract_violation_ids(parsed_response)
+    exp_ids = _extract_violation_ids(parsed_expected)
+
+    if not exp_ids and not pred_ids:
+        return 1.0
+    if not exp_ids or not pred_ids:
+        return 0.0
+
+    tp = len(pred_ids & exp_ids)
+    fp = len(pred_ids - exp_ids)
+    fn = len(exp_ids - pred_ids)
+
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    if precision + recall == 0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
+
+
+def false_positive_penalty(
+    response: str,
+    expected: str | None = None,
+    **kwargs: Any,
+) -> float:
+    """Penalty score for fabricated violations (false positives).
+
+    Returns 1.0 (no penalty) when every predicted ``constraint_node_id``
+    is in the golden set; decays linearly to 0.0 as the share of predicted
+    violations not present in golden grows. The spec system prompt biases
+    toward "Pass" — this reward keeps the model honest about that bias.
+
+    Behavior:
+      * No predicted violations → 1.0 (no FPs possible).
+      * Invalid JSON → 0.0 (structural failure dominates).
+      * ``expected`` missing → fallback to json_valid.
+
+    Score is ``1.0 - fp_count / len(pred_ids)``. Bounded in [0, 1].
+    """
+    if expected is None or expected == "":
+        return json_valid(response, schema={"type": "object"})
+
+    try:
+        parsed_response = json.loads(response)
+    except (json.JSONDecodeError, TypeError):
+        return 0.0
+
+    try:
+        parsed_expected = json.loads(expected)
+    except (json.JSONDecodeError, TypeError):
+        return 0.0
+
+    pred_ids = _extract_violation_ids(parsed_response)
+    exp_ids = _extract_violation_ids(parsed_expected)
+
+    if not pred_ids:
+        return 1.0
+
+    fp = len(pred_ids - exp_ids)
+    return max(0.0, 1.0 - fp / len(pred_ids))
+
+
 # ── Performance Reward ──
 
 
@@ -534,6 +650,9 @@ REWARD_REGISTRY: dict[str, RewardFn] = {
     "score_calibration": score_calibration,
     "score_correlation": score_correlation,
     "recall_improvement": recall_improvement,
+    # Guardrail (Sprint FT-LORA-PHASE10.5a)
+    "violation_detection_accuracy": violation_detection_accuracy,
+    "false_positive_penalty": false_positive_penalty,
     # Performance
     "latency_reward": latency_reward,
 }
