@@ -1,0 +1,156 @@
+# Sprint FT-LORA-PHASE11 — Automated RL Post-Training Config
+#
+# This config drives the GRPO trainer in neural/training/rl/trainer.py,
+# the reward sampler, advantage estimator, and dual regression harness.
+# Every knob is exposed here (MEMORY: no hardcoded values) with CLI overrides
+# on `python -m neural.training.rl.trainer --help`.
+#
+# Policy compliance:
+#   - epochs: 3 explicit (MEMORY: epoch cap = 3; n_epochs=auto disallowed)
+#   - early_stop on val_reward < best × 0.95 for 2 evals (CLAUDE.md §Overfitting)
+#   - run_id generation: CUIDv2 (MEMORY feedback_cuidv2_required)
+#   - judge_model: gpt-5.4-mini; max_tokens ≥ 3000; latency_budget_ms ≥ 15000
+
+sprint:
+  id: FT-LORA-PHASE11
+  created: "2026-04-24"
+
+# ── Base model (Phase 5 dense SFT output) ───────────────────────────────────
+base_model:
+  path: ".local-models/qwen3-14b-mdemg-v1"
+  # Pin from Phase 5 PR #347 (merged 2026-04-23). Advisory — preflight logs
+  # mismatches but does not abort on them, since the adapter manifest is the
+  # authoritative check.
+  sha256: "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
+
+# ── Output paths ────────────────────────────────────────────────────────────
+output:
+  # Sandbox path used during training; promoted to `base_blessed_path` on
+  # dual-regression-gate PASS. On FAIL the sandbox path is retained for
+  # post-mortem and cleanup is left to the operator.
+  sandbox_path: ".local-models/qwen3-14b-mdemg-v1-rl-sandbox"
+  base_blessed_path: ".local-models/qwen3-14b-mdemg-v1-rl"
+  regression_report: "training_data/eval/phase11_regression_report.json"
+
+# ── Model under test (for Phase 10 runner invoked by regression harness) ────
+model_under_test:
+  path: ".local-models/qwen3-14b-mdemg-v1-rl-sandbox"
+  mlx_host: "127.0.0.1"
+  mlx_port: 8101
+
+# ── TSDB connection (honors TSDB_* env vars set by docker-compose) ──────────
+tsdb:
+  host: "localhost"
+  port: 5433
+  user: "mdemg"
+  password: "mdemg_metrics"   # dev default — overridden by TSDB_PASSWORD env
+  database: "mdemg_metrics"
+
+# ── Preflight gates ─────────────────────────────────────────────────────────
+preflight:
+  min_rows_per_task: 5        # at least N rows per task in benchmark_results
+
+# ── GRPO training loop ──────────────────────────────────────────────────────
+training:
+  # Absolute epoch cap — MEMORY: 3 max, n_epochs=auto disallowed.
+  epochs: 3
+  # Early-stop: val_reward < best × early_stop_threshold for
+  # early_stop_patience consecutive evals.
+  early_stop_threshold: 0.95
+  early_stop_patience: 2
+  # Safety cap on total optimization steps. Prevents runaway training if
+  # early-stop patience is mis-tuned. Rough budget: 16 tasks × batch_size 8
+  # × ~6 steps/batch ~= 750 steps per epoch; 3 epochs × 1.5x headroom.
+  max_steps: 3500
+  # Eval cadence on valid_golden subset (in optimizer steps).
+  eval_interval_steps: 100
+  batch_size: 8
+  gradient_accumulation_steps: 1
+
+  # LoRA hyper-parameters (matches Phase 5 rank/alpha).
+  lora:
+    rank: 32
+    alpha: 64
+    dropout: 0.05
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+
+  # Optimizer.
+  optim:
+    name: adamw
+    lr: 1.0e-5
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-8
+    warmup_steps: 50
+
+  seed: 0
+
+# ── GRPO loss knobs ─────────────────────────────────────────────────────────
+grpo:
+  clip_ratio: 0.2            # π_new/π_old clamp range (± clip_ratio)
+  kl_coef: 0.01              # KL(π_new ‖ π_ref) coefficient
+  entropy_coef: 0.0          # entropy bonus (0 = off; stabilizes exploration)
+  advantage_clip: [-5.0, 5.0]
+
+# ── Advantage estimator ─────────────────────────────────────────────────────
+advantage:
+  # Policy when historical per-task stddev is 0 (applies to 9/16 Phase 10 tasks).
+  #   intra_batch_only — compute stddev from current RL batch rollouts only.
+  #                      Default; chosen because batch rollouts have real
+  #                      variance from sampling temperature even when the
+  #                      historical reward is deterministic (structured tasks).
+  #   widen            — use mean × widen_factor as the normalization denom.
+  #   drop             — skip the task from the RL step loop.
+  zero_stddev_policy: intra_batch_only
+  widen_factor: 0.05         # only used when zero_stddev_policy = widen
+  # Minimum stddev clamp — prevents division-by-zero when intra-batch stddev
+  # also collapses to 0 (rare; happens if temperature sampling is disabled).
+  min_stddev: 1.0e-4
+
+# ── Reward source ───────────────────────────────────────────────────────────
+reward_sampler:
+  # Source run_ids to pull (prompt, response, reward) tuples from.
+  # Empty list = latest completed benchmark_runs row (by started_at DESC).
+  source_run_ids: []
+  # How many rows to sample per (task, sampling_group) per training step.
+  samples_per_task_per_step: 8
+  # Sampling strategy: random | weighted_by_inverse_count | stratified_by_group.
+  strategy: stratified_by_group
+
+# ── Rollout (MLX inference) ─────────────────────────────────────────────────
+rollout:
+  # Inherit T/C/J sampling recipes from Phase 10.
+  sampling_policy_config: "configs/benchmark_phase10.yaml"
+  max_tokens: 4000           # MEMORY: ≥ 3000
+  latency_budget_ms: 30000   # MEMORY: ≥ 15000
+  retry_attempts: 1
+  retry_backoff_s: 2.0
+
+# ── Regression gate (Epic 5) ────────────────────────────────────────────────
+regression:
+  # 5a: vs Phase 5 SFT baseline
+  phase5_baseline_run_id: "q283a23bz59mrg6faxo32ydx2"
+  phase5_baseline_aggregate: 0.8338
+  aggregate_target_multiplier: 1.02    # ≥ 0.8338 × 1.02 = 0.8505 to pass
+  per_task_max_regression: 0.02        # no task may drop more than 2 pp
+
+  # 5b: fresh dense-14B re-merge (adapter-merge corruption check)
+  fresh_merge_max_delta: 0.005         # 5a vs 5b aggregate delta must be ≤ 0.5 pp
+
+  # Judge settings — only invoked during regression, never per RL step.
+  enable_judge: true
+  judge_model: "gpt-5.4-mini"
+  judge_max_tokens: 4000
+  judge_latency_budget_ms: 30000
+
+# ── TSDB persistence ────────────────────────────────────────────────────────
+persist:
+  enabled: true
+  # Following Phase 10 pattern, emit a .sql sidecar for operator to apply.
+  # (Live psycopg writer is follow-up work; no blocker for Phase 11.)
+  write_sql_sidecar: true

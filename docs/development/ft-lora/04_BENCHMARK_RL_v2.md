@@ -277,7 +277,19 @@ Data source: `scripts/jiminy_effectiveness_report.py --space-id <space> --days 7
 
 ---
 
-## Phase 11: Automated Reinforcement Learning
+## Phase 11: Automated Reinforcement Learning ✅ **CODE EXECUTED 2026-04-24** (Sprint FT-LORA-PHASE11 — compute pass operator-gated)
+
+> **GRPO trainer + DPO pair generator + dual regression harness shipped.** Code surface under `neural/training/rl/` (trainer, grpo_loss, advantage, reward_sampler, preflight, regression) + `neural/training/dpo/pair_generator.py`. 73 tests green (37 unit + 36 integration/e2e). TSDB V0013 migration (`rl_training_runs` + `rl_training_steps` hypertable, gate_verdict CHECK constraint) **applied live** (schema_meta 12→13).
+>
+> **Custom in-repo trainer, not `mlx-lm-lora`** (Plan Risk #1 Option B). `mlx_lm==0.31.2` has no native GRPO; the orchestrator is MLX-agnostic via `RolloutFn` / `OptimizerStepFn` / `EvalFn` / `CheckpointFn` Protocol callables so the MLX optimizer coupling can land later (~100 LOC adapter, task #227) without touching the core trainer. The loss is hand-computed-fixture-verified at TOL=1e-6 so the numerics layer is already proven.
+>
+> **Zero-stddev policy** (9/16 Phase 10 tasks have historical σ=0): default `intra_batch_only` — current batch's sampling-temperature variance is the denominator. Fallbacks `widen` (mean × 0.05) and `drop` (skip task) config-selectable.
+>
+> **DPO pair set shipped** end-to-end from Phase 10 TSDB: `training_data/dpo/phase11/pairs.jsonl` (5 pairs across 2 tasks, SHA256 `bbe7bb9a…`). Coverage intentionally thin (single source benchmark run); Phase 12 re-generates against Phase 10 + Phase 11 combined once the compute pass ships.
+>
+> **Deferred, operator-gated (not this sprint)**: MLX adapter wiring (#227); real GRPO run (~4–8 hrs wall-clock); gate 5a/5b execution; adapter blessing sandbox → `.local-models/qwen3-14b-mdemg-v1-rl/`; `--scorer=registry` default flip in `evaluate_ft.py` (gates on 5a PASS); stagnation auto-exit log (gates on `benchmark_runs.count() ≥ 2`).
+>
+> Authoritative post-docs: [`phase_11_rl_post.md`](phase_11_rl_post.md), [`sprint_plan_ft_lora_phase11.md`](sprint_plan_ft_lora_phase11.md). Planning-phase content below preserved as intent.
 
 ### 11.1 Method Selection
 
