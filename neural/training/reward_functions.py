@@ -28,13 +28,48 @@ RewardFn = Callable[..., float]
 # ── Structural Rewards ──
 
 
-def json_valid(response: str, **kwargs: Any) -> float:
-    """Return 1.0 if response is a valid JSON object, 0.0 otherwise."""
+def json_valid(
+    response: str, schema: dict[str, Any] | None = None, **kwargs: Any
+) -> float:
+    """Return 1.0 if response is structurally valid JSON against the ULTS schema.
+
+    Schema-aware (``schema.type``), matching
+    ``neural.training.evaluate_ft.check_json_valid``:
+      * ``"object"`` (default): response must parse to a dict.
+      * ``"array"``:            response must parse to a list.
+      * ``"string"``:           response must be non-empty and, if
+                                ``schema.pattern`` is set, match the regex
+                                (no JSON decoding — some specs emit a bare
+                                token, e.g. ``jiminy.codegen``).
+      * ``"number"``/``"integer"``: response must parse as a numeric primitive.
+      * ``"boolean"``:          response must parse as ``true``/``false``.
+
+    Prior behavior (``isinstance(parsed, dict)`` only) silently zero-credited
+    every array/string-schema spec (``ape.reflect``, ``hidden.reclassify``,
+    ``retrieval.rerank_cross``, ``jiminy.codegen``) when called via the
+    Phase 10 registry path. Shadow-mode divergence audit caught it.
+    """
+    stype = (schema or {}).get("type", "object")
+    if stype == "string":
+        if not response or not response.strip():
+            return 0.0
+        pattern = (schema or {}).get("pattern")
+        if pattern:
+            import re
+            return 1.0 if re.match(pattern, response.strip()) else 0.0
+        return 1.0
     try:
         parsed = json.loads(response)
-        return 1.0 if isinstance(parsed, dict) else 0.0
     except (json.JSONDecodeError, TypeError):
         return 0.0
+    if stype == "array":
+        return 1.0 if isinstance(parsed, list) else 0.0
+    if stype in ("number", "integer"):
+        return 1.0 if isinstance(parsed, (int, float)) and not isinstance(parsed, bool) else 0.0
+    if stype == "boolean":
+        return 1.0 if isinstance(parsed, bool) else 0.0
+    # default: object
+    return 1.0 if isinstance(parsed, dict) else 0.0
 
 
 def schema_match(response: str, schema: dict[str, Any] | None = None, **kwargs: Any) -> float:
@@ -101,47 +136,108 @@ def format_valid(response: str, **kwargs: Any) -> float:
 # ── Classification Rewards ──
 
 
+def _extract_classification(value: Any) -> str:
+    """Return the classification label from a parsed value (dict, list, or str).
+
+    Handles:
+      * dict with ``type`` / ``classification`` / ``label`` key → that field
+      * dict with ``types``: ["foo"] (list) → first element
+      * list → first element as string
+      * anything else → ``str(value).strip()``
+    """
+    if isinstance(value, dict):
+        for key in ("type", "classification", "label"):
+            if key in value:
+                return str(value[key]).strip()
+        # Plural form (retrieval.query_classify uses {"types": [...]})
+        for key in ("types", "classifications", "labels"):
+            v = value.get(key)
+            if isinstance(v, list) and v:
+                return str(v[0]).strip()
+            if isinstance(v, str):
+                return v.strip()
+        return ""
+    if isinstance(value, list) and value:
+        return str(value[0]).strip()
+    return str(value).strip()
+
+
 def classification_accuracy(
     response: str,
     expected: str | None = None,
     **kwargs: Any,
 ) -> float:
-    """Return 1.0 if predicted classification matches expected, 0.0 otherwise."""
-    if expected is None:
+    """Return 1.0 if predicted classification matches expected, 0.0 otherwise.
+
+    Both ``response`` and ``expected`` are JSON strings from which a canonical
+    classification label is extracted via ``_extract_classification``. Comparing
+    parsed label to parsed label — not parsed label to the raw JSON string —
+    prevents silent 0-credit when the model produces the exact target JSON.
+    """
+    if expected is None or expected == "":
         return json_valid(response)  # Can't verify without ground truth
 
     try:
-        parsed = json.loads(response)
+        parsed_response = json.loads(response)
     except (json.JSONDecodeError, TypeError):
         return 0.0
 
-    if isinstance(parsed, dict):
-        predicted = parsed.get("type", parsed.get("classification", ""))
-    else:
-        predicted = str(parsed)
+    try:
+        parsed_expected = json.loads(expected)
+    except (json.JSONDecodeError, TypeError):
+        # Caller passed a bare label string rather than JSON — use as-is.
+        parsed_expected = expected
 
-    return 1.0 if str(predicted).lower().strip() == str(expected).lower().strip() else 0.0
+    predicted_label = _extract_classification(parsed_response).lower()
+    expected_label = _extract_classification(parsed_expected).lower()
+    if not expected_label:
+        return json_valid(response)
+    return 1.0 if predicted_label == expected_label else 0.0
+
+
+def _extract_verdict(value: Any) -> str:
+    """Return the verdict label from a parsed value (dict or scalar)."""
+    if isinstance(value, dict):
+        for key in ("verdict", "evaluation", "outcome", "decision"):
+            if key in value:
+                return str(value[key]).strip()
+        return ""
+    return str(value).strip()
 
 
 def evaluation_accuracy(
     response: str,
     expected_verdict: str | None = None,
+    expected: str | None = None,
     **kwargs: Any,
 ) -> float:
-    """Reward for correct evaluation verdict (jiminy.evaluate tasks)."""
-    if expected_verdict is None:
+    """Reward for correct evaluation verdict (jiminy.evaluate / evaluate_llm).
+
+    Accepts ``expected_verdict`` (legacy) OR ``expected`` (the benchmark-runner
+    kwarg produced by ``_extract_reward_kwargs`` from the golden row's
+    assistant message). When ``expected`` is a JSON string, its verdict is
+    parsed out the same way as the response's — so comparing parsed label to
+    parsed label, never parsed label to raw JSON.
+    """
+    target = expected_verdict if expected_verdict is not None else expected
+    if target is None or target == "":
         return json_valid(response)
 
     try:
-        parsed = json.loads(response)
+        parsed_response = json.loads(response)
     except (json.JSONDecodeError, TypeError):
         return 0.0
 
-    if isinstance(parsed, dict):
-        verdict = parsed.get("verdict", parsed.get("evaluation", ""))
-        return 1.0 if str(verdict).lower().strip() == expected_verdict.lower().strip() else 0.0
+    try:
+        parsed_target = json.loads(target)
+    except (json.JSONDecodeError, TypeError):
+        parsed_target = target
 
-    return 0.0
+    response_verdict = _extract_verdict(parsed_response).lower()
+    target_verdict = _extract_verdict(parsed_target).lower()
+    if not target_verdict:
+        return json_valid(response)
+    return 1.0 if response_verdict == target_verdict else 0.0
 
 
 # ── Quality Rewards ──

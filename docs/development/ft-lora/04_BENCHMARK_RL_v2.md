@@ -38,6 +38,21 @@ Stage 5: Deploy or Reject                       ← Regression gate
 
 ## Phase 10: Automated Benchmark Framework
 
+> **✅ EXECUTED — Sprint FT-LORA-PHASE10 (2026-04-23 → 2026-04-24).**
+>
+> MVP framework shipped. First authoritative baseline for `.local-models/qwen3-14b-mdemg-v1/` captured: **aggregate weighted score 0.8338** across **16 of 17 ULTS specs × 5 runs = 80 rows** (all `finish_reason=stop`, zero truncations). Per-group: T=0.8404 / C=0.8222 / J=0.8389.
+>
+> - **Post-run report**: [`phase_10_benchmark_post.md`](phase_10_benchmark_post.md)
+> - **Sprint plan**: [`sprint_plan_ft_lora_phase10.md`](sprint_plan_ft_lora_phase10.md)
+> - **Baseline artifact**: `training_data/eval/benchmark_qwen3_14b_v1_baseline.json` (run_id `q283a23bz59mrg6faxo32ydx2`, config SHA `3716f9a4…`, golden SHA `8e44cdf9…`, file SHA `789459f1…`)
+> - **SHA pins**: base model config `a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5`
+> - **New modules**: `neural/benchmarks/{run_benchmark,llm_judge,sampling_policy,variance,preflight}.py` + `judge_prompts/{coherence,depth,relevance,naturalness}.txt`
+> - **Config**: `configs/benchmark_phase10.yaml` (zero hardcoded constants — N_runs, stagnation thresholds, group weights, judge kwargs, performance floors all declarative + CLI-overridable)
+> - **TSDB V0012**: `internal/tsdb/migrations/012_benchmark_results.sql` (additive, hypertable on `recorded_at`; live migration deferred, baseline JSON persisted as durable sidecar)
+> - **Scorer fixes** (`neural/training/reward_functions.py`): `classification_accuracy` + `evaluation_accuracy` each had a silent kwarg/shape mismatch that inflated/deflated scores. First baseline under buggy scorers: 0.7990; post-fix: 0.8338 (+0.0348, +4.4% relative). Epic-4 shadow-run confirmed registry path bit-compatible with legacy heuristic path within `|delta|<1%` on the Phase 5 dev set.
+> - **Deferrals (Phase 10.5)**: (1) `guardrail.evaluate` 17th task — no golden rows + 2 unimplemented reward functions + no SFT training data (#216); (2) UBENCH promotion to formal UxTS framework (#215); (3) live TSDB migration when Docker restored; (4) Grafana panels for `benchmark_results` / `benchmark_runs`; (5) `neural/benchmarks/benchmark_scheduler.py` + launchd automation (Phase 11 operational scaffolding).
+> - **Phase 11 GRPO unblocked.** Consumes `benchmark_results.reward_vector` per (task, run_idx) + `stddev` per task as advantage-normalization denominator.
+
 ### 10.0 Sampling Parameter Recipes (Three Groups — memo §3.3)
 
 Every inference path (evaluation harness, benchmark runner, GRPO rollout, production vllm-mlx) **must** use the group recipe for the task's Group label from [`01_RESEARCH_v2.md §1.1`](01_RESEARCH_v2.md). No per-task deviations in v5.0 — a task's group membership determines its sampling recipe.

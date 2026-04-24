@@ -1,0 +1,22 @@
+You are evaluating the RELEVANCE of a model response.
+
+Relevance = the response directly addresses what the task actually asks. A relevant response answers the specific question; an irrelevant response answers a different (even adjacent) question.
+
+Relevance is NOT about quality — only about whether the response is on-task.
+
+## Task description
+{task_description}
+
+## Response to evaluate
+{task_response}
+
+## Scoring rubric
+- 1.0: response directly and completely addresses the task's specific ask.
+- 0.8: addresses the task but drifts briefly into an adjacent topic before returning.
+- 0.6: addresses roughly the right topic but misses the specific angle the task requested.
+- 0.4: answers a clearly different (but related) question.
+- 0.2: only tangentially connected to the task.
+- 0.0: off-topic, refusal, or empty.
+
+Respond ONLY with a JSON object:
+{{"score": <0..1 float>, "rationale": "<one-sentence explanation>"}}

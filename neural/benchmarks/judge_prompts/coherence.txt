@@ -1,0 +1,22 @@
+You are evaluating the COHERENCE of a model response.
+
+Coherence = the response reads as a logically connected whole: claims follow from prior claims; pronouns resolve; paragraph-to-paragraph transitions make sense; there are no non-sequiturs or sudden topic shifts.
+
+Coherence is NOT about factual accuracy or style — only internal consistency of reasoning.
+
+## Task description
+{task_description}
+
+## Response to evaluate
+{task_response}
+
+## Scoring rubric
+- 1.0: flawlessly coherent — every clause builds on the previous ones.
+- 0.8: coherent with at most one minor transition seam.
+- 0.6: mostly coherent but one or two non-sequiturs or ambiguous pronouns.
+- 0.4: multiple unconnected threads; reader must work to reconstruct the logic.
+- 0.2: fragmented; half the response is unrelated to its own earlier claims.
+- 0.0: incoherent — random or contradictory within itself.
+
+Respond ONLY with a JSON object:
+{{"score": <0..1 float>, "rationale": "<one-sentence explanation>"}}
