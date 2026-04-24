@@ -427,26 +427,202 @@ def build_config_from_yaml(yaml_cfg: dict[str, Any], *, sidecar_path: Path,
     )
 
 
-def main() -> int:  # pragma: no cover — real MLX wiring out of scope for Epic 2
-    """CLI entry point. Full MLX wiring is a follow-up adapter module.
+def main() -> int:  # pragma: no cover — exercised by T-subset smoke + full run
+    """CLI entry point — wires MLX adapter + live prompt/reward providers.
 
-    This is a stub that reads the YAML and would delegate to
-    ``neural.training.rl.mlx_adapter`` (not yet implemented). Shipping the
-    orchestrator unblocks the e2e smoke path in Epic 6.
+    End-to-end flow:
+        1. Load YAML config + preflight-checked baseline.
+        2. Build ``RewardSampler`` from ``benchmark_results`` TSDB rows.
+        3. Build ``LiveCallSite`` (prompt_provider + reward_fn).
+        4. Construct :class:`MLXGRPOAdapter` — loads policy + frozen reference
+           through ``mlx_lm.load``.
+        5. Attach the adapter's tokenizer to the prompt provider.
+        6. Build the registry-only eval command.
+        7. Instantiate :class:`GRPOTrainer` and run ``train()``.
+
+    Exit codes:
+        0 — training completed (possibly via early-stop).
+        2 — config/preflight error or unrecoverable MLX error.
     """
     import argparse
-    p = argparse.ArgumentParser(description="GRPO trainer (Phase 11)")
-    p.add_argument("--config", required=True)
-    p.add_argument("--out-sidecar", required=True)
-    args = p.parse_args()
-    cfg = build_config_from_yaml(_load_yaml(Path(args.config)),
-                                  sidecar_path=Path(args.out_sidecar))
-    logger.info("Config loaded: %s", cfg)
-    logger.error(
-        "MLX adapter not yet wired — integration test mocks the rollout/logprob "
-        "callables. Real MLX wiring is the Epic 6 e2e smoke item."
+
+    # Configure root logger so logger.info/warning calls from this module and
+    # the MLX adapter reach stdout. Without this, `python -m ...trainer`
+    # produces a silent log — the SQL sidecar is still written at end, but
+    # mid-run progress is invisible to operators and monitors.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    return 2
+
+    p = argparse.ArgumentParser(
+        description="GRPO trainer (Phase 11) — real MLX run",
+    )
+    p.add_argument("--config", required=True,
+                    help="Phase 11 RL config YAML (configs/rl_phase11.yaml)")
+    p.add_argument("--out-sidecar", required=True,
+                    help="SQL sidecar output path for rl_training_runs/steps")
+    p.add_argument("--golden",
+                    default="training_data/eval/valid_golden.jsonl",
+                    help="Phase 10 golden holdout JSONL (prompt source)")
+    p.add_argument("--specs-dir", default="docs/tests/ults/specs",
+                    help="ULTS spec directory (reward source)")
+    p.add_argument("--benchmark-config",
+                    default="configs/benchmark_phase10.yaml",
+                    help="Phase 10 benchmark config for in-training eval")
+    p.add_argument("--max-steps", type=int, default=None,
+                    help="Override training.max_steps (useful for smoke runs)")
+    p.add_argument("--eval-interval-steps", type=int, default=None,
+                    help="Override training.eval_interval_steps")
+    p.add_argument("--batch-size", type=int, default=None,
+                    help="Override training.batch_size")
+    p.add_argument("--max-tokens", type=int, default=None,
+                    help="Override rollout.max_tokens (min 3000 per MEMORY)")
+    p.add_argument("--run-id", default=None,
+                    help="CUIDv2 run_id; generated if omitted")
+    p.add_argument("--dry-run", action="store_true",
+                    help="Preflight + instantiate everything; exit before training")
+    args = p.parse_args()
+
+    # Lazy imports so `--help` doesn't pay the MLX cost.
+    import hashlib
+    from .live_wiring import (
+        InProcessEvaluator,
+        build_live_call_site,
+        build_registry_eval_cmd,
+    )
+    from .mlx_adapter import MLXGRPOAdapter
+
+    cfg_path = Path(args.config)
+    yaml_cfg = _load_yaml(cfg_path)
+    cfg_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
+    cfg = build_config_from_yaml(
+        yaml_cfg, sidecar_path=Path(args.out_sidecar), config_sha=cfg_sha,
+    )
+
+    # CLI overrides land on the config object so operators can shrink a run
+    # for smoke-testing without editing YAML.
+    if args.max_steps is not None:
+        cfg.max_steps = args.max_steps
+    if args.eval_interval_steps is not None:
+        cfg.eval_interval_steps = args.eval_interval_steps
+    if args.batch_size is not None:
+        cfg.batch_size = args.batch_size
+
+    logger.info("GRPO config: %s", cfg)
+
+    # ── Reward sampler (reads benchmark_results rows from TSDB) ─────────────
+    rs_cfg = yaml_cfg.get("reward_sampler", {}) or {}
+    sampler = RewardSampler.from_tsdb(
+        yaml_cfg.get("tsdb", {}) or {},
+        run_ids=rs_cfg.get("source_run_ids") or None,
+        strategy=rs_cfg.get("strategy", "stratified_by_group"),
+        rng_seed=yaml_cfg["training"].get("seed", 0),
+    )
+    logger.info("RewardSampler: %d rows, %d tasks, zero-stddev tasks=%s",
+                sampler.row_count, len(sampler.task_ids),
+                sampler.zero_stddev_tasks())
+
+    # ── Live prompt/reward wiring ───────────────────────────────────────────
+    site = build_live_call_site(
+        golden_path=Path(args.golden),
+        specs_dir=Path(args.specs_dir),
+    )
+
+    # ── MLX adapter (heaviest step — loads policy + ref) ────────────────────
+    rollout_cfg = yaml_cfg.get("rollout", {}) or {}
+    max_tokens = args.max_tokens if args.max_tokens is not None else rollout_cfg.get("max_tokens", 4000)
+    if max_tokens < 3000:
+        logger.error("--max-tokens=%d violates MEMORY min-3000 policy", max_tokens)
+        return 2
+    generation_kwargs = {
+        "max_tokens": max_tokens,
+    }
+    # MLX generate supports sampling kwargs via generation_kwargs dict.
+    # Phase 10 sampling policy (temperature etc.) ships via the benchmark
+    # config; the RL rollout uses MLX defaults unless operator overrides.
+
+    # Model under test path (RL sandbox) = cfg.output_path. But for the FIRST
+    # training step the policy is Phase 5 base — so we load from base_model
+    # and write checkpoints into output_path.
+    eval_cmd = build_registry_eval_cmd(
+        model_path=cfg.base_model_path,
+        benchmark_config=Path(args.benchmark_config),
+    )
+
+    adapter = MLXGRPOAdapter(
+        base_model_path=cfg.base_model_path,
+        adapter_path=None,  # Phase 5 base is the merged dense adapter
+        prompt_provider=site.prompt_provider,
+        reward_fn=site.reward_fn,
+        clip_ratio=cfg.clip_ratio,
+        kl_coef=cfg.kl_coef,
+        entropy_coef=cfg.entropy_coef,
+        lr=yaml_cfg["training"]["optim"]["lr"],
+        weight_decay=yaml_cfg["training"]["optim"].get("weight_decay", 0.01),
+        betas=(
+            yaml_cfg["training"]["optim"].get("beta1", 0.9),
+            yaml_cfg["training"]["optim"].get("beta2", 0.999),
+        ),
+        eps=yaml_cfg["training"]["optim"].get("eps", 1e-8),
+        generation_kwargs=generation_kwargs,
+        eval_cmd=eval_cmd,
+    )
+    # Tokenizer chicken-and-egg: set after MLX load.
+    site.prompt_provider.attach_tokenizer(adapter.tokenizer)
+
+    # ── Verify reward coverage for every task the sampler will hit ──────────
+    missing_reward = sorted(set(sampler.task_ids) - set(site.reward_fn.available_tasks()))
+    if missing_reward:
+        logger.warning(
+            "reward_fn has no coverage for %d sampler tasks: %s — "
+            "those samples will score 0.0",
+            len(missing_reward), missing_reward,
+        )
+    missing_prompt = sorted(set(sampler.task_ids) - set(site.prompt_provider.available_tasks()))
+    if missing_prompt:
+        logger.error(
+            "prompt_provider has no golden rows for %d sampler tasks: %s — "
+            "rollouts will crash. Either add rows to valid_golden.jsonl or "
+            "exclude these tasks from source_run_ids.",
+            len(missing_prompt), missing_prompt,
+        )
+        return 2
+
+    if args.dry_run:
+        logger.info("--dry-run: everything constructed; exiting before train()")
+        return 0
+
+    # ── In-process evaluator (faithful to training weights) ─────────────────
+    # subprocess-based adapter.eval_fn talks to mlx_lm.server which holds a
+    # pre-training model — would give a stale signal. Swap to in-process.
+    eval_tasks = sorted(
+        set(sampler.task_ids)
+        & set(site.prompt_provider.available_tasks())
+        & set(site.reward_fn.available_tasks())
+    )
+    evaluator = InProcessEvaluator(
+        adapter=adapter,
+        prompt_provider=site.prompt_provider,
+        reward_fn=site.reward_fn,
+        tasks=eval_tasks,
+        n_samples_per_task=2,
+        generation_kwargs=generation_kwargs,
+    )
+
+    # ── Run training ────────────────────────────────────────────────────────
+    trainer = GRPOTrainer(
+        config=cfg,
+        sampler=sampler,
+        rollout_fn=adapter.rollout_fn,
+        optimizer_step_fn=adapter.optimizer_step_fn,
+        eval_fn=evaluator,
+        checkpoint_fn=adapter.checkpoint_fn,
+        run_id=args.run_id,
+    )
+    result = trainer.train()
+    logger.info("GRPO training complete: %s", result)
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover
