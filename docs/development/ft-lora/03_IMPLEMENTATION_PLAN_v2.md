@@ -449,6 +449,30 @@ Existing pipeline (Tier 1 merge → quantize → deploy) extended to stack Tier 
 
 ---
 
+## Phase 5.10: Automated Benchmark Framework ✅ **EXECUTED 2026-04-23 → 2026-04-24** (Sprint FT-LORA-PHASE10)
+
+> Authoritative first baseline for `.local-models/qwen3-14b-mdemg-v1/`: **aggregate weighted score 0.8338**, 16/17 ULTS specs × 5 runs = 80 rows, zero truncations, run_id `q283a23bz59mrg6faxo32ydx2`. Merged via PR #348. New module tree under `neural/benchmarks/`; TSDB V0012 migration authored (`benchmark_results` hypertable + `benchmark_runs`); `evaluate_ft.py --scorer={heuristic,registry,dual}` shadow refactor in place. 17th spec `guardrail.evaluate` deferred to Phase 10.5 (#216). Authoritative post-docs: [`phase_10_benchmark_post.md`](phase_10_benchmark_post.md), [`sprint_plan_ft_lora_phase10.md`](sprint_plan_ft_lora_phase10.md).
+
+---
+
+## Phase 5.11: Automated RL Post-Training ✅ **EXECUTED 2026-04-24** (Sprint FT-LORA-PHASE11 — code complete; compute pass operator-gated)
+
+> **GRPO trainer + DPO pair generator + dual regression harness shipped.** 73 tests green (37 unit + 36 integration/e2e). V0013 migration (`rl_training_runs` + `rl_training_steps` hypertable) **applied live** (schema_meta 12→13). End-to-end DPO pair generation against Phase 10 TSDB produced `training_data/dpo/phase11/pairs.jsonl` (5 pairs, SHA256 `bbe7bb9a…`).
+>
+> **New module tree — `neural/training/rl/`**: `trainer.py` (MLX-agnostic orchestrator, injectable `RolloutFn`/`OptimizerStepFn`/`EvalFn`/`CheckpointFn` callables), `grpo_loss.py` (clipped surrogate + KL + entropy, log-ratio clamp at ±20, hand-computed fixture at TOL=1e-6), `advantage.py` (per-task normalization + 3 zero-stddev policies), `reward_sampler.py` (3 sampling strategies), `preflight.py` (5 gates), `regression.py` (dual gate 5a vs Phase 5 baseline 0.8338 + 5b vs fresh-merge).
+>
+> **New module tree — `neural/training/dpo/`**: `pair_generator.py` (reads `benchmark_results`, buckets by (task_id, prompt_hash), chosen/rejected by scalar reward delta ≥ 0.15).
+>
+> **Configs**: `rl_phase11.yaml` + `dpo_phase12_pairs.yaml` — zero hardcoded values.
+>
+> **Policy fork resolutions (Plan §10)**: Risk #1 Option B (custom in-repo trainer) over Option A (vendor `mlx-lm-lora`). Risk #2 default `zero_stddev_policy: intra_batch_only` — the 9/16 Phase 10 tasks with historical σ=0 get advantage-normalized from current batch's sampling-temperature variance.
+>
+> **Deferred (explicit, operator-gated)**: MLX adapter wiring for `OptimizerStepFn` (~100 LOC, task #227); real GRPO run; gate 5a/5b execution; adapter blessing (sandbox → `.local-models/qwen3-14b-mdemg-v1-rl/`); `--scorer=registry` flip; stagnation auto-exit (needs benchmark_runs.count() ≥ 2).
+>
+> **Phase 12 HITL DPO unblocked.** Authoritative post-docs: [`phase_11_rl_post.md`](phase_11_rl_post.md), [`sprint_plan_ft_lora_phase11.md`](sprint_plan_ft_lora_phase11.md).
+
+---
+
 ## Phase 6: Recursive Cycle Automation (Python) 🔄 PARTIALLY COMPLETE [Verified: 2026-04-02]
 
 ### 6A. `neural/training/cycle_runner.py` — Orchestrates complete cycle with anti-collapse protocol ⬜ NOT STARTED

@@ -1,0 +1,64 @@
+# Sprint FT-LORA-PHASE11 — DPO Pair Generator Config
+#
+# Drives neural/training/dpo/pair_generator.py, which reads benchmark_results
+# rows (Phase 10 and Phase 11 benchmark runs) and emits win/loss JSONL pairs
+# for Phase 12 HITL DPO curation + training. Pair generation ships this sprint;
+# DPO training itself is deferred to Phase 12.
+#
+# Policy compliance:
+#   - No hardcoded values (MEMORY): every knob below.
+#   - prompt_hash_strategy: blake2b_16 gives 128-bit collision-resistant keys
+#     with low storage cost — prompts rarely collide at that width.
+
+sprint:
+  id: FT-LORA-PHASE11
+  created: "2026-04-24"
+
+# ── Source runs ─────────────────────────────────────────────────────────────
+sources:
+  # Empty list = all completed benchmark_runs rows (ordered by started_at).
+  # CLI --source <run_id,run_id,...> overrides.
+  run_ids: []
+
+# ── Pair selection ──────────────────────────────────────────────────────────
+selection:
+  # Minimum |reward_chosen - reward_rejected| for a pair to be emitted.
+  # 0.15 is Phase 11 MVP; Phase 12 may tighten after manual review.
+  reward_delta_threshold: 0.15
+
+  # Minimum pairs per task required for the task to be considered "covered";
+  # the manifest records any tasks under this floor (the sprint plan allows
+  # ≥ N-1 of N tasks to meet the floor — documented exceptions are OK).
+  min_pairs_per_task: 20
+
+  # Bucketing: pairs are formed within a (task_id, prompt_hash) bucket.
+  # prompt_hash_strategy options:
+  #   blake2b_16        — 128-bit blake2b digest; default; fast + stable
+  #   sha256_full       — 256-bit; overkill for bucketing but auditable
+  #   task_first_tokens — first N tokens of the rendered prompt; weakest
+  prompt_hash_strategy: blake2b_16
+  task_first_tokens_n: 64     # only used when strategy = task_first_tokens
+
+  # When multiple candidate pairs exist in a bucket, cap how many are emitted
+  # per bucket to avoid flooding the DPO training set with near-duplicates.
+  max_pairs_per_bucket: 4
+
+  # Reward aggregation: how to turn reward_vector (dict of per-metric scores)
+  # into a scalar for delta comparison.
+  #   mean         — arithmetic mean of per-metric scores (Phase 10 convention)
+  #   weighted     — uses reward_weights below (override mean on specific tasks)
+  reward_aggregation: mean
+  reward_weights: {}           # e.g. { "ape.reflect": { "actionability_score": 0.5, "insight_count": 0.3, "json_valid": 0.2 } }
+
+# ── Output ──────────────────────────────────────────────────────────────────
+output:
+  pairs_jsonl: "training_data/dpo/phase11/pairs.jsonl"
+  manifest_json: "training_data/dpo/phase11/manifest.json"
+
+# ── TSDB (inherits env overrides; same defaults as rl_phase11.yaml) ─────────
+tsdb:
+  host: "localhost"
+  port: 5433
+  user: "mdemg"
+  password: "mdemg_metrics"
+  database: "mdemg_metrics"

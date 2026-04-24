@@ -306,6 +306,12 @@ Endpoints:
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
   - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)
   - Golden holdout: `training_data/eval/valid_golden.jsonl` (seeded carve from Phase 5 valid splits)
+- RL post-training (Phase 11 GRPO framework):
+  - Preflight: `TSDB_PORT=5433 python -m neural.training.rl.preflight --config configs/rl_phase11.yaml` (5 gates: TSDB baseline rows, per-task row count, per-task stats, Phase 5 adapter SHAs, MLX single-instance)
+  - Trainer (MLX adapter wiring pending; orchestrator + tests complete): `python -m neural.training.rl.trainer --config configs/rl_phase11.yaml --out-sidecar training_data/eval/rl_run.sql`
+  - DPO pair generator: `TSDB_PORT=5433 python -m neural.training.dpo.pair_generator --config configs/dpo_phase12_pairs.yaml` → `training_data/dpo/phase11/{pairs.jsonl,manifest.json}`
+  - Dual regression: `python -m neural.training.rl.regression --config configs/rl_phase11.yaml --sandbox-adapter <p> --fresh-adapter <p>` (5a vs Phase 5 baseline 0.8338, 5b vs fresh-merge ≤0.5pp)
+  - Unit + integration suites: `pytest -xvs neural/training/rl/tests/ neural/training/dpo/tests/` (73 tests)
 - Live validation: `python3 scripts/live_validation.py` (19 end-to-end tests)
 - Synergy: `mdemg synergy status` | `mdemg synergy check --auto` | `mdemg synergy migrate --dry-run`
 - Synergy API: `GET /v1/synergy/status?space_id=mdemg-dev`
