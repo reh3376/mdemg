@@ -403,3 +403,92 @@ user activity on the Mac.
   module-level function (~70 LOC) + call site in `__init__` + new
   `gradient_checkpointing: bool = True` constructor param
 - `docs/development/ft-lora/phase_11_mlx_adapter.md` — this section
+
+---
+
+# Bugfix wave — LoRA install + adapter_config + regression harness
+
+**Status:** EXECUTED (2026-04-25). Four distinct bugs blocked the actual Phase 11 LoRA deliverable; all four fixed and verified end-to-end. **Initial 100-step gate verdict: FAIL** (sprint plan target not met). Retry with tuned `kl_coef` queued.
+
+## Bugs fixed (in execution order)
+
+### Bug 1 — Trainer never installed LoRA structure
+`MLXGRPOAdapter.__init__` called `mlx_lm.load(base, adapter_path=None)` and then began training. The base model (`.local-models/qwen3-14b-mdemg-v1`) is **4-bit quantized** (`bits: 4, group_size: 64`); its linear weights are frozen at load time. Without an explicit `linear_to_lora_layers` call, the only un-frozen parameters were RMSNorm scales — so `model.trainable_parameters()` returned 161 norm tensors (~425K params), not LoRA matrices. **The first 100-step run was inadvertently norm-tuning, not LoRA fine-tuning.**
+
+Fix: `_apply_lora_layers(model, lora_config)` helper mirrors `mlx_lm.lora.train_model`'s pattern exactly:
+```python
+model.freeze()
+linear_to_lora_layers(model, num_layers=len(model.layers), config=lora_config)
+```
+Called from `__init__` after `mlx_lm.load`. Defensive (no-op on test stubs lacking `.layers`/`.freeze` or when `mlx_lm.tuner.utils` is unavailable).
+
+New `__init__` params: `lora_rank`, `lora_alpha`, `lora_dropout`, `lora_target_modules`. Defaults match `configs/rl_phase11.yaml §training.lora` (rank=32, alpha=64, dropout=0.05, targets=[q,k,v,o]_proj). `trainer.main()` reads YAML and threads them through; YAML targets are bare suffixes (`q_proj`), the trainer prepends `self_attn.` so mlx_lm sees the full layer-relative path it expects.
+
+### Bug 2 — `checkpoint_fn` didn't write `adapter_config.json`
+`mlx_lm.tuner.utils.load_adapters` reads `adapter_path / "adapter_config.json"` to know what LoRA structure to install before loading the safetensors. Without that file, `mlx_lm.server --adapter-path` fails immediately with `FileNotFoundError`. Fix: `checkpoint_fn` writes a companion JSON:
+```json
+{"fine_tune_type": "lora", "num_layers": 40, "lora_parameters": { ...rank, scale, dropout, keys... }}
+```
+
+### Bug 3 — Regression harness sent the wrong `model` field in HTTP requests
+`run_benchmark.py`'s `--mlx-model-name` defaults to `"local-mlx"`. `mlx_lm.server` interprets that as a HuggingFace repo ID, fails to find it, and returns 404 on every `/v1/chat/completions` call. The benchmark report came back with `aggregate_weighted_score = 0.0`, all 17 specs flagged with `MLX HTTP 404: Not Found`. Fix: regression harness's `shell_runner` now passes `--mlx-model-name <abs_base_path>`. The server's `/v1/models` registers the loaded model under its absolute filesystem path; matching the client request to that path makes the request route to the loaded weights instead of triggering an HF download attempt.
+
+### Bug 4 — `_per_task_scores` assumed the wrong shape for `per_task_aggregate`
+The Phase 10 baseline (and any Phase 10 runner output) persists `per_task_aggregate` as a **list** of `{task_id, overall_mean, ...}` dicts, not a dict-of-dicts. The harness's `_per_task_scores` called `.values()` on it expecting the latter. Fix: handle both shapes with explicit `isinstance(agg, list) / isinstance(agg, dict)` branches; legacy fallbacks preserved for older fixtures.
+
+### Bug 5 — `shell_runner` invoked `python` instead of `sys.executable`
+On systems without `python` in PATH (only `python3` + the venv binary), the subprocess for both `mlx_lm.server` and `run_benchmark` failed with `FileNotFoundError: 'python'`. Fix: use `sys.executable` for both invocations.
+
+### Bug 6 — `shell_runner` had a stub `--adapter` flag for a nonexistent CLI option
+`run_benchmark.py` is **client-mode only** — it doesn't load the model itself, just hits an `mlx_lm.server` over HTTP. There is no `--adapter` flag. Fix: harness now spins up `mlx_lm.server --model <base> --adapter-path <adapter>` itself (with a `_wait_for_server` poll on `/v1/models`), runs the benchmark, then `terminate()`s the server. Lifecycle is per-gate so 5a and 5b each get their own server instance.
+
+## Validation — first real Phase 11 LoRA compute pass
+
+After all six fixes, ran the canonical 100-step compute pass. **70m 43s wall-clock**. Each step memory profile:
+
+| Stat | Range |
+|---|---|
+| peak_mem | 9.81 - 14.45 GB |
+| cache_mem | 0.00 GB on every step |
+| active_mem | 8.98 GB constant |
+| swap | 5.3 GB stable (never grew) |
+
+Adapter output:
+- 320 LoRA tensors (160 lora_A + 160 lora_B) — exact match for 40 layers × {q,k,v,o}_proj × 2
+- 41,943,040 params (vs 425K norm-only)
+- 168 MB safetensors (vs 867 KB norm-only)
+- adapter_config.json written
+
+## Initial gate verdict: FAIL
+
+| Gate | Result | Sandbox | Baseline | Target |
+|---|---|---|---|---|
+| 5a (vs Phase 5 SFT) | ❌ **FAIL** | 0.8392 | 0.8338 | ≥ 0.8505 (1.02×) |
+| 5b (fresh-merge byte-stability) | ✅ PASS | 0.8392 | 0.8430 | δ ≤ 0.005 |
+
+**Aggregate gain is real but small (+0.65pp);** sprint plan asked for ≥+2.0pp.
+
+**Three tasks regressed beyond the 2pp per-task cap:**
+- `consulting.classify`: −8.67pp (0.6800 vs 0.7667)
+- `consulting.synthesis`: −7.35pp (0.7904 vs 0.8639)
+- `retrieval.query_classify`: −10.00pp (0.6000 vs 0.7000)
+
+Adapter remains in `.local-models/qwen3-14b-mdemg-v1-rl-sandbox/` — **not** promoted to the blessed `-rl/` path.
+
+## Why the gate likely failed
+
+1. **100 steps is short.** The sprint plan caps at 3500; 100 was a smoke target. GRPO often needs hundreds-to-thousands of steps for tail tasks to stabilize.
+2. **Three regressing tasks share a flavor.** `consulting.classify` and `retrieval.query_classify` are C-group classification tasks (deterministic temperature=0); small policy drifts can flip a label and tank the per-row score from 1.0 to 0.0.
+3. **`kl_coef = 0.01` is permissive.** With 100 steps the policy still drifted enough to hurt classification while gaining only marginal aggregate ground.
+
+## Retry queued
+
+Tuned 500-step run with `kl_coef: 0.01 → 0.05` (constrains policy drift relative to the SFT reference). All six bugs above are landed in code; the retry is a config-only experiment. Wall-clock projection: ~5.8 hr training + ~6 min × 2 regression = ~6 hr total.
+
+## Artifacts (delta over Tier 3 merge at PR #354)
+
+- `neural/training/rl/mlx_adapter.py` — `_apply_lora_layers` helper + `__init__` LoRA install + `checkpoint_fn` adapter_config write + new constructor params
+- `neural/training/rl/trainer.py` — `main()` reads `lora` block from YAML, prefixes target_modules with `self_attn.`, passes through to adapter
+- `neural/training/rl/regression.py` — `shell_runner` rewritten to spin up mlx_lm.server with `--adapter-path`; `_per_task_scores` handles list-shape `per_task_aggregate`; `_wait_for_server` polls `/v1/models`; `--mlx-model-name` forwarded as absolute base path; `sys.executable` for subprocess
+- `training_data/eval/phase11_regression_report.json` — first real Phase 11 gate verdict (FAIL)
+- This doc (Bugfix wave + initial verdict appended)
