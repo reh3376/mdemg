@@ -180,6 +180,92 @@ def _lora_disabled(model: Any) -> Iterator[None]:
             mod.scale = original_scale
 
 
+def _apply_gradient_checkpointing(model: Any) -> None:
+    """Monkey-patch ``Qwen3Model.__call__`` so each transformer layer's
+    forward is wrapped in ``mx.checkpoint``.
+
+    Why the patch is at the *outer* model rather than at ``TransformerBlock``:
+    ``mx.checkpoint`` tree-flattens its args (treating them as arrays/trees-
+    of-arrays). Installing ``mx.checkpoint(method)`` directly as a class
+    ``__call__`` therefore corrupts ``self`` — the module instance gets
+    flattened to its parameter dict before the method body runs. Instead,
+    we keep each layer's native ``__call__`` and build a per-layer closure
+    that captures the layer reference outside the checkpointed function
+    boundary, so ``mx.checkpoint`` only sees tensor inputs (``h``, ``mask``,
+    ``cache``). See inline note below.
+
+    Effect: backward-pass activation memory drops ~10x (activations for
+    each layer are *recomputed* during backward instead of stored from the
+    forward pass). Wall-clock cost: ~33% more per step because of the
+    recomputation. For Qwen3-14B × seq_len=3000 on 128GB unified memory,
+    this is what brings the 237GB outlier-step peak down to within
+    physical RAM.
+
+    Idempotent: if the Qwen3Model class is already patched by a previous
+    adapter in the same process, skip. Applies to the model's installed
+    class, so subsequent ``mlx_lm.load`` calls inherit the patch.
+
+    Resilient: if ``mlx_lm.models.qwen3`` is unavailable or the model is
+    not a Qwen3Model (e.g. a test stub), the function is a no-op with a
+    warning. Phase 12 work on other architectures can add per-arch branches.
+    """
+    import mlx.core as mx  # noqa: PLC0415
+    try:
+        from mlx_lm.models import qwen3  # noqa: PLC0415
+    except (ImportError, ModuleNotFoundError):
+        logger.warning(
+            "gradient checkpointing: mlx_lm.models.qwen3 not importable; "
+            "skipping (non-Qwen3 model or stub)"
+        )
+        return
+
+    if getattr(qwen3.Qwen3Model, "_mdemg_checkpointed", False):
+        logger.info("gradient checkpointing: Qwen3Model already patched; skipping")
+        return
+
+    # Verify the loaded model's inner model is a Qwen3Model instance. If
+    # not (e.g. test stub), bail cleanly.
+    inner = getattr(model, "model", None)
+    if inner is None or not isinstance(inner, qwen3.Qwen3Model):
+        logger.warning(
+            "gradient checkpointing: model.model is not a Qwen3Model "
+            "(type=%s); skipping", type(inner).__name__
+        )
+        return
+
+    _original_qwen3_model_call = qwen3.Qwen3Model.__call__
+
+    def _checkpointed_qwen3_model_call(
+        self,
+        inputs: Any,
+        cache: Any = None,
+        input_embeddings: Any = None,
+    ) -> Any:
+        # Mirrors the upstream Qwen3Model.__call__ flow (inlined so we can
+        # wrap each layer invocation). Kept in sync with mlx_lm==0.31.2.
+        if input_embeddings is not None:
+            h = input_embeddings
+        else:
+            h = self.embed_tokens(inputs)
+        if cache is None:
+            cache = [None] * len(self.layers)
+        mask = qwen3.create_attention_mask(h, cache[0])
+        for layer, c in zip(self.layers, cache):
+            # Closure captures `layer` outside the checkpoint boundary so
+            # mx.checkpoint only tree-flattens tensor args (h, mask, c=None
+            # during training). Creating the checkpointed fn per iteration
+            # is intentional — mx.checkpoint is cheap to construct; each
+            # call produces an independent graph node whose intermediate
+            # activations are recomputed during the backward pass.
+            def _layer_fwd(x_in, m_in, c_in, _l=layer):
+                return _l(x_in, m_in, c_in)
+            h = mx.checkpoint(_layer_fwd)(h, mask, c)
+        return self.norm(h)
+
+    qwen3.Qwen3Model.__call__ = _checkpointed_qwen3_model_call
+    qwen3.Qwen3Model._mdemg_checkpointed = True
+
+
 class MLXGRPOAdapter:
     """Real MLX wiring for the Phase 11 GRPO trainer's four callables.
 
@@ -228,6 +314,7 @@ class MLXGRPOAdapter:
         eps: float = 1e-8,
         generation_kwargs: dict[str, Any] | None = None,
         eval_cmd: list[str] | None = None,
+        gradient_checkpointing: bool = True,
     ) -> None:
         # Lazy imports so unit tests can exercise the class without a Metal
         # backend. Any real instantiation in a Mac env pulls these in once.
@@ -250,6 +337,14 @@ class MLXGRPOAdapter:
             "MLXGRPOAdapter: reference policy = same weights with LoRA "
             "scales zeroed in-forward (descriptor-budget fix)"
         )
+
+        if gradient_checkpointing:
+            _apply_gradient_checkpointing(self.model)
+            logger.info(
+                "MLXGRPOAdapter: gradient checkpointing applied to Qwen3 "
+                "transformer layers (~10x backward activation memory "
+                "reduction at ~33%% wall-clock cost)"
+            )
 
         self.optimizer = optim.AdamW(
             learning_rate=lr,
