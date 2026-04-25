@@ -211,3 +211,95 @@ memory budget:
   `ChatTemplatedPromptProvider` + `SpecDrivenRewardFn` + `InProcessEvaluator`
 - `neural/training/rl/tests/test_live_wiring.py` (new, ~380 LOC)
 - This doc (Follow-up section appended)
+
+---
+
+# Tier 2 — Per-sample gradient accumulation
+
+**Status:** EXECUTED (2026-04-24); proven to extend stable run length but not sufficient alone for 25+ step runs on 128 GB unified memory.
+
+## What changed
+
+`optimizer_step_fn` rewritten from one-shot `value_and_grad` over all N kept
+samples to a per-sample loop:
+
+```python
+for local_i, orig_i in enumerate(kept_indices):
+    def sample_loss_fn(model, ...):
+        lp_new_i = sum_response_logprobs(model, mx, full_ids_i, prompt_len_i)
+        # Per-sample clipped surrogate + KL + entropy, scaled by 1/N
+        return (policy_loss_i + kl_coef * kl_i - entropy_coef * entropy_i) / n_kept
+
+    sample_loss, sample_grads = nn.value_and_grad(self.model, sample_loss_fn)(self.model)
+
+    if grads_accum is None:
+        grads_accum = sample_grads
+    else:
+        grads_accum = tree_map(lambda a, b: a + b, grads_accum, sample_grads)
+
+    mx.eval(grads_accum)          # free this sample's forward/backward graph
+    self._clear_cache()
+
+self.optimizer.update(self.model, grads_accum)
+```
+
+**Mathematically identical** to the prior batched-mean loss: `∂(mean_i L_i)/∂θ = (1/N) Σ ∂L_i/∂θ`. No change to GRPO semantics.
+
+**Memory profile**: peak activation memory is bounded to ONE sample's
+forward+backward graph regardless of batch size. Between samples,
+`mx.eval(grads_accum)` materializes the accumulated grads and releases the
+prior sample's activation tape; `_clear_cache()` drains Metal descriptor
+buffers.
+
+## Validation
+
+- 19/19 `test_mlx_adapter.py` green (stub gained `mlx.utils.tree_map`).
+- 106/106 full Phase 11 + DPO suite green.
+- 5-step smoke at batch_size=4: **PASS**. Peaks now vary 13-91 GB per step
+  (was monotonic watermark before). Losses differ slightly from Tier 1
+  (`2.250 / 0.940 / 3.023 / 1.776 / 3.567` vs Tier 1 `2.249 / 1.015 / 3.271 /
+  3.188 / 3.423`) — expected because per-sample vs batched-mean means
+  slightly different numerical paths; both are correct GRPO.
+- 25-step smoke at batch_size=4: made it to **step 16** (vs Tier 1 step 13
+  jetsam kill). Terminal operator-kill at step 16 because swap saturated.
+  Key observations:
+  - Most steps: 13-100 GB peak, ~20-50 sec wall-clock
+  - ~every 10th step: 230-240 GB peak, 5-9 min wall-clock (swap thrashing)
+  - The "monster" steps coincide with 4× long-sequence samples in one batch;
+    the per-sample loop serializes the backward passes but one sample's
+    Qwen3-14B × 3000-token forward+backward can transiently hit ~60 GB,
+    and MLX's allocator keeps unfused-op intermediates pushing peak higher.
+
+## Per-step memory spike: root cause & next lever
+
+Per-sample accumulation cuts the N-way batch-stacking problem but does not
+address the **fundamental single-sample ceiling**: Qwen3-14B × seq_len=3000
+activation tape × MLX's current allocator behavior (no fused attention, no
+gradient checkpointing) = occasional 230+ GB transients on outlier batches.
+
+**Next architectural lever — gradient checkpointing on transformer layers.**
+`mx.checkpoint` (or a thin module wrap equivalent) recomputes layer forward
+activations during backward instead of storing them. Expected impact:
+~10× reduction in backward activation memory, at the cost of ~33% more
+wall-clock per step. Implementation target: wrap each `Qwen3DecoderLayer`
+call site in `mlx_lm`'s model with a checkpoint shim.
+
+Neither Tier 2 alone nor Tier 2 + checkpointing changes GRPO mathematics;
+both are pure memory-management changes.
+
+## 100-step compute pass: still operator-gated
+
+Tier 2 extends the stable run length substantially (beat both prior kill
+points) but does not yet close the hardware gap on 128 GB unified memory
+with outlier long-sequence batches. Until gradient checkpointing lands,
+the operator preconditions in the Follow-up section above (fresh reboot,
+batch_size 1 first, monitor telemetry) remain in force.
+
+## Artifacts (delta over Tier 1 merge at c816e71)
+
+- `neural/training/rl/mlx_adapter.py` — `optimizer_step_fn` refactor (~70 LOC
+  changed). Per-sample loop + `tree_map`-based accumulation.
+- `neural/training/rl/tests/test_mlx_adapter.py` — stub gained `_tree_map`
+  helper; existing tests still pass without modification (the accumulation
+  pattern lands with a single sample batch in test fixtures).
+- This doc (Tier 2 section appended)

@@ -481,56 +481,89 @@ class MLXGRPOAdapter:
         clip = self.clip_ratio
         kl_coef = self.kl_coef
         entropy_coef = self.entropy_coef
+        n_kept = len(kept_indices)
 
-        def loss_fn(model: Any) -> Any:
-            # Recompute lp_new under the current (trainable) policy.
-            lp_new_list = [
-                sum_response_logprobs(
-                    model, mx,
-                    self._stash[i].full_ids,   # type: ignore[union-attr]
-                    self._stash[i].prompt_len,  # type: ignore[union-attr]
+        # ── Tier 2: per-sample gradient accumulation ────────────────────────
+        # Previously we built one loss over all N kept samples and backproped
+        # through a single mx.value_and_grad call. That held N full forward
+        # graphs alive simultaneously (for the backward tape), which on a
+        # 14B model × seq_len=3000 easily hits 100+ GB per batch and drove
+        # jetsam kills at batch_size=4 during the Tier 1 25-step smoke.
+        #
+        # Per-sample accumulation: compute each sample's ∂L_i/∂θ independently,
+        # scale by 1/N, accumulate into grads_accum. Mathematically identical
+        # to the batched mean (∂(mean_i L_i)/∂θ = (1/N) Σ ∂L_i/∂θ) — preserves
+        # GRPO semantics exactly. Peak activation memory is bounded to ONE
+        # sample regardless of batch size. Cost: N forward+backward passes
+        # serialized instead of one fused pass; wall-clock roughly the same
+        # because per-sample ops are the same ops, just scheduled one at a
+        # time on the GPU.
+        from mlx.utils import tree_map  # noqa: PLC0415
+
+        grads_accum: Any = None
+        mlx_loss_total = 0.0
+
+        for local_i, orig_i in enumerate(kept_indices):
+            # Capture per-sample constants into the closure as Python floats
+            # so value_and_grad only differentiates w.r.t. model params, not
+            # these fixed rollout-time values.
+            adv_i = float(kept_adv[local_i])
+            lp_old_i = float(self._stash[orig_i].lp_old_frozen)  # type: ignore[union-attr]
+            lp_ref_i = float(self._stash[orig_i].lp_ref_frozen)  # type: ignore[union-attr]
+            full_ids_i = self._stash[orig_i].full_ids            # type: ignore[union-attr]
+            prompt_len_i = self._stash[orig_i].prompt_len        # type: ignore[union-attr]
+
+            def sample_loss_fn(model: Any,
+                                _adv=adv_i,
+                                _lp_old=lp_old_i,
+                                _lp_ref=lp_ref_i,
+                                _full=full_ids_i,
+                                _plen=prompt_len_i,
+                                _n=n_kept) -> Any:
+                lp_new_i = sum_response_logprobs(model, mx, _full, _plen)
+                log_ratio_i = mx.clip(lp_new_i - _lp_old,
+                                       -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
+                ratio_i = mx.exp(log_ratio_i)
+                clipped_i = mx.clip(ratio_i, 1.0 - clip, 1.0 + clip)
+                # Per-sample clipped surrogate; no mean reduction (that's
+                # what the 1/N scaling at the end does across accumulation).
+                policy_loss_i = -mx.minimum(ratio_i * _adv, clipped_i * _adv)
+                log_diff_i = mx.clip(lp_new_i - _lp_ref,
+                                      -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
+                kl_i = log_diff_i
+                entropy_i = -lp_new_i
+                sample_loss_scaled = (
+                    policy_loss_i + kl_coef * kl_i - entropy_coef * entropy_i
+                ) / _n
+                return sample_loss_scaled
+
+            sample_grad_fn = nn.value_and_grad(self.model, sample_loss_fn)
+            sample_loss, sample_grads = sample_grad_fn(self.model)
+
+            if grads_accum is None:
+                grads_accum = sample_grads
+            else:
+                grads_accum = tree_map(
+                    lambda a, b: a + b, grads_accum, sample_grads
                 )
-                for i in kept_indices
-            ]
-            lp_new = mx.stack(lp_new_list)
 
-            log_ratio = mx.clip(lp_new - lp_old_frozen,
-                                 -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
-            ratio = mx.exp(log_ratio)
-            clipped = mx.clip(ratio, 1.0 - clip, 1.0 + clip)
-            policy_loss = -mx.mean(
-                mx.minimum(ratio * adv_mx, clipped * adv_mx)
-            )
-            log_diff = mx.clip(lp_new - lp_ref_frozen,
-                                -_MAX_LOG_RATIO, _MAX_LOG_RATIO)
-            kl = mx.mean(log_diff)
-            entropy = -mx.mean(lp_new)
+            # Materialize + free this sample's forward/backward graph before
+            # the next iteration. Without this eval the graphs accumulate and
+            # we're back to the same activation-memory problem.
+            mx.eval(grads_accum)
+            mlx_loss_total += float(sample_loss)
+            self._clear_cache()
 
-            return policy_loss + kl_coef * kl - entropy_coef * entropy
-
-        # value_and_grad returns (loss, grads) where grads is a tree matching
-        # the trainable parameter tree.
-        loss_and_grad = nn.value_and_grad(self.model, loss_fn)
-        mlx_loss, grads = loss_and_grad(self.model)
-        self.optimizer.update(self.model, grads)
-
-        # Tier 1 memory hygiene: single combined barrier for model params,
-        # optimizer state, AND the scalar loss. One mx.eval() materializes
-        # the full graph in one pass instead of creating three separate
-        # graph closures (which is what leaks descriptors over long runs).
-        # ``model.state`` is preferred over ``model.parameters()`` — it
-        # includes buffers too, so the optimizer state update is committed
-        # atomically with the forward-pass activations it depends on.
+        # Apply accumulated gradients; combined barrier for model + optimizer.
+        self.optimizer.update(self.model, grads_accum)
         model_state = getattr(self.model, "state", None)
         if model_state is None:
             model_state = self.model.parameters()
-        mx.eval(model_state, self.optimizer.state, mlx_loss)
-        # Release per-step activation graph + grad tree before the next
-        # rollout. grads drops out of scope anyway but be explicit.
-        del grads
+        mx.eval(model_state, self.optimizer.state)
+        del grads_accum
         self._clear_cache()
 
-        mlx_loss_f = float(mlx_loss)
+        mlx_loss_f = float(mlx_loss_total)
         delta = abs(mlx_loss_f - loss_value)
 
         # Per-step memory telemetry. If memory stays bounded across a long
