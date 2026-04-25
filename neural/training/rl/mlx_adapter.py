@@ -180,6 +180,66 @@ def _lora_disabled(model: Any) -> Iterator[None]:
             mod.scale = original_scale
 
 
+def _apply_lora_layers(model: Any, lora_config: dict[str, Any]) -> None:
+    """Install LoRA layers on a quantized base model so it can be GRPO-trained.
+
+    The base ``mlx_lm.load(path, adapter_path=None)`` returns a quantized
+    model whose linear-layer weights are frozen (4-bit grouped quantization
+    on Qwen3-14B). Without this call, the only un-frozen parameters left are
+    layer norms — meaning ``model.trainable_parameters()`` returns ~425K
+    norm scales, *not* the LoRA matrices the sprint plan specifies.
+
+    Pattern mirrors ``mlx_lm.lora.train_model`` exactly:
+        model.freeze()
+        linear_to_lora_layers(model, num_layers, lora_parameters)
+
+    After this call, ``model.trainable_parameters()`` returns the LoRA
+    A/B matrices (and any other non-frozen modules added by linear_to_lora_layers).
+    Loss flows through LoRA forward path: ``base(x) + scale * (x @ A) @ B``.
+
+    ``lora_config`` shape (matches mlx_lm.tuner.utils convention):
+        {
+            "rank":   <int>,         # r=32 per sprint
+            "scale":  <float>,       # alpha / rank, e.g. 64/32 = 2.0
+            "dropout": <float>,      # 0.05 per sprint
+            "keys":   [<str>, ...],  # layer-relative module paths,
+                                     # e.g. "self_attn.q_proj"
+        }
+
+    Defensive: no-op on test stubs lacking ``layers`` / ``freeze``, no-op when
+    ``mlx_lm.tuner.utils`` is unavailable. Any of these means we are not in
+    a real-MLX training run and the LoRA install is moot.
+    """
+    if not hasattr(model, "layers") or not hasattr(model, "freeze"):
+        logger.warning(
+            "_apply_lora_layers: model lacks .layers/.freeze (type=%s); "
+            "skipping (test stub or non-Qwen3 architecture)",
+            type(model).__name__,
+        )
+        return
+    try:
+        from mlx_lm.tuner.utils import linear_to_lora_layers  # noqa: PLC0415
+    except (ImportError, ModuleNotFoundError, AttributeError):
+        logger.warning(
+            "_apply_lora_layers: mlx_lm.tuner.utils.linear_to_lora_layers "
+            "unavailable; skipping"
+        )
+        return
+
+    model.freeze()
+    linear_to_lora_layers(
+        model,
+        num_layers=len(model.layers),
+        config=lora_config,
+    )
+    logger.info(
+        "_apply_lora_layers: LoRA installed (rank=%d scale=%.4f dropout=%.3f keys=%s) "
+        "on %d layers",
+        lora_config["rank"], lora_config["scale"], lora_config["dropout"],
+        lora_config.get("keys", "<auto>"), len(model.layers),
+    )
+
+
 def _apply_gradient_checkpointing(model: Any) -> None:
     """Monkey-patch ``Qwen3Model.__call__`` so each transformer layer's
     forward is wrapped in ``mx.checkpoint``.
@@ -315,6 +375,10 @@ class MLXGRPOAdapter:
         generation_kwargs: dict[str, Any] | None = None,
         eval_cmd: list[str] | None = None,
         gradient_checkpointing: bool = True,
+        lora_rank: int = 32,
+        lora_alpha: float = 64.0,
+        lora_dropout: float = 0.05,
+        lora_target_modules: list[str] | None = None,
     ) -> None:
         # Lazy imports so unit tests can exercise the class without a Metal
         # backend. Any real instantiation in a Mac env pulls these in once.
@@ -337,6 +401,28 @@ class MLXGRPOAdapter:
             "MLXGRPOAdapter: reference policy = same weights with LoRA "
             "scales zeroed in-forward (descriptor-budget fix)"
         )
+
+        # ── Install LoRA structure on the quantized base ───────────────────
+        # The base from mlx_lm.load(adapter_path=None) is 4-bit quantized;
+        # its linear weights are frozen. Without this, trainable_parameters
+        # would only return layer norm scales (= norm-tuning, not LoRA).
+        # Mirrors mlx_lm.lora.train_model: model.freeze() + linear_to_lora_layers.
+        if lora_target_modules is None:
+            # Sensible default for Qwen3 attention. mlx_lm uses layer-local
+            # paths inside each TransformerBlock, e.g. "self_attn.q_proj".
+            lora_target_modules = [
+                "self_attn.q_proj",
+                "self_attn.k_proj",
+                "self_attn.v_proj",
+                "self_attn.o_proj",
+            ]
+        self._lora_config: dict[str, Any] = {
+            "rank": int(lora_rank),
+            "scale": float(lora_alpha) / float(lora_rank),
+            "dropout": float(lora_dropout),
+            "keys": list(lora_target_modules),
+        }
+        _apply_lora_layers(self.model, self._lora_config)
 
         if gradient_checkpointing:
             _apply_gradient_checkpointing(self.model)
@@ -765,8 +851,24 @@ class MLXGRPOAdapter:
         trainable = dict(tree_flatten(self.model.trainable_parameters()))
         target = path / "adapters.safetensors"
         mx.save_safetensors(str(target), trainable)
-        logger.info("checkpoint_fn step=%d wrote %d params to %s",
-                    step, len(trainable), target)
+
+        # Companion adapter_config.json — required by mlx_lm.tuner.utils.load_adapters
+        # so mlx_lm.server --adapter-path can re-install the LoRA structure
+        # before loading these weights.
+        adapter_cfg = {
+            "fine_tune_type": "lora",
+            "num_layers": (
+                len(self.model.layers)
+                if hasattr(self.model, "layers") else 0
+            ),
+            "lora_parameters": getattr(self, "_lora_config", {}),
+        }
+        cfg_path = path / "adapter_config.json"
+        cfg_path.write_text(json.dumps(adapter_cfg, indent=2))
+        logger.info(
+            "checkpoint_fn step=%d wrote %d params to %s + adapter_config.json",
+            step, len(trainable), target,
+        )
 
 
 # ── helper ──────────────────────────────────────────────────────────────────

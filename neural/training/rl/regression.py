@@ -98,14 +98,38 @@ class DualGateReport:
 def _per_task_scores(report: BenchmarkReport) -> dict[str, float]:
     """Pull per-task aggregate scores from a Phase 10 runner report.
 
-    Phase 10's report persists ``per_task_aggregate`` as a dict keyed by
-    task_id with a ``weighted_score`` field (see neural/benchmarks/run_benchmark.py).
-    Fall back to ``per_task_scores`` for legacy shapes.
+    Phase 10's actual report shape (verified against
+    ``training_data/eval/benchmark_qwen3_14b_v1_baseline.json``):
+
+        per_task_aggregate: [
+            {"task_id": "<task>", "overall_mean": <float>, "n": <int>, ...},
+            ...
+        ]
+
+    The first list item may be a global summary lacking ``task_id`` — those
+    are skipped. ``overall_mean`` is the per-task mean across the N runs;
+    ``weighted_score`` shows up only at the top level (``aggregate_weighted_score``).
+
+    Falls back to legacy dict-of-dicts and ``per_task_scores`` shapes if
+    encountered, so older fixtures stay usable in tests.
     """
-    agg = report.get("per_task_aggregate") or {}
-    if agg and all(isinstance(v, dict) for v in agg.values()):
+    agg = report.get("per_task_aggregate")
+    if isinstance(agg, list):
+        out: dict[str, float] = {}
+        for item in agg:
+            if not isinstance(item, dict):
+                continue
+            tid = item.get("task_id")
+            if not tid:
+                continue
+            score = item.get("overall_mean")
+            if score is None:
+                score = item.get("weighted_score", item.get("score", 0.0))
+            out[tid] = float(score)
+        return out
+    if isinstance(agg, dict) and agg and all(isinstance(v, dict) for v in agg.values()):
         return {
-            task: float(body.get("weighted_score", body.get("score", 0.0)))
+            task: float(body.get("weighted_score", body.get("overall_mean", body.get("score", 0.0))))
             for task, body in agg.items()
         }
     # Legacy fallback.
@@ -271,17 +295,83 @@ def main() -> int:  # pragma: no cover — compute-bound, exercised in Epic 6 e2
         fresh_merge_max_delta=reg["fresh_merge_max_delta"],
     )
 
+    # Resolve base model + server host/port from the Phase 10 config — the
+    # benchmark hits a running mlx_lm.server (it does not load the model
+    # itself). For each gate run, we spin up a server with --adapter-path
+    # pointing at the gate's adapter, wait for /v1/models to respond, run
+    # the benchmark, then terminate the server cleanly.
+    import time  # noqa: PLC0415
+    import urllib.request  # noqa: PLC0415
+    import urllib.error  # noqa: PLC0415
+    with open(args.phase10_config) as f:
+        phase10_cfg = yaml.safe_load(f)
+    mut = phase10_cfg["model_under_test"]
+    base_model_path = mut["path"]
+    server_host = mut.get("mlx_host", "127.0.0.1")
+    server_port = int(mut.get("mlx_port", 8101))
+    server_ready_url = f"http://{server_host}:{server_port}/v1/models"
+
+    def _wait_for_server(timeout_s: float = 180.0) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(server_ready_url, timeout=2.0):
+                    return True
+            except (urllib.error.URLError, ConnectionError, OSError):
+                time.sleep(2.0)
+        return False
+
     def shell_runner(cfg_path: str, adapter: str) -> BenchmarkReport:
-        """Real runner: invokes Phase 10 benchmark as subprocess."""
+        """Real runner — spins up mlx_lm.server with the given adapter,
+        runs the Phase 10 benchmark against it, tears the server down.
+
+        Note: ``run_benchmark.py`` is client-mode; it doesn't accept an
+        ``--adapter`` flag. The adapter has to be loaded server-side via
+        ``mlx_lm.server --adapter-path``. We orchestrate that lifecycle
+        here so the regression harness has a single self-contained call.
+        """
         with tempfile.NamedTemporaryFile(
             suffix=".json", delete=False, mode="w", encoding="utf-8"
         ) as tmp:
             out_path = tmp.name
-        subprocess.run(
-            ["python", "-m", "neural.benchmarks.run_benchmark",
-             "--config", cfg_path, "--adapter", adapter, "--out", out_path],
-            check=True,
+
+        logger.info(
+            "Starting mlx_lm.server (model=%s adapter=%s port=%d)",
+            base_model_path, adapter, server_port,
         )
+        import sys as _sys  # noqa: PLC0415
+        server = subprocess.Popen(
+            [_sys.executable, "-m", "mlx_lm", "server",
+             "--model", base_model_path,
+             "--adapter-path", adapter,
+             "--host", server_host,
+             "--port", str(server_port)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            if not _wait_for_server():
+                raise RuntimeError(
+                    f"mlx_lm.server failed to come up at {server_ready_url} "
+                    "within 180s"
+                )
+            logger.info("mlx_lm.server ready; running Phase 10 benchmark")
+            import os as _os  # noqa: PLC0415
+            mlx_name = _os.path.abspath(base_model_path)
+            subprocess.run(
+                [_sys.executable, "-m", "neural.benchmarks.run_benchmark",
+                 "--config", cfg_path,
+                 "--mlx-model-name", mlx_name,
+                 "--out", out_path],
+                check=True,
+            )
+        finally:
+            logger.info("Terminating mlx_lm.server (pid=%d)", server.pid)
+            server.terminate()
+            try:
+                server.wait(timeout=20.0)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=5.0)
         return json.loads(Path(out_path).read_text())
 
     dual = run_dual_regression(

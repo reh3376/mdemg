@@ -550,6 +550,18 @@ def main() -> int:  # pragma: no cover — exercised by T-subset smoke + full ru
         benchmark_config=Path(args.benchmark_config),
     )
 
+    # LoRA hyperparameters from rl_phase11.yaml §training.lora — sprint plan
+    # mandates rank=32, alpha=64, dropout=0.05, target_modules=[q,k,v,o]_proj.
+    # target_modules in YAML are bare suffixes (e.g. "q_proj"); mlx_lm wants
+    # layer-local paths (e.g. "self_attn.q_proj").
+    lora_yaml = (yaml_cfg.get("training") or {}).get("lora") or {}
+    raw_targets = lora_yaml.get("target_modules") or [
+        "q_proj", "k_proj", "v_proj", "o_proj"
+    ]
+    lora_targets = [
+        m if "." in m else f"self_attn.{m}" for m in raw_targets
+    ]
+
     adapter = MLXGRPOAdapter(
         base_model_path=cfg.base_model_path,
         adapter_path=None,  # Phase 5 base is the merged dense adapter
@@ -567,6 +579,10 @@ def main() -> int:  # pragma: no cover — exercised by T-subset smoke + full ru
         eps=yaml_cfg["training"]["optim"].get("eps", 1e-8),
         generation_kwargs=generation_kwargs,
         eval_cmd=eval_cmd,
+        lora_rank=int(lora_yaml.get("rank", 32)),
+        lora_alpha=float(lora_yaml.get("alpha", 64)),
+        lora_dropout=float(lora_yaml.get("dropout", 0.05)),
+        lora_target_modules=lora_targets,
     )
     # Tokenizer chicken-and-egg: set after MLX load.
     site.prompt_provider.attach_tokenizer(adapter.tokenizer)
