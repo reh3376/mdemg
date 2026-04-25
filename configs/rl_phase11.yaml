@@ -93,7 +93,7 @@ training:
 # ── GRPO loss knobs ─────────────────────────────────────────────────────────
 grpo:
   clip_ratio: 0.2            # π_new/π_old clamp range (± clip_ratio)
-  kl_coef: 0.01              # KL(π_new ‖ π_ref) coefficient
+  kl_coef: 0.05              # KL(π_new ‖ π_ref) coefficient — bumped 0.01→0.05 for the 500-step retry to constrain policy drift on C-group classification tasks (consulting.classify, retrieval.query_classify regressed -8.7/-10.0pp at 100 steps with kl_coef=0.01)
   entropy_coef: 0.0          # entropy bonus (0 = off; stabilizes exploration)
   advantage_clip: [-5.0, 5.0]
 
