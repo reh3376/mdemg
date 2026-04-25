@@ -303,3 +303,103 @@ batch_size 1 first, monitor telemetry) remain in force.
   helper; existing tests still pass without modification (the accumulation
   pattern lands with a single sample batch in test fixtures).
 - This doc (Tier 2 section appended)
+
+---
+
+# Tier 3 — Gradient checkpointing on Qwen3 transformer layers
+
+**Status:** EXECUTED (2026-04-24); **closes the hardware gap. 25-step smoke PASSES, 100-step full compute pass now viable unsupervised.**
+
+## What changed
+
+`_apply_gradient_checkpointing(model)` monkey-patches `qwen3.Qwen3Model.__call__`
+to wrap each transformer-layer invocation with `mx.checkpoint`. Effect:
+intermediate activations are *recomputed* during backward rather than stored
+from the forward pass.
+
+### Why the patch is at the outer Qwen3Model (not at TransformerBlock)
+
+Direct class-level `TransformerBlock.__call__ = mx.checkpoint(original)` fails
+because `mx.checkpoint` tree-flattens its args — it treats the module instance
+passed as `self` as an array/tree-of-arrays, corrupting the call. Validated
+empirically in isolation: passing a plain callable with a module instance as
+the first arg reproduces the failure (`AttributeError: 'dict' object has no
+attribute 'linear'` — the module has been flattened to its param dict before
+the method body runs).
+
+Workaround: patch the outer `Qwen3Model.__call__` so the layer-loop is under
+our control, and for each iteration build a tiny closure `_layer_fwd(x, mask, cache, _l=layer)`
+that captures `layer` outside the checkpoint boundary. `mx.checkpoint` sees
+only tensor inputs; the module reference is a captured free variable, not an
+argument.
+
+### Control flow
+
+```python
+# Inside _checkpointed_qwen3_model_call(self, inputs, cache=None, input_embeddings=None):
+for layer, c in zip(self.layers, cache):
+    def _layer_fwd(x_in, m_in, c_in, _l=layer):
+        return _l(x_in, m_in, c_in)
+    h = mx.checkpoint(_layer_fwd)(h, mask, c)
+return self.norm(h)
+```
+
+Gradient flow: each `_layer_fwd` closure references `layer`'s params via
+attribute access inside the function body. During backward, `mx.checkpoint`
+re-runs `_layer_fwd` to produce activations, and the grad w.r.t. those params
+is captured correctly because `layer`'s params are part of the model's
+trainable-parameter tree that `nn.value_and_grad` differentiates against.
+
+### Idempotent + resilient
+
+- Flag `qwen3.Qwen3Model._mdemg_checkpointed = True` prevents double-patching
+  if a subsequent `MLXGRPOAdapter` is constructed in the same process.
+- If `mlx_lm.models.qwen3` is unavailable (non-Qwen3 model, test stub), the
+  function is a no-op with a warning. Keeps unit tests green without stub
+  changes.
+- If the loaded model's inner module is not a `Qwen3Model` instance (e.g.
+  model architecture changes in a future sprint), also no-op with warning.
+
+New constructor param: `gradient_checkpointing: bool = True`. Defaults on
+because the memory savings are decisive and the wall-clock cost is
+recovered many times over by avoiding swap thrashing on outlier batches.
+
+## Validation
+
+- 19/19 `test_mlx_adapter.py` green.
+- 106/106 full Phase 11 + DPO suite green.
+- **5-step smoke at batch_size=4**: peaks 9.21 - 14.45 GB per step (previous
+  Tier 2 peaks: 13.72 - 91.03 GB). Wall-clock actually *faster* than Tier 2
+  (1m 38s vs 2m 20s) because the step 5 compressed-swap thrashing is gone.
+- **25-step smoke at batch_size=4: COMPLETED.** All peaks in 9-19.6 GB
+  range. Swap unchanged throughout. Wall-clock 13m 30s. Checkpoint written.
+  Sidecar flushed. vs Tier 2's kill at step 16 from swap saturation.
+
+### Step-by-step peaks (Tier 2 vs Tier 3, batch_size=4)
+
+| Step | Tier 2 peak | Tier 3 peak | Tier 2 wall-gap | Tier 3 wall-gap |
+|------|---|---|---|---|
+| 1 | 19.0 GB | **9.8 GB** | — | — |
+| 5 | 91.0 GB | **14.4 GB** | 38s | 24s |
+| 10 | 88.5 GB | **14.3 GB** | 46s | 29s |
+| 11 | **237.2 GB** | **19.2 GB** | **5 min** | **30s** |
+| 14 | **238.1 GB** | **19.5 GB** | **8.5 min** | **2 min** |
+| 16 | — (killed) | **9.5 GB** | — | **9s** |
+| 25 | — | **10.9 GB** | — | **16s** |
+
+The monster-step problem is gone. Per-step wall-clock is uniformly low.
+
+## 100-step full compute pass: no longer operator-gated
+
+The preconditions from the Tier 1 Follow-up (fresh reboot, close GPU
+consumers, batch_size=1) are no longer necessary. Peak memory sits
+comfortably under 20 GB per step, well below 128 GB physical RAM with
+plenty of headroom for the tokenizer, reward fn subprocess, and any other
+user activity on the Mac.
+
+## Artifacts (delta over Tier 2 merge at c816e71)
+
+- `neural/training/rl/mlx_adapter.py` — `_apply_gradient_checkpointing`
+  module-level function (~70 LOC) + call site in `__init__` + new
+  `gradient_checkpointing: bool = True` constructor param
+- `docs/development/ft-lora/phase_11_mlx_adapter.md` — this section
