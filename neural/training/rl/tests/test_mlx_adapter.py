@@ -101,11 +101,23 @@ def stub_mlx(monkeypatch):
             self.state["last_grads"] = grads
     optim_stub.AdamW = _StubAdamW
 
-    # ── mlx.utils stub (tree_flatten) ──────────────────────────────────────
+    # ── mlx.utils stub (tree_flatten + tree_map) ────────────────────────────
     utils_stub = types.SimpleNamespace()
     utils_stub.tree_flatten = lambda params: list(
         (k, np.zeros(1)) for k in (params.keys() if isinstance(params, dict) else ["p0"])
     )
+
+    # Tier 2 per-sample accumulation uses tree_map(lambda a, b: a + b, ...) to
+    # accumulate per-sample grads. For stubs the grad tree is a flat dict
+    # {"fake_grad": np.zeros(1)}, so the single-level walk below suffices.
+    def _tree_map(fn, *trees):
+        if not trees:
+            return None
+        first = trees[0]
+        if isinstance(first, dict):
+            return {k: fn(*(tr[k] for tr in trees)) for k in first}
+        return fn(*trees)
+    utils_stub.tree_map = _tree_map
 
     # ── mlx_lm stub (load + generate) ──────────────────────────────────────
     mlx_lm_stub = types.SimpleNamespace()
