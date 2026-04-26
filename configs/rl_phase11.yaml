@@ -119,8 +119,11 @@ reward_sampler:
   source_run_ids: []
   # How many rows to sample per (task, sampling_group) per training step.
   samples_per_task_per_step: 8
-  # Sampling strategy: random | weighted_by_inverse_count | stratified_by_group.
-  strategy: stratified_by_group
+  # Sampling strategy: random | weighted_by_inverse_count | stratified_by_group | stratified_by_task.
+  # stratified_by_task added 2026-04-25 — corrects under-representation of
+  # low-row-count tasks (e.g. retrieval.query_classify with 5 rows vs other
+  # C-group tasks with 10) that drove the -20pp regression at kl_coef=0.05.
+  strategy: stratified_by_task
 
 # ── Rollout (MLX inference) ─────────────────────────────────────────────────
 rollout:

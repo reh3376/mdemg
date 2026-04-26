@@ -158,3 +158,56 @@ def test_to_diag_shape():
     sample = RewardSampler(rows).sample_batch(1)[0]
     diag = sample.to_diag()
     assert set(diag) == {"task_id", "run_idx", "sampling_group", "scalar_reward"}
+
+
+def test_stratified_by_task_equalizes_within_group():
+    """stratified_by_task: draws are uniform across TASKS in a group,
+    independent of how many rows each task has. Validates the fix for the
+    Phase 11 retrieval.query_classify regression — small-row-count tasks
+    were under-represented under stratified_by_group."""
+    import collections
+    # C-group: task A has 10 rows, task B has 5 rows. Under
+    # stratified_by_group, A is drawn 2x as often as B. Under
+    # stratified_by_task, both should be drawn ~equally.
+    rows = []
+    for i in range(10):
+        rows.append(_mk_row("c.big", i, "C", {"acc": 0.5}))
+    for i in range(5):
+        rows.append(_mk_row("c.small", i, "C", {"acc": 0.5}))
+    s = RewardSampler(rows, strategy="stratified_by_task", rng_seed=0)
+
+    # Draw a large batch so the law-of-large-numbers gives a stable ratio.
+    batch = s.sample_batch(2000)
+    counts = collections.Counter(x.task_id for x in batch)
+    big = counts["c.big"]
+    small = counts["c.small"]
+    # Expect roughly equal: ratio should be near 1.0 ± 0.1
+    ratio = big / small
+    assert 0.85 < ratio < 1.15, f"big/small={ratio:.3f} (counts: big={big} small={small})"
+
+
+def test_stratified_by_group_undersamples_low_row_tasks():
+    """Confirms the bias that motivates stratified_by_task. Under
+    stratified_by_group, the 10-row task should be drawn ~2x as often as
+    the 5-row task (linear with row count)."""
+    import collections
+    rows = []
+    for i in range(10):
+        rows.append(_mk_row("c.big", i, "C", {"acc": 0.5}))
+    for i in range(5):
+        rows.append(_mk_row("c.small", i, "C", {"acc": 0.5}))
+    s = RewardSampler(rows, strategy="stratified_by_group", rng_seed=0)
+    batch = s.sample_batch(2000)
+    counts = collections.Counter(x.task_id for x in batch)
+    ratio = counts["c.big"] / counts["c.small"]
+    # Should be close to 10/5 = 2.0 (the bias we're fixing)
+    assert 1.7 < ratio < 2.3, f"expected ~2.0; got {ratio:.3f}"
+
+
+def test_stratified_by_task_total_matches_n():
+    rows = [_mk_row(f"t{i//3}.x", i, "T", {"x": 1.0}) for i in range(15)]
+    rows += [_mk_row(f"c{i//2}.x", i, "C", {"x": 1.0}) for i in range(10)]
+    s = RewardSampler(rows, strategy="stratified_by_task", rng_seed=42)
+    for n in (1, 8, 32, 100):
+        batch = s.sample_batch(n)
+        assert len(batch) == n

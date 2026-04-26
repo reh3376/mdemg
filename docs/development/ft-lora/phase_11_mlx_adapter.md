@@ -569,3 +569,100 @@ Implementation queued in `neural/training/rl/reward_sampler.py`: add an `oversam
 - `training_data/eval/rl_full/lora_500_kl05.sql` — TSDB sidecar with 500 step rows (gitignored)
 - `training_data/eval/phase11_regression_report_kl05.json` — full per-task scores (gitignored)
 - This doc (Tuned retry section appended)
+
+---
+
+# stratified_by_task retry (kl=0.05 + balanced within-group sampling)
+
+**Status:** EXECUTED (2026-04-25 → 2026-04-26). Gate verdict: **FAIL**, but with the most informative failure pattern of the three runs — diagnoses the bottleneck as **LoRA capacity, not hyperparameter tuning**.
+
+## Hypothesis tested
+
+The kl=0.05/500 run halved the consulting.* regressions but doubled `retrieval.query_classify`'s regression to -20pp. That task has only 5 rows in the reward source vs ~10 for other C-group tasks; the existing `stratified_by_group` strategy distributed draws across T/C/J groups proportionally, then sampled uniformly *within* a group — so 5-row tasks got drawn at half the rate of 10-row peers. Hypothesis: equalizing within-group draws by task (not by row) will let the policy stabilize on retrieval.query_classify without losing the consulting.* gains.
+
+## New strategy: `stratified_by_task`
+
+Added to `neural/training/rl/reward_sampler.py`:
+- Same group-level distribution as `stratified_by_group` (proportional to group size)
+- *Within* each group, uniform across distinct `task_id`s, then uniform across rows of the chosen task
+- Net: every task in a group has equal expected draws regardless of its row count
+
+3 new unit tests in `test_reward_sampler.py`:
+- `test_stratified_by_task_equalizes_within_group`: 10-row task drawn ~equally to 5-row task in same group (ratio 0.85-1.15 over 2000 draws)
+- `test_stratified_by_group_undersamples_low_row_tasks`: documents the bias being fixed (10/5 ≈ 2.0 ratio for the existing strategy)
+- `test_stratified_by_task_total_matches_n`: batch totals match across n=1, 8, 32, 100
+
+109/109 Phase 11 + DPO suite green (was 106).
+
+## Run
+
+| | |
+|---|---|
+| Wall clock | 7h 13m (2026-04-25 17:46 → 2026-04-26 00:59) |
+| Steps | 500/500 |
+| Config delta vs kl=0.05/500 | `strategy: stratified_by_group → stratified_by_task` |
+| Per-step memory | peak 10-14 GB; cache 0.00 GB every step; active 8.98 GB flat |
+| Pace | 51.7 s/step (vs 44 s/step for stratified_by_group) — slower because per-batch cross-task contention is higher |
+| Adapter SHA | `bf3e54ba2bda0f2a56e8e8ce6e01ce162cad06356d8342aefbf72b1c9bc07832` |
+| Errors | None |
+
+## Loss trajectory (50-step rolling means)
+
+| Window | strat=task | strat=group (kl=0.05/500 ref) | Δ |
+|---|---|---|---|
+| 1-50 | 4.41 | 4.14 | +0.27 |
+| 51-100 | 4.83 | 3.98 | **+0.85** ← peak divergence |
+| 101-150 | 4.39 | 4.26 | +0.12 |
+| 151-200 | 4.26 | 3.83 | +0.43 |
+| 201-250 | 4.55 | 4.10 | +0.45 |
+| 251-300 | 4.16 | 4.30 | **−0.14** ← strat=task starts winning |
+| 301-350 | 3.85 | 4.05 | **−0.20** |
+| 351-400 | 3.73 | 3.74 | −0.01 |
+| 401-450 | 4.37 | 4.24 | +0.14 |
+| 451-500 | 4.35 | **3.40** | **+0.95** ← strat=group converged, strat=task did not |
+
+The strat=task run paid an early adaptation cost (windows 26-100), found a competitive equilibrium mid-run (windows 251-400), but didn't continue down in the back third the way strat=group did. That last divergence is the fingerprint of the capacity bottleneck.
+
+## Regression — three-run side-by-side
+
+| Run | 5a aggregate | Tasks regressing >2pp | Net change |
+|---|---|---|---|
+| Phase 5 baseline | 0.8338 | — | — |
+| kl=0.01 / 100 | 0.8392 | 3 | +0.54pp aggregate |
+| kl=0.05 / 500 | 0.8415 | 3 | +0.77pp |
+| **kl=0.05 + strat / 500** | **0.8421** | **4** | **+0.83pp** |
+
+**Per-task delta vs baseline (changed tasks only):**
+
+| Task | kl=0.01/100 | kl=0.05/500 | **kl=0.05+strat/500** | Read |
+|---|---|---|---|---|
+| consulting.classify | -8.67pp | -4.33pp | **0.00pp** ✅ | **fully recovered** |
+| retrieval.query_classify | -10.00pp | -20.00pp | **-10.00pp** | halved (back to baseline level) |
+| consulting.synthesis | -7.35pp | -5.31pp | -5.04pp | gradually recovering |
+| ape.reflect | -1.00pp | +1.00pp | **-5.67pp** ❌ | **new regression** |
+| jiminy.evaluate | 0.00pp | -2.00pp | **-4.00pp** ❌ | progressively worse |
+| hidden.reclassify | +50.00pp | +50.00pp | +50.00pp ✅ | same big win all three runs |
+
+5b (byte-stable adapter delta): 0.0038 → 0.0057 → **0.0180**. Increasing variance suggests the policy is doing more nuanced/sensitive things now; the 0.005 threshold is too tight relative to per-pass temperature-sampling noise on the T-group.
+
+## Diagnosis confirmed: LoRA capacity is the bottleneck
+
+Three runs at three different (kl_coef, sampler) settings all stalled in the **0.8392 - 0.8421 aggregate band**. They differ in *which* tasks regress, not in *how many* or *by how much in total*. Each tuning move:
+- Helped the targeted failure mode (consulting.classify recovered, then retrieval.query_classify halved)
+- But knocked over previously-passing tasks because LoRA capacity was already saturated
+
+Current LoRA: 4 attention modules × 40 layers × 2 (A+B) × rank 32 = **320 tensors, 41.9M params**. That's ~0.3% of Qwen3-14B's parameters. For a 16-task multi-objective RL adaptation, that's tight.
+
+## Next: Option C — add MLP LoRA targets (capacity expansion)
+
+Plan documented inline in this section's commit; will land as a separate commit after this one. Adding `mlp.gate_proj`, `mlp.up_proj`, `mlp.down_proj` brings the count to **7 modules × 40 layers × 2 × 32 = 560 tensors, ~120M params (~3× capacity)**. Same kl_coef, same sampler, same 500-step budget — purely a capacity intervention to test whether the failure pattern is genuinely capacity-bound.
+
+## Artifacts (delta over kl=0.05 commit at 9975255)
+
+- `neural/training/rl/reward_sampler.py` — `stratified_by_task` strategy (~30 LOC)
+- `neural/training/rl/tests/test_reward_sampler.py` — 3 new tests
+- `configs/rl_phase11.yaml` — `strategy: stratified_by_group → stratified_by_task` with rationale comment
+- `.local-models/qwen3-14b-mdemg-v1-rl-sandbox/adapters.safetensors` — refreshed (sha256 `bf3e54ba...c07832`)
+- `training_data/eval/rl_full/lora_500_kl05_strat.sql` — TSDB sidecar (gitignored)
+- `training_data/eval/phase11_regression_report_strat.json` — full per-task scores (gitignored)
+- This doc (stratified_by_task retry section appended)
