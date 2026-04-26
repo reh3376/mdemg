@@ -16,6 +16,10 @@ Key design points:
         random                    — uniform over matching rows
         weighted_by_inverse_count — upweight rare tasks
         stratified_by_group       — equal count from each T/C/J group
+        stratified_by_task        — equal count per group, then equal weight
+                                    per *task* within group (corrects for
+                                    tasks with few rows being under-drawn
+                                    under stratified_by_group)
 """
 from __future__ import annotations
 
@@ -29,7 +33,10 @@ except ImportError:  # pragma: no cover
 
 
 SamplingStrategy = Literal[
-    "random", "weighted_by_inverse_count", "stratified_by_group"
+    "random",
+    "weighted_by_inverse_count",
+    "stratified_by_group",
+    "stratified_by_task",
 ]
 
 
@@ -234,6 +241,36 @@ class RewardSampler:
             picked = []
             for g in groups:
                 picked.extend(self._rng.choices(self._by_group[g], k=counts[g]))
+        elif self._strategy == "stratified_by_task":
+            # Two-level uniform draw: distribute n across groups by group
+            # size (same as stratified_by_group), then within each group
+            # pick a task uniformly across distinct task_ids and a row
+            # uniformly within that task. This makes every TASK in a group
+            # have equal expected draws, so a 5-row task is sampled at the
+            # same rate as a 10-row task — the under-representation that
+            # surfaced as the retrieval.query_classify regression at
+            # kl_coef=0.05 (-20pp). See Phase 11 doc for analysis.
+            groups = list(self._by_group.keys())
+            counts = {g: max(1, int(round(n * len(self._by_group[g]) / len(self._rows))))
+                      for g in groups}
+            total = sum(counts.values())
+            while total != n:
+                if total < n:
+                    g = max(groups, key=lambda g: len(self._by_group[g]))
+                    counts[g] += 1; total += 1
+                else:
+                    g = min(groups, key=lambda g: counts[g] if counts[g] > 1 else 10**9)
+                    counts[g] -= 1; total -= 1
+            # Pre-compute per-group task lists for fast within-group draw.
+            tasks_by_group: dict[str, list[str]] = {}
+            for g in groups:
+                tasks_by_group[g] = sorted({self._rows[i]["task_id"] for i in self._by_group[g]})
+            picked = []
+            for g in groups:
+                tlist = tasks_by_group[g]
+                for _ in range(counts[g]):
+                    chosen_task = self._rng.choice(tlist)
+                    picked.append(self._rng.choice(self._by_task[chosen_task]))
         else:  # pragma: no cover — validated at init
             raise ValueError(f"unknown strategy: {self._strategy}")
 
