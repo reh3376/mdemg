@@ -73,10 +73,21 @@ training:
     alpha: 64
     dropout: 0.05
     target_modules:
+      # Attention (bare names auto-prefixed to self_attn.* by trainer.main())
       - q_proj
       - k_proj
       - v_proj
       - o_proj
+      # MLP (full paths — added 2026-04-26 for Option C capacity expansion).
+      # Three runs with attention-only LoRA stalled at aggregate 0.84;
+      # the failure pattern (always 3-4 task regressions, just different
+      # tasks each tuning move) is the capacity-bound signature, not a
+      # hyperparameter issue. Adding MLP triples LoRA params (~42M→120M)
+      # and gives the policy degrees of freedom for both attention-pattern
+      # AND MLP-routing requirements simultaneously.
+      - mlp.gate_proj
+      - mlp.up_proj
+      - mlp.down_proj
 
   # Optimizer.
   optim:

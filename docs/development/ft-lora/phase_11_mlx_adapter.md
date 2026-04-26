@@ -666,3 +666,96 @@ Plan documented inline in this section's commit; will land as a separate commit 
 - `training_data/eval/rl_full/lora_500_kl05_strat.sql` — TSDB sidecar (gitignored)
 - `training_data/eval/phase11_regression_report_strat.json` — full per-task scores (gitignored)
 - This doc (stratified_by_task retry section appended)
+
+---
+
+# Critical bugfix — gradient checkpointing was zeroing all LoRA gradients (silent no-op for 4 prior runs)
+
+**Status:** EXECUTED (2026-04-26). Bug discovered during the Option C 25-step health check; root cause + fix verified end-to-end.
+
+## Disclosure
+
+**The four prior compute runs produced LoRA adapters with `lora_b = 0` everywhere** — i.e., functionally equivalent to the unmodified Phase 5 base model:
+
+- kl=0.01 / 100 steps
+- kl=0.05 / 500 steps
+- kl=0.05 + stratified_by_task / 500 steps
+- Option C smoke / 25 steps (with broken checkpoint)
+
+The "regression" results we'd been chasing — aggregate 0.8338 → 0.8392 → 0.8415 → 0.8421, per-task movements like `consulting.classify -8.67pp → 0pp` and `retrieval.query_classify -10pp → -20pp → -10pp` — **were Phase 10 benchmark sampling noise**, not policy improvements. Gate 5b's growing delta (0.0038 → 0.0057 → 0.0180) was the noise floor showing through.
+
+The diagnosis we drew from the per-task pattern (capacity-bound, 3-4 task regressions rearranged across runs) was wrong. We were observing pure stochastic variance from temperature sampling on a fixed, unchanged model.
+
+## Root cause
+
+The previous `_apply_gradient_checkpointing` (commit `3c99554`) wrapped each transformer-layer call in a closure that captured the layer reference outside the checkpoint boundary:
+
+```python
+# BROKEN PATTERN (removed in this commit):
+for layer, c in zip(self.layers, cache):
+    def _layer_fwd(x_in, m_in, c_in, _l=layer):  # ← layer captured via closure
+        return _l(x_in, m_in, c_in)
+    h = mx.checkpoint(_layer_fwd)(h, mask, c)
+```
+
+`mx.checkpoint` only computes gradients **with respect to its explicit input arguments** (`x_in`, `m_in`, `c_in` — all tensors). Variables captured via closure (`_l = layer`) are treated as **constants** during the backward pass. So the layer's parameters (`lora_a`, `lora_b`) never received gradient updates.
+
+The Tier 3 commit's claimed memory savings were real (`mx.checkpoint` was doing recomputation) — but training was a no-op. Empirical proof: a minimal repro shows `nn.value_and_grad` returns `lora_b grad abs_max = 0.0` with the broken checkpoint applied, vs `0.0077` without it.
+
+## Fix — adopt the proven `mlx_lm.tuner.trainer.grad_checkpoint` pattern
+
+`mlx_lm==0.31.2` ships a working pattern at `mlx_lm/tuner/trainer.py:25-38`:
+
+```python
+def grad_checkpoint(layer):
+    fn = type(layer).__call__
+    def checkpointed_fn(model, *args, **kwargs):
+        def inner_fn(params, *call_args, **call_kwargs):
+            model.update(params)               # re-attach grad-tracked params
+            return fn(model, *call_args, **call_kwargs)
+        return mx.checkpoint(inner_fn)(
+            model.trainable_parameters(),       # params as explicit input
+            *args, **kwargs,
+        )
+    type(layer).__call__ = checkpointed_fn
+```
+
+The key insight: pass `model.trainable_parameters()` as an **explicit input** to the checkpointed function. `mx.checkpoint` will then track gradients w.r.t. those params correctly. Inside `inner_fn`, `self.update(params)` re-attaches the grad-tracked params to the layer instance so `fn(self, ...)` (the original `__call__`) uses them. The layer instance itself is captured via closure (no tree-flattening problem), but its *params* are passed explicitly (gradient flow restored).
+
+Adopted verbatim into `_apply_gradient_checkpointing` (now patches `qwen3.TransformerBlock.__call__` rather than `Qwen3Model.__call__` — granularity matches the canonical pattern).
+
+## Verification
+
+End-to-end confirmation:
+
+```
+=== checkpointing OFF (control) ===
+OFF: grad lora_b abs_max = 7.71e-3
+OFF: after-step lora_b abs_max = 3.16e-3
+
+=== checkpointing ON (FIXED) ===
+ON:  grad lora_b abs_max = 8.53e-3
+ON:  after-step lora_b abs_max = 3.16e-3
+```
+
+5-step smoke through the trainer's full path (`MLXGRPOAdapter.__init__` with `gradient_checkpointing=True`) writes a checkpoint with `lora_b rms ~= 2e-4` (was always 0 before). 25-step health check shows continued growth to `rms ~= 3.5e-4` — real cumulative training.
+
+19/19 `test_mlx_adapter.py` tests still green; 109/109 full Phase 11 + DPO suite green.
+
+## What this means for the previously-completed PRs
+
+`#352`, `#354`, `#356` (and the merged commits behind them) are still **correct as code changes** — Option A, Tier 1, Tier 2, the LoRA install bugs, the regression harness, the stratified_by_task strategy. None of those are invalidated. What's invalidated is the **claim that those changes were demonstrated end-to-end via real LoRA training** — they weren't, because the broken checkpoint silently nullified every backward pass that touched the trainable params.
+
+The implementation is sound. The validation evidence we had wasn't.
+
+## Next: redo Option C with working gradient checkpointing
+
+500-step run with kl_coef=0.05 + stratified_by_task + 7 LoRA target modules + the **fixed** gradient checkpointing. Wall-clock projection: **~12.5 hr** (90 s/step × 500), ~2× the broken-checkpoint runs because gradient flow + recomputation are now actually doing work. Memory peaks land around 22-35 GB on outlier batches, comfortably inside 128 GB physical RAM.
+
+This will be the **first real Phase 11 LoRA training** in the repo's history. Regression results will reflect actual policy changes for the first time.
+
+## Artifacts (delta over PR #356)
+
+- `neural/training/rl/mlx_adapter.py` — `_apply_gradient_checkpointing` rewritten to mlx_lm's proven pattern (~70 LOC, granularity moved from `Qwen3Model` to `TransformerBlock`)
+- `configs/rl_phase11.yaml` — `target_modules` extended with `mlp.gate_proj`, `mlp.up_proj`, `mlp.down_proj` (Option C capacity expansion: 4 → 7 modules, 320 → 560 LoRA tensors, 42M → 128M params)
+- This doc (Critical bugfix section appended)
