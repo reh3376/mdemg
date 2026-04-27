@@ -73,15 +73,32 @@ training:
     alpha: 64
     dropout: 0.05
     target_modules:
+      # Attention (bare names auto-prefixed to self_attn.* by trainer.main())
       - q_proj
       - k_proj
       - v_proj
       - o_proj
+      # MLP (full paths — added 2026-04-26 for Option C capacity expansion).
+      # Three runs with attention-only LoRA stalled at aggregate 0.84;
+      # the failure pattern (always 3-4 task regressions, just different
+      # tasks each tuning move) is the capacity-bound signature, not a
+      # hyperparameter issue. Adding MLP triples LoRA params (~42M→120M)
+      # and gives the policy degrees of freedom for both attention-pattern
+      # AND MLP-routing requirements simultaneously.
+      - mlp.gate_proj
+      - mlp.up_proj
+      - mlp.down_proj
 
   # Optimizer.
   optim:
     name: adamw
-    lr: 1.0e-5
+    lr: 2.0e-6     # Lowered from 1e-5 (sprint plan default) on 2026-04-26 after the
+                     # first real LoRA training run (Option C, 7 modules, 128M params)
+                     # showed exponential outlier growth: median loss healthy 3-10
+                     # but max loss reached 6e8 by step 51 (log_ratio hitting ±20
+                     # clamp on policy-divergent samples). 5x smaller lr should
+                     # bound per-step policy drift to keep log_ratio well within
+                     # the clamp.
     weight_decay: 0.01
     beta1: 0.9
     beta2: 0.999

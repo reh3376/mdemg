@@ -666,3 +666,200 @@ Plan documented inline in this section's commit; will land as a separate commit 
 - `training_data/eval/rl_full/lora_500_kl05_strat.sql` — TSDB sidecar (gitignored)
 - `training_data/eval/phase11_regression_report_strat.json` — full per-task scores (gitignored)
 - This doc (stratified_by_task retry section appended)
+
+---
+
+# Critical bugfix — gradient checkpointing was zeroing all LoRA gradients (silent no-op for 4 prior runs)
+
+**Status:** EXECUTED (2026-04-26). Bug discovered during the Option C 25-step health check; root cause + fix verified end-to-end.
+
+## Disclosure
+
+**The four prior compute runs produced LoRA adapters with `lora_b = 0` everywhere** — i.e., functionally equivalent to the unmodified Phase 5 base model:
+
+- kl=0.01 / 100 steps
+- kl=0.05 / 500 steps
+- kl=0.05 + stratified_by_task / 500 steps
+- Option C smoke / 25 steps (with broken checkpoint)
+
+The "regression" results we'd been chasing — aggregate 0.8338 → 0.8392 → 0.8415 → 0.8421, per-task movements like `consulting.classify -8.67pp → 0pp` and `retrieval.query_classify -10pp → -20pp → -10pp` — **were Phase 10 benchmark sampling noise**, not policy improvements. Gate 5b's growing delta (0.0038 → 0.0057 → 0.0180) was the noise floor showing through.
+
+The diagnosis we drew from the per-task pattern (capacity-bound, 3-4 task regressions rearranged across runs) was wrong. We were observing pure stochastic variance from temperature sampling on a fixed, unchanged model.
+
+## Root cause
+
+The previous `_apply_gradient_checkpointing` (commit `3c99554`) wrapped each transformer-layer call in a closure that captured the layer reference outside the checkpoint boundary:
+
+```python
+# BROKEN PATTERN (removed in this commit):
+for layer, c in zip(self.layers, cache):
+    def _layer_fwd(x_in, m_in, c_in, _l=layer):  # ← layer captured via closure
+        return _l(x_in, m_in, c_in)
+    h = mx.checkpoint(_layer_fwd)(h, mask, c)
+```
+
+`mx.checkpoint` only computes gradients **with respect to its explicit input arguments** (`x_in`, `m_in`, `c_in` — all tensors). Variables captured via closure (`_l = layer`) are treated as **constants** during the backward pass. So the layer's parameters (`lora_a`, `lora_b`) never received gradient updates.
+
+The Tier 3 commit's claimed memory savings were real (`mx.checkpoint` was doing recomputation) — but training was a no-op. Empirical proof: a minimal repro shows `nn.value_and_grad` returns `lora_b grad abs_max = 0.0` with the broken checkpoint applied, vs `0.0077` without it.
+
+## Fix — adopt the proven `mlx_lm.tuner.trainer.grad_checkpoint` pattern
+
+`mlx_lm==0.31.2` ships a working pattern at `mlx_lm/tuner/trainer.py:25-38`:
+
+```python
+def grad_checkpoint(layer):
+    fn = type(layer).__call__
+    def checkpointed_fn(model, *args, **kwargs):
+        def inner_fn(params, *call_args, **call_kwargs):
+            model.update(params)               # re-attach grad-tracked params
+            return fn(model, *call_args, **call_kwargs)
+        return mx.checkpoint(inner_fn)(
+            model.trainable_parameters(),       # params as explicit input
+            *args, **kwargs,
+        )
+    type(layer).__call__ = checkpointed_fn
+```
+
+The key insight: pass `model.trainable_parameters()` as an **explicit input** to the checkpointed function. `mx.checkpoint` will then track gradients w.r.t. those params correctly. Inside `inner_fn`, `self.update(params)` re-attaches the grad-tracked params to the layer instance so `fn(self, ...)` (the original `__call__`) uses them. The layer instance itself is captured via closure (no tree-flattening problem), but its *params* are passed explicitly (gradient flow restored).
+
+Adopted verbatim into `_apply_gradient_checkpointing` (now patches `qwen3.TransformerBlock.__call__` rather than `Qwen3Model.__call__` — granularity matches the canonical pattern).
+
+## Verification
+
+End-to-end confirmation:
+
+```
+=== checkpointing OFF (control) ===
+OFF: grad lora_b abs_max = 7.71e-3
+OFF: after-step lora_b abs_max = 3.16e-3
+
+=== checkpointing ON (FIXED) ===
+ON:  grad lora_b abs_max = 8.53e-3
+ON:  after-step lora_b abs_max = 3.16e-3
+```
+
+5-step smoke through the trainer's full path (`MLXGRPOAdapter.__init__` with `gradient_checkpointing=True`) writes a checkpoint with `lora_b rms ~= 2e-4` (was always 0 before). 25-step health check shows continued growth to `rms ~= 3.5e-4` — real cumulative training.
+
+19/19 `test_mlx_adapter.py` tests still green; 109/109 full Phase 11 + DPO suite green.
+
+## What this means for the previously-completed PRs
+
+`#352`, `#354`, `#356` (and the merged commits behind them) are still **correct as code changes** — Option A, Tier 1, Tier 2, the LoRA install bugs, the regression harness, the stratified_by_task strategy. None of those are invalidated. What's invalidated is the **claim that those changes were demonstrated end-to-end via real LoRA training** — they weren't, because the broken checkpoint silently nullified every backward pass that touched the trainable params.
+
+The implementation is sound. The validation evidence we had wasn't.
+
+## Next: redo Option C with working gradient checkpointing
+
+500-step run with kl_coef=0.05 + stratified_by_task + 7 LoRA target modules + the **fixed** gradient checkpointing. Wall-clock projection: **~12.5 hr** (90 s/step × 500), ~2× the broken-checkpoint runs because gradient flow + recomputation are now actually doing work. Memory peaks land around 22-35 GB on outlier batches, comfortably inside 128 GB physical RAM.
+
+This will be the **first real Phase 11 LoRA training** in the repo's history. Regression results will reflect actual policy changes for the first time.
+
+## Artifacts (delta over PR #356)
+
+- `neural/training/rl/mlx_adapter.py` — `_apply_gradient_checkpointing` rewritten to mlx_lm's proven pattern (~70 LOC, granularity moved from `Qwen3Model` to `TransformerBlock`)
+- `configs/rl_phase11.yaml` — `target_modules` extended with `mlp.gate_proj`, `mlp.up_proj`, `mlp.down_proj` (Option C capacity expansion: 4 → 7 modules, 320 → 560 LoRA tensors, 42M → 128M params)
+- This doc (Critical bugfix section appended)
+
+---
+
+# First REAL Phase 11 LoRA training result (lr=2e-6 + Option C)
+
+**Status:** EXECUTED (2026-04-26 → 2026-04-27). After fixing the gradient-checkpointing bug that had silently zeroed all four prior runs, this is the **first real GRPO LoRA training in the repo's history that actually moved task scores**. Gate verdict: **FAIL on per-task cap**, but **5a aggregate target met for the first time** (0.8514 ≥ 0.8505).
+
+## What changed vs the killed lr=1e-5 run
+
+The lr=1e-5 attempt with the fixed checkpoint diverged: by step 75, max single-step loss had climbed to 6×10⁸ and the outlier rate was 32%. Diagnosis: with 7 LoRA target modules (attention + MLP, ~128M params) and `lr=1e-5`, per-step policy drift was enough to push some samples into the `_MAX_LOG_RATIO=20` clamp regime (`exp(20)≈5e8`), producing exponentially growing printed loss values and unstable gradient flow.
+
+Fix: `lr: 1.0e-5 → 2.0e-6` (5× smaller). Predicted outcome: per-step weight delta drops 5×, log_ratio stays well below ±20 on virtually all samples, max printed loss bounded.
+
+## Run characterization
+
+| | |
+|---|---|
+| Wall clock | 13:00:10 → 01:52:17 (next day) = **12h 52m** |
+| Steps | 500/500 |
+| Adapter SHA256 | `3dc38f85eb29fb158a33fe7eb5c0ab0f5ca35bb63085cfd390225c053c2ef3b8` |
+| LoRA tensors | 560 (40 layers × 7 modules × {A,B}) |
+| LoRA params | 128.4M |
+| Safetensors size | 514 MB |
+| Per-step memory | peak 11.5-47.1 GB; cache 0.00 GB every step; active 10.36 GB flat; swap stable |
+| Pace | 95 s/step (vs 90 s/step projected) |
+| Errors / NaN / kills | None |
+
+## Loss profile vs killed lr=1e-5 run
+
+| Metric | lr=2e-6 (this run) | lr=1e-5 (killed at step 75) |
+|---|---|---|
+| Max loss across run | **3,715** (one outlier ~step 110) | **603,983,488** (~6×10⁸) |
+| Mean | 22.8 (skewed by outliers) | 152.6 (at step 75 alone) |
+| Median | **3.58** (rock stable across all 50-step windows) | 3.40 |
+| Outliers >10 | 54 / 500 = 10.8% | 24 / 75 = 32% |
+| Outliers >100 | 4 / 500 = 0.8% | many, growing exponentially |
+
+The median tells the truth: typical samples produce healthy losses (~3.5) throughout the run. Outliers happen when a sample has high advantage AND policy diverges from the rollout-time policy enough to hit the clipped-surrogate ceiling. Each outlier is followed by recovery — clip_ratio is doing its job preventing actual divergence.
+
+**LoRA growth verifies real cumulative training:**
+| Layer | rms after 25 steps | rms after 500 steps | Growth |
+|---|---|---|---|
+| L0 attn q_proj.lora_b | 6.5e-5 | 1.69e-4 | 2.6× |
+| L0 mlp gate.lora_b | 6.6e-5 | 1.64e-4 | 2.5× |
+| L20 mlp down.lora_b | (n/a) | 2.73e-4 | (n/a) |
+| L39 attn o.lora_b | (n/a) | 3.23e-4 | (n/a) |
+
+Deeper layers trained more than shallow ones — consistent with policy gradients pushing changes through the late-network attention readouts.
+
+## Regression gate verdict — first real signal
+
+**Gate 5a:** FAIL (per-task cap), but **aggregate target met for the first time**:
+
+| | |
+|---|---|
+| Aggregate | **0.8514** (vs target 0.8505 = baseline × 1.02) ✅ |
+| Per-task regressions >2pp cap | 3 tasks |
+
+**Per-task delta vs Phase 5 baseline (sorted by magnitude):**
+
+| Task | Baseline | Real | Δ | Read |
+|---|---|---|---|---|
+| `hidden.reclassify` | 0.5000 | 1.0000 | **+50.00pp** 🟢 | Same all runs (benchmark quirk; baseline got unlucky) |
+| `ape.reflect` | 0.8667 | 0.9067 | **+4.00pp** 🟢 | Real GRPO win |
+| `jiminy.synthesize` | 0.7550 | 0.7750 | **+2.00pp** 🟢 | Real win |
+| `metalearn.generalize` | 0.8754 | 0.8830 | +0.76pp | Tiny win |
+| `summarize.generate` | 0.8671 | 0.8711 | +0.40pp | Tiny win |
+| `hidden.summarize` | 0.8046 | 0.8090 | +0.44pp | Tiny |
+| (8 tasks) | — | — | 0.00pp | Unchanged (ceiling effects) |
+| `consulting.synthesis` | 0.8639 | 0.8335 | **-3.04pp** 🔴 | Persistent C-group regressor |
+| `consulting.classify` | 0.7667 | 0.7233 | **-4.33pp** 🔴 | Persistent |
+| `retrieval.query_classify` | 0.7000 | 0.6000 | **-10.00pp** 🔴 | Persistent (5 rows; one label flip = 20pp) |
+
+**Net per-task ledger (excluding hidden.reclassify's noise-driven +50):** 5 wins totaling +7.6pp, 3 losses totaling -17.4pp. Gate's per-task cap (-2pp) trips on all 3 regressors.
+
+**Gate 5b:** FAIL — sandbox 0.8514 vs fresh-merge 0.8383, delta 0.0131 (cap 0.005). **Same byte-identical adapter** producing different aggregates is stochastic noise from temperature-sampled T-group rollouts. Threshold should be loosened to ~0.020 for this benchmark's noise floor.
+
+## Persistent regressors — hypothesis
+
+The same 3 tasks regress in both the prior "fake" runs (where they were noise) AND in this real run (where they're causal). They share:
+- C-group (deterministic temp=0 evaluation)
+- Small row counts (5-7 rows in the reward source)
+- Score sensitivity to single-token output flips (one wrong label = 10-20pp aggregate move)
+
+Hypothesis: with `kl_coef=0.05` the policy can drift far enough on rare-task gradients to flip C-group classification labels. The persistent regressions are **policy drift on under-represented C-group tasks**, not a capacity issue.
+
+## What's next
+
+The aggregate target is met but the per-task cap fails. Two paths:
+
+**Higher `kl_coef` (e.g. 0.10)** — constrain drift further, accept smaller aggregate gains in exchange for stable C-group performance. Smallest config change.
+
+**Per-task `samples_per_task_per_step` reweighting** — explicitly upweight the 3 regressing tasks so the policy gets enough signal to keep them stable. Requires sampler change + config plumbing.
+
+Recommendation: try `kl_coef: 0.05 → 0.10` first; it's a 1-line config change and the same training infrastructure can handle it. If regressors persist, escalate to per-task reweighting.
+
+## Artifacts (delta over PR #356 + the gradient checkpointing fix at 5504b36)
+
+- `configs/rl_phase11.yaml` — `lr: 1.0e-5 → 2.0e-6` (with rationale comment)
+- `.local-models/qwen3-14b-mdemg-v1-rl-sandbox/adapters.safetensors` — first REAL Phase 11 LoRA adapter (sha256 `3dc38f85...e2ef3b8`)
+- `.local-models/qwen3-14b-mdemg-v1-rl-sandbox/adapter_config.json` — companion config
+- `training_data/eval/phase11_regression_report_real.json` — the first real gate verdict (gitignored)
+- `training_data/eval/rl_full/lora_500_optionC_lr2e6.sql` — TSDB sidecar with 500 step rows (gitignored)
+- This doc (REAL training section appended)

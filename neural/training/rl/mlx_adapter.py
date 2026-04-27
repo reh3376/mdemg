@@ -241,33 +241,54 @@ def _apply_lora_layers(model: Any, lora_config: dict[str, Any]) -> None:
 
 
 def _apply_gradient_checkpointing(model: Any) -> None:
-    """Monkey-patch ``Qwen3Model.__call__`` so each transformer layer's
-    forward is wrapped in ``mx.checkpoint``.
+    """Apply gradient checkpointing to each Qwen3 transformer layer.
 
-    Why the patch is at the *outer* model rather than at ``TransformerBlock``:
-    ``mx.checkpoint`` tree-flattens its args (treating them as arrays/trees-
-    of-arrays). Installing ``mx.checkpoint(method)`` directly as a class
-    ``__call__`` therefore corrupts ``self`` — the module instance gets
-    flattened to its parameter dict before the method body runs. Instead,
-    we keep each layer's native ``__call__`` and build a per-layer closure
-    that captures the layer reference outside the checkpointed function
-    boundary, so ``mx.checkpoint`` only sees tensor inputs (``h``, ``mask``,
-    ``cache``). See inline note below.
+    Mirrors the proven pattern in ``mlx_lm.tuner.trainer.grad_checkpoint``
+    (mlx_lm==0.31.2). The trick — and why my previous implementation was
+    broken — is that ``mx.checkpoint`` only computes gradients with respect
+    to its **explicit input arguments**. Variables captured via closure are
+    treated as constants during backward, so closure-captured Module
+    references silently produce zero gradients for that module's parameters.
+
+    Pattern (verified against ``mlx_lm/tuner/trainer.py:25-38``):
+
+        def grad_checkpoint(layer):
+            fn = type(layer).__call__
+            def checkpointed_fn(model, *args, **kwargs):
+                def inner_fn(params, *args, **kwargs):
+                    model.update(params)               # ← re-attach grad-tracked params
+                    return fn(model, *args, **kwargs)
+                return mx.checkpoint(inner_fn)(
+                    model.trainable_parameters(),       # ← params as explicit input
+                    *args, **kwargs,
+                )
+            type(layer).__call__ = checkpointed_fn
+
+    Why this works: ``inner_fn`` takes ``params`` as its first input.
+    ``mx.checkpoint`` therefore tracks gradients w.r.t. params correctly.
+    Inside ``inner_fn``, ``model.update(params)`` re-attaches those
+    gradient-tracked params to the layer instance so the original forward
+    method (``fn(model, ...)``) uses them. The layer instance ``model``
+    itself is captured via closure (not an arg), avoiding ``mx.checkpoint``'s
+    tree-flattening of Module objects.
 
     Effect: backward-pass activation memory drops ~10x (activations for
-    each layer are *recomputed* during backward instead of stored from the
-    forward pass). Wall-clock cost: ~33% more per step because of the
-    recomputation. For Qwen3-14B × seq_len=3000 on 128GB unified memory,
-    this is what brings the 237GB outlier-step peak down to within
-    physical RAM.
+    each layer are recomputed during backward instead of stored from the
+    forward pass). Wall-clock cost: ~33% more per step.
 
-    Idempotent: if the Qwen3Model class is already patched by a previous
-    adapter in the same process, skip. Applies to the model's installed
-    class, so subsequent ``mlx_lm.load`` calls inherit the patch.
+    History: the prior implementation in this file (commit 3c99554) wrapped
+    each layer's forward in a closure inside ``Qwen3Model.__call__``, with
+    the layer captured via a default kwarg. That captured the layer
+    *outside* the checkpoint's gradient scope, so ``lora_a`` / ``lora_b``
+    grads were always zero — the four 100/500-step compute runs that ran
+    with that code produced adapters with ``lora_b == 0`` and were
+    effectively no-ops for LoRA training. Discovered 2026-04-26 during the
+    Option C 25-step health check. This rewrite adopts the upstream pattern
+    verbatim.
 
-    Resilient: if ``mlx_lm.models.qwen3`` is unavailable or the model is
-    not a Qwen3Model (e.g. a test stub), the function is a no-op with a
-    warning. Phase 12 work on other architectures can add per-arch branches.
+    Idempotent: a class-level flag prevents double-patching when multiple
+    adapters are constructed in one process. Resilient: no-op on test
+    stubs or non-Qwen3 architectures.
     """
     import mlx.core as mx  # noqa: PLC0415
     try:
@@ -279,12 +300,10 @@ def _apply_gradient_checkpointing(model: Any) -> None:
         )
         return
 
-    if getattr(qwen3.Qwen3Model, "_mdemg_checkpointed", False):
-        logger.info("gradient checkpointing: Qwen3Model already patched; skipping")
+    if getattr(qwen3.TransformerBlock, "_mdemg_checkpointed", False):
+        logger.info("gradient checkpointing: TransformerBlock already patched; skipping")
         return
 
-    # Verify the loaded model's inner model is a Qwen3Model instance. If
-    # not (e.g. test stub), bail cleanly.
     inner = getattr(model, "model", None)
     if inner is None or not isinstance(inner, qwen3.Qwen3Model):
         logger.warning(
@@ -292,38 +311,25 @@ def _apply_gradient_checkpointing(model: Any) -> None:
             "(type=%s); skipping", type(inner).__name__
         )
         return
+    if not inner.layers or not isinstance(inner.layers[0], qwen3.TransformerBlock):
+        logger.warning(
+            "gradient checkpointing: model.layers[0] is not a TransformerBlock; skipping"
+        )
+        return
 
-    _original_qwen3_model_call = qwen3.Qwen3Model.__call__
+    layer_cls = qwen3.TransformerBlock
+    fn = layer_cls.__call__
 
-    def _checkpointed_qwen3_model_call(
-        self,
-        inputs: Any,
-        cache: Any = None,
-        input_embeddings: Any = None,
-    ) -> Any:
-        # Mirrors the upstream Qwen3Model.__call__ flow (inlined so we can
-        # wrap each layer invocation). Kept in sync with mlx_lm==0.31.2.
-        if input_embeddings is not None:
-            h = input_embeddings
-        else:
-            h = self.embed_tokens(inputs)
-        if cache is None:
-            cache = [None] * len(self.layers)
-        mask = qwen3.create_attention_mask(h, cache[0])
-        for layer, c in zip(self.layers, cache):
-            # Closure captures `layer` outside the checkpoint boundary so
-            # mx.checkpoint only tree-flattens tensor args (h, mask, c=None
-            # during training). Creating the checkpointed fn per iteration
-            # is intentional — mx.checkpoint is cheap to construct; each
-            # call produces an independent graph node whose intermediate
-            # activations are recomputed during the backward pass.
-            def _layer_fwd(x_in, m_in, c_in, _l=layer):
-                return _l(x_in, m_in, c_in)
-            h = mx.checkpoint(_layer_fwd)(h, mask, c)
-        return self.norm(h)
+    def checkpointed_fn(self, *args, **kwargs):  # noqa: ANN001
+        def inner_fn(params, *call_args, **call_kwargs):
+            self.update(params)
+            return fn(self, *call_args, **call_kwargs)
+        return mx.checkpoint(inner_fn)(
+            self.trainable_parameters(), *args, **kwargs,
+        )
 
-    qwen3.Qwen3Model.__call__ = _checkpointed_qwen3_model_call
-    qwen3.Qwen3Model._mdemg_checkpointed = True
+    layer_cls.__call__ = checkpointed_fn
+    layer_cls._mdemg_checkpointed = True
 
 
 class MLXGRPOAdapter:
