@@ -110,7 +110,7 @@ training:
 # ── GRPO loss knobs ─────────────────────────────────────────────────────────
 grpo:
   clip_ratio: 0.2            # π_new/π_old clamp range (± clip_ratio)
-  kl_coef: 0.05              # KL(π_new ‖ π_ref) coefficient — bumped 0.01→0.05 for the 500-step retry to constrain policy drift on C-group classification tasks (consulting.classify, retrieval.query_classify regressed -8.7/-10.0pp at 100 steps with kl_coef=0.01)
+  kl_coef: 0.10              # KL(π_new ‖ π_ref) coefficient — bumped 0.05→0.10 on 2026-04-27 for next iteration. The first REAL LoRA training (lr=2e-6, kl=0.05) hit aggregate target 0.8514 ≥ 0.8505 but failed the per-task cap on 3 C-group classifiers (consulting.classify -4.33pp, consulting.synthesis -3.04pp, retrieval.query_classify -10.00pp). Hypothesis: with kl=0.05 the policy still drifts enough on under-represented small-row C-group samples to flip classification labels (deterministic temp=0 scoring). Higher kl pulls the policy harder toward the SFT reference, accepting smaller aggregate gains for fewer per-task regressions.
   entropy_coef: 0.0          # entropy bonus (0 = off; stabilizes exploration)
   advantage_clip: [-5.0, 5.0]
 
