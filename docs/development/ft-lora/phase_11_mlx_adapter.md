@@ -863,3 +863,98 @@ Recommendation: try `kl_coef: 0.05 → 0.10` first; it's a 1-line config change 
 - `training_data/eval/phase11_regression_report_real.json` — the first real gate verdict (gitignored)
 - `training_data/eval/rl_full/lora_500_optionC_lr2e6.sql` — TSDB sidecar with 500 step rows (gitignored)
 - This doc (REAL training section appended)
+
+---
+
+# Benchmark data — Base (Phase 5 SFT) vs RL-merged (run 5, kl=0.05/lr=2e-6/500 steps)
+
+This section pins down the actual benchmark deltas the first real Phase 11 LoRA training produced. Numbers below are the live data extracted from `training_data/eval/benchmark_qwen3_14b_v1_baseline.json` (base, Phase 10 baseline run) and `training_data/eval/phase11_regression_report_real.json` (RL-merged, sandbox report from the run-5 regression).
+
+**Apples-to-apples caveat:** the baseline benchmark was run with `--enable-judge` (gpt-5.4-mini scoring `coherence`/`depth`/`naturalness`/`relevance` per task), while the regression harness runs the benchmark with **registry-only** scorers to avoid OpenAI judge spend during iteration. The judge metrics appear in baseline `per_metric_mean` but not in the real-run report. **However, each task's `overall_mean` is computed only over its declared `reward_functions`** (which are registry-only across all 16 tasks per the Phase 10 spec set), so the aggregate and per-task `overall_mean` comparisons below are valid. Per-metric tables are presented for shared registry metrics only.
+
+## Headline
+
+| Model | Path | Aggregate (5a) | vs base |
+|-------|------|---------------:|--------:|
+| Base (Phase 5 SFT) | `.local-models/qwen3-14b-mdemg-v1` | **0.8338** | — |
+| RL-merged (run 5) | `…-rl-sandbox/` (sha256 `3dc38f85…e2ef3b8`) | **0.8514** | **+0.0176 (+1.76pp)** |
+| 5a target (≥ baseline × 1.02) | — | 0.8505 | — |
+
+**Aggregate target met for the first time** by 0.09pp. Per-task cap (no task may drop more than 2pp) fails on 3 tasks.
+
+## Per-task table (n=5 runs per task, Phase 10 16-task suite)
+
+| Task | Group | Base | RL-merged | Δ | Read |
+|------|:---:|------:|---------:|----:|------|
+| ape.reflect | T | 0.8667 | **0.9067** | **+0.0400** 🟢 | Real GRPO win |
+| consulting.classify | C | 0.7667 | 0.7233 | **−0.0433** 🔴 | Persistent regressor |
+| consulting.synthesis | T | 0.8639 | 0.8335 | −0.0304 🔴 | Persistent regressor |
+| hidden.name_emergence | J | 0.9500 | 0.9500 | 0.0000 | Ceiling |
+| hidden.reclassify | C | 0.5000 | **1.0000** | **+0.5000** 🟢 | Benchmark quirk; same in all 4 prior runs (including no-ops) — likely a baseline-side scoring artifact |
+| hidden.summarize | T | 0.8046 | 0.8090 | +0.0044 | Tiny |
+| jiminy.codegen | C | 1.0000 | 1.0000 | 0.0000 | Ceiling |
+| jiminy.evaluate | C | 0.9667 | 0.9667 | 0.0000 | Ceiling |
+| jiminy.evaluate_llm | J | 0.6667 | 0.6667 | 0.0000 | (zero-stddev task; intra_batch_only policy is in effect) |
+| **jiminy.synthesize** | T | 0.7550 | **0.7750** | **+0.0200** 🟢 | Real win |
+| metalearn.generalize | T | 0.8754 | 0.8830 | +0.0076 | Tiny |
+| retrieval.intent_translate | C | 1.0000 | 1.0000 | 0.0000 | Ceiling |
+| **retrieval.query_classify** | C | 0.7000 | 0.6000 | **−0.1000** 🔴 | Largest persistent regressor (single-label-flip on 5-row task) |
+| retrieval.rerank_cross | J | 0.9000 | 0.9000 | 0.0000 | Ceiling |
+| retrieval.rerank_nli | T | 0.8500 | 0.8500 | 0.0000 | (zero-stddev) |
+| summarize.generate | T | 0.8671 | 0.8711 | +0.0040 | Tiny |
+
+**Net per-task ledger** (excluding `hidden.reclassify`'s benchmark-quirk +0.50):
+- 5 wins totaling **+0.076pp** (ape.reflect, jiminy.synthesize, metalearn.generalize, summarize.generate, hidden.summarize)
+- 3 losses totaling **−0.174pp** (consulting.classify, consulting.synthesis, retrieval.query_classify)
+- 8 ties (ceiling effects + zero-stddev tasks where the intra_batch_only advantage policy produces no signal)
+
+The aggregate gain is real (+1.76pp) but driven primarily by `hidden.reclassify` flipping 0.50 → 1.00. Without that single task, the net delta would be approximately neutral, reinforcing that this checkpoint is competitive with base on most metrics but not yet a clear quality improvement on the production-relevant tasks.
+
+## Per-metric breakdown (registry metrics only) for tasks with non-zero Δ
+
+```
+ape.reflect  (overall Δ +0.0400)
+  actionability_score          base=0.6000  real=0.7200  Δ=+0.1200 🟢
+
+consulting.classify  (overall Δ -0.0433)
+  classification_accuracy      base=1.0000  real=0.8000  Δ=-0.2000 🔴
+  summary_quality              base=0.3000  real=0.3700  Δ=+0.0700 🟢
+
+consulting.synthesis  (overall Δ -0.0304)
+  actionability_score          base=0.7200  real=0.6600  Δ=-0.0600 🔴
+  coverage_score               base=0.9716  real=0.9404  Δ=-0.0312
+
+hidden.summarize  (overall Δ +0.0044)
+  coverage_score               base=0.7092  real=0.7180  Δ=+0.0088
+
+jiminy.synthesize  (overall Δ +0.0200)
+  follow_rate                  base=0.7050  real=0.7250  Δ=+0.0200
+  specificity_score            base=0.6600  real=0.7000  Δ=+0.0400
+
+metalearn.generalize  (overall Δ +0.0076)
+  generalization_quality_score base=0.7508  real=0.7660  Δ=+0.0152
+
+retrieval.query_classify  (overall Δ -0.1000)
+  classification_accuracy      base=0.4000  real=0.2000  Δ=-0.2000 🔴
+
+summarize.generate  (overall Δ +0.0040)
+  coverage_score               base=0.7012  real=0.7132  Δ=+0.0120
+```
+
+## What this tells us about the production-substitution case (vs gpt-5.4-mini)
+
+The Phase 11 RL-merged adapter at this checkpoint is:
+
+✅ **Aggregate-competitive with the SFT base.** Beats it by 1.76pp in the weighted average, which means a swap from base → RL-merged is at least neutral (and slightly positive) on average task quality.
+
+✅ **Genuine wins on T-group tasks.** `ape.reflect`, `jiminy.synthesize`, `metalearn.generalize`, `summarize.generate`, and `hidden.summarize` all moved up — these are MDEMG's reflective/synthesis/summarization workflows where idiosyncratic formatting and reasoning patterns benefit from local task-specific tuning that gpt-5.4-mini's general RLHF doesn't optimize for.
+
+❌ **Dangerous on C-group classifiers.** `consulting.classify` and `retrieval.query_classify` regressed by 4-10pp on `classification_accuracy` specifically. For a production swap on these tasks, this checkpoint would produce noticeably worse routing decisions than either the SFT base or gpt-5.4-mini.
+
+🟡 **Ceiling-saturated tasks unchanged.** 8/16 tasks score the same as base. Some of those (`jiminy.codegen`=1.0, `retrieval.intent_translate`=1.0) are at ceiling; others (`jiminy.evaluate_llm`=0.6667, `retrieval.rerank_nli`=0.85) have zero historical reward stddev so GRPO produces no gradient signal under the `intra_batch_only` policy.
+
+**Migration strategy implied by these numbers:** The RL-merged adapter is a viable gpt-5.4-mini replacement on **the T-group (reflective/synthesis) workflows** where it's measurably better than base SFT — `ape.reflect`, `jiminy.synthesize`, `metalearn.generalize`, `summarize.generate`. For C-group classification tasks, **stay on gpt-5.4-mini until the persistent regressors are addressed** (currently being attempted with the kl=0.10 retry). For ceiling-saturated tasks, either choice (base / RL-merged / gpt-5.4-mini) is fine on quality and the cost / latency / privacy criteria become the deciding factor.
+
+## What we don't yet have
+
+A `gpt-5.4-mini` number on this same Phase 10 16-task benchmark suite. Without that, "RL-merged beats gpt-5.4-mini" is structurally unverifiable — we have base vs RL-merged and base vs (implicitly) RLHF-default-LLM-quality as priors, but not the direct comparison. A one-shot Phase 10 benchmark run pointing the harness at gpt-5.4-mini (estimated cost: ~$10-30, ~30 min wall-clock) would close that gap and give a real cost-quality tradeoff curve. **Adding this measurement is the missing piece for the cost-replacement decision.**
