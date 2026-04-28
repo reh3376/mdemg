@@ -958,3 +958,72 @@ The Phase 11 RL-merged adapter at this checkpoint is:
 ## What we don't yet have
 
 A `gpt-5.4-mini` number on this same Phase 10 16-task benchmark suite. Without that, "RL-merged beats gpt-5.4-mini" is structurally unverifiable — we have base vs RL-merged and base vs (implicitly) RLHF-default-LLM-quality as priors, but not the direct comparison. A one-shot Phase 10 benchmark run pointing the harness at gpt-5.4-mini (estimated cost: ~$10-30, ~30 min wall-clock) would close that gap and give a real cost-quality tradeoff curve. **Adding this measurement is the missing piece for the cost-replacement decision.**
+
+---
+
+# Run 6 (kl=0.10) — REGRESSED below baseline; kl=0.05 confirmed as the working value
+
+**Status:** EXECUTED (2026-04-27). Hypothesis tested: tighter kl regularization (0.05 → 0.10) would constrain policy drift on the persistent C-group regressors. **Hypothesis falsified.** Adapter regressed below baseline; reverted config.
+
+## Run
+
+| | |
+|---|---|
+| Wall clock | 12:52 → 22:32 = ~14h (includes one ~92-min user-initiated SIGSTOP/SIGCONT pause for laptop relocation) |
+| Steps | 500/500 |
+| Adapter SHA | `1a6f4100166fd4087bec192b5f8f6429363b4db5cd7e6539e5ecd5dc44b7751f` |
+| LoRA growth | **1.5-1.7× larger** lora_b rms than Run 5's at every sampled layer (counterintuitive for "tighter regularization") |
+| Late-training outliers | Two extreme spikes in last 100 steps: step 495 = 6×10⁸, step 499 = **1.2×10⁹** (50× larger than Run 5's worst) |
+
+The larger LoRA matrices despite tighter kl are real and surprising. Mechanism: with `kl_coef=0.10`, the loss has bigger kl-term contributions, which produces larger gradient signals on the LoRA params. AdamW's adaptive scaling normalizes this in steady state, but during training the cumulative effect was net-larger weight updates. The policy drifted *more* in some directions even though kl was supposed to pull it back to reference.
+
+## Regression verdict — FAIL on every dimension
+
+| Metric | kl=0.05 (Run 5) | kl=0.10 (Run 6) | Δ |
+|---|---|---|---|
+| 5a aggregate | **0.8514** ✅ | 0.8289 ❌ | −2.25pp |
+| vs target 0.8505 | passed | failed by 2.16pp | — |
+| vs baseline 0.8338 | +1.76pp | **−0.49pp** | the adapter is *worse than no training* |
+| 5b delta | 0.0131 | 0.0177 | both fail the 0.005 cap (noise threshold issue) |
+
+## Per-task delta (Run 6 vs Run 5 vs baseline)
+
+| Task | base | Run 5 | Run 6 | Run 6 vs base |
+|------|---:|---:|---:|---:|
+| ape.reflect | 0.8667 | **0.9067** | 0.8667 | 0.0000 (lost the +4pp Run-5 win) |
+| consulting.classify | 0.7667 | 0.7233 | 0.7667 | 0.0000 ✅ (only Run-6 win) |
+| consulting.synthesis | 0.8639 | 0.8335 | **0.7813** | **−0.0825** ❌ (got 5pp worse) |
+| jiminy.synthesize | 0.7550 | **0.7750** | 0.7400 | −0.0150 (lost Run-5 win) |
+| metalearn.generalize | 0.8754 | **0.8830** | 0.8695 | −0.0059 (lost Run-5 win) |
+| retrieval.query_classify | 0.7000 | 0.6000 | **0.5000** | **−0.2000** ❌ (got 10pp worse — opposite of hypothesis) |
+
+The kl=0.10 trade was: recover `consulting.classify` to baseline (+4.33pp vs Run 5) at the cost of:
+- All Run-5 T-group wins (ape.reflect, jiminy.synthesize, metalearn.generalize)
+- `consulting.synthesis` further regressed
+- `retrieval.query_classify` got *worse* (−10pp → −20pp), the OPPOSITE of what tighter kl was supposed to do
+
+## What this rules out — definitively
+
+The persistent C-group regressors are **not** a kl-coefficient tuning problem. We've now spanned kl ∈ {0.05, 0.10}:
+
+- kl=0.05 → +1.76pp aggregate, 3 task regressions (consulting.classify, consulting.synthesis, retrieval.query_classify)
+- kl=0.10 → −0.49pp aggregate, 2 task regressions (consulting.synthesis, retrieval.query_classify), lost T-group wins
+
+There's no kl value in our explored range that fixes the regressors without breaking other tasks. The 3 C-group classifiers (5-7 row tasks, deterministic temp=0 scoring, single-token-flip sensitivity) need a *different* intervention than hyperparameter tuning.
+
+## Decision: ship Run 5 as the Phase 11 deliverable; revert config to kl=0.05
+
+Run 5 (lr=2e-6, kl=0.05, stratified_by_task, 7 LoRA modules, 500 steps) remains the working configuration and the adapter that meets the 5a aggregate target. The 3 C-group regressors are deferred to Phase 11.5 follow-up or absorbed into Phase 12 HITL DPO scope.
+
+**`configs/rl_phase11.yaml` reverted: `kl_coef: 0.10 → 0.05`** with the rationale comment documenting the Run 6 finding so this experiment isn't repeated.
+
+## Caveat — adapter-on-disk state
+
+The Run 6 training overwrote the on-disk sandbox safetensors (Run 5's `3dc38f85…e2ef3b8` → Run 6's `1a6f4100…b7751f`). To produce the Run 5 adapter file again for production deployment, **the lr=2e-6/kl=0.05 run needs to be re-executed** (~13 hr wall-clock; reproducible from current config). The Run 5 regression report (`training_data/eval/phase11_regression_report_real.json`) still has the per-task scores documenting what Run 5 achieved.
+
+## Artifacts (delta vs the kl=0.10 commit at `5761d38`)
+
+- `configs/rl_phase11.yaml` — `kl_coef: 0.10 → 0.05` (with Run 6 falsification rationale in the inline comment)
+- `training_data/eval/phase11_regression_report_kl10.json` — Run 6 regression report (gitignored)
+- This doc (Run 6 disclosure section appended)
+- **NOT** an adapter file: the Run 5 sandbox safetensors needs to be regenerated by re-running `python -m neural.training.rl.trainer --config configs/rl_phase11.yaml --max-steps 500 --batch-size 4 --max-tokens 3000 --out-sidecar …`
