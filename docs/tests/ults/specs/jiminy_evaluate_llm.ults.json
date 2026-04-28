@@ -13,8 +13,11 @@
   },
   "sampling_group": "J",
   "prompt": {
-    "system_prompt_hash": "caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773",
-    "system_prompt_source": "internal/jiminy/eval_prompt.go:12",
+    "system_prompt_hash": [
+      "d8f4e2375bf118889d3e5e9e23d1c4e2e2caa7f56b39c0bd8d37e4c1a3a34a6e",
+      "1f02ee469728a422bd8e83629764be1a31115a02f7fbb5a372ef64243fb76bea"
+    ],
+    "system_prompt_source": "internal/jiminy/outcome_classifier.go:20 (classifySystemPrompt full + classifySystemPromptCompact)",
     "think_mode": true,
     "dynamic_prompt": false
   },

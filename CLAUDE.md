@@ -305,7 +305,11 @@ Endpoints:
 - Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
   - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)
-  - Golden holdout: `training_data/eval/valid_golden.jsonl` (seeded carve from Phase 5 valid splits)
+  - **Eval choices** (per Phase 11.5c — `phase_11_5c_post.md`):
+    - `valid_golden.jsonl` — Phase 10 baseline (108 rows, **99% leaked with training data**, kept for historical comparison only)
+    - `valid_clean.jsonl` — Phase 11.5c production-derived eval (180 rows, 9 of 17 tasks, **0% leakage**, leak-audit gated). **Use this for honest baselines.** Pair with `--mlx-timeout-s 300` to avoid 60s timeouts on long production prompts.
+  - Build/audit clean eval: `python scripts/build_clean_eval.py [--target-per-task 20]` + `python scripts/audit_eval_leakage.py --eval <jsonl> --against <comma-sep sources> --out <report>`
+- RL post-training (Phase 11 GRPO framework):
 - RL post-training (Phase 11 GRPO framework):
   - Preflight: `TSDB_PORT=5433 python -m neural.training.rl.preflight --config configs/rl_phase11.yaml` (5 gates: TSDB baseline rows, per-task row count, per-task stats, Phase 5 adapter SHAs, MLX single-instance)
   - Trainer (MLX adapter wiring pending; orchestrator + tests complete): `python -m neural.training.rl.trainer --config configs/rl_phase11.yaml --out-sidecar training_data/eval/rl_run.sql`

@@ -385,6 +385,9 @@ class MLXGRPOAdapter:
         lora_alpha: float = 64.0,
         lora_dropout: float = 0.05,
         lora_target_modules: list[str] | None = None,
+        lr_warmup_steps: int = 0,
+        lr_decay_steps: int = 0,
+        lr_final: float | None = None,
     ) -> None:
         # Lazy imports so unit tests can exercise the class without a Metal
         # backend. Any real instantiation in a Mac env pulls these in once.
@@ -438,8 +441,49 @@ class MLXGRPOAdapter:
                 "reduction at ~33%% wall-clock cost)"
             )
 
+        # Build the learning-rate schedule. Defaults to constant lr (back-
+        # compat with prior runs). When lr_warmup_steps > 0 or lr_decay_steps
+        # > 0, we wire up a join of:
+        #   1) linear warmup from 0 → lr over warmup_steps
+        #   2) cosine decay from lr → (lr_final or lr × 0.1) over decay_steps
+        # The Run 5 trainer ignored the YAML's warmup_steps field; this
+        # restores it AND adds the cosine tail that addresses late-training
+        # outliers (Run 6 step 499 hit 1.2×10⁹ on constant lr).
+        if lr_warmup_steps > 0 or lr_decay_steps > 0:
+            schedules: list[Any] = []
+            boundaries: list[int] = []
+            if lr_warmup_steps > 0:
+                schedules.append(
+                    optim.schedulers.linear_schedule(0.0, lr, lr_warmup_steps)
+                )
+            if lr_decay_steps > 0:
+                lr_end = lr_final if lr_final is not None else lr * 0.1
+                schedules.append(
+                    optim.schedulers.cosine_decay(lr, lr_decay_steps, lr_end)
+                )
+            else:
+                # No decay tail — hold at peak
+                from functools import partial as _partial  # noqa: PLC0415
+                def _const(_step: int, _v: float = lr) -> float:
+                    return _v
+                schedules.append(_const)
+            if lr_warmup_steps > 0 and len(schedules) > 1:
+                boundaries = [lr_warmup_steps]
+                lr_input: Any = optim.schedulers.join_schedules(schedules, boundaries)
+            else:
+                lr_input = schedules[0]
+            logger.info(
+                "MLXGRPOAdapter: LR schedule = warmup %d steps (0→%.2e) + "
+                "cosine decay %d steps (%.2e→%.2e)",
+                lr_warmup_steps, lr, lr_decay_steps, lr,
+                (lr_final if lr_final is not None else lr * 0.1),
+            )
+        else:
+            lr_input = lr
+            logger.info("MLXGRPOAdapter: constant LR = %.2e", lr)
+
         self.optimizer = optim.AdamW(
-            learning_rate=lr,
+            learning_rate=lr_input,
             betas=list(betas),
             eps=eps,
             weight_decay=weight_decay,

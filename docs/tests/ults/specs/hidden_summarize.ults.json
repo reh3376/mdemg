@@ -13,8 +13,8 @@
   },
   "sampling_group": "T",
   "prompt": {
-    "system_prompt_hash": "5110d51bc460daded7e77526c3e7d4a58f4ccf0139da31f50b5f2dad3c1f6d5a",
-    "system_prompt_source": "internal/summarize/service.go:366",
+    "system_prompt_hash": "ddeac4afb6344d6e54067560361582195c24041f1a5f4d7c2df0901bd6d090a4",
+    "system_prompt_source": "internal/hidden/cluster_summarizer.go:56 (clusterSummarySystemPrompt)",
     "think_mode": true,
     "dynamic_prompt": false
   },

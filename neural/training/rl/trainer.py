@@ -583,6 +583,15 @@ def main() -> int:  # pragma: no cover — exercised by T-subset smoke + full ru
         lora_alpha=float(lora_yaml.get("alpha", 64)),
         lora_dropout=float(lora_yaml.get("dropout", 0.05)),
         lora_target_modules=lora_targets,
+        # LR schedule: warmup_steps from YAML §training.optim.warmup_steps;
+        # decay_steps defaults to (max_steps - warmup_steps) so the cosine
+        # tail covers the rest of training. lr_final defaults to lr × 0.1.
+        # Set warmup_steps=0 (or remove from YAML) to revert to constant lr.
+        lr_warmup_steps=int(yaml_cfg["training"]["optim"].get("warmup_steps", 0)),
+        lr_decay_steps=max(
+            0,
+            int(cfg.max_steps) - int(yaml_cfg["training"]["optim"].get("warmup_steps", 0)),
+        ),
     )
     # Tokenizer chicken-and-egg: set after MLX load.
     site.prompt_provider.attach_tokenizer(adapter.tokenizer)

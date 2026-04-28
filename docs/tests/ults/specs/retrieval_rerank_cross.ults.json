@@ -13,8 +13,11 @@
   },
   "sampling_group": "J",
   "prompt": {
-    "system_prompt_hash": "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
-    "system_prompt_source": "internal/retrieval/rerank.go:20",
+    "system_prompt_hash": [
+      "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
+      "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb"
+    ],
+    "system_prompt_source": "internal/retrieval/rerank.go:20 (rerankCrossSystemPrompt full + rerankNLISystemPrompt compact when RerankCompress=true)",
     "think_mode": true,
     "dynamic_prompt": false
   },
