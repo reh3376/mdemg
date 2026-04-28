@@ -13,8 +13,11 @@
   },
   "sampling_group": "C",
   "prompt": {
-    "system_prompt_hash": "dynamic",
-    "system_prompt_source": "internal/hidden/reclassifier.go:319",
+    "system_prompt_hash": [
+      "2fafc511c7756c568f588e4036aabbfca23ae4c5ad89c18a742c7d58928ced04",
+      "dynamic"
+    ],
+    "system_prompt_source": "internal/hidden/reclassifier.go:319 (buildReclassSystemPrompt; threshold templated)",
     "think_mode": false,
     "dynamic_prompt": true
   },

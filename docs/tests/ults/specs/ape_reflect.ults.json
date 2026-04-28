@@ -13,8 +13,8 @@
   },
   "sampling_group": "T",
   "prompt": {
-    "system_prompt_hash": "64d528cc23dfed0c75ccdddeecf507e671b8f8f85f2fc679226b6e1caf13cc33",
-    "system_prompt_source": "internal/ape/llm_reflector.go:62",
+    "system_prompt_hash": "ef068ab109841fd6d60013fa9efee88bfec8528edfcac8e7337c137ad4177a79",
+    "system_prompt_source": "internal/ape/llm_reflector.go:74 (rendered with AllowedLLMActions enum)",
     "think_mode": true,
     "dynamic_prompt": false
   },
