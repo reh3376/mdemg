@@ -1,0 +1,66 @@
+# Phase 11.5d Stage-1 SFT distillation config
+#
+# Distills gpt-5.4-mini exemplars into the model. Starts from Run 7 sandbox
+# (.local-models/qwen3-14b-mdemg-v1-rl-sandbox/) which already has +1.83pp
+# of real RL gain on valid_clean — this SFT pass aims to recover the
+# Run 7 regression on consulting.classify (-5.7pp from Phase 5) and
+# bridge the +18pp gap on retrieval.rerank_cross.
+#
+# Target: aggregate ≥ 0.85 on valid_clean (from Run 7 baseline 0.8235 → +2.65pp).
+#
+# MEMORY constraints honored:
+#   - Explicit epoch count (epochs=2 derived as iters=50 with batch=4 over 100 train rows)
+#   - No hardcoded values (all knobs in this YAML; CLI overrides allowed)
+#   - 7 LoRA modules (matches Run 7 / Phase 11 Option C target_modules)
+#   - Gradient checkpointing enabled (memory hygiene; mlx_lm.lora's proven path —
+#     not the custom-trainer closure-capture footgun)
+
+model: ".local-models/qwen3-14b-mdemg-v1"
+
+# Continue from Run 7 adapter (preserves +1.83pp RL gain)
+resume_adapter_file: ".local-models/qwen3-14b-mdemg-v1-rl-sandbox/adapters.safetensors"
+
+train: true
+
+# Distill data: 100 train + 12 valid pairs (consulting.classify 32+4 + retrieval.rerank_cross 68+8)
+data: "training_data/distill/phase11_5d"
+
+# LoRA params — match Run 7 (Phase 11 Option C: attn + MLP, 7 modules)
+fine_tune_type: lora
+num_layers: 40
+lora_parameters:
+  rank: 32
+  scale: 2.0
+  dropout: 0.05
+  keys:
+    - "self_attn.q_proj"
+    - "self_attn.k_proj"
+    - "self_attn.v_proj"
+    - "self_attn.o_proj"
+    - "mlp.gate_proj"
+    - "mlp.up_proj"
+    - "mlp.down_proj"
+
+# Training schedule
+batch_size: 4
+iters: 50           # epochs=2 over 100 train rows / batch=4 = 25 iters/epoch × 2
+learning_rate: 1.0e-5
+max_seq_length: 8192    # 11.5d-fix: longest captured prompt was 5899 tokens (rerank_cross
+                        # candidate lists). 4096 truncated ~half of rerank_cross pairs,
+                        # corrupting the (input, teacher-response) signal. 8192 covers all
+                        # observed prompts with margin; activation memory ~doubles but
+                        # well under 128GB hardware budget.
+seed: 0
+grad_checkpoint: true
+
+# Eval + checkpoint cadence
+steps_per_eval: 5   # 10 eval points across the run — early-stop visibility
+val_batches: 3      # 12 valid rows / batch=4 = 3 batches
+save_every: 10
+adapter_path: ".local-models/qwen3-14b-mdemg-v1-distill-sandbox"
+
+# Reporting
+steps_per_report: 5
+
+# Optimizer
+optimizer: adamw
