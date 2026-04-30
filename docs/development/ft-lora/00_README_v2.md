@@ -1,7 +1,20 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
-**Date:** 2026-04-28
-**Version:** 5.9 (Sprint FT-LORA-PHASE11.5c — Clean eval construction + honest re-baseline. Phase 10 baseline of 0.8338 was 99% leaked; clean baseline is 0.8052. Per-task analysis invalidated Phase 11 GRPO + Branch B premise.)
+**Date:** 2026-04-29
+**Version:** 5.10 (Sprint FT-LORA-PHASE11.5d — Branch B Revised. Stage-1 distill adapter promoted to qwen3-14b-mdemg-v1-rl/ at gpt-mini parity (0.8578 vs 0.8587). Benchmark row-sweep fix exposed that Phase 5 already at gpt-mini parity on real data; entire Phase 11 RL arc was net-zero.)
+
+> **Changes in v5.10 (Sprint FT-LORA-PHASE11.5d — 2026-04-29):**
+> - **Stage-1 distill adapter promoted to canonical `.local-models/qwen3-14b-mdemg-v1-rl/`** with full-lineage `manifest.json`. Run 7 archived to `-rl-run7`. Adapter SHA256 `71821ee4cc7a6d74…`, full-sweep aggregate **0.8578** (+0.26pp over Phase 5 0.8553, -0.09pp from gpt-5.4-mini ceiling 0.8587).
+> - **Per-task wins on connection-layer tasks**: `consulting.classify` 0.668 → 0.688 (+2.0pp; drives Jiminy guidance fidelity), `hidden.reclassify` 0.925 → 0.975 (+5.0pp; drives concept clustering quality). These are the user's stated purpose-target tasks.
+> - **Benchmark row-sweep fix (Phase 11.5e in code, executed in this sprint)**: `neural/benchmarks/run_benchmark.py` previously evaluated `rows[0]` only per spec (MVP cap). Patched to iterate ALL matched rows by default; added `RunnerOptions.rows_per_spec` field + `--rows-per-spec` CLI flag (default 0 = all). 109 RL/DPO + 13 benchmark unit tests still green.
+> - **The "+5pp gap to gpt-mini" was a single-prompt-per-spec artifact.** Real gap on full-sweep: Phase 5 0.8553 vs gpt-mini 0.8587 = **+0.34pp** (within noise). Phase 5 already at gpt-mini parity on real production data. The entire Phase 11 → 11.5 plateau narrative was optimizing against a phantom.
+> - **Phase 11 RL Runs 1-7 net-zero on real data**: Run 7 full-sweep aggregate **0.8531** (-0.22pp behind Phase 5 alone). Claimed "+1.83pp Run 7 over Phase 5" was the same single-prompt artifact. RL produced 2 task-wins + 3 task-losses; net negative.
+> - **Phase 5 BEATS gpt-mini on 4 of 9 measured tasks** (full-sweep): `retrieval.intent_translate` +12.4pp, `retrieval.query_classify` +2.5pp, `retrieval.rerank_cross` +0.6pp, `jiminy.synthesize` +0.7pp. Cloud teacher is not strictly better on production traffic.
+> - **Distillation set:** 100 train + 12 valid pairs (consulting.classify 36 + retrieval.rerank_cross 76) from gpt-5.4-mini at reward ≥ 0.8. Captured via new `scripts/x9_distill_capture_v2.py` with TSDB extraction + leak audit (0% overlap with valid_clean + 9 train/valid sources). OpenAI cost: ~$1 capture + ~$0.40 full-sweep re-baseline.
+> - **SFT execution:** `mlx_lm.lora` proven path (sidesteps Phase 11 custom-trainer footguns). 50 iters / 2 epochs / lr=1e-5 / batch=4 / 7 LoRA modules / r=32 / max_seq_length=8192 (initial 4096 truncated half the rerank_cross pairs; killed and retried at 8192). val_loss 0.685 → 0.417 (-39.1%) monotonic. Peak memory 84.7 GB. ~109 min wall-clock.
+> - **Stage-2 GRPO skipped** — Stage-1 cleared the realistic target zone after row-sweep fix; Stage-2 would chase noise.
+> - **New artifacts:** `docs/development/ft-lora/{sprint_plan_phase_11_5d.md, phase_11_5d_post.md}`; `configs/sft_phase11_5d_distill.yaml`; `scripts/x9_distill_capture_v2.py`; `training_data/distill/phase11_5d/{train.jsonl, valid.jsonl, manifest.json, raw_responses.jsonl}`; `training_data/eval/{baseline_phase5_clean_fullsweep.json, baseline_run7_clean_fullsweep.json, baseline_gpt54mini_clean_fullsweep.json, regression_phase11_5d_stage1_fullsweep.json, phase11_5d_epic0_verdict.json}`; `neural/benchmarks/run_benchmark.py` row-sweep patch.
+> - **Production-use:** `mlx_lm.server --model .local-models/qwen3-14b-mdemg-v1 --adapter-path .local-models/qwen3-14b-mdemg-v1-rl --host 127.0.0.1 --port 8101`. Recommended `max_tokens` 12000, `timeout_s` 300.
 
 > **Changes in v5.9 (Sprint FT-LORA-PHASE11.5c — 2026-04-28):**
 > - **Built leak-free `valid_clean.jsonl`** (180 rows, 9 of 17 tasks) from production TSDB; verified **0 prompt overlap** with any of 9 train/valid sources via new `audit_eval_leakage.py` tool. Audited the existing `valid_golden.jsonl` against the same sources: **94 of 95 prompts (99%) leak with training data** — the entire Phase 10 baseline of 0.8338 was largely measuring memorization.

@@ -249,6 +249,12 @@ class RunnerOptions:
     # model on Metal needs more wall-clock per call. ``None`` → use spec budget
     # (backward-compatible). Set via --mlx-timeout-s at the CLI.
     mlx_timeout_s: float | None = None
+    # Phase 11.5e row sweep: 0 = use ALL matched rows, K>0 = cap at K rows.
+    # Default 0 (all rows) corrects the prior single-prompt-per-spec MVP. The
+    # 11.5c clean baselines were measured with rows[0]-only behavior — those
+    # reports remain on disk; new reports must be regenerated for direct
+    # comparison.
+    rows_per_spec: int = 0
     # test hooks
     mlx_http_post: Callable[..., bytes] | None = None
     judge_http_post: Callable[..., bytes] | None = None
@@ -289,97 +295,110 @@ def run(opts: RunnerOptions) -> dict[str, Any]:
             per_spec_info[spec.task_name]["error"] = f"sampling_policy: {e}"
             continue
 
-        # Use the first matched row for N repeats (MVP — no row-level sweep)
-        row = rows[0]
-        messages = row.get("messages") or []
-        # Strip any assistant turn — we want the model to generate, not see, the target
-        invoke_messages = [m for m in messages if m.get("role") != "assistant"]
-        reward_kwargs = _extract_reward_kwargs(spec, row)
+        # Phase 11.5e: row sweep — iterate all matched rows by default. The
+        # prior behavior (rows[0] for N repeats) reduced any 20-row task to a
+        # single-prompt benchmark with N stochastic samples — variance signal
+        # only, not generalization signal. opts.rows_per_spec caps at K rows
+        # (0 = all). Total per-task calls = min(K, len(rows)) × n_runs.
+        rows_to_use = rows if opts.rows_per_spec <= 0 else rows[: opts.rows_per_spec]
 
-        for run_idx in range(opts.n_runs):
-            t0 = time.time()
-            try:
-                chat_out = _mlx_chat(
-                    base_url=opts.mlx_base_url,
-                    model=opts.mlx_model_name,
-                    messages=invoke_messages,
-                    sampling_kwargs=sampling_kwargs,
-                    max_tokens=spec.performance_max_tokens,
-                    timeout_s=(
-                        opts.mlx_timeout_s
-                        if opts.mlx_timeout_s is not None
-                        else spec.performance_latency_ms / 1000.0
-                    ),
-                    _http_post=opts.mlx_http_post,
+        for row_idx, row in enumerate(rows_to_use):
+            messages = row.get("messages") or []
+            # Strip any assistant turn — we want the model to generate, not see, the target
+            invoke_messages = [m for m in messages if m.get("role") != "assistant"]
+            reward_kwargs = _extract_reward_kwargs(spec, row)
+
+            for run_idx in range(opts.n_runs):
+                t0 = time.time()
+                try:
+                    chat_out = _mlx_chat(
+                        base_url=opts.mlx_base_url,
+                        model=opts.mlx_model_name,
+                        messages=invoke_messages,
+                        sampling_kwargs=sampling_kwargs,
+                        max_tokens=spec.performance_max_tokens,
+                        timeout_s=(
+                            opts.mlx_timeout_s
+                            if opts.mlx_timeout_s is not None
+                            else spec.performance_latency_ms / 1000.0
+                        ),
+                        _http_post=opts.mlx_http_post,
+                    )
+                except MLXError as e:
+                    # Don't overwrite earlier successes on the same spec;
+                    # accumulate per-row errors so the operator can spot a
+                    # bad-prompt-row vs a model-wide failure.
+                    errs = per_spec_info[spec.task_name].setdefault("row_errors", [])
+                    errs.append({"row_idx": row_idx, "run_idx": run_idx, "error": f"mlx: {e}"})
+                    continue
+
+                # Back-compat: accept either the new (str, finish_reason, usage)
+                # tuple or the legacy bare-string return (test hooks).
+                if isinstance(chat_out, tuple):
+                    response, finish_reason, usage = chat_out
+                else:
+                    response, finish_reason, usage = chat_out, None, {}
+
+                latency_ms = int((time.time() - t0) * 1000)
+
+                # Deterministic rewards
+                reward_vector = compute_reward(
+                    response, spec.reward_functions, **reward_kwargs
                 )
-            except MLXError as e:
-                per_spec_info[spec.task_name]["error"] = f"mlx: {e}"
-                continue
 
-            # Back-compat: accept either the new (str, finish_reason, usage)
-            # tuple or the legacy bare-string return (test hooks).
-            if isinstance(chat_out, tuple):
-                response, finish_reason, usage = chat_out
-            else:
-                response, finish_reason, usage = chat_out, None, {}
+                # Subjective judge (optional)
+                judge_scores: dict[str, float] = {}
+                judge_meta: dict[str, Any] = {}
+                if opts.enable_judge:
+                    task_desc = _human_task_description(spec)
+                    for metric in opts.judge_metrics:
+                        try:
+                            jr = judge(
+                                task_description=task_desc,
+                                task_response=response,
+                                metric=metric,
+                                run_idx=run_idx,
+                                config=opts.config,
+                                _http_post=opts.judge_http_post,
+                            )
+                            judge_scores[metric] = jr.score
+                            judge_meta[metric] = {
+                                "model": jr.model,
+                                "seed": jr.seed,
+                                "prompt_template_sha": jr.prompt_template_sha,
+                                "latency_ms": jr.latency_ms,
+                            }
+                        except JudgeError as e:
+                            judge_meta[metric] = {"error": str(e)}
 
-            latency_ms = int((time.time() - t0) * 1000)
+                # Aggregator key: encode row+run as a stable integer so per-task
+                # variance reflects per-prompt diversity + per-prompt sampling.
+                aggregator.add(RunSample(
+                    task_id=spec.task_name,
+                    run_idx=row_idx * opts.n_runs + run_idx,
+                    reward_vector=reward_vector,
+                    judge_scores=judge_scores,
+                ))
 
-            # Deterministic rewards
-            reward_vector = compute_reward(
-                response, spec.reward_functions, **reward_kwargs
-            )
-
-            # Subjective judge (optional)
-            judge_scores: dict[str, float] = {}
-            judge_meta: dict[str, Any] = {}
-            if opts.enable_judge:
-                task_desc = _human_task_description(spec)
-                for metric in opts.judge_metrics:
-                    try:
-                        jr = judge(
-                            task_description=task_desc,
-                            task_response=response,
-                            metric=metric,
-                            run_idx=run_idx,
-                            config=opts.config,
-                            _http_post=opts.judge_http_post,
-                        )
-                        judge_scores[metric] = jr.score
-                        judge_meta[metric] = {
-                            "model": jr.model,
-                            "seed": jr.seed,
-                            "prompt_template_sha": jr.prompt_template_sha,
-                            "latency_ms": jr.latency_ms,
-                        }
-                    except JudgeError as e:
-                        judge_meta[metric] = {"error": str(e)}
-
-            aggregator.add(RunSample(
-                task_id=spec.task_name,
-                run_idx=run_idx,
-                reward_vector=reward_vector,
-                judge_scores=judge_scores,
-            ))
-
-            # Row shaped for V0012 TSDB benchmark_results.
-            # ``finish_reason="length"`` marks a truncation — the operator
-            # must be able to spot this without re-reading response_text.
-            benchmark_results_rows.append({
-                "run_id": run_id,
-                "task_id": spec.task_name,
-                "run_idx": run_idx,
-                "sampling_group": spec.sampling_group,
-                "response_text": response,
-                "reward_vector": reward_vector,
-                "judge_scores": judge_scores,
-                "judge_meta": judge_meta,
-                "latency_ms": latency_ms,
-                "finish_reason": finish_reason,
-                "completion_tokens": usage.get("completion_tokens"),
-                "prompt_tokens": usage.get("prompt_tokens"),
-                "truncated": finish_reason == "length",
-            })
+                # Row shaped for V0012 TSDB benchmark_results.
+                # ``finish_reason="length"`` marks a truncation — the operator
+                # must be able to spot this without re-reading response_text.
+                benchmark_results_rows.append({
+                    "run_id": run_id,
+                    "task_id": spec.task_name,
+                    "row_idx": row_idx,
+                    "run_idx": run_idx,
+                    "sampling_group": spec.sampling_group,
+                    "response_text": response,
+                    "reward_vector": reward_vector,
+                    "judge_scores": judge_scores,
+                    "judge_meta": judge_meta,
+                    "latency_ms": latency_ms,
+                    "finish_reason": finish_reason,
+                    "completion_tokens": usage.get("completion_tokens"),
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "truncated": finish_reason == "length",
+                })
 
     # Aggregate per task
     per_task_aggregate = [a.to_dict() for a in aggregator.aggregate_all()]
@@ -546,6 +565,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                          "Overrides each spec's performance.latency_budget_ms "
                          "(which is the production SLO, not a benchmark budget). "
                          "Recommended for 14B models on Metal: 180.")
+    ap.add_argument("--rows-per-spec", type=int, default=0,
+                    help="Cap number of golden rows tested per spec. "
+                         "0 (default) = ALL matched rows (Phase 11.5e correct behavior). "
+                         "1 = legacy single-row × n_runs (the 11.5c MVP). "
+                         "K>1 = first K rows × n_runs.")
     return ap.parse_args(argv)
 
 
@@ -573,6 +597,7 @@ def main(argv: list[str] | None = None) -> int:
         config=config,
         persist_tsdb=bool(ns.persist_tsdb),
         mlx_timeout_s=ns.mlx_timeout_s,
+        rows_per_spec=int(ns.rows_per_spec),
     )
     if opts.enable_judge and not os.environ.get("OPENAI_API_KEY"):
         print("--enable-judge requested but OPENAI_API_KEY unset", file=sys.stderr)

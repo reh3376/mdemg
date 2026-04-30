@@ -305,9 +305,11 @@ Endpoints:
 - Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
   - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)
-  - **Eval choices** (per Phase 11.5c — `phase_11_5c_post.md`):
+  - **Eval choices** (per Phase 11.5c + 11.5d — `phase_11_5c_post.md`, `phase_11_5d_post.md`):
     - `valid_golden.jsonl` — Phase 10 baseline (108 rows, **99% leaked with training data**, kept for historical comparison only)
     - `valid_clean.jsonl` — Phase 11.5c production-derived eval (180 rows, 9 of 17 tasks, **0% leakage**, leak-audit gated). **Use this for honest baselines.** Pair with `--mlx-timeout-s 300` to avoid 60s timeouts on long production prompts.
+  - **Row sweep (Phase 11.5d Epic 4 fix)** — runner now iterates ALL matched rows by default. Use `--rows-per-spec 0` (default; legacy single-row × n_runs is `--rows-per-spec 1`). For 9 valid_clean tasks × 20 rows × n_runs=2: ~360 calls/model = ~5-7 min Phase 5 base, ~30-40 min with LoRA adapter, ~18 min gpt-mini OpenAI.
+  - **Production adapter** (Phase 11.5d shipped): `.local-models/qwen3-14b-mdemg-v1-rl/` — Stage-1 distill at gpt-mini parity (0.8578 vs 0.8587 on full-sweep). Manifest at `qwen3-14b-mdemg-v1-rl/manifest.json`. Run 7 archived at `-rl-run7/`.
   - Build/audit clean eval: `python scripts/build_clean_eval.py [--target-per-task 20]` + `python scripts/audit_eval_leakage.py --eval <jsonl> --against <comma-sep sources> --out <report>`
 - RL post-training (Phase 11 GRPO framework):
 - RL post-training (Phase 11 GRPO framework):
