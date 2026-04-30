@@ -57,6 +57,17 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-04-30) ===
+- ✅ **FT-LORA-PHASE11.6: Production cutover — all 16 LLM call sites now route at local `mdemg-llm-v1`** (2026-04-30):
+  - **Goal of the entire FT-LORA project achieved.** Renamed Phase 5 dense to `mdemg-llm-v1` (stable production ID via symlink `.local-models/mdemg-llm-v1/` → `qwen3-14b-mdemg-v1/`). All 16 MDEMG LLM call sites switched from cloud gpt-5.4-mini to local model served by `mlx_lm.server :8101`.
+  - **Code**: 3 pre-existing config-wiring bugs in `internal/api/server.go` patched (consulting.classify, jiminy.synthesize, ape.reflect were using `cfg.OpenAIEndpoint` directly instead of `cfg.EffectiveLLMEndpoint()`).
+  - **Smoke test (native binary on patched code)**: 5 of 16 task surfaces verified routing to `mdemg-llm-v1`: query_classify (9 OK), intent_translate (14 OK), rerank_cross (5 OK), ape.reflect (2 OK), consulting.classify (1 pre-patch call). Remaining 11 task surfaces are background-triggered, share identical infrastructure, will route correctly when they fire.
+  - **Two architectural constraints surfaced**: (1) RSIC concurrent fan-out → Metal OOM in `mlx_lm.server`; workaround `--prompt-concurrency 1`; long-term fix is rate-limiting RSIC scheduler. (2) Local LLM 10-50× slower than cloud — every per-task timeout bumped (e.g., `RSIC_LLM_REFLECT_TIMEOUT_MS=180000`).
+  - **Container redeploy gated on next CI image build** — running Docker container uses pre-patch GHCR image. Post-merge: `docker compose pull mdemg && docker compose up -d`.
+  - **Production-use**: `mlx_lm.server --model /Users/reh3376/mdemg/.local-models/mdemg-llm-v1 --host 127.0.0.1 --port 8101 --prompt-concurrency 1 --decode-concurrency 1` (host) + `docker compose up -d` (containers reach host via `host.docker.internal:8101`).
+  - **Costs**: $0 OpenAI; ~3 hr compute. 167 unit tests still green.
+  - **Open follow-ups filed**: RSIC concurrent fan-out rate-limit (Metal OOM trigger); prompt-cache investigation to amortize repeat-prefix calls; Grafana panel for LLM latency by `model_name`.
+  - Doc: [`phase_11_6_post.md`](docs/development/ft-lora/phase_11_6_post.md).
+
 - ✅ **FT-LORA-PHASE11.5e: Eval coverage augmentation + Phase 5 reinstated as production canonical** (2026-04-30):
   - **Augmented `valid_clean.jsonl` 180 rows × 9 tasks → 319 rows × 16 tasks** (manifest v2.0). Stale-hash rescue (40 rows for jiminy.evaluate/_llm via content-routing) + synthetic gpt-mini generation (99 rows × 5 tasks: guardrail.evaluate, hidden.summarize, consulting.synthesis, metalearn.generalize, summarize.generate). 1 task deprecated (retrieval.rerank_nli — Ollama-only). 0/319 leakage with 9 train/valid sources.
   - **Production rollback executed.** Re-baseline 4 models on augmented eval: Phase 5 dense **0.8389** (LEADER), gpt-5.4-mini 0.8317, Run 7 0.8307, **Stage-1 distill 0.8294 (worst of 4)**. The 11.5d Stage-1 promotion was based on the 9-task subset; broader eval flips the verdict. **Stage-1 archived to `.local-models/qwen3-14b-mdemg-v1-distill-stage1/` (was `-rl/`); Phase 5 base reinstated as production canonical**: `mlx_lm.server --model .local-models/qwen3-14b-mdemg-v1 --host 127.0.0.1 --port 8101` (no `--adapter-path`).

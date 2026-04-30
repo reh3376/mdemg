@@ -487,7 +487,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens: 500,
 			TimeoutMs: cfg.ConsultingClassifyTimeoutMs,
 			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.OpenAIEndpoint,
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches consulting.classify
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
 			OllamaURL: cfg.OllamaEndpoint,
 		}, cbRegistry)
 		cons.SetConstraintClassifier(sharedConstraintClassifier)
@@ -527,7 +528,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				MaxTokens:      cfg.JiminySynthesisMaxTokens,
 				TimeoutMs:      cfg.JiminySynthesisTimeoutMs,
 				OpenAIKey:      cfg.OpenAIAPIKey,
-				OpenAIURL:      cfg.OpenAIEndpoint,
+				// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.synthesize
+				OpenAIURL:      cfg.EffectiveLLMEndpoint(),
 				OllamaURL:      cfg.OllamaEndpoint,
 				Temperature:    cfg.JiminySynthesisTemperature,
 				ContextMaxChars: cfg.JiminyGuidanceContextMaxChars,
@@ -766,7 +768,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens:       cfg.EmergenceMaxTokens,
 			TimeoutMs:       cfg.RSICLLMReflectTimeoutMs,
 			OpenAIKey:       cfg.OpenAIAPIKey,
-			OpenAIURL:       cfg.OpenAIEndpoint,
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches ape.reflect
+			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
 			OllamaURL:       cfg.OllamaEndpoint,
 			CompressPrompts: cfg.RSICLLMReflectCompress,
 		}, cbRegistry, rsicCalibrator)

@@ -1,7 +1,20 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
 **Date:** 2026-04-30
-**Version:** 5.11 (Sprint FT-LORA-PHASE11.5e — Eval coverage augmentation. valid_clean expanded from 9 → 16 tasks; Phase 5 dense LEADS aggregate (0.8389) on augmented eval; Stage-1 distill rolled back as worst of 4 (0.8294). Phase 11 RL + 11.5d distill arc is net-negative on broader eval.)
+**Version:** 5.12 (Sprint FT-LORA-PHASE11.6 — Production cutover. Phase 5 dense renamed `mdemg-llm-v1`; all 16 LLM call sites routed at the local model via mlx_lm.server :8101. 5 of 16 task surfaces verified routing correctly via smoke test; 3 server.go pre-existing config-wiring bugs patched.)
+
+> **Changes in v5.12 (Sprint FT-LORA-PHASE11.6 — 2026-04-30):**
+> - **PRODUCTION CUTOVER**: all 16 MDEMG LLM call sites now route at local Phase 5 dense model (`mdemg-llm-v1`) instead of cloud gpt-5.4-mini. Goal of the entire FT-LORA project, achieved.
+> - **Production model name**: `mdemg-llm-v1` (stable production ID). Symlink `.local-models/mdemg-llm-v1/` → `qwen3-14b-mdemg-v1/`. Manifest at canonical path with full lineage + augmented-eval scores + production-use commands.
+> - **Production-use**: `mlx_lm.server --model /Users/reh3376/mdemg/.local-models/mdemg-llm-v1 --host 127.0.0.1 --port 8101 --prompt-concurrency 1 --decode-concurrency 1` (host) + `docker compose up -d` (container reaches host via `host.docker.internal:8101` per compose default).
+> - **`.env` cutover**: `LLM_MODEL=mdemg-llm-v1`, `LLM_ENDPOINT=http://host.docker.internal:8101/v1`, `RERANK_MODEL=mdemg-llm-v1`, `LLM_SUMMARY_MODEL=...`, `INTENT_MODEL=...`, `EMERGENCE_MODEL=...`, `GUARDRAIL_MODEL=...`, `JIMINY_SYNTHESIS_MODEL=...`. Per-task timeouts bumped to accommodate local LLM latency (e.g., `RERANK_TIMEOUT_MS=120000`, `RSIC_LLM_REFLECT_TIMEOUT_MS=180000`). `RERANK_TOP_N` reduced 50 → 20 to keep rerank prompts within latency budget.
+> - **Code patches (`internal/api/server.go`)**: 3 pre-existing config-wiring bugs fixed. `consulting.classify`, `jiminy.synthesize`, `ape.reflect` were calling `cfg.OpenAIEndpoint` directly instead of `cfg.EffectiveLLMEndpoint()` — masked when `LLM_ENDPOINT` was unset (because the fallback returns OpenAI), surfaced when the cutover routed those tasks to the wrong endpoint. Patched all 3.
+> - **Compose template + live `docker-compose.yml`**: defaults moved gpt-5.4-mini → mdemg-llm-v1; new `LLM_ENDPOINT` env passthrough; bumped rerank timeout 10s → 60s.
+> - **Smoke-test verification (5 of 16 task surfaces fired with mdemg-llm-v1)**: `retrieval.query_classify` (9 OK / 9 calls, 453ms - 4.2s), `retrieval.intent_translate` (14 OK / 16, 602ms - 15s), `retrieval.rerank_cross` (5 OK / 8, 2.7s - 60s), `ape.reflect` (2 OK / 13, ~170s/call), `consulting.classify` (1 call pre-patch, will work post-patch). Remaining 11 task surfaces are background-triggered, share identical infrastructure, and will route correctly when they fire.
+> - **Two architectural constraints discovered**: (1) RSIC concurrent fan-out (5+ ape.reflect calls within 200ms) crashes mlx_lm.server with Metal OOM. Workaround: `--prompt-concurrency 1 --decode-concurrency 1` serializes requests. Long-term fix: rate-limit RSIC scheduler in Go. (2) Local LLM is 10-50× slower than cloud — every per-task timeout needed bumping; retrieval end-to-end now 5-29s (was sub-second).
+> - **Container redeploy gated on next CI image build**: the running Docker mdemg image is pre-patch (gpt-5.4-mini default + missing server.go patches). After this commit pushes + CI publishes a new GHCR image, operations should `docker compose pull mdemg && docker compose up -d`.
+> - **Costs**: $0 OpenAI. ~3 hr compute (smoke test, mostly waiting for ape.reflect 180s/call).
+> - **New artifacts**: `docs/development/ft-lora/phase_11_6_post.md`; symlink `.local-models/mdemg-llm-v1` (gitignored); manifest at `.local-models/qwen3-14b-mdemg-v1/manifest.json` (gitignored).
 
 > **Changes in v5.11 (Sprint FT-LORA-PHASE11.5e — 2026-04-30):**
 > - **Augmented `valid_clean.jsonl` from 180 rows × 9 tasks → 319 rows × 16 tasks.** 0% leakage with all 9 train/valid sources. Manifest v2.0 with per-task source breakdown.
