@@ -1,7 +1,18 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
-**Date:** 2026-04-29
-**Version:** 5.10 (Sprint FT-LORA-PHASE11.5d — Branch B Revised. Stage-1 distill adapter promoted to qwen3-14b-mdemg-v1-rl/ at gpt-mini parity (0.8578 vs 0.8587). Benchmark row-sweep fix exposed that Phase 5 already at gpt-mini parity on real data; entire Phase 11 RL arc was net-zero.)
+**Date:** 2026-04-30
+**Version:** 5.11 (Sprint FT-LORA-PHASE11.5e — Eval coverage augmentation. valid_clean expanded from 9 → 16 tasks; Phase 5 dense LEADS aggregate (0.8389) on augmented eval; Stage-1 distill rolled back as worst of 4 (0.8294). Phase 11 RL + 11.5d distill arc is net-negative on broader eval.)
+
+> **Changes in v5.11 (Sprint FT-LORA-PHASE11.5e — 2026-04-30):**
+> - **Augmented `valid_clean.jsonl` from 180 rows × 9 tasks → 319 rows × 16 tasks.** 0% leakage with all 9 train/valid sources. Manifest v2.0 with per-task source breakdown.
+> - **Phase 5 dense LEADS the augmented-eval aggregate** at **0.8389**, beating gpt-5.4-mini (0.8317), Run 7 (0.8307), and Stage-1 distill (0.8294). The 11.5d "+0.26pp Stage-1 over Phase 5" was a 9-task-subset artifact; 7 more tasks of coverage flipped the verdict.
+> - **PRODUCTION ROLLBACK**: Stage-1 distill archived to `.local-models/qwen3-14b-mdemg-v1-distill-stage1/` (was `-rl/`). Phase 5 base (`qwen3-14b-mdemg-v1/`) reinstated as production canonical. Production-use: `mlx_lm.server --model .local-models/qwen3-14b-mdemg-v1 --host 127.0.0.1 --port 8101` (no `--adapter-path`).
+> - **Stale-hash rescue (Epic 1)** for jiminy.evaluate + jiminy.evaluate_llm: 40 rows extracted via content-routing through a discovered production task_name swap bug. TSDB rows tagged `jiminy.evaluate` actually contain `jiminy.evaluate_llm`'s production prompt content (and vice versa); affects all rows logged with these task names through 2026-04-29. Filed as production follow-up.
+> - **Synthetic prompt generation (Epic 2)** for 5 data-starved tasks: 99 rows captured from gpt-5.4-mini at temp=0.9 with reward filter ≥0.7. Per-task: guardrail.evaluate (20), hidden.summarize (19), consulting.synthesis (20), metalearn.generalize (20), summarize.generate (20). New `scripts/x10_synth_prompt_capture.py` (reusable). New `scripts/x11_jiminy_evaluate_rescue.py` (rescue extractor).
+> - **Deprecation: retrieval.rerank_nli** removed from active eval. Production OpenAI deploys emit `retrieval.rerank_cross`; the NLI task_name is Ollama-only, dead in production. Spec retained for code-completeness.
+> - **Strategic findings**: (1) Phase 11 RL + 11.5d distill are net-negative on broader eval; both archived. (2) Phase 5 wins more production-grounded tasks (4 of 9 TSDB tasks, including +21pp on `retrieval.intent_translate` over gpt-mini). (3) `consulting.classify` distillation backfired because training class distribution (mostly must/must_not) didn't match eval distribution (80% none). Filed as Phase 11.5f candidate. (4) `guardrail.evaluate` 20pp gap to gpt-mini on synthetic prompts confirms local models genuinely struggle here; needs production data, not synthesis.
+> - **OpenAI cost**: ~$3.80 (synthesis $0.60 + gpt-mini augmented re-baseline $3.20). Compute: ~3.5 hr local MLX.
+> - **New artifacts**: `docs/development/ft-lora/{sprint_plan_phase_11_5e.md, phase_11_5e_post.md}`; `training_data/eval/{valid_clean.jsonl (v2), valid_clean_manifest.json (v2), valid_clean_{rescued,synthetic}.jsonl, baseline_{phase5,run7,stage1,gpt54mini}_clean_v2_fullsweep.json, clean_v2_comparison.md, phase11_5e_epic0_verdict.json, valid_clean_v2_leakage_audit.json}`; `scripts/{x10_synth_prompt_capture.py, x11_jiminy_evaluate_rescue.py}`.
 
 > **Changes in v5.10 (Sprint FT-LORA-PHASE11.5d — 2026-04-29):**
 > - **Stage-1 distill adapter promoted to canonical `.local-models/qwen3-14b-mdemg-v1-rl/`** with full-lineage `manifest.json`. Run 7 archived to `-rl-run7`. Adapter SHA256 `71821ee4cc7a6d74…`, full-sweep aggregate **0.8578** (+0.26pp over Phase 5 0.8553, -0.09pp from gpt-5.4-mini ceiling 0.8587).
