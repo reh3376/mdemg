@@ -509,6 +509,22 @@ type Config struct {
 	MLXProbeTimeoutSec    int  // MLX_PROBE_TIMEOUT_SEC — per-probe HTTP timeout in seconds; must be < MLX_PROBE_INTERVAL_SEC (default: 2, min 1)
 	MLXFailFastEnabled    bool // MLX_FAIL_FAST_ENABLED — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
 
+	// Phase 13 — Note 04 Column-Voting Retrieval. Replaces the linear-
+	// combination ranker at scoring.go:797 with a Reciprocal Rank Fusion
+	// ensemble across 4 columns (Embedding + BM25 + GraphProximity +
+	// Structural; Temporal + RoleScoped deferred per Epic 0 data audit).
+	// Default false until the UVTS A/B verdict passes — flag-flip in same
+	// commit if the merge gate clears (B mean ≥ A mean AND no per-question
+	// regression > 10%).
+	RetrievalColumnVotingEnabled bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: false until A/B-validated)
+	RetrievalRRFK                int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
+	RetrievalColumnTimeoutFrac   float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
+	RetrievalStructuralHops      int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
+	RetrievalColumnEmbeddingEnabled  bool // RETRIEVAL_COLUMN_EMBEDDING_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnBM25Enabled       bool // RETRIEVAL_COLUMN_BM25_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnGraphEnabled      bool // RETRIEVAL_COLUMN_GRAPH_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnStructuralEnabled bool // RETRIEVAL_COLUMN_STRUCTURAL_ENABLED — per-column suppression knob (default: true)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -2496,6 +2512,34 @@ func FromEnv() (Config, error) {
 	}
 	mlxFailFastEnabled := getBool("MLX_FAIL_FAST_ENABLED", true)
 
+	// Phase 13 — Column-Voting Retrieval
+	retrievalColumnVotingEnabled := getBool("RETRIEVAL_COLUMN_VOTING_ENABLED", false)
+	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalRRFK < 1 {
+		return Config{}, fmt.Errorf("RETRIEVAL_RRF_K must be ≥ 1 (got %d)", retrievalRRFK)
+	}
+	retrievalColumnTimeoutFrac, err := atof("RETRIEVAL_COLUMN_TIMEOUT_FRACTION", 0.8)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalColumnTimeoutFrac <= 0 || retrievalColumnTimeoutFrac > 1 {
+		return Config{}, fmt.Errorf("RETRIEVAL_COLUMN_TIMEOUT_FRACTION must be in (0, 1] (got %v)", retrievalColumnTimeoutFrac)
+	}
+	retrievalStructuralHops, err := atoi("RETRIEVAL_STRUCTURAL_HOPS", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalStructuralHops < 1 || retrievalStructuralHops > 9 {
+		return Config{}, fmt.Errorf("RETRIEVAL_STRUCTURAL_HOPS must be in [1, 9] (got %d)", retrievalStructuralHops)
+	}
+	retrievalColEmbeddingEnabled := getBool("RETRIEVAL_COLUMN_EMBEDDING_ENABLED", true)
+	retrievalColBM25Enabled := getBool("RETRIEVAL_COLUMN_BM25_ENABLED", true)
+	retrievalColGraphEnabled := getBool("RETRIEVAL_COLUMN_GRAPH_ENABLED", true)
+	retrievalColStructuralEnabled := getBool("RETRIEVAL_COLUMN_STRUCTURAL_ENABLED", true)
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3901,6 +3945,17 @@ func FromEnv() (Config, error) {
 		MLXProbeIntervalSec: mlxProbeIntervalSec,
 		MLXProbeTimeoutSec:  mlxProbeTimeoutSec,
 		MLXFailFastEnabled:  mlxFailFastEnabled,
+
+		// Phase 13 — Column-Voting Retrieval
+		RetrievalColumnVotingEnabled:     retrievalColumnVotingEnabled,
+		RetrievalRRFK:                    retrievalRRFK,
+		RetrievalColumnTimeoutFrac:       retrievalColumnTimeoutFrac,
+		RetrievalStructuralHops:          retrievalStructuralHops,
+		RetrievalColumnEmbeddingEnabled:  retrievalColEmbeddingEnabled,
+		RetrievalColumnBM25Enabled:       retrievalColBM25Enabled,
+		RetrievalColumnGraphEnabled:      retrievalColGraphEnabled,
+		RetrievalColumnStructuralEnabled: retrievalColStructuralEnabled,
+
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,

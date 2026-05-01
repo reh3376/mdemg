@@ -24,7 +24,7 @@ func BenchmarkQueryCacheGet(b *testing.B) {
 				{NodeID: "node-1", Score: 0.9},
 			},
 		}
-		cache.Put(req, resp)
+		cache.Put(req, "", resp)
 	}
 
 	searchReq := models.RetrieveRequest{
@@ -35,7 +35,7 @@ func BenchmarkQueryCacheGet(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Get(searchReq)
+		cache.Get(searchReq, "")
 	}
 }
 
@@ -58,7 +58,7 @@ func BenchmarkQueryCachePut(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Put(req, resp)
+		cache.Put(req, "", resp)
 	}
 }
 
@@ -75,7 +75,7 @@ func BenchmarkCacheKeyGeneration(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = CacheKey(req)
+		_ = CacheKey(req, "")
 	}
 }
 
@@ -147,7 +147,7 @@ func BenchmarkQueryCacheStats(b *testing.B) {
 			SpaceID:   "test-space",
 			QueryText: "query " + string(rune(i)),
 		}
-		cache.Put(req, models.RetrieveResponse{})
+		cache.Put(req, "", models.RetrieveResponse{})
 	}
 
 	b.ResetTimer()
@@ -172,7 +172,7 @@ func BenchmarkCacheInvalidateSpace(b *testing.B) {
 				SpaceID:   space,
 				QueryText: "query " + string(rune(j)),
 			}
-			cache.Put(req, models.RetrieveResponse{})
+			cache.Put(req, "", models.RetrieveResponse{})
 		}
 		b.StartTimer()
 

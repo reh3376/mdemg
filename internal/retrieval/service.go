@@ -36,6 +36,19 @@ func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
 	s.retrievalRecorder = r
 }
 
+// scorerVersion returns an opaque short string identifying the active scoring
+// pipeline. Used to namespace the query cache so a config flip between the
+// legacy linear scorer and the Phase 13 (Note 04) RRF column-voting
+// aggregator does not serve stale entries from one against requests
+// expecting the other. Bump the literal whenever column weights, the
+// active column set, or the RRF k constant changes.
+func (s *Service) scorerVersion() string {
+	if s.cfg.RetrievalColumnVotingEnabled {
+		return "v1-rrf4" // 4 columns shipped (embedding+bm25+graph+structural; temporal+role deferred per Phase 13 Epic 0 audit)
+	}
+	return "v0-linear"
+}
+
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
 func (s *Service) SetIntentTranslator(t IntentTranslator) {
 	s.intentTranslator = t
@@ -370,12 +383,17 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	cacheReq.TopK = topK
 	cacheReq.HopDepth = hopDepth
 
-	// Check query cache (skip for Jiminy-enabled requests and temporal queries)
-	cacheKey := CacheKey(cacheReq)
-	slog.Info("query cache check", "enabled", s.cfg.QueryCacheEnabled, "jiminy", req.JiminyEnabled, "temporal", hints.TemporalIntent.Mode, "key", cacheKey[:16])
+	// Check query cache (skip for Jiminy-enabled requests and temporal queries).
+	// scorerVersion segments the cache namespace so Phase 13 (Note 04) flag
+	// flips between the legacy linear scorer and the RRF column-voting
+	// aggregator do not serve stale entries from one scorer to a request
+	// expecting the other.
+	scorerVersion := s.scorerVersion()
+	cacheKey := CacheKey(cacheReq, scorerVersion)
+	slog.Info("query cache check", "enabled", s.cfg.QueryCacheEnabled, "jiminy", req.JiminyEnabled, "temporal", hints.TemporalIntent.Mode, "key", cacheKey[:16], "scorer_version", scorerVersion)
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
-		if cached, ok := s.queryCache.Get(cacheReq); ok {
+		if cached, ok := s.queryCache.Get(cacheReq, scorerVersion); ok {
 			// Ensure Debug map exists and set cache_hit flag
 			if cached.Debug == nil {
 				cached.Debug = make(map[string]any)
@@ -756,7 +774,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// Store in query cache (skip for Jiminy-enabled and temporal requests)
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
-		s.queryCache.Put(cacheReq, resp)
+		s.queryCache.Put(cacheReq, scorerVersion, resp)
 		slog.Info("query cache PUT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))], "cache_size", s.queryCache.Len())
 	}
 
