@@ -542,17 +542,19 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		// J17-2: Wire constraint code generator
 		if cfg.J17CodegenEnabled && convSvc != nil {
 			codegenAPIKey := cfg.OpenAIAPIKey
-			codegenBaseURL := cfg.OpenAIEndpoint
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.codegen
+			codegenBaseURL := cfg.EffectiveLLMEndpoint()
 			if cfg.J17CodegenProvider == "ollama" {
 				codegenAPIKey = "ollama"
 				codegenBaseURL = cfg.OllamaEndpoint
 			}
 			codegenLLM := llmclient.New(llmclient.Config{
-				Provider:  cfg.J17CodegenProvider,
-				Model:     cfg.J17CodegenModel,
-				APIKey:    codegenAPIKey,
-				BaseURL:   codegenBaseURL,
-				TimeoutMs: 10000,
+				Provider: cfg.J17CodegenProvider,
+				Model:    cfg.J17CodegenModel,
+				APIKey:   codegenAPIKey,
+				BaseURL:  codegenBaseURL,
+				// Phase 11.6: bumped 10s → 60s for local-LLM latency budget
+				TimeoutMs: 60000,
 			}).WithContext("jiminy.codegen", "")
 			codegen := jiminy.NewConstraintCodeGenerator(codegenLLM)
 
@@ -573,7 +575,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 		// J13: Wire LLM evaluator
 		if cfg.JiminyEvaluateLLMEnabled {
-			evalBaseURL := cfg.OpenAIEndpoint
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.evaluate_llm
+			evalBaseURL := cfg.EffectiveLLMEndpoint()
 			evalAPIKey := cfg.OpenAIAPIKey
 			if cfg.JiminyEvaluateLLMProvider == "ollama" {
 				evalBaseURL = cfg.OllamaEndpoint
