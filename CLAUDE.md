@@ -96,6 +96,23 @@ Dependencies, Implementation Plan (sequential epics + gates), Testing Plan (3 ti
 Commit Strategy, Verification Checklist, Documentation Update (final epic — never cut),
 Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destructive ops).
 
+### Testing — Live System Testing Is Required (formalized 2026-05-01)
+Tier 3 e2e means **the real binary against the real services it depends on,
+with real outputs observed via TSDB queries / Grafana panels / log inspection**.
+Mocked e2e is Tier 2b (extended integration), not Tier 3. Sprint verification
+checklists must include at least one item of the form: "live smoke: run X
+against the real system, observe Y in TSDB/Grafana/logs, confirm Z." The
+local stack (mdemg native binary + Docker Compose) is the live system —
+production scale is not the requirement; real I/O on the real wire is.
+
+Evidence basis: across Phase 11.6.x, 11.6.2, and 12.0–12.6, every major
+defect was caught in live smoke runs while unit/integration tests passed —
+6 cutover-bypass sites, 5 latent UVTS-runner defects, host.docker.internal
+DNS resolution, panel-3 SQL false-positive. Surprise bugs caught during
+live smoke get their own follow-up fix-commit — do not silently roll them
+into the sprint commit (Phase 11.6.2 is the precedent). CMS observation
+`p5iv8effstxk5ujd1fa2qfy8`.
+
 ## Project Context
 
 **MDEMG** — Cognitive substrate for AI-assisted development. Persistent emergent long-term memory via Hebbian learning, 5-layer hierarchy, RSIC self-improvement. 105 core phases + sidecar phases complete.
