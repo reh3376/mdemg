@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
+	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/mathutil"
@@ -80,11 +81,19 @@ type Service struct {
 	synthesizer          Synthesizer          // Optional: if nil, LLM synthesis is skipped (Phase 101)
 	intentTranslator     IntentTranslator     // Optional: if nil, intent translation is skipped (Phase 102)
 	constraintClassifier *ConstraintClassifier // Optional: if nil, uses keyword-based fallback (Phase AR-3)
+	conflictTracker      *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
 }
 
 // SetConstraintClassifier attaches an optional LLM-powered constraint classifier.
 func (s *Service) SetConstraintClassifier(cc *ConstraintClassifier) {
 	s.constraintClassifier = cc
+}
+
+// SetConflictTracker attaches the conflicting-guidance recorder. Phase 12 Epic 6.
+// detectConflicts findings will be reported to TSDB when the tracker is set
+// and cfg.ConflictTrackerEnabled is true.
+func (s *Service) SetConflictTracker(t *conversation.ConflictTracker) {
+	s.conflictTracker = t
 }
 
 // NewService creates a new consulting service.
@@ -635,6 +644,26 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 		conflicts := s.detectConflicts(ctx, req.SpaceID, req.Context, filteredResults)
 		resp.Conflicts = conflicts
 		resp.Debug["conflicts_detected"] = len(conflicts)
+
+		// Phase 12 Epic 6: a non-zero conflict count is a divergence signal
+		// — accumulated retrieved results contradict each other in a way the
+		// detector can name. Record one row per Suggest() call (rate-limited
+		// at 1 row/space/minute by ConflictTracker.Track) so the 3-month
+		// observation window picks up the frequency + space distribution.
+		if len(conflicts) > 0 && s.conflictTracker != nil && s.cfg.ConflictTrackerEnabled {
+			rationale := fmt.Sprintf("consulting.Suggest detected %d conflict(s) across %d retrieved results for context: %.120s",
+				len(conflicts), len(filteredResults), req.Context)
+			rec := conversation.ConflictRecord{
+				SpaceID:                  req.SpaceID,
+				ConsultingRecommendation: fmt.Sprintf("conflicts=%d", len(conflicts)),
+				DivergenceKind:           conversation.DivergenceKindTextual,
+				Rationale:                rationale,
+				Source:                   "consulting.Suggest",
+				ContextHash:              conversation.HashContext(req.Context, req.FilePath, ""),
+			}
+			tracker := s.conflictTracker
+			go func() { _ = tracker.Track(ctx, rec) }()
+		}
 	}
 
 	// Step 7: Find applicable constraints if requested

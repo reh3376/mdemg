@@ -14,6 +14,7 @@ import (
 	"github.com/nrednav/cuid2"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
+	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
@@ -61,6 +62,7 @@ type Service struct {
 	reformulator            *StrictReformulator      // /strict: prompt reformulation
 	strictClassifier        *StrictClassifier        // /strict: response classification for PreToolUse
 	trustCancel             context.CancelFunc       // cancels trust persistence goroutine
+	conflictTracker         *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
 	codeComprehensionTracker *CodeComprehensionTracker // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter              // TSDB writer for constraint outcomes
 
@@ -530,6 +532,15 @@ func (s *Service) SetRetriever(r RetrievalProvider) {
 // SetSynthesizer sets the LLM guidance synthesizer (J8).
 func (s *Service) SetSynthesizer(syn *GuidanceSynthesizer) {
 	s.synthesizer = syn
+}
+
+// SetConflictTracker attaches the conflicting-guidance recorder. Phase 12
+// Epic 6. When set + cfg.ConflictTrackerEnabled, the Guide() path emits a
+// divergence row when low-confidence guidance is issued (the system thought
+// the context warranted output but had weak evidence — a soft form of
+// internal disagreement that's worth observing longitudinally).
+func (s *Service) SetConflictTracker(t *conversation.ConflictTracker) {
+	s.conflictTracker = t
 }
 
 // GetEvaluator returns the evaluator for handler wiring (J9).
@@ -1169,6 +1180,29 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Skip cache put when J17 bypass is enabled (tiers are trust-dependent, cache would stale)
 	if s.cache != nil && !cacheBypass {
 		s.cache.Put(req.SpaceID, req.SessionID, req.Context, resp)
+	}
+
+	// Phase 12 Epic 6: a guidance response with non-empty items but low
+	// confidence indicates internal disagreement — the synthesis layer
+	// produced output but the underlying signals weren't conclusive. Track
+	// this for the longitudinal divergence-observation window. Threshold of
+	// 0.30 picks up the cases where confidence is below the JiminyMinConfidence
+	// floor that gates surfacing — those would-have-been-suppressed cases
+	// where guidance still got emitted are exactly the divergence signal.
+	if s.conflictTracker != nil && s.cfg.ConflictTrackerEnabled &&
+		len(resp.Guidance) > 0 && resp.Confidence < 0.30 {
+		rationale := fmt.Sprintf("jiminy.Guide issued %d item(s) with confidence=%.3f below 0.30 floor — synthesis emitted despite weak signals (rationale: %.120s)",
+			len(resp.Guidance), resp.Confidence, resp.Rationale)
+		rec := conversation.ConflictRecord{
+			SpaceID:              req.SpaceID,
+			JiminyRecommendation: fmt.Sprintf("guidance_count=%d confidence=%.3f", len(resp.Guidance), resp.Confidence),
+			DivergenceKind:       conversation.DivergenceKindNumeric,
+			Rationale:            rationale,
+			Source:               "jiminy.Guide",
+			ContextHash:          conversation.HashContext(req.Context, req.FilePath, req.Query),
+		}
+		tracker := s.conflictTracker
+		go func() { _ = tracker.Track(ctx, rec) }()
 	}
 
 	return resp, nil

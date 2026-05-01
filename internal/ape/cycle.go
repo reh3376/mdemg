@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"mdemg/internal/config"
+	"mdemg/internal/conversation"
 	"mdemg/internal/metrics"
 	"mdemg/internal/tsdb"
 )
@@ -47,6 +50,12 @@ type CycleOrchestrator struct {
 	// to release. nil disables throttling (used by tests that pre-construct an
 	// orchestrator without going through NewCycleOrchestrator).
 	llmSem chan struct{}
+
+	// Phase 12 Epic 6: optional ConflictTracker for divergence-detection
+	// hooks. Wired by server.go via SetConflictTracker; nil-receiver-safe
+	// in conversation.ConflictTracker.Track so the hook is gated only by
+	// non-nil + cfg.ConflictTrackerEnabled.
+	conflictTracker *conversation.ConflictTracker
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -193,6 +202,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	}
 	metrics.Metrics().RSICActionTotal("reflect", "completed").Inc()
 	slog.Info("RSIC reflect complete", "cycle_id", cycleID, "insight_count", len(insights))
+
+	// Phase 12 Epic 6: divergence detection on the just-produced insight set.
+	c.recordReflectDivergence(ctx, spaceID, insights)
 
 	if len(insights) == 0 {
 		outcome := &CycleOutcome{
@@ -401,6 +413,66 @@ func (c *CycleOrchestrator) SetDatasetProvider(p tsdb.DatasetProvider) {
 // SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
 func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProvider) {
 	c.tierEffProvider = p
+}
+
+// SetConflictTracker attaches the conflicting-guidance recorder so the
+// orchestrator can emit divergence rows when LLM and rule-based reflectors
+// disagree on the same dimension. Phase 12 Epic 6.
+func (c *CycleOrchestrator) SetConflictTracker(t *conversation.ConflictTracker) {
+	c.conflictTracker = t
+}
+
+// recordReflectDivergence inspects insights produced by Reflector.Reflect and
+// emits a guidance_conflicts row when two insights recommend opposing actions
+// for the same target. Currently detects the documented pair
+// (graduate_volatile vs tombstone_stale, both targeting volatile nodes), and
+// the prune-vs-refresh edge pair (prune_decayed_edges vs refresh_stale_edges).
+// Async (caller's critical path is unaffected) and gated by both
+// cfg.ConflictTrackerEnabled and a non-nil tracker.
+func (c *CycleOrchestrator) recordReflectDivergence(ctx context.Context, spaceID string, insights []ReflectionInsight) {
+	if c.conflictTracker == nil || !c.cfg.ConflictTrackerEnabled || len(insights) < 2 {
+		return
+	}
+
+	// Known opposing-pair sets. Add new entries as new dimensions surface.
+	opposingPairs := map[string]string{
+		"graduate_volatile":   "tombstone_stale",
+		"tombstone_stale":     "graduate_volatile",
+		"prune_decayed_edges": "refresh_stale_edges",
+		"refresh_stale_edges": "prune_decayed_edges",
+	}
+
+	// Sort insight actions for deterministic context-hash inputs.
+	actions := make([]string, 0, len(insights))
+	for _, in := range insights {
+		actions = append(actions, in.RecommendedAction)
+	}
+	sort.Strings(actions)
+
+	// First-wins: stop at the first detected opposition. The rate limiter in
+	// ConflictTracker.Track already prevents balloon-on-busy-cycle; we don't
+	// need to enumerate every conflicting pair per cycle.
+	for i, a := range actions {
+		if other, ok := opposingPairs[a]; ok {
+			for _, b := range actions[i+1:] {
+				if b == other {
+					rationale := fmt.Sprintf("RSIC reflect divergence: insights recommend both %q and %q for the same dimension; rule-based vs LLM reflectors disagree.", a, b)
+					rec := conversation.ConflictRecord{
+						SpaceID:                  spaceID,
+						RSICRecommendation:       strings.Join(actions, ","),
+						DivergenceKind:           conversation.DivergenceKindTextual,
+						Rationale:                rationale,
+						Source:                   "ape.cycle.reflect",
+						ContextHash:              conversation.HashContext(a, b, ""),
+					}
+					go func() {
+						_ = c.conflictTracker.Track(ctx, rec)
+					}()
+					return
+				}
+			}
+		}
+	}
 }
 
 // isReversibleAction returns true if the action type can be rolled back.

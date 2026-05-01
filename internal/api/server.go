@@ -1074,6 +1074,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 func (s *Server) SetTSDBClient(client *tsdb.Client) {
 	s.tsdbClient = client
 	if client != nil {
+		// Phase 12 Epic 6: construct ConflictTracker once and inject into the
+		// three Services that have hook sites. Per-space rate limiter defaults
+		// to 1 row/space/minute (the value bound inside conversation/conflict_tracker.go);
+		// emergency disable via CONFLICT_TRACKER_ENABLED=false stops Track() at
+		// the call sites without requiring the tracker itself to be reconstructed.
+		conflictTracker := conversation.NewConflictTracker(client.Pool(), 0)
+		if s.jiminySvc != nil {
+			s.jiminySvc.SetConflictTracker(conflictTracker)
+		}
+		if s.consultant != nil {
+			s.consultant.SetConflictTracker(conflictTracker)
+		}
+		if s.rsicCycle != nil {
+			s.rsicCycle.SetConflictTracker(conflictTracker)
+		}
+		slog.Info("conflict_tracker: production hooks wired",
+			"enabled", s.cfg.ConflictTrackerEnabled,
+			"sites", "jiminy.Guide+consulting.Suggest+ape.cycle.Reflect")
+	}
+	if client != nil {
 		s.tsdbWriter = tsdb.NewMetricWriter(
 			client,
 			s.cfg.RSICWatchdogSpaceID,

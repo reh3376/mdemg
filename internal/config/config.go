@@ -490,6 +490,14 @@ type Config struct {
 	// reflector.Reflect() and releases on completion.
 	RSICLLMConcurrencyLimit int // RSIC_LLM_CONCURRENCY_LIMIT — max in-flight RSIC LLM calls (default: 2, min 1, max 8)
 
+	// Phase 12 Epic 6 (Workstream C #1): production wiring for the
+	// conflicting-guidance tracker. The recorder + V0015 hypertable
+	// shipped in Phase 11.6.x; this knob gates whether the three
+	// production decision sites (jiminy guidance, ape RSIC reflect,
+	// consulting suggestions) actually call ConflictTracker.Track().
+	// Default true — emergency-disable lever for if hooks misbehave.
+	ConflictTrackerEnabled bool // CONFLICT_TRACKER_ENABLED — enable production divergence-detection hooks (default: true)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -2453,6 +2461,8 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("RSIC_LLM_CONCURRENCY_LIMIT must be between 1 and 8 (got %d)", rsicLLMConcurrencyLimit)
 	}
 
+	conflictTrackerEnabled := getBool("CONFLICT_TRACKER_ENABLED", true)
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3851,6 +3861,7 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectCompress:           rsicLLMReflectCompress,
 		RSICLLMReflectTimeoutMs:          rsicLLMReflectTimeoutMs,
 		RSICLLMConcurrencyLimit:          rsicLLMConcurrencyLimit,
+		ConflictTrackerEnabled:           conflictTrackerEnabled,
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
