@@ -26,8 +26,8 @@
     {"name": "service_relationships", "count": 5, "weight": 1.0}
   ],
   "questions": {
-    "source_file": "docs/benchmarks/whk-wms/test_questions_120.json",
-    "agent_file": "demo-test/lnl_demo_questions_agent.json",
+    "source_file": "docs/architecture/benchmarks/whk-wms/test_questions_120.json",
+    "agent_file": "docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json",
     "total_questions": 40,
     "sampling": "stratified",
     "seed": 42

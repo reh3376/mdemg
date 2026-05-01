@@ -33,6 +33,10 @@ from uxts_report import build_result as _canonical_result, build_report as _cano
 # Add parent directories to path for imports
 SCRIPT_DIR = Path(__file__).resolve().parent
 MDEMG_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+# grader_v4 + answer_generator live under docs/architecture/benchmarks/.
+# Insert both paths so legacy `docs/benchmarks/` and current
+# `docs/architecture/benchmarks/` resolve regardless of where the runner is invoked from.
+sys.path.insert(0, str(MDEMG_ROOT / "docs" / "architecture" / "benchmarks"))
 sys.path.insert(0, str(MDEMG_ROOT / "docs" / "benchmarks"))
 
 try:
@@ -425,7 +429,9 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
 
 
 def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
-                       output_dir: Optional[str] = None) -> List[Dict]:
+                       output_dir: Optional[str] = None,
+                       retrieve_timeout_s: float = 30.0,
+                       space_id_override: Optional[str] = None) -> List[Dict]:
     """Run inline grading: retrieve from MDEMG, build answers, grade with Grader.
 
     GAP-04: This replaces the manual two-step pipeline (run_benchmark_v4 + grader_v4)
@@ -439,7 +445,19 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
         )]
 
     runner = UVTSRunner(spec_path, profile)
-    questions = runner._sample_questions()
+
+    # Resolve master question file path (mirror UVTSRunner.run() resolution).
+    master_path = runner.spec_path.parent.parent.parent.parent / runner.questions_config["source_file"]
+    if not master_path.exists():
+        master_path = MDEMG_ROOT / runner.questions_config["source_file"]
+    if not master_path.exists():
+        return [_canonical_result(
+            spec_path=spec_path, status="error", hash_verified=None,
+            assertions_evaluated=0, assertions_passed=0,
+            error=f"Master question file not found at expected paths: {runner.questions_config['source_file']}",
+        )]
+
+    questions = runner.load_questions(str(master_path))
 
     # Build output directory
     if output_dir is None:
@@ -451,7 +469,7 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
     print(f"Profile: {profile} | Questions: {len(questions)} | Server: {base_url}")
     print("-" * 60)
 
-    space_id = runner.validation.get("space_id", "mdemg-dev")
+    space_id = space_id_override or runner.validation.get("space_id", "mdemg-dev")
     answers = []
     grade_list = []
     total_scores = []
@@ -459,10 +477,12 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
     for i, q in enumerate(questions):
         # Step 1: Call MDEMG retrieve API
         try:
+            # Field is query_text per internal/models/models.go RetrieveRequest;
+            # earlier `query` value silently 400'd at the validator.
             resp = requests.post(
                 f"{base_url}/v1/memory/retrieve",
-                json={"space_id": space_id, "query": q["question"], "top_k": 5},
-                timeout=10,
+                json={"space_id": space_id, "query_text": q["question"], "top_k": 5},
+                timeout=retrieve_timeout_s,
             )
             if resp.status_code != 200:
                 print(f"  [{i+1}/{len(questions)}] Retrieve failed: HTTP {resp.status_code}")
@@ -515,15 +535,32 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
     # Step 3: Grade with Grader if available
     if HAS_GRADER:
         try:
-            # Write master questions file for Grader
+            # Grader.__init__ takes the questions list directly (per grader_v4.py:300);
+            # earlier code passed a path string here, which made Python attempt to
+            # iterate the path as if it were a list of dicts and surfaced as
+            # "string indices must be integers, not 'str'".
+            grader = Grader(questions)
+            grades, aggregate = grader.grade_all(answers)
+
+            # _build_graded_results expects {"summary": {...}, "grades": [...]} on
+            # disk. AggregateMetrics is a @dataclass, but its `mean` field is the
+            # canonical aggregate score — _build_graded_results reads
+            # summary.mean_score, so we map it explicitly.
+            from dataclasses import asdict as _asdict
+            agg_dict = _asdict(aggregate)
+            grades_data = {
+                "summary": {
+                    "mean_score": agg_dict.get("mean", 0.0),
+                    "aggregate": agg_dict,
+                    "token_usage": {"total": 0},
+                },
+                "grades": [g.to_dict() for g in grades],
+            }
+
+            # Persist questions + grades for forensic re-grading downstream.
             master_file = output_path / "questions_master.json"
             with open(master_file, "w") as f:
-                json.dump(questions, f, indent=2)
-
-            grader = Grader(str(master_file))
-            grades_data = grader.grade_all(answers)
-
-            # Write grades file
+                json.dump({"questions": questions}, f, indent=2)
             grades_file = output_path / "grades.json"
             with open(grades_file, "w") as f:
                 json.dump(grades_data, f, indent=2)
@@ -563,6 +600,10 @@ def main():
                        help="Output directory (default: auto-generated)")
     parser.add_argument("--grades", help="Path to grades.json to display results")
     parser.add_argument("--base-url", help="MDEMG server URL for inline grading (GAP-04)")
+    parser.add_argument("--retrieve-timeout-s", type=float, default=30.0,
+                        help="Per-question retrieve API timeout in seconds (default 30; bump for slow dev pipelines)")
+    parser.add_argument("--space-id", default=None,
+                        help="Override the spec's validation.space_id (e.g. for cross-space A/B). If unset, uses spec value.")
     parser.add_argument("--report", help="Output file path for canonical JSON report")
 
     args = parser.parse_args()
@@ -573,7 +614,9 @@ def main():
     if args.base_url:
         try:
             canonical_results = run_inline_grading(
-                args.spec, args.base_url, args.profile, args.output_dir
+                args.spec, args.base_url, args.profile, args.output_dir,
+                retrieve_timeout_s=args.retrieve_timeout_s,
+                space_id_override=args.space_id,
             )
         except Exception as e:
             print(f"ERROR: Inline grading failed: {e}", file=sys.stderr)
