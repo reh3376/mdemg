@@ -99,7 +99,13 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	// J11/J14: Initialize semantic outcome classifier if enabled
 	var classifier *OutcomeClassifier
 	if cfg.JiminyOutcomeClassifierEnabled && embedder != nil {
-		classifierBaseURL := cfg.OpenAIEndpoint
+		// Phase 11.6.2: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches the
+		// OutcomeClassifier's Tier-2 LLM (jiminy.evaluate_llm). Pre-fix, this site sent
+		// every Tier-2 classification to cfg.OpenAIEndpoint with model_name=local-path,
+		// which OpenAI rejected with "http 400 invalid model ID" — the classifier then
+		// fell back to heuristic and Phase 11.6.x's swap-fix swap at outcome_classifier.go:142
+		// could never actually fire in production. Test B (live validation) surfaced this.
+		classifierBaseURL := cfg.EffectiveLLMEndpoint()
 		if cfg.JiminySynthesisProvider == "ollama" {
 			classifierBaseURL = cfg.OllamaEndpoint
 		}
