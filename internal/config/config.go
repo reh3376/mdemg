@@ -484,6 +484,12 @@ type Config struct {
 	RSICLLMReflectCompress  bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
 	RSICLLMReflectTimeoutMs int    // RSIC_LLM_REFLECT_TIMEOUT_MS — timeout for reflection LLM call in ms (default: 15000, min 5000)
 
+	// Phase 11.6.x: per-space concurrency cap on RSIC LLM-bound stages (Reflect)
+	// to prevent unbounded fan-out from saturating the local mlx server and
+	// triggering Metal OOM. CycleOrchestrator acquires a slot before
+	// reflector.Reflect() and releases on completion.
+	RSICLLMConcurrencyLimit int // RSIC_LLM_CONCURRENCY_LIMIT — max in-flight RSIC LLM calls (default: 2, min 1, max 8)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -829,7 +835,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 13)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 15)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -2439,6 +2445,14 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("RSIC_LLM_REFLECT_TIMEOUT_MS must be >= 5000")
 	}
 
+	rsicLLMConcurrencyLimit, err := atoi("RSIC_LLM_CONCURRENCY_LIMIT", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicLLMConcurrencyLimit < 1 || rsicLLMConcurrencyLimit > 8 {
+		return Config{}, fmt.Errorf("RSIC_LLM_CONCURRENCY_LIMIT must be between 1 and 8 (got %d)", rsicLLMConcurrencyLimit)
+	}
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3327,7 +3341,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 13)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 15)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3836,6 +3850,7 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectModel:              rsicLLMReflectModel,
 		RSICLLMReflectCompress:           rsicLLMReflectCompress,
 		RSICLLMReflectTimeoutMs:          rsicLLMReflectTimeoutMs,
+		RSICLLMConcurrencyLimit:          rsicLLMConcurrencyLimit,
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,

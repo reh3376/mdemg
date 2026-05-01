@@ -139,7 +139,11 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 			APIKey:    cfg.LLMAPIKey,
 			BaseURL:   cfg.LLMBaseURL,
 			TimeoutMs: 15000,
-		}).WithContext("jiminy.evaluate", "")
+		}).WithContext("jiminy.evaluate_llm", "")
+		// Phase 11.6.x — task_name now matches the prompt content. The OutcomeClassifier
+		// emits classifySystemPrompt (hashes 1f02ee46... and historical f897ae32...),
+		// which the ULTS spec assigns to jiminy.evaluate_llm. Pre-fix this site was
+		// tagging rows as jiminy.evaluate; V0014 backfills the ~338 historical rows.
 	}
 
 	return oc

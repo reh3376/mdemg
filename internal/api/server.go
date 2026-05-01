@@ -575,7 +575,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 		// J13: Wire LLM evaluator
 		if cfg.JiminyEvaluateLLMEnabled {
-			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.evaluate_llm
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches the J13 evaluator.
 			evalBaseURL := cfg.EffectiveLLMEndpoint()
 			evalAPIKey := cfg.OpenAIAPIKey
 			if cfg.JiminyEvaluateLLMProvider == "ollama" {
@@ -587,7 +587,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				APIKey:    evalAPIKey,
 				BaseURL:   evalBaseURL,
 				TimeoutMs: cfg.JiminyEvaluateLLMTimeoutMs,
-			}).WithContext("jiminy.evaluate_llm", "")
+				// Phase 11.6.x — the J13 evaluator emits eval_prompt.go's evalSystemPrompt
+				// (hash caf70a3d...), which the ULTS spec assigns to jiminy.evaluate. Pre-fix
+				// this site was tagging rows as jiminy.evaluate_llm; V0014 backfills the ~106
+				// historical rows. The config flag stays JIMINY_EVALUATE_LLM_ENABLED for
+				// backward compat — the flag name is decoupled from the task_name.
+			}).WithContext("jiminy.evaluate", "")
 			evaluator := jiminySvc.GetEvaluator()
 			if evaluator != nil {
 				evaluator.SetLLM(evalLLM, cbRegistry)

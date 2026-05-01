@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-21
+**Date:** 2026-05-01
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -56,7 +56,20 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-04-30) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+- ✅ **FT-LORA-PHASE11.6.x: Operational hygiene bundle** (2026-05-01):
+  - **Forced by a realized Metal-OOM on the production mlx mid-sprint** — exactly the failure mode Epic 1 prevents. Restart with new flags + new binary recovered cleanly.
+  - **Epic 1 — RSIC concurrency-limit semaphore** (`internal/ape/cycle.go`): new `acquireLLMSlot/releaseLLMSlot` helpers wrap `reflector.Reflect()`. Config knob `RSIC_LLM_CONCURRENCY_LIMIT` (default 2, min 1, max 8); metric `mdemg_rsic_llm_semaphore_blocked_total`. 5 unit tests including 8-goroutine stress.
+  - **Epic 2 — Jiminy task_name swap fix**: `outcome_classifier.go:142` ↔ `server.go:590` had `WithContext("jiminy.evaluate", ...)` and `WithContext("jiminy.evaluate_llm", ...)` crossed. Both flipped. **V0014 backfill relabeled 447 historical rows** (109 + 248 + 90) with three-way hash routing + post-migration consistency check. New rows post-restart confirmed correctly tagged.
+  - **Epic 3 — Grafana panels**: new `dashboards/mdemg-llm-routing.json` (uid `mdemg-llm-routing`). 4 panels: model_name distribution, latency p50/p95/p99 by task × model, error rate %, open circuit-breaker count.
+  - **Epic 4 — mlx prompt-cache**: `--prompt-cache-size 4096` documented in `CLAUDE.md` runbook + active on running mlx. Empirical before/after measurement deferred to a quieter operational window.
+  - **Epic 5 — Conflicting-guidance tracker (Action 1)**: new `internal/conversation/conflict_tracker.go` (per-space rate limiter, nil-pool fail-open, nil-receiver safe). New TSDB hypertable `guidance_conflicts` (V0015). 7 tests including a live-TSDB integration test. **Subsystem callback wiring deferred to next sprint** — recorder ready for the 3-month observation window that empirically justifies Note 09 (FEP capstone).
+  - **Schema**: 13 → **15** (V0014 + V0015 applied; `TSDB_REQUIRED_SCHEMA_VERSION` default bumped).
+  - **Tests**: full `go test ./...` green. New tests: 5 in `cycle_test.go` + 7 in `conflict_tracker_test.go`.
+  - **Costs**: $0 OpenAI; ~3 hr compute.
+  - Doc: [`phase_11_6_x_post.md`](docs/development/ft-lora/phase_11_6_x_post.md). Plan: [`sprint_plan_phase_11_6_x_hygiene.md`](docs/development/ft-lora/sprint_plan_phase_11_6_x_hygiene.md). Roadmap: [`SPRINT_ROADMAP_POST_FT_LORA.md`](docs/development/SPRINT_ROADMAP_POST_FT_LORA.md).
+  - **Open follow-ups for next sprint**: (a) wire ConflictTracker into Jiminy/RSIC/Consulting decision callbacks; (b) collapse `model_name` full-path vs short-name variants in `llm_interactions`; (c) measure prompt-cache before/after under sustained load.
+
 - ✅ **FT-LORA-PHASE11.6: Production cutover — all 16 LLM call sites now route at local `mdemg-llm-v1`** (2026-04-30):
   - **Goal of the entire FT-LORA project achieved.** Renamed Phase 5 dense to `mdemg-llm-v1` (stable production ID via symlink `.local-models/mdemg-llm-v1/` → `qwen3-14b-mdemg-v1/`). All 16 MDEMG LLM call sites switched from cloud gpt-5.4-mini to local model served by `mlx_lm.server :8101`.
   - **Code**: 3 pre-existing config-wiring bugs in `internal/api/server.go` patched (consulting.classify, jiminy.synthesize, ape.reflect were using `cfg.OpenAIEndpoint` directly instead of `cfg.EffectiveLLMEndpoint()`).

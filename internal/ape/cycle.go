@@ -40,6 +40,13 @@ type CycleOrchestrator struct {
 	cfg              config.Config
 	policy           *OrchestrationPolicy
 	tierEffProvider  TierEffectivenessProvider // NLI feedback loop: tier effectiveness dataset builder
+
+	// Phase 11.6.x: bounded-buffer channel acts as a counting semaphore around
+	// reflector.Reflect to cap concurrent LLM calls per orchestrator instance.
+	// Capacity = cfg.RSICLLMConcurrencyLimit. Send to acquire, receive on defer
+	// to release. nil disables throttling (used by tests that pre-construct an
+	// orchestrator without going through NewCycleOrchestrator).
+	llmSem chan struct{}
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -53,6 +60,10 @@ func NewCycleOrchestrator(
 	calibrator *Calibrator,
 	watchdog *Watchdog,
 ) *CycleOrchestrator {
+	limit := cfg.RSICLLMConcurrencyLimit
+	if limit < 1 {
+		limit = 1
+	}
 	return &CycleOrchestrator{
 		assessor:   assessor,
 		reflector:  reflector,
@@ -62,7 +73,41 @@ func NewCycleOrchestrator(
 		calibrator: calibrator,
 		watchdog:   watchdog,
 		cfg:        cfg,
+		llmSem:     make(chan struct{}, limit),
 	}
+}
+
+// acquireLLMSlot blocks the calling goroutine until the per-orchestrator
+// LLM-stage semaphore has free capacity. The first arrival path is a
+// non-blocking send; only when that fails do we increment the blocked
+// counter and wait for a slot to free. Returns ctx.Err() if cancelled
+// while waiting. A nil llmSem returns immediately so test orchestrators
+// constructed without NewCycleOrchestrator are not forced to set it up.
+func (c *CycleOrchestrator) acquireLLMSlot(ctx context.Context) error {
+	if c.llmSem == nil {
+		return nil
+	}
+	select {
+	case c.llmSem <- struct{}{}:
+		return nil
+	default:
+	}
+	metrics.Metrics().RSICLLMSemaphoreBlocked.Inc()
+	select {
+	case c.llmSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// releaseLLMSlot frees one slot acquired via acquireLLMSlot. Safe to call
+// when llmSem is nil; pairs with acquireLLMSlot via defer.
+func (c *CycleOrchestrator) releaseLLMSlot() {
+	if c.llmSem == nil {
+		return
+	}
+	<-c.llmSem
 }
 
 // RunCycle executes the full 5-stage RSIC cycle for the given space and tier.
@@ -129,7 +174,17 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		return outcome, nil
 	}
 
-	// Stage 2: Reflect
+	// Stage 2: Reflect — bounded by per-orchestrator LLM-stage semaphore so
+	// a fan-out of concurrent RunCycle calls cannot saturate the local model
+	// server. The blocked-counter only increments when a goroutine actually
+	// has to wait, so a healthy run with sufficient capacity stays at zero.
+	if err := c.acquireLLMSlot(ctx); err != nil {
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
+		return nil, fmt.Errorf("reflect cancelled while waiting for llm slot: %w", err)
+	}
+	defer c.releaseLLMSlot()
+
 	insights, err := c.reflector.Reflect(ctx, report)
 	if err != nil {
 		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()

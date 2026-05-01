@@ -94,6 +94,12 @@ type StandardMetrics struct {
 	// RSIC safety metrics
 	RSICSafetyBlocked func(action, reason string) *Counter
 
+	// Phase 11.6.x: RSIC LLM-stage concurrency-limit instrumentation. Increments
+	// each time CycleOrchestrator must wait for an in-flight slot to free up
+	// before reflector.Reflect can run. Sustained non-zero values indicate the
+	// configured RSIC_LLM_CONCURRENCY_LIMIT is the rate-determining factor.
+	RSICLLMSemaphoreBlocked *Counter
+
 	// RSIC watchdog metrics
 	RSICWatchdogDecay      func(spaceID string) *Gauge
 	RSICWatchdogEscalation func(spaceID string) *Gauge
@@ -337,6 +343,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("rsic_safety_blocked_total", "RSIC safety blocks",
 			map[string]string{"action": action, "reason": reason})
 	}
+
+	// Phase 11.6.x — RSIC LLM-stage concurrency throttle counter
+	m.RSICLLMSemaphoreBlocked = r.NewCounter("mdemg_rsic_llm_semaphore_blocked_total",
+		"RSIC cycles that waited for an in-flight LLM-stage slot before reflector.Reflect", nil)
 
 	// RSIC watchdog metrics
 	m.RSICWatchdogDecay = func(spaceID string) *Gauge {
