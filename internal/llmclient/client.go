@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"mdemg/internal/mlxprobe"
 )
 
 // contextKey is an unexported type for context keys in this package.
@@ -468,7 +470,21 @@ func (c *Client) calculateBackoff(attempt int, retryAfter time.Duration) time.Du
 }
 
 // doWithRetry wraps fn with retry logic. fn is called up to MaxAttempts+1 times.
+//
+// Phase 11.6.3 (MLX Watchdog) fast-fail gate: if the mlxprobe singleton reports
+// the configured LLM endpoint is StateDown AND fast-fail is enabled, return
+// ErrMLXDown immediately — the 6-attempt × ~30 s retry loop is the source of
+// the retry-storm pattern when mlx_lm.server crashes. The gate keys on the
+// client's baseURL so OpenAI embedding clients (different endpoint) are
+// unaffected.
 func (c *Client) doWithRetry(ctx context.Context, fn func() (string, int, error)) (string, int, error) {
+	if mlxprobe.FastFailEnabled() {
+		if p := mlxprobe.Default(); p != nil && p.Endpoint() == c.baseURL && p.State() == mlxprobe.StateDown {
+			mlxprobe.NotifyFastFail(c.taskName, c.baseURL)
+			return "", 0, ErrMLXDown
+		}
+	}
+
 	if !c.retryCfg.Enabled || c.retryCfg.MaxAttempts <= 0 {
 		return fn()
 	}

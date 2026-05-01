@@ -16,12 +16,22 @@ import (
 var launchdServices = []struct {
 	Label    string
 	Template string
+	// Optional services are skipped at install time if their prerequisites
+	// are missing (e.g. mlx-server skipped when mlx_lm.server isn't on PATH).
+	// Required services fail Install() loudly when their template can't be
+	// rendered.
+	Optional bool
 }{
-	{"com.mdemg.server", "com.mdemg.server.plist"},
-	{"com.mdemg.neural-sidecar", "com.mdemg.neural-sidecar.plist"},
-	{"com.mdemg.ingest-claude-md", "com.mdemg.ingest-claude-md.plist"},
-	{"com.mdemg.training-export", "com.mdemg.training-export.plist"},
-	{"com.mdemg.maintenance", "com.mdemg.maintenance.plist"},
+	{"com.mdemg.server", "com.mdemg.server.plist", false},
+	{"com.mdemg.neural-sidecar", "com.mdemg.neural-sidecar.plist", false},
+	{"com.mdemg.ingest-claude-md", "com.mdemg.ingest-claude-md.plist", false},
+	{"com.mdemg.training-export", "com.mdemg.training-export.plist", false},
+	{"com.mdemg.maintenance", "com.mdemg.maintenance.plist", false},
+	// Phase 11.6.3 — MLX Watchdog. Auto-restarts mlx_lm.server on Metal-OOM
+	// crashes (KeepAlive.SuccessfulExit=false + ThrottleInterval=60s). Optional
+	// because mlx_lm is only available on Apple Silicon hosts that have run
+	// the FT-LORA pip install; absence is normal on Linux/Docker-only setups.
+	{"com.mdemg.mlx-server", "com.mdemg.mlx-server.plist", true},
 }
 
 type darwinServiceManager struct{}
@@ -54,9 +64,22 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	// Resolve python binary for neural sidecar
 	pythonBin := resolvePythonBin(projectDir)
 
+	// Resolve mlx_lm.server binary + default model path for the optional
+	// mlx-server plist. Values are looked up once; if mlx_lm isn't installed
+	// the optional service is skipped below.
+	mlxLMBin, mlxLMFound := resolveMLXLMBin()
+	modelPath := resolveMDEMGModelPath(projectDir)
+
 	templateDir := filepath.Join(projectDir, "packaging", "launchd")
 
 	for _, svc := range launchdServices {
+		// Optional services skip install when their prerequisites are missing.
+		if svc.Optional && svc.Label == "com.mdemg.mlx-server" && !mlxLMFound {
+			fmt.Printf("Skipping %s — mlx_lm.server not found on PATH (set MDEMG_MLX_LM_BIN to override)\n",
+				svc.Label)
+			continue
+		}
+
 		// Try disk first (repo checkout), fall back to embedded templates (Homebrew/binary)
 		tmpl, err := os.ReadFile(filepath.Join(templateDir, svc.Template))
 		if err != nil {
@@ -72,6 +95,8 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 		content = strings.ReplaceAll(content, "__HOME__", home)
 		content = strings.ReplaceAll(content, "__SPACE_ID__", spaceID)
 		content = strings.ReplaceAll(content, "__PYTHON_BIN__", pythonBin)
+		content = strings.ReplaceAll(content, "__MLX_LM_BIN__", mlxLMBin)
+		content = strings.ReplaceAll(content, "__MDEMG_MODEL_PATH__", modelPath)
 
 		destPath := filepath.Join(launchAgentsDir, svc.Template)
 		if err := os.WriteFile(destPath, []byte(content), 0644); err != nil {
@@ -89,6 +114,30 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	}
 
 	return nil
+}
+
+// resolveMLXLMBin locates mlx_lm.server: env override (MDEMG_MLX_LM_BIN), then
+// PATH lookup. Returns ("", false) if neither resolves to an executable.
+func resolveMLXLMBin() (string, bool) {
+	if env := os.Getenv("MDEMG_MLX_LM_BIN"); env != "" {
+		if _, err := os.Stat(env); err == nil {
+			return env, true
+		}
+	}
+	if path, err := exec.LookPath("mlx_lm.server"); err == nil {
+		return path, true
+	}
+	return "", false
+}
+
+// resolveMDEMGModelPath returns the model path for the mlx-server plist. Order:
+// MDEMG_MODEL_PATH env override, then <projectDir>/.local-models/mdemg-llm-v1
+// (the canonical Phase 11.5e production symlink).
+func resolveMDEMGModelPath(projectDir string) string {
+	if env := os.Getenv("MDEMG_MODEL_PATH"); env != "" {
+		return env
+	}
+	return filepath.Join(projectDir, ".local-models", "mdemg-llm-v1")
 }
 
 func (m *darwinServiceManager) Uninstall() error {

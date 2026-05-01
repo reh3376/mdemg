@@ -1,0 +1,176 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "LLM call distribution by model_name (24h)",
+      "type": "timeseries",
+      "description": "Stacked count of llm_interactions rows per model_name. Surfaces traffic shifts after the Phase 11.6 cutover and any unexpected fallback to OpenAI.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(model_name, 'unknown') AS metric, COUNT(*) AS value FROM llm_interactions WHERE $__timeFilter(time) AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": { "mode": "normal", "group": "A" },
+            "lineWidth": 0
+          },
+          "noValue": "0"
+        }
+      }
+    },
+    {
+      "title": "LLM latency p50 / p95 / p99 by task × model",
+      "type": "table",
+      "description": "Per (task_name, model_name) percentiles over the selected range. Compare gpt-5.4-mini (cloud) vs mdemg-llm-v1 (local) per task.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT task_name, COALESCE(model_name, 'unknown') AS model_name, COUNT(*) AS calls, percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms)::int AS p50_ms, percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms)::int AS p95_ms, percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms)::int AS p99_ms FROM llm_interactions WHERE $__timeFilter(time) AND latency_ms IS NOT NULL AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1, 2",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "noValue": "—" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p50_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          }
+        ]
+      }
+    },
+    {
+      "title": "LLM error rate % by task_name (selected range)",
+      "type": "table",
+      "description": "Percentage of llm_interactions with non-null error per task_name. Spikes indicate timeout pressure, breaker trips, or model failure modes.",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT task_name, COUNT(*) AS calls, SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) AS errors, ROUND(100.0 * SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS error_pct FROM llm_interactions WHERE $__timeFilter(time) AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1 ORDER BY error_pct DESC NULLS LAST, calls DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "noValue": "0" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error_pct" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Open circuit-breakers (current count)",
+      "type": "stat",
+      "description": "Number of named circuit breakers currently in StateOpen. Counter is exported as mdemg_circuit_breaker_state{state=\"open\"} — one series per breaker, summed here. With CIRCUIT_BREAKER_ENABLED=false the value should stay at 0; non-zero indicates a transient trip needing operator attention via /v1/admin/breakers/reset.",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT now() AS time, COALESCE(SUM(CASE WHEN labels->>'state' = 'open' THEN value ELSE 0 END), 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_circuit_breaker_state' AND time > now() - interval '5 minutes' AND space_id = '$space_id'",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["mdemg", "llm", "routing"],
+  "templating": {
+    "list": [
+      {
+        "allValue": "",
+        "current": { "selected": false, "text": "mdemg-dev", "value": "mdemg-dev" },
+        "datasource": { "type": "postgres", "uid": "timescaledb" },
+        "definition": "SELECT DISTINCT space_id FROM llm_interactions WHERE time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM llm_interactions WHERE time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG LLM Routing",
+  "uid": "mdemg-llm-routing",
+  "version": 1,
+  "refresh": "1m"
+}

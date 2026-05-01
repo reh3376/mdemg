@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"mdemg/internal/config"
+	"mdemg/internal/conversation"
 	"mdemg/internal/metrics"
 	"mdemg/internal/tsdb"
 )
@@ -40,6 +43,19 @@ type CycleOrchestrator struct {
 	cfg              config.Config
 	policy           *OrchestrationPolicy
 	tierEffProvider  TierEffectivenessProvider // NLI feedback loop: tier effectiveness dataset builder
+
+	// Phase 11.6.x: bounded-buffer channel acts as a counting semaphore around
+	// reflector.Reflect to cap concurrent LLM calls per orchestrator instance.
+	// Capacity = cfg.RSICLLMConcurrencyLimit. Send to acquire, receive on defer
+	// to release. nil disables throttling (used by tests that pre-construct an
+	// orchestrator without going through NewCycleOrchestrator).
+	llmSem chan struct{}
+
+	// Phase 12 Epic 6: optional ConflictTracker for divergence-detection
+	// hooks. Wired by server.go via SetConflictTracker; nil-receiver-safe
+	// in conversation.ConflictTracker.Track so the hook is gated only by
+	// non-nil + cfg.ConflictTrackerEnabled.
+	conflictTracker *conversation.ConflictTracker
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -53,6 +69,10 @@ func NewCycleOrchestrator(
 	calibrator *Calibrator,
 	watchdog *Watchdog,
 ) *CycleOrchestrator {
+	limit := cfg.RSICLLMConcurrencyLimit
+	if limit < 1 {
+		limit = 1
+	}
 	return &CycleOrchestrator{
 		assessor:   assessor,
 		reflector:  reflector,
@@ -62,7 +82,41 @@ func NewCycleOrchestrator(
 		calibrator: calibrator,
 		watchdog:   watchdog,
 		cfg:        cfg,
+		llmSem:     make(chan struct{}, limit),
 	}
+}
+
+// acquireLLMSlot blocks the calling goroutine until the per-orchestrator
+// LLM-stage semaphore has free capacity. The first arrival path is a
+// non-blocking send; only when that fails do we increment the blocked
+// counter and wait for a slot to free. Returns ctx.Err() if cancelled
+// while waiting. A nil llmSem returns immediately so test orchestrators
+// constructed without NewCycleOrchestrator are not forced to set it up.
+func (c *CycleOrchestrator) acquireLLMSlot(ctx context.Context) error {
+	if c.llmSem == nil {
+		return nil
+	}
+	select {
+	case c.llmSem <- struct{}{}:
+		return nil
+	default:
+	}
+	metrics.Metrics().RSICLLMSemaphoreBlocked.Inc()
+	select {
+	case c.llmSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// releaseLLMSlot frees one slot acquired via acquireLLMSlot. Safe to call
+// when llmSem is nil; pairs with acquireLLMSlot via defer.
+func (c *CycleOrchestrator) releaseLLMSlot() {
+	if c.llmSem == nil {
+		return
+	}
+	<-c.llmSem
 }
 
 // RunCycle executes the full 5-stage RSIC cycle for the given space and tier.
@@ -129,7 +183,17 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 		return outcome, nil
 	}
 
-	// Stage 2: Reflect
+	// Stage 2: Reflect — bounded by per-orchestrator LLM-stage semaphore so
+	// a fan-out of concurrent RunCycle calls cannot saturate the local model
+	// server. The blocked-counter only increments when a goroutine actually
+	// has to wait, so a healthy run with sufficient capacity stays at zero.
+	if err := c.acquireLLMSlot(ctx); err != nil {
+		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()
+		metrics.Metrics().RSICCycleDuration(string(tier)).ObserveDuration(startedAt)
+		return nil, fmt.Errorf("reflect cancelled while waiting for llm slot: %w", err)
+	}
+	defer c.releaseLLMSlot()
+
 	insights, err := c.reflector.Reflect(ctx, report)
 	if err != nil {
 		metrics.Metrics().RSICCycleTotal(string(tier), string(meta.TriggerSource), "error").Inc()
@@ -138,6 +202,9 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	}
 	metrics.Metrics().RSICActionTotal("reflect", "completed").Inc()
 	slog.Info("RSIC reflect complete", "cycle_id", cycleID, "insight_count", len(insights))
+
+	// Phase 12 Epic 6: divergence detection on the just-produced insight set.
+	c.recordReflectDivergence(ctx, spaceID, insights)
 
 	if len(insights) == 0 {
 		outcome := &CycleOutcome{
@@ -346,6 +413,66 @@ func (c *CycleOrchestrator) SetDatasetProvider(p tsdb.DatasetProvider) {
 // SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
 func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProvider) {
 	c.tierEffProvider = p
+}
+
+// SetConflictTracker attaches the conflicting-guidance recorder so the
+// orchestrator can emit divergence rows when LLM and rule-based reflectors
+// disagree on the same dimension. Phase 12 Epic 6.
+func (c *CycleOrchestrator) SetConflictTracker(t *conversation.ConflictTracker) {
+	c.conflictTracker = t
+}
+
+// recordReflectDivergence inspects insights produced by Reflector.Reflect and
+// emits a guidance_conflicts row when two insights recommend opposing actions
+// for the same target. Currently detects the documented pair
+// (graduate_volatile vs tombstone_stale, both targeting volatile nodes), and
+// the prune-vs-refresh edge pair (prune_decayed_edges vs refresh_stale_edges).
+// Async (caller's critical path is unaffected) and gated by both
+// cfg.ConflictTrackerEnabled and a non-nil tracker.
+func (c *CycleOrchestrator) recordReflectDivergence(ctx context.Context, spaceID string, insights []ReflectionInsight) {
+	if c.conflictTracker == nil || !c.cfg.ConflictTrackerEnabled || len(insights) < 2 {
+		return
+	}
+
+	// Known opposing-pair sets. Add new entries as new dimensions surface.
+	opposingPairs := map[string]string{
+		"graduate_volatile":   "tombstone_stale",
+		"tombstone_stale":     "graduate_volatile",
+		"prune_decayed_edges": "refresh_stale_edges",
+		"refresh_stale_edges": "prune_decayed_edges",
+	}
+
+	// Sort insight actions for deterministic context-hash inputs.
+	actions := make([]string, 0, len(insights))
+	for _, in := range insights {
+		actions = append(actions, in.RecommendedAction)
+	}
+	sort.Strings(actions)
+
+	// First-wins: stop at the first detected opposition. The rate limiter in
+	// ConflictTracker.Track already prevents balloon-on-busy-cycle; we don't
+	// need to enumerate every conflicting pair per cycle.
+	for i, a := range actions {
+		if other, ok := opposingPairs[a]; ok {
+			for _, b := range actions[i+1:] {
+				if b == other {
+					rationale := fmt.Sprintf("RSIC reflect divergence: insights recommend both %q and %q for the same dimension; rule-based vs LLM reflectors disagree.", a, b)
+					rec := conversation.ConflictRecord{
+						SpaceID:                  spaceID,
+						RSICRecommendation:       strings.Join(actions, ","),
+						DivergenceKind:           conversation.DivergenceKindTextual,
+						Rationale:                rationale,
+						Source:                   "ape.cycle.reflect",
+						ContextHash:              conversation.HashContext(a, b, ""),
+					}
+					go func() {
+						_ = c.conflictTracker.Track(ctx, rec)
+					}()
+					return
+				}
+			}
+		}
+	}
 }
 
 // isReversibleAction returns true if the action type can be rolled back.

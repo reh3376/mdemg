@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-04-21
+**Date:** 2026-05-01
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
@@ -56,7 +56,71 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-04-29) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+- ✅ **FT-LORA-PHASE11.6.3: MLX Watchdog (Operational Hygiene #2)** (2026-04-30) — auto-restart + fast-fail + degraded-mode protection. The retry-storm cascade observed in Phase 12 (1642% CPU when mlx died) is eliminated at the source. Phase 13 (Column-Voting Retrieval) unblocked for sustained live A/B testing.
+  - **`internal/mlxprobe` package** (~250 LOC): goroutine polling `<endpoint>/v1/models` every 5s, 2s timeout. State machine `up → degraded → down` with hysteresis (3-failure → down, 2-success → up). Atomic state, supervisor-managed lifecycle. Singleton pattern (`SetDefault`/`Default`) + observer hook (`SetFastFailObserver`) so llmclient stays metrics-free.
+  - **llmclient fast-fail gate** at `internal/llmclient/client.go:471`: 10-LOC check at top of `doWithRetry`. Returns new `ErrMLXDown` sentinel without entering retry math when `MLXFailFastEnabled && Default().Endpoint() == c.baseURL && State() == StateDown`. **Embeddings safe**: gate keys on baseURL match.
+  - **launchd plist** `packaging/launchd/com.mdemg.mlx-server.plist` (mirrored to embed dir): KeepAlive on crash, ThrottleInterval=60s, conservative Phase 12 mlx flags. `launchdServices` slice extension marked `Optional: true` — `mdemg service install` skips when `mlx_lm.server` not on PATH (`MDEMG_MLX_LM_BIN`/`MDEMG_MODEL_PATH` env overrides).
+  - **`mdemg watchdog status` CLI**: parses `/metrics` (line-oriented Prometheus parser), `launchctl print` (PID + restart generation + last exit), and `~/.mdemg/alerts/current.json` (last 5 mlx-server entries). `--json` flag validates with `jq`.
+  - **3 Prometheus metrics**: `mdemg_mlx_health_state{endpoint}`, `mdemg_mlx_fast_fail_total{caller_task}`, `mdemg_mlx_state_transitions_total{from,to}`.
+  - **Alert wiring**: up→down=High, down→up=Low; existing 300s cooldown handles 60s launchd restart-cycle flap suppression. Late-bound `srv.AlertDispatcher()` lookup avoids init-order hazards.
+  - **4 config knobs**: `MLX_WATCHDOG_ENABLED` (default `false` until Live Smoke 2 validates), `MLX_PROBE_INTERVAL_SEC` (5), `MLX_PROBE_TIMEOUT_SEC` (2; cross-field-validated `<` interval), `MLX_FAIL_FAST_ENABLED` (true; operator escape hatch).
+  - **Tests**: full `go test -race ./...` green; new tests in `mlxprobe`, `llmclient`, `config`, `cli` (watchdog + service_darwin), `tests/integration/mlx_watchdog_test.go` (100 concurrent fast-fails, OpenAI endpoint isolation). `golangci-lint` clean. **Tier 3 partial**: CLI verified against live system; destructive `kill -9 mlx` smokes (Live Smoke 1/2/3/4) deferred to operator-led validation per safe-execution policy.
+  - **Schema**: unchanged at 16. **Costs**: $0 OpenAI; ~3 hr local compute.
+  - **Decision-fork outcomes**: launchd-only > Go-binary supervisor; 5s/2s probe cadence; fast-fail only on `down` (degraded log-only); `MLX_WATCHDOG_ENABLED=false` rollout default; plist optional install.
+  - Doc: [`phase_11_6_3_post.md`](docs/development/ft-lora/phase_11_6_3_post.md). Plan: [`sprint_plan_phase_11_6_3.md`](docs/development/ft-lora/sprint_plan_phase_11_6_3.md).
+  - **Open follow-ups**: (a) operator-led Live Smoke 2 8h soak with periodic `kill -9` mlx; (b) flip `MLX_WATCHDOG_ENABLED` default `false → true` after Smoke 2 passes; (c) Phase 13 planning starts.
+
+- ✅ **POST-FT-LORA-PHASE12: UVTS Activation** (2026-05-01) — Sprint 2 of post-FT-LORA roadmap:
+  - **5 latent runner defects fixed** in `docs/tests/uvts/runners/uvts_runner.py`: undefined method, wrong API field name (`query` vs `query_text`), wrong sys.path (grader_v4 not importable), Grader API misuse (path string vs list), hardcoded 10s timeout fired before the dev pipeline returns. Plus `--retrieve-timeout-s`, `--space-id`, `--persist-tsdb`, `--branch-label`, `--codebase-sha` CLI flags.
+  - **TSDB V0016 migration** — `uvts_runs` + `uvts_results` (hypertable on `recorded_at`, 7-day chunks, `raw_grade` JSONB). `TSDB_REQUIRED_SCHEMA_VERSION` 15 → 16. Live-verified: 4 distinct branch_label runs landed in this sprint's smokes.
+  - **A/B compare harness** — new `uvts_ab_compare.py` with merge-gate criterion "B mean ≥ A mean AND no per-question regression > threshold". 3-case fixture smoke + 1 live A/B verified end-to-end. Optional `--persist-tsdb` writes verdict row with FK links to source runs.
+  - **Spec authoring** — `lnl_demo_validation` extended with `ab_mode` block; new `polysemy_resolution.uvts.json` (partial_authoring=true; 40-question polysemy authoring deferred to Note 05).
+  - **CI + Makefile** — new `make test-uvts-lint/-quick/-full` targets. Existing `uxts-canonical-specs.yml` already covered.
+  - **ConflictTracker production wiring** (Workstream C #1, deferred from 11.6.x) — `CONFLICT_TRACKER_ENABLED` config knob; setter+injection on 3 Services; hook sites at `ape.cycle.recordReflectDivergence`, `consulting.Suggest::detectConflicts>0`, `jiminy.Guide::confidence<0.30 + items>0`. All async + rate-limited. 9 unit tests for ape hook.
+  - **Live testing formalized as Tier 3 requirement** in `CLAUDE.md` (commit `d10c1a5`). CMS observation `p5iv8effstxk5ujd1fa2qfy8`. Evidence: every major defect across Phase 11.6.x/11.6.2/12.0-12.6 was caught in live smokes; unit+integration tests passed at every step.
+  - **Schema**: 15 → 16. **Tests**: full go test ./... green; +9 new in `internal/ape/conflict_tracker_hook_test.go`. **Costs**: $0 OpenAI.
+  - **Mid-sprint findings filed**: (a) MLX server fragility — Metal command-buffer OOM every 30-60min under sustained load — Phase 11.6.3 candidate (next sprint); (b) retry-storm pattern → 1642% CPU when mlx unreachable, needs llmclient connection-refused fast-fail.
+  - Doc: [`phase_12_uvts_post.md`](docs/development/post-ft-lora/phase_12_uvts_post.md). Plan: [`sprint_plan_phase_12_uvts.md`](docs/development/post-ft-lora/sprint_plan_phase_12_uvts.md). Roadmap: [`SPRINT_ROADMAP_POST_FT_LORA.md`](docs/development/SPRINT_ROADMAP_POST_FT_LORA.md).
+  - **Open follow-ups for next sprint**: (a) Phase 11.6.3 MLX watchdog (mandatory before further heavy live testing); (b) 333 stale `gpt-5.4-mini` rows in last 24h — audit for any post-`f81bfd6` to confirm no further bypass sites; (c) production ConflictTracker observation begins now (3-month window before Note 09 capstone re-evaluation).
+
+- ✅ **FT-LORA-PHASE11.6.x: Operational hygiene bundle** (2026-05-01):
+  - **Forced by a realized Metal-OOM on the production mlx mid-sprint** — exactly the failure mode Epic 1 prevents. Restart with new flags + new binary recovered cleanly.
+  - **Epic 1 — RSIC concurrency-limit semaphore** (`internal/ape/cycle.go`): new `acquireLLMSlot/releaseLLMSlot` helpers wrap `reflector.Reflect()`. Config knob `RSIC_LLM_CONCURRENCY_LIMIT` (default 2, min 1, max 8); metric `mdemg_rsic_llm_semaphore_blocked_total`. 5 unit tests including 8-goroutine stress.
+  - **Epic 2 — Jiminy task_name swap fix**: `outcome_classifier.go:142` ↔ `server.go:590` had `WithContext("jiminy.evaluate", ...)` and `WithContext("jiminy.evaluate_llm", ...)` crossed. Both flipped. **V0014 backfill relabeled 447 historical rows** (109 + 248 + 90) with three-way hash routing + post-migration consistency check. New rows post-restart confirmed correctly tagged.
+  - **Epic 3 — Grafana panels**: new `dashboards/mdemg-llm-routing.json` (uid `mdemg-llm-routing`). 4 panels: model_name distribution, latency p50/p95/p99 by task × model, error rate %, open circuit-breaker count.
+  - **Epic 4 — mlx prompt-cache**: `--prompt-cache-size 4096` documented in `CLAUDE.md` runbook + active on running mlx. Empirical before/after measurement deferred to a quieter operational window.
+  - **Epic 5 — Conflicting-guidance tracker (Action 1)**: new `internal/conversation/conflict_tracker.go` (per-space rate limiter, nil-pool fail-open, nil-receiver safe). New TSDB hypertable `guidance_conflicts` (V0015). 7 tests including a live-TSDB integration test. **Subsystem callback wiring deferred to next sprint** — recorder ready for the 3-month observation window that empirically justifies Note 09 (FEP capstone).
+  - **Schema**: 13 → **15** (V0014 + V0015 applied; `TSDB_REQUIRED_SCHEMA_VERSION` default bumped).
+  - **Tests**: full `go test ./...` green. New tests: 5 in `cycle_test.go` + 7 in `conflict_tracker_test.go`.
+  - **Costs**: $0 OpenAI; ~3 hr compute.
+  - Doc: [`phase_11_6_x_post.md`](docs/development/ft-lora/phase_11_6_x_post.md). Plan: [`sprint_plan_phase_11_6_x_hygiene.md`](docs/development/ft-lora/sprint_plan_phase_11_6_x_hygiene.md). Roadmap: [`SPRINT_ROADMAP_POST_FT_LORA.md`](docs/development/SPRINT_ROADMAP_POST_FT_LORA.md).
+  - **Open follow-ups for next sprint**: (a) wire ConflictTracker into Jiminy/RSIC/Consulting decision callbacks; (b) collapse `model_name` full-path vs short-name variants in `llm_interactions`; (c) measure prompt-cache before/after under sustained load.
+
+- ✅ **FT-LORA-PHASE11.6: Production cutover — all 16 LLM call sites now route at local `mdemg-llm-v1`** (2026-04-30):
+  - **Goal of the entire FT-LORA project achieved.** Renamed Phase 5 dense to `mdemg-llm-v1` (stable production ID via symlink `.local-models/mdemg-llm-v1/` → `qwen3-14b-mdemg-v1/`). All 16 MDEMG LLM call sites switched from cloud gpt-5.4-mini to local model served by `mlx_lm.server :8101`.
+  - **Code**: 3 pre-existing config-wiring bugs in `internal/api/server.go` patched (consulting.classify, jiminy.synthesize, ape.reflect were using `cfg.OpenAIEndpoint` directly instead of `cfg.EffectiveLLMEndpoint()`).
+  - **Smoke test (native binary on patched code)**: 5 of 16 task surfaces verified routing to `mdemg-llm-v1`: query_classify (9 OK), intent_translate (14 OK), rerank_cross (5 OK), ape.reflect (2 OK), consulting.classify (1 pre-patch call). Remaining 11 task surfaces are background-triggered, share identical infrastructure, will route correctly when they fire.
+  - **Two architectural constraints surfaced**: (1) RSIC concurrent fan-out → Metal OOM in `mlx_lm.server`; workaround `--prompt-concurrency 1`; long-term fix is rate-limiting RSIC scheduler. (2) Local LLM 10-50× slower than cloud — every per-task timeout bumped (e.g., `RSIC_LLM_REFLECT_TIMEOUT_MS=180000`).
+  - **Container redeploy gated on next CI image build** — running Docker container uses pre-patch GHCR image. Post-merge: `docker compose pull mdemg && docker compose up -d`.
+  - **Production-use**: `mlx_lm.server --model /Users/reh3376/mdemg/.local-models/mdemg-llm-v1 --host 127.0.0.1 --port 8101 --prompt-concurrency 1 --decode-concurrency 1` (host) + `docker compose up -d` (containers reach host via `host.docker.internal:8101`).
+  - **Costs**: $0 OpenAI; ~3 hr compute. 167 unit tests still green.
+  - **Open follow-ups filed**: RSIC concurrent fan-out rate-limit (Metal OOM trigger); prompt-cache investigation to amortize repeat-prefix calls; Grafana panel for LLM latency by `model_name`.
+  - Doc: [`phase_11_6_post.md`](docs/development/ft-lora/phase_11_6_post.md).
+
+- ✅ **FT-LORA-PHASE11.5e: Eval coverage augmentation + Phase 5 reinstated as production canonical** (2026-04-30):
+  - **Augmented `valid_clean.jsonl` 180 rows × 9 tasks → 319 rows × 16 tasks** (manifest v2.0). Stale-hash rescue (40 rows for jiminy.evaluate/_llm via content-routing) + synthetic gpt-mini generation (99 rows × 5 tasks: guardrail.evaluate, hidden.summarize, consulting.synthesis, metalearn.generalize, summarize.generate). 1 task deprecated (retrieval.rerank_nli — Ollama-only). 0/319 leakage with 9 train/valid sources.
+  - **Production rollback executed.** Re-baseline 4 models on augmented eval: Phase 5 dense **0.8389** (LEADER), gpt-5.4-mini 0.8317, Run 7 0.8307, **Stage-1 distill 0.8294 (worst of 4)**. The 11.5d Stage-1 promotion was based on the 9-task subset; broader eval flips the verdict. **Stage-1 archived to `.local-models/qwen3-14b-mdemg-v1-distill-stage1/` (was `-rl/`); Phase 5 base reinstated as production canonical**: `mlx_lm.server --model .local-models/qwen3-14b-mdemg-v1 --host 127.0.0.1 --port 8101` (no `--adapter-path`).
+  - **Production bug discovered**: jiminy.evaluate ↔ jiminy.evaluate_llm task_name labels are SWAPPED at production WithContext() call sites. Affects all rows logged through 2026-04-29. Workaround in sprint: content-routing extractor. Filed as separate production follow-up.
+  - **Phase 11 RL + 11.5d distill arc is net-negative on broader eval.** Run 7 -0.82pp behind Phase 5; Stage-1 -0.95pp. Both archived. Future RL/distillation requires fundamentally different design (different training data distribution, different reward, or different optimization target).
+  - **Per-task winners**: Phase 5 wins 4 of 9 TSDB tasks (`retrieval.intent_translate` +21pp over gpt-mini, `query_classify`, `hidden.reclassify`, `rerank_cross`). gpt-mini wins synthetic-eval tasks (`guardrail.evaluate` +20pp, `consulting.classify` +13pp). Phase 5 specialty fine-tuning beats cloud teacher on narrow production-grounded tasks.
+  - **`consulting.classify` distill backfired**: -5.2pp on this task (P5 0.712 → S1 0.660). 36 distill pairs 89% must/must_not but eval is 80% expected `none`. Class-distribution mismatch.
+  - **New tooling**: `scripts/x10_synth_prompt_capture.py` + `scripts/x11_jiminy_evaluate_rescue.py` (both reusable).
+  - **Costs**: ~$3.80 OpenAI + ~3.5 hr local MLX.
+  - **Decisions outliving the sprint**: (1) Phase 5 base canonical; (2) Phase 11 RL parked; (3) Stage-1 distill rolled back; (4) eval coverage is highest-leverage when training plateaus — flipped a production decision without retraining; (5) synthetic eval is biased toward gpt-mini self-evaluation; weight TSDB rows accordingly.
+  - **Open follow-ups filed**: (a) jiminy production task_name swap; (b) consulting.classify distill class-balance redesign; (c) query_classify 4-row eval-label inconsistency from 11.5d; (d) `guardrail.evaluate` 20pp gap to gpt-mini suggests local needs production data, not synthesis.
+  - Doc: [`phase_11_5e_post.md`](docs/development/ft-lora/phase_11_5e_post.md). Plan: [`sprint_plan_phase_11_5e.md`](docs/development/ft-lora/sprint_plan_phase_11_5e.md). Comparison: [`clean_v2_comparison.md`](training_data/eval/clean_v2_comparison.md) (gitignored, regeneratable).
+
 - ✅ **FT-LORA-PHASE11.5d: Branch B Revised — distill adapter shipped at gpt-mini parity** (2026-04-29):
   - **Stage-1 distill adapter promoted to canonical** `.local-models/qwen3-14b-mdemg-v1-rl/` (Run 7 archived to `-rl-run7`). Full-sweep aggregate **0.8578** = +0.26pp over Phase 5, -0.09pp from gpt-5.4-mini ceiling. Real per-task wins on connection-layer tasks: `consulting.classify` +2.0pp (drives Jiminy guidance), `hidden.reclassify` +5.0pp (drives concept clustering). Manifest at `qwen3-14b-mdemg-v1-rl/manifest.json` with full lineage.
   - **Benchmark row-sweep fix** (the highest-leverage win of the sprint, in retrospect). `neural/benchmarks/run_benchmark.py` previously evaluated `rows[0]` only (`# MVP — no row-level sweep`); patched to iterate ALL matched rows by default, with `RunnerOptions.rows_per_spec` field + `--rows-per-spec` CLI flag. The fix retroactively reveals that the entire Phase 11 → 11.5 plateau narrative was optimizing against a single-prompt-per-spec phantom: Phase 5 honest baseline jumps from 0.8052 → 0.8553 on the corrected eval. The "+5pp gap to gpt-mini" collapses to +0.34pp (noise floor). Phase 5 was already at gpt-mini parity on real data.

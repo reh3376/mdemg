@@ -221,6 +221,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	maintenanceCmd.GroupID = "advanced"
 	rootCmd.AddCommand(maintenanceCmd)
 
+	// Phase 11.6.3 — MLX Watchdog inspection
+	watchdogCmd := newWatchdogCmd()
+	watchdogCmd.GroupID = "advanced"
+	rootCmd.AddCommand(watchdogCmd)
+
 	return rootCmd
 }
 

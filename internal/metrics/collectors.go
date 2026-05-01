@@ -94,6 +94,12 @@ type StandardMetrics struct {
 	// RSIC safety metrics
 	RSICSafetyBlocked func(action, reason string) *Counter
 
+	// Phase 11.6.x: RSIC LLM-stage concurrency-limit instrumentation. Increments
+	// each time CycleOrchestrator must wait for an in-flight slot to free up
+	// before reflector.Reflect can run. Sustained non-zero values indicate the
+	// configured RSIC_LLM_CONCURRENCY_LIMIT is the rate-determining factor.
+	RSICLLMSemaphoreBlocked *Counter
+
 	// RSIC watchdog metrics
 	RSICWatchdogDecay      func(spaceID string) *Gauge
 	RSICWatchdogEscalation func(spaceID string) *Gauge
@@ -194,6 +200,12 @@ type StandardMetrics struct {
 	JiminyWarmDebounced func(spaceID string) *Counter
 	JiminyLatestAge     func(spaceID string) *Gauge
 	JiminyLatestServed  func(spaceID string) *Counter
+
+	// Phase 11.6.3 — MLX Watchdog. State + fast-fail + transition metrics for
+	// the goroutine in internal/mlxprobe and the gate in internal/llmclient.
+	MLXHealthState        func(endpoint string) *Gauge   // 0=up, 1=degraded, 2=down
+	MLXFastFailTotal      func(callerTask string) *Counter // increment when llmclient short-circuits a call
+	MLXStateTransitions   func(from, to string) *Counter   // increment on each up/degraded/down transition
 }
 
 // Registry returns the underlying metric registry.
@@ -337,6 +349,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("rsic_safety_blocked_total", "RSIC safety blocks",
 			map[string]string{"action": action, "reason": reason})
 	}
+
+	// Phase 11.6.x — RSIC LLM-stage concurrency throttle counter
+	m.RSICLLMSemaphoreBlocked = r.NewCounter("mdemg_rsic_llm_semaphore_blocked_total",
+		"RSIC cycles that waited for an in-flight LLM-stage slot before reflector.Reflect", nil)
 
 	// RSIC watchdog metrics
 	m.RSICWatchdogDecay = func(spaceID string) *Gauge {
@@ -643,6 +659,23 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.JiminyLatestServed = func(spaceID string) *Counter {
 		return r.NewCounter("jiminy_latest_served_total", "GET /latest requests served",
 			map[string]string{"space_id": spaceID})
+	}
+
+	// Phase 11.6.3 — MLX Watchdog metrics
+	m.MLXHealthState = func(endpoint string) *Gauge {
+		return r.NewGauge("mdemg_mlx_health_state",
+			"mlx_lm.server health state per endpoint (0=up, 1=degraded, 2=down)",
+			map[string]string{"endpoint": endpoint})
+	}
+	m.MLXFastFailTotal = func(callerTask string) *Counter {
+		return r.NewCounter("mdemg_mlx_fast_fail_total",
+			"Total LLM calls short-circuited by the watchdog fast-fail gate",
+			map[string]string{"caller_task": callerTask})
+	}
+	m.MLXStateTransitions = func(from, to string) *Counter {
+		return r.NewCounter("mdemg_mlx_state_transitions_total",
+			"Total mlx watchdog state transitions",
+			map[string]string{"from": from, "to": to})
 	}
 
 	return m

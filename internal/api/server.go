@@ -487,7 +487,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens: 500,
 			TimeoutMs: cfg.ConsultingClassifyTimeoutMs,
 			OpenAIKey: cfg.OpenAIAPIKey,
-			OpenAIURL: cfg.OpenAIEndpoint,
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches consulting.classify
+			OpenAIURL: cfg.EffectiveLLMEndpoint(),
 			OllamaURL: cfg.OllamaEndpoint,
 		}, cbRegistry)
 		cons.SetConstraintClassifier(sharedConstraintClassifier)
@@ -527,7 +528,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				MaxTokens:      cfg.JiminySynthesisMaxTokens,
 				TimeoutMs:      cfg.JiminySynthesisTimeoutMs,
 				OpenAIKey:      cfg.OpenAIAPIKey,
-				OpenAIURL:      cfg.OpenAIEndpoint,
+				// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.synthesize
+				OpenAIURL:      cfg.EffectiveLLMEndpoint(),
 				OllamaURL:      cfg.OllamaEndpoint,
 				Temperature:    cfg.JiminySynthesisTemperature,
 				ContextMaxChars: cfg.JiminyGuidanceContextMaxChars,
@@ -540,17 +542,19 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		// J17-2: Wire constraint code generator
 		if cfg.J17CodegenEnabled && convSvc != nil {
 			codegenAPIKey := cfg.OpenAIAPIKey
-			codegenBaseURL := cfg.OpenAIEndpoint
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.codegen
+			codegenBaseURL := cfg.EffectiveLLMEndpoint()
 			if cfg.J17CodegenProvider == "ollama" {
 				codegenAPIKey = "ollama"
 				codegenBaseURL = cfg.OllamaEndpoint
 			}
 			codegenLLM := llmclient.New(llmclient.Config{
-				Provider:  cfg.J17CodegenProvider,
-				Model:     cfg.J17CodegenModel,
-				APIKey:    codegenAPIKey,
-				BaseURL:   codegenBaseURL,
-				TimeoutMs: 10000,
+				Provider: cfg.J17CodegenProvider,
+				Model:    cfg.J17CodegenModel,
+				APIKey:   codegenAPIKey,
+				BaseURL:  codegenBaseURL,
+				// Phase 11.6: bumped 10s → 60s for local-LLM latency budget
+				TimeoutMs: 60000,
 			}).WithContext("jiminy.codegen", "")
 			codegen := jiminy.NewConstraintCodeGenerator(codegenLLM)
 
@@ -571,7 +575,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 		// J13: Wire LLM evaluator
 		if cfg.JiminyEvaluateLLMEnabled {
-			evalBaseURL := cfg.OpenAIEndpoint
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches the J13 evaluator.
+			evalBaseURL := cfg.EffectiveLLMEndpoint()
 			evalAPIKey := cfg.OpenAIAPIKey
 			if cfg.JiminyEvaluateLLMProvider == "ollama" {
 				evalBaseURL = cfg.OllamaEndpoint
@@ -582,7 +587,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				APIKey:    evalAPIKey,
 				BaseURL:   evalBaseURL,
 				TimeoutMs: cfg.JiminyEvaluateLLMTimeoutMs,
-			}).WithContext("jiminy.evaluate_llm", "")
+				// Phase 11.6.x — the J13 evaluator emits eval_prompt.go's evalSystemPrompt
+				// (hash caf70a3d...), which the ULTS spec assigns to jiminy.evaluate. Pre-fix
+				// this site was tagging rows as jiminy.evaluate_llm; V0014 backfills the ~106
+				// historical rows. The config flag stays JIMINY_EVALUATE_LLM_ENABLED for
+				// backward compat — the flag name is decoupled from the task_name.
+			}).WithContext("jiminy.evaluate", "")
 			evaluator := jiminySvc.GetEvaluator()
 			if evaluator != nil {
 				evaluator.SetLLM(evalLLM, cbRegistry)
@@ -766,7 +776,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			MaxTokens:       cfg.EmergenceMaxTokens,
 			TimeoutMs:       cfg.RSICLLMReflectTimeoutMs,
 			OpenAIKey:       cfg.OpenAIAPIKey,
-			OpenAIURL:       cfg.OpenAIEndpoint,
+			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches ape.reflect
+			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
 			OllamaURL:       cfg.OllamaEndpoint,
 			CompressPrompts: cfg.RSICLLMReflectCompress,
 		}, cbRegistry, rsicCalibrator)
@@ -1062,6 +1073,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 // Called from serve.go when TSDB is enabled and connected.
 func (s *Server) SetTSDBClient(client *tsdb.Client) {
 	s.tsdbClient = client
+	if client != nil {
+		// Phase 12 Epic 6: construct ConflictTracker once and inject into the
+		// three Services that have hook sites. Per-space rate limiter defaults
+		// to 1 row/space/minute (the value bound inside conversation/conflict_tracker.go);
+		// emergency disable via CONFLICT_TRACKER_ENABLED=false stops Track() at
+		// the call sites without requiring the tracker itself to be reconstructed.
+		conflictTracker := conversation.NewConflictTracker(client.Pool(), 0)
+		if s.jiminySvc != nil {
+			s.jiminySvc.SetConflictTracker(conflictTracker)
+		}
+		if s.consultant != nil {
+			s.consultant.SetConflictTracker(conflictTracker)
+		}
+		if s.rsicCycle != nil {
+			s.rsicCycle.SetConflictTracker(conflictTracker)
+		}
+		slog.Info("conflict_tracker: production hooks wired",
+			"enabled", s.cfg.ConflictTrackerEnabled,
+			"sites", "jiminy.Guide+consulting.Suggest+ape.cycle.Reflect")
+	}
 	if client != nil {
 		s.tsdbWriter = tsdb.NewMetricWriter(
 			client,

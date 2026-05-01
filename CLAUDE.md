@@ -96,6 +96,23 @@ Dependencies, Implementation Plan (sequential epics + gates), Testing Plan (3 ti
 Commit Strategy, Verification Checklist, Documentation Update (final epic — never cut),
 Risks & Mitigations, Documents Accessed. Optional: Rollback Procedures (destructive ops).
 
+### Testing — Live System Testing Is Required (formalized 2026-05-01)
+Tier 3 e2e means **the real binary against the real services it depends on,
+with real outputs observed via TSDB queries / Grafana panels / log inspection**.
+Mocked e2e is Tier 2b (extended integration), not Tier 3. Sprint verification
+checklists must include at least one item of the form: "live smoke: run X
+against the real system, observe Y in TSDB/Grafana/logs, confirm Z." The
+local stack (mdemg native binary + Docker Compose) is the live system —
+production scale is not the requirement; real I/O on the real wire is.
+
+Evidence basis: across Phase 11.6.x, 11.6.2, and 12.0–12.6, every major
+defect was caught in live smoke runs while unit/integration tests passed —
+6 cutover-bypass sites, 5 latent UVTS-runner defects, host.docker.internal
+DNS resolution, panel-3 SQL false-positive. Surprise bugs caught during
+live smoke get their own follow-up fix-commit — do not silently roll them
+into the sprint commit (Phase 11.6.2 is the precedent). CMS observation
+`p5iv8effstxk5ujd1fa2qfy8`.
+
 ## Project Context
 
 **MDEMG** — Cognitive substrate for AI-assisted development. Persistent emergent long-term memory via Hebbian learning, 5-layer hierarchy, RSIC self-improvement. 105 core phases + sidecar phases complete.
@@ -299,8 +316,16 @@ Endpoints:
 - **LaunchAgent embed:** `mdemg service install` reads templates from `packaging/launchd/` embedded via `embed.FS`
 - **LLM recorder init order:** `llmclient.SetDefaultRecorder()` MUST be called BEFORE `api.NewServer()` — clients capture the recorder at construction time. See `internal/cli/serve.go` early writer block.
 - **Context helpers:** `WithSpaceID(ctx, id)` and `WithSessionID(ctx, id)` carry request-scoped values to TSDB recording, overriding construction-time defaults in `recordInteraction()`
+- **MLX Watchdog (Phase 11.6.3):** background prober + llmclient fast-fail gate + launchd auto-restart for `mlx_lm.server`. Default `MLX_WATCHDOG_ENABLED=false` until live-soak validates; opt-in via `.env`. When enabled the prober polls `cfg.EffectiveLLMEndpoint() + /models` every `MLX_PROBE_INTERVAL_SEC` (default 5) with `MLX_PROBE_TIMEOUT_SEC` (default 2; must be `<` interval). State machine `up → degraded → down` with hysteresis (3-failure → down, 2-success → up); `up→down` triggers an alert + flips `mdemg_mlx_health_state` gauge. The llmclient gate at `client.go:471` short-circuits `doWithRetry` with `ErrMLXDown` when `MLX_FAIL_FAST_ENABLED=true && State()==Down && c.baseURL==Endpoint()` — eliminating the retry-storm pattern (1642% CPU when 16 LLM call sites independently retry 6× in parallel). Embeddings safe: gate keys on exact baseURL match. Operator visibility: `mdemg watchdog status` (or `--json` for jq). Plist `com.mdemg.mlx-server.plist` (KeepAlive on crash, ThrottleInterval=60s) auto-restarts mlx; install via `mdemg service install` (skipped automatically when `mlx_lm.server` not on PATH; override with `MDEMG_MLX_LM_BIN`/`MDEMG_MODEL_PATH`). Emergency disable without rebuild: `MLX_WATCHDOG_ENABLED=false` or `MLX_FAIL_FAST_ENABLED=false` + restart mdemg.
 
 ## Testing
+
+- UVTS validation (Phase 12 — Universal Validation Test Specification, semantic retrieval-quality):
+  - `make test-uvts-lint` — schema-validate all `*.uvts.json` (CI-safe, no live deps)
+  - `make test-uvts-quick BASE_URL=http://localhost:9999` — 16-question quick profile (~10 min)
+  - `make test-uvts-full BASE_URL=http://localhost:9999` — full 120-question corpus
+  - Direct: `python3 docs/tests/uvts/runners/uvts_runner.py --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json --base-url http://localhost:9999 --profile quick --persist-tsdb` (writes V0016 `uvts_runs` + `uvts_results`)
+  - A/B harness: `python3 docs/tests/uvts/runners/uvts_ab_compare.py --baseline runA/grades.json --candidate runB/grades.json --spec <spec>.uvts.json --out verdict.json` (exit 0=pass, 1=fail, 2=drift). Apply Note 02 merge gate: B mean ≥ A mean AND no per-question regression > `ab_mode.regression_threshold_per_question` (default 0.10).
 
 - Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
@@ -309,7 +334,7 @@ Endpoints:
     - `valid_golden.jsonl` — Phase 10 baseline (108 rows, **99% leaked with training data**, kept for historical comparison only)
     - `valid_clean.jsonl` — Phase 11.5c production-derived eval (180 rows, 9 of 17 tasks, **0% leakage**, leak-audit gated). **Use this for honest baselines.** Pair with `--mlx-timeout-s 300` to avoid 60s timeouts on long production prompts.
   - **Row sweep (Phase 11.5d Epic 4 fix)** — runner now iterates ALL matched rows by default. Use `--rows-per-spec 0` (default; legacy single-row × n_runs is `--rows-per-spec 1`). For 9 valid_clean tasks × 20 rows × n_runs=2: ~360 calls/model = ~5-7 min Phase 5 base, ~30-40 min with LoRA adapter, ~18 min gpt-mini OpenAI.
-  - **Production adapter** (Phase 11.5d shipped): `.local-models/qwen3-14b-mdemg-v1-rl/` — Stage-1 distill at gpt-mini parity (0.8578 vs 0.8587 on full-sweep). Manifest at `qwen3-14b-mdemg-v1-rl/manifest.json`. Run 7 archived at `-rl-run7/`.
+  - **Production adapter** (Phase 11.5e current): `.local-models/qwen3-14b-mdemg-v1/` — **Phase 5 dense base, no LoRA adapter**. Aggregate **0.8389** on augmented eval (16 tasks), beats gpt-mini (0.8317), Run 7 (0.8307), Stage-1 distill (0.8294). Symlinked at `.local-models/mdemg-llm-v1` for production identity (`LLM_MODEL` in `.env`). Production-use: `mlx_lm.server --model /Users/reh3376/mdemg/.local-models/mdemg-llm-v1 --host 127.0.0.1 --port 8101 --prompt-concurrency 4 --decode-concurrency 4 --prompt-cache-size 4096` (no `--adapter-path`). The `--prompt-concurrency 4` cap is the operator-side ceiling on simultaneous prompts; pair with `RSIC_LLM_CONCURRENCY_LIMIT=2` (default) so RSIC fan-out cannot saturate it (Phase 11.6.x semaphore). The `--prompt-cache-size 4096` flag amortizes the shared 20-action enum prefix on `ape.reflect` calls. Stage-1 distill archived at `qwen3-14b-mdemg-v1-distill-stage1/` (rolled back from canonical in 11.5e); Run 7 archived at `-rl-run7/`. The 11.5d "Stage-1 at gpt-mini parity" was a 9-task-subset artifact; the 16-task augmented eval flipped the verdict.
   - Build/audit clean eval: `python scripts/build_clean_eval.py [--target-per-task 20]` + `python scripts/audit_eval_leakage.py --eval <jsonl> --against <comma-sep sources> --out <report>`
 - RL post-training (Phase 11 GRPO framework):
 - RL post-training (Phase 11 GRPO framework):

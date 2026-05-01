@@ -26,8 +26,8 @@
     {"name": "service_relationships", "count": 5, "weight": 1.0}
   ],
   "questions": {
-    "source_file": "docs/benchmarks/whk-wms/test_questions_120.json",
-    "agent_file": "demo-test/lnl_demo_questions_agent.json",
+    "source_file": "docs/architecture/benchmarks/whk-wms/test_questions_120.json",
+    "agent_file": "docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json",
     "total_questions": 40,
     "sampling": "stratified",
     "seed": 42
@@ -66,5 +66,14 @@
     "owner": "mdemg-team",
     "created": "2026-02-06",
     "baseline_run": "temporal_validation_20260203"
+  },
+  "ab_mode": {
+    "enabled": false,
+    "regression_threshold_per_question": 0.10,
+    "branches": {
+      "baseline_label": "baseline",
+      "candidate_label": "candidate"
+    },
+    "_comment": "Phase 12 Epic 3: A/B mode is gated at the harness layer (uvts_ab_compare.py). When enabled there, the harness applies B mean >= A mean AND no per-question regression > regression_threshold_per_question (Note 02 merge bar). Threshold of 0.10 = 10% per the post-FT-LORA roadmap §RD-9."
   }
 }

@@ -1,0 +1,125 @@
+{
+  "uvts_version": "1.0.0",
+  "validation": {
+    "name": "polysemy_resolution",
+    "description": "Polysemy-stratified retrieval validation. Note 05 hypothesis seed: context-sensitive disambiguation should yield +5 to +10% on polysemous-query strata vs baseline rerank. This spec is the measurement axis for that hypothesis once Note 05 ships.",
+    "codebase": "/Users/reh3376/whk-wms",
+    "space_id": "lnl-demo-whk",
+    "model": "sonnet",
+    "top_k": 5
+  },
+  "thresholds": {
+    "_comment_calibration": "CALIBRATION_TODO: thresholds inherit from lnl_demo_validation as a starting point. Once Phase 13 column-voting and/or Note 05 polysemy resolution lands, recalibrate against the first full A/B run on this spec — the polysemy task is intrinsically harder than mixed retrieval, so mean_score is likely to baseline lower. Holding thresholds at lnl_demo values risks false-fail until calibration; ab_mode comparison gate is the safer pre-calibration signal.",
+    "mean_score": 0.795,
+    "strong_evidence_pct": 60.0,
+    "high_score_rate_pct": 70.0,
+    "min_category_score": 0.6,
+    "max_token_usage": 500000
+  },
+  "categories": [
+    {
+      "name": "homonym_disambiguation",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Same surface form, distinct senses (e.g. 'plan' = subscription tier vs project plan)."
+    },
+    {
+      "name": "context_carry_over",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Term meaning resolved by surrounding session/file context (e.g. 'order' inside checkout flow vs 'order' inside fulfillment)."
+    },
+    {
+      "name": "entity_resolution",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Multiple entities sharing identifier-like names (e.g. user_id vs account_id vs customer_id mapping)."
+    },
+    {
+      "name": "scope_disambiguation",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Term scope across module boundaries (e.g. 'cache' in retrieval layer vs storage layer)."
+    },
+    {
+      "name": "temporal_disambiguation",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Same concept across versions/eras (e.g. 'rerank' pre-RRF vs post-RRF)."
+    },
+    {
+      "name": "synonym_clustering",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Term has multiple synonymous expressions in the corpus (e.g. retrieve / fetch / lookup)."
+    },
+    {
+      "name": "abbreviation_expansion",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Acronyms vs expanded form (e.g. RSIC vs Recursive Self-Improvement Cycle)."
+    },
+    {
+      "name": "structural_polysemy",
+      "count": 5,
+      "weight": 1.0,
+      "_comment": "Same word in different syntactic roles (e.g. 'process' as noun vs verb in handler chains)."
+    }
+  ],
+  "questions": {
+    "source_file": "docs/architecture/benchmarks/whk-wms/test_questions_120.json",
+    "agent_file": "docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json",
+    "total_questions": 40,
+    "sampling": "stratified",
+    "seed": 42,
+    "_comment_partial": "Phase 12 Epic 3 ships partial authoring per the sprint plan: category structure + threshold seed, but actual polysemy-question authoring (40 stratified questions, 5 per category) is deferred to a Note 05 tee-up sprint. The seed_questions field below holds 1 example per category as a structure illustration; running this spec against the corpus will use stratified sampling from the existing 120-question whk-wms set, which has not been polysemy-stratified, so scores in the first run are NOT informative about polysemy resolution per se — they're a structural smoke test."
+  },
+  "profiles": {
+    "quick": {
+      "questions_per_category": 1,
+      "timeout_minutes": 8,
+      "description": "Quick smoke test (8 questions × 8 categories)"
+    },
+    "standard": {
+      "questions_per_category": 3,
+      "timeout_minutes": 24,
+      "description": "Standard validation (24 questions)"
+    },
+    "full": {
+      "questions_per_category": 5,
+      "timeout_minutes": 60,
+      "description": "Full benchmark (40 questions × 8 categories) — requires polysemy-stratified question authoring (deferred)"
+    }
+  },
+  "scoring": {
+    "evidence_weight": 0.70,
+    "semantic_weight": 0.15,
+    "concept_weight": 0.15,
+    "line_tolerance": 10
+  },
+  "output": {
+    "format": "json",
+    "include_answers": true,
+    "include_evidence": true,
+    "include_tokens": true
+  },
+  "ab_mode": {
+    "enabled": false,
+    "regression_threshold_per_question": 0.10,
+    "branches": {
+      "baseline_label": "baseline_rerank",
+      "candidate_label": "polysemy_aware_rerank"
+    },
+    "_comment": "When Note 05 ships, this spec becomes the primary A/B measurement axis: baseline = current rerank, candidate = polysemy-aware variant. Per-question regression threshold matches lnl_demo_validation."
+  },
+  "metadata": {
+    "tags": ["polysemy", "note-05", "validation", "whk-wms", "partial_authoring"],
+    "owner": "mdemg-team",
+    "created": "2026-05-01",
+    "partial_authoring": true,
+    "partial_authoring_note": "Schema + category structure + thresholds + ab_mode landed in Phase 12 Epic 3. Per-category question authoring (5 stratified per category × 8 categories = 40 questions) is queued behind Note 05 (polysemy-resolution implementation sprint). Until then this spec is structurally complete but should not be treated as a substantive polysemy measurement.",
+    "depends_on": [
+      "Note 05 — polysemy-resolution retrieval (research-eval Tier 2)"
+    ]
+  }
+}
