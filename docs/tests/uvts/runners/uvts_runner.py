@@ -16,6 +16,7 @@ Usage:
     python uvts_runner.py --spec specs/lnl_demo_validation.uvts.json --grades grades.json --report report.json
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -24,7 +25,7 @@ import random
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 import sys as _sys
 _sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
@@ -53,7 +54,132 @@ try:
 except ImportError:
     HAS_GRADER = False
 
+# Phase 12 Epic 2: optional TSDB persistence (V0016). Both psycopg + cuid2 are
+# vendored in the mdemg-ft-lora venv per Phase 11 precedent; treat as optional
+# so the runner still functions in CI environments without DB access.
+try:
+    import psycopg
+    from cuid2 import cuid_wrapper
+    _CUID = cuid_wrapper()
+    HAS_TSDB = True
+except ImportError:
+    HAS_TSDB = False
+
 UVTS_VERSION = "1.1.0"
+
+
+# ─── TSDB persistence helpers (Phase 12 Epic 2 / V0016) ─────────────────────
+
+def _tsdb_dsn() -> str:
+    """Build a libpq DSN from TSDB_* env vars (matches scripts/x11_jiminy_evaluate_rescue.py + conflict_tracker_test.go)."""
+    return (
+        f"host={os.environ.get('TSDB_HOST', 'localhost')} "
+        f"port={os.environ.get('TSDB_PORT', '5433')} "
+        f"user={os.environ.get('TSDB_USER', 'mdemg')} "
+        f"password={os.environ.get('TSDB_PASSWORD', 'mdemg_metrics')} "
+        f"dbname={os.environ.get('TSDB_DB', 'mdemg_metrics')}"
+    )
+
+
+def _persist_uvts_run_start(spec_path: str, profile: str, branch_label: Optional[str],
+                            codebase_root: Optional[str], codebase_sha: Optional[str],
+                            thresholds: Dict[str, Any]) -> Tuple[Optional[Any], Optional[str]]:
+    """Insert a 'pending' uvts_runs row; return (conn, run_id) or (None, None) on failure.
+
+    Failures are non-fatal — the runner's JSON-on-disk path stays intact.
+    The caller should treat conn=None as "TSDB persistence skipped" and not
+    try to persist per-question rows.
+    """
+    if not HAS_TSDB:
+        return None, None
+    try:
+        # Compute spec SHA so the historical row is auditable even if the
+        # spec file is later modified.
+        try:
+            spec_bytes = Path(spec_path).read_bytes()
+            spec_sha = hashlib.sha256(spec_bytes).hexdigest()
+        except OSError:
+            spec_sha = None
+
+        run_id = _CUID()
+        conn = psycopg.connect(_tsdb_dsn(), connect_timeout=5)
+
+        # Use psycopg3's Jsonb adapter for the threshold blob.
+        from psycopg.types.json import Jsonb
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO uvts_runs
+                       (run_id, spec_path, spec_sha, branch_label, codebase_root,
+                        codebase_sha, profile, gate_verdict, threshold_json, started_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, NOW())""",
+                (run_id, str(spec_path), spec_sha, branch_label, codebase_root,
+                 codebase_sha, profile, Jsonb(thresholds or {})),
+            )
+        conn.commit()
+        return conn, run_id
+    except Exception as e:  # broad on purpose — TSDB persistence is best-effort
+        print(f"WARN: TSDB run-start insert failed ({type(e).__name__}: {e}); continuing without persistence")
+        return None, None
+
+
+def _persist_uvts_run_finish(conn: Any, run_id: str, aggregate_score: float,
+                             gate_verdict: str, grades: List[Any]) -> int:
+    """Update uvts_runs with terminal state + bulk insert per-question rows.
+
+    `grades` is List[Grade] (the dataclass) — we pull category/scores/etc.
+    via .to_dict() for forensic preservation in raw_grade.
+    Returns count of uvts_results rows persisted (0 on failure).
+    """
+    if conn is None or run_id is None:
+        return 0
+    try:
+        from psycopg.types.json import Jsonb
+        rows_inserted = 0
+        with conn.cursor() as cur:
+            # 1. Finalize the run row.
+            cur.execute(
+                """UPDATE uvts_runs
+                       SET aggregate_score = %s,
+                           gate_verdict   = %s,
+                           completed_at   = NOW()
+                     WHERE run_id = %s""",
+                (aggregate_score, gate_verdict, run_id),
+            )
+
+            # 2. Per-question rows. One INSERT per row is fine at expected
+            # rate (≤120/run, ~minutes between runs in CI); reach for
+            # COPY only if we ever ship a corpus >5K questions.
+            for g in grades:
+                gd = g.to_dict() if hasattr(g, "to_dict") else g
+                cur.execute(
+                    """INSERT INTO uvts_results
+                           (recorded_at, result_id, run_id, question_id, category,
+                            final_score, evidence_score, semantic_score, concept_score,
+                            evidence_tier, file_loc_ok, raw_grade)
+                       VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (
+                        _CUID(), run_id, str(gd.get("id", "")), gd.get("category"),
+                        float(gd.get("scores", {}).get("final", 0.0)),
+                        float(gd.get("scores", {}).get("evidence", 0.0)),
+                        float(gd.get("scores", {}).get("semantic", 0.0)),
+                        float(gd.get("scores", {}).get("concept", 0.0)),
+                        gd.get("evidence_details", {}).get("tier"),
+                        bool(gd.get("evidence_details", {}).get("line_tolerance_met", False)),
+                        Jsonb(gd),
+                    ),
+                )
+                rows_inserted += 1
+        conn.commit()
+        conn.close()
+        return rows_inserted
+    except Exception as e:
+        print(f"WARN: TSDB run-finish persistence failed ({type(e).__name__}: {e}); run row may be left in 'pending' state")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return 0
+
 
 
 def _validate_supported_features(spec_dict: Dict[str, Any]) -> List[str]:
@@ -431,7 +557,10 @@ def display_results(grades_file: str, thresholds: Dict) -> None:
 def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
                        output_dir: Optional[str] = None,
                        retrieve_timeout_s: float = 30.0,
-                       space_id_override: Optional[str] = None) -> List[Dict]:
+                       space_id_override: Optional[str] = None,
+                       persist_tsdb: bool = False,
+                       branch_label: Optional[str] = None,
+                       codebase_sha: Optional[str] = None) -> List[Dict]:
     """Run inline grading: retrieve from MDEMG, build answers, grade with Grader.
 
     GAP-04: This replaces the manual two-step pipeline (run_benchmark_v4 + grader_v4)
@@ -473,6 +602,24 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
     answers = []
     grade_list = []
     total_scores = []
+
+    # Phase 12 Epic 2: optional TSDB run-row creation (--persist-tsdb).
+    # On any failure (DB unreachable, missing schema, etc.) the runner falls
+    # back to JSON-only output via conn=None / run_id=None.
+    tsdb_conn, uvts_run_id = (None, None)
+    if persist_tsdb:
+        tsdb_conn, uvts_run_id = _persist_uvts_run_start(
+            spec_path=spec_path,
+            profile=profile,
+            branch_label=branch_label,
+            codebase_root=runner.validation.get("codebase"),
+            codebase_sha=codebase_sha,
+            thresholds=runner.thresholds,
+        )
+        if uvts_run_id:
+            print(f"  TSDB persist: enabled, run_id={uvts_run_id}")
+        else:
+            print(f"  TSDB persist: requested but unavailable; continuing with JSON only")
 
     for i, q in enumerate(questions):
         # Step 1: Call MDEMG retrieve API
@@ -565,9 +712,31 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
             with open(grades_file, "w") as f:
                 json.dump(grades_data, f, indent=2)
 
-            return _build_graded_results(str(grades_file), spec_path, runner.thresholds)
+            canonical = _build_graded_results(str(grades_file), spec_path, runner.thresholds)
+
+            # Phase 12 Epic 2: TSDB run-finish (best-effort; no-op when conn=None).
+            if uvts_run_id is not None:
+                gate_verdict = canonical[0].get("status", "fail") if canonical else "fail"
+                # Constrain to the V0016 CHECK ('pending','pass','fail').
+                if gate_verdict not in ("pass", "fail"):
+                    gate_verdict = "fail"
+                rows = _persist_uvts_run_finish(
+                    tsdb_conn, uvts_run_id,
+                    aggregate_score=float(agg_dict.get("mean", 0.0)),
+                    gate_verdict=gate_verdict,
+                    grades=grades,
+                )
+                print(f"  TSDB persist: completed run_id={uvts_run_id} verdict={gate_verdict} per_question_rows={rows}")
+
+            return canonical
         except Exception as e:
             print(f"Grading error: {e}")
+            # Best-effort: close any open TSDB conn so we don't leak.
+            if tsdb_conn is not None:
+                try:
+                    tsdb_conn.close()
+                except Exception:
+                    pass
             return [_canonical_result(
                 spec_path=spec_path, status="error", hash_verified=None,
                 assertions_evaluated=0, assertions_passed=0,
@@ -604,6 +773,12 @@ def main():
                         help="Per-question retrieve API timeout in seconds (default 30; bump for slow dev pipelines)")
     parser.add_argument("--space-id", default=None,
                         help="Override the spec's validation.space_id (e.g. for cross-space A/B). If unset, uses spec value.")
+    parser.add_argument("--persist-tsdb", action="store_true",
+                        help="Phase 12: write per-question rows to V0016 uvts_results + run-row to uvts_runs. Off by default; safe no-op if TSDB unreachable.")
+    parser.add_argument("--branch-label", default=None,
+                        help="Phase 12: free-text branch label for A/B harness grouping (e.g. 'baseline' / 'candidate'). Persisted with --persist-tsdb.")
+    parser.add_argument("--codebase-sha", default=None,
+                        help="Phase 12: codebase SHA pin for the validation target (audits historical runs against frozen commits). Persisted with --persist-tsdb.")
     parser.add_argument("--report", help="Output file path for canonical JSON report")
 
     args = parser.parse_args()
@@ -617,6 +792,9 @@ def main():
                 args.spec, args.base_url, args.profile, args.output_dir,
                 retrieve_timeout_s=args.retrieve_timeout_s,
                 space_id_override=args.space_id,
+                persist_tsdb=args.persist_tsdb,
+                branch_label=args.branch_label,
+                codebase_sha=args.codebase_sha,
             )
         except Exception as e:
             print(f"ERROR: Inline grading failed: {e}", file=sys.stderr)

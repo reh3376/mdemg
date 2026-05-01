@@ -216,6 +216,58 @@ test-api-remote:
 		--report /tmp/api-report.json
 
 # ============================================================
+# UVTS Validation Testing Targets (Phase 12 — UVTS Activation)
+# ============================================================
+.PHONY: test-uvts test-uvts-quick test-uvts-full test-uvts-lint
+
+# Schema-validate all UVTS specs against uvts.schema.json. CI-safe (no live
+# services required). The verify_uxts_canonical_specs.py script already
+# covers UVTS via the framework matrix; this target is a focused, quick
+# pre-merge check that doesn't require pulling the full canonical sweep.
+test-uvts-lint:
+	@echo "Linting UVTS specs against schema..."
+	python3 scripts/verify_uxts_canonical_specs.py
+	@echo "UVTS spec lint complete"
+
+# Run UVTS lnl_demo_validation against the configured codebase (quick profile,
+# 16 questions). Requires a live mdemg server with retrieval data + grader_v4
+# importable. Phase 12 ships this target as advisory; Phase 13 promotes to
+# required-blocking after one full A/B cycle proves stability.
+#
+# Override BASE_URL to target a different mdemg server.
+# UVTS_PROFILE controls profile (quick / standard / full); default quick.
+# UVTS_RETRIEVE_TIMEOUT_S bumps per-question retrieve timeout (default 30s;
+# bump for slow dev pipelines per Phase 12.1 finding).
+UVTS_BASE_URL ?= $(BASE_URL)
+UVTS_PROFILE ?= quick
+UVTS_RETRIEVE_TIMEOUT_S ?= 30
+
+test-uvts-quick:
+	@echo "Running UVTS lnl_demo_validation (quick profile)..."
+	python3 docs/tests/uvts/runners/uvts_runner.py \
+		--spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json \
+		--base-url $(UVTS_BASE_URL) \
+		--profile quick \
+		--retrieve-timeout-s $(UVTS_RETRIEVE_TIMEOUT_S) \
+		--output-dir /tmp/uvts-quick \
+		--report /tmp/uvts-quick-report.json
+	@echo "UVTS quick run complete; report at /tmp/uvts-quick-report.json"
+
+test-uvts-full:
+	@echo "Running UVTS lnl_demo_validation (full profile, 120 questions)..."
+	python3 docs/tests/uvts/runners/uvts_runner.py \
+		--spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json \
+		--base-url $(UVTS_BASE_URL) \
+		--profile full \
+		--retrieve-timeout-s $(UVTS_RETRIEVE_TIMEOUT_S) \
+		--output-dir /tmp/uvts-full \
+		--report /tmp/uvts-full-report.json
+	@echo "UVTS full run complete; report at /tmp/uvts-full-report.json"
+
+# Default 'test-uvts' alias — matches the test-uats / test-uots convention.
+test-uvts: test-uvts-quick
+
+# ============================================================
 # UBTS Benchmark Testing Targets
 # ============================================================
 .PHONY: test-ubts-smoke test-ubts-load
