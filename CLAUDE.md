@@ -319,6 +319,13 @@ Endpoints:
 
 ## Testing
 
+- UVTS validation (Phase 12 — Universal Validation Test Specification, semantic retrieval-quality):
+  - `make test-uvts-lint` — schema-validate all `*.uvts.json` (CI-safe, no live deps)
+  - `make test-uvts-quick BASE_URL=http://localhost:9999` — 16-question quick profile (~10 min)
+  - `make test-uvts-full BASE_URL=http://localhost:9999` — full 120-question corpus
+  - Direct: `python3 docs/tests/uvts/runners/uvts_runner.py --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json --base-url http://localhost:9999 --profile quick --persist-tsdb` (writes V0016 `uvts_runs` + `uvts_results`)
+  - A/B harness: `python3 docs/tests/uvts/runners/uvts_ab_compare.py --baseline runA/grades.json --candidate runB/grades.json --spec <spec>.uvts.json --out verdict.json` (exit 0=pass, 1=fail, 2=drift). Apply Note 02 merge gate: B mean ≥ A mean AND no per-question regression > `ab_mode.regression_threshold_per_question` (default 0.10).
+
 - Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
   - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)

@@ -196,11 +196,13 @@ Plus (cheap, parallel):
 - Action 1: Conflicting-guidance tracker (1 day, runs in background for months)
 - Action 2: UAITS governance discussion scheduled
 
-### Sprint 2: **Phase 12 — UVTS Activation**
+### Sprint 2: **Phase 12 — UVTS Activation** ✅ EXECUTED (2026-05-01)
 
 3-week sprint, foundational. Unblocks all 8 research extensions. Per the doc this is "the highest-leverage single sprint the project could run right now."
 
-### Sprint 3: **Phase 13 — Note 04 Column-Voting Retrieval**
+**Outcome:** Shipped across 5 incremental commits (`0a99f29`, `4b27717`, `d6601b8`, `d10c1a5`, sprint-close). 5 latent runner defects fixed. V0016 TSDB migration + runner persistence + A/B harness + lnl_demo `ab_mode` extension + polysemy spec (partial-authoring) + ConflictTracker production wiring (Workstream C #1, deferred from 11.6.x). Live-testing formalized as required Tier-3 (CMS observation `p5iv8effstxk5ujd1fa2qfy8`). Phase 13 (Column-Voting) and Workstream C ConflictTracker observation window now unblocked. Mid-sprint discovery: MLX server fragility under sustained load — Phase 11.6.3 (MLX watchdog) is now the immediate next sprint, ahead of Phase 13. Doc: [`phase_12_uvts_post.md`](post-ft-lora/phase_12_uvts_post.md). Plan: [`sprint_plan_phase_12_uvts.md`](post-ft-lora/sprint_plan_phase_12_uvts.md).
+
+### Sprint 3: **Phase 13 — Note 04 Column-Voting Retrieval** (gated on Phase 11.6.3 MLX Watchdog)
 
 3-week sprint. Lowest-risk + highest-coverage research extension. Yields per-query `consensus_strength` signal that downstream extensions consume. Parallel-safe with any FT-LORA follow-up work.
 

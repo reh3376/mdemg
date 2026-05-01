@@ -57,6 +57,19 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+- ✅ **POST-FT-LORA-PHASE12: UVTS Activation** (2026-05-01) — Sprint 2 of post-FT-LORA roadmap:
+  - **5 latent runner defects fixed** in `docs/tests/uvts/runners/uvts_runner.py`: undefined method, wrong API field name (`query` vs `query_text`), wrong sys.path (grader_v4 not importable), Grader API misuse (path string vs list), hardcoded 10s timeout fired before the dev pipeline returns. Plus `--retrieve-timeout-s`, `--space-id`, `--persist-tsdb`, `--branch-label`, `--codebase-sha` CLI flags.
+  - **TSDB V0016 migration** — `uvts_runs` + `uvts_results` (hypertable on `recorded_at`, 7-day chunks, `raw_grade` JSONB). `TSDB_REQUIRED_SCHEMA_VERSION` 15 → 16. Live-verified: 4 distinct branch_label runs landed in this sprint's smokes.
+  - **A/B compare harness** — new `uvts_ab_compare.py` with merge-gate criterion "B mean ≥ A mean AND no per-question regression > threshold". 3-case fixture smoke + 1 live A/B verified end-to-end. Optional `--persist-tsdb` writes verdict row with FK links to source runs.
+  - **Spec authoring** — `lnl_demo_validation` extended with `ab_mode` block; new `polysemy_resolution.uvts.json` (partial_authoring=true; 40-question polysemy authoring deferred to Note 05).
+  - **CI + Makefile** — new `make test-uvts-lint/-quick/-full` targets. Existing `uxts-canonical-specs.yml` already covered.
+  - **ConflictTracker production wiring** (Workstream C #1, deferred from 11.6.x) — `CONFLICT_TRACKER_ENABLED` config knob; setter+injection on 3 Services; hook sites at `ape.cycle.recordReflectDivergence`, `consulting.Suggest::detectConflicts>0`, `jiminy.Guide::confidence<0.30 + items>0`. All async + rate-limited. 9 unit tests for ape hook.
+  - **Live testing formalized as Tier 3 requirement** in `CLAUDE.md` (commit `d10c1a5`). CMS observation `p5iv8effstxk5ujd1fa2qfy8`. Evidence: every major defect across Phase 11.6.x/11.6.2/12.0-12.6 was caught in live smokes; unit+integration tests passed at every step.
+  - **Schema**: 15 → 16. **Tests**: full go test ./... green; +9 new in `internal/ape/conflict_tracker_hook_test.go`. **Costs**: $0 OpenAI.
+  - **Mid-sprint findings filed**: (a) MLX server fragility — Metal command-buffer OOM every 30-60min under sustained load — Phase 11.6.3 candidate (next sprint); (b) retry-storm pattern → 1642% CPU when mlx unreachable, needs llmclient connection-refused fast-fail.
+  - Doc: [`phase_12_uvts_post.md`](docs/development/post-ft-lora/phase_12_uvts_post.md). Plan: [`sprint_plan_phase_12_uvts.md`](docs/development/post-ft-lora/sprint_plan_phase_12_uvts.md). Roadmap: [`SPRINT_ROADMAP_POST_FT_LORA.md`](docs/development/SPRINT_ROADMAP_POST_FT_LORA.md).
+  - **Open follow-ups for next sprint**: (a) Phase 11.6.3 MLX watchdog (mandatory before further heavy live testing); (b) 333 stale `gpt-5.4-mini` rows in last 24h — audit for any post-`f81bfd6` to confirm no further bypass sites; (c) production ConflictTracker observation begins now (3-month window before Note 09 capstone re-evaluation).
+
 - ✅ **FT-LORA-PHASE11.6.x: Operational hygiene bundle** (2026-05-01):
   - **Forced by a realized Metal-OOM on the production mlx mid-sprint** — exactly the failure mode Epic 1 prevents. Restart with new flags + new binary recovered cleanly.
   - **Epic 1 — RSIC concurrency-limit semaphore** (`internal/ape/cycle.go`): new `acquireLLMSlot/releaseLLMSlot` helpers wrap `reflector.Reflect()`. Config knob `RSIC_LLM_CONCURRENCY_LIMIT` (default 2, min 1, max 8); metric `mdemg_rsic_llm_semaphore_blocked_total`. 5 unit tests including 8-goroutine stress.
