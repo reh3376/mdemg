@@ -206,6 +206,13 @@ type StandardMetrics struct {
 	MLXHealthState        func(endpoint string) *Gauge   // 0=up, 1=degraded, 2=down
 	MLXFastFailTotal      func(callerTask string) *Counter // increment when llmclient short-circuits a call
 	MLXStateTransitions   func(from, to string) *Counter   // increment on each up/degraded/down transition
+
+	// Phase 13 — Note 04 Column-Voting Retrieval. consensus_strength
+	// distribution + per-column wall-clock + per-column failure counter.
+	// Populated only when cfg.RetrievalColumnVotingEnabled is true.
+	RetrievalConsensusStrength    *Histogram                   // mdemg_retrieval_consensus_strength — aggregate consensus per retrieve call
+	RetrievalColumnLatency        func(column string) *Histogram // mdemg_retrieval_column_latency_seconds{column}
+	RetrievalColumnFailedTotal    func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
 }
 
 // Registry returns the underlying metric registry.
@@ -676,6 +683,22 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("mdemg_mlx_state_transitions_total",
 			"Total mlx watchdog state transitions",
 			map[string]string{"from": from, "to": to})
+	}
+
+	// Phase 13 — Column-Voting Retrieval metrics
+	m.RetrievalConsensusStrength = r.NewHistogram(
+		"mdemg_retrieval_consensus_strength",
+		"Aggregate consensus_strength per retrieve call (0.0-1.0; higher = more column agreement)",
+		nil)
+	m.RetrievalColumnLatency = func(column string) *Histogram {
+		return r.NewHistogram("mdemg_retrieval_column_latency_seconds",
+			"Per-column retrieval wall-clock in seconds",
+			map[string]string{"column": column})
+	}
+	m.RetrievalColumnFailedTotal = func(column, reason string) *Counter {
+		return r.NewCounter("mdemg_retrieval_column_failed_total",
+			"Total per-column retrieval failures (column timed out, errored, or returned empty)",
+			map[string]string{"column": column, "reason": reason})
 	}
 
 	return m

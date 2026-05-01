@@ -525,6 +525,22 @@ type Config struct {
 	RetrievalColumnGraphEnabled      bool // RETRIEVAL_COLUMN_GRAPH_ENABLED — per-column suppression knob (default: true)
 	RetrievalColumnStructuralEnabled bool // RETRIEVAL_COLUMN_STRUCTURAL_ENABLED — per-column suppression knob (default: true)
 
+	// Phase 13 Epic 5 — Downstream consumers. Both flags default false:
+	// the wiring exists so Phase 14 doesn't have to touch this code,
+	// but the actual consumption (prompt-template inject in rerank,
+	// dimension input in DH-005) ships in Phase 14 alongside the sparse
+	// fingerprint + percentile gate features that need consensus_strength.
+	RetrievalRerankConsumeConsensus bool // RETRIEVAL_RERANK_CONSUME_CONSENSUS — let rerank stage inject consensus_strength as a prompt feature (default: false; wire only — actual inject deferred to Phase 14)
+	DH005ConsumeConsensus           bool // DH005_CONSUME_CONSENSUS — let DH-005 retrieval-confidence dim consume mean consensus_strength as input (default: false; wire only)
+
+	// Phase 13 Epic 6 — retrieval audit hypertable (V0017). When enabled,
+	// service.Retrieve writes one row per call to `retrieval_audit` so
+	// Phase 14 has a historical baseline of consensus_strength + per-column
+	// latency available the day Notes 05+06 ship. Default false to avoid
+	// unbounded TSDB growth — operators opt in via .env for observation
+	// windows.
+	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: false)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -870,7 +886,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 16)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 17 post-Phase 13 V0017 retrieval_audit)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -2540,6 +2556,13 @@ func FromEnv() (Config, error) {
 	retrievalColGraphEnabled := getBool("RETRIEVAL_COLUMN_GRAPH_ENABLED", true)
 	retrievalColStructuralEnabled := getBool("RETRIEVAL_COLUMN_STRUCTURAL_ENABLED", true)
 
+	// Phase 13 Epic 5 — Downstream consumer wiring (flag-off, prompts/inputs deferred to Phase 14)
+	retrievalRerankConsumeConsensus := getBool("RETRIEVAL_RERANK_CONSUME_CONSENSUS", false)
+	dh005ConsumeConsensus := getBool("DH005_CONSUME_CONSENSUS", false)
+
+	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
+	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3428,7 +3451,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 16)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 17)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3955,6 +3978,9 @@ func FromEnv() (Config, error) {
 		RetrievalColumnBM25Enabled:       retrievalColBM25Enabled,
 		RetrievalColumnGraphEnabled:      retrievalColGraphEnabled,
 		RetrievalColumnStructuralEnabled: retrievalColStructuralEnabled,
+		RetrievalRerankConsumeConsensus:  retrievalRerankConsumeConsensus,
+		DH005ConsumeConsensus:            dh005ConsumeConsensus,
+		RetrievalAuditEnabled:            retrievalAuditEnabled,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
