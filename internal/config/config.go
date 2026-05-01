@@ -498,6 +498,17 @@ type Config struct {
 	// Default true — emergency-disable lever for if hooks misbehave.
 	ConflictTrackerEnabled bool // CONFLICT_TRACKER_ENABLED — enable production divergence-detection hooks (default: true)
 
+	// Phase 11.6.3 — MLX Watchdog. Background prober + llmclient fast-fail
+	// gate that detect mlx_lm.server outages within seconds and short-circuit
+	// the 6-attempt × ~30 s retry loop that produced the retry-storm pattern
+	// observed in Phase 12 (1642% CPU when mlx died under load). All knobs
+	// default to safe-off so existing deployments are unaffected until the
+	// operator opts in via .env.
+	MLXWatchdogEnabled    bool // MLX_WATCHDOG_ENABLED — start the mlxprobe goroutine + Prometheus metrics (default: false until live-validated)
+	MLXProbeIntervalSec   int  // MLX_PROBE_INTERVAL_SEC — seconds between probe ticks (default: 5, min 1)
+	MLXProbeTimeoutSec    int  // MLX_PROBE_TIMEOUT_SEC — per-probe HTTP timeout in seconds; must be < MLX_PROBE_INTERVAL_SEC (default: 2, min 1)
+	MLXFailFastEnabled    bool // MLX_FAIL_FAST_ENABLED — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -2463,6 +2474,28 @@ func FromEnv() (Config, error) {
 
 	conflictTrackerEnabled := getBool("CONFLICT_TRACKER_ENABLED", true)
 
+	// Phase 11.6.3 — MLX Watchdog
+	mlxWatchdogEnabled := getBool("MLX_WATCHDOG_ENABLED", false)
+	mlxProbeIntervalSec, err := atoi("MLX_PROBE_INTERVAL_SEC", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if mlxProbeIntervalSec < 1 {
+		return Config{}, fmt.Errorf("MLX_PROBE_INTERVAL_SEC must be ≥ 1 (got %d)", mlxProbeIntervalSec)
+	}
+	mlxProbeTimeoutSec, err := atoi("MLX_PROBE_TIMEOUT_SEC", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if mlxProbeTimeoutSec < 1 {
+		return Config{}, fmt.Errorf("MLX_PROBE_TIMEOUT_SEC must be ≥ 1 (got %d)", mlxProbeTimeoutSec)
+	}
+	if mlxProbeTimeoutSec >= mlxProbeIntervalSec {
+		return Config{}, fmt.Errorf("MLX_PROBE_TIMEOUT_SEC (%d) must be < MLX_PROBE_INTERVAL_SEC (%d) — overlap risks ticker stalls",
+			mlxProbeTimeoutSec, mlxProbeIntervalSec)
+	}
+	mlxFailFastEnabled := getBool("MLX_FAIL_FAST_ENABLED", true)
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3862,6 +3895,12 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectTimeoutMs:          rsicLLMReflectTimeoutMs,
 		RSICLLMConcurrencyLimit:          rsicLLMConcurrencyLimit,
 		ConflictTrackerEnabled:           conflictTrackerEnabled,
+
+		// Phase 11.6.3 — MLX Watchdog
+		MLXWatchdogEnabled:  mlxWatchdogEnabled,
+		MLXProbeIntervalSec: mlxProbeIntervalSec,
+		MLXProbeTimeoutSec:  mlxProbeTimeoutSec,
+		MLXFailFastEnabled:  mlxFailFastEnabled,
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,

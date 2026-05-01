@@ -24,6 +24,8 @@ import (
 	"mdemg/internal/healthprobe"
 	"mdemg/internal/llmclient"
 	mlog "mdemg/internal/logging"
+	"mdemg/internal/metrics"
+	"mdemg/internal/mlxprobe"
 	"mdemg/internal/plugins"
 	"mdemg/internal/supervisor"
 	"mdemg/internal/tsdb"
@@ -277,6 +279,68 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		srv.SetTSDBClient(tsdbClient)
 	}
 
+	// Phase 11.6.3 — MLX Watchdog. Construct + register the prober BEFORE
+	// supervisor.Start so the goroutine joins the same panic-recovery loop
+	// the health prober uses. SetDefault wires the singleton llmclient reads
+	// at request time. Embeddings are unaffected because the gate keys on
+	// baseURL == cfg.EffectiveLLMEndpoint().
+	var mlxProber *mlxprobe.Prober
+	if cfg.MLXWatchdogEnabled {
+		mlxProber = mlxprobe.New(mlxprobe.Config{
+			Endpoint: cfg.EffectiveLLMEndpoint(),
+			Interval: time.Duration(cfg.MLXProbeIntervalSec) * time.Second,
+			Timeout:  time.Duration(cfg.MLXProbeTimeoutSec) * time.Second,
+		})
+		mlxprobe.SetDefault(mlxProber)
+		mlxprobe.SetFastFailEnabled(cfg.MLXFailFastEnabled)
+
+		// State transition callback: metrics on every transition, alerts on
+		// up→down (High) and down→up (Low). The alert dispatcher is resolved
+		// lazily via srv.AlertDispatcher() so this closure works even though
+		// the supervisor may start the goroutine before disp is wired.
+		stdMetrics := metrics.Metrics()
+		mlxProber.OnTransition(func(from, to mlxprobe.State, lastErr error) {
+			stdMetrics.MLXHealthState(cfg.EffectiveLLMEndpoint()).Set(float64(to))
+			stdMetrics.MLXStateTransitions(from.String(), to.String()).Inc()
+
+			disp := srv.AlertDispatcher()
+			if disp == nil {
+				return
+			}
+			switch {
+			case to == mlxprobe.StateDown:
+				msg := fmt.Sprintf("endpoint=%s last_error=%v",
+					cfg.EffectiveLLMEndpoint(), lastErr)
+				disp.SendAlert(context.Background(), "mlx-server",
+					"mlx unreachable — fast-fail engaged", msg, alert.SeverityHigh)
+			case from == mlxprobe.StateDown && to == mlxprobe.StateUp:
+				disp.SendAlert(context.Background(), "mlx-server",
+					"mlx recovered",
+					fmt.Sprintf("endpoint=%s back to StateUp", cfg.EffectiveLLMEndpoint()),
+					alert.SeverityLow)
+			}
+		})
+		// Initial state read so the gauge is populated before any tick.
+		stdMetrics.MLXHealthState(cfg.EffectiveLLMEndpoint()).Set(float64(mlxProber.State()))
+
+		// Wire fast-fail observer so the llmclient gate increments
+		// mdemg_mlx_fast_fail_total without llmclient importing metrics.
+		mlxprobe.SetFastFailObserver(func(callerTask, _ string) {
+			task := callerTask
+			if task == "" {
+				task = "unknown"
+			}
+			stdMetrics.MLXFastFailTotal(task).Inc()
+		})
+
+		slog.Info("mlx-watchdog: enabled",
+			"endpoint", cfg.EffectiveLLMEndpoint(),
+			"interval_sec", cfg.MLXProbeIntervalSec,
+			"timeout_sec", cfg.MLXProbeTimeoutSec,
+			"fast_fail", cfg.MLXFailFastEnabled,
+		)
+	}
+
 	// SNA-001: Goroutine supervisor with panic recovery and auto-restart
 	var sup *supervisor.Supervisor
 	if disp := srv.AlertDispatcher(); disp != nil {
@@ -293,6 +357,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				prober.Stop()
 				return nil
 			})
+		}
+
+		// Phase 11.6.3 — register mlx watchdog under supervisor for panic
+		// recovery + ctx cancellation. Probe.Run() blocks until ctx.Done().
+		if mlxProber != nil {
+			sup.Register("mlx-watchdog", mlxProber.Run)
 		}
 
 		// Register alert evaluator
@@ -347,6 +417,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				fmt.Sprintf("%d consecutive failures, last: %v", count, lastErr),
 				alert.SeverityHigh)
 		})
+
+		// Phase 11.6.3 — mlx watchdog OnTransition was wired earlier (with
+		// late-bound disp lookup) so it operates regardless of the order
+		// supervisor.Start fires relative to alert dispatcher availability.
 	}
 
 	// Start periodic conversation memory consolidation (every 5 minutes)

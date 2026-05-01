@@ -57,6 +57,20 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 
 WHAT REMAINS TO BE DONE:
 === COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+- ✅ **FT-LORA-PHASE11.6.3: MLX Watchdog (Operational Hygiene #2)** (2026-04-30) — auto-restart + fast-fail + degraded-mode protection. The retry-storm cascade observed in Phase 12 (1642% CPU when mlx died) is eliminated at the source. Phase 13 (Column-Voting Retrieval) unblocked for sustained live A/B testing.
+  - **`internal/mlxprobe` package** (~250 LOC): goroutine polling `<endpoint>/v1/models` every 5s, 2s timeout. State machine `up → degraded → down` with hysteresis (3-failure → down, 2-success → up). Atomic state, supervisor-managed lifecycle. Singleton pattern (`SetDefault`/`Default`) + observer hook (`SetFastFailObserver`) so llmclient stays metrics-free.
+  - **llmclient fast-fail gate** at `internal/llmclient/client.go:471`: 10-LOC check at top of `doWithRetry`. Returns new `ErrMLXDown` sentinel without entering retry math when `MLXFailFastEnabled && Default().Endpoint() == c.baseURL && State() == StateDown`. **Embeddings safe**: gate keys on baseURL match.
+  - **launchd plist** `packaging/launchd/com.mdemg.mlx-server.plist` (mirrored to embed dir): KeepAlive on crash, ThrottleInterval=60s, conservative Phase 12 mlx flags. `launchdServices` slice extension marked `Optional: true` — `mdemg service install` skips when `mlx_lm.server` not on PATH (`MDEMG_MLX_LM_BIN`/`MDEMG_MODEL_PATH` env overrides).
+  - **`mdemg watchdog status` CLI**: parses `/metrics` (line-oriented Prometheus parser), `launchctl print` (PID + restart generation + last exit), and `~/.mdemg/alerts/current.json` (last 5 mlx-server entries). `--json` flag validates with `jq`.
+  - **3 Prometheus metrics**: `mdemg_mlx_health_state{endpoint}`, `mdemg_mlx_fast_fail_total{caller_task}`, `mdemg_mlx_state_transitions_total{from,to}`.
+  - **Alert wiring**: up→down=High, down→up=Low; existing 300s cooldown handles 60s launchd restart-cycle flap suppression. Late-bound `srv.AlertDispatcher()` lookup avoids init-order hazards.
+  - **4 config knobs**: `MLX_WATCHDOG_ENABLED` (default `false` until Live Smoke 2 validates), `MLX_PROBE_INTERVAL_SEC` (5), `MLX_PROBE_TIMEOUT_SEC` (2; cross-field-validated `<` interval), `MLX_FAIL_FAST_ENABLED` (true; operator escape hatch).
+  - **Tests**: full `go test -race ./...` green; new tests in `mlxprobe`, `llmclient`, `config`, `cli` (watchdog + service_darwin), `tests/integration/mlx_watchdog_test.go` (100 concurrent fast-fails, OpenAI endpoint isolation). `golangci-lint` clean. **Tier 3 partial**: CLI verified against live system; destructive `kill -9 mlx` smokes (Live Smoke 1/2/3/4) deferred to operator-led validation per safe-execution policy.
+  - **Schema**: unchanged at 16. **Costs**: $0 OpenAI; ~3 hr local compute.
+  - **Decision-fork outcomes**: launchd-only > Go-binary supervisor; 5s/2s probe cadence; fast-fail only on `down` (degraded log-only); `MLX_WATCHDOG_ENABLED=false` rollout default; plist optional install.
+  - Doc: [`phase_11_6_3_post.md`](docs/development/ft-lora/phase_11_6_3_post.md). Plan: [`sprint_plan_phase_11_6_3.md`](docs/development/ft-lora/sprint_plan_phase_11_6_3.md).
+  - **Open follow-ups**: (a) operator-led Live Smoke 2 8h soak with periodic `kill -9` mlx; (b) flip `MLX_WATCHDOG_ENABLED` default `false → true` after Smoke 2 passes; (c) Phase 13 planning starts.
+
 - ✅ **POST-FT-LORA-PHASE12: UVTS Activation** (2026-05-01) — Sprint 2 of post-FT-LORA roadmap:
   - **5 latent runner defects fixed** in `docs/tests/uvts/runners/uvts_runner.py`: undefined method, wrong API field name (`query` vs `query_text`), wrong sys.path (grader_v4 not importable), Grader API misuse (path string vs list), hardcoded 10s timeout fired before the dev pipeline returns. Plus `--retrieve-timeout-s`, `--space-id`, `--persist-tsdb`, `--branch-label`, `--codebase-sha` CLI flags.
   - **TSDB V0016 migration** — `uvts_runs` + `uvts_results` (hypertable on `recorded_at`, 7-day chunks, `raw_grade` JSONB). `TSDB_REQUIRED_SCHEMA_VERSION` 15 → 16. Live-verified: 4 distinct branch_label runs landed in this sprint's smokes.

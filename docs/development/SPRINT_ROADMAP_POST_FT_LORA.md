@@ -202,7 +202,11 @@ Plus (cheap, parallel):
 
 **Outcome:** Shipped across 5 incremental commits (`0a99f29`, `4b27717`, `d6601b8`, `d10c1a5`, sprint-close). 5 latent runner defects fixed. V0016 TSDB migration + runner persistence + A/B harness + lnl_demo `ab_mode` extension + polysemy spec (partial-authoring) + ConflictTracker production wiring (Workstream C #1, deferred from 11.6.x). Live-testing formalized as required Tier-3 (CMS observation `p5iv8effstxk5ujd1fa2qfy8`). Phase 13 (Column-Voting) and Workstream C ConflictTracker observation window now unblocked. Mid-sprint discovery: MLX server fragility under sustained load — Phase 11.6.3 (MLX watchdog) is now the immediate next sprint, ahead of Phase 13. Doc: [`phase_12_uvts_post.md`](post-ft-lora/phase_12_uvts_post.md). Plan: [`sprint_plan_phase_12_uvts.md`](post-ft-lora/sprint_plan_phase_12_uvts.md).
 
-### Sprint 3: **Phase 13 — Note 04 Column-Voting Retrieval** (gated on Phase 11.6.3 MLX Watchdog)
+### Sprint 2.5: **Phase 11.6.3 — MLX Watchdog (Operational Hygiene #2)** ✅ EXECUTED (2026-04-30)
+
+**Outcome:** Auto-restart + fast-fail + degraded-mode wired end-to-end. New `internal/mlxprobe` package with state machine + supervisor integration, llmclient gate at `client.go:471` returning `ErrMLXDown` sentinel, launchd plist `com.mdemg.mlx-server.plist` with `KeepAlive.SuccessfulExit=false` + `ThrottleInterval=60s`, `mdemg watchdog status` CLI (parses `/metrics` + `launchctl print` + alert file), 3 Prometheus metrics, 4 config knobs. Tier 1 + Tier 2 fully green; Tier 3 partial (CLI verified live; destructive `kill -9 mlx` smokes deferred to operator-led validation per safe-execution policy). The retry-storm pattern observed in Phase 12 (1642% CPU when 16 LLM call sites independently retry on a dead mlx) is eliminated at the source. **Phase 13 unblocked**: sustained live A/B testing no longer risks 30-minute storms + manual recovery on every Metal-OOM crash. Doc: [`phase_11_6_3_post.md`](ft-lora/phase_11_6_3_post.md). Plan: [`sprint_plan_phase_11_6_3.md`](ft-lora/sprint_plan_phase_11_6_3.md).
+
+### Sprint 3: **Phase 13 — Note 04 Column-Voting Retrieval** (now unblocked by Phase 11.6.3)
 
 3-week sprint. Lowest-risk + highest-coverage research extension. Yields per-query `consensus_strength` signal that downstream extensions consume. Parallel-safe with any FT-LORA follow-up work.
 
