@@ -56,7 +56,29 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-05-02) ===
+- ✅ **HOTFIX 11.6.3.1: MLX always-on policy** (2026-05-02, commit `fc0961e`) — operator policy "MLX server should NEVER be down when mdemg framework is running" (memory: `feedback_mlx_required_when_mdemg_running.md`). Three changes flip the Phase 11.6.3 safe-off rollout to mandatory:
+  - `MLX_WATCHDOG_ENABLED` default `false → true` in `internal/config/config.go::FromEnv`. Soak gate supplanted by policy.
+  - `launchdServices` `com.mdemg.mlx-server` `Optional: true → false` in `internal/cli/service_darwin.go`. `mdemg service install` fails loudly with actionable guidance when `mlx_lm.server` not on PATH / not pointed at via `MDEMG_MLX_LM_BIN`.
+  - New `internal/cli/preflight_mlx.go` — startup probe; mdemg refuses to start if mlx unreachable at `cfg.EffectiveLLMEndpoint() + /models`. Operator escape hatch `MDEMG_ALLOW_NO_MLX=1` for Linux/Docker-only setups + emergency recovery.
+  - `.env` fixed at the same time: `LLM_ENDPOINT=host.docker.internal:8101/v1` → `http://127.0.0.1:8101/v1` (native binary couldn't resolve docker DNS — Phase 11.6.2 finding finally addressed); added `MDEMG_MLX_LM_BIN=/Users/reh3376/.venv/mdemg-ft-lora/bin/mlx_lm.server` + `MDEMG_MODEL_PATH=/Users/reh3376/mdemg/.local-models/mdemg-llm-v1`.
+  - **Live state**: `mlx_lm.server` running PID 20230 via `com.mdemg.mlx-server` launchd plist, HTTP 200 on `/v1/models`. Conservative Phase 12 flags hardcoded in plist.
+  - **CLAUDE.md** MLX Watchdog subsection rewritten to reflect mandatory always-on.
+  - Tests + lint green. Doc: this handoff entry; CHANGELOG `[Unreleased] ### Changed`.
+  - **Operator action required to make policy LIVE**: native mdemg PID 47207 is still running with old defaults (watchdog OFF). Either `kill 47207` to let `com.mdemg.server` launchd plist take over with new binary, OR `launchctl bootout gui/$(id -u)/com.mdemg.server` to keep the native + leave launchd-managed mdemg disabled. Sandbox blocked autonomous resolution.
+
+- ✅ **POST-FT-LORA-PHASE13: Column-Voting Retrieval — Epic 0-6 of 8** (2026-05-01, commits `6efdcdc`, `e3970d9`, `849de4e`) — Note 04 RRF-over-6-columns ranker shipped as **un-wired infrastructure** (default flag-off). Production behavior unchanged until Epic 7 A/B validation triggers default-flip in Epic 8. ~2400 LOC across 3 commits.
+  - **Epic 0 finding**: data audit on `mdemg-dev` (78,246 nodes) showed `last_accessed_at` 93.3% null + `role`/`source` 100% null. Per plan risk #8 fallback, **Phase 13 v1 ships 4 columns** (Embedding + BM25 + Graph + Structural). Temporal + RoleScoped deferred to Phase 13.1 once observation-stamping or backfill ships.
+  - **`internal/retrieval/column.go` + `column_{embedding,bm25,graph,structural}.go`** — Column interface + 3 refactor wrappers + new Structural column (variable-length Cypher walk across `contains|defined_in*1..N` edges with exponential hop decay; default 2 hops via `RETRIEVAL_STRUCTURAL_HOPS`).
+  - **`internal/retrieval/consensus.go`** — Aggregate function with parallel errgroup column execution + per-column timeout (default 80% of parent ctx remaining). RRF formula `score = w / (k + rank)` (k=60 default). `consensus_strength` per node = `(cols_with_node / cols_queried) × avg(normalized_rank)`, clipped [0,1]. `AggregateConsensus` is the per-call mean.
+  - **`internal/retrieval/scoring_rrf.go`** — `Service.ScoreAndRankRRF` orchestrator that builds 3 virtualColumns (Embedding/BM25/Graph as presorted views over upstream cands) + invokes Structural separately + calls Aggregate. Wired into `service.Retrieve` at the scorer-fork point with fail-open to legacy on RRF error.
+  - **Cache scorer-version namespacing** (`cache.go`) — `CacheKey(req, scorerVersion)` + `Get/Put` updated. `Service.scorerVersion()` returns `"v0-linear"` or `"v1-rrf4"`. Critical guard for A/B correctness (different scorer = different cache namespace = no cross-contamination).
+  - **TSDB V0017 retrieval_audit hypertable** — captures `consensus_strength`, per-column latency JSONB, columns_queried/returned, top_k_node_ids per call. `RetrievalAuditWriter` interface (`internal/retrieval/retrieval_audit.go`) + nil-safe call site at end of `service.Retrieve`. Default off (`RETRIEVAL_AUDIT_ENABLED=false`).
+  - **3 new Prometheus metrics**: `mdemg_retrieval_consensus_strength` (histogram), `mdemg_retrieval_column_latency_seconds{column}` (per-column histogram), `mdemg_retrieval_column_failed_total{column,reason}` (counter).
+  - **12 new config knobs** (Phase 13 + Epic 5 wires + Epic 6 audit).
+  - Plan: [`/Users/reh3376/.claude/plans/breezy-dancing-lerdorf.md`](.claude/plans/breezy-dancing-lerdorf.md) (frozen at sprint-start; copy to `docs/development/post-ft-lora/sprint_plan_phase_13_column_voting.md` lands in Epic 8).
+  - **Open follow-ups**: Epic 7 (operator-led UVTS A/B run, ~$5–25 OpenAI) + Epic 8 (docs + conditional default flip).
+
 - ✅ **FT-LORA-PHASE11.6.3: MLX Watchdog (Operational Hygiene #2)** (2026-04-30) — auto-restart + fast-fail + degraded-mode protection. The retry-storm cascade observed in Phase 12 (1642% CPU when mlx died) is eliminated at the source. Phase 13 (Column-Voting Retrieval) unblocked for sustained live A/B testing.
   - **`internal/mlxprobe` package** (~250 LOC): goroutine polling `<endpoint>/v1/models` every 5s, 2s timeout. State machine `up → degraded → down` with hysteresis (3-failure → down, 2-success → up). Atomic state, supervisor-managed lifecycle. Singleton pattern (`SetDefault`/`Default`) + observer hook (`SetFastFailObserver`) so llmclient stays metrics-free.
   - **llmclient fast-fail gate** at `internal/llmclient/client.go:471`: 10-LOC check at top of `doWithRetry`. Returns new `ErrMLXDown` sentinel without entering retry math when `MLXFailFastEnabled && Default().Endpoint() == c.baseURL && State() == StateDown`. **Embeddings safe**: gate keys on baseURL match.

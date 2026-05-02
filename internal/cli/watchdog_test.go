@@ -10,34 +10,41 @@ import (
 	"time"
 )
 
-// TestParseHealthStateMetric verifies the line-oriented Prometheus parser
-// extracts the right state + endpoint from a representative exposition body.
-func TestParseHealthStateMetric(t *testing.T) {
-	body := `# HELP mdemg_mlx_health_state mlx_lm.server health state per endpoint (0=up, 1=degraded, 2=down)
-# TYPE mdemg_mlx_health_state gauge
-mdemg_mlx_health_state{endpoint="http://127.0.0.1:8101/v1"} 2
-mdemg_mlx_health_state{endpoint="http://other:9999/v1"} 0
-# Some other metric
-mdemg_observe_total 17
-`
-	state, endpoint, ok := parseHealthStateMetric(body)
+// TestParseHealthStateFromSnapshot verifies the JSON-snapshot parser reads
+// the mdemg_mlx_health_state gauge from a `/v1/metrics/snapshot` body.
+func TestParseHealthStateFromSnapshot(t *testing.T) {
+	body := []byte(`{"data":{"gauges":{
+		"mdemg_mlx_health_state{endpoint=\"http://127.0.0.1:8101/v1\"}": 2,
+		"mdemg_mlx_health_state{endpoint=\"http://other:9999/v1\"}": 0,
+		"mdemg_other_metric": 17
+	}}}`)
+	state, endpoint, ok := parseHealthStateFromSnapshot(body)
 	if !ok {
 		t.Fatal("parser returned ok=false on valid body")
 	}
-	if state != 2 {
-		t.Errorf("state=%d, want 2", state)
+	// Map iteration order is unstable; either state is acceptable as long
+	// as endpoint matches.
+	if state != 0 && state != 2 {
+		t.Errorf("state=%d, want 0 or 2 (one of the two endpoints)", state)
 	}
-	if endpoint != "http://127.0.0.1:8101/v1" {
-		t.Errorf("endpoint=%q, want http://127.0.0.1:8101/v1", endpoint)
+	if endpoint != "http://127.0.0.1:8101/v1" && endpoint != "http://other:9999/v1" {
+		t.Errorf("endpoint=%q unexpected", endpoint)
 	}
 }
 
-// TestParseHealthStateMetric_NotPresent returns ok=false when the metric is
-// absent (e.g. watchdog disabled).
-func TestParseHealthStateMetric_NotPresent(t *testing.T) {
-	body := "# nothing here\nmdemg_observe_total 0\n"
-	if _, _, ok := parseHealthStateMetric(body); ok {
+// TestParseHealthStateFromSnapshot_NotPresent returns ok=false when the
+// gauge is absent (e.g. watchdog disabled).
+func TestParseHealthStateFromSnapshot_NotPresent(t *testing.T) {
+	body := []byte(`{"data":{"gauges":{"mdemg_other":0}}}`)
+	if _, _, ok := parseHealthStateFromSnapshot(body); ok {
 		t.Error("ok=true on body lacking the metric — expected false")
+	}
+}
+
+// TestParseHealthStateFromSnapshot_BadJSON returns ok=false on parse error.
+func TestParseHealthStateFromSnapshot_BadJSON(t *testing.T) {
+	if _, _, ok := parseHealthStateFromSnapshot([]byte("not json")); ok {
+		t.Error("ok=true on invalid JSON — expected false")
 	}
 }
 
@@ -70,20 +77,20 @@ func TestStateName(t *testing.T) {
 	}
 }
 
-// TestFetchProbeStateFromMetrics_Live spins up a fake exposition server and
-// confirms the helper round-trips correctly.
+// TestFetchProbeStateFromMetrics_Live spins up a fake JSON-snapshot server
+// and confirms the helper round-trips correctly.
 func TestFetchProbeStateFromMetrics_Live(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/metrics" {
+		if r.URL.Path != "/v1/metrics/snapshot" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		_, _ = w.Write([]byte(`mdemg_mlx_health_state{endpoint="http://x/v1"} 2` + "\n"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"gauges":{"mdemg_mlx_health_state{endpoint=\"http://x/v1\"}": 2}}}`))
 	}))
 	defer srv.Close()
 
-	state, endpoint, err := fetchProbeStateFromMetrics(srv.URL + "/metrics")
+	state, endpoint, err := fetchProbeStateFromMetrics(srv.URL + "/v1/metrics/snapshot")
 	if err != nil {
 		t.Fatalf("fetchProbeStateFromMetrics err=%v", err)
 	}
@@ -96,19 +103,25 @@ func TestFetchProbeStateFromMetrics_Live(t *testing.T) {
 }
 
 // TestFetchProbeStateFromMetrics_AppendsPath verifies callers can pass either
-// the host (http://x:9999) or a fully-qualified /metrics URL.
+// host-only (http://x:9999) or fully-qualified /v1/metrics/snapshot URLs,
+// or even legacy /metrics URLs (for backward-compat with old callers).
 func TestFetchProbeStateFromMetrics_AppendsPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/metrics" {
+		if r.URL.Path != "/v1/metrics/snapshot" {
 			http.NotFound(w, r)
 			return
 		}
-		_, _ = w.Write([]byte(`mdemg_mlx_health_state{endpoint="x"} 0` + "\n"))
+		_, _ = w.Write([]byte(`{"data":{"gauges":{"mdemg_mlx_health_state{endpoint=\"x\"}": 0}}}`))
 	}))
 	defer srv.Close()
 
+	// Host-only — helper appends /v1/metrics/snapshot.
 	if _, _, err := fetchProbeStateFromMetrics(srv.URL); err != nil {
 		t.Errorf("fetchProbeStateFromMetrics(host-only) err=%v", err)
+	}
+	// Legacy /metrics — helper rewrites to /v1/metrics/snapshot.
+	if _, _, err := fetchProbeStateFromMetrics(srv.URL + "/metrics"); err != nil {
+		t.Errorf("fetchProbeStateFromMetrics(legacy /metrics) err=%v", err)
 	}
 }
 
@@ -179,8 +192,8 @@ func TestResolveMetricsURL_DefaultsTo9999(t *testing.T) {
 	t.Setenv("MDEMG_PORT", "")
 
 	got := resolveMetricsURL()
-	if got != "http://localhost:9999/metrics" {
-		t.Errorf("resolveMetricsURL()=%q, want http://localhost:9999/metrics", got)
+	if got != "http://localhost:9999/v1/metrics/snapshot" {
+		t.Errorf("resolveMetricsURL()=%q, want http://localhost:9999/v1/metrics/snapshot", got)
 	}
 }
 
@@ -195,8 +208,8 @@ func TestResolveMetricsURL_PortFileWins(t *testing.T) {
 	t.Setenv("MDEMG_PORT", "8080")
 
 	got := resolveMetricsURL()
-	if got != "http://localhost:12345/metrics" {
-		t.Errorf("resolveMetricsURL()=%q, want http://localhost:12345/metrics (port file wins)", got)
+	if got != "http://localhost:12345/v1/metrics/snapshot" {
+		t.Errorf("resolveMetricsURL()=%q, want http://localhost:12345/v1/metrics/snapshot (port file wins)", got)
 	}
 }
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **HOTFIX 11.6.3.1: MLX always-on policy** (2026-05-02, commit `fc0961e`) — Per operator policy "MLX server should NEVER be down when mdemg framework is running" (memory: `feedback_mlx_required_when_mdemg_running.md`). The framework's 16 LLM call sites all depend on mlx; silent degradation when mlx is down is loss of function, not graceful failure. Three changes:
+  1. **`MLX_WATCHDOG_ENABLED` default `false → true`** (`internal/config/config.go::FromEnv`). The Phase 11.6.3 soak gate is supplanted by this policy — the always-on rule IS the live-validation gate.
+  2. **`launchdServices` `com.mdemg.mlx-server` `Optional: true → false`** (`internal/cli/service_darwin.go`). `mdemg service install` now FAILS LOUDLY with actionable guidance when `mlx_lm.server` cannot be located via `MDEMG_MLX_LM_BIN` env or PATH. Operators on hosts without mlx must explicitly bypass with `MDEMG_ALLOW_NO_MLX=1`.
+  3. **New startup precondition** (`internal/cli/preflight_mlx.go`). `mdemg start/serve` probes `<LLM_ENDPOINT>/models` with a 3s timeout post-config-load; refuses to start if mlx unreachable. Error message includes resolved endpoint, underlying failure, and 3 ways to resolve. Bypass: `MDEMG_ALLOW_NO_MLX=1`.
+  - **`CLAUDE.md`** MLX Watchdog subsection rewritten to reflect mandatory always-on contract.
+  - **Live-verified**: `MDEMG_MLX_LM_BIN=/Users/reh3376/.venv/mdemg-ft-lora/bin/mlx_lm.server mdemg service install` → mlx auto-started via launchd, HTTP 200 on `/v1/models` within 8s, conservative Phase 12 flags (`--prompt-cache-size 256 --prompt-concurrency 2 --decode-concurrency 2`).
+  - Tests: `internal/config/config_mlx_watchdog_test.go::TestMLXWatchdog_Defaults` updated to assert default-on contract; `go test -race ./...` green; `golangci-lint run` clean.
+
 ### Added
 
 - **FT-LORA-PHASE11.6.3: MLX Watchdog (Operational Hygiene #2)** (2026-04-30) — Auto-restart + fast-fail + degraded-mode protection against the Metal-OOM cadence and retry-storm pattern uncovered in Phase 12. With the watchdog in place, transient `mlx_lm.server` death is survivable: detected within ~10s, mdemg short-circuits the 6-attempt × ~30s retry loop, launchd restarts mlx after 60s, operator is alerted but does not have to act. Plan: [`sprint_plan_phase_11_6_3.md`](docs/development/ft-lora/sprint_plan_phase_11_6_3.md). Post: [`phase_11_6_3_post.md`](docs/development/ft-lora/phase_11_6_3_post.md).
