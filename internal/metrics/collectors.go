@@ -358,7 +358,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 
 	// Phase 11.6.x — RSIC LLM-stage concurrency throttle counter
-	m.RSICLLMSemaphoreBlocked = r.NewCounter("mdemg_rsic_llm_semaphore_blocked_total",
+	// Hotfix 11.6.3.1 followups — name registered without `mdemg_` prefix
+	// (registry adds it automatically; previous registration produced
+	// double-prefixed `mdemg_mdemg_rsic_llm_semaphore_blocked_total`).
+	m.RSICLLMSemaphoreBlocked = r.NewCounter("rsic_llm_semaphore_blocked_total",
 		"RSIC cycles that waited for an in-flight LLM-stage slot before reflector.Reflect", nil)
 
 	// RSIC watchdog metrics
