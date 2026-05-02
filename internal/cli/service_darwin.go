@@ -28,10 +28,16 @@ var launchdServices = []struct {
 	{"com.mdemg.training-export", "com.mdemg.training-export.plist", false},
 	{"com.mdemg.maintenance", "com.mdemg.maintenance.plist", false},
 	// Phase 11.6.3 — MLX Watchdog. Auto-restarts mlx_lm.server on Metal-OOM
-	// crashes (KeepAlive.SuccessfulExit=false + ThrottleInterval=60s). Optional
-	// because mlx_lm is only available on Apple Silicon hosts that have run
-	// the FT-LORA pip install; absence is normal on Linux/Docker-only setups.
-	{"com.mdemg.mlx-server", "com.mdemg.mlx-server.plist", true},
+	// crashes (KeepAlive.SuccessfulExit=false + ThrottleInterval=60s).
+	//
+	// Hotfix 11.6.3.1 (2026-05-02) — flipped Optional false: per always-on
+	// MLX policy (memory: feedback_mlx_required_when_mdemg_running.md), the
+	// MDEMG framework requires mlx to be up at all times. Install fails
+	// loudly when `mlx_lm.server` cannot be resolved (PATH or
+	// MDEMG_MLX_LM_BIN env override) rather than silently skipping. Hosts
+	// without mlx (Linux/Docker-only) must explicitly set MDEMG_ALLOW_NO_MLX=1
+	// at startup to bypass the policy.
+	{"com.mdemg.mlx-server", "com.mdemg.mlx-server.plist", false},
 }
 
 type darwinServiceManager struct{}
@@ -73,10 +79,23 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	templateDir := filepath.Join(projectDir, "packaging", "launchd")
 
 	for _, svc := range launchdServices {
-		// Optional services skip install when their prerequisites are missing.
-		if svc.Optional && svc.Label == "com.mdemg.mlx-server" && !mlxLMFound {
-			fmt.Printf("Skipping %s — mlx_lm.server not found on PATH (set MDEMG_MLX_LM_BIN to override)\n",
-				svc.Label)
+		// Hotfix 11.6.3.1 — mlx-server is now required (Optional=false). Fail
+		// loudly with actionable guidance if mlx_lm.server can't be located.
+		// Optional services (none currently) would still skip when prereqs
+		// missing, but the mlx-server policy is "must succeed."
+		if svc.Label == "com.mdemg.mlx-server" && !mlxLMFound {
+			return fmt.Errorf(
+				"install failed: mlx_lm.server not found on PATH (per always-on MLX policy, mlx is required for mdemg).\n"+
+					"  Resolve via one of:\n"+
+					"    1. Set MDEMG_MLX_LM_BIN=/path/to/mlx_lm.server in your shell or .env\n"+
+					"    2. Install mlx_lm in a venv on PATH (`pip install mlx-lm`)\n"+
+					"    3. (Emergency only) Skip this install with `MDEMG_ALLOW_NO_MLX=1 mdemg start ...` —\n"+
+					"       mdemg will refuse to serve LLM-dependent endpoints; intended for Linux/Docker-only setups.")
+		}
+		if svc.Optional && !mlxLMFound {
+			// Reserved for future optional services. mlx-server is no
+			// longer in this branch.
+			fmt.Printf("Skipping optional service %s\n", svc.Label)
 			continue
 		}
 

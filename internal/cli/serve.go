@@ -84,6 +84,15 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		return fmt.Errorf("config error: %w", err)
 	}
 
+	// Hotfix 11.6.3.1 — always-on MLX policy. The framework's 16 LLM call
+	// sites all depend on mlx; refusing to start when mlx is unreachable
+	// is the only honest signal. Operator escape hatch: MDEMG_ALLOW_NO_MLX=1
+	// (intended for Linux/Docker-only setups where the operator has wired
+	// LLM_ENDPOINT to a non-mlx provider).
+	if err := preflightMLXReachable(cfg); err != nil {
+		return err
+	}
+
 	// Support AUTO_MIGRATE / TSDB_AUTO_MIGRATE env vars for Docker deployments
 	// where CLI flags aren't available. AUTO_MIGRATE covers both Neo4j and TSDB.
 	if !autoMigrate {

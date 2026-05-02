@@ -504,7 +504,7 @@ type Config struct {
 	// observed in Phase 12 (1642% CPU when mlx died under load). All knobs
 	// default to safe-off so existing deployments are unaffected until the
 	// operator opts in via .env.
-	MLXWatchdogEnabled    bool // MLX_WATCHDOG_ENABLED — start the mlxprobe goroutine + Prometheus metrics (default: false until live-validated)
+	MLXWatchdogEnabled    bool // MLX_WATCHDOG_ENABLED — start the mlxprobe goroutine + Prometheus metrics (default: true; flipped from false in hotfix 11.6.3.1 per always-on policy)
 	MLXProbeIntervalSec   int  // MLX_PROBE_INTERVAL_SEC — seconds between probe ticks (default: 5, min 1)
 	MLXProbeTimeoutSec    int  // MLX_PROBE_TIMEOUT_SEC — per-probe HTTP timeout in seconds; must be < MLX_PROBE_INTERVAL_SEC (default: 2, min 1)
 	MLXFailFastEnabled    bool // MLX_FAIL_FAST_ENABLED — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
@@ -2507,7 +2507,7 @@ func FromEnv() (Config, error) {
 	conflictTrackerEnabled := getBool("CONFLICT_TRACKER_ENABLED", true)
 
 	// Phase 11.6.3 — MLX Watchdog
-	mlxWatchdogEnabled := getBool("MLX_WATCHDOG_ENABLED", false)
+	mlxWatchdogEnabled := getBool("MLX_WATCHDOG_ENABLED", true)
 	mlxProbeIntervalSec, err := atoi("MLX_PROBE_INTERVAL_SEC", 5)
 	if err != nil {
 		return Config{}, err

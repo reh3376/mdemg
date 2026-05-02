@@ -2,8 +2,10 @@ package config
 
 import "testing"
 
-// TestMLXWatchdog_Defaults confirms the safe-off rollout posture: watchdog
-// disabled, fail-fast on, 5s/2s probe cadence.
+// TestMLXWatchdog_Defaults confirms the always-on policy (hotfix 11.6.3.1):
+// the watchdog is mandatory whenever mdemg is running because all 16 LLM
+// call sites depend on mlx. Operators disable only via emergency
+// MLX_WATCHDOG_ENABLED=false override + MDEMG_ALLOW_NO_MLX=1.
 func TestMLXWatchdog_Defaults(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
@@ -16,8 +18,8 @@ func TestMLXWatchdog_Defaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
-	if cfg.MLXWatchdogEnabled {
-		t.Error("MLXWatchdogEnabled default = true, want false (safe-off rollout)")
+	if !cfg.MLXWatchdogEnabled {
+		t.Error("MLXWatchdogEnabled default = false, want true (always-on policy per hotfix 11.6.3.1)")
 	}
 	if cfg.MLXProbeIntervalSec != 5 {
 		t.Errorf("MLXProbeIntervalSec = %d, want 5", cfg.MLXProbeIntervalSec)
