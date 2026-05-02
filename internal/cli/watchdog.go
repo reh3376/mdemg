@@ -199,42 +199,6 @@ func parseHealthStateFromSnapshot(body []byte) (int, string, bool) {
 	return 0, "", false
 }
 
-// parseHealthStateMetric finds a line of the form
-//   mdemg_mlx_health_state{endpoint="..."} <value>
-// and returns the int value + the endpoint label. The Prometheus exposition
-// format is line-oriented so we don't need a full parser.
-func parseHealthStateMetric(body string) (int, string, bool) {
-	const metric = "mdemg_mlx_health_state{"
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, metric) {
-			continue
-		}
-		// metric{endpoint="x"} 2
-		closeBrace := strings.Index(line, "}")
-		if closeBrace < 0 {
-			continue
-		}
-		labels := line[len(metric):closeBrace]
-		valStr := strings.TrimSpace(line[closeBrace+1:])
-		// Endpoint label
-		var endpoint string
-		if e := extractLabelValue(labels, "endpoint"); e != "" {
-			endpoint = e
-		}
-		// Value parsed as float (Prometheus exposition uses float repr)
-		f, err := strconv.ParseFloat(strings.Fields(valStr)[0], 64)
-		if err != nil {
-			continue
-		}
-		return int(f), endpoint, true
-	}
-	return 0, "", false
-}
-
 func extractLabelValue(labels, key string) string {
 	prefix := key + `="`
 	idx := strings.Index(labels, prefix)
