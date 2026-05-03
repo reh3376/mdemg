@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **POST-FT-LORA-PHASE13.5: MLX Server Stability cutover** (2026-05-03, all epics) — production LLM substrate migrated from `mlx_lm.server` (port 8101, ~17 crashes/4h on M5 Max + macOS 26.3.x) to `llama-server` from llama.cpp b9000+ (port 8102, GGUF Q5_K_M, 0 crashes / 160 min × 301 calls). Decision was data-cited per operator constraint; no opinion-based picks. Plan: [`sprint_plan_phase_13_5_mlx_stability.md`](docs/development/post-ft-lora/sprint_plan_phase_13_5_mlx_stability.md). Bake-off results: [`phase_13_5_bakeoff_results.md`](docs/development/post-ft-lora/phase_13_5_bakeoff_results.md). Synthesis: [`phase_13_5_mlx_research_synthesis.md`](docs/development/post-ft-lora/phase_13_5_mlx_research_synthesis.md).
+  - **Research-first sprint**: 4 parallel streams (crash forensics, mlx-lm/Apple Metal community evidence, alternatives matrix, internal LLM call profile) cited 35+ external sources. Synthesis disqualified mlx_lm.server (maintainer-stated "not for production"; unbounded KV cache → Metal OOM → SIGABRT every ~14 min), Ollama (8+ open M5/26.3.x issues, matmul2d static_assert), LM Studio (closed-source operability risk for cognitive-substrate framework).
+  - **Empirical bake-off F1 (llama.cpp Q5_K_M GGUF) vs F2 (MLC-LLM q4f16_1 TVM)** — F1 wins every measured dimension: stability tied (both 0 crashes); latency 1.6× faster (3.10s avg vs 5.02s; p95 4.28 vs 6.56); UVTS quality at perfect mean parity (0.396 = 0.396) vs F2 −0.006; ~4× larger community + MIT licensed; GGUF format runs in many other tools.
+  - **Production cutover artifacts**:
+    - New launchd plist `~/Library/LaunchAgents/com.mdemg.llama-server.plist` (KeepAlive on crash, ThrottleInterval=30s)
+    - GGUF model `~/mdemg/.local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q5_K_M.gguf` (10 GB, mean parity with MLX form on UVTS)
+    - `.env` `LLM_ENDPOINT=http://127.0.0.1:8102/v1` (was 8101); watchdog re-enabled (probe is backend-agnostic)
+    - Old `com.mdemg.mlx-server.plist` renamed `.disabled-phase13_5` (kept for emergency rollback)
+  - **Model conversion path** (~5 min on M5 Max): MLX 4-bit safetensors → `mlx_lm.fuse --dequantize` → 28 GB bf16 HF safetensors → `convert_hf_to_gguf.py --outtype f16` → 29.5 GB f16 GGUF → `llama-quantize Q5_K_M` → 10.5 GB Q5_K_M GGUF
+  - **Code surface**: zero. The framework was already backend-agnostic by design (`cfg.EffectiveLLMEndpoint() + /models` probe works for any OpenAI-compat backend). Only configuration + plist + docs changed. Identifier renames (`MDEMG_ALLOW_NO_MLX` → `MDEMG_ALLOW_NO_LLM`, etc.) deferred to follow-up sprint Phase 13.6 with backward-compat aliases.
+  - **CLAUDE.md**: "MLX Watchdog" section replaced with "Local LLM Runtime — llama.cpp llama-server" describing the new architecture, why migrated, rollback path, conversion pipeline, why the alternates lost.
+  - **Phase 13.1 (column-weight ablation) now unblocked** on a stable substrate. Phase 13.6 (naming cleanup) queued.
+  - **Operator-driven discipline**: research synthesis explicitly captured operator constraints "no short-term patches" + "data-decidable questions are not operator-input questions" as new MEMORY entries (`feedback_no_short_term_mlx_patches.md`, `feedback_data_decides_not_operator.md`).
+
 ### Added
 
 - **POST-FT-LORA-PHASE13: Note 04 Column-Voting Retrieval** (2026-05-02, Epic 0-8) — RRF aggregator + 4 columns (Embedding + BM25 + Graph + Structural; Temporal + RoleScoped deferred per Epic 0 data audit) shipped as feature-flagged infrastructure. Plan: [`sprint_plan_phase_13_column_voting.md`](docs/development/post-ft-lora/sprint_plan_phase_13_column_voting.md). Post: [`phase_13_column_voting_post.md`](docs/development/post-ft-lora/phase_13_column_voting_post.md). A/B verdict: [`phase_13_ab_verdict_quick.json`](docs/development/post-ft-lora/phase_13_ab_verdict_quick.json).

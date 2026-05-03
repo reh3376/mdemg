@@ -2,10 +2,32 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-05-01
+**Date:** 2026-05-03
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
+
+## Latest update — Phase 13.5: MLX Server Stability cutover (2026-05-03)
+
+**Production LLM substrate replaced.** `mlx_lm.server` (port 8101, ~17 crashes/4h on M5 Max + macOS 26.3.x) → `llama-server` from llama.cpp b9000+ (port 8102, GGUF Q5_K_M, 0 crashes / 160 min × 301 calls). Decision was data-cited per operator constraint "no opinion required, follow the data."
+
+What landed:
+- 4 parallel research streams + synthesis disqualified mlx_lm.server (maintainer says not for production), Ollama (broken on M5+macOS 26.3.x), LM Studio (closed-source operability risk).
+- Empirical bake-off F1 (llama.cpp) vs F2 (MLC-LLM) — F1 won every measured dimension (stability tied; latency 1.6× faster; UVTS quality at perfect parity 0.396=0.396; community 4× larger; format ecosystem broader).
+- New `com.mdemg.llama-server.plist` bootstrapped (KeepAlive, ThrottleInterval=30s).
+- Production model converted: MLX safetensors → bf16 dequant → GGUF f16 → Q5_K_M (10 GB) at `.local-models/mdemg-llm-v1-gguf/`.
+- `.env` `LLM_ENDPOINT=http://127.0.0.1:8102/v1`; watchdog re-enabled (probe is backend-agnostic — `EffectiveLLMEndpoint() + /models`).
+- Old `com.mdemg.mlx-server.plist` renamed `.disabled-phase13_5` for emergency rollback.
+- Phase 13.1 (column-weight ablation) now unblocked on a stable substrate.
+
+Docs:
+- Bake-off results: `docs/development/post-ft-lora/phase_13_5_bakeoff_results.md`
+- Synthesis: `docs/development/post-ft-lora/phase_13_5_mlx_research_synthesis.md`
+- 4 stream reports: `phase_13_5_{crash_forensics,external_evidence,alternatives_matrix,call_profile}.md`
+- Frozen plan: `docs/development/post-ft-lora/sprint_plan_phase_13_5_mlx_stability.md`
+- Disqualification re-check: `docs/development/post-ft-lora/phase_13_5_epic_1_disqualification_check.md`
+
+Follow-up sprint queued: Phase 13.6 — backend-agnostic naming cleanup (`preflight_mlx.go` → `preflight_llm.go`, env-var renames with backward-compat aliases).
 
 <!--
 === AGENT RESUME CONTEXT ===
