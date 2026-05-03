@@ -161,6 +161,7 @@ type Server struct {
 	embeddingWriter          *tsdb.EmbeddingEventWriter
 	retrievalWriter          *tsdb.RetrievalEventWriter
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
+	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
 	logBuffer *LogRingBuffer
@@ -1218,6 +1219,17 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		}
 		slog.Info("tsdb: constraint outcomes logger attached")
 
+		// Phase 13.5 — LLM endpoint health events writer (V0018 hypertable).
+		// Watchdog state-transition + fast-fail-burst events land here for
+		// historical Grafana panels that survive mdemg restarts. Wire into
+		// mlxprobe.OnTransition/SetFastFailObserver in cli/serve.go via the
+		// LLMEndpointHealthWriter() getter.
+		s.llmEndpointHealthWriter = tsdb.NewLLMEndpointHealthWriter(
+			client.Pool(),
+			time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+		)
+		slog.Info("tsdb: llm-endpoint health writer attached")
+
 		// Multi-instance collision detection
 		if s.cfg.InstanceID != "" {
 			var otherInstances []string
@@ -1265,6 +1277,15 @@ func (s *Server) SetLogBuffer(buf *LogRingBuffer) {
 // AlertDispatcher returns the server's alert dispatcher for external callback wiring.
 func (s *Server) AlertDispatcher() *alert.Dispatcher {
 	return s.alertDispatcher
+}
+
+// LLMEndpointHealthWriter returns the V0018 health-event writer for external
+// callback wiring. Returns nil if TSDB isn't configured. Phase 13.5 — used
+// from cli/serve.go to subscribe the watchdog OnTransition + FastFail
+// callbacks so endpoint stability is observable in Grafana over time ranges
+// that survive process restarts (Prometheus counters reset on restart).
+func (s *Server) LLMEndpointHealthWriter() *tsdb.LLMEndpointHealthWriter {
+	return s.llmEndpointHealthWriter
 }
 
 // embeddingRecorderAdapter adapts tsdb.EmbeddingEventWriter to embeddings.EmbeddingEventRecorder.
@@ -1399,6 +1420,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.constraintOutcomesWriter != nil {
 		s.constraintOutcomesWriter.Close()
+	}
+	if s.llmEndpointHealthWriter != nil {
+		s.llmEndpointHealthWriter.Close()
 	}
 	if s.tsdbWriter != nil {
 		s.tsdbWriter.Close()
