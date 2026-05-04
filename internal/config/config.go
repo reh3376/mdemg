@@ -553,6 +553,19 @@ type Config struct {
 	// windows.
 	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: false)
 
+	// Phase 14 Epic 1 — Note 06 sparse activation gate. After RRF aggregation
+	// (consensus_strength + ranked candidates), the gate cuts the candidate
+	// set to those whose score crosses the per-call activation percentile.
+	// Defaults derived from phase_14_score_distribution_analysis.md (Epic 0):
+	// observed retrieval_scores p98/p50 = 4-5x, K-cap dominantly 20-50, so
+	// p95 within-call paired with MIN_ACTIVE=3 floor and MAX_ACTIVE=20 cap
+	// matches production K shape. SPARSE_RETRIEVAL_ENABLED defaults false
+	// initially; flipped to true in Epic 7 if A/B verdict passes.
+	SparseRetrievalEnabled    bool    // SPARSE_RETRIEVAL_ENABLED — apply percentile gate post-aggregation pre-rerank (default: false; flip in Epic 7 if A/B passes)
+	SparseActivationPercentile float64 // SPARSE_ACTIVATION_PERCENTILE — within-call score percentile cutoff (default: 0.95; range 0.5-0.999)
+	SparseMinActive           int     // SPARSE_MIN_ACTIVE — floor on active set size; gate cannot drop below this (default: 3)
+	SparseMaxActive           int     // SPARSE_MAX_ACTIVE — cap on active set size; gate cannot exceed this (default: 20; matches observed top-K cap)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -898,7 +911,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 18 post-Phase 13.5 V0018 llm_endpoint_health_events)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 19 post-Phase 14 V0019 sparse_gate_metrics)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -2619,6 +2632,33 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
 	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
 
+	// Phase 14 Epic 1 — Note 06 sparse activation gate. Defaults from
+	// phase_14_score_distribution_analysis.md Epic 0 forensic: p95 (not spec
+	// 0.98), MIN_ACTIVE=3 dominates clamp in observed K=20-50 regime,
+	// MAX_ACTIVE=20 (not spec 50) matches observed top-K cap.
+	sparseRetrievalEnabled := getBool("SPARSE_RETRIEVAL_ENABLED", false)
+	sparseActivationPercentile, err := atof("SPARSE_ACTIVATION_PERCENTILE", 0.95)
+	if err != nil {
+		return Config{}, err
+	}
+	if sparseActivationPercentile < 0.5 || sparseActivationPercentile > 0.999 {
+		return Config{}, fmt.Errorf("SPARSE_ACTIVATION_PERCENTILE must be in [0.5, 0.999] (got %v)", sparseActivationPercentile)
+	}
+	sparseMinActive, err := atoi("SPARSE_MIN_ACTIVE", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if sparseMinActive < 0 {
+		return Config{}, fmt.Errorf("SPARSE_MIN_ACTIVE must be ≥ 0 (got %d)", sparseMinActive)
+	}
+	sparseMaxActive, err := atoi("SPARSE_MAX_ACTIVE", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	if sparseMaxActive < sparseMinActive {
+		return Config{}, fmt.Errorf("SPARSE_MAX_ACTIVE (%d) must be ≥ SPARSE_MIN_ACTIVE (%d)", sparseMaxActive, sparseMinActive)
+	}
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -3507,7 +3547,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 18)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 19)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4043,6 +4083,12 @@ func FromEnv() (Config, error) {
 		RetrievalRerankConsumeConsensus:  retrievalRerankConsumeConsensus,
 		DH005ConsumeConsensus:            dh005ConsumeConsensus,
 		RetrievalAuditEnabled:            retrievalAuditEnabled,
+
+		// Phase 14 Epic 1 — Note 06 sparse activation gate
+		SparseRetrievalEnabled:     sparseRetrievalEnabled,
+		SparseActivationPercentile: sparseActivationPercentile,
+		SparseMinActive:            sparseMinActive,
+		SparseMaxActive:            sparseMaxActive,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,

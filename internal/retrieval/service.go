@@ -31,6 +31,22 @@ type Service struct {
 	retrievalRecorder  RetrievalEventRecorder     // Optional retrieval event recorder for contrastive training data
 	queryClassifier    *QueryClassifier            // Optional LLM query type classifier (PROD-READINESS)
 	retrievalAuditWriter RetrievalAuditWriter     // Phase 13 — Optional retrieval_audit writer (V0017); nil-safe
+	sparseGateRecorder   SparseGateRecorder       // Phase 14 — Optional V0019 sparse_gate_metrics writer; nil-safe
+}
+
+// SparseGateRecorder is the contract for persisting V0019 sparse_gate_metrics
+// rows. Implementation lives in internal/tsdb (avoids the import cycle that
+// blocks moving the type definition there). Wired by api.NewServer.
+type SparseGateRecorder interface {
+	RecordGate(spaceID string, meta SparseGateMetadata, scorerVersion string)
+}
+
+// SetSparseGateRecorder attaches a V0019 metrics recorder. Pass nil to disable.
+// service.Retrieve calls Record only when the gate fires, so the recorder
+// captures the same set of events as the in-process Prometheus histograms but
+// with TSDB durability.
+func (s *Service) SetSparseGateRecorder(r SparseGateRecorder) {
+	s.sparseGateRecorder = r
 }
 
 // SetRetrievalRecorder attaches a retrieval event recorder for training data collection.
@@ -682,6 +698,47 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 	_ = consensusResult // Audit row write happens at the end of Retrieve (Epic 6)
 
+	// Phase 14 Epic 1 — Note 06 sparse activation gate. Cuts the candidate
+	// list to those whose score crosses the per-call activation percentile.
+	// Operates pre-rerank so the LLM-bound rerank prompt receives a 4-6×
+	// smaller input (the dominant quantitative win — see
+	// docs/development/post-ft-lora/phase_14_score_distribution_analysis.md).
+	// Per-request override via SparseEnabled/SparsePercentile on the request.
+	var (
+		gateMeta    SparseGateMetadata
+		gateDropped []models.RetrieveResult
+		gateFired   bool
+	)
+	gateOpts := SparseGateOpts{
+		Enabled:    s.cfg.SparseRetrievalEnabled,
+		Percentile: s.cfg.SparseActivationPercentile,
+		MinActive:  s.cfg.SparseMinActive,
+		MaxActive:  s.cfg.SparseMaxActive,
+	}
+	if req.SparseOverridePresent {
+		gateOpts.Enabled = req.SparseEnabled
+	}
+	if req.SparsePercentile > 0 {
+		gateOpts.Percentile = req.SparsePercentile
+	}
+	if gateOpts.Enabled && len(results) > 0 {
+		results, gateDropped, gateMeta = ApplySparseGate(results, gateOpts)
+		gateFired = true
+		stdMetrics := metrics.Metrics()
+		stdMetrics.SparseGateActiveCount.Observe(float64(gateMeta.ActiveCount))
+		stdMetrics.SparseGateThreshold.Observe(gateMeta.Threshold)
+		if gateMeta.InputCount > 0 {
+			stdMetrics.SparseGateDroppedFraction.Observe(
+				float64(gateMeta.DroppedCount) / float64(gateMeta.InputCount),
+			)
+		}
+		// Persist to V0019 sparse_gate_metrics for durability beyond the
+		// Prometheus reset cycle. Phase 14.1 retunes from this hypertable.
+		if s.sparseGateRecorder != nil {
+			s.sparseGateRecorder.RecordGate(req.SpaceID, gateMeta, scorerVersion)
+		}
+	}
+
 	// 5) Reasoning Module Processing (if available and query text provided)
 	var reasoningModuleID string
 	var reasoningLatencyMs float64
@@ -828,6 +885,36 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// Add temporal constraint description to debug if present
 	if hints.TemporalIntent.Constraint != nil {
 		resp.Debug["temporal_constraint"] = hints.TemporalIntent.Constraint.Description
+	}
+
+	// Phase 14 Epic 1 — surface sparse-gate state to debug. Always present
+	// when the gate fired so operators can confirm it ran; below_threshold
+	// candidates only attached when JiminyEnabled (preserves Phase 13
+	// breakdown-debug pattern). The gate metadata is small and useful for
+	// ad-hoc troubleshooting even outside Jiminy.
+	if gateFired {
+		resp.Debug["sparse_gate_active_count"] = gateMeta.ActiveCount
+		resp.Debug["sparse_gate_dropped_count"] = gateMeta.DroppedCount
+		resp.Debug["sparse_gate_threshold"] = gateMeta.Threshold
+		resp.Debug["sparse_gate_percentile"] = gateMeta.PercentileApplied
+		resp.Debug["sparse_gate_floor_applied"] = gateMeta.FloorApplied
+		resp.Debug["sparse_gate_ceiling_applied"] = gateMeta.CeilingApplied
+		if req.JiminyEnabled && len(gateDropped) > 0 {
+			// Truncate node-id list to keep response size bounded — the
+			// scores tell the operator the rest. 50 is well below MAX_ACTIVE.
+			cap := len(gateDropped)
+			if cap > 50 {
+				cap = 50
+			}
+			belowIDs := make([]string, 0, cap)
+			belowScores := make([]float64, 0, cap)
+			for i := 0; i < cap; i++ {
+				belowIDs = append(belowIDs, gateDropped[i].NodeID)
+				belowScores = append(belowScores, gateDropped[i].Score)
+			}
+			resp.Debug["below_threshold_node_ids"] = belowIDs
+			resp.Debug["below_threshold_scores"] = belowScores
+		}
 	}
 
 	// Store in query cache (skip for Jiminy-enabled and temporal requests)

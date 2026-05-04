@@ -160,6 +160,8 @@ type Server struct {
 	llmWriter       *tsdb.LLMInteractionWriter
 	embeddingWriter          *tsdb.EmbeddingEventWriter
 	retrievalWriter          *tsdb.RetrievalEventWriter
+	retrievalAuditWriter     *tsdb.RetrievalAuditWriter
+	sparseGateWriter         *tsdb.SparseGateMetricsWriter
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
@@ -1219,6 +1221,36 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		}
 		slog.Info("tsdb: constraint outcomes logger attached")
 
+		// Phase 14 Epic 0 — V0017 retrieval_audit writer. Phase 13 Epic 6
+		// shipped the schema + interface but the writer was never wired,
+		// leaving V0017 empty. Wire it here so RETRIEVAL_AUDIT_ENABLED=true
+		// actually produces rows. Buffered + flushed via CopyFrom every
+		// TSDB_FLUSH_INTERVAL_SEC (default 30s).
+		if s.cfg.RetrievalAuditEnabled {
+			s.retrievalAuditWriter = tsdb.NewRetrievalAuditWriter(
+				client.Pool(),
+				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+			)
+			s.retriever.SetRetrievalAuditWriter(&retrievalAuditAdapter{
+				writer: s.retrievalAuditWriter,
+			})
+			slog.Info("tsdb: retrieval audit writer attached")
+		}
+
+		// Phase 14 Epic 1 — V0019 sparse_gate_metrics writer. Always wire
+		// (independent of SparseRetrievalEnabled default) so per-request
+		// `?sparse=true` overrides record even when env default is off. The
+		// recorder is called only when the gate fires, so the writer stays
+		// idle when the feature is disabled.
+		s.sparseGateWriter = tsdb.NewSparseGateMetricsWriter(
+			client.Pool(),
+			time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
+		)
+		s.retriever.SetSparseGateRecorder(&sparseGateRecorderAdapter{
+			writer: s.sparseGateWriter,
+		})
+		slog.Info("tsdb: sparse_gate_metrics writer attached")
+
 		// Phase 13.5 — LLM endpoint health events writer (V0018 hypertable).
 		// Watchdog state-transition + fast-fail-burst events land here for
 		// historical Grafana panels that survive mdemg restarts. Wire into
@@ -1300,6 +1332,65 @@ type retrievalRecorderAdapter struct {
 	writer         *tsdb.RetrievalEventWriter
 	instanceID     string
 	defaultSpaceID string
+}
+
+// retrievalAuditAdapter adapts tsdb.RetrievalAuditWriter (which lives in tsdb
+// to avoid an import cycle) to retrieval.RetrievalAuditWriter (the contract
+// the retrieval package consumes). Phase 14 Epic 0 wired this — Phase 13 Epic
+// 6 shipped the V0017 schema + interface but never the writer.
+type retrievalAuditAdapter struct {
+	writer *tsdb.RetrievalAuditWriter
+}
+
+// sparseGateRecorderAdapter adapts tsdb.SparseGateMetricsWriter (in tsdb, to
+// avoid the import cycle) to retrieval.SparseGateRecorder (the contract
+// retrieval consumes). One row per gate firing — enables Phase 14.1 retune
+// from production traffic.
+type sparseGateRecorderAdapter struct {
+	writer *tsdb.SparseGateMetricsWriter
+}
+
+// RecordGate satisfies retrieval.SparseGateRecorder. Translates the retrieval-
+// side metadata into the tsdb-side row shape and forwards to the buffered
+// writer (no synchronous DB call — flushed by ticker).
+func (a *sparseGateRecorderAdapter) RecordGate(spaceID string, meta retrieval.SparseGateMetadata, scorerVersion string) {
+	a.writer.Record(tsdb.SparseGateMetricRow{
+		SpaceID:           spaceID,
+		PercentileApplied: meta.PercentileApplied,
+		ThresholdScore:    meta.Threshold,
+		InputCount:        meta.InputCount,
+		ActiveCount:       meta.ActiveCount,
+		DroppedCount:      meta.DroppedCount,
+		FloorApplied:      meta.FloorApplied,
+		CeilingApplied:    meta.CeilingApplied,
+		ScorerVersion:     scorerVersion,
+	})
+}
+
+// Write satisfies retrieval.RetrievalAuditWriter. Translates the per-column
+// time.Duration map to int64 ms (tsdb-side) and forwards to the buffered
+// writer. Always returns nil — actual persistence happens on flush; the
+// service-level call site is fail-open by design.
+func (a *retrievalAuditAdapter) Write(_ context.Context, rec retrieval.RetrievalAuditRecord) error {
+	var perColMs map[string]int64
+	if len(rec.PerColumnLatency) > 0 {
+		perColMs = make(map[string]int64, len(rec.PerColumnLatency))
+		for k, v := range rec.PerColumnLatency {
+			perColMs[k] = v.Milliseconds()
+		}
+	}
+	a.writer.Record(tsdb.RetrievalAuditRow{
+		SpaceID:            rec.SpaceID,
+		QueryTextHash:      rec.QueryTextHash,
+		ScorerVersion:      rec.ScorerVersion,
+		ConsensusStrength:  rec.ConsensusStrength,
+		PerColumnLatencyMs: perColMs,
+		ColumnsQueried:     rec.ColumnsQueried,
+		ColumnsReturned:    rec.ColumnsReturned,
+		TopKNodeIDs:        rec.TopKNodeIDs,
+		TotalLatencyMs:     rec.TotalLatencyMs,
+	})
+	return nil
 }
 
 func (a *retrievalRecorderAdapter) RecordRetrieval(_ context.Context, event retrieval.RetrievalEvent) {
@@ -1417,6 +1508,12 @@ func (s *Server) Shutdown() {
 	}
 	if s.retrievalWriter != nil {
 		s.retrievalWriter.Close()
+	}
+	if s.retrievalAuditWriter != nil {
+		s.retrievalAuditWriter.Close()
+	}
+	if s.sparseGateWriter != nil {
+		s.sparseGateWriter.Close()
 	}
 	if s.constraintOutcomesWriter != nil {
 		s.constraintOutcomesWriter.Close()

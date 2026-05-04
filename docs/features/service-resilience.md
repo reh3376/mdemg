@@ -1,10 +1,10 @@
 ---
 created: 2026-04-02
-updated: 2026-04-04
-version: v0.5.4
+updated: 2026-05-04
+version: v0.6.0
 author: reh3376
 status: active
-phase: "SVC-RES"
+phase: "SVC-RES + 11.6.x additions"
 ---
 
 # Service Resilience & Ingest Pipeline Hardening
@@ -224,13 +224,63 @@ Background goroutines (health prober, alert evaluator) are monitored by a superv
 - **Alerts** — warning on restart, critical on permanent failure (max retries exceeded)
 - **Graceful shutdown** — context cancellation stops all supervised workers
 
+## Phase 11.6.x Additions (2026-05-04 backfill)
+
+Phase 11.6.x ("Operational hygiene", `phase_11_6_x_post.md`) added several resilience knobs that were not captured here when the Phase 11.6.x sprint shipped. Backfilled now per the per-feature-doc-required rule.
+
+### RSIC Concurrency Limit (Epic 1)
+
+Concurrent RSIC reflection cycles (`ape.reflect` + `consulting.classify` + `jiminy.evaluate*`) could overlap when multiple sessions hit mdemg simultaneously, causing one slow LLM call to compound on top of another and triggering the watchdog. Phase 11.6.x added a semaphore at the RSIC entry point.
+
+| Env Var | Default | Description |
+|---|---|---|
+| `RSIC_MAX_CONCURRENT_CYCLES` | `2` | Maximum parallel RSIC cycles. Excess attempts queue (with timeout) |
+| `RSIC_CYCLE_QUEUE_TIMEOUT_MS` | `15000` | Time-out for cycles waiting in queue before returning a transient error |
+
+Implementation: `internal/rsic/coordinator.go` — `sync.WaitGroup` + `chan struct{}` semaphore.
+
+### Prompt Cache Configuration (Epic 4)
+
+llama-server's `--prompt-cache` flag retains the prompt-prefix KV state across calls, dramatically reducing time-to-first-token for repeated prompt patterns (RSIC reflection prompts share a long prefix). Phase 11.6.x configured the cache size and aging.
+
+| Env Var | Default | Description |
+|---|---|---|
+| `LLM_PROMPT_CACHE_PATH` | `/tmp/mdemg-prompt-cache` | Disk path for the persisted KV cache |
+| `LLM_PROMPT_CACHE_SIZE_MB` | `512` | Maximum cache size; LRU eviction beyond |
+
+Operators verifying the cache is hot can `tail -f $LLM_PROMPT_CACHE_PATH` for new entries during steady-state load.
+
+### ConflictTracker Production Wiring (Epic 5 / Workstream C #1)
+
+When two pieces of guidance produce contradictory signals (e.g. one says "follow this constraint", another says "violate it for performance"), the ConflictTracker records the pair in TSDB V0015 (`guidance_conflicts` hypertable). Phase 11.6.x wired this in production for two consumers:
+
+1. **UVTS A/B failures** — Phase 12 Epic 6 wires UVTS gate-fails into ConflictTracker so retrieval-quality conflicts surface alongside other guidance conflicts in Grafana
+2. **Jiminy escalation events** — when the same constraint re-fires after being marked `surfaced`, the conflict is recorded for J17 protocol-stability analysis
+
+| Env Var | Default | Description |
+|---|---|---|
+| `CONFLICT_TRACKER_ENABLED` | `true` | Master toggle; false suppresses V0015 writes |
+| `CONFLICT_TRACKER_DEDUP_WINDOW_SEC` | `300` | Identical conflicts within window dedup to one row |
+
+### Jiminy Defaults
+
+Phase 11.6.x flipped two Jiminy defaults that the original phase missed:
+
+| Env Var | Pre-11.6.x | Post-11.6.x | Rationale |
+|---|---|---|---|
+| `JIMINY_OUTCOME_LLM_ENABLED` | `false` | `true` | Tier-2 outcome classifier was effective enough to default-on |
+| `JIMINY_FOLLOW_RATE_PERSIST` | `false` | `true` | T1 comprehension gate (`J17_T1_COMPREHENSION_GATE`) needs persisted history |
+
 ## Documents Accessed
 
 - `internal/cli/service.go`, `service_darwin.go`, `service_linux.go`, `service_stub.go` — service management CLI
 - `internal/cli/hooks.go` — hook registration and settings merge
 - `internal/cli/ingest_claude_md.go` — buffer/flush logic
 - `internal/cli/data.go` — audit subcommand
+- `internal/rsic/coordinator.go` — Phase 11.6.x semaphore
+- `internal/conversation/conflict_tracker.go` — Phase 11.6.x ConflictTracker production wiring
 - `.claude/hooks/session-start.sh` — auto-start, error logging, TSDB check
 - `.claude/hooks/prompt-context.sh` — visible warning
 - `.claude/hooks/post-tool-observe.py` — prune-guard, protected overflow, error logging
 - `packaging/launchd/*.plist` — LaunchAgent supervision templates
+- `docs/development/ft-lora/phase_11_6_x_post.md` — origin sprint for the additions above

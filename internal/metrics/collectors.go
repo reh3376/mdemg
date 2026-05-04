@@ -213,6 +213,15 @@ type StandardMetrics struct {
 	RetrievalConsensusStrength    *Histogram                   // mdemg_retrieval_consensus_strength — aggregate consensus per retrieve call
 	RetrievalColumnLatency        func(column string) *Histogram // mdemg_retrieval_column_latency_seconds{column}
 	RetrievalColumnFailedTotal    func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
+
+	// Phase 14 Epic 1 — Note 06 sparse activation gate. Populated only when
+	// cfg.SparseRetrievalEnabled is true (or per-request override sets it).
+	// Histograms over per-call gate behavior — V0020 sparse_gate_metrics
+	// captures the same data with longer retention than Prometheus reset
+	// cycles allow.
+	SparseGateActiveCount     *Histogram // mdemg_sparse_gate_active_count — active set size after clamps
+	SparseGateDroppedFraction *Histogram // mdemg_sparse_gate_dropped_fraction — fraction dropped (0..1)
+	SparseGateThreshold       *Histogram // mdemg_sparse_gate_threshold — score-value at percentile cutoff
 }
 
 // Registry returns the underlying metric registry.
@@ -708,6 +717,20 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 			"Total per-column retrieval failures (column timed out, errored, or returned empty)",
 			map[string]string{"column": column, "reason": reason})
 	}
+
+	// Phase 14 Epic 1 — Note 06 sparse activation gate metrics.
+	m.SparseGateActiveCount = r.NewHistogram(
+		"sparse_gate_active_count",
+		"Active set size after Note 06 percentile gate + clamps",
+		nil)
+	m.SparseGateDroppedFraction = r.NewHistogram(
+		"sparse_gate_dropped_fraction",
+		"Fraction of input candidates dropped by Note 06 gate (0..1)",
+		nil)
+	m.SparseGateThreshold = r.NewHistogram(
+		"sparse_gate_threshold",
+		"Score value at the per-call activation percentile cutoff",
+		nil)
 
 	return m
 }
