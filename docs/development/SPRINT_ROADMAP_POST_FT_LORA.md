@@ -232,7 +232,9 @@ Code-cleanup follow-up to Phase 13.5. Rename: `internal/cli/preflight_mlx.go` �
 
 **Phase 14 (this sprint, EXECUTED narrow)**: Note 06 sparse activation gate code shipped flag-off + Phase 13 Epic 6 V0017 audit-writer fix shipped + Epic 0 forensic doc + V0019 sparse_gate_metrics hypertable + Phase 11+ feature-doc backfill (5 new + 1 update). 16q quick PASSED at MIN=10/p95 (mean +0.019, 0 regressions); 120q full FAILED per-question (mean parity, 7 boundary regressions concentrated in `architecture_structure`). Note 05 deferred — Epic 0 found the spec's static 64/64/64/64 catalog bit allocation is wrong for `whk-wms` (0 symbols, 0 roles) → adaptive Builder redesign needed. See `phase_14_post.md`.
 
-**Phase 14.1 (queued)**: Adaptive per-category sparse gate. ~3 dev-days, ~$15 OpenAI. `SPARSE_GATE_CATEGORY_OVERRIDES` JSON config; retune A/B; conditional default-on flip. See `sprint_plan_phase_14_1_adaptive_per_category_gate.md`.
+**Phase 14.1 (EXECUTED 2026-05-04, fail)**: Adaptive per-category sparse gate. Shipped per-category override config + dispatch + tests + comparator eps fix flag-off. 16q quick passed, 120q full failed (mean -0.009; q119 -0.45 + q333 -0.35 catastrophic). Diagnosis: per-category is the wrong abstraction; both regressing questions had 3 required_files in categories Phase 14.1's design didn't override. `SPARSE_GATE_CATEGORY_OVERRIDES` lands as opt-in infrastructure; eps fix in `uvts_ab_compare.py` ships globally. See `phase_14_1_post.md`.
+
+**Phase 14.1.1 (queued)**: Complexity-based sparse gate override. Replaces per-category with required-files-count or complexity-tag dispatch. ~3 dev-days, ~$15-25 OpenAI. See `sprint_plan_phase_14_1_1_complexity_based_override.md`.
 
 **Phase 14.2 (queued)**: Note 05 with adaptive catalog Builder. ~7 dev-days, ~$25 OpenAI. V0028 + V0029 + V0020 schema; fingerprint computation; context column; backfill CLI; combined A/B with Phase 14.1 gate. See `sprint_plan_phase_14_2_note_05_sparse_fingerprints.md`.
 

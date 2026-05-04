@@ -626,9 +626,17 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
         try:
             # Field is query_text per internal/models/models.go RetrieveRequest;
             # earlier `query` value silently 400'd at the validator.
+            #
+            # Phase 14.1 Epic 2 — pass per-question category hint into the
+            # retrieve body so the sparse-gate dispatch can pick a per-category
+            # override when configured. No-op when SPARSE_GATE_CATEGORY_OVERRIDES
+            # is empty (Phase 14 behavior preserved).
+            payload = {"space_id": space_id, "query_text": q["question"], "top_k": 5}
+            if q.get("category"):
+                payload["category"] = q["category"]
             resp = requests.post(
                 f"{base_url}/v1/memory/retrieve",
-                json={"space_id": space_id, "query_text": q["question"], "top_k": 5},
+                json=payload,
                 timeout=retrieve_timeout_s,
             )
             if resp.status_code != 200:

@@ -208,6 +208,114 @@ func TestApplySparseGate_HeavyTailRealistic(t *testing.T) {
 	}
 }
 
+// Phase 14.1 — Per-category override tests.
+
+func TestApplySparseGate_CategoryOverride_AppliesMatchingCategory(t *testing.T) {
+	// Override for architecture_structure: MIN=15. Global MIN=3. With K=20 input,
+	// arch query → MIN=15 (top 15 active). Other-category query → MIN=3.
+	in := makeCandidates(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+	min15 := 15
+	overrides := map[string]SparseGateCategoryOpts{
+		"architecture_structure": {MinActive: &min15},
+	}
+	// Arch query gets the override.
+	activeArch, _, metaArch := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.95, MinActive: 3, MaxActive: 20,
+		CategoryOverrides: overrides, Category: "architecture_structure",
+	})
+	if len(activeArch) != 15 {
+		t.Fatalf("arch override MIN=15 should give 15 active; got %d", len(activeArch))
+	}
+	if !metaArch.FloorApplied {
+		t.Fatalf("arch override floor should fire (p95 admits 1 of 20)")
+	}
+
+	// Different category gets global default (MIN=3).
+	activeOther, _, metaOther := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.95, MinActive: 3, MaxActive: 20,
+		CategoryOverrides: overrides, Category: "relationship",
+	})
+	if len(activeOther) != 3 {
+		t.Fatalf("non-overridden category should use MIN=3; got %d", len(activeOther))
+	}
+	if !metaOther.FloorApplied {
+		t.Fatalf("global MIN=3 should fire on this distribution too")
+	}
+}
+
+func TestApplySparseGate_CategoryOverride_PointerNilFallsBack(t *testing.T) {
+	// Override sets only Percentile (lower → more admit). MinActive + MaxActive
+	// fall back to globals. Verifies the resolveCategoryOpts pointer-nil
+	// fallback semantics.
+	in := makeCandidates(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+	pct50 := 0.50
+	overrides := map[string]SparseGateCategoryOpts{
+		"foo": {Percentile: &pct50},
+	}
+	_, _, meta := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.95, MinActive: 3, MaxActive: 20,
+		CategoryOverrides: overrides, Category: "foo",
+	})
+	// Percentile should be the override (0.50), not the global (0.95).
+	if meta.PercentileApplied != 0.50 {
+		t.Fatalf("category percentile should override (0.50); got %v", meta.PercentileApplied)
+	}
+	// At p50 on scores 1..20: threshold ~10.5 → 10 candidates admitted (scores 11..20).
+	// Floor (3) doesn't fire since 10 > 3. Ceiling (20) doesn't fire since 10 < 20.
+	if meta.ActiveCount != 10 {
+		t.Fatalf("p50 should admit ~10 of 20; got %d", meta.ActiveCount)
+	}
+	if meta.FloorApplied || meta.CeilingApplied {
+		t.Fatalf("p50 with no clamps fired should not trigger floor/ceiling; got floor=%v ceiling=%v",
+			meta.FloorApplied, meta.CeilingApplied)
+	}
+}
+
+func TestApplySparseGate_CategoryOverride_EmptyCategoryUsesGlobals(t *testing.T) {
+	in := makeCandidates(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+	min15 := 15
+	overrides := map[string]SparseGateCategoryOpts{
+		"architecture_structure": {MinActive: &min15},
+	}
+	active, _, _ := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.95, MinActive: 3, MaxActive: 20,
+		CategoryOverrides: overrides, Category: "", // no category hint
+	})
+	if len(active) != 3 {
+		t.Fatalf("empty category should use global MIN=3; got %d", len(active))
+	}
+}
+
+func TestApplySparseGate_CategoryOverride_NilMapUsesGlobals(t *testing.T) {
+	in := makeCandidates(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+	active, _, _ := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.95, MinActive: 3, MaxActive: 20,
+		CategoryOverrides: nil, // no map
+		Category:          "architecture_structure",
+	})
+	if len(active) != 3 {
+		t.Fatalf("nil override map should use global MIN=3; got %d", len(active))
+	}
+}
+
+func TestApplySparseGate_CategoryOverride_AllFieldsSet(t *testing.T) {
+	// Override sets all three fields. Effective opts entirely from override.
+	in := makeCandidates(20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+	min10 := 10
+	max15 := 15
+	pct50 := 0.50
+	overrides := map[string]SparseGateCategoryOpts{
+		"foo": {MinActive: &min10, MaxActive: &max15, Percentile: &pct50},
+	}
+	_, _, meta := ApplySparseGate(in, SparseGateOpts{
+		Enabled: true, Percentile: 0.99, MinActive: 1, MaxActive: 30,
+		CategoryOverrides: overrides, Category: "foo",
+	})
+	if meta.PercentileApplied != 0.50 {
+		t.Fatalf("override percentile should be 0.50; got %v", meta.PercentileApplied)
+	}
+}
+
 func TestPercentileLinear_KnownValues(t *testing.T) {
 	// R-7 / Excel-default linear interpolation: q*(n-1) index.
 	// scores [1, 2, 3, 4, 5] (n=5):

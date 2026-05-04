@@ -3,8 +3,8 @@ created: 2026-05-04
 updated: 2026-05-04
 version: v0.6.0
 author: reh3376
-status: experimental (flag-off pending Phase 14.1 retune)
-phase: phase 14
+status: experimental (flag-off after Phase 14 + 14.1; pending Phase 14.1.1 complexity-based retune)
+phase: phase 14 + phase 14.1
 ---
 
 # Sparse Retrieval (Note 06 Percentile Activation Gate)
@@ -123,12 +123,20 @@ V0017 captures pre-gate state (top_k_node_ids, consensus_strength). V0019 captur
 - **Spec recommendation drift**: Note 06 spec recommended `MIN_ACTIVE=3` and the default ships there, but operator-recommendation-via-doc says MIN=10. The doc + the code default disagree. Phase 14.1 should reconcile.
 - **No test coverage of category-specific behavior**: Tier 1 unit tests verify percentile + clamp correctness on synthetic distributions but don't exercise per-category regression patterns.
 
-### Future improvements (Phase 14.1 scope)
+### Future improvements
 
-- Per-category MIN_ACTIVE / MAX_ACTIVE / percentile via `SPARSE_GATE_CATEGORY_OVERRIDES` JSON config
-- Adaptive percentile based on `consensus_strength` (high consensus → tighter gate; low consensus → wider)
-- `eps` tolerance in `uvts_ab_compare.py`
-- Default-on flip after Phase 14.1 A/B passes
+**Phase 14.1 (executed 2026-05-04, partial — flag-off):**
+- ✅ Per-category MIN_ACTIVE / MAX_ACTIVE / percentile via `SPARSE_GATE_CATEGORY_OVERRIDES` JSON config — **shipped flag-off**, infrastructure ready
+- ✅ `eps=1e-6` tolerance in `uvts_ab_compare.py` — **shipped globally**, eliminates floating-point boundary false-positives
+- ❌ Default-on flip — **120q failed**, 2 catastrophic regressions in `service_relationships` + `data_flow_integration` (both 3-required-files questions). Per-category was the wrong abstraction
+
+**Phase 14.1.1 (queued):**
+- Complexity / required-files-count override (replaces per-category) via `SPARSE_GATE_COMPLEXITY_OVERRIDE_THRESHOLD` + new `?required_files_count=N` URL param
+- Default-on flip if 120q passes
+- See `sprint_plan_phase_14_1_1_complexity_based_override.md`
+
+**Phase 14.x extensions:**
+- Adaptive percentile based on `consensus_strength` (high consensus → tighter gate; low consensus → wider) — research extension
 
 ## API Endpoints
 

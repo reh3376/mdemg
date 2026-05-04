@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -566,6 +567,18 @@ type Config struct {
 	SparseMinActive           int     // SPARSE_MIN_ACTIVE — floor on active set size; gate cannot drop below this (default: 3)
 	SparseMaxActive           int     // SPARSE_MAX_ACTIVE — cap on active set size; gate cannot exceed this (default: 20; matches observed top-K cap)
 
+	// Phase 14.1 Epic 1 — Per-category sparse-gate overrides. Phase 14 120q
+	// full A/B revealed boundary regressions concentrated in specific
+	// categories (architecture_structure 3/20, data_flow_integration 2/20).
+	// This map lets operators set per-category MIN_ACTIVE / MAX_ACTIVE /
+	// percentile that override the global defaults above when the request
+	// carries a `Category` field. Pointer fields mean "not set; fall back to
+	// global default". Empty map (default) preserves Phase 14 behavior.
+	//
+	// JSON env shape:
+	//   SPARSE_GATE_CATEGORY_OVERRIDES='{"architecture_structure":{"min_active":20},"data_flow_integration":{"min_active":15}}'
+	SparseGateCategoryOverrides map[string]SparseGateOverride
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -961,6 +974,20 @@ func (c Config) EffectiveLLMEndpoint() string {
 		return c.LLMEndpoint
 	}
 	return c.OpenAIEndpoint
+}
+
+// SparseGateOverride is one entry in SparseGateCategoryOverrides. Pointer
+// fields encode "not set" (fall back to global default) vs "set to value".
+// JSON marshalling handles missing keys naturally.
+//
+// Example JSON value: {"min_active": 20}
+//   → MinActive=20, MaxActive=nil, Percentile=nil
+//   → at gate site: use category MinActive=20, fall back to global MaxActive
+//     and global Percentile.
+type SparseGateOverride struct {
+	MinActive  *int     `json:"min_active,omitempty"`
+	MaxActive  *int     `json:"max_active,omitempty"`
+	Percentile *float64 `json:"percentile,omitempty"`
 }
 
 // TSDBConfig returns a tsdb.Config derived from the main config.
@@ -2659,6 +2686,33 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("SPARSE_MAX_ACTIVE (%d) must be ≥ SPARSE_MIN_ACTIVE (%d)", sparseMaxActive, sparseMinActive)
 	}
 
+	// Phase 14.1 Epic 1 — Per-category gate overrides. JSON env, parsed once.
+	// Empty / unset → empty map → Phase 14 behavior (global defaults only).
+	// Validates known category keys + each override's bounds.
+	sparseGateCategoryOverrides := map[string]SparseGateOverride{}
+	if raw := strings.TrimSpace(os.Getenv("SPARSE_GATE_CATEGORY_OVERRIDES")); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &sparseGateCategoryOverrides); err != nil {
+			return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES must be valid JSON: %w", err)
+		}
+		for cat, ov := range sparseGateCategoryOverrides {
+			if cat == "" {
+				return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES: empty category key")
+			}
+			if ov.MinActive != nil && *ov.MinActive < 0 {
+				return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES[%s].min_active must be ≥ 0 (got %d)", cat, *ov.MinActive)
+			}
+			if ov.MaxActive != nil && *ov.MaxActive < 0 {
+				return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES[%s].max_active must be ≥ 0 (got %d)", cat, *ov.MaxActive)
+			}
+			if ov.MinActive != nil && ov.MaxActive != nil && *ov.MaxActive < *ov.MinActive {
+				return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES[%s]: max_active (%d) must be ≥ min_active (%d)", cat, *ov.MaxActive, *ov.MinActive)
+			}
+			if ov.Percentile != nil && (*ov.Percentile < 0.5 || *ov.Percentile > 0.999) {
+				return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES[%s].percentile must be in [0.5, 0.999] (got %v)", cat, *ov.Percentile)
+			}
+		}
+	}
+
 	consultingLLMConstraintsEnabled := getBool("CONSULTING_LLM_CONSTRAINTS_ENABLED", false)
 	consultingLLMConstraintsProvider := get("CONSULTING_LLM_CONSTRAINTS_PROVIDER", emergenceProvider)
 	consultingLLMConstraintsModel := get("CONSULTING_LLM_CONSTRAINTS_MODEL", emergenceModel)
@@ -4089,6 +4143,9 @@ func FromEnv() (Config, error) {
 		SparseActivationPercentile: sparseActivationPercentile,
 		SparseMinActive:            sparseMinActive,
 		SparseMaxActive:            sparseMaxActive,
+
+		// Phase 14.1 Epic 1 — Per-category overrides
+		SparseGateCategoryOverrides: sparseGateCategoryOverrides,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,

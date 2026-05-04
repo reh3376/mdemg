@@ -114,11 +114,17 @@ def compute_ab_verdict(baseline_summary: Dict[str, Any],
     regressions: List[Dict[str, Any]] = []
     improvements_count = 0
 
+    # Phase 14.1 Epic 2 — eps tolerance for floating-point boundary cases.
+    # Phase 14's 7 reported regressions all had delta=-0.10000000…ε which is
+    # display-equivalent to -0.10 but tripped a strict `<` check. eps=1e-6 is
+    # well below the 0.001 grading granularity (so no real regression escapes)
+    # while eliminating the false-positive boundary cases.
+    eps = 1e-6
     for qid in shared:
         a = _final_score(baseline_by_id[qid])
         b = _final_score(candidate_by_id[qid])
         delta = b - a
-        if delta < -regression_threshold:
+        if delta < -(regression_threshold + eps):
             regressions.append({
                 "question_id": qid,
                 "category": baseline_by_id[qid].get("category"),

@@ -7,7 +7,30 @@
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 14: Sparse retrieval gate (narrow-close) + Phase 11+ feature-doc backfill (2026-05-04)
+## Latest update — Phase 14.1: Adaptive per-category sparse gate (failed 120q, ships flag-off) + comparator eps fix (2026-05-04)
+
+**Phase 14.1 shipped infrastructure flag-off after 120q full A/B failed.** 16q quick PASSED at `adaptive-arch-only` preset (mean parity, 0 regressions, 1 improvement) — eps-tolerance fix in `uvts_ab_compare.py` eliminated Phase 14's 7 boundary false-positives. 120q full FAILED with 2 catastrophic regressions:
+- q119 (`service_relationships`, 3 required_files): -0.45
+- q333 (`data_flow_integration`, 3 required_files): -0.35
+
+Mean delta -0.009; per-category Δ shows -0.028 in both `service_relationships` and `data_flow_integration` (categories Phase 14.1's override didn't target). Diagnosis: per-category is the wrong abstraction; **multi-file complexity** drives gate cut-loss probability, not category. Phase 14.1.1 queued to retry with complexity-based override.
+
+What landed in Phase 14.1:
+- **Per-category override config** — `SPARSE_GATE_CATEGORY_OVERRIDES` JSON env in `config.go` + `SparseGateOverride` struct (pointer fields = "fall back to global") + Validate() bounds checks
+- **Gate dispatch** — `SparseGateOpts.CategoryOverrides` + `Category` + `resolveCategoryOpts()` helper + `translateCategoryOverrides()` config→gate translator
+- **Hint plumbing** — `Category` field on `RetrieveRequest` + `?category=` URL param + `category` JSON body field
+- **UVTS runner injection** — auto-injects spec per-question `category` field
+- **Comparator eps fix** — `uvts_ab_compare.py:121` now uses `delta < -(threshold + 1e-6)` (eliminates Phase 14's 7 boundary regressions; verified working)
+- **Adaptive ablation runner** — `scripts/phase14_1_adaptive_runner.py`
+- **4 new Tier 1 unit tests** for category override semantics; all green
+
+Defaults stay flag-off (`SPARSE_RETRIEVAL_ENABLED=false`, `SPARSE_GATE_CATEGORY_OVERRIDES=`empty). Operators who opt in get the per-category override mechanism but should not expect a default-on flip until Phase 14.1.1.
+
+OpenAI spend: ~$12.40. Under sprint $15-25 budget.
+
+Docs: `phase_14_1_post.md`, `phase_14_1_forensic.md`, `sprint_plan_phase_14_1_1_complexity_based_override.md` (next sprint stub).
+
+## Earlier update — Phase 14: Sparse retrieval gate (narrow-close) + Phase 11+ feature-doc backfill (2026-05-04)
 
 **Phase 14 narrowed and closed.** Original plan combined Notes 05+06 in one sprint; closed with Note 06 only after Epic 0+1+2 produced design questions for both Notes that warrant dedicated follow-up sprints. Note 05 deferred to Phase 14.2 (catalog redesign needed for non-code spaces); Note 06 default-flag flip deferred to Phase 14.1 (adaptive per-category gate).
 

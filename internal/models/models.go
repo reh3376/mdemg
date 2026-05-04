@@ -46,6 +46,15 @@ type RetrieveRequest struct {
 	SparseOverridePresent bool    `json:"-"`                            // not serialized; set by handler when ?sparse= present
 	SparseEnabled         bool    `json:"sparse,omitempty"`             // request-level override for SPARSE_RETRIEVAL_ENABLED
 	SparsePercentile      float64 `json:"sparse_percentile,omitempty" validate:"omitempty,min=0.5,max=0.999"` // request-level override for SPARSE_ACTIVATION_PERCENTILE
+
+	// Phase 14.1 Epic 2 — Per-category gate dispatch hint. When the gate
+	// fires and this matches a key in `cfg.SparseGateCategoryOverrides`, the
+	// override's MIN_ACTIVE/MAX_ACTIVE/Percentile replace the globals for
+	// this call. Empty / unmatched → global defaults apply (Phase 14 behavior).
+	// Populated by the UVTS runner from spec per-question `category` field
+	// (URL param `?category=...`) or by JSON body field. Free-form string;
+	// validation is whether it matches a configured override key.
+	Category string `json:"category,omitempty"`
 }
 
 type RetrieveResult struct {

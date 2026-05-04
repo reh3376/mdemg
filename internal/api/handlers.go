@@ -466,6 +466,13 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Phase 14.1 Epic 2 — `?category=<name>` URL param falls back when JSON
+	// body field is unset. UVTS runner injects per-question category here.
+	if req.Category == "" {
+		if v := strings.TrimSpace(r.URL.Query().Get("category")); v != "" {
+			req.Category = v
+		}
+	}
 
 	// Phase 102: Intent Translation — rewrite query before embedding
 	var translatedIntent string
