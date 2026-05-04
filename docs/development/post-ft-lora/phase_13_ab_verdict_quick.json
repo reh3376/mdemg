@@ -1,0 +1,36 @@
+{
+  "framework": "uvts-ab",
+  "framework_version": "1.0.0",
+  "timestamp": "2026-05-02T16:30:33.118740+00:00",
+  "spec_path": "docs/tests/uvts/specs/lnl_demo_validation.uvts.json",
+  "baseline_grades_path": "/tmp/uvts-baseline/grades.json",
+  "candidate_grades_path": "/tmp/uvts-candidate/grades.json",
+  "verdict": {
+    "verdict": "fail",
+    "criterion": "B mean >= A mean AND no per-question regression > threshold",
+    "regression_threshold_per_question": 0.1,
+    "shared_question_count": 16,
+    "mean_gate_passed": false,
+    "baseline_mean": 0.396,
+    "candidate_mean": 0.358,
+    "mean_delta": -0.038,
+    "regressions": [
+      {
+        "question_id": "69",
+        "category": "architecture_structure",
+        "baseline_score": 0.354,
+        "candidate_score": 0.0,
+        "delta": -0.354
+      },
+      {
+        "question_id": "hard_sym_4",
+        "category": "computed_value",
+        "baseline_score": 0.35,
+        "candidate_score": 0.0,
+        "delta": -0.35
+      }
+    ],
+    "regression_count": 2,
+    "improvement_count": 1
+  }
+}

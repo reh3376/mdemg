@@ -160,6 +160,22 @@ jobs:
           export BACKUP_STORAGE_DIR=/tmp/mdemg-backups
           export METALEARN_ENABLED=true
           export METALEARN_GLOBAL_SPACE_ID=mdemg-global
+          # Phase 11.6.3.1 + 13.5: framework requires a healthy LLM endpoint at
+          # startup (preflight probes EffectiveLLMEndpoint() + /models). CI has no
+          # LLM backend running and LLM_ENDPOINT defaults to api.openai.com which
+          # 401s. Bypass with MDEMG_ALLOW_NO_MLX=1 — integration tests don't
+          # exercise LLM call sites. Disable watchdog too so its background prober
+          # doesn't churn against the absent endpoint.
+          export MDEMG_ALLOW_NO_MLX=1
+          export MLX_WATCHDOG_ENABLED=false
+          # Phase 13.1: column voting default-flipped to true in production. The
+          # integration test suite (TestScoringComponentBreakdown,
+          # TestGraphExpansion) asserts on legacy linear scorer specifics — exact
+          # weight formula and per-result Activation field semantics. Opt those
+          # tests back into legacy linear here. Operators get the new default in
+          # production; the test suite continues to validate the linear scorer
+          # specifically since RRF has its own dedicated unit tests.
+          export RETRIEVAL_COLUMN_VOTING_ENABLED=false
           mkdir -p /tmp/mdemg-backups
           ./bin/mdemg serve &
 

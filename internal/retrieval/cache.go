@@ -52,8 +52,13 @@ func NewQueryCache(capacity int, ttl time.Duration) *QueryCache {
 	}
 }
 
-// CacheKey generates a cache key from query parameters.
-func CacheKey(req models.RetrieveRequest) string {
+// CacheKey generates a cache key from query parameters + an opaque
+// scorerVersion namespace. Phase 13 (Note 04 Column-Voting Retrieval) added
+// the scorerVersion parameter so a config flag flip (legacy linear scorer →
+// RRF column voting, or per-column weight changes) bumps to a new cache
+// namespace and stale entries are bypassed automatically. Pass an empty
+// scorerVersion to preserve the pre-Phase-13 namespace ("v0-pre-versioned").
+func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 	// Create a deterministic key from the relevant query parameters
 	keyData := struct {
 		SpaceID            string `json:"s"`
@@ -65,6 +70,7 @@ func CacheKey(req models.RetrieveRequest) string {
 		IncludeGlobalSpace bool   `json:"ig"`
 		CodeOnly           bool   `json:"co"`
 		TranslateIntent    bool   `json:"ti"`
+		ScorerVersion      string `json:"sv"`
 	}{
 		SpaceID:            req.SpaceID,
 		QueryText:          req.QueryText,
@@ -75,6 +81,7 @@ func CacheKey(req models.RetrieveRequest) string {
 		IncludeGlobalSpace: req.IncludeGlobalSpace,
 		CodeOnly:           req.CodeOnly,
 		TranslateIntent:    req.TranslateIntent,
+		ScorerVersion:      scorerVersion,
 	}
 
 	data, _ := json.Marshal(keyData)
@@ -82,10 +89,13 @@ func CacheKey(req models.RetrieveRequest) string {
 	return hex.EncodeToString(hash[:16]) // First 16 bytes = 32 hex chars
 }
 
-// Get retrieves a cached response for the given request.
-// Returns (response, true) if found and not expired, (nil, false) otherwise.
-func (c *QueryCache) Get(req models.RetrieveRequest) (models.RetrieveResponse, bool) {
-	key := CacheKey(req)
+// Get retrieves a cached response for the given request + scorer version
+// namespace. Returns (response, true) if found and not expired,
+// (zero, false) otherwise. scorerVersion segments the cache: a flag flip
+// in the orchestrator (legacy linear → RRF column voting) maps to a fresh
+// namespace, ensuring stale entries are not served against the new scorer.
+func (c *QueryCache) Get(req models.RetrieveRequest, scorerVersion string) (models.RetrieveResponse, bool) {
+	key := CacheKey(req, scorerVersion)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -113,9 +123,10 @@ func (c *QueryCache) Get(req models.RetrieveRequest) (models.RetrieveResponse, b
 	return entry.value, true
 }
 
-// Put caches a response for the given request.
-func (c *QueryCache) Put(req models.RetrieveRequest, resp models.RetrieveResponse) {
-	key := CacheKey(req)
+// Put caches a response for the given request + scorer version namespace.
+// See [QueryCache.Get] for namespace semantics.
+func (c *QueryCache) Put(req models.RetrieveRequest, scorerVersion string, resp models.RetrieveResponse) {
+	key := CacheKey(req, scorerVersion)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

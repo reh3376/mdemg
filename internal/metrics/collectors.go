@@ -206,6 +206,13 @@ type StandardMetrics struct {
 	MLXHealthState        func(endpoint string) *Gauge   // 0=up, 1=degraded, 2=down
 	MLXFastFailTotal      func(callerTask string) *Counter // increment when llmclient short-circuits a call
 	MLXStateTransitions   func(from, to string) *Counter   // increment on each up/degraded/down transition
+
+	// Phase 13 — Note 04 Column-Voting Retrieval. consensus_strength
+	// distribution + per-column wall-clock + per-column failure counter.
+	// Populated only when cfg.RetrievalColumnVotingEnabled is true.
+	RetrievalConsensusStrength    *Histogram                   // mdemg_retrieval_consensus_strength — aggregate consensus per retrieve call
+	RetrievalColumnLatency        func(column string) *Histogram // mdemg_retrieval_column_latency_seconds{column}
+	RetrievalColumnFailedTotal    func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
 }
 
 // Registry returns the underlying metric registry.
@@ -351,7 +358,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 
 	// Phase 11.6.x — RSIC LLM-stage concurrency throttle counter
-	m.RSICLLMSemaphoreBlocked = r.NewCounter("mdemg_rsic_llm_semaphore_blocked_total",
+	// Hotfix 11.6.3.1 followups — name registered without `mdemg_` prefix
+	// (registry adds it automatically; previous registration produced
+	// double-prefixed `mdemg_mdemg_rsic_llm_semaphore_blocked_total`).
+	m.RSICLLMSemaphoreBlocked = r.NewCounter("rsic_llm_semaphore_blocked_total",
 		"RSIC cycles that waited for an in-flight LLM-stage slot before reflector.Reflect", nil)
 
 	// RSIC watchdog metrics
@@ -661,21 +671,42 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 			map[string]string{"space_id": spaceID})
 	}
 
-	// Phase 11.6.3 — MLX Watchdog metrics
+	// Phase 11.6.3 — MLX Watchdog metrics. Note: registry prepends `mdemg_`
+	// to all names automatically, so we register the unqualified suffix and
+	// the exposed metric name is `mdemg_mlx_health_state` etc. (Hotfix
+	// 11.6.3.1 fixed a double-prefix bug — names were registered as
+	// `mdemg_mlx_*` and exposed as `mdemg_mdemg_mlx_*`.)
 	m.MLXHealthState = func(endpoint string) *Gauge {
-		return r.NewGauge("mdemg_mlx_health_state",
+		return r.NewGauge("mlx_health_state",
 			"mlx_lm.server health state per endpoint (0=up, 1=degraded, 2=down)",
 			map[string]string{"endpoint": endpoint})
 	}
 	m.MLXFastFailTotal = func(callerTask string) *Counter {
-		return r.NewCounter("mdemg_mlx_fast_fail_total",
+		return r.NewCounter("mlx_fast_fail_total",
 			"Total LLM calls short-circuited by the watchdog fast-fail gate",
 			map[string]string{"caller_task": callerTask})
 	}
 	m.MLXStateTransitions = func(from, to string) *Counter {
-		return r.NewCounter("mdemg_mlx_state_transitions_total",
+		return r.NewCounter("mlx_state_transitions_total",
 			"Total mlx watchdog state transitions",
 			map[string]string{"from": from, "to": to})
+	}
+
+	// Phase 13 — Column-Voting Retrieval metrics (unqualified names; registry
+	// adds the `mdemg_` prefix automatically).
+	m.RetrievalConsensusStrength = r.NewHistogram(
+		"retrieval_consensus_strength",
+		"Aggregate consensus_strength per retrieve call (0.0-1.0; higher = more column agreement)",
+		nil)
+	m.RetrievalColumnLatency = func(column string) *Histogram {
+		return r.NewHistogram("retrieval_column_latency_seconds",
+			"Per-column retrieval wall-clock in seconds",
+			map[string]string{"column": column})
+	}
+	m.RetrievalColumnFailedTotal = func(column, reason string) *Counter {
+		return r.NewCounter("retrieval_column_failed_total",
+			"Total per-column retrieval failures (column timed out, errored, or returned empty)",
+			map[string]string{"column": column, "reason": reason})
 	}
 
 	return m

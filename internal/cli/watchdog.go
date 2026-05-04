@@ -135,11 +135,17 @@ func buildWatchdogStatus(metricsURL string) WatchdogStatus {
 	return st
 }
 
-// fetchProbeStateFromMetrics scrapes the Prometheus /metrics endpoint and
-// extracts the latest mdemg_mlx_health_state{endpoint=...} value.
+// fetchProbeStateFromMetrics scrapes the JSON metrics snapshot endpoint
+// (`/v1/metrics/snapshot`) and extracts the latest
+// `mdemg_mlx_health_state{endpoint=...}` gauge value. Hotfix 11.6.3.1
+// corrected the path from `/metrics` (Prometheus exposition, removed) to
+// `/v1/metrics/snapshot` (JSON shape mdemg actually serves).
 func fetchProbeStateFromMetrics(baseURL string) (int, string, error) {
-	if !strings.HasSuffix(baseURL, "/metrics") {
-		baseURL = strings.TrimRight(baseURL, "/") + "/metrics"
+	if !strings.HasSuffix(baseURL, "/v1/metrics/snapshot") {
+		baseURL = strings.TrimRight(baseURL, "/")
+		// Strip a trailing /metrics if present (legacy callers).
+		baseURL = strings.TrimSuffix(baseURL, "/metrics")
+		baseURL = baseURL + "/v1/metrics/snapshot"
 	}
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Get(baseURL)
@@ -152,50 +158,43 @@ func fetchProbeStateFromMetrics(baseURL string) (int, string, error) {
 		return 0, "", fmt.Errorf("metrics endpoint returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return 0, "", fmt.Errorf("read body: %w", err)
 	}
 
-	state, endpoint, ok := parseHealthStateMetric(string(body))
+	state, endpoint, ok := parseHealthStateFromSnapshot(body)
 	if !ok {
-		return 0, "", fmt.Errorf("mdemg_mlx_health_state metric not present (watchdog disabled?)")
+		return 0, "", fmt.Errorf("mdemg_mlx_health_state gauge not present (watchdog disabled?)")
 	}
 	return state, endpoint, nil
 }
 
-// parseHealthStateMetric finds a line of the form
-//   mdemg_mlx_health_state{endpoint="..."} <value>
-// and returns the int value + the endpoint label. The Prometheus exposition
-// format is line-oriented so we don't need a full parser.
-func parseHealthStateMetric(body string) (int, string, bool) {
-	const metric = "mdemg_mlx_health_state{"
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+// parseHealthStateFromSnapshot reads the JSON snapshot served by
+// `/v1/metrics/snapshot` and extracts the mdemg_mlx_health_state gauge.
+// Returns (state, endpoint, true) on success.
+func parseHealthStateFromSnapshot(body []byte) (int, string, bool) {
+	var doc struct {
+		Data struct {
+			Gauges map[string]float64 `json:"gauges"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return 0, "", false
+	}
+	// Match keys of the form `mdemg_mlx_health_state{endpoint="..."}`.
+	const prefix = "mdemg_mlx_health_state{"
+	for key, val := range doc.Data.Gauges {
+		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
-		if !strings.HasPrefix(line, metric) {
-			continue
-		}
-		// metric{endpoint="x"} 2
-		closeBrace := strings.Index(line, "}")
+		closeBrace := strings.Index(key, "}")
 		if closeBrace < 0 {
 			continue
 		}
-		labels := line[len(metric):closeBrace]
-		valStr := strings.TrimSpace(line[closeBrace+1:])
-		// Endpoint label
-		var endpoint string
-		if e := extractLabelValue(labels, "endpoint"); e != "" {
-			endpoint = e
-		}
-		// Value parsed as float (Prometheus exposition uses float repr)
-		f, err := strconv.ParseFloat(strings.Fields(valStr)[0], 64)
-		if err != nil {
-			continue
-		}
-		return int(f), endpoint, true
+		labels := key[len(prefix):closeBrace]
+		endpoint := extractLabelValue(labels, "endpoint")
+		return int(val), endpoint, true
 	}
 	return 0, "", false
 }
@@ -301,6 +300,9 @@ func alertFilePath() string {
 }
 
 // resolveMetricsURL prefers .mdemg.port if present, else MDEMG_PORT, else 9999.
+// Returns the JSON snapshot endpoint (`/v1/metrics/snapshot`) — Hotfix
+// 11.6.3.1 corrected the path from the (non-existent) `/metrics` Prometheus
+// route. fetchProbeStateFromMetrics tolerates either form for backward compat.
 func resolveMetricsURL() string {
 	port := os.Getenv("MDEMG_PORT")
 	cwd, _ := os.Getwd()
@@ -312,7 +314,7 @@ func resolveMetricsURL() string {
 	if port == "" {
 		port = "9999"
 	}
-	return fmt.Sprintf("http://localhost:%s/metrics", port)
+	return fmt.Sprintf("http://localhost:%s/v1/metrics/snapshot", port)
 }
 
 func stateName(v int) string {

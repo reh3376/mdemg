@@ -2,10 +2,47 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-05-01
+**Date:** 2026-05-03
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
+
+## Latest update — Phase 13.1: Column-weight ablation default-on (2026-05-03)
+
+**Phase 13's failed A/B is fixed.** Default `RetrievalColumnVotingEnabled` flipped `false → true` after embedding-heavy preset (`0.50/0.20/0.15/0.15`, hops=2) passed full 120q UVTS A/B with mean **+0.023 (+5.9%)**, **30 improvements**, 2 boundary regressions in `business_logic_constraints`. Phase 13's catastrophic regressions on q 69 + q hard_sym_4 are eliminated — q 69 now returns `secretsManager.module` direct hit. Forensic diagnosis confirmed H1 (Graph+Structural at equal weights crowded out Embedding+BM25 on precise-symbol queries).
+
+What landed:
+- 4 new env vars `RETRIEVAL_COLUMN_WEIGHT_{EMBEDDING,BM25,GRAPH,STRUCTURAL}` (defaults to embedding-heavy preset)
+- `Service.scorerVersion()` extended to include weights+hops+enables → cache namespace flips per preset automatically
+- Default `RetrievalColumnVotingEnabled=true`, default weights = embedding-heavy preset
+- Operator opt-out: `RETRIEVAL_COLUMN_VOTING_ENABLED=false` in .env + restart
+- `scripts/phase13_1_ablation_runner.py` (~350 LOC) for re-running ablation sweeps
+
+Phase 13.2 queued: investigate `business_logic_constraints` category for per-category weight tuning.
+
+Docs: `phase_13_1_post.md`, `phase_13_1_forensic_diagnosis.md`, `sprint_plan_phase_13_1_column_weight_ablation.md`.
+
+## Earlier update — Phase 13.5: MLX Server Stability cutover (2026-05-03)
+
+**Production LLM substrate replaced.** `mlx_lm.server` (port 8101, ~17 crashes/4h on M5 Max + macOS 26.3.x) → `llama-server` from llama.cpp b9000+ (port 8102, GGUF Q5_K_M, 0 crashes / 160 min × 301 calls). Decision was data-cited per operator constraint "no opinion required, follow the data."
+
+What landed:
+- 4 parallel research streams + synthesis disqualified mlx_lm.server (maintainer says not for production), Ollama (broken on M5+macOS 26.3.x), LM Studio (closed-source operability risk).
+- Empirical bake-off F1 (llama.cpp) vs F2 (MLC-LLM) — F1 won every measured dimension (stability tied; latency 1.6× faster; UVTS quality at perfect parity 0.396=0.396; community 4× larger; format ecosystem broader).
+- New `com.mdemg.llama-server.plist` bootstrapped (KeepAlive, ThrottleInterval=30s).
+- Production model converted: MLX safetensors → bf16 dequant → GGUF f16 → Q5_K_M (10 GB) at `.local-models/mdemg-llm-v1-gguf/`.
+- `.env` `LLM_ENDPOINT=http://127.0.0.1:8102/v1`; watchdog re-enabled (probe is backend-agnostic — `EffectiveLLMEndpoint() + /models`).
+- Old `com.mdemg.mlx-server.plist` renamed `.disabled-phase13_5` for emergency rollback.
+- Phase 13.1 (column-weight ablation) now unblocked on a stable substrate.
+
+Docs:
+- Bake-off results: `docs/development/post-ft-lora/phase_13_5_bakeoff_results.md`
+- Synthesis: `docs/development/post-ft-lora/phase_13_5_mlx_research_synthesis.md`
+- 4 stream reports: `phase_13_5_{crash_forensics,external_evidence,alternatives_matrix,call_profile}.md`
+- Frozen plan: `docs/development/post-ft-lora/sprint_plan_phase_13_5_mlx_stability.md`
+- Disqualification re-check: `docs/development/post-ft-lora/phase_13_5_epic_1_disqualification_check.md`
+
+Follow-up sprint queued: Phase 13.6 — backend-agnostic naming cleanup (`preflight_mlx.go` → `preflight_llm.go`, env-var renames with backward-compat aliases).
 
 <!--
 === AGENT RESUME CONTEXT ===
@@ -56,7 +93,34 @@ PROJECT STATUS: ALL DEVELOPMENT PHASES COMPLETE
 - Latest releases: CLI v0.8.5 (tagged 2026-04-20, see CHANGELOG `[0.8.5]`), GHCR mdemg:latest, GHCR neural-sidecar:latest, menubar v1.8.0, sidebar v0.3.0
 
 WHAT REMAINS TO BE DONE:
-=== COMPLETED SINCE LAST HANDOFF (2026-05-01) ===
+=== COMPLETED SINCE LAST HANDOFF (2026-05-02) ===
+- ⚠️ **POST-FT-LORA-PHASE13: Column-Voting Retrieval — A/B FAILED, default stays false** (2026-05-02, Epic 7+8 commit pending). Quick-profile A/B verdict: candidate `phase13-candidate-rrf4` (mean **0.358**) regressed −0.038 vs baseline `phase13-baseline-linear` (mean **0.396**) with **2 catastrophic per-question regressions to 0.000** (q `69` architecture_structure, q `hard_sym_4` computed_value). 13 of 16 questions produced bit-identical scores between linear and RRF — scorers converge on most queries; divergence concentrates on hard-symbol queries that need column re-weighting. **Infrastructure (Epic 0-6) is solid** — RRF aggregator + 4 columns + cache scorer-version namespacing + V0017 retrieval_audit + 3 Prometheus metrics all live and lint-clean. The merge gate worked exactly as designed: caught the regression before reaching production. Doc: [`phase_13_column_voting_post.md`](docs/development/post-ft-lora/phase_13_column_voting_post.md). Plan: [`sprint_plan_phase_13_column_voting.md`](docs/development/post-ft-lora/sprint_plan_phase_13_column_voting.md). A/B verdict: [`phase_13_ab_verdict_quick.json`](docs/development/post-ft-lora/phase_13_ab_verdict_quick.json).
+  - **Open follow-up: Phase 13.1 — column-weight ablation.** Sweep 3–5 weight presets (likely lower Structural / raise Embedding); find configuration that beats baseline on quick profile then validates on full 120-question profile. Cost ~$10–25. Open questions: (1) diagnose what's pulling q 69 + q hard_sym_4 candidates to grader-score 0.000 — capture actual top-K from RRF for those queries; (2) optimal Structural hop depth (sweep 1-3 via `RETRIEVAL_STRUCTURAL_HOPS`); (3) per-category weight tuning.
+  - **OpenAI spend actual**: ~$1.50 (16q × 2 runs × ~$0.04/q grader). Plan budget was $5–25; actual much lower because quick profile is small.
+  - **Live state**: native mdemg killed, launchd-managed `com.mdemg.server` now running with new binary; `RETRIEVAL_COLUMN_VOTING_ENABLED=false` (reverted post-A/B); mdemg + mlx + watchdog all healthy.
+
+- ✅ **HOTFIX 11.6.3.1: MLX always-on policy** (2026-05-02, commit `fc0961e`) — operator policy "MLX server should NEVER be down when mdemg framework is running" (memory: `feedback_mlx_required_when_mdemg_running.md`). Three changes flip the Phase 11.6.3 safe-off rollout to mandatory:
+  - `MLX_WATCHDOG_ENABLED` default `false → true` in `internal/config/config.go::FromEnv`. Soak gate supplanted by policy.
+  - `launchdServices` `com.mdemg.mlx-server` `Optional: true → false` in `internal/cli/service_darwin.go`. `mdemg service install` fails loudly with actionable guidance when `mlx_lm.server` not on PATH / not pointed at via `MDEMG_MLX_LM_BIN`.
+  - New `internal/cli/preflight_mlx.go` — startup probe; mdemg refuses to start if mlx unreachable at `cfg.EffectiveLLMEndpoint() + /models`. Operator escape hatch `MDEMG_ALLOW_NO_MLX=1` for Linux/Docker-only setups + emergency recovery.
+  - `.env` fixed at the same time: `LLM_ENDPOINT=host.docker.internal:8101/v1` → `http://127.0.0.1:8101/v1` (native binary couldn't resolve docker DNS — Phase 11.6.2 finding finally addressed); added `MDEMG_MLX_LM_BIN=/Users/reh3376/.venv/mdemg-ft-lora/bin/mlx_lm.server` + `MDEMG_MODEL_PATH=/Users/reh3376/mdemg/.local-models/mdemg-llm-v1`.
+  - **Live state**: `mlx_lm.server` running PID 20230 via `com.mdemg.mlx-server` launchd plist, HTTP 200 on `/v1/models`. Conservative Phase 12 flags hardcoded in plist.
+  - **CLAUDE.md** MLX Watchdog subsection rewritten to reflect mandatory always-on.
+  - Tests + lint green. Doc: this handoff entry; CHANGELOG `[Unreleased] ### Changed`.
+  - **Operator action required to make policy LIVE**: native mdemg PID 47207 is still running with old defaults (watchdog OFF). Either `kill 47207` to let `com.mdemg.server` launchd plist take over with new binary, OR `launchctl bootout gui/$(id -u)/com.mdemg.server` to keep the native + leave launchd-managed mdemg disabled. Sandbox blocked autonomous resolution.
+
+- ✅ **POST-FT-LORA-PHASE13: Column-Voting Retrieval — Epic 0-6 of 8** (2026-05-01, commits `6efdcdc`, `e3970d9`, `849de4e`) — Note 04 RRF-over-6-columns ranker shipped as **un-wired infrastructure** (default flag-off). Production behavior unchanged until Epic 7 A/B validation triggers default-flip in Epic 8. ~2400 LOC across 3 commits.
+  - **Epic 0 finding**: data audit on `mdemg-dev` (78,246 nodes) showed `last_accessed_at` 93.3% null + `role`/`source` 100% null. Per plan risk #8 fallback, **Phase 13 v1 ships 4 columns** (Embedding + BM25 + Graph + Structural). Temporal + RoleScoped deferred to Phase 13.1 once observation-stamping or backfill ships.
+  - **`internal/retrieval/column.go` + `column_{embedding,bm25,graph,structural}.go`** — Column interface + 3 refactor wrappers + new Structural column (variable-length Cypher walk across `contains|defined_in*1..N` edges with exponential hop decay; default 2 hops via `RETRIEVAL_STRUCTURAL_HOPS`).
+  - **`internal/retrieval/consensus.go`** — Aggregate function with parallel errgroup column execution + per-column timeout (default 80% of parent ctx remaining). RRF formula `score = w / (k + rank)` (k=60 default). `consensus_strength` per node = `(cols_with_node / cols_queried) × avg(normalized_rank)`, clipped [0,1]. `AggregateConsensus` is the per-call mean.
+  - **`internal/retrieval/scoring_rrf.go`** — `Service.ScoreAndRankRRF` orchestrator that builds 3 virtualColumns (Embedding/BM25/Graph as presorted views over upstream cands) + invokes Structural separately + calls Aggregate. Wired into `service.Retrieve` at the scorer-fork point with fail-open to legacy on RRF error.
+  - **Cache scorer-version namespacing** (`cache.go`) — `CacheKey(req, scorerVersion)` + `Get/Put` updated. `Service.scorerVersion()` returns `"v0-linear"` or `"v1-rrf4"`. Critical guard for A/B correctness (different scorer = different cache namespace = no cross-contamination).
+  - **TSDB V0017 retrieval_audit hypertable** — captures `consensus_strength`, per-column latency JSONB, columns_queried/returned, top_k_node_ids per call. `RetrievalAuditWriter` interface (`internal/retrieval/retrieval_audit.go`) + nil-safe call site at end of `service.Retrieve`. Default off (`RETRIEVAL_AUDIT_ENABLED=false`).
+  - **3 new Prometheus metrics**: `mdemg_retrieval_consensus_strength` (histogram), `mdemg_retrieval_column_latency_seconds{column}` (per-column histogram), `mdemg_retrieval_column_failed_total{column,reason}` (counter).
+  - **12 new config knobs** (Phase 13 + Epic 5 wires + Epic 6 audit).
+  - Plan: [`/Users/reh3376/.claude/plans/breezy-dancing-lerdorf.md`](.claude/plans/breezy-dancing-lerdorf.md) (frozen at sprint-start; copy to `docs/development/post-ft-lora/sprint_plan_phase_13_column_voting.md` lands in Epic 8).
+  - **Open follow-ups**: Epic 7 (operator-led UVTS A/B run, ~$5–25 OpenAI) + Epic 8 (docs + conditional default flip).
+
 - ✅ **FT-LORA-PHASE11.6.3: MLX Watchdog (Operational Hygiene #2)** (2026-04-30) — auto-restart + fast-fail + degraded-mode protection. The retry-storm cascade observed in Phase 12 (1642% CPU when mlx died) is eliminated at the source. Phase 13 (Column-Voting Retrieval) unblocked for sustained live A/B testing.
   - **`internal/mlxprobe` package** (~250 LOC): goroutine polling `<endpoint>/v1/models` every 5s, 2s timeout. State machine `up → degraded → down` with hysteresis (3-failure → down, 2-success → up). Atomic state, supervisor-managed lifecycle. Singleton pattern (`SetDefault`/`Default`) + observer hook (`SetFastFailObserver`) so llmclient stays metrics-free.
   - **llmclient fast-fail gate** at `internal/llmclient/client.go:471`: 10-LOC check at top of `doWithRetry`. Returns new `ErrMLXDown` sentinel without entering retry math when `MLXFailFastEnabled && Default().Endpoint() == c.baseURL && State() == StateDown`. **Embeddings safe**: gate keys on baseURL match.

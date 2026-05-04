@@ -3,6 +3,7 @@ package retrieval
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -29,11 +30,41 @@ type Service struct {
 	dataCollector      *DataCollector             // Neural re-ranker training data collector (NR-1)
 	retrievalRecorder  RetrievalEventRecorder     // Optional retrieval event recorder for contrastive training data
 	queryClassifier    *QueryClassifier            // Optional LLM query type classifier (PROD-READINESS)
+	retrievalAuditWriter RetrievalAuditWriter     // Phase 13 — Optional retrieval_audit writer (V0017); nil-safe
 }
 
 // SetRetrievalRecorder attaches a retrieval event recorder for training data collection.
 func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
 	s.retrievalRecorder = r
+}
+
+// scorerVersion returns an opaque short string identifying the active scoring
+// pipeline. Used to namespace the query cache so a config flip between the
+// legacy linear scorer and the Phase 13 (Note 04) RRF column-voting
+// aggregator does not serve stale entries from one against requests
+// expecting the other.
+//
+// Phase 13.1: extended to include the per-column weight + hop-depth +
+// per-column-enable flags so that ablation sweeps automatically invalidate
+// cache between presets without operator intervention. Two presets that
+// produce different rankings will produce different scorer versions →
+// different cache namespaces → no contamination.
+func (s *Service) scorerVersion() string {
+	if !s.cfg.RetrievalColumnVotingEnabled {
+		return "v0-linear"
+	}
+	return fmt.Sprintf(
+		"v1-rrf4|e=%.3f|b=%.3f|g=%.3f|s=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t",
+		s.cfg.RetrievalColumnWeightEmbedding,
+		s.cfg.RetrievalColumnWeightBM25,
+		s.cfg.RetrievalColumnWeightGraph,
+		s.cfg.RetrievalColumnWeightStructural,
+		s.cfg.RetrievalStructuralHops,
+		s.cfg.RetrievalColumnEmbeddingEnabled,
+		s.cfg.RetrievalColumnBM25Enabled,
+		s.cfg.RetrievalColumnGraphEnabled,
+		s.cfg.RetrievalColumnStructuralEnabled,
+	)
 }
 
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
@@ -370,12 +401,17 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	cacheReq.TopK = topK
 	cacheReq.HopDepth = hopDepth
 
-	// Check query cache (skip for Jiminy-enabled requests and temporal queries)
-	cacheKey := CacheKey(cacheReq)
-	slog.Info("query cache check", "enabled", s.cfg.QueryCacheEnabled, "jiminy", req.JiminyEnabled, "temporal", hints.TemporalIntent.Mode, "key", cacheKey[:16])
+	// Check query cache (skip for Jiminy-enabled requests and temporal queries).
+	// scorerVersion segments the cache namespace so Phase 13 (Note 04) flag
+	// flips between the legacy linear scorer and the RRF column-voting
+	// aggregator do not serve stale entries from one scorer to a request
+	// expecting the other.
+	scorerVersion := s.scorerVersion()
+	cacheKey := CacheKey(cacheReq, scorerVersion)
+	slog.Info("query cache check", "enabled", s.cfg.QueryCacheEnabled, "jiminy", req.JiminyEnabled, "temporal", hints.TemporalIntent.Mode, "key", cacheKey[:16], "scorer_version", scorerVersion)
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
-		if cached, ok := s.queryCache.Get(cacheReq); ok {
+		if cached, ok := s.queryCache.Get(cacheReq, scorerVersion); ok {
 			// Ensure Debug map exists and set cache_hit flag
 			if cached.Debug == nil {
 				cached.Debug = make(map[string]any)
@@ -592,18 +628,59 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		initialTopK = s.cfg.RerankTopN
 	}
 
-	// Use breakdown-enabled scoring if Jiminy is requested
+	// Phase 13 (Note 04 Column-Voting Retrieval) scorer fork. When the
+	// flag is on, the RRF aggregator replaces the linear scorer. The
+	// aggregator's `consensus_strength` signal is captured for downstream
+	// consumers (rerank, DH-005) and the V0017 retrieval_audit row.
+	//
+	// Jiminy compatibility: when Jiminy is requested, we keep using the
+	// linear scorer's breakdown-enabled path because Jiminy's explanation
+	// surfaces the per-component breakdown that RRF doesn't produce.
+	// Jiminy + RRF integration is deferred to a follow-up sprint.
 	var scoredCands []ScoredCandidate
 	var results []models.RetrieveResult
-	if req.JiminyEnabled {
+	var consensusResult ConsensusResult // populated only on RRF path
+	useRRF := s.cfg.RetrievalColumnVotingEnabled && !req.JiminyEnabled
+	switch {
+	case req.JiminyEnabled:
 		scoredCands = ScoreAndRankWithBreakdown(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 		results = make([]models.RetrieveResult, len(scoredCands))
 		for i, sc := range scoredCands {
 			results[i] = sc.RetrieveResult
 		}
-	} else {
+	case useRRF:
+		var rrfErr error
+		results, consensusResult, rrfErr = s.ScoreAndRankRRF(
+			ctx, cands, act, initialTopK,
+			req.QueryEmbedding, req.QueryText, spaceIDs, filter,
+		)
+		if rrfErr != nil {
+			// Fail open to legacy scorer rather than the user.
+			slog.Warn("RRF scorer failed, falling back to linear", "error", rrfErr)
+			results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
+		} else {
+			// Emit Phase 13 metrics. consensusResult.PerColumnLatency is
+			// populated for every attempted column (success or fail) so the
+			// histogram + per-column failure counter stay aligned.
+			stdMetrics := metrics.Metrics()
+			stdMetrics.RetrievalConsensusStrength.Observe(consensusResult.AggregateConsensus)
+			for col, lat := range consensusResult.PerColumnLatency {
+				stdMetrics.RetrievalColumnLatency(col).Observe(lat.Seconds())
+			}
+			for col, err := range consensusResult.PerColumnError {
+				if err != nil {
+					reason := "error"
+					if err.Error() != "" && len(err.Error()) > 0 {
+						reason = "error"
+					}
+					stdMetrics.RetrievalColumnFailedTotal(col, reason).Inc()
+				}
+			}
+		}
+	default:
 		results = ScoreAndRank(cands, act, edges, initialTopK, s.cfg, req.QueryText, hints)
 	}
+	_ = consensusResult // Audit row write happens at the end of Retrieve (Epic 6)
 
 	// 5) Reasoning Module Processing (if available and query text provided)
 	var reasoningModuleID string
@@ -756,7 +833,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	// Store in query cache (skip for Jiminy-enabled and temporal requests)
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
 		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
-		s.queryCache.Put(cacheReq, resp)
+		s.queryCache.Put(cacheReq, scorerVersion, resp)
 		slog.Info("query cache PUT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))], "cache_size", s.queryCache.Len())
 	}
 
@@ -764,7 +841,51 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	s.recordRetrievalEvent(ctx, req, vectorCands, bm25Out.results, preRerankResults,
 		results, wasReranked, rerankLatencyMs, recallLatencyMs, time.Since(start).Milliseconds())
 
+	// Phase 13 — write retrieval_audit row when enabled. Non-fatal on
+	// write error: the user-facing retrieve already succeeded and is
+	// returning; an audit-write failure shouldn't disrupt it.
+	if s.cfg.RetrievalAuditEnabled && s.retrievalAuditWriter != nil {
+		topKIDs := make([]string, 0, len(results))
+		for _, r := range results {
+			topKIDs = append(topKIDs, r.NodeID)
+		}
+		auditRec := RetrievalAuditRecord{
+			SpaceID:           req.SpaceID,
+			QueryTextHash:     hashQueryText(req.QueryText),
+			ScorerVersion:    scorerVersion,
+			ConsensusStrength: consensusResult.AggregateConsensus,
+			PerColumnLatency:  consensusResult.PerColumnLatency,
+			ColumnsQueried:    consensusResult.ColumnsQueried,
+			ColumnsReturned:   consensusResult.ColumnsReturned,
+			TopKNodeIDs:       topKIDs,
+			TotalLatencyMs:    time.Since(start).Milliseconds(),
+		}
+		// Fire-and-forget — the writer logs errors internally. Use a fresh
+		// context.Background-derived context because the request-scoped ctx
+		// may be cancelled by the time the response returns to the caller;
+		// we want the audit write to complete regardless. Same pattern as
+		// internal/conversation/conflict_tracker.go.
+		go func() { //nolint:gosec // G118: audit row outlives the request-scoped ctx by design
+			ctx2, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.retrievalAuditWriter.Write(ctx2, auditRec); err != nil {
+				slog.Warn("retrieval_audit: write failed", "error", err)
+			}
+		}()
+	}
+
 	return resp, nil
+}
+
+// hashQueryText returns a stable 16-hex-char digest of the query text.
+// Avoids storing PII in retrieval_audit while preserving the ability to
+// bucket by query template.
+func hashQueryText(s string) string {
+	if s == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:8]) // 8 bytes = 16 hex chars
 }
 
 // recordRetrievalEvent sends a retrieval pipeline event to the recorder if one is set.

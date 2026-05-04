@@ -238,7 +238,7 @@
     },
     {
       "id": 10,
-      "title": "Phase 10 Benchmark — Per-Task Pass Rate (latest run)",
+      "title": "Phase 10 Benchmark \u2014 Per-Task Pass Rate (latest run)",
       "type": "table",
       "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id.",
       "gridPos": {
@@ -260,22 +260,41 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": {"align": "auto"},
+          "custom": {
+            "align": "auto"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "yellow", "value": 0.6},
-              {"color": "green", "value": 0.8}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
             ]
           },
           "noValue": "Waiting for Phase 10 baseline"
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "mean_score"},
+            "matcher": {
+              "id": "byName",
+              "options": "mean_score"
+            },
             "properties": [
-              {"id": "custom.cellOptions", "value": {"type": "color-background"}}
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
             ]
           }
         ]
@@ -283,9 +302,9 @@
     },
     {
       "id": 11,
-      "title": "Phase 10 Benchmark — Per-Task Reward Variance (stddev)",
+      "title": "Phase 10 Benchmark \u2014 Per-Task Reward Variance (stddev)",
       "type": "bargauge",
-      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark — Phase 11 GRPO uses this as advantage-normalization denominator.",
+      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark \u2014 Phase 11 GRPO uses this as advantage-normalization denominator.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -317,9 +336,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.08},
-              {"color": "red", "value": 0.20}
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.08
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
             ]
           },
           "noValue": "Waiting for Phase 10 baseline"
@@ -328,7 +356,7 @@
     },
     {
       "id": 12,
-      "title": "Phase 10 Benchmark — Stagnation Flag (latest)",
+      "title": "Phase 10 Benchmark \u2014 Stagnation Flag (latest)",
       "type": "stat",
       "description": "Reads benchmark_runs.stagnation_flag for the most recent run. Phase 10 informational-only; becomes blocking in Phase 11 once benchmark_runs count >= 3.",
       "gridPos": {
@@ -349,7 +377,11 @@
         }
       ],
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "value_and_name"
@@ -357,14 +389,36 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "OK", "color": "green"}}},
-            {"type": "value", "options": {"1": {"text": "STAGNATION", "color": "red"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "STAGNATION",
+                  "color": "red"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "red", "value": 1}
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           },
           "noValue": "Waiting for Phase 10 baseline"
@@ -373,7 +427,7 @@
     },
     {
       "id": 13,
-      "title": "Phase 10 Benchmark — Aggregate Weighted Score (history)",
+      "title": "Phase 10 Benchmark \u2014 Aggregate Weighted Score (history)",
       "type": "timeseries",
       "description": "Reads benchmark_runs.aggregate_weighted_score over time. Group-weighted score (T:0.50 / C:0.35 / J:0.15). Stagnation threshold = |delta| < 0.005 across last 3.",
       "gridPos": {
@@ -464,6 +518,206 @@
           "noValue": "Not yet collected"
         }
       }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "LLM Endpoint Health (Phase 13.5+)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "LLM endpoint state (0=up, 1=degraded, 2=down)",
+      "description": "Watchdog state machine over time. Each row in llm_endpoint_health_events records a state transition; the line shows the active state between transitions.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT recorded_at AS time, state_numeric AS value, endpoint_url AS metric FROM llm_endpoint_health_events WHERE event_kind IN ('state_transition', 'probe_recovery') AND $__timeFilter(recorded_at) ORDER BY recorded_at",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 10,
+            "showPoints": "always",
+            "pointSize": 6
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "up",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "degraded",
+                  "color": "yellow"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "down",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "min": 0,
+          "max": 2,
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "State transitions in window",
+      "description": "Count of watchdog state changes (up\u2194degraded\u2194down) in selected time range. Steady state should be 0; transitions indicate endpoint instability.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 42
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COUNT(*) AS value FROM llm_endpoint_health_events WHERE event_kind = 'state_transition' AND $__timeFilter(recorded_at)",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Fast-fail bursts in window",
+      "description": "Number of 30s windows where the llmclient fast-fail gate engaged (i.e. caller asked for an LLM while watchdog state was Down). Each row aggregates short-circuits in its window; rows = bursts.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 42
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COUNT(*) AS value FROM llm_endpoint_health_events WHERE event_kind = 'fast_fail_burst' AND $__timeFilter(recorded_at)",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 18,
+      "type": "table",
+      "title": "Recent watchdog events (last 30 in window)",
+      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down\u2192up healing events; fast_fail_burst rows mark llmclient short-circuit windows.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT recorded_at AS \"time\", endpoint_url, event_kind, from_state, to_state, state_numeric, consecutive_failures, burst_short_circuits, LEFT(COALESCE(error_message, ''), 120) AS error FROM llm_endpoint_health_events WHERE $__timeFilter(recorded_at) ORDER BY recorded_at DESC LIMIT 30",
+          "format": "table"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -535,5 +789,5 @@
   "timezone": "browser",
   "title": "MDEMG Fine-Tuning Pipeline",
   "uid": "mdemg-ft-training",
-  "version": 1
+  "version": 2
 }

@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -82,6 +83,15 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
+	}
+
+	// Hotfix 11.6.3.1 — always-on MLX policy. The framework's 16 LLM call
+	// sites all depend on mlx; refusing to start when mlx is unreachable
+	// is the only honest signal. Operator escape hatch: MDEMG_ALLOW_NO_MLX=1
+	// (intended for Linux/Docker-only setups where the operator has wired
+	// LLM_ENDPOINT to a non-mlx provider).
+	if err := preflightMLXReachable(cfg); err != nil {
+		return err
 	}
 
 	// Support AUTO_MIGRATE / TSDB_AUTO_MIGRATE env vars for Docker deployments
@@ -297,11 +307,34 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		// State transition callback: metrics on every transition, alerts on
 		// up→down (High) and down→up (Low). The alert dispatcher is resolved
 		// lazily via srv.AlertDispatcher() so this closure works even though
-		// the supervisor may start the goroutine before disp is wired.
+		// the supervisor may start the goroutine before disp is wired. Phase
+		// 13.5: also write each transition to the V0018 llm_endpoint_health
+		// hypertable so Grafana panels can render historical stability over
+		// time ranges that survive process restarts.
 		stdMetrics := metrics.Metrics()
 		mlxProber.OnTransition(func(from, to mlxprobe.State, lastErr error) {
 			stdMetrics.MLXHealthState(cfg.EffectiveLLMEndpoint()).Set(float64(to))
 			stdMetrics.MLXStateTransitions(from.String(), to.String()).Inc()
+
+			// Persist to TSDB (V0018) — silent no-op if writer isn't ready.
+			if w := srv.LLMEndpointHealthWriter(); w != nil {
+				kind := "state_transition"
+				if from == mlxprobe.StateDown && to == mlxprobe.StateUp {
+					kind = "probe_recovery"
+				}
+				errMsg := ""
+				if lastErr != nil {
+					errMsg = lastErr.Error()
+				}
+				w.Record(tsdb.LLMEndpointHealthEvent{
+					EndpointURL:  cfg.EffectiveLLMEndpoint(),
+					EventKind:    kind,
+					FromState:    from.String(),
+					ToState:      to.String(),
+					ErrorMessage: errMsg,
+					StateNumeric: int(to),
+				})
+			}
 
 			disp := srv.AlertDispatcher()
 			if disp == nil {
@@ -325,13 +358,50 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 
 		// Wire fast-fail observer so the llmclient gate increments
 		// mdemg_mlx_fast_fail_total without llmclient importing metrics.
+		// Phase 13.5: also aggregate bursts into V0018 health rows.
+		// Rate-limit so a 9-min outage produces O(window-count) rows, not
+		// O(short-circuit-count). Window default 30s; 1 row per non-zero
+		// window flushed by the goroutine below.
+		var fastFailBurstMu sync.Mutex
+		var fastFailBurstCount int
 		mlxprobe.SetFastFailObserver(func(callerTask, _ string) {
 			task := callerTask
 			if task == "" {
 				task = "unknown"
 			}
 			stdMetrics.MLXFastFailTotal(task).Inc()
+			fastFailBurstMu.Lock()
+			fastFailBurstCount++
+			fastFailBurstMu.Unlock()
 		})
+		// Burst-flush goroutine (Phase 13.5). Persists at most 1 row per
+		// 30s window when the gate is engaged, with the count of
+		// short-circuits observed in the window. Silent in steady-state.
+		// Lives for process lifetime; on shutdown the LLMEndpointHealthWriter
+		// gets Closed() in api.Server.Shutdown which flushes any pending row.
+		go func() {
+			tick := time.NewTicker(30 * time.Second)
+			defer tick.Stop()
+			for range tick.C {
+				fastFailBurstMu.Lock()
+				n := fastFailBurstCount
+				fastFailBurstCount = 0
+				fastFailBurstMu.Unlock()
+				if n == 0 {
+					continue
+				}
+				if w := srv.LLMEndpointHealthWriter(); w != nil {
+					w.Record(tsdb.LLMEndpointHealthEvent{
+						EndpointURL:        cfg.EffectiveLLMEndpoint(),
+						EventKind:          "fast_fail_burst",
+						FromState:          mlxProber.State().String(),
+						ToState:            mlxProber.State().String(),
+						BurstShortCircuits: n,
+						StateNumeric:       int(mlxProber.State()),
+					})
+				}
+			}
+		}()
 
 		slog.Info("mlx-watchdog: enabled",
 			"endpoint", cfg.EffectiveLLMEndpoint(),
