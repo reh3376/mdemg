@@ -7,7 +7,27 @@
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 14.1: Adaptive per-category sparse gate (failed 120q, ships flag-off) + comparator eps fix (2026-05-04)
+## Latest update — Phase 14.1.1: Sparse gate default-on (hybrid passed 120q) + Phase 13.6 backend-agnostic env-var rename (2026-05-04)
+
+**Phase 14.1.1 hybrid PASSED 120q full A/B; sparse gate now default-on.** Tested simpler-first hypothesis (raise global `SPARSE_MIN_ACTIVE` from 3 to 15) — 120q produced mean +0.001 with 1 catastrophic regression (q302 in `data_flow_integration`, 4 required_files). Pivoted to hybrid (MIN=15 global + `data_flow_integration` MIN=20 override) using existing Phase 14.1 per-category mechanism — **120q PASSED** with mean +0.003, 0 regressions, 10 improvements. Defaults flipped:
+- `SPARSE_RETRIEVAL_ENABLED=true` (was false)
+- `SPARSE_MIN_ACTIVE=15` (was 3)
+- `SPARSE_GATE_CATEGORY_OVERRIDES` seeded with `{"data_flow_integration": {"min_active": 20}}`
+
+Phase 14 → 14.1 → 14.1.1 sequence closes with sparse gate as a default behavior. Operator opt-out via `SPARSE_RETRIEVAL_ENABLED=false`. Original complexity-plumbing design from the 14.1.1 plan stub deferred — the simpler global+override design proved sufficient. ~$20 OpenAI spend (2× 120q full).
+
+**Phase 13.6 env-var rename also shipped.** Backend-agnostic naming: primary names are now `LLM_*` (was `MLX_*`); legacy aliases kept with deprecation log at startup. `MDEMG_ALLOW_NO_MLX` → `MDEMG_ALLOW_NO_LLM` (with alias). Aliases will be removed ≥1 release cycle after this commit. Runtime-verified: deprecation log fires correctly when only the legacy name is set. Internal Go package (`internal/mlxprobe/`) and Prometheus metric prefix (`mdemg_mlx_*`) retained — operator-invisible / dashboard-coupled.
+
+What landed in Phase 14.1.1:
+- `internal/config/config.go` — 3 default flips (SparseRetrievalEnabled, SparseMinActive, SparseGateCategoryOverrides seed); doc comments updated
+- `docs/development/post-ft-lora/phase_14_1_1_post.md` — executed truth + verdict tables
+
+What landed in Phase 13.6:
+- `internal/config/config.go` — 4 env vars (`LLM_WATCHDOG_ENABLED`, `LLM_PROBE_INTERVAL_SEC`, `LLM_PROBE_TIMEOUT_SEC`, `LLM_FAIL_FAST_ENABLED`) get `getBoolWithAlias`/`atoiWithAlias` treatment; struct field doc comments updated
+- `internal/cli/preflight_mlx.go` — `MDEMG_ALLOW_NO_LLM` checked first, falls back to `MDEMG_ALLOW_NO_MLX` with deprecation log
+- `docs/features/mlx-watchdog.md` — Configuration table updated with primary/alias columns; "naming caveat" section replaced with "naming history"
+
+## Earlier update — Phase 14.1: Adaptive per-category sparse gate (failed 120q, ships flag-off) + comparator eps fix (2026-05-04)
 
 **Phase 14.1 shipped infrastructure flag-off after 120q full A/B failed.** 16q quick PASSED at `adaptive-arch-only` preset (mean parity, 0 regressions, 1 improvement) — eps-tolerance fix in `uvts_ab_compare.py` eliminated Phase 14's 7 boundary false-positives. 120q full FAILED with 2 catastrophic regressions:
 - q119 (`service_relationships`, 3 required_files): -0.45

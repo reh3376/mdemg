@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **POST-FT-LORA-PHASE14.1.1: Sparse retrieval gate default-on (hybrid 120q PASSED)** (2026-05-04) — Tested simpler-first design (global `SPARSE_MIN_ACTIVE=15`); 120q produced mean +0.001 with 1 regression (q302 4-required-files in `data_flow_integration`). Pivoted to hybrid (MIN=15 global + `data_flow_integration` MIN=20) using existing Phase 14.1 per-category mechanism. Hybrid 120q PASSED: mean +0.003, 0 regressions, 10 improvements. Defaults flipped in `internal/config/config.go`: `SPARSE_RETRIEVAL_ENABLED` `false → true`, `SPARSE_MIN_ACTIVE` `3 → 15`, `SPARSE_GATE_CATEGORY_OVERRIDES` seeded with `{"data_flow_integration": {"min_active": 20}}`. Sparse gate now default-on; operator opt-out via `SPARSE_RETRIEVAL_ENABLED=false`. Plan stub's complexity-plumbing design deferred (simpler design sufficient). Post: [`phase_14_1_1_post.md`](docs/development/post-ft-lora/phase_14_1_1_post.md). OpenAI spend: ~$20.
+
+- **POST-FT-LORA-PHASE13.6: Backend-agnostic env-var rename (MLX_* → LLM_*)** (2026-05-04) — Primary env names migrated to `LLM_*`; legacy `MLX_*` retained as deprecated aliases with startup log warning. `MDEMG_ALLOW_NO_MLX` → `MDEMG_ALLOW_NO_LLM` (with alias). Aliases removable ≥1 release cycle after this commit. Internal Go package (`internal/mlxprobe/`) and Prometheus metric prefix (`mdemg_mlx_*`) retained as operator-invisible / dashboard-coupled. Code: new `getBoolWithAlias`/`atoiWithAlias` helpers in `config.go`; `preflight_mlx.go` checks LLM primary first. Docs: `mlx-watchdog.md` Configuration table updated with primary/alias columns. Runtime-verified: deprecation log fires on `MDEMG_ALLOW_NO_MLX=1` legacy boot.
+
 ### Added
 
 - **POST-FT-LORA-PHASE14.1: Adaptive per-category sparse gate (flag-off after 120q failed)** (2026-05-04, all epics) — Per-category override infrastructure shipped flag-off; comparator eps fix shipped globally. Plan: [`sprint_plan_phase_14_1_adaptive_per_category_gate.md`](docs/development/post-ft-lora/sprint_plan_phase_14_1_adaptive_per_category_gate.md). Post: [`phase_14_1_post.md`](docs/development/post-ft-lora/phase_14_1_post.md). Forensic: [`phase_14_1_forensic.md`](docs/development/post-ft-lora/phase_14_1_forensic.md).
