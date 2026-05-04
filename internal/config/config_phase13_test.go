@@ -2,9 +2,11 @@ package config
 
 import "testing"
 
-// TestPhase13_Defaults documents the safe-off rollout posture: column voting
-// disabled by default, RRF k=60, structural hops=2, all per-column enable
-// knobs default to true (so flag flip alone activates the full ensemble).
+// TestPhase13_Defaults documents the production-on rollout posture (Phase 13.1
+// flipped this from safe-off to default-on after the embedding-heavy preset
+// passed full 120q UVTS A/B with mean +0.023 and 30 improvements). RRF k=60,
+// structural hops=2, all per-column enable knobs default to true. Default
+// weights are the Phase 13.1 winning preset (embedding-heavy: 0.50/0.20/0.15/0.15).
 func TestPhase13_Defaults(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
@@ -13,8 +15,8 @@ func TestPhase13_Defaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
-	if cfg.RetrievalColumnVotingEnabled {
-		t.Error("RetrievalColumnVotingEnabled default = true, want false (safe rollout)")
+	if !cfg.RetrievalColumnVotingEnabled {
+		t.Error("RetrievalColumnVotingEnabled default = false, want true (post-Phase-13.1 default)")
 	}
 	if cfg.RetrievalRRFK != 60 {
 		t.Errorf("RetrievalRRFK = %d, want 60 (Cormack et al.)", cfg.RetrievalRRFK)
@@ -37,20 +39,34 @@ func TestPhase13_Defaults(t *testing.T) {
 	if !cfg.RetrievalColumnStructuralEnabled {
 		t.Error("RetrievalColumnStructuralEnabled default = false, want true")
 	}
+	// Phase 13.1 winning preset weights
+	if cfg.RetrievalColumnWeightEmbedding != 0.50 {
+		t.Errorf("RetrievalColumnWeightEmbedding = %v, want 0.50 (Phase 13.1 embedding-heavy)", cfg.RetrievalColumnWeightEmbedding)
+	}
+	if cfg.RetrievalColumnWeightBM25 != 0.20 {
+		t.Errorf("RetrievalColumnWeightBM25 = %v, want 0.20 (Phase 13.1 embedding-heavy)", cfg.RetrievalColumnWeightBM25)
+	}
+	if cfg.RetrievalColumnWeightGraph != 0.15 {
+		t.Errorf("RetrievalColumnWeightGraph = %v, want 0.15 (Phase 13.1 embedding-heavy)", cfg.RetrievalColumnWeightGraph)
+	}
+	if cfg.RetrievalColumnWeightStructural != 0.15 {
+		t.Errorf("RetrievalColumnWeightStructural = %v, want 0.15 (Phase 13.1 embedding-heavy)", cfg.RetrievalColumnWeightStructural)
+	}
 }
 
-// TestPhase13_FlagFlip verifies an operator can opt in via .env.
+// TestPhase13_FlagFlip verifies an operator can opt out via .env (the default
+// is true post-Phase-13.1, so the flip-test exercises the opt-out path now).
 func TestPhase13_FlagFlip(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
-	t.Setenv("RETRIEVAL_COLUMN_VOTING_ENABLED", "true")
+	t.Setenv("RETRIEVAL_COLUMN_VOTING_ENABLED", "false")
 
 	cfg, err := FromEnv()
 	if err != nil {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
-	if !cfg.RetrievalColumnVotingEnabled {
-		t.Error("RetrievalColumnVotingEnabled stayed false after env override")
+	if cfg.RetrievalColumnVotingEnabled {
+		t.Error("RetrievalColumnVotingEnabled stayed true after env override to false")
 	}
 }
 

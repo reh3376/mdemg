@@ -68,7 +68,15 @@ func (s *Service) ScoreAndRankRRF(
 		RRFK:                     s.cfg.RetrievalRRFK,
 		PerColumnTimeoutFraction: s.cfg.RetrievalColumnTimeoutFrac,
 		TopN:                     topK,
-		// ColumnWeights nil → equal weights (1.0/N each), Phase 13 v1
+		// Phase 13.1: per-column weights wired from config. All-1.0 (default)
+		// reproduces Phase 13's equal-weights behavior. Operator ablation sweeps
+		// vary these via RETRIEVAL_COLUMN_WEIGHT_* env vars.
+		ColumnWeights: map[string]float64{
+			"embedding":  s.cfg.RetrievalColumnWeightEmbedding,
+			"bm25":       s.cfg.RetrievalColumnWeightBM25,
+			"graph":      s.cfg.RetrievalColumnWeightGraph,
+			"structural": s.cfg.RetrievalColumnWeightStructural,
+		},
 	}
 
 	consensus, err := Aggregate(ctx, cols, q, opts)

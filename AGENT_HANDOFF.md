@@ -7,7 +7,22 @@
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 13.5: MLX Server Stability cutover (2026-05-03)
+## Latest update — Phase 13.1: Column-weight ablation default-on (2026-05-03)
+
+**Phase 13's failed A/B is fixed.** Default `RetrievalColumnVotingEnabled` flipped `false → true` after embedding-heavy preset (`0.50/0.20/0.15/0.15`, hops=2) passed full 120q UVTS A/B with mean **+0.023 (+5.9%)**, **30 improvements**, 2 boundary regressions in `business_logic_constraints`. Phase 13's catastrophic regressions on q 69 + q hard_sym_4 are eliminated — q 69 now returns `secretsManager.module` direct hit. Forensic diagnosis confirmed H1 (Graph+Structural at equal weights crowded out Embedding+BM25 on precise-symbol queries).
+
+What landed:
+- 4 new env vars `RETRIEVAL_COLUMN_WEIGHT_{EMBEDDING,BM25,GRAPH,STRUCTURAL}` (defaults to embedding-heavy preset)
+- `Service.scorerVersion()` extended to include weights+hops+enables → cache namespace flips per preset automatically
+- Default `RetrievalColumnVotingEnabled=true`, default weights = embedding-heavy preset
+- Operator opt-out: `RETRIEVAL_COLUMN_VOTING_ENABLED=false` in .env + restart
+- `scripts/phase13_1_ablation_runner.py` (~350 LOC) for re-running ablation sweeps
+
+Phase 13.2 queued: investigate `business_logic_constraints` category for per-category weight tuning.
+
+Docs: `phase_13_1_post.md`, `phase_13_1_forensic_diagnosis.md`, `sprint_plan_phase_13_1_column_weight_ablation.md`.
+
+## Earlier update — Phase 13.5: MLX Server Stability cutover (2026-05-03)
 
 **Production LLM substrate replaced.** `mlx_lm.server` (port 8101, ~17 crashes/4h on M5 Max + macOS 26.3.x) → `llama-server` from llama.cpp b9000+ (port 8102, GGUF Q5_K_M, 0 crashes / 160 min × 301 calls). Decision was data-cited per operator constraint "no opinion required, follow the data."
 

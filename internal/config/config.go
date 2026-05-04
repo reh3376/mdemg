@@ -516,7 +516,7 @@ type Config struct {
 	// Default false until the UVTS A/B verdict passes — flag-flip in same
 	// commit if the merge gate clears (B mean ≥ A mean AND no per-question
 	// regression > 10%).
-	RetrievalColumnVotingEnabled bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: false until A/B-validated)
+	RetrievalColumnVotingEnabled bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
 	RetrievalRRFK                int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
 	RetrievalColumnTimeoutFrac   float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
 	RetrievalStructuralHops      int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
@@ -524,6 +524,18 @@ type Config struct {
 	RetrievalColumnBM25Enabled       bool // RETRIEVAL_COLUMN_BM25_ENABLED — per-column suppression knob (default: true)
 	RetrievalColumnGraphEnabled      bool // RETRIEVAL_COLUMN_GRAPH_ENABLED — per-column suppression knob (default: true)
 	RetrievalColumnStructuralEnabled bool // RETRIEVAL_COLUMN_STRUCTURAL_ENABLED — per-column suppression knob (default: true)
+
+	// Phase 13.1 — per-column RRF weights. Phase 13 shipped equal weights (1.0
+	// each via nil ColumnWeights map). Forensic diagnosis (phase_13_1_forensic_diagnosis.md)
+	// proved equal weights cause q 69 + q hard_sym_4 to regress to 0.000 because
+	// Graph+Structural collectively over-vote on structurally-connected code,
+	// crowding out Embedding+BM25's better matches for precise-symbol queries.
+	// 1.0 default per column = same as Phase 13 nil-map → equal weights → no
+	// behavior change unless operator opts in.
+	RetrievalColumnWeightEmbedding  float64 // RETRIEVAL_COLUMN_WEIGHT_EMBEDDING — RRF weight on the embedding column (default: 0.50, Phase 13.1 embedding-heavy preset)
+	RetrievalColumnWeightBM25       float64 // RETRIEVAL_COLUMN_WEIGHT_BM25 — RRF weight on the BM25 column (default: 0.20, Phase 13.1 embedding-heavy preset)
+	RetrievalColumnWeightGraph      float64 // RETRIEVAL_COLUMN_WEIGHT_GRAPH — RRF weight on the graph (spreading-activation) column (default: 0.15, Phase 13.1 embedding-heavy preset)
+	RetrievalColumnWeightStructural float64 // RETRIEVAL_COLUMN_WEIGHT_STRUCTURAL — RRF weight on the structural Cypher-walk column (default: 0.15, Phase 13.1 embedding-heavy preset)
 
 	// Phase 13 Epic 5 — Downstream consumers. Both flags default false:
 	// the wiring exists so Phase 14 doesn't have to touch this code,
@@ -2529,7 +2541,12 @@ func FromEnv() (Config, error) {
 	mlxFailFastEnabled := getBool("MLX_FAIL_FAST_ENABLED", true)
 
 	// Phase 13 — Column-Voting Retrieval
-	retrievalColumnVotingEnabled := getBool("RETRIEVAL_COLUMN_VOTING_ENABLED", false)
+	// Phase 13.1 (2026-05-03): default flipped false → true after embedding-heavy
+	// preset (weights below) passed full 120q UVTS A/B against legacy linear
+	// baseline: mean +0.023 (+5.9%), 30 improvements, 2 boundary regressions
+	// at exactly -0.10 in business_logic_constraints. See
+	// docs/development/post-ft-lora/phase_13_1_post.md.
+	retrievalColumnVotingEnabled := getBool("RETRIEVAL_COLUMN_VOTING_ENABLED", true)
 	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
 	if err != nil {
 		return Config{}, err
@@ -2555,6 +2572,45 @@ func FromEnv() (Config, error) {
 	retrievalColBM25Enabled := getBool("RETRIEVAL_COLUMN_BM25_ENABLED", true)
 	retrievalColGraphEnabled := getBool("RETRIEVAL_COLUMN_GRAPH_ENABLED", true)
 	retrievalColStructuralEnabled := getBool("RETRIEVAL_COLUMN_STRUCTURAL_ENABLED", true)
+
+	// Phase 13.1 — per-column RRF weights (ablation knobs). 1.0 default per
+	// column matches Phase 13's nil ColumnWeights map → equal weights → no
+	// behavior change unless operator opts in. Negative values are rejected
+	// to mirror the consensus.ColumnWeight contract.
+	// Phase 13.1 default weights from the embedding-heavy preset (winner of
+	// the Phase 13.1 ablation sweep). Diagnostic finding: equal weights
+	// (1.0/1.0/1.0/1.0) caused Graph+Structural to over-vote on
+	// structurally-connected code, crowding out Embedding+BM25's better
+	// matches for precise-symbol queries. Embedding-heavy
+	// (0.50/0.20/0.15/0.15) corrects the imbalance.
+	retrievalColumnWeightEmbedding, err := atof("RETRIEVAL_COLUMN_WEIGHT_EMBEDDING", 0.50)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalColumnWeightEmbedding < 0 {
+		return Config{}, fmt.Errorf("RETRIEVAL_COLUMN_WEIGHT_EMBEDDING must be ≥ 0 (got %v)", retrievalColumnWeightEmbedding)
+	}
+	retrievalColumnWeightBM25, err := atof("RETRIEVAL_COLUMN_WEIGHT_BM25", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalColumnWeightBM25 < 0 {
+		return Config{}, fmt.Errorf("RETRIEVAL_COLUMN_WEIGHT_BM25 must be ≥ 0 (got %v)", retrievalColumnWeightBM25)
+	}
+	retrievalColumnWeightGraph, err := atof("RETRIEVAL_COLUMN_WEIGHT_GRAPH", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalColumnWeightGraph < 0 {
+		return Config{}, fmt.Errorf("RETRIEVAL_COLUMN_WEIGHT_GRAPH must be ≥ 0 (got %v)", retrievalColumnWeightGraph)
+	}
+	retrievalColumnWeightStructural, err := atof("RETRIEVAL_COLUMN_WEIGHT_STRUCTURAL", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalColumnWeightStructural < 0 {
+		return Config{}, fmt.Errorf("RETRIEVAL_COLUMN_WEIGHT_STRUCTURAL must be ≥ 0 (got %v)", retrievalColumnWeightStructural)
+	}
 
 	// Phase 13 Epic 5 — Downstream consumer wiring (flag-off, prompts/inputs deferred to Phase 14)
 	retrievalRerankConsumeConsensus := getBool("RETRIEVAL_RERANK_CONSUME_CONSENSUS", false)
@@ -3978,6 +4034,12 @@ func FromEnv() (Config, error) {
 		RetrievalColumnBM25Enabled:       retrievalColBM25Enabled,
 		RetrievalColumnGraphEnabled:      retrievalColGraphEnabled,
 		RetrievalColumnStructuralEnabled: retrievalColStructuralEnabled,
+
+		// Phase 13.1 — per-column RRF weights (ablation knobs)
+		RetrievalColumnWeightEmbedding:  retrievalColumnWeightEmbedding,
+		RetrievalColumnWeightBM25:       retrievalColumnWeightBM25,
+		RetrievalColumnWeightGraph:      retrievalColumnWeightGraph,
+		RetrievalColumnWeightStructural: retrievalColumnWeightStructural,
 		RetrievalRerankConsumeConsensus:  retrievalRerankConsumeConsensus,
 		DH005ConsumeConsensus:            dh005ConsumeConsensus,
 		RetrievalAuditEnabled:            retrievalAuditEnabled,

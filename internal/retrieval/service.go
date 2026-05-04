@@ -42,13 +42,29 @@ func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
 // pipeline. Used to namespace the query cache so a config flip between the
 // legacy linear scorer and the Phase 13 (Note 04) RRF column-voting
 // aggregator does not serve stale entries from one against requests
-// expecting the other. Bump the literal whenever column weights, the
-// active column set, or the RRF k constant changes.
+// expecting the other.
+//
+// Phase 13.1: extended to include the per-column weight + hop-depth +
+// per-column-enable flags so that ablation sweeps automatically invalidate
+// cache between presets without operator intervention. Two presets that
+// produce different rankings will produce different scorer versions →
+// different cache namespaces → no contamination.
 func (s *Service) scorerVersion() string {
-	if s.cfg.RetrievalColumnVotingEnabled {
-		return "v1-rrf4" // 4 columns shipped (embedding+bm25+graph+structural; temporal+role deferred per Phase 13 Epic 0 audit)
+	if !s.cfg.RetrievalColumnVotingEnabled {
+		return "v0-linear"
 	}
-	return "v0-linear"
+	return fmt.Sprintf(
+		"v1-rrf4|e=%.3f|b=%.3f|g=%.3f|s=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t",
+		s.cfg.RetrievalColumnWeightEmbedding,
+		s.cfg.RetrievalColumnWeightBM25,
+		s.cfg.RetrievalColumnWeightGraph,
+		s.cfg.RetrievalColumnWeightStructural,
+		s.cfg.RetrievalStructuralHops,
+		s.cfg.RetrievalColumnEmbeddingEnabled,
+		s.cfg.RetrievalColumnBM25Enabled,
+		s.cfg.RetrievalColumnGraphEnabled,
+		s.cfg.RetrievalColumnStructuralEnabled,
+	)
 }
 
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
