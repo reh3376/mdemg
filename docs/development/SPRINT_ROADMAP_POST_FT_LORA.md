@@ -228,11 +228,15 @@ Phase 13.1 left `business_logic_constraints` as the only category with negative 
 
 Code-cleanup follow-up to Phase 13.5. Rename: `internal/cli/preflight_mlx.go` → `preflight_llm.go`; `MDEMG_ALLOW_NO_MLX` env var → `MDEMG_ALLOW_NO_LLM` (with backward-compat alias); `MLX_WATCHDOG_ENABLED` → `LLM_WATCHDOG_ENABLED`; `internal/mlxprobe` package → `internal/llmprobe`; `mdemg_mlx_*` Prometheus metrics → `mdemg_llm_endpoint_*`. The framework is functionally backend-agnostic post-Phase 13.5 but identifiers still reference mlx; renames bring identifiers in line with reality. Backward-compat aliases for env vars per `feedback_no_short_term_mlx_patches.md` discipline (no breaking changes without migration path).
 
-### Sprint 4: **Phase 14 — Notes 05+06 — Sparse fingerprints + percentile activation gate** (gated on Phase 13.x passing)
+### Sprint 4: **Phase 14 — Notes 05+06** (NARROW-CLOSED 2026-05-04 — split into 14, 14.1, 14.2)
 
-4-week sprint. Consumes the per-query `consensus_strength` signal Phase 13 emits (now flag-off pending 13.1 ablation). Parallel-safe with any FT-LORA follow-up work. See §3.3 for design details.
+**Phase 14 (this sprint, EXECUTED narrow)**: Note 06 sparse activation gate code shipped flag-off + Phase 13 Epic 6 V0017 audit-writer fix shipped + Epic 0 forensic doc + V0019 sparse_gate_metrics hypertable + Phase 11+ feature-doc backfill (5 new + 1 update). 16q quick PASSED at MIN=10/p95 (mean +0.019, 0 regressions); 120q full FAILED per-question (mean parity, 7 boundary regressions concentrated in `architecture_structure`). Note 05 deferred — Epic 0 found the spec's static 64/64/64/64 catalog bit allocation is wrong for `whk-wms` (0 symbols, 0 roles) → adaptive Builder redesign needed. See `phase_14_post.md`.
 
-After Sprint 3, sequence either becomes (a) Notes 05+06 in parallel (continue Tier 2), or (b) Note 01 narrative formalization (early Tier 3 prep) depending on operational signal.
+**Phase 14.1 (queued)**: Adaptive per-category sparse gate. ~3 dev-days, ~$15 OpenAI. `SPARSE_GATE_CATEGORY_OVERRIDES` JSON config; retune A/B; conditional default-on flip. See `sprint_plan_phase_14_1_adaptive_per_category_gate.md`.
+
+**Phase 14.2 (queued)**: Note 05 with adaptive catalog Builder. ~7 dev-days, ~$25 OpenAI. V0028 + V0029 + V0020 schema; fingerprint computation; context column; backfill CLI; combined A/B with Phase 14.1 gate. See `sprint_plan_phase_14_2_note_05_sparse_fingerprints.md`.
+
+After Phase 14.x sequence completes, consider either (a) Note 01 narrative formalization (early Tier 3 prep) or (b) Phase 13.2 per-category weight tuning depending on operational signal.
 
 ---
 

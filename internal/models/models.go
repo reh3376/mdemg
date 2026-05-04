@@ -37,6 +37,15 @@ type RetrieveRequest struct {
 	// Pagination fields (Phase 48.3)
 	Cursor string `json:"cursor,omitempty"` // Node ID to start after for cursor pagination
 	Limit  int    `json:"limit,omitempty"`  // Max results per page (default: 50, max: 500)
+
+	// Phase 14 Epic 1 — Note 06 sparse activation gate per-request overrides.
+	// When SparseOverridePresent is true, SparseEnabled overrides the
+	// SPARSE_RETRIEVAL_ENABLED config default for this call. SparsePercentile
+	// > 0 overrides SPARSE_ACTIVATION_PERCENTILE for this call. Use these to
+	// disable the gate per-call (`?sparse=false`) without restarting mdemg.
+	SparseOverridePresent bool    `json:"-"`                            // not serialized; set by handler when ?sparse= present
+	SparseEnabled         bool    `json:"sparse,omitempty"`             // request-level override for SPARSE_RETRIEVAL_ENABLED
+	SparsePercentile      float64 `json:"sparse_percentile,omitempty" validate:"omitempty,min=0.5,max=0.999"` // request-level override for SPARSE_ACTIVATION_PERCENTILE
 }
 
 type RetrieveResult struct {

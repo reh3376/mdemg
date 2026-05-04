@@ -2,12 +2,33 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-05-03
+**Date:** 2026-05-04
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 13.1: Column-weight ablation default-on (2026-05-03)
+## Latest update — Phase 14: Sparse retrieval gate (narrow-close) + Phase 11+ feature-doc backfill (2026-05-04)
+
+**Phase 14 narrowed and closed.** Original plan combined Notes 05+06 in one sprint; closed with Note 06 only after Epic 0+1+2 produced design questions for both Notes that warrant dedicated follow-up sprints. Note 05 deferred to Phase 14.2 (catalog redesign needed for non-code spaces); Note 06 default-flag flip deferred to Phase 14.1 (adaptive per-category gate).
+
+What landed in Phase 14:
+- **Phase 13 Epic 6 V0017 audit-writer fix** — `tsdb/retrieval_audit_writer.go` + adapter wired in `api/server.go`. V0017 was empty since Phase 13 because no caller of `SetRetrievalAuditWriter` existed; now writes per retrieve when `RETRIEVAL_AUDIT_ENABLED=true`. `.env` flipped to enable collection going forward.
+- **Note 06 sparse activation gate (flag-off)** — `internal/retrieval/gate.go` + tests + wiring + 4 config knobs (`SPARSE_*`) + per-request override (`?sparse=true|false`, `?sparse_percentile=N`) + 3 Prometheus histograms.
+- **TSDB V0019 `sparse_gate_metrics`** — buffered writer + adapter + migration. `TSDB_REQUIRED_SCHEMA_VERSION` 18→19.
+- **Epic 0 forensic doc** — `phase_14_score_distribution_analysis.md` derived data-driven defaults from `llm_interactions.retrieval_scores` (99k+50k score points); flagged Note 05 catalog redesign needed (`whk-wms` has 0 symbols, 0 roles).
+- **A/B verdicts** — 16q quick PASSED at MIN=10/p95 (mean +0.019, 0 regressions, 3 improvements); 120q full FAILED per-question (mean parity 0.413=0.413, 7 boundary regressions concentrated in `architecture_structure`).
+- **Phase 11+ feature-doc backfill** (operator request 2026-05-04, standing rule saved as `feedback_per_feature_docs_required.md`):
+  - new: `mlx-watchdog.md`, `uvts-validation.md`, `column-voting-retrieval.md`, `local-llm-runtime.md`, `sparse-retrieval.md`
+  - extended: `service-resilience.md` (Phase 11.6.x additions)
+- **Sprint plans for follow-ups**: `sprint_plan_phase_14_1_adaptive_per_category_gate.md` (~3 days, ~$15) + `sprint_plan_phase_14_2_note_05_sparse_fingerprints.md` (~7 days, ~$25).
+
+OpenAI spend: ~$13 (well under sprint $25-50 budget).
+
+Docs: `phase_14_post.md`, `phase_14_score_distribution_analysis.md`, `sprint_plan_phase_14_*.md` (frozen + 14.1/14.2 stubs).
+
+Phase 14.1 + Phase 14.2 queued; Phase 13.2 still queued for per-category weight tuning.
+
+## Earlier update — Phase 13.1: Column-weight ablation default-on (2026-05-03)
 
 **Phase 13's failed A/B is fixed.** Default `RetrievalColumnVotingEnabled` flipped `false → true` after embedding-heavy preset (`0.50/0.20/0.15/0.15`, hops=2) passed full 120q UVTS A/B with mean **+0.023 (+5.9%)**, **30 improvements**, 2 boundary regressions in `business_logic_constraints`. Phase 13's catastrophic regressions on q 69 + q hard_sym_4 are eliminated — q 69 now returns `secretsManager.module` direct hit. Forensic diagnosis confirmed H1 (Graph+Structural at equal weights crowded out Embedding+BM25 on precise-symbol queries).
 

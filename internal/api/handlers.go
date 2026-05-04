@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -439,6 +440,31 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	}
 	if !validateRequest(w, &req) {
 		return
+	}
+
+	// Phase 14 Epic 1 — Note 06 per-query overrides via URL params.
+	// `?sparse=true|false` overrides SPARSE_RETRIEVAL_ENABLED for this call;
+	// `?sparse_percentile=0.95` overrides SPARSE_ACTIVATION_PERCENTILE.
+	// JSON-body fields take precedence; URL params apply only when the body
+	// did not set them.
+	if !req.SparseOverridePresent {
+		if v := r.URL.Query().Get("sparse"); v != "" {
+			switch strings.ToLower(strings.TrimSpace(v)) {
+			case "true", "1", "yes", "on":
+				req.SparseEnabled = true
+				req.SparseOverridePresent = true
+			case "false", "0", "no", "off":
+				req.SparseEnabled = false
+				req.SparseOverridePresent = true
+			}
+		}
+	}
+	if req.SparsePercentile == 0 {
+		if v := r.URL.Query().Get("sparse_percentile"); v != "" {
+			if p, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil && p >= 0.5 && p <= 0.999 {
+				req.SparsePercentile = p
+			}
+		}
 	}
 
 	// Phase 102: Intent Translation — rewrite query before embedding
