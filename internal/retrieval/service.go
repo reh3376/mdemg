@@ -714,6 +714,11 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		Percentile: s.cfg.SparseActivationPercentile,
 		MinActive:  s.cfg.SparseMinActive,
 		MaxActive:  s.cfg.SparseMaxActive,
+		// Phase 14.1 Epic 2 — translate config map to gate-side type at the
+		// call site (cycle-safe: gate.go doesn't import config). Empty map →
+		// no overrides applied; same outcome as Phase 14.
+		CategoryOverrides: translateCategoryOverrides(s.cfg.SparseGateCategoryOverrides),
+		Category:          req.Category,
 	}
 	if req.SparseOverridePresent {
 		gateOpts.Enabled = req.SparseEnabled

@@ -16,6 +16,7 @@ package retrieval
 import (
 	"sort"
 
+	"mdemg/internal/config"
 	"mdemg/internal/models"
 )
 
@@ -39,6 +40,56 @@ type SparseGateOpts struct {
 	// MaxActive — ceiling on active set size. The gate cannot grow the active
 	// set above this many candidates. Set ≤0 to disable the ceiling.
 	MaxActive int
+
+	// Phase 14.1 — Per-category overrides. When the request carries a
+	// Category that matches a key in this map, the override's per-field
+	// (pointer-set) values replace the global Percentile/MinActive/MaxActive
+	// for this call. Pointer-nil fields fall back to the global default.
+	// Empty map → Phase 14 behavior (global defaults only).
+	CategoryOverrides map[string]SparseGateCategoryOpts
+
+	// Category — the request's category hint. When empty, no override is
+	// looked up (global defaults always apply). When non-empty but not in
+	// CategoryOverrides, no override is applied (still global defaults).
+	Category string
+}
+
+// SparseGateCategoryOpts mirrors config.SparseGateOverride at the gate site.
+// Pointer fields encode "fall back to global default" semantics. Decoupled
+// from the config type to keep internal/retrieval free of config-package
+// shape constraints.
+type SparseGateCategoryOpts struct {
+	MinActive  *int
+	MaxActive  *int
+	Percentile *float64
+}
+
+// resolveCategoryOpts returns the effective Percentile/MinActive/MaxActive
+// for this call after applying any matching category override. Pure function;
+// no side effects. Falls back to opts.Percentile/MinActive/MaxActive when
+// the category isn't in the override map or the matched override leaves a
+// field nil.
+func (opts SparseGateOpts) resolveCategoryOpts() (percentile float64, minActive int, maxActive int) {
+	percentile = opts.Percentile
+	minActive = opts.MinActive
+	maxActive = opts.MaxActive
+	if opts.Category == "" || opts.CategoryOverrides == nil {
+		return
+	}
+	override, ok := opts.CategoryOverrides[opts.Category]
+	if !ok {
+		return
+	}
+	if override.Percentile != nil {
+		percentile = *override.Percentile
+	}
+	if override.MinActive != nil {
+		minActive = *override.MinActive
+	}
+	if override.MaxActive != nil {
+		maxActive = *override.MaxActive
+	}
+	return
 }
 
 // SparseGateMetadata captures observability for one gate application. Emitted
@@ -86,8 +137,14 @@ type SparseGateMetadata struct {
 //
 // Safe to call with empty input (returns empty + zeroed metadata).
 func ApplySparseGate(items []models.RetrieveResult, opts SparseGateOpts) (active, dropped []models.RetrieveResult, meta SparseGateMetadata) {
+	// Phase 14.1 — resolve effective per-call opts after any category
+	// override. Falls back to global Percentile/MinActive/MaxActive when no
+	// override applies. This is the only line in the function aware of
+	// per-category dispatch; the rest of the body works on the resolved
+	// values exactly as Phase 14's gate did.
+	effPercentile, effMinActive, effMaxActive := opts.resolveCategoryOpts()
 	meta.InputCount = len(items)
-	meta.PercentileApplied = opts.Percentile
+	meta.PercentileApplied = effPercentile
 
 	if !opts.Enabled || len(items) == 0 {
 		// Passthrough: gate is off or empty input. Active = input verbatim.
@@ -109,7 +166,7 @@ func ApplySparseGate(items []models.RetrieveResult, opts SparseGateOpts) (active
 	// per-call list of 20-50 candidates this is fine without going to a more
 	// elaborate estimator; the alternative would be the next-rank rule which
 	// has discrete steps that confuse operators.
-	threshold := percentileLinear(scores, opts.Percentile)
+	threshold := percentileLinear(scores, effPercentile)
 	meta.Threshold = threshold
 
 	// Admit candidates with score >= threshold. Use >= so the cutoff is
@@ -128,13 +185,13 @@ func ApplySparseGate(items []models.RetrieveResult, opts SparseGateOpts) (active
 	// Apply the MIN_ACTIVE floor: if the percentile admitted fewer than
 	// MinActive candidates, pull more from the top of the dropped set
 	// (highest-scored first) until the floor is met.
-	if opts.MinActive > 0 && len(preClamp) < opts.MinActive {
+	if effMinActive > 0 && len(preClamp) < effMinActive {
 		// Sort dropped desc by score to pick the highest-scored fallbacks.
 		// Stable sort so ties preserve input order.
 		sort.SliceStable(belowClamp, func(i, j int) bool {
 			return belowClamp[i].Score > belowClamp[j].Score
 		})
-		need := opts.MinActive - len(preClamp)
+		need := effMinActive - len(preClamp)
 		if need > len(belowClamp) {
 			need = len(belowClamp)
 		}
@@ -145,11 +202,11 @@ func ApplySparseGate(items []models.RetrieveResult, opts SparseGateOpts) (active
 
 	// Apply the MAX_ACTIVE ceiling: if the percentile admitted more than
 	// MaxActive candidates, demote the lowest-scored excess into dropped.
-	if opts.MaxActive > 0 && len(preClamp) > opts.MaxActive {
+	if effMaxActive > 0 && len(preClamp) > effMaxActive {
 		// preClamp inherits input order (caller's score-desc sort). Slice off
 		// the tail.
-		demoted := preClamp[opts.MaxActive:]
-		preClamp = preClamp[:opts.MaxActive]
+		demoted := preClamp[effMaxActive:]
+		preClamp = preClamp[:effMaxActive]
 		// Prepend demoted to belowClamp so the dropped set still reflects
 		// "items not in the active set" without reordering caller-visible
 		// data.
@@ -160,6 +217,27 @@ func ApplySparseGate(items []models.RetrieveResult, opts SparseGateOpts) (active
 	meta.ActiveCount = len(preClamp)
 	meta.DroppedCount = len(belowClamp)
 	return preClamp, belowClamp, meta
+}
+
+// translateCategoryOverrides converts the config-package map shape
+// (config.SparseGateOverride) to the retrieval-package map shape
+// (SparseGateCategoryOpts). Cycle-safe: retrieval imports config, but the
+// helper lives here so the gate doesn't need to know about config-side
+// types beyond the input map. Returns nil for nil/empty input (no allocation
+// when no overrides configured).
+func translateCategoryOverrides(in map[string]config.SparseGateOverride) map[string]SparseGateCategoryOpts {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]SparseGateCategoryOpts, len(in))
+	for cat, ov := range in {
+		out[cat] = SparseGateCategoryOpts{
+			MinActive:  ov.MinActive,
+			MaxActive:  ov.MaxActive,
+			Percentile: ov.Percentile,
+		}
+	}
+	return out
 }
 
 // percentileLinear computes the q-th quantile (q ∈ [0, 1]) of an ascending-
