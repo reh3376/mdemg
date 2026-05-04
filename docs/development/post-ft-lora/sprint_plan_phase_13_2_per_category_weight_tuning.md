@@ -1,6 +1,6 @@
 # Sprint POST-FT-LORA-PHASE13.2 — Per-Category Column-Weight Tuning
 
-> **STUB — scoped 2026-05-04** as a follow-up to Phase 13.1 (column-voting default-on with embedding-heavy 0.50/0.20/0.15/0.15). Phase 13.1's 120q full A/B passed with mean +0.023 but had **2 boundary regressions in `business_logic_constraints`** that the eps fix shipped in Phase 14.1 likely now eliminates. This sprint re-runs Phase 13.1's full 120q A/B with the eps comparator to confirm the boundary regressions were artifacts. If they were artifacts, Phase 13.2 is closed as documentation. If real, this sprint extends the `business_logic_constraints`-specific weight tune.
+> **EXECUTED 2026-05-04 — Path A confirmed.** Phase 13.1's 2 reported `business_logic_constraints` boundary regressions were floating-point artifacts. Re-running with the Phase 14.1 Epic 2 eps=1e-6 comparator produced regression_count=0 (mean +0.023 and 30 improvements unchanged). Phase 13.2 closes as documentation. Path B (real per-category weight tune) NOT needed. See `phase_13_2_post.md`.
 
 ## Context
 

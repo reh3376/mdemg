@@ -37,6 +37,8 @@ The full 120-question UVTS A/B (legacy linear baseline vs embedding-heavy candid
 
 The 2 new boundary-case regressions (q `206` and q `283`, both `business_logic_constraints` at −0.100) are the same boundary-case quirk we saw in Phase 13.5 F1's UVTS A/B (q `472` at exactly −0.100): UVTS scoring increments by 0.05; the threshold is 0.10 (= 2 increments). Inclusive-vs-exclusive comparator interpretation flips the verdict at this boundary.
 
+> **Retroactive clarification (Phase 13.2, 2026-05-04)**: these "2 boundary regressions" were confirmed floating-point artifacts. Phase 14.1 Epic 2 shipped an `eps=1e-6` tolerance in `uvts_ab_compare.py:121`. Phase 13.2 re-ran this exact A/B with the new comparator and got **regression_count = 0** (mean +0.023 and 30 improvements unchanged). The "boundary case" flag was correct in spirit (these are not real regressions); the count is now retroactively recategorized to 0. See `phase_13_2_post.md`. Phase 13.2.1 (per-category column-weight tuning for `business_logic_constraints`) is not needed — the category never had a real weight problem.
+
 ---
 
 ## Sprint summary
