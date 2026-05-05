@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 )
 
 // BitKind enumerates the kinds of features a catalog bit can represent.
@@ -196,6 +197,11 @@ type CatalogLoader interface {
 	// LoadVersion returns a specific historical catalog version for spaceID.
 	// Used for cross-version fingerprint comparison fallback.
 	LoadVersion(ctx context.Context, spaceID string, version int) (*Catalog, error)
+
+	// Freshness returns the elapsed time since the active catalog for spaceID
+	// was created. The bool reports cold-start (true → no active catalog yet).
+	// Used by the CycleOrchestrator stage 6 refresh hook.
+	Freshness(ctx context.Context, spaceID string) (time.Duration, bool, error)
 }
 
 // Builder constructs a new Catalog version from per-space density data.

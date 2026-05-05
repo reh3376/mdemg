@@ -823,6 +823,21 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
 	slog.Info("RSIC orchestration policy initialized", "cooldown_sec", cfg.RSICTriggerCooldownSec, "dedupe_sec", cfg.RSICTriggerDedupeSec)
 
+	// Phase 14.2 Epic 2: Wire ContextCatalog Builder + Loader for the
+	// stage-6 fingerprint refresh hook. Disabling refresh via
+	// CONTEXT_FINGERPRINT_REFRESH_ENABLED=false bypasses the hook regardless.
+	if cfg.ContextFingerprintEnabled {
+		catalogBuilder := hidden.NewNeo4jBuilder(driver, hidden.BuilderOptsFromConfig(cfg))
+		catalogLoader := hidden.NewNeo4jLoader(driver)
+		rsicCycle.SetContextCatalog(catalogBuilder, catalogLoader)
+		slog.Info("RSIC context catalog wired",
+			"refresh_enabled", cfg.ContextFingerprintRefreshEnabled,
+			"interval_hours", cfg.ContextFingerprintRefreshIntervalHours,
+			"timeout_ms", cfg.ContextFingerprintRefreshTimeoutMs,
+			"bit_budget", cfg.ContextFingerprintBitBudget,
+		)
+	}
+
 	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
 	safetyValidator := ape.NewSafetyValidator(driver)
 	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)

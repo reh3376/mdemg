@@ -12,6 +12,7 @@ import (
 
 	"mdemg/internal/config"
 	"mdemg/internal/conversation"
+	"mdemg/internal/hidden"
 	"mdemg/internal/metrics"
 	"mdemg/internal/tsdb"
 )
@@ -54,8 +55,15 @@ type CycleOrchestrator struct {
 	// Phase 12 Epic 6: optional ConflictTracker for divergence-detection
 	// hooks. Wired by server.go via SetConflictTracker; nil-receiver-safe
 	// in conversation.ConflictTracker.Track so the hook is gated only by
-	// non-nil + cfg.ConflictTrackerEnabled.
+	// non-nil + cfg.ContextFingerprintRefreshEnabled.
 	conflictTracker *conversation.ConflictTracker
+
+	// Phase 14.2 Epic 2: optional ContextCatalog Builder + Loader for the
+	// stage-6 fingerprint refresh. Both nil → stage 6 is a no-op (default
+	// for tests + cold-installs). Wired by serve.go after Builder/Loader
+	// are constructed against the live Neo4j driver.
+	contextCatalogBuilder hidden.Builder
+	contextCatalogLoader  hidden.CatalogLoader
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -365,12 +373,64 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 
 	slog.Info("RSIC cycle complete", "cycle_id", cycleID, "executed", outcome.ActionsExecuted, "success", outcome.SuccessCount, "failed", outcome.FailedCount)
 
+	// Stage 6: Context Catalog refresh (Phase 14.2 Epic 2).
+	// Time-bounded; failures logged but do not fail the cycle.
+	c.maybeRefreshContextCatalog(ctx, spaceID, cycleID)
+
 	// Reset watchdog
 	if c.watchdog != nil {
 		c.watchdog.RecordCycle()
 	}
 
 	return outcome, nil
+}
+
+// maybeRefreshContextCatalog rebuilds the per-space ContextCatalog when the
+// active version is older than ContextFingerprintRefreshIntervalHours (or no
+// catalog exists yet — cold-start). Gated on cfg.ContextFingerprintRefreshEnabled
+// and on both Builder + Loader being wired.
+//
+// Time-bounded by cfg.ContextFingerprintRefreshTimeoutMs; partial work is
+// fine (next cycle picks up where this one left off).
+func (c *CycleOrchestrator) maybeRefreshContextCatalog(parentCtx context.Context, spaceID, cycleID string) {
+	if !c.cfg.ContextFingerprintRefreshEnabled {
+		return
+	}
+	if c.contextCatalogBuilder == nil || c.contextCatalogLoader == nil {
+		return
+	}
+	timeout := time.Duration(c.cfg.ContextFingerprintRefreshTimeoutMs) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
+
+	age, cold, err := c.contextCatalogLoader.Freshness(ctx, spaceID)
+	if err != nil {
+		slog.Warn("RSIC stage6 freshness probe failed", "cycle_id", cycleID, "space_id", spaceID, "error", err)
+		return
+	}
+	interval := time.Duration(c.cfg.ContextFingerprintRefreshIntervalHours) * time.Hour
+	if !cold && age < interval {
+		return
+	}
+
+	startedAt := time.Now()
+	cat, err := c.contextCatalogBuilder.BuildForSpace(ctx, spaceID)
+	if err != nil {
+		slog.Warn("RSIC stage6 catalog build failed", "cycle_id", cycleID, "space_id", spaceID, "cold_start", cold, "error", err)
+		return
+	}
+	slog.Info("RSIC stage6 catalog refreshed",
+		"cycle_id", cycleID,
+		"space_id", spaceID,
+		"version", cat.Version,
+		"total_bits", cat.TotalBits,
+		"cold_start", cold,
+		"age_before", age.String(),
+		"duration", time.Since(startedAt).String(),
+	)
 }
 
 // Assess exposes just the assessment stage for the API.
@@ -420,6 +480,14 @@ func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProv
 // disagree on the same dimension. Phase 12 Epic 6.
 func (c *CycleOrchestrator) SetConflictTracker(t *conversation.ConflictTracker) {
 	c.conflictTracker = t
+}
+
+// SetContextCatalog attaches a Builder + CatalogLoader pair so RunCycle's
+// stage 6 can refresh the per-space context fingerprint catalog when stale.
+// Either nil disables stage 6. Phase 14.2 Epic 2.
+func (c *CycleOrchestrator) SetContextCatalog(b hidden.Builder, l hidden.CatalogLoader) {
+	c.contextCatalogBuilder = b
+	c.contextCatalogLoader = l
 }
 
 // recordReflectDivergence inspects insights produced by Reflector.Reflect and
