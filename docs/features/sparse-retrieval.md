@@ -3,8 +3,8 @@ created: 2026-05-04
 updated: 2026-05-04
 version: v0.6.0
 author: reh3376
-status: experimental (flag-off after Phase 14 + 14.1; pending Phase 14.1.1 complexity-based retune)
-phase: phase 14 + phase 14.1
+status: active (default-on since Phase 14.1.1, 2026-05-04)
+phase: phase 14 + phase 14.1 + phase 14.1.1
 ---
 
 # Sparse Retrieval (Note 06 Percentile Activation Gate)
@@ -54,10 +54,11 @@ Phase 14 shipped the gate code + V0019 metrics + tests, then ran a 4-preset A/B 
 
 | Env Var | Default | Description |
 |---|---|---|
-| `SPARSE_RETRIEVAL_ENABLED` | **`false`** | Master toggle. Phase 14 ships flag-off; Phase 14.1 will flip after retune |
+| `SPARSE_RETRIEVAL_ENABLED` | **`true`** | Master toggle. Default-on since Phase 14.1.1 (2026-05-04 — hybrid 120q passed) |
 | `SPARSE_ACTIVATION_PERCENTILE` | `0.95` | Within-call score percentile cutoff in `[0.5, 0.999]` |
-| `SPARSE_MIN_ACTIVE` | `3` | Floor on active set size. ≤0 disables floor |
-| `SPARSE_MAX_ACTIVE` | `20` | Ceiling on active set size. ≤0 disables ceiling. Matches observed top-K cap |
+| `SPARSE_MIN_ACTIVE` | **`15`** | Floor on active set size. Bumped from 3 in Phase 14.1.1 (Phase 14's MIN=3 caused boundary regressions) |
+| `SPARSE_MAX_ACTIVE` | `20` | Ceiling on active set size. Matches observed top-K cap |
+| `SPARSE_GATE_CATEGORY_OVERRIDES` | `{"data_flow_integration":{"min_active":20}}` | Per-category overrides seed. The default seed handles q302-shape (4-required-files in `data_flow_integration`); operator-supplied JSON REPLACES the seed entirely (merge isn't supported) |
 
 ### V0019 telemetry
 

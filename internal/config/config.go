@@ -505,10 +505,14 @@ type Config struct {
 	// observed in Phase 12 (1642% CPU when mlx died under load). All knobs
 	// default to safe-off so existing deployments are unaffected until the
 	// operator opts in via .env.
-	MLXWatchdogEnabled    bool // MLX_WATCHDOG_ENABLED — start the mlxprobe goroutine + Prometheus metrics (default: true; flipped from false in hotfix 11.6.3.1 per always-on policy)
-	MLXProbeIntervalSec   int  // MLX_PROBE_INTERVAL_SEC — seconds between probe ticks (default: 5, min 1)
-	MLXProbeTimeoutSec    int  // MLX_PROBE_TIMEOUT_SEC — per-probe HTTP timeout in seconds; must be < MLX_PROBE_INTERVAL_SEC (default: 2, min 1)
-	MLXFailFastEnabled    bool // MLX_FAIL_FAST_ENABLED — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
+	// Phase 13.6 — env-var primaries are LLM_*; legacy MLX_* names accepted
+	// as aliases with a deprecation log. Struct field names retained as MLX*
+	// to minimize blast radius (internal symbols only; rename in a future
+	// pure-rename sprint if desired).
+	MLXWatchdogEnabled    bool // LLM_WATCHDOG_ENABLED (alias: MLX_WATCHDOG_ENABLED) — start the watchdog goroutine + metrics (default: true; flipped from false in hotfix 11.6.3.1 per always-on policy)
+	MLXProbeIntervalSec   int  // LLM_PROBE_INTERVAL_SEC (alias: MLX_PROBE_INTERVAL_SEC) — seconds between probe ticks (default: 5, min 1)
+	MLXProbeTimeoutSec    int  // LLM_PROBE_TIMEOUT_SEC (alias: MLX_PROBE_TIMEOUT_SEC) — per-probe HTTP timeout in seconds; must be < LLM_PROBE_INTERVAL_SEC (default: 2, min 1)
+	MLXFailFastEnabled    bool // LLM_FAIL_FAST_ENABLED (alias: MLX_FAIL_FAST_ENABLED) — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
 
 	// Phase 13 — Note 04 Column-Voting Retrieval. Replaces the linear-
 	// combination ranker at scoring.go:797 with a Reciprocal Rank Fusion
@@ -1030,6 +1034,7 @@ func FromEnv() (Config, error) {
 		}
 		return v
 	}
+
 	atoi := func(k string, def int) (int, error) {
 		v := strings.TrimSpace(os.Getenv(k))
 		if v == "" {
@@ -2559,26 +2564,56 @@ func FromEnv() (Config, error) {
 	conflictTrackerEnabled := getBool("CONFLICT_TRACKER_ENABLED", true)
 
 	// Phase 11.6.3 — MLX Watchdog
-	mlxWatchdogEnabled := getBool("MLX_WATCHDOG_ENABLED", true)
-	mlxProbeIntervalSec, err := atoi("MLX_PROBE_INTERVAL_SEC", 5)
+	// Phase 13.6 — backend-agnostic env-var rename. Primary names are
+	// LLM_*; legacy MLX_* names accepted as aliases with a deprecation log
+	// at startup. Drop aliases ≥1 release cycle after rename ships.
+	getBoolWithAlias := func(primary, alias string, def bool) bool {
+		if v := strings.TrimSpace(os.Getenv(primary)); v != "" {
+			return v == "true" || v == "1" || v == "yes" || v == "on"
+		}
+		if v := strings.TrimSpace(os.Getenv(alias)); v != "" {
+			slog.Warn("config: env var deprecated, please rename", "deprecated", alias, "primary", primary)
+			return v == "true" || v == "1" || v == "yes" || v == "on"
+		}
+		return def
+	}
+	atoiWithAlias := func(primary, alias string, def int) (int, error) {
+		v := strings.TrimSpace(os.Getenv(primary))
+		if v == "" {
+			if alt := strings.TrimSpace(os.Getenv(alias)); alt != "" {
+				slog.Warn("config: env var deprecated, please rename", "deprecated", alias, "primary", primary)
+				v = alt
+			}
+		}
+		if v == "" {
+			return def, nil
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, fmt.Errorf("%s must be int: %w", primary, err)
+		}
+		return n, nil
+	}
+	mlxWatchdogEnabled := getBoolWithAlias("LLM_WATCHDOG_ENABLED", "MLX_WATCHDOG_ENABLED", true)
+	mlxProbeIntervalSec, err := atoiWithAlias("LLM_PROBE_INTERVAL_SEC", "MLX_PROBE_INTERVAL_SEC", 5)
 	if err != nil {
 		return Config{}, err
 	}
 	if mlxProbeIntervalSec < 1 {
-		return Config{}, fmt.Errorf("MLX_PROBE_INTERVAL_SEC must be ≥ 1 (got %d)", mlxProbeIntervalSec)
+		return Config{}, fmt.Errorf("LLM_PROBE_INTERVAL_SEC must be ≥ 1 (got %d)", mlxProbeIntervalSec)
 	}
-	mlxProbeTimeoutSec, err := atoi("MLX_PROBE_TIMEOUT_SEC", 2)
+	mlxProbeTimeoutSec, err := atoiWithAlias("LLM_PROBE_TIMEOUT_SEC", "MLX_PROBE_TIMEOUT_SEC", 2)
 	if err != nil {
 		return Config{}, err
 	}
 	if mlxProbeTimeoutSec < 1 {
-		return Config{}, fmt.Errorf("MLX_PROBE_TIMEOUT_SEC must be ≥ 1 (got %d)", mlxProbeTimeoutSec)
+		return Config{}, fmt.Errorf("LLM_PROBE_TIMEOUT_SEC must be ≥ 1 (got %d)", mlxProbeTimeoutSec)
 	}
 	if mlxProbeTimeoutSec >= mlxProbeIntervalSec {
 		return Config{}, fmt.Errorf("MLX_PROBE_TIMEOUT_SEC (%d) must be < MLX_PROBE_INTERVAL_SEC (%d) — overlap risks ticker stalls",
 			mlxProbeTimeoutSec, mlxProbeIntervalSec)
 	}
-	mlxFailFastEnabled := getBool("MLX_FAIL_FAST_ENABLED", true)
+	mlxFailFastEnabled := getBoolWithAlias("LLM_FAIL_FAST_ENABLED", "MLX_FAIL_FAST_ENABLED", true)
 
 	// Phase 13 — Column-Voting Retrieval
 	// Phase 13.1 (2026-05-03): default flipped false → true after embedding-heavy
@@ -2659,11 +2694,16 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
 	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
 
-	// Phase 14 Epic 1 — Note 06 sparse activation gate. Defaults from
-	// phase_14_score_distribution_analysis.md Epic 0 forensic: p95 (not spec
-	// 0.98), MIN_ACTIVE=3 dominates clamp in observed K=20-50 regime,
-	// MAX_ACTIVE=20 (not spec 50) matches observed top-K cap.
-	sparseRetrievalEnabled := getBool("SPARSE_RETRIEVAL_ENABLED", false)
+	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
+	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
+	// Phase 14.1.1 hybrid 120q PASSED (mean +0.003, 0 regressions, 10
+	// improvements) at MIN=15 global + data_flow_integration MIN=20
+	// category override. Defaults flipped to that hybrid configuration:
+	//   SPARSE_RETRIEVAL_ENABLED=true (was false in Phase 14)
+	//   SPARSE_MIN_ACTIVE=15 (was 3 in Phase 14)
+	//   SPARSE_GATE_CATEGORY_OVERRIDES seeded with data_flow_integration MIN=20
+	// Operator opt-out: SPARSE_RETRIEVAL_ENABLED=false in .env + restart.
+	sparseRetrievalEnabled := getBool("SPARSE_RETRIEVAL_ENABLED", true)
 	sparseActivationPercentile, err := atof("SPARSE_ACTIVATION_PERCENTILE", 0.95)
 	if err != nil {
 		return Config{}, err
@@ -2671,7 +2711,7 @@ func FromEnv() (Config, error) {
 	if sparseActivationPercentile < 0.5 || sparseActivationPercentile > 0.999 {
 		return Config{}, fmt.Errorf("SPARSE_ACTIVATION_PERCENTILE must be in [0.5, 0.999] (got %v)", sparseActivationPercentile)
 	}
-	sparseMinActive, err := atoi("SPARSE_MIN_ACTIVE", 3)
+	sparseMinActive, err := atoi("SPARSE_MIN_ACTIVE", 15)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2686,11 +2726,20 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("SPARSE_MAX_ACTIVE (%d) must be ≥ SPARSE_MIN_ACTIVE (%d)", sparseMaxActive, sparseMinActive)
 	}
 
-	// Phase 14.1 Epic 1 — Per-category gate overrides. JSON env, parsed once.
-	// Empty / unset → empty map → Phase 14 behavior (global defaults only).
-	// Validates known category keys + each override's bounds.
-	sparseGateCategoryOverrides := map[string]SparseGateOverride{}
+	// Phase 14.1 Epic 1 → Phase 14.1.1 — Per-category gate overrides.
+	// Seeded by default with the Phase 14.1.1 hybrid winner override:
+	//   data_flow_integration: MIN=20 (handles 4-required_files queries
+	//   like q302 — system-wide data-flow walks where the gate at MIN=15
+	//   would cut a needed citation).
+	// Operator may extend or override the map via SPARSE_GATE_CATEGORY_OVERRIDES
+	// JSON env (env value REPLACES the default map; merge isn't supported).
+	sparseGateDataFlowMin := 20
+	sparseGateCategoryOverrides := map[string]SparseGateOverride{
+		"data_flow_integration": {MinActive: &sparseGateDataFlowMin},
+	}
 	if raw := strings.TrimSpace(os.Getenv("SPARSE_GATE_CATEGORY_OVERRIDES")); raw != "" {
+		// Operator-supplied map replaces the default seed entirely.
+		sparseGateCategoryOverrides = map[string]SparseGateOverride{}
 		if err := json.Unmarshal([]byte(raw), &sparseGateCategoryOverrides); err != nil {
 			return Config{}, fmt.Errorf("SPARSE_GATE_CATEGORY_OVERRIDES must be valid JSON: %w", err)
 		}

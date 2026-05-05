@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -27,7 +28,15 @@ import (
 // timeout) all return an error that lists the resolved endpoint + the
 // error reason + the escape-hatch instructions.
 func preflightMLXReachable(cfg config.Config) error {
-	if os.Getenv("MDEMG_ALLOW_NO_MLX") == "1" {
+	// Phase 13.6 — backend-agnostic env rename. MDEMG_ALLOW_NO_LLM is the
+	// new primary; MDEMG_ALLOW_NO_MLX kept as alias with deprecation log.
+	allowNoLLM := os.Getenv("MDEMG_ALLOW_NO_LLM") == "1"
+	if !allowNoLLM && os.Getenv("MDEMG_ALLOW_NO_MLX") == "1" {
+		slog.Warn("config: env var deprecated, please rename",
+			"deprecated", "MDEMG_ALLOW_NO_MLX", "primary", "MDEMG_ALLOW_NO_LLM")
+		allowNoLLM = true
+	}
+	if allowNoLLM {
 		// Operator opt-out — the policy explicitly allows this for
 		// Linux/Docker-only setups + emergency recovery.
 		return nil

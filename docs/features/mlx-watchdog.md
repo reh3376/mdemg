@@ -14,7 +14,7 @@ phase: phase 11.6.3 (with phase 13.5 backend-agnostic note)
 **Feature**: `mlx-watchdog`
 **Summary**: Always-on supervisor that probes the local LLM endpoint (`/v1/models`) every 5 s, runs a 3-state machine (`up → degraded → down`) with hysteresis, fast-fails LLM client retries when the endpoint is `Down` (eliminates the retry-storm pattern that masked Metal-OOM crashes), records every state transition + fast-fail burst to TSDB V0018, and exposes operator visibility via `mdemg watchdog status`.
 
-> **Naming caveat (post-Phase 13.5):** the feature is still named "MLX Watchdog" because that was the original Phase 11.6.3 name. After Phase 13.5 cut over from `mlx_lm.server` to `llama.cpp llama-server`, the watchdog is **backend-agnostic** — it probes whichever endpoint `LLM_ENDPOINT` points at. The `MLX_*` env-var names are also historical and will be renamed to `LLM_*` in Phase 13.6 (queued).
+> **Naming history**: the feature is still named "MLX Watchdog" because that was the original Phase 11.6.3 name; the implementation is **backend-agnostic** post-Phase 13.5 (probes whichever endpoint `LLM_ENDPOINT` points at). Phase 13.6 (2026-05-04) renamed the env vars to `LLM_*` primaries while keeping `MLX_*` as deprecated aliases (logs a warning at startup; works indefinitely until ≥1 release cycle elapses). The internal Go package (`internal/mlxprobe/`) and Prometheus metric prefix (`mdemg_mlx_*`) retain their MLX names — those are operator-invisible / Grafana-coupled and out of scope for the env-var rename.
 
 ## Vision & Goals
 
@@ -61,15 +61,16 @@ Hysteresis prevents flap: the machine doesn't transition `Up → Down` until the
 
 ### Configuration
 
-| Env Var | Default | Description |
-|---|---|---|
-| `MLX_WATCHDOG_ENABLED` | `true` | Master toggle (default-on per Phase 11.6.3 scope) |
-| `MLX_PROBE_INTERVAL_SEC` | `5` | Seconds between probes |
-| `MLX_PROBE_TIMEOUT_SEC` | `2` | Per-probe HTTP timeout |
-| `MLX_MAX_CONSECUTIVE_FAILURES` | `3` | Failures before `Down` |
-| `MLX_FAST_FAIL_BURST_WINDOW_SEC` | `60` | Aggregation window for fast-fail-burst V0018 rows |
-| `MDEMG_ALLOW_NO_MLX` | unset | When `1`, mdemg startup proceeds even if endpoint unreachable. Use for local dev without llama-server running |
-| `LLM_ENDPOINT` | `http://127.0.0.1:8102/v1` | The endpoint the watchdog probes (Phase 13.5 default; was `8101` for mlx-server) |
+| Env Var (primary) | Legacy alias (deprecated) | Default | Description |
+|---|---|---|---|
+| `LLM_WATCHDOG_ENABLED` | `MLX_WATCHDOG_ENABLED` | `true` | Master toggle (default-on per Phase 11.6.3 scope) |
+| `LLM_PROBE_INTERVAL_SEC` | `MLX_PROBE_INTERVAL_SEC` | `5` | Seconds between probes |
+| `LLM_PROBE_TIMEOUT_SEC` | `MLX_PROBE_TIMEOUT_SEC` | `2` | Per-probe HTTP timeout |
+| `LLM_FAIL_FAST_ENABLED` | `MLX_FAIL_FAST_ENABLED` | `true` | Let llmclient short-circuit when probe says StateDown |
+| `MDEMG_ALLOW_NO_LLM` | `MDEMG_ALLOW_NO_MLX` | unset | When `1`, mdemg startup proceeds even if endpoint unreachable. Use for local dev without llama-server running |
+| `LLM_ENDPOINT` | — | `http://127.0.0.1:8102/v1` | The endpoint the watchdog probes (Phase 13.5 default; was `8101` for mlx-server) |
+
+> **Aliases**: setting the legacy `MLX_*` name still works but emits a deprecation log at startup. Aliases will be removed ≥1 release cycle after Phase 13.6. Operators should migrate to `LLM_*` primaries.
 
 ### launchd integration
 
