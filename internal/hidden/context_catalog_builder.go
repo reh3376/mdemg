@@ -169,15 +169,36 @@ RETURN path, freq`
 		return nil, fmt.Errorf("top paths: %w", err)
 	}
 
-	// Query 2: top tags by frequency (UNWIND tags array).
+	// Query 2: top "tags" — Phase 14.2.2 retune.
+	//
+	// Phase 14.2 collected from m.tags (LLM-summary buckets like `api`,
+	// `architecture`, `caching`). Those buckets have low discrimination
+	// against typical domain queries — vector + token derivation both
+	// produced near-empty fingerprints in the 14.2 / 14.2.1 A/B runs.
+	//
+	// Phase 14.2.2 retune: collect top-N path segments (split paths on
+	// '/'). Path segments carry domain vocabulary directly (e.g.
+	// `barrelOwnership`, `auth`, `inventory-upload`) so query embeddings
+	// land on the right bits. We filter out "everywhere" segments
+	// (frequency > total_obs/2) since they contribute zero discrimination
+	// and inflate the Jaccard noise floor.
+	//
+	// The bits keep BitKindTag (no schema migration) — semantically the
+	// kind name now reads as "discriminative-token" rather than
+	// "user-defined tag", and that's accurate for the vector-cosine
+	// matching path which is the production use.
 	queryTopTags := `
 MATCH (m:MemoryNode {space_id: $space_id})
-WHERE m.tags IS NOT NULL
-UNWIND m.tags AS tag
-WITH tag, count(*) AS freq
-ORDER BY freq DESC, tag ASC
+WHERE m.path IS NOT NULL
+WITH count(DISTINCT m) AS total
+MATCH (m:MemoryNode {space_id: $space_id})
+WHERE m.path IS NOT NULL
+UNWIND split(m.path, "/") AS seg
+WITH seg, count(DISTINCT m) AS freq, total
+WHERE seg <> "" AND size(seg) >= 2 AND freq <= total / 2
+ORDER BY freq DESC, seg ASC
 LIMIT $limit
-RETURN tag, freq`
+RETURN seg AS tag, freq`
 	if _, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryTopTags, map[string]any{
 			"space_id": spaceID,

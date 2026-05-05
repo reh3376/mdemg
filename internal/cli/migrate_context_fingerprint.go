@@ -45,6 +45,7 @@ func newMigrateContextFingerprintCmd() *cobra.Command {
 	var dryRun bool
 	var batchSize int
 	var build bool
+	var forceRebuild bool
 
 	cmd := &cobra.Command{
 		Use:   "context-fingerprint",
@@ -88,7 +89,7 @@ Algorithm:
 			if cerr != nil {
 				return fmt.Errorf("config: %w", cerr)
 			}
-			return runMigrateContextFingerprint(ctx, driver, cfg, spaceID, dryRun, batchSize, build)
+			return runMigrateContextFingerprint(ctx, driver, cfg, spaceID, dryRun, batchSize, build, forceRebuild)
 		},
 	}
 
@@ -96,6 +97,7 @@ Algorithm:
 	cmd.Flags().BoolVar(&dryRun, "dry-run", true, "Preview mode (default: true)")
 	cmd.Flags().IntVar(&batchSize, "batch-size", 500, "Process observations in batches of this size")
 	cmd.Flags().BoolVar(&build, "build", false, "Build a new catalog if no active version exists (cold start)")
+	cmd.Flags().BoolVar(&forceRebuild, "force-rebuild", false, "Phase 14.2.2: rebuild the catalog even if an active version exists (deactivates the previous active version + creates a new one). Implies --build behavior.")
 
 	return cmd
 }
@@ -108,6 +110,7 @@ func runMigrateContextFingerprint(
 	dryRun bool,
 	batchSize int,
 	build bool,
+	forceRebuild bool,
 ) error {
 	fmt.Println("MDEMG Context Fingerprint Backfill (Phase 14.2)")
 	fmt.Println("================================================")
@@ -126,14 +129,19 @@ func runMigrateContextFingerprint(
 	if err != nil {
 		return fmt.Errorf("load active catalog: %w", err)
 	}
-	if cat == nil {
-		if !build {
+	needBuild := cat == nil || forceRebuild
+	if needBuild {
+		switch {
+		case cat == nil && !build && !forceRebuild:
 			return fmt.Errorf("no active ContextCatalog for space=%q; pass --build to bootstrap one (or run a CycleOrchestrator macro tick)", spaceID)
+		case dryRun:
+			return fmt.Errorf("(re)build requested but --dry-run is set; cannot build catalog in dry-run mode (re-run with --dry-run=false)")
 		}
-		if dryRun {
-			return fmt.Errorf("no active catalog and --dry-run is set; cannot build catalog in dry-run mode (re-run with --dry-run=false --build)")
+		if forceRebuild && cat != nil {
+			fmt.Printf("Step 0: --force-rebuild — deactivating current v%d, building new version...\n", cat.Version)
+		} else {
+			fmt.Println("Step 0: No active catalog; building via adaptive Builder...")
 		}
-		fmt.Println("Step 0: No active catalog; building via adaptive Builder...")
 		builder := hidden.NewNeo4jBuilder(driver, hidden.BuilderOptsFromConfig(cfg))
 		cat, err = builder.BuildForSpace(ctx, spaceID)
 		if err != nil {

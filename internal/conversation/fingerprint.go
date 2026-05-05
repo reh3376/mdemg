@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
@@ -47,10 +48,12 @@ func ComputeContextFingerprintLocal(obs *Observation, cat *hidden.Catalog) []uin
 
 	bits := make(map[uint16]struct{}, 8)
 
-	// Path bit
+	// Path bit (full-path match against catalog path bits)
+	var filePath string
 	if obs.Metadata != nil {
 		if pathRaw, ok := obs.Metadata["file_path"]; ok {
 			if path, ok := pathRaw.(string); ok && path != "" {
+				filePath = path
 				if pos, ok := cat.PathBit(path); ok {
 					bits[pos] = struct{}{}
 				}
@@ -65,10 +68,23 @@ func ComputeContextFingerprintLocal(obs *Observation, cat *hidden.Catalog) []uin
 		bits[pos] = struct{}{}
 	}
 
-	// Tag bits — intersection of obs.Tags ∩ catalog.tagToBit
+	// Tag bits — intersection of obs.Tags ∩ catalog.tagToBit.
+	// Phase 14.2.2: catalog tag refs are now path-segment tokens (Builder
+	// retune). Match obs.Tags first (legacy, harmless if no overlap), then
+	// also tokenize the obs's file_path on '/' and match each segment.
+	// This is the observe-time mirror of the Builder's path-segment
+	// collection; without it, fingerprints of new observations would never
+	// hit the path-segment tag bits.
 	for _, tag := range obs.Tags {
 		if pos, ok := cat.TagBit(tag); ok {
 			bits[pos] = struct{}{}
+		}
+	}
+	if filePath != "" {
+		for _, seg := range pathSegments(filePath) {
+			if pos, ok := cat.TagBit(seg); ok {
+				bits[pos] = struct{}{}
+			}
 		}
 	}
 
@@ -80,6 +96,21 @@ func ComputeContextFingerprintLocal(obs *Observation, cat *hidden.Catalog) []uin
 		out = append(out, b)
 	}
 	slices.Sort(out)
+	return out
+}
+
+// pathSegments splits a file path on '/' and drops empty segments. Mirrors
+// the Cypher `split(m.path, "/")` used by the Builder's path-segment tag
+// collection (Phase 14.2.2). Segments must be ≥ 2 chars to match the
+// Builder's filter (single-char segments are too noisy to be useful bits).
+func pathSegments(path string) []string {
+	parts := strings.Split(path, "/")
+	out := parts[:0]
+	for _, p := range parts {
+		if len(p) >= 2 {
+			out = append(out, p)
+		}
+	}
 	return out
 }
 

@@ -67,8 +67,10 @@ func TestComputeContextFingerprintLocal_ConversationObs(t *testing.T) {
 	got := ComputeContextFingerprintLocal(obs, cat)
 	// Default role_type=conversation_observation, layer=0 → bit 1.
 	// Tags: typescript=32, validation=33.
-	// Path: /auth/login.go=64.
-	want := []uint16{1, 32, 33, 64}
+	// Path: /auth/login.go=64 (full-path bit).
+	// Phase 14.2.2: path also splits to ["auth","login.go"]; "auth" matches
+	// catalog tag bit 34 (set in makeFingerprintCatalog).
+	want := []uint16{1, 32, 33, 34, 64}
 	if len(got) != len(want) {
 		t.Fatalf("len(bits) = %d, want %d (got %v)", len(got), len(want), got)
 	}
