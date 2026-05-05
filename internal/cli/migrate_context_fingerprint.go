@@ -145,14 +145,14 @@ func runMigrateContextFingerprint(
 	}
 	fmt.Println()
 
-	// Step 2: stream observations needing refresh.
+	// Step 2: stream nodes needing refresh.
 	type obsRow struct {
-		obsID     string
-		roleType  string
-		layer     int
-		tags      []string
-		filePath  string
-		curVer    int
+		nodeID   string
+		roleType string
+		layer    int
+		tags     []string
+		filePath string
+		curVer   int
 	}
 
 	startedAt := time.Now()
@@ -162,21 +162,25 @@ func runMigrateContextFingerprint(
 		skipped int
 	)
 
-	// Single Cypher walk that returns all observations needing refresh.
-	// Filter at query-time so we don't ship every node over the wire.
+	// Single Cypher walk that returns every MemoryNode whose fingerprint
+	// version is older than the active catalog. Keyed on node_id (not
+	// obs_id) so code-derived MemoryNodes (which have no obs_id) are also
+	// backfilled — fingerprint is a property of the node itself, not just
+	// conversation observations. Filter at query-time so we don't ship
+	// every node over the wire.
 	queryQ := `
 		MATCH (m:MemoryNode {space_id: $space_id})
 		WHERE coalesce(m.context_fingerprint_version, 0) < $target_version
 		  AND m.role_type IS NOT NULL
-		RETURN m.obs_id AS obs_id,
+		RETURN m.node_id AS node_id,
 		       coalesce(m.role_type, 'conversation_observation') AS role_type,
 		       coalesce(m.layer, 0) AS layer,
 		       coalesce(m.tags, []) AS tags,
-		       coalesce(m.file_path, '') AS file_path,
+		       coalesce(m.path, '') AS file_path,
 		       coalesce(m.context_fingerprint_version, 0) AS cur_ver
 	`
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	rowsRaw, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	rowsRaw, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryQ, map[string]any{
 			"space_id":       spaceID,
 			"target_version": int64(cat.Version),
@@ -187,17 +191,17 @@ func runMigrateContextFingerprint(
 		var rows []obsRow
 		for res.Next(ctx) {
 			rec := res.Record()
-			obsID, _ := rec.Get("obs_id")
+			nodeID, _ := rec.Get("node_id")
 			roleType, _ := rec.Get("role_type")
 			layerRaw, _ := rec.Get("layer")
 			tagsRaw, _ := rec.Get("tags")
 			pathRaw, _ := rec.Get("file_path")
 			verRaw, _ := rec.Get("cur_ver")
-			if obsID == nil {
+			if nodeID == nil {
 				continue
 			}
 			row := obsRow{
-				obsID:    fmt.Sprint(obsID),
+				nodeID:   fmt.Sprint(nodeID),
 				roleType: fmt.Sprint(roleType),
 				filePath: fmt.Sprint(pathRaw),
 			}
@@ -233,12 +237,12 @@ func runMigrateContextFingerprint(
 
 	// Step 3: compute fingerprint per row + batch-write.
 	type writeBatch struct {
-		obsIDs []string
-		bits   [][]int64
+		nodeIDs []string
+		bits    [][]int64
 	}
 	var batch writeBatch
 	flush := func() error {
-		if len(batch.obsIDs) == 0 {
+		if len(batch.nodeIDs) == 0 {
 			return nil
 		}
 		if dryRun {
@@ -247,19 +251,19 @@ func runMigrateContextFingerprint(
 		}
 		writeQ := `
 			UNWIND $rows AS row
-			MATCH (m:MemoryNode {obs_id: row.obs_id})
+			MATCH (m:MemoryNode {node_id: row.node_id})
 			SET m.context_fingerprint_active = row.bits,
 			    m.context_fingerprint_version = $version
 		`
-		writeRows := make([]map[string]any, len(batch.obsIDs))
-		for i, id := range batch.obsIDs {
+		writeRows := make([]map[string]any, len(batch.nodeIDs))
+		for i, id := range batch.nodeIDs {
 			writeRows[i] = map[string]any{
-				"obs_id": id,
-				"bits":   batch.bits[i],
+				"node_id": id,
+				"bits":    batch.bits[i],
 			}
 		}
 		ws := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		_, werr := neo4j.ExecuteWrite(ctx, ws, func(tx neo4j.ManagedTransaction) (any, error) {
+		_, werr := ws.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			_, err := tx.Run(ctx, writeQ, map[string]any{
 				"rows":    writeRows,
 				"version": int64(cat.Version),
@@ -290,9 +294,9 @@ func runMigrateContextFingerprint(
 			skipped++
 			continue
 		}
-		batch.obsIDs = append(batch.obsIDs, row.obsID)
+		batch.nodeIDs = append(batch.nodeIDs, row.nodeID)
 		batch.bits = append(batch.bits, uint16ToInt64(fp))
-		if len(batch.obsIDs) >= batchSize {
+		if len(batch.nodeIDs) >= batchSize {
 			if err := flush(); err != nil {
 				return fmt.Errorf("flush batch: %w", err)
 			}
