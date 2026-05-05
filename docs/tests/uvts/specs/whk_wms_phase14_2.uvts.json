@@ -1,0 +1,81 @@
+{
+  "uvts_version": "1.0.0",
+  "validation": {
+    "name": "whk_wms_phase14_2",
+    "description": "Phase 14.2 (Note 05 sparse fingerprints) A/B validation against refreshed whk-wms corpus (re-ingested 2026-05-05, 9791 nodes, 116 path-validated questions). Inherits the lnl_demo question set with stale paths filtered out.",
+    "codebase": "/Users/reh3376/whk-wms",
+    "space_id": "whk-wms",
+    "model": "sonnet",
+    "top_k": 5
+  },
+  "thresholds": {
+    "mean_score": 0.5,
+    "strong_evidence_pct": 50.0,
+    "high_score_rate_pct": 50.0,
+    "min_category_score": 0.4,
+    "max_token_usage": 500000,
+    "_comment": "Thresholds intentionally lowered for first run on refreshed corpus; tighten after baseline calibration."
+  },
+  "categories": [
+    {"name": "architecture_structure", "count": 5, "weight": 1.0},
+    {"name": "business_logic_constraints", "count": 5, "weight": 1.0},
+    {"name": "computed_value", "count": 5, "weight": 1.0},
+    {"name": "cross_cutting_concerns", "count": 5, "weight": 1.0},
+    {"name": "data_flow_integration", "count": 5, "weight": 1.0},
+    {"name": "disambiguation", "count": 5, "weight": 1.0},
+    {"name": "relationship", "count": 5, "weight": 1.0},
+    {"name": "service_relationships", "count": 5, "weight": 1.0}
+  ],
+  "questions": {
+    "source_file": "docs/architecture/benchmarks/whk-wms/test_questions_phase14_2.json",
+    "agent_file": "docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json",
+    "total_questions": 116,
+    "sampling": "stratified",
+    "seed": 42
+  },
+  "profiles": {
+    "quick": {
+      "questions_per_category": 2,
+      "timeout_minutes": 15,
+      "description": "Quick smoke test (~16 questions)"
+    },
+    "standard": {
+      "questions_per_category": 5,
+      "timeout_minutes": 45,
+      "description": "Standard validation (~40 questions)"
+    },
+    "full": {
+      "questions_per_category": -1,
+      "timeout_minutes": 180,
+      "description": "Full benchmark (116 path-validated questions)"
+    }
+  },
+  "scoring": {
+    "evidence_weight": 0.70,
+    "semantic_weight": 0.15,
+    "concept_weight": 0.15,
+    "line_tolerance": 10
+  },
+  "output": {
+    "format": "json",
+    "include_answers": true,
+    "include_evidence": true,
+    "include_tokens": true
+  },
+  "metadata": {
+    "tags": ["phase-14.2", "note-05", "context-fingerprints", "whk-wms"],
+    "owner": "mdemg-team",
+    "created": "2026-05-05",
+    "baseline_run": "phase_14_2_baseline_pre_context_column",
+    "corpus_state": "whk-wms HEAD c1e4263e, ingested 2026-05-05 with web_monorepo preset, 9791 nodes, 5-layer hierarchy consolidated, ContextCatalog v1 with 256 bits"
+  },
+  "ab_mode": {
+    "enabled": false,
+    "regression_threshold_per_question": 0.10,
+    "branches": {
+      "baseline_label": "phase_14_1_1_production",
+      "candidate_label": "phase_14_2_context_column"
+    },
+    "_comment": "Apply harness eps tolerance (uvts_ab_compare.py:121, eps=1e-6 from Phase 14.1). B mean >= A mean AND no per-question regression > 0.10."
+  }
+}

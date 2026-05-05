@@ -21,6 +21,7 @@ import (
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
+	"mdemg/internal/hidden"
 	"mdemg/internal/jobs"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
@@ -481,6 +482,21 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			switch strings.ToLower(strings.TrimSpace(v)) {
 			case "true", "1", "yes", "on":
 				req.StrictContextMode = true
+			}
+		}
+	}
+
+	// Phase 14.2 Epic 4 — `?context=auto` URL param: server-side fingerprint
+	// derivation when the caller didn't supply one. Tokenizes the query text
+	// and matches tokens against the active ContextCatalog's tag + path
+	// bits. Without this, the ContextColumn has nothing to score against
+	// (queries from UVTS / external clients don't carry fingerprints).
+	if len(req.QueryContextFingerprint) == 0 && req.QueryText != "" {
+		v := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("context")))
+		if v == "auto" || v == "true" || v == "1" {
+			fp := s.deriveQueryFingerprint(r.Context(), req.SpaceID, req.QueryText)
+			if len(fp) > 0 {
+				req.QueryContextFingerprint = fp
 			}
 		}
 	}
@@ -4022,4 +4038,99 @@ func (s *Server) handleMetricsTrends(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// deriveQueryFingerprint constructs a sparse context fingerprint for the
+// query by tokenizing the query text and matching tokens against the active
+// ContextCatalog's tag and path bits. Phase 14.2 Epic 4 — `?context=auto`
+// helper. Returns an empty slice on cold-start (no catalog), unmatched
+// tokens, or any Neo4j error (fail-open: better to skip the column than
+// fail the retrieve).
+//
+// Tokenization rules: split on non-alphanumeric, lowercase, drop tokens
+// shorter than 3 chars or in the stop list. CamelCase / snake_case /
+// kebab-case all break apart correctly.
+func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText string) []uint16 {
+	if s.driver == nil || spaceID == "" || queryText == "" {
+		return nil
+	}
+	loader := hidden.NewNeo4jLoader(s.driver)
+	cat, err := loader.LoadActive(ctx, spaceID)
+	if err != nil || cat == nil {
+		return nil
+	}
+
+	bits := make(map[uint16]struct{}, 8)
+	for _, tok := range tokenizeForFingerprint(queryText) {
+		if pos, ok := cat.TagBit(tok); ok {
+			bits[pos] = struct{}{}
+		}
+		if pos, ok := cat.PathBit(tok); ok {
+			bits[pos] = struct{}{}
+		}
+	}
+	if len(bits) == 0 {
+		return nil
+	}
+	out := make([]uint16, 0, len(bits))
+	for b := range bits {
+		out = append(out, b)
+	}
+	// Sort ascending for stable wire format and Jaccard math.
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j-1] > out[j]; j-- {
+			out[j-1], out[j] = out[j], out[j-1]
+		}
+	}
+	return out
+}
+
+// tokenizeForFingerprint splits a query string into lowercase atoms suitable
+// for catalog tag/path matching. Handles camelCase, snake_case, kebab-case,
+// and dot-separated identifiers. Drops stop words and tokens < 3 chars.
+func tokenizeForFingerprint(s string) []string {
+	var atoms []string
+	var cur []rune
+	flush := func() {
+		if len(cur) > 0 {
+			atoms = append(atoms, strings.ToLower(string(cur)))
+			cur = cur[:0]
+		}
+	}
+	prev := rune(0)
+	for _, r := range s {
+		isLower := r >= 'a' && r <= 'z'
+		isUpper := r >= 'A' && r <= 'Z'
+		isDigit := r >= '0' && r <= '9'
+		isAlpha := isLower || isUpper
+		switch {
+		case !isAlpha && !isDigit:
+			flush()
+		case isUpper && len(cur) > 0 && (prev >= 'a' && prev <= 'z'):
+			// camelCase boundary: lower→Upper
+			flush()
+			cur = append(cur, r)
+		default:
+			cur = append(cur, r)
+		}
+		prev = r
+	}
+	flush()
+
+	out := atoms[:0]
+	for _, a := range atoms {
+		if len(a) < 3 {
+			continue
+		}
+		switch a {
+		case "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
+			"her", "was", "one", "our", "out", "day", "get", "has", "him", "his",
+			"how", "man", "new", "now", "old", "see", "two", "way", "who", "boy",
+			"did", "its", "let", "put", "say", "she", "too", "use", "with", "from",
+			"this", "that", "they", "have", "where", "what":
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
