@@ -4041,17 +4041,24 @@ func (s *Server) handleMetricsTrends(w http.ResponseWriter, r *http.Request) {
 }
 
 // deriveQueryFingerprint constructs a sparse context fingerprint for the
-// query by tokenizing the query text and matching tokens against the active
-// ContextCatalog's tag and path bits. Phase 14.2 Epic 4 — `?context=auto`
-// helper. Returns an empty slice on cold-start (no catalog), unmatched
-// tokens, or any Neo4j error (fail-open: better to skip the column than
-// fail the retrieve).
+// query. Phase 14.2.1 retune: vector-based cosine similarity between the
+// query embedding and each catalog ref's embedding (computed once per
+// (space, version), cached in-process via Server.contextFPCache).
 //
-// Tokenization rules: split on non-alphanumeric, lowercase, drop tokens
-// shorter than 3 chars or in the stop list. CamelCase / snake_case /
-// kebab-case all break apart correctly.
+// Phase 14.2 used a tokenize-and-match approach that produced empty
+// fingerprints for most queries because catalog tags are LLM-summary
+// buckets (`api`, `architecture`, `caching`...) while UVTS / domain
+// queries use code/feature vocabulary that rarely intersects them
+// literally. Vector matching surfaces semantic affinity instead — e.g.
+// the query "barrel ownership transfer" can land on the `architecture`
+// or `service_relationships` ref bits even though no token overlaps.
+//
+// Returns nil on: missing cache (cfg.ContextFingerprintEnabled=false),
+// missing catalog (cold-start), embedder error (fail-open — the
+// ContextColumn gracefully votes 0 when fingerprint is empty rather
+// than blocking the retrieve).
 func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText string) []uint16 {
-	if s.driver == nil || spaceID == "" || queryText == "" {
+	if s == nil || s.driver == nil || s.contextFPCache == nil || spaceID == "" || queryText == "" {
 		return nil
 	}
 	loader := hidden.NewNeo4jLoader(s.driver)
@@ -4059,78 +4066,15 @@ func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText 
 	if err != nil || cat == nil {
 		return nil
 	}
-
-	bits := make(map[uint16]struct{}, 8)
-	for _, tok := range tokenizeForFingerprint(queryText) {
-		if pos, ok := cat.TagBit(tok); ok {
-			bits[pos] = struct{}{}
-		}
-		if pos, ok := cat.PathBit(tok); ok {
-			bits[pos] = struct{}{}
-		}
+	topK := s.cfg.ContextFingerprintQueryTopK
+	if topK <= 0 {
+		topK = 8
 	}
-	if len(bits) == 0 {
+	bits, err := s.contextFPCache.derive(ctx, cat, queryText, topK)
+	if err != nil {
+		slog.Warn("context fingerprint derive failed", "space_id", spaceID, "error", err)
 		return nil
 	}
-	out := make([]uint16, 0, len(bits))
-	for b := range bits {
-		out = append(out, b)
-	}
-	// Sort ascending for stable wire format and Jaccard math.
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j-1] > out[j]; j-- {
-			out[j-1], out[j] = out[j], out[j-1]
-		}
-	}
-	return out
+	return bits
 }
 
-// tokenizeForFingerprint splits a query string into lowercase atoms suitable
-// for catalog tag/path matching. Handles camelCase, snake_case, kebab-case,
-// and dot-separated identifiers. Drops stop words and tokens < 3 chars.
-func tokenizeForFingerprint(s string) []string {
-	var atoms []string
-	var cur []rune
-	flush := func() {
-		if len(cur) > 0 {
-			atoms = append(atoms, strings.ToLower(string(cur)))
-			cur = cur[:0]
-		}
-	}
-	prev := rune(0)
-	for _, r := range s {
-		isLower := r >= 'a' && r <= 'z'
-		isUpper := r >= 'A' && r <= 'Z'
-		isDigit := r >= '0' && r <= '9'
-		isAlpha := isLower || isUpper
-		switch {
-		case !isAlpha && !isDigit:
-			flush()
-		case isUpper && len(cur) > 0 && (prev >= 'a' && prev <= 'z'):
-			// camelCase boundary: lower→Upper
-			flush()
-			cur = append(cur, r)
-		default:
-			cur = append(cur, r)
-		}
-		prev = r
-	}
-	flush()
-
-	out := atoms[:0]
-	for _, a := range atoms {
-		if len(a) < 3 {
-			continue
-		}
-		switch a {
-		case "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
-			"her", "was", "one", "our", "out", "day", "get", "has", "him", "his",
-			"how", "man", "new", "now", "old", "see", "two", "way", "who", "boy",
-			"did", "its", "let", "put", "say", "she", "too", "use", "with", "from",
-			"this", "that", "they", "have", "where", "what":
-			continue
-		}
-		out = append(out, a)
-	}
-	return out
-}

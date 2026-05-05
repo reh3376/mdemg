@@ -606,6 +606,7 @@ type Config struct {
 	RetrievalContextColumnEnabled          bool   // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: false until Epic 6 A/B passes; flipped in same commit if passes)
 	RetrievalContextColumnWeight           float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
 	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
+	ContextFingerprintQueryTopK            int    // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
 
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
@@ -2811,6 +2812,14 @@ func FromEnv() (Config, error) {
 	if retrievalContextStrictThreshold < 0 || retrievalContextStrictThreshold > 1 {
 		return Config{}, fmt.Errorf("RETRIEVAL_CTX_STRICT_THRESHOLD must be in [0, 1] (got %v)", retrievalContextStrictThreshold)
 	}
+	// Phase 14.2.1 — vector-based query→fingerprint top-K
+	contextFingerprintQueryTopK, err := atoi("CONTEXT_FINGERPRINT_QUERY_TOPK", 8)
+	if err != nil {
+		return Config{}, err
+	}
+	if contextFingerprintQueryTopK < 1 || contextFingerprintQueryTopK > 64 {
+		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_QUERY_TOPK must be in [1, 64] (got %d)", contextFingerprintQueryTopK)
+	}
 
 	// Phase 14.1 Epic 1 → Phase 14.1.1 — Per-category gate overrides.
 	// Seeded by default with the Phase 14.1.1 hybrid winner override:
@@ -4295,6 +4304,7 @@ func FromEnv() (Config, error) {
 		RetrievalContextColumnEnabled:          retrievalContextColumnEnabled,
 		RetrievalContextColumnWeight:           retrievalContextColumnWeight,
 		RetrievalContextStrictThreshold:        retrievalContextStrictThreshold,
+		ContextFingerprintQueryTopK:            contextFingerprintQueryTopK,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
