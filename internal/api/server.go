@@ -284,6 +284,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
 		slog.Info("conversation service initialized", "vector_index", cfg.VectorIndexName, "constraint_detection", cfg.ConstraintDetectionEnabled)
 
+		// Phase 14.2 Epic 3: wire ContextCatalog loader so Service.Observe
+		// can compute observe-time fingerprints when CONTEXT_FINGERPRINT_ENABLED.
+		if cfg.ContextFingerprintEnabled {
+			convSvc.SetCatalogLoader(hidden.NewNeo4jLoader(driver))
+			slog.Info("conversation context fingerprint wired", "bit_budget", cfg.ContextFingerprintBitBudget)
+		}
+
 		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
 		ctxCooler = conversation.NewContextCooler(driver, cfg)
 		lea.SetStabilityReinforcer(ctxCooler)

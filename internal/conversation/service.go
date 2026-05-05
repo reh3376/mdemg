@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/hidden"
 	"mdemg/internal/metrics"
 	"mdemg/internal/sanitize"
 )
@@ -52,7 +53,8 @@ type Service struct {
 	constraintDetector       *ConstraintDetector
 	constraintDetEnabled     bool
 	constraintGateClassifier ConstraintGateClassifier // F6a: optional LLM gate
-	codeGenerator            ConstraintCodeGen         // J17-2: optional constraint code generator
+	codeGenerator            ConstraintCodeGen        // J17-2: optional constraint code generator
+	catalogLoader            hidden.CatalogLoader     // Phase 14.2: optional context fingerprint catalog
 	cfg                      config.Config
 }
 
@@ -111,6 +113,16 @@ func (s *Service) SetConstraintGateClassifier(c ConstraintGateClassifier) {
 // SetCodeGenerator injects the J17-2 constraint code generator.
 func (s *Service) SetCodeGenerator(gen ConstraintCodeGen) {
 	s.codeGenerator = gen
+}
+
+// SetCatalogLoader injects the optional ContextCatalog loader. When set
+// AND cfg.ContextFingerprintEnabled is true, Service.Observe computes an
+// observe-time fingerprint from local features (path, role_type, layer,
+// tags) and stores it on the new MemoryNode. nil-loader → no fingerprint
+// (graceful degradation per Note 05 §2.4 cold-start fallback).
+// Phase 14.2 Epic 3.
+func (s *Service) SetCatalogLoader(loader hidden.CatalogLoader) {
+	s.catalogLoader = loader
 }
 
 // Ping verifies the Neo4j connection is alive with a lightweight read query.
@@ -430,6 +442,21 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
+	// Phase 14.2 Epic 3: compute observe-time context fingerprint when the
+	// feature is enabled AND a catalog loader is wired. Cold-start (no
+	// active catalog) yields nil fingerprint + version=0; that's the Note
+	// 05 §2.4 fallback. The post-hoc refresh in CycleOrchestrator stage 6
+	// upgrades cold rows once a catalog has been built for the space.
+	if s.cfg.ContextFingerprintEnabled && s.catalogLoader != nil {
+		cat, cerr := s.catalogLoader.LoadActive(ctx, obs.SpaceID)
+		if cerr != nil {
+			slog.Warn("context fingerprint: catalog load failed", "space_id", obs.SpaceID, "error", cerr)
+		} else if cat != nil {
+			obs.ContextFingerprintActive = ComputeContextFingerprintLocal(&obs, cat)
+			obs.ContextFingerprintVersion = cat.Version
+		}
+	}
+
 	// Create MemoryNode in Neo4j
 	err = s.createObservationNode(ctx, nodeID, obs, tags)
 	if err != nil {
@@ -560,6 +587,8 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 				tier: $tier,
 				last_accessed_at: datetime($lastAccessedAt),
 				org_review_status: $orgReviewStatus,
+				context_fingerprint_active: $contextFingerprintActive,
+				context_fingerprint_version: $contextFingerprintVersion,
 				created_at: datetime($createdAt),
 				updated_at: datetime($createdAt)
 			})
@@ -617,11 +646,13 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 			"pinned":          obs.Pinned,
 			"templateId":      obs.TemplateID,
 			"structuredData":  structuredDataStr,
-			"importanceScore": obs.ImportanceScore,
-			"tier":            tier,
-			"lastAccessedAt":  lastAccessedAt.Format(time.RFC3339),
-			"orgReviewStatus": obs.OrgReviewStatus,
-			"createdAt":       obs.CreatedAt.Format(time.RFC3339),
+			"importanceScore":           obs.ImportanceScore,
+			"tier":                      tier,
+			"lastAccessedAt":            lastAccessedAt.Format(time.RFC3339),
+			"orgReviewStatus":           obs.OrgReviewStatus,
+			"contextFingerprintActive":  asInt64Slice(obs.ContextFingerprintActive),
+			"contextFingerprintVersion": int64(obs.ContextFingerprintVersion),
+			"createdAt":                 obs.CreatedAt.Format(time.RFC3339),
 		}
 
 		// Add metadata as properties if present
