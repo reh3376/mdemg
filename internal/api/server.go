@@ -54,6 +54,9 @@ type Server struct {
 	retriever       *retrieval.Service
 	learner         *learning.Service
 	embedder        embeddings.Embedder
+	// Phase 14.2.1 — vector-based query→fingerprint cache. nil-safe;
+	// initialized in NewServer when an embedder is available.
+	contextFPCache *contextFingerprintCache
 	anomalyDetector *anomaly.Service
 	hiddenLayer     *hidden.Service
 	pluginMgr       *plugins.Manager
@@ -943,12 +946,18 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Wire RSIC dispatcher → alert dispatcher
 	rsicDispatcher.SetAlertDispatcher(&rsicAlertAdapter{dispatcher: alertDisp})
 
+	embedderForFP := embeddings.NilSafe(emb)
+	var fpCache *contextFingerprintCache
+	if cfg.ContextFingerprintEnabled && emb != nil {
+		fpCache = newContextFingerprintCache(embedderForFP)
+	}
 	s := &Server{
 		cfg:             cfg,
 		driver:          driver,
 		retriever:       ret,
 		learner:         lea,
-		embedder:        embeddings.NilSafe(emb),
+		embedder:        embedderForFP,
+		contextFPCache:  fpCache,
 		anomalyDetector: anom,
 		hiddenLayer:     hid,
 		hiddenSvc:       hid,
