@@ -55,6 +55,20 @@ type RetrieveRequest struct {
 	// (URL param `?category=...`) or by JSON body field. Free-form string;
 	// validation is whether it matches a configured override key.
 	Category string `json:"category,omitempty"`
+
+	// Phase 14.2 Epic 4 — Sparse context fingerprint for the query (Note 05).
+	// When set, the ContextColumn ranks candidates by Jaccard similarity
+	// between the candidate observation's fingerprint and this query
+	// fingerprint. Empty → ContextColumn contributes 0 to the RRF sum
+	// (graceful degradation; doesn't block other columns).
+	QueryContextFingerprint []uint16 `json:"query_context_fingerprint,omitempty"`
+
+	// Phase 14.2 Epic 4 — Strict-context mode. When true AND
+	// QueryContextFingerprint is non-empty, candidates with Jaccard
+	// similarity < cfg.RetrievalContextStrictThreshold are filtered out
+	// pre-aggregation (does NOT apply when fingerprint is empty —
+	// graceful degradation). URL param: `?strict_context=true`.
+	StrictContextMode bool `json:"strict_context,omitempty"`
 }
 
 type RetrieveResult struct {

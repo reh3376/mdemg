@@ -473,6 +473,17 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			req.Category = v
 		}
 	}
+	// Phase 14.2 Epic 4 — `?strict_context=true` URL param falls back when
+	// JSON body did not set it. Operates on QueryContextFingerprint;
+	// gracefully no-ops when fingerprint is empty.
+	if !req.StrictContextMode {
+		if v := r.URL.Query().Get("strict_context"); v != "" {
+			switch strings.ToLower(strings.TrimSpace(v)) {
+			case "true", "1", "yes", "on":
+				req.StrictContextMode = true
+			}
+		}
+	}
 
 	// Phase 102: Intent Translation — rewrite query before embedding
 	var translatedIntent string
