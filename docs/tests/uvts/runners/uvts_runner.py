@@ -560,7 +560,8 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
                        space_id_override: Optional[str] = None,
                        persist_tsdb: bool = False,
                        branch_label: Optional[str] = None,
-                       codebase_sha: Optional[str] = None) -> List[Dict]:
+                       codebase_sha: Optional[str] = None,
+                       extra_url_params: Optional[str] = None) -> List[Dict]:
     """Run inline grading: retrieve from MDEMG, build answers, grade with Grader.
 
     GAP-04: This replaces the manual two-step pipeline (run_benchmark_v4 + grader_v4)
@@ -634,8 +635,11 @@ def run_inline_grading(spec_path: str, base_url: str, profile: str = "standard",
             payload = {"space_id": space_id, "query_text": q["question"], "top_k": 5}
             if q.get("category"):
                 payload["category"] = q["category"]
+            url = f"{base_url}/v1/memory/retrieve"
+            if extra_url_params:
+                url = f"{url}?{extra_url_params.lstrip('?')}"
             resp = requests.post(
-                f"{base_url}/v1/memory/retrieve",
+                url,
                 json=payload,
                 timeout=retrieve_timeout_s,
             )
@@ -788,6 +792,10 @@ def main():
     parser.add_argument("--codebase-sha", default=None,
                         help="Phase 12: codebase SHA pin for the validation target (audits historical runs against frozen commits). Persisted with --persist-tsdb.")
     parser.add_argument("--report", help="Output file path for canonical JSON report")
+    parser.add_argument("--extra-url-params", default=None,
+                        help="Phase 14.2: extra URL query string appended to /v1/memory/retrieve "
+                             "(e.g. 'context=auto' to derive query fingerprint server-side, "
+                             "'strict_context=true' for strict-mode pre-filter).")
 
     args = parser.parse_args()
 
@@ -803,6 +811,7 @@ def main():
                 persist_tsdb=args.persist_tsdb,
                 branch_label=args.branch_label,
                 codebase_sha=args.codebase_sha,
+                extra_url_params=args.extra_url_params,
             )
         except Exception as e:
             print(f"ERROR: Inline grading failed: {e}", file=sys.stderr)
