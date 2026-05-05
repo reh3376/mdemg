@@ -226,6 +226,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	watchdogCmd.GroupID = "advanced"
 	rootCmd.AddCommand(watchdogCmd)
 
+	// Phase 14.2 Epic 5 — schema + data migrations (e.g. context-fingerprint backfill).
+	migrateCmd := newMigrateCmd()
+	migrateCmd.GroupID = "advanced"
+	rootCmd.AddCommand(migrateCmd)
+
 	return rootCmd
 }
 
