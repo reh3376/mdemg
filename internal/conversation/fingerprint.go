@@ -123,7 +123,7 @@ func RefineWithCoactivations(ctx context.Context, driver neo4j.DriverWithContext
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	added, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	added, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// 1. Read current fingerprint + co-activated node_ids.
 		readQ := `
 			MATCH (o:MemoryNode {obs_id: $obs_id})
@@ -206,7 +206,10 @@ func RefineWithCoactivations(ctx context.Context, driver neo4j.DriverWithContext
 	if added == nil {
 		return 0, nil
 	}
-	return added.(int), nil
+	if n, ok := added.(int); ok {
+		return n, nil
+	}
+	return 0, nil
 }
 
 // asInt64Slice converts []uint16 → []int64 for Neo4j parameter binding.

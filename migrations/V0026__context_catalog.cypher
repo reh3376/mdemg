@@ -5,7 +5,10 @@
 // CycleOrchestrator refresh tick:
 //   1. Mark previous active version: SET prev.is_active = false
 //   2. Create new ContextCatalog node with is_active = true
-//   3. Persist 256-element bits[] array of {position, kind, ref, token}
+//   3. Persist `bits_json` property: a JSON-encoded string holding the
+//      256-element [{position, kind, ref, token}] array. Stored as a
+//      string because Neo4j disallows arrays of map literals as property
+//      values. The Loader unmarshals back into []BitEntry on read.
 //
 // `kind` enum: 'role_type_layer' | 'tag' | 'path' | 'symbol'
 //

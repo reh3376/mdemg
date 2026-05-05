@@ -20,6 +20,7 @@ package hidden
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -144,7 +145,7 @@ WITH m.path AS path, count(*) AS freq
 ORDER BY freq DESC, path ASC
 LIMIT $limit
 RETURN path, freq`
-	if _, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	if _, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryTopPaths, map[string]any{
 			"space_id": spaceID,
 			"limit":    int64(b.opts.TopNPaths),
@@ -177,7 +178,7 @@ WITH tag, count(*) AS freq
 ORDER BY freq DESC, tag ASC
 LIMIT $limit
 RETURN tag, freq`
-	if _, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	if _, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryTopTags, map[string]any{
 			"space_id": spaceID,
 			"limit":    int64(b.opts.TopNTags),
@@ -209,7 +210,7 @@ WITH m.role_type AS rt, m.layer AS l, count(*) AS freq
 ORDER BY freq DESC, rt ASC, l ASC
 LIMIT $limit
 RETURN rt, l, freq`
-	if _, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	if _, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryTopRTL, map[string]any{
 			"space_id": spaceID,
 			"limit":    int64(b.opts.RoleTypeLayerBits),
@@ -257,7 +258,7 @@ CALL {
   RETURN count(DISTINCT m.symbol) AS ds
 }
 RETURN dp, dt, ds`
-	if _, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	if _, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, queryCounts, map[string]any{"space_id": spaceID})
 		if err != nil {
 			return nil, err
@@ -377,7 +378,7 @@ func (b *neo4jBuilder) activeVersionFor(ctx context.Context, spaceID string) (in
 	defer sess.Close(ctx)
 
 	q := `MATCH (c:ContextCatalog {space_id: $space_id, is_active: true}) RETURN c.version AS v LIMIT 1`
-	v, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	v, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, q, map[string]any{"space_id": spaceID})
 		if err != nil {
 			return 0, err
@@ -394,7 +395,10 @@ func (b *neo4jBuilder) activeVersionFor(ctx context.Context, spaceID string) (in
 	if err != nil {
 		return 0, err
 	}
-	return v.(int), nil
+	if iv, ok := v.(int); ok {
+		return iv, nil
+	}
+	return 0, nil
 }
 
 // persistCatalog atomically creates a new ContextCatalog node with
@@ -405,15 +409,13 @@ func (b *neo4jBuilder) persistCatalog(ctx context.Context, spaceID string, versi
 	sess := b.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Marshal bits[] into a Neo4j-native list of map literals.
-	bitMaps := make([]map[string]any, 0, len(bits))
-	for _, b := range bits {
-		bitMaps = append(bitMaps, map[string]any{
-			"position": int64(b.Position),
-			"kind":     string(b.Kind),
-			"ref":      b.Ref,
-			"token":    b.Token,
-		})
+	// Neo4j rejects arrays of maps as property values. Serialize the bits
+	// array to a JSON string and store it on the ContextCatalog node;
+	// loadOne unmarshals it back. Phase 14.2 V0026 originally specified an
+	// array-of-map shape but the Cypher type system disallows it.
+	bitsJSON, err := json.Marshal(bits)
+	if err != nil {
+		return fmt.Errorf("marshal bits: %w", err)
 	}
 
 	q := `
@@ -426,18 +428,18 @@ CREATE (c:ContextCatalog {
   space_id: $space_id,
   version: $version,
   total_bits: $total_bits,
-  bits: $bits,
+  bits_json: $bits_json,
   is_active: true,
   created_at: datetime()
 })
 RETURN c.version AS v`
 
-	_, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, q, map[string]any{
 			"space_id":   spaceID,
 			"version":    int64(version),
 			"total_bits": int64(b.opts.BitBudget),
-			"bits":       bitMaps,
+			"bits_json":  string(bitsJSON),
 		})
 		if err != nil {
 			return nil, err
@@ -481,7 +483,12 @@ func (l *neo4jLoader) loadOne(ctx context.Context, spaceID, query string, params
 	sess := l.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	raw, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	// Use *neo4j.Node (typed pointer) so the cold-start path returns a
+	// typed nil that survives the driver's generic castGeneric helper.
+	// Returning untyped nil from the closure causes castGeneric's type
+	// assertion to panic on `result.(any)` when the result is a true nil
+	// interface (driver internals at transaction_helpers.go:70).
+	nodePtr, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (*neo4j.Node, error) {
 		res, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return nil, err
@@ -498,37 +505,47 @@ func (l *neo4jLoader) loadOne(ctx context.Context, spaceID, query string, params
 		if !ok {
 			return nil, fmt.Errorf("'c' is not a Node (got %T)", nodeRaw)
 		}
-		return node, res.Err()
+		return &node, res.Err()
 	})
 	if err != nil {
 		return nil, err
 	}
-	if raw == nil {
+	if nodePtr == nil {
 		return nil, nil // cold-start
 	}
 
-	node := raw.(neo4j.Node)
+	node := *nodePtr
 	props := node.Props
 	versionVal, _ := props["version"].(int64)
 	totalBitsVal, _ := props["total_bits"].(int64)
-	bitsRaw, _ := props["bits"].([]any)
 
-	bits := make([]BitEntry, 0, len(bitsRaw))
-	for _, br := range bitsRaw {
-		m, ok := br.(map[string]any)
-		if !ok {
-			continue
+	// V0026 stores the bits array as a JSON-encoded string property
+	// (Neo4j disallows arrays of maps). Older catalog rows that may have
+	// been written before this fix use property "bits" with an array-of-map
+	// shape — fall back to that when "bits_json" is absent.
+	var bits []BitEntry
+	if bitsJSON, ok := props["bits_json"].(string); ok && bitsJSON != "" {
+		if err := json.Unmarshal([]byte(bitsJSON), &bits); err != nil {
+			return nil, fmt.Errorf("unmarshal bits_json: %w", err)
 		}
-		pos, _ := m["position"].(int64)
-		kind, _ := m["kind"].(string)
-		ref, _ := m["ref"].(string)
-		token, _ := m["token"].(string)
-		bits = append(bits, BitEntry{
-			Position: uint16(pos),
-			Kind:     BitKind(kind),
-			Ref:      ref,
-			Token:    token,
-		})
+	} else if bitsRaw, ok := props["bits"].([]any); ok {
+		bits = make([]BitEntry, 0, len(bitsRaw))
+		for _, br := range bitsRaw {
+			m, ok := br.(map[string]any)
+			if !ok {
+				continue
+			}
+			pos, _ := m["position"].(int64)
+			kind, _ := m["kind"].(string)
+			ref, _ := m["ref"].(string)
+			token, _ := m["token"].(string)
+			bits = append(bits, BitEntry{
+				Position: uint16(pos),
+				Kind:     BitKind(kind),
+				Ref:      ref,
+				Token:    token,
+			})
+		}
 	}
 	SortBitsByPosition(bits)
 	return NewCatalog(spaceID, int(versionVal), uint16(totalBitsVal), bits)
@@ -593,7 +610,9 @@ func (l *neo4jLoader) Freshness(ctx context.Context, spaceID string) (time.Durat
 	defer sess.Close(ctx)
 
 	q := `MATCH (c:ContextCatalog {space_id: $space_id, is_active: true}) RETURN c.created_at AS ts LIMIT 1`
-	raw, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (any, error) {
+	// Use *time.Time (typed pointer) so the cold-start path returns a typed
+	// nil that survives the driver's generic castGeneric helper.
+	tsPtr, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (*time.Time, error) {
 		res, err := tx.Run(ctx, q, map[string]any{"space_id": spaceID})
 		if err != nil {
 			return nil, err
@@ -603,18 +622,16 @@ func (l *neo4jLoader) Freshness(ctx context.Context, spaceID string) (time.Durat
 		}
 		rec := res.Record()
 		ts, _ := rec.Get("ts")
-		return ts, res.Err()
+		if t, ok := ts.(time.Time); ok {
+			return &t, res.Err()
+		}
+		return nil, res.Err()
 	})
 	if err != nil {
 		return 0, false, err
 	}
-	if raw == nil {
+	if tsPtr == nil {
 		return 0, true, nil
 	}
-	// Neo4j returns DateTime as time.Time
-	if t, ok := raw.(time.Time); ok {
-		return time.Since(t), false, nil
-	}
-	// Fallback: treat as cold if we can't parse
-	return 0, true, nil
+	return time.Since(*tsPtr), false, nil
 }
