@@ -86,6 +86,15 @@ type Observation struct {
 	OrgReviewStatus string    // none, pending, approved, rejected
 	OrgFlaggedAt    time.Time // When flagged for org review
 	OrgFlaggedBy    string    // Who flagged it
+
+	// Phase 14.2 — Sparse context fingerprint (Note 05).
+	// ContextFingerprintActive is the sorted set of bit positions whose value
+	// is 1 in the 256-bit fingerprint vector for this observation. Empty when
+	// no active ContextCatalog exists for the space (cold-start fallback).
+	// ContextFingerprintVersion identifies the catalog version that produced
+	// the fingerprint; 0 means cold-start (no catalog at observe time).
+	ContextFingerprintActive  []uint16
+	ContextFingerprintVersion int
 }
 
 // SurpriseFactors breaks down the surprise score

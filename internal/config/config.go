@@ -583,6 +583,30 @@ type Config struct {
 	//   SPARSE_GATE_CATEGORY_OVERRIDES='{"architecture_structure":{"min_active":20},"data_flow_integration":{"min_active":15}}'
 	SparseGateCategoryOverrides map[string]SparseGateOverride
 
+	// Phase 14.2 Epic 1+2 — Note 05 sparse fingerprints (context catalog +
+	// 5th RRF column). Two-phase fingerprint design: observe-time uses
+	// observation-local features (path, role_type, layer, top-N tags);
+	// post-hoc refresh in CycleOrchestrator macro-cycle adds symbol bits
+	// from CO_ACTIVATED_WITH edges. Adaptive Builder allocates bits per
+	// space by feature density (Phase 14 + 14.2 Epic 0 forensic confirmed
+	// no production space has populated symbol/role).
+	//
+	// Defaults flag-off until Epic 6 A/B verdict — operator can enable
+	// observe-time fingerprint computation alone (no retrieval-side use)
+	// to start populating data for a future A/B.
+	ContextFingerprintEnabled              bool   // CONTEXT_FINGERPRINT_ENABLED — Service.Observe computes + writes context_fingerprint_active on new MemoryNodes (default: false until Epic 6 A/B passes)
+	ContextFingerprintBitBudget            int    // CONTEXT_FINGERPRINT_BIT_BUDGET — total bits per fingerprint (default: 256 per Note 05 spec)
+	ContextFingerprintRefreshEnabled       bool   // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
+	ContextFingerprintRefreshIntervalHours int    // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
+	ContextFingerprintRefreshTimeoutMs     int    // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
+	ContextCatalogTopNPaths                int    // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
+	ContextCatalogTopNTags                 int    // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
+	ContextCatalogFloorBitsPerKind         int    // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
+	ContextCatalogRoleTypeLayerBits        int    // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
+	RetrievalContextColumnEnabled          bool   // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: false until Epic 6 A/B passes; flipped in same commit if passes)
+	RetrievalContextColumnWeight           float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
+	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -928,7 +952,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 19 post-Phase 14 V0019 sparse_gate_metrics)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 20 post-Phase 14.2 V0020 context_catalog_versions)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -2726,6 +2750,68 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("SPARSE_MAX_ACTIVE (%d) must be ≥ SPARSE_MIN_ACTIVE (%d)", sparseMaxActive, sparseMinActive)
 	}
 
+	// Phase 14.2 Epic 1+2 — Note 05 sparse fingerprints + adaptive catalog.
+	// All flag-off initially; flipped per Epic 6 A/B verdict. Builder
+	// defaults match Phase 14.2 Epic 0 forensic recommendations.
+	contextFingerprintEnabled := getBool("CONTEXT_FINGERPRINT_ENABLED", false)
+	contextFingerprintBitBudget, err := atoi("CONTEXT_FINGERPRINT_BIT_BUDGET", 256)
+	if err != nil {
+		return Config{}, err
+	}
+	if contextFingerprintBitBudget < 32 || contextFingerprintBitBudget > 1024 {
+		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_BIT_BUDGET must be in [32, 1024] (got %d)", contextFingerprintBitBudget)
+	}
+	contextFingerprintRefreshEnabled := getBool("CONTEXT_FINGERPRINT_REFRESH_ENABLED", false)
+	contextFingerprintRefreshIntervalHours, err := atoi("CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if contextFingerprintRefreshIntervalHours < 1 {
+		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS must be ≥ 1 (got %d)", contextFingerprintRefreshIntervalHours)
+	}
+	contextFingerprintRefreshTimeoutMs, err := atoi("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS", 60000)
+	if err != nil {
+		return Config{}, err
+	}
+	if contextFingerprintRefreshTimeoutMs < 1000 {
+		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS must be ≥ 1000 (got %d)", contextFingerprintRefreshTimeoutMs)
+	}
+	contextCatalogTopNPaths, err := atoi("CONTEXT_CATALOG_TOP_N_PATHS", 192)
+	if err != nil {
+		return Config{}, err
+	}
+	contextCatalogTopNTags, err := atoi("CONTEXT_CATALOG_TOP_N_TAGS", 32)
+	if err != nil {
+		return Config{}, err
+	}
+	contextCatalogFloorBitsPerKind, err := atoi("CONTEXT_CATALOG_FLOOR_BITS_PER_KIND", 16)
+	if err != nil {
+		return Config{}, err
+	}
+	contextCatalogRoleTypeLayerBits, err := atoi("CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS", 32)
+	if err != nil {
+		return Config{}, err
+	}
+	if contextCatalogTopNPaths+contextCatalogTopNTags+contextCatalogRoleTypeLayerBits > contextFingerprintBitBudget {
+		return Config{}, fmt.Errorf("CONTEXT_CATALOG_TOP_N_PATHS (%d) + TOP_N_TAGS (%d) + ROLE_TYPE_LAYER_BITS (%d) must not exceed BIT_BUDGET (%d)",
+			contextCatalogTopNPaths, contextCatalogTopNTags, contextCatalogRoleTypeLayerBits, contextFingerprintBitBudget)
+	}
+	retrievalContextColumnEnabled := getBool("RETRIEVAL_CONTEXT_COLUMN_ENABLED", false)
+	retrievalContextColumnWeight, err := atof("RETRIEVAL_CONTEXT_COLUMN_WEIGHT", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalContextColumnWeight < 0 {
+		return Config{}, fmt.Errorf("RETRIEVAL_CONTEXT_COLUMN_WEIGHT must be ≥ 0 (got %v)", retrievalContextColumnWeight)
+	}
+	retrievalContextStrictThreshold, err := atof("RETRIEVAL_CTX_STRICT_THRESHOLD", 0.25)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrievalContextStrictThreshold < 0 || retrievalContextStrictThreshold > 1 {
+		return Config{}, fmt.Errorf("RETRIEVAL_CTX_STRICT_THRESHOLD must be in [0, 1] (got %v)", retrievalContextStrictThreshold)
+	}
+
 	// Phase 14.1 Epic 1 → Phase 14.1.1 — Per-category gate overrides.
 	// Seeded by default with the Phase 14.1.1 hybrid winner override:
 	//   data_flow_integration: MIN=20 (handles 4-required_files queries
@@ -3650,7 +3736,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 19)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 20)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4195,6 +4281,20 @@ func FromEnv() (Config, error) {
 
 		// Phase 14.1 Epic 1 — Per-category overrides
 		SparseGateCategoryOverrides: sparseGateCategoryOverrides,
+
+		// Phase 14.2 Epic 1+2 — Note 05 sparse fingerprints + adaptive catalog
+		ContextFingerprintEnabled:              contextFingerprintEnabled,
+		ContextFingerprintBitBudget:            contextFingerprintBitBudget,
+		ContextFingerprintRefreshEnabled:       contextFingerprintRefreshEnabled,
+		ContextFingerprintRefreshIntervalHours: contextFingerprintRefreshIntervalHours,
+		ContextFingerprintRefreshTimeoutMs:     contextFingerprintRefreshTimeoutMs,
+		ContextCatalogTopNPaths:                contextCatalogTopNPaths,
+		ContextCatalogTopNTags:                 contextCatalogTopNTags,
+		ContextCatalogFloorBitsPerKind:         contextCatalogFloorBitsPerKind,
+		ContextCatalogRoleTypeLayerBits:        contextCatalogRoleTypeLayerBits,
+		RetrievalContextColumnEnabled:          retrievalContextColumnEnabled,
+		RetrievalContextColumnWeight:           retrievalContextColumnWeight,
+		RetrievalContextStrictThreshold:        retrievalContextStrictThreshold,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,

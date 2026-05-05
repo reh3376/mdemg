@@ -98,7 +98,7 @@ config:
   gracefulShutdownTimeout: 30
 
   # Schema
-  requiredSchemaVersion: "24"
+  requiredSchemaVersion: "26"
 
   # Embedding
   embeddingProvider: "openai"

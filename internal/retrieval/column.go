@@ -50,6 +50,18 @@ type ColumnQuery struct {
 	// Filter optionally restricts the candidate pool (extension allow/deny,
 	// path globs, etc.). Same shape as the legacy retrieval path.
 	Filter FileFilter
+
+	// Phase 14.2 Epic 4 — Sparse context fingerprint for the query (Note 05).
+	// When non-empty, ContextColumn scores candidates by Jaccard similarity
+	// between their observation fingerprint and this vector. Empty → the
+	// column contributes 0 / column suppressed (no context-aware ranking).
+	QueryContextFingerprint []uint16
+
+	// Candidates carries the upstream-fused candidate set (already loaded
+	// once by the orchestrator). ContextColumn re-ranks this set; it does
+	// NOT do a separate Cypher walk. Other future columns may reuse this
+	// to avoid duplicate I/O too.
+	Candidates []Candidate
 }
 
 // ColumnResult bundles a column's output. Latency is reported in all cases

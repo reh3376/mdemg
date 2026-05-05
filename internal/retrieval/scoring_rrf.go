@@ -8,23 +8,25 @@ import (
 	"mdemg/internal/models"
 )
 
-// ScoreAndRankRRF is the Phase 13 (Note 04) Column-Voting Retrieval scorer.
-// It produces the final []RetrieveResult by running 4 columns through the
-// consensus aggregator (consensus.go) instead of the legacy linear formula
-// at scoring.go:797.
+// ScoreAndRankRRF is the Phase 13 (Note 04) Column-Voting Retrieval scorer,
+// extended in Phase 14.2 to a 5-column form (adding ContextColumn). It
+// produces the final []RetrieveResult by running up to 5 columns through
+// the consensus aggregator (consensus.go) instead of the legacy linear
+// formula at scoring.go:797.
 //
 // The 3 "virtual" columns (Embedding, BM25, Graph) are derived from the
 // already-fused upstream `cands` set: each column re-ranks the same set by
 // its own per-candidate signal (VectorSim, BM25Score, activation map). The
 // 4th column (Structural) optionally runs an independent Cypher walk via
-// the supplied StructuralColumn — if nil, only 3 columns participate and
-// `consensus_strength` is computed over 3.
+// the supplied StructuralColumn — if nil, only 3 columns participate. The
+// 5th column (Context) is virtual over the same `cands` set and ranks by
+// Jaccard similarity between candidate fingerprints and the query
+// fingerprint when one is supplied (Phase 14.2 Note 05).
 //
 // This design keeps the upstream Cypher unchanged: the same vector recall +
 // BM25 search + spreading activation work that feeds the legacy scorer
 // also feeds the RRF aggregator. The only new I/O is the Structural
-// column's Cypher walk. That keeps Phase 13's cost profile predictable
-// for the A/B comparison.
+// column's Cypher walk.
 func (s *Service) ScoreAndRankRRF(
 	ctx context.Context,
 	cands []Candidate,
@@ -34,6 +36,7 @@ func (s *Service) ScoreAndRankRRF(
 	queryText string,
 	spaceIDs []string,
 	filter FileFilter,
+	queryFingerprint []uint16,
 ) ([]models.RetrieveResult, ConsensusResult, error) {
 	if topK <= 0 {
 		topK = 20
@@ -56,26 +59,36 @@ func (s *Service) ScoreAndRankRRF(
 		cols = append(cols, structCol)
 	}
 
+	// Phase 14.2 Epic 4: ContextColumn. Always added when enabled, but
+	// gracefully degrades to zero contribution when query fingerprint is
+	// empty (cold caller). The column reads candidate fingerprints from
+	// ColumnQuery.Candidates (no separate I/O).
+	if s.cfg.RetrievalContextColumnEnabled {
+		cols = append(cols, NewContextColumn(true))
+	}
+
 	q := ColumnQuery{
-		SpaceIDs:       spaceIDs,
-		QueryText:      queryText,
-		QueryEmbedding: queryEmbedding,
-		TopN:           topK * 4, // headroom for column disagreement before truncation
-		Filter:         filter,
+		SpaceIDs:                spaceIDs,
+		QueryText:               queryText,
+		QueryEmbedding:          queryEmbedding,
+		TopN:                    topK * 4, // headroom for column disagreement before truncation
+		Filter:                  filter,
+		QueryContextFingerprint: queryFingerprint,
+		Candidates:              cands,
 	}
 
 	opts := ConsensusOpts{
 		RRFK:                     s.cfg.RetrievalRRFK,
 		PerColumnTimeoutFraction: s.cfg.RetrievalColumnTimeoutFrac,
 		TopN:                     topK,
-		// Phase 13.1: per-column weights wired from config. All-1.0 (default)
-		// reproduces Phase 13's equal-weights behavior. Operator ablation sweeps
-		// vary these via RETRIEVAL_COLUMN_WEIGHT_* env vars.
+		// Phase 13.1: per-column weights wired from config. Phase 14.2 adds
+		// a 5th key "context".
 		ColumnWeights: map[string]float64{
 			"embedding":  s.cfg.RetrievalColumnWeightEmbedding,
 			"bm25":       s.cfg.RetrievalColumnWeightBM25,
 			"graph":      s.cfg.RetrievalColumnWeightGraph,
 			"structural": s.cfg.RetrievalColumnWeightStructural,
+			"context":    s.cfg.RetrievalContextColumnWeight,
 		},
 	}
 

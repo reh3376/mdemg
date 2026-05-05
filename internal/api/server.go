@@ -284,6 +284,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
 		slog.Info("conversation service initialized", "vector_index", cfg.VectorIndexName, "constraint_detection", cfg.ConstraintDetectionEnabled)
 
+		// Phase 14.2 Epic 3: wire ContextCatalog loader so Service.Observe
+		// can compute observe-time fingerprints when CONTEXT_FINGERPRINT_ENABLED.
+		if cfg.ContextFingerprintEnabled {
+			convSvc.SetCatalogLoader(hidden.NewNeo4jLoader(driver))
+			slog.Info("conversation context fingerprint wired", "bit_budget", cfg.ContextFingerprintBitBudget)
+		}
+
 		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
 		ctxCooler = conversation.NewContextCooler(driver, cfg)
 		lea.SetStabilityReinforcer(ctxCooler)
@@ -822,6 +829,21 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	orchPolicy := ape.NewOrchestrationPolicy(cfg)
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
 	slog.Info("RSIC orchestration policy initialized", "cooldown_sec", cfg.RSICTriggerCooldownSec, "dedupe_sec", cfg.RSICTriggerDedupeSec)
+
+	// Phase 14.2 Epic 2: Wire ContextCatalog Builder + Loader for the
+	// stage-6 fingerprint refresh hook. Disabling refresh via
+	// CONTEXT_FINGERPRINT_REFRESH_ENABLED=false bypasses the hook regardless.
+	if cfg.ContextFingerprintEnabled {
+		catalogBuilder := hidden.NewNeo4jBuilder(driver, hidden.BuilderOptsFromConfig(cfg))
+		catalogLoader := hidden.NewNeo4jLoader(driver)
+		rsicCycle.SetContextCatalog(catalogBuilder, catalogLoader)
+		slog.Info("RSIC context catalog wired",
+			"refresh_enabled", cfg.ContextFingerprintRefreshEnabled,
+			"interval_hours", cfg.ContextFingerprintRefreshIntervalHours,
+			"timeout_ms", cfg.ContextFingerprintRefreshTimeoutMs,
+			"bit_budget", cfg.ContextFingerprintBitBudget,
+		)
+	}
 
 	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
 	safetyValidator := ape.NewSafetyValidator(driver)

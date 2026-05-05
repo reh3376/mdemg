@@ -20,7 +20,7 @@ services:
       NEO4J_USER: "neo4j"
       NEO4J_PASS: "${NEO4J_PASSWORD}"
       NEO4J_MAX_POOL_SIZE: "100"
-      REQUIRED_SCHEMA_VERSION: "24"
+      REQUIRED_SCHEMA_VERSION: "26"
 
       # Embedding provider
       EMBEDDING_PROVIDER: "openai"

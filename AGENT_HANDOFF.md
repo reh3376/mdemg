@@ -7,7 +7,30 @@
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 14.1.1: Sparse gate default-on (hybrid passed 120q) + Phase 13.6 backend-agnostic env-var rename (2026-05-04)
+## Latest update — Phase 14.2 Note 05 sparse fingerprints (Epics 1–5 landed; Epic 6 A/B + Epic 7 docs in progress) (2026-05-04)
+
+**Phase 14.2 ships per-observation sparse context fingerprints + a 5th RRF column.** The HTM solution to polysemy: keep one MemoryNode per symbol (graph stays stable) but tag *each observation* with a 256-bit sparse fingerprint of "what else was active when it was captured." Retrieval ranks observations by fingerprint similarity to the query's current context. Two-phase computation per operator-approved 2026-05-05 design — observe-time uses local features (path + role_type×layer + tags), post-hoc refinement at the macro-cycle stage 6 hook walks CO_ACTIVATED_WITH for symbol bits. Adaptive Builder allocates 256 bits per-space by feature density (Epic 0 forensic confirmed every surveyed production space has 0 distinct symbols + 0 distinct roles, so the static 64/64/64/64 spec wasted 128 bits — fixed via log-density allocator with 32-bit role_type×layer floor).
+
+What landed (Epics 0–5; 5 commits on `reh3376_dev01`: `011d7e6`, `6e3aad6`, `77b5b8d`, `d6dba0f`, `0aab999`):
+- **Schema** — Neo4j V0025 + V0026; TSDB V0020; `TSDB_REQUIRED_SCHEMA_VERSION` 19 → 20
+- **Adaptive Builder + Loader** — `internal/hidden/context_catalog_builder.go` (~620 LOC); 4 Cypher density queries; deterministic + idempotent allocateBits; atomic persistCatalog; `Freshness` on the CatalogLoader interface
+- **Stage 6 refresh hook** — `internal/ape/cycle.go::CycleOrchestrator.maybeRefreshContextCatalog`; weekly cadence; cold-start path; time-bounded
+- **Observe-time computation** — `internal/conversation/fingerprint.go::ComputeContextFingerprintLocal` + `RefineWithCoactivations`; `Service.Observe` extended; createObservationNode Cypher writes `context_fingerprint_active` + `_version`
+- **5th RRF column + strict mode** — `internal/retrieval/column_context.go::ContextColumn` + `JaccardFingerprint`; cache namespace `v1-rrf4|...` → `v1-rrf5|...|c=W|...|ctx=B|strict=T`; `?strict_context=true` URL fallback
+- **Backfill CLI** — `mdemg migrate context-fingerprint --space-id <id> [--build] [--dry-run] [--batch-size 500]`
+- **12 new env knobs** — `CONTEXT_FINGERPRINT_*` + `CONTEXT_CATALOG_*` + `RETRIEVAL_CONTEXT_*`
+
+Pending:
+- **Epic 6** (A/B verification + live polysemy demo): needs server restart + catalog build on `whk-wms` + 3 quick presets (fingerprint_only, gate+fingerprint, fingerprint_strict) + full 120q on winner + live polysemy demo on mdemg-dev. ~$25 OpenAI spend, ~3-4 hr wall clock.
+- **Epic 7 docs**: partially landed (this entry + CHANGELOG + CLAUDE.md + new feature doc); `phase_14_2_post.md` waits on Epic 6 verdict; conditional default flip pending.
+
+`RETRIEVAL_CONTEXT_COLUMN_ENABLED` defaults `false` until Epic 6 verdict + conditional flip. Fingerprint *computation* defaults `true` so production data accumulates fingerprints starting at restart.
+
+Feature doc: [`docs/features/context-fingerprinting.md`](docs/features/context-fingerprinting.md).
+Sprint plan (frozen): [`docs/development/post-ft-lora/sprint_plan_phase_14_2_note_05_sparse_fingerprints.md`](docs/development/post-ft-lora/sprint_plan_phase_14_2_note_05_sparse_fingerprints.md).
+Forensic: [`docs/development/post-ft-lora/phase_14_2_forensic.md`](docs/development/post-ft-lora/phase_14_2_forensic.md).
+
+## Earlier update — Phase 14.1.1: Sparse gate default-on (hybrid passed 120q) + Phase 13.6 backend-agnostic env-var rename (2026-05-04)
 
 **Phase 14.1.1 hybrid PASSED 120q full A/B; sparse gate now default-on.** Tested simpler-first hypothesis (raise global `SPARSE_MIN_ACTIVE` from 3 to 15) — 120q produced mean +0.001 with 1 catastrophic regression (q302 in `data_flow_integration`, 4 required_files). Pivoted to hybrid (MIN=15 global + `data_flow_integration` MIN=20 override) using existing Phase 14.1 per-category mechanism — **120q PASSED** with mean +0.003, 0 regressions, 10 improvements. Defaults flipped:
 - `SPARSE_RETRIEVAL_ENABLED=true` (was false)

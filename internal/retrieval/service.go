@@ -65,21 +65,28 @@ func (s *Service) SetRetrievalRecorder(r RetrievalEventRecorder) {
 // cache between presets without operator intervention. Two presets that
 // produce different rankings will produce different scorer versions →
 // different cache namespaces → no contamination.
+//
+// Phase 14.2 Epic 4: bumped to "v1-rrf5" + extended with context column
+// flag/weight/strict-threshold so toggling the 5th column (ContextColumn)
+// flips the cache namespace.
 func (s *Service) scorerVersion() string {
 	if !s.cfg.RetrievalColumnVotingEnabled {
 		return "v0-linear"
 	}
 	return fmt.Sprintf(
-		"v1-rrf4|e=%.3f|b=%.3f|g=%.3f|s=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t",
+		"v1-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f",
 		s.cfg.RetrievalColumnWeightEmbedding,
 		s.cfg.RetrievalColumnWeightBM25,
 		s.cfg.RetrievalColumnWeightGraph,
 		s.cfg.RetrievalColumnWeightStructural,
+		s.cfg.RetrievalContextColumnWeight,
 		s.cfg.RetrievalStructuralHops,
 		s.cfg.RetrievalColumnEmbeddingEnabled,
 		s.cfg.RetrievalColumnBM25Enabled,
 		s.cfg.RetrievalColumnGraphEnabled,
 		s.cfg.RetrievalColumnStructuralEnabled,
+		s.cfg.RetrievalContextColumnEnabled,
+		s.cfg.RetrievalContextStrictThreshold,
 	)
 }
 
@@ -644,6 +651,33 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		initialTopK = s.cfg.RerankTopN
 	}
 
+	// Phase 14.2 Epic 4: strict-context pre-aggregation filter. When
+	// req.StrictContextMode is true AND the query carries a fingerprint,
+	// drop candidates whose Jaccard similarity falls below the configured
+	// threshold BEFORE scoring. Has no effect on non-RRF paths or when the
+	// query fingerprint is empty (graceful degradation).
+	if req.StrictContextMode && len(req.QueryContextFingerprint) > 0 && s.cfg.RetrievalContextStrictThreshold > 0 {
+		threshold := s.cfg.RetrievalContextStrictThreshold
+		filtered := make([]Candidate, 0, len(cands))
+		for _, c := range cands {
+			if JaccardFingerprint(req.QueryContextFingerprint, c.ContextFingerprintActive) >= threshold {
+				filtered = append(filtered, c)
+			}
+		}
+		if len(filtered) == 0 {
+			// All candidates filtered out — fail open: keep the original set
+			// rather than returning a hard empty (matches the Note 05 §3.2
+			// "no-eligible-context" fallback). Operators get a log line they
+			// can spot when tuning the threshold.
+			slog.Warn("strict_context filter zeroed candidate pool; falling back to unfiltered set",
+				"threshold", threshold, "before", len(cands))
+		} else {
+			slog.Debug("strict_context filter applied",
+				"threshold", threshold, "before", len(cands), "after", len(filtered))
+			cands = filtered
+		}
+	}
+
 	// Phase 13 (Note 04 Column-Voting Retrieval) scorer fork. When the
 	// flag is on, the RRF aggregator replaces the linear scorer. The
 	// aggregator's `consensus_strength` signal is captured for downstream
@@ -669,6 +703,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		results, consensusResult, rrfErr = s.ScoreAndRankRRF(
 			ctx, cands, act, initialTopK,
 			req.QueryEmbedding, req.QueryText, spaceIDs, filter,
+			req.QueryContextFingerprint,
 		)
 		if rrfErr != nil {
 			// Fail open to legacy scorer rather than the user.
@@ -1059,6 +1094,13 @@ type Candidate struct {
 	RRFScore      float64  // Fused RRF score (authoritative ranking signal)
 	Layer         int      // 0=base, 1=hidden/concern, 2+=concept
 	Tags          []string // Tags for scoring boosts (e.g., "config")
+
+	// Phase 14.2 Epic 4 — Sparse context fingerprint (Note 05). Populated
+	// from MemoryNode.context_fingerprint_active when fetched; nil for
+	// pre-Phase-14.2 nodes (cold-start fallback). Read by ContextColumn
+	// for Jaccard scoring; ignored by other columns.
+	ContextFingerprintActive  []uint16
+	ContextFingerprintVersion int
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -1103,6 +1145,8 @@ RETURN node.node_id AS node_id,
        coalesce(node.canonical_time, node.updated_at, datetime()) AS canonical_time,
        coalesce(node.layer, 0) AS layer,
        coalesce(node.tags, []) AS tags,
+       coalesce(node.context_fingerprint_active, []) AS context_fingerprint_active,
+       coalesce(node.context_fingerprint_version, 0) AS context_fingerprint_version,
        score AS score
 ORDER BY score DESC`
 
@@ -1124,17 +1168,21 @@ ORDER BY score DESC`
 			canonicalAny, _ := rec.Get("canonical_time")
 			layer, _ := rec.Get("layer")
 			tagsAny, _ := rec.Get("tags")
+			fpAny, _ := rec.Get("context_fingerprint_active")
+			fpVerAny, _ := rec.Get("context_fingerprint_version")
 			sc, _ := rec.Get("score")
 
 			ct := Candidate{
-				NodeID:     fmt.Sprint(nid),
-				Path:       fmt.Sprint(path),
-				Name:       fmt.Sprint(name),
-				Summary:    fmt.Sprint(sum),
-				Confidence: toFloat64(conf, 0.6),
-				VectorSim:  toFloat64(sc, 0),
-				Layer:      toInt(layer, 0),
-				Tags:       toStringSlice(tagsAny),
+				NodeID:                    fmt.Sprint(nid),
+				Path:                      fmt.Sprint(path),
+				Name:                      fmt.Sprint(name),
+				Summary:                   fmt.Sprint(sum),
+				Confidence:                toFloat64(conf, 0.6),
+				VectorSim:                 toFloat64(sc, 0),
+				Layer:                     toInt(layer, 0),
+				Tags:                      toStringSlice(tagsAny),
+				ContextFingerprintActive:  toUint16Slice(fpAny),
+				ContextFingerprintVersion: toInt(fpVerAny, 0),
 			}
 			// neo4j returns time as neo4j.LocalDateTime or time.Time depending on driver
 			switch v := upd.(type) {
@@ -2058,6 +2106,39 @@ func toStringSlice(v any) []string {
 			if s, ok := item.(string); ok {
 				result = append(result, s)
 			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+// toUint16Slice converts a Neo4j integer-array property to []uint16. Used
+// for context_fingerprint_active. Neo4j stores integers as int64; we
+// safely narrow each element. Phase 14.2 Epic 4.
+func toUint16Slice(v any) []uint16 {
+	if v == nil {
+		return nil
+	}
+	switch x := v.(type) {
+	case []uint16:
+		return x
+	case []any:
+		result := make([]uint16, 0, len(x))
+		for _, item := range x {
+			switch n := item.(type) {
+			case int64:
+				if n >= 0 && n <= 0xFFFF {
+					result = append(result, uint16(n))
+				}
+			case int:
+				if n >= 0 && n <= 0xFFFF {
+					result = append(result, uint16(n))
+				}
+			}
+		}
+		if len(result) == 0 {
+			return nil
 		}
 		return result
 	default:
