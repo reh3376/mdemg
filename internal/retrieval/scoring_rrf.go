@@ -37,6 +37,7 @@ func (s *Service) ScoreAndRankRRF(
 	spaceIDs []string,
 	filter FileFilter,
 	queryFingerprint []uint16,
+	category string,
 ) ([]models.RetrieveResult, ConsensusResult, error) {
 	if topK <= 0 {
 		topK = 20
@@ -77,18 +78,33 @@ func (s *Service) ScoreAndRankRRF(
 		Candidates:              cands,
 	}
 
+	// Phase 14.2.3: per-category override of the context-column weight.
+	// Phase 14.2.2's 120q forensic identified 3 categories with consistent
+	// regressions (`service_relationships`, `business_logic_constraints`,
+	// `relationship`); zero-weighting the column on those queries while
+	// keeping default weight on the rest preserves the +0.090 lift on
+	// `computed_value` and the zero-score rescues without the catastrophic
+	// regressions. Operator can extend / replace via env JSON map.
+	contextWeight := s.cfg.RetrievalContextColumnWeight
+	if category != "" {
+		if w, ok := s.cfg.RetrievalContextColumnCategoryWeights[category]; ok {
+			contextWeight = w
+		}
+	}
+
 	opts := ConsensusOpts{
 		RRFK:                     s.cfg.RetrievalRRFK,
 		PerColumnTimeoutFraction: s.cfg.RetrievalColumnTimeoutFrac,
 		TopN:                     topK,
 		// Phase 13.1: per-column weights wired from config. Phase 14.2 adds
-		// a 5th key "context".
+		// a 5th key "context". Phase 14.2.3 overrides "context" weight
+		// per-category when configured.
 		ColumnWeights: map[string]float64{
 			"embedding":  s.cfg.RetrievalColumnWeightEmbedding,
 			"bm25":       s.cfg.RetrievalColumnWeightBM25,
 			"graph":      s.cfg.RetrievalColumnWeightGraph,
 			"structural": s.cfg.RetrievalColumnWeightStructural,
-			"context":    s.cfg.RetrievalContextColumnWeight,
+			"context":    contextWeight,
 		},
 	}
 

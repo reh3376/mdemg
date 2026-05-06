@@ -704,6 +704,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			ctx, cands, act, initialTopK,
 			req.QueryEmbedding, req.QueryText, spaceIDs, filter,
 			req.QueryContextFingerprint,
+			req.Category,
 		)
 		if rrfErr != nil {
 			// Fail open to legacy scorer rather than the user.
