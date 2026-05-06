@@ -2,12 +2,40 @@
 
 <!-- markdownlint-disable MD022 MD031 MD032 MD040 MD051 MD058 MD060 -->
 
-**Date:** 2026-05-04
+**Date:** 2026-05-06
 **Branch:** `reh3376_dev01`
 **Repository:** `/Users/reh3376/mdemg`
 **Purpose:** Complete context for continuing development of the MDEMG framework
 
-## Latest update — Phase 14.2 Note 05 sparse fingerprints (Epics 1–5 landed; Epic 6 A/B + Epic 7 docs in progress) (2026-05-04)
+## Latest update — Phase 14.2.3 Per-category context-column weight (default-on after 120q PASSED) (2026-05-06)
+
+**Phase 14.2.3 closed the Phase 14 sequence: `RETRIEVAL_CONTEXT_COLUMN_ENABLED` and `CONTEXT_FINGERPRINT_ENABLED` now default-on.** The per-category weight retune (zero-weight on `service_relationships`, `business_logic_constraints`, `relationship`) passed the canonical 120q full A/B merge gate — first time across the entire Phase 14.2.x sequence. Verdict: **mean +0.009, std -0.023 (much tighter), 11 improvements, 0 regressions**. min jumped 0.000 → 0.350 (zero-rescues stuck). Closeout commit and post: [`phase_14_2_3_post.md`](docs/development/post-ft-lora/phase_14_2_3_post.md).
+
+The 4-step retune narrative across 14.2.x:
+
+| Phase | Change | 16q | 120q | Default |
+|---|---|---|---|---|
+| 14.2 | LLM-summary tags | parity | parity | flag-off |
+| 14.2.1 | Vector derivation | parity | not run | flag-off |
+| 14.2.2 | Path-seg Builder retune | +0.006 PASS | -0.004 FAIL (3 regressions) | flag-off |
+| **14.2.3** | **Per-cat column weight (zero on 3 cats)** | not run | **+0.009 PASS, 0 regressions** | **default-on** |
+
+The two real levers turned out to be (1) catalog content — path-segment tokens beat LLM-summary tags for semantic discrimination, (2) per-category weight — apply the column only where it helps. Mirror of the Phase 14 → 14.1 → 14.1.1 sparse-gate journey.
+
+What's live in production by default:
+- Observe-time fingerprint computation on every new MemoryNode (path + path-segments + role_type×layer + tags)
+- 5th RRF column with vector-based `?context=auto` query-fingerprint derivation
+- Per-category weight overrides (3-category zero-weight default seed)
+- Stage 6 weekly catalog refresh hook
+- Backfill CLI for legacy spaces
+
+Operator opt-out: `RETRIEVAL_CONTEXT_COLUMN_ENABLED=false` or `CONTEXT_FINGERPRINT_ENABLED=false` + restart.
+
+OpenAI spend: ~$30-35 across all of Phase 14.2.x.
+
+---
+
+## Earlier update — Phase 14.2 Note 05 sparse fingerprints (Epics 1–5 landed; Epic 6 A/B + Epic 7 docs in progress) (2026-05-04)
 
 **Phase 14.2 ships per-observation sparse context fingerprints + a 5th RRF column.** The HTM solution to polysemy: keep one MemoryNode per symbol (graph stays stable) but tag *each observation* with a 256-bit sparse fingerprint of "what else was active when it was captured." Retrieval ranks observations by fingerprint similarity to the query's current context. Two-phase computation per operator-approved 2026-05-05 design — observe-time uses local features (path + role_type×layer + tags), post-hoc refinement at the macro-cycle stage 6 hook walks CO_ACTIVATED_WITH for symbol bits. Adaptive Builder allocates 256 bits per-space by feature density (Epic 0 forensic confirmed every surveyed production space has 0 distinct symbols + 0 distinct roles, so the static 64/64/64/64 spec wasted 128 bits — fixed via log-density allocator with 32-bit role_type×layer floor).
 

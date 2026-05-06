@@ -2763,7 +2763,10 @@ func FromEnv() (Config, error) {
 	// Phase 14.2 Epic 1+2 — Note 05 sparse fingerprints + adaptive catalog.
 	// All flag-off initially; flipped per Epic 6 A/B verdict. Builder
 	// defaults match Phase 14.2 Epic 0 forensic recommendations.
-	contextFingerprintEnabled := getBool("CONTEXT_FINGERPRINT_ENABLED", false)
+	// Phase 14.2.3 (2026-05-06) — default flipped false → true after the
+	// per-category context-column weight retune passed 120q full A/B
+	// (mean +0.009, std -0.023, 11 improvements, 0 regressions).
+	contextFingerprintEnabled := getBool("CONTEXT_FINGERPRINT_ENABLED", true)
 	contextFingerprintBitBudget, err := atoi("CONTEXT_FINGERPRINT_BIT_BUDGET", 256)
 	if err != nil {
 		return Config{}, err
@@ -2806,7 +2809,10 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("CONTEXT_CATALOG_TOP_N_PATHS (%d) + TOP_N_TAGS (%d) + ROLE_TYPE_LAYER_BITS (%d) must not exceed BIT_BUDGET (%d)",
 			contextCatalogTopNPaths, contextCatalogTopNTags, contextCatalogRoleTypeLayerBits, contextFingerprintBitBudget)
 	}
-	retrievalContextColumnEnabled := getBool("RETRIEVAL_CONTEXT_COLUMN_ENABLED", false)
+	// Phase 14.2.3 (2026-05-06) — default flipped false → true after the
+	// per-category context-column weight retune passed 120q full A/B.
+	// Operator opt-out: RETRIEVAL_CONTEXT_COLUMN_ENABLED=false.
+	retrievalContextColumnEnabled := getBool("RETRIEVAL_CONTEXT_COLUMN_ENABLED", true)
 	retrievalContextColumnWeight, err := atof("RETRIEVAL_CONTEXT_COLUMN_WEIGHT", 0.10)
 	if err != nil {
 		return Config{}, err
