@@ -81,7 +81,7 @@ Phase 14.2 ships:
 
 ### Configuration
 
-See "Configuration Reference" below. Defaults are conservative — `RETRIEVAL_CONTEXT_COLUMN_ENABLED=false` until the Phase 14.2 Epic 6 A/B verdict lands. Fingerprint computation itself defaults on so production data starts accumulating fingerprints immediately.
+See "Configuration Reference" below. **As of Phase 14.2.3 (2026-05-06) the column is default-on**: `RETRIEVAL_CONTEXT_COLUMN_ENABLED=true`, `CONTEXT_FINGERPRINT_ENABLED=true`, `CONTEXT_FINGERPRINT_REFRESH_ENABLED=true`. The retune narrative across 14.2 → 14.2.1 → 14.2.2 → 14.2.3 found two real levers: (1) catalog content (path-segment tokens beat LLM-summary tags), (2) per-category column weight (the Phase 14.2.3 default seed zeros the column on `service_relationships`, `business_logic_constraints`, `relationship`, where the 16q/120q forensic showed it neutral-to-harmful). Operator opt-out: `RETRIEVAL_CONTEXT_COLUMN_ENABLED=false` or `CONTEXT_FINGERPRINT_ENABLED=false` + restart.
 
 ## Notes
 
@@ -135,8 +135,9 @@ Add `--dry-run=false` to actually write. Idempotent: skips observations already 
 | `CONTEXT_CATALOG_TOP_N_TAGS` | `32` | Top-N tag bits in the catalog |
 | `CONTEXT_CATALOG_FLOOR_BITS_PER_KIND` | `16` | Minimum bits allocated to any kind with ≥10 distinct values |
 | `CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS` | `32` | Reserved bits for `role_type × layer` combinations |
-| `RETRIEVAL_CONTEXT_COLUMN_ENABLED` | `false` (initial — flipped after Epic 6 verdict) | Master toggle for the 5th RRF column |
-| `RETRIEVAL_CONTEXT_COLUMN_WEIGHT` | `0.10` | RRF weight on the context column |
+| `RETRIEVAL_CONTEXT_COLUMN_ENABLED` | `true` (Phase 14.2.3 default-on) | Master toggle for the 5th RRF column |
+| `RETRIEVAL_CONTEXT_COLUMN_WEIGHT` | `0.10` | Default RRF weight on the context column when no per-category override applies |
+| `RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS` | `{"service_relationships":0,"business_logic_constraints":0,"relationship":0}` | JSON of per-category column-weight overrides; categories at `0` are effectively disabled |
 | `RETRIEVAL_CONTEXT_STRICT_THRESHOLD` | `0.25` | Jaccard threshold for `?strict_context=true` mode |
 
 ## Dependencies

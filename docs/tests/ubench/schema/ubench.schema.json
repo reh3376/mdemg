@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdemg.dev/schemas/ubench/v1.0.0",
+  "title": "UBENCH - Universal Benchmark Specification",
+  "description": "Schema for defining reward-signal benchmark runs over ULTS task specs. UBENCH wraps neural.benchmarks.run_benchmark as a UxTS-pattern framework so contract tests and registry parity gates can be enforced uniformly with UVTS/ULTS.",
+  "type": "object",
+  "required": ["ubench_version", "benchmark", "model_under_test", "config", "judge", "ults", "golden_holdout", "output"],
+  "properties": {
+    "ubench_version": {
+      "type": "string",
+      "description": "Version of the UBENCH schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "benchmark": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"}
+      }
+    },
+    "model_under_test": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {"type": "string", "description": "Filesystem path or model identifier"},
+        "base_sha": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "adapter_manifest": {"type": "string"},
+        "endpoint": {"type": "string", "format": "uri"}
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the YAML config consumed by neural.benchmarks.run_benchmark (e.g. configs/benchmark_phase10.yaml)"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA256 of the config file at spec authoring time. Verified by runner."
+        }
+      }
+    },
+    "judge": {
+      "type": "object",
+      "required": ["model", "max_tokens", "latency_budget_ms"],
+      "properties": {
+        "model": {"type": "string"},
+        "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+        "max_tokens": {"type": "integer", "minimum": 3000, "description": "MEMORY: never < 3000"},
+        "latency_budget_ms": {"type": "integer", "minimum": 15000, "description": "MEMORY: never < 15000"},
+        "metrics": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "ults": {
+      "type": "object",
+      "required": ["specs_dir", "expected_specs"],
+      "properties": {
+        "specs_dir": {"type": "string"},
+        "expected_specs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected count of ULTS specs. Contract test fails if discovered spec count != this."
+        },
+        "allowed_sampling_groups": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "golden_holdout": {
+      "type": "object",
+      "required": ["path", "expected_rows", "expected_tasks"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "expected_rows": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected golden row count. Pinned to detect inadvertent regressions."
+        },
+        "expected_tasks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected count of distinct task_name values present in the holdout."
+        },
+        "min_rows_per_task": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Contract test fails if any ULTS spec resolves to fewer matching golden rows than this."
+        }
+      }
+    },
+    "registry_parity": {
+      "type": "object",
+      "description": "Registry-vs-heuristic shadow-run parity gate. Mirrors evaluate_ft.py --scorer=dual.",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "max_per_task_delta": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.01,
+          "description": "Maximum allowed |registry - heuristic| per task. Default 1% matches Phase 10 Epic 4 gate."
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Pass/fail thresholds applied to the run aggregate.",
+      "properties": {
+        "min_aggregate_weighted_score": {"type": "number", "minimum": 0, "maximum": 1},
+        "max_truncated_rows": {"type": "integer", "minimum": 0, "default": 0,
+          "description": "finish_reason=length count ceiling. Default 0 — any truncation is a perf-floors regression."}
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["report_path"],
+      "properties": {
+        "report_path": {"type": "string"},
+        "baseline_path": {"type": "string"},
+        "preflight_report_path": {"type": "string"}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {"type": "string"},
+        "created": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

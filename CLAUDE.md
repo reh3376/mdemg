@@ -346,7 +346,15 @@ Endpoints:
   - Direct: `python3 docs/tests/uvts/runners/uvts_runner.py --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json --base-url http://localhost:9999 --profile quick --persist-tsdb` (writes V0016 `uvts_runs` + `uvts_results`)
   - A/B harness: `python3 docs/tests/uvts/runners/uvts_ab_compare.py --baseline runA/grades.json --candidate runB/grades.json --spec <spec>.uvts.json --out verdict.json` (exit 0=pass, 1=fail, 2=drift). Apply Note 02 merge gate: B mean ≥ A mean AND no per-question regression > `ab_mode.regression_threshold_per_question` (default 0.10).
 
-- Benchmark (Phase 10 automated framework): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
+- UBENCH framework (Phase 10.5 — wraps the Phase 10 benchmark in the UxTS pattern):
+  - `make test-ubench-lint` — schema-validate `docs/tests/ubench/specs/*.ubench.json` + verify config + holdout SHAs (CI-safe, no LLM)
+  - `make test-ubench-contract` — lint + dataset↔holdout contract (every ULTS spec has ≥ `min_rows_per_task` golden rows). The forcing function preventing the Phase 10 guardrail.evaluate gap class.
+  - `make test-ubench-run` — full benchmark execution; gates on `min_aggregate_weighted_score` + `max_truncated_rows`. Requires `http://127.0.0.1:8102/v1` reachable.
+  - Pytest entry: `pytest docs/tests/ubench/contracts/ -v`
+  - Spec: `docs/tests/ubench/specs/mdemg.ubench.json` (108 rows / 17 tasks / `min_rows_per_task=3`)
+  - Feature doc: `docs/features/ubench-framework.md`
+
+- Benchmark (Phase 10 automated framework, wrapped by UBENCH above): `python -m neural.benchmarks.run_benchmark --config configs/benchmark_phase10.yaml --out training_data/eval/benchmark_<run>.json`
   - Deterministic rewards via `neural.training.reward_functions.REWARD_REGISTRY`; optional LLM judge (`--enable-judge`, `gpt-5.4-mini`, fixed seed per run_idx); per-task variance + aggregate weighted score; V0012 TSDB persistence via `--persist-tsdb` (SQL sidecar)
   - ULTS specs: `docs/tests/ults/specs/*.ults.json` (17 tasks, `sampling_group ∈ {T,C,J}`)
   - **Eval choices** (per Phase 11.5c + 11.5d — `phase_11_5c_post.md`, `phase_11_5d_post.md`):

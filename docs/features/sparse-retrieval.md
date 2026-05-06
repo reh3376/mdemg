@@ -12,7 +12,7 @@ phase: phase 14 + phase 14.1 + phase 14.1.1
 ## Summary
 
 **Feature**: `sparse-retrieval`
-**Summary**: Pre-rerank percentile gate that cuts the candidate list down to those whose score crosses a per-call activation threshold. Within `[MIN_ACTIVE, MAX_ACTIVE]` clamps; emits per-call metadata + Prometheus histograms + V0019 hypertable rows. Ships **flag-off in Phase 14** because the 120q full A/B at the most-permissive viable clamp (MIN=10, p95) hit per-question regressions concentrated in the `architecture_structure` category. Phase 14.1 (queued) will introduce adaptive per-category percentile + clamp to address this and flip default-on.
+**Summary**: Pre-rerank percentile gate that cuts the candidate list down to those whose score crosses a per-call activation threshold. Within `[MIN_ACTIVE, MAX_ACTIVE]` clamps; emits per-call metadata + Prometheus histograms + V0019 hypertable rows. **Default-on as of Phase 14.1.1 (2026-05-04)** with the hybrid config that passed the canonical 120q A/B: `SPARSE_RETRIEVAL_ENABLED=true`, `SPARSE_MIN_ACTIVE=15` global, plus a `data_flow_integration` per-category override at `MIN=20`. Operator opt-out via `SPARSE_RETRIEVAL_ENABLED=false`. The Phase 14 → 14.1 → 14.1.1 sequence is the full narrative — Phase 14 shipped flag-off after a 120q regression in `architecture_structure`; Phase 14.1 added per-category overrides; Phase 14.1.1 closed with the simpler-first hybrid that mean-improved +0.003 with 0 regressions and 10 improvements.
 
 ## Vision & Goals
 
@@ -131,10 +131,11 @@ V0017 captures pre-gate state (top_k_node_ids, consensus_strength). V0019 captur
 - ✅ `eps=1e-6` tolerance in `uvts_ab_compare.py` — **shipped globally**, eliminates floating-point boundary false-positives
 - ❌ Default-on flip — **120q failed**, 2 catastrophic regressions in `service_relationships` + `data_flow_integration` (both 3-required-files questions). Per-category was the wrong abstraction
 
-**Phase 14.1.1 (queued):**
-- Complexity / required-files-count override (replaces per-category) via `SPARSE_GATE_COMPLEXITY_OVERRIDE_THRESHOLD` + new `?required_files_count=N` URL param
-- Default-on flip if 120q passes
-- See `sprint_plan_phase_14_1_1_complexity_based_override.md`
+**Phase 14.1.1 (executed 2026-05-04 — DEFAULT-ON):**
+- ✅ Tested simpler-first hypothesis: raise global `SPARSE_MIN_ACTIVE` from 3 → 15. Initial 120q hit one catastrophic regression (q302 in `data_flow_integration`, 4 required files).
+- ✅ Pivoted to **hybrid**: MIN=15 global + `data_flow_integration` MIN=20 override (using the Phase 14.1 per-category mechanism). Re-ran 120q → **PASSED** with mean +0.003, 0 regressions, 10 improvements.
+- ✅ Defaults flipped: `SPARSE_RETRIEVAL_ENABLED=true`, `SPARSE_MIN_ACTIVE=15`, `SPARSE_GATE_CATEGORY_OVERRIDES` seeded with `{"data_flow_integration": {"min_active": 20}}`. The complexity-plumbing design from the Phase 14.1.1 plan stub is deferred — the simpler global+override pattern proved sufficient.
+- See `phase_14_1_1_post.md`.
 
 **Phase 14.x extensions:**
 - Adaptive percentile based on `consensus_strength` (high consensus → tighter gate; low consensus → wider) — research extension
