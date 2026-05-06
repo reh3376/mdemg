@@ -2774,7 +2774,13 @@ func FromEnv() (Config, error) {
 	if contextFingerprintBitBudget < 32 || contextFingerprintBitBudget > 1024 {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_BIT_BUDGET must be in [32, 1024] (got %d)", contextFingerprintBitBudget)
 	}
-	contextFingerprintRefreshEnabled := getBool("CONTEXT_FINGERPRINT_REFRESH_ENABLED", false)
+	// Phase 14.2.3 (2026-05-06) — default flipped false → true alongside
+	// CONTEXT_FINGERPRINT_ENABLED + RETRIEVAL_CONTEXT_COLUMN_ENABLED. The
+	// macro-cycle stage 6 hook now runs Builder.BuildForSpace +
+	// fingerprint-refresh batch on the configured interval (default 168h
+	// weekly), keeping production catalogs current with the corpus.
+	// Operator opt-out: CONTEXT_FINGERPRINT_REFRESH_ENABLED=false.
+	contextFingerprintRefreshEnabled := getBool("CONTEXT_FINGERPRINT_REFRESH_ENABLED", true)
 	contextFingerprintRefreshIntervalHours, err := atoi("CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS", 168)
 	if err != nil {
 		return Config{}, err
