@@ -608,6 +608,15 @@ type Config struct {
 	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
 	ContextFingerprintQueryTopK            int    // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
 
+	// Phase 14.2.3 — Per-category override of the context-column RRF weight.
+	// Default seed reflects the Phase 14.2.2 120q forensic: zero-weight on
+	// the 3 categories that consistently regressed (service_relationships
+	// -0.043, business_logic_constraints -0.023, relationship -0.017),
+	// keep default RetrievalContextColumnWeight on the others.
+	// Operator may extend or replace via RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS
+	// JSON env (env value REPLACES the default seed entirely; merge isn't supported).
+	RetrievalContextColumnCategoryWeights map[string]float64 // RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS — JSON {"<category>":<weight>}; per-category override of the global RetrievalContextColumnWeight (default: 3-category zero-weight seed)
+
 	// Phase AR-3: LLM-powered constraint classification
 	ConsultingLLMConstraintsEnabled  bool   // CONSULTING_LLM_CONSTRAINTS_ENABLED — enable LLM constraint classification (default: false)
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
@@ -2821,6 +2830,30 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_QUERY_TOPK must be in [1, 64] (got %d)", contextFingerprintQueryTopK)
 	}
 
+	// Phase 14.2.3 — per-category context-column weight overrides.
+	// Default seed reflects the Phase 14.2.2 120q forensic: zero-weight
+	// the column on the 3 categories that consistently regressed.
+	// Operator-supplied JSON REPLACES the default seed entirely.
+	retrievalContextColumnCategoryWeights := map[string]float64{
+		"service_relationships":      0.0,
+		"business_logic_constraints": 0.0,
+		"relationship":               0.0,
+	}
+	if raw := strings.TrimSpace(os.Getenv("RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS")); raw != "" {
+		retrievalContextColumnCategoryWeights = map[string]float64{}
+		if err := json.Unmarshal([]byte(raw), &retrievalContextColumnCategoryWeights); err != nil {
+			return Config{}, fmt.Errorf("RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS must be valid JSON: %w", err)
+		}
+		for cat, w := range retrievalContextColumnCategoryWeights {
+			if cat == "" {
+				return Config{}, fmt.Errorf("RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS: empty category key")
+			}
+			if w < 0 || w > 10 {
+				return Config{}, fmt.Errorf("RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS[%q] must be in [0, 10] (got %v)", cat, w)
+			}
+		}
+	}
+
 	// Phase 14.1 Epic 1 → Phase 14.1.1 — Per-category gate overrides.
 	// Seeded by default with the Phase 14.1.1 hybrid winner override:
 	//   data_flow_integration: MIN=20 (handles 4-required_files queries
@@ -4305,6 +4338,7 @@ func FromEnv() (Config, error) {
 		RetrievalContextColumnWeight:           retrievalContextColumnWeight,
 		RetrievalContextStrictThreshold:        retrievalContextStrictThreshold,
 		ContextFingerprintQueryTopK:            contextFingerprintQueryTopK,
+		RetrievalContextColumnCategoryWeights:  retrievalContextColumnCategoryWeights,
 
 		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
