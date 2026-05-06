@@ -564,9 +564,11 @@ type Config struct {
 	// Defaults derived from phase_14_score_distribution_analysis.md (Epic 0):
 	// observed retrieval_scores p98/p50 = 4-5x, K-cap dominantly 20-50, so
 	// p95 within-call paired with MIN_ACTIVE=3 floor and MAX_ACTIVE=20 cap
-	// matches production K shape. SPARSE_RETRIEVAL_ENABLED defaults false
-	// initially; flipped to true in Epic 7 if A/B verdict passes.
-	SparseRetrievalEnabled    bool    // SPARSE_RETRIEVAL_ENABLED — apply percentile gate post-aggregation pre-rerank (default: false; flip in Epic 7 if A/B passes)
+	// matches production K shape. Phase 14.1.1 (2026-05-04) flipped the
+	// gate default-on with the hybrid config (MIN=15 global +
+	// data_flow_integration MIN=20 override) after the canonical 120q
+	// A/B passed mean +0.003 / 0 regressions / 10 improvements.
+	SparseRetrievalEnabled    bool    // SPARSE_RETRIEVAL_ENABLED — apply percentile gate post-aggregation pre-rerank (default: true since Phase 14.1.1)
 	SparseActivationPercentile float64 // SPARSE_ACTIVATION_PERCENTILE — within-call score percentile cutoff (default: 0.95; range 0.5-0.999)
 	SparseMinActive           int     // SPARSE_MIN_ACTIVE — floor on active set size; gate cannot drop below this (default: 3)
 	SparseMaxActive           int     // SPARSE_MAX_ACTIVE — cap on active set size; gate cannot exceed this (default: 20; matches observed top-K cap)
@@ -603,7 +605,7 @@ type Config struct {
 	ContextCatalogTopNTags                 int    // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
 	ContextCatalogFloorBitsPerKind         int    // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
 	ContextCatalogRoleTypeLayerBits        int    // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
-	RetrievalContextColumnEnabled          bool   // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: false until Epic 6 A/B passes; flipped in same commit if passes)
+	RetrievalContextColumnEnabled          bool   // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: true since Phase 14.2.3, 2026-05-06; per-category zero-weight overrides for service_relationships / business_logic_constraints / relationship live in RetrievalContextColumnCategoryWeights)
 	RetrievalContextColumnWeight           float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
 	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
 	ContextFingerprintQueryTopK            int    // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)

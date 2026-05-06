@@ -268,6 +268,48 @@ test-uvts-full:
 test-uvts: test-uvts-quick
 
 # ============================================================
+# UBENCH Benchmark Testing Targets (Phase 10.5 — UBENCH framework)
+# ============================================================
+# UBENCH wraps neural.benchmarks.run_benchmark as a UxTS-pattern framework so
+# the dataset↔holdout contract test can fire in CI without a live LLM.
+# The contract mode is the forcing function preventing the class of gap that
+# hit guardrail.evaluate in Phase 10 (spec exists, golden rows missing).
+.PHONY: test-ubench test-ubench-lint test-ubench-contract test-ubench-run
+
+UBENCH_SPEC ?= docs/tests/ubench/specs/mdemg.ubench.json
+UBENCH_REPORT ?= /tmp/ubench-report.json
+
+# Schema + SHA verification only. CI-safe; no LLM required.
+test-ubench-lint:
+	@echo "Linting UBENCH spec against schema + verifying config/holdout SHAs..."
+	python3 docs/tests/ubench/runners/ubench_runner.py \
+		--spec $(UBENCH_SPEC) \
+		--mode lint \
+		--report $(UBENCH_REPORT)
+	@echo "UBENCH lint complete; report at $(UBENCH_REPORT)"
+
+# Lint + dataset↔holdout contract. CI-safe; no LLM required.
+test-ubench-contract:
+	@echo "Running UBENCH contract (dataset↔holdout)..."
+	python3 docs/tests/ubench/runners/ubench_runner.py \
+		--spec $(UBENCH_SPEC) \
+		--mode contract \
+		--report $(UBENCH_REPORT)
+	@echo "UBENCH contract complete; report at $(UBENCH_REPORT)"
+
+# Full benchmark run (requires LLM endpoint up + golden holdout populated).
+test-ubench-run:
+	@echo "Running UBENCH full benchmark (requires LLM endpoint)..."
+	python3 docs/tests/ubench/runners/ubench_runner.py \
+		--spec $(UBENCH_SPEC) \
+		--mode run \
+		--report $(UBENCH_REPORT)
+	@echo "UBENCH run complete; report at $(UBENCH_REPORT)"
+
+# Default alias.
+test-ubench: test-ubench-contract
+
+# ============================================================
 # UBTS Benchmark Testing Targets
 # ============================================================
 .PHONY: test-ubts-smoke test-ubts-load

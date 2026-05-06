@@ -1,0 +1,55 @@
+{
+  "ubench_version": "1.0.0",
+  "benchmark": {
+    "name": "mdemg-llm-v1-baseline",
+    "description": "Reward-signal benchmark for the production mdemg-llm-v1 model across all 17 ULTS task specs. Wraps neural.benchmarks.run_benchmark; emits canonical UxTS report.",
+    "version": "1.0.0"
+  },
+  "model_under_test": {
+    "path": ".local-models/qwen3-14b-mdemg-v1",
+    "base_sha": "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5",
+    "adapter_manifest": "adapters/tier1/manifest.json",
+    "endpoint": "http://127.0.0.1:8102/v1"
+  },
+  "config": {
+    "path": "configs/benchmark_phase10.yaml",
+    "sha256": "76c97eb83188a4d6150aff791c2906309749530dc17aa7ae7a4d77ff9dff8522"
+  },
+  "judge": {
+    "model": "gpt-5.4-mini",
+    "temperature": 0.0,
+    "max_tokens": 4000,
+    "latency_budget_ms": 30000,
+    "metrics": ["coherence", "depth", "relevance", "naturalness"]
+  },
+  "ults": {
+    "specs_dir": "docs/tests/ults/specs",
+    "expected_specs": 17,
+    "allowed_sampling_groups": ["T", "C", "J"]
+  },
+  "golden_holdout": {
+    "path": "training_data/eval/valid_golden.jsonl",
+    "sha256": "b2004783607cd4934b2da6a3e7d95f066e82a936d677bcfb42d246864116fe3e",
+    "expected_rows": 108,
+    "expected_tasks": 17,
+    "min_rows_per_task": 3
+  },
+  "registry_parity": {
+    "enabled": true,
+    "max_per_task_delta": 0.01
+  },
+  "thresholds": {
+    "min_aggregate_weighted_score": 0.80,
+    "max_truncated_rows": 0
+  },
+  "output": {
+    "report_path": "training_data/eval/ubench_report.json",
+    "baseline_path": "training_data/eval/benchmark_qwen3_14b_v1_baseline.json",
+    "preflight_report_path": "training_data/eval/preflight_report.json"
+  },
+  "metadata": {
+    "author": "phase-10.5-follow-up",
+    "created": "2026-05-06",
+    "notes": "Promotes Phase 10 benchmark to UxTS framework. Endpoint switched to llama-server :8102 per Phase 13.5 cutover. Golden holdout SHA includes Phase 10.5a guardrail.evaluate rows (108 total, 17 tasks)."
+  }
+}
