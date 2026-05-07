@@ -25,12 +25,13 @@ func newWatchdogCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "watchdog",
 		Short: "Inspect MLX watchdog state, restart count, and recent alerts",
-		Long: `Inspect the Phase 11.6.3 MLX watchdog.
+		Long: `Inspect the LLM watchdog (Phase 11.6.3, Phase 13.5 cutover).
 
 The watchdog has two halves: an in-process probe goroutine that reads
 mdemg_mlx_health_state from the running mdemg's /metrics endpoint, and an
-out-of-process launchd plist (com.mdemg.mlx-server) that auto-restarts
-mlx_lm.server when it dies.
+out-of-process launchd plist (com.mdemg.llama-server) that auto-restarts
+llama-server when it dies. (Metric name retained for dashboard
+compatibility; runtime is llama.cpp llama-server since Phase 13.5.)
 
 Subcommands:
   status   Show current probe state, launchd restart count, last 5 alerts`,
