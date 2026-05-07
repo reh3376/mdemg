@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mdemg.llama-server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__LLAMA_SERVER_BIN__</string>
+        <string>--model</string>
+        <string>__MDEMG_MODEL_PATH__</string>
+        <string>--port</string>
+        <string>8102</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--ctx-size</string>
+        <string>32768</string>
+        <string>--parallel</string>
+        <string>4</string>
+        <string>--cont-batching</string>
+        <string>--metrics</string>
+        <string>--jinja</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_DIR__</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/.mdemg/logs/llama-server.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.mdemg/logs/llama-server.err.log</string>
+</dict>
+</plist>

@@ -4,6 +4,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
@@ -17,9 +18,8 @@ var launchdServices = []struct {
 	Label    string
 	Template string
 	// Optional services are skipped at install time if their prerequisites
-	// are missing (e.g. mlx-server skipped when mlx_lm.server isn't on PATH).
-	// Required services fail Install() loudly when their template can't be
-	// rendered.
+	// are missing. Required services fail Install() loudly when their
+	// template can't be rendered or their binary can't be located.
 	Optional bool
 }{
 	{"com.mdemg.server", "com.mdemg.server.plist", false},
@@ -27,17 +27,15 @@ var launchdServices = []struct {
 	{"com.mdemg.ingest-claude-md", "com.mdemg.ingest-claude-md.plist", false},
 	{"com.mdemg.training-export", "com.mdemg.training-export.plist", false},
 	{"com.mdemg.maintenance", "com.mdemg.maintenance.plist", false},
-	// Phase 11.6.3 — MLX Watchdog. Auto-restarts mlx_lm.server on Metal-OOM
-	// crashes (KeepAlive.SuccessfulExit=false + ThrottleInterval=60s).
-	//
-	// Hotfix 11.6.3.1 (2026-05-02) — flipped Optional false: per always-on
-	// MLX policy (memory: feedback_mlx_required_when_mdemg_running.md), the
-	// MDEMG framework requires mlx to be up at all times. Install fails
-	// loudly when `mlx_lm.server` cannot be resolved (PATH or
-	// MDEMG_MLX_LM_BIN env override) rather than silently skipping. Hosts
-	// without mlx (Linux/Docker-only) must explicitly set MDEMG_ALLOW_NO_MLX=1
-	// at startup to bypass the policy.
-	{"com.mdemg.mlx-server", "com.mdemg.mlx-server.plist", false},
+	// Phase 13.5 cutover (2026-05-03) — production LLM runtime is
+	// llama.cpp llama-server (port 8102, GGUF Q5_K_M). Replaces mlx_lm.server
+	// (port 8101) which exhibited unbounded KV-cache → Metal-OOM crashes.
+	// Per always-on policy (memory: feedback_mlx_required_when_mdemg_running.md
+	// — name predates Phase 13.5 rename), Install() fails loudly when
+	// `llama-server` cannot be resolved (PATH or MDEMG_LLAMA_SERVER_BIN env
+	// override). Hosts without llama-server must explicitly set
+	// MDEMG_ALLOW_NO_LLM=1 at startup to bypass.
+	{"com.mdemg.llama-server", "com.mdemg.llama-server.plist", false},
 }
 
 type darwinServiceManager struct{}
@@ -70,31 +68,35 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	// Resolve python binary for neural sidecar
 	pythonBin := resolvePythonBin(projectDir)
 
-	// Resolve mlx_lm.server binary + default model path for the optional
-	// mlx-server plist. Values are looked up once; if mlx_lm isn't installed
-	// the optional service is skipped below.
-	mlxLMBin, mlxLMFound := resolveMLXLMBin()
+	// Resolve llama-server binary + default model path for the llama-server
+	// plist. Values are looked up once; install fails loudly if the required
+	// llama-server isn't found.
+	llamaServerBin, llamaServerFound := resolveLlamaServerBin()
 	modelPath := resolveMDEMGModelPath(projectDir)
+
+	// Phase 13.5 migration: if a pre-cutover com.mdemg.mlx-server plist is
+	// already bootstrapped, bootout and disable it before installing the new
+	// llama-server agent. Two services on different ports won't conflict, but
+	// the old one is non-functional under the Phase 13.5 stack and would
+	// continue restarting under launchd KeepAlive forever, burning resources.
+	migrateLegacyMLXServerPlist(launchAgentsDir, uid)
 
 	templateDir := filepath.Join(projectDir, "packaging", "launchd")
 
 	for _, svc := range launchdServices {
-		// Hotfix 11.6.3.1 — mlx-server is now required (Optional=false). Fail
-		// loudly with actionable guidance if mlx_lm.server can't be located.
-		// Optional services (none currently) would still skip when prereqs
-		// missing, but the mlx-server policy is "must succeed."
-		if svc.Label == "com.mdemg.mlx-server" && !mlxLMFound {
+		// Phase 13.5 — llama-server is required (Optional=false). Fail loudly
+		// with actionable guidance if llama-server can't be located.
+		if svc.Label == "com.mdemg.llama-server" && !llamaServerFound {
 			return fmt.Errorf(
-				"install failed: mlx_lm.server not found on PATH (per always-on MLX policy, mlx is required for mdemg).\n"+
+				"install failed: llama-server not found on PATH (per always-on LLM policy, llama-server is required for mdemg).\n"+
 					"  Resolve via one of:\n"+
-					"    1. Set MDEMG_MLX_LM_BIN=/path/to/mlx_lm.server in your shell or .env\n"+
-					"    2. Install mlx_lm in a venv on PATH (`pip install mlx-lm`)\n"+
-					"    3. (Emergency only) Skip this install with `MDEMG_ALLOW_NO_MLX=1 mdemg start ...` —\n"+
+					"    1. Set MDEMG_LLAMA_SERVER_BIN=/path/to/llama-server in your shell or .env\n"+
+					"    2. Install llama.cpp via Homebrew: `brew install llama.cpp`\n"+
+					"    3. (Emergency only) Skip this install with `MDEMG_ALLOW_NO_LLM=1 mdemg start ...` —\n"+
 					"       mdemg will refuse to serve LLM-dependent endpoints; intended for Linux/Docker-only setups.")
 		}
-		if svc.Optional && !mlxLMFound {
-			// Reserved for future optional services. mlx-server is no
-			// longer in this branch.
+		if svc.Optional && !llamaServerFound {
+			// Reserved for future optional services. llama-server is required.
 			fmt.Printf("Skipping optional service %s\n", svc.Label)
 			continue
 		}
@@ -114,7 +116,7 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 		content = strings.ReplaceAll(content, "__HOME__", home)
 		content = strings.ReplaceAll(content, "__SPACE_ID__", spaceID)
 		content = strings.ReplaceAll(content, "__PYTHON_BIN__", pythonBin)
-		content = strings.ReplaceAll(content, "__MLX_LM_BIN__", mlxLMBin)
+		content = strings.ReplaceAll(content, "__LLAMA_SERVER_BIN__", llamaServerBin)
 		content = strings.ReplaceAll(content, "__MDEMG_MODEL_PATH__", modelPath)
 
 		destPath := filepath.Join(launchAgentsDir, svc.Template)
@@ -135,28 +137,63 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 	return nil
 }
 
-// resolveMLXLMBin locates mlx_lm.server: env override (MDEMG_MLX_LM_BIN), then
-// PATH lookup. Returns ("", false) if neither resolves to an executable.
-func resolveMLXLMBin() (string, bool) {
-	if env := os.Getenv("MDEMG_MLX_LM_BIN"); env != "" {
+// resolveLlamaServerBin locates llama-server: env override
+// (MDEMG_LLAMA_SERVER_BIN), then deprecated alias (MDEMG_MLX_LM_BIN, kept for
+// ≥1 release cycle per the Phase 13.6 deprecation pattern), then PATH lookup
+// for `llama-server`. Returns ("", false) if nothing resolves.
+func resolveLlamaServerBin() (string, bool) {
+	if env := os.Getenv("MDEMG_LLAMA_SERVER_BIN"); env != "" {
 		if _, err := os.Stat(env); err == nil {
 			return env, true
 		}
 	}
-	if path, err := exec.LookPath("mlx_lm.server"); err == nil {
+	if env := os.Getenv("MDEMG_MLX_LM_BIN"); env != "" {
+		if _, err := os.Stat(env); err == nil {
+			slog.Warn("config: env var deprecated, please rename",
+				"old", "MDEMG_MLX_LM_BIN", "new", "MDEMG_LLAMA_SERVER_BIN")
+			return env, true
+		}
+	}
+	if path, err := exec.LookPath("llama-server"); err == nil {
 		return path, true
 	}
 	return "", false
 }
 
-// resolveMDEMGModelPath returns the model path for the mlx-server plist. Order:
-// MDEMG_MODEL_PATH env override, then <projectDir>/.local-models/mdemg-llm-v1
-// (the canonical Phase 11.5e production symlink).
+// resolveMDEMGModelPath returns the model path for the llama-server plist.
+// Order: MDEMG_MODEL_PATH env override, then the canonical Phase 13.5 GGUF
+// produced by the conversion pipeline. llama-server takes a `.gguf` filepath
+// (not a HF-style directory), so the default targets the Q5_K_M build.
 func resolveMDEMGModelPath(projectDir string) string {
 	if env := os.Getenv("MDEMG_MODEL_PATH"); env != "" {
 		return env
 	}
-	return filepath.Join(projectDir, ".local-models", "mdemg-llm-v1")
+	return filepath.Join(projectDir, ".local-models", "mdemg-llm-v1-gguf", "mdemg-llm-v1.Q5_K_M.gguf")
+}
+
+// migrateLegacyMLXServerPlist boots out and disables a pre-Phase-13.5
+// com.mdemg.mlx-server LaunchAgent if one is still bootstrapped, then renames
+// the plist file to .disabled-phase13_5 (matching the manual operator
+// convention). Best-effort — failures are logged but never block the install.
+func migrateLegacyMLXServerPlist(launchAgentsDir, uid string) {
+	const legacyLabel = "com.mdemg.mlx-server"
+	const legacyPlist = "com.mdemg.mlx-server.plist"
+
+	plistPath := filepath.Join(launchAgentsDir, legacyPlist)
+	if _, err := os.Stat(plistPath); err != nil {
+		return // not present, nothing to migrate
+	}
+
+	target := fmt.Sprintf("gui/%s/%s", uid, legacyLabel)
+	_ = exec.Command("launchctl", "bootout", target).Run()
+
+	disabledPath := plistPath + ".disabled-phase13_5"
+	if err := os.Rename(plistPath, disabledPath); err != nil {
+		fmt.Printf("Warning: could not rename %s to %s: %v (Phase 13.5 migration)\n",
+			plistPath, disabledPath, err)
+		return
+	}
+	fmt.Printf("Migrated %s → %s (decommissioned in Phase 13.5)\n", legacyLabel, filepath.Base(disabledPath))
 }
 
 func (m *darwinServiceManager) Uninstall() error {
