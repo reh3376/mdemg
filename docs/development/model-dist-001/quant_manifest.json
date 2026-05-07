@@ -1,0 +1,60 @@
+{
+  "$schema": "https://mdemg.dev/schemas/quant-manifest-v1.json",
+  "version": "1.0.0",
+  "model_name": "mdemg-llm-v1",
+  "namespace_default": "reh3376",
+  "produced_by": "Sprint MODEL-DIST-001",
+  "base_model": {
+    "name": "Qwen3-14B",
+    "source": "mlx-community/Qwen3-14B-4bit",
+    "phase5_sha256": "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
+  },
+  "fine_tune": {
+    "phase": "5 (SFT)",
+    "method": "LoRA r=32 alpha=64 (single-tier dense, post MoE→dense pivot)",
+    "best_iter": 2400,
+    "aggregate_eval_score": 0.8389,
+    "aggregate_eval_corpus": "valid_clean.jsonl v2 (180 production-grounded + 139 synthetic = 319 rows × 16 tasks)",
+    "production_state": "Phase 11.5e — Phase 5 dense reinstated as canonical; Stage-1 distill rolled back, Phase 11 GRPO archived"
+  },
+  "quants": {
+    "Q4_K_M": {
+      "status": "pending (Epic 1)",
+      "expected_size_bytes_approx": 6500000000,
+      "expected_min_ram_gb": 8,
+      "expected_recommended_ram_gb": 16,
+      "sha256": null,
+      "size_bytes": null,
+      "ollama_manifest_digest": null
+    },
+    "Q5_K_M": {
+      "status": "production (Phase 13.5)",
+      "expected_size_bytes_approx": 9800000000,
+      "expected_min_ram_gb": 12,
+      "expected_recommended_ram_gb": 24,
+      "sha256": "144ad723101d688f0875a3129336b0cd0fa356ff5266034a3d35db5e6d5f5d54",
+      "size_bytes": null,
+      "ollama_manifest_digest": null,
+      "note": "Local file at .local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q5_K_M.gguf"
+    },
+    "Q8_0": {
+      "status": "pending (Epic 1)",
+      "expected_size_bytes_approx": 14600000000,
+      "expected_min_ram_gb": 16,
+      "expected_recommended_ram_gb": 32,
+      "sha256": null,
+      "size_bytes": null,
+      "ollama_manifest_digest": null
+    }
+  },
+  "adapter": {
+    "status": "pending (Epic 2 — riskiest)",
+    "source": "adapters/tier1/adapters.safetensors (MLX format, 514 MB)",
+    "target_base": "qwen3:14b",
+    "target_base_layer_digest": "sha256:a8cc1361f3145dc01f6d77c6c82c9116b9ffe3c97b34716fe20418455876c40e",
+    "target_base_manifest_digest": null,
+    "sha256": null,
+    "size_bytes": null,
+    "ollama_manifest_digest": null
+  }
+}
