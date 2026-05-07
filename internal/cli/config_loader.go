@@ -34,6 +34,16 @@ func loadConfig() (config.Config, error) {
 		return cfg, err
 	}
 
+	// Inject build-time version/commit when not overridden by MDEMG_VERSION/MDEMG_COMMIT.
+	// config.FromEnv defaults these to "" so cli's ldflags-injected values win unless the
+	// operator sets the env var explicitly. /healthz and /readyz read from cfg.Mdemg{Version,Commit}.
+	if cfg.MdemgVersion == "" {
+		cfg.MdemgVersion = Version
+	}
+	if cfg.MdemgCommit == "" {
+		cfg.MdemgCommit = Commit
+	}
+
 	// Auto-detect project-scoped Neo4j container name for backups.
 	// If still the default "mdemg-neo4j", override with the project-scoped name
 	// so backup full commands target the correct container.

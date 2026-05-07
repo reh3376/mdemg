@@ -1756,8 +1756,8 @@ func FromEnv() (Config, error) {
 	pluginsEnabled := getBool("PLUGINS_ENABLED", true)
 	pluginsDir := get("PLUGINS_DIR", "./plugins")
 	pluginSocketDir := get("PLUGIN_SOCKET_DIR", "/tmp/mdemg-plugins")
-	mdemgVersion := get("MDEMG_VERSION", "0.6.0")
-	mdemgCommit := get("MDEMG_COMMIT", "unknown")
+	mdemgVersion := get("MDEMG_VERSION", "")
+	mdemgCommit := get("MDEMG_COMMIT", "")
 
 	// Linear integration settings (Phase 4)
 	linearTeamID := get("LINEAR_TEAM_ID", "")
