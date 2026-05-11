@@ -4,6 +4,7 @@
   "model_name": "mdemg-llm-v1",
   "namespace_default": "reh3376",
   "produced_by": "Sprint MODEL-DIST-001",
+  "build_date": "2026-05-11",
   "base_model": {
     "name": "Qwen3-14B",
     "source": "mlx-community/Qwen3-14B-4bit",
@@ -19,33 +20,45 @@
   },
   "quants": {
     "Q4_K_M": {
-      "status": "pending (Epic 1)",
-      "expected_size_bytes_approx": 6500000000,
-      "expected_min_ram_gb": 8,
-      "expected_recommended_ram_gb": 16,
-      "sha256": null,
-      "size_bytes": null,
-      "ollama_manifest_digest": null
+      "status": "built (Epic 1)",
+      "size_bytes": 9658404096,
+      "size_human": "9.0 GB",
+      "bpw": 4.87,
+      "min_ram_gb": 12,
+      "recommended_ram_gb": 16,
+      "sha256": "401161710c22f0ae64159a57ed78b29bc0eb1227ad441acbbb3fe44f411d42ea",
+      "ollama_manifest_digest": null,
+      "local_path": ".local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q4_K_M.gguf"
     },
     "Q5_K_M": {
       "status": "production (Phase 13.5)",
-      "expected_size_bytes_approx": 9800000000,
-      "expected_min_ram_gb": 12,
-      "expected_recommended_ram_gb": 24,
+      "size_bytes": 11811160064,
+      "size_human": "11 GB",
+      "bpw": 5.69,
+      "min_ram_gb": 14,
+      "recommended_ram_gb": 24,
       "sha256": "144ad723101d688f0875a3129336b0cd0fa356ff5266034a3d35db5e6d5f5d54",
-      "size_bytes": null,
       "ollama_manifest_digest": null,
-      "note": "Local file at .local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q5_K_M.gguf"
+      "local_path": ".local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q5_K_M.gguf"
     },
     "Q8_0": {
-      "status": "pending (Epic 1)",
-      "expected_size_bytes_approx": 14600000000,
-      "expected_min_ram_gb": 16,
-      "expected_recommended_ram_gb": 32,
-      "sha256": null,
-      "size_bytes": null,
-      "ollama_manifest_digest": null
+      "status": "built (Epic 1)",
+      "size_bytes": 17179869184,
+      "size_human": "16 GB",
+      "bpw": 8.5,
+      "min_ram_gb": 20,
+      "recommended_ram_gb": 32,
+      "sha256": "fc14dcb40af1bb586c4754492cbddcc8b8881366d3e67587d92f437588db6089",
+      "ollama_manifest_digest": null,
+      "local_path": ".local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q8_0.gguf"
     }
+  },
+  "intermediate_f16": {
+    "size_bytes": 32212254720,
+    "size_human": "30 GB",
+    "sha256": "436cd6f41a68480b424d23584f8224fcb06c528b2d6b780dca8f9e45232177bd",
+    "local_path": ".local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.f16.gguf",
+    "note": "Intermediate; retained for Epic 2 adapter conversion verification. Delete after Epic 2 closes."
   },
   "adapter": {
     "status": "pending (Epic 2 — riskiest)",
