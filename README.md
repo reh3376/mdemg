@@ -66,6 +66,20 @@ This will:
 
 > **All ports are dynamic.** Each project gets its own `COMPOSE_PROJECT_NAME` for multi-instance isolation. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
 
+### Step 2b (optional): Pull the local LLM
+
+For the local-LLM path (`mdemg-llm-v1`, Phase 5 Qwen3-14B fine-tune served via `llama.cpp llama-server`):
+
+```bash
+brew install ollama          # one-time — Ollama is the distribution channel
+mdemg model pull             # RAM-auto picks Q4_K_M / Q5_K_M / Q8_0 quant
+# → prints the MDEMG_MODEL_PATH line to add to .env
+```
+
+Three quants serve three RAM tiers: Q4_K_M (~9 GB, 16 GB Macs), Q5_K_M (~11 GB, 24 GB — production canonical), Q8_0 (~16 GB, 32+ GB). See [`docs/features/local-model-distribution.md`](docs/features/local-model-distribution.md) for the full Configurability Contract (every value overridable via env or flag — namespace, name, backend, quant allowlist, RAM-tier map, paths).
+
+Skip this step if you're using OpenAI for inference; OpenAI is the framework's fallback.
+
 ### Open the Dashboard
 
 Once the stack is running, open the built-in browser dashboard:

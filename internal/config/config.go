@@ -56,6 +56,23 @@ type Config struct {
 	OllamaModel         string // default: qwen3-embedding:8b
 	EmbeddingTargetDims int    // EMBEDDING_TARGET_DIMS — target embedding dimensions for MRL truncation (0 = use model native)
 
+	// Model distribution (Sprint MODEL-DIST-001 — `mdemg model pull` and friends).
+	// Every value is dynamic per the framework's no-hardcoding rule. The CLI surface
+	// uses a ModelFetcher interface; v1 ships OllamaFetcher; future backends (hf, s3,
+	// github-release, file) plug in via factory dispatch on ModelBackend without
+	// touching the CLI surface.
+	ModelBackend       string // MDEMG_MODEL_BACKEND — default: ollama
+	ModelNamespace     string // MDEMG_MODEL_NAMESPACE — default: reh3376
+	ModelName          string // MDEMG_MODEL_NAME — default: mdemg-llm-v1
+	ModelQuants        string // MDEMG_MODEL_QUANTS — comma-separated allowlist; default: Q4_K_M,Q5_K_M,Q8_0
+	ModelRamTiers      string // MDEMG_MODEL_RAM_TIERS — JSON map e.g. {"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}
+	ModelQuant         string // MDEMG_MODEL_QUANT — selected quant; "auto" triggers RAM-tier dispatch (default: auto)
+	AdapterBase        string // MDEMG_ADAPTER_BASE — base model tag for adapter Modelfile (default: qwen3:14b)
+	ModelDir           string // MDEMG_MODEL_DIR — where mdemg model pull symlinks GGUFs (default: $HOME/.mdemg/models)
+	OllamaModelsRoot   string // OLLAMA_MODELS — ollama-standard env (default: $HOME/.ollama/models)
+	OllamaRegistryHost string // OLLAMA_HOST — ollama-standard env (default: registry.ollama.ai)
+	ModelManifestPath  string // MDEMG_MODEL_MANIFEST_PATH — override for runtime quant manifest (default: empty = use embedded)
+
 	// Embedding cache settings
 	EmbeddingCacheEnabled bool // Feature toggle (default: true)
 	EmbeddingCacheSize    int  // LRU cache capacity (default: 1000)
@@ -964,7 +981,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 20 post-Phase 14.2 V0020 context_catalog_versions)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 21 post-MODEL-DIST-001 V0021 model_install_events)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1464,6 +1481,22 @@ func FromEnv() (Config, error) {
 	llmEndpoint := get("LLM_ENDPOINT", "")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "qwen3-embedding:8b")
+
+	// Sprint MODEL-DIST-001 — model distribution config (Configurability Contract).
+	// Defaults match the v1 production reality so `mdemg model pull` with no flags
+	// Just Works for the common case; every value is overridable via env or flag.
+	homeDir, _ := os.UserHomeDir()
+	modelBackend := get("MDEMG_MODEL_BACKEND", "ollama")
+	modelNamespace := get("MDEMG_MODEL_NAMESPACE", "reh3376")
+	modelName := get("MDEMG_MODEL_NAME", "mdemg-llm-v1")
+	modelQuants := get("MDEMG_MODEL_QUANTS", "Q4_K_M,Q5_K_M,Q8_0")
+	modelRamTiers := get("MDEMG_MODEL_RAM_TIERS", `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}`)
+	modelQuant := get("MDEMG_MODEL_QUANT", "auto")
+	adapterBase := get("MDEMG_ADAPTER_BASE", "qwen3:14b")
+	modelDir := get("MDEMG_MODEL_DIR", filepath.Join(homeDir, ".mdemg", "models"))
+	ollamaModelsRoot := get("OLLAMA_MODELS", filepath.Join(homeDir, ".ollama", "models"))
+	ollamaRegistryHost := get("OLLAMA_HOST", "registry.ollama.ai")
+	modelManifestPath := get("MDEMG_MODEL_MANIFEST_PATH", "")
 	embTargetDims, err := atoi("EMBEDDING_TARGET_DIMS", 0)
 	if err != nil {
 		return Config{}, err
@@ -3792,7 +3825,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 20)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 21)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3913,6 +3946,17 @@ func FromEnv() (Config, error) {
 		LLMEndpoint:    llmEndpoint,
 		OllamaEndpoint: ollamaEndpoint,
 		OllamaModel:         ollamaModel,
+		ModelBackend:        modelBackend,
+		ModelNamespace:      modelNamespace,
+		ModelName:           modelName,
+		ModelQuants:         modelQuants,
+		ModelRamTiers:       modelRamTiers,
+		ModelQuant:          modelQuant,
+		AdapterBase:         adapterBase,
+		ModelDir:            modelDir,
+		OllamaModelsRoot:    ollamaModelsRoot,
+		OllamaRegistryHost:  ollamaRegistryHost,
+		ModelManifestPath:   modelManifestPath,
 		EmbeddingTargetDims: embTargetDims,
 		EmbeddingCacheEnabled:     embCacheEnabled,
 		EmbeddingCacheSize:        embCacheSize,

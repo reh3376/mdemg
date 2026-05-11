@@ -1,0 +1,19 @@
+# mdemg-llm-v1 — Q5_K_M (5.69 BPW, ~11 GB) — production canonical (Phase 13.5)
+# Source: Phase 5 SFT fine-tune of mlx-community/Qwen3-14B-4bit
+# Sprint: MODEL-DIST-001 (docs/development/model-dist-001/)
+# Built: 2026-05-02 (existing production GGUF; SHA matches Epic 1 manifest)
+# Min RAM: 14 GB | Recommended RAM: 24 GB | Apple Silicon
+# Chat template + tokenizer embedded in GGUF metadata; no TEMPLATE directive needed.
+
+FROM ../../.local-models/mdemg-llm-v1-gguf/mdemg-llm-v1.Q5_K_M.gguf
+
+PARAMETER num_ctx 32768
+PARAMETER num_predict 4096
+PARAMETER temperature 0.7
+PARAMETER top_p 0.95
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM """You are mdemg-llm-v1, a Qwen3-14B model fine-tuned for the MDEMG cognitive substrate framework. You specialize in code understanding, retrieval reasoning, constraint classification, and structured-output reasoning for AI-assisted development workflows."""
+
+LICENSE """Apache License 2.0 (inherits from base model Qwen3-14B). Fine-tune data and adapter weights produced by the MDEMG project — see https://github.com/reh3376/mdemg for details."""

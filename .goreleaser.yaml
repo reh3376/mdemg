@@ -261,5 +261,13 @@ brews:
       Docker is required for running MDEMG services.
       After 'brew upgrade mdemg', running Docker instances are updated automatically.
       Jiminy inner-voice guidance is configured during 'mdemg init'.
-      Default model: gpt-5.4-mini (OpenAI) or qwen3:8b (Ollama).
+
+      Local LLM (mdemg-llm-v1, Phase 13.5 production canonical):
+        brew install ollama          # one-time distribution prereq
+        mdemg model pull             # RAM-auto picks Q4/Q5/Q8 quant
+        # → prints MDEMG_MODEL_PATH for your .env
+
+      OpenAI fallback if you don't want a local LLM:
+        Default models: gpt-5.4-mini (OpenAI) or qwen3:8b (Ollama).
+
       Run 'mdemg init' in your project directory to get started.
