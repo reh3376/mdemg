@@ -1520,6 +1520,173 @@ mdemg sidebar status
 
 ---
 
+## Model Distribution
+
+Sprint MODEL-DIST-001 (v0.10.0) shipped a pluggable backend for fetching `mdemg-llm-v1` (the fine-tuned local LLM). v1 ships Ollama Library as the only backend; future backends (HF Hub, S3, GitHub Release, file://) plug in via `MDEMG_MODEL_BACKEND` without changing the CLI surface.
+
+Every operator-visible value is dynamic — see the **Configurability Contract** below. Defaults are tuned to the v1 production reality, so `mdemg model pull` with no flags Just Works.
+
+### `mdemg model`
+
+Parent command for model distribution. Subcommands: `pull`, `list`, `verify`, `remove`, `where`.
+
+---
+
+### `mdemg model pull`
+
+**Synopsis:** `mdemg model pull [flags]`
+
+Pull a fused-quant model from the configured distribution backend. The flow:
+
+1. Resolve config from env + flags (Configurability Contract).
+2. Resolve quant: if `auto` (default), detect host RAM and dispatch via `MDEMG_MODEL_RAM_TIERS`; else use the explicit value (must be in `MDEMG_MODEL_QUANTS` allowlist).
+3. Call `Fetcher.Fetch` (Ollama backend invokes `ollama pull <namespace>/<name>:<quant>`, then locates the GGUF blob via the manifest at `<OLLAMA_MODELS>/manifests/<OLLAMA_HOST>/<ns>/<name>/<quant>` and filters for `mediaType: application/vnd.ollama.image.model`).
+4. Symlink the blob to `<MDEMG_MODEL_DIR>/<name>.<quant>.gguf`.
+5. SHA-verify against the embedded `quant_manifest.json` (or `MDEMG_MODEL_MANIFEST_PATH` override).
+6. Write a V0021 `model_install_events` TSDB row.
+7. Print operator instructions for wiring into `.env` + restarting `llama-server`.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--backend` | string | `ollama` | Distribution backend (env: `MDEMG_MODEL_BACKEND`) |
+| `--namespace` | string | `reh3376` | Registry namespace (env: `MDEMG_MODEL_NAMESPACE`) |
+| `--name` | string | `mdemg-llm-v1` | Model name (env: `MDEMG_MODEL_NAME`) |
+| `--quants` | string | `Q4_K_M,Q5_K_M,Q8_0` | Allowlist of acceptable quants (env: `MDEMG_MODEL_QUANTS`) |
+| `--ram-tiers` | string | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` | JSON map for `auto` quant dispatch (env: `MDEMG_MODEL_RAM_TIERS`) |
+| `--quant` | string | `auto` | Selected quant (`auto` triggers RAM dispatch; env: `MDEMG_MODEL_QUANT`) |
+| `--adapter-base` | string | `qwen3:14b` | Adapter base model (env: `MDEMG_ADAPTER_BASE`; adapter path deferred to MODEL-DIST-002) |
+| `--model-dir` | string | `~/.mdemg/models` | Local symlink target dir (env: `MDEMG_MODEL_DIR`) |
+| `--manifest` | string | embedded | Override embedded quant manifest (env: `MDEMG_MODEL_MANIFEST_PATH`) |
+| `--adapter` | bool | `false` | Pull adapter-only artifact (deferred to MODEL-DIST-002; currently errors with deferral message) |
+| `--dry-run` | bool | `false` | Resolve config + print plan; no side effects |
+
+**Usage Examples:**
+
+```bash
+# Defaults — RAM-auto picks the right quant for the host
+mdemg model pull
+
+# Explicit quant
+mdemg model pull --quant Q5_K_M
+
+# Fork's variant (publisher under a different namespace)
+mdemg model pull --namespace acme --name custom-llm --quant Q5_K_M
+
+# Air-gapped operator with custom manifest
+mdemg model pull --manifest /etc/mdemg/internal-quant-manifest.json
+
+# Plan-only (no Fetch invoked, no side effects)
+mdemg model pull --dry-run
+```
+
+**Output:** prints the resolved config tuple, the pull progress (Ollama backend passes stdout through), the verified SHA prefix, and the operator instructions for wiring `MDEMG_MODEL_PATH` into `.env` plus the `launchctl kickstart` command to restart `llama-server`.
+
+**See Also:** `mdemg model verify`, `mdemg model list`, [`docs/features/local-model-distribution.md`](../features/local-model-distribution.md)
+
+---
+
+### `mdemg model list`
+
+**Synopsis:** `mdemg model list`
+
+List models pulled into `<MDEMG_MODEL_DIR>`. Output format: tabular (name, symlink target, size in bytes, SHA256 prefix).
+
+**Usage Examples:**
+
+```bash
+mdemg model list
+```
+
+Sample output:
+```
+NAME                      SYMLINK_TARGET                                              SIZE         SHA256_PREFIX
+mdemg-llm-v1.Q5_K_M.gguf  /Users/reh3376/.ollama/models/blobs/sha256-144ad723101d…   10514569568  (use verify)
+```
+
+For large files (>100 MB), the SHA column shows `(use verify)` — run `mdemg model verify` to compute hashes.
+
+---
+
+### `mdemg model verify`
+
+**Synopsis:** `mdemg model verify [flags]`
+
+Re-check SHA256 of pulled models against the binary-embedded `quant_manifest.json` (or `MDEMG_MODEL_MANIFEST_PATH` override). Walks `<MDEMG_MODEL_DIR>` and reports per-file pass/fail. Exit code 0 if all match; 1 if any mismatch.
+
+**Flags:** same Configurability Contract as `pull` (backend, namespace, name, quants, ram-tiers, quant, model-dir, manifest).
+
+**Usage Examples:**
+
+```bash
+mdemg model verify
+# ✓ mdemg-llm-v1.Q5_K_M.gguf — sha 144ad723101d688f…
+```
+
+Writes a single V0021 `model_install_events` row per invocation (event_type=`verify`).
+
+---
+
+### `mdemg model remove`
+
+**Synopsis:** `mdemg model remove --yes [flags]`
+
+Remove a pulled model. Destructive — unlinks the symlink in `<MDEMG_MODEL_DIR>` AND invokes the backend's Remove method (Ollama: `ollama rm <namespace>/<name>:<quant>`). Requires `--yes` to confirm.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--yes` | bool | `false` | Confirm the destructive action |
+
+Plus the standard Configurability Contract flags.
+
+**Usage Examples:**
+
+```bash
+mdemg model remove --yes --quant Q4_K_M
+```
+
+Writes a V0021 `model_install_events` row (event_type=`remove`).
+
+---
+
+### `mdemg model where`
+
+**Synopsis:** `mdemg model where [flags]`
+
+Print the resolved local path for a pulled model (for shell scripting). Exits non-zero if the model isn't pulled.
+
+**Usage Examples:**
+
+```bash
+LLAMA_GGUF=$(mdemg model where --quant Q5_K_M)
+llama-server --model "$LLAMA_GGUF" --port 18102 --ctx-size 32768 --jinja
+```
+
+---
+
+### Configurability Contract (11 knobs)
+
+| Concern | Env Var | CLI Flag | Default |
+|---|---|---|---|
+| Distribution backend | `MDEMG_MODEL_BACKEND` | `--backend` | `ollama` |
+| Registry namespace | `MDEMG_MODEL_NAMESPACE` | `--namespace` | `reh3376` |
+| Model name | `MDEMG_MODEL_NAME` | `--name` | `mdemg-llm-v1` |
+| Available quants | `MDEMG_MODEL_QUANTS` | `--quants` | `Q4_K_M,Q5_K_M,Q8_0` |
+| RAM-tier auto-pick (JSON) | `MDEMG_MODEL_RAM_TIERS` | `--ram-tiers` | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` |
+| Selected quant override | `MDEMG_MODEL_QUANT` | `--quant` | `auto` |
+| Adapter base model | `MDEMG_ADAPTER_BASE` | `--adapter-base` | `qwen3:14b` |
+| Local symlink dir | `MDEMG_MODEL_DIR` | `--model-dir` | `~/.mdemg/models` |
+| Ollama blob root | `OLLAMA_MODELS` | (ollama-standard) | `~/.ollama/models` |
+| Ollama registry host | `OLLAMA_HOST` | (ollama-standard) | `registry.ollama.ai` |
+| Quant manifest source | `MDEMG_MODEL_MANIFEST_PATH` | `--manifest` | embed.FS `quant_manifest.json` |
+
+Flag overrides take precedence over env; env over default.
+
+### Distribution architecture note
+
+**Ollama is the distribution channel, not the inference runtime.** The production runtime is `llama.cpp llama-server` on port 8102 (Phase 13.5). `mdemg model pull` invokes `ollama pull` under the hood to download via Ollama Library's CDN, then symlinks the resulting GGUF blob into `<MDEMG_MODEL_DIR>` so `llama-server` can serve it. Ollama's runtime (`ollama serve` on port 11434) is never invoked by mdemg's inference path.
+
+---
+
 ## Synergy Optimization
 
 ### `mdemg synergy`
@@ -3247,6 +3414,24 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `NEURAL_RERANK_FALLBACK` | string | *(from `RERANK_PROVIDER`)* | Fallback re-rank provider if sidecar fails |
 | `SIDECAR_ENABLED` | bool | `false` | Master switch for Python sidecar integration |
 
+### Model Distribution (Sprint MODEL-DIST-001, v0.10.0)
+
+Every operator-visible value is dynamic. Defaults tuned to the v1 production reality so `mdemg model pull` with no flags Just Works.
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `MDEMG_MODEL_BACKEND` | string | `ollama` | Distribution backend. v1: `ollama`. Future: `hf`, `s3`, `github-release`, `file`. Pluggable via `internal/cli/model_fetcher.go`. |
+| `MDEMG_MODEL_NAMESPACE` | string | `reh3376` | Registry namespace. Forks override to publish under their own org. |
+| `MDEMG_MODEL_NAME` | string | `mdemg-llm-v1` | Model name. Multi-model support without code change. |
+| `MDEMG_MODEL_QUANTS` | string | `Q4_K_M,Q5_K_M,Q8_0` | Allowlist of acceptable quants (comma-separated). New quants added by env, not code. |
+| `MDEMG_MODEL_RAM_TIERS` | string (JSON) | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` | RAM-tier map for `auto` quant dispatch. Keys: `<N` (less-than threshold in GB) or `default`. |
+| `MDEMG_MODEL_QUANT` | string | `auto` | Selected quant; `auto` triggers RAM-tier dispatch. |
+| `MDEMG_ADAPTER_BASE` | string | `qwen3:14b` | Base model tag for adapter Modelfile (adapter path deferred to MODEL-DIST-002). |
+| `MDEMG_MODEL_DIR` | string | `~/.mdemg/models` | Where `mdemg model pull` symlinks GGUFs. |
+| `MDEMG_MODEL_MANIFEST_PATH` | string | embedded | Override embedded quant manifest (air-gapped operators). |
+| `OLLAMA_MODELS` | string | `~/.ollama/models` | Ollama-standard env. Ollama blob root. |
+| `OLLAMA_HOST` | string | `registry.ollama.ai` | Ollama-standard env. Registry host. |
+
 ---
 
 ## Platform-Specific Notes
@@ -3376,6 +3561,14 @@ mdemg
       restart         Restart the sidebar app
       status          Show sidebar app status
     upgrade           Self-update the mdemg binary
+
+  Model Distribution (Sprint MODEL-DIST-001, v0.10.0):
+    model
+      pull            Pull a fused-quant model from the configured backend
+      list            List models pulled into <MDEMG_MODEL_DIR>
+      verify          Re-check SHAs against the quant manifest
+      remove          Remove a pulled model (--yes required)
+      where           Print resolved local path (shell scripting)
 
   Advanced:
     mcp               Start MCP server (stdio mode)
