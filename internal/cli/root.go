@@ -172,6 +172,14 @@ Use "mdemg <command> --help" for more information about a command.`,
 	upgradeCmd.GroupID = "config"
 	rootCmd.AddCommand(upgradeCmd)
 
+	// Sprint MODEL-DIST-001 — local LLM model distribution.
+	// `mdemg model pull|list|verify|remove|where`. See model.go for the
+	// Cobra registration and model_fetcher.go for the pluggable backend
+	// interface (only OllamaFetcher shipped in v1).
+	modelCmd := newModelCmd()
+	modelCmd.GroupID = "config"
+	rootCmd.AddCommand(modelCmd)
+
 	menubarCmd := newMenubarCmd()
 	menubarCmd.GroupID = "config"
 	rootCmd.AddCommand(menubarCmd)

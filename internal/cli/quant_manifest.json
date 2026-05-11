@@ -1,0 +1,39 @@
+{
+  "$comment": "Runtime quant manifest embedded into the mdemg binary via embed.FS. Source of truth: docs/development/model-dist-001/quant_manifest.json. Keep in sync; CI may add a diff check in a follow-up.",
+  "version": "1.0.0",
+  "model_name": "mdemg-llm-v1",
+  "namespace_default": "reh3376",
+  "build_date": "2026-05-11",
+  "quants": {
+    "Q4_K_M": {
+      "size_bytes": 9658404096,
+      "size_human": "9.0 GB",
+      "bpw": 4.87,
+      "min_ram_gb": 12,
+      "recommended_ram_gb": 16,
+      "sha256": "401161710c22f0ae64159a57ed78b29bc0eb1227ad441acbbb3fe44f411d42ea",
+      "ollama_local_id": "5c3a7252c295",
+      "ollama_manifest_digest": null
+    },
+    "Q5_K_M": {
+      "size_bytes": 11811160064,
+      "size_human": "11 GB",
+      "bpw": 5.69,
+      "min_ram_gb": 14,
+      "recommended_ram_gb": 24,
+      "sha256": "144ad723101d688f0875a3129336b0cd0fa356ff5266034a3d35db5e6d5f5d54",
+      "ollama_local_id": "08c13b480864",
+      "ollama_manifest_digest": null
+    },
+    "Q8_0": {
+      "size_bytes": 17179869184,
+      "size_human": "16 GB",
+      "bpw": 8.5,
+      "min_ram_gb": 20,
+      "recommended_ram_gb": 32,
+      "sha256": "fc14dcb40af1bb586c4754492cbddcc8b8881366d3e67587d92f437588db6089",
+      "ollama_local_id": "6b1006facd36",
+      "ollama_manifest_digest": null
+    }
+  }
+}
