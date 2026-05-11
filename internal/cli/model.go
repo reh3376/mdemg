@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,9 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
+	"mdemg/internal/tsdb"
 )
 
 // newModelCmd registers the `mdemg model` subcommand group. Subcommands
@@ -115,6 +118,40 @@ func (o *modelOverrides) resolve() (config.Config, error) {
 		cfg.ModelManifestPath = o.manifestPath
 	}
 	return cfg, nil
+}
+
+// recordModelEvent fires a V0021 model_install_events row best-effort: it
+// times-out fast on connect failures and never blocks the CLI exit beyond the
+// configured deadline (default 2s). Returning an error is non-fatal — the
+// caller logs and proceeds.
+//
+// Empty/disabled TSDB config silently no-ops (per the framework's degraded-
+// mode pattern: observability shouldn't block correctness).
+func recordModelEvent(parent context.Context, cfg config.Config, row tsdb.ModelInstallEventRow) {
+	if !cfg.TSDBEnabled || cfg.TSDBHost == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+
+	tsdbCfg := tsdb.Config{
+		Host:     cfg.TSDBHost,
+		Port:     cfg.TSDBPort,
+		User:     cfg.TSDBUser,
+		Password: cfg.TSDBPassword,
+		Database: cfg.TSDBDatabase,
+		SSLMode:  cfg.TSDBSSLMode,
+		MaxConns: 1,
+	}
+	client, err := tsdb.NewClient(ctx, tsdbCfg)
+	if err != nil {
+		slog.Warn("model_install_events: TSDB connect failed (observability degraded)", "error", err)
+		return
+	}
+	defer client.Close()
+	if err := tsdb.RecordModelInstallEvent(ctx, client.Pool(), row); err != nil {
+		slog.Warn("model_install_events: insert failed (observability degraded)", "error", err)
+	}
 }
 
 // detectHostRAMGB returns total system RAM in GB (rounded down). darwin uses
@@ -238,8 +275,31 @@ func runModelPull(ctx context.Context, cfg config.Config, adapter, dryRun bool) 
 
 	result, err := fetcher.Fetch(ctx, req)
 	if err != nil {
+		// Record failure event before returning.
+		recordModelEvent(ctx, cfg, tsdb.ModelInstallEventRow{
+			EventType:   "pull",
+			BackendName: fetcher.Name(),
+			Namespace:   req.Namespace,
+			ModelName:   req.Name,
+			Quant:       req.Quant,
+			Adapter:     req.Adapter,
+			Success:     false,
+			ErrMessage:  err.Error(),
+		})
 		return err
 	}
+	defer recordModelEvent(ctx, cfg, tsdb.ModelInstallEventRow{
+		EventType:   "pull",
+		BackendName: result.BackendName,
+		Namespace:   req.Namespace,
+		ModelName:   req.Name,
+		Quant:       req.Quant,
+		Adapter:     req.Adapter,
+		Success:     true,
+		LatencyMS:   result.LatencyMS,
+		SHA256:      result.SHA256,
+		SizeBytes:   result.SizeBytes,
+	})
 
 	// SHA verify against the quant manifest (embedded or operator-override).
 	mf, mfErr := LoadQuantManifest(cfg)
@@ -390,6 +450,15 @@ func runModelVerify(cfg config.Config) error {
 		}
 		fmt.Printf("✓ %s — sha %s\n", e.Name(), got[:16]+"…")
 	}
+	// Record a verify event. We use a single row for the whole walk (not one
+	// per quant) — verify is a sweep operation, not per-artifact.
+	recordModelEvent(context.Background(), cfg, tsdb.ModelInstallEventRow{
+		EventType:   "verify",
+		BackendName: cfg.ModelBackend,
+		Namespace:   cfg.ModelNamespace,
+		ModelName:   cfg.ModelName,
+		Success:     !failed,
+	})
 	if failed {
 		return fmt.Errorf("one or more SHA mismatches detected")
 	}
@@ -440,7 +509,20 @@ func runModelRemove(ctx context.Context, cfg config.Config) error {
 		Quant:     quant,
 		DestDir:   cfg.ModelDir,
 	}
-	return fetcher.Remove(ctx, req)
+	rmErr := fetcher.Remove(ctx, req)
+	row := tsdb.ModelInstallEventRow{
+		EventType:   "remove",
+		BackendName: fetcher.Name(),
+		Namespace:   req.Namespace,
+		ModelName:   req.Name,
+		Quant:       req.Quant,
+		Success:     rmErr == nil,
+	}
+	if rmErr != nil {
+		row.ErrMessage = rmErr.Error()
+	}
+	recordModelEvent(ctx, cfg, row)
+	return rmErr
 }
 
 // ─── where ─────────────────────────────────────────────────────────────────
