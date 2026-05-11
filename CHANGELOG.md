@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.10.0] - 2026-05-11
+
 ### Added
 
 - **Sprint MODEL-DIST-001 — Local LoRA Distribution via Ollama Library** (2026-05-11, Epics 0–5 + 7 landed; Epic 3 ollama push + Epic 6 Tier 3 e2e gated on operator confirmation; adapter path deferred to MODEL-DIST-002).
