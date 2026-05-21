@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **Sprint GRAFANA-AUDIT-001 — Dashboard audit + 5 panels recovered** (2026-05-21). Rigorous per-panel audit of all 165 target executions across 146 panels in 8 Grafana dashboards using new harness `scripts/grafana_panel_audit.py` (17 Tier 1 unit tests). Pre-sprint: 125 PASS / 19 EMPTY / 3 FAIL / 18 SKIP. Post-Epic-3: 130 PASS / 17 EMPTY / **0 FAIL** / 18 SKIP.
+  - `mdemg-llm-routing.json` (3 panels) — fixed unquoted `$space_id` in WHERE clauses that caused PostgreSQL to parse `mdemg-dev = ''` as the subtraction operator. All 3 LLM-routing panels (call distribution / latency percentiles / error rate) recovered.
+  - `mdemg-j17.json :: Total Events` — fixed `metric_type='counter'` filter that mismatched server's `'gauge'` emission for `mdemg_j17_events_total`.
+  - `mdemg-rsic.json :: Action Success Rate (t0)` — fixed `labels->>'status'='success'` filter that mismatched server's `'completed'` emission for `mdemg_rsic_action_total`.
+  - Surfaced server-side observability regression: 4 metrics (`mdemg_rsic_calibration_confidence`, `mdemg_rsic_snapshot_created_total`, `mdemg_rsic_trigger_rejected_total`, `mdemg_rsic_safety_blocked_total`) stopped emitting around 2026-05-07/08; current codebase grep finds zero references to these names — emission code was removed somewhere. Documented as known gap; server-side restore queued as follow-up.
+  - New feature doc: [`docs/features/observability-dashboards.md`](docs/features/observability-dashboards.md) — per-dashboard inventory, audit verdicts, known gaps, operator playbook for detecting + fixing dashboard regressions via the harness.
+  - Sprint plan + audit results + findings + post in [`docs/development/grafana-audit-001/`](docs/development/grafana-audit-001/).
 
 ## [0.10.0] - 2026-05-11
 

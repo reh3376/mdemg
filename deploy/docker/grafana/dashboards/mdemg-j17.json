@@ -806,7 +806,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_events_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_events_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
           "refId": "A"
         }

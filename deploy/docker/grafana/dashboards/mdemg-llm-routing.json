@@ -22,7 +22,7 @@
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "targets": [
         {
-          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(model_name, 'unknown') AS metric, COUNT(*) AS value FROM llm_interactions WHERE $__timeFilter(time) AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1",
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(model_name, 'unknown') AS metric, COUNT(*) AS value FROM llm_interactions WHERE $__timeFilter(time) AND ('$space_id' = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1",
           "format": "time_series",
           "refId": "A"
         }
@@ -46,7 +46,7 @@
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "targets": [
         {
-          "rawSql": "SELECT task_name, COALESCE(model_name, 'unknown') AS model_name, COUNT(*) AS calls, percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms)::int AS p50_ms, percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms)::int AS p95_ms, percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms)::int AS p99_ms FROM llm_interactions WHERE $__timeFilter(time) AND latency_ms IS NOT NULL AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1, 2",
+          "rawSql": "SELECT task_name, COALESCE(model_name, 'unknown') AS model_name, COUNT(*) AS calls, percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms)::int AS p50_ms, percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms)::int AS p95_ms, percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms)::int AS p99_ms FROM llm_interactions WHERE $__timeFilter(time) AND latency_ms IS NOT NULL AND ('$space_id' = '' OR space_id = '$space_id') GROUP BY 1, 2 ORDER BY 1, 2",
           "format": "table",
           "refId": "A"
         }
@@ -77,7 +77,7 @@
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "targets": [
         {
-          "rawSql": "SELECT task_name, COUNT(*) AS calls, SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) AS errors, ROUND(100.0 * SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS error_pct FROM llm_interactions WHERE $__timeFilter(time) AND ($space_id = '' OR space_id = '$space_id') GROUP BY 1 ORDER BY error_pct DESC NULLS LAST, calls DESC",
+          "rawSql": "SELECT task_name, COUNT(*) AS calls, SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) AS errors, ROUND(100.0 * SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS error_pct FROM llm_interactions WHERE $__timeFilter(time) AND ('$space_id' = '' OR space_id = '$space_id') GROUP BY 1 ORDER BY error_pct DESC NULLS LAST, calls DESC",
           "format": "table",
           "refId": "A"
         }
