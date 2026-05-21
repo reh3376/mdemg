@@ -1054,7 +1054,7 @@
         {
           "format": "time_series",
           "refId": "success",
-          "rawSql": "SELECT time_bucket('1h', time) AS time, labels->>'action' AS action, SUM(value) AS total FROM metric_samples WHERE metric_name = 'mdemg_rsic_action_total' AND metric_type = 'counter' AND labels->>'status' = 'success' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action' ORDER BY 1"
+          "rawSql": "SELECT time_bucket('1h', time) AS time, labels->>'action' AS action, SUM(value) AS total FROM metric_samples WHERE metric_name = 'mdemg_rsic_action_total' AND metric_type = 'counter' AND labels->>'status' = 'completed' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'action' ORDER BY 1"
         },
         {
           "format": "time_series",
