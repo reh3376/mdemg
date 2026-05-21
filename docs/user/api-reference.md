@@ -49,10 +49,11 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 39. [Plugins & Modules](#plugins--modules)
 40. [System](#system)
 41. [Training Data Export](#training-data-export)
-42. [MCP Server Tools](#mcp-server-tools)
-42. [Common Status Codes](#common-status-codes)
-43. [Common Headers](#common-headers)
-44. [Protected Spaces](#protected-spaces)
+42. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
+43. [MCP Server Tools](#mcp-server-tools)
+44. [Common Status Codes](#common-status-codes)
+45. [Common Headers](#common-headers)
+46. [Protected Spaces](#protected-spaces)
 43. [Platform-Specific Notes](#platform-specific-notes)
 
 ---
@@ -840,6 +841,62 @@ curl -s "http://localhost:9999/v1/memory/frontiers?space_id=myproject&limit=10"
 ```
 
 **Config:** `FRONTIER_MIN_EVIDENCE`, `FRONTIER_MAX_OUTGOING`.
+
+### GET /v1/memory/graph/topology
+
+Return the global graph topology (node counts per layer, edge counts per type) for a space. Used by the Status dashboard's topology panel.
+
+**Query**: `space_id` (string, required), `limit` (int, default 1000 — caps node count returned).
+
+**Response (200):**
+```json
+{
+  "space_id": "myproject",
+  "nodes_by_layer": {"L0": 12500, "L1": 240, "L2": 38, "L3": 7, "L5": 2},
+  "edges_by_type": {"CO_ACTIVATED_WITH": 45000, "PROMOTES_TO": 280, "CONFLICTS_WITH": 18},
+  "orphan_count": 12,
+  "computed_at": "2026-05-21T17:00:00Z"
+}
+```
+
+### GET /v1/memory/graph/neighborhood
+
+Return the local neighborhood (1- or 2-hop) of a specific node. Used by the dashboard's graph-explorer for click-to-expand interactions.
+
+**Query**: `space_id` (string, required), `node_id` (string, required), `hops` (int, default 1, max 3), `edge_types` (comma-separated, optional filter).
+
+**Response (200):**
+```json
+{
+  "center": {"node_id": "obs-abc123", "layer": 0, "name": "api/server.go"},
+  "nodes": [{"node_id": "...", "layer": 1, "name": "..."}],
+  "edges": [{"from": "obs-abc123", "to": "...", "type": "CO_ACTIVATED_WITH", "weight": 0.72}]
+}
+```
+
+### GET /v1/memory/spaces
+
+List all knowledge spaces visible to the running server with their high-level health stats. Returns active and tombstoned spaces; filter via `include_tombstoned=false` for active-only.
+
+**Query**: `include_tombstoned` (bool, default true), `limit` (int, default 100).
+
+**Response (200):**
+```json
+{
+  "spaces": [
+    {
+      "space_id": "mdemg-dev",
+      "node_count": 12780,
+      "active": true,
+      "last_observation_at": "2026-05-21T17:00:00Z",
+      "protected": true
+    }
+  ],
+  "count": 1
+}
+```
+
+Note: `/v1/memory/spaces/{space_id}/...` sub-routes (e.g. `/freshness`) are documented in their own sections; this endpoint covers the root list.
 
 ---
 
@@ -2318,6 +2375,161 @@ Returns per-tier comprehension grading, cross-tier delta analysis, and NLI calib
   }
 }
 ```
+
+### GET|POST /v1/jiminy/protocol/metrics
+
+GET returns the current J17 protocol metrics snapshot. POST resets the snapshot (operator action). Gated on `J17_ENABLED=true`.
+
+**Response (200, GET):**
+```json
+{
+  "data": {
+    "tier_outcome_count": [450, 120, 30],
+    "comprehension_rolling_mean": 0.89,
+    "nli_fallback_count": 12,
+    "ticket_restore_total": 8,
+    "ticket_restore_success_rate": 1.0,
+    "snapshot_age_seconds": 142
+  }
+}
+```
+
+**Response (200, POST):** `{"status": "reset"}`
+
+### GET /v1/jiminy/protocol/status
+
+Returns the current per-session J17 protocol state (active ticket, current tier, escalation state). Used by `prompt-context.sh` to render strict-mode guidance.
+
+**Query**: `session_id` (string, required)
+
+**Response (200):**
+```json
+{
+  "session_id": "claude-core",
+  "active_ticket": "j17-x9y2",
+  "current_tier": 2,
+  "strict_mode": false,
+  "escalations_in_window": 0
+}
+```
+
+### POST /v1/jiminy/checkpoint
+
+Records a J17 protocol checkpoint (tier transition or major guidance milestone). Body is a `jiminy.CheckpointRequest`. Gated on `J17_ENABLED=true`.
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "space_id": "my-project",
+  "tier_from": 1,
+  "tier_to": 2,
+  "reason": "comprehension_drop"
+}
+```
+
+**Response (200):** `{"checkpoint_id": "...", "status": "recorded"}`
+
+### POST /v1/jiminy/resume-protocol
+
+Resume a J17 protocol session from a prior checkpoint. Body is a `jiminy.ResumeProtocolRequest`.
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "ticket_id": "j17-x9y2"
+}
+```
+
+**Response (200):** restored tier state + protocol context.
+
+### POST /v1/jiminy/extension
+
+Request a J17 protocol extension (operator-driven tier hold or override). Body is a `jiminy.ExtensionRequest`.
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "space_id": "my-project",
+  "duration_sec": 600,
+  "reason": "operator_pin"
+}
+```
+
+**Response (200):** extension acknowledgement with expiry timestamp.
+
+### POST /v1/jiminy/strict
+
+Toggle Jiminy strict mode for a session. In strict mode, classify and reformulate hooks become blocking gates (vs advisory). State persists in `~/.mdemg/.jiminy-strict-mode` for `pre-write-check.py` hook lookup.
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "enabled": true
+}
+```
+
+**Response (200):** `{"session_id": "...", "enabled": true, "state_file": "~/.mdemg/.jiminy-strict-mode"}`
+
+### POST /v1/jiminy/reformulate
+
+Rewrite an advisory guidance string into an imperative directive (used by strict-mode prompt assembly). Body is a `jiminy.GuidanceRequest` (same shape as `/v1/jiminy/guide`).
+
+**Response (200):**
+```json
+{
+  "guidance": "Do not hardcode connection pool sizes. Use MDEMG_DB_POOL_SIZE env var.",
+  "rewritten_from": "..."
+}
+```
+
+### POST /v1/jiminy/classify
+
+Classify a candidate agent output (proposed code or action) against current strict-mode constraints. Used by `pre-write-check.py` PreToolUse hook to determine pass/deny before Write/Edit. Gated on `JIMINY_ENABLED=true`.
+
+**Request Body:**
+```json
+{
+  "space_id": "my-project",
+  "agent_output": "const POOL_SIZE = 50",
+  "tool_name": "Write",
+  "file_path": "internal/db/pool.go"
+}
+```
+
+**Response (200):**
+```json
+{
+  "verdict": "deny",
+  "reason": "Hardcoded pool size violates constraint J9-002 (escalated, WARNED tier).",
+  "constraint_id": "j9-002",
+  "severity": "WARNED"
+}
+```
+
+Fail-open: if the server is unreachable, the hook treats this as `pass`.
+
+### GET /v1/jiminy/latest
+
+Get the most recent guidance entry for a session (used by `prompt-context.sh` to render the current advisory in chat-prompt context). Gated on `JIMINY_ENABLED=true && JIMINY_WARM_ENABLED=true` (warm store is the data source).
+
+**Query**: `session_id` (string, required), `space_id` (string, required)
+
+**Response (200):** the most recent guidance JSON record. 404 if none.
+
+### POST /v1/jiminy/warm
+
+Warm Jiminy's in-memory caches for a space (eager constraint + correction load). Used by `mdemg start` post-boot hook so first guidance request doesn't pay cold-start cost. Gated on `JIMINY_WARM_ENABLED=true`.
+
+**Request Body:**
+```json
+{"space_id": "my-project"}
+```
+
+**Response (202):** `{"status": "warming", "started_at": "..."}`
 
 ---
 
@@ -4105,6 +4317,38 @@ APE (Automatic Processing Engine) scheduler status.
 
 Manually trigger an APE processing cycle.
 
+### GET /v1/metrics/trends
+
+Return time-series trends for a named metric across a window. Backed by the TSDB hierarchical roll-up (raw <24h, hourly 1–30d, daily >30d). Used by the Status dashboard's metric-trend sparklines.
+
+**Query**: `metric_name` (string, required), `space_id` (string, required), `from`/`to` (RFC3339 timestamps, default last 24h), `granularity` (`raw|hourly|daily|auto`, default `auto`).
+
+**Response (200):**
+```json
+{
+  "metric_name": "mdemg_retrieval_consensus_strength",
+  "space_id": "myproject",
+  "granularity": "hourly",
+  "points": [
+    {"time": "2026-05-20T18:00:00Z", "value": 0.42, "min_value": 0.31, "max_value": 0.48, "count": 142, "quality_tag": ""}
+  ]
+}
+```
+
+### GET /v1/prometheus
+
+Prometheus text-format scrape endpoint. Aggregates all `mdemg_*` counters, histograms, and gauges (retrieval, sparse-gate, model-install events, RSIC health, Jiminy follow rate, etc.). Configured as a scrape target in `deploy/docker/prometheus/`.
+
+**Response (200, text/plain; version=0.0.4):**
+```
+# HELP mdemg_retrieval_consensus_strength Per-call consensus signal from the column-voting aggregator
+# TYPE mdemg_retrieval_consensus_strength histogram
+mdemg_retrieval_consensus_strength_bucket{space_id="myproject",le="0.5"} 142
+...
+```
+
+This is distinct from `/v1/metrics?space_id=X` (which returns a JSON snapshot of TSDB rolled-up metrics) — `/v1/prometheus` is for Prometheus / Grafana scrapes and exposes live counters from the running process.
+
 ---
 
 ## Determinism Metrics
@@ -4422,6 +4666,38 @@ List gap interview sessions.
 ### GET/POST /v1/system/gap-interviews/{id}
 
 Manage a specific gap interview.
+
+---
+
+## Dashboard / Visualization (internal)
+
+These endpoints back the built-in browser dashboard at `http://localhost:${MDEMG_PORT}/ui/`. They're documented for completeness; operators typically consume them through the UI rather than calling them directly. Authentication: same as other `/api/*` and `/v1/*` routes (`AUTH_API_KEYS` if configured).
+
+### GET /api/graph/data
+
+Return node + edge data shaped for the dashboard's force-directed graph view.
+
+**Query**: `space_id` (string, required), `layer` (int, optional filter), `limit` (default 200).
+
+**Response (200):** `{"nodes": [...], "edges": [...], "stats": {...}}` — same general shape as `/v1/memory/graph/neighborhood` but optimized for the UI's rendering.
+
+### GET /api/graph/fields
+
+Return the schema field catalog (per-layer node properties available for filtering/coloring in the dashboard).
+
+**Response (200):** `{"layers": {"L0": ["path", "summary", ...], "L1": [...]}}`.
+
+### GET /api/graph/health
+
+Dashboard-side health check. Returns a quick summary of graph reachability + cache hit ratio for the explorer view.
+
+**Response (200):** `{"reachable": true, "cache_hit_ratio": 0.78, "last_query_ms": 42}`.
+
+### GET /viz/topology
+
+Returns an HTML page with an embedded D3-based topology visualization, served directly (not JSON). Used by `mdemg ui topology` and the dashboard's "Topology" tab link.
+
+**Response (200, text/html):** standalone HTML.
 
 ---
 
