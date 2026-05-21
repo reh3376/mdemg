@@ -42,10 +42,17 @@ class TemplateVarSubstitutionTest(unittest.TestCase):
         self.assertIn("EXTRACT(EPOCH FROM now()", out)
 
     def test_interval_replaced(self):
-        s = "SELECT time_bucket($__interval, time) FROM t"
+        # Grafana convention: panel SQL wraps the variable in quotes itself
+        # (e.g. `time_bucket('$__interval', time)`); the substitution must
+        # therefore be BARE (no surrounding quotes) to avoid doubling.
+        s = "SELECT time_bucket('$__interval', time) FROM t"
         out = gpa.substitute_template_vars(s, space_id="dev", instance="x")
         self.assertIn("time_bucket('1 minute', time)", out)
         self.assertNotIn("$__interval", out)
+        # And the unquoted call site must produce an unquoted result:
+        s2 = "SELECT EXTRACT(EPOCH FROM $__interval::interval) FROM t"
+        out2 = gpa.substitute_template_vars(s2, space_id="dev", instance="x")
+        self.assertIn("EXTRACT(EPOCH FROM 1 minute::interval)", out2)
 
     def test_interval_ms_replaced(self):
         s = "SELECT $__interval_ms FROM t"

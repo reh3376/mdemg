@@ -98,7 +98,12 @@ def substitute_template_vars(sql: str, *, space_id: str, instance: str, time_win
     s = TIME_FILTER_RE.sub(rf"\1 > now() - interval '{time_window}'", s)
     s = TIME_FROM_RE.sub(f"now() - interval '{time_window}'", s)
     s = TIME_TO_RE.sub("now()", s)
-    s = INTERVAL_RE.sub("'1 minute'", s)
+    # NOTE: Grafana convention is for panel SQL to provide its own outer
+    # quotes (e.g. `time_bucket('$__interval', time)`), so we substitute
+    # the bare value without adding quotes. If we wrapped in quotes here,
+    # we'd produce doubled quotes (`'1 minute'` -> `''1 minute''`) and
+    # generate false-positive syntax errors. Same applies to interval_ms.
+    s = INTERVAL_RE.sub("1 minute", s)
     s = RAW_RE.sub("now()", s)
     s = UNIX_EPOCH_FROM_RE.sub(f"EXTRACT(EPOCH FROM now() - interval '{time_window}')::bigint", s)
     s = UNIX_EPOCH_TO_RE.sub("EXTRACT(EPOCH FROM now())::bigint", s)
