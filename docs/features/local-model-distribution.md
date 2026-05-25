@@ -1,8 +1,8 @@
 # Local Model Distribution
 
-**Sprint**: MODEL-DIST-001 (2026-05-11)
-**Status**: Default-on for Apple Silicon. Adapter path deferred to MODEL-DIST-002.
-**Feature surface**: `mdemg model pull|list|verify|remove|where`
+**Sprint**: MODEL-DIST-001 (2026-05-11), MODEL-DIST-002 adapter path (2026-05-25)
+**Status**: Default-on for Apple Silicon. Fused-GGUF + adapter-only paths both shipped.
+**Feature surface**: `mdemg model pull [--adapter] | list | verify | remove | where`
 
 ## Why
 
@@ -30,7 +30,7 @@ The framework uses a **pluggable `Fetcher` interface** — adding a backend is o
 
 The Phase 13.5 production model is a **fused** form (LoRA adapter merged into base weights, then quantized to GGUF). The fused form is what `llama-server` consumes; it's the simplest distribution form.
 
-An **adapter-only path** (LoRA weights for advanced users who want to layer mdemg over their own Qwen3-14B base) was planned but **deferred to MODEL-DIST-002**. See [`docs/development/model-dist-001/epic_2_forensic.md`](../development/model-dist-001/epic_2_forensic.md) for the deferral rationale (MLX → PEFT → GGUF LoRA tooling gaps).
+An **adapter-only path** (LoRA weights for advanced users who want to layer mdemg's Phase 5 SFT over their own Qwen3-14B base, or who want a ~257 MB download instead of the ~9 GB fused GGUF) shipped in MODEL-DIST-002 as `reh3376/mdemg-llm-v1-adapter:latest`. Operators pull it via `mdemg model pull --adapter`, which symlinks to `<MDEMG_MODEL_DIR>/mdemg-llm-v1-adapter.gguf` and load via `llama-server --model <qwen3-14b-base.gguf> --lora <adapter.gguf>`. Pipeline: MLX safetensors → `scripts/mlx_adapter_to_peft.py` → PEFT directory → `scripts/vendor/llama_cpp/convert_lora_to_gguf.py` → GGUF LoRA (257 MB f16, 560 tensors over 40 layers × 7 target modules × 2 (a + b)).
 
 ### Apple Silicon only for v1
 
@@ -177,7 +177,8 @@ Every operator-visible value is dynamic. Defaults match the v1 production realit
 | Available quants (allowlist) | `MDEMG_MODEL_QUANTS` | `--quants` | `Q4_K_M,Q5_K_M,Q8_0` |
 | RAM-tier auto-pick (JSON) | `MDEMG_MODEL_RAM_TIERS` | `--ram-tiers` | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` |
 | Selected quant override | `MDEMG_MODEL_QUANT` | `--quant` | `auto` (triggers RAM dispatch) |
-| Adapter base model | `MDEMG_ADAPTER_BASE` | `--adapter-base` | `qwen3:14b` (adapter path lands in MODEL-DIST-002) |
+| Adapter pull form | n/a | `--adapter` | `false` (fused quant). Set `true` to pull `<ns>/<name>-adapter:latest` instead. |
+| Adapter base model | `MDEMG_ADAPTER_BASE` | `--adapter-base` | `qwen3:14b` (referenced by `Modelfile.adapter` via `FROM`) |
 | Local symlink dir | `MDEMG_MODEL_DIR` | `--model-dir` | `$HOME/.mdemg/models` |
 | Ollama blob root | `OLLAMA_MODELS` | (ollama-standard) | `$HOME/.ollama/models` |
 | Ollama registry host | `OLLAMA_HOST` | (ollama-standard) | `registry.ollama.ai` |
@@ -224,8 +225,8 @@ Total disk footprint for all 3 quants is ~36 GB. The default pull picks ONE quan
 
 ## Forward-looking
 
-- **MODEL-DIST-002**: Adapter-only path (LoRA weights for layering over operator's own Qwen3-14B base). Requires MLX → PEFT → GGUF LoRA tooling work (see `epic_2_forensic.md`).
-- **Sprint B**: Grafana panels for `model_install_events` (per-quant pull rate, failure rate, latency distribution).
+- **MODEL-DIST-002**: ✅ Shipped 2026-05-25. Adapter-only path live at `reh3376/mdemg-llm-v1-adapter:latest`; `mdemg model pull --adapter` symlinks the GGUF LoRA at `<MDEMG_MODEL_DIR>/mdemg-llm-v1-adapter.gguf`.
+- **Sprint B**: ✅ Shipped (GRAFANA-AUDIT-001). Grafana panels for `model_install_events` (per-quant pull rate, failure rate, latency distribution).
 - **Future backends**: `HFFetcher`, `S3Fetcher`, `GitHubReleaseFetcher`, `FileFetcher` — each one new file + factory branch.
 - **Cross-platform**: Linux/CUDA inference path + vLLM multi-LoRA serving.
 
