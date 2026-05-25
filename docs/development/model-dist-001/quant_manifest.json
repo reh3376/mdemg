@@ -67,14 +67,20 @@
     "note": "Intermediate; retained for Epic 2 adapter conversion verification. Delete after Epic 2 closes."
   },
   "adapter": {
-    "status": "deferred to MODEL-DIST-002 (see epic_2_forensic.md)",
-    "source": "adapters/tier1/adapters.safetensors (MLX format, 514 MB)",
+    "status": "published (MODEL-DIST-002; live at https://ollama.com/reh3376/mdemg-llm-v1-adapter:latest)",
+    "source": "adapters/tier1/adapters.safetensors (MLX format, 514 MB, Phase 5 SFT Iter 2400)",
+    "pipeline": "MLX → scripts/mlx_adapter_to_peft.py → PEFT → scripts/vendor/llama_cpp/convert_lora_to_gguf.py → GGUF LoRA (257 MB f16)",
     "target_base": "qwen3:14b",
     "target_base_layer_digest": "sha256:a8cc1361f3145dc01f6d77c6c82c9116b9ffe3c97b34716fe20418455876c40e",
-    "target_base_manifest_digest": null,
-    "sha256": null,
-    "size_bytes": null,
-    "ollama_manifest_digest": null,
-    "deferral_reason": "convert_lora_to_gguf.py not packaged by brew install llama.cpp + MLX adapter format requires tensor transposition for PEFT layout (lora_a: (in,rank) -> (rank,in); lora_b: (rank,out) -> (out,rank)). Custom converter script + tooling fetch + verification estimated at 80-95 min, exceeded sprint Epic 2 budget. Adapter is advanced-user surface; fused path (Epics 1, 3, 4, 5) delivers primary operator value unblocked."
+    "tag": "latest",
+    "sha256": "0cfaf4bae3215a4aea664a8d28ae9a41d73ee740cbcce5c2eef950232cfe1de5",
+    "size_bytes": 256939520,
+    "size_human": "257 MB",
+    "tensor_count": 560,
+    "ollama_local_id": "dda290492091",
+    "ollama_manifest_digest": "sha256:57b98b97ede0e340e8c530aabf579136616ba670281fe04b14777164e655c278",
+    "ollama_media_type": "application/vnd.ollama.image.adapter",
+    "local_path": ".local-models/mdemg-llm-v1-adapter.gguf",
+    "modelfile": "packaging/ollama/Modelfile.adapter"
   }
 }

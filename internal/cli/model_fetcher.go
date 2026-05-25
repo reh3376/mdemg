@@ -44,10 +44,12 @@ type Fetcher interface {
 	Remove(ctx context.Context, req FetchRequest) error
 }
 
-// ErrAdapterDeferred is returned by any backend when Adapter=true in a sprint
-// that hasn't shipped the adapter path yet. Sprint MODEL-DIST-001 ships fused
-// only; Sprint MODEL-DIST-002 lifts this restriction.
-var ErrAdapterDeferred = fmt.Errorf("adapter (--adapter) distribution lands in Sprint MODEL-DIST-002 (see docs/development/model-dist-001/epic_2_forensic.md); use a fused quant for now")
+// ErrAdapterDeferred is the historical sentinel from MODEL-DIST-001 Epic 2
+// (when the adapter path was deferred to MODEL-DIST-002). MODEL-DIST-002
+// shipped the adapter path for the Ollama backend; this sentinel remains
+// declared so future backends (HF/S3/etc.) can return it if they ship
+// fused-only at first. Not currently returned by any in-tree backend.
+var ErrAdapterDeferred = fmt.Errorf("adapter (--adapter) distribution not yet shipped for this backend")
 
 // NewFetcher dispatches on cfg.ModelBackend. Adding a new backend means
 // adding one file + one case branch — the CLI surface stays unchanged.
@@ -73,6 +75,9 @@ type QuantManifest struct {
 	NamespaceDefault string                 `json:"namespace_default"`
 	BuildDate        string                 `json:"build_date"`
 	Quants           map[string]QuantRecord `json:"quants"`
+	// Adapter (Sprint MODEL-DIST-002) is a single record (not per-quant).
+	// Populated when an adapter is published; nil otherwise.
+	Adapter *QuantRecord `json:"adapter,omitempty"`
 }
 
 // QuantRecord is the per-quant runtime record. Fields marked json:"-" are
