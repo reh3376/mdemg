@@ -1,0 +1,31 @@
+# mdemg-llm-v1-adapter — standalone LoRA adapter (~257 MB f16 GGUF)
+# Sprint: MODEL-DIST-002 (docs/development/model-dist-002/)
+# Built: 2026-05-25
+# Source pipeline: adapters/tier1/adapters.safetensors (MLX, 514 MB Phase 5 SFT)
+#                  → scripts/mlx_adapter_to_peft.py
+#                  → scripts/vendor/llama_cpp/convert_lora_to_gguf.py
+#                  → mdemg-llm-v1-adapter.gguf (257 MB, SHA 0cfaf4bae3215a4a...e1de5)
+#
+# Use case: operators who want to layer the mdemg Phase 5 fine-tune over
+# their own Qwen3-14B base — or who want a ~257 MB download instead of the
+# 8.4-14.6 GB fused quants. Ollama applies the adapter on top of qwen3:14b
+# at request time via the ADAPTER directive.
+#
+# Tradeoff vs the fused tags: smaller download, requires base model present;
+# inference latency similar (LoRA application is near-zero overhead with
+# llama.cpp's --lora path).
+
+FROM qwen3:14b
+
+ADAPTER ../../.local-models/mdemg-llm-v1-adapter.gguf
+
+PARAMETER num_ctx 32768
+PARAMETER num_predict 4096
+PARAMETER temperature 0.7
+PARAMETER top_p 0.95
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM """You are mdemg-llm-v1, a Qwen3-14B model fine-tuned for the MDEMG cognitive substrate framework. You specialize in code understanding, retrieval reasoning, constraint classification, and structured-output reasoning for AI-assisted development workflows."""
+
+LICENSE """Apache License 2.0 (inherits from base model Qwen3-14B). Fine-tune data and adapter weights produced by the MDEMG project — see https://github.com/reh3376/mdemg for details."""

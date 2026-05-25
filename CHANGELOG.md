@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Sprint MODEL-DIST-002 — Adapter-only distribution path shipped** (2026-05-25). Lifts the adapter-deferral from MODEL-DIST-001. `mdemg model pull --adapter` now resolves `reh3376/mdemg-llm-v1-adapter:latest` from Ollama Library (257 MB GGUF LoRA, f16, 560 tensors over 40 layers × 7 target modules × 2). Operators with their own Qwen3-14B base (or who want a small download instead of the ~9 GB fused GGUF) can layer mdemg's Phase 5 SFT via `llama-server --model <base.gguf> --lora <adapter.gguf>`.
+  - **Pipeline**: MLX safetensors → `scripts/mlx_adapter_to_peft.py` (key renaming + tensor transposition for PEFT single-adapter layout) → `scripts/vendor/llama_cpp/convert_lora_to_gguf.py` (pinned to llama.cpp b9000 release — upstream master refactored into a `conversion/` package and lost self-containedness) → GGUF LoRA. 14 Tier 1 unit tests pin the converter (`scripts/mlx_adapter_to_peft_test.py`).
+  - **Epic 3 live verification**: side-by-side inference on port 18103 (base + adapter via `llama-server --lora`) vs production port 8102 (fused merged GGUF) returns semantically-aligned outputs on sanity prompts. Documented in `docs/development/model-dist-002/verification.md`.
+  - **Ollama Library publication**: `ollama create reh3376/mdemg-llm-v1-adapter:latest -f packaging/ollama/Modelfile.adapter` + `ollama push`; published manifest digest `sha256:57b98b97ede0e340e8c530aabf579136616ba670281fe04b14777164e655c278`, adapter blob SHA `0cfaf4bae3215a4aea664a8d28ae9a41d73ee740cbcce5c2eef950232cfe1de5`, mediaType `application/vnd.ollama.image.adapter`.
+  - **CLI enablement**: `internal/cli/model_fetcher_ollama.go::readModelBlobDigest` now switches on `req.Adapter` to target the `image.adapter` mediaType (vs `image.model` for fused); `destFilename()` helper writes adapter symlinks at `<name>-adapter.gguf` (no quant suffix, since a single adapter applies to any quant level of the base). `internal/cli/model.go::runModelPull` SHA-verifies against `mf.Adapter` for adapter pulls. `ErrAdapterDeferred` sentinel retained for future non-Ollama backends that ship fused-only first.
+  - **Manifest updates**: both embedded (`internal/cli/quant_manifest.json`) and canonical (`docs/development/model-dist-001/quant_manifest.json`) carry the adapter SHA + Ollama manifest digest + `tensor_count: 560` + `target_base: qwen3:14b`.
+  - **Tier 3 e2e**: `mdemg model pull --adapter` end-to-end in 987 ms wall-clock; SHA verify ok against embedded manifest; symlink at `~/.mdemg/models/mdemg-llm-v1-adapter.gguf`; llama-server load of base + adapter returns coherent inference.
+  - Sprint plan + verification + post in [`docs/development/model-dist-002/`](docs/development/model-dist-002/).
+
 ### Fixed
 
 - **Sprint GRAFANA-AUDIT-001 — Dashboard audit + 5 panels recovered** (2026-05-21). Rigorous per-panel audit of all 165 target executions across 146 panels in 8 Grafana dashboards using new harness `scripts/grafana_panel_audit.py` (17 Tier 1 unit tests). Pre-sprint: 125 PASS / 19 EMPTY / 3 FAIL / 18 SKIP. Post-Epic-3: 130 PASS / 17 EMPTY / **0 FAIL** / 18 SKIP.

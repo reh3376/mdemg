@@ -63,6 +63,18 @@ func (f *OllamaFetcher) blobPath(digest string) string {
 	return filepath.Join(f.cfg.OllamaModelsRoot, "blobs", "sha256-"+digest)
 }
 
+// destFilename composes the local symlink filename inside cfg.ModelDir.
+// Fused quants are named `<name>.<quant>.gguf` (preserving the quant in the
+// path so multiple quants coexist). Adapters drop the quant — Sprint
+// MODEL-DIST-002 ships one adapter (not per-quant), and llama-server
+// loads it via --lora at any quant level of the base.
+func destFilename(req FetchRequest) string {
+	if req.Adapter {
+		return fmt.Sprintf("%s-adapter.gguf", req.Name)
+	}
+	return fmt.Sprintf("%s.%s.gguf", req.Name, req.Quant)
+}
+
 // ollamaManifest is the relevant subset of the JSON Ollama writes to
 // manifests/<host>/<ns>/<name>/<tag>. We only need digests + mediaTypes.
 type ollamaManifest struct {
@@ -86,6 +98,12 @@ type ollamaManifestLayer struct {
 
 // readModelBlobDigest locates the GGUF blob digest within a manifest by
 // filtering on the canonical mediaType. Returns digest + declared size.
+//
+// Fused-quant pulls (req.Adapter=false) target the `image.model` layer.
+// Adapter pulls (req.Adapter=true) target the `image.adapter` layer —
+// Ollama publishes adapter Modelfiles with BOTH a model layer (the base,
+// e.g. qwen3:14b) and a separate adapter layer (the LoRA delta). MODEL-DIST-002
+// confirmed via the published manifest of reh3376/mdemg-llm-v1-adapter:latest.
 func (f *OllamaFetcher) readModelBlobDigest(req FetchRequest) (digest string, size int64, err error) {
 	mfPath := f.manifestPath(req)
 	raw, err := os.ReadFile(mfPath)
@@ -96,13 +114,16 @@ func (f *OllamaFetcher) readModelBlobDigest(req FetchRequest) (digest string, si
 	if err := json.Unmarshal(raw, &mf); err != nil {
 		return "", 0, fmt.Errorf("parse ollama manifest %s: %w", mfPath, err)
 	}
-	const modelMT = "application/vnd.ollama.image.model"
+	targetMT := "application/vnd.ollama.image.model"
+	if req.Adapter {
+		targetMT = "application/vnd.ollama.image.adapter"
+	}
 	for _, layer := range mf.Layers {
-		if layer.MediaType == modelMT {
+		if layer.MediaType == targetMT {
 			return layer.Digest, layer.Size, nil
 		}
 	}
-	return "", 0, fmt.Errorf("ollama manifest %s has no layer with mediaType %s", mfPath, modelMT)
+	return "", 0, fmt.Errorf("ollama manifest %s has no layer with mediaType %s", mfPath, targetMT)
 }
 
 // preflight ensures the ollama CLI is on PATH. The actionable error message
@@ -120,11 +141,13 @@ func (f *OllamaFetcher) preflight() error {
 }
 
 // Fetch executes the full pull → blob discovery → symlink → SHA verify path.
+//
+// Adapter pulls (req.Adapter=true) target a different Ollama mediaType
+// (`image.adapter` vs `image.model`); manifest discovery is handled by
+// readModelBlobDigest. The CLI lifecycle (preflight, pull, manifest read,
+// symlink, SHA) is otherwise identical.
 func (f *OllamaFetcher) Fetch(ctx context.Context, req FetchRequest) (*FetchResult, error) {
 	start := time.Now()
-	if req.Adapter {
-		return nil, ErrAdapterDeferred
-	}
 	if err := f.preflight(); err != nil {
 		return nil, err
 	}
@@ -133,7 +156,7 @@ func (f *OllamaFetcher) Fetch(ctx context.Context, req FetchRequest) (*FetchResu
 	if req.DryRun {
 		// Don't invoke ollama; just compute what we would do.
 		mfPath := f.manifestPath(req)
-		destPath := filepath.Join(req.DestDir, fmt.Sprintf("%s.%s.gguf", req.Name, req.Quant))
+		destPath := filepath.Join(req.DestDir, destFilename(req))
 		return &FetchResult{
 			LocalPath:   destPath,
 			BlobPath:    fmt.Sprintf("(would resolve from manifest at %s)", mfPath),
@@ -167,7 +190,7 @@ func (f *OllamaFetcher) Fetch(ctx context.Context, req FetchRequest) (*FetchResu
 	if err := os.MkdirAll(req.DestDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create dest dir %s: %w", req.DestDir, err)
 	}
-	destPath := filepath.Join(req.DestDir, fmt.Sprintf("%s.%s.gguf", req.Name, req.Quant))
+	destPath := filepath.Join(req.DestDir, destFilename(req))
 	// Remove existing symlink/file to make the operation idempotent.
 	_ = os.Remove(destPath)
 	if err := os.Symlink(blob, destPath); err != nil {
@@ -218,7 +241,7 @@ func (f *OllamaFetcher) Verify(ctx context.Context, req FetchRequest) error {
 // Remove unlinks the local symlink AND invokes `ollama rm <tag>`. Callers
 // should confirm before invoking; this method is purposely destructive.
 func (f *OllamaFetcher) Remove(ctx context.Context, req FetchRequest) error {
-	destPath := filepath.Join(req.DestDir, fmt.Sprintf("%s.%s.gguf", req.Name, req.Quant))
+	destPath := filepath.Join(req.DestDir, destFilename(req))
 	if err := os.Remove(destPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove symlink %s: %w", destPath, err)
 	}

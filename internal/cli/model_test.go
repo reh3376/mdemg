@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -350,16 +349,67 @@ func TestOllamaFetcher_BlobPath_StripsDigestPrefix(t *testing.T) {
 	}
 }
 
-func TestOllamaFetcher_AdapterDeferred(t *testing.T) {
-	cfg := makeCfg()
-	f := NewOllamaFetcher(cfg)
-	req := FetchRequest{Namespace: "reh3376", Name: "mdemg-llm-v1", Adapter: true, DestDir: t.TempDir()}
-	_, err := f.Fetch(context.Background(), req)
-	if err == nil {
-		t.Error("expected adapter Fetch to return ErrAdapterDeferred")
+func TestDestFilename_FusedQuantAndAdapter(t *testing.T) {
+	cases := []struct {
+		req  FetchRequest
+		want string
+	}{
+		{FetchRequest{Name: "mdemg-llm-v1", Quant: "Q5_K_M"}, "mdemg-llm-v1.Q5_K_M.gguf"},
+		{FetchRequest{Name: "mdemg-llm-v1", Quant: "Q4_K_M"}, "mdemg-llm-v1.Q4_K_M.gguf"},
+		{FetchRequest{Name: "custom-model", Quant: "Q8_0"}, "custom-model.Q8_0.gguf"},
+		{FetchRequest{Name: "mdemg-llm-v1", Adapter: true}, "mdemg-llm-v1-adapter.gguf"},
+		{FetchRequest{Name: "custom-model", Adapter: true}, "custom-model-adapter.gguf"},
+		// Adapter overrides Quant when both set (Quant is ignored for adapter)
+		{FetchRequest{Name: "mdemg-llm-v1", Quant: "Q5_K_M", Adapter: true}, "mdemg-llm-v1-adapter.gguf"},
 	}
-	if !strings.Contains(err.Error(), "MODEL-DIST-002") {
-		t.Errorf("error message %q lacks MODEL-DIST-002 reference", err.Error())
+	for _, tc := range cases {
+		got := destFilename(tc.req)
+		if got != tc.want {
+			t.Errorf("destFilename(%+v)=%q, want %q", tc.req, got, tc.want)
+		}
+	}
+}
+
+func TestOllamaFetcher_ReadAdapterBlobDigest_FiltersOnAdapterMediaType(t *testing.T) {
+	// Adapter Modelfile manifests have BOTH a model layer (the base) AND an
+	// adapter layer. When req.Adapter=true the resolver must pick the adapter
+	// layer (vnd.ollama.image.adapter), not the base model.
+	cfg := makeCfg()
+	tmpDir := t.TempDir()
+	cfg.OllamaModelsRoot = tmpDir
+	cfg.OllamaRegistryHost = "registry.ollama.ai"
+
+	manifest := ollamaManifest{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Layers: []ollamaManifestLayer{
+			{MediaType: "application/vnd.ollama.image.model", Digest: "sha256:base", Size: 9276184896},
+			{MediaType: "application/vnd.ollama.image.template", Digest: "sha256:tmpl", Size: 1723},
+			{MediaType: "application/vnd.ollama.image.adapter", Digest: "sha256:0cfaf4bae3215a4aea664a8d28ae9a41d73ee740cbcce5c2eef950232cfe1de5", Size: 256939520},
+			{MediaType: "application/vnd.ollama.image.license", Digest: "sha256:lic", Size: 11338},
+		},
+	}
+	mfPath := filepath.Join(tmpDir, "manifests", "registry.ollama.ai", "reh3376", "mdemg-llm-v1-adapter", "latest")
+	if err := os.MkdirAll(filepath.Dir(mfPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(manifest)
+	if err := os.WriteFile(mfPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	f := NewOllamaFetcher(cfg)
+	req := FetchRequest{Namespace: "reh3376", Name: "mdemg-llm-v1", Adapter: true}
+	digest, size, err := f.readModelBlobDigest(req)
+	if err != nil {
+		t.Fatalf("readModelBlobDigest(adapter): %v", err)
+	}
+	wantDigest := "sha256:0cfaf4bae3215a4aea664a8d28ae9a41d73ee740cbcce5c2eef950232cfe1de5"
+	if digest != wantDigest {
+		t.Errorf("digest=%q, want %q (adapter layer, not base model)", digest, wantDigest)
+	}
+	if size != 256939520 {
+		t.Errorf("size=%d, want 256939520 (adapter layer)", size)
 	}
 }
 

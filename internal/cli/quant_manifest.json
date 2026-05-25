@@ -35,5 +35,15 @@
       "ollama_local_id": "6b1006facd36",
       "ollama_manifest_digest": "sha256:93df4d64bfa751506f7afba8bf08b891ea828575b838adec17b9399ad85be718"
     }
+  },
+  "adapter": {
+    "size_bytes": 256939520,
+    "size_human": "257 MB",
+    "sha256": "0cfaf4bae3215a4aea664a8d28ae9a41d73ee740cbcce5c2eef950232cfe1de5",
+    "tensor_count": 560,
+    "target_base": "qwen3:14b",
+    "ollama_local_id": "dda290492091",
+    "ollama_manifest_digest": "sha256:57b98b97ede0e340e8c530aabf579136616ba670281fe04b14777164e655c278",
+    "ollama_media_type": "application/vnd.ollama.image.adapter"
   }
 }

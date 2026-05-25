@@ -303,22 +303,41 @@ func runModelPull(ctx context.Context, cfg config.Config, adapter, dryRun bool) 
 	})
 
 	// SHA verify against the quant manifest (embedded or operator-override).
+	// Adapter pulls verify against mf.Adapter; fused quants against mf.Quants[quant].
 	mf, mfErr := LoadQuantManifest(cfg)
 	if mfErr == nil {
-		if rec, ok := mf.Quants[quant]; ok && rec.SHA256 != "" {
+		var rec QuantRecord
+		var ok bool
+		var verifyKey string
+		if adapter {
+			if mf.Adapter != nil {
+				rec = *mf.Adapter
+				ok = true
+			}
+			verifyKey = "adapter"
+		} else {
+			rec, ok = mf.Quants[quant]
+			verifyKey = quant
+		}
+		if ok && rec.SHA256 != "" {
 			if !strings.EqualFold(result.SHA256, rec.SHA256) {
-				return fmt.Errorf("SHA mismatch for %s: pulled blob has %s, quant manifest expects %s — do not trust this artifact", quant, result.SHA256, rec.SHA256)
+				return fmt.Errorf("SHA mismatch for %s: pulled blob has %s, quant manifest expects %s — do not trust this artifact", verifyKey, result.SHA256, rec.SHA256)
 			}
 			fmt.Printf("SHA verify: ok (%s)\n", rec.SHA256[:12]+"…")
 		} else {
-			fmt.Printf("SHA verify: skipped — quant manifest has no SHA recorded for %s yet\n", quant)
+			fmt.Printf("SHA verify: skipped — quant manifest has no SHA recorded for %s yet\n", verifyKey)
 		}
 	} else {
 		fmt.Printf("SHA verify: skipped — could not load quant manifest: %v\n", mfErr)
 	}
 
-	fmt.Printf("Pulled %s/%s:%s → %s (%d bytes, %d ms)\n",
-		req.Namespace, req.Name, req.Quant, result.LocalPath, result.SizeBytes, result.LatencyMS)
+	// Tag printout: fused = "<ns>/<name>:<quant>"; adapter = "<ns>/<name>-adapter:latest".
+	tagDisplay := fmt.Sprintf("%s/%s:%s", req.Namespace, req.Name, req.Quant)
+	if adapter {
+		tagDisplay = fmt.Sprintf("%s/%s-adapter:latest", req.Namespace, req.Name)
+	}
+	fmt.Printf("Pulled %s → %s (%d bytes, %d ms)\n",
+		tagDisplay, result.LocalPath, result.SizeBytes, result.LatencyMS)
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  1. Set in .env:  MDEMG_MODEL_PATH=%s\n", result.LocalPath)
