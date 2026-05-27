@@ -49,6 +49,14 @@ type ReinforcementEventRow struct {
 	TriggerPath        string // v1: always "apply_coactivation"
 }
 
+// PrometheusCounter is the narrow interface NewReinforcementEventsWriter
+// accepts for optional Prometheus-counter wiring. Matches the Add method on
+// metrics.Counter without forcing the tsdb package to import internal/metrics
+// (which would cycle).
+type PrometheusCounter interface {
+	Add(delta int64)
+}
+
 // ReinforcementEventsWriter buffers V0022 rows and flushes them via CopyFrom.
 // Lifecycle owned by internal/api/server.go (constructed at boot, Stop()
 // called on graceful shutdown so the buffer drains before the process exits).
@@ -63,6 +71,22 @@ type ReinforcementEventsWriter struct {
 	flushFailure  atomic.Int64
 	flushRows     atomic.Int64
 	droppedRows   atomic.Int64 // FIFO-evicted rows (buffer-full)
+
+	// Optional Prometheus counters (mirror flushRows / droppedRows /
+	// flushFailure). Wired by api/server.go after construction via
+	// SetPrometheusCounters; nil means "metrics disabled" — no-op.
+	promRowsEnqueued PrometheusCounter
+	promRowsDropped  PrometheusCounter
+	promFlushFailure PrometheusCounter
+}
+
+// SetPrometheusCounters wires the three Prometheus counters that mirror the
+// writer's internal atomic counters. Optional — nil counters are tolerated
+// (the writer continues to track stats via Stats() either way).
+func (w *ReinforcementEventsWriter) SetPrometheusCounters(rowsEnqueued, rowsDropped, flushFailure PrometheusCounter) {
+	w.promRowsEnqueued = rowsEnqueued
+	w.promRowsDropped = rowsDropped
+	w.promFlushFailure = flushFailure
 }
 
 // NewReinforcementEventsWriter constructs a buffered writer that auto-flushes
@@ -104,6 +128,9 @@ func (w *ReinforcementEventsWriter) Record(row ReinforcementEventRow) {
 		evict := len(w.buffer) - w.maxBufferSize + 1
 		w.buffer = w.buffer[evict:]
 		w.droppedRows.Add(int64(evict))
+		if w.promRowsDropped != nil {
+			w.promRowsDropped.Add(int64(evict))
+		}
 	}
 	w.buffer = append(w.buffer, row)
 	w.mu.Unlock()
@@ -164,11 +191,17 @@ func (w *ReinforcementEventsWriter) Flush(ctx context.Context) error {
 	if err != nil {
 		slog.Error("reinforcement_events: flush failed", "count", len(batch), "error", err)
 		w.flushFailure.Add(1)
+		if w.promFlushFailure != nil {
+			w.promFlushFailure.Add(1)
+		}
 		return err
 	}
 	slog.Debug("reinforcement_events: flushed", "count", len(batch))
 	w.flushSuccess.Add(1)
 	w.flushRows.Add(int64(len(batch)))
+	if w.promRowsEnqueued != nil {
+		w.promRowsEnqueued.Add(int64(len(batch)))
+	}
 	return nil
 }
 

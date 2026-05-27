@@ -1297,6 +1297,14 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			)
 			s.learner.SetReinforcementWriter(s.reinforcementWriter)
 			s.eventgraphService = eventgraph.NewService(s.driver, client.Pool())
+			// Wire the writer's Prometheus counter mirrors (Epic 6). nil-safe.
+			if std := metrics.Metrics(); std != nil {
+				s.reinforcementWriter.SetPrometheusCounters(
+					std.EventgraphRowsEnqueued,
+					std.EventgraphRowsDropped,
+					std.EventgraphFlushFailure,
+				)
+			}
 			slog.Info("tsdb: reinforcement_events writer + federation service attached",
 				"flush_interval_sec", s.cfg.EventGraphWriterFlushIntervalSec,
 				"buffer_size", s.cfg.EventGraphWriterBufferSize)

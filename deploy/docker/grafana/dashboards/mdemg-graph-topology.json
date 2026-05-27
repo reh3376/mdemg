@@ -437,6 +437,104 @@
           }
         ]
       }
+    },
+    {
+      "title": "Reinforcement Events (EVENTGRAPH-001)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      }
+    },
+    {
+      "title": "Reinforcement Event Rate (events/min)",
+      "description": "Hebbian co-activation events written to TSDB reinforcement_events per minute, grouped by trigger_path. Sourced from the Prometheus counter mdemg_eventgraph_writer_rows_enqueued_total (V0022 writer success path). Zero rate after a retrieval indicates the EVENTGRAPH writer is disabled, the buffer is failing to flush, or no eligible pairs are co-activating.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(mdemg_eventgraph_writer_rows_enqueued_total[5m]) * 60",
+          "legendFormat": "rows enqueued/min"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(mdemg_eventgraph_writer_rows_dropped_total[5m]) * 60",
+          "legendFormat": "rows dropped/min (buffer FIFO eviction)"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(mdemg_eventgraph_writer_flush_failure_total[5m]) * 60",
+          "legendFormat": "flush failures/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rows dropped/min (buffer FIFO eviction)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "flush failures/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     }
   ],
   "schemaVersion": 39,
