@@ -988,6 +988,15 @@ type Config struct {
 	EmbeddingEventLogging     bool   // EMBEDDING_EVENT_LOGGING — log all Embed() calls for contrastive training data (default: true)
 	RetrievalEventLogging     bool   // RETRIEVAL_EVENT_LOGGING — log all Retrieve() pipelines for contrastive training data (default: true)
 
+	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
+	EventGraphEnabled                       bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
+	EventGraphWriterFlushIntervalSec        int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
+	EventGraphWriterBufferSize              int  // EVENTGRAPH_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
+	EventGraphMaxPairsPerEventBatch         int  // EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH — defensive cap on rows emitted per ApplyCoactivation invocation (default: 200, matches LearningEdgeCapPerRequest)
+	EventGraphMaxEventsPerQuery             int  // EVENTGRAPH_MAX_EVENTS_PER_QUERY — federation API ceiling on returned events (default: 500)
+	EventGraphFederationDefaultHops         int  // EVENTGRAPH_FEDERATION_DEFAULT_HOPS — federation API default hops when request omits the field (default: 2)
+	EventGraphFederationDefaultLookbackHours int // EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS — federation API default lookback window in hours (default: 24)
+
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
 	LiveGuidanceRefreshSec      int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
@@ -2763,6 +2772,36 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
 	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
 
+	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
+	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
+	eventGraphWriterFlushIntervalSec, err := atoi("EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if eventGraphWriterFlushIntervalSec < 5 {
+		eventGraphWriterFlushIntervalSec = 5
+	}
+	eventGraphWriterBufferSize, err := atoi("EVENTGRAPH_WRITER_BUFFER_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	eventGraphMaxPairsPerEventBatch, err := atoi("EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	eventGraphMaxEventsPerQuery, err := atoi("EVENTGRAPH_MAX_EVENTS_PER_QUERY", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	eventGraphFederationDefaultHops, err := atoi("EVENTGRAPH_FEDERATION_DEFAULT_HOPS", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	eventGraphFederationDefaultLookbackHours, err := atoi("EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
 	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
 	// Phase 14.1.1 hybrid 120q PASSED (mean +0.003, 0 regressions, 10
@@ -4372,6 +4411,15 @@ func FromEnv() (Config, error) {
 		RetrievalRerankConsumeConsensus:  retrievalRerankConsumeConsensus,
 		DH005ConsumeConsensus:            dh005ConsumeConsensus,
 		RetrievalAuditEnabled:            retrievalAuditEnabled,
+
+		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
+		EventGraphEnabled:                        eventGraphEnabled,
+		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
+		EventGraphWriterBufferSize:               eventGraphWriterBufferSize,
+		EventGraphMaxPairsPerEventBatch:          eventGraphMaxPairsPerEventBatch,
+		EventGraphMaxEventsPerQuery:              eventGraphMaxEventsPerQuery,
+		EventGraphFederationDefaultHops:          eventGraphFederationDefaultHops,
+		EventGraphFederationDefaultLookbackHours: eventGraphFederationDefaultLookbackHours,
 
 		// Phase 14 Epic 1 — Note 06 sparse activation gate
 		SparseRetrievalEnabled:     sparseRetrievalEnabled,

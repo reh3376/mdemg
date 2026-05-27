@@ -36,6 +36,11 @@ type Service struct {
 
 	// Optional: Context Cooler for stability reinforcement
 	stabilityReinforcer StabilityReinforcer
+
+	// Optional: EVENTGRAPH-001 reinforcement-event writer. Nil = events not
+	// emitted (feature disabled or TSDB unavailable at boot). The writer
+	// itself is non-blocking; the Hebbian hot path never waits on it.
+	reinforcementWriter *tsdb.ReinforcementEventsWriter
 }
 
 // learningPhaseEntry caches the edge count for a space to avoid frequent DB queries
@@ -65,6 +70,15 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 // When nodes are co-activated, the reinforcer will be called for conversation observations.
 func (s *Service) SetStabilityReinforcer(reinforcer StabilityReinforcer) {
 	s.stabilityReinforcer = reinforcer
+}
+
+// SetReinforcementWriter wires the EVENTGRAPH-001 TSDB writer so per-pair
+// Hebbian telemetry lands in reinforcement_events. Callers pass nil to
+// disable (matches cfg.EventGraphEnabled=false). Following the
+// SetStabilityReinforcer precedent — back-compat for tests that don't
+// construct a writer.
+func (s *Service) SetReinforcementWriter(w *tsdb.ReinforcementEventsWriter) {
+	s.reinforcementWriter = w
 }
 
 // FreezeLearning stops all learning edge creation/updates for a space.
@@ -500,6 +514,16 @@ RETURN
 
 	if err != nil {
 		return err
+	}
+
+	// EVENTGRAPH-001 Epic 4: forward captured per-pair telemetry into the
+	// TSDB writer. Buffered + non-blocking — the Hebbian write has already
+	// completed; this can't fail the function.
+	if s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
+		for _, row := range reinforcementRows {
+			row.SpaceID = spaceID
+			s.reinforcementWriter.Record(row)
+		}
 	}
 
 	// If stability reinforcer is set, update stability for conversation observations
