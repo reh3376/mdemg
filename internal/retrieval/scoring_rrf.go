@@ -116,16 +116,25 @@ func (s *Service) ScoreAndRankRRF(
 	// Convert ConsensusResult.Ranked → []RetrieveResult. Mirrors the
 	// shape of ScoreAndRank's output so downstream rerank/evidence/etc
 	// don't need to know the difference.
+	//
+	// EVENTGRAPH-001 fix-commit: Activation is propagated from the
+	// spreading-activation map (same source as scoring.go:883). The legacy
+	// scorer set this field; the RRF path silently dropped it, which
+	// caused ApplyCoactivation to filter out every result (Activation=0
+	// < LearningMinActivation=0.20) and Hebbian learning to no-op on
+	// every retrieve since Phase 13.1 default-on. Discovered during
+	// EVENTGRAPH-001 Epic 7 live e2e — see verification.md.
 	results := make([]models.RetrieveResult, 0, len(consensus.Ranked))
 	for _, c := range consensus.Ranked {
 		results = append(results, models.RetrieveResult{
-			NodeID:    c.NodeID,
-			Path:      c.Path,
-			Name:      c.Name,
-			Summary:   c.Summary,
-			Layer:     c.Layer,
-			Score:     c.RRFScore, // RRF score becomes the ranking signal
-			VectorSim: c.VectorSim,
+			NodeID:     c.NodeID,
+			Path:       c.Path,
+			Name:       c.Name,
+			Summary:    c.Summary,
+			Layer:      c.Layer,
+			Score:      c.RRFScore, // RRF score becomes the ranking signal
+			VectorSim:  c.VectorSim,
+			Activation: act[c.NodeID],
 		})
 	}
 	return results, consensus, nil
