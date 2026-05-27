@@ -26,6 +26,7 @@ import (
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/eventgraph"
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
@@ -166,6 +167,7 @@ type Server struct {
 	retrievalAuditWriter     *tsdb.RetrievalAuditWriter
 	sparseGateWriter         *tsdb.SparseGateMetricsWriter
 	reinforcementWriter      *tsdb.ReinforcementEventsWriter
+	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
@@ -1294,7 +1296,8 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				s.cfg.EventGraphWriterBufferSize,
 			)
 			s.learner.SetReinforcementWriter(s.reinforcementWriter)
-			slog.Info("tsdb: reinforcement_events writer attached",
+			s.eventgraphService = eventgraph.NewService(s.driver, client.Pool())
+			slog.Info("tsdb: reinforcement_events writer + federation service attached",
 				"flush_interval_sec", s.cfg.EventGraphWriterFlushIntervalSec,
 				"buffer_size", s.cfg.EventGraphWriterBufferSize)
 		} else {
@@ -2410,6 +2413,7 @@ func (s *Server) Routes() http.Handler {
 	// DH-004 E4.3: circuit breaker inspection + manual reset
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
+	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
