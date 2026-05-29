@@ -88,6 +88,27 @@ This is precedent-aligned with the project memory `feedback_thorough_troubleshoo
 }
 ```
 
+## Post-merge re-verification (2026-05-29)
+
+After PR #401 landed on `main`, the running production server was rebuilt from `main` HEAD and the live e2e was re-run end-to-end:
+
+- Server restart with rebuilt main binary, "reinforcement_events writer + federation service attached" logged.
+- 4 retrieves against `mdemg-dev` → 7 new events landed in TSDB (total grew 10 → 17 across the post-merge runs).
+- Federation API at hops=1 from a fresh seed returned the expected 5-node neighborhood + 6 in-neighborhood events.
+- Prometheus counters via `/v1/metrics/snapshot`: `rows_enqueued_total` incrementing from 0 → 6 → 7 across the runs; `rows_dropped_total = 0`; `flush_failure_total = 0`.
+
+### Gap discovered + fixed post-merge: Grafana panel datasource
+
+The Epic 6 Grafana panel used a `prometheus` datasource that doesn't exist in this Grafana instance. mdemg exposes Prometheus-style counters via `/v1/metrics/snapshot` (JSON), not a `/metrics` scrape endpoint, and the configured Grafana datasources are `mdemg-nodegraph` / `neo4j` / `timescaledb` only. The panel rendered as "No data."
+
+**Fix:** rewrote the panel to query the `reinforcement_events` hypertable directly via the `timescaledb` datasource. Two targets:
+1. `count(*) by 1-minute time_bucket` — overall rate
+2. `count(*) FILTER (WHERE created_new_edge)` vs `WHERE NOT created_new_edge` by 1-minute bucket — splits new edges from strengthened edges
+
+Both targets templated on `$space_id` (existing dashboard template var). Audit harness now reports 2 PASS for the new panel (previously SKIP because no SQL target existed).
+
+Dashboard reloaded into the running Grafana via POST /api/dashboards/db, returned `status: success version: 4`. Live verification confirmed via Grafana's /api/ds/query against the same SQL: returns 1-minute buckets with `events_per_min` values matching the TSDB direct count.
+
 ## Conclusion
 
 Epic 7 verification PASS. The Pattern Y1 implementation works end-to-end on the live stack: Hebbian writes produce reinforcement events, events land in TSDB within the flush window, the federation API correctly orchestrates graph-walk + TSDB query + neighborhood annotation. Sprint may proceed to Epic 8 (Documentation Update + close).
