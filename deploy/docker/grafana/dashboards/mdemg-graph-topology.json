@@ -451,7 +451,7 @@
     },
     {
       "title": "Reinforcement Event Rate (events/min)",
-      "description": "Hebbian co-activation events written to TSDB reinforcement_events per minute, grouped by trigger_path. Sourced from the Prometheus counter mdemg_eventgraph_writer_rows_enqueued_total (V0022 writer success path). Zero rate after a retrieval indicates the EVENTGRAPH writer is disabled, the buffer is failing to flush, or no eligible pairs are co-activating.",
+      "description": "Hebbian co-activation events written to TSDB reinforcement_events. Top series: rolling rate (events/min) over 5-minute buckets. Bottom series: split by created_new_edge (new connections formed vs existing connections strengthened). Source: V0022 reinforcement_events hypertable. Operator-facing Prometheus counters (rows_enqueued_total, rows_dropped_total, flush_failure_total) are exposed via /v1/metrics/snapshot for ops scripts; the panel uses TSDB directly because this Grafana instance is configured against timescaledb (no Prometheus scrape endpoint on mdemg).",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -460,24 +460,19 @@
         "y": 40
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "postgres",
+        "uid": "timescaledb"
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(mdemg_eventgraph_writer_rows_enqueued_total[5m]) * 60",
-          "legendFormat": "rows enqueued/min"
+          "rawSql": "SELECT time_bucket('1 minute', recorded_at) AS time, count(*) AS \"events/min (total)\" FROM reinforcement_events WHERE space_id = '$space_id' AND $__timeFilter(recorded_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
         },
         {
           "refId": "B",
-          "expr": "rate(mdemg_eventgraph_writer_rows_dropped_total[5m]) * 60",
-          "legendFormat": "rows dropped/min (buffer FIFO eviction)"
-        },
-        {
-          "refId": "C",
-          "expr": "rate(mdemg_eventgraph_writer_flush_failure_total[5m]) * 60",
-          "legendFormat": "flush failures/min"
+          "rawSql": "SELECT time_bucket('1 minute', recorded_at) AS time, count(*) FILTER (WHERE created_new_edge) AS \"new edges/min\", count(*) FILTER (WHERE NOT created_new_edge) AS \"strengthened/min\" FROM reinforcement_events WHERE space_id = '$space_id' AND $__timeFilter(recorded_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
         }
       ],
       "fieldConfig": {
