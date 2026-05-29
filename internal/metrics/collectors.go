@@ -222,6 +222,13 @@ type StandardMetrics struct {
 	SparseGateActiveCount     *Histogram // mdemg_sparse_gate_active_count — active set size after clamps
 	SparseGateDroppedFraction *Histogram // mdemg_sparse_gate_dropped_fraction — fraction dropped (0..1)
 	SparseGateThreshold       *Histogram // mdemg_sparse_gate_threshold — score-value at percentile cutoff
+
+	// EVENTGRAPH-001 — reinforcement_events writer counters. Surfaced from
+	// the writer's Stats() into Prometheus by the api server's metrics
+	// snapshot path. Counters monotonically increase from process start.
+	EventgraphRowsEnqueued *Counter // mdemg_eventgraph_writer_rows_enqueued_total — successful CopyFrom rows
+	EventgraphRowsDropped  *Counter // mdemg_eventgraph_writer_rows_dropped_total — FIFO-evicted rows (buffer-full)
+	EventgraphFlushFailure *Counter // mdemg_eventgraph_writer_flush_failure_total — CopyFrom errors
 }
 
 // Registry returns the underlying metric registry.
@@ -731,6 +738,17 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		"sparse_gate_threshold",
 		"Score value at the per-call activation percentile cutoff",
 		nil)
+
+	// EVENTGRAPH-001 — reinforcement_events writer counters.
+	m.EventgraphRowsEnqueued = r.NewCounter(
+		"eventgraph_writer_rows_enqueued_total",
+		"Reinforcement-event rows successfully written to TSDB", nil)
+	m.EventgraphRowsDropped = r.NewCounter(
+		"eventgraph_writer_rows_dropped_total",
+		"Reinforcement-event rows FIFO-evicted (buffer-full)", nil)
+	m.EventgraphFlushFailure = r.NewCounter(
+		"eventgraph_writer_flush_failure_total",
+		"Reinforcement-event writer CopyFrom failures", nil)
 
 	return m
 }

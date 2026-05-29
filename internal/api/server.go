@@ -26,6 +26,7 @@ import (
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
+	"mdemg/internal/eventgraph"
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
@@ -165,6 +166,8 @@ type Server struct {
 	retrievalWriter          *tsdb.RetrievalEventWriter
 	retrievalAuditWriter     *tsdb.RetrievalAuditWriter
 	sparseGateWriter         *tsdb.SparseGateMetricsWriter
+	reinforcementWriter      *tsdb.ReinforcementEventsWriter
+	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
@@ -1282,6 +1285,33 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		})
 		slog.Info("tsdb: sparse_gate_metrics writer attached")
 
+		// EVENTGRAPH-001 Epic 4 — V0022 reinforcement_events writer. Gated
+		// by EVENTGRAPH_ENABLED (default true); when disabled the writer is
+		// not constructed and learning.Service.reinforcementWriter stays nil
+		// so the Hebbian path short-circuits cleanly.
+		if s.cfg.EventGraphEnabled {
+			s.reinforcementWriter = tsdb.NewReinforcementEventsWriter(
+				client.Pool(),
+				time.Duration(s.cfg.EventGraphWriterFlushIntervalSec)*time.Second,
+				s.cfg.EventGraphWriterBufferSize,
+			)
+			s.learner.SetReinforcementWriter(s.reinforcementWriter)
+			s.eventgraphService = eventgraph.NewService(s.driver, client.Pool())
+			// Wire the writer's Prometheus counter mirrors (Epic 6). nil-safe.
+			if std := metrics.Metrics(); std != nil {
+				s.reinforcementWriter.SetPrometheusCounters(
+					std.EventgraphRowsEnqueued,
+					std.EventgraphRowsDropped,
+					std.EventgraphFlushFailure,
+				)
+			}
+			slog.Info("tsdb: reinforcement_events writer + federation service attached",
+				"flush_interval_sec", s.cfg.EventGraphWriterFlushIntervalSec,
+				"buffer_size", s.cfg.EventGraphWriterBufferSize)
+		} else {
+			slog.Info("tsdb: reinforcement_events writer disabled (EVENTGRAPH_ENABLED=false)")
+		}
+
 		// Phase 13.5 — LLM endpoint health events writer (V0018 hypertable).
 		// Watchdog state-transition + fast-fail-burst events land here for
 		// historical Grafana panels that survive mdemg restarts. Wire into
@@ -1545,6 +1575,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.sparseGateWriter != nil {
 		s.sparseGateWriter.Close()
+	}
+	if s.reinforcementWriter != nil {
+		s.reinforcementWriter.Close()
 	}
 	if s.constraintOutcomesWriter != nil {
 		s.constraintOutcomesWriter.Close()
@@ -2388,6 +2421,7 @@ func (s *Server) Routes() http.Handler {
 	// DH-004 E4.3: circuit breaker inspection + manual reset
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
+	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization

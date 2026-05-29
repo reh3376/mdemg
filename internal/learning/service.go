@@ -14,6 +14,7 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
 	"mdemg/internal/models"
+	"mdemg/internal/tsdb"
 )
 
 // StabilityReinforcer is called when nodes are co-activated to update stability scores
@@ -35,6 +36,11 @@ type Service struct {
 
 	// Optional: Context Cooler for stability reinforcement
 	stabilityReinforcer StabilityReinforcer
+
+	// Optional: EVENTGRAPH-001 reinforcement-event writer. Nil = events not
+	// emitted (feature disabled or TSDB unavailable at boot). The writer
+	// itself is non-blocking; the Hebbian hot path never waits on it.
+	reinforcementWriter *tsdb.ReinforcementEventsWriter
 }
 
 // learningPhaseEntry caches the edge count for a space to avoid frequent DB queries
@@ -64,6 +70,15 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext) *Service {
 // When nodes are co-activated, the reinforcer will be called for conversation observations.
 func (s *Service) SetStabilityReinforcer(reinforcer StabilityReinforcer) {
 	s.stabilityReinforcer = reinforcer
+}
+
+// SetReinforcementWriter wires the EVENTGRAPH-001 TSDB writer so per-pair
+// Hebbian telemetry lands in reinforcement_events. Callers pass nil to
+// disable (matches cfg.EventGraphEnabled=false). Following the
+// SetStabilityReinforcer precedent — back-compat for tests that don't
+// construct a writer.
+func (s *Service) SetReinforcementWriter(w *tsdb.ReinforcementEventsWriter) {
+	s.reinforcementWriter = w
 }
 
 // FreezeLearning stops all learning edge creation/updates for a space.
@@ -386,6 +401,10 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
+	// Capture per-pair reinforcement telemetry as the result-set drains.
+	// EVENTGRAPH-001 Epic 4 forwards these into tsdb.ReinforcementEventsWriter.
+	var reinforcementRows []tsdb.ReinforcementEventRow
+
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Cypher query implements MERGE pattern for CO_ACTIVATED_WITH edges:
 		// - MERGE creates edge if missing, matches if exists
@@ -461,19 +480,50 @@ ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=d
 ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
              rr.evidence_count=coalesce(rr.evidence_count,0)+1, rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight,
              rr.direction=CASE WHEN rr.direction IS NULL THEN $revDir ELSE rr.direction END
-RETURN count(*) AS updated;`
+RETURN
+  a.node_id AS src_node_id,
+  b.node_id AS dst_node_id,
+  w AS prev_weight,
+  r.weight AS new_weight,
+  (r.weight - w) AS delta_weight,
+  r.evidence_count AS evidence_count_after,
+  ($eta * etaMult) AS eta_effective,
+  surpriseFactor AS surprise_factor,
+  prod AS activation_product,
+  pathSim AS path_sim,
+  coalesce(a.role_type, '') AS role_a,
+  coalesce(b.role_type, '') AS role_b,
+  coalesce(a.obs_type, '') AS obs_type_a,
+  coalesce(b.obs_type, '') AS obs_type_b,
+  CASE WHEN sessionA <> '' THEN sessionA WHEN sessionB <> '' THEN sessionB ELSE '' END AS session_id,
+  r.direction AS direction,
+  (r.evidence_count = 1) AS created_new_edge;`
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}
 		for res.Next(ctx) {
-			// consume
+			rec := res.Record()
+			row := parseReinforcementRow(func(key string) (any, bool) {
+				return rec.Get(key)
+			})
+			reinforcementRows = append(reinforcementRows, row)
 		}
 		return nil, res.Err()
 	})
 
 	if err != nil {
 		return err
+	}
+
+	// EVENTGRAPH-001 Epic 4: forward captured per-pair telemetry into the
+	// TSDB writer. Buffered + non-blocking — the Hebbian write has already
+	// completed; this can't fail the function.
+	if s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
+		for _, row := range reinforcementRows {
+			row.SpaceID = spaceID
+			s.reinforcementWriter.Record(row)
+		}
 	}
 
 	// If stability reinforcer is set, update stability for conversation observations
