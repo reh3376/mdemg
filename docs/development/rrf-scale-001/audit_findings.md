@@ -66,6 +66,31 @@ All three remain **separate config knobs** (same default) so any one can be rais
 
 **All thresholds become config-driven** (new `CONSULTING_*` env vars, Epic 2) with the RRF-calibrated defaults above. A CLAUDE.md "score-scale contract" note (Epic 5) records that these are RRF-scale-coupled and must be re-reviewed on any scorer change — the structural defense against a 4th instance of this bug class.
 
+## Epic 3 resolution — remaining (LOW) findings reviewed
+
+Findings #10–12 (`retrieval/jiminy.go` lines 45, 155, 192, plus sibling
+`LearningEdgeBoost > 0.01` gates) were traced live and **intentionally left
+unchanged**, with rationale (not dismissed):
+
+- **Path:** these are in the retrieval *explainability* renderer (`buildRationale`,
+  `calculateConfidence`, `DetermineRetrievalPath` for the J7 score-breakdown
+  display) — **not** the consulting/guidance-surfacing path. They cannot
+  contribute to the dormant-loop bug.
+- **Behavior at RRF scale:** live `breakdown.Activation ≈ 0.723`, well above both
+  0.01 and 0.1. So these gates are now effectively always-true and only ever
+  *add* an explanation line (#45, #192) or a uniform +0.1 confidence nudge
+  (#155) — they never *remove* or gate information. No relative distortion, no
+  misbehavior; activation genuinely is a strong contributor, so showing it is
+  correct.
+- **Decision:** config-ifying display-verbosity thresholds (4+ env vars) is out
+  of proportion to zero functional impact. Left as-is per the audit's
+  "document any intentionally left as-is with rationale" provision. If a future
+  scorer change pushes activation below these thresholds, the only effect is
+  less verbose explanations — still no guidance-gating impact.
+
+This keeps Epic 3 honest: every High/Med finding remediated (Epic 2), every Low
+finding traced + decided.
+
 ## Blast radius confirmed
 
 The Jiminy `Guide` debug for "commit to main" showed `retrieval_found:10, suggest_constraints:0, suggest_suggestions:0, suggest_conflicts:0` — **the entire consulting output is empty**, consistent with findings #1–7 all over-gating simultaneously. Fixing the cluster revives constraints, suggestions, and conflicts together.
