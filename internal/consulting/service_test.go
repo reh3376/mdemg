@@ -3229,30 +3229,79 @@ func TestFindApplicableConstraints_PolicyNode(t *testing.T) {
 }
 
 func TestFindApplicableConstraints_ConstraintNodeScore(t *testing.T) {
-	s := &Service{}
+	// RRF-SCALE-001: the constraint floor default is now 0.45 (RRF-calibrated),
+	// resolved via s.constraintFloor() from cfg with a zero-value fallback.
+	s := &Service{} // empty cfg → constraintFloor() falls back to default 0.45
 
-	// Test that constraint node requires score > 0.55
+	// Just below the default floor → excluded.
 	results := []models.RetrieveResult{
 		{
 			NodeID:  "c1",
 			Name:    "important-constraint",
 			Summary: "Some guidelines",
-			Score:   0.54, // Just below threshold
+			Score:   0.44,
 		},
 	}
-
-	constraints := s.findApplicableConstraints(nil, "test-space", results, nil)
-
+	constraints := s.findApplicableConstraints(context.TODO(), "test-space", results, nil)
 	if len(constraints) != 0 {
-		t.Errorf("findApplicableConstraints() should not include low-score constraint node, got %d", len(constraints))
+		t.Errorf("findApplicableConstraints() should exclude score 0.44 (< 0.45 floor), got %d", len(constraints))
 	}
 
-	// Just above threshold
-	results[0].Score = 0.56
-	constraints = s.findApplicableConstraints(nil, "test-space", results, nil)
-
+	// Just above the default floor → included (this is the RRF strong-match band
+	// that the legacy 0.55 gate wrongly rejected).
+	results[0].Score = 0.46
+	constraints = s.findApplicableConstraints(context.TODO(), "test-space", results, nil)
 	if len(constraints) == 0 {
-		t.Error("findApplicableConstraints() should include constraint node at score 0.56")
+		t.Error("findApplicableConstraints() should include constraint node at score 0.46 (>= 0.45 floor)")
+	}
+}
+
+// TestFindApplicableConstraints_RRFStrongMatchBand is the regression test for
+// the dormant-guidance bug: a strong RRF match scoring ~0.50 (which the legacy
+// 0.55 gate rejected, killing the guidance loop) must now surface.
+func TestFindApplicableConstraints_RRFStrongMatchBand(t *testing.T) {
+	s := &Service{}
+	results := []models.RetrieveResult{
+		{NodeID: "c1", Name: "never-commit-to-main", Summary: "must not commit directly to main branch", Score: 0.50},
+	}
+	constraints := s.findApplicableConstraints(context.TODO(), "test-space", results, nil)
+	if len(constraints) == 0 {
+		t.Fatal("RRF strong-match (0.50) must surface as a constraint — this is the bug RRF-SCALE-001 fixes")
+	}
+}
+
+// TestConstraintFloor_ConfigDriven verifies the floor is operator-tunable and
+// not re-hardcoded (no-hardcoding rule).
+func TestConstraintFloor_ConfigDriven(t *testing.T) {
+	// Override the floor to 0.60 — now a 0.50 match should be rejected again.
+	s := &Service{cfg: config.Config{ConsultingConstraintScoreFloor: 0.60}}
+	results := []models.RetrieveResult{
+		{NodeID: "c1", Name: "x", Summary: "must do y", Score: 0.50},
+	}
+	if got := s.findApplicableConstraints(context.TODO(), "test-space", results, nil); len(got) != 0 {
+		t.Errorf("with floor=0.60, score 0.50 should be excluded, got %d", len(got))
+	}
+	if s.constraintFloor() != 0.60 {
+		t.Errorf("constraintFloor() = %v, want 0.60 (config override honored)", s.constraintFloor())
+	}
+}
+
+// TestNormalizeRetrievalConfidence_RRFCalibration verifies the recalibrated
+// sigmoid maps the RRF score band to meaningful confidence (the legacy 1.5/1.5
+// crushed everything to ~0.1-0.2).
+func TestNormalizeRetrievalConfidence_RRFCalibration(t *testing.T) {
+	s := &Service{} // zero cfg → default midpoint 0.45, steepness 8.0
+	cases := []struct{ score, wantMin, wantMax float64 }{
+		{0.10, 0.0, 0.15},  // noise → low
+		{0.45, 0.45, 0.55}, // midpoint → ~0.5
+		{0.50, 0.55, 0.65}, // strong → ~0.6
+		{0.58, 0.70, 0.80}, // very strong → ~0.74
+	}
+	for _, c := range cases {
+		got := s.normalizeRetrievalConfidence(c.score)
+		if got < c.wantMin || got > c.wantMax {
+			t.Errorf("normalizeRetrievalConfidence(%.2f) = %.3f, want [%.2f, %.2f]", c.score, got, c.wantMin, c.wantMax)
+		}
 	}
 }
 
@@ -3264,12 +3313,12 @@ func TestDetectConflicts_ContradictionLowScore(t *testing.T) {
 			NodeID:  "node1",
 			Name:    "async-patterns",
 			Summary: "The codebase uses async patterns",
-			Score:   0.5, // Below 0.6 threshold
+			Score:   0.30, // RRF-SCALE-001: genuinely below the 0.45 conflict floor (0.5 is a strong RRF match)
 		},
 	}
 
 	// Context uses "sync" but result has "async" with low score
-	conflicts := s.detectConflicts(nil, "test-space", "using sync operations", results)
+	conflicts := s.detectConflicts(context.TODO(), "test-space", "using sync operations", results)
 
 	// Low score should not trigger contradiction conflict
 	contradictionFound := false

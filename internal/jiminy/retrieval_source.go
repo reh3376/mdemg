@@ -15,10 +15,13 @@ import "mdemg/internal/mathutil"
 //
 //	score 0.5 → ~0.18,  1.0 → ~0.32,  1.5 → ~0.50,  2.0 → ~0.68,  3.0 → ~0.90
 //
-// These constants MUST match those in internal/consulting/service.go.
+// RRF-SCALE-001: sigmoid midpoint/steepness are now config-driven (passed in
+// from the caller via cfg.RetrievalConfidenceSigmoid{Midpoint,Steepness}) and
+// recalibrated for RRF scale (legacy 1.5/1.5 crushed RRF scores to ~0.1-0.2).
+// These constants are the zero-value fallback only.
 const (
-	retrievalScoreMidpoint  = 1.5
-	retrievalScoreSteepness = 1.5
+	defaultRetrievalScoreMidpoint  = 0.45
+	defaultRetrievalScoreSteepness = 8.0
 	// maxConfidence caps normalized scores. From a Bayesian perspective,
 	// absolute certainty is epistemologically invalid.
 	maxConfidence = 0.95
@@ -30,7 +33,13 @@ const (
 //
 // Retrieval scores are normalized to [0, 1] via sigmoid so they are comparable
 // with cosine-similarity-based confidence from constraint/correction/frontier sources.
-func mapRetrievalToGuidance(results []RetrievalResult) []GuidanceItem {
+func mapRetrievalToGuidance(results []RetrievalResult, sigmoidMidpoint, sigmoidSteepness float64) []GuidanceItem {
+	if sigmoidMidpoint <= 0 {
+		sigmoidMidpoint = defaultRetrievalScoreMidpoint
+	}
+	if sigmoidSteepness <= 0 {
+		sigmoidSteepness = defaultRetrievalScoreSteepness
+	}
 	var items []GuidanceItem
 	for _, r := range results {
 		gType := classifyRetrievalItem(r)
@@ -47,7 +56,7 @@ func mapRetrievalToGuidance(results []RetrievalResult) []GuidanceItem {
 			continue
 		}
 
-		conf := mathutil.NormalizeScore(r.Score, retrievalScoreMidpoint, retrievalScoreSteepness)
+		conf := mathutil.NormalizeScore(r.Score, sigmoidMidpoint, sigmoidSteepness)
 		if conf > maxConfidence {
 			conf = maxConfidence
 		}

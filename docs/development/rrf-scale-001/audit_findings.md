@@ -53,9 +53,11 @@ Within-result-set normconf spread (query "never commit to main", all raw scores 
 
 **Mechanism: config-driven, RRF-calibrated absolute thresholds** (plan §5 Epic 2 Option B), chosen over Option A (percentile) on the basis of the distribution data above — percentile is positional and admits noise on uniform-score sets. Disclosure per `feedback_plan_options_pattern.md`.
 
-Defaults derived from the live band:
-- **Constraint/authority gates (#1–3):** strong matches live at 0.49–0.58, so a constraint floor of **0.45** admits them while rejecting the ~0.1 weak tail. Authority-tier boosts scale proportionally.
-- **Conflict gates (#4–7):** conflicts are higher-confidence by design; default ~0.50 (still below the 0.55–0.70 legacy values, but above the constraint floor).
+Defaults derived from the live band — **all three floors default to 0.45**:
+- **Constraint/authority gates (#1–3):** strong matches live at 0.49–0.58, so a floor of **0.45** admits them while rejecting the ~0.1 weak tail. *Critical finding during Epic 2:* `keywordClassifyConstraint` has an **inner** authority gate that binds *tighter* than the outer constraint gate — so authority floor MUST also be 0.45, else the binding gate re-rejects the strong-match band and the loop stays dormant. The RRF band (0.49–0.58) is too compressed to subdivide into distinct constraint/authority tiers.
+- **Conflict gates (#4–7):** default **0.45** for consistency. The legacy values (0.55–0.70) implied conflicts need *higher* confidence than constraints, but at RRF scale there's no headroom to express that. Operators wanting stricter conflict detection can raise `CONSULTING_CONFLICT_SCORE_FLOOR` independently.
+
+All three remain **separate config knobs** (same default) so any one can be raised without affecting the others.
 - **Sigmoid (#8):** midpoint 1.5 → **0.45**, steepness retained/tuned so a 0.5 raw score maps to ~0.6 confidence (was ~0.05 at midpoint 1.5).
 - **Noise pre-filter (#9):** already config-driven; keep default 0.3.
 - **Activation display (#10–12):** LOW — config-ify the thresholds for consistency (no-hardcoding), but these only affect explanation verbosity, not whether guidance surfaces.

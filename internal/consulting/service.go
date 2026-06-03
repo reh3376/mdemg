@@ -25,20 +25,69 @@ import (
 // no room for belief updating with new evidence.
 const MaxConfidence = 0.95
 
-// retrievalScoreMidpoint and retrievalScoreSteepness control sigmoid
-// normalization of composite retrieval scores (unbounded sums) into [0, 1]
-// confidence values. These MUST match the values in internal/jiminy/retrieval_source.go
-// to ensure consistent confidence semantics across the system.
-//
-// midpoint=1.5: score 0.5 → ~0.18,  1.0 → ~0.32,  1.5 → ~0.50,  2.0 → ~0.68,  3.0 → ~0.90
+// Default sigmoid params for score→confidence normalization. RRF-SCALE-001
+// recalibrated these from the legacy 1.5/1.5 (linear-scorer scale) to RRF
+// scale: strong RRF matches top out ~0.49-0.58, so a midpoint of 0.45 +
+// steepness 8.0 maps 0.1→0.06, 0.5→0.60, 0.58→0.74 (clean separation),
+// where the legacy 1.5/1.5 crushed everything to ~0.1-0.2. Operator-tunable
+// via RETRIEVAL_CONFIDENCE_SIGMOID_{MIDPOINT,STEEPNESS}; these constants are
+// the zero-value fallback (e.g. for tests constructing Config{} directly).
 const (
-	retrievalScoreMidpoint  = 1.5
-	retrievalScoreSteepness = 1.5
+	defaultRetrievalScoreMidpoint  = 0.45
+	defaultRetrievalScoreSteepness = 8.0
 )
 
-// normalizeRetrievalConfidence maps a composite retrieval score to [0, MaxConfidence].
-func normalizeRetrievalConfidence(score float64) float64 {
-	normalized := mathutil.NormalizeScore(score, retrievalScoreMidpoint, retrievalScoreSteepness)
+// RRF-SCALE-001 — RRF-calibrated score-gate defaults (zero-value fallback for
+// Config{} in tests). See docs/development/rrf-scale-001/audit_findings.md for
+// the derivation from the live mdemg-dev score distribution.
+// All three default to 0.45: the RRF strong-match band (0.49-0.58) is too
+// compressed to subdivide into meaningfully different gate tiers, and the
+// binding gate for keyword-classified constraints is the authority floor —
+// so it must admit the same band as the constraint floor or the loop stays
+// dormant. They remain separate config knobs so operators can raise any one
+// independently (e.g. stricter conflict detection) without affecting the others.
+const (
+	defaultConstraintScoreFloor = 0.45 // result→constraint (outer gate)
+	defaultAuthorityScoreFloor  = 0.45 // keyword/name classifier inner gate
+	defaultConflictScoreFloor   = 0.45 // conflict/contradiction detection
+)
+
+// constraintFloor / authorityFloor / conflictFloor resolve the config-driven
+// gate thresholds, falling back to RRF-calibrated defaults when unset (≤0).
+func (s *Service) constraintFloor() float64 {
+	if s.cfg.ConsultingConstraintScoreFloor > 0 {
+		return s.cfg.ConsultingConstraintScoreFloor
+	}
+	return defaultConstraintScoreFloor
+}
+
+func (s *Service) authorityFloor() float64 {
+	if s.cfg.ConsultingAuthorityScoreFloor > 0 {
+		return s.cfg.ConsultingAuthorityScoreFloor
+	}
+	return defaultAuthorityScoreFloor
+}
+
+func (s *Service) conflictFloor() float64 {
+	if s.cfg.ConsultingConflictScoreFloor > 0 {
+		return s.cfg.ConsultingConflictScoreFloor
+	}
+	return defaultConflictScoreFloor
+}
+
+// normalizeRetrievalConfidence maps a composite retrieval score to [0, MaxConfidence]
+// using the config-driven sigmoid (RRF-SCALE-001). Falls back to RRF-calibrated
+// defaults when cfg values are unset (zero), so it is robust to Config{} in tests.
+func (s *Service) normalizeRetrievalConfidence(score float64) float64 {
+	midpoint := s.cfg.RetrievalConfidenceSigmoidMidpoint
+	if midpoint <= 0 {
+		midpoint = defaultRetrievalScoreMidpoint
+	}
+	steepness := s.cfg.RetrievalConfidenceSigmoidSteepness
+	if steepness <= 0 {
+		steepness = defaultRetrievalScoreSteepness
+	}
+	normalized := mathutil.NormalizeScore(score, midpoint, steepness)
 	if normalized > MaxConfidence {
 		return MaxConfidence
 	}
@@ -375,7 +424,7 @@ func (s *Service) generateSuggestions(ctx context.Context, req models.ConsultReq
 		suggestions = append(suggestions, models.Suggestion{
 			Type:        suggestionType,
 			Content:     content,
-			Confidence:  normalizeRetrievalConfidence(r.Score),
+			Confidence:  s.normalizeRetrievalConfidence(r.Score),
 			SourceNodes: []string{r.NodeID},
 		})
 	}
@@ -809,7 +858,7 @@ func (s *Service) generateProactiveSuggestions(ctx context.Context, req models.S
 		suggestions = append(suggestions, models.Suggestion{
 			Type:        suggType,
 			Content:     content,
-			Confidence:  normalizeRetrievalConfidence(r.Score),
+			Confidence:  s.normalizeRetrievalConfidence(r.Score),
 			SourceNodes: []string{r.NodeID},
 		})
 	}
@@ -928,7 +977,7 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 		// Check for deprecated patterns being used
 		if strings.Contains(summaryLower, "deprecated") {
 			// Check if context might be using deprecated approach
-			if r.Score > 0.7 { // High similarity suggests relevant
+			if r.Score > s.conflictFloor() { // High similarity suggests relevant (RRF-SCALE-001)
 				conflicts = append(conflicts, models.ConflictWarning{
 					Severity:      "medium",
 					Description:   fmt.Sprintf("You may be using a deprecated pattern: %s", r.Name),
@@ -941,7 +990,7 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 
 		// Check for "don't" or "avoid" patterns
 		if strings.Contains(summaryLower, "avoid") || strings.Contains(summaryLower, "don't") || strings.Contains(summaryLower, "do not") {
-			if r.Score > 0.6 {
+			if r.Score > s.conflictFloor() {
 				conflicts = append(conflicts, models.ConflictWarning{
 					Severity:      "low",
 					Description:   fmt.Sprintf("Consider reviewing: %s", r.Name),
@@ -954,7 +1003,7 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 
 		// Check for naming/style conflicts
 		if strings.Contains(summaryLower, "naming") || strings.Contains(nameLower, "convention") {
-			if r.Score > 0.65 {
+			if r.Score > s.conflictFloor() {
 				conflicts = append(conflicts, models.ConflictWarning{
 					Severity:      "low",
 					Description:   "Review naming convention",
@@ -978,7 +1027,7 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 		if strings.Contains(contextLower, pair.pattern1) {
 			// Look for results about the opposite pattern
 			for _, r := range results {
-				if strings.Contains(strings.ToLower(r.Summary), pair.pattern2) && r.Score > 0.6 {
+				if strings.Contains(strings.ToLower(r.Summary), pair.pattern2) && r.Score > s.conflictFloor() {
 					conflicts = append(conflicts, models.ConflictWarning{
 						Severity:      "low",
 						Description:   fmt.Sprintf("Context uses %s but codebase has %s patterns", pair.pattern1, pair.pattern2),
@@ -1002,7 +1051,7 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 	useLLM := s.constraintClassifier != nil
 
 	for _, r := range results {
-		if r.Score < 0.55 {
+		if r.Score < s.constraintFloor() {
 			continue
 		}
 
@@ -1042,7 +1091,7 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 				ConstraintType: constraintType,
 				Scope:          r.Path,
 				SourceNodes:    []string{r.NodeID},
-				Confidence:     normalizeRetrievalConfidence(r.Score),
+				Confidence:     s.normalizeRetrievalConfidence(r.Score),
 			})
 		}
 	}
@@ -1078,13 +1127,13 @@ func (s *Service) keywordClassifyConstraint(r models.RetrieveResult) string {
 		constraintType = "should"
 	}
 
-	if constraintType != "" && r.Score > 0.6 {
+	if constraintType != "" && r.Score > s.authorityFloor() {
 		return constraintType
 	}
 
 	// Look for rule/policy nodes
 	if strings.Contains(nameLower, "rule") || strings.Contains(nameLower, "policy") || strings.Contains(nameLower, "constraint") {
-		if r.Score > 0.55 {
+		if r.Score > s.authorityFloor() {
 			ct := "should"
 			if strings.Contains(summaryLower, "must") {
 				ct = "must"
