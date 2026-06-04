@@ -18,7 +18,7 @@ func TestMapRetrievalToGuidance_Basic(t *testing.T) {
 		{NodeID: "n3", Name: "Bug Fix", Summary: "", Layer: 0, Score: 0.75, ObsType: "correction"},
 	}
 
-	items := mapRetrievalToGuidance(results)
+	items := mapRetrievalToGuidance(results, 0.45, 8.0)
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
@@ -39,7 +39,7 @@ func TestMapRetrievalToGuidance_EmptyContent(t *testing.T) {
 	results := []RetrievalResult{
 		{NodeID: "n1", Name: "", Summary: "", Layer: 0, Score: 0.5},
 	}
-	items := mapRetrievalToGuidance(results)
+	items := mapRetrievalToGuidance(results, 0.45, 8.0)
 	if len(items) != 0 {
 		t.Errorf("expected 0 items for empty content, got %d", len(items))
 	}

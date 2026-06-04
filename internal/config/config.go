@@ -641,6 +641,16 @@ type Config struct {
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
 	ConsultingLLMConstraintsModel    string // CONSULTING_LLM_CONSTRAINTS_MODEL — model for classification (default: from EMERGENCE_MODEL)
 	ConsultingClassifyTimeoutMs      int    // CONSULTING_CLASSIFY_TIMEOUT_MS — timeout for constraint classification LLM call in ms (default: 30000, min 5000)
+	// RRF-SCALE-001 — score gates for the consulting suggestion/constraint path.
+	// These were hardcoded (0.55/0.6/0.65/0.7) and calibrated for the legacy
+	// linear scorer; Phase 13.1 RRF default-on dropped the score scale (strong
+	// matches now top out ~0.49-0.58), so the legacy gates rejected everything
+	// and the Jiminy guidance loop went dormant. Defaults below are RRF-calibrated.
+	ConsultingConstraintScoreFloor      float64 // CONSULTING_CONSTRAINT_SCORE_FLOOR — min retrieval score for a result to become a constraint (default: 0.45)
+	ConsultingAuthorityScoreFloor       float64 // CONSULTING_AUTHORITY_SCORE_FLOOR — min retrieval score for high-authority constraint tier / confidence boost (default: 0.50)
+	ConsultingConflictScoreFloor        float64 // CONSULTING_CONFLICT_SCORE_FLOOR — min retrieval score for conflict/contradiction detection (default: 0.50)
+	RetrievalConfidenceSigmoidMidpoint  float64 // RETRIEVAL_CONFIDENCE_SIGMOID_MIDPOINT — sigmoid midpoint for score→confidence normalization (default: 0.45, was 1.5 legacy)
+	RetrievalConfidenceSigmoidSteepness float64 // RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS — sigmoid steepness for score→confidence normalization (default: 8.0, was 1.5 legacy)
 
 	// Phase AR-3: LLM-powered query classification
 	RetrievalLLMClassifyEnabled  bool   // RETRIEVAL_LLM_CLASSIFY_ENABLED — enable LLM query classification (default: false)
@@ -2987,6 +2997,28 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("CONSULTING_CLASSIFY_TIMEOUT_MS must be >= 5000")
 	}
 
+	// RRF-SCALE-001 — RRF-calibrated consulting score gates + confidence sigmoid.
+	consultingConstraintScoreFloor, err := atof("CONSULTING_CONSTRAINT_SCORE_FLOOR", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	consultingAuthorityScoreFloor, err := atof("CONSULTING_AUTHORITY_SCORE_FLOOR", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	consultingConflictScoreFloor, err := atof("CONSULTING_CONFLICT_SCORE_FLOOR", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalConfidenceSigmoidMidpoint, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_MIDPOINT", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalConfidenceSigmoidSteepness, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS", 8.0)
+	if err != nil {
+		return Config{}, err
+	}
+
 	retrievalLLMClassifyEnabled := getBool("RETRIEVAL_LLM_CLASSIFY_ENABLED", false)
 	retrievalLLMClassifyProvider := get("RETRIEVAL_LLM_CLASSIFY_PROVIDER", emergenceProvider)
 	retrievalLLMClassifyModel := get("RETRIEVAL_LLM_CLASSIFY_MODEL", emergenceModel)
@@ -4450,6 +4482,11 @@ func FromEnv() (Config, error) {
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
 		ConsultingClassifyTimeoutMs:      consultingClassifyTimeoutMs,
+		ConsultingConstraintScoreFloor:      consultingConstraintScoreFloor,
+		ConsultingAuthorityScoreFloor:       consultingAuthorityScoreFloor,
+		ConsultingConflictScoreFloor:        consultingConflictScoreFloor,
+		RetrievalConfidenceSigmoidMidpoint:  retrievalConfidenceSigmoidMidpoint,
+		RetrievalConfidenceSigmoidSteepness: retrievalConfidenceSigmoidSteepness,
 		RetrievalLLMClassifyEnabled:      retrievalLLMClassifyEnabled,
 		RetrievalLLMClassifyProvider:     retrievalLLMClassifyProvider,
 		RetrievalLLMClassifyModel:        retrievalLLMClassifyModel,

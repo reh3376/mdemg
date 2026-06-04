@@ -850,7 +850,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 				debug["retrieval_error"] = err.Error()
 				return
 			}
-			retrievalItems := mapRetrievalToGuidance(results)
+			retrievalItems := mapRetrievalToGuidance(results, s.cfg.RetrievalConfidenceSigmoidMidpoint, s.cfg.RetrievalConfidenceSigmoidSteepness)
 			items = append(items, retrievalItems...)
 			debug["retrieval_found"] = len(retrievalItems)
 		}()
