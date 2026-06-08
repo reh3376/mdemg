@@ -37,6 +37,7 @@ import (
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
 	"mdemg/internal/dockerbin"
+	"mdemg/internal/jobhealth"
 	"mdemg/internal/metrics"
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
@@ -1112,6 +1113,25 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 func (s *Server) SetTSDBClient(client *tsdb.Client) {
 	s.tsdbClient = client
 	if client != nil {
+		// NOSILENT-001: wire the backup scheduler's outcome hook now that both
+		// the TSDB pool and the alert dispatcher exist. A failed (or never-run)
+		// scheduled backup now records a scheduled_job_events row + fires a
+		// high-severity alert instead of a silent slog.Warn.
+		if s.tsdbBackupScheduler != nil {
+			pool := client.Pool()
+			disp := s.alertDispatcher
+			instanceID := s.cfg.InstanceID
+			s.tsdbBackupScheduler.SetResultHook(func(success bool, latencyMS int64, runErr error) {
+				ev := tsdb.JobEventRow{
+					JobName: "tsdb-backup", InstanceID: instanceID,
+					Success: success, LatencyMS: latencyMS,
+				}
+				if runErr != nil {
+					ev.ErrorMessage = runErr.Error()
+				}
+				jobhealth.Report(context.Background(), pool, disp, ev)
+			})
+		}
 		// Phase 12 Epic 6: construct ConflictTracker once and inject into the
 		// three Services that have hook sites. Per-space rate limiter defaults
 		// to 1 row/space/minute (the value bound inside conversation/conflict_tracker.go);

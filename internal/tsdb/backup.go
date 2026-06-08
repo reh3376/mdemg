@@ -315,14 +315,37 @@ func (s *TSDBBackupService) RunRetention() (deleted int, freedBytes int64, err e
 // ── Scheduler ──
 
 // TSDBBackupScheduler runs periodic TSDB backups.
+// JobResultFunc is an optional post-run hook invoked after each scheduled
+// backup with the outcome. It lets the server record a scheduled_job_events row
+// + raise an alert on failure WITHOUT internal/tsdb importing internal/alert —
+// the glue (jobhealth.Report) is wired by the caller. NOSILENT-001.
+type JobResultFunc func(success bool, latencyMS int64, err error)
+
 type TSDBBackupScheduler struct {
-	svc    *TSDBBackupService
-	stopCh chan struct{}
+	svc      *TSDBBackupService
+	stopCh   chan struct{}
+	hookMu   sync.Mutex
+	onResult JobResultFunc
 }
 
 // NewTSDBBackupScheduler creates a new scheduler.
 func NewTSDBBackupScheduler(svc *TSDBBackupService) *TSDBBackupScheduler {
 	return &TSDBBackupScheduler{svc: svc}
+}
+
+// SetResultHook registers a post-run outcome callback (NOSILENT-001). Optional;
+// nil leaves behavior unchanged. Mutex-guarded so it's safe to set after
+// Start() (the first tick is an interval away, but -race demands the guard).
+func (bs *TSDBBackupScheduler) SetResultHook(fn JobResultFunc) {
+	bs.hookMu.Lock()
+	bs.onResult = fn
+	bs.hookMu.Unlock()
+}
+
+func (bs *TSDBBackupScheduler) resultHook() JobResultFunc {
+	bs.hookMu.Lock()
+	defer bs.hookMu.Unlock()
+	return bs.onResult
 }
 
 // Start begins periodic TSDB backups at the configured interval.
@@ -342,6 +365,7 @@ func (bs *TSDBBackupScheduler) Start() {
 			select {
 			case <-ticker.C:
 				slog.Info("tsdb backup scheduler: triggering backup")
+				startedAt := time.Now()
 				rec, err := bs.svc.Trigger("scheduled")
 				if err != nil {
 					slog.Warn("tsdb backup scheduler: backup failed", "error", err)
@@ -350,6 +374,11 @@ func (bs *TSDBBackupScheduler) Start() {
 						"backup_id", rec.BackupID,
 						"size_bytes", rec.SizeBytes,
 					)
+				}
+				// NOSILENT-001: report the outcome so a failed/never-run backup
+				// is recorded + alerted, not silently swallowed.
+				if hook := bs.resultHook(); hook != nil {
+					hook(err == nil, time.Since(startedAt).Milliseconds(), err)
 				}
 
 				// Run retention after backup
