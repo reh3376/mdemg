@@ -29,6 +29,19 @@ SPACE_ID=$(get_space_id)
 # Read hook input from stdin
 INPUT=$(cat)
 
+# Resolve SessionID per conversation: MDEMG_SESSION_ID env > Claude Code stdin
+# session_id > ~/.mdemg/.claude-session > claude-core. Publish it so the agent
+# (skill) reads the same per-conversation id the hooks use.
+SESSION_ID="${MDEMG_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+  SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+fi
+if [ -z "$SESSION_ID" ] && [ -f "$HOME/.mdemg/.claude-session" ]; then
+  SESSION_ID=$(jq -r '.session_id // empty' "$HOME/.mdemg/.claude-session" 2>/dev/null || true)
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="claude-core"
+printf '{"session_id":"%s","ts":%d}\n' "$SESSION_ID" "$(date +%s)" > "$HOME/.mdemg/.claude-session" 2>/dev/null || true
+
 # Extract the user's prompt text
 USER_PROMPT=$(echo "$INPUT" | jq -r '.user_prompt // empty' 2>/dev/null)
 if [ -z "$USER_PROMPT" ]; then
@@ -62,7 +75,7 @@ if [ "$RESULT_COUNT" -eq 0 ] 2>/dev/null; then
     echo "!! Consider: POST /v1/conversation/observe to record this topic."
   fi
   # Session health ribbon (1s timeout)
-  HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
+  HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=${SESSION_ID}" \
     --connect-timeout 1 --max-time 1 2>/dev/null) || true
   if [ -n "$HEALTH_RESP" ]; then
     H_SCORE=$(echo "$HEALTH_RESP" | jq -r '.health_score // "?"' 2>/dev/null || echo "?")
@@ -91,7 +104,7 @@ if [ -f "$HOME/.mdemg/.jiminy-strict-mode" ]; then
   REFORM_TMP=$(mktemp /tmp/jiminy-reform-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-reform-$$.json")
   curl -sf -X POST "${MDEMG_URL}/v1/jiminy/reformulate" \
     -H "Content-Type: application/json" \
-    -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"claude-core\"}" \
+    -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"${SESSION_ID}\"}" \
     --connect-timeout 2 --max-time 8 > "$REFORM_TMP" 2>/dev/null || true
 
   if [ -s "$REFORM_TMP" ]; then
@@ -99,8 +112,8 @@ if [ -f "$HOME/.mdemg/.jiminy-strict-mode" ]; then
     GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$REFORM_TMP" 2>/dev/null)
     if [ -n "$GUIDANCE_ID" ]; then
       mkdir -p ~/.mdemg 2>/dev/null || true
-      printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
-        "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+      printf '{"guidance_id":"%s","space_id":"%s","session_id":"%s","ts":%d}\n' \
+        "$GUIDANCE_ID" "$SPACE_ID" "$SESSION_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
     fi
     if [ -n "$DIRECTIVE" ]; then
       echo ""
@@ -130,8 +143,8 @@ else
     GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
     if [ -n "$GUIDANCE_ID" ]; then
       mkdir -p ~/.mdemg 2>/dev/null || true
-      printf '{"guidance_id":"%s","space_id":"%s","session_id":"claude-core","ts":%d}\n' \
-        "$GUIDANCE_ID" "$SPACE_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+      printf '{"guidance_id":"%s","space_id":"%s","session_id":"%s","ts":%d}\n' \
+        "$GUIDANCE_ID" "$SPACE_ID" "$SESSION_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
     else
       rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
     fi
@@ -168,7 +181,7 @@ fi
 # Fire-and-forget: warm guidance for NEXT prompt with current context
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
   -H "Content-Type: application/json" \
-  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"claude-core\"}" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"${SESSION_ID}\"}" \
   --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
 
 # --- Reinforce recalled observations via retrieval co-activation ---
@@ -181,7 +194,7 @@ curl -sf -X POST "${MDEMG_URL}/v1/memory/retrieve" \
   --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null &
 
 # Phase 80: Session health ribbon
-HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=claude-core" \
+HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=${SESSION_ID}" \
   --connect-timeout 1 --max-time 1 2>/dev/null) || true
 if [ -n "$HEALTH_RESP" ]; then
   H_SCORE=$(echo "$HEALTH_RESP" | jq -r '.health_score // "?"' 2>/dev/null || echo "?")
