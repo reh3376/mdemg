@@ -1058,6 +1058,11 @@ type Config struct {
 	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
 	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
 
+	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
+	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
+	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
+	JobFailureLookbackMin   int  // JOB_FAILURE_LOOKBACK_MIN — alert if any scheduled job failed within this lookback window (default: 60)
+
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
 }
@@ -4044,6 +4049,17 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// NOSILENT-001 — scheduled-job health alerting
+	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
+	jobBackupStalenessHours, err := atoi("JOB_BACKUP_STALENESS_HOURS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	jobFailureLookbackMin, err := atoi("JOB_FAILURE_LOOKBACK_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// TSDB Writer
 	tsdbWriterBufferMaxSize, err := atoi("TSDB_WRITER_BUFFER_MAX_SIZE", 1000)
 	if err != nil {
@@ -4804,6 +4820,9 @@ func FromEnv() (Config, error) {
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
 		// Alert Evaluator
+		JobHealthAlertEnabled:     jobHealthAlertEnabled,
+		JobBackupStalenessHours:   jobBackupStalenessHours,
+		JobFailureLookbackMin:     jobFailureLookbackMin,
 		AlertEvaluatorEnabled:     alertEvaluatorEnabled,
 		AlertEvaluatorIntervalSec: alertEvaluatorIntervalSec,
 
