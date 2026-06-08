@@ -297,9 +297,15 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fire-and-forget: run Guide() in background goroutine
+	// Fire-and-forget: run Guide() in background goroutine.
+	// GUIDANCE-SYNTH-001: timeout is config-driven (was a hardcoded 30s that
+	// starved synthesis — per-node classifier + synthesis exceeded 30s).
+	computeTimeoutMs := s.cfg.JiminyWarmComputeTimeoutMs
+	if computeTimeoutMs <= 0 {
+		computeTimeoutMs = 90000
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(computeTimeoutMs)*time.Millisecond)
 		defer cancel()
 		ctx = llmclient.WithSessionID(ctx, req.SessionID)
 

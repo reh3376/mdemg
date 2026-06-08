@@ -282,6 +282,11 @@ type Config struct {
 	// Jiminy Warm Store (event-driven pre-computation)
 	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
 	JiminyWarmDebounceSec int  // JIMINY_WARM_DEBOUNCE_SEC — min seconds between warm computations (default: 10)
+	// GUIDANCE-SYNTH-001 — timeout for the warm-path background Guide() compute.
+	// Was a hardcoded 30s that starved synthesis (per-node classifier ~15s +
+	// synthesis 8-27s > 30s). Default 90s leaves headroom for the parallel
+	// classifier + a slow synthesis. No-hardcoding rule.
+	JiminyWarmComputeTimeoutMs int // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 90000)
 	JiminyWarmMaxAgeSec   int  // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim          float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
@@ -2174,6 +2179,10 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Warm Store (event-driven pre-computation)
 	jiminyWarmEnabled := getBool("JIMINY_WARM_ENABLED", true)
+	jiminyWarmComputeTimeoutMs, err := atoi("JIMINY_WARM_COMPUTE_TIMEOUT_MS", 90000)
+	if err != nil {
+		return Config{}, err
+	}
 	jiminyWarmDebounceSec, err := atoi("JIMINY_WARM_DEBOUNCE_SEC", 10)
 	if err != nil {
 		return Config{}, err
@@ -4223,6 +4232,7 @@ func FromEnv() (Config, error) {
 		JiminyEffectivenessTTLSec:     jiminyEffectivenessTTLSec,
 		JiminyWarmEnabled:             jiminyWarmEnabled,
 		JiminyWarmDebounceSec:         jiminyWarmDebounceSec,
+		JiminyWarmComputeTimeoutMs:    jiminyWarmComputeTimeoutMs,
 		JiminyWarmMaxAgeSec:           jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
