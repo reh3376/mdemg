@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/config"
@@ -129,12 +130,24 @@ type Service struct {
 	conceptFetcher       ConceptFetcher       // Optional: if nil, uses internal fetchRelatedConcepts
 	synthesizer          Synthesizer          // Optional: if nil, LLM synthesis is skipped (Phase 101)
 	intentTranslator     IntentTranslator     // Optional: if nil, intent translation is skipped (Phase 102)
-	constraintClassifier *ConstraintClassifier // Optional: if nil, uses keyword-based fallback (Phase AR-3)
+	constraintClassifier constraintClassifierIface // Optional: if nil, uses keyword-based fallback (Phase AR-3)
 	conflictTracker      *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
+}
+
+// constraintClassifierIface is the minimal surface findApplicableConstraints needs
+// from the LLM constraint classifier. Extracted (GUIDANCE-SYNTH-001) so the
+// concurrent classification path can be unit-tested with a fake. *ConstraintClassifier
+// satisfies it.
+type constraintClassifierIface interface {
+	Classify(ctx context.Context, nodeID, text string) (*ConstraintClassification, error)
 }
 
 // SetConstraintClassifier attaches an optional LLM-powered constraint classifier.
 func (s *Service) SetConstraintClassifier(cc *ConstraintClassifier) {
+	if cc == nil {
+		s.constraintClassifier = nil // avoid a non-nil interface wrapping a nil pointer
+		return
+	}
 	s.constraintClassifier = cc
 }
 
@@ -1044,26 +1057,36 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 }
 
 // findApplicableConstraints finds architectural constraints relevant to the context.
-func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Constraint {
-	var constraints []models.Constraint
+// defaultClassifyConcurrency is the zero-value fallback for
+// CONSULTING_CLASSIFY_CONCURRENCY (GUIDANCE-SYNTH-001).
+const defaultClassifyConcurrency = 4
 
-	// Phase AR-3: Try LLM-powered classification first, fall back to keyword-based
+func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Constraint {
+	// Phase AR-3: Try LLM-powered classification first, fall back to keyword-based.
 	useLLM := s.constraintClassifier != nil
 
+	// Apply the score gate first (cheap, serial) to fix a stable candidate order.
+	candidates := make([]models.RetrieveResult, 0, len(results))
 	for _, r := range results {
 		if r.Score < s.constraintFloor() {
 			continue
 		}
+		candidates = append(candidates, r)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
 
-		var constraintType string
-		var summary string
-
+	// classifyOne classifies a single candidate into a *Constraint (nil if not a
+	// constraint). Pure per-node work — safe to run concurrently (the classifier's
+	// LRU cache is mutex-guarded).
+	classifyOne := func(r models.RetrieveResult) *models.Constraint {
+		var constraintType, summary string
 		if useLLM {
 			classText := r.Summary
 			if classText == "" {
 				classText = r.Name
 			}
-			// Thread source path for LLM interaction logging
 			classCtx := ctx
 			if r.Path != "" {
 				classCtx = llmclient.WithSourcePath(ctx, r.Path)
@@ -1073,39 +1096,71 @@ func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string,
 				constraintType = classification.Type
 				summary = classification.Summary
 			} else if err != nil {
-				// LLM failed — fall back to keyword-based for this node
+				// LLM failed — fall back to keyword-based for this node.
 				constraintType = s.keywordClassifyConstraint(r)
 			}
 		} else {
 			constraintType = s.keywordClassifyConstraint(r)
 		}
-
-		if constraintType != "" {
-			desc := r.Summary
-			if summary != "" {
-				desc = summary
-			}
-			constraints = append(constraints, models.Constraint{
-				Name:           r.Name,
-				Description:    desc,
-				ConstraintType: constraintType,
-				Scope:          r.Path,
-				SourceNodes:    []string{r.NodeID},
-				Confidence:     s.normalizeRetrievalConfidence(r.Score),
-			})
+		if constraintType == "" {
+			return nil
+		}
+		desc := r.Summary
+		if summary != "" {
+			desc = summary
+		}
+		return &models.Constraint{
+			Name:           r.Name,
+			Description:    desc,
+			ConstraintType: constraintType,
+			Scope:          r.Path,
+			SourceNodes:    []string{r.NodeID},
+			Confidence:     s.normalizeRetrievalConfidence(r.Score),
 		}
 	}
 
-	// Deduplicate by name
+	// GUIDANCE-SYNTH-001: classify candidates with bounded concurrency. Each
+	// node's classification is an independent LLM call; serial classification
+	// (~1.5s/node) starved guidance synthesis of its time budget. Results are
+	// written to position-indexed slots so the output order is identical to the
+	// serial path (determinism). Keyword-only classification (no LLM) or cap=1
+	// runs serially — there's no LLM latency to hide.
+	concurrency := s.cfg.ConsultingClassifyConcurrency
+	if concurrency < 1 {
+		concurrency = defaultClassifyConcurrency
+	}
+	out := make([]*models.Constraint, len(candidates))
+	if !useLLM || concurrency == 1 {
+		for i, r := range candidates {
+			out[i] = classifyOne(r)
+		}
+	} else {
+		sem := make(chan struct{}, concurrency)
+		var wg sync.WaitGroup
+		for i := range candidates {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(i int) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				out[i] = classifyOne(candidates[i])
+			}(i)
+		}
+		wg.Wait()
+	}
+
+	// Collect in candidate order + deduplicate by name (identical to serial).
 	seen := make(map[string]bool)
 	var unique []models.Constraint
-	for _, c := range constraints {
+	for _, c := range out {
+		if c == nil {
+			continue
+		}
 		if !seen[c.Name] {
 			seen[c.Name] = true
-			unique = append(unique, c)
+			unique = append(unique, *c)
 		}
 	}
-
 	return unique
 }
 

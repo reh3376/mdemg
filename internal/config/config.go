@@ -647,6 +647,11 @@ type Config struct {
 	ConsultingLLMConstraintsProvider string // CONSULTING_LLM_CONSTRAINTS_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
 	ConsultingLLMConstraintsModel    string // CONSULTING_LLM_CONSTRAINTS_MODEL — model for classification (default: from EMERGENCE_MODEL)
 	ConsultingClassifyTimeoutMs      int    // CONSULTING_CLASSIFY_TIMEOUT_MS — timeout for constraint classification LLM call in ms (default: 30000, min 5000)
+	// GUIDANCE-SYNTH-001 — bounded concurrency for the per-node LLM constraint
+	// classifier in findApplicableConstraints. Serial classification (~1.5s/node ×
+	// ~10 nodes) starved guidance synthesis of its time budget. Default 4 matches
+	// llama-server --parallel 4; floor 1 = serial (rollback). No-hardcoding rule.
+	ConsultingClassifyConcurrency    int    // CONSULTING_CLASSIFY_CONCURRENCY (default: 4, floor 1)
 	// RRF-SCALE-001 — score gates for the consulting suggestion/constraint path.
 	// These were hardcoded (0.55/0.6/0.65/0.7) and calibrated for the legacy
 	// linear scorer; Phase 13.1 RRF default-on dropped the score scale (strong
@@ -3006,6 +3011,13 @@ func FromEnv() (Config, error) {
 	if consultingClassifyTimeoutMs < 5000 {
 		return Config{}, fmt.Errorf("CONSULTING_CLASSIFY_TIMEOUT_MS must be >= 5000")
 	}
+	consultingClassifyConcurrency, err := atoi("CONSULTING_CLASSIFY_CONCURRENCY", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	if consultingClassifyConcurrency < 1 {
+		consultingClassifyConcurrency = 1
+	}
 
 	// RRF-SCALE-001 — RRF-calibrated consulting score gates + confidence sigmoid.
 	consultingConstraintScoreFloor, err := atof("CONSULTING_CONSTRAINT_SCORE_FLOOR", 0.45)
@@ -4493,6 +4505,7 @@ func FromEnv() (Config, error) {
 		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
 		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
 		ConsultingClassifyTimeoutMs:      consultingClassifyTimeoutMs,
+		ConsultingClassifyConcurrency:    consultingClassifyConcurrency,
 		ConsultingConstraintScoreFloor:      consultingConstraintScoreFloor,
 		ConsultingAuthorityScoreFloor:       consultingAuthorityScoreFloor,
 		ConsultingConflictScoreFloor:        consultingConflictScoreFloor,
