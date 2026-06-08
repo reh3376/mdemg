@@ -39,6 +39,7 @@ func claudeHookFiles() []claudeHookEntry {
 		{"post-tool-observe.py", "PostToolUse", 10, "Bash|Write|Edit"},
 		{"pre-compact.sh", "PreCompact", 10, ""},      // empty matcher = fire on all compaction
 		{"pre-bash-check.py", "PreToolUse", 5, "Bash"},
+		{"pre-write-check.py", "PreToolUse", 8, "Write|Edit"}, // /strict J17 classify gate
 	}
 }
 
