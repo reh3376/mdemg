@@ -185,6 +185,33 @@ curl -X POST http://localhost:9999/v1/eventgraph/reinforcement-neighborhood \
   -d '{"space_id":"mdemg-dev","seed_node_id":"n_be61aa4671ef8194ae09","hops":2,"since_seconds":86400}'
 ```
 
+### CLI — `mdemg eventgraph reinforcement-neighborhood`
+
+The CLI is the operator-friendly consumer of the federation API (EVENTGRAPH-CLI-001). It wraps the same `POST /v1/eventgraph/reinforcement-neighborhood` endpoint and renders a summary + events table, or raw JSON for piping.
+
+```bash
+# Explicit seed node:
+mdemg eventgraph reinforcement-neighborhood --seed n_8d0b318843bbe8769c01 --hops 2 --since 24h
+
+# Resolve the seed from a query (top retrieval result becomes the seed):
+mdemg eventgraph reinforcement-neighborhood --query "circuit breaker state machine"
+
+# Machine-readable output for piping to jq:
+mdemg eventgraph reinforcement-neighborhood --seed n_abc --json | jq '.events | length'
+```
+
+| Flag | Purpose | Default |
+|---|---|---|
+| `--seed` | Seed node_id to walk from (required unless `--query`) | — |
+| `--query` | Resolve the seed from the top `/v1/memory/retrieve` result for this text | — |
+| `--hops` | Graph traversal depth | server config (`EVENTGRAPH_FEDERATION_DEFAULT_HOPS`) |
+| `--since` | Lookback window, e.g. `24h`, `90m` | server config (`EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS`) |
+| `--limit` | Max events returned | server config (`EVENTGRAPH_MAX_EVENTS_PER_QUERY`) |
+| `--json` | Raw JSON instead of the table | `false` |
+| `--space-id` | Space to query | `mdemg-dev` |
+
+Unset flags are omitted from the request body so the server applies its own config defaults — there is no second copy of `hops`/`since`/`limit` defaults hardcoded in the CLI. The table marks new-edge formation (`new` column: `✓` = `created_new_edge`) and which endpoints fell inside the N-hop neighborhood (`nbhd` column: `✓✓` = both src + dst inside). The CLI is also the live-testing harness for the EVENTGRAPH line — running it against the real stack exercises the full Hebbian-write → federation-read loop end-to-end.
+
 ### Sample SQL — top-strengthened pairs in the last hour
 
 ```sql
@@ -215,6 +242,7 @@ The Grafana panel "Reinforcement Event Rate (events/min)" on the `mdemg-graph-to
 
 ## Forward-looking
 
+- **EVENTGRAPH-CLI-001 (shipped)** — `mdemg eventgraph reinforcement-neighborhood`, the first consumer of the federation API + the live-testing harness for the line (see the CLI section above).
 - **EVENTGRAPH-002** — extend the federation API to a second event class (guidance outcomes from `GUIDANCE_OUTCOME` edges). Same hypertable shape with a new `trigger_path` value, OR a separate hypertable if the schema diverges.
 - **EVENTGRAPH-003** — wire the writer into the other three Hebbian entry points (`ApplySymbolCoactivation`, `CoactivateSession`, `ApplyNegativeFeedback`).
 - **Pattern Y2 escalation** — promote one event class to skinny graph link-nodes when a query proves single-pass Cypher across events is necessary. Triggered by, not assumed.
