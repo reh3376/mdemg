@@ -298,7 +298,11 @@ func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStalene
 		{
 			ID:          "scheduled_job_recent_failure",
 			Title:       "Scheduled Job Recently Failed",
-			Service:     "scheduled-jobs",
+			// Distinct Service per rule: the dispatcher cooldown key is
+			// (Service, Severity), so two scheduled-job rules sharing one
+			// service would suppress each other (caught in NOSILENT-001 live
+			// testing — the staleness alert was masked by the failure alert).
+			Service:     "scheduled-job-failure",
 			Severity:    SeverityHigh,
 			Interval:    60 * time.Second,
 			ForDuration: 0, // fire promptly — a failure is already a discrete event
@@ -315,7 +319,7 @@ func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStalene
 		rules = append(rules, AlertRule{
 			ID:          "backup_no_recent_success",
 			Title:       "No Successful TSDB Backup In Window",
-			Service:     "scheduled-jobs",
+			Service:     "scheduled-job-staleness",
 			Severity:    SeverityHigh,
 			Interval:    5 * time.Minute,
 			ForDuration: 0,

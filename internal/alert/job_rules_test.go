@@ -26,6 +26,12 @@ func TestJobHealthRules_FailureRuleAlwaysPresent(t *testing.T) {
 	if r.Severity != SeverityHigh {
 		t.Errorf("failure rule should be high severity")
 	}
+	// The two job rules must use distinct services so the dispatcher cooldown
+	// (keyed on Service+Severity) doesn't let one suppress the other.
+	stale, _ := findRule(JobHealthRules(48, 60, true), "backup_no_recent_success")
+	if r.Service == stale.Service {
+		t.Errorf("failure and staleness rules must have distinct services, both = %q", r.Service)
+	}
 	if !strings.Contains(r.QuerySQL, "success = false") || !strings.Contains(r.QuerySQL, "60 minutes") {
 		t.Errorf("failure rule SQL wrong: %s", r.QuerySQL)
 	}
