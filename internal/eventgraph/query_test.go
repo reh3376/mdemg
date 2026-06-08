@@ -2,6 +2,8 @@ package eventgraph
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -41,6 +43,27 @@ func TestFederationRequest_RejectsNegativeHops(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for negative hops, got nil")
+	}
+}
+
+// TestFederationResult_EmptyArraysNotNull pins the JSON contract: both array
+// fields must serialize as [] (never null) when empty. EVENTGRAPH-CLI-001 live
+// contract testing caught neighbor_node_ids marshaling as null for an unknown
+// seed (walkNeighborhood returns a nil slice); EventsInGraphNeighborhood now
+// coalesces it. UATS happy-path asserts type_is array on both fields.
+func TestFederationResult_EmptyArraysNotNull(t *testing.T) {
+	// Built exactly as EventsInGraphNeighborhood builds an empty result.
+	r := FederationResult{Events: []EventWithContext{}, NeighborNodeIDs: []string{}}
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	s := string(b)
+	if strings.Contains(s, `"events":null`) || !strings.Contains(s, `"events":[]`) {
+		t.Errorf("events must serialize as [] not null: %s", s)
+	}
+	if strings.Contains(s, `"neighbor_node_ids":null`) || !strings.Contains(s, `"neighbor_node_ids":[]`) {
+		t.Errorf("neighbor_node_ids must serialize as [] not null: %s", s)
 	}
 }
 

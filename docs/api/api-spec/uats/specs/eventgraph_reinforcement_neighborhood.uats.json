@@ -1,0 +1,198 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Eventgraph Reinforcement Neighborhood",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "eventgraph",
+      "federation",
+      "read",
+      "tsdb"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-08",
+    "description": "Validates POST /v1/eventgraph/reinforcement-neighborhood (EVENTGRAPH-001 federation API): graph-walk from a seed + TSDB reinforcement_events touching the neighborhood. Happy path asserts the response contract shape (works even with an unknown seed \u2014 empty neighborhood is a valid 200); variants cover required-field, range, ceiling, and method guards.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "eventgraph"
+    ],
+    "sha256": "840c7af7ca030a29384e462d3c818b70ec4b18bde1e68258e3aecb30b0120bbd"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/eventgraph/reinforcement-neighborhood",
+    "body": {
+      "space_id": "mdemg-dev",
+      "seed_node_id": "uats-contract-seed-does-not-need-to-exist",
+      "hops": 1,
+      "since_seconds": 86400,
+      "limit": 50
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.events",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.neighbor_node_ids",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.graph_hops",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.tsdb_rows_scanned",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.truncated",
+        "op": "type_is",
+        "expected": "boolean"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "An empty space_id returns 400 (the runner deep-merges variant body over the base, so the required-field guard is exercised via an empty-string override rather than key omission).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/eventgraph/reinforcement-neighborhood",
+        "body": {
+          "space_id": "",
+          "seed_node_id": "n_abc"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "space_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_seed_node_id",
+      "description": "An empty seed_node_id returns 400 (empty-string override; see missing_space_id note on deep-merge).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/eventgraph/reinforcement-neighborhood",
+        "body": {
+          "space_id": "mdemg-dev",
+          "seed_node_id": ""
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "seed_node_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "negative_hops",
+      "description": "A negative hops value is rejected with 400.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/eventgraph/reinforcement-neighborhood",
+        "body": {
+          "space_id": "mdemg-dev",
+          "seed_node_id": "n_abc",
+          "hops": -1
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "hops"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hops_over_ceiling",
+      "description": "A hops value above the server ceiling (2 \u00d7 default) is rejected with 400.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/eventgraph/reinforcement-neighborhood",
+        "body": {
+          "space_id": "mdemg-dev",
+          "seed_node_id": "n_abc",
+          "hops": 999
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "ceiling"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/eventgraph/reinforcement-neighborhood",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 405,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "method"
+          }
+        ]
+      }
+    }
+  ]
+}

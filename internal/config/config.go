@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"mdemg/migrations"
 )
@@ -282,11 +283,13 @@ type Config struct {
 	// Jiminy Warm Store (event-driven pre-computation)
 	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
 	JiminyWarmDebounceSec int  // JIMINY_WARM_DEBOUNCE_SEC — min seconds between warm computations (default: 10)
-	// GUIDANCE-SYNTH-001 — timeout for the warm-path background Guide() compute.
-	// Was a hardcoded 30s that starved synthesis (per-node classifier ~15s +
-	// synthesis 8-27s > 30s). Default 90s leaves headroom for the parallel
-	// classifier + a slow synthesis. No-hardcoding rule.
-	JiminyWarmComputeTimeoutMs int // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 90000)
+	// GUIDANCE-SYNTH-001 — timeout for the Guide() compute on the warm path AND
+	// the synchronous /v1/jiminy/guide handler. Was a hardcoded 30s (in both
+	// handlers) that starved synthesis (per-node classifier ~15s + synthesis
+	// 8-50s > 30s). Default 90s leaves headroom. Resolve via the single
+	// JiminyWarmComputeTimeout() method — do NOT re-default the literal at call
+	// sites. No-hardcoding rule (single source of truth).
+	JiminyWarmComputeTimeoutMs int // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: DefaultJiminyWarmComputeTimeoutMs)
 	JiminyWarmMaxAgeSec   int  // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim          float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
@@ -1061,6 +1064,38 @@ type Config struct {
 
 // EffectiveLLMEndpoint returns the endpoint for LLM text-generation calls.
 // If LLMEndpoint is set, it is used; otherwise falls back to OpenAIEndpoint.
+// Single source of truth for config defaults that are also referenced as
+// zero-value fallbacks by consuming packages (consulting, jiminy). FromEnv uses
+// these as the env defaults, and the consuming packages alias them — so each
+// value is defined in exactly one place. Change here to change everywhere.
+const (
+	DefaultJiminyWarmComputeTimeoutMs = 90000 // JIMINY_WARM_COMPUTE_TIMEOUT_MS (warm path + /v1/jiminy/guide)
+
+	// RRF-SCALE-001 — consulting score gates + confidence sigmoid.
+	DefaultConsultingConstraintScoreFloor      = 0.45 // CONSULTING_CONSTRAINT_SCORE_FLOOR
+	DefaultConsultingAuthorityScoreFloor       = 0.45 // CONSULTING_AUTHORITY_SCORE_FLOOR
+	DefaultConsultingConflictScoreFloor        = 0.45 // CONSULTING_CONFLICT_SCORE_FLOOR
+	DefaultRetrievalConfidenceSigmoidMidpoint  = 0.45 // RETRIEVAL_CONFIDENCE_SIGMOID_MIDPOINT
+	DefaultRetrievalConfidenceSigmoidSteepness = 8.0  // RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS
+
+	// JIMINY-OUTCOME-001 — embedding-similarity constraint-code matching.
+	DefaultJiminyConstraintCodeSimThreshold = 0.55 // JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD
+
+	// GUIDANCE-SYNTH-001 — per-node constraint classifier concurrency.
+	DefaultConsultingClassifyConcurrency = 4 // CONSULTING_CLASSIFY_CONCURRENCY
+)
+
+// JiminyWarmComputeTimeout returns the effective Guide()-compute timeout as a
+// Duration, applying the default when unset. Call sites use this instead of
+// re-defaulting the literal, so the value lives in exactly one place.
+func (c Config) JiminyWarmComputeTimeout() time.Duration {
+	ms := c.JiminyWarmComputeTimeoutMs
+	if ms <= 0 {
+		ms = DefaultJiminyWarmComputeTimeoutMs
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
 func (c Config) EffectiveLLMEndpoint() string {
 	if c.LLMEndpoint != "" {
 		return c.LLMEndpoint
@@ -2162,7 +2197,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyConstraintCodeSimThreshold, err := atof("JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD", 0.55)
+	jiminyConstraintCodeSimThreshold, err := atof("JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD", DefaultJiminyConstraintCodeSimThreshold)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2179,7 +2214,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Warm Store (event-driven pre-computation)
 	jiminyWarmEnabled := getBool("JIMINY_WARM_ENABLED", true)
-	jiminyWarmComputeTimeoutMs, err := atoi("JIMINY_WARM_COMPUTE_TIMEOUT_MS", 90000)
+	jiminyWarmComputeTimeoutMs, err := atoi("JIMINY_WARM_COMPUTE_TIMEOUT_MS", DefaultJiminyWarmComputeTimeoutMs)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3020,7 +3055,7 @@ func FromEnv() (Config, error) {
 	if consultingClassifyTimeoutMs < 5000 {
 		return Config{}, fmt.Errorf("CONSULTING_CLASSIFY_TIMEOUT_MS must be >= 5000")
 	}
-	consultingClassifyConcurrency, err := atoi("CONSULTING_CLASSIFY_CONCURRENCY", 4)
+	consultingClassifyConcurrency, err := atoi("CONSULTING_CLASSIFY_CONCURRENCY", DefaultConsultingClassifyConcurrency)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3029,23 +3064,23 @@ func FromEnv() (Config, error) {
 	}
 
 	// RRF-SCALE-001 — RRF-calibrated consulting score gates + confidence sigmoid.
-	consultingConstraintScoreFloor, err := atof("CONSULTING_CONSTRAINT_SCORE_FLOOR", 0.45)
+	consultingConstraintScoreFloor, err := atof("CONSULTING_CONSTRAINT_SCORE_FLOOR", DefaultConsultingConstraintScoreFloor)
 	if err != nil {
 		return Config{}, err
 	}
-	consultingAuthorityScoreFloor, err := atof("CONSULTING_AUTHORITY_SCORE_FLOOR", 0.45)
+	consultingAuthorityScoreFloor, err := atof("CONSULTING_AUTHORITY_SCORE_FLOOR", DefaultConsultingAuthorityScoreFloor)
 	if err != nil {
 		return Config{}, err
 	}
-	consultingConflictScoreFloor, err := atof("CONSULTING_CONFLICT_SCORE_FLOOR", 0.45)
+	consultingConflictScoreFloor, err := atof("CONSULTING_CONFLICT_SCORE_FLOOR", DefaultConsultingConflictScoreFloor)
 	if err != nil {
 		return Config{}, err
 	}
-	retrievalConfidenceSigmoidMidpoint, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_MIDPOINT", 0.45)
+	retrievalConfidenceSigmoidMidpoint, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_MIDPOINT", DefaultRetrievalConfidenceSigmoidMidpoint)
 	if err != nil {
 		return Config{}, err
 	}
-	retrievalConfidenceSigmoidSteepness, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS", 8.0)
+	retrievalConfidenceSigmoidSteepness, err := atof("RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS", DefaultRetrievalConfidenceSigmoidSteepness)
 	if err != nil {
 		return Config{}, err
 	}

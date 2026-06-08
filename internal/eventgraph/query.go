@@ -98,6 +98,13 @@ func (s *Service) EventsInGraphNeighborhood(ctx context.Context, req FederationR
 	if err != nil {
 		return nil, fmt.Errorf("graph walk failed: %w", err)
 	}
+	// Guarantee a non-nil slice so the JSON contract is consistent with
+	// Events: both array fields always serialize as [] (never null) when
+	// empty — e.g. an unknown seed has no neighborhood. Caught in EVENTGRAPH-
+	// CLI-001 live contract testing (UATS happy-path asserts type_is array).
+	if neighbors == nil {
+		neighbors = []string{}
+	}
 
 	result := &FederationResult{
 		Events:          []EventWithContext{},

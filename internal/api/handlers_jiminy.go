@@ -185,7 +185,10 @@ func (s *Server) handleJiminyGuide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	// GUIDANCE-SYNTH-001 fix-commit: the direct /guide handler had the same
+	// hardcoded 30s cap as the warm path — it starved synthesis (up to ~50s on
+	// the local model). Use the single config-driven compute budget.
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.JiminyWarmComputeTimeout())
 	defer cancel()
 	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
@@ -300,12 +303,9 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 	// Fire-and-forget: run Guide() in background goroutine.
 	// GUIDANCE-SYNTH-001: timeout is config-driven (was a hardcoded 30s that
 	// starved synthesis — per-node classifier + synthesis exceeded 30s).
-	computeTimeoutMs := s.cfg.JiminyWarmComputeTimeoutMs
-	if computeTimeoutMs <= 0 {
-		computeTimeoutMs = 90000
-	}
+	warmComputeTimeout := s.cfg.JiminyWarmComputeTimeout()
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(computeTimeoutMs)*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), warmComputeTimeout)
 		defer cancel()
 		ctx = llmclient.WithSessionID(ctx, req.SessionID)
 

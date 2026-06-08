@@ -2448,7 +2448,7 @@ func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) 
 
 // defaultConstraintCodeSimThreshold is the zero-value fallback for
 // JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD (JIMINY-OUTCOME-001).
-const defaultConstraintCodeSimThreshold = 0.55
+const defaultConstraintCodeSimThreshold = config.DefaultJiminyConstraintCodeSimThreshold
 
 // matchConstraintCodeByEmbedding finds the best-matching constraint code for a
 // guidance item via the constraint vector index (JIMINY-OUTCOME-001). Concept-

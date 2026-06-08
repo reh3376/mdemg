@@ -192,6 +192,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	synergyCmd.GroupID = "config"
 	rootCmd.AddCommand(synergyCmd)
 
+	eventgraphCmd := newEventgraphCmd()
+	eventgraphCmd.GroupID = "advanced"
+	rootCmd.AddCommand(eventgraphCmd)
+
 	// Advanced
 	mcpCmd := newMCPCmd()
 	mcpCmd.GroupID = "advanced"
