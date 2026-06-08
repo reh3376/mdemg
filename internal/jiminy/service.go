@@ -875,8 +875,27 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	if s.cfg.J17Enabled && s.driver != nil && len(items) > 0 {
 		constraints := s.loadSpaceConstraintCodes(ctx, req.SpaceID)
 		if len(constraints) > 0 {
+			threshold := s.cfg.JiminyConstraintCodeSimThreshold
+			if threshold <= 0 {
+				threshold = defaultConstraintCodeSimThreshold
+			}
 			for i := range items {
-				items[i].ConstraintCode = matchConstraintCode(items[i], constraints)
+				// JIMINY-OUTCOME-001: try embedding-similarity match first
+				// (concept-abstracted content rarely shares 3+ literal words
+				// with raw constraint text, so the keyword matcher missed
+				// everything → dormant Neo4j GUIDANCE_OUTCOME sink). Fall back
+				// to keyword overlap when the embedder is unavailable, the
+				// content is empty, or no constraint clears the threshold.
+				code := ""
+				if s.embedder != nil && items[i].Content != "" {
+					if vec, err := s.embedder.Embed(ctx, items[i].Content); err == nil {
+						code = s.matchConstraintCodeByEmbedding(ctx, req.SpaceID, vec, threshold)
+					}
+				}
+				if code == "" {
+					code = matchConstraintCode(items[i], constraints)
+				}
+				items[i].ConstraintCode = code
 			}
 		}
 	}
@@ -2425,6 +2444,66 @@ func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) 
 	}
 	entries, _ := result.([]constraintCodeEntry)
 	return entries
+}
+
+// defaultConstraintCodeSimThreshold is the zero-value fallback for
+// JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD (JIMINY-OUTCOME-001).
+const defaultConstraintCodeSimThreshold = 0.55
+
+// matchConstraintCodeByEmbedding finds the best-matching constraint code for a
+// guidance item via the constraint vector index (JIMINY-OUTCOME-001). Concept-
+// abstracted guidance content rarely shares 3+ literal words with raw constraint
+// text, so the keyword matcher (matchConstraintCode) missed everything and the
+// Neo4j GUIDANCE_OUTCOME edge sink went dormant. This matches semantically:
+// embed the item content, query the role_type='constraint' nodes by cosine
+// similarity, and return the code of the closest above the threshold. Returns ""
+// on any miss/error so the caller can fall back to the keyword matcher.
+//
+// Mirrors the proven Evaluator.findMatchingConstraints vector-index pattern.
+func (s *Service) matchConstraintCodeByEmbedding(ctx context.Context, spaceID string, embedding []float32, threshold float64) string {
+	if s.driver == nil || len(embedding) == 0 {
+		return ""
+	}
+	indexName := s.cfg.VectorIndexName
+	if indexName == "" {
+		indexName = "memNodeEmbedding"
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	cypher := `
+	CALL db.index.vector.queryNodes($indexName, 50, $embedding)
+	YIELD node AS c, score AS sim
+	WHERE c.space_id = $spaceId
+	  AND c.role_type = 'constraint'
+	  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+	  AND NOT coalesce(c.is_archived, false)
+	  AND sim >= $threshold
+	RETURN c.constraint_code AS code, sim
+	ORDER BY sim DESC LIMIT 1`
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, txErr := tx.Run(ctx, cypher, map[string]any{
+			"indexName": indexName,
+			"embedding": embedding,
+			"spaceId":   spaceID,
+			"threshold": threshold,
+		})
+		if txErr != nil {
+			return "", txErr
+		}
+		if res.Next(ctx) {
+			codeVal, _ := res.Record().Get("code")
+			return asStringVal(codeVal), res.Err()
+		}
+		return "", res.Err()
+	})
+	if err != nil {
+		slog.Debug("jiminy: constraint-code embedding match failed", "error", err)
+		return ""
+	}
+	code, _ := result.(string)
+	return code
 }
 
 // matchConstraintCode finds the best constraint code for a guidance item by keyword overlap.
