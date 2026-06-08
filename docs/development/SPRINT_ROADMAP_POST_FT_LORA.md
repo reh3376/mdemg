@@ -189,13 +189,15 @@ Per research-eval: "single most leveraged action across the entire collection." 
 
 Ship a Claude Code **skill** that makes Jiminy the authoritative, deterministic source of project context + governance over the J17 AI2AI protocol — so an agent queries Jiminy (not stale `.md`, not training-data priors) at session start and before every governed action. The skill is intentionally a **routing/handshake shim**, not a rulebook: real constraints live in the MDEMG graph so they can be measured, escalated, and persisted. Aligns directly with the work this branch already landed (RRF-SCALE-001 / JIMINY-OUTCOME-001 / GUIDANCE-SYNTH-001 revived the guidance→feedback→`GUIDANCE_OUTCOME` loop; this skill is the agent-facing front door to it).
 
-**Build-out scope (the spec ships with deliberate wire-up placeholders that must be resolved against the real instance — not guessed):**
-1. Resolve the wire-up: the Jiminy query interface (MCP server name + context/constraint query tool(s), or the gRPC/local endpoint), the **PreToolUse hook** command/path that enforces J17 deterministically, the SessionID identity source, and the J17 message/tool names for comprehension-ack, **RetireCode**, and `GUIDANCE_OUTCOME` emission.
-2. Author the skill in `.claude/skills/` (matching the existing skill format) from the resolved spec.
-3. Wire + verify the PreToolUse hook actually blocks/modifies governed tool calls (enforcement must not depend on the skill triggering) — fail-closed-and-surface, no workarounds.
-4. Test: session-start handshake, scoped constraint query, comprehension ack recorded, an enforced block surfaced to the user, and a `GUIDANCE_OUTCOME` edge written. Live Tier-3 per the testing policy.
+**Build-out scope:**
+1. ✅ **Resolve the wire-up against the real instance (DONE 2026-06-08).** All five placeholders resolved + verified live in `docs/development/jiminy-governance-skill/SKILL.md` (§"Wire-up — RESOLVED"): Jiminy query interface (MCP `mdemg mcp` stdio → `jiminy_guide`/`validate_changes`; HTTP `/v1/jiminy/guide` + `/bootstrap` glossary + `/latest`), PreToolUse hooks (`pre-bash-check.py` Bash fail-closed; `pre-write-check.py` Write/Edit → `/v1/jiminy/classify`), SessionID (`claude-core` convention), comprehension-ack (`/v1/jiminy/protocol/feedback`), `GUIDANCE_OUTCOME` (`/v1/jiminy/feedback {guidance_id,…}`), RetireCode (**internal-only by design — no agent-facing call**).
+2. **Close the two integration gaps** the resolution surfaced (the real work):
+   - **(a) MCP not registered:** no `.mcp.json` exists, so an agent has no MCP tool to call — context is currently *pushed* by `prompt-context.sh`, not *pulled* by the agent. Register the MDEMG MCP server, or route the skill's handshake over HTTP.
+   - **(b) Enforcement is `/strict`-gated + fail-open:** the J17 Write/Edit gate (`pre-write-check.py` → `/classify`) only enforces when `/strict` is on AND the server is reachable, so it is *not* deterministic-by-default. Decide: enable `/strict` in the handshake; keep the Write/Edit gate fail-open or move it to fail-closed-and-surface (the skill's "comply, surface, no workaround" intent leans fail-closed; the Bash gate already is).
+3. Author the skill in `.claude/skills/` (matching the existing skill format) from the resolved spec.
+4. Test (live Tier-3): session-start handshake, scoped constraint query, comprehension ack recorded, an enforced block surfaced to the user, and a `GUIDANCE_OUTCOME` edge written.
 
-**Cost:** ~1 sprint (most of the effort is resolving the wire-up + the hook-enforcement verification, not the skill prose). **Dependency:** the guidance loop is already live end-to-end (this branch), so the outcome sink it relies on exists.
+**Cost:** ~1 sprint; step 1 done — remaining effort is the two integration gaps + hook-enforcement verification, not the skill prose. **Dependency:** the guidance loop is already live end-to-end (this branch), so the outcome sink it relies on exists.
 
 ---
 
