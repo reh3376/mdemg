@@ -5,7 +5,19 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 $MDEMG_URL = if ($env:MDEMG_URL) { $env:MDEMG_URL } else { "{{MDEMG_URL}}" }
 $SPACE_ID = "{{SPACE_ID}}"
-$SESSION_ID = "claude-core"
+# Resolve SessionID per conversation: MDEMG_SESSION_ID env > Claude Code stdin
+# session_id > ~/.mdemg/.claude-session > claude-core. Publish it for the agent.
+$rawInput = [Console]::In.ReadToEnd()
+try { $hookInput = $rawInput | ConvertFrom-Json } catch { $hookInput = $null }
+$SESSION_ID = if ($env:MDEMG_SESSION_ID) { $env:MDEMG_SESSION_ID } else { "" }
+if (-not $SESSION_ID -and $hookInput) { $SESSION_ID = $hookInput.session_id }
+if (-not $SESSION_ID) { try { $SESSION_ID = (Get-Content "$env:USERPROFILE\.mdemg\.claude-session" -Raw | ConvertFrom-Json).session_id } catch {} }
+if (-not $SESSION_ID) { $SESSION_ID = "claude-core" }
+try {
+    $sessDir = "$env:USERPROFILE\.mdemg"
+    if (-not (Test-Path $sessDir)) { New-Item -ItemType Directory -Path $sessDir -Force | Out-Null }
+    @{session_id=$SESSION_ID; ts=[int][double]::Parse((Get-Date -UFormat %s))} | ConvertTo-Json -Compress | Set-Content "$sessDir\.claude-session"
+} catch {}
 $MAX_OBS = 10
 
 # Check if MDEMG server is reachable

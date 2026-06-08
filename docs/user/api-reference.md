@@ -48,6 +48,7 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 38. [Hash Verification (UNTS)](#hash-verification-unts)
 39. [Plugins & Modules](#plugins--modules)
 40. [System](#system)
+41. [Event Graph Federation](#event-graph-federation)
 41. [Training Data Export](#training-data-export)
 42. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
 43. [MCP Server Tools](#mcp-server-tools)
@@ -4893,6 +4894,79 @@ $env:EMBEDDING_PROVIDER = "openai"
 # PowerShell (persistent for user)
 [Environment]::SetEnvironmentVariable("NEO4J_URI", "bolt://localhost:7687", "User")
 ```
+
+---
+
+## Event Graph Federation
+
+Pattern Y1 federation: a graph walk in Neo4j combined with the time-series events touching that neighborhood in TSDB, joined in Go. Both endpoints require `EVENTGRAPH_ENABLED=true` (else `503 {"error":"eventgraph disabled"}`) and share the `/v1/admin/breakers` auth convention (gated when `AUTH_API_KEYS` is set). See the feature doc `docs/features/event-graph-federation.md` and the CLI consumers `mdemg eventgraph …`.
+
+Both endpoints share the same optional-field convention: `hops`/`since_seconds`/`limit` are omitted to take the server config defaults. `hops` must be ≥ 0 and ≤ the server ceiling (`2 × EVENTGRAPH_FEDERATION_DEFAULT_HOPS`). Errors: `400` (bad JSON / missing `space_id` or `seed_node_id` / bad hops), `405` (non-POST), `503` (disabled / service uninitialized), `500` (`{"error":"federation query failed","detail":"…"}`).
+
+### POST /v1/eventgraph/reinforcement-neighborhood
+
+Reinforcement (Hebbian co-activation) events in a node's graph neighborhood (EVENTGRAPH-001).
+
+**Request body:**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `space_id` | string | yes | |
+| `seed_node_id` | string | yes | walk origin |
+| `hops` | int | no | nil → `EVENTGRAPH_FEDERATION_DEFAULT_HOPS` (default 2) |
+| `since_seconds` | int | no | nil → `EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS` × 3600 |
+| `limit` | int | no | nil → `EVENTGRAPH_MAX_EVENTS_PER_QUERY` (default 500) |
+
+**Response 200:**
+
+```json
+{
+  "events": [{
+    "event_id": "…", "recorded_at": "2026-06-08T17:49:01Z",
+    "src_node_id": "n_…", "dst_node_id": "n_…",
+    "prev_weight": 0.10, "new_weight": 0.11, "delta_weight": 0.008,
+    "evidence_count_after": 2, "direction": "bidirectional",
+    "session_id": "…", "created_new_edge": true, "trigger_path": "apply_coactivation",
+    "src_in_neighborhood": true, "dst_in_neighborhood": true
+  }],
+  "neighbor_node_ids": ["n_…"],
+  "graph_hops": 2,
+  "tsdb_rows_scanned": 20,
+  "truncated": false
+}
+```
+
+`events` and `neighbor_node_ids` always serialize as `[]` (never `null`) when empty.
+
+### POST /v1/eventgraph/guidance-outcome-neighborhood
+
+Guidance outcomes (constraint effectiveness) in a constraint's graph neighborhood (EVENTGRAPH-002). Walks the neighborhood, collects each neighbor's `constraint_code`, and joins `constraint_outcomes` on those codes.
+
+**Request body:** identical fields + validation to the reinforcement endpoint (`space_id`, `seed_node_id` required; `hops`/`since_seconds`/`limit` optional with the same defaults + ceiling).
+
+**Response 200:**
+
+```json
+{
+  "outcomes": [{
+    "time": "2026-06-08T15:15:19Z",
+    "constraint_id": "40e8a524-…",          // TSDB source UUID (NOT a Neo4j node_id)
+    "constraint_code": "no-direct-main-commits",  // the join key
+    "guidance_id": "…", "session_id": "claude-core",
+    "outcome_type": "followed",             // followed|ignored|contradicted|partial_compliance|not_applicable
+    "similarity": 1.0, "guidance_type": "pattern",
+    "constraint_node_id": "n_…",            // Neo4j constraint node whose code matched
+    "in_neighborhood": true
+  }],
+  "neighbor_node_ids": ["n_…"],
+  "neighbor_constraint_codes": ["no-direct-main-commits"],
+  "graph_hops": 2,
+  "tsdb_rows_scanned": 11,
+  "truncated": false
+}
+```
+
+All three array fields (`outcomes`, `neighbor_node_ids`, `neighbor_constraint_codes`) always serialize as `[]` (never `null`) when empty. Outcomes recorded without a `constraint_code` are not joinable and won't appear.
 
 ---
 

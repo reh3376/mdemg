@@ -36,7 +36,28 @@ def _resolve_mdemg_url() -> str:
 
 
 MDEMG_URL = _resolve_mdemg_url()
+# Default; main() resolves the real per-conversation id from the hook stdin.
 SESSION_ID = "claude-core"
+
+
+def _resolve_session_id(input_data):
+    """Per-conversation SessionID: MDEMG_SESSION_ID env > Claude Code stdin
+    session_id > ~/.mdemg/.claude-session > claude-core. Realizes J17
+    per-(session,constraint) isolation instead of one shared id."""
+    sid = os.environ.get("MDEMG_SESSION_ID")
+    if sid:
+        return sid
+    sid = (input_data or {}).get("session_id")
+    if sid:
+        return sid
+    try:
+        with open(os.path.join(os.path.expanduser("~"), ".mdemg", ".claude-session")) as f:
+            sid = json.load(f).get("session_id")
+            if sid:
+                return sid
+    except Exception:
+        pass
+    return "claude-core"
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
 INGEST_LOG = os.path.join(os.path.expanduser("~"), ".mdemg", "logs", "ingest-claude-md.log")
@@ -543,6 +564,10 @@ def main():
         input_data = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):
         sys.exit(0)
+
+    # Resolve the per-conversation SessionID for all observe() calls below.
+    global SESSION_ID
+    SESSION_ID = _resolve_session_id(input_data)
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})

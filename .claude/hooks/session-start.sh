@@ -17,7 +17,22 @@ if [ -z "${MDEMG_URL:-}" ]; then
     fi
     MDEMG_URL="http://localhost:${_PORT:-9999}"
 fi
-SESSION_ID="claude-core"
+# Resolve SessionID per conversation: MDEMG_SESSION_ID env (stable-identity
+# escape hatch) > Claude Code stdin session_id (per-conversation) >
+# ~/.mdemg/.claude-session > claude-core. Realizes J17 per-(session,constraint)
+# isolation instead of one shared "claude-core" across all conversations.
+HOOK_INPUT=$(cat 2>/dev/null || true)
+SESSION_ID="${MDEMG_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$HOOK_INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+fi
+if [ -z "$SESSION_ID" ] && [ -f "$HOME/.mdemg/.claude-session" ]; then
+    SESSION_ID=$(jq -r '.session_id // empty' "$HOME/.mdemg/.claude-session" 2>/dev/null || true)
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="claude-core"
+# Publish the resolved session id so the agent (skill) + any stdin-less context
+# reads the same per-conversation id the hooks use.
+printf '{"session_id":"%s","ts":%d}\n' "$SESSION_ID" "$(date +%s)" > "$HOME/.mdemg/.claude-session" 2>/dev/null || true
 MAX_OBS=10
 
 get_space_id() {
@@ -234,7 +249,7 @@ fi
 # Pre-warm Jiminy guidance for first prompt (fire-and-forget)
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
   -H "Content-Type: application/json" \
-  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":\"session-start\",\"session_id\":\"claude-core\"}" \
+  -d "{\"space_id\":\"${SPACE_ID}\",\"context_hint\":\"session-start\",\"session_id\":\"${SESSION_ID}\"}" \
   --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
 
 # J17: Detect whether J17 is enabled via server healthz (env var may not be in shell)
@@ -364,8 +379,8 @@ SYNERGY_WARN
   if [ -n "$MEMORY_PATH" ]; then
     MEMORY_CONTENT=$(head -c 500 "$MEMORY_PATH" 2>/dev/null || true)
     if [ -n "$MEMORY_CONTENT" ]; then
-      BASELINE_PAYLOAD=$(jq -nc --arg sid "$RECOVERY_BUFFER_SPACE" --arg content "$MEMORY_CONTENT" \
-        '{space_id: $sid, session_id: "claude-core", content: $content, obs_type: "constraint", tags: ["recovery-buffer", "baseline-snapshot", "jiminy-outage"]}')
+      BASELINE_PAYLOAD=$(jq -nc --arg sid "$RECOVERY_BUFFER_SPACE" --arg content "$MEMORY_CONTENT" --arg sess "$SESSION_ID" \
+        '{space_id: $sid, session_id: $sess, content: $content, obs_type: "constraint", tags: ["recovery-buffer", "baseline-snapshot", "jiminy-outage"]}')
       # Try Tier 1: CMS buffer space
       if ! curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
         -H "Content-Type: application/json" \
@@ -435,7 +450,7 @@ if [ "$JIMINY_OK" = "true" ]; then
             curl -sf -X POST "${MDEMG_URL}/v1/conversation/observe" \
               -H "Content-Type: application/json" \
               -d "$(jq -nc --arg c "$CONTENT" --arg t "$OBS_TYPE" \
-                --arg s "$SPACE_ID" '{space_id: $s, session_id: "claude-core", content: $c, obs_type: $t, tags: ["recovery-buffer", "promoted"]}')" \
+                --arg s "$SPACE_ID" --arg sess "$SESSION_ID" '{space_id: $s, session_id: $sess, content: $c, obs_type: $t, tags: ["recovery-buffer", "promoted"]}')" \
               --connect-timeout 2 --max-time 5 -o /dev/null 2>/dev/null && FLUSH_COUNT=$((FLUSH_COUNT + 1)) || true
             [ "$FLUSH_DELAY_SEC" != "0" ] && sleep "$FLUSH_DELAY_SEC" 2>/dev/null || true
           fi

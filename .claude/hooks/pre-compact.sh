@@ -40,6 +40,14 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null 
 SESSION_ID_INPUT=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
 
+# Per-conversation SessionID: MDEMG_SESSION_ID env > Claude Code stdin >
+# ~/.mdemg/.claude-session > claude-core (was hardcoded claude-core above).
+SESSION_ID="${MDEMG_SESSION_ID:-${SESSION_ID_INPUT:-}}"
+if [ -z "$SESSION_ID" ] && [ -f "$HOME/.mdemg/.claude-session" ]; then
+    SESSION_ID=$(jq -r '.session_id // empty' "$HOME/.mdemg/.claude-session" 2>/dev/null || true)
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="claude-core"
+
 # Build a richer context message by examining recent state
 CONTEXT_PARTS="Pre-compaction state save."
 

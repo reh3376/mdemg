@@ -20,8 +20,8 @@ func TestClaudeHookFilesReturnsAllHooks(t *testing.T) {
 	}
 
 	entries := claudeHookFiles()
-	if len(entries) != 5 {
-		t.Fatalf("expected 5 hook entries, got %d", len(entries))
+	if len(entries) != 6 {
+		t.Fatalf("expected 6 hook entries, got %d", len(entries))
 	}
 
 	expected := map[string]struct {
@@ -34,6 +34,7 @@ func TestClaudeHookFilesReturnsAllHooks(t *testing.T) {
 		"post-tool-observe.py": {"PostToolUse", 10, "Bash|Write|Edit"},
 		"pre-compact.sh":       {"PreCompact", 10, ""},
 		"pre-bash-check.py":    {"PreToolUse", 5, "Bash"},
+		"pre-write-check.py":   {"PreToolUse", 8, "Write|Edit"},
 	}
 
 	for _, entry := range entries {

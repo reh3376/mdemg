@@ -1554,10 +1554,10 @@ Pull a fused-quant model from the configured distribution backend. The flow:
 | `--quants` | string | `Q4_K_M,Q5_K_M,Q8_0` | Allowlist of acceptable quants (env: `MDEMG_MODEL_QUANTS`) |
 | `--ram-tiers` | string | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` | JSON map for `auto` quant dispatch (env: `MDEMG_MODEL_RAM_TIERS`) |
 | `--quant` | string | `auto` | Selected quant (`auto` triggers RAM dispatch; env: `MDEMG_MODEL_QUANT`) |
-| `--adapter-base` | string | `qwen3:14b` | Adapter base model (env: `MDEMG_ADAPTER_BASE`; adapter path deferred to MODEL-DIST-002) |
+| `--adapter-base` | string | `qwen3:14b` | Adapter base model the LoRA layers over (env: `MDEMG_ADAPTER_BASE`) |
 | `--model-dir` | string | `~/.mdemg/models` | Local symlink target dir (env: `MDEMG_MODEL_DIR`) |
 | `--manifest` | string | embedded | Override embedded quant manifest (env: `MDEMG_MODEL_MANIFEST_PATH`) |
-| `--adapter` | bool | `false` | Pull adapter-only artifact (deferred to MODEL-DIST-002; currently errors with deferral message) |
+| `--adapter` | bool | `false` | Pull the adapter-only artifact (`<ns>/<name>-adapter:latest`, ~257 MB GGUF LoRA) instead of the fused model; symlinks `<name>-adapter.gguf`, SHA-verifies against the manifest. Shipped in MODEL-DIST-002. Load via `llama-server --model <base.gguf> --lora <adapter.gguf>`. |
 | `--dry-run` | bool | `false` | Resolve config + print plan; no side effects |
 
 **Usage Examples:**
@@ -1663,6 +1663,29 @@ llama-server --model "$LLAMA_GGUF" --port 18102 --ctx-size 32768 --jinja
 
 ---
 
+### `mdemg model run`
+
+**Synopsis:** `mdemg model run [-- <prompt>] [flags]`
+
+Chat with the running LLM endpoint — one-shot (with `--prompt` or a trailing `-- <prompt>`) or an interactive REPL (omit the prompt).
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `-p, --prompt` | string | — | One-shot prompt; omit to enter the interactive REPL |
+| `-s, --system` | string | — | System message prepended to the conversation |
+| `--endpoint` | string | `cfg.EffectiveLLMEndpoint` | LLM endpoint override |
+| `--model` | string | `cfg.LLMModel` | Model name to send |
+| `--temperature` | float | `0.7` | Sampling temperature |
+| `--max-tokens` | int | `1024` | Max tokens to generate |
+| `--timeout` | duration | `60s` | Per-request timeout |
+
+```bash
+mdemg model run -- "summarize the retrieval pipeline"
+mdemg model run --system "You are terse." --temperature 0.2   # interactive REPL
+```
+
+---
+
 ### Configurability Contract (11 knobs)
 
 | Concern | Env Var | CLI Flag | Default |
@@ -1737,6 +1760,44 @@ Flush recovery buffer entries to `mdemg-dev`. Promotes buffered observations fro
 
 ---
 
+## Event Graph Federation
+
+Consumers of the EVENTGRAPH federation API (Pattern Y1): a graph walk from a seed node combined with the time-series events touching that neighborhood. See `docs/features/event-graph-federation.md`. Both subcommands take `--seed n_…` **or** `--query "<text>"` (resolves the seed from the top `/v1/memory/retrieve` result); unset `--hops`/`--since`/`--limit` take the server config defaults.
+
+### `mdemg eventgraph reinforcement-neighborhood`
+
+**Synopsis:** `mdemg eventgraph reinforcement-neighborhood [flags]`
+
+Walk the graph from a seed node and return the `reinforcement_events` (Hebbian co-activation weight updates) touching that neighborhood, annotated with which endpoints fell inside the N-hop walk.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--seed` | string | — | Seed node_id to walk from (required unless `--query`) |
+| `--query` | string | — | Resolve the seed from the top retrieval result for this text |
+| `--hops` | int | `-1` (server config) | Graph traversal depth |
+| `--since` | string | server config | Lookback window, e.g. `24h`, `90m` |
+| `--limit` | int | `0` (server config) | Max events returned |
+| `--json` | bool | `false` | Output raw JSON |
+| `--space-id` | string | `mdemg-dev` | Space to query |
+
+```bash
+mdemg eventgraph reinforcement-neighborhood --seed n_8d0b318843bbe8769c01 --hops 2 --since 24h
+mdemg eventgraph reinforcement-neighborhood --query "circuit breaker state machine" --json
+```
+
+### `mdemg eventgraph guidance-outcome-neighborhood`
+
+**Synopsis:** `mdemg eventgraph guidance-outcome-neighborhood [flags]`
+
+Walk the graph from a seed constraint node and return the guidance outcomes (followed/ignored/contradicted feedback from `constraint_outcomes`) for every `constraint_code` present in that neighborhood — i.e. how well the seed constraint **and its graph-related constraints** are being followed. Same flags as `reinforcement-neighborhood` (`--limit` is "max outcomes returned"). Outcomes with no `constraint_code` aren't joinable and won't appear. Seeding by an explicit constraint code is a planned follow-up.
+
+```bash
+mdemg eventgraph guidance-outcome-neighborhood --seed myya3xf8kpk3wpbo0qonah99 --hops 1 --since 720h
+mdemg eventgraph guidance-outcome-neighborhood --query "never commit directly to main"
+```
+
+---
+
 ## Advanced
 
 ### `mdemg mcp`
@@ -1751,6 +1812,35 @@ mdemg mcp
 ```
 
 **See Also:** `mdemg serve --mcp`, `mdemg start --mcp`
+
+---
+
+### `mdemg watchdog status`
+
+**Synopsis:** `mdemg watchdog status [--json]`
+
+Inspect the LLM watchdog state — the `up → degraded → down` state machine, launchd restart count, and recent alerts (the watchdog probes the local LLM endpoint and gates retries when it's down). `--json` for machine-readable output.
+
+```bash
+mdemg watchdog status
+mdemg watchdog status --json | jq .state
+```
+
+---
+
+### `mdemg migrate context-fingerprint`
+
+**Synopsis:** `mdemg migrate context-fingerprint --space-id <id> [flags]`
+
+Backfill the Phase 14.2 sparse context fingerprints on existing observations (idempotent).
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--space-id` | string | — | Space to backfill (required) |
+| `--dry-run` | bool | `true` | Preview mode |
+| `--batch-size` | int | `500` | Batch size |
+| `--build` | bool | `false` | Build a new catalog if none active (cold start) |
+| `--force-rebuild` | bool | `false` | Rebuild even if an active version exists (implies `--build`) |
 
 ---
 
@@ -2492,6 +2582,58 @@ mdemg data check --pre-campaign --space-id mdemg-dev
 ```
 
 **See Also:** `mdemg data status`, `mdemg data export`
+
+---
+
+### `mdemg data curate`
+
+**Synopsis:** `mdemg data curate [flags]`
+
+Run the spec-driven (UAITS) training-data curation pipeline — the paradigm router for SFT / DPO / RAFT / curriculum.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--spec` | string | default spec path | UAITS spec to drive curation |
+| `--input-dir` | string | — | Source data dir |
+| `--output-dir` | string | — | Curated output dir |
+| `--version` | string | `v1` | Output version tag |
+| `--dry-run` | bool | `false` | Plan only |
+
+---
+
+### `mdemg data validate`
+
+**Synopsis:** `mdemg data validate [flags]`
+
+Validate a UAITS spec (schema) and optionally check data compliance against it.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--spec` | string | — | Spec to validate |
+| `--data-dir` | string | — | Optional data dir to check for compliance |
+| `--report` | string | — | Write a validation report to this path |
+
+---
+
+### `mdemg data clean`
+
+**Synopsis:** `mdemg data clean --space-id <id> [flags]`
+
+Remove error records and silent failures from TSDB. **Dry-run by default** — pass `--dry-run=false --force` to actually delete (test with `--limit` first).
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--space-id` | string | `mdemg-dev` | Space to clean |
+| `--dry-run` | bool | `true` | Preview only, no deletions |
+| `--force` | bool | `false` | Required with `--dry-run=false` to confirm deletion |
+| `--limit` | int | `0` (unlimited) | Max rows to delete per category |
+| `--min-response-len` | int | `10` | Shorter responses treated as silent failures |
+| `--json` | bool | `false` | Machine-readable output |
+
+```bash
+mdemg data clean --space-id mdemg-dev                       # dry-run preview
+mdemg data clean --space-id mdemg-dev --dry-run=false --force --limit 5   # delete first 5
+```
 
 ---
 
@@ -3426,7 +3568,7 @@ Every operator-visible value is dynamic. Defaults tuned to the v1 production rea
 | `MDEMG_MODEL_QUANTS` | string | `Q4_K_M,Q5_K_M,Q8_0` | Allowlist of acceptable quants (comma-separated). New quants added by env, not code. |
 | `MDEMG_MODEL_RAM_TIERS` | string (JSON) | `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}` | RAM-tier map for `auto` quant dispatch. Keys: `<N` (less-than threshold in GB) or `default`. |
 | `MDEMG_MODEL_QUANT` | string | `auto` | Selected quant; `auto` triggers RAM-tier dispatch. |
-| `MDEMG_ADAPTER_BASE` | string | `qwen3:14b` | Base model tag for adapter Modelfile (adapter path deferred to MODEL-DIST-002). |
+| `MDEMG_ADAPTER_BASE` | string | `qwen3:14b` | Base model tag the adapter LoRA layers over (`mdemg model pull --adapter`). |
 | `MDEMG_MODEL_DIR` | string | `~/.mdemg/models` | Where `mdemg model pull` symlinks GGUFs. |
 | `MDEMG_MODEL_MANIFEST_PATH` | string | embedded | Override embedded quant manifest (air-gapped operators). |
 | `OLLAMA_MODELS` | string | `~/.ollama/models` | Ollama-standard env. Ollama blob root. |
@@ -3562,16 +3704,26 @@ mdemg
       status          Show sidebar app status
     upgrade           Self-update the mdemg binary
 
-  Model Distribution (Sprint MODEL-DIST-001, v0.10.0):
+  Model Distribution (Sprint MODEL-DIST-001/002):
     model
-      pull            Pull a fused-quant model from the configured backend
+      pull            Pull a fused-quant (or --adapter) model from the backend
+      run             Chat with the running LLM endpoint (one-shot or REPL)
       list            List models pulled into <MDEMG_MODEL_DIR>
       verify          Re-check SHAs against the quant manifest
       remove          Remove a pulled model (--yes required)
       where           Print resolved local path (shell scripting)
 
+  Event Graph Federation (Pattern Y1):
+    eventgraph
+      reinforcement-neighborhood    Hebbian reinforcement events in a node's neighborhood
+      guidance-outcome-neighborhood Guidance outcomes for a constraint's neighborhood
+
   Advanced:
     mcp               Start MCP server (stdio mode)
+    watchdog
+      status          LLM watchdog state + restart count + recent alerts
+    migrate
+      context-fingerprint  Backfill Phase 14.2 sparse context fingerprints
     decay             Apply time-based decay to learning edges
     prune             Prune weak edges and orphan nodes
     watch             Watch directory for file changes
@@ -3598,6 +3750,13 @@ mdemg
       stats             Per-task training data statistics
       annotate          Run quality annotation pipeline
       quality           Show training data quality report
+      audit             Audit collected training data
+      export            Export a UTDS training-data archive
+      export-auto       Automated daily export with retention
+      check             Pre-campaign readiness checks
+      curate            Spec-driven (UAITS) curation pipeline
+      validate          Validate a UAITS spec / data compliance
+      clean             Remove error records + silent failures from TSDB
 
   Neural Training (Python sidecar):
     mdemg-neural-train              Fine-tune cross-encoder re-ranker
