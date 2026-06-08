@@ -8,7 +8,8 @@
     "tags": [
       "eventgraph",
       "federation",
-      "read"
+      "read",
+      "tsdb"
     ]
   },
   "metadata": {
@@ -23,7 +24,7 @@
     "tags": [
       "eventgraph"
     ],
-    "sha256": "8e222c4a6d644d8b05c3ba864e436ebfde933fbb340071fec410ee7bee2649d1"
+    "sha256": "840c7af7ca030a29384e462d3c818b70ec4b18bde1e68258e3aecb30b0120bbd"
   },
   "request": {
     "method": "POST",
