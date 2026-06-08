@@ -17,6 +17,13 @@
     <dict>
         <key>MDEMG_CONFIG_DIR</key>
         <string>__HOME__/.mdemg</string>
+        <!-- launchd hands processes a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin)
+             that excludes the Docker Desktop symlink (/usr/local/bin/docker) and
+             Apple-Silicon Homebrew (/opt/homebrew/bin). Include them so any
+             shelled-out tool (docker stats, docker compose backup) resolves.
+             The internal/dockerbin resolver is the in-code backstop. -->
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
