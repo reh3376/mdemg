@@ -272,6 +272,12 @@ type Config struct {
 	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 15000)
 	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
+	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
+	// with raw constraint text, so keyword matching missed everything and the Neo4j
+	// GUIDANCE_OUTCOME edge sink went dormant; embedding match links them. Keyword
+	// matching remains the fallback. (default: 0.55)
+	JiminyConstraintCodeSimThreshold float64 // JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD
 
 	// Jiminy Warm Store (event-driven pre-computation)
 	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
@@ -2143,6 +2149,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyConstraintCodeSimThreshold, err := atof("JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD", 0.55)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4194,6 +4204,7 @@ func FromEnv() (Config, error) {
 		JiminyTimeoutMs:        jiminyTimeoutMs,
 		JiminyMaxItems:         jiminyMaxItems,
 		JiminyMinConfidence:    jiminyMinConfidence,
+		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,
 		JiminyIncludeFrontiers: jiminyIncludeFrontiers,
 		JiminyFrontierMinSim:          jiminyFrontierMinSim,
 		JiminyEffectivenessEnabled:    jiminyEffectivenessEnabled,
