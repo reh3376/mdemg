@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-06-08
+
 ### Added
+
+- **`jiminy-governance` Claude Code skill + MDEMG MCP registration** (2026-06-08). Ships the agent-facing front door to the J17 governance protocol: a Claude Code Agent Skill (`.claude/skills/jiminy-governance/`) that makes Jiminy the authoritative source of project context + constraints — query Jiminy at session start and before governed actions instead of relying on memory/stale docs. `.mcp.json` registers the MDEMG MCP server (`mdemg mcp`, stdio) exposing `jiminy_guide` / `validate_changes`, so the agent can *pull* guidance, not only receive the hook *push*. The skill is a routing/handshake shim (rules stay in the graph). Live-verified: full handshake (identify→request→comprehend→act→report) against the real instance with `GUIDANCE_OUTCOME` edges written. Wire-up resolution + integration-gap analysis + verification in `docs/development/jiminy-governance-skill/`.
+- **Per-conversation SessionID across hooks + skill** (2026-06-08). Hooks and the skill previously hardcoded `session_id="claude-core"`, collapsing trust/escalation/observations from all Claude Code conversations into one shared MDEMG session. They now resolve `MDEMG_SESSION_ID` env → Claude Code stdin `session_id` (per-conversation) → `~/.mdemg/.claude-session` → `claude-core`, realizing J17's per-`(session,constraint)` isolation (env override preserves the old shared-identity behavior). `pre-write-check.py` (the `/strict` Write/Edit `/classify` gate) is now a tracked, installer-registered hook so its fix propagates via `mdemg hooks install`. Live-verified: an observation keyed to the per-conversation id in Neo4j. See `docs/development/jiminy-governance-skill/session-id-verification.md`.
 
 - **Sprint NOSILENT-001 — Fail-loud scheduled jobs (no silent failures)** (2026-06-08). Triggered by a live-discovered silent failure: with `TSDB_BACKUP_ENABLED=true`, the backup scheduler ran every 24h, its `docker compose pg_dump` failing every time (docker not on the launchd PATH), surfacing only a buried `slog.Warn`. A core data-protection job, silently broken. This sprint kills the *class*.
   - **V0024 `scheduled_job_events` hypertable** + synchronous `RecordJobEvent` writer (mirrors V0021). One row per run of a scheduled job: `job_name`, `success`, `latency_ms`, `error_message`, `metadata`. Schema 23→24.
@@ -1271,7 +1276,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker Compose configuration for Neo4j
 - Environment configuration via `.env` with example template
 
-[Unreleased]: https://github.com/reh3376/mdemg/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/reh3376/mdemg/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/reh3376/mdemg/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/reh3376/mdemg/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/reh3376/mdemg/compare/v0.8.5...v0.9.0
+[0.8.5]: https://github.com/reh3376/mdemg/compare/v0.8.0...v0.8.5
 [0.7.4]: https://github.com/reh3376/mdemg/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/reh3376/mdemg/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/reh3376/mdemg/compare/v0.7.1...v0.7.2
