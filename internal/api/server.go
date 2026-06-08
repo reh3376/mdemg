@@ -2422,6 +2422,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
+	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
