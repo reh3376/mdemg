@@ -157,6 +157,120 @@ func TestEventgraph_RenderEmptyAndTable(t *testing.T) {
 	}
 }
 
+// ── guidance-outcome-neighborhood (EVENTGRAPH-002) ──────────────────────────
+
+func TestGuidanceOutcome_SeedRequired(t *testing.T) {
+	err := runGuidanceOutcomeNeighborhood(guidanceOutcomeNeighborhoodOpts{spaceID: "sp"})
+	if err == nil || !strings.Contains(err.Error(), "seed is required") {
+		t.Fatalf("expected seed-required error, got %v", err)
+	}
+}
+
+func TestGuidanceOutcome_RequestOmitsUnsetDefaults(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/eventgraph/guidance-outcome-neighborhood" {
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &gotBody)
+			_, _ = w.Write([]byte(`{"outcomes":[],"neighbor_node_ids":[],"neighbor_constraint_codes":[],"graph_hops":0,"tsdb_rows_scanned":0,"truncated":false}`))
+		}
+	}))
+	defer srv.Close()
+	t.Setenv("MDEMG_URL", srv.URL)
+
+	if err := runGuidanceOutcomeNeighborhood(guidanceOutcomeNeighborhoodOpts{
+		spaceID: "sp", seed: "n_abc", hops: -1, jsonOutput: true,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, k := range []string{"hops", "since_seconds", "limit"} {
+		if _, ok := gotBody[k]; ok {
+			t.Errorf("unset %s should be omitted, got %v", k, gotBody[k])
+		}
+	}
+	if gotBody["seed_node_id"] != "n_abc" || gotBody["space_id"] != "sp" {
+		t.Errorf("required fields wrong: %v", gotBody)
+	}
+
+	gotBody = nil
+	if err := runGuidanceOutcomeNeighborhood(guidanceOutcomeNeighborhoodOpts{
+		spaceID: "sp", seed: "n_abc", hops: 2, since: "24h", limit: 50, jsonOutput: true,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotBody["hops"].(float64) != 2 || gotBody["since_seconds"].(float64) != 86400 || gotBody["limit"].(float64) != 50 {
+		t.Errorf("set fields wrong: %v", gotBody)
+	}
+}
+
+func TestGuidanceOutcome_QueryResolvesSeed(t *testing.T) {
+	var fedSeed string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/memory/retrieve":
+			_, _ = w.Write([]byte(`{"results":[{"node_id":"n_from_query"}]}`))
+		case "/v1/eventgraph/guidance-outcome-neighborhood":
+			b, _ := io.ReadAll(r.Body)
+			var body map[string]any
+			_ = json.Unmarshal(b, &body)
+			fedSeed, _ = body["seed_node_id"].(string)
+			_, _ = w.Write([]byte(`{"outcomes":[],"neighbor_node_ids":[],"neighbor_constraint_codes":[],"graph_hops":1,"tsdb_rows_scanned":0,"truncated":false}`))
+		}
+	}))
+	defer srv.Close()
+	t.Setenv("MDEMG_URL", srv.URL)
+
+	if err := runGuidanceOutcomeNeighborhood(guidanceOutcomeNeighborhoodOpts{
+		spaceID: "sp", query: "never commit to main", jsonOutput: true,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fedSeed != "n_from_query" {
+		t.Errorf("--query should resolve seed to n_from_query, federation got %q", fedSeed)
+	}
+}
+
+func TestGuidanceOutcome_ErrorStatusSurfaced(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":"eventgraph disabled","reason":"EVENTGRAPH_ENABLED=false"}`))
+	}))
+	defer srv.Close()
+	t.Setenv("MDEMG_URL", srv.URL)
+	err := runGuidanceOutcomeNeighborhood(guidanceOutcomeNeighborhoodOpts{spaceID: "sp", seed: "n_abc"})
+	if err == nil || !strings.Contains(err.Error(), "eventgraph disabled") {
+		t.Fatalf("expected surfaced 503 error, got %v", err)
+	}
+}
+
+func TestGuidanceOutcome_RenderEmptyAndTable(t *testing.T) {
+	if out := captureStdout(func() {
+		printFedGuidanceResult(fedGuidanceResult{NeighborNodeIDs: []string{"a"}, NeighborConstraintCodes: []string{"c"}, GraphHops: 1}, "n_seed")
+	}); !strings.Contains(out, "No guidance outcomes") {
+		t.Errorf("empty render missing message: %q", out)
+	}
+	res := fedGuidanceResult{
+		NeighborNodeIDs: []string{"a", "b"}, NeighborConstraintCodes: []string{"no-direct-main-commits"}, GraphHops: 1, TSDBRowsScanned: 2,
+		Outcomes: []fedGuidanceOutcome{
+			{ConstraintCode: "no-direct-main-commits", OutcomeType: "followed", Similarity: 1.0, GuidanceType: "pattern", GuidanceID: "w2ewml"},
+			{ConstraintCode: "no-direct-main-commits", OutcomeType: "ignored", Similarity: 0.3, GuidanceType: "concept", GuidanceID: "abc123"},
+		},
+	}
+	out := captureStdout(func() { printFedGuidanceResult(res, "n_seed") })
+	if !strings.Contains(out, "no-direct-main-commits") || !strings.Contains(out, "followed: 1") || !strings.Contains(out, "ignored: 1") {
+		t.Errorf("table render missing expected content: %q", out)
+	}
+}
+
+func TestTruncStr(t *testing.T) {
+	if truncStr("abcdefgh", 4) != "abcd" {
+		t.Error("truncStr should truncate")
+	}
+	if truncStr("ab", 4) != "ab" {
+		t.Error("truncStr should pass short strings")
+	}
+}
+
 func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()

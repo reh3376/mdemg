@@ -1,6 +1,9 @@
 package alert
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // AlertRule defines a server-native alert rule evaluated against TSDB.
 type AlertRule struct {
@@ -267,4 +270,67 @@ func DefaultRules() []AlertRule {
 			Enabled:   true,
 		},
 	}
+}
+
+// JobHealthRules returns the NOSILENT-001 scheduled-job alert rules, evaluated
+// against the V0024 scheduled_job_events hypertable. These make a failed — or
+// never-run — scheduled job LOUD instead of a silent log line.
+//
+//   - stalenessHours: alert if no successful tsdb-backup landed within this
+//     window. This is the key "job never ran" guarantee — it fires from the
+//     server's observation of *absent* success, so it catches a job that
+//     silently died or never started, not just one that ran and errored.
+//   - failureLookbackMin: alert if ANY scheduled job recorded a failure within
+//     this lookback.
+//   - includeBackupStaleness: only emit the staleness rule when backups are
+//     actually enabled (otherwise "0 successes" is expected, not an incident).
+//
+// Both thresholds are config-driven (no hardcoded literals).
+func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStaleness bool) []AlertRule {
+	if stalenessHours <= 0 {
+		stalenessHours = 48 // safety fallback; caller normally derives interval×2
+	}
+	if failureLookbackMin <= 0 {
+		failureLookbackMin = 60
+	}
+
+	rules := []AlertRule{
+		{
+			ID:          "scheduled_job_recent_failure",
+			Title:       "Scheduled Job Recently Failed",
+			// Distinct Service per rule: the dispatcher cooldown key is
+			// (Service, Severity), so two scheduled-job rules sharing one
+			// service would suppress each other (caught in NOSILENT-001 live
+			// testing — the staleness alert was masked by the failure alert).
+			Service:     "scheduled-job-failure",
+			Severity:    SeverityHigh,
+			Interval:    60 * time.Second,
+			ForDuration: 0, // fire promptly — a failure is already a discrete event
+			QuerySQL: fmt.Sprintf(`SELECT count(*) FROM scheduled_job_events
+				WHERE success = false
+				  AND recorded_at > now() - interval '%d minutes'`, failureLookbackMin),
+			Threshold: 0,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+
+	if includeBackupStaleness {
+		rules = append(rules, AlertRule{
+			ID:          "backup_no_recent_success",
+			Title:       "No Successful TSDB Backup In Window",
+			Service:     "scheduled-job-staleness",
+			Severity:    SeverityHigh,
+			Interval:    5 * time.Minute,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT count(*) FROM scheduled_job_events
+				WHERE job_name = 'tsdb-backup' AND success = true
+				  AND recorded_at > now() - interval '%d hours'`, stalenessHours),
+			Threshold: 0.5, // < 0.5 ⇒ zero successes ⇒ stale
+			Operator:  "lt",
+			Enabled:   true,
+		})
+	}
+
+	return rules
 }

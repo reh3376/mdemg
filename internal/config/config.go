@@ -1010,7 +1010,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 22 post-EVENTGRAPH-001 V0022 reinforcement_events)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 24 post-NOSILENT-001 V0024 scheduled_job_events)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1057,6 +1057,11 @@ type Config struct {
 	// ===== Alert Evaluator =====
 	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
 	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
+
+	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
+	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
+	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
+	JobFailureLookbackMin   int  // JOB_FAILURE_LOOKBACK_MIN — alert if any scheduled job failed within this lookback window (default: 60)
 
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
@@ -3962,7 +3967,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 22)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 24)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4040,6 +4045,17 @@ func FromEnv() (Config, error) {
 	// Alert Evaluator
 	alertEvaluatorEnabled := getBool("ALERT_EVALUATOR_ENABLED", true)
 	alertEvaluatorIntervalSec, err := atoi("ALERT_EVALUATOR_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// NOSILENT-001 — scheduled-job health alerting
+	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
+	jobBackupStalenessHours, err := atoi("JOB_BACKUP_STALENESS_HOURS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	jobFailureLookbackMin, err := atoi("JOB_FAILURE_LOOKBACK_MIN", 60)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4804,6 +4820,9 @@ func FromEnv() (Config, error) {
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
 		// Alert Evaluator
+		JobHealthAlertEnabled:     jobHealthAlertEnabled,
+		JobBackupStalenessHours:   jobBackupStalenessHours,
+		JobFailureLookbackMin:     jobFailureLookbackMin,
 		AlertEvaluatorEnabled:     alertEvaluatorEnabled,
 		AlertEvaluatorIntervalSec: alertEvaluatorIntervalSec,
 

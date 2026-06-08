@@ -36,6 +36,8 @@ import (
 	"mdemg/internal/metalearn"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
+	"mdemg/internal/dockerbin"
+	"mdemg/internal/jobhealth"
 	"mdemg/internal/metrics"
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
@@ -1111,6 +1113,25 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 func (s *Server) SetTSDBClient(client *tsdb.Client) {
 	s.tsdbClient = client
 	if client != nil {
+		// NOSILENT-001: wire the backup scheduler's outcome hook now that both
+		// the TSDB pool and the alert dispatcher exist. A failed (or never-run)
+		// scheduled backup now records a scheduled_job_events row + fires a
+		// high-severity alert instead of a silent slog.Warn.
+		if s.tsdbBackupScheduler != nil {
+			pool := client.Pool()
+			disp := s.alertDispatcher
+			instanceID := s.cfg.InstanceID
+			s.tsdbBackupScheduler.SetResultHook(func(success bool, latencyMS int64, runErr error) {
+				ev := tsdb.JobEventRow{
+					JobName: "tsdb-backup", InstanceID: instanceID,
+					Success: success, LatencyMS: latencyMS,
+				}
+				if runErr != nil {
+					ev.ErrorMessage = runErr.Error()
+				}
+				jobhealth.Report(context.Background(), pool, disp, ev)
+			})
+		}
 		// Phase 12 Epic 6: construct ConflictTracker once and inject into the
 		// three Services that have hook sites. Per-space rate limiter defaults
 		// to 1 row/space/minute (the value bound inside conversation/conflict_tracker.go);
@@ -2422,6 +2443,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
+	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization
@@ -2741,6 +2763,10 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	return data
 }
 
+// dockerStatsUnavailableWarn ensures the "docker CLI not found" notice is
+// logged once, not on every 60s container-stats refresh.
+var dockerStatsUnavailableWarn sync.Once
+
 // collectNeo4jContainerStats gets CPU/memory from docker stats with 60s cache.
 func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 	s.containerStatsCache.Lock()
@@ -2770,11 +2796,26 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 		}
 	}
 
+	// Container resource stats are optional telemetry (Neo4j CPU/mem gauges).
+	// When the docker CLI can't be located — e.g. a non-Docker deployment, or
+	// a launchd/systemd process with a minimal PATH that excludes the Docker
+	// Desktop symlink — degrade gracefully and warn ONCE instead of erroring on
+	// the 60s cache-refresh loop. The data plane (Neo4j Bolt + TSDB) is over
+	// the network and unaffected.
+	if !dockerbin.Available() {
+		dockerStatsUnavailableWarn.Do(func() {
+			slog.Warn("metrics: docker CLI not found — Neo4j container resource gauges disabled (data plane unaffected); set MDEMG_DOCKER_BIN or add docker to PATH to enable",
+				"probed_env", dockerbin.EnvOverride)
+		})
+		return s.containerStatsCache.data
+	}
+
+	dockerExe := dockerbin.Path()
 	var out []byte
 	var err error
 	for _, name := range unique {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		out, err = exec.CommandContext(ctx, "docker", "stats", name,
+		out, err = exec.CommandContext(ctx, dockerExe, "stats", name, //nolint:gosec // G204: docker path resolved by dockerbin, container name from config
 			"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
 		cancel()
 		if err == nil {
@@ -2782,7 +2823,7 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 		}
 	}
 	if err != nil {
-		slog.Error("metrics: docker stats failed", "error", err, "tried", unique)
+		slog.Error("metrics: docker stats failed", "error", err, "tried", unique, "docker", dockerExe)
 		return s.containerStatsCache.data
 	}
 

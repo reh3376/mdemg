@@ -9,7 +9,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"mdemg/internal/eventgraph"
 )
@@ -30,21 +29,7 @@ type ReinforcementNeighborhoodRequest struct {
 // /v1/eventgraph/reinforcement-neighborhood. Returns the federation result
 // (events + neighborhood IDs + truncation flag).
 func (s *Server) handleEventgraphReinforcementNeighborhood(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
-		return
-	}
-	if !s.cfg.EventGraphEnabled {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error":  "eventgraph disabled",
-			"reason": "EVENTGRAPH_ENABLED=false; set to true to enable",
-		})
-		return
-	}
-	if s.eventgraphService == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "eventgraph service not initialized (TSDB unavailable at boot?)",
-		})
+	if !s.eventgraphGate(w, r) {
 		return
 	}
 
@@ -62,34 +47,9 @@ func (s *Server) handleEventgraphReinforcementNeighborhood(w http.ResponseWriter
 		return
 	}
 
-	// Apply defaults / clamps from config.
-	hops := s.cfg.EventGraphFederationDefaultHops
-	if req.Hops != nil {
-		hops = *req.Hops
-	}
-	if hops < 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "hops must be ≥ 0"})
+	hops, since, limit, ok := s.resolveFederationDefaults(w, req.Hops, req.SinceSeconds, req.Limit)
+	if !ok {
 		return
-	}
-	// Cap hops at a reasonable max to prevent runaway Cypher walks. Use 2×
-	// the configured default as the ceiling — operators can raise the
-	// default itself if they need deeper walks.
-	if maxHops := s.cfg.EventGraphFederationDefaultHops * 2; maxHops > 0 && hops > maxHops {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":  "hops exceeds server ceiling",
-			"ceiling": "2 × EVENTGRAPH_FEDERATION_DEFAULT_HOPS",
-		})
-		return
-	}
-
-	since := time.Duration(s.cfg.EventGraphFederationDefaultLookbackHours) * time.Hour
-	if req.SinceSeconds != nil {
-		since = time.Duration(*req.SinceSeconds) * time.Second
-	}
-
-	limit := s.cfg.EventGraphMaxEventsPerQuery
-	if req.Limit != nil && *req.Limit > 0 && *req.Limit < s.cfg.EventGraphMaxEventsPerQuery {
-		limit = *req.Limit
 	}
 
 	result, err := s.eventgraphService.EventsInGraphNeighborhood(r.Context(), eventgraph.FederationRequest{

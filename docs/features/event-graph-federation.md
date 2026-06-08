@@ -240,10 +240,46 @@ The Grafana panel "Reinforcement Event Rate (events/min)" on the `mdemg-graph-to
 
 `EVENTGRAPH_ENABLED=false` + restart. The Hebbian write path cleanly short-circuits the writer call; existing TSDB data is preserved; re-enable any time. No schema rollback needed.
 
+## Guidance-Outcome Federation (EVENTGRAPH-002)
+
+The second federated event class: **guidance outcomes** — the followed / ignored / contradicted feedback recorded for every surfaced guidance item. It answers a question per-constraint aggregation can't: *"How well is this constraint **and its graph-related constraints** being followed over a time window?"*
+
+**Endpoint:** `POST /v1/eventgraph/guidance-outcome-neighborhood` · **CLI:** `mdemg eventgraph guidance-outcome-neighborhood`
+
+### Why it reuses `constraint_outcomes` (no new sink)
+
+Unlike reinforcement events, the guidance-outcome event stream **already lived in TSDB** before this sprint — the `constraint_outcomes` hypertable (migration 011), written by every `/v1/jiminy/feedback` call (RRF-SCALE-001 + JIMINY-OUTCOME-001). EVENTGRAPH-002 **federates the existing stream** rather than creating a parallel `guidance_outcome_events` table — duplicating a populated sink would violate the no-duplication rule. So this sprint added no new writer and no new enqueue site, only a read-side federation + one index.
+
+### The join key is `constraint_code`, not `node_id`
+
+The reinforcement federation joins TSDB events to the graph on `src/dst_node_id` (real Neo4j node IDs). Guidance outcomes can't: `constraint_outcomes.constraint_id` is a UUID that does **not** match the Neo4j `node_id` (CUID). The only reliable key is **`constraint_code`**, carried by both the Neo4j `role_type='constraint'` nodes (a property) and the `constraint_outcomes` rows (a column). The federation:
+
+1. Walks `CO_ACTIVATED_WITH|GENERALIZES` from the seed, collecting each neighbor's `constraint_code` (+ a code→node map).
+2. Queries `constraint_outcomes WHERE constraint_code = ANY(neighborhood_codes) AND time > window` — backed by the V0023 `idx_constraint_outcomes_code (space_id, constraint_code, time DESC)` index.
+3. Joins in Go: each outcome's `constraint_node_id` resolves to the neighborhood constraint its code maps to.
+
+Outcomes recorded **without** a `constraint_code` (unmatched at record time) are not joinable and won't appear — a documented limitation, not a defect.
+
+### CLI usage
+
+```bash
+# Seed from a constraint node_id:
+mdemg eventgraph guidance-outcome-neighborhood --seed myya3xf8kpk3wpbo0qonah99 --hops 1 --since 720h
+
+# Resolve the seed from a query:
+mdemg eventgraph guidance-outcome-neighborhood --query "never commit directly to main"
+
+# Machine output:
+mdemg eventgraph guidance-outcome-neighborhood --seed n_abc --json | jq '.outcomes | length'
+```
+
+The table shows the followed/ignored split + per-outcome `CONSTRAINT_CODE · OUTCOME · sim · g_type · guidance_id · recorded`. Flags mirror the reinforcement subcommand (`--seed`/`--query`/`--hops`/`--since`/`--limit`/`--json`/`--space-id`), and unset `--hops`/`--since`/`--limit` are omitted so the server applies the same `EVENTGRAPH_FEDERATION_DEFAULT_*` / `EVENTGRAPH_MAX_EVENTS_PER_QUERY` config — both federation endpoints share one gate + default-resolution helper server-side. Seeding by an explicit `--constraint-code` is a planned follow-up (needs server-side code→node resolution).
+
 ## Forward-looking
 
 - **EVENTGRAPH-CLI-001 (shipped)** — `mdemg eventgraph reinforcement-neighborhood`, the first consumer of the federation API + the live-testing harness for the line (see the CLI section above).
-- **EVENTGRAPH-002** — extend the federation API to a second event class (guidance outcomes from `GUIDANCE_OUTCOME` edges). Same hypertable shape with a new `trigger_path` value, OR a separate hypertable if the schema diverges.
+- **EVENTGRAPH-002 (shipped)** — guidance-outcome federation (see above): `POST /v1/eventgraph/guidance-outcome-neighborhood` + `mdemg eventgraph guidance-outcome-neighborhood`, reusing `constraint_outcomes`, joined on `constraint_code`.
+- **EVENTGRAPH-002 follow-up** — `--constraint-code` seeding (resolve a constraint node from its code server-side).
 - **EVENTGRAPH-003** — wire the writer into the other three Hebbian entry points (`ApplySymbolCoactivation`, `CoactivateSession`, `ApplyNegativeFeedback`).
 - **Pattern Y2 escalation** — promote one event class to skinny graph link-nodes when a query proves single-pass Cypher across events is necessary. Triggered by, not assumed.
 - **Retention policy** — default TimescaleDB behavior (chunks forever) is fine for v1. Revisit when chunk count exceeds 26 weeks; add `drop_chunks` policy.

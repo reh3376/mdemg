@@ -438,7 +438,20 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		// Register alert evaluator
 		if tsdbClient != nil && cfg.AlertEvaluatorEnabled {
 			evalInterval := time.Duration(cfg.AlertEvaluatorIntervalSec) * time.Second
-			evaluator := alert.NewEvaluator(alert.DefaultRules(), tsdbClient.Pool(), disp, evalInterval)
+			rules := alert.DefaultRules()
+			// NOSILENT-001: append scheduled-job staleness/failure rules so the
+			// server catches "a job failed OR never ran". Backup-staleness
+			// window derives from the actual backup interval × 2 unless
+			// explicitly overridden; gated on backups actually being enabled.
+			if cfg.JobHealthAlertEnabled {
+				staleness := cfg.JobBackupStalenessHours
+				if staleness <= 0 {
+					staleness = cfg.TSDBBackupIntervalHours * 2
+				}
+				rules = append(rules, alert.JobHealthRules(
+					staleness, cfg.JobFailureLookbackMin, cfg.TSDBBackupEnabled)...)
+			}
+			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			sup.Register("alert-evaluator", func(_ context.Context) error {
 				evaluator.Start() // blocks until evaluator.Stop()
 				return nil

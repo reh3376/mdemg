@@ -28,7 +28,7 @@ Exports the last 24 hours of data to the output directory, prunes old
 archives beyond the --keep limit, and maintains a latest.tar.gz symlink.
 
 Designed for use with launchd/systemd timers (see mdemg service install).`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (retErr error) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
 
@@ -36,6 +36,11 @@ Designed for use with launchd/systemd timers (see mdemg service install).`,
 			if spaceID == "" {
 				return fmt.Errorf("--space-id is required (or set MDEMG_SPACE_ID)")
 			}
+
+			// NOSILENT-001: record this run's outcome + alert on failure so a
+			// failing scheduled export is never silent.
+			startedAt := time.Now()
+			defer func() { reportScheduledJob("export-auto", spaceID, startedAt, retErr) }()
 
 			// Resolve instance ID: MDEMG_INSTANCE_ID env > auto-generate
 			instanceID := resolveInstanceID("", spaceID)

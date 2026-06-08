@@ -184,6 +184,19 @@ Per research-eval: "the most actionable input for the collaboration brief." MDEM
 ### Action 6 — Collaboration Brief: FEP Co-Implementer (Q-DM-1)
 Per research-eval: "single most leveraged action across the entire collection." Without an FEP-specialist co-implementer, Note 09 stays in planning-document state. Begin recruitment now (months ahead of when Note 09 would start).
 
+### Action 7 — `jiminy-governance` Claude Code skill build-out (J17 handshake + PreToolUse enforcement)
+**Status:** Planned (added 2026-06-08). **Spec:** `docs/development/jiminy-governance-skill/SKILL.md`.
+
+Ship a Claude Code **skill** that makes Jiminy the authoritative, deterministic source of project context + governance over the J17 AI2AI protocol — so an agent queries Jiminy (not stale `.md`, not training-data priors) at session start and before every governed action. The skill is intentionally a **routing/handshake shim**, not a rulebook: real constraints live in the MDEMG graph so they can be measured, escalated, and persisted. Aligns directly with the work this branch already landed (RRF-SCALE-001 / JIMINY-OUTCOME-001 / GUIDANCE-SYNTH-001 revived the guidance→feedback→`GUIDANCE_OUTCOME` loop; this skill is the agent-facing front door to it).
+
+**Build-out scope (the spec ships with deliberate wire-up placeholders that must be resolved against the real instance — not guessed):**
+1. Resolve the wire-up: the Jiminy query interface (MCP server name + context/constraint query tool(s), or the gRPC/local endpoint), the **PreToolUse hook** command/path that enforces J17 deterministically, the SessionID identity source, and the J17 message/tool names for comprehension-ack, **RetireCode**, and `GUIDANCE_OUTCOME` emission.
+2. Author the skill in `.claude/skills/` (matching the existing skill format) from the resolved spec.
+3. Wire + verify the PreToolUse hook actually blocks/modifies governed tool calls (enforcement must not depend on the skill triggering) — fail-closed-and-surface, no workarounds.
+4. Test: session-start handshake, scoped constraint query, comprehension ack recorded, an enforced block surfaced to the user, and a `GUIDANCE_OUTCOME` edge written. Live Tier-3 per the testing policy.
+
+**Cost:** ~1 sprint (most of the effort is resolving the wire-up + the hook-enforcement verification, not the skill prose). **Dependency:** the guidance loop is already live end-to-end (this branch), so the outcome sink it relies on exists.
+
 ---
 
 ## Recommendation — Next 3 Sprints

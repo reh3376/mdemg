@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -20,13 +21,18 @@ func newMaintenanceCmd() *cobra.Command {
 		Long: `Runs a full maintenance cycle: edge decay followed by orphan pruning.
 Equivalent to running 'mdemg decay' then 'mdemg prune' with sensible defaults.
 Suitable for scheduling via launchd, systemd, or cron.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (retErr error) {
 			if spaceID == "" {
 				spaceID = resolveSpaceID(cmd)
 			}
 			if spaceID == "" {
 				return fmt.Errorf("--space-id is required")
 			}
+
+			// NOSILENT-001: record this run's outcome + alert on failure so a
+			// failing scheduled maintenance cycle is never silent.
+			startedAt := time.Now()
+			defer func() { reportScheduledJob("maintenance", spaceID, startedAt, retErr) }()
 
 			ctx := context.Background()
 
