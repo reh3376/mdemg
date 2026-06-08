@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"mdemg/internal/dockerbin"
 )
 
 // TSDBBackupConfig holds configuration for TimescaleDB backups.
@@ -105,8 +107,10 @@ func (s *TSDBBackupService) Trigger(label string) (*TSDBBackupRecord, error) {
 		Label:     label,
 	}
 
-	// Run pg_dump via docker compose exec (uses service name, not container name)
-	cmd := exec.Command("docker", "compose", //nolint:gosec // G204: compose file path from config
+	// Run pg_dump via docker compose exec (uses service name, not container name).
+	// dockerbin.Path resolves the CLI even under a minimal launchd/systemd PATH
+	// (the auto-export LaunchAgent runs here) — see internal/dockerbin.
+	cmd := exec.Command(dockerbin.Path(), "compose", //nolint:gosec // G204: docker path resolved by dockerbin, compose file from config
 		"-f", composeFile,
 		"exec", "-T", s.cfg.ServiceName,
 		"pg_dump", "-Fc", "-U", s.cfg.User, s.cfg.Database,
@@ -204,7 +208,7 @@ func (s *TSDBBackupService) Restore(dumpPath string) error {
 	}
 	defer inFile.Close()
 
-	cmd := exec.Command("docker", "compose", //nolint:gosec // G204: compose file path from config
+	cmd := exec.Command(dockerbin.Path(), "compose", //nolint:gosec // G204: docker path resolved by dockerbin, compose file from config
 		"-f", composeFile,
 		"exec", "-T", s.cfg.ServiceName,
 		"pg_restore", "-U", s.cfg.User, "-d", s.cfg.Database, "--clean", "--if-exists",

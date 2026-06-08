@@ -36,6 +36,7 @@ import (
 	"mdemg/internal/metalearn"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
+	"mdemg/internal/dockerbin"
 	"mdemg/internal/metrics"
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
@@ -2742,6 +2743,10 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	return data
 }
 
+// dockerStatsUnavailableWarn ensures the "docker CLI not found" notice is
+// logged once, not on every 60s container-stats refresh.
+var dockerStatsUnavailableWarn sync.Once
+
 // collectNeo4jContainerStats gets CPU/memory from docker stats with 60s cache.
 func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 	s.containerStatsCache.Lock()
@@ -2771,11 +2776,26 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 		}
 	}
 
+	// Container resource stats are optional telemetry (Neo4j CPU/mem gauges).
+	// When the docker CLI can't be located — e.g. a non-Docker deployment, or
+	// a launchd/systemd process with a minimal PATH that excludes the Docker
+	// Desktop symlink — degrade gracefully and warn ONCE instead of erroring on
+	// the 60s cache-refresh loop. The data plane (Neo4j Bolt + TSDB) is over
+	// the network and unaffected.
+	if !dockerbin.Available() {
+		dockerStatsUnavailableWarn.Do(func() {
+			slog.Warn("metrics: docker CLI not found — Neo4j container resource gauges disabled (data plane unaffected); set MDEMG_DOCKER_BIN or add docker to PATH to enable",
+				"probed_env", dockerbin.EnvOverride)
+		})
+		return s.containerStatsCache.data
+	}
+
+	dockerExe := dockerbin.Path()
 	var out []byte
 	var err error
 	for _, name := range unique {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		out, err = exec.CommandContext(ctx, "docker", "stats", name,
+		out, err = exec.CommandContext(ctx, dockerExe, "stats", name, //nolint:gosec // G204: docker path resolved by dockerbin, container name from config
 			"--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}").Output()
 		cancel()
 		if err == nil {
@@ -2783,7 +2803,7 @@ func (s *Server) collectNeo4jContainerStats() *metrics.ContainerStats {
 		}
 	}
 	if err != nil {
-		slog.Error("metrics: docker stats failed", "error", err, "tried", unique)
+		slog.Error("metrics: docker stats failed", "error", err, "tried", unique, "docker", dockerExe)
 		return s.containerStatsCache.data
 	}
 
