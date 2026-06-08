@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mdemg": {
+      "type": "stdio",
+      "command": "mdemg",
+      "args": ["mcp"],
+      "env": {
+        "MDEMG_ENDPOINT": "http://localhost:9999"
+      }
+    }
+  }
+}

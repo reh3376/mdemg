@@ -185,19 +185,19 @@ Per research-eval: "the most actionable input for the collaboration brief." MDEM
 Per research-eval: "single most leveraged action across the entire collection." Without an FEP-specialist co-implementer, Note 09 stays in planning-document state. Begin recruitment now (months ahead of when Note 09 would start).
 
 ### Action 7 — `jiminy-governance` Claude Code skill build-out (J17 handshake + PreToolUse enforcement)
-**Status:** Planned (added 2026-06-08). **Spec:** `docs/development/jiminy-governance-skill/SKILL.md`.
+**Status:** ✅ SHIPPED (2026-06-08). Skill: `.claude/skills/jiminy-governance/SKILL.md`; MCP registered: `.mcp.json`; spec + verification: `docs/development/jiminy-governance-skill/`.
 
 Ship a Claude Code **skill** that makes Jiminy the authoritative, deterministic source of project context + governance over the J17 AI2AI protocol — so an agent queries Jiminy (not stale `.md`, not training-data priors) at session start and before every governed action. The skill is intentionally a **routing/handshake shim**, not a rulebook: real constraints live in the MDEMG graph so they can be measured, escalated, and persisted. Aligns directly with the work this branch already landed (RRF-SCALE-001 / JIMINY-OUTCOME-001 / GUIDANCE-SYNTH-001 revived the guidance→feedback→`GUIDANCE_OUTCOME` loop; this skill is the agent-facing front door to it).
 
 **Build-out scope:**
 1. ✅ **Resolve the wire-up against the real instance (DONE 2026-06-08).** All five placeholders resolved + verified live in `docs/development/jiminy-governance-skill/SKILL.md` (§"Wire-up — RESOLVED"): Jiminy query interface (MCP `mdemg mcp` stdio → `jiminy_guide`/`validate_changes`; HTTP `/v1/jiminy/guide` + `/bootstrap` glossary + `/latest`), PreToolUse hooks (`pre-bash-check.py` Bash fail-closed; `pre-write-check.py` Write/Edit → `/v1/jiminy/classify`), SessionID (`claude-core` convention), comprehension-ack (`/v1/jiminy/protocol/feedback`), `GUIDANCE_OUTCOME` (`/v1/jiminy/feedback {guidance_id,…}`), RetireCode (**internal-only by design — no agent-facing call**).
-2. **Close the two integration gaps** the resolution surfaced (the real work):
-   - **(a) MCP not registered:** no `.mcp.json` exists, so an agent has no MCP tool to call — context is currently *pushed* by `prompt-context.sh`, not *pulled* by the agent. Register the MDEMG MCP server, or route the skill's handshake over HTTP.
-   - **(b) Enforcement is `/strict`-gated + fail-open:** the J17 Write/Edit gate (`pre-write-check.py` → `/classify`) only enforces when `/strict` is on AND the server is reachable, so it is *not* deterministic-by-default. Decide: enable `/strict` in the handshake; keep the Write/Edit gate fail-open or move it to fail-closed-and-surface (the skill's "comply, surface, no workaround" intent leans fail-closed; the Bash gate already is).
-3. Author the skill in `.claude/skills/` (matching the existing skill format) from the resolved spec.
-4. Test (live Tier-3): session-start handshake, scoped constraint query, comprehension ack recorded, an enforced block surfaced to the user, and a `GUIDANCE_OUTCOME` edge written.
+2. ✅ **Closed the two integration gaps:**
+   - **(a) MCP registered** — `.mcp.json` registers `mdemg mcp` (stdio); live-probed, `jiminy_guide`/`validate_changes` reachable, so the agent can *pull* guidance, not only receive the hook *push*.
+   - **(b) Enforcement policy set** — Write/Edit J17 gate kept **fail-open** (a hard server dependency on every edit is too brittle); the skill's handshake **auto-enables `/strict`** so the gate is active per session. Bash gate already fail-closed (demonstrated live). A future config flag for fail-closed-and-surface is a follow-up.
+3. ✅ Skill authored at the canonical `.claude/skills/jiminy-governance/SKILL.md` (frontmatter valid; concrete wire-up inline).
+4. ✅ Live Tier-3 PASSED — full handshake identify→request→comprehend→act→report ran against the real instance; `GUIDANCE_OUTCOME` edges 906→909 (one per coded constraint). See `docs/development/jiminy-governance-skill/verification.md`.
 
-**Cost:** ~1 sprint; step 1 done — remaining effort is the two integration gaps + hook-enforcement verification, not the skill prose. **Dependency:** the guidance loop is already live end-to-end (this branch), so the outcome sink it relies on exists.
+**Follow-ups:** per-Claude-session SessionID (today uses the `claude-core` convention); optional config-gated fail-closed Write/Edit gate.
 
 ---
 
