@@ -45,6 +45,16 @@ time (UTC)            | latency_ms | status
 
 The local model takes up to ~50s for the ~1900-char guidance narrative. The 90s budget accommodates it, but this latency is itself worth watching — if it grows, the budget (config-tunable) or the synthesis prompt size (`JIMINY_GUIDANCE_OUTPUT_MAX_CHARS`) may need attention. Not in scope here; the warm path is fire-and-forget background compute, so the latency doesn't block the hook (which reads the cached `/latest`).
 
+## Post-merge live-smoke findings (2026-06-08, fix-commit)
+
+A comprehensive live e2e of the **full revived loop through the real production hook path** (run at the user's direction — "standard testing isn't sufficient to find live problems") surfaced two items:
+
+1. **Real hook works.** `prompt-context.sh`'s exact `perl`-strip + `jq` captured `guidance_id` (`w2ewml…`), fed it to feedback, and produced **+7 Neo4j `GUIDANCE_OUTCOME` edges on real constraint nodes** (`no-direct-main-commits`, `mandatory-use-cms-every-session`) + 10 TSDB rows. The whole loop closes through the actual hook (also re-confirms Follow-up C is a non-issue).
+
+2. **Sibling bug found + fixed: the `/v1/jiminy/guide` handler had the SAME hardcoded 30s cap.** GUIDANCE-SYNTH-001 fixed the warm path; the synchronous `/guide` handler (`handlers_jiminy.go`) still capped at 30s, so its synthesis deadline-exceeded (exactly 30.003s). This is what made the prior sprints' `/guide`-based integration tests flaky. **Fix-commit:** `/guide` now uses the same config-driven `JiminyWarmComputeTimeout()`. Live-verified: `/guide` synthesis succeeds — a **50.05s** synthesis completed (`synthesis_used=true`), which would have died at 30s. (On the warm path, synthesis is *correctly skipped* when trust ≥ 0.75 — T1 compact-code encoding — so it only runs the synthesizer when trust is low; the fix ensures it has budget when it does.)
+
+3. **Single source of truth for config defaults** (per the user's directive — "single place to change all instances"). The 90s budget was initially duplicated as a literal across 3 sites (config `atoi` + 2 handlers); and prior sprints had similarly duplicated each default (e.g. the sigmoid 0.45/8.0 appeared in 3 places). Consolidated: each default is now a single exported `config.Default*` const, referenced by `FromEnv` (env default) and aliased by the consuming-package fallbacks + a `Config.JiminyWarmComputeTimeout()` method. Zero behavior change (compile-time aliases to the same values); `-race` + full suites green; live `/guide` re-verified after the refactor.
+
 ## Conclusion
 
 GUIDANCE-SYNTH-001's acceptance bar is met and live-verified: the warm-path guidance synthesis, which failed on every production call, now succeeds. The two fixes — parallelizing the per-node constraint classifier and config-driving the warm-compute timeout (30s → 90s) — together give synthesis the budget it needs. **This closes Follow-up B**; the guidance pipeline (surfacing + codes + synthesis) is now fully functional end-to-end.

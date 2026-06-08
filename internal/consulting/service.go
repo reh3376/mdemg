@@ -33,9 +33,10 @@ const MaxConfidence = 0.95
 // where the legacy 1.5/1.5 crushed everything to ~0.1-0.2. Operator-tunable
 // via RETRIEVAL_CONFIDENCE_SIGMOID_{MIDPOINT,STEEPNESS}; these constants are
 // the zero-value fallback (e.g. for tests constructing Config{} directly).
+// Aliases to the single source of truth in config (no duplicated literals).
 const (
-	defaultRetrievalScoreMidpoint  = 0.45
-	defaultRetrievalScoreSteepness = 8.0
+	defaultRetrievalScoreMidpoint  = config.DefaultRetrievalConfidenceSigmoidMidpoint
+	defaultRetrievalScoreSteepness = config.DefaultRetrievalConfidenceSigmoidSteepness
 )
 
 // RRF-SCALE-001 — RRF-calibrated score-gate defaults (zero-value fallback for
@@ -48,9 +49,9 @@ const (
 // dormant. They remain separate config knobs so operators can raise any one
 // independently (e.g. stricter conflict detection) without affecting the others.
 const (
-	defaultConstraintScoreFloor = 0.45 // result→constraint (outer gate)
-	defaultAuthorityScoreFloor  = 0.45 // keyword/name classifier inner gate
-	defaultConflictScoreFloor   = 0.45 // conflict/contradiction detection
+	defaultConstraintScoreFloor = config.DefaultConsultingConstraintScoreFloor // result→constraint (outer gate)
+	defaultAuthorityScoreFloor  = config.DefaultConsultingAuthorityScoreFloor   // keyword/name classifier inner gate
+	defaultConflictScoreFloor   = config.DefaultConsultingConflictScoreFloor    // conflict/contradiction detection
 )
 
 // constraintFloor / authorityFloor / conflictFloor resolve the config-driven
@@ -1059,7 +1060,7 @@ func (s *Service) detectConflicts(ctx context.Context, spaceID, contextText stri
 // findApplicableConstraints finds architectural constraints relevant to the context.
 // defaultClassifyConcurrency is the zero-value fallback for
 // CONSULTING_CLASSIFY_CONCURRENCY (GUIDANCE-SYNTH-001).
-const defaultClassifyConcurrency = 4
+const defaultClassifyConcurrency = config.DefaultConsultingClassifyConcurrency
 
 func (s *Service) findApplicableConstraints(ctx context.Context, spaceID string, results []models.RetrieveResult, triggers []models.ContextTrigger) []models.Constraint {
 	// Phase AR-3: Try LLM-powered classification first, fall back to keyword-based.

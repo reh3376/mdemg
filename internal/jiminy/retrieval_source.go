@@ -1,6 +1,9 @@
 package jiminy
 
-import "mdemg/internal/mathutil"
+import (
+	"mdemg/internal/config"
+	"mdemg/internal/mathutil"
+)
 
 // Retrieval score normalization parameters.
 // Retrieval FinalScore is a composite sum (vector + BM25 + activation + boosts)
@@ -20,8 +23,9 @@ import "mdemg/internal/mathutil"
 // recalibrated for RRF scale (legacy 1.5/1.5 crushed RRF scores to ~0.1-0.2).
 // These constants are the zero-value fallback only.
 const (
-	defaultRetrievalScoreMidpoint  = 0.45
-	defaultRetrievalScoreSteepness = 8.0
+	// Aliases to the single source of truth in config (no duplicated literals).
+	defaultRetrievalScoreMidpoint  = config.DefaultRetrievalConfidenceSigmoidMidpoint
+	defaultRetrievalScoreSteepness = config.DefaultRetrievalConfidenceSigmoidSteepness
 	// maxConfidence caps normalized scores. From a Bayesian perspective,
 	// absolute certainty is epistemologically invalid.
 	maxConfidence = 0.95
