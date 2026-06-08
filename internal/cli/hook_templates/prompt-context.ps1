@@ -19,6 +19,18 @@ try {
 
 if (-not $userPrompt) { exit 0 }
 
+# Resolve SessionID per conversation: MDEMG_SESSION_ID env > Claude Code stdin
+# session_id > ~/.mdemg/.claude-session > claude-core. Publish it for the agent.
+$SESSION_ID = if ($env:MDEMG_SESSION_ID) { $env:MDEMG_SESSION_ID } else { "" }
+if (-not $SESSION_ID) { $SESSION_ID = $hookInput.session_id }
+if (-not $SESSION_ID) { try { $SESSION_ID = (Get-Content "$env:USERPROFILE\.mdemg\.claude-session" -Raw | ConvertFrom-Json).session_id } catch {} }
+if (-not $SESSION_ID) { $SESSION_ID = "claude-core" }
+try {
+    $sessDir = "$env:USERPROFILE\.mdemg"
+    if (-not (Test-Path $sessDir)) { New-Item -ItemType Directory -Path $sessDir -Force | Out-Null }
+    @{session_id=$SESSION_ID; ts=[int][double]::Parse((Get-Date -UFormat %s))} | ConvertTo-Json -Compress | Set-Content "$sessDir\.claude-session"
+} catch {}
+
 # Skip very short prompts (commands like "y", "ok", etc.)
 if ($userPrompt.Length -lt 15) { exit 0 }
 
@@ -53,7 +65,7 @@ if ($resultCount -eq 0) {
         Write-Output "!! Consider: POST /v1/conversation/observe to record this topic."
     }
     try {
-        $health = Invoke-RestMethod -Uri "$MDEMG_URL/v1/conversation/session/health?session_id=claude-core" -TimeoutSec 1
+        $health = Invoke-RestMethod -Uri "$MDEMG_URL/v1/conversation/session/health?session_id=$SESSION_ID" -TimeoutSec 1
         $hScore = if ($health.health_score) { $health.health_score } else { "?" }
         $hObs = if ($health.observations_since_resume) { $health.observations_since_resume } else { "?" }
         Write-Output "[Session health: $hScore | obs: $hObs]"
@@ -80,7 +92,7 @@ try {
     $guidanceBody = @{
         space_id = $SPACE_ID
         context = $userPrompt
-        session_id = "claude-core"
+        session_id = $SESSION_ID
     } | ConvertTo-Json
     $guidance = Invoke-RestMethod -Uri "$MDEMG_URL/v1/jiminy/guide" -Method Post -ContentType "application/json" -Body $guidanceBody -TimeoutSec 6
 
@@ -100,7 +112,7 @@ Start-Job -ScriptBlock {
 
 # Session health ribbon
 try {
-    $health = Invoke-RestMethod -Uri "$MDEMG_URL/v1/conversation/session/health?session_id=claude-core" -TimeoutSec 1
+    $health = Invoke-RestMethod -Uri "$MDEMG_URL/v1/conversation/session/health?session_id=$SESSION_ID" -TimeoutSec 1
     $hScore = if ($health.health_score) { $health.health_score } else { "?" }
     $hObs = if ($health.observations_since_resume) { $health.observations_since_resume } else { "?" }
     Write-Output "[Session health: $hScore | obs: $hObs]"

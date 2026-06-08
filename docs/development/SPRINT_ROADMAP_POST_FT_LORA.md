@@ -197,7 +197,9 @@ Ship a Claude Code **skill** that makes Jiminy the authoritative, deterministic 
 3. ✅ Skill authored at the canonical `.claude/skills/jiminy-governance/SKILL.md` (frontmatter valid; concrete wire-up inline).
 4. ✅ Live Tier-3 PASSED — full handshake identify→request→comprehend→act→report ran against the real instance; `GUIDANCE_OUTCOME` edges 906→909 (one per coded constraint). See `docs/development/jiminy-governance-skill/verification.md`.
 
-**Follow-ups:** per-Claude-session SessionID (today uses the `claude-core` convention); optional config-gated fail-closed Write/Edit gate.
+**Follow-ups:**
+- ✅ **Per-conversation SessionID (DONE 2026-06-08)** — hooks + skill now resolve `MDEMG_SESSION_ID` env → Claude Code stdin `session_id` → `~/.mdemg/.claude-session` → `claude-core`, realizing J17 per-`(session,constraint)` isolation (was one shared `claude-core`). Tracked templates `internal/cli/hook_templates/*` + skill updated; live-verified an observation keyed to the per-conversation id in Neo4j. See `docs/development/jiminy-governance-skill/session-id-verification.md`. Sub-follow-up: `pre-write-check.py` is local-only (no tracked installer template) — add it to the tracked hooks so its fix propagates.
+- Optional config-gated fail-closed Write/Edit gate.
 
 ---
 

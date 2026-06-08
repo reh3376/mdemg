@@ -13,21 +13,21 @@ In this project, **Jiminy is your authoritative contact for context and governan
 
 - **MCP server `mdemg`** (registered in `.mcp.json`, stdio) — preferred. Relevant tools: `jiminy_guide` (proactive guidance incl. applicable constraints), `validate_changes` (check a diff against active constraints), `memory_recall`.
 - **HTTP fallback** at the MDEMG server. Discover the base URL in this order: `MDEMG_URL` env → `.mdemg.port` file → `.env` `MDEMG_PORT=` → `http://localhost:9999`. Confirm up with `GET /healthz`.
-- **SessionID:** use `claude-core` consistently for the whole session (the project convention; trust + escalation are keyed to it).
+- **SessionID:** resolve it once and reuse it for the whole session — `MDEMG_SESSION_ID` env if set, else read `session_id` from `~/.mdemg/.claude-session` (the SessionStart/UserPromptSubmit hooks publish your per-conversation id there), else `claude-core`. Trust + escalation are keyed to it, so it must match what the hooks use. Below, `<SessionID>` means this resolved value.
 - If Jiminy is unreachable (no `/healthz`, MCP tool errors), say so plainly and **stop the governed action** rather than proceeding on assumed constraints.
 
 ## The J17 handshake — run before acting
 
 1. **Identify + arm enforcement.** Once per session, enable deterministic enforcement for your SessionID:
-   `POST /v1/jiminy/strict {"session_id":"claude-core","enabled":true}`. (This makes the Write/Edit PreToolUse gate active for the session — see "Enforcement" below.) Optionally fetch the constraint-code glossary once: `GET /v1/jiminy/bootstrap?space_id=<space>`.
+   `POST /v1/jiminy/strict {"session_id":"<SessionID>","enabled":true}`. (This makes the Write/Edit PreToolUse gate active for the session — see "Enforcement" below.) Optionally fetch the constraint-code glossary once: `GET /v1/jiminy/bootstrap?space_id=<space>`.
 2. **Request.** Scope the query to what you are about to do (target files/paths, tool, task type) — not in the abstract:
    - MCP: call `jiminy_guide` with `{context, file_path?, agent_output?, space_id?}`, **or**
-   - HTTP: `POST /v1/jiminy/guide {"space_id":"<space>","context":"<what you're about to do>","file_path":"<path>","agent_output":"<proposed change>","session_id":"claude-core"}`.
+   - HTTP: `POST /v1/jiminy/guide {"space_id":"<space>","context":"<what you're about to do>","file_path":"<path>","agent_output":"<proposed change>","session_id":"<SessionID>"}`.
    Keep the returned `guidance_id` — you need it to report the outcome.
 3. **Comprehend.** Restate the returned constraints so your understanding is on record. When tested explicitly, return scored trials: `POST /v1/jiminy/protocol/feedback {"trials":[{"constraint_code":"<code>","tier":1,"score":<0-10>,"interpretation":"<your restatement>","sender_intent":"<why it exists>"}]}`.
 4. **Act under enforcement.** Proceed. Enforcement is deterministic at the point of action via the PreToolUse hooks (below), independent of this skill.
 5. **Report outcome.** After acting, close the loop so Jiminy records a `GUIDANCE_OUTCOME` edge:
-   `POST /v1/jiminy/feedback {"guidance_id":"<from step 2>","action_summary":"<what you did>","space_id":"<space>","session_id":"claude-core","outcome":"followed|partial_compliance|ignored|contradicted|not_applicable"}`. Do not silently drop or rewrite the outcome.
+   `POST /v1/jiminy/feedback {"guidance_id":"<from step 2>","action_summary":"<what you did>","space_id":"<space>","session_id":"<SessionID>","outcome":"followed|partial_compliance|ignored|contradicted|not_applicable"}`. Do not silently drop or rewrite the outcome.
 
 ## Enforcement is not optional
 
