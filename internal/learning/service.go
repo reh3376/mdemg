@@ -695,6 +695,9 @@ func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID stri
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
+	// EVENTGRAPH-003: per-pair reinforcement telemetry (trigger_path=coactivate_session).
+	var reinforcementRows []tsdb.ReinforcementEventRow
+
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// Find all conversation_observation nodes in the session
 		// Create edges weighted by temporal proximity and surprise
@@ -771,22 +774,53 @@ ON MATCH SET rr.updated_at=datetime(), rr.last_activated_at=datetime(),
              rr.evidence_count=coalesce(rr.evidence_count,0)+1,
              rr.version=coalesce(rr.version,0)+1, rr.weight=r.weight
 
-RETURN count(*) AS edges_created
+RETURN
+  a.node_id AS src_node_id,
+  b.node_id AS dst_node_id,
+  w AS prev_weight,
+  r.weight AS new_weight,
+  (r.weight - w) AS delta_weight,
+  r.evidence_count AS evidence_count_after,
+  $eta AS eta_effective,
+  surpriseFactor AS surprise_factor,
+  prod AS activation_product,
+  null AS path_sim,
+  coalesce(a.role_type, '') AS role_a,
+  coalesce(b.role_type, '') AS role_b,
+  coalesce(a.obs_type, '') AS obs_type_a,
+  coalesce(b.obs_type, '') AS obs_type_b,
+  $sessionId AS session_id,
+  'bidirectional' AS direction,
+  (r.evidence_count = 1) AS created_new_edge
 `
 		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}
-		if res.Next(ctx) {
+		// EVENTGRAPH-003: capture per-pair telemetry (one row per forward edge;
+		// the reverse edge is a mirror — avoids double counting).
+		for res.Next(ctx) {
 			rec := res.Record()
-			count, _ := rec.Get("edges_created")
-			return count, nil
+			row := parseReinforcementRow(func(key string) (any, bool) {
+				return rec.Get(key)
+			})
+			reinforcementRows = append(reinforcementRows, row)
 		}
-		return int64(0), res.Err()
+		return nil, res.Err()
 	})
 
 	if err != nil {
 		return err
+	}
+
+	// EVENTGRAPH-003: forward captured per-pair telemetry into the TSDB writer.
+	// Buffered + non-blocking — the Hebbian write already committed.
+	if s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
+		for _, row := range reinforcementRows {
+			row.SpaceID = spaceID
+			row.TriggerPath = "coactivate_session"
+			s.reinforcementWriter.Record(row)
+		}
 	}
 
 	// DH-004 E5: reinforce stability of all session observations. Previously
