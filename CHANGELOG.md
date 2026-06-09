@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Sprint EVENTGRAPH-003 — reinforcement-event coverage for the other Hebbian paths** (2026-06-09). EVENTGRAPH-001 federated only one of four Hebbian write paths (`ApplyCoactivation`). Now all four feed `reinforcement_events`, distinguished by `trigger_path`: `ApplySymbolCoactivation` (`apply_symbol_coactivation`), `CoactivateSession` (`coactivate_session`), and `ApplyNegativeFeedback` weaken-path (`apply_negative_feedback`, negative `delta_weight`). Each via a Cypher `RETURN`-extension + parse-and-record hook reusing the existing writer — **no schema/writer/endpoint change**; the federation API + `mdemg eventgraph reinforcement-neighborhood` surface the new events for free. The contradict path (`CONTRADICTS` edges) is deferred (not traversed by the federation walk). Cypher edits are `EXPLAIN`-validated + behavior-preserving (weight `SET` unchanged). Live-verified: all four `trigger_path`s emit rows; the federation read surfaces them. Sprint in `docs/development/eventgraph-003/`.
+
+### Fixed
+
+- **`CoactivateSession` was never invoked — session co-activation learning silently dead** (2026-06-09, discovered via EVENTGRAPH-003 live smoke). `conversation.NewServiceWithConfig` set `learningService=nil` pending `SetLearningService`, but that setter had **no caller** — so `Observe()`'s `if s.learningService != nil` guard always skipped `CoactivateSession`, and **0 `CO_ACTIVATED_WITH` edges between conversation observations had ever been created** (across 5495 such nodes in mdemg-dev). The function + Cypher were correct (proven by running it directly); it was just never called. Fix: `convSvc.SetLearningService(lea)` at construction. Live-verified: observations now create session co-activation edges. Same latent-dormancy class as EVENTGRAPH-001's RRF-`Activation`-drop — only live testing surfaces it.
+
 ## [0.10.1] - 2026-06-08
 
 ### Added
