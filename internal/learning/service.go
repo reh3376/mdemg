@@ -560,7 +560,11 @@ func (s *Service) ApplySymbolCoactivation(ctx context.Context, spaceID string, r
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Find SymbolNodes connected to co-retrieved MemoryNodes, then MERGE CO_ACTIVATED_WITH
+	// Find SymbolNodes connected to co-retrieved MemoryNodes, then MERGE CO_ACTIVATED_WITH.
+	// EVENTGRAPH-003: the weight update is split out of the ON MATCH clause so we can
+	// capture the pre-update weight (w) and emit prev/new/delta. createdNew (evidence
+	// _count = 1) keeps a fresh edge at 0.1 and increments matches by +0.05 — preserving
+	// the original ON-clause behavior exactly (verified by EXPLAIN + reasoning).
 	cypher := `
 UNWIND $nodeIds AS nid
 MATCH (m:MemoryNode {node_id: nid, space_id: $spaceId})-[:DEFINES_SYMBOL]->(sym:SymbolNode {space_id: $spaceId})
@@ -576,19 +580,65 @@ ON CREATE SET
     r.updated_at = datetime(),
     r.evidence_count = 1
 ON MATCH SET
-    r.weight = CASE WHEN r.weight < 1.0 THEN r.weight + 0.05 ELSE r.weight END,
     r.updated_at = datetime(),
-    r.evidence_count = r.evidence_count + 1`
+    r.evidence_count = r.evidence_count + 1
+WITH s1, s2, r, coalesce(r.weight, 0.1) AS w, (r.evidence_count = 1) AS createdNew
+SET r.weight = CASE
+    WHEN createdNew THEN w
+    WHEN w < 1.0 THEN w + 0.05
+    ELSE w
+END
+RETURN
+  s1.node_id AS src_node_id,
+  s2.node_id AS dst_node_id,
+  w AS prev_weight,
+  r.weight AS new_weight,
+  (r.weight - w) AS delta_weight,
+  r.evidence_count AS evidence_count_after,
+  null AS eta_effective,
+  null AS surprise_factor,
+  null AS activation_product,
+  null AS path_sim,
+  coalesce(s1.role_type, 'symbol_node') AS role_a,
+  coalesce(s2.role_type, 'symbol_node') AS role_b,
+  coalesce(s1.obs_type, '') AS obs_type_a,
+  coalesce(s2.obs_type, '') AS obs_type_b,
+  '' AS session_id,
+  'forward' AS direction,
+  createdNew AS created_new_edge`
 
+	var reinforcementRows []tsdb.ReinforcementEventRow
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		_, err := tx.Run(ctx, cypher, map[string]any{
+		res, err := tx.Run(ctx, cypher, map[string]any{
 			"nodeIds": nodeIDs,
 			"spaceId": spaceID,
 		})
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			row := parseReinforcementRow(func(key string) (any, bool) {
+				return rec.Get(key)
+			})
+			reinforcementRows = append(reinforcementRows, row)
+		}
+		return nil, res.Err()
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	// EVENTGRAPH-003: forward symbol co-activation telemetry to the writer.
+	if s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
+		for _, row := range reinforcementRows {
+			row.SpaceID = spaceID
+			row.TriggerPath = "apply_symbol_coactivation"
+			s.reinforcementWriter.Record(row)
+		}
+	}
+
+	return nil
 }
 
 // reinforceConversationObservations calls the stability reinforcer for any conversation observations
