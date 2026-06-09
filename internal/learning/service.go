@@ -1009,6 +1009,8 @@ func (s *Service) ApplyNegativeFeedback(ctx context.Context, spaceID string, que
 	defer sess.Close(ctx)
 
 	var result NegativeFeedbackResult
+	// EVENTGRAPH-003: per-pair weaken telemetry (trigger_path=apply_negative_feedback).
+	var reinforcementRows []tsdb.ReinforcementEventRow
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		// For each query-rejected pair, weaken existing CO_ACTIVATED_WITH or create CONTRADICTS
@@ -1019,8 +1021,11 @@ MATCH (q:MemoryNode {node_id: qid, space_id: $spaceId})
 MATCH (r:MemoryNode {node_id: rid, space_id: $spaceId})
 WHERE q <> r
 OPTIONAL MATCH (q)-[coact:CO_ACTIVATED_WITH {space_id: $spaceId}]->(r)
+// EVENTGRAPH-003: capture the pre-weaken weight before the FOREACH SET so the
+// weaken path can emit a per-pair reinforcement event (negative delta_weight).
 WITH q, r, coact,
-     CASE WHEN coact IS NOT NULL THEN 'weaken' ELSE 'contradict' END AS action
+     CASE WHEN coact IS NOT NULL THEN 'weaken' ELSE 'contradict' END AS action,
+     coact.weight AS prevWeight
 FOREACH (_ IN CASE WHEN action = 'weaken' THEN [1] ELSE [] END |
     SET coact.weight = CASE WHEN coact.weight - $negWeight < 0 THEN 0.0 ELSE coact.weight - $negWeight END,
         coact.updated_at = datetime()
@@ -1030,7 +1035,27 @@ FOREACH (_ IN CASE WHEN action = 'contradict' THEN [1] ELSE [] END |
     ON CREATE SET c.weight = $negWeight, c.evidence_count = 1, c.created_at = datetime()
     ON MATCH SET c.evidence_count = c.evidence_count + 1, c.updated_at = datetime()
 )
-RETURN action, count(*) AS cnt`
+// Per-pair RETURN (was aggregated action,count(*)): the Go side counts rows and
+// emits reinforcement events for the weaken rows only. Writes above unchanged.
+RETURN
+  action,
+  q.node_id AS src_node_id,
+  r.node_id AS dst_node_id,
+  prevWeight AS prev_weight,
+  coact.weight AS new_weight,
+  (coact.weight - prevWeight) AS delta_weight,
+  coalesce(coact.evidence_count, 0) AS evidence_count_after,
+  null AS eta_effective,
+  null AS surprise_factor,
+  null AS activation_product,
+  null AS path_sim,
+  coalesce(q.role_type, '') AS role_a,
+  coalesce(r.role_type, '') AS role_b,
+  coalesce(q.obs_type, '') AS obs_type_a,
+  coalesce(r.obs_type, '') AS obs_type_b,
+  coalesce(q.session_id, '') AS session_id,
+  coalesce(coact.direction, 'forward') AS direction,
+  false AS created_new_edge`
 
 		params := map[string]any{
 			"spaceId":     spaceID,
@@ -1047,18 +1072,30 @@ RETURN action, count(*) AS cnt`
 		for res.Next(ctx) {
 			rec := res.Record()
 			action, _ := rec.Get("action")
-			cnt, _ := rec.Get("cnt")
-			count := int(cnt.(int64))
-			switch action.(string) {
+			actStr, _ := action.(string)
+			switch actStr {
 			case "weaken":
-				result.Weakened += count
+				result.Weakened++
+				row := parseReinforcementRow(func(key string) (any, bool) {
+					return rec.Get(key)
+				})
+				reinforcementRows = append(reinforcementRows, row)
 			case "contradict":
-				result.Contradicted += count
+				result.Contradicted++
 			}
-			result.Processed += count
+			result.Processed++
 		}
 		return nil, res.Err()
 	})
+
+	// EVENTGRAPH-003: forward the weaken events (negative delta) to the writer.
+	if err == nil && s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
+		for _, row := range reinforcementRows {
+			row.SpaceID = spaceID
+			row.TriggerPath = "apply_negative_feedback"
+			s.reinforcementWriter.Record(row)
+		}
+	}
 
 	return result, err
 }
