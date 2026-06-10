@@ -290,6 +290,13 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var ctxCooler *conversation.ContextCooler
 	if emb != nil {
 		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
+		// EVENTGRAPH-003 fix: inject the learning service so Observe() triggers
+		// CoactivateSession. This setter had no caller — the conversation
+		// service's learningService stayed nil, so session co-activation
+		// (CO_ACTIVATED_WITH edges between same-session observations) NEVER
+		// fired (0 such edges ever in mdemg-dev). Discovered via EVENTGRAPH-003
+		// live smoke when coactivate_session reinforcement events never landed.
+		convSvc.SetLearningService(lea)
 		slog.Info("conversation service initialized", "vector_index", cfg.VectorIndexName, "constraint_detection", cfg.ConstraintDetectionEnabled)
 
 		// Phase 14.2 Epic 3: wire ContextCatalog loader so Service.Observe

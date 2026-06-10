@@ -33,16 +33,18 @@ Y1 is the cheapest path that preserves graph traversal capability. Federation in
 
 Hebbian writes are **per-retrieve** — far higher volume than the CLI-driven `model_install_events`. V0021's synchronous-single-row INSERT pattern would put the writer in the hot path of every retrieve. V0019's buffered CopyFrom (30s auto-flush, 1000-row buffer with FIFO eviction on full) is the right shape: non-blocking enqueue, batched DB write.
 
-### One event class first (`ApplyCoactivation` only)
+### All four Hebbian entry points (the `trigger_path` discriminator)
 
-Four Hebbian entry points exist:
+All four Hebbian write paths now feed `reinforcement_events`, distinguished by `trigger_path`:
 
-1. `ApplyCoactivation` (retrieval hot path) ← shipped in EVENTGRAPH-001
-2. `ApplySymbolCoactivation` (symbol-to-symbol)
-3. `CoactivateSession` (session-level)
-4. `ApplyNegativeFeedback` (weakening / contradiction)
+| `trigger_path` | source | notes |
+|---|---|---|
+| `apply_coactivation` | `ApplyCoactivation` (retrieval hot path) | EVENTGRAPH-001; full Hebbian fields |
+| `apply_symbol_coactivation` | `ApplySymbolCoactivation` (symbol-to-symbol) | EVENTGRAPH-003; eta/surprise/activation/path_sim N/A (NULL); high pair volume |
+| `coactivate_session` | `CoactivateSession` (same-session observations) | EVENTGRAPH-003; full Hebbian fields |
+| `apply_negative_feedback` | `ApplyNegativeFeedback` (weaken path) | EVENTGRAPH-003; **negative** `delta_weight`, `created_new_edge=false` |
 
-EVENTGRAPH-001 instruments only #1. The pattern proves out, the TSDB schema absorbs the shape, the federation API surface is exercised. EVENTGRAPH-003 will extend to the other three (with `trigger_path` distinguishing them in the same table).
+EVENTGRAPH-001 shipped #1 (proving the pattern + schema + federation surface). EVENTGRAPH-003 added #2–#4 — each via a `RETURN`-extension + parse-and-record hook reusing the existing writer (no schema/writer/endpoint change; the federation read surfaces the new `trigger_path`s for free). The `ApplyNegativeFeedback` **contradict** path (which creates `CONTRADICTS` edges, not `CO_ACTIVATED_WITH`) is deliberately **not** emitted — `CONTRADICTS` isn't traversed by the federation walk, so a future sprint can federate contradictions as their own event class. EVENTGRAPH-003 live testing also revived a dormant path: `CoactivateSession` had never been invoked (its `learningService` was never injected) — fixed so session co-activation learning actually runs.
 
 ### Forward-only — no historical backfill
 
@@ -97,7 +99,7 @@ One row per logical co-activation pair. The Hebbian Cypher's final `RETURN` clau
 - Optional float-nullable columns: `eta_effective`, `surprise_factor`, `activation_product`, `path_sim`
 - Optional string-nullable columns: `role_a`, `role_b`, `obs_type_a`, `obs_type_b`, `session_id`, `direction` (`forward` | `reverse` | `bidirectional`)
 - `created_new_edge` (true when ON CREATE fired; false when ON MATCH; reliable proxy for "new connection formed" vs "existing connection strengthened")
-- `trigger_path` (v1: always `apply_coactivation`)
+- `trigger_path` (`apply_coactivation` | `apply_symbol_coactivation` | `coactivate_session` | `apply_negative_feedback`)
 
 Indexes: `(space_id, recorded_at DESC)`, `(space_id, src_node_id, recorded_at DESC)`, `(space_id, dst_node_id, recorded_at DESC)`, partial `(space_id, session_id, recorded_at DESC) WHERE session_id IS NOT NULL`.
 
@@ -280,6 +282,6 @@ The table shows the followed/ignored split + per-outcome `CONSTRAINT_CODE · OUT
 - **EVENTGRAPH-CLI-001 (shipped)** — `mdemg eventgraph reinforcement-neighborhood`, the first consumer of the federation API + the live-testing harness for the line (see the CLI section above).
 - **EVENTGRAPH-002 (shipped)** — guidance-outcome federation (see above): `POST /v1/eventgraph/guidance-outcome-neighborhood` + `mdemg eventgraph guidance-outcome-neighborhood`, reusing `constraint_outcomes`, joined on `constraint_code`.
 - **EVENTGRAPH-002 follow-up** — `--constraint-code` seeding (resolve a constraint node from its code server-side).
-- **EVENTGRAPH-003** — wire the writer into the other three Hebbian entry points (`ApplySymbolCoactivation`, `CoactivateSession`, `ApplyNegativeFeedback`).
+- **EVENTGRAPH-003 (shipped)** — wired the writer into the other three Hebbian entry points (`ApplySymbolCoactivation`, `CoactivateSession`, `ApplyNegativeFeedback` weaken-only), distinguished by `trigger_path`. Also revived a dormant path (`CoactivateSession` was never invoked). Contradict events (`CONTRADICTS`) deferred as a future event class.
 - **Pattern Y2 escalation** — promote one event class to skinny graph link-nodes when a query proves single-pass Cypher across events is necessary. Triggered by, not assumed.
 - **Retention policy** — default TimescaleDB behavior (chunks forever) is fine for v1. Revisit when chunk count exceeds 26 weeks; add `drop_chunks` policy.
