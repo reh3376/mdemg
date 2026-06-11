@@ -351,14 +351,22 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	ret.SetCircuitBreakerRegistry(cbRegistry)
 	hid.SetCircuitBreakerRegistry(cbRegistry)
 
-	// Wire circuit breaker to embedder if it supports it (OpenAI and Ollama)
+	// Wire circuit breaker to the BASE embedder (EMBED-WIRE-001): the old
+	// type assertions checked the OUTERMOST value, which under the default
+	// config is *CachedEmbedder (EmbeddingCacheEnabled=true) — so the breaker
+	// was never wired in any default deployment, silently. Base() walks the
+	// wrapper chain (cache, rate-limit, future Unwrap()ers) to the provider.
 	if emb != nil {
-		if openAIEmb, ok := emb.(*embeddings.OpenAI); ok {
-			openAIEmb.SetCircuitBreaker(cbRegistry.Get("openai-embeddings"))
+		switch base := embeddings.Base(emb).(type) {
+		case *embeddings.OpenAI:
+			base.SetCircuitBreaker(cbRegistry.Get("openai-embeddings"))
 			slog.Info("circuit breaker wired to OpenAI embedder")
-		} else if ollamaEmb, ok := emb.(*embeddings.Ollama); ok {
-			ollamaEmb.SetCircuitBreaker(cbRegistry.Get("ollama-embeddings"))
+		case *embeddings.Ollama:
+			base.SetCircuitBreaker(cbRegistry.Get("ollama-embeddings"))
 			slog.Info("circuit breaker wired to Ollama embedder")
+		default:
+			slog.Warn("embedding circuit breaker NOT wired — base embedder is neither OpenAI nor Ollama",
+				"base_type", fmt.Sprintf("%T", base))
 		}
 
 		// Wrap embedder with rate limiting if enabled (Phase 48.4.3)
@@ -1248,15 +1256,19 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				client.Pool(),
 				time.Duration(s.cfg.TSDBFlushIntervalSec)*time.Second,
 			)
-			// Wire recorder into CachedEmbedder if available
-			if ce, ok := s.embedder.(*embeddings.CachedEmbedder); ok {
+			// EMBED-WIRE-001: find the cache layer by walking the wrapper
+			// chain — the old direct assertion silently lost recording
+			// whenever an outer wrapper was present or the cache disabled.
+			if ce, ok := embeddings.FindCached(s.embedder); ok {
 				ce.SetRecorder(&embeddingRecorderAdapter{
 					writer:         s.embeddingWriter,
 					instanceID:     s.cfg.InstanceID,
 					defaultSpaceID: s.cfg.RSICWatchdogSpaceID,
 				})
+				slog.Info("tsdb: embedding event logger attached")
+			} else {
+				slog.Warn("tsdb: embedding event logger NOT attached — no CachedEmbedder layer (EMBEDDING_CACHE_ENABLED=false?); embedding training data will not be recorded")
 			}
-			slog.Info("tsdb: embedding event logger attached")
 		}
 
 		// Retrieval event logger — record all Retrieve() pipelines for contrastive training data
