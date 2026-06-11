@@ -704,6 +704,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			RetentionMaxAgeDays:   cfg.BackupRetentionMaxAgeDays,
 			RetentionMaxStorageGB: cfg.BackupRetentionMaxStorageGB,
 			RetentionRunAfter:     cfg.BackupRetentionRunAfter,
+			SnapshotWaitTimeoutSec: cfg.BackupSnapshotWaitTimeoutSec,
 		}
 		exp := transfer.NewExporter(driver)
 		backupSvc = backup.NewService(backupCfg, driver, exp)

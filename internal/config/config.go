@@ -724,6 +724,8 @@ type Config struct {
 	BackupRetentionMaxAgeDays   int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
 	BackupRetentionMaxStorageGB int    // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
 	BackupRetentionRunAfter     bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
+	BackupSnapshotWaitTimeoutSec int   // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for the pre-restore safety snapshot (default: 300)
+	BackupJobStalenessHours     int    // BACKUP_JOB_STALENESS_HOURS — neo4j-backup staleness alert window; 0 = partial interval × 2 (default: 0)
 
 	// TimescaleDB Backup & Restore
 	TSDBBackupEnabled             bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
@@ -3280,6 +3282,14 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	backupRetentionRunAfter := getBool("BACKUP_RETENTION_RUN_AFTER_BACKUP", true)
+	backupSnapshotWaitTimeoutSec, err := atoi("BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	backupJobStalenessHours, err := atoi("BACKUP_JOB_STALENESS_HOURS", 0)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// TimescaleDB Backup & Restore
 	tsdbBackupEnabled := getBool("TSDB_BACKUP_ENABLED", false)
@@ -4743,6 +4753,8 @@ func FromEnv() (Config, error) {
 		BackupRetentionMaxAgeDays:   backupRetentionMaxAgeDays,
 		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
 		BackupRetentionRunAfter:     backupRetentionRunAfter,
+		BackupSnapshotWaitTimeoutSec: backupSnapshotWaitTimeoutSec,
+		BackupJobStalenessHours:     backupJobStalenessHours,
 
 		// TimescaleDB Backup & Restore
 		TSDBBackupEnabled:             tsdbBackupEnabled,

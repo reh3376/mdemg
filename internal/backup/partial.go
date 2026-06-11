@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	pb "mdemg/api/transferpb"
 	"mdemg/internal/jobs"
 	"mdemg/internal/transfer"
 )
@@ -74,6 +75,11 @@ func (s *Service) runPartialBackup(ctx context.Context, job *jobs.Job, record *B
 	nodeCount, edgeCount, _ := s.queryNodeEdgeCounts(ctx)
 	schemaVer, _ := s.querySchemaVersion(ctx)
 
+	// BACKUP-RESTORE-VERIFY-001: count what the FILE contains — the
+	// whole-database counts above diverge from file contents on partial
+	// backups, so they cannot validate a restore.
+	fileNodes, fileEdges, fileObs := countChunkContents(allResult.Chunks)
+
 	manifest := BackupManifest{
 		BackupID:      record.BackupID,
 		Type:          string(record.Type),
@@ -87,7 +93,32 @@ func (s *Service) runPartialBackup(ctx context.Context, job *jobs.Job, record *B
 		SchemaVersion: schemaVer,
 		KeepForever:   record.KeepForever,
 		Label:         record.Label,
+
+		FileNodeCount:        fileNodes,
+		FileEdgeCount:        fileEdges,
+		FileObservationCount: fileObs,
 	}
 
 	return s.writeManifest(record, manifest)
+}
+
+// countChunkContents tallies the nodes/edges/observations actually present
+// in an export chunk stream (BACKUP-RESTORE-VERIFY-001 — the restore
+// validation reference).
+func countChunkContents(chunks []*pb.SpaceChunk) (nodes, edges, observations int64) {
+	for _, c := range chunks {
+		if c == nil {
+			continue
+		}
+		if nb := c.GetNodes(); nb != nil {
+			nodes += int64(len(nb.GetNodes()))
+		}
+		if eb := c.GetEdges(); eb != nil {
+			edges += int64(len(eb.GetEdges()))
+		}
+		if ob := c.GetObservations(); ob != nil {
+			observations += int64(len(ob.GetObservations()))
+		}
+	}
+	return nodes, edges, observations
 }
