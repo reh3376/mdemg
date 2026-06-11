@@ -33,8 +33,23 @@ jobs:
             echo "No open PR found, will create one"
           fi
 
-      - name: Build PR body from commits
+      # A push whose content is identical to main (e.g. a manual post-merge
+      # base-sync — see sync-dev-after-merge.yml) must not open an empty PR
+      # (failure mode: PR #420). The automated sync pushes with GITHUB_TOKEN
+      # and never triggers this workflow; this guard covers manual pushes.
+      - name: Skip when branch content matches main
         if: steps.check.outputs.exists == 'false'
+        id: diff
+        run: |
+          if git diff --quiet origin/main HEAD; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            echo "Branch content is identical to main (sync-only push) — skipping PR creation."
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build PR body from commits
+        if: steps.check.outputs.exists == 'false' && steps.diff.outputs.empty == 'false'
         id: body
         run: |
           COMMIT_LOG=$(git log origin/main..HEAD --pretty=format:"- %s" 2>/dev/null || echo "- Initial dev branch push")
@@ -53,7 +68,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create PR
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.exists == 'false' && steps.diff.outputs.empty == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BODY: ${{ steps.body.outputs.body }}

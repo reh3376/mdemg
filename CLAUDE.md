@@ -62,6 +62,7 @@ Skills are CMS-backed pinned observations. Recall: `POST /v1/skills/<name>/recal
 
 Branch pattern: `<github_handle>_dev<01-09>` — **never commit directly to `main`** (branch-protected).
 Auto-PR on push to `*_dev*`. Branch naming enforced by CI. Current: `reh3376_dev01`.
+**Post-merge base sync is automated** (`sync-dev-after-merge.yml`): after each squash-merged dev PR, CI merges `main` back into the source branch (squash merges never advance the merge-base — without this, every sprint touching CHANGELOG/CLAUDE.md goes CONFLICTING, per PR #419). If the sync job fails (branch moved during review), resolve manually: verify `main` ≡ branch-pre-sprint content, then `git merge origin/main -X ours`. `auto-pr.yml` skips PR creation for zero-content-diff pushes.
 
 ---
 
