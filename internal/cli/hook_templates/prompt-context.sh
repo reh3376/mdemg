@@ -65,14 +65,24 @@ fi
 # --- Alert delivery: show pending MDEMG service alerts ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then
+  _PENDING=$(jq -c '[.alerts[] | select(.cleared == false)][:10]' "$_ALERT_FILE" 2>/dev/null || echo "[]")
   _ALERT_COUNT=$(jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
-  if [ "$_ALERT_COUNT" -gt 0 ] 2>/dev/null; then
+  _SHOWN=$(echo "$_PENDING" | jq 'length' 2>/dev/null || echo 0)
+  if [ "$_SHOWN" -gt 0 ] 2>/dev/null; then
     echo ""
-    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending] !!"
-    jq -r '.alerts[] | select(.cleared == false) |
+    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending, showing $_SHOWN] !!"
+    echo "$_PENDING" | jq -r '.[] |
       "  [\(.severity | ascii_upcase)] [\(.time | .[0:19])] \(.service): \(.title) — \(.message)"
-    ' "$_ALERT_FILE" 2>/dev/null | head -10
+    ' 2>/dev/null
     echo ""
+    # HOOKSYNC-001: mark the DISPLAYED alerts cleared (= delivered to the
+    # operator) so they don't re-render every prompt. Persisting conditions
+    # re-fire new entries via the evaluator. Fire-and-forget, fail-open.
+    _IDS=$(echo "$_PENDING" | jq -c '[.[].id]' 2>/dev/null || echo "[]")
+    if [ "$_IDS" != "[]" ]; then
+      curl -sf -X POST "${MDEMG_URL}/v1/alerts/clear" -H "Content-Type: application/json" \
+        -d "{\"ids\":${_IDS}}" --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+    fi
   fi
 fi
 
@@ -134,6 +144,25 @@ if [ -s "$GUIDANCE_TMP" ]; then
   fi
 
   if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
+    # Detect T1/T2 tiers in guidance items — if present, prepend bootstrap header
+    # so the agent can decode compact formats. Bootstrap is ~50 tokens.
+    # (HOOKSYNC-001: this block existed only in the live hook — reverse drift —
+    # and is now single-sourced here.)
+    MAX_TIER=$(jq -r '[.data.guidance[]?.tier // 3] | min' "$GUIDANCE_TMP" 2>/dev/null || echo "3")
+    if [ "$MAX_TIER" = "1" ] || [ "$MAX_TIER" = "2" ]; then
+      BOOTSTRAP=$(curl -sf "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
+        --connect-timeout 1 --max-time 2 2>/dev/null | jq -r '.data.bootstrap // empty' 2>/dev/null) || true
+      if [ -n "$BOOTSTRAP" ]; then
+        echo ""
+        printf '%s\n' "$BOOTSTRAP"
+      fi
+      if [ "$MAX_TIER" = "1" ]; then
+        printf 'ACTIVE CONSTRAINTS (T1 coded format — apply these before responding):\n'
+      else
+        printf 'ACTIVE CONSTRAINTS (telegraphic — apply these before responding):\n'
+      fi
+    fi
+
     echo ""
     printf '%s\n' "$AUGMENTATION"
     if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
@@ -171,3 +200,10 @@ fi
 # Synergy: token count footer for recall + guidance
 RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
 echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_BYTES:-0}]"
+
+# HOOKSYNC-001: hook-channel heartbeat — one row per fire so the server's
+# hook_channel_silent rule can prove this channel is alive (the inverse signal
+# caught a months-long outage only by manual audit). Fire-and-forget.
+curl -sf -X POST "${MDEMG_URL}/v1/hooks/event" -H "Content-Type: application/json" \
+  -d "{\"hook\":\"prompt-context\",\"session_id\":\"${SESSION_ID}\",\"duration_ms\":$((SECONDS * 1000))}" \
+  --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &

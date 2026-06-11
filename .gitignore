@@ -137,6 +137,7 @@ coverage.txt
 !.claude/hooks/prompt-context.sh
 !.claude/hooks/pre-compact.sh
 !.claude/hooks/pre-bash-check.py
+!.claude/hooks/pre-write-check.py
 !.claude/hooks/post-tool-observe.py
 .claude_settings.json
 .cursor/

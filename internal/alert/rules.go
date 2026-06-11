@@ -334,3 +334,47 @@ func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStalene
 
 	return rules
 }
+
+// HookHealthRules returns the HOOKSYNC-001 hook-channel absence rule. The
+// per-prompt delivery channel (prompt-context) had a months-long silent
+// outage caught only by manual audit; this is the "job never ran" guarantee
+// applied to the channel. Two independent heartbeats land in
+// scheduled_job_events via POST /v1/hooks/event: hook:post-tool-observe
+// (throttled; proves sessions are ACTIVE) and hook:prompt-context (per
+// prompt; the monitored channel). Sessions demonstrably active + zero
+// prompt-context fires = the channel is silently dead.
+//
+//   - lookbackHours: observation window (HOOK_SILENT_LOOKBACK_HOURS).
+//   - minActivityEvents: post-tool-observe rows required before the rule is
+//     eligible (HOOK_ACTIVITY_MIN_EVENTS) — prevents false fires on idle days.
+func HookHealthRules(lookbackHours, minActivityEvents int) []AlertRule {
+	if lookbackHours <= 0 {
+		lookbackHours = 24
+	}
+	if minActivityEvents <= 0 {
+		minActivityEvents = 5
+	}
+	return []AlertRule{
+		{
+			ID:    "hook_channel_silent",
+			Title: "Per-Prompt Hook Channel Silent While Sessions Active",
+			// Distinct Service per the NOSILENT-001 cooldown-collision rule.
+			Service:     "hook-channel-silent",
+			Severity:    SeverityHigh,
+			Interval:    300 * time.Second,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT CASE WHEN
+				(SELECT count(*) FROM scheduled_job_events
+				   WHERE job_name = 'hook:post-tool-observe'
+				     AND recorded_at > now() - interval '%d hours') >= %d
+				AND
+				(SELECT count(*) FROM scheduled_job_events
+				   WHERE job_name = 'hook:prompt-context'
+				     AND recorded_at > now() - interval '%d hours') = 0
+				THEN 1 ELSE 0 END`, lookbackHours, minActivityEvents, lookbackHours),
+			Threshold: 0,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}

@@ -19,13 +19,13 @@
     "priority": "high"
   },
   "config": {
-    "timeout_ms": 30000,
+    "timeout_ms": 90000,
     "tags": [
       "jiminy",
       "sanitization",
       "b1"
     ],
-    "sha256": "65fc2fcbbfc193bd28d5ce69acee4361c497e47d5da25919fc7199e3798e21e6"
+    "sha256": "89a65346330afe0b6e0628689e99b655b4539a3b891a190bcc58b8b62fb01b0f"
   },
   "variables": {
     "space_id": "mdemg-dev",

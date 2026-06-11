@@ -62,6 +62,30 @@ if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
   exit 0
 fi
 
+# --- Alert delivery: show pending MDEMG service alerts ---
+_ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
+if [ -f "$_ALERT_FILE" ]; then
+  _PENDING=$(jq -c '[.alerts[] | select(.cleared == false)][:10]' "$_ALERT_FILE" 2>/dev/null || echo "[]")
+  _ALERT_COUNT=$(jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  _SHOWN=$(echo "$_PENDING" | jq 'length' 2>/dev/null || echo 0)
+  if [ "$_SHOWN" -gt 0 ] 2>/dev/null; then
+    echo ""
+    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending, showing $_SHOWN] !!"
+    echo "$_PENDING" | jq -r '.[] |
+      "  [\(.severity | ascii_upcase)] [\(.time | .[0:19])] \(.service): \(.title) — \(.message)"
+    ' 2>/dev/null
+    echo ""
+    # HOOKSYNC-001: mark the DISPLAYED alerts cleared (= delivered to the
+    # operator) so they don't re-render every prompt. Persisting conditions
+    # re-fire new entries via the evaluator. Fire-and-forget, fail-open.
+    _IDS=$(echo "$_PENDING" | jq -c '[.[].id]' 2>/dev/null || echo "[]")
+    if [ "$_IDS" != "[]" ]; then
+      curl -sf -X POST "${MDEMG_URL}/v1/alerts/clear" -H "Content-Type: application/json" \
+        -d "{\"ids\":${_IDS}}" --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+    fi
+  fi
+fi
+
 # Recall relevant context from CMS
 RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
   -H "Content-Type: application/json" \
@@ -93,87 +117,61 @@ else
   echo "═══ END CMS RECALL ═══"
 fi
 
-# --- Jiminy inner voice guidance ---
-GUIDANCE_BYTES=0
+# --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
+# Reads pre-computed guidance instantly (<100ms) from warm store.
+# Then triggers async warm-up for NEXT prompt with current context.
+# NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
+# string values. Shell variable expansion + echo corrupts these bytes, so we write
+# to a temp file and parse with jq directly from the file.
+GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
+curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
+  --connect-timeout 1 --max-time 2 2>/dev/null | \
+  perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
 
-if [ -f "$HOME/.mdemg/.jiminy-strict-mode" ]; then
-  # /strict mode: call /v1/jiminy/reformulate for imperative directives
-  REFORM_TMP=$(mktemp /tmp/jiminy-reform-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-reform-$$.json")
-  curl -sf -X POST "${MDEMG_URL}/v1/jiminy/reformulate" \
-    -H "Content-Type: application/json" \
-    -d "{\"space_id\":\"${SPACE_ID}\",\"context\":$(echo "$USER_PROMPT" | head -c 500 | jq -Rs .),\"session_id\":\"${SESSION_ID}\"}" \
-    --connect-timeout 2 --max-time 8 > "$REFORM_TMP" 2>/dev/null || true
+if [ -s "$GUIDANCE_TMP" ]; then
+  WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
+  AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
 
-  if [ -s "$REFORM_TMP" ]; then
-    DIRECTIVE=$(jq -r '.data.directive // empty' "$REFORM_TMP" 2>/dev/null)
-    GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$REFORM_TMP" 2>/dev/null)
-    if [ -n "$GUIDANCE_ID" ]; then
-      mkdir -p ~/.mdemg 2>/dev/null || true
-      printf '{"guidance_id":"%s","space_id":"%s","session_id":"%s","ts":%d}\n' \
-        "$GUIDANCE_ID" "$SPACE_ID" "$SESSION_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
-    fi
-    if [ -n "$DIRECTIVE" ]; then
-      echo ""
-      printf '%s\n' "$DIRECTIVE"
-    fi
+  # J17: Capture guidance_id for feedback loop closure
+  GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
+  if [ -n "$GUIDANCE_ID" ]; then
+    mkdir -p ~/.mdemg 2>/dev/null || true
+    printf '{"guidance_id":"%s","space_id":"%s","session_id":"%s","ts":%d}\n' \
+      "$GUIDANCE_ID" "$SPACE_ID" "$SESSION_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
+  else
+    rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
   fi
-  GUIDANCE_BYTES=$(wc -c < "$REFORM_TMP" 2>/dev/null | tr -d ' ' || echo "0")
-  rm -f "$REFORM_TMP" 2>/dev/null || true
-else
-  # Advisory mode: event-driven warm/latest pattern
-  # Reads pre-computed guidance instantly (<100ms) from warm store.
-  # Then triggers async warm-up for NEXT prompt with current context.
-  # NOTE: Guidance responses may contain control chars (U+0000-U+001F) inside JSON
-  # string values. Shell variable expansion + echo corrupts these bytes, so we write
-  # to a temp file and parse with jq directly from the file.
-  GUIDANCE_TMP=$(mktemp /tmp/jiminy-guidance-XXXXXX.json 2>/dev/null || echo "/tmp/jiminy-guidance-$$.json")
-  curl -sf "${MDEMG_URL}/v1/jiminy/latest?space_id=${SPACE_ID}" \
-    --connect-timeout 1 --max-time 2 2>/dev/null | \
-    perl -pe 's/[\x00-\x08\x0b\x0c\x0e-\x1f]//g' > "$GUIDANCE_TMP" 2>/dev/null || true
 
-  if [ -s "$GUIDANCE_TMP" ]; then
-    WARM=$(jq -r '.warm // false' "$GUIDANCE_TMP" 2>/dev/null)
-    AUGMENTATION=$(jq -r '.data.prompt_augmentation // empty' "$GUIDANCE_TMP" 2>/dev/null)
-    AGE_MS=$(jq -r '.age_ms // "?"' "$GUIDANCE_TMP" 2>/dev/null)
-
-    # J17: Capture guidance_id for feedback loop closure
-    GUIDANCE_ID=$(jq -r '.data.guidance_id // empty' "$GUIDANCE_TMP" 2>/dev/null)
-    if [ -n "$GUIDANCE_ID" ]; then
-      mkdir -p ~/.mdemg 2>/dev/null || true
-      printf '{"guidance_id":"%s","space_id":"%s","session_id":"%s","ts":%d}\n' \
-        "$GUIDANCE_ID" "$SPACE_ID" "$SESSION_ID" "$(date +%s)" > ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
-    else
-      rm -f ~/.mdemg/.jiminy-guidance-state 2>/dev/null || true
-    fi
-
-    if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
-      # Detect T1/T2 tiers in guidance items — if present, prepend bootstrap header
-      # so the agent can decode compact formats. Bootstrap is ~50 tokens.
-      MAX_TIER=$(jq -r '[.data.guidance[]?.tier // 3] | min' "$GUIDANCE_TMP" 2>/dev/null || echo "3")
-      if [ "$MAX_TIER" = "1" ] || [ "$MAX_TIER" = "2" ]; then
-        BOOTSTRAP=$(curl -sf "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
-          --connect-timeout 1 --max-time 2 2>/dev/null | jq -r '.data.bootstrap // empty' 2>/dev/null) || true
-        if [ -n "$BOOTSTRAP" ]; then
-          echo ""
-          printf '%s\n' "$BOOTSTRAP"
-        fi
-        if [ "$MAX_TIER" = "1" ]; then
-          printf 'ACTIVE CONSTRAINTS (T1 coded format — apply these before responding):\n'
-        else
-          printf 'ACTIVE CONSTRAINTS (telegraphic — apply these before responding):\n'
-        fi
+  if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
+    # Detect T1/T2 tiers in guidance items — if present, prepend bootstrap header
+    # so the agent can decode compact formats. Bootstrap is ~50 tokens.
+    # (HOOKSYNC-001: this block existed only in the live hook — reverse drift —
+    # and is now single-sourced here.)
+    MAX_TIER=$(jq -r '[.data.guidance[]?.tier // 3] | min' "$GUIDANCE_TMP" 2>/dev/null || echo "3")
+    if [ "$MAX_TIER" = "1" ] || [ "$MAX_TIER" = "2" ]; then
+      BOOTSTRAP=$(curl -sf "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
+        --connect-timeout 1 --max-time 2 2>/dev/null | jq -r '.data.bootstrap // empty' 2>/dev/null) || true
+      if [ -n "$BOOTSTRAP" ]; then
+        echo ""
+        printf '%s\n' "$BOOTSTRAP"
       fi
-
-      echo ""
-      printf '%s\n' "$AUGMENTATION"
-      if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
-        echo "[guidance age: ${AGE_MS}ms — may be stale]"
+      if [ "$MAX_TIER" = "1" ]; then
+        printf 'ACTIVE CONSTRAINTS (T1 coded format — apply these before responding):\n'
+      else
+        printf 'ACTIVE CONSTRAINTS (telegraphic — apply these before responding):\n'
       fi
     fi
+
+    echo ""
+    printf '%s\n' "$AUGMENTATION"
+    if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then
+      echo "[guidance age: ${AGE_MS}ms — may be stale]"
+    fi
   fi
-  GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
-  rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 fi
+GUIDANCE_BYTES=$(wc -c < "$GUIDANCE_TMP" 2>/dev/null | tr -d ' ' || echo "0")
+rm -f "$GUIDANCE_TMP" 2>/dev/null || true
 
 # Fire-and-forget: warm guidance for NEXT prompt with current context
 curl -sf -X POST "${MDEMG_URL}/v1/jiminy/warm" \
@@ -202,3 +200,10 @@ fi
 # Synergy: token count footer for recall + guidance
 RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
 echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_BYTES:-0}]"
+
+# HOOKSYNC-001: hook-channel heartbeat — one row per fire so the server's
+# hook_channel_silent rule can prove this channel is alive (the inverse signal
+# caught a months-long outage only by manual audit). Fire-and-forget.
+curl -sf -X POST "${MDEMG_URL}/v1/hooks/event" -H "Content-Type: application/json" \
+  -d "{\"hook\":\"prompt-context\",\"session_id\":\"${SESSION_ID}\",\"duration_ms\":$((SECONDS * 1000))}" \
+  --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &

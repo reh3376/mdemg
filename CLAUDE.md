@@ -396,6 +396,8 @@ Endpoints:
 
 Hooks in `.claude/hooks/` run automatically — they are not optional.
 
+**Hook channel health (HOOKSYNC-001, 2026-06-11):** templates in `internal/cli/hook_templates/` are the single source — live hooks must byte-match modulo `{{SPACE_ID}}` (CI-gated; edit the template, regenerate live, same commit). Hooks display pending alerts then clear them via `POST /v1/alerts/clear` (cleared = delivered). Heartbeats → `POST /v1/hooks/event` → V0024; evaluator rule `hook_channel_silent` fires when sessions are active but prompt-context never fires. Triage: `mdemg hooks doctor`. Compose binds `${MDEMG_BIND_ADDR:-127.0.0.1}`; sidecar binds `127.0.0.1:8101`. Feature doc: `docs/features/hook-channel-health.md`.
+
 **Hook stdin contract (HOOKWIRE-001, 2026-06-10 — pinned):** UserPromptSubmit sends `prompt` (NOT `user_prompt`); PostToolUse sends `tool_response` (NOT `tool_output`; string OR object — normalize via `_response_text`); transcript lines are `{type, message:{content:[{type, text|name,…}]}}`. The old field names silently killed the entire per-prompt channel (recall/guidance//strict/reinforcement never fired) and fabricated "Build/test succeeded" observations. When editing hooks: keep the legacy fallbacks, never couple guidance delivery to recall results, and never claim success on empty output. PostToolUse fires only on SUCCESSFUL tool completion — non-zero-exit commands are unobserved unless output surfaces in a successful completion. Template copies in `internal/cli/hook_templates/` must move in the same commit (CI parity gate is HOOKSYNC-001 scope).
 
 - **`session-start.sh`**: Resumes CMS memory, RSIC health, synergy fingerprint, Jiminy warning

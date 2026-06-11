@@ -451,6 +451,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				rules = append(rules, alert.JobHealthRules(
 					staleness, cfg.JobFailureLookbackMin, cfg.TSDBBackupEnabled)...)
 			}
+			// HOOKSYNC-001: hook-channel absence detection — sessions active
+			// (post-tool-observe heartbeats) but zero prompt-context fires.
+			if cfg.HookHealthAlertEnabled {
+				rules = append(rules, alert.HookHealthRules(
+					cfg.HookSilentLookbackHours, cfg.HookActivityMinEvents)...)
+			}
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			sup.Register("alert-evaluator", func(_ context.Context) error {
 				evaluator.Start() // blocks until evaluator.Stop()

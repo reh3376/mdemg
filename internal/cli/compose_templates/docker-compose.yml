@@ -15,7 +15,11 @@ services:
     #   dockerfile: deploy/docker/Dockerfile.prod
     restart: unless-stopped
     ports:
-      - "${MDEMG_PORT}:9999"
+      # HOOKSYNC-001: bind loopback by default — the server exposes
+      # unauthenticated admin/destructive routes; publishing on 0.0.0.0
+      # exposed them off-host. Set MDEMG_BIND_ADDR=0.0.0.0 to opt in to a
+      # wide bind (e.g. for remote operators), ideally with AUTH_API_KEYS.
+      - "${MDEMG_BIND_ADDR:-127.0.0.1}:${MDEMG_PORT}:9999"
     environment:
       LISTEN_ADDR: ":9999"
       LOG_FORMAT: "${LOG_FORMAT:-json}"

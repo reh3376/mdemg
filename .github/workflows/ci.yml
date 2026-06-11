@@ -36,6 +36,27 @@ jobs:
             diff -q "$f" "internal/cli/launchd_templates/$base"
           done
 
+      # HOOKSYNC-001: the repo's live hooks must equal the installer templates
+      # modulo the {{SPACE_ID}} placeholder. Bidirectional drift severed alert
+      # delivery for weeks (template had it, live didn't) and nearly lost the
+      # T1 bootstrap block (live had it, template didn't).
+      - name: Verify live hooks match hook templates
+        run: |
+          FAIL=0
+          for f in internal/cli/hook_templates/*.sh internal/cli/hook_templates/*.py; do
+            base=$(basename "$f")
+            live=".claude/hooks/$base"
+            if [ ! -f "$live" ]; then
+              echo "MISSING live hook: $live"; FAIL=1; continue
+            fi
+            if ! diff -q <(sed 's/{{SPACE_ID}}/mdemg-dev/g' "$f") "$live" >/dev/null; then
+              echo "DRIFT: $base (live vs template modulo SPACE_ID)"
+              diff <(sed 's/{{SPACE_ID}}/mdemg-dev/g' "$f") "$live" | head -20
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
       - name: Validate schema version consistency
         run: |
           EXPECTED=$(ls migrations/V*.cypher | wc -l | tr -d ' ')
