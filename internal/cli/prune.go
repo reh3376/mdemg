@@ -895,21 +895,21 @@ WHERE NOT EXISTS { MATCH ()-[:DEFINES_SYMBOL]->(s) }
 CALL (s) { DETACH DELETE s } IN TRANSACTIONS OF 1000 ROWS
 RETURN count(*) AS deleted`
 
-	delResult, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
-		if err != nil {
-			return nil, err
-		}
-		if res.Next(ctx) {
-			cnt, _ := res.Record().Get("deleted")
-			return neo4jutil.AsInt(cnt), nil
-		}
-		return 0, res.Err()
-	})
+	// MAINT-LIVE-001 live-smoke fix: `CALL { … } IN TRANSACTIONS` requires an
+	// IMPLICIT transaction — inside ExecuteWrite (explicit tx) Neo4j raises
+	// TransactionStartFailed. The dry-run path never executes this statement,
+	// so the first-ever live maintenance run was the first to hit it.
+	res, err := sess.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
 	if err != nil {
 		return stats, err
 	}
-	stats.deleted = delResult.(int)
+	if res.Next(ctx) {
+		cnt, _ := res.Record().Get("deleted")
+		stats.deleted = neo4jutil.AsInt(cnt)
+	}
+	if err := res.Err(); err != nil {
+		return stats, err
+	}
 
 	return stats, nil
 }
@@ -958,21 +958,18 @@ WHERE NOT EXISTS { MATCH ()-[:HAS_OBSERVATION]->(o) }
 CALL (o) { DETACH DELETE o } IN TRANSACTIONS OF 1000 ROWS
 RETURN count(*) AS deleted`
 
-	delResult, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
-		if err != nil {
-			return nil, err
-		}
-		if res.Next(ctx) {
-			cnt, _ := res.Record().Get("deleted")
-			return neo4jutil.AsInt(cnt), nil
-		}
-		return 0, res.Err()
-	})
+	// Same implicit-transaction requirement as the SymbolNode sweep above.
+	res, err := sess.Run(ctx, deleteCypher, map[string]any{"spaceId": cfg.SpaceID})
 	if err != nil {
 		return stats, err
 	}
-	stats.deleted = delResult.(int)
+	if res.Next(ctx) {
+		cnt, _ := res.Record().Get("deleted")
+		stats.deleted = neo4jutil.AsInt(cnt)
+	}
+	if err := res.Err(); err != nil {
+		return stats, err
+	}
 
 	return stats, nil
 }
