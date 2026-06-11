@@ -675,14 +675,18 @@ func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceI
 		if item.TotalSurfaced < 3 {
 			continue
 		}
+		// RSIC-VALIDATE-001: counter-free path — injecting synthetic
+		// "followed"/"ignored" outcomes inflated total_surfaced/total_followed,
+		// the exact counters GetConstraintEffectiveness reads next cycle.
+		boost, decay := d.guidanceCalibrator.ConfidenceCalibrationDeltas()
 		if item.EffectivenessRate >= 0.7 {
-			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "followed"); err != nil {
+			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, boost); err != nil {
 				slog.Error("RSIC-SK1: boost failed", "node_id", item.NodeID, "error", err)
 			} else {
 				boosted++
 			}
 		} else if item.EffectivenessRate < 0.1 && item.TotalSurfaced >= 5 {
-			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "ignored"); err != nil {
+			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, -decay); err != nil {
 				slog.Error("RSIC-SK1: decay failed", "node_id", item.NodeID, "error", err)
 			} else {
 				decayed++

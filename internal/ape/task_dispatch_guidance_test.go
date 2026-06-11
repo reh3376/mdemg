@@ -21,6 +21,25 @@ func (m *mockGuidanceCalibrator) GetConstraintEffectiveness(_ context.Context, _
 	return m.items, m.getErr
 }
 
+// AdjustNodeConfidenceDirect records counter-free adjustments (RSIC-VALIDATE-001).
+// Deltas map to the legacy outcome labels so existing assertions keep meaning:
+// positive → "followed"-equivalent boost, negative → "ignored"-equivalent decay.
+func (m *mockGuidanceCalibrator) AdjustNodeConfidenceDirect(_ context.Context, nodeID string, delta float64) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	m.updateCalls = append(m.updateCalls, nodeID)
+	if delta >= 0 {
+		m.updateOutcomes = append(m.updateOutcomes, "followed")
+	} else {
+		m.updateOutcomes = append(m.updateOutcomes, "ignored")
+	}
+	return nil
+}
+
+// ConfidenceCalibrationDeltas returns fixed magnitudes for tests.
+func (m *mockGuidanceCalibrator) ConfidenceCalibrationDeltas() (float64, float64) { return 0.05, 0.03 }
+
 func (m *mockGuidanceCalibrator) UpdateNodeConfidence(_ context.Context, nodeID string, outcome string) error {
 	m.updateCalls = append(m.updateCalls, nodeID)
 	m.updateOutcomes = append(m.updateOutcomes, outcome)

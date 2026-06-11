@@ -220,9 +220,9 @@ func TestProtocolMetrics_SidecarMetrics(t *testing.T) {
 	c := NewProtocolMetricsCollector()
 
 	// Record some sidecar calls
-	c.RecordSidecarCall(15.0, nil, false, 1, 1, false)                  // agreement, no override
-	c.RecordSidecarCall(20.0, nil, false, 2, 1, true)                  // override
-	c.RecordSidecarCall(0, fmt.Errorf("timeout"), true, 0, 1, false)   // error + timeout
+	c.RecordSidecarCall(15.0, nil, false, 1, 1, false)               // agreement, no override
+	c.RecordSidecarCall(20.0, nil, false, 2, 1, true)                // override
+	c.RecordSidecarCall(0, fmt.Errorf("timeout"), true, 0, 1, false) // error + timeout
 
 	snap := c.Snapshot()
 	if snap.Sidecar == nil {
@@ -439,7 +439,7 @@ func TestSnapshot_ZeroSamples_AllFieldsSafe(t *testing.T) {
 		"CompressionRatio":         snap.CompressionRatio,
 		"AvgTokensPerGuidance":     snap.AvgTokensPerGuidance,
 		"ReplayFrequencyPerHour":   snap.ReplayFrequencyPerHour,
-		"TicketRestoreSuccessRate":  snap.TicketRestoreSuccessRate,
+		"TicketRestoreSuccessRate": snap.TicketRestoreSuccessRate,
 		"CodeCoverage":             snap.CodeCoverage,
 		"NLIFallbackRate":          snap.NLIFallbackRate,
 	}

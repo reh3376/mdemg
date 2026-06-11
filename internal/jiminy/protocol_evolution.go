@@ -15,7 +15,7 @@ type ProtocolEvolver struct {
 	encoder     *ProtocolEncoder
 	seqTracker  *SequenceTracker
 	driver      neo4j.DriverWithContext // GAP 4: for RetireCode Neo4j writes
-	trustScorer *TrustScorer           // GAP 5: for threshold reads/writes
+	trustScorer *TrustScorer            // GAP 5: for threshold reads/writes
 }
 
 // NewProtocolEvolver creates a new protocol evolver.
@@ -263,10 +263,10 @@ func (pe *ProtocolEvolver) AdjustReplayBuffer(_ context.Context, _ string) (map[
 		"replay_freq_per_hour", snapshot.ReplayFrequencyPerHour)
 
 	return map[string]any{
-		"old_size":          oldSize,
-		"new_size":          newSize,
+		"old_size":           oldSize,
+		"new_size":           newSize,
 		"replay_freq_before": snapshot.ReplayFrequencyPerHour,
-		"action":            "adjust_replay_buffer",
+		"action":             "adjust_replay_buffer",
 	}, nil
 }
 

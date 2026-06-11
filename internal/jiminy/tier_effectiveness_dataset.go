@@ -10,12 +10,12 @@ import (
 
 // TierEffectivenessDataset is a curated aggregation of tier effectiveness data for RSIC.
 type TierEffectivenessDataset struct {
-	GeneratedAt   time.Time            `json:"generated_at"`
-	WindowStart   time.Time            `json:"window_start"`
-	WindowEnd     time.Time            `json:"window_end"`
-	TotalOutcomes int64                `json:"total_outcomes"`
-	TierGrades    [3]TierGrade         `json:"tier_grades"`
-	CodeDrift     []CodeDriftEntry     `json:"code_drift"`
+	GeneratedAt     time.Time            `json:"generated_at"`
+	WindowStart     time.Time            `json:"window_start"`
+	WindowEnd       time.Time            `json:"window_end"`
+	TotalOutcomes   int64                `json:"total_outcomes"`
+	TierGrades      [3]TierGrade         `json:"tier_grades"`
+	CodeDrift       []CodeDriftEntry     `json:"code_drift"`
 	Recommendations []TierRecommendation `json:"recommendations"`
 }
 

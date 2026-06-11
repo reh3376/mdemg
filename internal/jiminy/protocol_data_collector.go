@@ -24,22 +24,22 @@ type protocolTrainingRecord struct {
 	SessionID          string  `json:"session_id"`
 	// NS-03: Expanded fields for sidecar arbitration training
 	ApplicabilityScore float64 `json:"applicability_score,omitempty"`
-	ScoreSource        string  `json:"score_source,omitempty"`    // "heuristic" or "nli"
-	MLTier             int     `json:"ml_tier,omitempty"`         // ML-predicted tier (0 if unavailable)
-	RuleTier           int     `json:"rule_tier,omitempty"`       // Rule-based tier
-	MLConfidence       float64 `json:"ml_confidence,omitempty"`   // ML prediction confidence
-	TierSource         string  `json:"tier_source,omitempty"`     // "rule", "ml", or "fallback"
-	SidecarMode        string  `json:"sidecar_mode,omitempty"`    // shadow/compare/canary/active
-	GuidanceID         string  `json:"guidance_id,omitempty"`     // Correlation key for llm_interactions join
+	ScoreSource        string  `json:"score_source,omitempty"`  // "heuristic" or "nli"
+	MLTier             int     `json:"ml_tier,omitempty"`       // ML-predicted tier (0 if unavailable)
+	RuleTier           int     `json:"rule_tier,omitempty"`     // Rule-based tier
+	MLConfidence       float64 `json:"ml_confidence,omitempty"` // ML prediction confidence
+	TierSource         string  `json:"tier_source,omitempty"`   // "rule", "ml", or "fallback"
+	SidecarMode        string  `json:"sidecar_mode,omitempty"`  // shadow/compare/canary/active
+	GuidanceID         string  `json:"guidance_id,omitempty"`   // Correlation key for llm_interactions join
 }
 
 // ProtocolDataCollector writes protocol events to JSONL files for ML training.
 type ProtocolDataCollector struct {
-	mu         sync.Mutex
-	dir        string
+	mu          sync.Mutex
+	dir         string
 	maxFileSize int64
-	file       *os.File
-	written    int64
+	file        *os.File
+	written     int64
 }
 
 // NewProtocolDataCollector creates a new protocol data collector.

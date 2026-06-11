@@ -515,6 +515,12 @@ type ProtocolEvolverProvider interface {
 type GuidanceCalibrationProvider interface {
 	GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]GuidanceEffectivenessItem, error)
 	UpdateNodeConfidence(ctx context.Context, nodeID string, outcome string) error
+	// AdjustNodeConfidenceDirect applies a counter-free confidence delta —
+	// RSIC self-calibration must not pollute the real-feedback outcome
+	// counters it reads next cycle (RSIC-VALIDATE-001).
+	AdjustNodeConfidenceDirect(ctx context.Context, nodeID string, delta float64) error
+	// ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
+	ConfidenceCalibrationDeltas() (boost, decay float64)
 	ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error)
 }
 

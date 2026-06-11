@@ -42,7 +42,7 @@ func TestTrustScorer_FollowedBoosts(t *testing.T) {
 
 func TestTrustScorer_IgnoreDecays(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
-		Initial:      0.5,
+		Initial:        0.5,
 		DecayPerIgnore: 0.1,
 	})
 
@@ -82,7 +82,7 @@ func TestTrustScorer_ClampBounds(t *testing.T) {
 
 	// Should clamp to 0.0
 	ts2 := NewTrustScorer(TrustConfig{
-		Initial:      0.05,
+		Initial:        0.05,
 		DecayPerIgnore: 0.1,
 	})
 	ts2.RecordOutcome("sess-2", OutcomeIgnored)

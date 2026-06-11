@@ -8,10 +8,10 @@ import (
 
 // Extension types that agents can negotiate.
 const (
-	ExtTierPreference  = "tier_preference"
-	ExtAbbreviatedIDs  = "abbreviated_ids"
-	ExtBatchMode       = "batch_mode"
-	ExtDensityBoost    = "density_boost"
+	ExtTierPreference = "tier_preference"
+	ExtAbbreviatedIDs = "abbreviated_ids"
+	ExtBatchMode      = "batch_mode"
+	ExtDensityBoost   = "density_boost"
 )
 
 // NonNegotiableAspects lists protocol aspects that cannot be changed.
@@ -48,8 +48,8 @@ type ActiveExtension struct {
 // ExtensionRegistry manages per-session protocol extensions.
 type ExtensionRegistry struct {
 	mu         sync.RWMutex
-	allowed    map[string]bool               // allowed extension names
-	extensions map[string][]ActiveExtension  // sessionID → active extensions
+	allowed    map[string]bool              // allowed extension names
+	extensions map[string][]ActiveExtension // sessionID → active extensions
 }
 
 // NewExtensionRegistry creates a new extension registry with the given allowed extensions.

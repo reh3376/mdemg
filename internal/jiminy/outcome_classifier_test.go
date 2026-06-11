@@ -34,8 +34,8 @@ func (s *sequenceEmbedder) EmbedBatch(_ context.Context, _ []string) ([][]float3
 	return nil, nil
 }
 
-func (s *sequenceEmbedder) Name() string       { return "test-sequence" }
-func (s *sequenceEmbedder) Dimensions() int     { return 3 }
+func (s *sequenceEmbedder) Name() string    { return "test-sequence" }
+func (s *sequenceEmbedder) Dimensions() int { return 3 }
 
 func newTestClassifier(embedder *sequenceEmbedder, llmEnabled bool) *OutcomeClassifier {
 	return NewOutcomeClassifier(embedder, OutcomeClassifierConfig{

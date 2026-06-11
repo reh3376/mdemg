@@ -20,14 +20,14 @@ type ProtocolMetrics struct {
 	Sidecar                  *SidecarMetrics    `json:"sidecar_metrics,omitempty"` // NS-07
 
 	// Per-tier comprehension tracking (NLI feedback loop)
-	TierComprehension     [3]float64                `json:"tier_comprehension"`
+	TierComprehension     [3]float64                 `json:"tier_comprehension"`
 	TierCodeComprehension map[int]map[string]float64 `json:"tier_code_comprehension,omitempty"`
 	TierOutcomeCount      [3]int64                   `json:"tier_outcome_count"`
 
 	// NLI fallback tracking (degraded-state awareness)
-	NLIFallbackCount int64              `json:"nli_fallback_count,omitempty"`
-	NLIFallbackRate  float64            `json:"nli_fallback_rate,omitempty"`
-	CodeOutcomeCount map[string]int64   `json:"code_outcome_count,omitempty"`
+	NLIFallbackCount int64            `json:"nli_fallback_count,omitempty"`
+	NLIFallbackRate  float64          `json:"nli_fallback_rate,omitempty"`
+	CodeOutcomeCount map[string]int64 `json:"code_outcome_count,omitempty"`
 
 	// Trust score aggregates (populated from TrustScorer at snapshot time)
 	AvgTrustScore     float64 `json:"avg_trust_score"`
@@ -60,8 +60,8 @@ type ProtocolMetricsCollector struct {
 	codeTotal    map[string]int // code → total occurrences
 
 	// Replay & ticket tracking
-	replayEvents      int64
-	ticketRestoreOK   int64
+	replayEvents       int64
+	ticketRestoreOK    int64
 	ticketRestoreTotal int64
 
 	// T2 frequency per constraint
@@ -80,8 +80,8 @@ type ProtocolMetricsCollector struct {
 	sidecarLatencySum int64 // nanoseconds
 
 	// Per-tier comprehension tracking (NLI feedback loop)
-	tierCompScoreSum [3]float64            // running sum of comprehension per tier
-	tierCompCount    [3]int64              // count of outcomes per tier
+	tierCompScoreSum [3]float64              // running sum of comprehension per tier
+	tierCompCount    [3]int64                // count of outcomes per tier
 	tierCodeScores   [3]map[string][]float64 // per-tier, per-code scores
 
 	// NLI fallback tracking (degraded-state awareness)

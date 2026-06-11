@@ -11,19 +11,19 @@ import (
 // using a sliding window. When a code's average comprehension drops below
 // a threshold over N samples, it signals that the code should be regenerated.
 type CodeComprehensionTracker struct {
-	mu          sync.Mutex
-	minSamples  int
-	threshold   float64
-	maxPerHour  int
-	cooldown    time.Duration
-	scores      map[string]*codeScoreWindow // constraint_code → window
-	regenLog    []time.Time                 // timestamps of recent regenerations
-	codeGen     *ConstraintCodeGenerator
+	mu         sync.Mutex
+	minSamples int
+	threshold  float64
+	maxPerHour int
+	cooldown   time.Duration
+	scores     map[string]*codeScoreWindow // constraint_code → window
+	regenLog   []time.Time                 // timestamps of recent regenerations
+	codeGen    *ConstraintCodeGenerator
 }
 
 type codeScoreWindow struct {
-	scores     []float64
-	lastRegen  time.Time
+	scores    []float64
+	lastRegen time.Time
 }
 
 // NewCodeComprehensionTracker creates a new tracker.

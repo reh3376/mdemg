@@ -27,8 +27,8 @@ type TicketManager struct {
 
 	// Per-session last-issued ticket with LRU eviction
 	lastTickets map[string]*list.Element // sessionID → list element
-	lruList     *list.List              // front = most recent
-	maxSize     int                     // maximum entries (0 = unlimited)
+	lruList     *list.List               // front = most recent
+	maxSize     int                      // maximum entries (0 = unlimited)
 }
 
 // NewTicketManager creates a new TicketManager.

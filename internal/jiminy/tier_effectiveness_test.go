@@ -4,8 +4,8 @@ import "testing"
 
 func TestGradeTierEffectiveness_SingleTier(t *testing.T) {
 	snapshot := &ProtocolMetrics{
-		TierComprehension:  [3]float64{0.9, 0, 0},
-		TierOutcomeCount:   [3]int64{10, 0, 0},
+		TierComprehension: [3]float64{0.9, 0, 0},
+		TierOutcomeCount:  [3]int64{10, 0, 0},
 		TierCodeComprehension: map[int]map[string]float64{
 			1: {"no-force-push": 0.9},
 		},
@@ -18,8 +18,8 @@ func TestGradeTierEffectiveness_SingleTier(t *testing.T) {
 
 func TestGradeTierEffectiveness_CrossTierDelta(t *testing.T) {
 	snapshot := &ProtocolMetrics{
-		TierComprehension:  [3]float64{0.5, 0.9, 0},
-		TierOutcomeCount:   [3]int64{10, 10, 0},
+		TierComprehension: [3]float64{0.5, 0.9, 0},
+		TierOutcomeCount:  [3]int64{10, 10, 0},
 		TierCodeComprehension: map[int]map[string]float64{
 			1: {"no-force-push": 0.5},
 			2: {"no-force-push": 0.9},
@@ -46,8 +46,8 @@ func TestGradeTierEffectiveness_CrossTierDelta(t *testing.T) {
 
 func TestGradeTierEffectiveness_MinSamples(t *testing.T) {
 	snapshot := &ProtocolMetrics{
-		TierComprehension:  [3]float64{0.5, 0.9, 0},
-		TierOutcomeCount:   [3]int64{2, 2, 0}, // below min samples
+		TierComprehension: [3]float64{0.5, 0.9, 0},
+		TierOutcomeCount:  [3]int64{2, 2, 0}, // below min samples
 		TierCodeComprehension: map[int]map[string]float64{
 			1: {"code-a": 0.5},
 			2: {"code-a": 0.9},
@@ -61,8 +61,8 @@ func TestGradeTierEffectiveness_MinSamples(t *testing.T) {
 
 func TestGradeTierEffectiveness_IneffectiveTiers(t *testing.T) {
 	snapshot := &ProtocolMetrics{
-		TierComprehension:  [3]float64{0.4, 0.85, 0},
-		TierOutcomeCount:   [3]int64{10, 10, 0},
+		TierComprehension: [3]float64{0.4, 0.85, 0},
+		TierOutcomeCount:  [3]int64{10, 10, 0},
 		TierCodeComprehension: map[int]map[string]float64{
 			1: {"code-a": 0.4},
 			2: {"code-a": 0.85},

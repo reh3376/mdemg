@@ -38,7 +38,7 @@ func TestGuide_SignalLearnerEmission(t *testing.T) {
 	}
 
 	cfg := config.Config{
-		JiminyMaxItems:     10,
+		JiminyMaxItems:      10,
 		JiminyMinConfidence: 0.1,
 		JiminyTimeoutMs:     5000,
 	}

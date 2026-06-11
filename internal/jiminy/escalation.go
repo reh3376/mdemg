@@ -23,14 +23,14 @@ type escalationState struct {
 // EscalationTracker tracks per-session, per-constraint escalation state.
 // Thread-safe in-memory map with TTL-based decay.
 type EscalationTracker struct {
-	mu              sync.Mutex
-	states          map[escalationKey]*escalationState
-	warnAfter       int           // ignores before WARNED
-	escalateAfter   int           // ignores before ESCALATED
-	blockAfter      int           // ignores before BLOCKED
-	blockEnabled    bool          // whether BLOCKED state is allowed
-	decayDuration   time.Duration // reset if not surfaced within this duration
-	onDirty         func(sessionID string) // callback when state changes (for persistence)
+	mu            sync.Mutex
+	states        map[escalationKey]*escalationState
+	warnAfter     int                    // ignores before WARNED
+	escalateAfter int                    // ignores before ESCALATED
+	blockAfter    int                    // ignores before BLOCKED
+	blockEnabled  bool                   // whether BLOCKED state is allowed
+	decayDuration time.Duration          // reset if not surfaced within this duration
+	onDirty       func(sessionID string) // callback when state changes (for persistence)
 }
 
 // NewEscalationTracker creates a new EscalationTracker from config.

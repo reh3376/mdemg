@@ -4,8 +4,8 @@ package jiminy
 type TierEffectivenessReport struct {
 	OverallTierComprehension [3]float64            `json:"overall_tier_comprehension"`
 	TierOutcomeCount         [3]int64              `json:"tier_outcome_count"`
-	CodeTierDelta            []CodeTierComparison   `json:"code_tier_delta,omitempty"`
-	IneffectiveTiers         []TierIneffectiveness  `json:"ineffective_tiers,omitempty"`
+	CodeTierDelta            []CodeTierComparison  `json:"code_tier_delta,omitempty"`
+	IneffectiveTiers         []TierIneffectiveness `json:"ineffective_tiers,omitempty"`
 }
 
 // CodeTierComparison shows comprehension differences across tiers for a single code.

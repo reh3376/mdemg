@@ -11,13 +11,13 @@ type TrustScorer struct {
 	mu     sync.RWMutex
 	scores map[string]*trustEntry
 
-	initial           float64
-	boostPerFollow    float64
-	decayPerIgnore    float64
+	initial            float64
+	boostPerFollow     float64
+	decayPerIgnore     float64
 	decayPerContradict float64
-	highThreshold     float64
-	lowThreshold      float64
-	ttl               time.Duration
+	highThreshold      float64
+	lowThreshold       float64
+	ttl                time.Duration
 
 	onDirty func(string) // called after score changes with sessionID
 }
@@ -29,13 +29,13 @@ type trustEntry struct {
 
 // TrustConfig holds trust scorer configuration.
 type TrustConfig struct {
-	Initial           float64       // starting trust score (default: 0.65)
-	BoostPerFollow    float64       // trust increase per followed constraint (default: 0.05)
-	DecayPerIgnore    float64       // trust decrease per ignored constraint (default: 0.02)
-	DecayPerContradict float64      // trust decrease per contradicted constraint (default: 0.04)
-	HighThreshold     float64       // above this → agent has earned dense encoding (default: 0.75)
-	LowThreshold      float64       // below this → agent needs more explanation (default: 0.35)
-	TTL               time.Duration // trust entry expiry (default: 4h)
+	Initial            float64       // starting trust score (default: 0.65)
+	BoostPerFollow     float64       // trust increase per followed constraint (default: 0.05)
+	DecayPerIgnore     float64       // trust decrease per ignored constraint (default: 0.02)
+	DecayPerContradict float64       // trust decrease per contradicted constraint (default: 0.04)
+	HighThreshold      float64       // above this → agent has earned dense encoding (default: 0.75)
+	LowThreshold       float64       // below this → agent needs more explanation (default: 0.35)
+	TTL                time.Duration // trust entry expiry (default: 4h)
 }
 
 // NewTrustScorer creates a new trust scorer with the given config.

@@ -108,10 +108,10 @@ func TestProtocolEncoder_TierSelection(t *testing.T) {
 	enc := NewProtocolEncoder(TierCoded)
 
 	tests := []struct {
-		name       string
-		hasCode    bool
-		trust      float64
-		wantTier   int
+		name     string
+		hasCode  bool
+		trust    float64
+		wantTier int
 	}{
 		{"high trust + code → T1", true, 0.9, TierCoded},
 		{"moderate trust + code → T2", true, 0.5, TierTelegraphic},
