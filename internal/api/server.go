@@ -727,6 +727,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			Database:            cfg.TSDBDatabase,
 			User:                cfg.TSDBUser,
 			IntervalHours:       cfg.TSDBBackupIntervalHours,
+			InitialDelayMin:     cfg.TSDBBackupInitialDelayMin,
 			RetentionCount:      cfg.TSDBBackupRetentionCount,
 			RetentionMaxAgeDays: cfg.TSDBBackupRetentionMaxAgeDays,
 		}

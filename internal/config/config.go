@@ -735,6 +735,7 @@ type Config struct {
 	TSDBBackupComposeFile         string // TSDB_BACKUP_COMPOSE_FILE — docker compose file path (default: auto-detect)
 	TSDBBackupServiceName         string // TSDB_BACKUP_SERVICE — compose service name (default: "timescaledb")
 	TSDBBackupIntervalHours       int    // TSDB_BACKUP_INTERVAL_HOURS — hours between backups (default: 24)
+	TSDBBackupInitialDelayMin     int    // TSDB_BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial backup; 0 disables (default: 10)
 	TSDBBackupRetentionCount      int    // TSDB_BACKUP_RETENTION_COUNT — keep last N backups (default: 14)
 	TSDBBackupRetentionMaxAgeDays int    // TSDB_BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
 
@@ -3315,6 +3316,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	tsdbBackupInitialDelayMin, err := atoi("TSDB_BACKUP_INITIAL_DELAY_MIN", 10)
+	if err != nil {
+		return Config{}, err
+	}
 	if tsdbBackupIntervalHours < 1 {
 		return Config{}, errors.New("TSDB_BACKUP_INTERVAL_HOURS must be >= 1")
 	}
@@ -4779,6 +4784,7 @@ func FromEnv() (Config, error) {
 		TSDBBackupComposeFile:         tsdbBackupComposeFile,
 		TSDBBackupServiceName:         tsdbBackupServiceName,
 		TSDBBackupIntervalHours:       tsdbBackupIntervalHours,
+		TSDBBackupInitialDelayMin:     tsdbBackupInitialDelayMin,
 		TSDBBackupRetentionCount:      tsdbBackupRetentionCount,
 		TSDBBackupRetentionMaxAgeDays: tsdbBackupRetentionMaxAgeDays,
 
