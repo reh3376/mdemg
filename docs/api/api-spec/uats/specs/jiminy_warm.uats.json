@@ -1,0 +1,114 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Warm (Guidance Pre-Computation)",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "warm-store",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/jiminy/warm \u2014 fire-and-forget guidance pre-computation called by post-tool-observe.py (HOOKWIRE-001 made it load-bearing per tool use; GUIDANCE-SYNTH-001's warm-compute budget lives behind it). CONTRACT: always 202 on a valid request, with status 'warming' (computation launched) OR 'debounced' (a recent computation exists; age_ms + debounce_ms then present). The union assertion makes the spec immune to debounce-timing flakiness \u2014 back-to-back runs legitimately alternate states.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "jiminy"
+    ],
+    "sha256": "6c21bb6a95f6624ef9904098a9194d3941bb118e30d0c6e1f8cff59cb68be91f"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/warm",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "mdemg-dev",
+      "context_hint": "uats contract probe",
+      "session_id": "uats-contract-strict"
+    }
+  },
+  "expected": {
+    "status": 202,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "one_of",
+        "expected": [
+          "warming",
+          "debounced"
+        ]
+      },
+      {
+        "path": "$.age_ms",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.debounce_ms",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Empty space_id is a 400 request-validation failure.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/warm",
+        "body": {
+          "space_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "space_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_get",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/warm"
+      },
+      "expected": {
+        "status": 405
+      }
+    },
+    {
+      "name": "disabled_contract_503",
+      "skip": true,
+      "skip_reason": "Requires JIMINY_ENABLED=false or JIMINY_WARM_ENABLED=false + restart; documented contracts: 503 {error: 'jiminy guidance is not enabled'} or 503 {error: 'jiminy warm store is not enabled (set JIMINY_WARM_ENABLED=true)'}.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/warm",
+        "body": {
+          "space_id": "mdemg-dev"
+        }
+      },
+      "expected": {
+        "status": 503
+      }
+    }
+  ]
+}
