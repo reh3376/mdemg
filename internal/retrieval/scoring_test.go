@@ -167,7 +167,7 @@ func TestBypassBonus(t *testing.T) {
 
 	// VectorSim above threshold should produce a bonus
 	vectorSim := 0.95
-	excess := vectorSim - cfg.ScoringBypassThreshold // 0.10
+	excess := vectorSim - cfg.ScoringBypassThreshold  // 0.10
 	expectedBonus := cfg.ScoringBypassWeight * excess // 0.15 * 0.10 = 0.015
 	if abs(expectedBonus-0.015) > 0.001 {
 		t.Errorf("expected bypass bonus ~0.015, got %f", expectedBonus)

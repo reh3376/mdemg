@@ -144,7 +144,7 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 	originalWeight := 1.0 - rerankWeight
 
 	type scoredResult struct {
-		Result       models.RetrieveResult
+		Result        models.RetrieveResult
 		OriginalScore float64
 		RerankScore   float64
 		FinalScore    float64
@@ -268,12 +268,15 @@ func (s *Service) rerankWithOpenAI(ctx context.Context, systemPrompt, prompt, sp
 
 // doRerankWithOpenAI performs the actual OpenAI rerank API call.
 func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
-	client := llmclient.New(llmclient.Config{
-		Provider: "openai",
-		Model:    s.cfg.RerankModel,
-		APIKey:   s.cfg.OpenAIAPIKey,
-		BaseURL:  s.cfg.EffectiveLLMEndpoint(),
-	}).WithContext("retrieval.rerank_cross", spaceID)
+	s.rerankOpenAIOnce.Do(func() {
+		s.rerankOpenAIClient = llmclient.New(llmclient.Config{
+			Provider: "openai",
+			Model:    s.cfg.RerankModel,
+			APIKey:   s.cfg.OpenAIAPIKey,
+			BaseURL:  s.cfg.EffectiveLLMEndpoint(),
+		})
+	})
+	client := s.rerankOpenAIClient.WithContext("retrieval.rerank_cross", spaceID)
 
 	msgs := []llmclient.Message{
 		{Role: "system", Content: systemPrompt},
@@ -318,11 +321,14 @@ func (s *Service) rerankWithOllama(ctx context.Context, systemPrompt, prompt, sp
 
 // doRerankWithOllama performs the actual Ollama rerank API call.
 func (s *Service) doRerankWithOllama(ctx context.Context, systemPrompt, prompt, spaceID string) ([]float64, int, error) {
-	client := llmclient.New(llmclient.Config{
-		Provider: "ollama",
-		Model:    s.cfg.RerankModel,
-		BaseURL:  s.cfg.OllamaEndpoint,
-	}).WithContext("retrieval.rerank_nli", spaceID)
+	s.rerankOllamaOnce.Do(func() {
+		s.rerankOllamaClient = llmclient.New(llmclient.Config{
+			Provider: "ollama",
+			Model:    s.cfg.RerankModel,
+			BaseURL:  s.cfg.OllamaEndpoint,
+		})
+	})
+	client := s.rerankOllamaClient.WithContext("retrieval.rerank_nli", spaceID)
 
 	msgs := []llmclient.Message{
 		{Role: "system", Content: systemPrompt},

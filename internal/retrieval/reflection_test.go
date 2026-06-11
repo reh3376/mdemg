@@ -770,11 +770,11 @@ func TestScoreDecay(t *testing.T) {
 // TestLayerBoostCalculation tests the layer boost calculation for abstractions
 func TestLayerBoostCalculation(t *testing.T) {
 	tests := []struct {
-		name      string
-		layer     int
-		distance  int
-		minScore  float64
-		maxScore  float64
+		name     string
+		layer    int
+		distance int
+		minScore float64
+		maxScore float64
 	}{
 		{
 			name:     "layer 0, distance 1",

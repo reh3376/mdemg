@@ -151,8 +151,8 @@ func Aggregate(ctx context.Context, cols []Column, q ColumnQuery, opts Consensus
 
 	// First pass: gather metadata, count columns, build per-column rank maps.
 	type rankInfo struct {
-		rank      int     // 1-indexed position in the column's output (1 = best)
-		maxRank   int     // total nodes the column returned (used for normalized rank)
+		rank    int // 1-indexed position in the column's output (1 = best)
+		maxRank int // total nodes the column returned (used for normalized rank)
 	}
 	// rankByNode[node_id][column_name] -> rank info
 	rankByNode := map[string]map[string]rankInfo{}

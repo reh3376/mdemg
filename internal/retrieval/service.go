@@ -17,19 +17,30 @@ import (
 	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
 	"mdemg/internal/models"
+	"sync"
 )
 
 type Service struct {
-	cfg                config.Config
-	driver             neo4j.DriverWithContext
-	reasoningProvider  ReasoningProvider
-	queryCache         *QueryCache
-	embeddingCache     *NodeEmbeddingCache       // Cache for node embeddings (query-aware expansion)
-	cbRegistry         *circuitbreaker.Registry   // Circuit breaker registry for external API calls
-	intentTranslator   IntentTranslator           // Optional BM25 query rewriter
-	dataCollector      *DataCollector             // Neural re-ranker training data collector (NR-1)
-	retrievalRecorder  RetrievalEventRecorder     // Optional retrieval event recorder for contrastive training data
-	queryClassifier    *QueryClassifier            // Optional LLM query type classifier (PROD-READINESS)
+	cfg    config.Config
+	driver neo4j.DriverWithContext
+	// RRF-SCALE-002: persistent rerank clients. A fresh llmclient.New per
+	// call reset the consecutive-failure counter (the alert threshold could
+	// NEVER fire for retrieval.rerank_cross/rerank_nli) and discarded the
+	// HTTP transport on the hottest LLM path. WithContext() shallow-copies
+	// and SHARES the *atomic counter + breaker, so deriving per-call
+	// contexts from these bases preserves failure accounting.
+	rerankOpenAIOnce     sync.Once
+	rerankOpenAIClient   *llmclient.Client
+	rerankOllamaOnce     sync.Once
+	rerankOllamaClient   *llmclient.Client
+	reasoningProvider    ReasoningProvider
+	queryCache           *QueryCache
+	embeddingCache       *NodeEmbeddingCache      // Cache for node embeddings (query-aware expansion)
+	cbRegistry           *circuitbreaker.Registry // Circuit breaker registry for external API calls
+	intentTranslator     IntentTranslator         // Optional BM25 query rewriter
+	dataCollector        *DataCollector           // Neural re-ranker training data collector (NR-1)
+	retrievalRecorder    RetrievalEventRecorder   // Optional retrieval event recorder for contrastive training data
+	queryClassifier      *QueryClassifier         // Optional LLM query type classifier (PROD-READINESS)
 	retrievalAuditWriter RetrievalAuditWriter     // Phase 13 — Optional retrieval_audit writer (V0017); nil-safe
 	sparseGateRecorder   SparseGateRecorder       // Phase 14 — Optional V0019 sparse_gate_metrics writer; nil-safe
 }
@@ -894,27 +905,27 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		SpaceID: req.SpaceID,
 		Results: results,
 		Debug: map[string]any{
-			"candidate_k":            candK,
-			"seed_n":                 seedN,
-			"edges_fetched":          len(edges),
-			"hop_depth":              effectiveHopDepth,
-			"query_type":             hints.QueryType,
-			"vector_weight":          hints.VectorWeight,
-			"bm25_weight":            hints.BM25Weight,
-			"hybrid_enabled":         s.cfg.HybridRetrievalEnabled,
-			"vector_count":           len(vectorCands),
-			"bm25_count":             bm25Count,
-			"fused_count":            len(cands),
-			"reasoning_module":       reasoningModuleID,
-			"reasoning_latency_ms":   reasoningLatencyMs,
-			"reasoning_tokens":       reasoningTokens,
-			"rerank_enabled":         s.cfg.RerankEnabled,
-			"rerank_latency_ms":      rerankLatencyMs,
-			"rerank_tokens":          rerankTokens,
-			"jiminy_enabled":         req.JiminyEnabled,
-			"cache_hit":              false,
-			"edge_type_strategy":     s.cfg.EdgeTypeStrategy,
-			"hybrid_switch_hop":      s.cfg.HybridSwitchHop,
+			"candidate_k":                candK,
+			"seed_n":                     seedN,
+			"edges_fetched":              len(edges),
+			"hop_depth":                  effectiveHopDepth,
+			"query_type":                 hints.QueryType,
+			"vector_weight":              hints.VectorWeight,
+			"bm25_weight":                hints.BM25Weight,
+			"hybrid_enabled":             s.cfg.HybridRetrievalEnabled,
+			"vector_count":               len(vectorCands),
+			"bm25_count":                 bm25Count,
+			"fused_count":                len(cands),
+			"reasoning_module":           reasoningModuleID,
+			"reasoning_latency_ms":       reasoningLatencyMs,
+			"reasoning_tokens":           reasoningTokens,
+			"rerank_enabled":             s.cfg.RerankEnabled,
+			"rerank_latency_ms":          rerankLatencyMs,
+			"rerank_tokens":              rerankTokens,
+			"jiminy_enabled":             req.JiminyEnabled,
+			"cache_hit":                  false,
+			"edge_type_strategy":         s.cfg.EdgeTypeStrategy,
+			"hybrid_switch_hop":          s.cfg.HybridSwitchHop,
 			"temporal_mode":              string(hints.TemporalIntent.Mode),
 			"temporal_keywords":          hints.TemporalIntent.Keywords,
 			"temporal_confidence":        hints.TemporalIntent.Confidence,
@@ -980,7 +991,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		auditRec := RetrievalAuditRecord{
 			SpaceID:           req.SpaceID,
 			QueryTextHash:     hashQueryText(req.QueryText),
-			ScorerVersion:    scorerVersion,
+			ScorerVersion:     scorerVersion,
 			ConsensusStrength: consensusResult.AggregateConsensus,
 			PerColumnLatency:  consensusResult.PerColumnLatency,
 			ColumnsQueried:    consensusResult.ColumnsQueried,
@@ -2165,7 +2176,7 @@ func minInt(a, b int) int {
 // ConversationContextResult represents conversation knowledge that supports retrieval
 type ConversationContextResult struct {
 	NodeID  string
-	Type    string  // conversation_observation, conversation_theme, emergent_concept
+	Type    string // conversation_observation, conversation_theme, emergent_concept
 	Content string
 	Score   float64
 	Layer   int

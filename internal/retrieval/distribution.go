@@ -9,18 +9,18 @@ import (
 
 // ScoreDistribution tracks score statistics for a single retrieval query
 type ScoreDistribution struct {
-	Mean       float64   `json:"mean"`
-	StdDev     float64   `json:"std_dev"`
-	Min        float64   `json:"min"`
-	Max        float64   `json:"max"`
-	P10        float64   `json:"p10"`        // 10th percentile
-	P25        float64   `json:"p25"`        // 25th percentile
-	P50        float64   `json:"p50"`        // Median
-	P75        float64   `json:"p75"`        // 75th percentile
-	P90        float64   `json:"p90"`        // 90th percentile
-	Range      float64   `json:"range"`      // Max - Min
-	Count      int       `json:"count"`      // Number of results
-	Timestamp  time.Time `json:"timestamp"`
+	Mean      float64   `json:"mean"`
+	StdDev    float64   `json:"std_dev"`
+	Min       float64   `json:"min"`
+	Max       float64   `json:"max"`
+	P10       float64   `json:"p10"`   // 10th percentile
+	P25       float64   `json:"p25"`   // 25th percentile
+	P50       float64   `json:"p50"`   // Median
+	P75       float64   `json:"p75"`   // 75th percentile
+	P90       float64   `json:"p90"`   // 90th percentile
+	Range     float64   `json:"range"` // Max - Min
+	Count     int       `json:"count"` // Number of results
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // LearningPhase represents the current state of learning edge accumulation
@@ -317,15 +317,15 @@ func (m *DistributionMonitor) GetStats(spaceID string) DistributionStats {
 
 		n := float64(len(history))
 		stats.AggregatedStats = &AggregatedDistributionStats{
-			AvgMean:      sumMean / n,
-			AvgStdDev:    sumStdDev / n,
-			MinMean:      minMean,
-			MaxMean:      maxMean,
-			MinStdDev:    minStdDev,
-			MaxStdDev:    maxStdDev,
-			SampleCount:  len(history),
-			WindowStart:  history[0].Timestamp,
-			WindowEnd:    history[len(history)-1].Timestamp,
+			AvgMean:     sumMean / n,
+			AvgStdDev:   sumStdDev / n,
+			MinMean:     minMean,
+			MaxMean:     maxMean,
+			MinStdDev:   minStdDev,
+			MaxStdDev:   maxStdDev,
+			SampleCount: len(history),
+			WindowStart: history[0].Timestamp,
+			WindowEnd:   history[len(history)-1].Timestamp,
 		}
 
 		// Calculate trend (comparing recent vs older)
@@ -383,15 +383,15 @@ func (m *DistributionMonitor) ClearAlerts(spaceID string) {
 
 // DistributionStats contains comprehensive monitoring statistics
 type DistributionStats struct {
-	SpaceID         string                        `json:"space_id"`
-	EdgeCount       int64                         `json:"edge_count"`
-	Phase           LearningPhase                 `json:"phase"`
-	PhaseThresholds map[string]int64              `json:"phase_thresholds,omitempty"`
-	QueryCount      int                           `json:"query_count"`
-	Latest          *ScoreDistribution            `json:"latest,omitempty"`
-	AggregatedStats *AggregatedDistributionStats  `json:"aggregated,omitempty"`
-	Trend           *DistributionTrend            `json:"trend,omitempty"`
-	Alerts          []AlertCondition              `json:"alerts,omitempty"`
+	SpaceID         string                       `json:"space_id"`
+	EdgeCount       int64                        `json:"edge_count"`
+	Phase           LearningPhase                `json:"phase"`
+	PhaseThresholds map[string]int64             `json:"phase_thresholds,omitempty"`
+	QueryCount      int                          `json:"query_count"`
+	Latest          *ScoreDistribution           `json:"latest,omitempty"`
+	AggregatedStats *AggregatedDistributionStats `json:"aggregated,omitempty"`
+	Trend           *DistributionTrend           `json:"trend,omitempty"`
+	Alerts          []AlertCondition             `json:"alerts,omitempty"`
 }
 
 // AggregatedDistributionStats contains aggregate statistics across multiple queries
@@ -410,7 +410,7 @@ type AggregatedDistributionStats struct {
 // DistributionTrend indicates whether score distributions are improving or degrading
 type DistributionTrend struct {
 	MeanDelta   float64 `json:"mean_delta"`
-	Direction   string  `json:"direction"`   // "improving", "stable", "degrading"
+	Direction   string  `json:"direction"` // "improving", "stable", "degrading"
 	Description string  `json:"description"`
 }
 

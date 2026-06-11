@@ -30,8 +30,8 @@ func TestParseTemporalIntent_NoneMode(t *testing.T) {
 func TestParseTemporalIntent_SoftMode(t *testing.T) {
 	now := time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
-		query          string
-		expectKeyword  string
+		query         string
+		expectKeyword string
 	}{
 		{"recent changes to auth", "recent"},
 		{"show me the latest updates", "latest"},
@@ -249,7 +249,7 @@ func TestFilterCandidates_BeforeConstraint(t *testing.T) {
 
 	cands := []Candidate{
 		{NodeID: "old", UpdatedAt: time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)}, // before cutoff
-		{NodeID: "new", UpdatedAt: now},                                            // after cutoff
+		{NodeID: "new", UpdatedAt: now},                                          // after cutoff
 	}
 
 	constraint := &TemporalConstraint{Before: &before}
@@ -514,8 +514,8 @@ func TestStaleReferencePenalty_UsesCanonicalTime(t *testing.T) {
 	cands := []Candidate{
 		{
 			NodeID:        "old-content",
-			UpdatedAt:     now,                                    // recently re-ingested
-			CanonicalTime: now.Add(-90 * 24 * time.Hour),         // but content is 90 days old
+			UpdatedAt:     now,                           // recently re-ingested
+			CanonicalTime: now.Add(-90 * 24 * time.Hour), // but content is 90 days old
 		},
 		{
 			NodeID:    "new-content",
@@ -609,8 +609,8 @@ func TestFilterCandidatesByTime_UsesCanonicalTime(t *testing.T) {
 		},
 		{
 			NodeID:        "old-content",
-			UpdatedAt:     now.Add(-1 * 24 * time.Hour),   // UpdatedAt is recent
-			CanonicalTime: now.Add(-30 * 24 * time.Hour),  // but CanonicalTime is old
+			UpdatedAt:     now.Add(-1 * 24 * time.Hour),  // UpdatedAt is recent
+			CanonicalTime: now.Add(-30 * 24 * time.Hour), // but CanonicalTime is old
 		},
 	}
 

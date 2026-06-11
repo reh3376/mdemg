@@ -179,19 +179,19 @@ func escapeLuceneQuery(query string) string {
 
 // FusedCandidate represents a candidate after combining vector and BM25 results
 type FusedCandidate struct {
-	NodeID      string
-	Path        string
-	Name        string
-	Summary     string
-	UpdatedAt   time.Time
-	Confidence  float64
-	VectorSim   float64 // Original vector similarity
-	BM25Score   float64 // Original BM25 score
-	RRFScore    float64 // Combined RRF score
-	VectorRank  int     // Rank in vector results (0 if not present)
-	BM25Rank    int     // Rank in BM25 results (0 if not present)
-	Layer       int
-	Tags        []string
+	NodeID     string
+	Path       string
+	Name       string
+	Summary    string
+	UpdatedAt  time.Time
+	Confidence float64
+	VectorSim  float64 // Original vector similarity
+	BM25Score  float64 // Original BM25 score
+	RRFScore   float64 // Combined RRF score
+	VectorRank int     // Rank in vector results (0 if not present)
+	BM25Rank   int     // Rank in BM25 results (0 if not present)
+	Layer      int
+	Tags       []string
 }
 
 // ReciprocalRankFusion combines results from vector and BM25 search using RRF.
@@ -307,9 +307,9 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 			Summary:    f.Summary,
 			UpdatedAt:  f.UpdatedAt,
 			Confidence: f.Confidence,
-			VectorSim:  f.VectorSim,  // Real value, 0.0 for BM25-only
-			BM25Score:  f.BM25Score,   // Real value, 0.0 for vector-only
-			RRFScore:   f.RRFScore,    // Fused RRF score — authoritative ranking signal
+			VectorSim:  f.VectorSim, // Real value, 0.0 for BM25-only
+			BM25Score:  f.BM25Score, // Real value, 0.0 for vector-only
+			RRFScore:   f.RRFScore,  // Fused RRF score — authoritative ranking signal
 			Layer:      f.Layer,
 			Tags:       f.Tags,
 		}

@@ -461,9 +461,9 @@ RETURN n.node_id AS node_id,
 
 // AbstractionEdge represents an ABSTRACTS_TO edge for upward traversal
 type AbstractionEdge struct {
-	Src     string
-	Dst     string
-	Weight  float64
+	Src    string
+	Dst    string
+	Weight float64
 }
 
 // fetchAbstractionEdges fetches ABSTRACTS_TO edges for upward traversal from the given node IDs
