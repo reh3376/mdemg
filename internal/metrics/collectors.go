@@ -863,7 +863,9 @@ func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
 		m.Neo4jGraphObservations(s.SpaceID).Set(float64(s.Observations))
 		m.Neo4jGraphOrphans(s.SpaceID).Set(float64(s.Orphans))
 		m.Neo4jGraphNullWeightEdges(s.SpaceID).Set(float64(s.NullWeightEdges))
-		m.Neo4jConversationCoverage(s.SpaceID).Set(s.ConversationCoverage)
+		if s.ConversationCoverage >= 0 { // -1 sentinel: below CONVERSATION_COVERAGE_MIN_OBS, no gauge
+			m.Neo4jConversationCoverage(s.SpaceID).Set(s.ConversationCoverage)
+		}
 		m.Neo4jGraphHealthScore(s.SpaceID).Set(s.HealthScore)
 		m.Neo4jGraphLearningEdges(s.SpaceID).Set(float64(s.LearningEdges))
 		totalNodes += s.Nodes

@@ -4247,12 +4247,18 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 
 	// Step 6: Create theme nodes for each cluster
 	themeID := 0
+	// PR-B: every dropped cluster's members join the noise pool for density
+	// assignment below — KMeans never emits label -1, so before this the
+	// noise list was structurally empty and the min-samples/max-themes
+	// drops silently excluded observations from the hierarchy forever.
 	for _, members := range clusters {
 		if result.ThemesCreated >= maxThemes {
-			break
+			noise = append(noise, members...)
+			continue
 		}
 
 		if len(members) < s.cfg.HiddenLayerMinSamples {
+			noise = append(noise, members...)
 			continue
 		}
 
@@ -4263,6 +4269,7 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		}
 		centroid := ComputeCentroid(clusterEmbeddings)
 		if centroid == nil {
+			noise = append(noise, members...)
 			continue
 		}
 
@@ -4362,7 +4369,7 @@ func (s *Service) fetchClusterableConversationObservations(ctx context.Context, 
 	if s.cfg.HiddenLayerBatchSize > 0 {
 		cypher = fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE o.embedding IS NOT NULL%s
+WHERE o.embedding IS NOT NULL AND NOT coalesce(o.is_archived, false)%s
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
        o.session_id AS sessionId, o.tags AS tags
@@ -4370,7 +4377,7 @@ LIMIT %d`, noiseFilters, s.cfg.HiddenLayerBatchSize)
 	} else {
 		cypher = fmt.Sprintf(`
 MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-WHERE o.embedding IS NOT NULL%s
+WHERE o.embedding IS NOT NULL AND NOT coalesce(o.is_archived, false)%s
 RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
        o.summary AS summary, o.embedding AS embedding, o.surprise_score AS surpriseScore,
        o.session_id AS sessionId, o.tags AS tags`, noiseFilters)

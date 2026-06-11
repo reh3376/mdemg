@@ -2808,12 +2808,19 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		slog.Error("metrics: neo4j graph query (conversation coverage) failed", "error", err)
 		return s.graphMetricsCache.data
 	}
+	// Spaces below the observation floor emit NO coverage gauge (sentinel
+	// -1, skipped by the collector): coverage over a handful of test-space
+	// observations is statistically meaningless and would alarm forever.
+	covMinObs := int64(s.cfg.ConversationCoverageMinObs)
+	for _, row := range spaces {
+		row.conversationCoverage = -1
+	}
 	for _, rec := range collected5.([]*neo4j.Record) {
 		sid, _ := rec.Get("sid")
 		total, _ := rec.Get("total")
 		themed, _ := rec.Get("themed")
 		if row, ok := spaces[sid.(string)]; ok {
-			if t := total.(int64); t > 0 {
+			if t := total.(int64); t >= covMinObs && t > 0 {
 				row.conversationCoverage = float64(themed.(int64)) / float64(t)
 			}
 		}
