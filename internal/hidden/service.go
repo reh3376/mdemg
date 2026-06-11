@@ -1613,7 +1613,12 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 
 	// Step 1: Run node-creation steps via pipeline (phase 10-20: hidden, concern, config, comparison, temporal, ui, constraint)
-	pipelineResult, err := s.pipeline.RunPhaseRange(ctx, spaceID, nil, 10, 20)
+	// HIDDEN-CHURN-001: delegate to the single range source. The hardcoded
+	// (10, 20) here silently skipped phase 22 (dynamic_emergence) — with
+	// EMERGENCE_ENABLED=true the AUTOMATED consolidation path never ran LLM
+	// concept emergence while the manual path did. RunNodeCreationPipeline
+	// owns the range (10–22) and the emergence gate.
+	pipelineResult, err := s.RunNodeCreationPipeline(ctx, spaceID, s.cfg.EmergenceEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("node creation pipeline: %w", err)
 	}
