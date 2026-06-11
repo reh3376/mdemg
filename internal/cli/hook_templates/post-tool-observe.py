@@ -58,6 +58,27 @@ def _resolve_session_id(input_data):
     except Exception:
         pass
     return "claude-core"
+
+
+def _response_text(resp):
+    """HOOKWIRE-001: normalize a PostToolUse tool_response (string | dict |
+    list) to analyzable text. Bash responses arrive as an object carrying
+    stdout/stderr; older payloads were plain strings."""
+    if isinstance(resp, str):
+        return resp
+    if isinstance(resp, dict):
+        parts = [str(resp[k]) for k in ("stdout", "stderr", "output", "content", "error") if resp.get(k)]
+        if parts:
+            return "\n".join(parts)
+        try:
+            return json.dumps(resp)
+        except (TypeError, ValueError):
+            return str(resp)
+    if isinstance(resp, list):
+        return "\n".join(_response_text(x) for x in resp)
+    return str(resp) if resp else ""
+
+
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
 INGEST_LOG = os.path.join(os.path.expanduser("~"), ".mdemg", "logs", "ingest-claude-md.log")
@@ -571,10 +592,12 @@ def main():
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
-    tool_output = input_data.get("tool_output", "")
-
-    # Truncate output for analysis
-    output_str = str(tool_output)[:2000] if tool_output else ""
+    # HOOKWIRE-001: Claude Code's PostToolUse stdin field is `tool_response`
+    # (string OR object). The old `tool_output` read was always empty, so the
+    # error indicators below never matched and every build/test command was
+    # recorded as "succeeded" sight-unseen. Keep `tool_output` as fallback.
+    tool_output = input_data.get("tool_response") or input_data.get("tool_output") or ""
+    output_str = _response_text(tool_output)[:2000]
 
     # --- Write/Edit to CLAUDE.md or settings → decision ---
     if tool_name in ("Write", "Edit"):
@@ -628,8 +651,13 @@ def main():
             warm_guidance(f"bash error: {command[:200]}")
 
         # Successful build/test → progress
+        # HOOKWIRE-001: require NON-EMPTY output before claiming success.
+        # When tool_output was always empty (the tool_response contract bug),
+        # this branch blind-recorded "succeeded" for every build/test command.
+        # Trade-off: a truly silent success (no output at all) records nothing
+        # — better to miss a success than to fabricate one.
         if any(kw in command for kw in ["go build", "go test", "npm run build", "pytest"]):
-            if not any(indicator in output_str for indicator in error_indicators):
+            if output_str and not any(indicator in output_str for indicator in error_indicators):
                 observe(
                     f"Build/test succeeded: {command[:200]}",
                     "progress",
