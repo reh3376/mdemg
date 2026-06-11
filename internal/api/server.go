@@ -1881,17 +1881,23 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 					slog.Error("periodic consolidation error", "error", err)
 				} else {
 					themesCreated := 0
+					themesUpdated := 0
+					noiseAssigned := 0
 					conceptsCreated := 0
 					if result.ThemeResult != nil {
 						themesCreated = result.ThemeResult.ThemesCreated
+						themesUpdated = result.ThemeResult.ThemesUpdated
+						noiseAssigned = result.ThemeResult.NoiseAssigned
 					}
 					if result.ConceptResult != nil {
 						for _, count := range result.ConceptResult.ConceptsCreated {
 							conceptsCreated += count
 						}
 					}
-					if themesCreated > 0 || conceptsCreated > 0 {
-						slog.Info("periodic consolidation complete", "themes_created", themesCreated, "concepts_created", conceptsCreated)
+					// Post HIDDEN-CHURN-001 stable identity, created is usually 0
+					// on healthy cycles — updated/assigned must keep the log alive.
+					if themesCreated > 0 || themesUpdated > 0 || noiseAssigned > 0 || conceptsCreated > 0 {
+						slog.Info("periodic consolidation complete", "themes_created", themesCreated, "themes_updated", themesUpdated, "noise_assigned", noiseAssigned, "concepts_created", conceptsCreated)
 					}
 				}
 			case <-s.stopConsolidate:

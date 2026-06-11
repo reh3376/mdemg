@@ -75,7 +75,7 @@ type IngestCodebaseRequest struct {
 
 // IngestSourceConfig defines source type and git options
 type IngestSourceConfig struct {
-	Type   string `json:"type,omitempty"`  // "local" or "git"
+	Type   string `json:"type,omitempty"`   // "local" or "git"
 	Branch string `json:"branch,omitempty"` // for git sources
 	Since  string `json:"since,omitempty"`  // for incremental mode
 }
@@ -139,22 +139,22 @@ type IngestRetryConfig struct {
 
 // IngestCodebaseResponse defines the response for /v1/memory/ingest-codebase
 type IngestCodebaseResponse struct {
-	JobID   string             `json:"job_id"`
-	Status  string             `json:"status"` // "queued", "running", "completed", "failed"
-	SpaceID string             `json:"space_id"`
-	Path    string             `json:"path"`
+	JobID   string               `json:"job_id"`
+	Status  string               `json:"status"` // "queued", "running", "completed", "failed"
+	SpaceID string               `json:"space_id"`
+	Path    string               `json:"path"`
 	Stats   *IngestCodebaseStats `json:"stats,omitempty"`
-	Error   string             `json:"error,omitempty"`
+	Error   string               `json:"error,omitempty"`
 }
 
 // IngestCodebaseStats provides ingestion statistics
 type IngestCodebaseStats struct {
-	FilesFound      int64   `json:"files_found"`
-	FilesProcessed  int64   `json:"files_processed"`
-	SymbolsExtracted int64  `json:"symbols_extracted"`
-	Errors          int64   `json:"errors"`
-	Rate            float64 `json:"rate"`
-	Duration        string  `json:"duration,omitempty"`
+	FilesFound       int64   `json:"files_found"`
+	FilesProcessed   int64   `json:"files_processed"`
+	SymbolsExtracted int64   `json:"symbols_extracted"`
+	Errors           int64   `json:"errors"`
+	Rate             float64 `json:"rate"`
+	Duration         string  `json:"duration,omitempty"`
 }
 
 // IngestJob tracks a running ingestion job
@@ -595,4 +595,3 @@ func (s *Server) handleIngestCodebaseList(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"jobs": jobs})
 }
-

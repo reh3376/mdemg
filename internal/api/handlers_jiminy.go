@@ -54,7 +54,7 @@ func (s *Server) handleJiminyReady(w http.ResponseWriter, r *http.Request) {
 
 	// Feature flags
 	features := map[string]bool{
-		"synthesis":           s.cfg.JiminySynthesisEnabled,
+		"synthesis":          s.cfg.JiminySynthesisEnabled,
 		"evaluate_llm":       s.cfg.JiminyEvaluateLLMEnabled,
 		"outcome_llm":        s.cfg.JiminyOutcomeLLMEnabled,
 		"outcome_classifier": s.cfg.JiminyOutcomeClassifierEnabled,
@@ -293,8 +293,8 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 			m.JiminyWarmDebounced(req.SpaceID).Inc()
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{
-			"status":    "debounced",
-			"age_ms":    ageMs,
+			"status":      "debounced",
+			"age_ms":      ageMs,
 			"debounce_ms": debounceMs,
 		})
 		return
@@ -393,12 +393,12 @@ func (s *Server) handleJiminyLatest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"warm":        true,
-		"data":        entry.Response,
-		"age_ms":      ageMs,
-		"compute_ms":  entry.ComputeMs,
+		"warm":         true,
+		"data":         entry.Response,
+		"age_ms":       ageMs,
+		"compute_ms":   entry.ComputeMs,
 		"context_hint": entry.ContextHint,
-		"stale":       ageMs > maxAgeMs,
+		"stale":        ageMs > maxAgeMs,
 	})
 }
 

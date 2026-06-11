@@ -112,4 +112,3 @@ RETURN n.node_id AS node_id,
 
 	writeJSON(w, http.StatusOK, result)
 }
-

@@ -43,10 +43,10 @@ import (
 // embeddings. Built once per snapshot, reused for all subsequent
 // `?context=auto` calls until a new catalog version supersedes it.
 type catalogVecCache struct {
-	spaceID string
-	version int
+	spaceID   string
+	version   int
 	totalBits uint16
-	refs    []vecCacheEntry
+	refs      []vecCacheEntry
 }
 
 type vecCacheEntry struct {

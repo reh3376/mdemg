@@ -9,9 +9,9 @@ import (
 // featureEntry describes a service/feature with its runtime status.
 type featureEntry struct {
 	Name         string `json:"name"`
-	Status       string `json:"status"`       // healthy, stopped, unavailable
-	State        string `json:"state"`         // running, stopped, n/a
-	Controllable bool   `json:"controllable"`  // true if Start/Stop available
+	Status       string `json:"status"`               // healthy, stopped, unavailable
+	State        string `json:"state"`                // running, stopped, n/a
+	Controllable bool   `json:"controllable"`         // true if Start/Stop available
 	ConfigKey    string `json:"config_key,omitempty"` // config key that enables it
 }
 

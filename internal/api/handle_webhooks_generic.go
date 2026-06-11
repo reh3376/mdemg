@@ -20,10 +20,10 @@ import (
 
 // WebhookConfig holds configuration for a webhook source.
 type WebhookConfig struct {
-	Source        string // e.g., "github", "gitlab", "bitbucket"
-	Secret        string // HMAC signing secret
-	SpaceID       string // Target space for observations
-	ModuleID      string // Ingestion module to use (optional)
+	Source          string // e.g., "github", "gitlab", "bitbucket"
+	Secret          string // HMAC signing secret
+	SpaceID         string // Target space for observations
+	ModuleID        string // Ingestion module to use (optional)
 	SignatureHeader string // Header containing signature (default varies by source)
 }
 
@@ -58,15 +58,15 @@ func (d *webhookDebouncer) debounce(key string, fn func()) {
 
 // genericWebhookPayload represents a normalized webhook payload.
 type genericWebhookPayload struct {
-	Source      string          `json:"source"`       // github, gitlab, etc.
-	Action      string          `json:"action"`       // push, pull_request, issue, etc.
-	EventType   string          `json:"event_type"`   // create, update, delete
-	EntityID    string          `json:"entity_id"`    // Unique ID for the entity
-	EntityType  string          `json:"entity_type"`  // repository, issue, pr, etc.
-	URL         string          `json:"url"`          // URL to the entity
-	Timestamp   string          `json:"timestamp"`    // Event timestamp
-	RawPayload  json.RawMessage `json:"raw_payload"`  // Original payload
-	Metadata    map[string]string `json:"metadata"`   // Additional metadata
+	Source     string            `json:"source"`      // github, gitlab, etc.
+	Action     string            `json:"action"`      // push, pull_request, issue, etc.
+	EventType  string            `json:"event_type"`  // create, update, delete
+	EntityID   string            `json:"entity_id"`   // Unique ID for the entity
+	EntityType string            `json:"entity_type"` // repository, issue, pr, etc.
+	URL        string            `json:"url"`         // URL to the entity
+	Timestamp  string            `json:"timestamp"`   // Event timestamp
+	RawPayload json.RawMessage   `json:"raw_payload"` // Original payload
+	Metadata   map[string]string `json:"metadata"`    // Additional metadata
 }
 
 // handleGenericWebhook handles POST /v1/webhooks/{source}

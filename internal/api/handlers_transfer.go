@@ -37,11 +37,11 @@ type SpaceExportRequest struct {
 
 // SpaceExportResponse is the response for POST /v1/admin/spaces/export.
 type SpaceExportResponse struct {
-	SpaceID string                  `json:"space_id"`
-	Profile string                  `json:"profile"`
+	SpaceID string                   `json:"space_id"`
+	Profile string                   `json:"profile"`
 	Header  transfer.MdemgFileHeader `json:"header"`
-	Chunks  []json.RawMessage       `json:"chunks"`
-	Summary SpaceExportSummary      `json:"summary"`
+	Chunks  []json.RawMessage        `json:"chunks"`
+	Summary SpaceExportSummary       `json:"summary"`
 }
 
 // SpaceExportSummary is the summary section of the export response.
