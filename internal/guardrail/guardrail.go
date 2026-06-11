@@ -41,6 +41,10 @@ type GuardrailConfig struct {
 	ConstraintDefaultAuthority string // CONSTRAINT_DEFAULT_AUTHORITY (default: "team_standard")
 
 	CompressPrompts bool // J17-PC: compress guardrail eval prompts to reduce tokens
+
+	// RRF-SCALE-002: cosine floor for constraint vector retrieval
+	// (GUARDRAIL_CONSTRAINT_SIM_FLOOR; was hardcoded 0.3 in Cypher).
+	ConstraintSimFloor float64
 }
 
 // Validator defines the interface for guardrail validation.
@@ -62,7 +66,7 @@ type ValidateRequest struct {
 
 // ValidateResponse represents the guardrail validation result.
 type ValidateResponse struct {
-	Status     string              `json:"status"` // "Pass", "Warning", "Block"
+	Status     string               `json:"status"` // "Pass", "Warning", "Block"
 	Violations []GuardrailViolation `json:"violations"`
 	Warnings   []GuardrailViolation `json:"warnings"`
 }

@@ -418,14 +418,17 @@ func (m *mcpServer) memoryReflectHandler(ctx context.Context, request mcp.CallTo
 		return mcp.NewToolResultText(sb.String()), nil
 	}
 
-	// Group by relevance tiers
+	// Group by relevance tiers (RRF-SCALE-002: config-driven floors)
+	reflectHigh, reflectMedium := mcpReflectTiers()
 	var highRelevance, medRelevance, lowRelevance []map[string]any
 	for _, r := range results {
 		result, _ := r.(map[string]any)
 		score, _ := result["score"].(float64)
-		if score >= 0.7 {
+		// RRF-SCALE-002: tiers were hardcoded 0.7/0.4 against raw RRF scores
+		// (strong matches top out ~0.49-0.58) — the high tier was unreachable.
+		if score >= reflectHigh {
 			highRelevance = append(highRelevance, result)
-		} else if score >= 0.4 {
+		} else if score >= reflectMedium {
 			medRelevance = append(medRelevance, result)
 		} else {
 			lowRelevance = append(lowRelevance, result)
@@ -1612,4 +1615,21 @@ func (m *mcpServer) jiminyGuideHandler(ctx context.Context, request mcp.CallTool
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{mcp.NewTextContent(augmentation)},
 	}, nil
+}
+
+// mcpReflectTiers resolves the memory_reflect relevance-tier floors from
+// config (RRF-SCALE-002 — the old hardcoded 0.7/0.4 predates the RRF scale).
+func mcpReflectTiers() (high, medium float64) {
+	cfg, err := loadConfig()
+	if err != nil {
+		return config.DefaultMCPReflectScoreHigh, config.DefaultMCPReflectScoreMedium
+	}
+	high, medium = cfg.MCPReflectScoreHigh, cfg.MCPReflectScoreMedium
+	if high <= 0 {
+		high = config.DefaultMCPReflectScoreHigh
+	}
+	if medium <= 0 {
+		medium = config.DefaultMCPReflectScoreMedium
+	}
+	return high, medium
 }

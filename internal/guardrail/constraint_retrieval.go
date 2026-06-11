@@ -147,12 +147,19 @@ func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary 
 	WHERE c.space_id = $spaceId
 	  AND c.role_type = 'constraint'
 	  AND NOT coalesce(c.is_archived, false)
-	  AND sim > 0.3` + g.scopeClause() + g.authorityClause(trustLevel) + `
+	  AND sim > $simFloor` + g.scopeClause() + g.authorityClause(trustLevel) + `
 	RETURN c.node_id AS node_id, c.name AS name, c.constraint_type AS constraint_type,
 	       c.content AS content, c.confidence AS confidence, sim
 	ORDER BY sim DESC LIMIT 10`
 
+	// RRF-SCALE-002: cosine floor was hardcoded (score-literal class);
+	// cosine-stable but config-driven per the score-scale contract.
+	simFloor := g.cfg.ConstraintSimFloor
+	if simFloor <= 0 {
+		simFloor = 0.3 // package-local fallback mirroring config.DefaultGuardrailConstraintSimFloor
+	}
 	params := map[string]any{
+		"simFloor":  simFloor,
 		"spaceId":   spaceID,
 		"embedding": embedding,
 		"indexName": indexName,
