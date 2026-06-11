@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -8,6 +9,20 @@ import (
 	"mdemg/internal/config"
 	"mdemg/internal/secrets"
 )
+
+// loadYAMLConfigOrWarn loads a DISCOVERED yaml config file, warning loudly
+// on failure instead of silently proceeding with env/defaults
+// (CONFIG-DEADFLAG-001: nine call sites blank-assigned the error, so a
+// malformed .mdemg/config.yaml — a typo'd key, broken indent — degraded
+// every command to defaults with zero operator signal). The file is known
+// to exist (FindConfigFile found it), so any error here is real. Warn
+// rather than hard-fail: a corrupt yaml must not brick every CLI command,
+// but it must be visible.
+func loadYAMLConfigOrWarn(cfgPath string) {
+	if err := config.LoadYAMLConfig(cfgPath); err != nil {
+		fmt.Fprintf(os.Stderr, "WARN: config file %s could not be loaded (continuing with env/defaults): %v\n", cfgPath, err)
+	}
+}
 
 // loadConfig loads the full MDEMG configuration using the layered priority:
 //  1. Defaults (in FromEnv)
@@ -19,7 +34,7 @@ import (
 func loadConfig() (config.Config, error) {
 	// Layer 2: YAML config (only sets env vars not already present)
 	if cfgPath := config.FindConfigFile(); cfgPath != "" {
-		_ = config.LoadYAMLConfig(cfgPath)
+		loadYAMLConfigOrWarn(cfgPath)
 	}
 
 	// Layer 2.5: Keychain secrets (opportunistic — errors silently ignored)

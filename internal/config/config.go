@@ -1229,12 +1229,26 @@ func FromEnv() (Config, error) {
 		}
 		return f, nil
 	}
+	// CONFIG-DEADFLAG-001: strict boolean parsing. The old getBool treated
+	// ANY unrecognized value as false — an operator typo like
+	// FEATURE_ENABLED=ture silently disabled the feature (and "off"/"no"/
+	// "0" only worked by accident of being "not true"). Invalid values now
+	// fail FromEnv like atoi/atof do; errors accumulate so every bad
+	// boolean surfaces in one startup failure.
+	var boolErrs []string
 	getBool := func(k string, def bool) bool {
 		v := strings.ToLower(strings.TrimSpace(os.Getenv(k)))
-		if v == "" {
+		switch v {
+		case "":
+			return def
+		case "true", "1", "yes", "on":
+			return true
+		case "false", "0", "no", "off":
+			return false
+		default:
+			boolErrs = append(boolErrs, fmt.Sprintf("%s=%q (want true/false, 1/0, yes/no, on/off)", k, os.Getenv(k)))
 			return def
 		}
-		return v == "true" || v == "1" || v == "yes"
 	}
 
 	listen := get("LISTEN_ADDR", ":9999")
@@ -4213,6 +4227,11 @@ func FromEnv() (Config, error) {
 	tsdbWriterBufferMaxSize, err := atoi("TSDB_WRITER_BUFFER_MAX_SIZE", 1000)
 	if err != nil {
 		return Config{}, err
+	}
+
+	// CONFIG-DEADFLAG-001: surface every invalid boolean at once.
+	if len(boolErrs) > 0 {
+		return Config{}, fmt.Errorf("invalid boolean env value(s): %s", strings.Join(boolErrs, "; "))
 	}
 
 	return Config{

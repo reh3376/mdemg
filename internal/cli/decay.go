@@ -90,7 +90,7 @@ Protected edges (high evidence count or pinned) are never pruned.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load config (YAML → .env → env vars)
 			if cfgPath := config.FindConfigFile(); cfgPath != "" {
-				_ = config.LoadYAMLConfig(cfgPath)
+				loadYAMLConfigOrWarn(cfgPath)
 			}
 			_ = godotenv.Load()
 

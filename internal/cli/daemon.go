@@ -210,7 +210,7 @@ func runStart(port int, dbURI string, autoMigrate, mcpEnabled, noDB bool) error 
 	// .env is loaded FIRST so YAML skip-if-set logic respects .env values.
 	_ = godotenv.Load()
 	if cfgPath := config.FindConfigFile(); cfgPath != "" {
-		_ = config.LoadYAMLConfig(cfgPath)
+		loadYAMLConfigOrWarn(cfgPath)
 	}
 
 	// Start detached process

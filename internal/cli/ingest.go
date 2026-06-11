@@ -481,7 +481,7 @@ func runIngest(cfg *ingestConfig) error {
 
 	// Load config (YAML → .env → env vars)
 	if cfgPath := config.FindConfigFile(); cfgPath != "" {
-		_ = config.LoadYAMLConfig(cfgPath)
+		loadYAMLConfigOrWarn(cfgPath)
 	}
 	if err := godotenv.Load(); err != nil {
 		slog.Info("no .env file found, using defaults/flags")
