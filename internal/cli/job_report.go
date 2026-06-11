@@ -23,6 +23,13 @@ import (
 // session-start / prompt hooks surface, so the alert reaches the operator even
 // though this is a separate process from the server.
 func reportScheduledJob(jobName, spaceID string, startedAt time.Time, runErr error) {
+	reportScheduledJobMeta(jobName, spaceID, startedAt, runErr, nil)
+}
+
+// reportScheduledJobMeta is reportScheduledJob with job-specific metadata
+// (e.g. dry_run for maintenance — MAINT-LIVE-001's only-ever-dry-runs rule
+// filters on metadata->>'dry_run', so a previewing schedule self-reports).
+func reportScheduledJobMeta(jobName, spaceID string, startedAt time.Time, runErr error, meta map[string]any) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -54,6 +61,7 @@ func reportScheduledJob(jobName, spaceID string, startedAt time.Time, runErr err
 		InstanceID: instanceID,
 		Success:    runErr == nil,
 		LatencyMS:  time.Since(startedAt).Milliseconds(),
+		Metadata:   meta,
 	}
 	if runErr != nil {
 		ev.ErrorMessage = runErr.Error()

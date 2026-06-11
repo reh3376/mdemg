@@ -31,8 +31,13 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 
 			// NOSILENT-001: record this run's outcome + alert on failure so a
 			// failing scheduled maintenance cycle is never silent.
+			// MAINT-LIVE-001: record dry_run so the maintenance_no_live_run
+			// rule can detect a schedule that only ever previews.
 			startedAt := time.Now()
-			defer func() { reportScheduledJob("maintenance", spaceID, startedAt, retErr) }()
+			defer func() {
+				reportScheduledJobMeta("maintenance", spaceID, startedAt, retErr,
+					map[string]any{"dry_run": dryRun})
+			}()
 
 			ctx := context.Background()
 

@@ -11,6 +11,10 @@
         <string>maintenance</string>
         <string>--space-id</string>
         <string>__SPACE_ID__</string>
+        <!-- MAINT-LIVE-001: scheduled runs execute for real. The CLI default
+             stays --dry-run=true for safe manual previews; the SCHEDULE is
+             the thing that must not silently no-op. -->
+        <string>--dry-run=false</string>
     </array>
     <key>WorkingDirectory</key>
     <string>__PROJECT_DIR__</string>
