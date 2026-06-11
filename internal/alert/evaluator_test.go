@@ -179,52 +179,92 @@ func TestEvaluator_IntervalGating(t *testing.T) {
 	}
 }
 
-func TestRuleFailureStreak_MetaAlertAtThreshold(t *testing.T) {
+func TestRuleFailureStreak_PerRuleAlertAtThreshold(t *testing.T) {
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	now := time.Now()
+	e.lastAnySuccess = now // other rules are succeeding → per-rule verdict
 
-	// Below threshold (default 3): no meta-alert
+	// Below threshold (default 3): silent
 	for i := 1; i <= 2; i++ {
-		fire, n := e.recordRuleFailure("r1")
-		if fire {
-			t.Fatalf("meta-alert fired at %d consecutive failures (threshold 3)", n)
+		v, n := e.recordRuleFailure("r1", now)
+		if v != metaSilent {
+			t.Fatalf("verdict %v at %d consecutive failures (threshold 3)", v, n)
 		}
 	}
-	// Third consecutive failure fires exactly once
-	fire, n := e.recordRuleFailure("r1")
-	if !fire || n != 3 {
-		t.Fatalf("expected meta-alert at 3rd failure, got fire=%v n=%d", fire, n)
+	// Third consecutive failure fires per-rule exactly once
+	v, n := e.recordRuleFailure("r1", now)
+	if v != metaFirePerRule || n != 3 {
+		t.Fatalf("expected per-rule meta-alert at 3rd failure, got verdict=%v n=%d", v, n)
 	}
 	// Streak continues — no re-fire
-	fire, _ = e.recordRuleFailure("r1")
-	if fire {
+	if v, _ := e.recordRuleFailure("r1", now); v != metaSilent {
 		t.Fatal("meta-alert re-fired within the same failure streak")
+	}
+}
+
+func TestRuleFailureStreak_GlobalOutageAggregates(t *testing.T) {
+	// No rule has ever succeeded (e.g. TSDB down at startup): the threshold
+	// crossing must produce ONE aggregate alert, not one per rule.
+	e := NewEvaluator([]AlertRule{{ID: "r1"}, {ID: "r2"}}, nil, nil, time.Second)
+	now := time.Now()
+
+	for i := 1; i <= 2; i++ {
+		e.recordRuleFailure("r1", now)
+		e.recordRuleFailure("r2", now)
+	}
+	if v, _ := e.recordRuleFailure("r1", now); v != metaFireGlobal {
+		t.Fatalf("expected global verdict for first rule at threshold, got %v", v)
+	}
+	if v, _ := e.recordRuleFailure("r2", now); v != metaSilent {
+		t.Fatalf("second rule must not duplicate the global alert, got %v", v)
+	}
+}
+
+func TestRuleFailureStreak_StaleSuccessIsGlobal(t *testing.T) {
+	// lastAnySuccess far older than threshold×interval → global outage path.
+	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	now := time.Now()
+	e.lastAnySuccess = now.Add(-time.Minute)
+
+	e.recordRuleFailure("r1", now)
+	e.recordRuleFailure("r1", now)
+	if v, _ := e.recordRuleFailure("r1", now); v != metaFireGlobal {
+		t.Fatalf("expected global verdict with stale lastAnySuccess, got %v", v)
 	}
 }
 
 func TestRuleFailureStreak_RearmsOnSuccess(t *testing.T) {
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	now := time.Now()
+	e.lastAnySuccess = now
+
 	for range 3 {
-		e.recordRuleFailure("r1")
+		e.recordRuleFailure("r1", now)
 	}
-	// Success resets streak + re-arms
+	// Success resets streak, re-arms both per-rule and global alerts
 	e.mu.Lock()
-	e.state["r1"].recordRuleSuccess()
+	e.recordRuleSuccess(e.state["r1"], now)
 	e.mu.Unlock()
+	if e.globalAlerted {
+		t.Fatal("global alert not re-armed on success")
+	}
 
 	for i := 1; i <= 2; i++ {
-		if fire, _ := e.recordRuleFailure("r1"); fire {
+		if v, _ := e.recordRuleFailure("r1", now); v != metaSilent {
 			t.Fatalf("meta-alert fired at %d failures after re-arm", i)
 		}
 	}
-	if fire, _ := e.recordRuleFailure("r1"); !fire {
+	if v, _ := e.recordRuleFailure("r1", now); v != metaFirePerRule {
 		t.Fatal("meta-alert did not fire after re-armed streak reached threshold")
 	}
 }
 
 func TestRuleFailureStreak_ConfigurableThreshold(t *testing.T) {
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	now := time.Now()
+	e.lastAnySuccess = now
 	e.SetRuleFailureThreshold(1)
-	if fire, _ := e.recordRuleFailure("r1"); !fire {
+	if v, _ := e.recordRuleFailure("r1", now); v != metaFirePerRule {
 		t.Fatal("threshold=1 should fire on first failure")
 	}
 	// Non-positive keeps current threshold
@@ -237,7 +277,7 @@ func TestRuleFailureStreak_ConfigurableThreshold(t *testing.T) {
 func TestRuleFailureStreak_UnknownRuleID(t *testing.T) {
 	e := NewEvaluator(nil, nil, nil, time.Second)
 	// Must not panic on a rule ID with no pre-seeded state
-	if fire, n := e.recordRuleFailure("ghost"); fire || n != 1 {
-		t.Fatalf("unexpected result for unseeded rule: fire=%v n=%d", fire, n)
+	if v, n := e.recordRuleFailure("ghost", time.Now()); v != metaSilent || n != 1 {
+		t.Fatalf("unexpected result for unseeded rule: verdict=%v n=%d", v, n)
 	}
 }

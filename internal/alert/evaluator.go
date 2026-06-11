@@ -35,6 +35,8 @@ type Evaluator struct {
 	interval         time.Duration
 	stopCh           chan struct{}
 	failureThreshold int
+	lastAnySuccess   time.Time // SUPERVISOR-002: last successful query across all rules
+	globalAlerted    bool      // SUPERVISOR-002: evaluator-degraded alert sent for this outage
 }
 
 // NewEvaluator creates an alert evaluator with the given rules, TSDB pool, and dispatcher.
@@ -129,8 +131,12 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 		// meta-channel must not depend on the failing rule mechanism).
 		slog.Warn("alert evaluator: query failed",
 			"rule", rule.ID, "error", err)
-		fireMeta, failures := e.recordRuleFailure(rule.ID)
-		if fireMeta && e.dispatcher != nil {
+		verdict, failures := e.recordRuleFailure(rule.ID, now)
+		if e.dispatcher == nil {
+			return
+		}
+		switch verdict {
+		case metaFirePerRule:
 			go e.dispatcher.Send(context.Background(), Alert{
 				// Distinct Service per rule: the dispatcher cooldown key is
 				// (Service, Severity) — shared labels suppress each other.
@@ -140,6 +146,17 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 				Message: fmt.Sprintf("rule %q failed %d consecutive evaluations and is effectively disabled; last error: %v",
 					rule.ID, failures, err),
 			})
+		case metaFireGlobal:
+			// No rule is succeeding — TSDB-level outage or schema-wide
+			// break. One aggregate alert instead of a per-rule storm.
+			go e.dispatcher.Send(context.Background(), Alert{
+				Service:  "alert-evaluator-degraded",
+				Severity: SeverityHigh,
+				Title:    "Alert evaluator degraded: no rule queries succeeding",
+				Message: fmt.Sprintf("all rule queries failing (alerting is effectively disabled); first rule at threshold: %q, last error: %v",
+					rule.ID, err),
+			})
+		case metaSilent:
 		}
 		return
 	}
@@ -150,8 +167,8 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 	defer e.mu.Unlock()
 
 	st := e.state[rule.ID]
-	// SUPERVISOR-002: query succeeded — re-arm the rule-health meta-alert.
-	st.recordRuleSuccess()
+	// SUPERVISOR-002: query succeeded — re-arm the rule-health meta-alerts.
+	e.recordRuleSuccess(st, now)
 	if !breached {
 		// Condition cleared — reset state
 		st.conditionFirstTrue = time.Time{}
@@ -181,11 +198,22 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 	}
 }
 
+// metaVerdict is the outcome of recordRuleFailure (SUPERVISOR-002).
+type metaVerdict int
+
+const (
+	metaSilent      metaVerdict = iota // below threshold or already alerted
+	metaFirePerRule                    // this rule is failing while others succeed
+	metaFireGlobal                     // no rule is succeeding — aggregate outage alert
+)
+
 // recordRuleFailure tracks a rule query failure (SUPERVISOR-002): resets the
-// ForDuration state and increments the consecutive-failure streak. Returns
-// whether the rule-health meta-alert should fire now (once per streak) and
-// the current streak length.
-func (e *Evaluator) recordRuleFailure(ruleID string) (bool, int) {
+// ForDuration state and increments the consecutive-failure streak. At the
+// threshold it returns metaFirePerRule when other rules are still succeeding
+// (broken SQL on this rule), or metaFireGlobal — once per outage — when no
+// rule has succeeded recently (TSDB-level outage; a per-rule alert per rule
+// would be a storm duplicating the health prober's signal).
+func (e *Evaluator) recordRuleFailure(ruleID string, now time.Time) (metaVerdict, int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	st := e.state[ruleID]
@@ -196,18 +224,31 @@ func (e *Evaluator) recordRuleFailure(ruleID string) (bool, int) {
 	st.conditionFirstTrue = time.Time{}
 	st.fired = false
 	st.consecutiveFailures++
-	if st.consecutiveFailures >= e.failureThreshold && !st.failureAlerted {
-		st.failureAlerted = true
-		return true, st.consecutiveFailures
+	if st.consecutiveFailures < e.failureThreshold || st.failureAlerted {
+		return metaSilent, st.consecutiveFailures
 	}
-	return false, st.consecutiveFailures
+	st.failureAlerted = true
+
+	// Global outage: nothing has succeeded within the time it takes a rule
+	// to reach the failure threshold on the base evaluation cadence.
+	staleWindow := time.Duration(e.failureThreshold) * e.interval
+	if e.lastAnySuccess.IsZero() || now.Sub(e.lastAnySuccess) > staleWindow {
+		if e.globalAlerted {
+			return metaSilent, st.consecutiveFailures
+		}
+		e.globalAlerted = true
+		return metaFireGlobal, st.consecutiveFailures
+	}
+	return metaFirePerRule, st.consecutiveFailures
 }
 
-// recordRuleSuccess re-arms the rule-health meta-alert after a successful
-// query (SUPERVISOR-002). Caller must hold e.mu.
-func (st *ruleState) recordRuleSuccess() {
+// recordRuleSuccess re-arms the rule-health meta-alerts after a successful
+// query (SUPERVISOR-002).
+func (e *Evaluator) recordRuleSuccess(st *ruleState, now time.Time) {
 	st.consecutiveFailures = 0
 	st.failureAlerted = false
+	e.lastAnySuccess = now
+	e.globalAlerted = false
 }
 
 // checkThreshold compares a value against a threshold using the given operator.
