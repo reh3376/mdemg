@@ -16,12 +16,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/anomaly"
 	"mdemg/internal/circuitbreaker"
-	"mdemg/internal/embeddings"
 	"mdemg/internal/db"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/hidden"
+	"mdemg/internal/jobhealth"
 	"mdemg/internal/jobs"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/models"
@@ -333,19 +335,19 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 
 // EmbeddingHealthResponse represents the response for the embedding health endpoint.
 type EmbeddingHealthResponse struct {
-	Status           string  `json:"status"`                      // "healthy", "degraded", "unhealthy"
-	Provider         string  `json:"provider"`                    // e.g., "openai", "ollama"
-	Model            string  `json:"model,omitempty"`             // e.g., "text-embedding-3-small"
-	Dimensions       int     `json:"dimensions"`                  // e.g., 1536
-	LatencyMs        float64 `json:"latency_ms"`                  // Last probe latency
-	CacheEnabled     bool    `json:"cache_enabled"`               // Whether caching is enabled
-	CacheHitRate     float64 `json:"cache_hit_rate,omitempty"`    // Cache hit percentage
-	ErrorCount24h    int     `json:"error_count_24h,omitempty"`   // Errors in last 24h
-	SuccessRate24h   float64 `json:"success_rate_24h,omitempty"`  // Success rate in last 24h
-	CircuitBreaker   string  `json:"circuit_breaker,omitempty"`   // "closed", "open", "half-open"
-	LastError        string  `json:"last_error,omitempty"`        // Last error message
-	LastErrorAt      string  `json:"last_error_at,omitempty"`     // Last error timestamp
-	ConfiguredEnvVar bool    `json:"configured_env_var"`          // Whether env vars are set
+	Status           string  `json:"status"`                     // "healthy", "degraded", "unhealthy"
+	Provider         string  `json:"provider"`                   // e.g., "openai", "ollama"
+	Model            string  `json:"model,omitempty"`            // e.g., "text-embedding-3-small"
+	Dimensions       int     `json:"dimensions"`                 // e.g., 1536
+	LatencyMs        float64 `json:"latency_ms"`                 // Last probe latency
+	CacheEnabled     bool    `json:"cache_enabled"`              // Whether caching is enabled
+	CacheHitRate     float64 `json:"cache_hit_rate,omitempty"`   // Cache hit percentage
+	ErrorCount24h    int     `json:"error_count_24h,omitempty"`  // Errors in last 24h
+	SuccessRate24h   float64 `json:"success_rate_24h,omitempty"` // Success rate in last 24h
+	CircuitBreaker   string  `json:"circuit_breaker,omitempty"`  // "closed", "open", "half-open"
+	LastError        string  `json:"last_error,omitempty"`       // Last error message
+	LastErrorAt      string  `json:"last_error_at,omitempty"`    // Last error timestamp
+	ConfiguredEnvVar bool    `json:"configured_env_var"`         // Whether env vars are set
 }
 
 func (s *Server) handleEmbeddingHealth(w http.ResponseWriter, r *http.Request) {
@@ -2818,10 +2820,39 @@ func (s *Server) runIngestJob(ctx context.Context, job *jobs.Job) {
 
 	slog.Info("ingestion job started", "job_id", job.ID, "space_id", spaceID, "path", path)
 
+	// INGEST-EXEC-001: scheduled-sync runs are unattended background jobs —
+	// report their outcome to scheduled_job_events (NOSILENT pattern) so a
+	// sync that keeps failing is never silent. Manual API-triggered jobs are
+	// operator-visible through the job queue and are not reported here.
+	if job.Type == "scheduled-sync" {
+		startedAt := time.Now()
+		defer func() {
+			snap := job.GetSnapshot()
+			var runErr error
+			if snap.Status != jobs.StatusCompleted {
+				runErr = fmt.Errorf("scheduled sync job %s ended in status %s: %s", job.ID, snap.Status, snap.Error)
+			}
+			var pool *pgxpool.Pool
+			if s.tsdbClient != nil {
+				pool = s.tsdbClient.Pool()
+			}
+			ev := tsdb.JobEventRow{
+				JobName: "codebase-sync", SpaceID: spaceID,
+				InstanceID: s.cfg.InstanceID,
+				Success:    runErr == nil,
+				LatencyMS:  time.Since(startedAt).Milliseconds(),
+			}
+			if runErr != nil {
+				ev.ErrorMessage = runErr.Error()
+			}
+			jobhealth.Report(context.Background(), pool, s.alertDispatcher, ev)
+		}()
+	}
+
 	// Build CLI arguments from job config
 	args := buildIngestArgsFromConfig(job.Config, s.cfg.ListenAddr)
 
-	cmd := exec.CommandContext(ctx, "./bin/mdemg", append([]string{"ingest"}, args...)...)
+	cmd := exec.CommandContext(ctx, resolveMdemgBin(), append([]string{"ingest"}, args...)...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -3474,13 +3505,13 @@ func (s *Server) handlePoolMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"connection_pool": poolMetrics,
 		"runtime": map[string]any{
-			"goroutines":      runtime.NumGoroutine(),
-			"heap_alloc_mb":   float64(memStats.HeapAlloc) / 1024 / 1024,
-			"heap_sys_mb":     float64(memStats.HeapSys) / 1024 / 1024,
-			"heap_objects":    memStats.HeapObjects,
-			"gc_pause_ns":     memStats.PauseNs[(memStats.NumGC+255)%256],
+			"goroutines":        runtime.NumGoroutine(),
+			"heap_alloc_mb":     float64(memStats.HeapAlloc) / 1024 / 1024,
+			"heap_sys_mb":       float64(memStats.HeapSys) / 1024 / 1024,
+			"heap_objects":      memStats.HeapObjects,
+			"gc_pause_ns":       memStats.PauseNs[(memStats.NumGC+255)%256],
 			"gc_total_pause_ms": float64(memStats.PauseTotalNs) / 1e6,
-			"num_gc":          memStats.NumGC,
+			"num_gc":            memStats.NumGC,
 		},
 	})
 }
@@ -4077,4 +4108,3 @@ func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText 
 	}
 	return bits
 }
-

@@ -288,3 +288,42 @@ func New(cfg Config) (Embedder, error) {
 
 	return embedder, nil
 }
+
+// Unwrap returns the wrapped embedder (EMBED-WIRE-001 chain-walking).
+func (c *CachedEmbedder) Unwrap() Embedder { return c.embedder }
+
+// unwrapper is implemented by any embedder wrapper; Base and FindCached walk
+// the chain through it, so future wrappers join automatically by adding an
+// Unwrap method (no type lists to maintain).
+type unwrapper interface{ Unwrap() Embedder }
+
+// Base walks the wrapper chain to the innermost embedder (EMBED-WIRE-001:
+// the circuit-breaker wiring type-asserted the OUTERMOST value, which under
+// the DEFAULT config is *CachedEmbedder — the breaker was never wired).
+func Base(e Embedder) Embedder {
+	for e != nil {
+		u, ok := e.(unwrapper)
+		if !ok {
+			return e
+		}
+		e = u.Unwrap()
+	}
+	return e
+}
+
+// FindCached walks the chain looking for the CachedEmbedder layer (the
+// recorder attaches there; the old direct assertion silently lost recording
+// whenever an outer wrapper was present or the cache layer absent).
+func FindCached(e Embedder) (*CachedEmbedder, bool) {
+	for e != nil {
+		if c, ok := e.(*CachedEmbedder); ok {
+			return c, true
+		}
+		u, ok := e.(unwrapper)
+		if !ok {
+			return nil, false
+		}
+		e = u.Unwrap()
+	}
+	return nil, false
+}

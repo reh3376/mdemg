@@ -283,7 +283,7 @@ func (s *Server) runIngestionJob(ctx context.Context, job *IngestJob, req *Inges
 	slog.Info("ingest-codebase: starting job", "job_id", job.ID, "space_id", job.SpaceID, "path", job.Path)
 
 	// Run unified CLI ingest subcommand from current working directory
-	cmd := exec.CommandContext(ctx, "./bin/mdemg", append([]string{"ingest"}, args...)...)
+	cmd := exec.CommandContext(ctx, resolveMdemgBin(), append([]string{"ingest"}, args...)...)
 
 	output, err := cmd.CombinedOutput()
 
