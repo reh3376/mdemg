@@ -94,12 +94,13 @@ func (s *Service) runRestore(ctx context.Context, job *jobs.Job, req RestoreRequ
 
 // waitForBackupJob polls the jobs queue until the given backup job
 // completes. Fails closed on job failure, cancellation, disappearance, or
-// timeout (SnapshotWaitTimeoutSec, default 300) — a restore without its
-// safety snapshot is a data-loss risk, not a degraded mode.
+// timeout (SnapshotWaitTimeoutSec, default 3600 — a whole-database export
+// runs ~15 min live) — a restore without its safety snapshot is a
+// data-loss risk, not a degraded mode.
 func (s *Service) waitForBackupJob(ctx context.Context, backupID string) error {
 	timeout := time.Duration(s.cfg.SnapshotWaitTimeoutSec) * time.Second
 	if timeout <= 0 {
-		timeout = 300 * time.Second
+		timeout = 3600 * time.Second
 	}
 	deadline := time.Now().Add(timeout)
 	q := jobs.GetQueue()

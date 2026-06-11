@@ -16,7 +16,7 @@ type Config struct {
 	RetentionMaxAgeDays  int    // delete backups older than N days
 	RetentionMaxStorageGB int   // delete oldest until under quota
 	RetentionRunAfter    bool   // run retention after each backup
-	SnapshotWaitTimeoutSec int  // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for the pre-restore safety snapshot to complete (default: 300)
+	SnapshotWaitTimeoutSec int  // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for triggered backup jobs: pre-restore snapshot + scheduled-run reporting (default: 3600)
 	InitialBackupDelayMin  int  // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup runs; 0 disables (default: 5)
 }
 

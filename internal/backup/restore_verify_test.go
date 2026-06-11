@@ -184,3 +184,77 @@ func TestDockerCommand_RoutingTable(t *testing.T) {
 		}
 	}
 }
+
+// sparseFile creates a file whose logical size is sizeBytes without
+// consuming disk (retention sums logical sizes).
+func sparseFile(t *testing.T, path string, sizeBytes int64) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := f.Truncate(sizeBytes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// BACKUP-RESTORE-VERIFY-001 live-caught: a quota smaller than one backup
+// must not delete the backup that was just created (the 2 GB default quota
+// deleted every 3 GB whole-database backup ~80 ms after completion).
+func TestRetention_QuotaNeverDeletesNewestPerType(t *testing.T) {
+	dir := t.TempDir()
+	s := &Service{cfg: Config{
+		StorageDir:            dir,
+		RetentionMaxStorageGB: 1, // 1 GB quota
+	}}
+
+	mk := func(id, createdAt string) {
+		sparseFile(t, filepath.Join(dir, id+".mdemg"), 800*1024*1024)
+		m := BackupManifest{BackupID: id, Type: string(BackupTypePartial), CreatedAt: createdAt}
+		if err := s.writeManifest(&BackupRecord{BackupID: id}, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("bk-old", "2026-06-10T00:00:00Z")
+	mk("bk-new", "2026-06-11T00:00:00Z")
+
+	res, err := s.RunRetention(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "bk-new.mdemg")); err != nil {
+		t.Fatalf("newest backup was deleted by quota retention: %v (deleted=%v)", err, res.Deleted)
+	}
+	for _, id := range res.Deleted {
+		if id == "bk-new" {
+			t.Fatal("newest backup in deletion list")
+		}
+	}
+}
+
+func TestRetention_QuotaSingleOversizeBackupSurvives(t *testing.T) {
+	dir := t.TempDir()
+	s := &Service{cfg: Config{
+		StorageDir:            dir,
+		RetentionMaxStorageGB: 1,
+	}}
+	// One 2 GB sparse backup — over quota by itself (the live incident shape).
+	sparseFile(t, filepath.Join(dir, "bk-only.mdemg"), 2*1024*1024*1024)
+	m := BackupManifest{BackupID: "bk-only", Type: string(BackupTypePartial), CreatedAt: "2026-06-11T00:00:00Z"}
+	if err := s.writeManifest(&BackupRecord{BackupID: "bk-only"}, m); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := s.RunRetention(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Deleted) != 0 {
+		t.Fatalf("oversize-but-only backup was deleted: %v", res.Deleted)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "bk-only.mdemg")); err != nil {
+		t.Fatal("the only backup must survive an over-quota condition")
+	}
+}
