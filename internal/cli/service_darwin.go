@@ -110,14 +110,7 @@ func (m *darwinServiceManager) Install(projectDir, mdemgBin, spaceID string) err
 			}
 		}
 
-		content := string(tmpl)
-		content = strings.ReplaceAll(content, "__MDEMG_BIN__", mdemgBin)
-		content = strings.ReplaceAll(content, "__PROJECT_DIR__", projectDir)
-		content = strings.ReplaceAll(content, "__HOME__", home)
-		content = strings.ReplaceAll(content, "__SPACE_ID__", spaceID)
-		content = strings.ReplaceAll(content, "__PYTHON_BIN__", pythonBin)
-		content = strings.ReplaceAll(content, "__LLAMA_SERVER_BIN__", llamaServerBin)
-		content = strings.ReplaceAll(content, "__MDEMG_MODEL_PATH__", modelPath)
+		content := renderLaunchdTemplate(string(tmpl), mdemgBin, projectDir, home, spaceID, pythonBin, llamaServerBin, modelPath)
 
 		destPath := filepath.Join(launchAgentsDir, svc.Template)
 		if err := os.WriteFile(destPath, []byte(content), 0644); err != nil {
@@ -364,4 +357,77 @@ func resolvePythonBin(projectDir string) string {
 		return path
 	}
 	return "python3"
+}
+
+// RefreshInstalledDarwinServices re-renders ALREADY-INSTALLED mdemg
+// LaunchAgent plists from the new binary's embedded templates and reloads
+// them (MAINT-LIVE-001). Without this, plist fixes ship in releases but
+// never reach installed machines — the maintenance --dry-run override sat
+// unreachable next to upgraded binaries. Only refreshes services whose
+// plist already exists (upgrade must not install new services); returns
+// the count refreshed.
+func RefreshInstalledDarwinServices(projectDir, mdemgBin, spaceID string) (int, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0, fmt.Errorf("get home directory: %w", err)
+	}
+	launchAgentsDir := filepath.Join(home, "Library", "LaunchAgents")
+	uid, err := currentUID()
+	if err != nil {
+		return 0, err
+	}
+
+	pythonBin := resolvePythonBin(projectDir)
+	llamaServerBin, _ := resolveLlamaServerBin()
+	modelPath := resolveMDEMGModelPath(projectDir)
+	templateDir := filepath.Join(projectDir, "packaging", "launchd")
+
+	refreshed := 0
+	for _, svc := range launchdServices {
+		destPath := filepath.Join(launchAgentsDir, svc.Template)
+		if _, err := os.Stat(destPath); err != nil {
+			continue // not installed — upgrade refreshes, never installs
+		}
+
+		// Disk first (repo checkout), embedded fallback (Homebrew/binary).
+		tmpl, err := os.ReadFile(filepath.Join(templateDir, svc.Template))
+		if err != nil {
+			tmpl, err = launchd_templates.FS.ReadFile(svc.Template)
+			if err != nil {
+				fmt.Printf("  skip %s: template unavailable: %v\n", svc.Label, err)
+				continue
+			}
+		}
+
+		content := renderLaunchdTemplate(string(tmpl), mdemgBin, projectDir, home, spaceID, pythonBin, llamaServerBin, modelPath)
+		if err := os.WriteFile(destPath, []byte(content), 0644); err != nil { //nolint:gosec // launchd plists are world-readable by convention
+			fmt.Printf("  skip %s: write failed: %v\n", svc.Label, err)
+			continue
+		}
+
+		target := fmt.Sprintf("gui/%s", uid)
+		_ = exec.Command("launchctl", "bootout", target+"/"+svc.Label).Run()
+		if err := exec.Command("launchctl", "bootstrap", target, destPath).Run(); err != nil {
+			fmt.Printf("  warn %s: bootstrap failed: %v\n", svc.Label, err)
+			continue
+		}
+		fmt.Printf("  refreshed %s\n", svc.Label)
+		refreshed++
+	}
+	return refreshed, nil
+}
+
+// renderLaunchdTemplate applies the standard plist placeholder substitutions
+// (single source for Install + Refresh — drift here is how the sidecar's raw
+// __HOME__ copy exit-78'd during HOOKSYNC-001 live smoke).
+func renderLaunchdTemplate(tmpl, mdemgBin, projectDir, home, spaceID, pythonBin, llamaServerBin, modelPath string) string {
+	content := tmpl
+	content = strings.ReplaceAll(content, "__MDEMG_BIN__", mdemgBin)
+	content = strings.ReplaceAll(content, "__PROJECT_DIR__", projectDir)
+	content = strings.ReplaceAll(content, "__HOME__", home)
+	content = strings.ReplaceAll(content, "__SPACE_ID__", spaceID)
+	content = strings.ReplaceAll(content, "__PYTHON_BIN__", pythonBin)
+	content = strings.ReplaceAll(content, "__LLAMA_SERVER_BIN__", llamaServerBin)
+	content = strings.ReplaceAll(content, "__MDEMG_MODEL_PATH__", modelPath)
+	return content
 }
