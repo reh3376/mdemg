@@ -230,6 +230,10 @@ type Config struct {
 	// Dynamic Emergence settings (Phase 103)
 	EmergenceEnabled                bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
 	HiddenThemeIdentitySimThreshold float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
+	HiddenThemeTargetRatio          float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
+	HiddenThemeAssignSimThreshold   float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
+	ConversationCoverageAlertFloor  float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
+	ConversationCoverageMinObs      int     // CONVERSATION_COVERAGE_MIN_OBS — spaces with fewer live conversation observations don't emit the coverage gauge (statistically meaningless; default: 50, DH-005 confidence-threshold pattern)
 	EmergenceProvider               string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
 	EmergenceModel                  string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
 	EmergenceMaxTokens              int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
@@ -2059,6 +2063,22 @@ func FromEnv() (Config, error) {
 	// Dynamic Emergence settings (Phase 103)
 	emergenceEnabled := getBool("EMERGENCE_ENABLED", false)
 	hiddenThemeIdentitySimThreshold, err := atof("HIDDEN_THEME_IDENTITY_SIM_THRESHOLD", 0.90)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenThemeTargetRatio, err := atof("HIDDEN_THEME_TARGET_RATIO", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenThemeAssignSimThreshold, err := atof("HIDDEN_THEME_ASSIGN_SIM_THRESHOLD", 0.70)
+	if err != nil {
+		return Config{}, err
+	}
+	conversationCoverageAlertFloor, err := atof("CONVERSATION_COVERAGE_ALERT_FLOOR", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+	conversationCoverageMinObs, err := atoi("CONVERSATION_COVERAGE_MIN_OBS", 50)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4316,6 +4336,10 @@ func FromEnv() (Config, error) {
 		// Phase 103: Dynamic Emergence
 		EmergenceEnabled:                emergenceEnabled,
 		HiddenThemeIdentitySimThreshold: hiddenThemeIdentitySimThreshold,
+		HiddenThemeTargetRatio:          hiddenThemeTargetRatio,
+		HiddenThemeAssignSimThreshold:   hiddenThemeAssignSimThreshold,
+		ConversationCoverageAlertFloor:  conversationCoverageAlertFloor,
+		ConversationCoverageMinObs:      conversationCoverageMinObs,
 		EmergenceProvider:               emergenceProvider,
 		EmergenceModel:                  emergenceModel,
 		EmergenceMaxTokens:              emergenceMaxTokens,

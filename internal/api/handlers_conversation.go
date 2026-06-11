@@ -473,9 +473,13 @@ func (s *Server) handleConversationConsolidate(w http.ResponseWriter, r *http.Re
 	}
 
 	themesCreated := 0
+	themesUpdated := 0
+	noiseAssigned := 0
 	conceptsCreated := 0
 	if result.ThemeResult != nil {
 		themesCreated = result.ThemeResult.ThemesCreated
+		themesUpdated = result.ThemeResult.ThemesUpdated
+		noiseAssigned = result.ThemeResult.NoiseAssigned
 	}
 	if result.ConceptResult != nil {
 		for _, count := range result.ConceptResult.ConceptsCreated {
@@ -486,6 +490,8 @@ func (s *Server) handleConversationConsolidate(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, map[string]any{
 		"space_id":         req.SpaceID,
 		"themes_created":   themesCreated,
+		"themes_updated":   themesUpdated,
+		"noise_assigned":   noiseAssigned,
 		"concepts_created": conceptsCreated,
 		"duration_ms":      result.TotalDuration.Milliseconds(),
 	})
@@ -588,22 +594,22 @@ func (s *Server) handleSessionHealth(w http.ResponseWriter, r *http.Request) {
 	state := s.sessionTracker.GetState(sessionID)
 	if state == nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"session_id":               sessionID,
-			"resumed":                  false,
+			"session_id":                sessionID,
+			"resumed":                   false,
 			"observations_since_resume": 0,
-			"health_score":             0.0,
-			"tracked":                  false,
+			"health_score":              0.0,
+			"tracked":                   false,
 		})
 		return
 	}
 
 	resp := map[string]any{
-		"session_id":               state.SessionID,
-		"space_id":                 state.SpaceID,
-		"resumed":                  state.Resumed,
+		"session_id":                state.SessionID,
+		"space_id":                  state.SpaceID,
+		"resumed":                   state.Resumed,
 		"observations_since_resume": state.ObservationsSinceResume,
-		"health_score":             state.HealthScore(),
-		"tracked":                  true,
+		"health_score":              state.HealthScore(),
+		"tracked":                   true,
 	}
 
 	if !state.LastResumeAt.IsZero() {

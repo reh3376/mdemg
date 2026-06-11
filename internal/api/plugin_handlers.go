@@ -53,21 +53,21 @@ type PluginInfo struct {
 
 // PluginDetailResponse is the response for GET /v1/plugins/{id}
 type PluginDetailResponse struct {
-	ID           string                `json:"id"`
-	Name         string                `json:"name"`
-	Type         string                `json:"type"`
-	Version      string                `json:"version"`
-	Status       string                `json:"status"`
-	Path         string                `json:"path"`
-	SocketPath   string                `json:"socket_path,omitempty"`
-	PID          int                   `json:"pid,omitempty"`
-	StartedAt    string                `json:"started_at,omitempty"`
-	LastHealthy  string                `json:"last_healthy,omitempty"`
-	LastError    string                `json:"last_error,omitempty"`
-	Capabilities []string              `json:"capabilities,omitempty"`
-	Metrics      map[string]string     `json:"metrics,omitempty"`
-	Manifest     *plugins.Manifest     `json:"manifest,omitempty"`
-	Health       *PluginHealthStatus   `json:"health,omitempty"`
+	ID           string              `json:"id"`
+	Name         string              `json:"name"`
+	Type         string              `json:"type"`
+	Version      string              `json:"version"`
+	Status       string              `json:"status"`
+	Path         string              `json:"path"`
+	SocketPath   string              `json:"socket_path,omitempty"`
+	PID          int                 `json:"pid,omitempty"`
+	StartedAt    string              `json:"started_at,omitempty"`
+	LastHealthy  string              `json:"last_healthy,omitempty"`
+	LastError    string              `json:"last_error,omitempty"`
+	Capabilities []string            `json:"capabilities,omitempty"`
+	Metrics      map[string]string   `json:"metrics,omitempty"`
+	Manifest     *plugins.Manifest   `json:"manifest,omitempty"`
+	Health       *PluginHealthStatus `json:"health,omitempty"`
 }
 
 // PluginHealthStatus contains health information
@@ -80,11 +80,11 @@ type PluginHealthStatus struct {
 
 // PluginValidateResponse is the response for POST /v1/plugins/{id}/validate
 type PluginValidateResponse struct {
-	Valid     bool                          `json:"valid"`
-	Manifest  *plugins.ManifestValidation   `json:"manifest,omitempty"`
-	Proto     *plugins.ProtoValidation      `json:"proto,omitempty"`
-	Health    *plugins.HealthValidation     `json:"health,omitempty"`
-	Lifecycle *plugins.LifecycleValidation  `json:"lifecycle,omitempty"`
+	Valid     bool                         `json:"valid"`
+	Manifest  *plugins.ManifestValidation  `json:"manifest,omitempty"`
+	Proto     *plugins.ProtoValidation     `json:"proto,omitempty"`
+	Health    *plugins.HealthValidation    `json:"health,omitempty"`
+	Lifecycle *plugins.LifecycleValidation `json:"lifecycle,omitempty"`
 }
 
 // handlePluginCreate handles POST /v1/plugins/create

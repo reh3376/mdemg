@@ -581,7 +581,7 @@ func TestComputeHealthScore(t *testing.T) {
 			name: "partial scores across all components",
 			input: StatsResponseForTest{
 				MemoryCount:       200,
-				EmbeddingCoverage: 0.75,          // 0.75 * 0.4 = 0.3
+				EmbeddingCoverage: 0.75,                                  // 0.75 * 0.4 = 0.3
 				Connectivity:      &ConnectivityForTest{OrphanCount: 50}, // (1 - 0.25) * 0.3 = 0.225
 				TemporalDist:      &TemporalDistForTest{Last7d: 100},     // 0.5 * 0.3 = 0.15
 			},

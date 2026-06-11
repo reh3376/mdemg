@@ -65,13 +65,13 @@ func (s *Server) handleSynergyStatus(w http.ResponseWriter, r *http.Request) {
 
 	// 9. Build response
 	data := map[string]any{
-		"jiminy_healthy":               jiminyHealthy,
-		"claude_md_lines":              claudeMDLines,
-		"memory_md_lines":              memoryMDLines,
-		"auto_memory_files":            autoMemoryFiles,
-		"auto_memory_lines":            autoMemoryLines,
-		"overflow_events_24h":          overflowEvents24h,
-		"synergy_health":               synergyHealth,
+		"jiminy_healthy":                jiminyHealthy,
+		"claude_md_lines":               claudeMDLines,
+		"memory_md_lines":               memoryMDLines,
+		"auto_memory_files":             autoMemoryFiles,
+		"auto_memory_lines":             autoMemoryLines,
+		"overflow_events_24h":           overflowEvents24h,
+		"synergy_health":                synergyHealth,
 		"recovery_buffer_space_entries": bufferSpaceEntries,
 		"recovery_buffer_local_entries": bufferLocalEntries,
 		"recovery_buffer_total":         bufferSpaceEntries + bufferLocalEntries,
@@ -301,4 +301,3 @@ func computeSynergyHealth(jiminyHealthy bool, claudeLines, memoryLines, overflow
 	}
 	return score
 }
-

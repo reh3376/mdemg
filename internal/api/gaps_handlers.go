@@ -16,8 +16,8 @@ func (s *Server) handleCapabilityGaps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters
-	status := r.URL.Query().Get("status")  // "open", "addressed", "dismissed"
-	gapType := r.URL.Query().Get("type")   // "data_source", "reasoning", "query_pattern"
+	status := r.URL.Query().Get("status") // "open", "addressed", "dismissed"
+	gapType := r.URL.Query().Get("type")  // "data_source", "reasoning", "query_pattern"
 	spaceID := r.URL.Query().Get("space_id")
 
 	ctx := r.Context()
@@ -388,9 +388,9 @@ func (s *Server) handleRunGapInterview(w http.ResponseWriter, r *http.Request) {
 
 	// Parse optional config overrides
 	var reqConfig struct {
-		MaxPrompts   int     `json:"max_prompts"`
-		MinPriority  float64 `json:"min_priority"`
-		MinOccurrences int   `json:"min_occurrences"`
+		MaxPrompts     int     `json:"max_prompts"`
+		MinPriority    float64 `json:"min_priority"`
+		MinOccurrences int     `json:"min_occurrences"`
 	}
 	if r.ContentLength > 0 {
 		if !readJSON(w, r, &reqConfig) {

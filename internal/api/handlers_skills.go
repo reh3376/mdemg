@@ -26,12 +26,12 @@ type SkillRecallRequest struct {
 }
 
 type SkillRecallResponse struct {
-	SpaceID string              `json:"space_id"`
-	Skill   string              `json:"skill"`
-	Section string              `json:"section,omitempty"`
-	Query   string              `json:"query"`
+	SpaceID string                `json:"space_id"`
+	Skill   string                `json:"skill"`
+	Section string                `json:"section,omitempty"`
+	Query   string                `json:"query"`
 	Results []models.RecallResult `json:"results"`
-	Debug   map[string]any      `json:"debug,omitempty"`
+	Debug   map[string]any        `json:"debug,omitempty"`
 }
 
 type SkillRegisterRequest struct {
@@ -320,7 +320,7 @@ func (s *Server) handleSkillRecall(w http.ResponseWriter, r *http.Request, name 
 		Query:   query,
 		Results: apiResults,
 		Debug: map[string]any{
-			"tag_filter":       tagFilter,
+			"tag_filter":        tagFilter,
 			"observation_count": len(apiResults),
 		},
 	})

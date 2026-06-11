@@ -230,8 +230,8 @@ func (s *Server) handleJ17Bootstrap(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"bootstrap":    bootstrap,
-			"version":      jiminy.J17Version,
+			"bootstrap":     bootstrap,
+			"version":       jiminy.J17Version,
 			"first_session": true,
 		},
 	})

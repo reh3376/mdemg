@@ -20,7 +20,7 @@ import (
 type ReinforcementNeighborhoodRequest struct {
 	SpaceID      string `json:"space_id"`
 	SeedNodeID   string `json:"seed_node_id"`
-	Hops         *int   `json:"hops,omitempty"`         // nil → server default
+	Hops         *int   `json:"hops,omitempty"`          // nil → server default
 	SinceSeconds *int64 `json:"since_seconds,omitempty"` // nil → server default (lookback hours × 3600)
 	Limit        *int   `json:"limit,omitempty"`         // nil → server default
 }

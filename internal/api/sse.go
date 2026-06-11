@@ -147,8 +147,8 @@ func (s *Server) handleJobStreamWithConfig(w http.ResponseWriter, r *http.Reques
 				lastProgress = snap.Progress.Current
 
 				eventData := map[string]any{
-					"job_id":  jobID,
-					"status":  snap.Status,
+					"job_id": jobID,
+					"status": snap.Status,
 					"progress": map[string]any{
 						"total":      snap.Progress.Total,
 						"current":    snap.Progress.Current,

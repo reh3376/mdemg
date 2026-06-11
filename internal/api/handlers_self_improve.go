@@ -369,8 +369,8 @@ func (s *Server) handleSelfImproveHealth(w http.ResponseWriter, r *http.Request)
 				"protected_spaces":   s.cfg.RSICProtectedSpaces,
 			},
 			"rollback": map[string]any{
-				"window_sec":            s.cfg.RSICRollbackWindow,
-				"snapshots_held":        s.snapshotStore.GetSnapshotCount(),
+				"window_sec":              s.cfg.RSICRollbackWindow,
+				"snapshots_held":          s.snapshotStore.GetSnapshotCount(),
 				"oldest_snapshot_age_sec": s.snapshotStore.GetOldestSnapshotAgeSec(),
 			},
 		}
@@ -420,8 +420,8 @@ func (s *Server) handleSelfImproveRollback(w http.ResponseWriter, r *http.Reques
 			snapshots = []ape.ActionSnapshot{}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"snapshots":          snapshots,
-			"count":              len(snapshots),
+			"snapshots":           snapshots,
+			"count":               len(snapshots),
 			"rollback_window_sec": s.cfg.RSICRollbackWindow,
 		})
 
@@ -457,4 +457,3 @@ func (s *Server) handleSelfImproveRollback(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
-

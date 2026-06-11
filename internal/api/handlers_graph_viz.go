@@ -48,11 +48,11 @@ var layerColorMap = map[int]string{
 
 var edgeColorMap = map[string]string{
 	// structural (purple)
-	"ABSTRACTS_TO":    "#B877D9",
-	"GENERALIZES":     "#B877D9",
-	"GENERALIZES_TO":  "#B877D9",
-	"SPECIALIZES":     "#B877D9",
-	"INSTANTIATES":    "#B877D9",
+	"ABSTRACTS_TO":   "#B877D9",
+	"GENERALIZES":    "#B877D9",
+	"GENERALIZES_TO": "#B877D9",
+	"SPECIALIZES":    "#B877D9",
+	"INSTANTIATES":   "#B877D9",
 	// learned (cyan)
 	"CO_ACTIVATED_WITH": "#8AB8FF",
 	// causal (orange)
@@ -67,9 +67,9 @@ var edgeColorMap = map[string]string{
 	"TEMPORALLY_ADJACENT": "#8F8F8F",
 	// code (teal)
 	"IMPORTS":        "#73BF69",
-	"CALLS":         "#73BF69",
-	"EXTENDS":       "#73BF69",
-	"IMPLEMENTS":    "#73BF69",
+	"CALLS":          "#73BF69",
+	"EXTENDS":        "#73BF69",
+	"IMPLEMENTS":     "#73BF69",
 	"DEFINES_SYMBOL": "#73BF69",
 	// compositional (gold)
 	"COMPOSES_WITH": "#FADE2A",

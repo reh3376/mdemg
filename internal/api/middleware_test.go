@@ -213,11 +213,11 @@ func TestResponseWriter_Write(t *testing.T) {
 // TestLoggingMiddleware tests the LoggingMiddleware function
 func TestLoggingMiddleware(t *testing.T) {
 	tests := []struct {
-		name           string
-		method         string
-		path           string
-		config         LogConfig
-		handlerStatus  int
+		name            string
+		method          string
+		path            string
+		config          LogConfig
+		handlerStatus   int
 		expectRequestID bool
 	}{
 		{

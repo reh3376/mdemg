@@ -460,6 +460,9 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// HIDDEN-WEIGHT-001: NULL-weight abstraction edges reappearing.
 			rules = append(rules, alert.WeightIntegrityRules(
 				cfg.NullWeightEdgeAlertThreshold)...)
+			// HIDDEN-CHURN-001 PR-B: conversation coverage below floor.
+			rules = append(rules, alert.CoverageRules(
+				cfg.ConversationCoverageAlertFloor)...)
 			// MAINT-LIVE-001: maintenance recorded but never running live.
 			if cfg.MaintLiveAlertEnabled {
 				rules = append(rules, alert.MaintenanceLivenessRules(

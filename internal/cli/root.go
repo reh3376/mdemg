@@ -131,8 +131,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.AddCommand(tsdbCmd)
 
 	graphCmd := newGraphCmd()
+	conceptsCmd := newConceptsCmd()
 	graphCmd.GroupID = "database"
 	rootCmd.AddCommand(graphCmd)
+	rootCmd.AddCommand(conceptsCmd)
 
 	// Memory & Ingestion
 	ingestCmd := newIngestCmd()
