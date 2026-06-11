@@ -440,6 +440,13 @@ const tombstoneStaleCandidates = `
 	WITH DISTINCT stale LIMIT 50
 `
 
+// ExecuteTombstoneStaleForTest exposes the tombstone executor to the
+// integration suite (tests/integration), which drills the snapshot →
+// execute → rollback chain against live Neo4j (RSIC-STORM-001 Epic E).
+func (d *Dispatcher) ExecuteTombstoneStaleForTest(ctx context.Context, spaceID, cycleID string) (map[string]any, error) {
+	return d.executeTombstoneStale(ctx, spaceID, cycleID)
+}
+
 func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID, cycleID string) (map[string]any, error) {
 	if d.driver == nil {
 		return nil, fmt.Errorf("neo4j driver not available")

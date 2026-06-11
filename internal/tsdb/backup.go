@@ -31,6 +31,7 @@ type TSDBBackupConfig struct {
 	IntervalHours       int    // default: 24
 	RetentionCount      int    // default: 14
 	RetentionMaxAgeDays int    // default: 90
+	InitialDelayMin     int    // TSDB_BACKUP_INITIAL_DELAY_MIN — initial backup after start; 0 disables (default: 10)
 }
 
 // TSDBBackupRecord represents a completed or in-progress TSDB backup.
@@ -366,6 +367,25 @@ func (bs *TSDBBackupScheduler) Start() {
 	}
 
 	run := func(runCtx context.Context) error {
+		// RSIC-STORM-001 follow-on (same gap BACKUP-RESTORE-VERIFY-001
+		// fixed for the Neo4j scheduler): the interval ticker resets on
+		// every restart, so a server restarted more often than the
+		// interval NEVER backs up — live, tsdb-backup had zero recorded
+		// runs ever after a day of restarts, with the staleness alert
+		// honestly firing. Run an initial backup shortly after start.
+		if delay := time.Duration(bs.svc.cfg.InitialDelayMin) * time.Minute; delay > 0 {
+			select {
+			case <-runCtx.Done():
+				return nil
+			case <-bs.stopCh:
+				slog.Info("tsdb backup scheduler: stopped")
+				return nil
+			case <-time.After(delay):
+				slog.Info("tsdb backup scheduler: running initial backup on start")
+				bs.runOnce()
+			}
+		}
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -374,31 +394,7 @@ func (bs *TSDBBackupScheduler) Start() {
 			case <-runCtx.Done():
 				return nil
 			case <-ticker.C:
-				slog.Info("tsdb backup scheduler: triggering backup")
-				startedAt := time.Now()
-				rec, err := bs.svc.Trigger("scheduled")
-				if err != nil {
-					slog.Warn("tsdb backup scheduler: backup failed", "error", err)
-				} else {
-					slog.Info("tsdb backup scheduler: backup completed",
-						"backup_id", rec.BackupID,
-						"size_bytes", rec.SizeBytes,
-					)
-				}
-				// NOSILENT-001: report the outcome so a failed/never-run backup
-				// is recorded + alerted, not silently swallowed.
-				if hook := bs.resultHook(); hook != nil {
-					hook(err == nil, time.Since(startedAt).Milliseconds(), err)
-				}
-
-				// Run retention after backup
-				deleted, freed, rErr := bs.svc.RunRetention()
-				if rErr != nil {
-					slog.Warn("tsdb backup scheduler: retention failed", "error", rErr)
-				} else if deleted > 0 {
-					slog.Info("tsdb backup scheduler: retention pruned", "deleted", deleted, "freed_bytes", freed)
-				}
-
+				bs.runOnce()
 			case <-bs.stopCh:
 				slog.Info("tsdb backup scheduler: stopped")
 				return nil
@@ -412,6 +408,35 @@ func (bs *TSDBBackupScheduler) Start() {
 	go func() {
 		_ = run(context.Background())
 	}()
+}
+
+// runOnce triggers one scheduled backup, reports the outcome (NOSILENT-001),
+// and runs retention.
+func (bs *TSDBBackupScheduler) runOnce() {
+	slog.Info("tsdb backup scheduler: triggering backup")
+	startedAt := time.Now()
+	rec, err := bs.svc.Trigger("scheduled")
+	if err != nil {
+		slog.Warn("tsdb backup scheduler: backup failed", "error", err)
+	} else {
+		slog.Info("tsdb backup scheduler: backup completed",
+			"backup_id", rec.BackupID,
+			"size_bytes", rec.SizeBytes,
+		)
+	}
+	// NOSILENT-001: report the outcome so a failed/never-run backup
+	// is recorded + alerted, not silently swallowed.
+	if hook := bs.resultHook(); hook != nil {
+		hook(err == nil, time.Since(startedAt).Milliseconds(), err)
+	}
+
+	// Run retention after backup
+	deleted, freed, rErr := bs.svc.RunRetention()
+	if rErr != nil {
+		slog.Warn("tsdb backup scheduler: retention failed", "error", rErr)
+	} else if deleted > 0 {
+		slog.Info("tsdb backup scheduler: retention pruned", "deleted", deleted, "freed_bytes", freed)
+	}
 }
 
 // Stop halts the backup scheduler.
