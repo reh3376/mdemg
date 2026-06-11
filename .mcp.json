@@ -3,9 +3,12 @@
     "mdemg": {
       "type": "stdio",
       "command": "mdemg",
-      "args": ["mcp"],
+      "args": [
+        "mcp"
+      ],
       "env": {
-        "MDEMG_ENDPOINT": "http://localhost:9999"
+        "MDEMG_ENDPOINT": "http://localhost:9999",
+        "MDEMG_SPACE_ID": "mdemg-dev"
       }
     }
   }
