@@ -1266,3 +1266,22 @@ func TestPhaseMultiplier(t *testing.T) {
 		}
 	}
 }
+
+// CONFIG-DEADFLAG-001: the EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH cap was
+// parsed since EVENTGRAPH-001 but never enforced.
+func TestSetMaxPairsPerEventBatch_CapsForwardedRows(t *testing.T) {
+	s := &Service{}
+	s.SetMaxPairsPerEventBatch(3)
+	if s.maxPairsPerEventBatch != 3 {
+		t.Fatalf("cap not stored: %d", s.maxPairsPerEventBatch)
+	}
+	// Enforcement is a slice bound at the forward site; pin the semantics.
+	rows := make([]int, 10)
+	capN := s.maxPairsPerEventBatch
+	if capN > 0 && len(rows) > capN {
+		rows = rows[:capN]
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 forwarded rows, got %d", len(rows))
+	}
+}

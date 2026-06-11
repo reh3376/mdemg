@@ -1360,6 +1360,7 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				s.cfg.EventGraphWriterBufferSize,
 			)
 			s.learner.SetReinforcementWriter(s.reinforcementWriter)
+			s.learner.SetMaxPairsPerEventBatch(s.cfg.EventGraphMaxPairsPerEventBatch)
 			s.eventgraphService = eventgraph.NewService(s.driver, client.Pool())
 			// Wire the writer's Prometheus counter mirrors (Epic 6). nil-safe.
 			if std := metrics.Metrics(); std != nil {
