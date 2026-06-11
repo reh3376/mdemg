@@ -77,3 +77,60 @@ func TestJobHealthRules_NonPositiveFallback(t *testing.T) {
 		t.Errorf("non-positive lookback should fall back to 60m: %s", f.QuerySQL)
 	}
 }
+
+// ── BACKUP-RESTORE-VERIFY-001: generalized per-job staleness ──
+
+func TestJobStalenessRule_Factory(t *testing.T) {
+	r := jobStalenessRule("x_no_recent_success", "X Stale", "scheduled-job-staleness-x", "x-job", 12)
+	if r.ID != "x_no_recent_success" || r.Service != "scheduled-job-staleness-x" {
+		t.Fatalf("unexpected identity: %s / %s", r.ID, r.Service)
+	}
+	if !strings.Contains(r.QuerySQL, "job_name = 'x-job'") || !strings.Contains(r.QuerySQL, "interval '12 hours'") {
+		t.Fatalf("query not parameterized: %s", r.QuerySQL)
+	}
+	if !strings.Contains(r.QuerySQL, "recorded_at") {
+		t.Fatal("scheduled_job_events rules must use recorded_at (that table has it; metric_samples does not)")
+	}
+	// Non-positive window falls back to the 48h safety default
+	r = jobStalenessRule("y", "Y", "svc-y", "y-job", 0)
+	if !strings.Contains(r.QuerySQL, "interval '48 hours'") {
+		t.Fatalf("expected 48h fallback, got: %s", r.QuerySQL)
+	}
+}
+
+func TestNeo4jBackupStalenessRule(t *testing.T) {
+	r := Neo4jBackupStalenessRule(48)
+	if r.ID != "neo4j_backup_no_recent_success" {
+		t.Fatalf("unexpected ID %s", r.ID)
+	}
+	if !strings.Contains(r.QuerySQL, "job_name = 'neo4j-backup'") {
+		t.Fatalf("wrong job_name: %s", r.QuerySQL)
+	}
+	// Distinct Service from the tsdb rule — shared (Service, Severity)
+	// cooldown keys suppress each other (NOSILENT-001).
+	tsdbRules := JobHealthRules(48, 60, true)
+	for _, tr := range tsdbRules {
+		if tr.Service == r.Service && tr.Severity == r.Severity {
+			t.Fatalf("service collision with %s: %s", tr.ID, tr.Service)
+		}
+	}
+}
+
+func TestJobHealthRules_TSDBRuleUnchangedByFactoryRefactor(t *testing.T) {
+	rules := JobHealthRules(48, 60, true)
+	var found bool
+	for _, r := range rules {
+		if r.ID == "backup_no_recent_success" {
+			found = true
+			if r.Service != "scheduled-job-staleness" {
+				t.Errorf("tsdb staleness Service changed: %s", r.Service)
+			}
+			if !strings.Contains(r.QuerySQL, "job_name = 'tsdb-backup'") {
+				t.Errorf("tsdb staleness job_name changed: %s", r.QuerySQL)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("backup_no_recent_success missing after refactor")
+	}
+}

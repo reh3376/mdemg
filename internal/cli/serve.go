@@ -462,6 +462,16 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				}
 				rules = append(rules, alert.JobHealthRules(
 					staleness, cfg.JobFailureLookbackMin, cfg.TSDBBackupEnabled)...)
+				// BACKUP-RESTORE-VERIFY-001: same guarantee for the Neo4j
+				// backup scheduler (window = partial interval × 2 unless
+				// BACKUP_JOB_STALENESS_HOURS overrides).
+				if cfg.BackupEnabled {
+					neoStaleness := cfg.BackupJobStalenessHours
+					if neoStaleness <= 0 {
+						neoStaleness = cfg.BackupPartialIntervalHours * 2
+					}
+					rules = append(rules, alert.Neo4jBackupStalenessRule(neoStaleness))
+				}
 			}
 			// HOOKSYNC-001: hook-channel absence detection — sessions active
 			// (post-tool-observe heartbeats) but zero prompt-context fires.

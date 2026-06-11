@@ -1151,6 +1151,24 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				jobhealth.Report(context.Background(), pool, disp, ev)
 			})
 		}
+		// BACKUP-RESTORE-VERIFY-001: the default-ON Neo4j backup scheduler was
+		// the unmonitored one (inverted NOSILENT coverage) — wire the same
+		// jobhealth hook with its own job_name.
+		if s.backupScheduler != nil {
+			pool := client.Pool()
+			disp := s.alertDispatcher
+			instanceID := s.cfg.InstanceID
+			s.backupScheduler.SetResultHook(func(success bool, latencyMS int64, runErr error) {
+				ev := tsdb.JobEventRow{
+					JobName: "neo4j-backup", InstanceID: instanceID,
+					Success: success, LatencyMS: latencyMS,
+				}
+				if runErr != nil {
+					ev.ErrorMessage = runErr.Error()
+				}
+				jobhealth.Report(context.Background(), pool, disp, ev)
+			})
+		}
 		// Phase 12 Epic 6: construct ConflictTracker once and inject into the
 		// three Services that have hook sites. Per-space rate limiter defaults
 		// to 1 row/space/minute (the value bound inside conversation/conflict_tracker.go);
