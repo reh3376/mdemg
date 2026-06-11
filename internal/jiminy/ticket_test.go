@@ -13,9 +13,9 @@ func TestTicketManager_IssueAndValidate(t *testing.T) {
 	tm := NewTicketManager("test-secret-key-32bytes!!", 4, 0)
 
 	payload := TicketPayload{
-		SpaceID:   "test-space",
-		SessionID: "test-session",
-		LastSeq:   42,
+		SpaceID:    "test-space",
+		SessionID:  "test-session",
+		LastSeq:    42,
 		TrustScore: 0.75,
 		EscalationSnapshot: map[string]EscalationEntry{
 			"node-1": {NodeID: "node-1", Level: EscalationWarned, IgnoreCount: 2},

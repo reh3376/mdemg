@@ -118,11 +118,11 @@ func TestLiveCollectors_CollectProtocolMetrics_NilProvider(t *testing.T) {
 func TestLiveCollectors_CollectProtocolMetrics_Success(t *testing.T) {
 	mock := &mockProtocolProvider{
 		stats: ProtocolStatsResult{
-			TierDistribution:   [3]float64{0.5, 0.3, 0.2},
-			CompressionRatio:   0.75,
-			AvgComprehension:   0.9,
+			TierDistribution:     [3]float64{0.5, 0.3, 0.2},
+			CompressionRatio:     0.75,
+			AvgComprehension:     0.9,
 			AvgTokensPerGuidance: 120.0,
-			TotalEvents:        42,
+			TotalEvents:          42,
 		},
 	}
 	lc := NewLiveCollectors(nil, mock, nil, "test-space", 60*time.Second)

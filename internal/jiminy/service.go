@@ -28,43 +28,43 @@ type ConsultingService interface {
 
 // Service orchestrates all Jiminy guidance sources.
 type Service struct {
-	cfg               config.Config
-	driver            neo4j.DriverWithContext
-	consultant        ConsultingService
-	embedder          embeddings.Embedder
-	tracker           *EffectivenessTracker  // Phase AR-2: guidance effectiveness tracking
-	persistence       *PersistenceStore      // F3: Neo4j write-through for guidance outcomes
-	confidenceUpdater *ConfidenceUpdater     // F3: Bayesian confidence updates
-	cache             *GuidanceCache         // F10: TTL-based LRU cache for guidance responses
-	retriever         RetrievalProvider      // J7: full retrieval pipeline access
-	synthesizer       *GuidanceSynthesizer   // J8: LLM guidance synthesis
-	classifier        *OutcomeClassifier     // J11: semantic outcome classification
-	escalation        *EscalationTracker     // J12: session-aware escalation
-	evaluator         *Evaluator             // J9: agent output evaluation
-	statsCollector    *StatsCollector        // J10: guidance stats for RSIC
-	ticketManager     *TicketManager         // J17: session ticket management
-	sequenceTracker   *SequenceTracker       // J17: monotonic sequence counter
-	encoder           *ProtocolEncoder       // J17: three-tier encoding
-	codeGenerator     *ConstraintCodeGenerator // J17: constraint code generation
-	trustScorer       *TrustScorer           // J17: per-session trust scoring
-	protocolMetrics   *ProtocolMetricsCollector // J17-4: protocol metrics for RSIC
-	extensions        *ExtensionRegistry       // J17-5: per-session protocol extensions
-	signalLearner     SignalLearnerProvider    // RSIC-SK1: Hebbian signal learner for guidance
-	tierPredictor     *TierPredictor           // Gap 6: ML tier prediction
-	nliScorer           *NLIComprehensionScorer  // Gap 6: NLI comprehension scoring
-	arbitrator          *SidecarArbitrator       // NS-01: sidecar mode arbitration
-	dataCollector       *ProtocolDataCollector   // NS-14: protocol training data collection
-	calibrationTracker  *NLICalibrationTracker   // NLI feedback loop: NLI-vs-heuristic calibration
-	warmStore               *WarmStore               // B7: WarmStore reference for trust-based invalidation
-	trustStore              *TrustStore              // J17: write-behind trust persistence to Neo4j
-	escalationStore         *EscalationStore         // J12: write-behind escalation persistence to Neo4j
-	strictMode              *StrictModeManager       // /strict: per-session strict mode toggle
-	reformulator            *StrictReformulator      // /strict: prompt reformulation
-	strictClassifier        *StrictClassifier        // /strict: response classification for PreToolUse
-	trustCancel             context.CancelFunc       // cancels trust persistence goroutine
-	conflictTracker         *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
-	codeComprehensionTracker *CodeComprehensionTracker // P1-15: code comprehension feedback loop
-	outcomeWriter            OutcomeWriter              // TSDB writer for constraint outcomes
+	cfg                      config.Config
+	driver                   neo4j.DriverWithContext
+	consultant               ConsultingService
+	embedder                 embeddings.Embedder
+	tracker                  *EffectivenessTracker         // Phase AR-2: guidance effectiveness tracking
+	persistence              *PersistenceStore             // F3: Neo4j write-through for guidance outcomes
+	confidenceUpdater        *ConfidenceUpdater            // F3: Bayesian confidence updates
+	cache                    *GuidanceCache                // F10: TTL-based LRU cache for guidance responses
+	retriever                RetrievalProvider             // J7: full retrieval pipeline access
+	synthesizer              *GuidanceSynthesizer          // J8: LLM guidance synthesis
+	classifier               *OutcomeClassifier            // J11: semantic outcome classification
+	escalation               *EscalationTracker            // J12: session-aware escalation
+	evaluator                *Evaluator                    // J9: agent output evaluation
+	statsCollector           *StatsCollector               // J10: guidance stats for RSIC
+	ticketManager            *TicketManager                // J17: session ticket management
+	sequenceTracker          *SequenceTracker              // J17: monotonic sequence counter
+	encoder                  *ProtocolEncoder              // J17: three-tier encoding
+	codeGenerator            *ConstraintCodeGenerator      // J17: constraint code generation
+	trustScorer              *TrustScorer                  // J17: per-session trust scoring
+	protocolMetrics          *ProtocolMetricsCollector     // J17-4: protocol metrics for RSIC
+	extensions               *ExtensionRegistry            // J17-5: per-session protocol extensions
+	signalLearner            SignalLearnerProvider         // RSIC-SK1: Hebbian signal learner for guidance
+	tierPredictor            *TierPredictor                // Gap 6: ML tier prediction
+	nliScorer                *NLIComprehensionScorer       // Gap 6: NLI comprehension scoring
+	arbitrator               *SidecarArbitrator            // NS-01: sidecar mode arbitration
+	dataCollector            *ProtocolDataCollector        // NS-14: protocol training data collection
+	calibrationTracker       *NLICalibrationTracker        // NLI feedback loop: NLI-vs-heuristic calibration
+	warmStore                *WarmStore                    // B7: WarmStore reference for trust-based invalidation
+	trustStore               *TrustStore                   // J17: write-behind trust persistence to Neo4j
+	escalationStore          *EscalationStore              // J12: write-behind escalation persistence to Neo4j
+	strictMode               *StrictModeManager            // /strict: per-session strict mode toggle
+	reformulator             *StrictReformulator           // /strict: prompt reformulation
+	strictClassifier         *StrictClassifier             // /strict: response classification for PreToolUse
+	trustCancel              context.CancelFunc            // cancels trust persistence goroutine
+	conflictTracker          *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
+	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
+	outcomeWriter            OutcomeWriter                 // TSDB writer for constraint outcomes
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -298,35 +298,35 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	}
 
 	return &Service{
-		cfg:               cfg,
-		driver:            driver,
-		consultant:        consultant,
-		embedder:          embedder,
-		tracker:           tracker,
-		persistence:       persistence,
-		confidenceUpdater: confidenceUpdater,
-		cache:             cache,
-		classifier:        classifier,
-		escalation:        escalation,
-		evaluator:         evaluator,
-		statsCollector:    statsCollector,
-		ticketManager:     ticketManager,
-		sequenceTracker:   sequenceTracker,
-		encoder:           encoder,
-		trustScorer:       trustScorer,
-		protocolMetrics:   protocolMetrics,
-		extensions:        extensions,
-		tierPredictor:     tierPredictor,
-		nliScorer:           nliScorer,
-		arbitrator:          arbitrator,
-		dataCollector:       dataCollector,
-		calibrationTracker:  calibrationTracker,
-		trustStore:          trustStore,
-		escalationStore:     escalationStore,
-		strictMode:          strictMode,
-		reformulator:        reformulator,
-		strictClassifier:    strictClassifier,
-		feedbackCounts:      make(map[string]*sessionFeedback),
+		cfg:                cfg,
+		driver:             driver,
+		consultant:         consultant,
+		embedder:           embedder,
+		tracker:            tracker,
+		persistence:        persistence,
+		confidenceUpdater:  confidenceUpdater,
+		cache:              cache,
+		classifier:         classifier,
+		escalation:         escalation,
+		evaluator:          evaluator,
+		statsCollector:     statsCollector,
+		ticketManager:      ticketManager,
+		sequenceTracker:    sequenceTracker,
+		encoder:            encoder,
+		trustScorer:        trustScorer,
+		protocolMetrics:    protocolMetrics,
+		extensions:         extensions,
+		tierPredictor:      tierPredictor,
+		nliScorer:          nliScorer,
+		arbitrator:         arbitrator,
+		dataCollector:      dataCollector,
+		calibrationTracker: calibrationTracker,
+		trustStore:         trustStore,
+		escalationStore:    escalationStore,
+		strictMode:         strictMode,
+		reformulator:       reformulator,
+		strictClassifier:   strictClassifier,
+		feedbackCounts:     make(map[string]*sessionFeedback),
 	}
 }
 
@@ -513,6 +513,24 @@ func (s *Service) UpdateNodeConfidence(ctx context.Context, nodeID string, outco
 		return fmt.Errorf("confidence updater not available")
 	}
 	return s.confidenceUpdater.UpdateConfidence(ctx, nodeID, outcome)
+}
+
+// AdjustNodeConfidenceDirect applies a counter-free confidence delta
+// (RSIC-VALIDATE-001 — system-initiated calibration must not pollute the
+// real-feedback outcome counters).
+func (s *Service) AdjustNodeConfidenceDirect(ctx context.Context, nodeID string, delta float64) error {
+	if s.confidenceUpdater == nil {
+		return fmt.Errorf("confidence updater not available")
+	}
+	return s.confidenceUpdater.AdjustConfidenceDirect(ctx, nodeID, delta)
+}
+
+// ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
+func (s *Service) ConfidenceCalibrationDeltas() (boost, decay float64) {
+	if s.confidenceUpdater == nil {
+		return 0, 0
+	}
+	return s.confidenceUpdater.CalibrationDeltas()
 }
 
 // ArchiveStaleConstraints delegates to the confidence updater to archive constraints
@@ -1966,8 +1984,8 @@ func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
 		s.codeComprehensionTracker = NewCodeComprehensionTracker(
 			s.cfg.JiminyCodeRegenThreshold,
 			s.cfg.JiminyCodeRegenMinSamples,
-			5,             // max 5 regens per hour
-			time.Hour,     // 1 hour cooldown per code
+			5,         // max 5 regens per hour
+			time.Hour, // 1 hour cooldown per code
 			gen,
 		)
 		slog.Info("jiminy: code comprehension feedback loop enabled",
@@ -2214,17 +2232,17 @@ type ProtocolFeedbackRequest struct {
 type ProtocolFeedbackTrial struct {
 	ConstraintCode string  `json:"constraint_code"`
 	Tier           int     `json:"tier"`
-	Score          float64 `json:"score"`           // 0-10 comprehension score
-	Interpretation string  `json:"interpretation"`  // receiver's interpretation
-	SenderIntent   string  `json:"sender_intent"`   // ground truth
+	Score          float64 `json:"score"`          // 0-10 comprehension score
+	Interpretation string  `json:"interpretation"` // receiver's interpretation
+	SenderIntent   string  `json:"sender_intent"`  // ground truth
 }
 
 // ProtocolFeedbackResponse returns aggregated learning results.
 type ProtocolFeedbackResponse struct {
-	Ingested      int                `json:"ingested"`
-	WeakCodes     []WeakCodeReport   `json:"weak_codes,omitempty"`
-	Improvements  []CodeImprovement  `json:"improvements,omitempty"`
-	MetricsAfter  *ProtocolMetrics   `json:"metrics_after,omitempty"`
+	Ingested     int               `json:"ingested"`
+	WeakCodes    []WeakCodeReport  `json:"weak_codes,omitempty"`
+	Improvements []CodeImprovement `json:"improvements,omitempty"`
+	MetricsAfter *ProtocolMetrics  `json:"metrics_after,omitempty"`
 }
 
 // WeakCodeReport identifies a code with low comprehension at a specific tier.

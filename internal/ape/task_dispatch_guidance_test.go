@@ -21,6 +21,25 @@ func (m *mockGuidanceCalibrator) GetConstraintEffectiveness(_ context.Context, _
 	return m.items, m.getErr
 }
 
+// AdjustNodeConfidenceDirect records counter-free adjustments (RSIC-VALIDATE-001).
+// Deltas map to the legacy outcome labels so existing assertions keep meaning:
+// positive → "followed"-equivalent boost, negative → "ignored"-equivalent decay.
+func (m *mockGuidanceCalibrator) AdjustNodeConfidenceDirect(_ context.Context, nodeID string, delta float64) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	m.updateCalls = append(m.updateCalls, nodeID)
+	if delta >= 0 {
+		m.updateOutcomes = append(m.updateOutcomes, "followed")
+	} else {
+		m.updateOutcomes = append(m.updateOutcomes, "ignored")
+	}
+	return nil
+}
+
+// ConfidenceCalibrationDeltas returns fixed magnitudes for tests.
+func (m *mockGuidanceCalibrator) ConfidenceCalibrationDeltas() (float64, float64) { return 0.05, 0.03 }
+
 func (m *mockGuidanceCalibrator) UpdateNodeConfidence(_ context.Context, nodeID string, outcome string) error {
 	m.updateCalls = append(m.updateCalls, nodeID)
 	m.updateOutcomes = append(m.updateOutcomes, outcome)
@@ -46,10 +65,10 @@ func TestExecuteReviewGuidanceEffectiveness(t *testing.T) {
 	// With calibrator
 	mock := &mockGuidanceCalibrator{
 		items: []GuidanceEffectivenessItem{
-			{NodeID: "n1", TotalSurfaced: 10, EffectivenessRate: 0.9},  // high
-			{NodeID: "n2", TotalSurfaced: 10, EffectivenessRate: 0.3},  // low
-			{NodeID: "n3", TotalSurfaced: 2, EffectivenessRate: 0.0},   // insufficient
-			{NodeID: "n4", TotalSurfaced: 8, EffectivenessRate: 0.05},  // low
+			{NodeID: "n1", TotalSurfaced: 10, EffectivenessRate: 0.9}, // high
+			{NodeID: "n2", TotalSurfaced: 10, EffectivenessRate: 0.3}, // low
+			{NodeID: "n3", TotalSurfaced: 2, EffectivenessRate: 0.0},  // insufficient
+			{NodeID: "n4", TotalSurfaced: 8, EffectivenessRate: 0.05}, // low
 		},
 	}
 	d.guidanceCalibrator = mock
@@ -80,10 +99,10 @@ func TestExecuteAdjustGuidanceConfidence(t *testing.T) {
 
 	mock := &mockGuidanceCalibrator{
 		items: []GuidanceEffectivenessItem{
-			{NodeID: "boost-me", TotalSurfaced: 10, EffectivenessRate: 0.8},   // boost (>= 0.7)
-			{NodeID: "decay-me", TotalSurfaced: 5, EffectivenessRate: 0.05},   // decay (< 0.1 && >= 5 surfaces)
-			{NodeID: "skip-low", TotalSurfaced: 2, EffectivenessRate: 0.0},    // skip (< 3 surfaces)
-			{NodeID: "mid-range", TotalSurfaced: 10, EffectivenessRate: 0.4},  // neither boost nor decay
+			{NodeID: "boost-me", TotalSurfaced: 10, EffectivenessRate: 0.8},  // boost (>= 0.7)
+			{NodeID: "decay-me", TotalSurfaced: 5, EffectivenessRate: 0.05},  // decay (< 0.1 && >= 5 surfaces)
+			{NodeID: "skip-low", TotalSurfaced: 2, EffectivenessRate: 0.0},   // skip (< 3 surfaces)
+			{NodeID: "mid-range", TotalSurfaced: 10, EffectivenessRate: 0.4}, // neither boost nor decay
 		},
 		archiveCount: 1,
 	}

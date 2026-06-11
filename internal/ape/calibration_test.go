@@ -20,12 +20,12 @@ func TestValidateWithPostReport(t *testing.T) {
 	}
 
 	postReport := &SelfAssessmentReport{
-		OverallHealth:    0.75,
-		RetrievalQuality: 0.8,
-		MemoryHealth:     0.9,
-		EdgeHealth:       0.7,
-		OrphanRatio:      0.1,
-		CorrectionRate:   0.05,
+		OverallHealth:     0.75,
+		RetrievalQuality:  0.8,
+		MemoryHealth:      0.9,
+		EdgeHealth:        0.7,
+		OrphanRatio:       0.1,
+		CorrectionRate:    0.05,
 		EdgeWeightEntropy: 0.6,
 	}
 
@@ -215,15 +215,28 @@ func TestCriteriaEvaluation_MissingData(t *testing.T) {
 		{TaskID: "t1", Status: "completed"},
 	}
 
-	// With postReport present but missing the specific metric → missing_data, criteria stays true
+	// RSIC-VALIDATE-001 fail-closed: prune_decayed_edges MUTATES the graph,
+	// so a criterion with missing evidence counts as NOT met. (The previous
+	// assertion pinned the vacuous-pass bug as the contract: ~16/17 actions
+	// "succeeded" with zero evidence and rollback was unreachable.)
 	postReport := &SelfAssessmentReport{OverallHealth: 0.7}
 	outcome := cal.Validate(context.Background(), "cycle-5", TierMicro, "test-space", tasks, reports, map[string]float64{}, postReport)
 
+	if outcome.CriteriaMet {
+		t.Error("fail-closed: mutating action with missing evidence must NOT validate")
+	}
+	if outcome.CriteriaDetail["nonexistent_metric"] != "missing_data_failclosed" {
+		t.Errorf("expected 'missing_data_failclosed', got %q", outcome.CriteriaDetail["nonexistent_metric"])
+	}
+
+	// Non-mutating (observational) actions keep advisory semantics.
+	tasks[0].ActionType = "review_guidance_effectiveness"
+	outcome = cal.Validate(context.Background(), "cycle-5b", TierMicro, "test-space", tasks, reports, map[string]float64{}, postReport)
 	if !outcome.CriteriaMet {
-		t.Error("expected CriteriaMet=true for missing data (no delta to evaluate)")
+		t.Error("advisory: non-mutating action with missing evidence keeps CriteriaMet=true")
 	}
 	if outcome.CriteriaDetail["nonexistent_metric"] != "missing_data" {
-		t.Errorf("expected 'missing_data', got %q", outcome.CriteriaDetail["nonexistent_metric"])
+		t.Errorf("expected advisory 'missing_data', got %q", outcome.CriteriaDetail["nonexistent_metric"])
 	}
 }
 

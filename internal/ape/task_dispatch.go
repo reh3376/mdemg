@@ -18,13 +18,13 @@ type Dispatcher struct {
 	activeTasks map[string]*activeTask
 	reports     map[string][]RSICProgressReport
 
-	learner       LearningStatsProvider
-	convSvc       ConversationStatsProvider
-	hiddenSvc     HiddenLayerProvider
-	driver        neo4j.DriverWithContext
-	protoEvolver       ProtocolEvolverProvider       // J17: protocol mutation executor
-	guidanceCalibrator GuidanceCalibrationProvider   // RSIC-SK1: guidance self-calibration
-	freshnessProvider  FreshnessProvider              // Phase 47.2: ingest staleness provider
+	learner            LearningStatsProvider
+	convSvc            ConversationStatsProvider
+	hiddenSvc          HiddenLayerProvider
+	driver             neo4j.DriverWithContext
+	protoEvolver       ProtocolEvolverProvider     // J17: protocol mutation executor
+	guidanceCalibrator GuidanceCalibrationProvider // RSIC-SK1: guidance self-calibration
+	freshnessProvider  FreshnessProvider           // Phase 47.2: ingest staleness provider
 
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
@@ -419,17 +419,27 @@ func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) 
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Tombstone observations that have been superseded by corrections
+		// RSIC-VALIDATE-001: tombstone ONLY observations RELATED to a recent
+		// correction — same session as the correction, or its 1-hop
+		// CO_ACTIVATED_WITH neighborhood. The previous query archived 50
+		// ARBITRARY older observations whenever ANY correction existed in
+		// the window (no relationship at all) — silently eroding unrelated
+		// memory on every dispatch.
 		cypher := `
 			MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
 			WHERE correction.created_at > datetime() - duration('P7D')
-			WITH correction
+			WITH collect(correction) AS corrections
+			UNWIND corrections AS correction
 			MATCH (stale:MemoryNode {space_id: $spaceId})
 			WHERE stale.role_type = 'conversation_observation'
 			  AND stale.obs_type <> 'correction'
 			  AND stale.created_at < correction.created_at
 			  AND NOT coalesce(stale.is_archived, false)
-			WITH stale LIMIT 50
+			  AND (
+			        (stale.session_id IS NOT NULL AND stale.session_id = correction.session_id)
+			     OR (stale)-[:CO_ACTIVATED_WITH]-(correction)
+			  )
+			WITH DISTINCT stale LIMIT 50
 			SET stale.is_archived = true
 			RETURN count(stale) AS tombstoned
 		`
@@ -458,7 +468,7 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 	defer sess.Close(ctx)
 
 	type refreshResult struct {
-		Refreshed      int64
+		Refreshed       int64
 		AvgWeightBefore float64
 		AvgWeightAfter  float64
 	}
@@ -487,17 +497,23 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 		}
 
 		// Refresh stale edges: bump last_activated and recompute weight via co-activation decay
+		// RSIC-VALIDATE-001: capture staleness BEFORE bumping last_activated.
+		// The previous single SET bumped last_activated first, so the weight
+		// expression read duration.between(now, now) = 0 days — the decay
+		// term vanished and every "refresh" was a pure +0.1·log(count+1)
+		// boost. Weights could only inflate.
 		refreshCypher := `
 			MATCH ()-[e:LEARNING_EDGE {space_id: $spaceId}]->()
 			WHERE e.last_activated < datetime() - duration('P30D')
-			WITH e LIMIT 100
-			SET e.last_activated = datetime(),
-			    e.weight = CASE
+			WITH e, duration.between(e.last_activated, datetime()).days AS staleDays
+			LIMIT 100
+			SET e.weight = CASE
 			        WHEN e.co_activation_count > 0
-			        THEN e.weight * (1.0 - 0.02 * duration.between(e.last_activated, datetime()).days / 30.0)
+			        THEN e.weight * (1.0 - 0.02 * toFloat(staleDays) / 30.0)
 			             + 0.1 * log(toFloat(e.co_activation_count) + 1)
 			        ELSE e.weight * 0.8
-			    END
+			    END,
+			    e.last_activated = datetime()
 			RETURN count(e) AS refreshed, avg(e.weight) AS avg_weight_after
 		`
 		res, err := tx.Run(ctx, refreshCypher, map[string]any{"spaceId": spaceID})
@@ -659,14 +675,18 @@ func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceI
 		if item.TotalSurfaced < 3 {
 			continue
 		}
+		// RSIC-VALIDATE-001: counter-free path — injecting synthetic
+		// "followed"/"ignored" outcomes inflated total_surfaced/total_followed,
+		// the exact counters GetConstraintEffectiveness reads next cycle.
+		boost, decay := d.guidanceCalibrator.ConfidenceCalibrationDeltas()
 		if item.EffectivenessRate >= 0.7 {
-			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "followed"); err != nil {
+			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, boost); err != nil {
 				slog.Error("RSIC-SK1: boost failed", "node_id", item.NodeID, "error", err)
 			} else {
 				boosted++
 			}
 		} else if item.EffectivenessRate < 0.1 && item.TotalSurfaced >= 5 {
-			if err := d.guidanceCalibrator.UpdateNodeConfidence(ctx, item.NodeID, "ignored"); err != nil {
+			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, -decay); err != nil {
 				slog.Error("RSIC-SK1: decay failed", "node_id", item.NodeID, "error", err)
 			} else {
 				decayed++
@@ -886,9 +906,9 @@ func (d *Dispatcher) executeReviewNLICalibration(ctx context.Context, spaceID st
 	defer sess.Close(ctx)
 
 	type nliStats struct {
-		TotalConstraints int64
+		TotalConstraints  int64
 		ActiveConstraints int64
-		AvgConfidence    float64
+		AvgConfidence     float64
 	}
 
 	stats, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (nliStats, error) {

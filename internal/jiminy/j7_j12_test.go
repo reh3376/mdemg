@@ -102,12 +102,12 @@ func TestGuide_WithRetriever(t *testing.T) {
 		},
 	}
 	cfg := config.Config{
-		JiminyEnabled:          true,
-		JiminyTimeoutMs:        2000,
-		JiminyMaxItems:         10,
-		JiminyMinConfidence:    0.3,
-		JiminyRetrievalEnabled: true,
-		JiminyRetrievalTopK:    10,
+		JiminyEnabled:           true,
+		JiminyTimeoutMs:         2000,
+		JiminyMaxItems:          10,
+		JiminyMinConfidence:     0.3,
+		JiminyRetrievalEnabled:  true,
+		JiminyRetrievalTopK:     10,
 		JiminyRetrievalHopDepth: 2,
 	}
 	s := NewService(cfg, nil, nil, nil)
@@ -236,12 +236,12 @@ func TestOutcomeClassifier_FallbackToTextOverlap(t *testing.T) {
 
 func TestEscalationTracker_BasicFlow(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    2,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
 		JiminyEscalationEscalateAfter: 4,
-		JiminyEscalationBlockAfter:   6,
-		JiminyEscalationBlockEnabled: false,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    6,
+		JiminyEscalationBlockEnabled:  false,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 
@@ -260,12 +260,12 @@ func TestEscalationTracker_BasicFlow(t *testing.T) {
 
 func TestEscalationTracker_EscalationPath(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    2,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
 		JiminyEscalationEscalateAfter: 4,
-		JiminyEscalationBlockAfter:   6,
-		JiminyEscalationBlockEnabled: true,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    6,
+		JiminyEscalationBlockEnabled:  true,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 
@@ -295,12 +295,12 @@ func TestEscalationTracker_EscalationPath(t *testing.T) {
 
 func TestEscalationTracker_BlockDisabled(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    1,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     1,
 		JiminyEscalationEscalateAfter: 2,
-		JiminyEscalationBlockAfter:   3,
-		JiminyEscalationBlockEnabled: false, // blocking disabled
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    3,
+		JiminyEscalationBlockEnabled:  false, // blocking disabled
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 
@@ -321,11 +321,11 @@ func TestEscalationTracker_BlockDisabled(t *testing.T) {
 
 func TestEscalationTracker_DecayReset(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    2,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
 		JiminyEscalationEscalateAfter: 4,
-		JiminyEscalationBlockAfter:   6,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    6,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 	// Override decay for testing
@@ -378,11 +378,11 @@ func TestApplyEscalation_Escalated(t *testing.T) {
 
 func TestEscalationTracker_SessionEscalation(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    1,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     1,
 		JiminyEscalationEscalateAfter: 3,
-		JiminyEscalationBlockAfter:   5,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    5,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 
@@ -400,11 +400,11 @@ func TestEscalationTracker_SessionEscalation(t *testing.T) {
 
 func TestEscalationTracker_CleanupExpired(t *testing.T) {
 	cfg := config.Config{
-		JiminyEscalationEnabled:      true,
-		JiminyEscalationWarnAfter:    2,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
 		JiminyEscalationEscalateAfter: 4,
-		JiminyEscalationBlockAfter:   6,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    6,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	et := NewEscalationTracker(cfg)
 	et.decayDuration = 1 * time.Millisecond
@@ -430,15 +430,15 @@ func TestGuide_WithEscalation(t *testing.T) {
 		resp: mockSuggestResponseWithConstraint(),
 	}
 	cfg := config.Config{
-		JiminyEnabled:          true,
-		JiminyTimeoutMs:        2000,
-		JiminyMaxItems:         10,
-		JiminyMinConfidence:    0.3,
-		JiminyEscalationEnabled: true,
-		JiminyEscalationWarnAfter: 1,
+		JiminyEnabled:                 true,
+		JiminyTimeoutMs:               2000,
+		JiminyMaxItems:                10,
+		JiminyMinConfidence:           0.3,
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     1,
 		JiminyEscalationEscalateAfter: 3,
-		JiminyEscalationBlockAfter: 5,
-		JiminyEscalationDecayMinutes: 60,
+		JiminyEscalationBlockAfter:    5,
+		JiminyEscalationDecayMinutes:  60,
 	}
 	s := NewService(cfg, nil, consultant, nil)
 

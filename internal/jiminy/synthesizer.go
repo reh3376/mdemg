@@ -13,17 +13,17 @@ import (
 
 // SynthesisConfig holds configuration for the Jiminy LLM synthesizer.
 type SynthesisConfig struct {
-	Enabled     bool
-	Provider    string
-	Model       string
-	MaxTokens   int
-	TimeoutMs   int
-	OpenAIKey   string
-	OpenAIURL   string
-	OllamaURL   string
-	Temperature    *float64 // J15: optional temperature (nil = API default)
-	ContextMaxChars int     // J16: max chars for agent context (default: 200000, 0 = unlimited)
-	OutputMaxChars  int     // J16: max chars for agent output (default: 200000, 0 = unlimited)
+	Enabled         bool
+	Provider        string
+	Model           string
+	MaxTokens       int
+	TimeoutMs       int
+	OpenAIKey       string
+	OpenAIURL       string
+	OllamaURL       string
+	Temperature     *float64 // J15: optional temperature (nil = API default)
+	ContextMaxChars int      // J16: max chars for agent context (default: 200000, 0 = unlimited)
+	OutputMaxChars  int      // J16: max chars for agent output (default: 200000, 0 = unlimited)
 }
 
 // GuidanceSynthesizer synthesizes guidance items into coherent LLM-generated narratives.

@@ -9,8 +9,8 @@ import (
 
 func TestPlan_SuppressesLowConfidenceActions(t *testing.T) {
 	cfg := config.Config{
-		RSICMaxNodePrunePct:    0.05,
-		RSICMaxEdgePrunePct:    0.10,
+		RSICMaxNodePrunePct:     0.05,
+		RSICMaxEdgePrunePct:     0.10,
 		RSICMinActionConfidence: 0.2,
 	}
 
@@ -58,8 +58,8 @@ func TestPlan_SuppressesLowConfidenceActions(t *testing.T) {
 
 func TestPlan_AllowsCriticalEvenLowConfidence(t *testing.T) {
 	cfg := config.Config{
-		RSICMaxNodePrunePct:    0.05,
-		RSICMaxEdgePrunePct:    0.10,
+		RSICMaxNodePrunePct:     0.05,
+		RSICMaxEdgePrunePct:     0.10,
 		RSICMinActionConfidence: 0.2,
 	}
 
@@ -99,8 +99,8 @@ func TestPlan_AllowsCriticalEvenLowConfidence(t *testing.T) {
 
 func TestPlan_NoCalibrator(t *testing.T) {
 	cfg := config.Config{
-		RSICMaxNodePrunePct:    0.05,
-		RSICMaxEdgePrunePct:    0.10,
+		RSICMaxNodePrunePct:     0.05,
+		RSICMaxEdgePrunePct:     0.10,
 		RSICMinActionConfidence: 0.2,
 	}
 	planner := NewPlanner(cfg)

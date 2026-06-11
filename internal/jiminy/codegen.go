@@ -20,7 +20,7 @@ const codegenSystemPrompt = `You are a constraint code generator for a knowledge
 type ConstraintCodeGenerator struct {
 	mu         sync.Mutex
 	client     *llmclient.Client
-	existing   map[string]bool         // all known codes for collision avoidance
+	existing   map[string]bool          // all known codes for collision avoidance
 	cbRegistry *circuitbreaker.Registry // G8: circuit breaker for LLM calls
 }
 

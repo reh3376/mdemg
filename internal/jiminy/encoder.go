@@ -16,10 +16,10 @@ const (
 type T1CompactLevel int
 
 const (
-	T1CompactNone    T1CompactLevel = 0 // Full T1 with all annotations + src
-	T1CompactDropSrc T1CompactLevel = 1 // Drop src:NODE_ID (traceability metadata)
+	T1CompactNone     T1CompactLevel = 0 // Full T1 with all annotations + src
+	T1CompactDropSrc  T1CompactLevel = 1 // Drop src:NODE_ID (traceability metadata)
 	T1CompactGlossary T1CompactLevel = 2 // Drop src + annotations redundant with glossary DICT (default — 5.2x compression, 0 comprehension loss)
-	T1CompactMax     T1CompactLevel = 3 // Drop src + redundant annotations + shorten remaining
+	T1CompactMax      T1CompactLevel = 3 // Drop src + redundant annotations + shorten remaining
 
 	// T1CompactDefault is the production default. T1CompactGlossary achieves 5.2x compression
 	// (19% of original size) with zero comprehension loss by leveraging the bootstrap DICT header.

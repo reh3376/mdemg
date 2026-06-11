@@ -242,8 +242,8 @@ func (a *rsicJiminyAdapter) GetGuidanceStats(ctx context.Context, spaceID string
 		TotalIgnored:           stats.TotalIgnored,
 		TotalContradicted:      stats.TotalContradicted,
 		FollowRate:             stats.FollowRate,
-		ConstraintEffRate:   stats.ConstraintEffRate,
-		ConstraintDataAvail: stats.ConstraintDataAvail,
+		ConstraintEffRate:      stats.ConstraintEffRate,
+		ConstraintDataAvail:    stats.ConstraintDataAvail,
 		SourceDiversity:        stats.SourceDiversity,
 	}, nil
 }
@@ -311,6 +311,16 @@ type rsicGuidanceCalibrationAdapter struct {
 	svc *jiminy.Service
 }
 
+// AdjustNodeConfidenceDirect — counter-free calibration (RSIC-VALIDATE-001).
+func (a *rsicGuidanceCalibrationAdapter) AdjustNodeConfidenceDirect(ctx context.Context, nodeID string, delta float64) error {
+	return a.svc.AdjustNodeConfidenceDirect(ctx, nodeID, delta)
+}
+
+// ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
+func (a *rsicGuidanceCalibrationAdapter) ConfidenceCalibrationDeltas() (boost, decay float64) {
+	return a.svc.ConfidenceCalibrationDeltas()
+}
+
 func (a *rsicGuidanceCalibrationAdapter) GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]ape.GuidanceEffectivenessItem, error) {
 	items, err := a.svc.GetConstraintEffectiveness(ctx, spaceID)
 	if err != nil {
@@ -351,9 +361,9 @@ func (a *rsicTierEffectivenessAdapter) BuildDataset() map[string]any {
 		return nil
 	}
 	return map[string]any{
-		"generated_at":   ds.GeneratedAt,
-		"total_outcomes": ds.TotalOutcomes,
-		"code_drift":     len(ds.CodeDrift),
+		"generated_at":    ds.GeneratedAt,
+		"total_outcomes":  ds.TotalOutcomes,
+		"code_drift":      len(ds.CodeDrift),
 		"recommendations": len(ds.Recommendations),
 	}
 }

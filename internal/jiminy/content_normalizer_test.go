@@ -124,4 +124,3 @@ func TestNaturalJoin(t *testing.T) {
 		}
 	}
 }
-

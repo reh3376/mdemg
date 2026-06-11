@@ -596,6 +596,7 @@ func SeedObservationNodes(t *testing.T, driver neo4j.DriverWithContext, spaceID 
 			CREATE (n:MemoryNode {
 				node_id: $prefix + '-' + toString(i), space_id: $spaceId,
 				path: $prefix + '-' + toString(i),
+				session_id: 'test-session-' + $spaceId,
 				role_type: 'conversation_observation', obs_type: $obsType,
 				content: 'test observation ' + toString(i),
 				volatile: true, stability_score: 0.1, is_archived: false,

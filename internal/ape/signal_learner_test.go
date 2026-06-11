@@ -402,10 +402,10 @@ func TestGetAllEffectiveness_MultipleSignals(t *testing.T) {
 
 func TestGetAllEffectiveness_ResponseRateCalculation(t *testing.T) {
 	tests := []struct {
-		name           string
-		emissions      int
-		responses      int
-		expectedRate   float64
+		name         string
+		emissions    int
+		responses    int
+		expectedRate float64
 	}{
 		{"no emissions", 0, 0, 0.0},
 		{"no responses", 5, 0, 0.0},

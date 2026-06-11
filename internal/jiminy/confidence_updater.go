@@ -154,3 +154,49 @@ RETURN count(n) AS archived_count`
 
 	return count, nil
 }
+
+// AdjustConfidenceDirect applies a confidence delta WITHOUT touching the
+// outcome counters (RSIC-VALIDATE-001). RSIC's self-calibration previously
+// injected synthetic "followed"/"ignored" outcomes through UpdateConfidence,
+// inflating total_surfaced/total_followed — the very counters
+// GetConstraintEffectiveness reads next cycle (circular self-reinforcement).
+// The counters now belong exclusively to REAL guidance feedback; system-
+// initiated calibration uses this path. Clamp + archive logic unchanged.
+func (u *ConfidenceUpdater) AdjustConfidenceDirect(ctx context.Context, nodeID string, delta float64) error {
+	cypher := `
+MATCH (n:MemoryNode {node_id: $nodeId})
+WITH n, coalesce(n.confidence, 0.5) + $delta AS raw
+WITH n,
+     CASE
+       WHEN raw > 0.95 THEN 0.95
+       WHEN raw < 0.0  THEN 0.0
+       ELSE raw
+     END AS new_confidence
+SET
+  n.confidence = new_confidence,
+  n.status     = CASE WHEN new_confidence < $archiveThreshold AND n.constraint_type IS NOT NULL THEN 'archived' ELSE coalesce(n.status, 'active') END
+RETURN n.node_id AS node_id`
+
+	sess := u.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer sess.Close(ctx)
+
+	_, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (bool, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"nodeId":           nodeID,
+			"delta":            delta,
+			"archiveThreshold": u.archiveThreshold,
+		})
+		if err != nil {
+			return false, err
+		}
+		_, err = res.Consume(ctx)
+		return err == nil, err
+	})
+	return err
+}
+
+// CalibrationDeltas exposes the configured boost/decay magnitudes so callers
+// (RSIC) can mirror outcome-equivalent adjustments through the direct path.
+func (u *ConfidenceUpdater) CalibrationDeltas() (boost, decay float64) {
+	return u.boostPerPositive, u.decayPerNegative
+}

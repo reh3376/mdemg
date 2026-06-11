@@ -19,13 +19,13 @@ import (
 
 // mockAPEModuleClient implements pb.APEModuleClient for testing
 type mockAPEModuleClient struct {
-	getScheduleResp  *pb.GetScheduleResponse
-	getScheduleErr   error
-	executeResp      *pb.ExecuteResponse
-	executeErr       error
-	executeCalled    bool
-	executeReq       *pb.ExecuteRequest
-	mu               sync.Mutex
+	getScheduleResp *pb.GetScheduleResponse
+	getScheduleErr  error
+	executeResp     *pb.ExecuteResponse
+	executeErr      error
+	executeCalled   bool
+	executeReq      *pb.ExecuteRequest
+	mu              sync.Mutex
 }
 
 func (m *mockAPEModuleClient) Execute(ctx context.Context, in *pb.ExecuteRequest, opts ...grpc.CallOption) (*pb.ExecuteResponse, error) {

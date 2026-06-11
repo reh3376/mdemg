@@ -33,17 +33,17 @@ type HistoryFilter struct {
 
 // CycleOrchestrator runs the full Assess → Reflect → Plan → Execute → Validate cycle.
 type CycleOrchestrator struct {
-	assessor   *Assessor
-	reflector  *Reflector
-	planner    *Planner
-	dispatcher *Dispatcher
-	monitor    *Monitor
-	calibrator *Calibrator
-	watchdog         *Watchdog
-	snapshotStore    *SnapshotStore
-	cfg              config.Config
-	policy           *OrchestrationPolicy
-	tierEffProvider  TierEffectivenessProvider // NLI feedback loop: tier effectiveness dataset builder
+	assessor        *Assessor
+	reflector       *Reflector
+	planner         *Planner
+	dispatcher      *Dispatcher
+	monitor         *Monitor
+	calibrator      *Calibrator
+	watchdog        *Watchdog
+	snapshotStore   *SnapshotStore
+	cfg             config.Config
+	policy          *OrchestrationPolicy
+	tierEffProvider TierEffectivenessProvider // NLI feedback loop: tier effectiveness dataset builder
 
 	// Phase 11.6.x: bounded-buffer channel acts as a counting semaphore around
 	// reflector.Reflect to cap concurrent LLM calls per orchestrator instance.
@@ -243,18 +243,10 @@ func (c *CycleOrchestrator) RunCycle(ctx context.Context, spaceID string, tier C
 	}
 
 	// Stage 3: Plan
-	baseline := map[string]float64{
-		"overall_health":      report.OverallHealth,
-		"retrieval_quality":   report.RetrievalQuality,
-		"memory_health":       report.MemoryHealth,
-		"edge_health":         report.EdgeHealth,
-		"total_nodes":         float64(report.TotalNodes),
-		"edge_count":          float64(report.EdgeCount),
-		"orphan_ratio":        report.OrphanRatio,
-		"volatile_count":      float64(report.VolatileCount),
-		"correction_rate":     report.CorrectionRate,
-		"edge_weight_entropy": report.EdgeWeightEntropy,
-	}
+	// RSIC-VALIDATE-001: single-source metric extraction — the old inline
+	// map populated 10 keys while task criteria referenced ~15 others,
+	// making validation vacuous.
+	baseline := reportMetricsMap(report)
 
 	tasks, err := c.planner.Plan(ctx, insights, spaceID, baseline)
 	if err != nil {
@@ -526,12 +518,12 @@ func (c *CycleOrchestrator) recordReflectDivergence(ctx context.Context, spaceID
 				if b == other {
 					rationale := fmt.Sprintf("RSIC reflect divergence: insights recommend both %q and %q for the same dimension; rule-based vs LLM reflectors disagree.", a, b)
 					rec := conversation.ConflictRecord{
-						SpaceID:                  spaceID,
-						RSICRecommendation:       strings.Join(actions, ","),
-						DivergenceKind:           conversation.DivergenceKindTextual,
-						Rationale:                rationale,
-						Source:                   "ape.cycle.reflect",
-						ContextHash:              conversation.HashContext(a, b, ""),
+						SpaceID:            spaceID,
+						RSICRecommendation: strings.Join(actions, ","),
+						DivergenceKind:     conversation.DivergenceKindTextual,
+						Rationale:          rationale,
+						Source:             "ape.cycle.reflect",
+						ContextHash:        conversation.HashContext(a, b, ""),
 					}
 					go func() {
 						_ = c.conflictTracker.Track(ctx, rec)

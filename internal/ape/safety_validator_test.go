@@ -214,10 +214,10 @@ func TestSafetySummary_AccumulatesCorrectly(t *testing.T) {
 	summary.ActionsChecked++
 	summary.ActionsRejected++
 	summary.Rejections = append(summary.Rejections, SafetyRejection{
-		Action: "prune_decayed_edges",
-		Reason: "blast_radius_exceeded",
+		Action:            "prune_decayed_edges",
+		Reason:            "blast_radius_exceeded",
 		EstimatedAffected: 150,
-		Limit:  100,
+		Limit:             100,
 	})
 
 	if summary.ActionsChecked != 3 {
@@ -267,10 +267,10 @@ func TestDestructiveActionsMap_HasCorrectEntries(t *testing.T) {
 func TestActionDelta_Shape(t *testing.T) {
 	delta := ActionDelta{
 		Action:                "prune_decayed_edges",
-		WouldExecute:         true,
-		EstimatedAffected:    47,
-		SafetyLimit:          100,
-		WithinBounds:         true,
+		WouldExecute:          true,
+		EstimatedAffected:     47,
+		SafetyLimit:           100,
+		WithinBounds:          true,
 		ProtectedSpaceBlocked: false,
 	}
 

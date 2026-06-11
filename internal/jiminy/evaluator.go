@@ -23,8 +23,8 @@ type Evaluator struct {
 	cfg        config.Config
 	driver     neo4j.DriverWithContext
 	embedder   embeddings.Embedder
-	llm        *llmclient.Client          // J13: LLM for Tier 2 evaluation
-	cbRegistry *circuitbreaker.Registry   // J13: circuit breaker registry
+	llm        *llmclient.Client        // J13: LLM for Tier 2 evaluation
+	cbRegistry *circuitbreaker.Registry // J13: circuit breaker registry
 
 	// J13: LRU cache for evaluation results
 	cacheMu   sync.Mutex

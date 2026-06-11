@@ -7,16 +7,16 @@ const J17Version = "j17v1"
 
 // TicketPayload holds the serializable state that survives context resets.
 type TicketPayload struct {
-	Version             string                       `json:"version"`               // "j17v1"
-	SpaceID             string                       `json:"space_id"`
-	SessionID           string                       `json:"session_id"`
-	LastSeq             int64                        `json:"last_seq"`
-	TrustScore          float64                      `json:"trust_score"`
-	EscalationSnapshot  map[string]EscalationEntry   `json:"escalation_snapshot"`   // constraint_node_id → entry
-	ActiveConstraintIDs []string                     `json:"active_constraint_ids"`
-	ConversationPhase   string                       `json:"conversation_phase"`
-	IssuedAt            time.Time                    `json:"issued_at"`
-	TTL                 time.Duration                `json:"ttl"`
+	Version             string                     `json:"version"` // "j17v1"
+	SpaceID             string                     `json:"space_id"`
+	SessionID           string                     `json:"session_id"`
+	LastSeq             int64                      `json:"last_seq"`
+	TrustScore          float64                    `json:"trust_score"`
+	EscalationSnapshot  map[string]EscalationEntry `json:"escalation_snapshot"` // constraint_node_id → entry
+	ActiveConstraintIDs []string                   `json:"active_constraint_ids"`
+	ConversationPhase   string                     `json:"conversation_phase"`
+	IssuedAt            time.Time                  `json:"issued_at"`
+	TTL                 time.Duration              `json:"ttl"`
 }
 
 // SessionTicket is a signed, opaque ticket for state persistence across context resets.
@@ -37,8 +37,8 @@ type ProtocolState struct {
 
 // ProtocolInfo is an optional field on GuidanceResponse with J17 state.
 type ProtocolInfo struct {
-	Version    string `json:"version"`
-	Seq        int64  `json:"seq"`
+	Version    string  `json:"version"`
+	Seq        int64   `json:"seq"`
 	TrustScore float64 `json:"trust_score,omitempty"`
 }
 
@@ -77,9 +77,9 @@ type ResumeProtocolRequest struct {
 
 // ResumeProtocolResponse is the output from POST /v1/jiminy/resume-protocol.
 type ResumeProtocolResponse struct {
-	Restored       bool            `json:"restored"`
-	TrustScore     float64         `json:"trust_score"`
+	Restored        bool                       `json:"restored"`
+	TrustScore      float64                    `json:"trust_score"`
 	EscalationState map[string]EscalationEntry `json:"escalation_state,omitempty"`
-	ReplayedEvents []SequenceEvent `json:"replayed_events,omitempty"`
-	Message        string          `json:"message"`
+	ReplayedEvents  []SequenceEvent            `json:"replayed_events,omitempty"`
+	Message         string                     `json:"message"`
 }

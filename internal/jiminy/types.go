@@ -12,68 +12,68 @@ import (
 type GuidanceType string
 
 const (
-	GuidanceConstraint    GuidanceType = "constraint"
-	GuidanceCorrection    GuidanceType = "correction"
-	GuidancePattern       GuidanceType = "pattern"
-	GuidanceConflict      GuidanceType = "conflict"
-	GuidanceRisk          GuidanceType = "risk"
-	GuidanceSuggestion    GuidanceType = "suggestion"
-	GuidanceFrontier      GuidanceType = "frontier"
-	GuidanceDecision      GuidanceType = "decision"   // J7: from retrieval pipeline
-	GuidanceLearning      GuidanceType = "learning"    // J7: from retrieval pipeline
-	GuidancePreference    GuidanceType = "preference"  // J7: from retrieval pipeline
-	GuidanceConcept       GuidanceType = "concept"     // J7: from retrieval pipeline (L2-L5 nodes)
+	GuidanceConstraint GuidanceType = "constraint"
+	GuidanceCorrection GuidanceType = "correction"
+	GuidancePattern    GuidanceType = "pattern"
+	GuidanceConflict   GuidanceType = "conflict"
+	GuidanceRisk       GuidanceType = "risk"
+	GuidanceSuggestion GuidanceType = "suggestion"
+	GuidanceFrontier   GuidanceType = "frontier"
+	GuidanceDecision   GuidanceType = "decision"   // J7: from retrieval pipeline
+	GuidanceLearning   GuidanceType = "learning"   // J7: from retrieval pipeline
+	GuidancePreference GuidanceType = "preference" // J7: from retrieval pipeline
+	GuidanceConcept    GuidanceType = "concept"    // J7: from retrieval pipeline (L2-L5 nodes)
 )
 
 // GuidanceRequest is the input to the Guide() method.
 type GuidanceRequest struct {
 	SpaceID     string `json:"space_id"`               // required
-	Context     string `json:"context"`                 // required — what the agent is doing
-	FilePath    string `json:"file_path,omitempty"`     // optional — current file
-	AgentOutput string `json:"agent_output,omitempty"`  // optional — proposed code/action
-	Query       string `json:"query,omitempty"`         // optional — user's original query
-	SessionID   string `json:"session_id,omitempty"`    // optional — for correction lookup
-	MaxItems    int    `json:"max_items,omitempty"`     // default 10
+	Context     string `json:"context"`                // required — what the agent is doing
+	FilePath    string `json:"file_path,omitempty"`    // optional — current file
+	AgentOutput string `json:"agent_output,omitempty"` // optional — proposed code/action
+	Query       string `json:"query,omitempty"`        // optional — user's original query
+	SessionID   string `json:"session_id,omitempty"`   // optional — for correction lookup
+	MaxItems    int    `json:"max_items,omitempty"`    // default 10
 }
 
 // GuidanceResponse is the output from the Guide() method.
 type GuidanceResponse struct {
-	GuidanceID            string              `json:"guidance_id"` // CUID2 identifier for feedback correlation (Phase AR-2)
-	Guidance              []GuidanceItem      `json:"guidance"`
-	PromptAugmentation    string              `json:"prompt_augmentation"`
-	SynthesizedNarrative  string              `json:"synthesized_narrative,omitempty"`  // J8: LLM-synthesized guidance
-	EncodedAugmentation   string              `json:"encoded_augmentation,omitempty"`   // J17: tier-encoded form (pre-synthesis)
-	Confidence            float64             `json:"confidence"`
-	Rationale             string              `json:"rationale"`
-	Warnings              []string            `json:"warnings,omitempty"`
-	SourceCounts          SourceCounts        `json:"source_counts"`
-	SessionEscalation     *SessionEscalation  `json:"session_escalation,omitempty"` // J12: escalation state
-	GuidanceSeq           int64               `json:"guidance_seq,omitempty"`       // J17: monotonic sequence number
-	Protocol              *ProtocolInfo       `json:"protocol,omitempty"`           // J17: protocol state info
-	Debug                 map[string]any      `json:"debug,omitempty"`
+	GuidanceID           string             `json:"guidance_id"` // CUID2 identifier for feedback correlation (Phase AR-2)
+	Guidance             []GuidanceItem     `json:"guidance"`
+	PromptAugmentation   string             `json:"prompt_augmentation"`
+	SynthesizedNarrative string             `json:"synthesized_narrative,omitempty"` // J8: LLM-synthesized guidance
+	EncodedAugmentation  string             `json:"encoded_augmentation,omitempty"`  // J17: tier-encoded form (pre-synthesis)
+	Confidence           float64            `json:"confidence"`
+	Rationale            string             `json:"rationale"`
+	Warnings             []string           `json:"warnings,omitempty"`
+	SourceCounts         SourceCounts       `json:"source_counts"`
+	SessionEscalation    *SessionEscalation `json:"session_escalation,omitempty"` // J12: escalation state
+	GuidanceSeq          int64              `json:"guidance_seq,omitempty"`       // J17: monotonic sequence number
+	Protocol             *ProtocolInfo      `json:"protocol,omitempty"`           // J17: protocol state info
+	Debug                map[string]any     `json:"debug,omitempty"`
 }
 
 // GuidanceItem is a single piece of guidance.
 type GuidanceItem struct {
 	Type            GuidanceType      `json:"type"`
-	Priority        string            `json:"priority"`    // high, medium, low
+	Priority        string            `json:"priority"` // high, medium, low
 	Content         string            `json:"content"`
 	Confidence      float64           `json:"confidence"`
 	SourceNodes     []string          `json:"source_nodes,omitempty"`
 	EscalationLevel EscalationLevel   `json:"escalation_level,omitempty"` // J12: current escalation state
 	ConstraintCode  string            `json:"constraint_code,omitempty"`  // J17: mnemonic code for T1 encoding
 	Tier            int               `json:"tier,omitempty"`             // J17: encoding tier used (1=coded, 2=telegraphic, 3=full NL)
-	Annotations     map[string]string `json:"annotations,omitempty"`     // J17: inline annotations for T1 disambiguation (alt:, scope:, ctx:, neg:)
+	Annotations     map[string]string `json:"annotations,omitempty"`      // J17: inline annotations for T1 disambiguation (alt:, scope:, ctx:, neg:)
 }
 
 // SourceCounts tracks how many items came from each source.
 type SourceCounts struct {
-	Constraints   int `json:"constraints"`
-	Corrections   int `json:"corrections"`
-	Patterns      int `json:"patterns"`
-	Conflicts     int `json:"conflicts"`
-	Frontiers     int `json:"frontiers"`
-	Retrievals    int `json:"retrievals,omitempty"` // J7: from retrieval pipeline
+	Constraints int `json:"constraints"`
+	Corrections int `json:"corrections"`
+	Patterns    int `json:"patterns"`
+	Conflicts   int `json:"conflicts"`
+	Frontiers   int `json:"frontiers"`
+	Retrievals  int `json:"retrievals,omitempty"` // J7: from retrieval pipeline
 }
 
 // correctionMatch represents a correction observation found via vector search.
@@ -129,8 +129,8 @@ type GuidanceFeedbackRequest struct {
 	GuidanceID    string          `json:"guidance_id"`
 	ActionSummary string          `json:"action_summary"`
 	SpaceID       string          `json:"space_id"`
-	SessionID     string          `json:"session_id,omitempty"`  // J17: per-session trust routing (falls back to SpaceID)
-	Outcome       GuidanceOutcome `json:"outcome,omitempty"`     // B4: explicit outcome bypasses heuristic classification
+	SessionID     string          `json:"session_id,omitempty"` // J17: per-session trust routing (falls back to SpaceID)
+	Outcome       GuidanceOutcome `json:"outcome,omitempty"`    // B4: explicit outcome bypasses heuristic classification
 }
 
 // GuidanceFeedbackResponse is the output from the feedback endpoint.
@@ -142,11 +142,11 @@ type GuidanceFeedbackResponse struct {
 
 // GuidanceItemFeedback records the outcome for a single guidance item.
 type GuidanceItemFeedback struct {
-	Type       GuidanceType       `json:"type"`
-	Content    string             `json:"content"`
-	Outcome    GuidanceOutcome    `json:"outcome"`
-	Similarity float64            `json:"similarity"`
-	Reasoning  string             `json:"reasoning,omitempty"`  // J14: LLM classification reasoning
+	Type       GuidanceType        `json:"type"`
+	Content    string              `json:"content"`
+	Outcome    GuidanceOutcome     `json:"outcome"`
+	Similarity float64             `json:"similarity"`
+	Reasoning  string              `json:"reasoning,omitempty"`  // J14: LLM classification reasoning
 	Dimensions *FeedbackDimensions `json:"dimensions,omitempty"` // NS-03: multi-dimensional feedback
 }
 
@@ -221,8 +221,8 @@ type JiminyStats struct {
 	TotalIgnored           int     `json:"total_ignored"`
 	TotalContradicted      int     `json:"total_contradicted"`
 	FollowRate             float64 `json:"follow_rate"`
-	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
-	ConstraintDataAvail bool    `json:"constraint_data_available"`
+	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	ConstraintDataAvail    bool    `json:"constraint_data_available"`
 	SourceDiversity        float64 `json:"source_diversity"` // 0-1, higher = more diverse
 }
 
@@ -240,10 +240,10 @@ type EscalationLevel string
 const (
 	EscalationInactive  EscalationLevel = ""          // not yet surfaced
 	EscalationSurfaced  EscalationLevel = "surfaced"  // first presentation
-	EscalationWarned    EscalationLevel = "warned"     // ignored once, now warned
-	EscalationEscalated EscalationLevel = "escalated"  // ignored multiple times
-	EscalationBlocked   EscalationLevel = "blocked"    // max escalation
-	EscalationResolved  EscalationLevel = "resolved"   // agent followed guidance
+	EscalationWarned    EscalationLevel = "warned"    // ignored once, now warned
+	EscalationEscalated EscalationLevel = "escalated" // ignored multiple times
+	EscalationBlocked   EscalationLevel = "blocked"   // max escalation
+	EscalationResolved  EscalationLevel = "resolved"  // agent followed guidance
 )
 
 // SessionEscalation summarizes escalation state for a guidance response.
@@ -257,10 +257,10 @@ type SessionEscalation struct {
 
 // EscalationEntry tracks the escalation state for a specific constraint in a session.
 type EscalationEntry struct {
-	NodeID        string          `json:"node_id"`
-	Level         EscalationLevel `json:"level"`
-	IgnoreCount   int             `json:"ignore_count"`
-	LastSurfaced  time.Time       `json:"last_surfaced"`
+	NodeID       string          `json:"node_id"`
+	Level        EscalationLevel `json:"level"`
+	IgnoreCount  int             `json:"ignore_count"`
+	LastSurfaced time.Time       `json:"last_surfaced"`
 }
 
 // ClassifyRequest is the input to the /strict classification endpoint.
@@ -274,7 +274,7 @@ type ClassifyRequest struct {
 
 // ClassifyResponse is the output from the /strict classification endpoint.
 type ClassifyResponse struct {
-	Verdict         string          `json:"verdict"`                    // "pass" or "deny"
+	Verdict         string          `json:"verdict"` // "pass" or "deny"
 	DenialReason    string          `json:"denial_reason,omitempty"`
 	ViolatedCodes   []string        `json:"violated_codes,omitempty"`
 	Confidence      float64         `json:"confidence"`

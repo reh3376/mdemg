@@ -33,11 +33,11 @@ type ActionSnapshot struct {
 
 // RollbackResult describes the outcome of a rollback operation.
 type RollbackResult struct {
-	RolledBack   bool      `json:"rolled_back"`
-	SnapshotID   string    `json:"snapshot_id"`
-	Action       string    `json:"action"`
-	RestoredCount int      `json:"restored_count"`
-	RolledBackAt time.Time `json:"rolled_back_at"`
+	RolledBack    bool      `json:"rolled_back"`
+	SnapshotID    string    `json:"snapshot_id"`
+	Action        string    `json:"action"`
+	RestoredCount int       `json:"restored_count"`
+	RolledBackAt  time.Time `json:"rolled_back_at"`
 }
 
 // SnapshotStore manages in-memory pre-mutation snapshots for RSIC rollback.

@@ -25,11 +25,11 @@ const (
 type TriggerSource string
 
 const (
-	TriggerManualAPI        TriggerSource = "manual_api"
-	TriggerMicroAuto        TriggerSource = "micro_auto"
-	TriggerSessionPeriodic  TriggerSource = "session_periodic"
-	TriggerMacroCron        TriggerSource = "macro_cron"
-	TriggerWatchdogForce    TriggerSource = "watchdog_force"
+	TriggerManualAPI       TriggerSource = "manual_api"
+	TriggerMicroAuto       TriggerSource = "micro_auto"
+	TriggerSessionPeriodic TriggerSource = "session_periodic"
+	TriggerMacroCron       TriggerSource = "macro_cron"
+	TriggerWatchdogForce   TriggerSource = "watchdog_force"
 )
 
 // PolicyVersion is the current orchestration policy version.
@@ -68,11 +68,11 @@ func IsDiagnosticAction(actionType string) bool {
 
 // ValidTriggerSources maps valid source strings for input validation.
 var ValidTriggerSources = map[string]TriggerSource{
-	"manual_api":        TriggerManualAPI,
-	"micro_auto":        TriggerMicroAuto,
-	"session_periodic":  TriggerSessionPeriodic,
-	"macro_cron":        TriggerMacroCron,
-	"watchdog_force":    TriggerWatchdogForce,
+	"manual_api":       TriggerManualAPI,
+	"micro_auto":       TriggerMicroAuto,
+	"session_periodic": TriggerSessionPeriodic,
+	"macro_cron":       TriggerMacroCron,
+	"watchdog_force":   TriggerWatchdogForce,
 }
 
 // Priority returns the trigger priority (lower = higher priority).
@@ -163,26 +163,26 @@ type SelfAssessmentReport struct {
 	SynergyRecoveryBufferEntries int `json:"synergy_recovery_buffer_entries"`
 
 	// Raw details exposed for reflection
-	LearningPhase        string  `json:"learning_phase"`
-	EdgeCount            int64   `json:"edge_count"`
-	OrphanCount          int64   `json:"orphan_count"`
-	TotalNodes           int64   `json:"total_nodes"`
-	OrphanRatio          float64 `json:"orphan_ratio"`
-	CorrectionRate       float64 `json:"correction_rate"`
-	ConsolidationAgeSec  int64   `json:"consolidation_age_sec"`
-	VolatileCount        int     `json:"volatile_count"`
-	PermanentCount       int     `json:"permanent_count"`
-	AvgEdgeWeight        float64 `json:"avg_edge_weight"`
-	EdgesBelowThreshold  int64   `json:"edges_below_threshold"`
-	EdgeWeightEntropy    float64 `json:"edge_weight_entropy"`
-	StaleIngestSpaces    int     `json:"stale_ingest_spaces"`    // Phase 47.2: count of spaces past staleness threshold
-	SidecarHealthy       bool    `json:"sidecar_healthy"`        // Sidecar health: neural sidecar reachable
+	LearningPhase       string  `json:"learning_phase"`
+	EdgeCount           int64   `json:"edge_count"`
+	OrphanCount         int64   `json:"orphan_count"`
+	TotalNodes          int64   `json:"total_nodes"`
+	OrphanRatio         float64 `json:"orphan_ratio"`
+	CorrectionRate      float64 `json:"correction_rate"`
+	ConsolidationAgeSec int64   `json:"consolidation_age_sec"`
+	VolatileCount       int     `json:"volatile_count"`
+	PermanentCount      int     `json:"permanent_count"`
+	AvgEdgeWeight       float64 `json:"avg_edge_weight"`
+	EdgesBelowThreshold int64   `json:"edges_below_threshold"`
+	EdgeWeightEntropy   float64 `json:"edge_weight_entropy"`
+	StaleIngestSpaces   int     `json:"stale_ingest_spaces"` // Phase 47.2: count of spaces past staleness threshold
+	SidecarHealthy      bool    `json:"sidecar_healthy"`     // Sidecar health: neural sidecar reachable
 
 	// TSDB Dataset fields (populated when DatasetProvider is available)
-	LLMPerformance    []tsdb.LLMPerformanceSummary    `json:"llm_performance,omitempty"`
-	RetrievalDataset  *tsdb.RetrievalQualitySummary    `json:"retrieval_dataset,omitempty"`
-	EmbeddingDataset  *tsdb.EmbeddingCoverageSummary   `json:"embedding_dataset,omitempty"`
-	TrainingReadiness *tsdb.TrainingDataReadiness       `json:"training_readiness,omitempty"`
+	LLMPerformance    []tsdb.LLMPerformanceSummary   `json:"llm_performance,omitempty"`
+	RetrievalDataset  *tsdb.RetrievalQualitySummary  `json:"retrieval_dataset,omitempty"`
+	EmbeddingDataset  *tsdb.EmbeddingCoverageSummary `json:"embedding_dataset,omitempty"`
+	TrainingReadiness *tsdb.TrainingDataReadiness    `json:"training_readiness,omitempty"`
 }
 
 // ───────────── Reflection ─────────────
@@ -280,16 +280,16 @@ type RSICTaskSpec struct {
 	Safety           SafetyBounds   `json:"safety"`
 
 	// Deliverables
-	Deliverables    []Deliverable  `json:"deliverables"`
-	SuccessCriteria []Criterion    `json:"success_criteria"`
+	Deliverables    []Deliverable `json:"deliverables"`
+	SuccessCriteria []Criterion   `json:"success_criteria"`
 
 	// Reporting
 	ReportSchedule ReportSchedule `json:"report_schedule"`
 
 	// Execution limits
-	Timeout         time.Duration  `json:"timeout"`
+	Timeout         time.Duration      `json:"timeout"`
 	BaselineMetrics map[string]float64 `json:"baseline_metrics"`
-	Priority        int            `json:"priority"`
+	Priority        int                `json:"priority"`
 
 	// Parameter routing for protocol mutation actions
 	TargetNodeID string `json:"target_node_id,omitempty"` // for codify_constraint: constraint node ID
@@ -315,20 +315,20 @@ type RSICProgressReport struct {
 
 // CycleOutcome summarises a completed RSIC cycle.
 type CycleOutcome struct {
-	CycleID          string             `json:"cycle_id"`
-	Tier             CycleTier          `json:"tier"`
-	SpaceID          string             `json:"space_id"`
-	StartedAt        time.Time          `json:"started_at"`
-	CompletedAt      time.Time          `json:"completed_at"`
-	ActionsExecuted  int                `json:"actions_executed"`
-	SuccessCount     int                `json:"success_count"`
-	FailedCount      int                `json:"failed_count"`
-	DiagnosticCount  int                `json:"diagnostic_count,omitempty"`
-	MetricsBefore    map[string]float64 `json:"metrics_before"`
-	MetricsAfter     map[string]float64 `json:"metrics_after"`
-	CalibrationDelta map[string]float64 `json:"calibration_delta,omitempty"`
+	CycleID          string              `json:"cycle_id"`
+	Tier             CycleTier           `json:"tier"`
+	SpaceID          string              `json:"space_id"`
+	StartedAt        time.Time           `json:"started_at"`
+	CompletedAt      time.Time           `json:"completed_at"`
+	ActionsExecuted  int                 `json:"actions_executed"`
+	SuccessCount     int                 `json:"success_count"`
+	FailedCount      int                 `json:"failed_count"`
+	DiagnosticCount  int                 `json:"diagnostic_count,omitempty"`
+	MetricsBefore    map[string]float64  `json:"metrics_before"`
+	MetricsAfter     map[string]float64  `json:"metrics_after"`
+	CalibrationDelta map[string]float64  `json:"calibration_delta,omitempty"`
 	Insights         []ReflectionInsight `json:"insights,omitempty"`
-	Error            string             `json:"error,omitempty"`
+	Error            string              `json:"error,omitempty"`
 
 	// Phase 87: Trigger provenance
 	TriggerSource  TriggerSource `json:"trigger_source,omitempty"`
@@ -338,10 +338,10 @@ type CycleOutcome struct {
 	IdempotencyKey string        `json:"idempotency_key,omitempty"`
 
 	// Phase 88: Safety enforcement
-	DryRun         bool            `json:"dry_run,omitempty"`
-	SafetyVersion  string          `json:"safety_version,omitempty"`
-	SafetySummary  *SafetySummary  `json:"safety_summary,omitempty"`
-	Deltas         []ActionDelta   `json:"deltas,omitempty"`
+	DryRun        bool           `json:"dry_run,omitempty"`
+	SafetyVersion string         `json:"safety_version,omitempty"`
+	SafetySummary *SafetySummary `json:"safety_summary,omitempty"`
+	Deltas        []ActionDelta  `json:"deltas,omitempty"`
 
 	// Phase AR-1: Feedback loop — criteria evaluation
 	CriteriaMet     bool              `json:"criteria_met"`
@@ -354,11 +354,11 @@ type CycleOutcome struct {
 
 // SafetySummary records safety enforcement results for a cycle.
 type SafetySummary struct {
-	ActionsChecked  int               `json:"actions_checked"`
-	ActionsAllowed  int               `json:"actions_allowed"`
-	ActionsRejected int               `json:"actions_rejected"`
-	Rejections      []SafetyRejection `json:"rejections,omitempty"`
-	SnapshotsCreated int              `json:"snapshots_created"`
+	ActionsChecked   int               `json:"actions_checked"`
+	ActionsAllowed   int               `json:"actions_allowed"`
+	ActionsRejected  int               `json:"actions_rejected"`
+	Rejections       []SafetyRejection `json:"rejections,omitempty"`
+	SnapshotsCreated int               `json:"snapshots_created"`
 }
 
 // SafetyRejection records why an action was rejected by the safety validator.
@@ -371,14 +371,14 @@ type SafetyRejection struct {
 
 // ActionDelta describes what a dry-run action would do without executing.
 type ActionDelta struct {
-	Action               string `json:"action"`
-	WouldExecute         bool   `json:"would_execute"`
-	EstimatedAffected    int    `json:"estimated_affected"`
-	SafetyLimit          int    `json:"safety_limit"`
-	WithinBounds         bool   `json:"within_bounds"`
-	ProtectedSpaceBlocked bool  `json:"protected_space_blocked"`
-	RejectionReason      string `json:"rejection_reason,omitempty"`
-	Note                 string `json:"note,omitempty"`
+	Action                string `json:"action"`
+	WouldExecute          bool   `json:"would_execute"`
+	EstimatedAffected     int    `json:"estimated_affected"`
+	SafetyLimit           int    `json:"safety_limit"`
+	WithinBounds          bool   `json:"within_bounds"`
+	ProtectedSpaceBlocked bool   `json:"protected_space_blocked"`
+	RejectionReason       string `json:"rejection_reason,omitempty"`
+	Note                  string `json:"note,omitempty"`
 }
 
 // ───────────── Watchdog ─────────────
@@ -447,8 +447,8 @@ type JiminyStatsResult struct {
 	TotalIgnored           int     `json:"total_ignored"`
 	TotalContradicted      int     `json:"total_contradicted"`
 	FollowRate             float64 `json:"follow_rate"`
-	ConstraintEffRate   float64 `json:"constraint_effectiveness_rate"`
-	ConstraintDataAvail bool    `json:"constraint_data_available"`
+	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
+	ConstraintDataAvail    bool    `json:"constraint_data_available"`
 	SourceDiversity        float64 `json:"source_diversity"`
 }
 
@@ -459,16 +459,16 @@ type ProtocolStatsProvider interface {
 
 // ProtocolStatsResult carries J17 protocol metrics for RSIC assessment.
 type ProtocolStatsResult struct {
-	TierDistribution         [3]float64                 `json:"tier_distribution"`
-	CompressionRatio         float64                    `json:"compression_ratio"`
-	AvgComprehension         float64                    `json:"avg_comprehension"`
-	ReplayFrequencyPerHour   float64                    `json:"replay_frequency_per_hour"`
-	TicketRestoreSuccessRate float64                    `json:"ticket_restore_success_rate"`
-	TicketRestoreTotal       int64                      `json:"ticket_restore_total"` // disambiguates "no data" (0) from "100% pass" (>0 && rate==1.0)
-	CodeCoverage             float64                    `json:"code_coverage"`
-	TotalEvents              int64                      `json:"total_events"`
-	T2FrequencyByConstraint  map[string]int             `json:"t2_frequency_by_constraint,omitempty"`
-	CodeComprehension        map[string]float64         `json:"code_comprehension,omitempty"`
+	TierDistribution         [3]float64         `json:"tier_distribution"`
+	CompressionRatio         float64            `json:"compression_ratio"`
+	AvgComprehension         float64            `json:"avg_comprehension"`
+	ReplayFrequencyPerHour   float64            `json:"replay_frequency_per_hour"`
+	TicketRestoreSuccessRate float64            `json:"ticket_restore_success_rate"`
+	TicketRestoreTotal       int64              `json:"ticket_restore_total"` // disambiguates "no data" (0) from "100% pass" (>0 && rate==1.0)
+	CodeCoverage             float64            `json:"code_coverage"`
+	TotalEvents              int64              `json:"total_events"`
+	T2FrequencyByConstraint  map[string]int     `json:"t2_frequency_by_constraint,omitempty"`
+	CodeComprehension        map[string]float64 `json:"code_comprehension,omitempty"`
 
 	// Per-tier comprehension (NLI feedback loop)
 	TierComprehension     [3]float64                 `json:"tier_comprehension"`
@@ -480,9 +480,9 @@ type ProtocolStatsResult struct {
 	NLIBiasAlert bool    `json:"nli_bias_alert"`
 
 	// NLI fallback tracking (degraded-state awareness)
-	NLIFallbackCount int64              `json:"nli_fallback_count,omitempty"`
-	NLIFallbackRate  float64            `json:"nli_fallback_rate,omitempty"`
-	CodeOutcomeCount map[string]int64   `json:"code_outcome_count,omitempty"`
+	NLIFallbackCount int64            `json:"nli_fallback_count,omitempty"`
+	NLIFallbackRate  float64          `json:"nli_fallback_rate,omitempty"`
+	CodeOutcomeCount map[string]int64 `json:"code_outcome_count,omitempty"`
 
 	// Token efficiency
 	AvgTokensPerGuidance float64 `json:"avg_tokens_per_guidance"`
@@ -515,6 +515,12 @@ type ProtocolEvolverProvider interface {
 type GuidanceCalibrationProvider interface {
 	GetConstraintEffectiveness(ctx context.Context, spaceID string) ([]GuidanceEffectivenessItem, error)
 	UpdateNodeConfidence(ctx context.Context, nodeID string, outcome string) error
+	// AdjustNodeConfidenceDirect applies a counter-free confidence delta —
+	// RSIC self-calibration must not pollute the real-feedback outcome
+	// counters it reads next cycle (RSIC-VALIDATE-001).
+	AdjustNodeConfidenceDirect(ctx context.Context, nodeID string, delta float64) error
+	// ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
+	ConfidenceCalibrationDeltas() (boost, decay float64)
 	ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error)
 }
 

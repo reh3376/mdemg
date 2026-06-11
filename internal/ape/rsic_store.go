@@ -15,7 +15,7 @@ import (
 // CalibrationSnapshot holds serializable calibration state.
 type CalibrationSnapshot struct {
 	ActionHistory map[string][]ActionOutcome `json:"action_history"`
-	CycleHistory  []CycleOutcome            `json:"cycle_history"`
+	CycleHistory  []CycleOutcome             `json:"cycle_history"`
 }
 
 // OrchestrationSnapshot holds serializable orchestration policy state.
@@ -37,8 +37,8 @@ type RSICStore struct {
 	cancel    context.CancelFunc
 
 	// In-memory cached state
-	calibrationData   map[string]*CalibrationSnapshot  // key: spaceID
-	watchdogData      map[string]*WatchdogState         // key: spaceID
+	calibrationData   map[string]*CalibrationSnapshot // key: spaceID
+	watchdogData      map[string]*WatchdogState       // key: spaceID
 	orchestrationData *OrchestrationSnapshot
 
 	lastFlush   time.Time
@@ -299,7 +299,7 @@ func (s *RSICStore) GetStatus() map[string]any {
 	status := map[string]any{
 		"enabled":      true,
 		"dirty_keys":   len(s.dirty),
-		"flush_errors":  s.flushErrors,
+		"flush_errors": s.flushErrors,
 	}
 
 	if !s.lastFlush.IsZero() {
