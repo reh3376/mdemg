@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "jiminy.evaluate_llm",
-    "description": "LLM-based constraint compliance evaluator \u2014 same as jiminy.evaluate but called via evaluator.go path",
+    "description": "LLM-based constraint compliance evaluator — same as jiminy.evaluate but called via evaluator.go path",
     "version": "1.0.0"
   },
   "metadata": {
@@ -14,10 +14,13 @@
   "sampling_group": "J",
   "prompt": {
     "system_prompt_hash": [
-      "d8f4e2375bf118889d3e5e9e23d1c4e2e2caa7f56b39c0bd8d37e4c1a3a34a6e",
+      "d8f4e2375bf11888445e3a0fad59802ebfb9bb9ef9bc527aee25c8c7e0a2a787",
       "1f02ee469728a422bd8e83629764be1a31115a02f7fbb5a372ef64243fb76bea"
     ],
-    "system_prompt_source": "internal/jiminy/outcome_classifier.go:20 (classifySystemPrompt full + classifySystemPromptCompact)",
+    "system_prompt_source": [
+      "internal/jiminy/outcome_classifier.go:20 (classifySystemPrompt full)",
+      "internal/jiminy/outcome_classifier.go:47 (classifySystemPromptCompact)"
+    ],
     "think_mode": true,
     "dynamic_prompt": false
   },

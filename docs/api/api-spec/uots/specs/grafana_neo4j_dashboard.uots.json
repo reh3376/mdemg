@@ -3,7 +3,11 @@
   "observability": {
     "name": "Grafana Neo4j Dashboard",
     "type": "grafana_dashboard",
-    "tags": ["grafana", "neo4j", "dashboard"]
+    "tags": [
+      "grafana",
+      "neo4j",
+      "dashboard"
+    ]
   },
   "target": {
     "file": "deploy/docker/grafana/dashboards/mdemg-neo4j.json"
@@ -18,31 +22,35 @@
         "Total Edges",
         "Total Spaces",
         "Neo4j Pool Active",
-        "Heap Memory",
+        "Neo4j Memory",
         "Neo4j Container CPU Usage",
         "Neo4j Container Memory Usage",
         "Space Overview",
         "Health Score Over Time",
-        "Orphans Per Space Over Time",
+        "Orphan Nodes",
         "Neo4j Connection Pool",
-        "Learning Edges Over Time"
+        "Hebbian Co-Activation Edges"
       ],
       "required_queries": [
         "mdemg_neo4j_graph_total_nodes",
         "mdemg_neo4j_graph_total_edges",
-        "mdemg_neo4j_graph_total_spaces",
-        "mdemg_neo4j_graph_nodes",
-        "mdemg_neo4j_graph_edges",
-        "mdemg_neo4j_graph_observations",
-        "mdemg_neo4j_graph_orphans",
-        "mdemg_neo4j_graph_health_score",
-        "mdemg_neo4j_graph_learning_edges",
         "mdemg_neo4j_pool_active_connections",
+        "mdemg_neo4j_pool_idle_connections",
+        "mdemg_neo4j_pool_waiting_requests",
         "mdemg_neo4j_container_cpu_percent",
-        "mdemg_neo4j_container_mem_used_bytes"
+        "mdemg_neo4j_container_mem_used_bytes",
+        "mdemg_rsic_health_overall",
+        "mdemg_circuit_breaker_state"
       ],
-      "required_template_vars": ["instance", "space_id"],
-      "tags": ["mdemg", "neo4j", "graph"]
+      "required_template_vars": [
+        "instance",
+        "space_id"
+      ],
+      "tags": [
+        "mdemg",
+        "neo4j",
+        "graph"
+      ]
     }
   },
   "config": {
@@ -51,9 +59,13 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "updated": "2026-03-27",
-    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels with rawSql queries for all Neo4j graph and container metrics.",
+    "updated": "2026-06-11",
+    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels and metric queries. Refreshed in UXTS-CI-001 to the post-GRAFANA-AUDIT-001 dashboard truth (panels renamed: Heap Memory→Neo4j Memory, Orphans Per Space Over Time→Orphan Nodes, Learning Edges Over Time→Hebbian Co-Activation Edges; per-space mdemg_neo4j_graph_* metric queries moved out of this dashboard) — the stale spec was invisible while the UOTS step was a continue-on-error zombie.",
     "status": "active",
-    "tags": ["grafana", "neo4j", "phase-grafana"]
+    "tags": [
+      "grafana",
+      "neo4j",
+      "phase-grafana"
+    ]
   }
 }

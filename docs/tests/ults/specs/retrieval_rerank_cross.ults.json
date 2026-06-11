@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "retrieval.rerank_cross",
-    "description": "Cross-encoder reranker \u2014 scores retrieval candidates for relevance using detailed prompt with full context",
+    "description": "Cross-encoder reranker — scores retrieval candidates for relevance using detailed prompt with full context",
     "version": "1.0.0"
   },
   "metadata": {
@@ -17,7 +17,10 @@
       "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
       "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb"
     ],
-    "system_prompt_source": "internal/retrieval/rerank.go:20 (rerankCrossSystemPrompt full + rerankNLISystemPrompt compact when RerankCompress=true)",
+    "system_prompt_source": [
+      "internal/retrieval/rerank.go:20 (rerankCrossSystemPrompt full)",
+      "internal/retrieval/rerank.go:22 (rerankNLISystemPrompt compact when RerankCompress=true)"
+    ],
     "think_mode": true,
     "dynamic_prompt": false
   },

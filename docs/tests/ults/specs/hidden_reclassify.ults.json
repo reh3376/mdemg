@@ -2,19 +2,19 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "hidden.reclassify",
-    "description": "Code reclassifier \u2014 assigns sub-categories to ingested source files based on content analysis",
+    "description": "Code reclassifier — assigns sub-categories to ingested source files based on content analysis",
     "version": "1.0.0"
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-03-30",
     "priority": "medium",
-    "notes": "Dynamic prompt \u2014 threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25. Output is an array of cluster objects (not a single classification); classification_accuracy reward is structurally inapplicable and was removed in Phase 10. A cluster-overlap reward function is tracked for Phase 10.5 UBENCH (#215)."
+    "notes": "Dynamic prompt — threshold percentage injected via fmt.Sprintf in buildReclassSystemPrompt(). Default threshold 0.25. Output is an array of cluster objects (not a single classification); classification_accuracy reward is structurally inapplicable and was removed in Phase 10. A cluster-overlap reward function is tracked for Phase 10.5 UBENCH (#215)."
   },
   "sampling_group": "C",
   "prompt": {
     "system_prompt_hash": [
-      "2fafc511c7756c568f588e4036aabbfca23ae4c5ad89c18a742c7d58928ced04",
+      "2933a2e63f5be63e199c9849a4768bbee69fb21dcc12330550120d6619092c17",
       "dynamic"
     ],
     "system_prompt_source": "internal/hidden/reclassifier.go:319 (buildReclassSystemPrompt; threshold templated)",
