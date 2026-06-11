@@ -632,7 +632,7 @@ func TestMaxDepthEnforcement(t *testing.T) {
 	// Category at depth 4 should NOT be detected as oversized, even if it exceeds threshold
 	classes := map[string][]BaseNode{
 		"typescript-services-auth-saml": make([]BaseNode, 80), // depth 4
-		"go": make([]BaseNode, 20),
+		"go":                            make([]BaseNode, 20),
 	}
 
 	oversized := r.detectOversizedCategories(classes, 100)
@@ -691,8 +691,8 @@ func TestMiscDescriptionFallback(t *testing.T) {
 	nodes := []BaseNode{
 		{NodeID: "1", Summary: "Module: auth service"},
 		{NodeID: "2", Summary: "Class: user controller"},
-		{NodeID: "3", Summary: "File: utility code"},          // → misc
-		{NodeID: "4", Summary: "File: random documentation"},  // → misc
+		{NodeID: "3", Summary: "File: utility code"},         // → misc
+		{NodeID: "4", Summary: "File: random documentation"}, // → misc
 	}
 
 	classes := map[string][]BaseNode{
@@ -859,4 +859,3 @@ func descKeys(m map[string]string) []string {
 	}
 	return keys
 }
-

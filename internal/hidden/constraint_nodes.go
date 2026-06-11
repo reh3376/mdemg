@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nrednav/cuid2"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/nrednav/cuid2"
 )
 
 // ConstraintNodeResult tracks what happened during constraint node creation.
@@ -53,7 +53,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			nodeID              string
 			name                string
 			content             string
-			constraintCode      string   // J17 constraint code from observation
+			constraintCode      string // J17 constraint code from observation
 			tags                []string
 			embedding           []float64
 			cTypes              []string // extracted constraint types
