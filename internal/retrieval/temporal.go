@@ -383,7 +383,7 @@ func parseMonth(name string) time.Month {
 		"february": time.February, "feb": time.February,
 		"march": time.March, "mar": time.March,
 		"april": time.April, "apr": time.April,
-		"may": time.May,
+		"may":  time.May,
 		"june": time.June, "jun": time.June,
 		"july": time.July, "jul": time.July,
 		"august": time.August, "aug": time.August,

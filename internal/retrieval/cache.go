@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"encoding/binary"
+	"math"
 	"mdemg/internal/models"
 )
 
@@ -60,20 +62,40 @@ func NewQueryCache(capacity int, ttl time.Duration) *QueryCache {
 // scorerVersion to preserve the pre-Phase-13 namespace ("v0-pre-versioned").
 func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 	// Create a deterministic key from the relevant query parameters
+	// CACHE-KEY-002: every result-affecting RetrieveRequest field MUST be in
+	// this key (the v0.7.0 cache-key class — second occurrence fixed here).
+	// A reflection test (cache_key_coverage_test.go) forces new fields to be
+	// classified: either added here or explicitly allowlisted as
+	// result-neutral.
 	keyData := struct {
-		SpaceID            string `json:"s"`
-		QueryText          string `json:"q"`
-		CandidateK         int    `json:"ck"`
-		TopK               int    `json:"tk"`
-		HopDepth           int    `json:"hd"`
-		IncludeEvidence    bool   `json:"ie"`
-		IncludeGlobalSpace bool   `json:"ig"`
-		CodeOnly           bool   `json:"co"`
-		TranslateIntent    bool   `json:"ti"`
-		ScorerVersion      string `json:"sv"`
+		SpaceID            string         `json:"s"`
+		QueryText          string         `json:"q"`
+		QueryEmbeddingHash string         `json:"qe,omitempty"`
+		CandidateK         int            `json:"ck"`
+		TopK               int            `json:"tk"`
+		HopDepth           int            `json:"hd"`
+		IncludeEvidence    bool           `json:"ie"`
+		IncludeGlobalSpace bool           `json:"ig"`
+		CodeOnly           bool           `json:"co"`
+		TranslateIntent    bool           `json:"ti"`
+		IncludeExtensions  []string       `json:"inx,omitempty"`
+		ExcludeExtensions  []string       `json:"exx,omitempty"`
+		TemporalAfter      string         `json:"ta,omitempty"`
+		TemporalBefore     string         `json:"tb,omitempty"`
+		PolicyContext      map[string]any `json:"pc,omitempty"`
+		Cursor             string         `json:"cu,omitempty"`
+		Limit              int            `json:"li,omitempty"`
+		SparseOverride     bool           `json:"so,omitempty"`
+		SparseEnabled      bool           `json:"se,omitempty"`
+		SparsePercentile   float64        `json:"sp,omitempty"`
+		Category           string         `json:"ca,omitempty"`
+		ContextFingerprint []uint16       `json:"cf,omitempty"`
+		StrictContextMode  bool           `json:"sc,omitempty"`
+		ScorerVersion      string         `json:"sv"`
 	}{
 		SpaceID:            req.SpaceID,
 		QueryText:          req.QueryText,
+		QueryEmbeddingHash: hashEmbedding(req.QueryEmbedding),
 		CandidateK:         req.CandidateK,
 		TopK:               req.TopK,
 		HopDepth:           req.HopDepth,
@@ -81,6 +103,19 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		IncludeGlobalSpace: req.IncludeGlobalSpace,
 		CodeOnly:           req.CodeOnly,
 		TranslateIntent:    req.TranslateIntent,
+		IncludeExtensions:  req.IncludeExtensions,
+		ExcludeExtensions:  req.ExcludeExtensions,
+		TemporalAfter:      req.TemporalAfter,
+		TemporalBefore:     req.TemporalBefore,
+		PolicyContext:      req.PolicyContext,
+		Cursor:             req.Cursor,
+		Limit:              req.Limit,
+		SparseOverride:     req.SparseOverridePresent,
+		SparseEnabled:      req.SparseEnabled,
+		SparsePercentile:   req.SparsePercentile,
+		Category:           req.Category,
+		ContextFingerprint: req.QueryContextFingerprint,
+		StrictContextMode:  req.StrictContextMode,
 		ScorerVersion:      scorerVersion,
 	}
 
@@ -229,4 +264,20 @@ func (c *QueryCache) evictOldest() {
 	c.lruList.Remove(elem)
 	entry := elem.Value.(*queryCacheEntry)
 	delete(c.items, entry.key)
+}
+
+// hashEmbedding fingerprints a caller-supplied query embedding for the cache
+// key ("" when absent). Without this, two different embedding-only queries
+// collided on one cache entry (CACHE-KEY-002).
+func hashEmbedding(emb []float32) string {
+	if len(emb) == 0 {
+		return ""
+	}
+	h := sha256.New()
+	buf := make([]byte, 4)
+	for _, f := range emb {
+		binary.LittleEndian.PutUint32(buf, math.Float32bits(f))
+		h.Write(buf)
+	}
+	return hex.EncodeToString(h.Sum(nil)[:8])
 }

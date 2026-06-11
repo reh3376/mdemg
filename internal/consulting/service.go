@@ -625,7 +625,12 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 
 	minConfidence := req.MinConfidence
 	if minConfidence <= 0 {
-		minConfidence = 0.5 // Default threshold
+		// RRF-SCALE-002: was a hardcoded 0.5 against a scale whose strong
+		// matches top out ~0.49-0.58 — Suggest filtered nearly everything.
+		minConfidence = s.cfg.ConsultingSuggestMinConfidence
+		if minConfidence <= 0 {
+			minConfidence = config.DefaultConsultingSuggestMinConfidence
+		}
 	}
 
 	// Step 1: Analyze context to identify triggers

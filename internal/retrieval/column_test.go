@@ -228,8 +228,8 @@ func TestColumnInterface_AllReturnLatencyEvenOnFastPath(t *testing.T) {
 // working.
 func TestColumnNilSvcErrorIsDescriptive(t *testing.T) {
 	cases := []struct {
-		col      Column
-		wantSub  string
+		col     Column
+		wantSub string
 	}{
 		{&EmbeddingColumn{svc: nil}, "embedding"},
 		{&BM25Column{svc: nil}, "bm25"},

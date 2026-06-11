@@ -32,11 +32,11 @@ type ReasoningRequest struct {
 
 // ReasoningResult contains output from reasoning modules
 type ReasoningResult struct {
-	Results     []models.RetrieveResult
-	ModuleID    string  // Which module processed the request
-	LatencyMs   float64
-	TokensUsed  int
-	Metadata    map[string]string
+	Results    []models.RetrieveResult
+	ModuleID   string // Which module processed the request
+	LatencyMs  float64
+	TokensUsed int
+	Metadata   map[string]string
 }
 
 // PluginReasoningProvider implements ReasoningProvider using the plugin system

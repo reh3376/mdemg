@@ -15,7 +15,7 @@ type fakeColumn struct {
 	res  ColumnResult
 }
 
-func (f *fakeColumn) Name() string                                  { return f.name }
+func (f *fakeColumn) Name() string                                      { return f.name }
 func (f *fakeColumn) Run(_ context.Context, _ ColumnQuery) ColumnResult { return f.res }
 
 // candList is a tiny helper to build a ranked Candidate slice.

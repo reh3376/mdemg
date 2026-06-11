@@ -10,8 +10,8 @@ import (
 
 // QueryMetrics tracks query execution statistics.
 type QueryMetrics struct {
-	TotalQueries   atomic.Int64
-	SlowQueries    atomic.Int64
+	TotalQueries    atomic.Int64
+	SlowQueries     atomic.Int64
 	TotalDurationNs atomic.Int64
 }
 
@@ -75,10 +75,10 @@ func GetQueryMetrics() map[string]any {
 	}
 
 	return map[string]any{
-		"total_queries":    total,
-		"slow_queries":     slow,
-		"slow_query_pct":   float64(slow) / float64(max(total, 1)) * 100,
-		"avg_duration_ms":  avgDuration,
+		"total_queries":     total,
+		"slow_queries":      slow,
+		"slow_query_pct":    float64(slow) / float64(max(total, 1)) * 100,
+		"avg_duration_ms":   avgDuration,
 		"total_duration_ms": totalDuration / 1e6,
 	}
 }

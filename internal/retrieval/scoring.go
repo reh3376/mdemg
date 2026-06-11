@@ -205,7 +205,7 @@ func isCodeQuery(query string) bool {
 	// Code-related keywords that suggest the user wants specific code elements
 	// IMPORTANT: Avoid overly general phrases like "how does" which appear in many non-code queries
 	codeKeywords := []string{
-		" class", "class ",  // "X class" or "class X"
+		" class", "class ", // "X class" or "class X"
 		" function", "function ",
 		" method", "method ",
 		" struct", "struct ",
@@ -391,10 +391,10 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 
 	// Symbol lookup: maximize vector precision, minimize graph noise
 	if isSymbolLookupQuery(queryText) {
-		hints.SeedN = 30           // Fewer seeds (more precise)
-		hints.HopDepth = 1         // Minimal expansion
-		hints.VectorWeight = 0.85  // Strong vector preference
-		hints.BM25Weight = 0.15    // Weak BM25
+		hints.SeedN = 30              // Fewer seeds (more precise)
+		hints.HopDepth = 1            // Minimal expansion
+		hints.VectorWeight = 0.85     // Strong vector preference
+		hints.BM25Weight = 0.15       // Weak BM25
 		hints.EnableExpansion = false // Skip graph expansion
 		hints.EdgeTypeStrategy = "structural_first"
 		hints.QueryType = "symbol_lookup"
@@ -414,10 +414,10 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 
 	// Relationship query: emphasize graph traversal
 	if isRelationshipQuery(queryText) {
-		hints.SeedN = 60           // More seeds for broader coverage
-		hints.HopDepth = 2         // Full expansion
-		hints.VectorWeight = 0.6   // Balanced
-		hints.BM25Weight = 0.4     // Higher BM25 for relationship keywords
+		hints.SeedN = 60         // More seeds for broader coverage
+		hints.HopDepth = 2       // Full expansion
+		hints.VectorWeight = 0.6 // Balanced
+		hints.BM25Weight = 0.4   // Higher BM25 for relationship keywords
 		hints.EdgeTypeStrategy = "hybrid"
 		hints.QueryType = "relationship"
 		return hints
@@ -439,7 +439,7 @@ func ComputeRetrievalHints(queryText string, cfg config.Config) RetrievalHints {
 		hints.SeedN = 60
 		hints.HopDepth = 2
 		hints.VectorWeight = 0.55
-		hints.BM25Weight = 0.45    // Higher BM25 for architecture keywords
+		hints.BM25Weight = 0.45 // Higher BM25 for architecture keywords
 		hints.EdgeTypeStrategy = "hybrid"
 		hints.QueryType = "architecture"
 		return hints
@@ -658,10 +658,10 @@ func ScoreAndRankWithBreakdown(cands []Candidate, act map[string]float64, edges 
 
 	// Hyperparameters from config (see config.Config for defaults)
 	// Note: alpha and beta are now adjusted via query gating below
-	gamma := cfg.ScoringGamma       // recency weight
-	delta := cfg.ScoringDelta       // confidence weight
-	phi := cfg.ScoringPhi           // hub penalty coefficient
-	kappa := cfg.ScoringKappa       // redundancy penalty coefficient
+	gamma := cfg.ScoringGamma // recency weight
+	delta := cfg.ScoringDelta // confidence weight
+	phi := cfg.ScoringPhi     // hub penalty coefficient
+	kappa := cfg.ScoringKappa // redundancy penalty coefficient
 	// Note: rho is now layer-specific, computed per-candidate via getLayerDecayRate()
 	configBoost := cfg.ScoringConfigBoost // config node boost multiplier
 	pathBoost := cfg.ScoringPathBoost     // path match boost coefficient

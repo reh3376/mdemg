@@ -282,9 +282,9 @@ func TestQueryAwareExpansion_FeatureToggle(t *testing.T) {
 	t.Run("default enabled", func(t *testing.T) {
 		// Default should be enabled
 		cfg := config.Config{
-			QueryAwareExpansionEnabled:  true,
-			QueryAwareAttentionWeight:   0.5,
-			NodeEmbeddingCacheSize:      5000,
+			QueryAwareExpansionEnabled: true,
+			QueryAwareAttentionWeight:  0.5,
+			NodeEmbeddingCacheSize:     5000,
 		}
 
 		if !cfg.QueryAwareExpansionEnabled {

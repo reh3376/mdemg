@@ -18,7 +18,7 @@ import (
 type NodeEmbeddingCache struct {
 	mu       sync.Mutex
 	items    map[string]*list.Element // nodeID -> list element
-	lruList  *list.List              // front = most recent, back = least recent
+	lruList  *list.List               // front = most recent, back = least recent
 	capacity int
 	maxAge   time.Duration // DD-P2-21: TTL for cache entries (0 = no TTL)
 	hits     int64

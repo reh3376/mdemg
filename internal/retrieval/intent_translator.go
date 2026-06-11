@@ -193,4 +193,3 @@ func (t *LLMIntentTranslator) Translate(ctx context.Context, query string) (stri
 
 	return translated, nil
 }
-

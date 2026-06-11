@@ -267,4 +267,3 @@ func (qc *QueryClassifier) parseResponse(raw string) (*QueryClassification, erro
 
 	return &result, nil
 }
-

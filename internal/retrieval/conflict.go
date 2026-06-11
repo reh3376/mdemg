@@ -106,12 +106,12 @@ func LogVersionMismatch(spaceID, nodeID, operation string, expected, actual int6
 // LogStaleUpdate is a convenience function for stale update conflicts.
 func LogStaleUpdate(spaceID, nodeID, path, operation string) {
 	LogConflict(ConflictEvent{
-		Type:      ConflictStaleUpdate,
-		SpaceID:   spaceID,
-		NodeID:    nodeID,
-		Path:      path,
-		Operation: operation,
-		Resolved:  false,
+		Type:       ConflictStaleUpdate,
+		SpaceID:    spaceID,
+		NodeID:     nodeID,
+		Path:       path,
+		Operation:  operation,
+		Resolved:   false,
 		Resolution: ResolutionUnresolved,
 	})
 }
@@ -138,11 +138,11 @@ func LogConflictResolved(evt ConflictEvent, resolution ConflictResolution) {
 
 // ConflictStats tracks conflict statistics for monitoring.
 type ConflictStats struct {
-	TotalConflicts       int64            `json:"total_conflicts"`
-	ConflictsByType      map[string]int64 `json:"conflicts_by_type"`
-	ResolvedConflicts    int64            `json:"resolved_conflicts"`
-	UnresolvedConflicts  int64            `json:"unresolved_conflicts"`
-	LastConflictTime     time.Time        `json:"last_conflict_time,omitempty"`
+	TotalConflicts      int64            `json:"total_conflicts"`
+	ConflictsByType     map[string]int64 `json:"conflicts_by_type"`
+	ResolvedConflicts   int64            `json:"resolved_conflicts"`
+	UnresolvedConflicts int64            `json:"unresolved_conflicts"`
+	LastConflictTime    time.Time        `json:"last_conflict_time,omitempty"`
 }
 
 // ConflictTracker provides in-memory tracking of conflict statistics.
