@@ -15,6 +15,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/mathutil"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
@@ -712,6 +713,11 @@ func (s *Service) Suggest(ctx context.Context, req models.SuggestRequest) (model
 		conflicts := s.detectConflicts(ctx, req.SpaceID, req.Context, filteredResults)
 		resp.Conflicts = conflicts
 		resp.Debug["conflicts_detected"] = len(conflicts)
+		if len(conflicts) > 0 {
+			// TSDB-CONSUME-001: surfaces conflict frequency in
+			// metric_samples — the measurable half of idea 09's go/no-go.
+			metrics.Metrics().GuidanceConflicts(req.SpaceID).Add(int64(len(conflicts)))
+		}
 
 		// Phase 12 Epic 6: a non-zero conflict count is a divergence signal
 		// — accumulated retrieved results contradict each other in a way the

@@ -93,3 +93,171 @@ func TestMetricSamplesRules_UseTimeColumn(t *testing.T) {
 		}
 	}
 }
+
+// TSDB-CONSUME-001: the retrieve-latency rules replaced the broken
+// lifetime-cumulative HTTP synthetic rules. Pins:
+//   - query retrieval_audit (real per-call wall time), whose time column is
+//     recorded_at — the INVERSE of the metric_samples pin above
+//   - aggregate + COALESCE so an idle window returns 0, not "no rows in
+//     result set" (the recurring rule-health-*_latency failure mode)
+//   - never LIMIT 1 (latest-sample semantics caused both failure modes)
+func TestRetrieveLatencyRules_Defaults(t *testing.T) {
+	rules := RetrieveLatencyRules(0, 0, 0)
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(rules))
+	}
+	p95, p99 := rules[0], rules[1]
+	if p95.ID != "retrieve_p95_latency" || p99.ID != "retrieve_p99_latency" {
+		t.Errorf("ids = %q/%q", p95.ID, p99.ID)
+	}
+	if p95.Threshold != 120000 || p99.Threshold != 300000 {
+		t.Errorf("default thresholds = %v/%v, want 120000/300000", p95.Threshold, p99.Threshold)
+	}
+	if p95.Severity != SeverityMedium || p99.Severity != SeverityCritical {
+		t.Errorf("severities = %v/%v", p95.Severity, p99.Severity)
+	}
+	for _, r := range rules {
+		for _, want := range []string{"retrieval_audit", "recorded_at", "COALESCE", "percentile_cont", "total_latency_ms", "'30 minutes'"} {
+			if !strings.Contains(r.QuerySQL, want) {
+				t.Errorf("rule %s QuerySQL missing %q", r.ID, want)
+			}
+		}
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule %s uses LIMIT 1 (idle window → no rows → rule-health noise)", r.ID)
+		}
+		if strings.Contains(r.QuerySQL, "metric_samples") {
+			t.Errorf("rule %s queries metric_samples (must read retrieval_audit real wall time)", r.ID)
+		}
+		if !r.Enabled {
+			t.Errorf("rule %s should be enabled", r.ID)
+		}
+	}
+}
+
+func TestRetrieveLatencyRules_CustomParams(t *testing.T) {
+	rules := RetrieveLatencyRules(45000, 90000, 15)
+	if rules[0].Threshold != 45000 || rules[1].Threshold != 90000 {
+		t.Errorf("custom thresholds not applied: %v/%v", rules[0].Threshold, rules[1].Threshold)
+	}
+	if !strings.Contains(rules[0].QuerySQL, "'15 minutes'") {
+		t.Errorf("custom lookback not applied")
+	}
+}
+
+// Pin: the dead rules stay dead. high_p95_latency/critical_p99_latency read
+// lifetime-cumulative synthetics (perpetually pegged at the 9.95 bucket
+// clamp); neo4j_pool_exhausted read a perpetual-zero fake gauge.
+func TestDefaultRules_RemovedRulesStayRemoved(t *testing.T) {
+	for _, r := range DefaultRules() {
+		switch r.ID {
+		case "high_p95_latency", "critical_p99_latency", "neo4j_pool_exhausted":
+			t.Errorf("rule %s was removed by TSDB-CONSUME-001 and must not return", r.ID)
+		}
+	}
+}
+
+// TSDB-CONSUME-001: writer flush-failure rule pins — per-writer MAX-MIN
+// delta (restart-safe) over metric_samples (time column), COALESCE'd.
+func TestTSDBWriterRules(t *testing.T) {
+	r := TSDBWriterRules(0)[0]
+	if r.ID != "tsdb_writer_flush_failures" || r.Service != "tsdb-writer" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	if r.Severity != SeverityHigh || r.Threshold != 0 || r.Operator != "gt" {
+		t.Errorf("severity/threshold/op = %v/%v/%q", r.Severity, r.Threshold, r.Operator)
+	}
+	for _, want := range []string{"mdemg_tsdb_writer_flush_failures_total", "labels->>'writer'", "MAX(value) - MIN(value)", "COALESCE", "'60 minutes'", "time >"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if strings.Contains(r.QuerySQL, "recorded_at") {
+		t.Errorf("metric_samples rule uses recorded_at (column is `time`)")
+	}
+	if got := TSDBWriterRules(15)[0]; !strings.Contains(got.QuerySQL, "'15 minutes'") {
+		t.Errorf("custom lookback not applied")
+	}
+}
+
+// TSDB-CONSUME-001: scorer-drift tripwires — the RRF-SCALE-001 regression
+// class (scorer changes silently breaking Score consumers) self-detects.
+// Pins: retrieval_audit time column is recorded_at; always-return-a-row
+// (COALESCE / CASE over aggregates); unique Service per rule (dispatcher
+// cooldown key is (Service, Severity) — shared labels mask each other).
+func TestScorerDriftRules(t *testing.T) {
+	rules := ScorerDriftRules(0, 0, 0, 0, 0)
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(rules))
+	}
+	change, shift := rules[0], rules[1]
+	if change.ID != "scorer_version_change" || shift.ID != "consensus_shift" {
+		t.Errorf("ids = %q/%q", change.ID, shift.ID)
+	}
+	if change.Service == shift.Service {
+		t.Errorf("rules share Service %q — cooldown key collision masks alerts", change.Service)
+	}
+	for _, want := range []string{"COUNT(DISTINCT scorer_version)", "COALESCE", "retrieval_audit", "recorded_at", "'24 hours'"} {
+		if !strings.Contains(change.QuerySQL, want) {
+			t.Errorf("scorer_version_change QuerySQL missing %q", want)
+		}
+	}
+	if change.Threshold != 1 || change.Operator != "gt" {
+		t.Errorf("change threshold/op = %v/%q", change.Threshold, change.Operator)
+	}
+	for _, want := range []string{"consensus_strength", "ABS(", ">= 20", "'6 hours'", "'7 days'", "recorded_at"} {
+		if !strings.Contains(shift.QuerySQL, want) {
+			t.Errorf("consensus_shift QuerySQL missing %q", want)
+		}
+	}
+	if shift.Threshold != 0.10 {
+		t.Errorf("shift threshold = %v, want 0.10", shift.Threshold)
+	}
+	for _, r := range rules {
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule %s uses LIMIT 1", r.ID)
+		}
+		if strings.Contains(r.QuerySQL, "metric_samples") {
+			t.Errorf("rule %s must query retrieval_audit directly", r.ID)
+		}
+	}
+}
+
+func TestScorerDriftRules_CustomParams(t *testing.T) {
+	rules := ScorerDriftRules(48, 0.25, 12, 14, 50)
+	if !strings.Contains(rules[0].QuerySQL, "'48 hours'") {
+		t.Errorf("custom change lookback not applied")
+	}
+	if rules[1].Threshold != 0.25 {
+		t.Errorf("custom shift threshold not applied: %v", rules[1].Threshold)
+	}
+	for _, want := range []string{">= 50", "'12 hours'", "'14 days'"} {
+		if !strings.Contains(rules[1].QuerySQL, want) {
+			t.Errorf("consensus_shift custom QuerySQL missing %q", want)
+		}
+	}
+}
+
+// TSDB-CONSUME-001: the DBSCAN O(n²) deferral condition (>60s emergence
+// cycles) is observable. Gauge MAX over window, metric_samples time column,
+// COALESCE'd.
+func TestEmergenceCycleRules(t *testing.T) {
+	r := EmergenceCycleRules(0, 0)[0]
+	if r.ID != "emergence_cycle_slow" || r.Service != "emergence-cycle" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	if r.Threshold != 60 || r.Operator != "gt" {
+		t.Errorf("threshold/op = %v/%q", r.Threshold, r.Operator)
+	}
+	for _, want := range []string{"mdemg_emergence_cycle_duration_seconds", "COALESCE(MAX(value), 0)", "'120 minutes'", "time >"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if strings.Contains(r.QuerySQL, "recorded_at") {
+		t.Errorf("metric_samples rule uses recorded_at (column is `time`)")
+	}
+	custom := EmergenceCycleRules(90, 30)[0]
+	if custom.Threshold != 90 || !strings.Contains(custom.QuerySQL, "'30 minutes'") {
+		t.Errorf("custom params not applied")
+	}
+}

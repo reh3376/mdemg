@@ -61,6 +61,7 @@ func NewSparseGateMetricsWriter(pool poolIface, flushInterval time.Duration) *Sp
 		buffer: make([]SparseGateMetricRow, 0, 64),
 		done:   make(chan struct{}),
 	}
+	registerWriterStats("sparse_gate_metrics", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

@@ -1,9 +1,13 @@
 {
   "uots_version": "1.0.0",
   "observability": {
-    "name": "Neo4j Connection Pool Metrics",
+    "name": "TSDB pgx Connection Pool Metrics",
     "type": "metrics_snapshot",
-    "tags": ["neo4j", "pool", "connections"]
+    "tags": [
+      "tsdb",
+      "pool",
+      "connections"
+    ]
   },
   "target": {
     "endpoint": "/v1/metrics/snapshot",
@@ -12,46 +16,44 @@
   "expected": {
     "metrics": [
       {
-        "name": "mdemg_neo4j_pool_active_connections",
+        "name": "mdemg_tsdb_pool_total_conns",
         "type": "gauge",
-        "help_contains": "active",
-        "value_range": { "min": 0 }
+        "help_contains": "Total",
+        "value_range": {
+          "min": 0
+        }
       },
       {
-        "name": "mdemg_neo4j_pool_idle_connections",
+        "name": "mdemg_tsdb_pool_idle_conns",
         "type": "gauge",
-        "help_contains": "idle",
-        "value_range": { "min": 0 }
+        "help_contains": "Idle",
+        "value_range": {
+          "min": 0
+        }
       },
       {
-        "name": "mdemg_neo4j_pool_waiting_requests",
+        "name": "mdemg_tsdb_pool_acquired_conns",
         "type": "gauge",
-        "help_contains": "waiting",
-        "value_range": { "min": 0 }
+        "help_contains": "checked out",
+        "value_range": {
+          "min": 0
+        }
       },
       {
-        "name": "mdemg_neo4j_pool_acquired_total",
+        "name": "mdemg_tsdb_pool_max_conns",
         "type": "gauge",
-        "help_contains": "acquired",
-        "value_range": { "min": 0 }
+        "help_contains": "capacity",
+        "value_range": {
+          "min": 0
+        }
       },
       {
-        "name": "mdemg_neo4j_pool_created_total",
+        "name": "mdemg_tsdb_pool_empty_acquire_total",
         "type": "gauge",
-        "help_contains": "created",
-        "value_range": { "min": 0 }
-      },
-      {
-        "name": "mdemg_neo4j_pool_closed_total",
-        "type": "gauge",
-        "help_contains": "closed",
-        "value_range": { "min": 0 }
-      },
-      {
-        "name": "mdemg_neo4j_pool_failed_acquire_total",
-        "type": "gauge",
-        "help_contains": "failed",
-        "value_range": { "min": 0 }
+        "help_contains": "empty pool",
+        "value_range": {
+          "min": 0
+        }
       }
     ]
   },
@@ -62,8 +64,13 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "description": "Validates that Neo4j connection pool metrics are exposed via the metrics snapshot endpoint. These metrics track connection lifecycle and pool utilization.",
+    "description": "Validates that TSDB pgx connection pool metrics are exposed via the metrics snapshot endpoint. TSDB-CONSUME-001 replaced the fake mdemg_neo4j_pool_* gauges (the neo4j driver has no pool-stats API; the old values were a VerifyConnectivity probe counter and perpetual zeros) with real pgxpool.Stat() values.",
     "status": "active",
-    "tags": ["neo4j", "pool", "phase-48"]
+    "tags": [
+      "tsdb",
+      "pool",
+      "tsdb-consume-001"
+    ],
+    "updated": "2026-06-11"
   }
 }

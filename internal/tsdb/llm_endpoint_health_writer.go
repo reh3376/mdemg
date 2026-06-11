@@ -63,6 +63,7 @@ func NewLLMEndpointHealthWriter(pool poolIface, flushInterval time.Duration) *LL
 		buffer: make([]LLMEndpointHealthEvent, 0, 8),
 		done:   make(chan struct{}),
 	}
+	registerWriterStats("llm_endpoint_health_events", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

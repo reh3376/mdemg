@@ -68,6 +68,7 @@ func NewRetrievalAuditWriter(pool poolIface, flushInterval time.Duration) *Retri
 		buffer: make([]RetrievalAuditRow, 0, 64),
 		done:   make(chan struct{}),
 	}
+	registerWriterStats("retrieval_audit", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

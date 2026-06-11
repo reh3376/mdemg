@@ -136,7 +136,7 @@
       }
     },
     {
-      "title": "Neo4j Pool Active",
+      "title": "TSDB Pool Acquired Conns",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -146,9 +146,10 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_active_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_tsdb_pool_acquired_conns' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "acquired"
         }
       ],
       "options": {
@@ -180,7 +181,8 @@
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
-      }
+      },
+      "description": "TSDB pgx pool connections checked out (TSDB-CONSUME-001: replaced the fake Neo4j pool gauges \u2014 the neo4j driver has no pool API; the old values were a VerifyConnectivity probe counter and perpetual zeros)."
     },
     {
       "title": "Neo4j Memory",
@@ -510,7 +512,7 @@
       }
     },
     {
-      "title": "Neo4j Connection Pool",
+      "title": "TSDB Connection Pool (pgx)",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -520,19 +522,22 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_active_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_tsdb_pool_acquired_conns' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "acquired"
         },
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_idle_connections' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_tsdb_pool_idle_conns' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
-          "refId": "B"
+          "refId": "B",
+          "legendFormat": "idle"
         },
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_neo4j_pool_waiting_requests' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_tsdb_pool_total_conns' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
-          "refId": "C"
+          "refId": "C",
+          "legendFormat": "total"
         }
       ],
       "fieldConfig": {
@@ -581,7 +586,8 @@
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
-      }
+      },
+      "description": "Real pgx pool stats: acquired / idle / total. Replaces the fake Neo4j pool panel (TSDB-CONSUME-001)."
     },
     {
       "title": "Hebbian Co-Activation Edges",

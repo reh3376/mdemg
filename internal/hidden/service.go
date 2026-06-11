@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // EdgePruner is an optional dependency that prunes excess CO_ACTIVATED_WITH edges per node.
@@ -1656,6 +1657,7 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 		slog.Warn("consolidation: empty graph, skipping concept clustering", "space_id", spaceID)
 		result.EmptyGraph = true
 		result.TotalDuration = time.Since(start)
+		metrics.Metrics().EmergenceCycleDuration(spaceID, "consolidation").Set(result.TotalDuration.Seconds())
 		return result, nil
 	}
 
@@ -1720,6 +1722,7 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 
 	result.TotalDuration = time.Since(start)
+	metrics.Metrics().EmergenceCycleDuration(spaceID, "consolidation").Set(result.TotalDuration.Seconds())
 	return result, nil
 }
 
@@ -4790,6 +4793,7 @@ func (s *Service) RunConversationConsolidation(ctx context.Context, spaceID stri
 	}
 
 	result.TotalDuration = time.Since(start)
+	metrics.Metrics().EmergenceCycleDuration(spaceID, "conversation").Set(result.TotalDuration.Seconds())
 	return result, nil
 }
 
@@ -5621,6 +5625,7 @@ func (s *Service) RunFullConversationConsolidation(ctx context.Context, spaceID 
 	}
 
 	result.TotalDuration = time.Since(start)
+	metrics.Metrics().EmergenceCycleDuration(spaceID, "conversation_full").Set(result.TotalDuration.Seconds())
 	return result, nil
 }
 

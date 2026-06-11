@@ -110,3 +110,10 @@ func isTrustedProxy(ip string, trusted []string) bool {
 func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'f', 2, 64)
 }
+
+// AddRejectedForTest increments the rejection counter directly. Test-only:
+// lets metrics tests exercise CollectRateLimitMetrics delta tracking without
+// standing up the middleware.
+func AddRejectedForTest(n int64) {
+	atomic.AddInt64(&rejectedTotal, n)
+}

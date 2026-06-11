@@ -31,6 +31,14 @@ type MetricsRecorder struct {
 	// Counter delta tracking — stores last-flushed value per counter key
 	lastCounterValues sync.Map // map[string]int64
 
+	// Histogram window tracking — last-flushed cumulative bucket snapshot per
+	// histogram key (TSDB-CONSUME-001). Synthetic p95/p99 are computed over
+	// the delta between flushes; lifetime-cumulative percentiles peg
+	// permanently once one slow observation lands (live symptom: a constant
+	// 9.95 top-bucket clamp firing a perpetual latency CRITICAL).
+	// Touched only inside FlushToTSDB (single flush goroutine).
+	lastHistSnapshots map[string]histSnapshot
+
 	// Bounded retry buffer for TSDB write resilience
 	mu           sync.Mutex
 	retryBuffer  []tsdb.MetricSample
@@ -51,10 +59,11 @@ type MetricsRecorder struct {
 // NewMetricsRecorder creates a new recorder. writer may be nil if TSDB is not configured.
 func NewMetricsRecorder(registry *Registry, writer *tsdb.MetricWriter, spaceID string) *MetricsRecorder {
 	return &MetricsRecorder{
-		registry:     registry,
-		writer:       writer,
-		spaceID:      spaceID,
-		maxBufferLen: 10000,
+		registry:          registry,
+		writer:            writer,
+		spaceID:           spaceID,
+		maxBufferLen:      10000,
+		lastHistSnapshots: make(map[string]histSnapshot),
 	}
 }
 
@@ -197,7 +206,7 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 	}
 
 	// --- Histograms (decomposed) ---
-	for _, h := range mr.registry.hists {
+	for key, h := range mr.registry.hists {
 		buckets, sum, count := h.Snapshot()
 
 		// Bucket samples
@@ -240,29 +249,42 @@ func (mr *MetricsRecorder) FlushToTSDB() {
 			Labels:     copyLabels(h.labels, instanceID),
 		})
 
-		// Synthetic P95 / P99 gauges
-		p95 := estimatePercentile(h, 0.95)
-		p99 := estimatePercentile(h, 0.99)
-		samples = append(samples, tsdb.MetricSample{
-			Time:       now,
-			SpaceID:    mr.spaceID,
-			MetricName: h.name + "_p95",
-			Value:      p95,
-			Source:     "recorder",
-			QualityTag: "nominal",
-			MetricType: "gauge",
-			Labels:     copyLabels(h.labels, instanceID),
-		})
-		samples = append(samples, tsdb.MetricSample{
-			Time:       now,
-			SpaceID:    mr.spaceID,
-			MetricName: h.name + "_p99",
-			Value:      p99,
-			Source:     "recorder",
-			QualityTag: "nominal",
-			MetricType: "gauge",
-			Labels:     copyLabels(h.labels, instanceID),
-		})
+		// Synthetic P95 / P99 gauges — WINDOWED (TSDB-CONSUME-001): computed
+		// over the bucket delta since the last flush, emitted only when the
+		// window saw observations. Lifetime-cumulative percentiles never
+		// recover after one slow call; idle windows emit nothing (gaps are
+		// honest — alert rules must aggregate + COALESCE, not LIMIT 1).
+		prev := mr.lastHistSnapshots[key]
+		deltaCount := count - prev.count
+		deltaBuckets := make(map[float64]int64, len(buckets))
+		for le, cnt := range buckets {
+			deltaBuckets[le] = cnt - prev.buckets[le]
+		}
+		mr.lastHistSnapshots[key] = histSnapshot{buckets: buckets, count: count}
+		if deltaCount > 0 {
+			p95 := estimatePercentileFromCumulative(deltaBuckets, deltaCount, 0.95)
+			p99 := estimatePercentileFromCumulative(deltaBuckets, deltaCount, 0.99)
+			samples = append(samples, tsdb.MetricSample{
+				Time:       now,
+				SpaceID:    mr.spaceID,
+				MetricName: h.name + "_p95",
+				Value:      p95,
+				Source:     "recorder",
+				QualityTag: "nominal",
+				MetricType: "gauge",
+				Labels:     copyLabels(h.labels, instanceID),
+			})
+			samples = append(samples, tsdb.MetricSample{
+				Time:       now,
+				SpaceID:    mr.spaceID,
+				MetricName: h.name + "_p99",
+				Value:      p99,
+				Source:     "recorder",
+				QualityTag: "nominal",
+				MetricType: "gauge",
+				Labels:     copyLabels(h.labels, instanceID),
+			})
+		}
 	}
 
 	mr.registry.mu.RUnlock()
@@ -390,9 +412,51 @@ func copyLabels(labels map[string]string, instanceID string) map[string]string {
 	return result
 }
 
+// histSnapshot stores a histogram's cumulative bucket counts at the last
+// flush, so FlushToTSDB can compute windowed (per-flush-interval) synthetic
+// percentiles instead of lifetime-cumulative ones (TSDB-CONSUME-001).
+type histSnapshot struct {
+	buckets map[float64]int64 // bound → cumulative count (nil on first flush; reads return 0)
+	count   int64
+}
+
+// estimatePercentileFromCumulative computes an estimated percentile from a
+// map of bucket bound → cumulative count (the Histogram.Snapshot format, or
+// a delta of two such snapshots) using the same linear interpolation as
+// estimatePercentile.
+func estimatePercentileFromCumulative(buckets map[float64]int64, count int64, q float64) float64 {
+	if count <= 0 || len(buckets) == 0 {
+		return 0
+	}
+	bounds := make([]float64, 0, len(buckets))
+	for b := range buckets {
+		bounds = append(bounds, b)
+	}
+	sort.Float64s(bounds)
+
+	target := q * float64(count)
+	var prevCum int64
+	var prevBound float64
+	for _, bound := range bounds {
+		cum := buckets[bound]
+		if float64(cum) >= target {
+			bucketCount := cum - prevCum
+			if bucketCount <= 0 {
+				return prevBound
+			}
+			fraction := (target - float64(prevCum)) / float64(bucketCount)
+			return prevBound + fraction*(bound-prevBound)
+		}
+		prevCum = cum
+		prevBound = bound
+	}
+	return bounds[len(bounds)-1]
+}
+
 // estimatePercentile computes an estimated percentile from histogram buckets
 // using linear interpolation within the target bucket (same as Prometheus histogram_quantile).
-// The histogram's mutex is assumed to be held by the caller OR accessed via Snapshot().
+// Lifetime-cumulative — used by SnapshotAll (the /v1/metrics/snapshot debug
+// endpoint); FlushToTSDB uses the windowed variant above.
 func estimatePercentile(h *Histogram, q float64) float64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()

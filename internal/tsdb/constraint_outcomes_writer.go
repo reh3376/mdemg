@@ -48,6 +48,7 @@ func NewConstraintOutcomesWriter(pool poolIface, flushInterval time.Duration) *C
 		buffer: make([]ConstraintOutcomeRow, 0, 32),
 		done:   make(chan struct{}),
 	}
+	registerWriterStats("constraint_outcomes", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

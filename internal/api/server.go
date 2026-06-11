@@ -876,20 +876,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	rsicCycle.SetOrchestrationPolicy(orchPolicy)
 	slog.Info("RSIC orchestration policy initialized", "cooldown_sec", cfg.RSICTriggerCooldownSec, "dedupe_sec", cfg.RSICTriggerDedupeSec)
 
-	// Phase 14.2 Epic 2: Wire ContextCatalog Builder + Loader for the
-	// stage-6 fingerprint refresh hook. Disabling refresh via
-	// CONTEXT_FINGERPRINT_REFRESH_ENABLED=false bypasses the hook regardless.
-	if cfg.ContextFingerprintEnabled {
-		catalogBuilder := hidden.NewNeo4jBuilder(driver, hidden.BuilderOptsFromConfig(cfg))
-		catalogLoader := hidden.NewNeo4jLoader(driver)
-		rsicCycle.SetContextCatalog(catalogBuilder, catalogLoader)
-		slog.Info("RSIC context catalog wired",
-			"refresh_enabled", cfg.ContextFingerprintRefreshEnabled,
-			"interval_hours", cfg.ContextFingerprintRefreshIntervalHours,
-			"timeout_ms", cfg.ContextFingerprintRefreshTimeoutMs,
-			"bit_budget", cfg.ContextFingerprintBitBudget,
-		)
-	}
+	// Phase 14.2 Epic 2 catalog wiring moved below the Server literal
+	// (TSDB-CONSUME-001): the V0020 VersionRecorder closure captures s so it
+	// can read s.tsdbClient lazily at build time (catalog builds run long
+	// after SetTSDBClient).
 
 	// Phase 88: Create safety validator and snapshot store, wire to dispatcher
 	safetyValidator := ape.NewSafetyValidator(driver)
@@ -1054,6 +1044,45 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		enforcementLog:          newEnforcementEventLog(1000),
 		conflictDetector:        conflictDet,
 		alertDispatcher:         alertDisp,
+	}
+
+	// Phase 14.2 Epic 2: Wire ContextCatalog Builder + Loader for the
+	// stage-6 fingerprint refresh hook. Disabling refresh via
+	// CONTEXT_FINGERPRINT_REFRESH_ENABLED=false bypasses the hook regardless.
+	// TSDB-CONSUME-001: each successful build also records a V0020
+	// context_catalog_versions row (the table had zero writes ever); the
+	// closure reads s.tsdbClient at build time — nil-safe before/without
+	// SetTSDBClient.
+	if cfg.ContextFingerprintEnabled {
+		opts := hidden.BuilderOptsFromConfig(cfg)
+		opts.VersionRecorder = func(ctx context.Context, rec hidden.CatalogVersionRecord) {
+			row := tsdb.ContextCatalogVersionRow{
+				SpaceID:           rec.SpaceID,
+				Version:           rec.Version,
+				TotalBits:         rec.TotalBits,
+				AllocationJSON:    rec.AllocationJSON,
+				TopSymbols:        rec.TopSymbols,
+				TopPaths:          rec.TopPaths,
+				TopTags:           rec.TopTags,
+				BitsRoleTypeLayer: rec.BitsRoleTypeLayer,
+				BitsTag:           rec.BitsTag,
+				BitsPath:          rec.BitsPath,
+				BitsSymbol:        rec.BitsSymbol,
+			}
+			if err := tsdb.RecordContextCatalogVersion(ctx, s.tsdbClient, row); err != nil {
+				slog.Warn("context catalog: V0020 version record failed",
+					"space_id", rec.SpaceID, "version", rec.Version, "error", err)
+			}
+		}
+		catalogBuilder := hidden.NewNeo4jBuilder(driver, opts)
+		catalogLoader := hidden.NewNeo4jLoader(driver)
+		rsicCycle.SetContextCatalog(catalogBuilder, catalogLoader)
+		slog.Info("RSIC context catalog wired",
+			"refresh_enabled", cfg.ContextFingerprintRefreshEnabled,
+			"interval_hours", cfg.ContextFingerprintRefreshIntervalHours,
+			"timeout_ms", cfg.ContextFingerprintRefreshTimeoutMs,
+			"bit_budget", cfg.ContextFingerprintBitBudget,
+		)
 	}
 
 	// Set instance ID for metric labels (e.g. "localhost:9999")
@@ -1256,8 +1285,17 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 						m.CollectCacheMetrics(cacheStats)
 					}
 
-					// Infrastructure: Neo4j pool, graph, container
-					m.CollectNeo4jPoolMetrics()
+					// Infrastructure: TSDB pgx pool (real stats — TSDB-CONSUME-001)
+					// + rate-limit rejection deltas
+					if srv.tsdbClient != nil && srv.tsdbClient.Pool() != nil {
+						st := srv.tsdbClient.Pool().Stat()
+						m.CollectTSDBPoolMetrics(int64(st.TotalConns()), int64(st.IdleConns()),
+							int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
+					}
+					m.CollectRateLimitMetrics()
+					m.CollectTSDBWriterStats(tsdb.AllWriterStats())
+
+					// Infrastructure: Neo4j graph, container
 					graphData := srv.collectNeo4jGraphData()
 					m.CollectNeo4jGraphMetrics(graphData)
 					containerStats := srv.collectNeo4jContainerStats()
@@ -3110,8 +3148,14 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 			m.CollectCacheMetrics(cacheStats)
 		}
 
-		// Collect Neo4j pool metrics (Phase 48.4.1)
-		m.CollectNeo4jPoolMetrics()
+		// Collect TSDB pgx pool metrics (real stats — TSDB-CONSUME-001)
+		if s.tsdbClient != nil && s.tsdbClient.Pool() != nil {
+			st := s.tsdbClient.Pool().Stat()
+			m.CollectTSDBPoolMetrics(int64(st.TotalConns()), int64(st.IdleConns()),
+				int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
+		}
+		m.CollectRateLimitMetrics()
+		m.CollectTSDBWriterStats(tsdb.AllWriterStats())
 
 		// Collect Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
 		graphData := s.collectNeo4jGraphData()

@@ -91,6 +91,8 @@ services:
 
       # Campaign task activation (set in .env to enable training data collection)
       QUERY_CLASSIFY_ENABLED: "${QUERY_CLASSIFY_ENABLED:-true}"
+      # TSDB-CONSUME-001: default-on — feeds the scorer-drift tripwire rules
+      RETRIEVAL_AUDIT_ENABLED: "${RETRIEVAL_AUDIT_ENABLED:-true}"
       INTENT_ENABLED: "${INTENT_ENABLED:-false}"
       JIMINY_ENABLED: "${JIMINY_ENABLED:-false}"
       JIMINY_SYNTHESIS_ENABLED: "${JIMINY_SYNTHESIS_ENABLED:-true}"

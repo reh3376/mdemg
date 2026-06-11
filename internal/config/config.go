@@ -583,7 +583,7 @@ type Config struct {
 	// latency available the day Notes 05+06 ship. Default false to avoid
 	// unbounded TSDB growth — operators opt in via .env for observation
 	// windows.
-	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: false)
+	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: true since TSDB-CONSUME-001 — feeds the scorer-drift tripwires)
 
 	// Phase 14 Epic 1 — Note 06 sparse activation gate. After RRF aggregation
 	// (consensus_strength + ranked candidates), the gate cuts the candidate
@@ -996,7 +996,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 24 post-NOSILENT-001 V0024 scheduled_job_events)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 25 post-TSDB-CONSUME-001 V0025 retention/compression)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1054,6 +1054,28 @@ type Config struct {
 	// ===== Alert Evaluator =====
 	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
 	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
+
+	// TSDB-CONSUME-001 — retrieve-latency SLO rules over retrieval_audit
+	// real wall-time (replaced the broken lifetime-cumulative HTTP synthetics).
+	// Defaults calibrated from the live distribution (7d p95 61.6s / p99 90s).
+	AlertRetrieveP95Ms              int // ALERT_RETRIEVE_P95_MS — medium alert when windowed retrieve p95 exceeds this (default: 120000)
+	AlertRetrieveP99Ms              int // ALERT_RETRIEVE_P99_MS — critical alert when windowed retrieve p99 exceeds this (default: 300000)
+	AlertRetrieveLatencyLookbackMin int // ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN — percentile window in minutes (default: 30)
+	TSDBWriterAlertLookbackMin      int // TSDB_WRITER_ALERT_LOOKBACK_MIN — window for buffered-writer flush-failure growth detection (default: 60)
+
+	// TSDB-CONSUME-001 — scorer-drift tripwires over retrieval_audit (the
+	// RRF-SCALE-001 regression class: scorer changes silently breaking
+	// downstream Score consumers).
+	ScorerChangeLookbackHours  int     // SCORER_CHANGE_LOOKBACK_HOURS — window for the >1-distinct-scorer_version tripwire (default: 24)
+	ConsensusShiftThreshold    float64 // CONSENSUS_SHIFT_THRESHOLD — |recent − baseline| mean consensus_strength to alert on; live σ≈0.097 (default: 0.10)
+	ConsensusShiftRecentHours  int     // CONSENSUS_SHIFT_RECENT_HOURS — recent comparison window (default: 6)
+	ConsensusShiftBaselineDays int     // CONSENSUS_SHIFT_BASELINE_DAYS — trailing baseline window (default: 7)
+	ConsensusShiftMinSamples   int     // CONSENSUS_SHIFT_MIN_SAMPLES — minimum rows in each window before the rule can fire (default: 20)
+
+	// TSDB-CONSUME-001 — emergence-cycle duration tripwire (the DBSCAN O(n²)
+	// deferral condition becomes observable).
+	EmergenceCycleAlertThresholdSec float64 // EMERGENCE_CYCLE_ALERT_THRESHOLD_SEC — alert when a cycle exceeds this wall time (default: 60)
+	EmergenceCycleAlertLookbackMin  int     // EMERGENCE_CYCLE_ALERT_LOOKBACK_MIN — window scanned for slow cycles (default: 120)
 
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
@@ -2861,7 +2883,7 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 5 — Downstream consumer wiring (flag-off, prompts/inputs deferred to Phase 14)
 
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
-	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
+	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
@@ -3985,7 +4007,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 24)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 25)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4085,6 +4107,50 @@ func FromEnv() (Config, error) {
 	// Alert Evaluator
 	alertEvaluatorEnabled := getBool("ALERT_EVALUATOR_ENABLED", true)
 	alertEvaluatorIntervalSec, err := atoi("ALERT_EVALUATOR_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRetrieveP95Ms, err := atoi("ALERT_RETRIEVE_P95_MS", 120000)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRetrieveP99Ms, err := atoi("ALERT_RETRIEVE_P99_MS", 300000)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRetrieveLatencyLookbackMin, err := atoi("ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	tsdbWriterAlertLookbackMin, err := atoi("TSDB_WRITER_ALERT_LOOKBACK_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	scorerChangeLookbackHours, err := atoi("SCORER_CHANGE_LOOKBACK_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftThreshold, err := atof("CONSENSUS_SHIFT_THRESHOLD", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftRecentHours, err := atoi("CONSENSUS_SHIFT_RECENT_HOURS", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftBaselineDays, err := atoi("CONSENSUS_SHIFT_BASELINE_DAYS", 7)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftMinSamples, err := atoi("CONSENSUS_SHIFT_MIN_SAMPLES", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	emergenceCycleAlertThresholdSec, err := atof("EMERGENCE_CYCLE_ALERT_THRESHOLD_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	emergenceCycleAlertLookbackMin, err := atoi("EMERGENCE_CYCLE_ALERT_LOOKBACK_MIN", 120)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4887,6 +4953,19 @@ func FromEnv() (Config, error) {
 		JobFailureLookbackMin:        jobFailureLookbackMin,
 		AlertEvaluatorEnabled:        alertEvaluatorEnabled,
 		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
+
+		// TSDB-CONSUME-001 — retrieve-latency SLO rules + writer flush health
+		AlertRetrieveP95Ms:              alertRetrieveP95Ms,
+		AlertRetrieveP99Ms:              alertRetrieveP99Ms,
+		AlertRetrieveLatencyLookbackMin: alertRetrieveLatencyLookbackMin,
+		TSDBWriterAlertLookbackMin:      tsdbWriterAlertLookbackMin,
+		ScorerChangeLookbackHours:       scorerChangeLookbackHours,
+		ConsensusShiftThreshold:         consensusShiftThreshold,
+		ConsensusShiftRecentHours:       consensusShiftRecentHours,
+		ConsensusShiftBaselineDays:      consensusShiftBaselineDays,
+		ConsensusShiftMinSamples:        consensusShiftMinSamples,
+		EmergenceCycleAlertThresholdSec: emergenceCycleAlertThresholdSec,
+		EmergenceCycleAlertLookbackMin:  emergenceCycleAlertLookbackMin,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

@@ -21,26 +21,26 @@
         "Total Nodes",
         "Total Edges",
         "Total Spaces",
-        "Neo4j Pool Active",
+        "TSDB Pool Acquired Conns",
         "Neo4j Memory",
         "Neo4j Container CPU Usage",
         "Neo4j Container Memory Usage",
         "Space Overview",
         "Health Score Over Time",
         "Orphan Nodes",
-        "Neo4j Connection Pool",
+        "TSDB Connection Pool (pgx)",
         "Hebbian Co-Activation Edges"
       ],
       "required_queries": [
         "mdemg_neo4j_graph_total_nodes",
         "mdemg_neo4j_graph_total_edges",
-        "mdemg_neo4j_pool_active_connections",
-        "mdemg_neo4j_pool_idle_connections",
-        "mdemg_neo4j_pool_waiting_requests",
         "mdemg_neo4j_container_cpu_percent",
         "mdemg_neo4j_container_mem_used_bytes",
         "mdemg_rsic_health_overall",
-        "mdemg_circuit_breaker_state"
+        "mdemg_circuit_breaker_state",
+        "mdemg_tsdb_pool_acquired_conns",
+        "mdemg_tsdb_pool_idle_conns",
+        "mdemg_tsdb_pool_total_conns"
       ],
       "required_template_vars": [
         "instance",
@@ -60,7 +60,7 @@
     "author": "claude",
     "created": "2026-02-16",
     "updated": "2026-06-11",
-    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels and metric queries. Refreshed in UXTS-CI-001 to the post-GRAFANA-AUDIT-001 dashboard truth (panels renamed: Heap Memory→Neo4j Memory, Orphans Per Space Over Time→Orphan Nodes, Learning Edges Over Time→Hebbian Co-Activation Edges; per-space mdemg_neo4j_graph_* metric queries moved out of this dashboard) — the stale spec was invisible while the UOTS step was a continue-on-error zombie.",
+    "description": "Validates the Grafana Neo4j dashboard JSON structure: correct UID, title, required panels and metric queries. Refreshed in UXTS-CI-001 to the post-GRAFANA-AUDIT-001 dashboard truth (panels renamed: Heap Memory\u2192Neo4j Memory, Orphans Per Space Over Time\u2192Orphan Nodes, Learning Edges Over Time\u2192Hebbian Co-Activation Edges; per-space mdemg_neo4j_graph_* metric queries moved out of this dashboard) \u2014 the stale spec was invisible while the UOTS step was a continue-on-error zombie. TSDB-CONSUME-001: pool panels rewired from the fake Neo4j pool gauges to real TSDB pgx pool stats.",
     "status": "active",
     "tags": [
       "grafana",

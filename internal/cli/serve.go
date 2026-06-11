@@ -130,10 +130,6 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	}
 	defer driver.Close(context.Background())
 
-	// Start pool metrics collector (10s probe interval)
-	cancelPoolMetrics := db.StartPoolMetricsCollector(context.Background(), driver)
-	defer cancelPoolMetrics()
-
 	// Auto-migrate if requested
 	if autoMigrate {
 		applied, migrateErr := db.RunMigrations(context.Background(), driver, migrations.FS)
@@ -490,6 +486,27 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				rules = append(rules, alert.MaintenanceLivenessRules(
 					cfg.MaintLiveLookbackDays)...)
 			}
+			// TSDB-CONSUME-001: retrieve-latency SLO over retrieval_audit
+			// real wall-time (replaces the lifetime-cumulative HTTP
+			// synthetic rules removed from DefaultRules).
+			rules = append(rules, alert.RetrieveLatencyRules(
+				float64(cfg.AlertRetrieveP95Ms), float64(cfg.AlertRetrieveP99Ms),
+				cfg.AlertRetrieveLatencyLookbackMin)...)
+			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
+			// writer used to drop rows in silence).
+			rules = append(rules, alert.TSDBWriterRules(
+				cfg.TSDBWriterAlertLookbackMin)...)
+			// TSDB-CONSUME-001: scorer-drift tripwires over retrieval_audit
+			// (the RRF-SCALE-001 regression class becomes self-detecting).
+			rules = append(rules, alert.ScorerDriftRules(
+				cfg.ScorerChangeLookbackHours, cfg.ConsensusShiftThreshold,
+				cfg.ConsensusShiftRecentHours, cfg.ConsensusShiftBaselineDays,
+				cfg.ConsensusShiftMinSamples)...)
+			// TSDB-CONSUME-001: slow emergence cycles (the DBSCAN O(n²)
+			// deferral condition, observable for the first time).
+			rules = append(rules, alert.EmergenceCycleRules(
+				cfg.EmergenceCycleAlertThresholdSec,
+				cfg.EmergenceCycleAlertLookbackMin)...)
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			// SUPERVISOR-002: meta-alert when a rule's query fails repeatedly
 			evaluator.SetRuleFailureThreshold(cfg.AlertRuleFailureThreshold)
