@@ -354,7 +354,7 @@ MDEMG's fine-tuning infrastructure now supports three distinct training workstre
 | Workstream | Technique | Model | Data Source | Status |
 |---|---|---|---|---|
 | **Cross-encoder reranker** (NR-4) | MSE regression | ms-marco-MiniLM-L-6-v2 | Rerank JSONL collector | Built |
-| **Generative LoRA** (Phases 2-12) | SFT + GRPO | Qwen3.6-35B-A3B | `llm_interactions` hypertable (16 tasks) | Pipeline complete |
+| **Generative LoRA** (Phases 2-12) | SFT + GRPO | dense Qwen3-14B (`mdemg-llm-v1`; MoE Qwen3.6-35B-A3B abandoned 2026-04-22 — Metal ceiling) | `llm_interactions` hypertable (16 tasks) | Pipeline complete |
 | **Embedding fine-tuning** (Phase D) | Contrastive learning | Domain-tuned 3072-dim model | `embedding_events` + `retrieval_events` hypertables | Collecting data |
 
 **Generative LoRA** trains the generative model on LLM I/O from all 16 tasks. RAFT context enrichment ensures training data includes retrieval context (open-book mode). ULTS specs define quality thresholds for curation. See [RAFT Retrieval Context](raft-retrieval-context.md) and [ULTS Framework](ults-framework.md).
@@ -373,12 +373,12 @@ The full pipeline from data collection to deployment:
 | 6. Evaluate | `evaluate_ft.py` | Per-task evaluation against held-out test set using ULTS quality_metrics contract |
 | 7. Gate | `regression_gate.py` | Deployment decision: no task regresses >5%, >=2 improve, JSON validity >=95% |
 | 8. Deploy | `quantize_deploy.py` | Fuse adapter → quantize to 4-bit → verify with test inference |
-| 9. Serve | `vllm-mlx` | OpenAI-compatible inference server with prefix caching |
+| 9. Serve | `llama-server` (llama.cpp, :8102) | OpenAI-compatible inference serving `mdemg-llm-v1.Q5_K_M.gguf` (Phase 13.5 cutover; vllm-mlx decommissioned) |
 
 **Supplementary tools:**
 - `teacher_distill.py` — synthetic data generation for under-represented tasks using teacher LLM
 - `reward_functions.py` — 21 GRPO reward functions for post-SFT reinforcement learning
-- `test_vllm_mlx.py` — smoke test all 16 ULTS tasks through vllm-mlx
+- `test_vllm_mlx.py` — historical smoke test of the 16 ULTS tasks (vllm-mlx era; production serving is llama-server :8102 since Phase 13.5)
 
 **Multi-paradigm curation** (UAITS framework, added 2026-04-10):
 - `paradigm_router.py` — spec-driven curation across SFT, DPO, RAFT, and curriculum paradigms

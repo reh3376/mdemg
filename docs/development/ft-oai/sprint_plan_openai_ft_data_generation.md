@@ -37,7 +37,7 @@ Before any other epic begins:
 
 ## 2. Problem Statement
 
-MDEMG has been collecting LLM interaction data into TimescaleDB since v0.7.0 via the `llm_interactions` table, with privacy scrubbing, guidance_id correlation, RAFT context enrichment, and think-content extraction (PRs #217, #218, #219). The UAITS framework (10th UxTS framework) declares 4 training datasets for Qwen3.6-35B-A3B LoRA fine-tuning on Apple Silicon (`docs/tests/uaits/specs/mdemg.uaits.json`). The existing pipeline (`quality_filter.py` → `format_converter.py` → `dataset_versioner.py`) produces MLX chat format JSONL; `mdemg data curate --paradigm sft` orchestrates the full chain.
+MDEMG has been collecting LLM interaction data into TimescaleDB since v0.7.0 via the `llm_interactions` table, with privacy scrubbing, guidance_id correlation, RAFT context enrichment, and think-content extraction (PRs #217, #218, #219). The UAITS framework (10th UxTS framework) declares 4 training datasets for local LoRA fine-tuning on Apple Silicon (originally targeting Qwen3.6-35B-A3B; the MoE target was abandoned 2026-04-22 for dense Qwen3-14B / `mdemg-llm-v1`) (`docs/tests/uaits/specs/mdemg.uaits.json`). The existing pipeline (`quality_filter.py` → `format_converter.py` → `dataset_versioner.py`) produces MLX chat format JSONL; `mdemg data curate --paradigm sft` orchestrates the full chain.
 
 **What's missing:** A **test run that validates the pipeline end-to-end** against an actual third-party fine-tuning provider — specifically OpenAI. This will:
 
@@ -80,7 +80,7 @@ OpenAI's supervised fine-tuning format is `{"messages": [{"role": "system"|"user
 
 - DPO pair generation (requires `constraint_outcomes` data; separate sprint).
 - RAFT dataset with resolved Neo4j node content (current pipeline uses ids_only mode; separate sprint).
-- Any Qwen3.6-35B-A3B training (separate hardware track; requires M-series Mac 128GB).
+- Any local-model training (was scoped as Qwen3.6-35B-A3B; that MoE target was later abandoned 2026-04-22 — production fine-tune is dense Qwen3-14B / `mdemg-llm-v1`).
 - Automated evaluation of the fine-tuned model (separate sprint — use existing `evaluate_ft.py` infrastructure).
 - Modifying the existing `quality_filter.py` or `format_converter.py` (they are correct as-is for MLX; any OpenAI-specific deviation goes in the new adapter).
 - UAITS spec modification (OpenAI doesn't get a new paradigm entry; it reuses `sft_interactions` data with a post-processing step).
