@@ -1,0 +1,84 @@
+name: Sync Dev Branch After Merge
+
+# Squash merges never advance the dev branch's merge-base, so every sprint
+# that touches CHANGELOG.md / CLAUDE.md (i.e. all of them) would hit
+# CONFLICTING on its next PR (first bitten: PR #419, 2026-06-10). After each
+# merged dev-branch PR, merge main back into the source branch so the next
+# PR starts from a current base.
+#
+# The push uses the default GITHUB_TOKEN, whose pushes do NOT trigger other
+# workflows — so this can never spawn an (empty) auto-PR (the manual-sync
+# failure mode seen in PR #420). workflow_dispatch is for manual runs and
+# live testing.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Dev branch to sync with main'
+        required: true
+        default: 'reh3376_dev01'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Merge main back into dev branch
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.head.ref, '_dev'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target branch
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pass untrusted refs through env, never inline into the script
+          # (actionlint: script-injection hardening).
+          DISPATCH_BRANCH: ${{ inputs.branch }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BRANCH="$DISPATCH_BRANCH"
+          else
+            BRANCH="$PR_HEAD_REF"
+          fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          # Branch may have been deleted after merge — skip gracefully.
+          if gh api "repos/${{ github.repository }}/branches/$BRANCH" --jq .name >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Branch $BRANCH no longer exists — nothing to sync."
+          fi
+
+      - name: Checkout dev branch
+        if: steps.target.outputs.exists == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.target.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Merge main into dev branch and push
+        if: steps.target.outputs.exists == 'true'
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Already up to date with main — nothing to sync."
+            exit 0
+          fi
+          # Post-squash the dev branch content is identical to main, so this
+          # merge is expected to be conflict-free. If it conflicts (the branch
+          # moved ahead during PR review), fail loudly for manual resolution:
+          # verify main == branch-pre-sprint content, then merge -X ours.
+          git merge origin/main -m "chore: sync $BRANCH with main (post-merge base advance)"
+          git push origin "$BRANCH"
+          echo "Synced $BRANCH with main."
