@@ -1,5 +1,37 @@
 # MDEMG Fine-Tuning Plan — Complete Document Suite
 
+> ## STATUS (DOC-TRUTH-001, 2026-06-11) — read this before planning
+>
+> **SHIPPED through production cutover:** Phase 5 SFT (dense) → Phase 11.x
+> RL/eval → Phase 11.6 cutover → Phase 13.5 runtime. Production:
+> `mdemg-llm-v1` (single-tier LoRA on dense `mlx-community/Qwen3-14B-4bit`),
+> GGUF Q5_K_M on llama-server :8102; aggregate 0.8389 (16-task augmented
+> eval) vs gpt-5.4-mini 0.8317.
+>
+> **SUPERSEDED (2026-04-22 MoE→dense pivot — see v5.6 below):** the
+> Qwen3.6-35B-A3B MoE target, the two-tier MoE-Sieve strategy, the Sprint
+> A→E critical path, and Sprint C's three gates (overtaken — the FT-2
+> "MLX validation" step was skipped as moot and FT-3 "expert profiling"
+> consumption was superseded; D/E artifacts retained as research per the
+> R-LT-4 prototype-discipline adjudication: prototypes that lose their
+> production path are kept as research artifacts, never silently deleted,
+> and any Phase-15/Note research work must re-derive from the CURRENT
+> architecture, not these).
+>
+> **NOT STARTED:** the recursive-retraining loop — Phases 6 (Recursive
+> Cycle Automation), 7 (RSIC Integration), 9 (Monitoring). This is the
+> line's largest unfinished promise and the bridge from shipped FT to the
+> RSIC vision. Trigger: FT-CLASSIFY-002 (Roadmap Q3 Phase 4) proving the
+> production-row → retrain → regression-gate path end-to-end.
+>
+> **Provenance notes:** memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md`, cited
+> by earlier CLAUDE.md revisions as canonical, never existed in this repo
+> — THIS document is canonical. The MDEMG specification
+> (`docs/research/mdemg_sprint_ideas/mdemg-specification.md`) is currently
+> UNTRACKED; its §6.6 revision is carried here until the FG-2 fork-gate
+> work formalizes spec tracking.
+
+
 **Date:** 2026-04-30
 **Version:** 5.12 (Sprint FT-LORA-PHASE11.6 — Production cutover. Phase 5 dense renamed `mdemg-llm-v1`; all 16 LLM call sites routed at the local model via mlx_lm.server :8101. 5 of 16 task surfaces verified routing correctly via smoke test; 3 server.go pre-existing config-wiring bugs patched.)
 

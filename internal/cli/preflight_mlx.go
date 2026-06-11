@@ -45,7 +45,7 @@ func preflightMLXReachable(cfg config.Config) error {
 	endpoint := cfg.EffectiveLLMEndpoint()
 	if endpoint == "" {
 		return fmt.Errorf(
-			"preflight: cfg.EffectiveLLMEndpoint() resolved empty — set LLM_ENDPOINT or OPENAI_ENDPOINT in .env (e.g. http://127.0.0.1:8101/v1 for native mlx_lm.server)\n" +
+			"preflight: cfg.EffectiveLLMEndpoint() resolved empty — set LLM_ENDPOINT or OPENAI_ENDPOINT in .env (e.g. http://127.0.0.1:8102/v1 for the llama-server runtime)\n" +
 				"  Bypass for emergency recovery: MDEMG_ALLOW_NO_MLX=1 mdemg ...",
 		)
 	}
@@ -55,19 +55,19 @@ func preflightMLXReachable(cfg config.Config) error {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 	if err != nil {
-		return fmt.Errorf("preflight: build mlx probe request to %s: %w", probeURL, err)
+		return fmt.Errorf("preflight: build LLM-endpoint probe request to %s: %w", probeURL, err)
 	}
 
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf(
-			"preflight: mlx unreachable at %s — mdemg requires mlx to be up at all times.\n"+
+			"preflight: LLM endpoint unreachable at %s — mdemg requires its LLM runtime to be up at all times (Phase 13.5: llama-server).\n"+
 				"  Underlying error: %v\n"+
 				"  Resolve via:\n"+
-				"    1. Start mlx: `MDEMG_MLX_LM_BIN=/path/to/mlx_lm.server mdemg service install` then `launchctl kickstart gui/$(id -u)/com.mdemg.mlx-server`\n"+
-				"    2. Or run mlx_lm.server manually: `mlx_lm.server --model %s --host 127.0.0.1 --port 8101 --prompt-cache-size 256 --prompt-concurrency 2 --decode-concurrency 2`\n"+
-				"    3. (Emergency only) Bypass with `MDEMG_ALLOW_NO_MLX=1 mdemg ...`",
+				"    1. Install + start the managed runtime: `mdemg service install` then `launchctl kickstart gui/$(id -u)/com.mdemg.llama-server`\n"+
+				"    2. Or run llama-server manually: `llama-server --model %s --port 8102 --host 127.0.0.1 --ctx-size 32768 --parallel 4 --cont-batching --jinja`\n"+
+				"    3. (Emergency only) Bypass with `MDEMG_ALLOW_NO_MLX=1 mdemg ...` (rename to MDEMG_ALLOW_NO_LLM pending)",
 			probeURL, err, mlxModelHintFromEnv(),
 		)
 	}
@@ -75,7 +75,7 @@ func preflightMLXReachable(cfg config.Config) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf(
-			"preflight: mlx at %s returned HTTP %d (expected 2xx) — mdemg requires a healthy mlx.\n"+
+			"preflight: LLM endpoint at %s returned HTTP %d (expected 2xx) — mdemg requires a healthy LLM runtime.\n"+
 				"  Bypass with MDEMG_ALLOW_NO_MLX=1 if intentional",
 			probeURL, resp.StatusCode,
 		)

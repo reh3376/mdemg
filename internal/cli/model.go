@@ -40,7 +40,7 @@ match the v1 production reality (Ollama Library, reh3376/mdemg-llm-v1, the
   MDEMG_MODEL_QUANTS     --quants          Allowlist (default: Q4_K_M,Q5_K_M,Q8_0)
   MDEMG_MODEL_RAM_TIERS  --ram-tiers       JSON map for auto-pick
   MDEMG_MODEL_QUANT      --quant           Selected quant; 'auto' triggers RAM dispatch
-  MDEMG_ADAPTER_BASE     --adapter-base    Base model for adapter Modelfile (deferred to MODEL-DIST-002)
+  MDEMG_ADAPTER_BASE     --adapter-base    Base model for adapter Modelfile (adapter path shipped in MODEL-DIST-002)
   MDEMG_MODEL_DIR        --model-dir       Local symlink target dir (default: ~/.mdemg/models)
   MDEMG_MODEL_MANIFEST_PATH --manifest     Override embedded quant manifest
   OLLAMA_MODELS                            Ollama blob root (default: ~/.ollama/models)
@@ -79,7 +79,7 @@ func (o *modelOverrides) addFlags(c *cobra.Command) {
 	c.Flags().StringVar(&o.quants, "quants", "", "allowlist, comma-separated (env MDEMG_MODEL_QUANTS)")
 	c.Flags().StringVar(&o.ramTiers, "ram-tiers", "", "JSON map for auto-pick (env MDEMG_MODEL_RAM_TIERS)")
 	c.Flags().StringVar(&o.quant, "quant", "", "selected quant; 'auto' triggers RAM dispatch (env MDEMG_MODEL_QUANT)")
-	c.Flags().StringVar(&o.adapterBase, "adapter-base", "", "adapter base model (env MDEMG_ADAPTER_BASE; adapter path deferred to MODEL-DIST-002)")
+	c.Flags().StringVar(&o.adapterBase, "adapter-base", "", "adapter base model (env MDEMG_ADAPTER_BASE)")
 	c.Flags().StringVar(&o.modelDir, "model-dir", "", "local symlink target dir (env MDEMG_MODEL_DIR)")
 	c.Flags().StringVar(&o.manifestPath, "manifest", "", "override embedded quant manifest (env MDEMG_MODEL_MANIFEST_PATH)")
 }
@@ -232,7 +232,7 @@ Examples:
 		},
 	}
 	o.addFlags(cmd)
-	cmd.Flags().BoolVar(&adapter, "adapter", false, "pull adapter-only artifact (deferred to MODEL-DIST-002)")
+	cmd.Flags().BoolVar(&adapter, "adapter", false, "pull adapter-only artifact (GGUF LoRA; shipped in MODEL-DIST-002)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "resolve config + print plan; no side effects")
 	return cmd
 }
