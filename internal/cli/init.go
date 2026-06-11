@@ -1248,7 +1248,7 @@ func reloadConfigEnv() {
 	}
 	// Clear NEO4J_URI so LoadYAMLConfig will set it from the updated config.yaml
 	_ = os.Unsetenv("NEO4J_URI")
-	_ = config.LoadYAMLConfig(cfgPath)
+	loadYAMLConfigOrWarn(cfgPath)
 }
 
 // ParseIgnoreFile reads a .mdemgignore file and returns the list of patterns.

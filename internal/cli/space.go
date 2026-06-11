@@ -719,7 +719,7 @@ func getEnv(key, defaultVal string) string {
 func newDriver() (neo4j.DriverWithContext, error) {
 	// Load config (YAML → .env → env vars)
 	if cfgPath := config.FindConfigFile(); cfgPath != "" {
-		_ = config.LoadYAMLConfig(cfgPath)
+		loadYAMLConfigOrWarn(cfgPath)
 	}
 	_ = godotenv.Load()
 

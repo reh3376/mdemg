@@ -22,10 +22,70 @@ type RelationshipQuery struct {
 	Query         *sitter.Query // Compiled tree-sitter query
 }
 
+// Relationship extraction tiers (see RelationshipQuery.Tier; tier 1 = imports).
+const (
+	tierInheritance = 2
+	tierCalls       = 3
+)
+
+// defaultMaxCallsPerFunc is the historical per-function call cap
+// (CONFIG-DEADFLAG-001: was a literal 50 in ExtractRelationships).
+const defaultMaxCallsPerFunc = 50
+
+// RelationshipExtractionConfig controls which relationship tiers
+// ExtractRelationships runs and the per-function call cap (CONFIG-DEADFLAG-001).
+// A nil *RelationshipExtractionConfig means defaults: all tiers extracted and
+// MaxCallsPerFunc=50 — identical to the historical behavior.
+type RelationshipExtractionConfig struct {
+	// ExtractInheritance enables tier-2 (EXTENDS/IMPLEMENTS) extraction.
+	// Wired from REL_EXTRACT_INHERITANCE (default: true).
+	ExtractInheritance bool
+
+	// ExtractCalls enables tier-3 (CALLS) extraction.
+	// Wired from REL_EXTRACT_CALLS (default: true).
+	ExtractCalls bool
+
+	// MaxCallsPerFunc caps CALLS relationships extracted per query.
+	// <=0 means the default cap (50).
+	// Wired from REL_MAX_CALLS_PER_FUNCTION (default: 50).
+	MaxCallsPerFunc int
+}
+
+// extractInheritance reports whether tier-2 extraction is enabled (nil-safe; nil = on).
+func (c *RelationshipExtractionConfig) extractInheritance() bool {
+	return c == nil || c.ExtractInheritance
+}
+
+// extractCalls reports whether tier-3 extraction is enabled (nil-safe; nil = on).
+func (c *RelationshipExtractionConfig) extractCalls() bool {
+	return c == nil || c.ExtractCalls
+}
+
+// maxCallsPerFunc returns the effective per-function call cap (nil-safe; nil or <=0 = 50).
+func (c *RelationshipExtractionConfig) maxCallsPerFunc() int {
+	if c == nil || c.MaxCallsPerFunc <= 0 {
+		return defaultMaxCallsPerFunc
+	}
+	return c.MaxCallsPerFunc
+}
+
 // QueryEngine extracts relationships from ASTs using tree-sitter queries.
 type QueryEngine struct {
 	queries   map[Language][]RelationshipQuery
 	languages map[Language]*sitter.Language
+
+	// extraction controls tier skips + call cap (CONFIG-DEADFLAG-001).
+	// nil = defaults (all tiers on, cap 50).
+	extraction *RelationshipExtractionConfig
+}
+
+// SetExtractionConfig sets the relationship-extraction options (CONFIG-DEADFLAG-001).
+// Passing nil restores defaults (all tiers on, MaxCallsPerFunc=50).
+func (qe *QueryEngine) SetExtractionConfig(cfg *RelationshipExtractionConfig) {
+	if qe == nil {
+		return
+	}
+	qe.extraction = cfg
 }
 
 // NewQueryEngine creates a query engine by loading and compiling .scm files
@@ -120,11 +180,24 @@ func (qe *QueryEngine) ExtractRelationships(lang Language, root *sitter.Node, co
 
 	var rels []Relationship
 	for _, rq := range queries {
+		// CONFIG-DEADFLAG-001: REL_EXTRACT_INHERITANCE — tier-2 (inheritance)
+		// queries previously ran unconditionally.
+		if rq.Tier == tierInheritance && !qe.extraction.extractInheritance() {
+			continue
+		}
+		// CONFIG-DEADFLAG-001: REL_EXTRACT_CALLS — tier-3 (calls) queries
+		// previously ran unconditionally.
+		if rq.Tier == tierCalls && !qe.extraction.extractCalls() {
+			continue
+		}
+
 		cursor := sitter.NewQueryCursor()
 		cursor.Exec(rq.Query, root)
 
 		callCount := 0
-		maxCalls := 50 // Cap per function to prevent noise
+		// CONFIG-DEADFLAG-001: REL_MAX_CALLS_PER_FUNCTION — replaces the
+		// literal `maxCalls := 50` cap per function to prevent noise.
+		maxCalls := qe.extraction.maxCallsPerFunc()
 
 		for {
 			match, ok := cursor.NextMatch()

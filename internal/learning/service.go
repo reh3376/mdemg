@@ -41,6 +41,10 @@ type Service struct {
 	// emitted (feature disabled or TSDB unavailable at boot). The writer
 	// itself is non-blocking; the Hebbian hot path never waits on it.
 	reinforcementWriter *tsdb.ReinforcementEventsWriter
+	// CONFIG-DEADFLAG-001: EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH — parsed
+	// since EVENTGRAPH-001 but never enforced. Caps per-call telemetry
+	// forwarded to the writer (0 = unlimited).
+	maxPairsPerEventBatch int
 }
 
 // learningPhaseEntry caches the edge count for a space to avoid frequent DB queries
@@ -79,6 +83,13 @@ func (s *Service) SetStabilityReinforcer(reinforcer StabilityReinforcer) {
 // construct a writer.
 func (s *Service) SetReinforcementWriter(w *tsdb.ReinforcementEventsWriter) {
 	s.reinforcementWriter = w
+}
+
+// SetMaxPairsPerEventBatch caps the per-call reinforcement rows forwarded
+// to the TSDB writer (CONFIG-DEADFLAG-001: wires the previously-dead
+// EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH; 0 = unlimited).
+func (s *Service) SetMaxPairsPerEventBatch(n int) {
+	s.maxPairsPerEventBatch = n
 }
 
 // FreezeLearning stops all learning edge creation/updates for a space.
@@ -520,7 +531,17 @@ RETURN
 	// TSDB writer. Buffered + non-blocking — the Hebbian write has already
 	// completed; this can't fail the function.
 	if s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
-		for _, row := range reinforcementRows {
+		// CONFIG-DEADFLAG-001: enforce the per-batch pair cap that
+		// EVENTGRAPH-001 parsed but never wired. Telemetry-only truncation
+		// (the Hebbian write above is untouched); log when it binds so the
+		// drop isn't silent.
+		rows := reinforcementRows
+		if s.maxPairsPerEventBatch > 0 && len(rows) > s.maxPairsPerEventBatch {
+			slog.Warn("learning: reinforcement telemetry truncated by EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH",
+				"pairs", len(rows), "cap", s.maxPairsPerEventBatch)
+			rows = rows[:s.maxPairsPerEventBatch]
+		}
+		for _, row := range rows {
 			row.SpaceID = spaceID
 			s.reinforcementWriter.Record(row)
 		}

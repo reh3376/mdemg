@@ -62,8 +62,9 @@ func (s *Server) handleGuardrailEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse limit parameter (default: 50)
-	limit := 50
+	// Parse limit parameter (CONFIG-DEADFLAG-001: PAGINATION_DEF_LIMIT,
+	// default 50 — the literal previously always won)
+	limit := s.cfg.PaginationDefLimit
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n

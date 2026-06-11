@@ -15,11 +15,23 @@ import (
 // Store provides Neo4j persistence for symbols.
 type Store struct {
 	driver neo4j.DriverWithContext
+
+	// relBatchSize is the UNWIND batch size used by SaveRelationships
+	// (CONFIG-DEADFLAG-001: REL_BATCH_SIZE). <=0 means the default (500),
+	// so a zero-value Store keeps historical behavior.
+	relBatchSize int
 }
 
 // NewStore creates a new symbol store with the given Neo4j driver.
 func NewStore(driver neo4j.DriverWithContext) *Store {
 	return &Store{driver: driver}
+}
+
+// SetRelationshipBatchSize sets the UNWIND batch size used by
+// SaveRelationships (CONFIG-DEADFLAG-001: REL_BATCH_SIZE).
+// Values <=0 restore the default (500).
+func (s *Store) SetRelationshipBatchSize(n int) {
+	s.relBatchSize = n
 }
 
 // SymbolRecord represents a symbol ready for Neo4j storage.

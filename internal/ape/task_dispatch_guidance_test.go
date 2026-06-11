@@ -159,6 +159,78 @@ func TestExecuteArchiveIneffectiveConstraints(t *testing.T) {
 	}
 }
 
+// CONFIG-DEADFLAG-001: zero-valued threshold fields must resolve to the
+// historical literals; SetGuidanceCalibrationThresholds overrides them.
+func TestGuidanceCalibrationThresholds_DefaultsAndOverride(t *testing.T) {
+	d := &Dispatcher{}
+	if got := d.guidanceMinSurfaces(); got != 3 {
+		t.Errorf("default min surfaces: expected 3, got %d", got)
+	}
+	if got := d.guidanceBoostThreshold(); got != 0.7 {
+		t.Errorf("default boost threshold: expected 0.7, got %v", got)
+	}
+	if got := d.guidanceDecayThreshold(); got != 0.1 {
+		t.Errorf("default decay threshold: expected 0.1, got %v", got)
+	}
+	if got := d.guidanceDecayMinSurfaces(); got != 5 {
+		t.Errorf("default decay min surfaces: expected 5, got %d", got)
+	}
+
+	d.SetGuidanceCalibrationThresholds(7, 0.9, 0.2, 12)
+	if got := d.guidanceMinSurfaces(); got != 7 {
+		t.Errorf("overridden min surfaces: expected 7, got %d", got)
+	}
+	if got := d.guidanceBoostThreshold(); got != 0.9 {
+		t.Errorf("overridden boost threshold: expected 0.9, got %v", got)
+	}
+	if got := d.guidanceDecayThreshold(); got != 0.2 {
+		t.Errorf("overridden decay threshold: expected 0.2, got %v", got)
+	}
+	if got := d.guidanceDecayMinSurfaces(); got != 12 {
+		t.Errorf("overridden decay min surfaces: expected 12, got %d", got)
+	}
+
+	// Non-positive values fall back to the historical defaults.
+	d.SetGuidanceCalibrationThresholds(0, -1, 0, -2)
+	if d.guidanceMinSurfaces() != 3 || d.guidanceBoostThreshold() != 0.7 ||
+		d.guidanceDecayThreshold() != 0.1 || d.guidanceDecayMinSurfaces() != 5 {
+		t.Error("non-positive thresholds should fall back to defaults")
+	}
+}
+
+// CONFIG-DEADFLAG-001: configured thresholds must change executor behavior.
+func TestExecuteAdjustGuidanceConfidence_ConfiguredThresholds(t *testing.T) {
+	d := &Dispatcher{
+		activeTasks: make(map[string]*activeTask),
+		reports:     make(map[string][]RSICProgressReport),
+	}
+	mock := &mockGuidanceCalibrator{
+		items: []GuidanceEffectivenessItem{
+			{NodeID: "n-boost", TotalSurfaced: 10, EffectivenessRate: 0.85}, // boost only at threshold 0.8
+			{NodeID: "n-decay", TotalSurfaced: 8, EffectivenessRate: 0.15},  // decay only at threshold 0.2/minSurfaces 8
+			{NodeID: "n-skip", TotalSurfaced: 5, EffectivenessRate: 0.0},    // skipped at minSurfaces 6
+		},
+	}
+	d.guidanceCalibrator = mock
+	d.SetGuidanceCalibrationThresholds(6, 0.8, 0.2, 8)
+
+	deliverables, err := d.executeAdjustGuidanceConfidence(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deliverables["boosted"] != 1 {
+		t.Errorf("expected boosted=1, got %v", deliverables["boosted"])
+	}
+	if deliverables["decayed"] != 1 {
+		t.Errorf("expected decayed=1, got %v", deliverables["decayed"])
+	}
+	// With the historical defaults (3/0.7/0.1/5), n-skip would NOT be skipped
+	// and n-decay (rate 0.15 >= 0.1) would not decay — verify the override took.
+	if len(mock.updateCalls) != 2 {
+		t.Fatalf("expected 2 update calls, got %d: %v", len(mock.updateCalls), mock.updateCalls)
+	}
+}
+
 func TestExecuteAdjustGuidanceConfidence_GetError(t *testing.T) {
 	d := &Dispatcher{
 		activeTasks: make(map[string]*activeTask),

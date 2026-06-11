@@ -44,7 +44,7 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 
 			// Load config (YAML → .env → env vars)
 			if cfgPath := config.FindConfigFile(); cfgPath != "" {
-				_ = config.LoadYAMLConfig(cfgPath)
+				loadYAMLConfigOrWarn(cfgPath)
 			}
 			_ = godotenv.Load()
 

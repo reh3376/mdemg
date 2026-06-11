@@ -167,6 +167,12 @@ type ParserConfig struct {
 	// Example: "60 * 1000" -> "60000"
 	// Default: true
 	EvaluateConstants bool
+
+	// Relationships controls relationship extraction (CONFIG-DEADFLAG-001:
+	// REL_EXTRACT_INHERITANCE / REL_EXTRACT_CALLS / REL_MAX_CALLS_PER_FUNCTION).
+	// nil means defaults: all tiers extracted, calls capped at 50 per function
+	// — identical to historical behavior, so a zero-value ParserConfig is unchanged.
+	Relationships *RelationshipExtractionConfig
 }
 
 // DefaultParserConfig returns the default parser configuration.

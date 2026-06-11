@@ -45,7 +45,25 @@ type Dispatcher struct {
 
 	// SR-001: Alert delivery
 	alertDispatcher AlertDispatcher
+
+	// CONFIG-DEADFLAG-001: RSIC-SK1 guidance calibration thresholds
+	// (RSIC_GUIDANCE_* config). Zero values fall back to the historical
+	// literals via the accessor methods below, so direct-constructed
+	// Dispatchers (e.g. in tests) keep the pre-sprint behavior.
+	guidanceMinSurfacesCfg      int     // RSIC_GUIDANCE_MIN_SURFACES (default 3)
+	guidanceBoostThresholdCfg   float64 // RSIC_GUIDANCE_BOOST_THRESHOLD (default 0.7)
+	guidanceDecayThresholdCfg   float64 // RSIC_GUIDANCE_DECAY_THRESHOLD (default 0.1)
+	guidanceDecayMinSurfacesCfg int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES (default 5)
 }
+
+// CONFIG-DEADFLAG-001: historical literals for the RSIC-SK1 guidance
+// calibration thresholds, used when no config value has been wired.
+const (
+	defaultGuidanceMinSurfaces      = 3
+	defaultGuidanceBoostThreshold   = 0.7
+	defaultGuidanceDecayThreshold   = 0.1
+	defaultGuidanceDecayMinSurfaces = 5
+)
 
 type activeTask struct {
 	Spec      RSICTaskSpec
@@ -86,6 +104,50 @@ func (d *Dispatcher) SetProtocolEvolver(pe ProtocolEvolverProvider) {
 // SetGuidanceCalibrator attaches an RSIC-SK1 guidance calibration provider.
 func (d *Dispatcher) SetGuidanceCalibrator(gc GuidanceCalibrationProvider) {
 	d.guidanceCalibrator = gc
+}
+
+// SetGuidanceCalibrationThresholds wires the RSIC_GUIDANCE_* config values
+// into the RSIC-SK1 guidance calibration executors (CONFIG-DEADFLAG-001).
+// Non-positive values are stored as-is and fall back to the historical
+// defaults (3 / 0.7 / 0.1 / 5) at read time, so an unwired or zero-valued
+// Dispatcher behaves exactly as before this sprint.
+func (d *Dispatcher) SetGuidanceCalibrationThresholds(minSurfaces int, boostThreshold, decayThreshold float64, decayMinSurfaces int) {
+	d.guidanceMinSurfacesCfg = minSurfaces
+	d.guidanceBoostThresholdCfg = boostThreshold
+	d.guidanceDecayThresholdCfg = decayThreshold
+	d.guidanceDecayMinSurfacesCfg = decayMinSurfaces
+}
+
+// guidanceMinSurfaces returns RSIC_GUIDANCE_MIN_SURFACES or the historical default (CONFIG-DEADFLAG-001).
+func (d *Dispatcher) guidanceMinSurfaces() int {
+	if d.guidanceMinSurfacesCfg > 0 {
+		return d.guidanceMinSurfacesCfg
+	}
+	return defaultGuidanceMinSurfaces
+}
+
+// guidanceBoostThreshold returns RSIC_GUIDANCE_BOOST_THRESHOLD or the historical default (CONFIG-DEADFLAG-001).
+func (d *Dispatcher) guidanceBoostThreshold() float64 {
+	if d.guidanceBoostThresholdCfg > 0 {
+		return d.guidanceBoostThresholdCfg
+	}
+	return defaultGuidanceBoostThreshold
+}
+
+// guidanceDecayThreshold returns RSIC_GUIDANCE_DECAY_THRESHOLD or the historical default (CONFIG-DEADFLAG-001).
+func (d *Dispatcher) guidanceDecayThreshold() float64 {
+	if d.guidanceDecayThresholdCfg > 0 {
+		return d.guidanceDecayThresholdCfg
+	}
+	return defaultGuidanceDecayThreshold
+}
+
+// guidanceDecayMinSurfaces returns RSIC_GUIDANCE_DECAY_MIN_SURFACES or the historical default (CONFIG-DEADFLAG-001).
+func (d *Dispatcher) guidanceDecayMinSurfaces() int {
+	if d.guidanceDecayMinSurfacesCfg > 0 {
+		return d.guidanceDecayMinSurfacesCfg
+	}
+	return defaultGuidanceDecayMinSurfaces
 }
 
 // SetFreshnessProvider attaches an ingest freshness provider for stale space re-ingestion (Phase 47.2).
@@ -668,9 +730,11 @@ func (d *Dispatcher) executeReviewGuidanceEffectiveness(ctx context.Context, spa
 	}
 	var lowCount, highCount, insufficientCount int
 	for _, item := range items {
-		if item.TotalSurfaced < 3 {
+		// CONFIG-DEADFLAG-001: thresholds from RSIC_GUIDANCE_MIN_SURFACES /
+		// RSIC_GUIDANCE_BOOST_THRESHOLD (defaults 3 / 0.7).
+		if item.TotalSurfaced < d.guidanceMinSurfaces() {
 			insufficientCount++
-		} else if item.EffectivenessRate >= 0.7 {
+		} else if item.EffectivenessRate >= d.guidanceBoostThreshold() {
 			highCount++
 		} else {
 			lowCount++
@@ -694,20 +758,23 @@ func (d *Dispatcher) executeAdjustGuidanceConfidence(ctx context.Context, spaceI
 	}
 	var boosted, decayed int
 	for _, item := range items {
-		if item.TotalSurfaced < 3 {
+		// CONFIG-DEADFLAG-001: thresholds from RSIC_GUIDANCE_MIN_SURFACES /
+		// RSIC_GUIDANCE_BOOST_THRESHOLD / RSIC_GUIDANCE_DECAY_THRESHOLD /
+		// RSIC_GUIDANCE_DECAY_MIN_SURFACES (defaults 3 / 0.7 / 0.1 / 5).
+		if item.TotalSurfaced < d.guidanceMinSurfaces() {
 			continue
 		}
 		// RSIC-VALIDATE-001: counter-free path — injecting synthetic
 		// "followed"/"ignored" outcomes inflated total_surfaced/total_followed,
 		// the exact counters GetConstraintEffectiveness reads next cycle.
 		boost, decay := d.guidanceCalibrator.ConfidenceCalibrationDeltas()
-		if item.EffectivenessRate >= 0.7 {
+		if item.EffectivenessRate >= d.guidanceBoostThreshold() {
 			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, boost); err != nil {
 				slog.Error("RSIC-SK1: boost failed", "node_id", item.NodeID, "error", err)
 			} else {
 				boosted++
 			}
-		} else if item.EffectivenessRate < 0.1 && item.TotalSurfaced >= 5 {
+		} else if item.EffectivenessRate < d.guidanceDecayThreshold() && item.TotalSurfaced >= d.guidanceDecayMinSurfaces() {
 			if err := d.guidanceCalibrator.AdjustNodeConfidenceDirect(ctx, item.NodeID, -decay); err != nil {
 				slog.Error("RSIC-SK1: decay failed", "node_id", item.NodeID, "error", err)
 			} else {

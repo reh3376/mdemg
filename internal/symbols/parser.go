@@ -55,6 +55,9 @@ func NewParser(config ParserConfig) (*Parser, error) {
 	if err != nil {
 		slog.Warn("query engine init failed, relationship extraction disabled", "error", err)
 	}
+	// CONFIG-DEADFLAG-001: plumb relationship-extraction options (tier skips +
+	// per-function call cap) into the query engine; nil keeps historical defaults.
+	qe.SetExtractionConfig(config.Relationships)
 	p.queryEngine = qe
 
 	return p, nil

@@ -838,8 +838,10 @@ func (s *Server) detectResumeAnomalies(ctx context.Context, spaceID string, resp
 	var anomalies []models.AnomalySignal
 	memoryState := "healthy"
 
-	// Check for empty resume with existing data
-	if len(resp.Observations) == 0 {
+	// Check for empty resume with existing data.
+	// CONFIG-DEADFLAG-001: gated on METACOG_EMPTY_RESUME_CHECK (parsed
+	// since MetaCog shipped, never read; default true = unchanged).
+	if s.cfg.MetaCogEmptyResumeCheck && len(resp.Observations) == 0 {
 		// Query if space actually has data
 		nodeCount := s.countSpaceNodes(ctx, spaceID)
 		if nodeCount > 0 {

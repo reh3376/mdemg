@@ -299,7 +299,6 @@ type Config struct {
 	JiminyWarmMaxAgeSec        int     // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers     bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim       float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
-	JiminyEffectivenessEnabled bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
 	JiminyEffectivenessTTLSec  int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
 
 	// Jiminy J7: Full-Spectrum Retrieval
@@ -363,9 +362,6 @@ type Config struct {
 	JiminyCodeRegenMinSamples int     // JIMINY_CODE_REGEN_MIN_SAMPLES — minimum samples before evaluating (default: 10)
 
 	// RSIC Jiminy Integration (J10)
-	RSICJiminyFollowRateThreshold              float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
-	RSICJiminyConstraintEffectivenessThreshold float64 // RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD — min effectiveness (default: 0.3)
-	RSICJiminySourceImbalanceThreshold         float64 // RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD — max single source ratio (default: 0.8)
 
 	// J17: AI-to-AI Communication Protocol
 	J17Enabled            bool   // J17_ENABLED — enable J17 protocol for compact communication (default: true)
@@ -405,7 +401,6 @@ type Config struct {
 	J17ExtensionsEnabled       bool     // J17_EXTENSIONS_ENABLED — enable agent-negotiated extensions (default: inherits J17)
 	J17AllowedExtensions       []string // J17_ALLOWED_EXTENSIONS — comma-separated list of allowed extensions
 	J17MLTierPredictionEnabled bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
-	J17TierModelMinSamples     int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
 	J17SidecarURL              string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
 	J17SidecarTimeoutMs        int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 1000, floor: 100)
 
@@ -442,7 +437,6 @@ type Config struct {
 
 	// Linear integration settings (Phase 4)
 	LinearTeamID      string // Default team ID for issue creation
-	LinearWorkspaceID string // Workspace identifier
 
 	// Linear webhook settings (Phase 9.4)
 	LinearWebhookSecret  string // LINEAR_WEBHOOK_SECRET — HMAC-SHA256 signing secret
@@ -459,7 +453,6 @@ type Config struct {
 	ConflictLogEnabled bool // CONFLICT_LOG_ENABLED — enable structured conflict logging (default: true)
 
 	// Scheduled orphan cleanup settings (Phase 9.5)
-	OrphanCleanupIntervalHours int // ORPHAN_CLEANUP_INTERVAL_HOURS — scheduled cleanup interval (0=disabled)
 
 	// Optimistic retry settings (Phase 47)
 	OptimisticRetryEnabled     bool    // OPTIMISTIC_RETRY_ENABLED — enable optimistic locking with retry (default: true)
@@ -471,7 +464,6 @@ type Config struct {
 	// Edge staleness settings (Phase 47)
 	EdgeStalenessCascadeEnabled   bool    // EDGE_STALENESS_CASCADE_ENABLED — enable edge staleness cascade (default: true)
 	EdgeStalenessRefreshBatchSize int     // EDGE_STALENESS_REFRESH_BATCH_SIZE — edges per refresh call (default: 100)
-	EdgeStalenessReclusterThresh  float64 // EDGE_STALENESS_RECLUSTER_THRESHOLD — centroid drift threshold (default: 0.3)
 
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
@@ -584,8 +576,6 @@ type Config struct {
 	// but the actual consumption (prompt-template inject in rerank,
 	// dimension input in DH-005) ships in Phase 14 alongside the sparse
 	// fingerprint + percentile gate features that need consensus_strength.
-	RetrievalRerankConsumeConsensus bool // RETRIEVAL_RERANK_CONSUME_CONSENSUS — let rerank stage inject consensus_strength as a prompt feature (default: false; wire only — actual inject deferred to Phase 14)
-	DH005ConsumeConsensus           bool // DH005_CONSUME_CONSENSUS — let DH-005 retrieval-confidence dim consume mean consensus_strength as input (default: false; wire only)
 
 	// Phase 13 Epic 6 — retrieval audit hypertable (V0017). When enabled,
 	// service.Retrieve writes one row per call to `retrieval_audit` so
@@ -682,9 +672,6 @@ type Config struct {
 	RetrievalConfidenceSigmoidSteepness float64 // RETRIEVAL_CONFIDENCE_SIGMOID_STEEPNESS — sigmoid steepness for score→confidence normalization (default: 8.0, was 1.5 legacy)
 
 	// Phase AR-3: LLM-powered query classification
-	RetrievalLLMClassifyEnabled  bool   // RETRIEVAL_LLM_CLASSIFY_ENABLED — enable LLM query classification (default: false)
-	RetrievalLLMClassifyProvider string // RETRIEVAL_LLM_CLASSIFY_PROVIDER — LLM provider (default: from EMERGENCE_PROVIDER)
-	RetrievalLLMClassifyModel    string // RETRIEVAL_LLM_CLASSIFY_MODEL — model for classification (default: from EMERGENCE_MODEL)
 
 	// Phase 38: UNTS Hash Verification
 	UNTSEnabled  bool   // UNTS_ENABLED — enable hash verification REST API (default: false)
@@ -744,7 +731,6 @@ type Config struct {
 	RelExtractInheritance bool // REL_EXTRACT_INHERITANCE — extract inheritance relationships (default: true)
 	RelExtractCalls       bool // REL_EXTRACT_CALLS — extract function call relationships (default: true)
 	RelCrossFileResolve   bool // REL_CROSS_FILE_RESOLVE — enable cross-file symbol resolution (default: true)
-	GoTypesEnabled        bool // GO_TYPES_ANALYSIS_ENABLED — use go/types for accurate analysis (default: false)
 	RelMaxCallsPerFunc    int  // REL_MAX_CALLS_PER_FUNCTION — max calls extracted per function (default: 50)
 	RelBatchSize          int  // REL_BATCH_SIZE — batch size for relationship insertion (default: 500)
 	RelResolutionTimeout  int  // REL_RESOLUTION_TIMEOUT_SEC — timeout for symbol resolution in seconds (default: 60)
@@ -757,8 +743,6 @@ type Config struct {
 	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 1)
 	L5SourceMinLayer         int     // L5_SOURCE_MIN_LAYER — minimum layer for L5/dynamic edge source nodes (default: 3)
 	SymbolActivationEnabled  bool    // SYMBOL_ACTIVATION_ENABLED — enable symbol-aware activation boost (default: true)
-	SecondaryLabelsEnabled   bool    // SECONDARY_LABELS_ENABLED — enable secondary node labels (default: true)
-	ThemeOfEdgeEnabled       bool    // THEME_OF_EDGE_ENABLED — enable THEME_OF edge creation (default: true)
 
 	// Deterministic consolidation trigger (Phase 45.5)
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
@@ -893,7 +877,6 @@ type Config struct {
 
 	// ===== ANN Optimization: Negative Feedback =====
 	LearningNegativeWeight        float64 // LEARNING_NEGATIVE_WEIGHT — weight reduction per negative feedback (default: 0.15)
-	LearningNegativeDecayMult     float64 // LEARNING_NEGATIVE_DECAY_MULT — decay multiplier for contradicted edges (default: 2.0)
 	LearningNegativeMaxPerRequest int     // LEARNING_NEGATIVE_MAX_PER_REQUEST — max rejected nodes per request (default: 20)
 
 	// ===== ANN Optimization: Frontier Detection =====
@@ -903,8 +886,6 @@ type Config struct {
 	// ===== FSD-2026-001: Constraint Lifecycle Closure =====
 
 	// F1: Guardrail Enforcement Hook
-	GuardrailHookEnabled   bool // GUARDRAIL_HOOK_ENABLED — enable PreToolUse enforcement hook (default: false)
-	GuardrailHookTimeoutMs int  // GUARDRAIL_HOOK_TIMEOUT_MS — timeout for hook validation in ms (default: 3000)
 
 	// F2a: Contradiction Detection
 	ContradictionEnabled       bool    // CONTRADICTION_ENABLED — enable contradiction detection in surprise scoring (default: true)
@@ -941,7 +922,6 @@ type Config struct {
 	JiminyCacheTTLSec      int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
 	JiminyCacheSize        int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
 	JiminyCacheJ17Bypass   bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
-	JiminyPartialTimeoutMs int  // JIMINY_PARTIAL_TIMEOUT_MS — timeout for partial results (default: 2000)
 
 	// F11: Configurable Activation Dimension Weights
 	ActivationDimSemanticWeight     float64 // ACTIVATION_DIM_SEMANTIC_WEIGHT — semantic dimension weight (default: 0.6)
@@ -949,8 +929,6 @@ type Config struct {
 	ActivationDimCoactivationWeight float64 // ACTIVATION_DIM_COACTIVATION_WEIGHT — coactivation dimension weight (default: 0.2)
 
 	// F13: Constraint Decay/Expiry
-	ConstraintDecayEnabled     bool    // CONSTRAINT_DECAY_ENABLED — enable time-based constraint confidence decay (default: false)
-	ConstraintDecayRatePerWeek float64 // CONSTRAINT_DECAY_RATE_PER_WEEK — confidence reduction per week for unsurfaced constraints (default: 0.01)
 
 	// F15: Configurable Hop Depth
 	MaxHopDepth int // MAX_HOP_DEPTH — maximum hop depth for architecture queries (default: 3)
@@ -980,18 +958,13 @@ type Config struct {
 	// ===== Synergy: Claude Code ↔ MDEMG Token Optimization =====
 
 	SynergyMemoryLineThreshold    int     // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
-	SynergyMemoryAutoIngest       bool    // SYNERGY_MEMORY_AUTO_INGEST — master switch for auto-ingestion (default: true)
 	SynergyClaudeMDPath           string  // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
 	SynergyMemoryMDPath           string  // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
 	SynergyAssessmentEnabled      bool    // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
 	SynergyTargetClaudeLines      int     // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
 	SynergyTargetMemoryLines      int     // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
 	SynergyOverlapSampleSize      int     // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
-	SynergyOverlapThreshold       float64 // SYNERGY_OVERLAP_THRESHOLD — similarity threshold for "overlapping" (default: 0.85)
 	SynergyOverflowAlertThreshold int     // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
-	SynergyMaxHookTokens          int     // SYNERGY_MAX_HOOK_TOKENS — max per-prompt hook injection tokens (default: 500)
-	SynergyCronInterval           string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
-	SynergyCronEnabled            bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
 
 	// ===== RSIC Overall-Health Weights (DH-005) =====
 	// Base priors for ComputeOverallHealth's 7 sub-dimensions. Values need not
@@ -1009,8 +982,6 @@ type Config struct {
 	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
 	SynergyRecoveryBufferSpace      string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
 	SynergyRecoveryBufferPath       string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
-	SynergyRecoveryBufferMaxEntries int    // SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES — max JSONL entries before FIFO eviction (default: 50)
-	SynergyRecoveryAutoFlush        bool   // SYNERGY_RECOVERY_AUTO_FLUSH — auto-flush buffer on Jiminy recovery at session start (default: true)
 
 	// ===== TimescaleDB (Historical Metrics + FT Data) =====
 
@@ -1229,12 +1200,26 @@ func FromEnv() (Config, error) {
 		}
 		return f, nil
 	}
+	// CONFIG-DEADFLAG-001: strict boolean parsing. The old getBool treated
+	// ANY unrecognized value as false — an operator typo like
+	// FEATURE_ENABLED=ture silently disabled the feature (and "off"/"no"/
+	// "0" only worked by accident of being "not true"). Invalid values now
+	// fail FromEnv like atoi/atof do; errors accumulate so every bad
+	// boolean surfaces in one startup failure.
+	var boolErrs []string
 	getBool := func(k string, def bool) bool {
 		v := strings.ToLower(strings.TrimSpace(os.Getenv(k)))
-		if v == "" {
+		switch v {
+		case "":
+			return def
+		case "true", "1", "yes", "on":
+			return true
+		case "false", "0", "no", "off":
+			return false
+		default:
+			boolErrs = append(boolErrs, fmt.Sprintf("%s=%q (want true/false, 1/0, yes/no, on/off)", k, os.Getenv(k)))
 			return def
 		}
-		return v == "true" || v == "1" || v == "yes"
 	}
 
 	listen := get("LISTEN_ADDR", ":9999")
@@ -1913,7 +1898,6 @@ func FromEnv() (Config, error) {
 
 	// Linear integration settings (Phase 4)
 	linearTeamID := get("LINEAR_TEAM_ID", "")
-	linearWorkspaceID := get("LINEAR_WORKSPACE_ID", "")
 
 	// Linear webhook settings (Phase 9.4)
 	linearWebhookSecret := get("LINEAR_WEBHOOK_SECRET", "")
@@ -1928,15 +1912,6 @@ func FromEnv() (Config, error) {
 
 	// Conflict logging settings (Phase 9.5)
 	conflictLogEnabled := getBool("CONFLICT_LOG_ENABLED", true)
-
-	// Scheduled orphan cleanup settings (Phase 9.5)
-	orphanCleanupIntervalHours, err := atoi("ORPHAN_CLEANUP_INTERVAL_HOURS", 0)
-	if err != nil {
-		return Config{}, err
-	}
-	if orphanCleanupIntervalHours < 0 {
-		return Config{}, errors.New("ORPHAN_CLEANUP_INTERVAL_HOURS must be >= 0")
-	}
 
 	// Optimistic retry settings (Phase 47)
 	optimisticRetryEnabled := getBool("OPTIMISTIC_RETRY_ENABLED", true)
@@ -1977,13 +1952,6 @@ func FromEnv() (Config, error) {
 	}
 	if edgeStalenessRefreshBatchSize < 1 {
 		return Config{}, errors.New("EDGE_STALENESS_REFRESH_BATCH_SIZE must be >= 1")
-	}
-	edgeStalenessReclusterThresh, err := atof("EDGE_STALENESS_RECLUSTER_THRESHOLD", 0.3)
-	if err != nil {
-		return Config{}, err
-	}
-	if edgeStalenessReclusterThresh < 0 || edgeStalenessReclusterThresh > 1 {
-		return Config{}, errors.New("EDGE_STALENESS_RECLUSTER_THRESHOLD must be in range [0, 1]")
 	}
 
 	// LLM Summary settings (semantic summaries for ingest)
@@ -2275,7 +2243,6 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyEffectivenessEnabled := getBool("JIMINY_EFFECTIVENESS_ENABLED", true)
 	jiminyEffectivenessTTLSec, err := atoi("JIMINY_EFFECTIVENESS_TTL_SEC", 86400)
 	if err != nil {
 		return Config{}, err
@@ -2436,18 +2403,6 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	rsicJiminyFollowRateThreshold, err := atof("RSIC_JIMINY_FOLLOW_RATE_THRESHOLD", 0.5)
-	if err != nil {
-		return Config{}, err
-	}
-	rsicJiminyConstraintEffThreshold, err := atof("RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD", 0.3)
-	if err != nil {
-		return Config{}, err
-	}
-	rsicJiminySourceImbalanceThreshold, err := atof("RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD", 0.8)
-	if err != nil {
-		return Config{}, err
-	}
 
 	// J17: AI-to-AI Communication Protocol
 	j17Enabled := getBool("J17_ENABLED", true)
@@ -2543,10 +2498,6 @@ func FromEnv() (Config, error) {
 		}
 	}
 	j17MLTierPredictionEnabled := getBool("J17_ML_TIER_PREDICTION_ENABLED", false)
-	j17TierModelMinSamples, err := atoi("J17_TIER_MODEL_MIN_SAMPLES", 500)
-	if err != nil {
-		return Config{}, err
-	}
 	j17SidecarURL := get("J17_SIDECAR_URL", "")
 	// Default raised 200→1000ms (DH-004 E3): 200ms was too tight under typical
 	// sidecar latency, causing ~56% NLI fallback rate observed in production.
@@ -2908,8 +2859,6 @@ func FromEnv() (Config, error) {
 	}
 
 	// Phase 13 Epic 5 — Downstream consumer wiring (flag-off, prompts/inputs deferred to Phase 14)
-	retrievalRerankConsumeConsensus := getBool("RETRIEVAL_RERANK_CONSUME_CONSENSUS", false)
-	dh005ConsumeConsensus := getBool("DH005_CONSUME_CONSENSUS", false)
 
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
 	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
@@ -3174,9 +3123,6 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
-	retrievalLLMClassifyEnabled := getBool("RETRIEVAL_LLM_CLASSIFY_ENABLED", false)
-	retrievalLLMClassifyProvider := get("RETRIEVAL_LLM_CLASSIFY_PROVIDER", emergenceProvider)
-	retrievalLLMClassifyModel := get("RETRIEVAL_LLM_CLASSIFY_MODEL", emergenceModel)
 
 	// Phase 38: UNTS Hash Verification
 	untsEnabled := getBool("UNTS_ENABLED", false)
@@ -3337,7 +3283,6 @@ func FromEnv() (Config, error) {
 	relExtractInheritance := getBool("REL_EXTRACT_INHERITANCE", true)
 	relExtractCalls := getBool("REL_EXTRACT_CALLS", true)
 	relCrossFileResolve := getBool("REL_CROSS_FILE_RESOLVE", true)
-	goTypesEnabled := getBool("GO_TYPES_ANALYSIS_ENABLED", false)
 	relMaxCallsPerFunc, err := atoi("REL_MAX_CALLS_PER_FUNCTION", 50)
 	if err != nil {
 		return Config{}, err
@@ -3372,8 +3317,6 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	symbolActivationEnabled := getBool("SYMBOL_ACTIVATION_ENABLED", true)
-	secondaryLabelsEnabled := getBool("SECONDARY_LABELS_ENABLED", true)
-	themeOfEdgeEnabled := getBool("THEME_OF_EDGE_ENABLED", true)
 
 	// Phase 80: Meta-Cognition
 	metaCogEnabled := getBool("METACOG_ENABLED", true)
@@ -3516,10 +3459,6 @@ func FromEnv() (Config, error) {
 
 	// ===== ANN Optimization: Negative Feedback =====
 	learningNegativeWeight, err := atof("LEARNING_NEGATIVE_WEIGHT", 0.15)
-	if err != nil {
-		return Config{}, err
-	}
-	learningNegativeDecayMult, err := atof("LEARNING_NEGATIVE_DECAY_MULT", 2.0)
 	if err != nil {
 		return Config{}, err
 	}
@@ -3818,11 +3757,6 @@ func FromEnv() (Config, error) {
 	// ===== FSD-2026-001: Constraint Lifecycle Closure =====
 
 	// F1: Guardrail Enforcement Hook
-	guardrailHookEnabled := getBool("GUARDRAIL_HOOK_ENABLED", false)
-	guardrailHookTimeoutMs, err := atoi("GUARDRAIL_HOOK_TIMEOUT_MS", 3000)
-	if err != nil {
-		return Config{}, err
-	}
 
 	// F2a: Contradiction Detection
 	contradictionEnabled := getBool("CONTRADICTION_ENABLED", true)
@@ -3886,10 +3820,6 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyCacheJ17Bypass := getBool("JIMINY_CACHE_J17_BYPASS", true)
-	jiminyPartialTimeoutMs, err := atoi("JIMINY_PARTIAL_TIMEOUT_MS", 2000)
-	if err != nil {
-		return Config{}, err
-	}
 
 	// F11: Configurable Activation Dimension Weights
 	activationDimSemanticWeight, err := atof("ACTIVATION_DIM_SEMANTIC_WEIGHT", 0.6)
@@ -3906,11 +3836,6 @@ func FromEnv() (Config, error) {
 	}
 
 	// F13: Constraint Decay/Expiry
-	constraintDecayEnabled := getBool("CONSTRAINT_DECAY_ENABLED", false)
-	constraintDecayRatePerWeek, err := atof("CONSTRAINT_DECAY_RATE_PER_WEEK", 0.01)
-	if err != nil {
-		return Config{}, err
-	}
 
 	// F15: Configurable Hop Depth
 	maxHopDepth, err := atoi("MAX_HOP_DEPTH", 3)
@@ -3948,7 +3873,6 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	synergyMemoryAutoIngest := getBool("SYNERGY_MEMORY_AUTO_INGEST", true)
 	synergyClaudeMDPath := get("SYNERGY_CLAUDE_MD_PATH", "")
 	synergyMemoryMDPath := get("SYNERGY_MEMORY_MD_PATH", "")
 	synergyAssessmentEnabled := getBool("SYNERGY_ASSESSMENT_ENABLED", true)
@@ -3964,27 +3888,12 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	synergyOverlapThreshold, err := atof("SYNERGY_OVERLAP_THRESHOLD", 0.85)
-	if err != nil {
-		return Config{}, err
-	}
 	synergyOverflowAlertThreshold, err := atoi("SYNERGY_OVERFLOW_ALERT_THRESHOLD", 5)
 	if err != nil {
 		return Config{}, err
 	}
-	synergyMaxHookTokens, err := atoi("SYNERGY_MAX_HOOK_TOKENS", 500)
-	if err != nil {
-		return Config{}, err
-	}
-	synergyCronInterval := get("SYNERGY_CRON_INTERVAL", "4h")
-	synergyCronEnabled := getBool("SYNERGY_CRON_ENABLED", true)
 	synergyRecoveryBufferSpace := get("SYNERGY_RECOVERY_BUFFER_SPACE", "synergy-buffer")
 	synergyRecoveryBufferPath := get("SYNERGY_RECOVERY_BUFFER_PATH", ".mdemg/synergy-recovery-buffer.jsonl")
-	synergyRecoveryBufferMaxEntries, err := atoi("SYNERGY_RECOVERY_BUFFER_MAX_ENTRIES", 50)
-	if err != nil {
-		return Config{}, err
-	}
-	synergyRecoveryAutoFlush := getBool("SYNERGY_RECOVERY_AUTO_FLUSH", true)
 
 	// RSIC overall-health weights (DH-005). Defaults mirror
 	// ape.DefaultHealthWeights(); negative values fall back to the default
@@ -4215,6 +4124,11 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// CONFIG-DEADFLAG-001: surface every invalid boolean at once.
+	if len(boolErrs) > 0 {
+		return Config{}, fmt.Errorf("invalid boolean env value(s): %s", strings.Join(boolErrs, "; "))
+	}
+
 	return Config{
 		ListenAddr:                     listen,
 		Neo4jURI:                       uri,
@@ -4352,14 +4266,12 @@ func FromEnv() (Config, error) {
 		MdemgVersion:                   mdemgVersion,
 		MdemgCommit:                    mdemgCommit,
 		LinearTeamID:                   linearTeamID,
-		LinearWorkspaceID:              linearWorkspaceID,
 		LinearWebhookSecret:            linearWebhookSecret,
 		LinearWebhookSpaceID:           linearWebhookSpaceID,
 		WebhookConfigs:                 webhookConfigs,
 		FileWatcherEnabled:             fileWatcherEnabled,
 		FileWatcherConfigs:             fileWatcherConfigs,
 		ConflictLogEnabled:             conflictLogEnabled,
-		OrphanCleanupIntervalHours:     orphanCleanupIntervalHours,
 
 		// Phase 47: Optimistic Retry + Edge Consistency
 		OptimisticRetryEnabled:        optimisticRetryEnabled,
@@ -4369,7 +4281,6 @@ func FromEnv() (Config, error) {
 		OptimisticRetryMultiplier:     optimisticRetryMultiplier,
 		EdgeStalenessCascadeEnabled:   edgeStalenessCascadeEnabled,
 		EdgeStalenessRefreshBatchSize: edgeStalenessRefreshBatchSize,
-		EdgeStalenessReclusterThresh:  edgeStalenessReclusterThresh,
 
 		LLMSummaryEnabled:   llmSummaryEnabled,
 		LLMSummaryProvider:  llmSummaryProvider,
@@ -4433,7 +4344,6 @@ func FromEnv() (Config, error) {
 		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,
 		JiminyIncludeFrontiers:           jiminyIncludeFrontiers,
 		JiminyFrontierMinSim:             jiminyFrontierMinSim,
-		JiminyEffectivenessEnabled:       jiminyEffectivenessEnabled,
 		JiminyEffectivenessTTLSec:        jiminyEffectivenessTTLSec,
 		JiminyWarmEnabled:                jiminyWarmEnabled,
 		JiminyWarmDebounceSec:            jiminyWarmDebounceSec,
@@ -4484,9 +4394,6 @@ func FromEnv() (Config, error) {
 		JiminyCodeRegenEnabled:                     jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:                   jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples:                  jiminyCodeRegenMinSamples,
-		RSICJiminyFollowRateThreshold:              rsicJiminyFollowRateThreshold,
-		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
-		RSICJiminySourceImbalanceThreshold:         rsicJiminySourceImbalanceThreshold,
 
 		// J17: AI-to-AI Communication Protocol
 		J17Enabled:                     j17Enabled,
@@ -4519,7 +4426,6 @@ func FromEnv() (Config, error) {
 		J17ExtensionsEnabled:           j17ExtensionsEnabled,
 		J17AllowedExtensions:           j17AllowedExtensions,
 		J17MLTierPredictionEnabled:     j17MLTierPredictionEnabled,
-		J17TierModelMinSamples:         j17TierModelMinSamples,
 		J17SidecarURL:                  j17SidecarURL,
 		J17SidecarTimeoutMs:            j17SidecarTimeoutMs,
 		J17SidecarMode:                 j17SidecarMode,
@@ -4679,8 +4585,6 @@ func FromEnv() (Config, error) {
 		RetrievalColumnWeightBM25:       retrievalColumnWeightBM25,
 		RetrievalColumnWeightGraph:      retrievalColumnWeightGraph,
 		RetrievalColumnWeightStructural: retrievalColumnWeightStructural,
-		RetrievalRerankConsumeConsensus: retrievalRerankConsumeConsensus,
-		DH005ConsumeConsensus:           dh005ConsumeConsensus,
 		RetrievalAuditEnabled:           retrievalAuditEnabled,
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
@@ -4731,9 +4635,6 @@ func FromEnv() (Config, error) {
 		ConsultingConflictScoreFloor:        consultingConflictScoreFloor,
 		RetrievalConfidenceSigmoidMidpoint:  retrievalConfidenceSigmoidMidpoint,
 		RetrievalConfidenceSigmoidSteepness: retrievalConfidenceSigmoidSteepness,
-		RetrievalLLMClassifyEnabled:         retrievalLLMClassifyEnabled,
-		RetrievalLLMClassifyProvider:        retrievalLLMClassifyProvider,
-		RetrievalLLMClassifyModel:           retrievalLLMClassifyModel,
 
 		// Phase 38: UNTS Hash Verification
 		UNTSEnabled:  untsEnabled,
@@ -4793,7 +4694,6 @@ func FromEnv() (Config, error) {
 		RelExtractInheritance:    relExtractInheritance,
 		RelExtractCalls:          relExtractCalls,
 		RelCrossFileResolve:      relCrossFileResolve,
-		GoTypesEnabled:           goTypesEnabled,
 		RelMaxCallsPerFunc:       relMaxCallsPerFunc,
 		RelBatchSize:             relBatchSize,
 		RelResolutionTimeout:     relResolutionTimeout,
@@ -4804,8 +4704,6 @@ func FromEnv() (Config, error) {
 		L5BridgeEvidenceMin:      l5BridgeEvidenceMin,
 		L5SourceMinLayer:         l5SourceMinLayer,
 		SymbolActivationEnabled:  symbolActivationEnabled,
-		SecondaryLabelsEnabled:   secondaryLabelsEnabled,
-		ThemeOfEdgeEnabled:       themeOfEdgeEnabled,
 
 		// Phase 80: Meta-Cognition
 		MetaCogEnabled:          metaCogEnabled,
@@ -4860,14 +4758,11 @@ func FromEnv() (Config, error) {
 
 		// ANN Optimization: Negative Feedback + Frontier
 		LearningNegativeWeight:        learningNegativeWeight,
-		LearningNegativeDecayMult:     learningNegativeDecayMult,
 		LearningNegativeMaxPerRequest: learningNegativeMaxPerRequest,
 		FrontierMinEvidence:           frontierMinEvidence,
 		FrontierMaxOutgoing:           frontierMaxOutgoing,
 
 		// FSD-2026-001: Constraint Lifecycle Closure
-		GuardrailHookEnabled:               guardrailHookEnabled,
-		GuardrailHookTimeoutMs:             guardrailHookTimeoutMs,
 		ContradictionEnabled:               contradictionEnabled,
 		ContradictionSimThreshold:          contradictionSimThreshold,
 		ContradictionMaxCandidates:         contradictionMaxCandidates,
@@ -4888,12 +4783,9 @@ func FromEnv() (Config, error) {
 		JiminyCacheTTLSec:                  jiminyCacheTTLSec,
 		JiminyCacheSize:                    jiminyCacheSize,
 		JiminyCacheJ17Bypass:               jiminyCacheJ17Bypass,
-		JiminyPartialTimeoutMs:             jiminyPartialTimeoutMs,
 		ActivationDimSemanticWeight:        activationDimSemanticWeight,
 		ActivationDimTemporalWeight:        activationDimTemporalWeight,
 		ActivationDimCoactivationWeight:    activationDimCoactivationWeight,
-		ConstraintDecayEnabled:             constraintDecayEnabled,
-		ConstraintDecayRatePerWeek:         constraintDecayRatePerWeek,
 		MaxHopDepth:                        maxHopDepth,
 		LearningAutoPruneExcessEnabled:     learningAutoPruneExcessEnabled,
 		ConstraintAuthorityEnabled:         constraintAuthorityEnabled,
@@ -4910,22 +4802,15 @@ func FromEnv() (Config, error) {
 
 		// Synergy
 		SynergyMemoryLineThreshold:      synergyMemoryLineThreshold,
-		SynergyMemoryAutoIngest:         synergyMemoryAutoIngest,
 		SynergyClaudeMDPath:             synergyClaudeMDPath,
 		SynergyMemoryMDPath:             synergyMemoryMDPath,
 		SynergyAssessmentEnabled:        synergyAssessmentEnabled,
 		SynergyTargetClaudeLines:        synergyTargetClaudeLines,
 		SynergyTargetMemoryLines:        synergyTargetMemoryLines,
 		SynergyOverlapSampleSize:        synergyOverlapSampleSize,
-		SynergyOverlapThreshold:         synergyOverlapThreshold,
 		SynergyOverflowAlertThreshold:   synergyOverflowAlertThreshold,
-		SynergyMaxHookTokens:            synergyMaxHookTokens,
-		SynergyCronInterval:             synergyCronInterval,
-		SynergyCronEnabled:              synergyCronEnabled,
 		SynergyRecoveryBufferSpace:      synergyRecoveryBufferSpace,
 		SynergyRecoveryBufferPath:       synergyRecoveryBufferPath,
-		SynergyRecoveryBufferMaxEntries: synergyRecoveryBufferMaxEntries,
-		SynergyRecoveryAutoFlush:        synergyRecoveryAutoFlush,
 
 		// RSIC overall-health weights (DH-005)
 		RSICHealthWeightRetrieval: rsicHealthWeightRetrieval,

@@ -73,6 +73,18 @@ func newIngestCmd() *cobra.Command {
 				}
 			}
 
+			// CONFIG-DEADFLAG-001: record which LLM summary values are pinned by
+			// an explicit flag (or, for the two preset-controlled values, a speed
+			// preset). Unpinned values are filled from the env-parsed config in
+			// runIngest, after YAML/.env loading.
+			presetApplied := cfg.speed != ""
+			cfg.resolveLLMSummaryFromEnv = true
+			cfg.llmSummaryPinned = cmd.Flags().Changed("llm-summary") || presetApplied
+			cfg.llmSummaryBatchPinned = cmd.Flags().Changed("llm-summary-batch") || presetApplied
+			cfg.llmSummaryMaxTokensPinned = cmd.Flags().Changed("llm-summary-max-tokens")
+			cfg.llmSummaryTimeoutMsPinned = cmd.Flags().Changed("llm-summary-timeout-ms")
+			cfg.llmSummaryCacheSizePinned = cmd.Flags().Changed("llm-summary-cache-size")
+
 			return runIngest(cfg)
 		},
 	}
@@ -126,6 +138,10 @@ func newIngestCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.llmSummaryModel, "llm-summary-model", "gpt-4o-mini", "Model for LLM summaries")
 	cmd.Flags().IntVar(&cfg.llmSummaryBatch, "llm-summary-batch", 10, "Files per LLM API call for summaries")
 	cmd.Flags().StringVar(&cfg.llmSummaryProvider, "llm-summary-provider", "openai", "LLM provider for summaries (openai/ollama)")
+	// CONFIG-DEADFLAG-001: flags for the previously hardcoded summarize.Config literals.
+	cmd.Flags().IntVar(&cfg.llmSummaryMaxTokens, "llm-summary-max-tokens", 150, "Max tokens per LLM summary (env LLM_SUMMARY_MAX_TOKENS)")
+	cmd.Flags().IntVar(&cfg.llmSummaryTimeoutMs, "llm-summary-timeout-ms", 30000, "LLM summary request timeout in ms (env LLM_SUMMARY_TIMEOUT_MS)")
+	cmd.Flags().IntVar(&cfg.llmSummaryCacheSize, "llm-summary-cache-size", 5000, "Max cached LLM summaries (env LLM_SUMMARY_CACHE_SIZE)")
 
 	// Performance guards
 	cmd.Flags().IntVar(&cfg.maxFileSize, "max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
@@ -186,10 +202,27 @@ type ingestConfig struct {
 	progressJSON bool
 
 	// LLM summary
-	llmSummary         bool
-	llmSummaryModel    string
-	llmSummaryBatch    int
-	llmSummaryProvider string
+	llmSummary          bool
+	llmSummaryModel     string
+	llmSummaryBatch     int
+	llmSummaryProvider  string
+	llmSummaryMaxTokens int // CONFIG-DEADFLAG-001: LLM_SUMMARY_MAX_TOKENS (default 150)
+	llmSummaryTimeoutMs int // CONFIG-DEADFLAG-001: LLM_SUMMARY_TIMEOUT_MS (default 30000)
+	llmSummaryCacheSize int // CONFIG-DEADFLAG-001: LLM_SUMMARY_CACHE_SIZE (default 5000)
+
+	// CONFIG-DEADFLAG-001: env-default resolution bookkeeping. The cobra RunE
+	// sets resolveLLMSummaryFromEnv=true and records which values were pinned
+	// by an explicit flag or speed preset; runIngest (after YAML/.env loading)
+	// then lets the env-parsed config fill the unpinned values. Precedence:
+	// explicit flag > speed preset > LLM_SUMMARY_* env/config > built-in default.
+	// Direct-constructed configs (e.g. buildInitialIngestConfig) leave
+	// resolveLLMSummaryFromEnv=false and keep the pre-sprint behavior.
+	resolveLLMSummaryFromEnv  bool
+	llmSummaryPinned          bool
+	llmSummaryBatchPinned     bool
+	llmSummaryMaxTokensPinned bool
+	llmSummaryTimeoutMsPinned bool
+	llmSummaryCacheSizePinned bool
 
 	// Performance guards
 	maxFileSize        int
@@ -447,6 +480,27 @@ type gitDiffResult struct {
 	Renamed  map[string]string
 }
 
+// applyLLMSummaryEnvDefaults fills LLM summary settings from the env-parsed
+// config for every value not pinned by an explicit flag or speed preset
+// (CONFIG-DEADFLAG-001). Pinned values always win.
+func applyLLMSummaryEnvDefaults(cfg *ingestConfig, appCfg *config.Config) {
+	if !cfg.llmSummaryPinned {
+		cfg.llmSummary = appCfg.LLMSummaryEnabled
+	}
+	if !cfg.llmSummaryBatchPinned {
+		cfg.llmSummaryBatch = appCfg.LLMSummaryBatchSize
+	}
+	if !cfg.llmSummaryMaxTokensPinned {
+		cfg.llmSummaryMaxTokens = appCfg.LLMSummaryMaxTokens
+	}
+	if !cfg.llmSummaryTimeoutMsPinned {
+		cfg.llmSummaryTimeoutMs = appCfg.LLMSummaryTimeoutMs
+	}
+	if !cfg.llmSummaryCacheSizePinned {
+		cfg.llmSummaryCacheSize = appCfg.LLMSummaryCacheSize
+	}
+}
+
 func runIngest(cfg *ingestConfig) error {
 	// Log output priority
 	if cfg.logFile != "" {
@@ -481,10 +535,36 @@ func runIngest(cfg *ingestConfig) error {
 
 	// Load config (YAML → .env → env vars)
 	if cfgPath := config.FindConfigFile(); cfgPath != "" {
-		_ = config.LoadYAMLConfig(cfgPath)
+		loadYAMLConfigOrWarn(cfgPath)
 	}
 	if err := godotenv.Load(); err != nil {
 		slog.Info("no .env file found, using defaults/flags")
+	}
+
+	// CONFIG-DEADFLAG-001: the env-parsed config (LLM_SUMMARY_*) supplies
+	// defaults for LLM summary settings not pinned by an explicit flag or
+	// speed preset. config.FromEnv's defaults match the historical literals
+	// (true / 150 / 10 / 30000 / 5000), so zero-config behavior is unchanged.
+	if cfg.resolveLLMSummaryFromEnv {
+		if appCfg, err := config.FromEnv(); err == nil {
+			applyLLMSummaryEnvDefaults(cfg, &appCfg)
+		} else {
+			slog.Warn("CONFIG-DEADFLAG-001: config.FromEnv failed; LLM summary settings fall back to flag defaults", "error", err)
+		}
+	}
+	// CONFIG-DEADFLAG-001: zero values (direct-constructed configs, e.g. the
+	// post-init initial ingest, or a failed FromEnv) fall back to the
+	// historical summarize.Config literals. Note: a cache size of 0 is
+	// treated as unset and becomes 5000 — disabling the summary cache is not
+	// supported on this path (matches pre-sprint behavior).
+	if cfg.llmSummaryMaxTokens <= 0 {
+		cfg.llmSummaryMaxTokens = 150
+	}
+	if cfg.llmSummaryTimeoutMs <= 0 {
+		cfg.llmSummaryTimeoutMs = 30000
+	}
+	if cfg.llmSummaryCacheSize <= 0 {
+		cfg.llmSummaryCacheSize = 5000
 	}
 
 	// Resolve endpoint
@@ -569,15 +649,18 @@ func runIngest(cfg *ingestConfig) error {
 		if cfg.llmSummaryProvider == "openai" && apiKey == "" {
 			slog.Warn("LLM summaries enabled but OPENAI_API_KEY not set, using structural fallback")
 		} else {
+			// CONFIG-DEADFLAG-001: MaxTokens/TimeoutMs/CacheSize were hardcoded
+			// literals (150/30000/5000); Enabled was a hardcoded true. They now
+			// come from flags with LLM_SUMMARY_* env config as the default.
 			sumCfg := summarize.Config{
-				Enabled:        true,
+				Enabled:        cfg.llmSummary,
 				Provider:       cfg.llmSummaryProvider,
 				Model:          cfg.llmSummaryModel,
-				MaxTokens:      150,
+				MaxTokens:      cfg.llmSummaryMaxTokens,
 				BatchSize:      cfg.llmSummaryBatch,
-				TimeoutMs:      30000,
+				TimeoutMs:      cfg.llmSummaryTimeoutMs,
 				CacheEnabled:   true,
-				CacheSize:      5000,
+				CacheSize:      cfg.llmSummaryCacheSize,
 				Debug:          cfg.verbose,
 				OpenAIAPIKey:   apiKey,
 				OpenAIEndpoint: os.Getenv("OPENAI_ENDPOINT"),
