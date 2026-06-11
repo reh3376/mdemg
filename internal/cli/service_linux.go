@@ -104,3 +104,7 @@ func (m *linuxServiceManager) Logs(follow bool) error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
+
+// RefreshInstalledDarwinServices is darwin-only; no-op elsewhere (the Linux
+// analog — systemd unit refresh — already lives in upgrade.go).
+func RefreshInstalledDarwinServices(_, _, _ string) (int, error) { return 0, nil }

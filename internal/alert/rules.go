@@ -409,3 +409,39 @@ func WeightIntegrityRules(threshold int) []AlertRule {
 		},
 	}
 }
+
+// MaintenanceLivenessRules returns the MAINT-LIVE-001 rule: maintenance runs
+// are being recorded but NONE executed live (metadata dry_run=false) within
+// the lookback window — the only-ever-dry-runs pattern that let the weekly
+// decay+prune cycle silently no-op for the project's entire history while
+// reporting success. lookbackDays ≤ 0 → default 8 (weekly cadence + buffer).
+func MaintenanceLivenessRules(lookbackDays int) []AlertRule {
+	if lookbackDays <= 0 {
+		lookbackDays = 8
+	}
+	return []AlertRule{
+		{
+			ID:    "maintenance_no_live_run",
+			Title: "Maintenance Only Dry-Running — Decay/Prune Not Executing",
+			// Distinct Service per the NOSILENT-001 cooldown-collision rule.
+			Service:     "maintenance-liveness",
+			Severity:    SeverityHigh,
+			Interval:    3600 * time.Second,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT CASE WHEN
+				(SELECT count(*) FROM scheduled_job_events
+				   WHERE job_name = 'maintenance'
+				     AND recorded_at > now() - interval '%d days') > 0
+				AND
+				(SELECT count(*) FROM scheduled_job_events
+				   WHERE job_name = 'maintenance'
+				     AND success = true
+				     AND metadata->>'dry_run' = 'false'
+				     AND recorded_at > now() - interval '%d days') = 0
+				THEN 1 ELSE 0 END`, lookbackDays, lookbackDays),
+			Threshold: 0,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}

@@ -1072,6 +1072,10 @@ type Config struct {
 	// HIDDEN-WEIGHT-001 — abstraction-edge weight integrity.
 	NullWeightEdgeAlertThreshold int // NULL_WEIGHT_EDGE_ALERT_THRESHOLD — alert when NULL-weight GENERALIZES/ABSTRACTS_TO edges exceed this (default: 100; steady state is 0)
 
+	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
+	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
+	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
+
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
 }
@@ -4074,6 +4078,11 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
+	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
+	if err != nil {
+		return Config{}, err
+	}
 	jobBackupStalenessHours, err := atoi("JOB_BACKUP_STALENESS_HOURS", 0)
 	if err != nil {
 		return Config{}, err
@@ -4848,6 +4857,8 @@ func FromEnv() (Config, error) {
 		HookSilentLookbackHours:      hookSilentLookbackHours,
 		HookActivityMinEvents:        hookActivityMinEvents,
 		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
+		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
+		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,
 		JobFailureLookbackMin:        jobFailureLookbackMin,
 		AlertEvaluatorEnabled:        alertEvaluatorEnabled,

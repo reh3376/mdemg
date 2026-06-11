@@ -287,6 +287,33 @@ func runUpgrade(dryRun, force, edge, noDocker, dockerOnly bool) error {
 		}
 	}
 
+	// MAINT-LIVE-001: darwin — refresh already-installed mdemg LaunchAgents
+	// from the NEW binary's embedded templates + re-sync mdemg-managed Claude
+	// hooks in the current project. Plist/hook fixes otherwise ship in
+	// releases but never reach installed machines (the maintenance dry-run
+	// override sat unreachable for the project's entire history).
+	if runtime.GOOS == "darwin" {
+		spaceID := os.Getenv("MDEMG_SPACE_ID")
+		if spaceID == "" {
+			spaceID = filepath.Base(cwd)
+		}
+		fmt.Println("Refreshing installed LaunchAgents from new templates...")
+		if n, refErr := RefreshInstalledDarwinServices(cwd, currentBinary, spaceID); refErr != nil {
+			fmt.Printf("  warn: LaunchAgent refresh: %v\n", refErr)
+		} else if n == 0 {
+			fmt.Println("  none installed — skipped")
+		}
+		// Hooks: refresh only when this project already has mdemg-managed hooks.
+		hookProbe := filepath.Join(cwd, ".claude", "hooks", "prompt-context.sh")
+		if isMdemgHook(hookProbe) {
+			if _, hErr := InstallClaudeHooks(cwd, spaceID, "http://localhost:9999", true); hErr != nil {
+				fmt.Printf("  warn: hook refresh: %v\n", hErr)
+			} else {
+				fmt.Println("  refreshed Claude hooks from new templates")
+			}
+		}
+	}
+
 	// Linux: update systemd unit files if present in archive and currently installed
 	if runtime.GOOS == "linux" {
 		systemdExtracted := filepath.Join(tmpDir, "systemd")

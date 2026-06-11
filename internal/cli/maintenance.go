@@ -14,6 +14,7 @@ import (
 func newMaintenanceCmd() *cobra.Command {
 	var spaceID string
 	var dryRun bool
+	var excludeRoleTypes []string
 
 	cmd := &cobra.Command{
 		Use:   "maintenance",
@@ -31,8 +32,13 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 
 			// NOSILENT-001: record this run's outcome + alert on failure so a
 			// failing scheduled maintenance cycle is never silent.
+			// MAINT-LIVE-001: record dry_run so the maintenance_no_live_run
+			// rule can detect a schedule that only ever previews.
 			startedAt := time.Now()
-			defer func() { reportScheduledJob("maintenance", spaceID, startedAt, retErr) }()
+			defer func() {
+				reportScheduledJobMeta("maintenance", spaceID, startedAt, retErr,
+					map[string]any{"dry_run": dryRun})
+			}()
 
 			ctx := context.Background()
 
@@ -76,18 +82,19 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 			// Step 2: Prune
 			fmt.Println("\n=== Maintenance: Step 2 — Orphan Pruning ===")
 			pruneCfg := pruneConfig{
-				Neo4jURI:        decayCfg.Neo4jURI,
-				Neo4jUser:       decayCfg.Neo4jUser,
-				Neo4jPass:       decayCfg.Neo4jPass,
-				WeightThreshold: 0.01,
-				MinEvidence:     3,
-				OlderThanDays:   30,
-				RetentionDays:   90,
-				MaxDegree:       1,
-				IncludeLabels:   []string{"MemoryNode", "SymbolNode", "Observation"},
-				DryRun:          dryRun,
-				SpaceID:         spaceID,
-				BatchSize:       1000,
+				Neo4jURI:         decayCfg.Neo4jURI,
+				Neo4jUser:        decayCfg.Neo4jUser,
+				Neo4jPass:        decayCfg.Neo4jPass,
+				WeightThreshold:  0.01,
+				MinEvidence:      3,
+				OlderThanDays:    30,
+				RetentionDays:    90,
+				MaxDegree:        1,
+				IncludeLabels:    []string{"MemoryNode", "SymbolNode", "Observation"},
+				ExcludeRoleTypes: excludeRoleTypes,
+				DryRun:           dryRun,
+				SpaceID:          spaceID,
+				BatchSize:        1000,
 			}
 			pruneDriver, err := newPruneDriver(pruneCfg)
 			if err != nil {
@@ -106,6 +113,9 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 
 	cmd.Flags().StringVar(&spaceID, "space-id", "", "Space ID to maintain (required)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", true, "Preview mode (default: true)")
+	cmd.Flags().StringSliceVar(&excludeRoleTypes, "exclude-role-types",
+		envCSV("PRUNE_EXCLUDE_ROLE_TYPES"),
+		"role_type values never tombstoned (env PRUNE_EXCLUDE_ROLE_TYPES)")
 
 	return cmd
 }

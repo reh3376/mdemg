@@ -29,3 +29,6 @@ func (m *stubServiceManager) Restart() error {
 func (m *stubServiceManager) Logs(follow bool) error {
 	return fmt.Errorf("service management not supported on this platform")
 }
+
+// RefreshInstalledDarwinServices is darwin-only; no-op on this platform.
+func RefreshInstalledDarwinServices(_, _, _ string) (int, error) { return 0, nil }
