@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -12,55 +11,13 @@ import (
 	"mdemg/internal/config"
 )
 
-// ConnectionPoolMetrics tracks connection pool statistics
-type ConnectionPoolMetrics struct {
-	ActiveConnections  int64 `json:"active_connections"`
-	IdleConnections    int64 `json:"idle_connections"`
-	WaitingRequests    int64 `json:"waiting_requests"`
-	TotalAcquired      int64 `json:"total_acquired"`
-	TotalCreated       int64 `json:"total_created"`
-	TotalClosed        int64 `json:"total_closed"`
-	TotalFailedAcquire int64 `json:"total_failed_acquire"`
-}
-
-var poolMetrics atomic.Pointer[ConnectionPoolMetrics]
-
-func init() {
-	poolMetrics.Store(&ConnectionPoolMetrics{})
-}
-
-// GetPoolMetrics returns current connection pool statistics
-func GetPoolMetrics() ConnectionPoolMetrics {
-	return *poolMetrics.Load()
-}
-
-// StartPoolMetricsCollector runs a background goroutine that probes the Neo4j
-// connection pool every 10s, populating metrics. Returns a cancel func.
-func StartPoolMetricsCollector(ctx context.Context, driver neo4j.DriverWithContext) context.CancelFunc {
-	ctx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel is returned to caller
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				m := poolMetrics.Load()
-				updated := *m
-				err := driver.VerifyConnectivity(ctx)
-				if err != nil {
-					updated.TotalFailedAcquire++
-					slog.Debug("neo4j pool probe failed", "error", err)
-				} else {
-					updated.TotalAcquired++
-				}
-				poolMetrics.Store(&updated)
-			}
-		}
-	}()
-	return cancel
-}
+// NOTE (TSDB-CONSUME-001): the former ConnectionPoolMetrics /
+// StartPoolMetricsCollector machinery was deleted. The neo4j Go driver
+// exposes no pool-stats API, so the "pool" numbers were a VerifyConnectivity
+// probe loop in disguise: TotalAcquired counted probe successes,
+// Active/Idle/Waiting were perpetual zeros. Liveness probing is the health
+// prober's job (internal/health); real pool gauges now come from the TSDB
+// pgx pool (metrics.CollectTSDBPoolMetrics).
 
 func NewDriver(cfg config.Config) (neo4j.DriverWithContext, error) {
 	// Configure connection pool options

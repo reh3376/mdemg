@@ -45,12 +45,14 @@ groups:
             datasourceUid: timescaledb
             model:
               rawSql: |
-                SELECT time, value FROM metric_samples
-                WHERE metric_name = 'mdemg_http_request_duration_seconds_p95'
-                  AND metric_type = 'gauge'
-                  AND labels->>'path' = '/v1/memory/retrieve'
-                  AND $__timeFilter(time)
-                ORDER BY time
+                -- TSDB-CONSUME-001: real windowed retrieve wall-time from
+                -- retrieval_audit. The old source (synthetic lifetime
+                -- percentile gauges) pegged permanently at the 9.95s bucket
+                -- clamp, and real retrieves exceed the 10s histogram ceiling.
+                SELECT now() AS time, COALESCE(
+                  percentile_cont(0.95) WITHIN GROUP (ORDER BY total_latency_ms), 0) AS value
+                FROM retrieval_audit
+                WHERE recorded_at > now() - interval '30 minutes'
               format: time_series
           - refId: B
             relativeTimeRange:
@@ -69,13 +71,13 @@ groups:
               conditions:
                 - evaluator:
                     type: gt
-                    params: [0.250]
+                    params: [120000]
         for: 5m
         labels:
           severity: warning
           team: platform
         annotations:
-          summary: "MDEMG P95 latency exceeds SLO (>250ms)"
+          summary: "MDEMG retrieve P95 latency exceeds SLO (>120s windowed, real wall-time)"
 
       - uid: mdemg-critical-p99-latency
         title: "MDEMG P99 Latency Critical"
@@ -88,12 +90,11 @@ groups:
             datasourceUid: timescaledb
             model:
               rawSql: |
-                SELECT time, value FROM metric_samples
-                WHERE metric_name = 'mdemg_http_request_duration_seconds_p99'
-                  AND metric_type = 'gauge'
-                  AND labels->>'path' = '/v1/memory/retrieve'
-                  AND $__timeFilter(time)
-                ORDER BY time
+                -- TSDB-CONSUME-001: see p95 rule — same source change.
+                SELECT now() AS time, COALESCE(
+                  percentile_cont(0.99) WITHIN GROUP (ORDER BY total_latency_ms), 0) AS value
+                FROM retrieval_audit
+                WHERE recorded_at > now() - interval '30 minutes'
               format: time_series
           - refId: B
             datasourceUid: __expr__
@@ -109,13 +110,13 @@ groups:
               conditions:
                 - evaluator:
                     type: gt
-                    params: [0.500]
+                    params: [300000]
         for: 2m
         labels:
           severity: critical
           team: platform
         annotations:
-          summary: "MDEMG P99 latency critical (>500ms)"
+          summary: "MDEMG retrieve P99 latency critical (>300s windowed, real wall-time)"
 
       - uid: mdemg-high-error-rate
         title: "MDEMG Error Rate Exceeds SLO"
@@ -503,45 +504,6 @@ groups:
           team: platform
         annotations:
           summary: "Neo4j container CPU usage >80%"
-
-      - uid: mdemg-neo4j-pool-exhausted
-        title: "MDEMG Neo4j Connection Pool Exhausted"
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 120
-              to: 0
-            datasourceUid: timescaledb
-            model:
-              rawSql: |
-                SELECT time, value FROM metric_samples
-                WHERE metric_name = 'mdemg_neo4j_pool_waiting_requests'
-                  AND metric_type = 'gauge'
-                  AND $__timeFilter(time)
-                ORDER BY time
-              format: time_series
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              expression: A
-              reducer: last
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: B
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [5]
-        for: 2m
-        labels:
-          severity: critical
-          team: platform
-        annotations:
-          summary: "Neo4j connection pool exhaustion — requests waiting"
 
       - uid: mdemg-graph-node-drop
         title: "MDEMG Significant Node Count Drop"

@@ -94,8 +94,11 @@ func TestRuleState_ResetOnRecovery(t *testing.T) {
 
 func TestDefaultRules_Count(t *testing.T) {
 	rules := DefaultRules()
-	if len(rules) != 13 {
-		t.Errorf("expected 13 default rules, got %d", len(rules))
+	// 13 → 10 in TSDB-CONSUME-001: high_p95_latency / critical_p99_latency
+	// (replaced by RetrieveLatencyRules over retrieval_audit) and
+	// neo4j_pool_exhausted (queried a perpetually-zero fake gauge) removed.
+	if len(rules) != 10 {
+		t.Errorf("expected 10 default rules, got %d", len(rules))
 	}
 
 	// Verify all rules are enabled

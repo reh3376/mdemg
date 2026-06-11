@@ -3,7 +3,11 @@
   "observability": {
     "name": "Neo4j Graph Alert Rules (Grafana Unified)",
     "type": "alert_rules",
-    "tags": ["grafana", "alerts", "neo4j"]
+    "tags": [
+      "grafana",
+      "alerts",
+      "neo4j"
+    ]
   },
   "target": {
     "file": "deploy/docker/grafana/provisioning/alerting/alerts.yml"
@@ -36,11 +40,6 @@
         "expr_contains": "neo4j_container_cpu_percent"
       },
       {
-        "name": "MDEMG Neo4j Connection Pool Exhausted",
-        "severity": "critical",
-        "expr_contains": "neo4j_pool_waiting_requests"
-      },
-      {
         "name": "MDEMG Significant Node Count Drop",
         "severity": "critical",
         "expr_contains": "neo4j_graph_nodes"
@@ -53,9 +52,14 @@
   "metadata": {
     "author": "claude",
     "created": "2026-02-16",
-    "updated": "2026-03-27",
-    "description": "Validates Neo4j graph health alert rules in Grafana Unified Alerting: correct alert titles, severity levels, SQL expressions.",
+    "updated": "2026-06-11",
+    "description": "Validates Neo4j graph health alert rules in Grafana Unified Alerting: correct alert titles, severity levels, SQL expressions. TSDB-CONSUME-001: the Connection Pool Exhausted rule was deleted \u2014 it read mdemg_neo4j_pool_waiting_requests, a perpetual zero from the fake pool gauges; it could never fire.",
     "status": "active",
-    "tags": ["grafana", "alerts", "neo4j", "phase-grafana"]
+    "tags": [
+      "grafana",
+      "alerts",
+      "neo4j",
+      "phase-grafana"
+    ]
   }
 }

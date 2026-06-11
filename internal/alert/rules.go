@@ -19,44 +19,23 @@ type AlertRule struct {
 	Enabled     bool
 }
 
-// DefaultRules returns the 13 server-native alert rules migrated from Grafana.
+// DefaultRules returns the 10 server-native alert rules migrated from Grafana.
 // SQL queries use raw TimescaleDB queries against the metric_samples table.
+//
+// Removed by TSDB-CONSUME-001:
+//   - high_p95_latency / critical_p99_latency — they read the synthetic
+//     mdemg_http_request_duration_seconds_p95/_p99 gauges, which were
+//     lifetime-cumulative (one slow call ever → permanently pegged; live
+//     value was the 9.95 top-bucket clamp, a perpetual false CRITICAL) and
+//     LIMIT 1 over an idle window returned zero rows (the recurring
+//     rule-health-*_latency noise). Replaced by RetrieveLatencyRules below,
+//     which computes real windowed percentiles over retrieval_audit.
+//   - neo4j_pool_exhausted — it read mdemg_neo4j_pool_waiting_requests,
+//     which was a perpetual zero (the neo4j driver has no pool-stats API;
+//     the "pool" gauges were a VerifyConnectivity probe in disguise). The
+//     rule could never fire. Neo4j liveness is the health prober's job.
 func DefaultRules() []AlertRule {
 	return []AlertRule{
-		{
-			ID:          "high_p95_latency",
-			Title:       "MDEMG P95 Latency Exceeds SLO",
-			Service:     "latency-slo",
-			Severity:    SeverityMedium,
-			Interval:    30 * time.Second,
-			ForDuration: 5 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_http_request_duration_seconds_p95'
-				  AND metric_type = 'gauge'
-				  AND labels->>'path' = '/v1/memory/retrieve'
-				  AND time > now() - interval '5 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 0.250,
-			Operator:  "gt",
-			Enabled:   true,
-		},
-		{
-			ID:          "critical_p99_latency",
-			Title:       "MDEMG P99 Latency Critical",
-			Service:     "latency-slo",
-			Severity:    SeverityCritical,
-			Interval:    30 * time.Second,
-			ForDuration: 2 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_http_request_duration_seconds_p99'
-				  AND metric_type = 'gauge'
-				  AND labels->>'path' = '/v1/memory/retrieve'
-				  AND time > now() - interval '5 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 0.500,
-			Operator:  "gt",
-			Enabled:   true,
-		},
 		{
 			ID:          "high_error_rate",
 			Title:       "MDEMG Error Rate Exceeds SLO",
@@ -173,22 +152,6 @@ func DefaultRules() []AlertRule {
 			Enabled:   true,
 		},
 		{
-			ID:          "neo4j_pool_exhausted",
-			Title:       "MDEMG Neo4j Connection Pool Exhausted",
-			Service:     "neo4j",
-			Severity:    SeverityCritical,
-			Interval:    30 * time.Second,
-			ForDuration: 2 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_neo4j_pool_waiting_requests'
-				  AND metric_type = 'gauge'
-				  AND time > now() - interval '2 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 5,
-			Operator:  "gt",
-			Enabled:   true,
-		},
-		{
 			ID:          "graph_node_drop",
 			Title:       "MDEMG Significant Node Count Drop",
 			Service:     "graph-health",
@@ -268,6 +231,68 @@ func DefaultRules() []AlertRule {
 			Threshold: 0.3,
 			Operator:  "lt",
 			Enabled:   true,
+		},
+	}
+}
+
+// RetrieveLatencyRules returns the retrieve-latency SLO rules
+// (TSDB-CONSUME-001), computed over retrieval_audit.total_latency_ms — the
+// real per-call wall time — instead of the lifetime-cumulative synthetic
+// HTTP percentile gauges the old rules read.
+//
+// SQL shape requirements (pinned by tests):
+//   - retrieval_audit's time column is recorded_at (NOT time — that is
+//     metric_samples; the inverse of the HIDDEN-CHURN-001 bug class).
+//   - Aggregate + COALESCE so the query ALWAYS returns one non-NULL row:
+//     an idle window yields 0, not the "no rows in result set" failures
+//     that fired rule-health-*_latency every quiet period.
+//
+// Thresholds are in milliseconds and config-driven
+// (ALERT_RETRIEVE_P95_MS / ALERT_RETRIEVE_P99_MS /
+// ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN). Defaults are calibrated against the
+// live distribution (7d: p50 20.4s, p95 61.6s, p99 90.0s — local-LLM rerank
+// dominates), so they catch regressions, not steady state. Non-positive
+// inputs fall back to defaults.
+func RetrieveLatencyRules(p95ThreshMs, p99ThreshMs float64, lookbackMin int) []AlertRule {
+	if p95ThreshMs <= 0 {
+		p95ThreshMs = 120000
+	}
+	if p99ThreshMs <= 0 {
+		p99ThreshMs = 300000
+	}
+	if lookbackMin <= 0 {
+		lookbackMin = 30
+	}
+	latencySQL := func(q float64) string {
+		return fmt.Sprintf(`SELECT COALESCE(
+				percentile_cont(%g) WITHIN GROUP (ORDER BY total_latency_ms), 0)
+			FROM retrieval_audit
+			WHERE recorded_at > now() - interval '%d minutes'`, q, lookbackMin)
+	}
+	return []AlertRule{
+		{
+			ID:          "retrieve_p95_latency",
+			Title:       "MDEMG Retrieve P95 Latency Exceeds SLO",
+			Service:     "latency-slo",
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 5 * time.Minute,
+			QuerySQL:    latencySQL(0.95),
+			Threshold:   p95ThreshMs,
+			Operator:    "gt",
+			Enabled:     true,
+		},
+		{
+			ID:          "retrieve_p99_latency",
+			Title:       "MDEMG Retrieve P99 Latency Critical",
+			Service:     "latency-slo",
+			Severity:    SeverityCritical,
+			Interval:    60 * time.Second,
+			ForDuration: 5 * time.Minute,
+			QuerySQL:    latencySQL(0.99),
+			Threshold:   p99ThreshMs,
+			Operator:    "gt",
+			Enabled:     true,
 		},
 	}
 }

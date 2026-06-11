@@ -1256,8 +1256,16 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 						m.CollectCacheMetrics(cacheStats)
 					}
 
-					// Infrastructure: Neo4j pool, graph, container
-					m.CollectNeo4jPoolMetrics()
+					// Infrastructure: TSDB pgx pool (real stats — TSDB-CONSUME-001)
+					// + rate-limit rejection deltas
+					if srv.tsdbClient != nil && srv.tsdbClient.Pool() != nil {
+						st := srv.tsdbClient.Pool().Stat()
+						m.CollectTSDBPoolMetrics(int64(st.TotalConns()), int64(st.IdleConns()),
+							int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
+					}
+					m.CollectRateLimitMetrics()
+
+					// Infrastructure: Neo4j graph, container
 					graphData := srv.collectNeo4jGraphData()
 					m.CollectNeo4jGraphMetrics(graphData)
 					containerStats := srv.collectNeo4jContainerStats()
@@ -3110,8 +3118,13 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 			m.CollectCacheMetrics(cacheStats)
 		}
 
-		// Collect Neo4j pool metrics (Phase 48.4.1)
-		m.CollectNeo4jPoolMetrics()
+		// Collect TSDB pgx pool metrics (real stats — TSDB-CONSUME-001)
+		if s.tsdbClient != nil && s.tsdbClient.Pool() != nil {
+			st := s.tsdbClient.Pool().Stat()
+			m.CollectTSDBPoolMetrics(int64(st.TotalConns()), int64(st.IdleConns()),
+				int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
+		}
+		m.CollectRateLimitMetrics()
 
 		// Collect Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
 		graphData := s.collectNeo4jGraphData()

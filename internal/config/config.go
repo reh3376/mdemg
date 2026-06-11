@@ -1055,6 +1055,13 @@ type Config struct {
 	AlertEvaluatorEnabled     bool // ALERT_EVALUATOR_ENABLED — enable server-native alert rule evaluation (default: true)
 	AlertEvaluatorIntervalSec int  // ALERT_EVALUATOR_INTERVAL_SEC — base tick interval in seconds (default: 30)
 
+	// TSDB-CONSUME-001 — retrieve-latency SLO rules over retrieval_audit
+	// real wall-time (replaced the broken lifetime-cumulative HTTP synthetics).
+	// Defaults calibrated from the live distribution (7d p95 61.6s / p99 90s).
+	AlertRetrieveP95Ms              int // ALERT_RETRIEVE_P95_MS — medium alert when windowed retrieve p95 exceeds this (default: 120000)
+	AlertRetrieveP99Ms              int // ALERT_RETRIEVE_P99_MS — critical alert when windowed retrieve p99 exceeds this (default: 300000)
+	AlertRetrieveLatencyLookbackMin int // ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN — percentile window in minutes (default: 30)
+
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
 	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
@@ -4088,6 +4095,18 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	alertRetrieveP95Ms, err := atoi("ALERT_RETRIEVE_P95_MS", 120000)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRetrieveP99Ms, err := atoi("ALERT_RETRIEVE_P99_MS", 300000)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRetrieveLatencyLookbackMin, err := atoi("ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN", 30)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
@@ -4887,6 +4906,11 @@ func FromEnv() (Config, error) {
 		JobFailureLookbackMin:        jobFailureLookbackMin,
 		AlertEvaluatorEnabled:        alertEvaluatorEnabled,
 		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
+
+		// TSDB-CONSUME-001 — retrieve-latency SLO rules
+		AlertRetrieveP95Ms:              alertRetrieveP95Ms,
+		AlertRetrieveP99Ms:              alertRetrieveP99Ms,
+		AlertRetrieveLatencyLookbackMin: alertRetrieveLatencyLookbackMin,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

@@ -1,8 +1,9 @@
 package metrics
 
 import (
+	"sync/atomic"
+
 	"mdemg/internal/circuitbreaker"
-	"mdemg/internal/db"
 	"mdemg/internal/ratelimit"
 )
 
@@ -21,6 +22,10 @@ type StandardMetrics struct {
 
 	// Rate limiting metrics
 	RateLimitRejected *Counter
+	// lastRateLimitRejected tracks the last-collected cumulative rejection
+	// total so CollectRateLimitMetrics adds deltas, not running totals.
+	// Atomic: collection can run from the flush loop and request handlers.
+	lastRateLimitRejected atomic.Int64
 
 	// Circuit breaker metrics (by service)
 	CircuitBreakerState func(service string) *Gauge
@@ -32,15 +37,17 @@ type StandardMetrics struct {
 	EmbeddingLatency *Histogram
 	EmbeddingBatches *Counter
 
-	// Neo4j pool metrics (Phase 48.4.1)
-	// Note: Using gauges for all metrics since we read absolute values from driver
-	Neo4jPoolActive   *Gauge // Current active connections
-	Neo4jPoolIdle     *Gauge // Current idle connections
-	Neo4jPoolWaiting  *Gauge // Waiting requests
-	Neo4jPoolAcquired *Gauge // Total connections acquired (absolute value from driver)
-	Neo4jPoolCreated  *Gauge // Total connections created (absolute value from driver)
-	Neo4jPoolClosed   *Gauge // Total connections closed (absolute value from driver)
-	Neo4jPoolFailed   *Gauge // Total failed acquire attempts (absolute value from driver)
+	// TSDB (pgx) connection pool — the only pool with a real stats API
+	// (TSDB-CONSUME-001). The former mdemg_neo4j_pool_* gauges were fake:
+	// the neo4j Go driver exposes no pool stats, so a probe loop counted
+	// VerifyConnectivity successes as "acquisitions" and Active/Idle/Waiting
+	// were perpetual zeros (which made the neo4j_pool_exhausted rule
+	// unfireable). Deleted rather than kept lying.
+	TSDBPoolTotal        *Gauge // Total connections in the pgx pool
+	TSDBPoolIdle         *Gauge // Idle connections
+	TSDBPoolAcquired     *Gauge // Connections currently checked out
+	TSDBPoolMax          *Gauge // Pool capacity (MaxConns)
+	TSDBPoolEmptyAcquire *Gauge // Cumulative acquires that waited on an empty pool
 
 	// Memory pressure metrics (Phase 48.4.4)
 	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
@@ -282,13 +289,11 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.EmbeddingBatches = r.NewCounter("embedding_batches_total", "Total embedding batch operations", nil)
 
 	// Neo4j pool metrics (Phase 48.4.1)
-	m.Neo4jPoolActive = r.NewGauge("neo4j_pool_active_connections", "Current active Neo4j connections", nil)
-	m.Neo4jPoolIdle = r.NewGauge("neo4j_pool_idle_connections", "Current idle Neo4j connections", nil)
-	m.Neo4jPoolWaiting = r.NewGauge("neo4j_pool_waiting_requests", "Requests waiting for Neo4j connection", nil)
-	m.Neo4jPoolAcquired = r.NewGauge("neo4j_pool_acquired_total", "Total Neo4j connections acquired", nil)
-	m.Neo4jPoolCreated = r.NewGauge("neo4j_pool_created_total", "Total Neo4j connections created", nil)
-	m.Neo4jPoolClosed = r.NewGauge("neo4j_pool_closed_total", "Total Neo4j connections closed", nil)
-	m.Neo4jPoolFailed = r.NewGauge("neo4j_pool_failed_acquire_total", "Total failed Neo4j connection acquire attempts", nil)
+	m.TSDBPoolTotal = r.NewGauge("tsdb_pool_total_conns", "Total connections in the TSDB pgx pool", nil)
+	m.TSDBPoolIdle = r.NewGauge("tsdb_pool_idle_conns", "Idle connections in the TSDB pgx pool", nil)
+	m.TSDBPoolAcquired = r.NewGauge("tsdb_pool_acquired_conns", "TSDB pgx pool connections currently checked out", nil)
+	m.TSDBPoolMax = r.NewGauge("tsdb_pool_max_conns", "TSDB pgx pool capacity (MaxConns)", nil)
+	m.TSDBPoolEmptyAcquire = r.NewGauge("tsdb_pool_empty_acquire_total", "Cumulative TSDB pool acquires that waited on an empty pool", nil)
 
 	// Memory pressure metrics (Phase 48.4.4)
 	m.MemoryPressureRejected = r.NewGauge("memory_pressure_rejected_total", "Requests rejected due to memory pressure", nil)
@@ -776,9 +781,15 @@ func normalizePath(path string) string {
 }
 
 // CollectRateLimitMetrics updates rate limit metrics from the ratelimit package.
+// RejectedTotal is cumulative, so only the delta since the last collection is
+// added — the previous implementation added the running total every flush
+// cycle, inflating the counter quadratically (TSDB-CONSUME-001).
 func (m *StandardMetrics) CollectRateLimitMetrics() {
-	// Get current rejected count from ratelimit package
-	m.RateLimitRejected.Add(ratelimit.RejectedTotal())
+	total := ratelimit.RejectedTotal()
+	last := m.lastRateLimitRejected.Swap(total)
+	if delta := total - last; delta > 0 {
+		m.RateLimitRejected.Add(delta)
+	}
 }
 
 // CollectCircuitBreakerMetrics updates circuit breaker metrics from a registry.
@@ -810,17 +821,15 @@ func (m *StandardMetrics) CollectCacheMetrics(cacheStats map[string]map[string]a
 	}
 }
 
-// CollectNeo4jPoolMetrics updates Neo4j connection pool metrics.
-func (m *StandardMetrics) CollectNeo4jPoolMetrics() {
-	poolMetrics := db.GetPoolMetrics()
-
-	m.Neo4jPoolActive.Set(float64(poolMetrics.ActiveConnections))
-	m.Neo4jPoolIdle.Set(float64(poolMetrics.IdleConnections))
-	m.Neo4jPoolWaiting.Set(float64(poolMetrics.WaitingRequests))
-	m.Neo4jPoolAcquired.Set(float64(poolMetrics.TotalAcquired))
-	m.Neo4jPoolCreated.Set(float64(poolMetrics.TotalCreated))
-	m.Neo4jPoolClosed.Set(float64(poolMetrics.TotalClosed))
-	m.Neo4jPoolFailed.Set(float64(poolMetrics.TotalFailedAcquire))
+// CollectTSDBPoolMetrics updates TSDB pgx connection pool gauges from a
+// pgxpool.Stat() snapshot (passed as plain ints to keep this package free of
+// a pgx dependency). Replaces the fake Neo4j pool collector (TSDB-CONSUME-001).
+func (m *StandardMetrics) CollectTSDBPoolMetrics(total, idle, acquired, maxConns, emptyAcquire int64) {
+	m.TSDBPoolTotal.Set(float64(total))
+	m.TSDBPoolIdle.Set(float64(idle))
+	m.TSDBPoolAcquired.Set(float64(acquired))
+	m.TSDBPoolMax.Set(float64(maxConns))
+	m.TSDBPoolEmptyAcquire.Set(float64(emptyAcquire))
 }
 
 // SpaceGraphData holds per-space graph stats for Prometheus collection.

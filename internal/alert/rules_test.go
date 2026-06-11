@@ -93,3 +93,65 @@ func TestMetricSamplesRules_UseTimeColumn(t *testing.T) {
 		}
 	}
 }
+
+// TSDB-CONSUME-001: the retrieve-latency rules replaced the broken
+// lifetime-cumulative HTTP synthetic rules. Pins:
+//   - query retrieval_audit (real per-call wall time), whose time column is
+//     recorded_at — the INVERSE of the metric_samples pin above
+//   - aggregate + COALESCE so an idle window returns 0, not "no rows in
+//     result set" (the recurring rule-health-*_latency failure mode)
+//   - never LIMIT 1 (latest-sample semantics caused both failure modes)
+func TestRetrieveLatencyRules_Defaults(t *testing.T) {
+	rules := RetrieveLatencyRules(0, 0, 0)
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(rules))
+	}
+	p95, p99 := rules[0], rules[1]
+	if p95.ID != "retrieve_p95_latency" || p99.ID != "retrieve_p99_latency" {
+		t.Errorf("ids = %q/%q", p95.ID, p99.ID)
+	}
+	if p95.Threshold != 120000 || p99.Threshold != 300000 {
+		t.Errorf("default thresholds = %v/%v, want 120000/300000", p95.Threshold, p99.Threshold)
+	}
+	if p95.Severity != SeverityMedium || p99.Severity != SeverityCritical {
+		t.Errorf("severities = %v/%v", p95.Severity, p99.Severity)
+	}
+	for _, r := range rules {
+		for _, want := range []string{"retrieval_audit", "recorded_at", "COALESCE", "percentile_cont", "total_latency_ms", "'30 minutes'"} {
+			if !strings.Contains(r.QuerySQL, want) {
+				t.Errorf("rule %s QuerySQL missing %q", r.ID, want)
+			}
+		}
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule %s uses LIMIT 1 (idle window → no rows → rule-health noise)", r.ID)
+		}
+		if strings.Contains(r.QuerySQL, "metric_samples") {
+			t.Errorf("rule %s queries metric_samples (must read retrieval_audit real wall time)", r.ID)
+		}
+		if !r.Enabled {
+			t.Errorf("rule %s should be enabled", r.ID)
+		}
+	}
+}
+
+func TestRetrieveLatencyRules_CustomParams(t *testing.T) {
+	rules := RetrieveLatencyRules(45000, 90000, 15)
+	if rules[0].Threshold != 45000 || rules[1].Threshold != 90000 {
+		t.Errorf("custom thresholds not applied: %v/%v", rules[0].Threshold, rules[1].Threshold)
+	}
+	if !strings.Contains(rules[0].QuerySQL, "'15 minutes'") {
+		t.Errorf("custom lookback not applied")
+	}
+}
+
+// Pin: the dead rules stay dead. high_p95_latency/critical_p99_latency read
+// lifetime-cumulative synthetics (perpetually pegged at the 9.95 bucket
+// clamp); neo4j_pool_exhausted read a perpetual-zero fake gauge.
+func TestDefaultRules_RemovedRulesStayRemoved(t *testing.T) {
+	for _, r := range DefaultRules() {
+		switch r.ID {
+		case "high_p95_latency", "critical_p99_latency", "neo4j_pool_exhausted":
+			t.Errorf("rule %s was removed by TSDB-CONSUME-001 and must not return", r.ID)
+		}
+	}
+}

@@ -3490,15 +3490,29 @@ func detectLanguage(filePath string) string {
 }
 
 // handlePoolMetrics handles GET /v1/system/pool-metrics
-// Returns Neo4j connection pool and Go runtime metrics.
+// Returns TSDB pgx connection pool and Go runtime metrics.
+// (TSDB-CONSUME-001: previously returned the fake Neo4j "pool" numbers —
+// a VerifyConnectivity probe counter; the neo4j driver has no pool API.)
 func (s *Server) handlePoolMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Get connection pool metrics
-	poolMetrics := db.GetPoolMetrics()
+	poolMetrics := map[string]any{"backend": "unavailable"}
+	if s.tsdbClient != nil && s.tsdbClient.Pool() != nil {
+		st := s.tsdbClient.Pool().Stat()
+		poolMetrics = map[string]any{
+			"backend":             "tsdb-pgx",
+			"total_conns":         st.TotalConns(),
+			"idle_conns":          st.IdleConns(),
+			"acquired_conns":      st.AcquiredConns(),
+			"constructing_conns":  st.ConstructingConns(),
+			"max_conns":           st.MaxConns(),
+			"acquire_count":       st.AcquireCount(),
+			"empty_acquire_count": st.EmptyAcquireCount(),
+		}
+	}
 
 	// Get Go runtime memory stats
 	var memStats runtime.MemStats
