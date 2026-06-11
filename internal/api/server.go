@@ -1264,6 +1264,7 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 							int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
 					}
 					m.CollectRateLimitMetrics()
+					m.CollectTSDBWriterStats(tsdb.AllWriterStats())
 
 					// Infrastructure: Neo4j graph, container
 					graphData := srv.collectNeo4jGraphData()
@@ -3125,6 +3126,7 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 				int64(st.AcquiredConns()), int64(st.MaxConns()), st.EmptyAcquireCount())
 		}
 		m.CollectRateLimitMetrics()
+		m.CollectTSDBWriterStats(tsdb.AllWriterStats())
 
 		// Collect Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
 		graphData := s.collectNeo4jGraphData()

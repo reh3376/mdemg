@@ -66,6 +66,7 @@ func NewEmbeddingEventWriter(pool poolIface, flushInterval time.Duration) *Embed
 		buffer: make([]EmbeddingEventRow, 0, 32),
 		done:   make(chan struct{}),
 	}
+	registerWriterStats("embedding_events", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

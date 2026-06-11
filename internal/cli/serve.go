@@ -492,6 +492,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.RetrieveLatencyRules(
 				float64(cfg.AlertRetrieveP95Ms), float64(cfg.AlertRetrieveP99Ms),
 				cfg.AlertRetrieveLatencyLookbackMin)...)
+			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
+			// writer used to drop rows in silence).
+			rules = append(rules, alert.TSDBWriterRules(
+				cfg.TSDBWriterAlertLookbackMin)...)
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			// SUPERVISOR-002: meta-alert when a rule's query fails repeatedly
 			evaluator.SetRuleFailureThreshold(cfg.AlertRuleFailureThreshold)

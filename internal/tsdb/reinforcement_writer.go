@@ -102,6 +102,15 @@ func NewReinforcementEventsWriter(pool poolIface, flushInterval time.Duration, m
 		maxBufferSize: maxBufferSize,
 		done:          make(chan struct{}),
 	}
+	registerWriterStats("reinforcement_events", func() FlushStats {
+		st := w.Stats()
+		return FlushStats{
+			SuccessCount:  st.SuccessCount,
+			FailureCount:  st.FailureCount,
+			TotalRows:     st.TotalRows,
+			OverflowCount: st.DroppedRows,
+		}
+	})
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

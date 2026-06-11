@@ -1061,6 +1061,7 @@ type Config struct {
 	AlertRetrieveP95Ms              int // ALERT_RETRIEVE_P95_MS — medium alert when windowed retrieve p95 exceeds this (default: 120000)
 	AlertRetrieveP99Ms              int // ALERT_RETRIEVE_P99_MS — critical alert when windowed retrieve p99 exceeds this (default: 300000)
 	AlertRetrieveLatencyLookbackMin int // ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN — percentile window in minutes (default: 30)
+	TSDBWriterAlertLookbackMin      int // TSDB_WRITER_ALERT_LOOKBACK_MIN — window for buffered-writer flush-failure growth detection (default: 60)
 
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
@@ -4107,6 +4108,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	tsdbWriterAlertLookbackMin, err := atoi("TSDB_WRITER_ALERT_LOOKBACK_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
@@ -4907,10 +4912,11 @@ func FromEnv() (Config, error) {
 		AlertEvaluatorEnabled:        alertEvaluatorEnabled,
 		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
 
-		// TSDB-CONSUME-001 — retrieve-latency SLO rules
+		// TSDB-CONSUME-001 — retrieve-latency SLO rules + writer flush health
 		AlertRetrieveP95Ms:              alertRetrieveP95Ms,
 		AlertRetrieveP99Ms:              alertRetrieveP99Ms,
 		AlertRetrieveLatencyLookbackMin: alertRetrieveLatencyLookbackMin,
+		TSDBWriterAlertLookbackMin:      tsdbWriterAlertLookbackMin,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

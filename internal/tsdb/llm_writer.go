@@ -62,6 +62,7 @@ func NewLLMInteractionWriter(pool poolIface, flushInterval time.Duration, maxBuf
 		done:          make(chan struct{}),
 		maxBufferSize: maxBuf,
 	}
+	registerWriterStats("llm_interactions", w.Stats)
 	w.flushTick = time.NewTicker(flushInterval)
 	go w.flushLoop()
 	return w

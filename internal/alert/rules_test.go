@@ -155,3 +155,26 @@ func TestDefaultRules_RemovedRulesStayRemoved(t *testing.T) {
 		}
 	}
 }
+
+// TSDB-CONSUME-001: writer flush-failure rule pins — per-writer MAX-MIN
+// delta (restart-safe) over metric_samples (time column), COALESCE'd.
+func TestTSDBWriterRules(t *testing.T) {
+	r := TSDBWriterRules(0)[0]
+	if r.ID != "tsdb_writer_flush_failures" || r.Service != "tsdb-writer" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	if r.Severity != SeverityHigh || r.Threshold != 0 || r.Operator != "gt" {
+		t.Errorf("severity/threshold/op = %v/%v/%q", r.Severity, r.Threshold, r.Operator)
+	}
+	for _, want := range []string{"mdemg_tsdb_writer_flush_failures_total", "labels->>'writer'", "MAX(value) - MIN(value)", "COALESCE", "'60 minutes'", "time >"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if strings.Contains(r.QuerySQL, "recorded_at") {
+		t.Errorf("metric_samples rule uses recorded_at (column is `time`)")
+	}
+	if got := TSDBWriterRules(15)[0]; !strings.Contains(got.QuerySQL, "'15 minutes'") {
+		t.Errorf("custom lookback not applied")
+	}
+}

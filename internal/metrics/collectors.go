@@ -5,6 +5,7 @@ import (
 
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/ratelimit"
+	"mdemg/internal/tsdb"
 )
 
 // StandardMetrics holds pre-registered standard metrics.
@@ -48,6 +49,14 @@ type StandardMetrics struct {
 	TSDBPoolAcquired     *Gauge // Connections currently checked out
 	TSDBPoolMax          *Gauge // Pool capacity (MaxConns)
 	TSDBPoolEmptyAcquire *Gauge // Cumulative acquires that waited on an empty pool
+
+	// Buffered TSDB writer flush stats, labeled by the hypertable the writer
+	// feeds (TSDB-CONSUME-001). Cumulative process-lifetime values exposed as
+	// gauges; the tsdb_writer_flush_failures rule alerts on in-window growth.
+	TSDBWriterFlushSuccess  func(writer string) *Gauge
+	TSDBWriterFlushFailures func(writer string) *Gauge
+	TSDBWriterRowsFlushed   func(writer string) *Gauge
+	TSDBWriterRowsDropped   func(writer string) *Gauge
 
 	// Memory pressure metrics (Phase 48.4.4)
 	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
@@ -294,6 +303,19 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.TSDBPoolAcquired = r.NewGauge("tsdb_pool_acquired_conns", "TSDB pgx pool connections currently checked out", nil)
 	m.TSDBPoolMax = r.NewGauge("tsdb_pool_max_conns", "TSDB pgx pool capacity (MaxConns)", nil)
 	m.TSDBPoolEmptyAcquire = r.NewGauge("tsdb_pool_empty_acquire_total", "Cumulative TSDB pool acquires that waited on an empty pool", nil)
+
+	m.TSDBWriterFlushSuccess = func(writer string) *Gauge {
+		return r.NewGauge("tsdb_writer_flush_success_total", "Cumulative successful flushes per buffered TSDB writer", map[string]string{"writer": writer})
+	}
+	m.TSDBWriterFlushFailures = func(writer string) *Gauge {
+		return r.NewGauge("tsdb_writer_flush_failures_total", "Cumulative failed flushes per buffered TSDB writer", map[string]string{"writer": writer})
+	}
+	m.TSDBWriterRowsFlushed = func(writer string) *Gauge {
+		return r.NewGauge("tsdb_writer_rows_flushed_total", "Cumulative rows flushed per buffered TSDB writer", map[string]string{"writer": writer})
+	}
+	m.TSDBWriterRowsDropped = func(writer string) *Gauge {
+		return r.NewGauge("tsdb_writer_rows_dropped_total", "Cumulative rows dropped (buffer overflow) per buffered TSDB writer", map[string]string{"writer": writer})
+	}
 
 	// Memory pressure metrics (Phase 48.4.4)
 	m.MemoryPressureRejected = r.NewGauge("memory_pressure_rejected_total", "Requests rejected due to memory pressure", nil)
@@ -830,6 +852,21 @@ func (m *StandardMetrics) CollectTSDBPoolMetrics(total, idle, acquired, maxConns
 	m.TSDBPoolAcquired.Set(float64(acquired))
 	m.TSDBPoolMax.Set(float64(maxConns))
 	m.TSDBPoolEmptyAcquire.Set(float64(emptyAcquire))
+}
+
+// CollectTSDBWriterStats updates the per-writer flush gauges from
+// tsdb.AllWriterStats() (TSDB-CONSUME-001). Stats are cumulative
+// process-lifetime values; the tsdb_writer_flush_failures evaluator rule
+// alerts on in-window growth. (metrics→tsdb is the established import
+// direction — recorder.go already depends on tsdb; tsdb never imports
+// metrics, by design — see reinforcement_writer.go.)
+func (m *StandardMetrics) CollectTSDBWriterStats(stats map[string]tsdb.FlushStats) {
+	for writer, st := range stats {
+		m.TSDBWriterFlushSuccess(writer).Set(float64(st.SuccessCount))
+		m.TSDBWriterFlushFailures(writer).Set(float64(st.FailureCount))
+		m.TSDBWriterRowsFlushed(writer).Set(float64(st.TotalRows))
+		m.TSDBWriterRowsDropped(writer).Set(float64(st.OverflowCount))
+	}
 }
 
 // SpaceGraphData holds per-space graph stats for Prometheus collection.

@@ -297,6 +297,40 @@ func RetrieveLatencyRules(p95ThreshMs, p99ThreshMs float64, lookbackMin int) []A
 	}
 }
 
+// TSDBWriterRules returns the buffered-writer flush-failure rule
+// (TSDB-CONSUME-001). Every buffered TSDB writer reports cumulative flush
+// stats into the mdemg_tsdb_writer_* gauge family; this rule fires when any
+// writer's failure count grew inside the lookback window — a wedged writer
+// previously dropped rows in silence (only the reinforcement writer had
+// metrics visibility). MAX-MIN per writer label, summed: restart-safe
+// (counts reset to 0, delta stays ≥ 0) and COALESCE'd so an empty window
+// returns a row.
+func TSDBWriterRules(lookbackMin int) []AlertRule {
+	if lookbackMin <= 0 {
+		lookbackMin = 60
+	}
+	return []AlertRule{
+		{
+			ID:          "tsdb_writer_flush_failures",
+			Title:       "MDEMG TSDB writer flush failures",
+			Service:     "tsdb-writer",
+			Severity:    SeverityHigh,
+			Interval:    60 * time.Second,
+			ForDuration: 2 * time.Minute,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(SUM(delta), 0) FROM (
+				SELECT labels->>'writer' AS writer, MAX(value) - MIN(value) AS delta
+				FROM metric_samples
+				WHERE metric_name = 'mdemg_tsdb_writer_flush_failures_total'
+				  AND time > now() - interval '%d minutes'
+				GROUP BY labels->>'writer'
+			) per_writer`, lookbackMin),
+			Threshold: 0,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
 // JobHealthRules returns the NOSILENT-001 scheduled-job alert rules, evaluated
 // against the V0024 scheduled_job_events hypertable. These make a failed — or
 // never-run — scheduled job LOUD instead of a silent log line.
