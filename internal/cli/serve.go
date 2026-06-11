@@ -502,6 +502,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				cfg.ScorerChangeLookbackHours, cfg.ConsensusShiftThreshold,
 				cfg.ConsensusShiftRecentHours, cfg.ConsensusShiftBaselineDays,
 				cfg.ConsensusShiftMinSamples)...)
+			// TSDB-CONSUME-001: slow emergence cycles (the DBSCAN O(n²)
+			// deferral condition, observable for the first time).
+			rules = append(rules, alert.EmergenceCycleRules(
+				cfg.EmergenceCycleAlertThresholdSec,
+				cfg.EmergenceCycleAlertLookbackMin)...)
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			// SUPERVISOR-002: meta-alert when a rule's query fails repeatedly
 			evaluator.SetRuleFailureThreshold(cfg.AlertRuleFailureThreshold)

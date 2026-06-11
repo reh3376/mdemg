@@ -375,6 +375,39 @@ func ScorerDriftRules(changeLookbackHours int, shiftThreshold float64, shiftRece
 	}
 }
 
+// EmergenceCycleRules returns the slow-emergence-cycle rule
+// (TSDB-CONSUME-001). The DBSCAN O(n²) ceiling deferral (roadmap §4) is
+// conditioned on cycles exceeding ~60s — previously unobservable because
+// ConsolidationResult.TotalDuration was computed and discarded. The gauge
+// mdemg_emergence_cycle_duration_seconds{space_id,cycle} records each
+// completed cycle; this rule takes the window MAX so any slow cycle inside
+// the lookback fires (COALESCE: idle window → 0 → quiet).
+func EmergenceCycleRules(thresholdSec float64, lookbackMin int) []AlertRule {
+	if thresholdSec <= 0 {
+		thresholdSec = 60
+	}
+	if lookbackMin <= 0 {
+		lookbackMin = 120
+	}
+	return []AlertRule{
+		{
+			ID:          "emergence_cycle_slow",
+			Title:       "MDEMG emergence cycle exceeded duration threshold",
+			Service:     "emergence-cycle",
+			Severity:    SeverityMedium,
+			Interval:    5 * time.Minute,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(MAX(value), 0) FROM metric_samples
+				WHERE metric_name = 'mdemg_emergence_cycle_duration_seconds'
+				  AND metric_type = 'gauge'
+				  AND time > now() - interval '%d minutes'`, lookbackMin),
+			Threshold: thresholdSec,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
 // TSDBWriterRules returns the buffered-writer flush-failure rule
 // (TSDB-CONSUME-001). Every buffered TSDB writer reports cumulative flush
 // stats into the mdemg_tsdb_writer_* gauge family; this rule fires when any

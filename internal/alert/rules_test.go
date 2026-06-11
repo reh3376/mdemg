@@ -236,3 +236,28 @@ func TestScorerDriftRules_CustomParams(t *testing.T) {
 		}
 	}
 }
+
+// TSDB-CONSUME-001: the DBSCAN O(n²) deferral condition (>60s emergence
+// cycles) is observable. Gauge MAX over window, metric_samples time column,
+// COALESCE'd.
+func TestEmergenceCycleRules(t *testing.T) {
+	r := EmergenceCycleRules(0, 0)[0]
+	if r.ID != "emergence_cycle_slow" || r.Service != "emergence-cycle" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	if r.Threshold != 60 || r.Operator != "gt" {
+		t.Errorf("threshold/op = %v/%q", r.Threshold, r.Operator)
+	}
+	for _, want := range []string{"mdemg_emergence_cycle_duration_seconds", "COALESCE(MAX(value), 0)", "'120 minutes'", "time >"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if strings.Contains(r.QuerySQL, "recorded_at") {
+		t.Errorf("metric_samples rule uses recorded_at (column is `time`)")
+	}
+	custom := EmergenceCycleRules(90, 30)[0]
+	if custom.Threshold != 90 || !strings.Contains(custom.QuerySQL, "'30 minutes'") {
+		t.Errorf("custom params not applied")
+	}
+}

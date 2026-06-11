@@ -1072,6 +1072,11 @@ type Config struct {
 	ConsensusShiftBaselineDays int     // CONSENSUS_SHIFT_BASELINE_DAYS — trailing baseline window (default: 7)
 	ConsensusShiftMinSamples   int     // CONSENSUS_SHIFT_MIN_SAMPLES — minimum rows in each window before the rule can fire (default: 20)
 
+	// TSDB-CONSUME-001 — emergence-cycle duration tripwire (the DBSCAN O(n²)
+	// deferral condition becomes observable).
+	EmergenceCycleAlertThresholdSec float64 // EMERGENCE_CYCLE_ALERT_THRESHOLD_SEC — alert when a cycle exceeds this wall time (default: 60)
+	EmergenceCycleAlertLookbackMin  int     // EMERGENCE_CYCLE_ALERT_LOOKBACK_MIN — window scanned for slow cycles (default: 120)
+
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
 	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
@@ -4141,6 +4146,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	emergenceCycleAlertThresholdSec, err := atof("EMERGENCE_CYCLE_ALERT_THRESHOLD_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	emergenceCycleAlertLookbackMin, err := atoi("EMERGENCE_CYCLE_ALERT_LOOKBACK_MIN", 120)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
@@ -4951,6 +4964,8 @@ func FromEnv() (Config, error) {
 		ConsensusShiftRecentHours:       consensusShiftRecentHours,
 		ConsensusShiftBaselineDays:      consensusShiftBaselineDays,
 		ConsensusShiftMinSamples:        consensusShiftMinSamples,
+		EmergenceCycleAlertThresholdSec: emergenceCycleAlertThresholdSec,
+		EmergenceCycleAlertLookbackMin:  emergenceCycleAlertLookbackMin,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

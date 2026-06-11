@@ -58,6 +58,18 @@ type StandardMetrics struct {
 	TSDBWriterRowsFlushed   func(writer string) *Gauge
 	TSDBWriterRowsDropped   func(writer string) *Gauge
 
+	// Guidance conflict counter (TSDB-CONSUME-001) — makes idea 09's
+	// go/no-go criterion measurable from metric_samples.
+	GuidanceConflicts func(spaceID string) *Counter
+
+	// Emergence/consolidation cycle wall time (TSDB-CONSUME-001) — the
+	// observable the DBSCAN O(n²) deferral is conditioned on (>60s revisit
+	// threshold). Gauge of the LAST completed cycle, not a histogram: the
+	// registry's fixed ≤10s latency buckets would clamp multi-minute cycles
+	// exactly like the HTTP percentiles this sprint un-broke, and at ~1-6
+	// cycles per flush window a percentile is noise anyway.
+	EmergenceCycleDuration func(spaceID, cycle string) *Gauge
+
 	// Memory pressure metrics (Phase 48.4.4)
 	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
 	MemoryHeapBytes        *Gauge // Current heap allocation in bytes
@@ -315,6 +327,13 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.TSDBWriterRowsDropped = func(writer string) *Gauge {
 		return r.NewGauge("tsdb_writer_rows_dropped_total", "Cumulative rows dropped (buffer overflow) per buffered TSDB writer", map[string]string{"writer": writer})
+	}
+
+	m.GuidanceConflicts = func(spaceID string) *Counter {
+		return r.NewCounter("guidance_conflicts_total", "Conflicts detected by consulting.Suggest (idea 09 go/no-go signal)", map[string]string{"space_id": spaceID})
+	}
+	m.EmergenceCycleDuration = func(spaceID, cycle string) *Gauge {
+		return r.NewGauge("emergence_cycle_duration_seconds", "Wall time of the last completed emergence/consolidation cycle (DBSCAN O(n²) deferral tripwire)", map[string]string{"space_id": spaceID, "cycle": cycle})
 	}
 
 	// Memory pressure metrics (Phase 48.4.4)
