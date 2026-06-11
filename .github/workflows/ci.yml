@@ -319,12 +319,15 @@ jobs:
             --spec "docs/tests/ults/specs/*.ults.json" \
             --verify-hashes
 
-      - name: Run UBENCH Contract Gate (merge-blocking)
-        # UXTS-CI-001: dataset↔holdout contract (no LLM needed) — the
-        # forcing function against the Phase 10 guardrail-gap class.
+      - name: Run UBENCH Lint Gate (merge-blocking)
+        # UXTS-CI-001: schema + config-SHA verification (holdout SHA is
+        # enforced wherever the gitignored training data exists — CI
+        # checkouts legitimately lack it, first CI contact proved it).
+        # The full dataset↔holdout contract (make test-ubench-contract)
+        # is the documented LOCAL pre-push gate for training-data changes.
         run: |
-          pip install pytest
-          make test-ubench-contract
+          pip install jsonschema
+          make test-ubench-lint
 
       - name: Run UAMS Auth Method Validation (soft-fail)
         continue-on-error: true

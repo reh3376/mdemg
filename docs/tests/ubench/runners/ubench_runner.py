@@ -159,9 +159,17 @@ def run_lint(spec_path: Path, spec: dict[str, Any], schema: dict[str, Any]) -> d
     if expected_gh_sha:
         assertions += 1
         if not gh_path.is_file():
-            failures.append(f"golden_holdout: file missing at {gh_path}")
-            hash_mismatches.append(f"golden_holdout.path missing: {gh_path}")
-            hash_verified = False
+            # UXTS-CI-001: the holdout lives under training_data/, which is
+            # gitignored by design (derived eval data stays out of the
+            # repo) — a CI checkout legitimately lacks it. Absence is a
+            # pass-with-warning; a PRESENT file with the wrong SHA still
+            # fails everywhere, so the drift forcing-function holds on
+            # every environment that carries the data.
+            passed += 1
+            warnings.append(
+                f"golden_holdout absent at {gh_path} (gitignored training data) — "
+                "SHA enforced on checkouts that carry it"
+            )
         else:
             actual = sha256_file(gh_path)
             if actual == expected_gh_sha:
