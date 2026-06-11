@@ -194,6 +194,28 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 		}
 	}
 
+	// RSIC-STORM-001: reserve the slot AT ADMISSION, under the same lock
+	// that performed the checks. Previously the active/cooldown records
+	// were written only by RecordTrigger — which callers invoke AFTER
+	// RunCycle completes — so for a cycle's entire multi-second duration
+	// every concurrent trigger passed every gate (live: ~20-30k micro
+	// cycles/day, 4 spawning within 50 ms; the 300 s cooldown effectively
+	// did not exist). RecordTrigger now updates the reservation with the
+	// real cycle ID; CompleteCycle clears the active slot; the cooldown
+	// record persists either way (a failed cycle must still cool down).
+	rec := TriggerRecord{
+		Source:    source,
+		SpaceID:   spaceID,
+		Tier:      tier,
+		CycleID:   "pending",
+		Timestamp: now,
+	}
+	p.activeCycles[activeKey] = rec
+	p.lastTrigger[cooldownKey] = rec
+	if idempotencyKey != "" {
+		p.dedupeWindow[idempotencyKey] = rec
+	}
+
 	return TriggerDecision{
 		Allowed: true,
 		Meta:    meta,
