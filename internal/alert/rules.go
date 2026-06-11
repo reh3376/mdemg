@@ -316,23 +316,48 @@ func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStalene
 	}
 
 	if includeBackupStaleness {
-		rules = append(rules, AlertRule{
-			ID:          "backup_no_recent_success",
-			Title:       "No Successful TSDB Backup In Window",
-			Service:     "scheduled-job-staleness",
-			Severity:    SeverityHigh,
-			Interval:    5 * time.Minute,
-			ForDuration: 0,
-			QuerySQL: fmt.Sprintf(`SELECT count(*) FROM scheduled_job_events
-				WHERE job_name = 'tsdb-backup' AND success = true
-				  AND recorded_at > now() - interval '%d hours'`, stalenessHours),
-			Threshold: 0.5, // < 0.5 ⇒ zero successes ⇒ stale
-			Operator:  "lt",
-			Enabled:   true,
-		})
+		rules = append(rules, jobStalenessRule(
+			"backup_no_recent_success", "No Successful TSDB Backup In Window",
+			"scheduled-job-staleness", "tsdb-backup", stalenessHours))
 	}
 
 	return rules
+}
+
+// jobStalenessRule builds a per-job "no recent success" rule over the V0024
+// scheduled_job_events hypertable (BACKUP-RESTORE-VERIFY-001 generalization
+// of the NOSILENT-001 tsdb-backup rule). This is the "job never ran"
+// guarantee: it fires from the server observing ABSENT success, catching a
+// job that silently died or never started. jobName must be an internal
+// constant (it is interpolated into SQL). Each rule gets its own Service —
+// the dispatcher cooldown key is (Service, Severity).
+func jobStalenessRule(id, title, service, jobName string, stalenessHours int) AlertRule {
+	if stalenessHours <= 0 {
+		stalenessHours = 48
+	}
+	return AlertRule{
+		ID:          id,
+		Title:       title,
+		Service:     service,
+		Severity:    SeverityHigh,
+		Interval:    5 * time.Minute,
+		ForDuration: 0,
+		QuerySQL: fmt.Sprintf(`SELECT count(*) FROM scheduled_job_events
+			WHERE job_name = '%s' AND success = true
+			  AND recorded_at > now() - interval '%d hours'`, jobName, stalenessHours),
+		Threshold: 0.5, // < 0.5 ⇒ zero successes ⇒ stale
+		Operator:  "lt",
+		Enabled:   true,
+	}
+}
+
+// Neo4jBackupStalenessRule alerts when the default-ON Neo4j backup scheduler
+// has recorded no successful run in the window (BACKUP-RESTORE-VERIFY-001 —
+// it previously had zero jobhealth coverage, the inverse of NOSILENT-001).
+func Neo4jBackupStalenessRule(stalenessHours int) AlertRule {
+	return jobStalenessRule(
+		"neo4j_backup_no_recent_success", "No Successful Neo4j Backup In Window",
+		"scheduled-job-staleness-neo4j", "neo4j-backup", stalenessHours)
 }
 
 // HookHealthRules returns the HOOKSYNC-001 hook-channel absence rule. The

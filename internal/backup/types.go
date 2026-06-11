@@ -16,6 +16,8 @@ type Config struct {
 	RetentionMaxAgeDays  int    // delete backups older than N days
 	RetentionMaxStorageGB int   // delete oldest until under quota
 	RetentionRunAfter    bool   // run retention after each backup
+	SnapshotWaitTimeoutSec int  // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for triggered backup jobs: pre-restore snapshot + scheduled-run reporting (default: 3600)
+	InitialBackupDelayMin  int  // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup runs; 0 disables (default: 5)
 }
 
 // BackupType identifies whether a backup is full or partial.
@@ -50,11 +52,20 @@ type BackupManifest struct {
 	Checksum      string   `json:"checksum"`
 	SizeBytes     int64    `json:"size_bytes"`
 	Spaces        []string `json:"spaces,omitempty"`
-	NodeCount     int64    `json:"node_count"`
-	EdgeCount     int64    `json:"edge_count"`
+	NodeCount     int64    `json:"node_count"` // whole-database count at backup time (informational)
+	EdgeCount     int64    `json:"edge_count"` // whole-database count at backup time (informational)
 	SchemaVersion int      `json:"schema_version"`
 	KeepForever   bool     `json:"keep_forever"`
 	Label         string   `json:"label,omitempty"`
+
+	// BACKUP-RESTORE-VERIFY-001: counts of what the .mdemg file actually
+	// contains, counted from the exported chunks. These are the
+	// restore-validation reference (NodeCount/EdgeCount above are
+	// whole-database and diverge from file contents on partial backups).
+	// Zero-valued on legacy manifests → validation downgrades to warn-only.
+	FileNodeCount        int64 `json:"file_node_count,omitempty"`
+	FileEdgeCount        int64 `json:"file_edge_count,omitempty"`
+	FileObservationCount int64 `json:"file_observation_count,omitempty"`
 }
 
 // TriggerRequest is the API payload for POST /v1/backup/trigger.

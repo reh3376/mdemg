@@ -704,6 +704,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			RetentionMaxAgeDays:   cfg.BackupRetentionMaxAgeDays,
 			RetentionMaxStorageGB: cfg.BackupRetentionMaxStorageGB,
 			RetentionRunAfter:     cfg.BackupRetentionRunAfter,
+			SnapshotWaitTimeoutSec: cfg.BackupSnapshotWaitTimeoutSec,
+			InitialBackupDelayMin:  cfg.BackupInitialDelayMin,
 		}
 		exp := transfer.NewExporter(driver)
 		backupSvc = backup.NewService(backupCfg, driver, exp)
@@ -1142,6 +1144,24 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			s.tsdbBackupScheduler.SetResultHook(func(success bool, latencyMS int64, runErr error) {
 				ev := tsdb.JobEventRow{
 					JobName: "tsdb-backup", InstanceID: instanceID,
+					Success: success, LatencyMS: latencyMS,
+				}
+				if runErr != nil {
+					ev.ErrorMessage = runErr.Error()
+				}
+				jobhealth.Report(context.Background(), pool, disp, ev)
+			})
+		}
+		// BACKUP-RESTORE-VERIFY-001: the default-ON Neo4j backup scheduler was
+		// the unmonitored one (inverted NOSILENT coverage) — wire the same
+		// jobhealth hook with its own job_name.
+		if s.backupScheduler != nil {
+			pool := client.Pool()
+			disp := s.alertDispatcher
+			instanceID := s.cfg.InstanceID
+			s.backupScheduler.SetResultHook(func(success bool, latencyMS int64, runErr error) {
+				ev := tsdb.JobEventRow{
+					JobName: "neo4j-backup", InstanceID: instanceID,
 					Success: success, LatencyMS: latencyMS,
 				}
 				if runErr != nil {

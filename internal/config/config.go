@@ -724,6 +724,9 @@ type Config struct {
 	BackupRetentionMaxAgeDays   int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
 	BackupRetentionMaxStorageGB int    // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
 	BackupRetentionRunAfter     bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
+	BackupSnapshotWaitTimeoutSec int   // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for triggered backup jobs (pre-restore snapshot, scheduled-run reporting) (default: 3600)
+	BackupJobStalenessHours     int    // BACKUP_JOB_STALENESS_HOURS — neo4j-backup staleness alert window; 0 = partial interval × 2 (default: 0)
+	BackupInitialDelayMin       int    // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup; 0 disables (default: 5)
 
 	// TimescaleDB Backup & Restore
 	TSDBBackupEnabled             bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
@@ -3275,11 +3278,28 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	backupRetentionMaxStorageGB, err := atoi("BACKUP_RETENTION_MAX_STORAGE_GB", 2)
+	// BACKUP-RESTORE-VERIFY-001: was 2 (comment/code drift vs the documented
+	// 50) — below the size of one whole-database export, which made
+	// retention delete every backup the moment it completed.
+	backupRetentionMaxStorageGB, err := atoi("BACKUP_RETENTION_MAX_STORAGE_GB", 50)
 	if err != nil {
 		return Config{}, err
 	}
 	backupRetentionRunAfter := getBool("BACKUP_RETENTION_RUN_AFTER_BACKUP", true)
+	// 3600 not 300: a whole-database export takes ~15 min on mdemg-dev;
+	// the pre-restore snapshot and scheduled-run reporting both wait on it.
+	backupSnapshotWaitTimeoutSec, err := atoi("BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC", 3600)
+	if err != nil {
+		return Config{}, err
+	}
+	backupJobStalenessHours, err := atoi("BACKUP_JOB_STALENESS_HOURS", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	backupInitialDelayMin, err := atoi("BACKUP_INITIAL_DELAY_MIN", 5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// TimescaleDB Backup & Restore
 	tsdbBackupEnabled := getBool("TSDB_BACKUP_ENABLED", false)
@@ -4743,6 +4763,9 @@ func FromEnv() (Config, error) {
 		BackupRetentionMaxAgeDays:   backupRetentionMaxAgeDays,
 		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
 		BackupRetentionRunAfter:     backupRetentionRunAfter,
+		BackupSnapshotWaitTimeoutSec: backupSnapshotWaitTimeoutSec,
+		BackupJobStalenessHours:     backupJobStalenessHours,
+		BackupInitialDelayMin:       backupInitialDelayMin,
 
 		// TimescaleDB Backup & Restore
 		TSDBBackupEnabled:             tsdbBackupEnabled,

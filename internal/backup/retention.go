@@ -84,7 +84,13 @@ func (s *Service) RunRetention(_ context.Context) (*RetentionResult, error) {
 		result.FreedBytes += freed
 	}
 
-	// Storage-based: if total size > quota, delete oldest non-exempt until under.
+	// Storage-based: if total size > quota, delete oldest non-exempt until
+	// under — but NEVER the newest backup of each type. A quota smaller
+	// than a single backup must degrade to "over quota, keep the backup",
+	// not "delete the backup you just made" (BACKUP-RESTORE-VERIFY-001
+	// live-caught: a 2 GB default quota silently deleted every 3 GB
+	// whole-database backup ~80 ms after it completed — the backup system
+	// was a no-op for any database whose export exceeded the quota).
 	if s.cfg.RetentionMaxStorageGB > 0 {
 		maxBytes := int64(s.cfg.RetentionMaxStorageGB) * 1024 * 1024 * 1024
 		totalSize := s.totalStorageSize()
@@ -94,11 +100,16 @@ func (s *Service) RunRetention(_ context.Context) (*RetentionResult, error) {
 			sort.Slice(remaining, func(i, j int) bool {
 				return remaining[i].CreatedAt < remaining[j].CreatedAt // oldest first
 			})
+			// Newest backup per type is sacrosanct in the quota pass.
+			newestPerType := make(map[string]string)
+			for _, m := range remaining {
+				newestPerType[m.Type] = m.BackupID // oldest-first: last wins
+			}
 			for _, m := range remaining {
 				if totalSize <= maxBytes {
 					break
 				}
-				if m.KeepForever {
+				if m.KeepForever || m.BackupID == newestPerType[m.Type] {
 					continue
 				}
 				freed, delErr := s.deleteBackupFiles(m.BackupID)
@@ -108,6 +119,10 @@ func (s *Service) RunRetention(_ context.Context) (*RetentionResult, error) {
 				result.Deleted = append(result.Deleted, m.BackupID)
 				result.FreedBytes += freed
 				totalSize -= freed
+			}
+			if totalSize > maxBytes {
+				slog.Warn("backup: retention: storage over quota but only newest/keep-forever backups remain — raise BACKUP_RETENTION_MAX_STORAGE_GB",
+					"total_bytes", totalSize, "quota_bytes", maxBytes)
 			}
 		}
 	}

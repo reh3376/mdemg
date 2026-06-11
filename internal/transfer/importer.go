@@ -196,6 +196,30 @@ type batchStats struct {
 	merged      int32 // Phase 35: CRDT merged edges
 }
 
+// nodeProps builds the base property map for an imported node. path and
+// name are written only when non-empty (BACKUP-RESTORE-VERIFY-001,
+// live-caught): conversation observations carry path=NULL in Neo4j, which
+// the memorynode_path_unique (space_id, path) constraint ignores — but
+// proto serializes NULL as "", and importing the literal empty string makes
+// every observation after the first collide with
+// ConstraintValidationFailed. Restores containing 2+ observation nodes had
+// always been broken.
+func nodeProps(nd *pb.NodeData) map[string]any {
+	props := map[string]any{
+		"space_id":  nd.SpaceId,
+		"node_id":   nd.NodeId,
+		"layer":     int64(nd.Layer),
+		"role_type": nd.RoleType,
+	}
+	if nd.Path != "" {
+		props["path"] = nd.Path
+	}
+	if nd.Name != "" {
+		props["name"] = nd.Name
+	}
+	return props
+}
+
 func (imp *Importer) importNodes(ctx context.Context, nodes []*pb.NodeData) (batchStats, error) {
 	sess := imp.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
@@ -228,15 +252,7 @@ func (imp *Importer) importNodes(ctx context.Context, nodes []*pb.NodeData) (bat
 				}
 			}
 
-			// Build property map
-			props := map[string]any{
-				"space_id":  nd.SpaceId,
-				"node_id":   nd.NodeId,
-				"path":      nd.Path,
-				"name":      nd.Name,
-				"layer":     int64(nd.Layer),
-				"role_type": nd.RoleType,
-			}
+			props := nodeProps(nd)
 
 			if nd.Version > 0 {
 				props["version"] = int64(nd.Version)
