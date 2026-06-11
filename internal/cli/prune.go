@@ -113,6 +113,9 @@ func newPruneCmd() *cobra.Command {
 
 	// Label selection
 	cmd.Flags().StringSliceVar(&cfg.IncludeLabels, "include-labels", []string{"MemoryNode"}, "Labels to scan for orphans (e.g. MemoryNode,SymbolNode,Observation)")
+	cmd.Flags().StringSliceVar(&cfg.ExcludeRoleTypes, "exclude-role-types",
+		envCSV("PRUNE_EXCLUDE_ROLE_TYPES"),
+		"role_type values never tombstoned (env PRUNE_EXCLUDE_ROLE_TYPES; orphan disposition is context-dependent)")
 	cmd.Flags().BoolVar(&cfg.MatchIgnore, "match-ignore", false, "Delete nodes with file_path matching .mdemgignore patterns")
 
 	// Processing options
@@ -183,7 +186,10 @@ type pruneConfig struct {
 
 	// Label selection
 	IncludeLabels []string // default: ["MemoryNode"]
-	MatchIgnore   bool     // delete nodes matching .mdemgignore patterns
+	// MAINT-LIVE-001: orphan disposition is context-dependent (operator
+	// 2026-06-11) — role types listed here are never tombstone candidates.
+	ExcludeRoleTypes []string
+	MatchIgnore      bool // delete nodes matching .mdemgignore patterns
 
 	// Processing options
 	DryRun    bool
@@ -766,6 +772,7 @@ func queryOrphanCandidates(ctx context.Context, driver neo4j.DriverWithContext, 
 MATCH (n:MemoryNode)
 WHERE n.space_id = $spaceId
   AND coalesce(n.status, 'active') <> 'tombstoned'
+  AND NOT coalesce(n.role_type, '') IN $excludeRoleTypes
 WITH n
 // Count all edges (both directions) for degree calculation
 OPTIONAL MATCH (n)-[e]-()
@@ -787,6 +794,8 @@ ORDER BY degree ASC, lastObsTime ASC`
 	params := map[string]any{
 		"spaceId":   cfg.SpaceID,
 		"maxDegree": cfg.MaxDegree,
+		// nil-safe: an empty exclusion list must bind as [] not null.
+		"excludeRoleTypes": append([]string{}, cfg.ExcludeRoleTypes...),
 	}
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -1700,4 +1709,19 @@ func printStats(stats pruneStats, cfg pruneConfig) {
 	} else {
 		fmt.Println("Changes applied successfully.")
 	}
+}
+
+// envCSV splits a comma-separated env var into a trimmed slice ([] when unset).
+func envCSV(key string) []string {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
