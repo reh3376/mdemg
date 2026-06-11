@@ -164,3 +164,79 @@ func TestParseReinforcementRow_WrongType_FallsBackToZero(t *testing.T) {
 		t.Errorf("wrong-typed string should fall back to empty, got %q", row.RoleA)
 	}
 }
+
+func TestParseReinforcementRow_ContradictCreate_EventGraph004(t *testing.T) {
+	// EVENTGRAPH-004 contradict statement, ON CREATE branch: a CONTRADICTS edge
+	// is born at weight=negWeight. prev=0, delta=+negWeight (the edge's OWN
+	// weight delta — negative-feedback semantics live in trigger_path, which the
+	// caller overrides to apply_negative_feedback_contradict after parsing).
+	rec := map[string]any{
+		"src_node_id":          "query-node",
+		"dst_node_id":          "rejected-node",
+		"prev_weight":          0.0,
+		"new_weight":           0.15,
+		"delta_weight":         0.15,
+		"evidence_count_after": int64(1),
+		"eta_effective":        nil,
+		"surprise_factor":      nil,
+		"activation_product":   nil,
+		"path_sim":             nil,
+		"role_a":               "conversation_observation",
+		"role_b":               "conversation_observation",
+		"obs_type_a":           "note",
+		"obs_type_b":           "note",
+		"session_id":           "eg004-probe",
+		"direction":            "forward",
+		"created_new_edge":     true,
+	}
+	row := parseReinforcementRow(mapGetter(rec))
+	if !row.CreatedNewEdge {
+		t.Fatalf("ON CREATE branch: created_new_edge should be true")
+	}
+	if row.PrevWeight != 0.0 || row.NewWeight != 0.15 || row.DeltaWeight != 0.15 {
+		t.Errorf("create weights: prev=%v new=%v delta=%v, want 0/0.15/0.15", row.PrevWeight, row.NewWeight, row.DeltaWeight)
+	}
+	if row.EvidenceCountAfter != 1 {
+		t.Errorf("evidence_count_after = %d, want 1", row.EvidenceCountAfter)
+	}
+	// Hebbian-only fields are NULL for contradict rows → zero values, which the
+	// writer's nullableFloat maps back to SQL NULL.
+	if row.EtaEffective != 0 || row.SurpriseFactor != 0 || row.ActivationProduct != 0 || row.PathSim != 0 {
+		t.Errorf("contradict rows must zero the Hebbian-only fields, got eta=%v surprise=%v act=%v sim=%v",
+			row.EtaEffective, row.SurpriseFactor, row.ActivationProduct, row.PathSim)
+	}
+}
+
+func TestParseReinforcementRow_ContradictRematch_EventGraph004(t *testing.T) {
+	// EVENTGRAPH-004 contradict statement, ON MATCH branch: evidence_count
+	// increments, weight unchanged → delta=0, created_new_edge=false.
+	rec := map[string]any{
+		"src_node_id":          "query-node",
+		"dst_node_id":          "rejected-node",
+		"prev_weight":          0.15,
+		"new_weight":           0.15,
+		"delta_weight":         0.0,
+		"evidence_count_after": int64(2),
+		"eta_effective":        nil,
+		"surprise_factor":      nil,
+		"activation_product":   nil,
+		"path_sim":             nil,
+		"role_a":               "conversation_observation",
+		"role_b":               "conversation_observation",
+		"obs_type_a":           "note",
+		"obs_type_b":           "note",
+		"session_id":           "eg004-probe",
+		"direction":            "forward",
+		"created_new_edge":     false,
+	}
+	row := parseReinforcementRow(mapGetter(rec))
+	if row.CreatedNewEdge {
+		t.Fatalf("ON MATCH branch: created_new_edge should be false")
+	}
+	if row.DeltaWeight != 0.0 || row.PrevWeight != 0.15 || row.NewWeight != 0.15 {
+		t.Errorf("re-match weights: prev=%v new=%v delta=%v, want 0.15/0.15/0", row.PrevWeight, row.NewWeight, row.DeltaWeight)
+	}
+	if row.EvidenceCountAfter != 2 {
+		t.Errorf("evidence_count_after = %d, want 2", row.EvidenceCountAfter)
+	}
+}

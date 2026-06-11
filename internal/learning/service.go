@@ -1010,35 +1010,38 @@ func (s *Service) ApplyNegativeFeedback(ctx context.Context, spaceID string, que
 
 	var result NegativeFeedbackResult
 	// EVENTGRAPH-003: per-pair weaken telemetry (trigger_path=apply_negative_feedback).
+	// EVENTGRAPH-004: per-pair contradict telemetry (trigger_path=apply_negative_feedback_contradict).
 	var reinforcementRows []tsdb.ReinforcementEventRow
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// For each query-rejected pair, weaken existing CO_ACTIVATED_WITH or create CONTRADICTS
-		cypher := `
+		// EVENTGRAPH-004: the original single statement handled both actions via
+		// FOREACH, but FOREACH-scoped variables are invisible to RETURN — the
+		// CONTRADICTS edge state could not be emitted. Split into two statements
+		// in the SAME transaction (atomicity preserved). Classification is
+		// identical to the original OPTIONAL MATCH snapshot: the weaken statement
+		// never deletes edges, so the contradict statement's NOT EXISTS sees the
+		// same co-activation edge set.
+		params := map[string]any{
+			"spaceId":     spaceID,
+			"queryIds":    queryNodeIDs,
+			"rejectedIds": rejectedNodeIDs,
+			"negWeight":   negWeight,
+		}
+
+		// Statement A — weaken existing CO_ACTIVATED_WITH (floor at 0).
+		// EVENTGRAPH-003: capture the pre-weaken weight before SET so each pair
+		// emits a reinforcement event with a negative delta_weight.
+		weakenCypher := `
 UNWIND $queryIds AS qid
 UNWIND $rejectedIds AS rid
 MATCH (q:MemoryNode {node_id: qid, space_id: $spaceId})
 MATCH (r:MemoryNode {node_id: rid, space_id: $spaceId})
 WHERE q <> r
-OPTIONAL MATCH (q)-[coact:CO_ACTIVATED_WITH {space_id: $spaceId}]->(r)
-// EVENTGRAPH-003: capture the pre-weaken weight before the FOREACH SET so the
-// weaken path can emit a per-pair reinforcement event (negative delta_weight).
-WITH q, r, coact,
-     CASE WHEN coact IS NOT NULL THEN 'weaken' ELSE 'contradict' END AS action,
-     coact.weight AS prevWeight
-FOREACH (_ IN CASE WHEN action = 'weaken' THEN [1] ELSE [] END |
-    SET coact.weight = CASE WHEN coact.weight - $negWeight < 0 THEN 0.0 ELSE coact.weight - $negWeight END,
-        coact.updated_at = datetime()
-)
-FOREACH (_ IN CASE WHEN action = 'contradict' THEN [1] ELSE [] END |
-    MERGE (q)-[c:CONTRADICTS {space_id: $spaceId}]->(r)
-    ON CREATE SET c.weight = $negWeight, c.evidence_count = 1, c.created_at = datetime()
-    ON MATCH SET c.evidence_count = c.evidence_count + 1, c.updated_at = datetime()
-)
-// Per-pair RETURN (was aggregated action,count(*)): the Go side counts rows and
-// emits reinforcement events for the weaken rows only. Writes above unchanged.
+MATCH (q)-[coact:CO_ACTIVATED_WITH {space_id: $spaceId}]->(r)
+WITH q, r, coact, coact.weight AS prevWeight
+SET coact.weight = CASE WHEN coact.weight - $negWeight < 0 THEN 0.0 ELSE coact.weight - $negWeight END,
+    coact.updated_at = datetime()
 RETURN
-  action,
   q.node_id AS src_node_id,
   r.node_id AS dst_node_id,
   prevWeight AS prev_weight,
@@ -1057,42 +1060,84 @@ RETURN
   coalesce(coact.direction, 'forward') AS direction,
   false AS created_new_edge`
 
-		params := map[string]any{
-			"spaceId":     spaceID,
-			"queryIds":    queryNodeIDs,
-			"rejectedIds": rejectedNodeIDs,
-			"negWeight":   negWeight,
-		}
-
-		res, err := tx.Run(ctx, cypher, params)
+		res, err := tx.Run(ctx, weakenCypher, params)
 		if err != nil {
 			return nil, err
 		}
-
 		for res.Next(ctx) {
 			rec := res.Record()
-			action, _ := rec.Get("action")
-			actStr, _ := action.(string)
-			switch actStr {
-			case "weaken":
-				result.Weakened++
-				row := parseReinforcementRow(func(key string) (any, bool) {
-					return rec.Get(key)
-				})
-				reinforcementRows = append(reinforcementRows, row)
-			case "contradict":
-				result.Contradicted++
-			}
+			row := parseReinforcementRow(func(key string) (any, bool) {
+				return rec.Get(key)
+			})
+			row.TriggerPath = "apply_negative_feedback"
+			reinforcementRows = append(reinforcementRows, row)
+			result.Weakened++
+			result.Processed++
+		}
+		if err := res.Err(); err != nil {
+			return nil, err
+		}
+
+		// Statement B — contradict: no co-activation edge exists, so record the
+		// rejection as a CONTRADICTS edge (increment evidence_count on re-match).
+		// created_new_edge detection relies on the invariant that ON MATCH always
+		// sets updated_at and ON CREATE never does — do not add updated_at to the
+		// ON CREATE branch (it would flip isNew for every freshly created edge).
+		// delta_weight here is the CONTRADICTS edge's OWN weight delta (+negWeight
+		// on create, 0 on re-match); the negative-feedback semantics are carried
+		// by trigger_path, not the sign.
+		contradictCypher := `
+UNWIND $queryIds AS qid
+UNWIND $rejectedIds AS rid
+MATCH (q:MemoryNode {node_id: qid, space_id: $spaceId})
+MATCH (r:MemoryNode {node_id: rid, space_id: $spaceId})
+WHERE q <> r
+  AND NOT EXISTS { MATCH (q)-[:CO_ACTIVATED_WITH {space_id: $spaceId}]->(r) }
+MERGE (q)-[c:CONTRADICTS {space_id: $spaceId}]->(r)
+ON CREATE SET c.weight = $negWeight, c.evidence_count = 1, c.created_at = datetime()
+ON MATCH SET c.evidence_count = c.evidence_count + 1, c.updated_at = datetime()
+WITH q, r, c, (c.updated_at IS NULL) AS isNew
+RETURN
+  q.node_id AS src_node_id,
+  r.node_id AS dst_node_id,
+  CASE WHEN isNew THEN 0.0 ELSE c.weight END AS prev_weight,
+  c.weight AS new_weight,
+  CASE WHEN isNew THEN c.weight ELSE 0.0 END AS delta_weight,
+  coalesce(c.evidence_count, 0) AS evidence_count_after,
+  null AS eta_effective,
+  null AS surprise_factor,
+  null AS activation_product,
+  null AS path_sim,
+  coalesce(q.role_type, '') AS role_a,
+  coalesce(r.role_type, '') AS role_b,
+  coalesce(q.obs_type, '') AS obs_type_a,
+  coalesce(r.obs_type, '') AS obs_type_b,
+  coalesce(q.session_id, '') AS session_id,
+  'forward' AS direction,
+  isNew AS created_new_edge`
+
+		res, err = tx.Run(ctx, contradictCypher, params)
+		if err != nil {
+			return nil, err
+		}
+		for res.Next(ctx) {
+			rec := res.Record()
+			row := parseReinforcementRow(func(key string) (any, bool) {
+				return rec.Get(key)
+			})
+			row.TriggerPath = "apply_negative_feedback_contradict"
+			reinforcementRows = append(reinforcementRows, row)
+			result.Contradicted++
 			result.Processed++
 		}
 		return nil, res.Err()
 	})
 
-	// EVENTGRAPH-003: forward the weaken events (negative delta) to the writer.
+	// EVENTGRAPH-003/004: forward weaken + contradict events to the writer.
+	// TriggerPath is set per-row at parse time (the two statements differ).
 	if err == nil && s.reinforcementWriter != nil && len(reinforcementRows) > 0 {
 		for _, row := range reinforcementRows {
 			row.SpaceID = spaceID
-			row.TriggerPath = "apply_negative_feedback"
 			s.reinforcementWriter.Record(row)
 		}
 	}

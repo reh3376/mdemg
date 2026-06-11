@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "1b0ee2cf1502b0f22c10ca8bb2e1310e496ea51332e4912242804445b6de9f97"
+    "sha256": "60e154dcdd72ba3a6889611351701a3a1181609c53c1a807eeab98f90226d250"
   },
   "variables": {
     "test_space": "uats-neg-feedback-test"
@@ -46,18 +46,18 @@
     "body_assertions": [
       {
         "path": "$.processed",
-        "op": "type_is",
-        "expected": "integer"
+        "op": "equals",
+        "expected": 0
       },
       {
         "path": "$.weakened",
-        "op": "type_is",
-        "expected": "integer"
+        "op": "equals",
+        "expected": 0
       },
       {
         "path": "$.contradicted",
-        "op": "type_is",
-        "expected": "integer"
+        "op": "equals",
+        "expected": 0
       }
     ]
   },
