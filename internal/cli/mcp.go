@@ -113,6 +113,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Jiminy Guidance tools (Phase Jiminy)
 	mcpSrv.registerJiminyGuideTool(s)
 
+	// Event-graph federation + /strict tools (MCP-REVIVE-001)
+	mcpSrv.registerEventgraphReinforcementTool(s)
+	mcpSrv.registerEventgraphGuidanceOutcomeTool(s)
+	mcpSrv.registerJiminyStrictTool(s)
+
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
 		return fmt.Errorf("MCP server error: %w", err)
@@ -1669,3 +1674,186 @@ func mcpReflectTiers() (high, medium float64) {
 	}
 	return high, medium
 }
+
+// =============================================================================
+// Event-graph federation + /strict tools (MCP-REVIVE-001)
+// =============================================================================
+
+// resolveEventgraphSeed returns the explicit seed_node_id, or resolves one
+// from the top /v1/memory/retrieve result for `query` (the CLI precedent —
+// internal/cli/eventgraph.go). Returns "" with an error message when neither
+// is usable.
+func (m *mcpServer) resolveEventgraphSeed(args map[string]any, spaceID string) (string, string) {
+	if seed, _ := args["seed_node_id"].(string); seed != "" {
+		return seed, ""
+	}
+	query, _ := args["query"].(string)
+	if query == "" {
+		return "", "either seed_node_id or query is required"
+	}
+	resp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
+		"space_id":   spaceID,
+		"query_text": query,
+		"top_k":      1,
+	})
+	if err != nil {
+		return "", fmt.Sprintf("seed resolution retrieve failed: %v", err)
+	}
+	results, _ := resp["results"].([]any)
+	if len(results) == 0 {
+		return "", fmt.Sprintf("no retrieval result for query %q — cannot resolve a seed", query)
+	}
+	top, _ := results[0].(map[string]any)
+	nodeID, _ := top["node_id"].(string)
+	if nodeID == "" {
+		return "", "top retrieval result has no node_id"
+	}
+	return nodeID, ""
+}
+
+// eventgraphRequest builds the federation request body. hops/since_hours/
+// limit are OMITTED when unset so the server's config defaults apply
+// (single source of truth — no client-side default copies; the
+// EVENTGRAPH-CLI-001 rule).
+func eventgraphRequest(args map[string]any, spaceID, seed string) map[string]any {
+	body := map[string]any{"space_id": spaceID, "seed_node_id": seed}
+	if hops, ok := args["hops"].(float64); ok && hops > 0 {
+		body["hops"] = int(hops)
+	}
+	if sinceHours, ok := args["since_hours"].(float64); ok && sinceHours > 0 {
+		body["since_seconds"] = int(sinceHours * 3600)
+	}
+	if limit, ok := args["limit"].(float64); ok && limit > 0 {
+		body["limit"] = int(limit)
+	}
+	return body
+}
+
+func (m *mcpServer) registerEventgraphReinforcementTool(s *server.MCPServer) {
+	tool := mcp.NewTool("eventgraph_reinforcement_neighborhood",
+		mcp.WithDescription(`Inspect Hebbian learning activity around a memory: walks the graph from a seed node and returns the reinforcement events (co-activation weight updates) that touched its neighborhood. Use this to understand WHY memories are connected and which sessions strengthened them.`),
+		mcp.WithString("seed_node_id",
+			mcp.Description("Seed node_id to walk from (use this OR query)")),
+		mcp.WithString("query",
+			mcp.Description("Resolve the seed from the top retrieval result for this query text")),
+		mcp.WithNumber("hops",
+			mcp.Description("Graph walk depth (default: server config)")),
+		mcp.WithNumber("since_hours",
+			mcp.Description("Event lookback in hours (default: server config)")),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum events returned (default: server config)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+	s.AddTool(tool, m.eventgraphReinforcementHandler)
+}
+
+func (m *mcpServer) eventgraphReinforcementHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	spaceID := m.resolveSpace(args)
+	seed, errMsg := m.resolveEventgraphSeed(args, spaceID)
+	if errMsg != "" {
+		return newToolResultError(errMsg), nil
+	}
+	resp, err := m.callMDEMG("/v1/eventgraph/reinforcement-neighborhood", eventgraphRequest(args, spaceID, seed))
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("federation query failed: %v", err)), nil
+	}
+	return formatEventgraphResult(resp, "Reinforcement events", seed)
+}
+
+func (m *mcpServer) registerEventgraphGuidanceOutcomeTool(s *server.MCPServer) {
+	tool := mcp.NewTool("eventgraph_guidance_outcome_neighborhood",
+		mcp.WithDescription(`Inspect guidance effectiveness around a constraint: walks the graph from a seed node and returns the followed/ignored/contradicted outcomes recorded for constraints in its neighborhood. Use this to see whether guidance derived from a memory region is actually being followed.`),
+		mcp.WithString("seed_node_id",
+			mcp.Description("Seed node_id to walk from (use this OR query)")),
+		mcp.WithString("query",
+			mcp.Description("Resolve the seed from the top retrieval result for this query text")),
+		mcp.WithNumber("hops",
+			mcp.Description("Graph walk depth (default: server config)")),
+		mcp.WithNumber("since_hours",
+			mcp.Description("Outcome lookback in hours (default: server config)")),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum outcomes returned (default: server config)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+	s.AddTool(tool, m.eventgraphGuidanceOutcomeHandler)
+}
+
+func (m *mcpServer) eventgraphGuidanceOutcomeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	spaceID := m.resolveSpace(args)
+	seed, errMsg := m.resolveEventgraphSeed(args, spaceID)
+	if errMsg != "" {
+		return newToolResultError(errMsg), nil
+	}
+	resp, err := m.callMDEMG("/v1/eventgraph/guidance-outcome-neighborhood", eventgraphRequest(args, spaceID, seed))
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("federation query failed: %v", err)), nil
+	}
+	return formatEventgraphResult(resp, "Guidance outcomes", seed)
+}
+
+// formatEventgraphResult renders a federation response compactly: counts +
+// the raw JSON (the payload is structured data the agent consumes directly).
+func formatEventgraphResult(resp map[string]any, kind, seed string) (*mcp.CallToolResult, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("## %s — neighborhood of %s\n\n", kind, seed))
+	if nn, ok := resp["neighbor_node_ids"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Neighborhood size: %d nodes\n", len(nn)))
+	}
+	if evs, ok := resp["events"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Events: %d\n\n", len(evs)))
+	}
+	if outs, ok := resp["outcomes"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Outcomes: %d\n\n", len(outs)))
+	}
+	data, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+	}
+	sb.WriteString("```json\n")
+	sb.Write(data)
+	sb.WriteString("\n```")
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func (m *mcpServer) registerJiminyStrictTool(s *server.MCPServer) {
+	tool := mcp.NewTool("jiminy_strict",
+		mcp.WithDescription(`Toggle Jiminy /strict mode (deterministic governance) for a session. When enabled, prompt hooks deliver imperative directives instead of advisory guidance and escalated constraints block Write/Edit operations. Fail-open: if the MDEMG server is unreachable, actions are allowed.`),
+		mcp.WithString("session_id",
+			mcp.Required(),
+			mcp.Description("Session to toggle strict mode for (e.g., 'claude-core')")),
+		mcp.WithBoolean("enabled",
+			mcp.Required(),
+			mcp.Description("true to enable strict mode, false to disable")),
+	)
+	s.AddTool(tool, m.jiminyStrictHandler)
+}
+
+func (m *mcpServer) jiminyStrictHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	sessionID, _ := args["session_id"].(string)
+	if sessionID == "" {
+		return newToolResultError("session_id is required"), nil
+	}
+	enabled, ok := args["enabled"].(bool)
+	if !ok {
+		return newToolResultError("enabled (boolean) is required"), nil
+	}
+	resp, err := m.callMDEMG("/v1/jiminy/strict", map[string]any{
+		"session_id": sessionID,
+		"enabled":    enabled,
+	})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("strict toggle failed: %v", err)), nil
+	}
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	msg, _ := resp["message"].(string)
+	return mcp.NewToolResultText(fmt.Sprintf("Strict mode %s for session %s. %s", state, sessionID, msg)), nil
+}
+

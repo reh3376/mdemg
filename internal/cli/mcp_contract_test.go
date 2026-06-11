@@ -298,3 +298,97 @@ func TestBackendError_SurfacesAsToolError(t *testing.T) {
 		t.Error("backend 500 must surface as a tool error result")
 	}
 }
+
+// --- eventgraph tools (MCP-REVIVE-001) ---
+
+func TestEventgraphReinforcement_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{
+		"neighbor_node_ids": []any{"n1", "n2"}, "events": []any{},
+	}}
+	m := newTestMCPServer(t, b, "env-space")
+
+	// explicit seed; defaults omitted so server config applies
+	_, err := m.eventgraphReinforcementHandler(context.Background(), toolRequest(map[string]any{
+		"seed_node_id": "n_seed",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := b.lastCall(t)
+	if call.Path != "/v1/eventgraph/reinforcement-neighborhood" {
+		t.Errorf("path = %s", call.Path)
+	}
+	if call.Body["space_id"] != "env-space" || call.Body["seed_node_id"] != "n_seed" {
+		t.Errorf("body = %v", call.Body)
+	}
+	for _, k := range []string{"hops", "since_seconds", "limit"} {
+		if _, present := call.Body[k]; present {
+			t.Errorf("%s must be OMITTED when unset (server defaults are the single source of truth)", k)
+		}
+	}
+
+	// overrides forwarded; since_hours converts to since_seconds
+	_, _ = m.eventgraphReinforcementHandler(context.Background(), toolRequest(map[string]any{
+		"seed_node_id": "n_seed", "hops": float64(2), "since_hours": float64(2), "limit": float64(10),
+	}))
+	call = b.lastCall(t)
+	if call.Body["hops"] != float64(2) || call.Body["since_seconds"] != float64(7200) || call.Body["limit"] != float64(10) {
+		t.Errorf("overrides = %v", call.Body)
+	}
+
+	// neither seed nor query → tool error, no HTTP
+	before := len(b.calls)
+	res, _ := m.eventgraphReinforcementHandler(context.Background(), toolRequest(map[string]any{}))
+	if !res.IsError || len(b.calls) != before {
+		t.Error("missing seed+query must be a tool error with no backend call")
+	}
+}
+
+func TestEventgraphSeedByQuery_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{
+		"results":           []any{map[string]any{"node_id": "n_resolved"}},
+		"neighbor_node_ids": []any{}, "outcomes": []any{},
+	}}
+	m := newTestMCPServer(t, b, "env-space")
+	_, err := m.eventgraphGuidanceOutcomeHandler(context.Background(), toolRequest(map[string]any{
+		"query": "circuit breaker",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.calls) != 2 {
+		t.Fatalf("expected retrieve + federation calls, got %d", len(b.calls))
+	}
+	if b.calls[0].Path != "/v1/memory/retrieve" || b.calls[0].Body["top_k"] != float64(1) {
+		t.Errorf("seed resolution call = %v", b.calls[0])
+	}
+	if b.calls[1].Path != "/v1/eventgraph/guidance-outcome-neighborhood" || b.calls[1].Body["seed_node_id"] != "n_resolved" {
+		t.Errorf("federation call = %v", b.calls[1])
+	}
+}
+
+// --- jiminy_strict ---
+
+func TestJiminyStrict_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{"message": "ok"}}
+	m := newTestMCPServer(t, b, "")
+	_, err := m.jiminyStrictHandler(context.Background(), toolRequest(map[string]any{
+		"session_id": "claude-core", "enabled": true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := b.lastCall(t)
+	if call.Path != "/v1/jiminy/strict" || call.Body["enabled"] != true || call.Body["session_id"] != "claude-core" {
+		t.Errorf("call = %s %v", call.Path, call.Body)
+	}
+
+	res, _ := m.jiminyStrictHandler(context.Background(), toolRequest(map[string]any{"enabled": true}))
+	if !res.IsError {
+		t.Error("missing session_id must be a tool error")
+	}
+	res, _ = m.jiminyStrictHandler(context.Background(), toolRequest(map[string]any{"session_id": "s"}))
+	if !res.IsError {
+		t.Error("missing enabled must be a tool error")
+	}
+}
