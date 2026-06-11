@@ -125,6 +125,31 @@ func TestRSICStore_MarkDirtyTracking(t *testing.T) {
 	}
 }
 
+// CONFIG-DEADFLAG-001: RSICState retention window must default to the
+// historical 30 days and honor SetCalibrationRetentionDays.
+func TestRSICStore_RetentionDays_DefaultAndOverride(t *testing.T) {
+	store := NewRSICStore(nil)
+
+	if got := store.retentionDays(); got != 30 {
+		t.Errorf("default retention: expected 30, got %d", got)
+	}
+
+	store.SetCalibrationRetentionDays(90)
+	if got := store.retentionDays(); got != 90 {
+		t.Errorf("overridden retention: expected 90, got %d", got)
+	}
+
+	// Non-positive values fall back to the 30-day default.
+	store.SetCalibrationRetentionDays(0)
+	if got := store.retentionDays(); got != 30 {
+		t.Errorf("zero retention should fall back to 30, got %d", got)
+	}
+	store.SetCalibrationRetentionDays(-5)
+	if got := store.retentionDays(); got != 30 {
+		t.Errorf("negative retention should fall back to 30, got %d", got)
+	}
+}
+
 func TestRSICStore_GetStatus_Shape(t *testing.T) {
 	store := NewRSICStore(nil)
 

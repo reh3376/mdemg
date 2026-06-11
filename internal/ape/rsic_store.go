@@ -43,7 +43,19 @@ type RSICStore struct {
 
 	lastFlush   time.Time
 	flushErrors int64
+
+	// CONFIG-DEADFLAG-001: retention window (days) for persisted RSICState
+	// nodes, from RSIC_CALIBRATION_DAYS. Zero/negative falls back to the
+	// historical 30-day literal at read time. Semantic note: the config
+	// field comment reads "days of history for calibration", but the actual
+	// consumer is RSICState node expiry in CleanupExpired — i.e. retention
+	// of ALL persisted RSIC state (calibration, watchdog, orchestration),
+	// not a calibration look-back window.
+	calibrationRetentionDays int
 }
+
+// defaultCalibrationRetentionDays is the historical CleanupExpired literal (CONFIG-DEADFLAG-001).
+const defaultCalibrationRetentionDays = 30
 
 // NewRSICStore creates a new persistence store.
 func NewRSICStore(driver neo4j.DriverWithContext) *RSICStore {
@@ -53,6 +65,26 @@ func NewRSICStore(driver neo4j.DriverWithContext) *RSICStore {
 		calibrationData: make(map[string]*CalibrationSnapshot),
 		watchdogData:    make(map[string]*WatchdogState),
 	}
+}
+
+// SetCalibrationRetentionDays wires RSIC_CALIBRATION_DAYS into the RSICState
+// expiry window used by CleanupExpired (CONFIG-DEADFLAG-001). Non-positive
+// values are stored as-is and fall back to the historical 30-day default at
+// read time, so an unwired store behaves exactly as before this sprint.
+func (s *RSICStore) SetCalibrationRetentionDays(days int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calibrationRetentionDays = days
+}
+
+// retentionDays resolves the effective RSICState retention window (CONFIG-DEADFLAG-001).
+func (s *RSICStore) retentionDays() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.calibrationRetentionDays > 0 {
+		return s.calibrationRetentionDays
+	}
+	return defaultCalibrationRetentionDays
 }
 
 // SetSupervise injects a supervised-goroutine launcher (SUPERVISOR-002).
@@ -272,18 +304,22 @@ func (s *RSICStore) Flush(ctx context.Context) error {
 
 // ───────────── Cleanup ─────────────
 
-// CleanupExpired removes RSICState nodes older than 30 days.
+// CleanupExpired removes RSICState nodes older than the configured retention
+// window (RSIC_CALIBRATION_DAYS, default 30 — CONFIG-DEADFLAG-001).
 func (s *RSICStore) CleanupExpired(ctx context.Context) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
+	// CONFIG-DEADFLAG-001: $days was the hardcoded literal 30.
+	days := s.retentionDays()
+
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, `
 			MATCH (s:MemoryNode:RSICState)
-			WHERE s.updated_at < datetime() - duration({days: 30})
+			WHERE s.updated_at < datetime() - duration({days: $days})
 			DETACH DELETE s
 			RETURN count(s) AS removed
-		`, nil)
+		`, map[string]any{"days": days})
 		if err != nil {
 			return 0, err
 		}

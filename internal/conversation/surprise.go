@@ -228,6 +228,18 @@ func (d *SurpriseDetector) detectCorrection(content string) float64 {
 func (d *SurpriseDetector) checkContradictions(ctx context.Context, obs Observation) (float64, error) {
 	checker := NewContradictionChecker(d.embedder, d.driver)
 	cfg := DefaultContradictionConfig()
+	// CONFIG-DEADFLAG-001: CONTRADICTION_{ENABLED,SIM_THRESHOLD,
+	// MAX_CANDIDATES} were parsed but this site always used the package
+	// defaults. Defaults match the old literals — zero-config unchanged.
+	if !d.cfg.ContradictionEnabled {
+		return 0, nil
+	}
+	if d.cfg.ContradictionSimThreshold > 0 {
+		cfg.SimThreshold = d.cfg.ContradictionSimThreshold
+	}
+	if d.cfg.ContradictionMaxCandidates > 0 {
+		cfg.MaxCandidates = d.cfg.ContradictionMaxCandidates
+	}
 	// F2b: wire NLI settings from config if available.
 	if d.cfg.ContradictionNLIEnabled {
 		cfg.NLIEnabled = true

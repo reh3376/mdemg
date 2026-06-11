@@ -7,19 +7,53 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
+
+// ResolverConfig configures relationship resolution (CONFIG-DEADFLAG-001).
+type ResolverConfig struct {
+	// CrossFileResolve enables the cross-file resolution strategies
+	// (same-package and global-unique). When false, only same-file
+	// resolution (strategy 1) runs.
+	// Wired from REL_CROSS_FILE_RESOLVE (default: true).
+	CrossFileResolve bool
+
+	// ResolutionTimeout bounds each Resolve call. 0 means no timeout
+	// (historical behavior).
+	// Wired from REL_RESOLUTION_TIMEOUT_SEC (default: 60s).
+	ResolutionTimeout time.Duration
+}
 
 // Resolver resolves raw relationships (from parser) into RelationshipRecords
 // by matching source/target names to actual SymbolNode IDs in Neo4j.
 type Resolver struct {
 	driver neo4j.DriverWithContext
+	config ResolverConfig
 }
 
-// NewResolver creates a new relationship resolver.
+// NewResolver creates a new relationship resolver with default behavior
+// (cross-file resolution enabled, no resolution timeout).
 func NewResolver(driver neo4j.DriverWithContext) *Resolver {
-	return &Resolver{driver: driver}
+	// CONFIG-DEADFLAG-001: defaults preserve historical behavior so existing
+	// callers are unchanged.
+	return NewResolverWithConfig(driver, ResolverConfig{CrossFileResolve: true})
+}
+
+// NewResolverWithConfig creates a relationship resolver with explicit
+// resolution options (CONFIG-DEADFLAG-001).
+func NewResolverWithConfig(driver neo4j.DriverWithContext, cfg ResolverConfig) *Resolver {
+	return &Resolver{driver: driver, config: cfg}
+}
+
+// resolutionContext applies the configured resolution timeout, if any
+// (CONFIG-DEADFLAG-001: REL_RESOLUTION_TIMEOUT_SEC).
+func (r *Resolver) resolutionContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if r.config.ResolutionTimeout > 0 {
+		return context.WithTimeout(ctx, r.config.ResolutionTimeout) //nolint:gosec // G118: cancel is returned to the caller, which defers it
+	}
+	return ctx, func() {}
 }
 
 // Resolve takes raw relationships from parsing and resolves them to SymbolNode pairs.
@@ -33,6 +67,11 @@ func (r *Resolver) Resolve(ctx context.Context, spaceID string, rels []Relations
 	if len(rels) == 0 {
 		return nil, nil
 	}
+
+	// CONFIG-DEADFLAG-001: REL_RESOLUTION_TIMEOUT_SEC — bound the resolution
+	// pass (no timeout when ResolutionTimeout is 0, the historical behavior).
+	ctx, cancel := r.resolutionContext(ctx)
+	defer cancel()
 
 	session := r.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
@@ -109,35 +148,39 @@ func (r *Resolver) Resolve(ctx context.Context, spaceID string, rels []Relations
 				continue
 			}
 
-			// Strategy 2: Same package/directory
-			dir := filepath.Dir(rel.SourceFile)
-			record, conf = r.resolveInPackage(ctx, tx, spaceID, targetName, dir)
-			if record != nil {
-				results = append(results, RelationshipRecord{
-					SourceSymbolID:   sourceSymbolID,
-					TargetSymbolID:   record.TargetSymbolID,
-					Relation:         rel.Relation,
-					SpaceID:          spaceID,
-					Tier:             rel.Tier,
-					Confidence:       conf,
-					ResolutionMethod: "same_package",
-				})
-				continue
-			}
+			// CONFIG-DEADFLAG-001: REL_CROSS_FILE_RESOLVE — strategies 2
+			// (same-package) and 3 (global-unique) previously ran unconditionally.
+			if r.config.CrossFileResolve {
+				// Strategy 2: Same package/directory
+				dir := filepath.Dir(rel.SourceFile)
+				record, conf = r.resolveInPackage(ctx, tx, spaceID, targetName, dir)
+				if record != nil {
+					results = append(results, RelationshipRecord{
+						SourceSymbolID:   sourceSymbolID,
+						TargetSymbolID:   record.TargetSymbolID,
+						Relation:         rel.Relation,
+						SpaceID:          spaceID,
+						Tier:             rel.Tier,
+						Confidence:       conf,
+						ResolutionMethod: "same_package",
+					})
+					continue
+				}
 
-			// Strategy 3: Global unique match
-			record, conf = r.resolveGlobal(ctx, tx, spaceID, targetName)
-			if record != nil {
-				results = append(results, RelationshipRecord{
-					SourceSymbolID:   sourceSymbolID,
-					TargetSymbolID:   record.TargetSymbolID,
-					Relation:         rel.Relation,
-					SpaceID:          spaceID,
-					Tier:             rel.Tier,
-					Confidence:       conf,
-					ResolutionMethod: "global_unique",
-				})
-				continue
+				// Strategy 3: Global unique match
+				record, conf = r.resolveGlobal(ctx, tx, spaceID, targetName)
+				if record != nil {
+					results = append(results, RelationshipRecord{
+						SourceSymbolID:   sourceSymbolID,
+						TargetSymbolID:   record.TargetSymbolID,
+						Relation:         rel.Relation,
+						SpaceID:          spaceID,
+						Tier:             rel.Tier,
+						Confidence:       conf,
+						ResolutionMethod: "global_unique",
+					})
+					continue
+				}
 			}
 
 			unresolved++

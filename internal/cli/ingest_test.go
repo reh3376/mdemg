@@ -3,7 +3,44 @@ package cli
 import (
 	"strings"
 	"testing"
+
+	"mdemg/internal/config"
 )
+
+// CONFIG-DEADFLAG-001: env-parsed LLM_SUMMARY_* values fill unpinned settings;
+// values pinned by an explicit flag or speed preset always win.
+func TestApplyLLMSummaryEnvDefaults(t *testing.T) {
+	appCfg := &config.Config{
+		LLMSummaryEnabled:   false,
+		LLMSummaryMaxTokens: 200,
+		LLMSummaryBatchSize: 25,
+		LLMSummaryTimeoutMs: 45000,
+		LLMSummaryCacheSize: 1000,
+	}
+
+	// Nothing pinned — env config supplies every value.
+	cfg := &ingestConfig{llmSummary: true, llmSummaryBatch: 10, llmSummaryMaxTokens: 150, llmSummaryTimeoutMs: 30000, llmSummaryCacheSize: 5000}
+	applyLLMSummaryEnvDefaults(cfg, appCfg)
+	if cfg.llmSummary != false {
+		t.Error("unpinned llmSummary should take env value false")
+	}
+	if cfg.llmSummaryBatch != 25 || cfg.llmSummaryMaxTokens != 200 || cfg.llmSummaryTimeoutMs != 45000 || cfg.llmSummaryCacheSize != 1000 {
+		t.Errorf("unpinned values should take env values, got batch=%d maxTokens=%d timeout=%d cache=%d",
+			cfg.llmSummaryBatch, cfg.llmSummaryMaxTokens, cfg.llmSummaryTimeoutMs, cfg.llmSummaryCacheSize)
+	}
+
+	// Everything pinned — env config must not override.
+	cfg = &ingestConfig{
+		llmSummary: true, llmSummaryBatch: 10, llmSummaryMaxTokens: 150, llmSummaryTimeoutMs: 30000, llmSummaryCacheSize: 5000,
+		llmSummaryPinned: true, llmSummaryBatchPinned: true, llmSummaryMaxTokensPinned: true,
+		llmSummaryTimeoutMsPinned: true, llmSummaryCacheSizePinned: true,
+	}
+	applyLLMSummaryEnvDefaults(cfg, appCfg)
+	if !cfg.llmSummary || cfg.llmSummaryBatch != 10 || cfg.llmSummaryMaxTokens != 150 || cfg.llmSummaryTimeoutMs != 30000 || cfg.llmSummaryCacheSize != 5000 {
+		t.Errorf("pinned values must win over env config, got enabled=%v batch=%d maxTokens=%d timeout=%d cache=%d",
+			cfg.llmSummary, cfg.llmSummaryBatch, cfg.llmSummaryMaxTokens, cfg.llmSummaryTimeoutMs, cfg.llmSummaryCacheSize)
+	}
+}
 
 func TestSpeedPresets_AllPresetsExist(t *testing.T) {
 	for _, name := range []string{"fast", "balanced", "thorough"} {

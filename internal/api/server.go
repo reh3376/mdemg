@@ -194,6 +194,10 @@ type Server struct {
 
 func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plugins.Manager) *Server {
 	ret := retrieval.NewService(cfg, driver)
+	// CONFIG-DEADFLAG-001: CONFLICT_LOG_ENABLED — setter existed since
+	// Phase 9.5 with zero callers; the package default (true) applied
+	// regardless of the env var.
+	retrieval.SetConflictLogEnabled(cfg.ConflictLogEnabled)
 
 	// Wire reasoning modules into retrieval pipeline
 	if pluginMgr != nil {
@@ -255,13 +259,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		slog.Info("dynamic emergence enabled", "provider", cfg.EmergenceProvider, "model", cfg.EmergenceModel, "min_weight", cfg.EmergenceMinWeight, "min_cluster_size", cfg.EmergenceMinClusterSize)
 	}
 
-	// Initialize symbol store
+	// Initialize symbol store.
+	// CONFIG-DEADFLAG-001: the six REL_* env vars were parsed but the
+	// extraction pipeline ran on literals (all tiers on, 50 calls/func,
+	// 500-row batches, cross-file on, no timeout). Defaults preserved.
 	symStore := symbols.NewStore(driver)
-	symParser, symParserErr := symbols.NewParser(symbols.ParserConfig{})
+	symStore.SetRelationshipBatchSize(cfg.RelBatchSize) // REL_BATCH_SIZE
+	symParser, symParserErr := symbols.NewParser(symbols.ParserConfig{
+		Relationships: &symbols.RelationshipExtractionConfig{
+			ExtractInheritance: cfg.RelExtractInheritance, // REL_EXTRACT_INHERITANCE
+			ExtractCalls:       cfg.RelExtractCalls,       // REL_EXTRACT_CALLS
+			MaxCallsPerFunc:    cfg.RelMaxCallsPerFunc,    // REL_MAX_CALLS_PER_FUNCTION
+		},
+	})
 	if symParserErr != nil {
 		slog.Warn("symbol parser init failed (relationship extraction disabled)", "error", symParserErr)
 	}
-	symResolver := symbols.NewResolver(driver)
+	symResolver := symbols.NewResolverWithConfig(driver, symbols.ResolverConfig{
+		CrossFileResolve:  cfg.RelCrossFileResolve,                               // REL_CROSS_FILE_RESOLVE
+		ResolutionTimeout: time.Duration(cfg.RelResolutionTimeout) * time.Second, // REL_RESOLUTION_TIMEOUT_SEC
+	})
 	slog.Info("symbol store initialized (parser + resolver for relationship extraction)")
 
 	// Initialize gap detector for capability gap detection
@@ -879,10 +896,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
 	rsicDispatcher.SetSafetyValidator(safetyValidator)
 	rsicDispatcher.SetSnapshotStore(snapshotStore)
-	// RSIC-SK1: Wire guidance calibrator for self-calibrating guidance
-	if jiminySvc != nil {
+	// RSIC-SK1: Wire guidance calibrator for self-calibrating guidance.
+	// CONFIG-DEADFLAG-001: gate on RSIC_GUIDANCE_CALIBRATION_ENABLED —
+	// parsed since RSIC-SK1 but the wiring ignored it (default true, so
+	// zero-config behavior is unchanged; operators can now disable).
+	if jiminySvc != nil && cfg.RSICGuidanceCalibrationEnabled {
 		rsicDispatcher.SetGuidanceCalibrator(&rsicGuidanceCalibrationAdapter{svc: jiminySvc})
 	}
+	// CONFIG-DEADFLAG-001: RSIC_GUIDANCE_* thresholds (were literals 3/0.7/0.1/5).
+	rsicDispatcher.SetGuidanceCalibrationThresholds(cfg.RSICGuidanceMinSurfaces, cfg.RSICGuidanceBoostThreshold, cfg.RSICGuidanceDecayThreshold, cfg.RSICGuidanceDecayMinSurfaces)
 	rsicCycle.SetSnapshotStore(snapshotStore)
 	// NLI feedback loop: wire tier effectiveness dataset builder
 	if jiminySvc != nil {
@@ -894,6 +916,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var rsicStore *ape.RSICStore
 	if cfg.RSICPersistenceEnabled {
 		rsicStore = ape.NewRSICStore(driver)
+		// CONFIG-DEADFLAG-001: RSIC_CALIBRATION_DAYS → RSICState retention.
+		rsicStore.SetCalibrationRetentionDays(cfg.RSICCalibrationDays)
 		// SUPERVISOR-002: flush loop started via StartSupervisedBackground
 
 		// Wire store to components

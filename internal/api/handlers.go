@@ -2571,14 +2571,16 @@ func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
 	exportedStr := query.Get("exported")
 	fulltextQuery := query.Get("q")
 
-	// Parse limit with default and max constraints
-	limit := 50
+	// Parse limit with default and max constraints.
+	// CONFIG-DEADFLAG-001: PAGINATION_DEF_LIMIT / PAGINATION_MAX_LIMIT
+	// were parsed but these literals (50/500 = the defaults) always won.
+	limit := s.cfg.PaginationDefLimit
 	if limitStr := query.Get("limit"); limitStr != "" {
 		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil || limit < 1 {
-			limit = 50
+			limit = s.cfg.PaginationDefLimit
 		}
-		if limit > 500 {
-			limit = 500
+		if limit > s.cfg.PaginationMaxLimit {
+			limit = s.cfg.PaginationMaxLimit
 		}
 	}
 

@@ -10,6 +10,19 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+// defaultRelBatchSize is the historical UNWIND batch size for SaveRelationships
+// (CONFIG-DEADFLAG-001: was a literal 500).
+const defaultRelBatchSize = 500
+
+// effectiveRelBatchSize returns the configured relationship batch size,
+// falling back to the default (500) when unset or invalid.
+func (s *Store) effectiveRelBatchSize() int {
+	if s.relBatchSize <= 0 {
+		return defaultRelBatchSize
+	}
+	return s.relBatchSize
+}
+
 // RelationshipRecord represents a resolved relationship ready for Neo4j storage.
 type RelationshipRecord struct {
 	SourceSymbolID   string  `json:"source_symbol_id"`
@@ -55,9 +68,11 @@ func (s *Store) SaveRelationships(ctx context.Context, spaceID string, rels []Re
 
 		// Process each relationship type with its own Cypher
 		for relType, records := range grouped {
-			// Batch in groups of 500
-			for i := 0; i < len(records); i += 500 {
-				end := i + 500
+			// CONFIG-DEADFLAG-001: REL_BATCH_SIZE — replaces the literal 500
+			// UNWIND batch size.
+			batchSize := s.effectiveRelBatchSize()
+			for i := 0; i < len(records); i += batchSize {
+				end := i + batchSize
 				if end > len(records) {
 					end = len(records)
 				}

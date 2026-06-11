@@ -35,6 +35,16 @@ func (s *Server) handleMetaLearn(w http.ResponseWriter, r *http.Request) {
 	if !validateRequest(w, &req) {
 		return
 	}
+	// CONFIG-DEADFLAG-001: METALEARN_MIN_LAYER / METALEARN_MIN_UPDATE_COUNT
+	// were parsed but the service fell back to literals (4 / 5) when the
+	// request omitted them. Config now supplies the defaults; explicit
+	// request values still win.
+	if req.MinLayer <= 0 {
+		req.MinLayer = s.cfg.MetaLearnMinLayer
+	}
+	if req.MinUpdateCount <= 0 {
+		req.MinUpdateCount = s.cfg.MetaLearnMinUpdateCount
+	}
 
 	resp, err := s.metaLearnSvc.Promote(r.Context(), req)
 	if err != nil {

@@ -209,7 +209,8 @@ func (s *Server) handleJ17Bootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.cfg.J17Enabled || s.jiminySvc == nil {
+	// CONFIG-DEADFLAG-001: J17_BOOTSTRAP_ENABLED gates this endpoint (parsed, never read; default true = unchanged).
+	if !s.cfg.J17Enabled || !s.cfg.J17BootstrapEnabled || s.jiminySvc == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "J17 protocol not enabled"})
 		return
 	}

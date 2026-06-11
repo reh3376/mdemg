@@ -388,6 +388,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Config consumer guard (merge-blocking)
+        # CONFIG-DEADFLAG-001: every Config field must have >=1 consumer.
+        # The parsed-but-never-read class caused the 24-day Hebbian no-op
+        # and the 9-week guidance dormancy. A new field lands wired or not
+        # at all (allowlist requires a cited in-flight plan).
+        run: python3 scripts/verify_config_consumers.py
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
