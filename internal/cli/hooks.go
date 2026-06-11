@@ -58,6 +58,7 @@ Subcommands:
 	cmd.AddCommand(newHooksInstallCmd())
 	cmd.AddCommand(newHooksUninstallCmd())
 	cmd.AddCommand(newHooksListCmd())
+	cmd.AddCommand(newHooksDoctorCmd())
 
 	return cmd
 }
