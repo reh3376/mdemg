@@ -163,6 +163,103 @@ func TestReflect_LLMErrorRateSpike_Normal(t *testing.T) {
 	}
 }
 
+// SUPERVISOR-002: recency gate — a high error rate computed over the 24h
+// window must not alarm when the most recent error is stale.
+func TestReflect_LLMErrorRateSpike_StaleSuppressed(t *testing.T) {
+	cfg := config.Config{RSICLLMErrorRecencyMin: 60}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		LLMPerformance: []tsdb.LLMPerformanceSummary{
+			// 33% errors, but the last one was 12h ago (the 2026-06-11
+			// jiminy.synthesize false-critical scenario)
+			{TaskName: "jiminy.synthesize", TotalCalls: 36, ErrorRate: 0.33,
+				LastErrorAt: time.Now().Add(-12 * time.Hour)},
+		},
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, i := range insights {
+		if i.PatternID == "llm_error_rate_spike" {
+			t.Error("stale error burst should be suppressed by the recency gate")
+		}
+	}
+}
+
+func TestReflect_LLMErrorRateSpike_FreshFires(t *testing.T) {
+	cfg := config.Config{RSICLLMErrorRecencyMin: 60}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		LLMPerformance: []tsdb.LLMPerformanceSummary{
+			{TaskName: "consult", TotalCalls: 100, ErrorRate: 0.08,
+				LastErrorAt: time.Now().Add(-5 * time.Minute)},
+		},
+	}
+	insights, _ := r.Reflect(context.Background(), report)
+	found := false
+	for _, i := range insights {
+		if i.PatternID == "llm_error_rate_spike" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("fresh error spike must fire through the recency gate")
+	}
+}
+
+func TestReflect_LLMErrorRateSpike_ZeroLastErrorFiresLegacy(t *testing.T) {
+	// A summary without LastErrorAt (older data source) must keep legacy
+	// behavior even with the gate enabled — never silently widen the gate.
+	cfg := config.Config{RSICLLMErrorRecencyMin: 60}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		LLMPerformance: []tsdb.LLMPerformanceSummary{
+			{TaskName: "consult", TotalCalls: 100, ErrorRate: 0.08},
+		},
+	}
+	insights, _ := r.Reflect(context.Background(), report)
+	found := false
+	for _, i := range insights {
+		if i.PatternID == "llm_error_rate_spike" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("zero LastErrorAt must not be treated as stale")
+	}
+}
+
+func TestReflect_LLMErrorRateSpike_GateDisabled(t *testing.T) {
+	// RSIC_LLM_ERROR_RECENCY_MIN=0 disables the gate (legacy behavior).
+	cfg := config.Config{RSICLLMErrorRecencyMin: 0}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		LLMPerformance: []tsdb.LLMPerformanceSummary{
+			{TaskName: "consult", TotalCalls: 100, ErrorRate: 0.08,
+				LastErrorAt: time.Now().Add(-48 * time.Hour)},
+		},
+	}
+	insights, _ := r.Reflect(context.Background(), report)
+	found := false
+	for _, i := range insights {
+		if i.PatternID == "llm_error_rate_spike" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("disabled gate must preserve legacy firing")
+	}
+}
+
 // ─── Pattern 27: Retrieval Quality Degradation ───
 
 func TestReflect_RetrievalQualityDegradation(t *testing.T) {

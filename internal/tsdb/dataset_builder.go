@@ -31,6 +31,7 @@ type LLMPerformanceSummary struct {
 	DistinctModels  int           `json:"distinct_models"`
 	HasSystemPrompt bool          `json:"has_system_prompt"`
 	HasRAFTContext  bool          `json:"has_raft_context"`
+	LastErrorAt     time.Time     `json:"last_error_at,omitzero"` // SUPERVISOR-002: most recent errored call in window (zero = none)
 	Window          time.Duration `json:"window"`
 }
 
@@ -127,7 +128,8 @@ func (b *DatasetBuilder) LLMPerformance(ctx context.Context, spaceID string, win
 			COALESCE(AVG(tokens_out)::float8, 0) AS avg_tokens_out,
 			COUNT(DISTINCT model_name)::int AS distinct_models,
 			COUNT(*) FILTER (WHERE system_prompt IS NOT NULL AND system_prompt != '')::int AS has_sys_prompt_count,
-			COUNT(*) FILTER (WHERE retrieval_node_ids IS NOT NULL AND array_length(retrieval_node_ids, 1) > 0)::int AS has_raft_count
+			COUNT(*) FILTER (WHERE retrieval_node_ids IS NOT NULL AND array_length(retrieval_node_ids, 1) > 0)::int AS has_raft_count,
+			MAX(time) FILTER (WHERE error IS NOT NULL AND error != '') AS last_error_at
 		FROM llm_interactions
 		WHERE space_id = $1 AND time >= $2
 		GROUP BY task_name
@@ -143,13 +145,18 @@ func (b *DatasetBuilder) LLMPerformance(ctx context.Context, spaceID string, win
 	for rows.Next() {
 		var s LLMPerformanceSummary
 		var errorCount, hasSysCount, hasRaftCount int
+		var lastErrorAt *time.Time
 		if err := rows.Scan(
 			&s.TaskName, &s.TotalCalls, &errorCount,
 			&s.LatencyP50, &s.LatencyP95,
 			&s.AvgTokensIn, &s.AvgTokensOut,
 			&s.DistinctModels, &hasSysCount, &hasRaftCount,
+			&lastErrorAt,
 		); err != nil {
 			return nil, fmt.Errorf("dataset_builder: llm_performance scan: %w", err)
+		}
+		if lastErrorAt != nil {
+			s.LastErrorAt = *lastErrorAt
 		}
 		if s.TotalCalls > 0 {
 			s.ErrorRate = float64(errorCount) / float64(s.TotalCalls)
