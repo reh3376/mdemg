@@ -4395,65 +4395,6 @@ RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
 	return result.([]ConversationObservation), nil
 }
 
-// detachObservationThemeEdges removes GENERALIZES edges from conversation observations
-// to existing conversation themes, and deletes any themes left with zero members.
-// This enables full re-clustering on every consolidation run.
-func (s *Service) detachObservationThemeEdges(ctx context.Context, spaceID string) (int, error) {
-	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
-
-	// Step 1: Delete GENERALIZES edges from observations to themes
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, `
-MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-      -[r:GENERALIZES]->(t:ConversationTheme {space_id: $spaceId})
-DELETE r
-RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
-		if err != nil {
-			return 0, err
-		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			cnt, _ := rec.Get("deleted")
-			return asInt(cnt), res.Err()
-		}
-		return 0, res.Err()
-	})
-	if err != nil {
-		return 0, err
-	}
-	detached := result.(int)
-
-	// Step 2: Clean up orphaned themes (no remaining members)
-	if detached > 0 {
-		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			res, err := tx.Run(ctx, `
-MATCH (t:ConversationTheme {space_id: $spaceId})
-WHERE NOT ()-[:GENERALIZES]->(t)
-DETACH DELETE t
-RETURN count(t) AS removed`, map[string]any{"spaceId": spaceID})
-			if err != nil {
-				return 0, err
-			}
-			if res.Next(ctx) {
-				rec := res.Record()
-				cnt, _ := rec.Get("removed")
-				removed := asInt(cnt)
-				if removed > 0 {
-					slog.Info("ClusterConversations: removed orphaned themes", "count", removed)
-				}
-				return removed, res.Err()
-			}
-			return 0, res.Err()
-		})
-		if err != nil {
-			return detached, fmt.Errorf("cleanup orphaned themes: %w", err)
-		}
-	}
-
-	return detached, nil
-}
-
 // countConversationThemes returns the current count of conversation theme nodes
 func (s *Service) countConversationThemes(ctx context.Context, spaceID string) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
