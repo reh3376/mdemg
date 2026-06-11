@@ -39,3 +39,19 @@ func TestHookHealthRules_CustomParams(t *testing.T) {
 		}
 	}
 }
+
+func TestWeightIntegrityRules(t *testing.T) {
+	r := WeightIntegrityRules(0)[0] // 0 → default 100
+	if r.ID != "null_weight_abstraction_edges" || r.Service != "graph-weight-integrity" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	if r.Threshold != 100 {
+		t.Errorf("default threshold = %v, want 100", r.Threshold)
+	}
+	if !strings.Contains(r.QuerySQL, "mdemg_neo4j_graph_null_weight_edges") {
+		t.Errorf("QuerySQL missing the gauge name")
+	}
+	if got := WeightIntegrityRules(250)[0].Threshold; got != 250 {
+		t.Errorf("custom threshold = %v, want 250", got)
+	}
+}

@@ -1069,6 +1069,9 @@ type Config struct {
 	HookSilentLookbackHours int  // HOOK_SILENT_LOOKBACK_HOURS — window for "sessions active but prompt-context never fired" (default: 24)
 	HookActivityMinEvents   int  // HOOK_ACTIVITY_MIN_EVENTS — post-tool-observe heartbeats required in the window before the rule is eligible (default: 5)
 
+	// HIDDEN-WEIGHT-001 — abstraction-edge weight integrity.
+	NullWeightEdgeAlertThreshold int // NULL_WEIGHT_EDGE_ALERT_THRESHOLD — alert when NULL-weight GENERALIZES/ABSTRACTS_TO edges exceed this (default: 100; steady state is 0)
+
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
 }
@@ -4067,6 +4070,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	nullWeightEdgeAlertThreshold, err := atoi("NULL_WEIGHT_EDGE_ALERT_THRESHOLD", 100)
+	if err != nil {
+		return Config{}, err
+	}
 	jobBackupStalenessHours, err := atoi("JOB_BACKUP_STALENESS_HOURS", 0)
 	if err != nil {
 		return Config{}, err
@@ -4836,14 +4843,15 @@ func FromEnv() (Config, error) {
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
 		// Alert Evaluator
-		JobHealthAlertEnabled:     jobHealthAlertEnabled,
-		HookHealthAlertEnabled:    hookHealthAlertEnabled,
-		HookSilentLookbackHours:   hookSilentLookbackHours,
-		HookActivityMinEvents:     hookActivityMinEvents,
-		JobBackupStalenessHours:   jobBackupStalenessHours,
-		JobFailureLookbackMin:     jobFailureLookbackMin,
-		AlertEvaluatorEnabled:     alertEvaluatorEnabled,
-		AlertEvaluatorIntervalSec: alertEvaluatorIntervalSec,
+		JobHealthAlertEnabled:        jobHealthAlertEnabled,
+		HookHealthAlertEnabled:       hookHealthAlertEnabled,
+		HookSilentLookbackHours:      hookSilentLookbackHours,
+		HookActivityMinEvents:        hookActivityMinEvents,
+		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
+		JobBackupStalenessHours:      jobBackupStalenessHours,
+		JobFailureLookbackMin:        jobFailureLookbackMin,
+		AlertEvaluatorEnabled:        alertEvaluatorEnabled,
+		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

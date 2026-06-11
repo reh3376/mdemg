@@ -296,8 +296,8 @@ func JobHealthRules(stalenessHours, failureLookbackMin int, includeBackupStalene
 
 	rules := []AlertRule{
 		{
-			ID:          "scheduled_job_recent_failure",
-			Title:       "Scheduled Job Recently Failed",
+			ID:    "scheduled_job_recent_failure",
+			Title: "Scheduled Job Recently Failed",
 			// Distinct Service per rule: the dispatcher cooldown key is
 			// (Service, Severity), so two scheduled-job rules sharing one
 			// service would suppress each other (caught in NOSILENT-001 live
@@ -373,6 +373,37 @@ func HookHealthRules(lookbackHours, minActivityEvents int) []AlertRule {
 				     AND recorded_at > now() - interval '%d hours') = 0
 				THEN 1 ELSE 0 END`, lookbackHours, minActivityEvents, lookbackHours),
 			Threshold: 0,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
+// WeightIntegrityRules returns the HIDDEN-WEIGHT-001 graph-weight rule:
+// NULL-weight abstraction edges (GENERALIZES/ABSTRACTS_TO) above threshold.
+// Steady state post-backfill is 0; sustained reappearance means the
+// point.distance bug class regressed at a creation site. threshold ≤ 0 →
+// default 100 (tolerates in-flight creation bursts between collector ticks).
+func WeightIntegrityRules(threshold int) []AlertRule {
+	if threshold <= 0 {
+		threshold = 100
+	}
+	return []AlertRule{
+		{
+			ID:    "null_weight_abstraction_edges",
+			Title: "NULL-Weight Abstraction Edges Reappearing",
+			// Distinct Service per the NOSILENT-001 cooldown-collision rule.
+			Service:     "graph-weight-integrity",
+			Severity:    SeverityHigh,
+			Interval:    300 * time.Second,
+			ForDuration: 10 * time.Minute,
+			QuerySQL: `SELECT coalesce(sum(value), 0) FROM (
+				SELECT DISTINCT ON (labels->>'space_id') value
+				FROM metric_samples
+				WHERE metric_name = 'mdemg_neo4j_graph_null_weight_edges'
+				  AND recorded_at > now() - interval '10 minutes'
+				ORDER BY labels->>'space_id', recorded_at DESC) latest`,
+			Threshold: float64(threshold),
 			Operator:  "gt",
 			Enabled:   true,
 		},
