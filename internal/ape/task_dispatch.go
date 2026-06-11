@@ -419,17 +419,27 @@ func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) 
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Tombstone observations that have been superseded by corrections
+		// RSIC-VALIDATE-001: tombstone ONLY observations RELATED to a recent
+		// correction — same session as the correction, or its 1-hop
+		// CO_ACTIVATED_WITH neighborhood. The previous query archived 50
+		// ARBITRARY older observations whenever ANY correction existed in
+		// the window (no relationship at all) — silently eroding unrelated
+		// memory on every dispatch.
 		cypher := `
 			MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
 			WHERE correction.created_at > datetime() - duration('P7D')
-			WITH correction
+			WITH collect(correction) AS corrections
+			UNWIND corrections AS correction
 			MATCH (stale:MemoryNode {space_id: $spaceId})
 			WHERE stale.role_type = 'conversation_observation'
 			  AND stale.obs_type <> 'correction'
 			  AND stale.created_at < correction.created_at
 			  AND NOT coalesce(stale.is_archived, false)
-			WITH stale LIMIT 50
+			  AND (
+			        (stale.session_id IS NOT NULL AND stale.session_id = correction.session_id)
+			     OR (stale)-[:CO_ACTIVATED_WITH]-(correction)
+			  )
+			WITH DISTINCT stale LIMIT 50
 			SET stale.is_archived = true
 			RETURN count(stale) AS tombstoned
 		`
@@ -487,17 +497,23 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 		}
 
 		// Refresh stale edges: bump last_activated and recompute weight via co-activation decay
+		// RSIC-VALIDATE-001: capture staleness BEFORE bumping last_activated.
+		// The previous single SET bumped last_activated first, so the weight
+		// expression read duration.between(now, now) = 0 days — the decay
+		// term vanished and every "refresh" was a pure +0.1·log(count+1)
+		// boost. Weights could only inflate.
 		refreshCypher := `
 			MATCH ()-[e:LEARNING_EDGE {space_id: $spaceId}]->()
 			WHERE e.last_activated < datetime() - duration('P30D')
-			WITH e LIMIT 100
-			SET e.last_activated = datetime(),
-			    e.weight = CASE
+			WITH e, duration.between(e.last_activated, datetime()).days AS staleDays
+			LIMIT 100
+			SET e.weight = CASE
 			        WHEN e.co_activation_count > 0
-			        THEN e.weight * (1.0 - 0.02 * duration.between(e.last_activated, datetime()).days / 30.0)
+			        THEN e.weight * (1.0 - 0.02 * toFloat(staleDays) / 30.0)
 			             + 0.1 * log(toFloat(e.co_activation_count) + 1)
 			        ELSE e.weight * 0.8
-			    END
+			    END,
+			    e.last_activated = datetime()
 			RETURN count(e) AS refreshed, avg(e.weight) AS avg_weight_after
 		`
 		res, err := tx.Run(ctx, refreshCypher, map[string]any{"spaceId": spaceID})
