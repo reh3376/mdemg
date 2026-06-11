@@ -39,6 +39,9 @@ jobs:
       - name: Verify canonical UxTS specs
         run: python3 scripts/verify_uxts_canonical_specs.py
 
-      - name: Check UxTS framework drift (soft-fail)
-        continue-on-error: true
+      - name: Check UxTS framework drift (merge-blocking)
+        # UXTS-CI-001: was a continue-on-error zombie while the matrix
+        # went 51 days stale (UATS off by +96 specs). The checker now
+        # covers all 15 frameworks and the matrix is refreshed — drift
+        # blocks until the matrix is updated alongside new specs.
         run: python3 scripts/verify_uxts_drift.py
