@@ -30,8 +30,9 @@ type SignalLearner struct {
 	decayRate float64
 	boostRate float64
 
-	driver neo4j.DriverWithContext // nil = in-memory only (tests)
-	cancel context.CancelFunc
+	driver    neo4j.DriverWithContext // nil = in-memory only (tests)
+	cancel    context.CancelFunc
+	supervise func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002
 }
 
 type signalState struct {
@@ -276,6 +277,12 @@ func (sl *SignalLearner) FlushSignals(ctx context.Context) error {
 	return nil
 }
 
+// SetSupervise injects a supervised-goroutine launcher (SUPERVISOR-002).
+// Must be called before StartPersistence; nil keeps legacy behavior.
+func (sl *SignalLearner) SetSupervise(fn func(name string, fn func(ctx context.Context) error)) {
+	sl.supervise = fn
+}
+
 // StartPersistence begins a background flush loop (30s interval).
 func (sl *SignalLearner) StartPersistence(ctx context.Context) {
 	if sl.driver == nil {
@@ -284,23 +291,32 @@ func (sl *SignalLearner) StartPersistence(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	sl.cancel = cancel
 
-	go func() { //nolint:gosec // flush uses Background() intentionally to survive parent cancel
+	run := func(runCtx context.Context) error {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ctx.Done():
 				// Final flush on shutdown
-				if err := sl.FlushSignals(context.Background()); err != nil {
+				if err := sl.FlushSignals(context.Background()); err != nil { //nolint:gosec // flush uses Background() intentionally to survive parent cancel
 					slog.Warn("signal learner: final flush failed", "error", err)
 				}
-				return
+				return nil
 			case <-ticker.C:
 				if err := sl.FlushSignals(context.Background()); err != nil {
 					slog.Warn("signal learner: periodic flush failed", "error", err)
 				}
 			}
 		}
+	}
+	if sl.supervise != nil {
+		sl.supervise("signal-learner-flush", run)
+		return
+	}
+	go func() {
+		_ = run(context.Background())
 	}()
 }
 

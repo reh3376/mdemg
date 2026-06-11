@@ -295,6 +295,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 	// at request time. Embeddings are unaffected because the gate keys on
 	// baseURL == cfg.EffectiveLLMEndpoint().
 	var mlxProber *mlxprobe.Prober
+	var burstFlushRun func(ctx context.Context) error // SUPERVISOR-002: launched under the supervisor below
 	if cfg.MLXWatchdogEnabled {
 		mlxProber = mlxprobe.New(mlxprobe.Config{
 			Endpoint: cfg.EffectiveLLMEndpoint(),
@@ -374,34 +375,41 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			fastFailBurstCount++
 			fastFailBurstMu.Unlock()
 		})
-		// Burst-flush goroutine (Phase 13.5). Persists at most 1 row per
+		// Burst-flush loop (Phase 13.5). Persists at most 1 row per
 		// 30s window when the gate is engaged, with the count of
 		// short-circuits observed in the window. Silent in steady-state.
 		// Lives for process lifetime; on shutdown the LLMEndpointHealthWriter
 		// gets Closed() in api.Server.Shutdown which flushes any pending row.
-		go func() {
+		// SUPERVISOR-002: defined here, launched below once the supervisor
+		// exists (sup.Go) so it gets panic recovery + restart budget.
+		burstFlushRun = func(ctx context.Context) error {
 			tick := time.NewTicker(30 * time.Second)
 			defer tick.Stop()
-			for range tick.C {
-				fastFailBurstMu.Lock()
-				n := fastFailBurstCount
-				fastFailBurstCount = 0
-				fastFailBurstMu.Unlock()
-				if n == 0 {
-					continue
-				}
-				if w := srv.LLMEndpointHealthWriter(); w != nil {
-					w.Record(tsdb.LLMEndpointHealthEvent{
-						EndpointURL:        cfg.EffectiveLLMEndpoint(),
-						EventKind:          "fast_fail_burst",
-						FromState:          mlxProber.State().String(),
-						ToState:            mlxProber.State().String(),
-						BurstShortCircuits: n,
-						StateNumeric:       int(mlxProber.State()),
-					})
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-tick.C:
+					fastFailBurstMu.Lock()
+					n := fastFailBurstCount
+					fastFailBurstCount = 0
+					fastFailBurstMu.Unlock()
+					if n == 0 {
+						continue
+					}
+					if w := srv.LLMEndpointHealthWriter(); w != nil {
+						w.Record(tsdb.LLMEndpointHealthEvent{
+							EndpointURL:        cfg.EffectiveLLMEndpoint(),
+							EventKind:          "fast_fail_burst",
+							FromState:          mlxProber.State().String(),
+							ToState:            mlxProber.State().String(),
+							BurstShortCircuits: n,
+							StateNumeric:       int(mlxProber.State()),
+						})
+					}
 				}
 			}
-		}()
+		}
 
 		slog.Info("mlx-watchdog: enabled",
 			"endpoint", cfg.EffectiveLLMEndpoint(),
@@ -481,13 +489,30 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 
 		go sup.Start(context.Background())
 		defer sup.Stop()
+
+		// SUPERVISOR-002: route all server background loops through the
+		// supervisor (panic recovery + sliding-window restart budget).
+		srv.SetSupervisor(sup.Go)
+		if burstFlushRun != nil {
+			sup.Go("llm-fastfail-burst-flush", burstFlushRun)
+		}
 	} else {
 		// Fallback: start prober directly if no supervisor
 		if prober != nil {
 			prober.Start()
 			defer prober.Stop()
 		}
+		if burstFlushRun != nil {
+			go func() {
+				_ = burstFlushRun(context.Background())
+			}()
+		}
 	}
+
+	// SUPERVISOR-002: start the construction-deferred loops (backup
+	// schedulers, RSIC store flush, signal-learner persistence) — supervised
+	// when a supervisor was injected above, bare goroutines otherwise.
+	srv.StartSupervisedBackground()
 
 	// SR-001: Wire alert callbacks for prober and TSDB writer
 	if disp := srv.AlertDispatcher(); disp != nil {

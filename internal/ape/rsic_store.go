@@ -33,8 +33,8 @@ type RSICStore struct {
 	mu     sync.Mutex
 	dirty  map[string]bool
 
-	flushTick *time.Ticker
 	cancel    context.CancelFunc
+	supervise func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002
 
 	// In-memory cached state
 	calibrationData   map[string]*CalibrationSnapshot // key: spaceID
@@ -55,31 +55,44 @@ func NewRSICStore(driver neo4j.DriverWithContext) *RSICStore {
 	}
 }
 
+// SetSupervise injects a supervised-goroutine launcher (SUPERVISOR-002).
+// Must be called before Start; nil keeps legacy bare-goroutine behavior.
+func (s *RSICStore) SetSupervise(fn func(name string, fn func(ctx context.Context) error)) {
+	s.supervise = fn
+}
+
 // Start begins the background flush goroutine (every 30 seconds).
 func (s *RSICStore) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
-	s.flushTick = time.NewTicker(30 * time.Second)
 
-	go func() { //nolint:gosec // G118: flush uses Background() intentionally — must succeed independently of parent ctx
+	run := func(runCtx context.Context) error {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ctx.Done():
-				return
-			case <-s.flushTick.C:
-				if err := s.Flush(context.Background()); err != nil {
+				return nil
+			case <-ticker.C:
+				if err := s.Flush(context.Background()); err != nil { //nolint:gosec // G118: flush uses Background() intentionally — must succeed independently of parent ctx
 					slog.Warn("RSIC persistence flush failed", "error", err)
 				}
 			}
 		}
+	}
+	if s.supervise != nil {
+		s.supervise("rsic-store-flush", run)
+		return
+	}
+	go func() {
+		_ = run(context.Background())
 	}()
 }
 
 // Stop stops the flush goroutine and performs a final flush.
 func (s *RSICStore) Stop() {
-	if s.flushTick != nil {
-		s.flushTick.Stop()
-	}
 	if s.cancel != nil {
 		s.cancel()
 	}
