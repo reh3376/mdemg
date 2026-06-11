@@ -668,7 +668,7 @@ type Config struct {
 	ConsultingConstraintScoreFloor      float64 // CONSULTING_CONSTRAINT_SCORE_FLOOR — min retrieval score for a result to become a constraint (default: 0.45)
 	ConsultingAuthorityScoreFloor       float64 // CONSULTING_AUTHORITY_SCORE_FLOOR — min retrieval score for high-authority constraint tier / confidence boost (default: 0.50)
 	ConsultingConflictScoreFloor        float64 // CONSULTING_CONFLICT_SCORE_FLOOR — min retrieval score for conflict/contradiction detection (default: 0.50)
-	ConsultingSuggestMinConfidence      float64 // CONSULTING_SUGGEST_MIN_CONFIDENCE — RRF-SCALE-002: default min-confidence floor for /v1/memory/suggest (default: 0.45; was hardcoded 0.5 against a scale topping out ~0.58)
+	ConsultingSuggestMinConfidence      float64 // CONSULTING_SUGGEST_MIN_CONFIDENCE — RRF-SCALE-002: default min-confidence floor for /v1/memory/suggest (default: 0.2, live-calibrated; was hardcoded 0.5 against a scale topping out ~0.58)
 	MCPReflectScoreHigh                 float64 // MCP_REFLECT_SCORE_HIGH — RRF-SCALE-002: memory_reflect high-relevance tier floor (default: 0.45; was hardcoded 0.7 — unreachable on the RRF scale)
 	MCPReflectScoreMedium               float64 // MCP_REFLECT_SCORE_MEDIUM — RRF-SCALE-002: memory_reflect medium tier floor (default: 0.25; was hardcoded 0.4)
 	GuardrailConstraintSimFloor         float64 // GUARDRAIL_CONSTRAINT_SIM_FLOOR — RRF-SCALE-002: cosine floor in guardrail constraint retrieval Cypher (default: 0.3; was hardcoded)
@@ -1095,7 +1095,7 @@ const (
 
 	// RRF-SCALE-001 — consulting score gates + confidence sigmoid.
 	DefaultConsultingConstraintScoreFloor      = 0.45 // CONSULTING_CONSTRAINT_SCORE_FLOOR
-	DefaultConsultingSuggestMinConfidence      = 0.45 // CONSULTING_SUGGEST_MIN_CONFIDENCE (RRF-SCALE-002)
+	DefaultConsultingSuggestMinConfidence      = 0.2 // CONSULTING_SUGGEST_MIN_CONFIDENCE (RRF-SCALE-002: live distribution — typical good hits 0.2-0.45, noise tail <0.01; 0.45 is the strong-match band, right for constraint PROMOTION but over-filtering for a recall surface)
 	DefaultMCPReflectScoreHigh                 = 0.45 // MCP_REFLECT_SCORE_HIGH (RRF strong band)
 	DefaultMCPReflectScoreMedium               = 0.25 // MCP_REFLECT_SCORE_MEDIUM
 	DefaultGuardrailConstraintSimFloor         = 0.3  // GUARDRAIL_CONSTRAINT_SIM_FLOOR (cosine scale, not RRF)
