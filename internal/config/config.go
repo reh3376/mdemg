@@ -295,6 +295,7 @@ type Config struct {
 	// JiminyWarmComputeTimeout() method — do NOT re-default the literal at call
 	// sites. No-hardcoding rule (single source of truth).
 	JiminyWarmComputeTimeoutMs int     // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: DefaultJiminyWarmComputeTimeoutMs)
+	JiminyFeedbackTimeoutMs    int     // JIMINY_FEEDBACK_TIMEOUT_MS — server-side budget for /v1/jiminy/feedback outcome processing, detached from the hook's connection lifetime (default: 60000; 0 = no timeout)
 	JiminyWarmMaxAgeSec        int     // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers     bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim       float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
@@ -2278,6 +2279,10 @@ func FromEnv() (Config, error) {
 	// Jiminy Warm Store (event-driven pre-computation)
 	jiminyWarmEnabled := getBool("JIMINY_WARM_ENABLED", true)
 	jiminyWarmComputeTimeoutMs, err := atoi("JIMINY_WARM_COMPUTE_TIMEOUT_MS", DefaultJiminyWarmComputeTimeoutMs)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFeedbackTimeoutMs, err := atoi("JIMINY_FEEDBACK_TIMEOUT_MS", 60000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4403,6 +4408,7 @@ func FromEnv() (Config, error) {
 		JiminyWarmEnabled:                jiminyWarmEnabled,
 		JiminyWarmDebounceSec:            jiminyWarmDebounceSec,
 		JiminyWarmComputeTimeoutMs:       jiminyWarmComputeTimeoutMs,
+		JiminyFeedbackTimeoutMs:          jiminyFeedbackTimeoutMs,
 		JiminyWarmMaxAgeSec:              jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12

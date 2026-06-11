@@ -235,7 +235,21 @@ func (s *Server) handleJiminyFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := llmclient.WithSessionID(r.Context(), req.SessionID)
+	// FEEDBACK-CTX fix (found live during SUPERVISOR-002): the hook fires
+	// this endpoint with a 5s curl --max-time, but per-item Tier-2 outcome
+	// classification (jiminy.evaluate_llm) routinely outlives the
+	// connection — the request ctx then cancelled every in-flight LLM call
+	// (657 "context canceled" rows/24h; outcomes silently degraded to the
+	// heuristic). Detach from the connection lifetime and give processing
+	// its own server-side budget (JIMINY_FEEDBACK_TIMEOUT_MS).
+	ctx := context.WithoutCancel(r.Context())
+	timeout := time.Duration(s.cfg.JiminyFeedbackTimeoutMs) * time.Millisecond
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
 	resp, err := s.jiminySvc.RecordOutcome(ctx, req)
 	if err != nil {
