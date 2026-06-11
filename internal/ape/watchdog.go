@@ -22,9 +22,10 @@ type Watchdog struct {
 	state        WatchdogState
 	cycleTrigger func(ctx context.Context, spaceID string, meta TriggerMetadata) // callback to auto-trigger meso cycle
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	supervise func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002
 }
 
 // NewWatchdog creates a Watchdog. cycleTrigger is called at EscalationForce level.
@@ -43,6 +44,12 @@ func NewWatchdog(cfg config.Config, spaceID string, cycleTrigger func(ctx contex
 	}
 }
 
+// SetSupervise injects a supervised-goroutine launcher (SUPERVISOR-002).
+// Must be called before Start; nil keeps legacy bare-goroutine behavior.
+func (w *Watchdog) SetSupervise(fn func(name string, fn func(ctx context.Context) error)) {
+	w.supervise = fn
+}
+
 // Start begins the watchdog ticker loop.
 func (w *Watchdog) Start() {
 	if !w.cfg.RSICWatchdogEnabled {
@@ -55,8 +62,8 @@ func (w *Watchdog) Start() {
 		interval = 5 * time.Minute
 	}
 
-	w.wg.Add(1)
-	go func() {
+	run := func(runCtx context.Context) error {
+		w.wg.Add(1)
 		defer w.wg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -65,12 +72,21 @@ func (w *Watchdog) Start() {
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-w.ctx.Done():
-				return
+				return nil
 			case <-ticker.C:
 				w.check()
 			}
 		}
+	}
+	if w.supervise != nil {
+		w.supervise("rsic-watchdog", run)
+		return
+	}
+	go func() {
+		_ = run(context.Background())
 	}()
 }
 

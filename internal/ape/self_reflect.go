@@ -462,9 +462,20 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
-	// 26. LLM error rate spike: >5% error rate
+	// 26. LLM error rate spike: >5% error rate.
+	// SUPERVISOR-002 recency gate: the error-rate window is 24h, so a
+	// transient burst kept this insight (and its HIGH alert) firing for up
+	// to a day after the incident self-resolved. Require the most recent
+	// error to be fresh (RSIC_LLM_ERROR_RECENCY_MIN, default 60; 0 = legacy
+	// behavior, no gate).
+	recency := time.Duration(r.cfg.RSICLLMErrorRecencyMin) * time.Minute
 	for _, perf := range report.LLMPerformance {
 		if perf.ErrorRate > 0.05 && perf.TotalCalls > 10 {
+			if recency > 0 && !perf.LastErrorAt.IsZero() && time.Since(perf.LastErrorAt) > recency {
+				slog.Debug("RSIC reflect: llm_error_rate_spike suppressed (stale)",
+					"task", perf.TaskName, "last_error_at", perf.LastErrorAt, "recency_gate", recency)
+				continue
+			}
 			insights = append(insights, ReflectionInsight{
 				PatternID:         "llm_error_rate_spike",
 				Severity:          SeverityHigh,

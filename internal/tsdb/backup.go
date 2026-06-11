@@ -3,6 +3,7 @@ package tsdb
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -322,10 +323,11 @@ func (s *TSDBBackupService) RunRetention() (deleted int, freedBytes int64, err e
 type JobResultFunc func(success bool, latencyMS int64, err error)
 
 type TSDBBackupScheduler struct {
-	svc      *TSDBBackupService
-	stopCh   chan struct{}
-	hookMu   sync.Mutex
-	onResult JobResultFunc
+	svc       *TSDBBackupService
+	stopCh    chan struct{}
+	hookMu    sync.Mutex
+	onResult  JobResultFunc
+	supervise func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002
 }
 
 // NewTSDBBackupScheduler creates a new scheduler.
@@ -348,6 +350,12 @@ func (bs *TSDBBackupScheduler) resultHook() JobResultFunc {
 	return bs.onResult
 }
 
+// SetSupervise injects a supervised-goroutine launcher (SUPERVISOR-002).
+// Must be called before Start; nil keeps legacy bare-goroutine behavior.
+func (bs *TSDBBackupScheduler) SetSupervise(fn func(name string, fn func(ctx context.Context) error)) {
+	bs.supervise = fn
+}
+
 // Start begins periodic TSDB backups at the configured interval.
 func (bs *TSDBBackupScheduler) Start() {
 	bs.stopCh = make(chan struct{})
@@ -357,12 +365,14 @@ func (bs *TSDBBackupScheduler) Start() {
 		interval = 24 * time.Hour
 	}
 
-	go func() {
+	run := func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				slog.Info("tsdb backup scheduler: triggering backup")
 				startedAt := time.Now()
@@ -391,9 +401,16 @@ func (bs *TSDBBackupScheduler) Start() {
 
 			case <-bs.stopCh:
 				slog.Info("tsdb backup scheduler: stopped")
-				return
+				return nil
 			}
 		}
+	}
+	if bs.supervise != nil {
+		bs.supervise("tsdb-backup-scheduler", run)
+		return
+	}
+	go func() {
+		_ = run(context.Background())
 	}()
 }
 

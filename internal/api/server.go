@@ -81,6 +81,7 @@ type Server struct {
 	stopScheduledSync       chan struct{}
 	stopSpacePrune          chan struct{}
 	bgWg                    sync.WaitGroup // tracks background goroutine completion
+	superviseFn             func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002: injected supervisor launcher
 
 	// Phase 3: Production readiness components
 	cbRegistry      *circuitbreaker.Registry
@@ -707,7 +708,8 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		exp := transfer.NewExporter(driver)
 		backupSvc = backup.NewService(backupCfg, driver, exp)
 		backupSched = backup.NewScheduler(backupSvc)
-		backupSched.Start()
+		// SUPERVISOR-002: started via StartSupervisedBackground (serve.go)
+		// so the loop runs under the goroutine supervisor.
 		slog.Info("backup enabled", "storage_dir", backupCfg.StorageDir, "full_interval_hours", backupCfg.FullIntervalHours, "partial_interval_hours", backupCfg.PartialIntervalHours)
 	}
 
@@ -728,7 +730,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		}
 		tsdbBackupSvc = tsdb.NewTSDBBackupService(tsdbBackupCfg)
 		tsdbBackupSched = tsdb.NewTSDBBackupScheduler(tsdbBackupSvc)
-		tsdbBackupSched.Start()
+		// SUPERVISOR-002: started via StartSupervisedBackground (serve.go)
 		slog.Info("tsdb backup enabled", "storage_dir", tsdbBackupCfg.StorageDir, "interval_hours", tsdbBackupCfg.IntervalHours)
 	}
 
@@ -889,7 +891,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var rsicStore *ape.RSICStore
 	if cfg.RSICPersistenceEnabled {
 		rsicStore = ape.NewRSICStore(driver)
-		rsicStore.Start(context.Background())
+		// SUPERVISOR-002: flush loop started via StartSupervisedBackground
 
 		// Wire store to components
 		rsicCalibrator.SetStore(rsicStore)
@@ -1097,11 +1099,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc.StartTrustPersistence(context.Background())
 	}
 
-	// Phase 80: Hydrate signal learner from Neo4j and start persistence
+	// Phase 80: Hydrate signal learner from Neo4j; persistence loop starts
+	// via StartSupervisedBackground (SUPERVISOR-002).
 	if err := signalLearner.HydrateSignals(context.Background()); err != nil {
 		slog.Warn("signal learner: hydration failed", "error", err)
 	}
-	signalLearner.StartPersistence(context.Background())
 
 	// B3: Bootstrap codification — codify constraints without codes on startup
 	if cfg.J17BootstrapCodification && jiminySvc != nil {
@@ -1650,17 +1652,17 @@ func (s *Server) StartMacroCronScheduler() {
 	s.macroCronCancel = cancel
 	s.macroNextRun = time.Now().Add(interval)
 
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	s.goSupervised("rsic-macro-cron", func(runCtx context.Context) error {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		slog.Info("RSIC macro cron scheduler started", "interval", interval, "next_run", s.macroNextRun.Format(time.RFC3339))
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ctx.Done():
-				return
+				return nil
 			case now := <-ticker.C:
 				// Cleanup expired orchestration entries on every tick
 				if s.orchestrationPolicy != nil {
@@ -1684,7 +1686,7 @@ func (s *Server) StartMacroCronScheduler() {
 					continue
 				}
 
-				go func() {
+				go func() { //nolint:gosec // G118: macro cycle must complete independently of the scheduler loop's ctx
 					opts := &ape.RunCycleOpts{TriggerMeta: &decision.Meta}
 					outcome, err := s.rsicCycle.RunCycle(context.Background(), spaceID, ape.TierMacro, opts)
 					if err != nil {
@@ -1701,7 +1703,7 @@ func (s *Server) StartMacroCronScheduler() {
 				}()
 			}
 		}
-	}()
+	})
 }
 
 // parseCronInterval converts common cron expressions to intervals.
@@ -1851,6 +1853,59 @@ func (s *Server) ingestFilesInternal(ctx context.Context, spaceID string, files 
 	return resp, nil
 }
 
+// SetSupervisor injects the goroutine-supervision launcher (SUPERVISOR-002).
+// When set, background loops started afterwards run with panic recovery and
+// a sliding-window restart budget. Call before the Start* methods.
+func (s *Server) SetSupervisor(fn func(name string, fn func(ctx context.Context) error)) {
+	s.superviseFn = fn
+}
+
+// goSupervised launches a blocking background loop under the injected
+// supervisor, falling back to a bare goroutine when none is set (legacy
+// behavior for tests and non-server callers). fn must block until its stop
+// condition and return nil on graceful stop; only panics or returned errors
+// trigger a supervised restart. bgWg brackets each run so Shutdown's
+// bgWg.Wait() keeps its meaning under restarts.
+func (s *Server) goSupervised(name string, fn func(ctx context.Context) error) {
+	wrapped := func(ctx context.Context) error {
+		s.bgWg.Add(1)
+		defer s.bgWg.Done()
+		return fn(ctx)
+	}
+	if s.superviseFn != nil {
+		s.superviseFn(name, wrapped)
+		return
+	}
+	go func() {
+		_ = wrapped(context.Background())
+	}()
+}
+
+// StartSupervisedBackground starts the background loops that historically
+// launched inside NewServer (backup schedulers, RSIC store flush,
+// signal-learner persistence), routing them through the injected supervisor
+// when one is set (SUPERVISOR-002). Call after SetSupervisor. Without a
+// supervisor the loops run as plain goroutines (legacy behavior), so callers
+// that never inject one lose nothing.
+func (s *Server) StartSupervisedBackground() {
+	if s.rsicStore != nil {
+		s.rsicStore.SetSupervise(s.superviseFn)
+		s.rsicStore.Start(context.Background())
+	}
+	if s.signalLearner != nil {
+		s.signalLearner.SetSupervise(s.superviseFn)
+		s.signalLearner.StartPersistence(context.Background())
+	}
+	if s.backupScheduler != nil {
+		s.backupScheduler.SetSupervise(s.superviseFn)
+		s.backupScheduler.Start()
+	}
+	if s.tsdbBackupScheduler != nil {
+		s.tsdbBackupScheduler.SetSupervise(s.superviseFn)
+		s.tsdbBackupScheduler.Start()
+	}
+}
+
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory
 // on a regular interval. Default interval is 5 minutes.
 func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Duration) {
@@ -1863,9 +1918,8 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 	}
 
 	s.stopConsolidate = make(chan struct{})
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	stopCh := s.stopConsolidate
+	s.goSupervised("periodic-consolidation", func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -1873,6 +1927,8 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				result, err := s.hiddenSvc.RunFullConversationConsolidation(ctx, spaceID)
@@ -1900,12 +1956,12 @@ func (s *Server) StartPeriodicConsolidation(spaceID string, interval time.Durati
 						slog.Info("periodic consolidation complete", "themes_created", themesCreated, "themes_updated", themesUpdated, "noise_assigned", noiseAssigned, "concepts_created", conceptsCreated)
 					}
 				}
-			case <-s.stopConsolidate:
+			case <-stopCh:
 				slog.Info("periodic consolidation stopped")
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // StopPeriodicConsolidation stops the background consolidation goroutine
@@ -1928,9 +1984,8 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 	}
 
 	s.stopCooler = make(chan struct{})
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	stopCh := s.stopCooler
+	s.goSupervised("context-cooler", func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -1938,6 +1993,8 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 
@@ -1956,12 +2013,12 @@ func (s *Server) StartContextCoolerProcessing(spaceID string, interval time.Dura
 				} else if summary.Graduated > 0 || summary.Tombstoned > 0 || decayed > 0 {
 					slog.Info("context cooler cycle complete", "graduated", summary.Graduated, "tombstoned", summary.Tombstoned, "decayed", decayed, "remaining_volatile", summary.RemainingVolatile)
 				}
-			case <-s.stopCooler:
+			case <-stopCh:
 				slog.Info("context cooler processing stopped")
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // StopContextCoolerProcessing stops the background Context Cooler goroutine
@@ -1980,25 +2037,26 @@ func (s *Server) StartSpacePruneScheduler(interval time.Duration) {
 		return
 	}
 	s.stopSpacePrune = make(chan struct{})
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	stopCh := s.stopSpacePrune
+	s.goSupervised("space-prune-scheduler", func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		slog.Info("space prune scheduler started", "interval", interval)
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				pruned, deleted, errors := s.runAutoSpacePrune()
 				if pruned > 0 || errors > 0 {
 					slog.Info("auto-prune complete", "pruned_spaces", pruned, "deleted_nodes", deleted, "errors", errors)
 				}
-			case <-s.stopSpacePrune:
+			case <-stopCh:
 				slog.Info("space prune scheduler stopped")
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // StopSpacePruneScheduler stops the background space prune goroutine.
@@ -2021,9 +2079,8 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 	}
 
 	s.stopInterviewer = make(chan struct{})
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	stopCh := s.stopInterviewer
+	s.goSupervised("weekly-gap-interviews", func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -2031,6 +2088,8 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
@@ -2043,12 +2102,12 @@ func (s *Server) StartWeeklyGapInterviews(interval time.Duration) {
 				} else if result.PromptsGenerated > 0 {
 					slog.Info("weekly gap interview complete", "gaps_analyzed", result.TotalGapsAnalyzed, "prompts_generated", result.PromptsGenerated, "high_priority", result.HighPriorityCount)
 				}
-			case <-s.stopInterviewer:
+			case <-stopCh:
 				slog.Info("weekly gap interviews stopped")
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // StopWeeklyGapInterviews stops the background gap interview goroutine
@@ -2068,9 +2127,8 @@ func (s *Server) StartScheduledSync(interval time.Duration) {
 	}
 
 	s.stopScheduledSync = make(chan struct{})
-	s.bgWg.Add(1)
-	go func() {
-		defer s.bgWg.Done()
+	stopCh := s.stopScheduledSync
+	s.goSupervised("scheduled-sync", func(runCtx context.Context) error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -2078,14 +2136,16 @@ func (s *Server) StartScheduledSync(interval time.Duration) {
 
 		for {
 			select {
+			case <-runCtx.Done():
+				return nil
 			case <-ticker.C:
 				s.runScheduledSyncCheck()
-			case <-s.stopScheduledSync:
+			case <-stopCh:
 				slog.Info("scheduled sync stopped")
-				return
+				return nil
 			}
 		}
-	}()
+	})
 }
 
 // StopScheduledSync stops the background scheduled sync goroutine
@@ -2099,6 +2159,7 @@ func (s *Server) StopScheduledSync() {
 // StartRSICWatchdog starts the RSIC decay watchdog.
 func (s *Server) StartRSICWatchdog() {
 	if s.rsicWatchdog != nil {
+		s.rsicWatchdog.SetSupervise(s.superviseFn) // SUPERVISOR-002
 		s.rsicWatchdog.Start()
 	}
 }
