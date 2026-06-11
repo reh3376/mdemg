@@ -109,6 +109,22 @@ jobs:
           NEO4J_PLUGINS: '["apoc"]'
         ports:
           - 7687:7687
+      # UXTS-CI-001: TimescaleDB so the tsdb-tagged contracts (eventgraph
+      # federation, metrics snapshot/trends, hooks_event, readyz_tsdb) run
+      # on every PR instead of never. Image pinned to the compose template.
+      timescaledb:
+        image: timescale/timescaledb:2.25.1-pg16
+        env:
+          POSTGRES_DB: mdemg_metrics
+          POSTGRES_USER: mdemg
+          POSTGRES_PASSWORD: mdemg_metrics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mdemg -d mdemg_metrics"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       TEST_NEO4J_URI: bolt://localhost:7687
       TEST_NEO4J_USER: neo4j
@@ -189,6 +205,14 @@ jobs:
           # doesn't churn against the absent endpoint.
           export MDEMG_ALLOW_NO_MLX=1
           export MLX_WATCHDOG_ENABLED=false
+          # UXTS-CI-001: TSDB service for the tsdb-tagged contracts.
+          export TSDB_ENABLED=true
+          export TSDB_HOST=localhost
+          export TSDB_PORT=5432
+          export TSDB_USER=mdemg
+          export TSDB_PASSWORD=mdemg_metrics
+          export TSDB_DATABASE=mdemg_metrics
+          export TSDB_AUTO_MIGRATE=true
           # Phase 13.1: column voting default-flipped to true in production. The
           # integration test suite (TestScoringComponentBreakdown,
           # TestGraphExpansion) asserts on legacy linear scorer specifics — exact
@@ -227,10 +251,12 @@ jobs:
 
       - name: Run UATS Contract Tests
         run: |
+          # UXTS-CI-001: tsdb tag un-excluded — the TimescaleDB service above
+          # makes the eventgraph federation + metrics contracts CI-runnable.
           python3 docs/api/api-spec/uats/runners/uats_runner.py validate-all \
             --spec-dir docs/api/api-spec/uats/specs/ \
             --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required,tsdb
+            --exclude-tag unts,llm_required,j17_disabled,jiminy_disabled,sidecar_required,constraint_scope_required
 
       - name: Run UBTS Smoke Benchmark (soft-fail)
         continue-on-error: true
@@ -259,8 +285,10 @@ jobs:
             --spec "docs/tests/uobs/specs/*.uobs.json" \
             --base-url http://localhost:${{ env.MDEMG_PORT }}
 
-      - name: Run UOTS Observability Artifact Tests (soft-fail)
-        continue-on-error: true
+      - name: Run UOTS Observability Artifact Tests (merge-blocking)
+        # UXTS-CI-001: was continue-on-error since inception — the
+        # "cannot-fail branch". With TSDB now in CI the suite is runnable
+        # for real; failures block.
         run: |
           python3 docs/api/api-spec/uots/runners/uots_runner.py \
             --spec-dir docs/api/api-spec/uots/specs/ \
@@ -274,13 +302,32 @@ jobs:
             --spec-dir docs/tests/uets/specs/ \
             --no-llm
 
-      - name: Run UVTS Semantic Validation (soft-fail)
-        continue-on-error: true
+      # UXTS-CI-001: the UVTS step is DELETED, not converted. Semantic
+      # retrieval grading in CI (stub embedder, no LLM, no seeded lnl_demo
+      # corpus) measures nothing — the step had been a continue-on-error
+      # zombie since it landed. UVTS gates retrieval changes via the
+      # documented LIVE flow: make test-uvts-quick / test-uvts-full + the
+      # uvts_ab_compare merge gate (see CLAUDE.md Testing).
+
+      - name: Run ULTS Prompt-Hash Verification (merge-blocking)
+        # UXTS-CI-001: prompt drift tripwire — every production LLM call
+        # site's system prompt is pinned by hash in its ULTS spec. A prompt
+        # edit without the matching spec update fails here (update the
+        # spec's hash in the same PR after re-validating the task).
         run: |
-          python3 docs/tests/uvts/runners/uvts_runner.py \
-            --spec docs/tests/uvts/specs/lnl_demo_validation.uvts.json \
-            --base-url http://localhost:${{ env.MDEMG_PORT }} \
-            --profile quick
+          python3 docs/tests/ults/runners/ults_runner.py \
+            --spec "docs/tests/ults/specs/*.ults.json" \
+            --verify-hashes
+
+      - name: Run UBENCH Lint Gate (merge-blocking)
+        # UXTS-CI-001: schema + config-SHA verification (holdout SHA is
+        # enforced wherever the gitignored training data exists — CI
+        # checkouts legitimately lack it, first CI contact proved it).
+        # The full dataset↔holdout contract (make test-ubench-contract)
+        # is the documented LOCAL pre-push gate for training-data changes.
+        run: |
+          pip install jsonschema
+          make test-ubench-lint
 
       - name: Run UAMS Auth Method Validation (soft-fail)
         continue-on-error: true
@@ -293,6 +340,40 @@ jobs:
         with:
           files: coverage.out
           fail_ci_if_error: false
+
+  neural-tests:
+    # UXTS-CI-001: ~610 neural/training Python tests had ZERO CI — first
+    # run surfaced two silently-failing tests (a stale MoE-era teacher
+    # label and a scalar-vs-array prompt-hash assumption). mlx-dependent
+    # modules (test_mlx_adapter, test_live_wiring) are excluded: mlx is
+    # Apple-Silicon-only and CI is ubuntu; those run locally on macOS.
+    # The sidecar app tests (neural/tests/) need sentence-transformers+
+    # torch (multi-GB) and stay local-only for now (disclosed).
+    name: Neural Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        # tiktoken: openai_ft_adapter token counting; pyyaml: rl trainer/
+        # preflight config loading (lazy imports the dep sweep missed on a
+        # fully-provisioned local venv — CI's first run caught it).
+        run: pip install pytest numpy jsonschema cuid2 ruff tiktoken pyyaml
+
+      - name: Ruff lint (all of neural/)
+        run: ruff check neural/
+
+      - name: Pytest (training pipeline)
+        run: |
+          python3 -m pytest neural/training/ -q \
+            --ignore=neural/training/rl/tests/test_mlx_adapter.py \
+            --ignore=neural/training/rl/tests/test_live_wiring.py
 
   lint:
     name: Lint

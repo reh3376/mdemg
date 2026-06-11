@@ -88,7 +88,6 @@ from training.recurate import SPRINT_PLAN_RAW_SHA_PIN, assert_raw_sha  # noqa: E
 from training.teacher_distill import (  # noqa: E402
     extract_system_prompt,
     generate_inputs,
-    validate_output,
 )
 
 # ── Defaults ────────────────────────────────────────────────────────────────
@@ -464,7 +463,6 @@ def _chat_completion(
 
     last_err: str | None = None
     last_preview: str | None = None
-    last_status: int | None = None
     attempts_used = 0
     max_attempts = max(1, max_retries)
     for attempt in range(max_attempts):
@@ -480,7 +478,6 @@ def _chat_completion(
             except Exception:
                 err_body = ""
             last_preview = _redact(err_body)
-            last_status = e.code
             last_err = f"HTTP {e.code}: {e.reason} — {last_preview}"
             # Retry on 429 / 5xx only.
             if e.code == 429 or 500 <= e.code < 600:
@@ -498,7 +495,6 @@ def _chat_completion(
         except (URLError, TimeoutError) as e:
             last_err = f"network/timeout: {e}"
             last_preview = last_err
-            last_status = None
             if attempt + 1 < max_attempts:
                 time.sleep(2 ** attempt)
                 continue

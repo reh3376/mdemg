@@ -8,10 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from neural.training.rl.regression import (
-    DualGateReport,
     RegressionConfig,
     evaluate_gate_5a,
     evaluate_gate_5b,

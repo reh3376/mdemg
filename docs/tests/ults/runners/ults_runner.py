@@ -260,8 +260,11 @@ def validate_schema(spec: Dict[str, Any], spec_path: str) -> List[CheckResult]:
         # Validate hash format (string or array of strings)
         hash_val = prompt.get("system_prompt_hash", "")
         if isinstance(hash_val, list):
+            # UXTS-CI-001: arrays may mix pinned hashes with the "dynamic"
+            # sentinel (templated prompts that cannot be hash-pinned) — the
+            # single-value branch already accepted "dynamic".
             all_valid = all(
-                isinstance(h, str) and re.match(r"^[a-f0-9]{64}$", h)
+                isinstance(h, str) and re.match(r"^([a-f0-9]{64}|dynamic)$", h)
                 for h in hash_val
             )
             if all_valid and len(hash_val) >= 2:
@@ -332,7 +335,18 @@ def _verify_single_hash(hash_val: str, source: str, repo_root: str) -> CheckResu
         with open(file_path) as f:
             content = f.read()
 
-        line_num = int(parts[1])
+        # UXTS-CI-001: system_prompt_source line numbers may carry a
+        # human annotation — "file.go:74 (rendered with ... enum)". Take
+        # the leading integer; int(parts[1]) choked on the annotation and
+        # 5 of 17 specs failed verification on a parser artifact.
+        line_match = re.match(r"\s*(\d+)", parts[1])
+        if not line_match:
+            return CheckResult(
+                name="prompt_hash_verify",
+                passed=False,
+                message=f"Cannot parse line number from source location: {source!r}",
+            )
+        line_num = int(line_match.group(1))
         lines = content.split("\n")
 
         if line_num > len(lines):
@@ -409,6 +423,8 @@ def verify_prompt_hash(spec: Dict[str, Any], repo_root: str) -> Optional[CheckRe
             )
         failures = []
         for h, s in zip(hash_val, sources):
+            if h == "dynamic":
+                continue  # UXTS-CI-001: templated variant — not hash-pinnable
             result = _verify_single_hash(h, s, repo_root)
             if not result.passed:
                 failures.append(result.message)

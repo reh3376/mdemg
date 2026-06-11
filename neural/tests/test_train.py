@@ -211,8 +211,6 @@ def test_train_from_checkpoint(sample_records: list[dict]) -> None:
 
         captured_source: list[str] = []
 
-        original_cross_encoder = MagicMock(return_value=mock_model)
-
         def capturing_cross_encoder(source, **kwargs):
             captured_source.append(source)
             return mock_model

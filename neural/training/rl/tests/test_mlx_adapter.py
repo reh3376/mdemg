@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import sys
 import types
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np

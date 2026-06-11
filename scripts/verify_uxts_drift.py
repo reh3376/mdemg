@@ -71,6 +71,22 @@ FRAMEWORKS = [
     Framework("UETS", "docs/tests/uets/specs", "*.uets.json",
               runner_path="docs/tests/uets/runners/uets_runner.py",
               hash_json_paths=["fixture.sha256"]),
+    # UXTS-CI-001: the five previously-omitted frameworks.
+    Framework("ULTS", "docs/tests/ults/specs", "*.ults.json",
+              runner_path="docs/tests/ults/runners/ults_runner.py",
+              hash_json_paths=[]),  # prompt hashes verified by the runner itself (--verify-hashes)
+    Framework("UITS", "docs/tests/uits/specs", "*.uits.json",
+              runner_path="docs/tests/uits/runners/uits_runner.py",
+              hash_json_paths=["config.sha256"]),
+    Framework("UTDS", "docs/tests/utds/specs", "*.utds.json",
+              runner_path="docs/tests/utds/runners/utds_runner.py",
+              hash_json_paths=["config.sha256"]),
+    Framework("UAITS", "docs/tests/uaits/specs", "*.uaits.json",
+              runner_path="docs/tests/uaits/runners/uaits_runner.py",
+              hash_json_paths=[]),  # validated live via `mdemg data validate`
+    Framework("UBENCH", "docs/tests/ubench/specs", "*.ubench.json",
+              runner_path="docs/tests/ubench/runners/ubench_runner.py",
+              hash_json_paths=[]),  # holdout SHAs verified by test-ubench-contract
 ]
 
 MATRIX_PATH = ROOT / "docs/development/UXTS_FRAMEWORK_MATRIX.md"

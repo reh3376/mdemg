@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-04-21
+Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; drift checker now covers ULTS/UITS/UTDS/UAITS/UBENCH and runs merge-blocking in CI)
 
 > **Architectural constraint (Sprint FT-LORA onwards, 2026-04-21):** MDEMG operates under a **no-tool-calling policy** — all 16 MDEMG LLM call sites are single-shot structured-output / reasoning. ULTS specs and ULTS-derived training data must not introduce `tool_use`, `function_call`, `toolCalls`, `tools: [`, `preserve_thinking`, `--tool-call-parser`, `enable-auto-tool-choice`, `tool_call`, or `tool_response` patterns. Any future UxTS framework that adds LLM contracts inherits this constraint. See `ft-lora/01_RESEARCH_v2.md §2.8`.
 
@@ -13,20 +13,21 @@ Last updated: 2026-04-21
 | Acronym | Name | Primary Scope | Status | Specs |
 | ------- | ---- | ------------- | ------ | ----- |
 | UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active | N/A (registry) |
-| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 12 canonical, 4 drafts |
-| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 124 canonical, 7 drafts |
-| UPTS | Universal Parser Test Specification | Language parser conformance | active | 27 |
+| UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 15 canonical, 4 drafts |
+| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 220 canonical, 7 drafts |
+| UPTS | Universal Parser Test Specification | Language parser conformance | active | 28 |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
-| USTS | Universal Security Test Specification | Security behavior and hardening tests | pilot | 3 canonical, 2 drafts |
+| USTS | Universal Security Test Specification | Security behavior and hardening tests | active | 5 canonical, 2 drafts |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only | 4 |
-| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 9 canonical, 1 draft |
+| UOBS | Universal Observability Specification | Runtime observability behavior checks | active | 11 canonical, 1 draft |
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active | 11 |
-| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | spec-only | 1 canonical, 1 draft |
+| UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | active (live-gated) | 3 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
-| ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 16 |
+| ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 17 |
 | UTDS | Universal Training Data Specification | Training data export manifest validation, privacy gates, archive integrity | active | 3 |
 | UAITS | Universal AI Training Specification | Training data curation governance: 4 paradigms (SFT, DPO, RAFT, curriculum), quality gates, format rules | active | 1 (4 datasets) |
+| UBENCH | Universal Benchmark Framework (LLM eval) | Aggregate LLM eval benchmark wrapping Phase 10 in the UxTS pattern | active | 1 (108 rows / 17 tasks) |
 
 ---
 

@@ -1,10 +1,8 @@
 """Tests for teacher distillation script."""
 
-import json
 import os
 import tempfile
 
-import pytest
 
 from training.teacher_distill import (
     extract_system_prompt,

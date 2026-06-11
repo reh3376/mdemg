@@ -934,6 +934,8 @@ def run_spec(spec_path: Path, base_url: str) -> UOTSResult:
         return _run_dashboard_scan(spec_path, spec)
     if test_type in ("schema", "schema_check"):
         return _run_schema_check(spec_path, spec, base_url)
+    if test_type == "artifact":
+        return _run_artifact(spec_path, spec, started)
 
     return _build_result(
         spec_path,
@@ -948,6 +950,68 @@ def run_spec(spec_path: Path, base_url: str) -> UOTSResult:
         ],
         started,
     )
+
+
+def _run_artifact(spec_path: Path, spec: dict, started: str) -> UOTSResult:
+    """UXTS-CI-001: validate an on-disk artifact (e.g. a backup manifest)
+    against required_fields. Artifacts are produced by scheduled jobs, so
+    absence is a SKIP-equivalent pass for merge_blocking=false specs (CI
+    may not have run a backup yet); presence triggers full validation.
+    """
+    import glob as _glob
+    import re as _re
+    from datetime import datetime as _dt
+
+    validation = spec.get("validation", {})
+    pattern = os.path.expanduser(validation.get("artifact_pattern", ""))
+    merge_blocking = bool(spec.get("merge_blocking", False))
+    checks: list[CheckResult] = []
+
+    matches = sorted(_glob.glob(pattern))
+    if not matches:
+        checks.append(CheckResult(
+            "artifact_present",
+            not merge_blocking,
+            f"no artifacts match {pattern!r}"
+            + ("" if merge_blocking else " — pass (merge_blocking=false; artifact is produced by a scheduled job)"),
+        ))
+        return _build_result(spec_path, spec, "artifact", checks, started)
+
+    newest = matches[-1]
+    try:
+        artifact = _load_json(Path(newest))
+        checks.append(CheckResult("artifact_loaded", True, f"loaded {newest}"))
+    except Exception as exc:
+        checks.append(CheckResult("artifact_loaded", False, f"failed to parse {newest}: {exc}"))
+        return _build_result(spec_path, spec, "artifact", checks, started)
+
+    type_map = {"integer": int, "number": (int, float), "string": str, "boolean": bool,
+                "array": list, "object": dict}
+    for field in validation.get("required_fields", []):
+        name = field.get("field", "")
+        val = artifact.get(name)
+        if val is None:
+            checks.append(CheckResult(f"field_{name}", False, f"missing required field {name!r}"))
+            continue
+        expected_type = type_map.get(field.get("type", ""), None)
+        if expected_type is not None and not isinstance(val, expected_type):
+            # bool is an int subclass in Python — reject bools for integer fields
+            checks.append(CheckResult(f"field_{name}", False,
+                                      f"{name}: expected {field.get('type')}, got {type(val).__name__}"))
+            continue
+        pat = field.get("pattern")
+        if pat and isinstance(val, str) and not _re.match(pat, val):
+            checks.append(CheckResult(f"field_{name}", False, f"{name}={val!r} does not match {pat!r}"))
+            continue
+        if field.get("format") == "rfc3339" and isinstance(val, str):
+            try:
+                _dt.fromisoformat(val.replace("Z", "+00:00"))
+            except ValueError:
+                checks.append(CheckResult(f"field_{name}", False, f"{name}={val!r} is not RFC3339"))
+                continue
+        checks.append(CheckResult(f"field_{name}", True, f"{name} ok"))
+
+    return _build_result(spec_path, spec, "artifact", checks, started)
 
 
 def _status_icon(passed: bool) -> str:

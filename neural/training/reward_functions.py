@@ -359,9 +359,9 @@ def insight_count(response: str, **kwargs: Any) -> float:
         return 0.0
 
     # Count bullet points, numbered items, or sentences
-    lines = [l.strip() for l in response.split("\n") if l.strip()]
-    points = sum(1 for l in lines if l.startswith(("-", "*", "•")) or
-                 (len(l) > 1 and l[0].isdigit() and l[1] in ".)" ))
+    lines = [ln.strip() for ln in response.split("\n") if ln.strip()]
+    points = sum(1 for ln in lines if ln.startswith(("-", "*", "•")) or
+                 (len(ln) > 1 and ln[0].isdigit() and ln[1] in ".)" ))
 
     if points == 0:
         # Fall back to sentence count

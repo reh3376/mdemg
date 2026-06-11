@@ -257,10 +257,12 @@ class RewardSampler:
             while total != n:
                 if total < n:
                     g = max(groups, key=lambda g: len(self._by_group[g]))
-                    counts[g] += 1; total += 1
+                    counts[g] += 1
+                    total += 1
                 else:
                     g = min(groups, key=lambda g: counts[g] if counts[g] > 1 else 10**9)
-                    counts[g] -= 1; total -= 1
+                    counts[g] -= 1
+                    total -= 1
             # Pre-compute per-group task lists for fast within-group draw.
             tasks_by_group: dict[str, list[str]] = {}
             for g in groups:

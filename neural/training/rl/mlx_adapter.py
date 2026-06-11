@@ -463,7 +463,6 @@ class MLXGRPOAdapter:
                 )
             else:
                 # No decay tail — hold at peak
-                from functools import partial as _partial  # noqa: PLC0415
                 def _const(_step: int, _v: float = lr) -> float:
                     return _v
                 schedules.append(_const)
@@ -699,15 +698,9 @@ class MLXGRPOAdapter:
         else:
             kept_adv = advantages.astype(np.float32)
 
-        adv_mx = mx.array(kept_adv)
-        lp_old_frozen = mx.array(
-            [self._stash[i].lp_old_frozen for i in kept_indices],
-            dtype=mx.float32,
-        )
-        lp_ref_frozen = mx.array(
-            [self._stash[i].lp_ref_frozen for i in kept_indices],
-            dtype=mx.float32,
-        )
+        # UXTS-CI-001 ruff F841: batched adv/lp arrays removed — the loss
+        # path below reads lp_old_frozen/lp_ref_frozen per-item from the
+        # stash; these mx.array locals were dead since that refactor.
 
         clip = self.clip_ratio
         kl_coef = self.kl_coef

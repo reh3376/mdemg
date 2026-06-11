@@ -373,10 +373,17 @@ class TestULTSSpecLoading(unittest.TestCase):
         if not os.path.isdir(specs_dir):
             self.skipTest("ULTS specs dir not found")
         specs = load_ults_specs(specs_dir)
-        # hidden.reclassify has dynamic prompt — hash should not be in known set
+        # hidden.reclassify has a dynamic prompt variant — the dynamic
+        # sentinel must be present so stale-hash filtering skips it.
+        # UXTS-CI-001: the spec evolved from scalar "dynamic" to an array
+        # mixing a pinned hash with the sentinel; accept both forms (this
+        # test had been failing silently — neural tests had zero CI).
         if "hidden.reclassify" in specs:
             h = specs["hidden.reclassify"]["system_prompt_hash"]
-            self.assertEqual(h, "dynamic")
+            if isinstance(h, list):
+                self.assertIn("dynamic", h)
+            else:
+                self.assertEqual(h, "dynamic")
 
     def test_multi_hash_array_loaded(self):
         """Tasks with array-type system_prompt_hash should load correctly."""
