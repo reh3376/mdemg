@@ -43,7 +43,10 @@ fi
 printf '{"session_id":"%s","ts":%d}\n' "$SESSION_ID" "$(date +%s)" > "$HOME/.mdemg/.claude-session" 2>/dev/null || true
 
 # Extract the user's prompt text
-USER_PROMPT=$(echo "$INPUT" | jq -r '.user_prompt // empty' 2>/dev/null)
+# HOOKWIRE-001: Claude Code's UserPromptSubmit stdin field is `prompt`.
+# The old `.user_prompt` read silently no-opped this hook on EVERY prompt
+# (empty → exit 0 below). Keep `.user_prompt` as a legacy fallback.
+USER_PROMPT=$(echo "$INPUT" | jq -r '.prompt // .user_prompt // empty' 2>/dev/null)
 if [ -z "$USER_PROMPT" ]; then
   exit 0
 fi
@@ -82,33 +85,27 @@ RECALL=$(curl -sf -X POST "${MDEMG_URL}/v1/conversation/recall" \
 # Check if there are results
 RESULT_COUNT=$(echo "$RECALL" | jq -r 'if type == "array" then length elif .results then (.results | length) else 0 end' 2>/dev/null || echo "0")
 
+# HOOKWIRE-001: empty recall must NOT exit — the old `exit 0` here also
+# skipped Jiminy guidance, the warm trigger, and the retrieve-time Hebbian
+# reinforcement below. Recall and guidance are independent deliveries.
 if [ "$RESULT_COUNT" -eq 0 ] 2>/dev/null; then
   # Phase 80: Empty recall warning for non-trivial queries
   if [ ${#USER_PROMPT} -gt 15 ]; then
     echo "!! CMS RECALL EMPTY — No relevant memory found for this query."
     echo "!! Consider: POST /v1/conversation/observe to record this topic."
   fi
-  # Session health ribbon (1s timeout)
-  HEALTH_RESP=$(curl -sf "${MDEMG_URL}/v1/conversation/session/health?session_id=${SESSION_ID}" \
-    --connect-timeout 1 --max-time 1 2>/dev/null) || true
-  if [ -n "$HEALTH_RESP" ]; then
-    H_SCORE=$(echo "$HEALTH_RESP" | jq -r '.health_score // "?"' 2>/dev/null || echo "?")
-    H_OBS=$(echo "$HEALTH_RESP" | jq -r '.observations_since_resume // "?"' 2>/dev/null || echo "?")
-    echo "[Session health: ${H_SCORE} | obs: ${H_OBS}]"
-  fi
-  exit 0
+else
+  # Format relevant context
+  echo "═══ CMS RECALL (relevant to this prompt) ═══"
+
+  # Handle both array response and object-with-results response
+  echo "$RECALL" | jq -r '
+    (if type == "array" then . elif .results then .results else [] end)[]? |
+    "  • [\(.type // .obs_type // "memory")] (score: \(.score // "?" | tostring | .[0:4])) \(.content // .summary // "no content" | .[0:200])"
+  ' 2>/dev/null || true
+
+  echo "═══ END CMS RECALL ═══"
 fi
-
-# Format relevant context
-echo "═══ CMS RECALL (relevant to this prompt) ═══"
-
-# Handle both array response and object-with-results response
-echo "$RECALL" | jq -r '
-  (if type == "array" then . elif .results then .results else [] end)[]? |
-  "  • [\(.type // .obs_type // "memory")] (score: \(.score // "?" | tostring | .[0:4])) \(.content // .summary // "no content" | .[0:200])"
-' 2>/dev/null || true
-
-echo "═══ END CMS RECALL ═══"
 
 # --- Jiminy inner voice guidance (event-driven warm/latest pattern) ---
 # Reads pre-computed guidance instantly (<100ms) from warm store.

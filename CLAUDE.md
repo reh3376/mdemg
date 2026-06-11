@@ -396,6 +396,8 @@ Endpoints:
 
 Hooks in `.claude/hooks/` run automatically — they are not optional.
 
+**Hook stdin contract (HOOKWIRE-001, 2026-06-10 — pinned):** UserPromptSubmit sends `prompt` (NOT `user_prompt`); PostToolUse sends `tool_response` (NOT `tool_output`; string OR object — normalize via `_response_text`); transcript lines are `{type, message:{content:[{type, text|name,…}]}}`. The old field names silently killed the entire per-prompt channel (recall/guidance//strict/reinforcement never fired) and fabricated "Build/test succeeded" observations. When editing hooks: keep the legacy fallbacks, never couple guidance delivery to recall results, and never claim success on empty output. PostToolUse fires only on SUCCESSFUL tool completion — non-zero-exit commands are unobserved unless output surfaces in a successful completion. Template copies in `internal/cli/hook_templates/` must move in the same commit (CI parity gate is HOOKSYNC-001 scope).
+
 - **`session-start.sh`**: Resumes CMS memory, RSIC health, synergy fingerprint, Jiminy warning
 - **`prompt-context.sh`**: Recalls CMS context + Jiminy guidance per prompt
 - **`post-tool-observe.py`**: Auto-captures decisions, errors, progress, MEMORY.md overflow
