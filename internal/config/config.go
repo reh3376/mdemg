@@ -1051,6 +1051,17 @@ type Config struct {
 	HealthProbeEnabled     bool // HEALTH_PROBE_ENABLED — enable periodic health probing (default: true)
 	HealthProbeIntervalSec int  // HEALTH_PROBE_INTERVAL_SEC — probe interval in seconds (default: 60)
 
+	// ===== Goroutine Supervisor (SUPERVISOR-002) =====
+	SupervisorMaxRestarts      int // SUPERVISOR_MAX_RESTARTS — restarts allowed within the sliding window before permanent failure (default: 3)
+	SupervisorRestartWindowMin int // SUPERVISOR_RESTART_WINDOW_MIN — sliding restart-budget window in minutes (default: 60)
+	SupervisorBackoffBaseSec   int // SUPERVISOR_BACKOFF_BASE_SEC — base restart backoff in seconds, doubles per in-window restart (default: 5)
+
+	// ===== Alert Rule Health (SUPERVISOR-002) =====
+	AlertRuleFailureThreshold int // ALERT_RULE_FAILURE_THRESHOLD — consecutive query failures before a rule-health meta-alert fires (default: 3)
+
+	// ===== RSIC LLM-Health Recency Gate (SUPERVISOR-002) =====
+	RSICLLMErrorRecencyMin int // RSIC_LLM_ERROR_RECENCY_MIN — minutes; llm_error_rate_spike fires only if the most recent error is this fresh (default: 60, 0 disables the gate)
+
 	// ===== LLM Client Retry =====
 	LLMRetryEnabled     bool    // LLM_RETRY_ENABLED — enable retry for transient LLM errors (default: true)
 	LLMRetryMaxAttempts int     // LLM_RETRY_MAX_ATTEMPTS — max retry attempts (default: 5)
@@ -4072,6 +4083,28 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// Goroutine Supervisor (SUPERVISOR-002)
+	supervisorMaxRestarts, err := atoi("SUPERVISOR_MAX_RESTARTS", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	supervisorRestartWindowMin, err := atoi("SUPERVISOR_RESTART_WINDOW_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	supervisorBackoffBaseSec, err := atoi("SUPERVISOR_BACKOFF_BASE_SEC", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	alertRuleFailureThreshold, err := atoi("ALERT_RULE_FAILURE_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicLLMErrorRecencyMin, err := atoi("RSIC_LLM_ERROR_RECENCY_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// LLM Client Retry
 	llmRetryEnabled := getBool("LLM_RETRY_ENABLED", true)
 	llmRetryMaxAttempts, err := atoi("LLM_RETRY_MAX_ATTEMPTS", 5)
@@ -4896,6 +4929,13 @@ func FromEnv() (Config, error) {
 		// Health Probe
 		HealthProbeEnabled:     healthProbeEnabled,
 		HealthProbeIntervalSec: healthProbeIntervalSec,
+
+		// Goroutine Supervisor (SUPERVISOR-002)
+		SupervisorMaxRestarts:      supervisorMaxRestarts,
+		SupervisorRestartWindowMin: supervisorRestartWindowMin,
+		SupervisorBackoffBaseSec:   supervisorBackoffBaseSec,
+		AlertRuleFailureThreshold:  alertRuleFailureThreshold,
+		RSICLLMErrorRecencyMin:     rsicLLMErrorRecencyMin,
 
 		// LLM Client Retry
 		LLMRetryEnabled:     llmRetryEnabled,

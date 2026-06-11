@@ -418,6 +418,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			sev := alert.Severity(severity)
 			disp.SendAlert(context.Background(), service, title, message, sev)
 		})
+		// SUPERVISOR-002: sliding-window restart budget from config
+		sup.Configure(cfg.SupervisorMaxRestarts,
+			time.Duration(cfg.SupervisorRestartWindowMin)*time.Minute,
+			time.Duration(cfg.SupervisorBackoffBaseSec)*time.Second)
 
 		// Register health prober
 		if prober != nil {

@@ -16,55 +16,124 @@ type AlertFunc func(service, title, message string, severity string)
 type workerState struct {
 	name     string
 	fn       func(ctx context.Context) error
-	restarts int
+	restarts []time.Time // restart timestamps inside the sliding window
 	running  bool
+	launched bool
 }
 
 // Supervisor monitors and restarts critical background goroutines.
+//
+// Restart budget is a sliding window: a worker fails permanently only when
+// it restarts more than maxRetry times within window. Restarts older than
+// the window are forgotten, so an occasional transient never accumulates
+// into permanent death (SUPERVISOR-002).
 type Supervisor struct {
 	mu       sync.Mutex
 	workers  []*workerState
 	alertFn  AlertFunc
 	maxRetry int
-	backoff  time.Duration // base delay, doubles each retry
+	window   time.Duration
+	backoff  time.Duration // base delay, doubles per in-window restart
+	now      func() time.Time
 	ctx      context.Context
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
 }
 
+const (
+	defaultMaxRetry = 3
+	defaultWindow   = time.Hour
+	defaultBackoff  = 5 * time.Second
+	maxBackoffDelay = 2 * time.Minute
+)
+
 // New creates a supervisor with default settings.
 func New(alertFn AlertFunc) *Supervisor {
 	return &Supervisor{
 		alertFn:  alertFn,
-		maxRetry: 3,
-		backoff:  5 * time.Second,
+		maxRetry: defaultMaxRetry,
+		window:   defaultWindow,
+		backoff:  defaultBackoff,
+		now:      time.Now,
 	}
 }
 
-// Register adds a named goroutine to supervision.
+// Configure overrides the restart-budget settings. Zero values keep the
+// current setting; negative values are rejected with a warning.
+func (s *Supervisor) Configure(maxRetry int, window, backoff time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if maxRetry > 0 {
+		s.maxRetry = maxRetry
+	} else if maxRetry < 0 {
+		slog.Warn("supervisor: ignoring negative max restarts", "value", maxRetry)
+	}
+	if window > 0 {
+		s.window = window
+	} else if window < 0 {
+		slog.Warn("supervisor: ignoring negative restart window", "value", window)
+	}
+	if backoff > 0 {
+		s.backoff = backoff
+	} else if backoff < 0 {
+		slog.Warn("supervisor: ignoring negative backoff", "value", backoff)
+	}
+}
+
+// Register adds a named goroutine to supervision. Workers registered before
+// Start are launched by Start; use Go to register and launch after Start.
 // The function should block until ctx is cancelled or an error occurs.
+// A nil return without ctx cancellation means intentional completion —
+// the worker is NOT restarted.
 func (s *Supervisor) Register(name string, fn func(ctx context.Context) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.workers = append(s.workers, &workerState{name: name, fn: fn})
 }
 
-// Start launches all registered workers and monitors them.
-// This method blocks until Stop is called.
+// Go registers a worker and, if the supervisor is already running, launches
+// it immediately under supervision. Safe to call before Start (equivalent to
+// Register) and after Stop (the worker is recorded but never launched).
+func (s *Supervisor) Go(name string, fn func(ctx context.Context) error) {
+	s.mu.Lock()
+	w := &workerState{name: name, fn: fn}
+	s.workers = append(s.workers, w)
+	launch := s.ctx != nil && s.ctx.Err() == nil
+	if launch {
+		w.launched = true
+		s.wg.Add(1)
+	}
+	s.mu.Unlock()
+	if launch {
+		slog.Info("supervisor: worker registered (late)", "worker", name)
+		go s.runWorker(w)
+	}
+}
+
+// Start launches all registered workers and monitors them. It blocks until
+// Stop is called (or ctx is cancelled), then waits for workers to drain.
+// The supervisor stays alive even if individual workers fail permanently,
+// so late workers added via Go remain supervised.
 func (s *Supervisor) Start(ctx context.Context) {
 	s.mu.Lock()
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	workers := make([]*workerState, len(s.workers))
-	copy(workers, s.workers)
+	var launch []*workerState
+	for _, w := range s.workers {
+		if !w.launched {
+			w.launched = true
+			launch = append(launch, w)
+		}
+	}
+	s.wg.Add(len(launch))
 	s.mu.Unlock()
 
-	slog.Info("supervisor: started", "workers", len(workers))
+	slog.Info("supervisor: started", "workers", len(launch))
 
-	for _, w := range workers {
-		s.wg.Add(1)
+	for _, w := range launch {
 		go s.runWorker(w)
 	}
 
+	<-s.ctx.Done()
 	s.wg.Wait()
 	slog.Info("supervisor: all workers stopped")
 }
@@ -92,15 +161,31 @@ func (s *Supervisor) runWorker(w *workerState) {
 			return
 		}
 
+		// Nil return without shutdown = intentional completion (e.g. the
+		// worker's own stop channel closed). Do not restart.
+		if err == nil {
+			slog.Info("supervisor: worker completed", "worker", w.name)
+			return
+		}
+
 		s.mu.Lock()
-		w.restarts++
-		restarts := w.restarts
+		now := s.now()
+		cutoff := now.Add(-s.window)
+		kept := w.restarts[:0]
+		for _, ts := range w.restarts {
+			if ts.After(cutoff) {
+				kept = append(kept, ts)
+			}
+		}
+		w.restarts = append(kept, now)
+		inWindow := len(w.restarts)
 		maxRetry := s.maxRetry
 		backoff := s.backoff
+		window := s.window
 		s.mu.Unlock()
 
-		if restarts > maxRetry {
-			msg := fmt.Sprintf("%s failed permanently after %d restarts", w.name, maxRetry)
+		if inWindow > maxRetry {
+			msg := fmt.Sprintf("%s failed permanently: %d restarts within %s", w.name, inWindow, window)
 			slog.Error("supervisor: "+msg, "worker", w.name, "last_error", err)
 			if s.alertFn != nil {
 				s.alertFn("supervisor", "Worker failed permanently", msg, "critical")
@@ -108,8 +193,9 @@ func (s *Supervisor) runWorker(w *workerState) {
 			return
 		}
 
-		delay := backoff * time.Duration(1<<(restarts-1)) // exponential backoff
-		msg := fmt.Sprintf("%s restarted (attempt %d/%d)", w.name, restarts, maxRetry)
+		// exponential backoff, capped
+		delay := min(backoff*time.Duration(1<<(inWindow-1)), maxBackoffDelay)
+		msg := fmt.Sprintf("%s restarted (%d/%d in window)", w.name, inWindow, maxRetry)
 		slog.Warn("supervisor: "+msg, "worker", w.name, "error", err, "backoff", delay)
 		if s.alertFn != nil {
 			s.alertFn("supervisor", "Worker restarted", msg, "medium")
