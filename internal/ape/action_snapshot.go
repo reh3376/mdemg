@@ -216,17 +216,12 @@ func (ss *SnapshotStore) capturePreState(ctx context.Context, action, spaceID st
 			 LIMIT 200`)
 
 	case "tombstone_stale":
+		// RSIC-STORM-001: MUST use the executor's exact candidate
+		// predicate — a drifted snapshot captures a different node set and
+		// rollback restores nothing (caught live: restored_count=0).
 		return ss.captureNodeState(ctx, spaceID,
-			`MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
-			 WHERE correction.created_at > datetime() - duration('P7D')
-			 WITH correction
-			 MATCH (stale:MemoryNode {space_id: $spaceId})
-			 WHERE stale.role_type = 'conversation_observation'
-			   AND stale.obs_type <> 'correction'
-			   AND stale.created_at < correction.created_at
-			   AND NOT coalesce(stale.is_archived, false)
-			 WITH DISTINCT stale LIMIT 50
-			 RETURN stale.node_id AS id, stale.is_archived AS archived, stale.obs_type AS obs_type`)
+			tombstoneStaleCandidates+
+				` RETURN stale.node_id AS id, stale.is_archived AS archived, stale.obs_type AS obs_type`)
 
 	case "graduate_volatile":
 		return ss.captureNodeState(ctx, spaceID,
@@ -354,6 +349,7 @@ func (ss *SnapshotStore) rollbackTombstone(ctx context.Context, snap *ActionSnap
 		cypher := `MATCH (n:MemoryNode)
 			WHERE n.node_id IN $ids AND n.is_archived = true
 			SET n.is_archived = false
+			REMOVE n.archived_at, n.archive_reason, n.archived_cycle_id
 			RETURN count(n) AS restored`
 		res, err := tx.Run(ctx, cypher, map[string]any{"ids": ids})
 		if err != nil {

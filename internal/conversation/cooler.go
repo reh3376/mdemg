@@ -33,6 +33,7 @@ type ContextCooler struct {
 	tombstoneThreshold        float64
 	graduationThreshold       float64
 	constraintProtectFromDecay bool
+	tombstoneMaxPerRun        int // RSIC-STORM-001: cap per ProcessGraduations run (0 = unlimited)
 }
 
 // NewContextCooler creates a new Context Cooler instance with config-driven parameters.
@@ -45,6 +46,7 @@ func NewContextCooler(driver neo4j.DriverWithContext, cfg config.Config) *Contex
 		tombstoneThreshold:         cfg.CoolerTombstoneThreshold,
 		graduationThreshold:        cfg.CoolerGraduationThreshold,
 		constraintProtectFromDecay: cfg.ConstraintProtectFromDecay,
+		tombstoneMaxPerRun:         cfg.CoolerTombstoneMaxPerRun,
 	}
 	// Apply defaults for zero values
 	if c.reinforcementWindowHours <= 0 {
@@ -291,13 +293,23 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 			constraintExclusion = "\n\t\t\t  AND NOT any(tag IN coalesce(n.tags, []) WHERE tag STARTS WITH 'constraint:')"
 		}
 
+		// RSIC-STORM-001: cap per run. The 2026-06-11 incident tombstoned
+		// 5,397 observations in ONE uncapped sweep (the backlog of
+		// pre-DH-004 graduation-bug victims) when a session-start hook hit
+		// the graduate endpoint — a CRITICAL node-drop alert and hours of
+		// mis-attribution. Successive runs drain a large backlog at cap
+		// rate instead.
+		capClause := ""
+		if c.tombstoneMaxPerRun > 0 {
+			capClause = "\n\t\t\tWITH n LIMIT $maxPerRun"
+		}
 		tombstoneCypher := `
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
 			  AND coalesce(n.volatile, true) = true
 			  AND NOT coalesce(n.pinned, false)
 			  AND n.created_at < datetime($windowCutoff)
-			  AND coalesce(n.stability_score, 0.1) < $tombstoneThreshold` + constraintExclusion + `
+			  AND coalesce(n.stability_score, 0.1) < $tombstoneThreshold` + constraintExclusion + capClause + `
 			SET n.is_archived = true,
 			    n.archived_at = datetime(),
 			    n.archive_reason = 'context_cooler_tombstone',
@@ -309,6 +321,7 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 			"spaceId":            spaceID,
 			"windowCutoff":       windowCutoff.Format(time.RFC3339),
 			"tombstoneThreshold": c.tombstoneThreshold,
+			"maxPerRun":          c.tombstoneMaxPerRun,
 		})
 		if err != nil {
 			return nil, err
@@ -316,6 +329,10 @@ func (c *ContextCooler) ProcessGraduations(ctx context.Context, spaceID string) 
 		if res.Next(ctx) {
 			count, _ := res.Record().Get("tombstonedCount")
 			summary.Tombstoned = int(count.(int64))
+			if c.tombstoneMaxPerRun > 0 && summary.Tombstoned >= c.tombstoneMaxPerRun {
+				slog.Warn("context cooler: tombstone cap reached — backlog remains and will drain on subsequent runs",
+					"space_id", spaceID, "tombstoned", summary.Tombstoned, "cap", c.tombstoneMaxPerRun)
+			}
 		}
 
 		// Step 3: Count remaining volatile nodes

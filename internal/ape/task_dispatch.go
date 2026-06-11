@@ -256,7 +256,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	case "graduate_volatile":
 		deliverables, execErr = d.executeGraduateVolatile(ctx, at.Spec.TargetSpace)
 	case "tombstone_stale":
-		deliverables, execErr = d.executeTombstoneStale(ctx, at.Spec.TargetSpace)
+		deliverables, execErr = d.executeTombstoneStale(ctx, at.Spec.TargetSpace, at.Spec.CycleID)
 	case "refresh_stale_edges":
 		deliverables, execErr = d.executeRefreshStaleEdges(ctx, at.Spec.TargetSpace)
 	case "codify_constraint":
@@ -411,7 +411,36 @@ func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string
 	return map[string]any{"graduated": result}, nil
 }
 
-func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) (map[string]any, error) {
+// tombstoneStaleCandidates is the SINGLE source for which observations
+// tombstone_stale may archive — shared by the executor below and the
+// rollback snapshot (action_snapshot.go) so the two can never drift.
+// RSIC-STORM-001: RSIC-VALIDATE-001 added the correction-linkage condition
+// to the executor only; the snapshot kept capturing the old unlinked set,
+// so rollback "restored" nodes that were never archived (restored_count=0
+// live while real archival went un-undone).
+//
+// RSIC-VALIDATE-001 semantics preserved: tombstone ONLY observations
+// RELATED to a recent correction — same session, or its 1-hop
+// CO_ACTIVATED_WITH neighborhood. Ends with `WITH DISTINCT stale LIMIT 50`;
+// append a SET/RETURN tail.
+const tombstoneStaleCandidates = `
+	MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
+	WHERE correction.created_at > datetime() - duration('P7D')
+	WITH collect(correction) AS corrections
+	UNWIND corrections AS correction
+	MATCH (stale:MemoryNode {space_id: $spaceId})
+	WHERE stale.role_type = 'conversation_observation'
+	  AND stale.obs_type <> 'correction'
+	  AND stale.created_at < correction.created_at
+	  AND NOT coalesce(stale.is_archived, false)
+	  AND (
+	        (stale.session_id IS NOT NULL AND stale.session_id = correction.session_id)
+	     OR (stale)-[:CO_ACTIVATED_WITH]-(correction)
+	  )
+	WITH DISTINCT stale LIMIT 50
+`
+
+func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID, cycleID string) (map[string]any, error) {
 	if d.driver == nil {
 		return nil, fmt.Errorf("neo4j driver not available")
 	}
@@ -419,31 +448,17 @@ func (d *Dispatcher) executeTombstoneStale(ctx context.Context, spaceID string) 
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// RSIC-VALIDATE-001: tombstone ONLY observations RELATED to a recent
-		// correction — same session as the correction, or its 1-hop
-		// CO_ACTIVATED_WITH neighborhood. The previous query archived 50
-		// ARBITRARY older observations whenever ANY correction existed in
-		// the window (no relationship at all) — silently eroding unrelated
-		// memory on every dispatch.
-		cypher := `
-			MATCH (correction:MemoryNode {space_id: $spaceId, obs_type: 'correction'})
-			WHERE correction.created_at > datetime() - duration('P7D')
-			WITH collect(correction) AS corrections
-			UNWIND corrections AS correction
-			MATCH (stale:MemoryNode {space_id: $spaceId})
-			WHERE stale.role_type = 'conversation_observation'
-			  AND stale.obs_type <> 'correction'
-			  AND stale.created_at < correction.created_at
-			  AND NOT coalesce(stale.is_archived, false)
-			  AND (
-			        (stale.session_id IS NOT NULL AND stale.session_id = correction.session_id)
-			     OR (stale)-[:CO_ACTIVATED_WITH]-(correction)
-			  )
-			WITH DISTINCT stale LIMIT 50
-			SET stale.is_archived = true
+		// RSIC-STORM-001: stamp attribution metadata — bare is_archived
+		// made these tombstones invisible to time/reason forensics (the
+		// 2026-06-11 burst was mis-attributed for hours because of it).
+		cypher := tombstoneStaleCandidates + `
+			SET stale.is_archived = true,
+			    stale.archived_at = datetime(),
+			    stale.archive_reason = 'rsic_tombstone_stale',
+			    stale.archived_cycle_id = $cycleID
 			RETURN count(stale) AS tombstoned
 		`
-		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID, "cycleID": cycleID})
 		if err != nil {
 			return nil, err
 		}

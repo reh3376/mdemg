@@ -22,7 +22,7 @@ func TestExecutors_NilDriverReturnsError(t *testing.T) {
 			return d.executeGraduateVolatile(context.Background(), "test-space")
 		}},
 		{"executeTombstoneStale", func() (map[string]any, error) {
-			return d.executeTombstoneStale(context.Background(), "test-space")
+			return d.executeTombstoneStale(context.Background(), "test-space", "test-cycle")
 		}},
 		{"executeRefreshStaleEdges", func() (map[string]any, error) {
 			return d.executeRefreshStaleEdges(context.Background(), "test-space")
