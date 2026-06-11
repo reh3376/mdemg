@@ -22,8 +22,8 @@ type HiddenNode struct {
 type BaseNode struct {
 	NodeID               string
 	SpaceID              string
-	Path                 string    // File path for grouping
-	Summary              string    // LLM-generated summary from ingestion
+	Path                 string // File path for grouping
+	Summary              string // LLM-generated summary from ingestion
 	Embedding            []float64
 	MessagePassEmbedding []float64 // Used when clustering higher layers
 }
@@ -45,11 +45,11 @@ type Cluster struct {
 
 // ClusteringResult holds the output of DBSCAN clustering
 type ClusteringResult struct {
-	Clusters      []Cluster
-	NoisePoints   []BaseNode
-	TotalPoints   int
-	ClusterCount  int
-	NoiseCount    int
+	Clusters     []Cluster
+	NoisePoints  []BaseNode
+	TotalPoints  int
+	ClusterCount int
+	NoiseCount   int
 }
 
 // ForwardPassResult holds statistics from a forward pass operation
@@ -68,19 +68,19 @@ type BackwardPassResult struct {
 
 // ConsolidationResult holds the combined results of a full consolidation run
 type ConsolidationResult struct {
-	Skipped               bool                 // true if consolidation was skipped (concurrent lock)
-	EmptyGraph            bool                 // true if no nodes to consolidate (empty space)
-	HiddenNodesCreated    int
-	ConceptNodesCreated   map[int]int          // layer -> count of concepts created
-	ConceptNodesMerged    int                  // count of clusters merged into existing concepts
-	ConstraintNodesResult *ConstraintNodeResult `json:"constraint_nodes,omitempty"` // Phase 45.5
-	PipelineSteps         map[string]*StepResult // Phase 46: all pipeline step results
-	ForwardPass           *ForwardPassResult
-	BackwardPass          *BackwardPassResult
-	DynamicEdgesCreated   int                  // Phase 75: dynamic edges created
-	L5NodesCreated        int                  // Phase 75: L5 emergent nodes created
-	L5GroundingEdgesCreated int                // ANN Opt Phase C: GROUNDED_BY edges created
-	TotalDuration         time.Duration
+	Skipped                 bool // true if consolidation was skipped (concurrent lock)
+	EmptyGraph              bool // true if no nodes to consolidate (empty space)
+	HiddenNodesCreated      int
+	ConceptNodesCreated     map[int]int            // layer -> count of concepts created
+	ConceptNodesMerged      int                    // count of clusters merged into existing concepts
+	ConstraintNodesResult   *ConstraintNodeResult  `json:"constraint_nodes,omitempty"` // Phase 45.5
+	PipelineSteps           map[string]*StepResult // Phase 46: all pipeline step results
+	ForwardPass             *ForwardPassResult
+	BackwardPass            *BackwardPassResult
+	DynamicEdgesCreated     int // Phase 75: dynamic edges created
+	L5NodesCreated          int // Phase 75: L5 emergent nodes created
+	L5GroundingEdgesCreated int // ANN Opt Phase C: GROUNDED_BY edges created
+	TotalDuration           time.Duration
 }
 
 // Edge represents a relationship between nodes with weight
@@ -136,21 +136,21 @@ type DynamicEdgeType string
 
 const (
 	// Structural relationships (inferred from embedding geometry)
-	EdgeAnalogous    DynamicEdgeType = "ANALOGOUS_TO"    // Parallel vectors across domains
-	EdgeContrasts    DynamicEdgeType = "CONTRASTS_WITH"  // Orthogonal/opposing approaches
-	EdgeComposes     DynamicEdgeType = "COMPOSES_WITH"   // Combines to form larger pattern
-	EdgeTensions     DynamicEdgeType = "TENSIONS_WITH"   // Design tradeoff relationship
-	EdgeInfluences   DynamicEdgeType = "INFLUENCES"      // Soft architectural dependency
-	EdgeSpecializes  DynamicEdgeType = "SPECIALIZES"     // More specific variant
-	EdgeGeneralizes  DynamicEdgeType = "GENERALIZES_TO"  // More abstract variant
+	EdgeAnalogous   DynamicEdgeType = "ANALOGOUS_TO"   // Parallel vectors across domains
+	EdgeContrasts   DynamicEdgeType = "CONTRASTS_WITH" // Orthogonal/opposing approaches
+	EdgeComposes    DynamicEdgeType = "COMPOSES_WITH"  // Combines to form larger pattern
+	EdgeTensions    DynamicEdgeType = "TENSIONS_WITH"  // Design tradeoff relationship
+	EdgeInfluences  DynamicEdgeType = "INFLUENCES"     // Soft architectural dependency
+	EdgeSpecializes DynamicEdgeType = "SPECIALIZES"    // More specific variant
+	EdgeGeneralizes DynamicEdgeType = "GENERALIZES_TO" // More abstract variant
 
 	// Emergent relationships (discovered during consolidation)
-	EdgeEmergesFrom  DynamicEdgeType = "EMERGES_FROM"    // Indicates emergent formation
-	EdgeBridges      DynamicEdgeType = "BRIDGES"         // Connects disparate domains
-	EdgeUnifies      DynamicEdgeType = "UNIFIES"         // Represents common abstraction
+	EdgeEmergesFrom DynamicEdgeType = "EMERGES_FROM" // Indicates emergent formation
+	EdgeBridges     DynamicEdgeType = "BRIDGES"      // Connects disparate domains
+	EdgeUnifies     DynamicEdgeType = "UNIFIES"      // Represents common abstraction
 
 	// L0 Skip Connection edge type (ANN Optimization Phase C)
-	EdgeGroundedBy   DynamicEdgeType = "GROUNDED_BY"     // L5 → L0 direct grounding
+	EdgeGroundedBy DynamicEdgeType = "GROUNDED_BY" // L5 → L0 direct grounding
 )
 
 // DynamicNodeType represents inferred node types for upper layer concepts
@@ -158,17 +158,17 @@ type DynamicNodeType string
 
 const (
 	// Structural node types (inferred from graph position)
-	NodePrinciple   DynamicNodeType = "principle"    // High-level guiding concept
-	NodePattern     DynamicNodeType = "pattern"      // Recurring architectural pattern
-	NodeConstraint  DynamicNodeType = "constraint"   // Limiting/guiding constraint
-	NodeBridge      DynamicNodeType = "bridge"       // Connects disparate domains
-	NodeHub         DynamicNodeType = "hub"          // Central connecting concept
+	NodePrinciple  DynamicNodeType = "principle"  // High-level guiding concept
+	NodePattern    DynamicNodeType = "pattern"    // Recurring architectural pattern
+	NodeConstraint DynamicNodeType = "constraint" // Limiting/guiding constraint
+	NodeBridge     DynamicNodeType = "bridge"     // Connects disparate domains
+	NodeHub        DynamicNodeType = "hub"        // Central connecting concept
 
 	// Emergent node types (discovered during analysis)
-	NodeEmergent    DynamicNodeType = "emergent"     // Newly formed concept
-	NodeEstablished DynamicNodeType = "established"  // Stable, mature concept
-	NodeTension     DynamicNodeType = "tension"      // Represents a tradeoff
-	NodeSynthesis   DynamicNodeType = "synthesis"    // Combines multiple patterns
+	NodeEmergent    DynamicNodeType = "emergent"    // Newly formed concept
+	NodeEstablished DynamicNodeType = "established" // Stable, mature concept
+	NodeTension     DynamicNodeType = "tension"     // Represents a tradeoff
+	NodeSynthesis   DynamicNodeType = "synthesis"   // Combines multiple patterns
 )
 
 // EdgeInference contains the result of inferring an edge type between two nodes
@@ -176,9 +176,9 @@ type EdgeInference struct {
 	SourceID     string
 	TargetID     string
 	InferredType DynamicEdgeType
-	Confidence   float64         // 0.0 - 1.0
-	Evidence     string          // Human-readable explanation
-	Metrics      EdgeMetrics     // Raw metrics used for inference
+	Confidence   float64     // 0.0 - 1.0
+	Evidence     string      // Human-readable explanation
+	Metrics      EdgeMetrics // Raw metrics used for inference
 }
 
 // EdgeMetrics holds the raw measurements used to infer edge types
@@ -194,34 +194,34 @@ type EdgeMetrics struct {
 type NodeInference struct {
 	NodeID       string
 	InferredType DynamicNodeType
-	Confidence   float64         // 0.0 - 1.0
-	Evidence     string          // Human-readable explanation
-	Metrics      NodeMetrics     // Raw metrics used for inference
+	Confidence   float64     // 0.0 - 1.0
+	Evidence     string      // Human-readable explanation
+	Metrics      NodeMetrics // Raw metrics used for inference
 }
 
 // NodeMetrics holds the raw measurements used to infer node types
 type NodeMetrics struct {
-	InDegree          int     // Incoming edges
-	OutDegree         int     // Outgoing edges
-	CrossDomainLinks  int     // Links to different domains
-	StabilityScore    float64 // How stable the embedding is
-	AggregationDepth  int     // How many layers of children
-	ChildDiversity    float64 // Diversity of child node types
+	InDegree         int     // Incoming edges
+	OutDegree        int     // Outgoing edges
+	CrossDomainLinks int     // Links to different domains
+	StabilityScore   float64 // How stable the embedding is
+	AggregationDepth int     // How many layers of children
+	ChildDiversity   float64 // Diversity of child node types
 }
 
 // InferenceThresholds configures the thresholds for type inference
 type InferenceThresholds struct {
 	// Edge type thresholds
-	AnalogousMinSim      float64 // Min cosine sim for ANALOGOUS_TO (default: 0.7)
-	ContrastsMaxSim      float64 // Max cosine sim for CONTRASTS_WITH (default: 0.3)
-	ComposesMinCoact     float64 // Min co-activation for COMPOSES_WITH (default: 0.5)
-	BridgesMinDomains    int     // Min distinct domains for BRIDGES (default: 3)
+	AnalogousMinSim   float64 // Min cosine sim for ANALOGOUS_TO (default: 0.7)
+	ContrastsMaxSim   float64 // Max cosine sim for CONTRASTS_WITH (default: 0.3)
+	ComposesMinCoact  float64 // Min co-activation for COMPOSES_WITH (default: 0.5)
+	BridgesMinDomains int     // Min distinct domains for BRIDGES (default: 3)
 
 	// Node type thresholds
-	HubMinDegree         int     // Min degree to be a hub (default: 10)
-	BridgeMinDomains     int     // Min domains to be a bridge (default: 3)
-	EstablishedMinStab   float64 // Min stability for established (default: 0.8)
-	EmergentMaxAge       int     // Max consolidation cycles for emergent (default: 3)
+	HubMinDegree       int     // Min degree to be a hub (default: 10)
+	BridgeMinDomains   int     // Min domains to be a bridge (default: 3)
+	EstablishedMinStab float64 // Min stability for established (default: 0.8)
+	EmergentMaxAge     int     // Max consolidation cycles for emergent (default: 3)
 }
 
 // DefaultInferenceThresholds returns sensible defaults for type inference
@@ -240,31 +240,31 @@ func DefaultInferenceThresholds() InferenceThresholds {
 
 // UpperLayerEdge represents an edge in the upper layers with dynamic typing
 type UpperLayerEdge struct {
-	EdgeID       string
-	SourceID     string
-	TargetID     string
-	SpaceID      string
-	EdgeType     DynamicEdgeType // Inferred type
-	Weight       float64
-	Confidence   float64 // Confidence in the type inference
-	Evidence     string  // Why this type was inferred
-	CreatedAt    time.Time
-	InferredAt   time.Time // When the type was last inferred
+	EdgeID     string
+	SourceID   string
+	TargetID   string
+	SpaceID    string
+	EdgeType   DynamicEdgeType // Inferred type
+	Weight     float64
+	Confidence float64 // Confidence in the type inference
+	Evidence   string  // Why this type was inferred
+	CreatedAt  time.Time
+	InferredAt time.Time // When the type was last inferred
 }
 
 // UpperLayerNode represents a node in L4-H4-L5 with dynamic typing
 type UpperLayerNode struct {
-	NodeID       string
-	SpaceID      string
-	Layer        int
-	Name         string
-	NodeType     DynamicNodeType // Inferred type
-	Embedding    []float64
-	Confidence   float64 // Confidence in the type inference
-	Evidence     string  // Why this type was inferred
-	Stability    float64 // Embedding stability over time
-	CreatedAt    time.Time
-	InferredAt   time.Time // When the type was last inferred
+	NodeID     string
+	SpaceID    string
+	Layer      int
+	Name       string
+	NodeType   DynamicNodeType // Inferred type
+	Embedding  []float64
+	Confidence float64 // Confidence in the type inference
+	Evidence   string  // Why this type was inferred
+	Stability  float64 // Embedding stability over time
+	CreatedAt  time.Time
+	InferredAt time.Time // When the type was last inferred
 }
 
 // =============================================================================
@@ -301,19 +301,20 @@ type ConversationTheme struct {
 
 // ConversationThemeResult holds the results of conversation theme clustering
 type ConversationThemeResult struct {
-	ThemesCreated     int                  // Number of new conversation_theme nodes created
-	EdgesCreated      int                  // Number of GENERALIZES edges created
-	ThemeSummaries    []string             // Summaries of created themes
-	ObservationsUsed  int                  // Total observations that were clustered
-	NoiseObservations int                  // Observations that didn't fit any cluster
+	ThemesCreated     int      // Number of new conversation_theme nodes created
+	ThemesUpdated     int      // HIDDEN-CHURN-001: themes matched by centroid and refreshed in place
+	EdgesCreated      int      // Number of GENERALIZES edges created
+	ThemeSummaries    []string // Summaries of created themes
+	ObservationsUsed  int      // Total observations that were clustered
+	NoiseObservations int      // Observations that didn't fit any cluster
 }
 
 // ConversationConsolidationResult holds results from conversation-specific consolidation
 type ConversationConsolidationResult struct {
-	ThemeResult    *ConversationThemeResult
-	ConceptResult  *EmergentConceptResult
-	ForwardPass    *ForwardPassResult
-	TotalDuration  time.Duration
+	ThemeResult   *ConversationThemeResult
+	ConceptResult *EmergentConceptResult
+	ForwardPass   *ForwardPassResult
+	TotalDuration time.Duration
 }
 
 // =============================================================================
@@ -339,12 +340,12 @@ type EmergentConcept struct {
 
 // EmergentConceptResult holds the results of emergent concept clustering
 type EmergentConceptResult struct {
-	ConceptsCreated   map[int]int // layer -> count of concepts created
-	EdgesCreated      int         // Number of ABSTRACTS_TO edges created
-	ThemesUsed        int         // Total themes that were clustered
-	NoiseThemes       int         // Themes that didn't fit any cluster
-	ConceptSummaries  []string    // Summaries of created concepts
-	MaxLayerReached   int         // Highest layer with concepts
+	ConceptsCreated  map[int]int // layer -> count of concepts created
+	EdgesCreated     int         // Number of ABSTRACTS_TO edges created
+	ThemesUsed       int         // Total themes that were clustered
+	NoiseThemes      int         // Themes that didn't fit any cluster
+	ConceptSummaries []string    // Summaries of created concepts
+	MaxLayerReached  int         // Highest layer with concepts
 }
 
 // ConversationThemeForClustering represents a conversation_theme node for clustering into emergent concepts

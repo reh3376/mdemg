@@ -440,4 +440,3 @@ func TestClassifyExtension(t *testing.T) {
 		})
 	}
 }
-

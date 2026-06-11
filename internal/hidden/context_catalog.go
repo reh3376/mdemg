@@ -7,23 +7,25 @@
 // + `context_fingerprint_version int` (which catalog version produced it).
 //
 // Two-phase fingerprint design (operator-approved 2026-05-05):
-//   Phase A (observe-time): Service.Observe computes fingerprint from
-//     observation-local features only — path, role_type, layer, top-N tags.
-//     No co-activation needed. Cold-start works (every obs has *some* fingerprint).
-//   Phase B (post-hoc refresh): CycleOrchestrator.RunCycle stage 6 walks
-//     observations whose version < current_catalog.version, queries Neo4j
-//     CO_ACTIVATED_WITH edges, and refines fingerprints with symbol bits.
-//     Mature data gets HTM-faithful fingerprints after the first weekly refresh.
+//
+//	Phase A (observe-time): Service.Observe computes fingerprint from
+//	  observation-local features only — path, role_type, layer, top-N tags.
+//	  No co-activation needed. Cold-start works (every obs has *some* fingerprint).
+//	Phase B (post-hoc refresh): CycleOrchestrator.RunCycle stage 6 walks
+//	  observations whose version < current_catalog.version, queries Neo4j
+//	  CO_ACTIVATED_WITH edges, and refines fingerprints with symbol bits.
+//	  Mature data gets HTM-faithful fingerprints after the first weekly refresh.
 //
 // Adaptive Builder (Phase 14.2 Epic 0 forensic):
-//   Note 05 spec's static 64/64/64/64 split wastes 128 bits on every
-//   production space surveyed (whk-wms, mdemg-dev, linear, ubts-load all have
-//   0 distinct symbols + 0 distinct roles). This package's Builder measures
-//   per-space density at refresh time and allocates bits proportionally:
-//     - 32 bits → top-32 (role_type, layer) tuples  (always informative)
-//     - up to 32 bits → top-N tags (or 0 if space has none)
-//     - 192 bits (or more if tags=0) → distributed across (paths, symbols)
-//       by log(1+distinct_count) with floor 16 each when both present
+//
+//	Note 05 spec's static 64/64/64/64 split wastes 128 bits on every
+//	production space surveyed (whk-wms, mdemg-dev, linear, ubts-load all have
+//	0 distinct symbols + 0 distinct roles). This package's Builder measures
+//	per-space density at refresh time and allocates bits proportionally:
+//	  - 32 bits → top-32 (role_type, layer) tuples  (always informative)
+//	  - up to 32 bits → top-N tags (or 0 if space has none)
+//	  - 192 bits (or more if tags=0) → distributed across (paths, symbols)
+//	    by log(1+distinct_count) with floor 16 each when both present
 //
 // Cycle-safety: this package does NOT import internal/conversation — fingerprint
 // computation lives in internal/conversation/fingerprint.go and uses Catalog
@@ -72,10 +74,10 @@ type Catalog struct {
 	Bits      []BitEntry // length == TotalBits
 
 	// Reverse lookup tables, populated at Load time. Read-only after that.
-	pathToBit      map[string]uint16
-	tagToBit       map[string]uint16
+	pathToBit          map[string]uint16
+	tagToBit           map[string]uint16
 	roleTypeLayerToBit map[string]uint16 // key = "<role_type>|<layer>"
-	symbolToBit    map[string]uint16
+	symbolToBit        map[string]uint16
 
 	mu sync.RWMutex // protects no mutation post-Load; reserved for future hot-reload
 }

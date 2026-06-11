@@ -294,17 +294,17 @@ SET n.summary = $summary, n.updated_at = datetime()`
 // buildPipeline registers all node-creation steps in phase order.
 func (s *Service) buildPipeline() *Pipeline {
 	p := NewPipeline()
-	p.Register(&hiddenStep{svc: s})             // phase 10 — required
-	p.Register(&concernStep{svc: s})            // phase 20
-	p.Register(&configStep{svc: s})             // phase 20
-	p.Register(&comparisonStep{svc: s})         // phase 20
-	p.Register(&temporalStep{svc: s})           // phase 20
-	p.Register(&uiStep{svc: s})                 // phase 20
-	p.Register(&constraintStep{svc: s})         // phase 20
-	p.Register(&dynamicEmergenceStep{svc: s})   // phase 22 — LLM-driven concept naming (Phase 103)
-	p.Register(&dynamicEdgesStep{svc: s})       // phase 25 — dynamic edges (after clustering)
-	p.Register(&clusterSummaryStep{svc: s})    // phase 28 — LLM summary enhancement (L1-L4)
-	p.Register(&emergentL5Step{svc: s})         // phase 30 — post-processing
+	p.Register(&hiddenStep{svc: s})           // phase 10 — required
+	p.Register(&concernStep{svc: s})          // phase 20
+	p.Register(&configStep{svc: s})           // phase 20
+	p.Register(&comparisonStep{svc: s})       // phase 20
+	p.Register(&temporalStep{svc: s})         // phase 20
+	p.Register(&uiStep{svc: s})               // phase 20
+	p.Register(&constraintStep{svc: s})       // phase 20
+	p.Register(&dynamicEmergenceStep{svc: s}) // phase 22 — LLM-driven concept naming (Phase 103)
+	p.Register(&dynamicEdgesStep{svc: s})     // phase 25 — dynamic edges (after clustering)
+	p.Register(&clusterSummaryStep{svc: s})   // phase 28 — LLM summary enhancement (L1-L4)
+	p.Register(&emergentL5Step{svc: s})       // phase 30 — post-processing
 	return p
 }
 
@@ -545,7 +545,6 @@ RETURN count(h) AS cnt`
 	}
 	return result.(int), nil
 }
-
 
 // fetchAllBaseNodes retrieves ALL L0 base nodes with embeddings for re-clustering.
 // Unlike fetchOrphanBaseNodes, this does not filter by existing GENERALIZES edges.
@@ -832,9 +831,9 @@ RETURN count(c) AS updated`
 //  4. Small clusters stay intact - emergent cross-cutting patterns
 //
 // ADAPTIVE CONSTRAINTS (loosen as layers increase):
-//  - Epsilon increases with layer (allows more distant concepts to cluster)
-//  - MinSamples decreases with layer (smaller emergent groups allowed)
-//  - MaxClusterSize stays generous (concepts can be broad)
+//   - Epsilon increases with layer (allows more distant concepts to cluster)
+//   - MinSamples decreases with layer (smaller emergent groups allowed)
+//   - MaxClusterSize stays generous (concepts can be broad)
 func (s *Service) CreateConceptNodes(ctx context.Context, spaceID string, targetLayer int) (created int, merged int, err error) {
 	if !s.cfg.HiddenLayerEnabled {
 		return 0, 0, nil
@@ -1613,7 +1612,12 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 
 	// Step 1: Run node-creation steps via pipeline (phase 10-20: hidden, concern, config, comparison, temporal, ui, constraint)
-	pipelineResult, err := s.pipeline.RunPhaseRange(ctx, spaceID, nil, 10, 20)
+	// HIDDEN-CHURN-001: delegate to the single range source. The hardcoded
+	// (10, 20) here silently skipped phase 22 (dynamic_emergence) — with
+	// EMERGENCE_ENABLED=true the AUTOMATED consolidation path never ran LLM
+	// concept emergence while the manual path did. RunNodeCreationPipeline
+	// owns the range (10–22) and the emergence gate.
+	pipelineResult, err := s.RunNodeCreationPipeline(ctx, spaceID, s.cfg.EmergenceEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("node creation pipeline: %w", err)
 	}
@@ -4192,15 +4196,14 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 	result.ObservationsUsed = len(observations)
 	slog.Info("ClusterConversations: clusterable observations", "count", len(observations))
 
-	// Step 2: Detach old GENERALIZES edges from observations to existing themes,
-	// and remove childless themes. This enables full re-clustering every run.
-	detached, err := s.detachObservationThemeEdges(ctx, spaceID)
+	// HIDDEN-CHURN-001: the global detach-everything step is GONE. Themes are
+	// matched to existing nodes by centroid similarity and updated in place
+	// (theme-scoped rewires); only themes matched by no cluster are deleted.
+	existingThemes, err := s.listConversationThemes(ctx, spaceID)
 	if err != nil {
-		return nil, fmt.Errorf("detach old theme edges: %w", err)
+		return nil, fmt.Errorf("list existing themes: %w", err)
 	}
-	if detached > 0 {
-		slog.Info("ClusterConversations: detached old observation→theme GENERALIZES edges", "count", detached)
-	}
+	claimedThemes := make(map[string]bool, len(existingThemes))
 
 	// Step 3: Filter to observations with embeddings
 	validObs := make([]ConversationObservation, 0, len(observations))
@@ -4264,6 +4267,22 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		// Find dominant observation type and average surprise score
 		dominantType, avgSurprise := analyzeClusterMetadata(members)
 
+		// HIDDEN-CHURN-001: match-or-create. A cluster whose centroid is
+		// within the identity threshold of an existing theme UPDATES that
+		// theme in place — node_id, inbound references, and evidence chains
+		// survive the cycle instead of being destroyed every ~5 minutes.
+		if matched := matchTheme(centroid, existingThemes, claimedThemes, s.themeIdentityThreshold()); matched != "" {
+			claimedThemes[matched] = true
+			edgesCreated, err := s.updateConversationThemeWithEdges(ctx, spaceID, matched, summary, centroid, members, dominantType, avgSurprise)
+			if err != nil {
+				return result, fmt.Errorf("update conversation theme %s: %w", matched, err)
+			}
+			result.ThemesUpdated++
+			result.EdgesCreated += edgesCreated
+			result.ThemeSummaries = append(result.ThemeSummaries, summary)
+			continue
+		}
+
 		// Create unique name
 		uniqueID := existingCount + themeID
 		name := fmt.Sprintf("ConvTheme-%s-%d", sanitizeThemeName(summary), uniqueID)
@@ -4280,7 +4299,23 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		themeID++
 	}
 
+	// HIDDEN-CHURN-001: only themes matched by NO cluster this run die.
+	if removed, err := s.deleteUnmatchedThemes(ctx, spaceID, claimedThemes, existingThemes); err != nil {
+		slog.Warn("ClusterConversations: stale-theme cleanup failed", "error", err)
+	} else if removed > 0 {
+		slog.Info("ClusterConversations: removed stale themes", "count", removed)
+	}
+
 	return result, nil
+}
+
+// themeIdentityThreshold resolves the centroid-similarity floor for theme
+// identity matching (HIDDEN_THEME_IDENTITY_SIM_THRESHOLD, default 0.90).
+func (s *Service) themeIdentityThreshold() float64 {
+	if s.cfg.HiddenThemeIdentitySimThreshold > 0 {
+		return s.cfg.HiddenThemeIdentitySimThreshold
+	}
+	return 0.90
 }
 
 // fetchClusterableConversationObservations retrieves all conversation observations eligible for clustering.
@@ -4358,65 +4393,6 @@ RETURN o.node_id AS nodeId, o.obs_type AS obsType, o.content AS content,
 		return nil, err
 	}
 	return result.([]ConversationObservation), nil
-}
-
-// detachObservationThemeEdges removes GENERALIZES edges from conversation observations
-// to existing conversation themes, and deletes any themes left with zero members.
-// This enables full re-clustering on every consolidation run.
-func (s *Service) detachObservationThemeEdges(ctx context.Context, spaceID string) (int, error) {
-	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
-
-	// Step 1: Delete GENERALIZES edges from observations to themes
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, `
-MATCH (o:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation', layer: 0})
-      -[r:GENERALIZES]->(t:ConversationTheme {space_id: $spaceId})
-DELETE r
-RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID})
-		if err != nil {
-			return 0, err
-		}
-		if res.Next(ctx) {
-			rec := res.Record()
-			cnt, _ := rec.Get("deleted")
-			return asInt(cnt), res.Err()
-		}
-		return 0, res.Err()
-	})
-	if err != nil {
-		return 0, err
-	}
-	detached := result.(int)
-
-	// Step 2: Clean up orphaned themes (no remaining members)
-	if detached > 0 {
-		_, err = sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			res, err := tx.Run(ctx, `
-MATCH (t:ConversationTheme {space_id: $spaceId})
-WHERE NOT ()-[:GENERALIZES]->(t)
-DETACH DELETE t
-RETURN count(t) AS removed`, map[string]any{"spaceId": spaceID})
-			if err != nil {
-				return 0, err
-			}
-			if res.Next(ctx) {
-				rec := res.Record()
-				cnt, _ := rec.Get("removed")
-				removed := asInt(cnt)
-				if removed > 0 {
-					slog.Info("ClusterConversations: removed orphaned themes", "count", removed)
-				}
-				return removed, res.Err()
-			}
-			return 0, res.Err()
-		})
-		if err != nil {
-			return detached, fmt.Errorf("cleanup orphaned themes: %w", err)
-		}
-	}
-
-	return detached, nil
 }
 
 // countConversationThemes returns the current count of conversation theme nodes

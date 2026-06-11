@@ -36,11 +36,11 @@ import (
 // to keep this package free of Config-shape coupling beyond the explicit
 // constructor wiring).
 type BuilderOpts struct {
-	BitBudget            int // total bits per fingerprint
-	TopNPaths            int // cap on path bits
-	TopNTags             int // cap on tag bits
-	FloorBitsPerKind     int // minimum bits for any kind with ≥10 distinct values
-	RoleTypeLayerBits    int // reserved bits for top-N (role_type, layer) tuples
+	BitBudget         int // total bits per fingerprint
+	TopNPaths         int // cap on path bits
+	TopNTags          int // cap on tag bits
+	FloorBitsPerKind  int // minimum bits for any kind with ≥10 distinct values
+	RoleTypeLayerBits int // reserved bits for top-N (role_type, layer) tuples
 }
 
 // BuilderOptsFromConfig translates Config into the package-local BuilderOpts.
@@ -76,9 +76,9 @@ type densityResult struct {
 	// Top (role_type, layer) tuples by frequency.
 	topRoleTypeLayer []countedRef
 	// Distinct counts (used by the floor + log-density allocator).
-	distinctPaths    int
-	distinctTags     int
-	distinctSymbols  int
+	distinctPaths   int
+	distinctTags    int
+	distinctSymbols int
 }
 
 type countedRef struct {
@@ -312,13 +312,13 @@ RETURN dp, dt, ds`
 // b.opts.BitBudget. This is the function unit-tested without a Neo4j driver.
 //
 // Algorithm (per Phase 14.2 Epic 0 forensic):
-//   1. Up to opts.RoleTypeLayerBits (default 32) → top-N role_type×layer tuples
-//      (always informative; single-bit per tuple regardless of frequency)
-//   2. Up to opts.TopNTags (default 32) → top-N tags (or 0 if empty)
-//   3. Remaining bits → paths (or split with symbols when symbol density is
-//      non-zero, with floor opts.FloorBitsPerKind each)
-//   4. Pad any unused budget with empty BitEntry placeholders so callers
-//      always see exactly bits[0..BitBudget-1] populated.
+//  1. Up to opts.RoleTypeLayerBits (default 32) → top-N role_type×layer tuples
+//     (always informative; single-bit per tuple regardless of frequency)
+//  2. Up to opts.TopNTags (default 32) → top-N tags (or 0 if empty)
+//  3. Remaining bits → paths (or split with symbols when symbol density is
+//     non-zero, with floor opts.FloorBitsPerKind each)
+//  4. Pad any unused budget with empty BitEntry placeholders so callers
+//     always see exactly bits[0..BitBudget-1] populated.
 func (b *neo4jBuilder) allocateBits(d *densityResult) []BitEntry {
 	bits := make([]BitEntry, 0, b.opts.BitBudget)
 	pos := uint16(0)

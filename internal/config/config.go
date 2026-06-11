@@ -228,14 +228,15 @@ type Config struct {
 	QueryClassifyTimeoutMs int    // QUERY_CLASSIFY_TIMEOUT_MS — timeout for classification in ms (default: 5000)
 
 	// Dynamic Emergence settings (Phase 103)
-	EmergenceEnabled        bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
-	EmergenceProvider       string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
-	EmergenceModel          string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
-	EmergenceMaxTokens      int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
-	EmergenceTimeoutMs      int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
-	EmergenceMinWeight      float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
-	EmergenceMinClusterSize int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
-	EmergenceMaxClusters    int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
+	EmergenceEnabled                bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
+	HiddenThemeIdentitySimThreshold float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
+	EmergenceProvider               string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
+	EmergenceModel                  string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
+	EmergenceMaxTokens              int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
+	EmergenceTimeoutMs              int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
+	EmergenceMinWeight              float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
+	EmergenceMinClusterSize         int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
+	EmergenceMaxClusters            int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
 
 	// Active MCP Guardrails settings (Phase 104)
 	GuardrailEnabled        bool   // GUARDRAIL_ENABLED — enable guardrail validation (default: false)
@@ -1095,7 +1096,7 @@ const (
 
 	// RRF-SCALE-001 — consulting score gates + confidence sigmoid.
 	DefaultConsultingConstraintScoreFloor      = 0.45 // CONSULTING_CONSTRAINT_SCORE_FLOOR
-	DefaultConsultingSuggestMinConfidence      = 0.2 // CONSULTING_SUGGEST_MIN_CONFIDENCE (RRF-SCALE-002: live distribution — typical good hits 0.2-0.45, noise tail <0.01; 0.45 is the strong-match band, right for constraint PROMOTION but over-filtering for a recall surface)
+	DefaultConsultingSuggestMinConfidence      = 0.2  // CONSULTING_SUGGEST_MIN_CONFIDENCE (RRF-SCALE-002: live distribution — typical good hits 0.2-0.45, noise tail <0.01; 0.45 is the strong-match band, right for constraint PROMOTION but over-filtering for a recall surface)
 	DefaultMCPReflectScoreHigh                 = 0.45 // MCP_REFLECT_SCORE_HIGH (RRF strong band)
 	DefaultMCPReflectScoreMedium               = 0.25 // MCP_REFLECT_SCORE_MEDIUM
 	DefaultGuardrailConstraintSimFloor         = 0.3  // GUARDRAIL_CONSTRAINT_SIM_FLOOR (cosine scale, not RRF)
@@ -2057,6 +2058,10 @@ func FromEnv() (Config, error) {
 
 	// Dynamic Emergence settings (Phase 103)
 	emergenceEnabled := getBool("EMERGENCE_ENABLED", false)
+	hiddenThemeIdentitySimThreshold, err := atof("HIDDEN_THEME_IDENTITY_SIM_THRESHOLD", 0.90)
+	if err != nil {
+		return Config{}, err
+	}
 	emergenceProvider := get("EMERGENCE_PROVIDER", llmProvider)
 	emergenceModel := get("EMERGENCE_MODEL", llmModel)
 	emergenceMaxTokens, err := atoi("EMERGENCE_MAX_TOKENS", 500)
@@ -4309,14 +4314,15 @@ func FromEnv() (Config, error) {
 		QueryClassifyTimeoutMs: queryClassifyTimeoutMs,
 
 		// Phase 103: Dynamic Emergence
-		EmergenceEnabled:        emergenceEnabled,
-		EmergenceProvider:       emergenceProvider,
-		EmergenceModel:          emergenceModel,
-		EmergenceMaxTokens:      emergenceMaxTokens,
-		EmergenceTimeoutMs:      emergenceTimeoutMs,
-		EmergenceMinWeight:      emergenceMinWeight,
-		EmergenceMinClusterSize: emergenceMinClusterSize,
-		EmergenceMaxClusters:    emergenceMaxClusters,
+		EmergenceEnabled:                emergenceEnabled,
+		HiddenThemeIdentitySimThreshold: hiddenThemeIdentitySimThreshold,
+		EmergenceProvider:               emergenceProvider,
+		EmergenceModel:                  emergenceModel,
+		EmergenceMaxTokens:              emergenceMaxTokens,
+		EmergenceTimeoutMs:              emergenceTimeoutMs,
+		EmergenceMinWeight:              emergenceMinWeight,
+		EmergenceMinClusterSize:         emergenceMinClusterSize,
+		EmergenceMaxClusters:            emergenceMaxClusters,
 
 		// Phase 104: Active MCP Guardrails
 		GuardrailEnabled:        guardrailEnabled,

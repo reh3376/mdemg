@@ -219,3 +219,12 @@ func TestPipeline_RunAll_Details_Preserved(t *testing.T) {
 		t.Errorf("expected concerns [auth, rbac], got %v", sr.Details["concerns"])
 	}
 }
+
+// HIDDEN-CHURN-001: RunConsolidation must include phase 22 via the single
+// range source — the hardcoded (10,20) range silently skipped emergence.
+func TestNodeCreationRange_IncludesEmergencePhase(t *testing.T) {
+	s := &dynamicEmergenceStep{}
+	if s.Phase() < 10 || s.Phase() > 22 {
+		t.Fatalf("dynamic_emergence phase %d outside the node-creation range [10,22] — RunNodeCreationPipeline/RunConsolidation will silently skip it", s.Phase())
+	}
+}
