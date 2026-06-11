@@ -232,7 +232,7 @@ Examples:
 		},
 	}
 	o.addFlags(cmd)
-	cmd.Flags().BoolVar(&adapter, "adapter", false, "pull adapter-only artifact (deferred to MODEL-DIST-002)")
+	cmd.Flags().BoolVar(&adapter, "adapter", false, "pull adapter-only artifact (GGUF LoRA; shipped in MODEL-DIST-002)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "resolve config + print plan; no side effects")
 	return cmd
 }
