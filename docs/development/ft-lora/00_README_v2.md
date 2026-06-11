@@ -23,6 +23,12 @@
 > line's largest unfinished promise and the bridge from shipped FT to the
 > RSIC vision. Trigger: FT-CLASSIFY-002 (Roadmap Q3 Phase 4) proving the
 > production-row → retrain → regression-gate path end-to-end.
+> **Buildable spec exists (FT-RECURSIVE-000, 2026-06-11):**
+> `docs/development/ft-recursive-001/SPEC_recursive_retraining_loop.md` —
+> code-verified as-built audit (the readiness→RSIC→no-op-actuator
+> skeleton, silent-failure + dead-seam inventories), target state machine,
+> phased 6a/6b/7/9 build plan, operator decision forks. STATUS unchanged:
+> nothing is built; the spec honors the FT-CLASSIFY-002 trigger.
 >
 > **Provenance notes:** memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md`, cited
 > by earlier CLAUDE.md revisions as canonical, never existed in this repo
