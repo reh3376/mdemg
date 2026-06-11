@@ -297,6 +297,84 @@ func RetrieveLatencyRules(p95ThreshMs, p99ThreshMs float64, lookbackMin int) []A
 	}
 }
 
+// ScorerDriftRules returns the retrieval_audit tripwire rules
+// (TSDB-CONSUME-001). The RRF-SCALE-001 class — a scorer change silently
+// breaking every downstream Score consumer (24-day Hebbian no-op, 9-week
+// guidance dormancy) — is detectable from data retrieval_audit already
+// records, but the table had no readers.
+//
+//   - scorer_version_change: >1 distinct scorer_version inside the lookback.
+//     Fires (medium) while old and new versions coexist in the window —
+//     deliberately announces every scorer change for ~lookback hours, which
+//     is the prompt to re-audit RetrieveResult.Score consumers per the
+//     score-scale contract (CLAUDE.md RRF-SCALE-001).
+//   - consensus_shift: |mean(consensus_strength) recent − baseline| above
+//     threshold, sample-count gated on both windows (live calibration:
+//     mean 0.31, σ 0.097 — default 0.10 ≈ 1σ).
+//
+// Both query retrieval_audit (time column recorded_at) and always return a
+// row.
+func ScorerDriftRules(changeLookbackHours int, shiftThreshold float64, shiftRecentHours, shiftBaselineDays, shiftMinSamples int) []AlertRule {
+	if changeLookbackHours <= 0 {
+		changeLookbackHours = 24
+	}
+	if shiftThreshold <= 0 {
+		shiftThreshold = 0.10
+	}
+	if shiftRecentHours <= 0 {
+		shiftRecentHours = 6
+	}
+	if shiftBaselineDays <= 0 {
+		shiftBaselineDays = 7
+	}
+	if shiftMinSamples <= 0 {
+		shiftMinSamples = 20
+	}
+	return []AlertRule{
+		{
+			ID:          "scorer_version_change",
+			Title:       "MDEMG retrieval scorer version changed",
+			Service:     "scorer-drift",
+			Severity:    SeverityMedium,
+			Interval:    5 * time.Minute,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(COUNT(DISTINCT scorer_version), 0)
+				FROM retrieval_audit
+				WHERE recorded_at > now() - interval '%d hours'`, changeLookbackHours),
+			Threshold: 1,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+		{
+			ID:          "consensus_shift",
+			Title:       "MDEMG retrieval consensus distribution shifted",
+			Service:     "consensus-shift",
+			Severity:    SeverityMedium,
+			Interval:    5 * time.Minute,
+			ForDuration: 15 * time.Minute,
+			QuerySQL: fmt.Sprintf(`SELECT CASE
+				WHEN recent.n >= %d AND base.n >= %d
+				THEN ABS(recent.avg_c - base.avg_c)
+				ELSE 0 END
+			FROM
+				(SELECT COALESCE(AVG(consensus_strength), 0) AS avg_c,
+				        COUNT(consensus_strength) AS n
+				 FROM retrieval_audit
+				 WHERE recorded_at > now() - interval '%d hours') recent,
+				(SELECT COALESCE(AVG(consensus_strength), 0) AS avg_c,
+				        COUNT(consensus_strength) AS n
+				 FROM retrieval_audit
+				 WHERE recorded_at BETWEEN now() - interval '%d days'
+				       AND now() - interval '%d hours') base`,
+				shiftMinSamples, shiftMinSamples,
+				shiftRecentHours, shiftBaselineDays, shiftRecentHours),
+			Threshold: shiftThreshold,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
 // TSDBWriterRules returns the buffered-writer flush-failure rule
 // (TSDB-CONSUME-001). Every buffered TSDB writer reports cumulative flush
 // stats into the mdemg_tsdb_writer_* gauge family; this rule fires when any

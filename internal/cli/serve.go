@@ -496,6 +496,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(
 				cfg.TSDBWriterAlertLookbackMin)...)
+			// TSDB-CONSUME-001: scorer-drift tripwires over retrieval_audit
+			// (the RRF-SCALE-001 regression class becomes self-detecting).
+			rules = append(rules, alert.ScorerDriftRules(
+				cfg.ScorerChangeLookbackHours, cfg.ConsensusShiftThreshold,
+				cfg.ConsensusShiftRecentHours, cfg.ConsensusShiftBaselineDays,
+				cfg.ConsensusShiftMinSamples)...)
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			// SUPERVISOR-002: meta-alert when a rule's query fails repeatedly
 			evaluator.SetRuleFailureThreshold(cfg.AlertRuleFailureThreshold)

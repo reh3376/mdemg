@@ -583,7 +583,7 @@ type Config struct {
 	// latency available the day Notes 05+06 ship. Default false to avoid
 	// unbounded TSDB growth — operators opt in via .env for observation
 	// windows.
-	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: false)
+	RetrievalAuditEnabled bool // RETRIEVAL_AUDIT_ENABLED — write retrieval_audit rows on every retrieve call (default: true since TSDB-CONSUME-001 — feeds the scorer-drift tripwires)
 
 	// Phase 14 Epic 1 — Note 06 sparse activation gate. After RRF aggregation
 	// (consensus_strength + ranked candidates), the gate cuts the candidate
@@ -1062,6 +1062,15 @@ type Config struct {
 	AlertRetrieveP99Ms              int // ALERT_RETRIEVE_P99_MS — critical alert when windowed retrieve p99 exceeds this (default: 300000)
 	AlertRetrieveLatencyLookbackMin int // ALERT_RETRIEVE_LATENCY_LOOKBACK_MIN — percentile window in minutes (default: 30)
 	TSDBWriterAlertLookbackMin      int // TSDB_WRITER_ALERT_LOOKBACK_MIN — window for buffered-writer flush-failure growth detection (default: 60)
+
+	// TSDB-CONSUME-001 — scorer-drift tripwires over retrieval_audit (the
+	// RRF-SCALE-001 regression class: scorer changes silently breaking
+	// downstream Score consumers).
+	ScorerChangeLookbackHours  int     // SCORER_CHANGE_LOOKBACK_HOURS — window for the >1-distinct-scorer_version tripwire (default: 24)
+	ConsensusShiftThreshold    float64 // CONSENSUS_SHIFT_THRESHOLD — |recent − baseline| mean consensus_strength to alert on; live σ≈0.097 (default: 0.10)
+	ConsensusShiftRecentHours  int     // CONSENSUS_SHIFT_RECENT_HOURS — recent comparison window (default: 6)
+	ConsensusShiftBaselineDays int     // CONSENSUS_SHIFT_BASELINE_DAYS — trailing baseline window (default: 7)
+	ConsensusShiftMinSamples   int     // CONSENSUS_SHIFT_MIN_SAMPLES — minimum rows in each window before the rule can fire (default: 20)
 
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
@@ -2869,7 +2878,7 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 5 — Downstream consumer wiring (flag-off, prompts/inputs deferred to Phase 14)
 
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
-	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", false)
+	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
@@ -4112,6 +4121,26 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	scorerChangeLookbackHours, err := atoi("SCORER_CHANGE_LOOKBACK_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftThreshold, err := atof("CONSENSUS_SHIFT_THRESHOLD", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftRecentHours, err := atoi("CONSENSUS_SHIFT_RECENT_HOURS", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftBaselineDays, err := atoi("CONSENSUS_SHIFT_BASELINE_DAYS", 7)
+	if err != nil {
+		return Config{}, err
+	}
+	consensusShiftMinSamples, err := atoi("CONSENSUS_SHIFT_MIN_SAMPLES", 20)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
@@ -4917,6 +4946,11 @@ func FromEnv() (Config, error) {
 		AlertRetrieveP99Ms:              alertRetrieveP99Ms,
 		AlertRetrieveLatencyLookbackMin: alertRetrieveLatencyLookbackMin,
 		TSDBWriterAlertLookbackMin:      tsdbWriterAlertLookbackMin,
+		ScorerChangeLookbackHours:       scorerChangeLookbackHours,
+		ConsensusShiftThreshold:         consensusShiftThreshold,
+		ConsensusShiftRecentHours:       consensusShiftRecentHours,
+		ConsensusShiftBaselineDays:      consensusShiftBaselineDays,
+		ConsensusShiftMinSamples:        consensusShiftMinSamples,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,

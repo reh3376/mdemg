@@ -178,3 +178,61 @@ func TestTSDBWriterRules(t *testing.T) {
 		t.Errorf("custom lookback not applied")
 	}
 }
+
+// TSDB-CONSUME-001: scorer-drift tripwires — the RRF-SCALE-001 regression
+// class (scorer changes silently breaking Score consumers) self-detects.
+// Pins: retrieval_audit time column is recorded_at; always-return-a-row
+// (COALESCE / CASE over aggregates); unique Service per rule (dispatcher
+// cooldown key is (Service, Severity) — shared labels mask each other).
+func TestScorerDriftRules(t *testing.T) {
+	rules := ScorerDriftRules(0, 0, 0, 0, 0)
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(rules))
+	}
+	change, shift := rules[0], rules[1]
+	if change.ID != "scorer_version_change" || shift.ID != "consensus_shift" {
+		t.Errorf("ids = %q/%q", change.ID, shift.ID)
+	}
+	if change.Service == shift.Service {
+		t.Errorf("rules share Service %q — cooldown key collision masks alerts", change.Service)
+	}
+	for _, want := range []string{"COUNT(DISTINCT scorer_version)", "COALESCE", "retrieval_audit", "recorded_at", "'24 hours'"} {
+		if !strings.Contains(change.QuerySQL, want) {
+			t.Errorf("scorer_version_change QuerySQL missing %q", want)
+		}
+	}
+	if change.Threshold != 1 || change.Operator != "gt" {
+		t.Errorf("change threshold/op = %v/%q", change.Threshold, change.Operator)
+	}
+	for _, want := range []string{"consensus_strength", "ABS(", ">= 20", "'6 hours'", "'7 days'", "recorded_at"} {
+		if !strings.Contains(shift.QuerySQL, want) {
+			t.Errorf("consensus_shift QuerySQL missing %q", want)
+		}
+	}
+	if shift.Threshold != 0.10 {
+		t.Errorf("shift threshold = %v, want 0.10", shift.Threshold)
+	}
+	for _, r := range rules {
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule %s uses LIMIT 1", r.ID)
+		}
+		if strings.Contains(r.QuerySQL, "metric_samples") {
+			t.Errorf("rule %s must query retrieval_audit directly", r.ID)
+		}
+	}
+}
+
+func TestScorerDriftRules_CustomParams(t *testing.T) {
+	rules := ScorerDriftRules(48, 0.25, 12, 14, 50)
+	if !strings.Contains(rules[0].QuerySQL, "'48 hours'") {
+		t.Errorf("custom change lookback not applied")
+	}
+	if rules[1].Threshold != 0.25 {
+		t.Errorf("custom shift threshold not applied: %v", rules[1].Threshold)
+	}
+	for _, want := range []string{">= 50", "'12 hours'", "'14 days'"} {
+		if !strings.Contains(rules[1].QuerySQL, want) {
+			t.Errorf("consensus_shift custom QuerySQL missing %q", want)
+		}
+	}
+}
