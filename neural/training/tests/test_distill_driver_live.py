@@ -21,7 +21,6 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest import mock
 
 _NEURAL_ROOT = Path(__file__).resolve().parents[2]
 if str(_NEURAL_ROOT) not in sys.path:

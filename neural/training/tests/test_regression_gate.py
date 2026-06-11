@@ -1,6 +1,5 @@
 """Tests for the regression gate."""
 
-import pytest
 
 from training.regression_gate import (
     MAX_REGRESSION_PCT,

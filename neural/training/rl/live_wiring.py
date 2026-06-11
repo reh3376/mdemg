@@ -32,7 +32,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from neural.training.reward_functions import compute_reward
 

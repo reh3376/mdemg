@@ -102,7 +102,7 @@ def render_doc(
     lines.append("")
     lines.append(f"**Generated at execution time: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}**")
     lines.append("")
-    lines.append(f"**Runbook ref:** `docs/development/ft-lora/sprint_plan_ft_lora_d.md` §5 Epic 3")
+    lines.append("**Runbook ref:** `docs/development/ft-lora/sprint_plan_ft_lora_d.md` §5 Epic 3")
     lines.append("")
     lines.append("---")
     lines.append("")

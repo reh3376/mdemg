@@ -144,10 +144,10 @@ class TestBuildMeta(unittest.TestCase):
             synthesis_version="v1-abc",
         )
         self.assertFalse(meta["weak_signal"])
-        self.assertEqual(meta["source"], "synth-qwen3.6-local")
+        self.assertEqual(meta["source"], "synth-qwen3-14b-local")  # UXTS-CI-001: was the MoE-era qwen3.6 label; code moved to qwen3-14b at the 2026-04-22 pivot
         # space_id and instance_id invariants (plan §5 Epic 2 Step 5):
         self.assertEqual(meta["space_id"], "synth")
-        self.assertEqual(meta["instance_id"], "synth-qwen3.6-local")
+        self.assertEqual(meta["instance_id"], "synth-qwen3-14b-local")  # UXTS-CI-001: MoE-era label, see source assertion above
 
 
 class TestRunOneTaskDryRun(unittest.TestCase):

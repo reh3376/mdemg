@@ -6,14 +6,11 @@ import json
 import math
 import os
 import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from neural_sidecar.evaluate import (
-    EvalStats,
-    ModelEvalResult,
     compute_stats,
     dcg_at_k,
     evaluate_model,

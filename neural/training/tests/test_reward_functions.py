@@ -1,7 +1,6 @@
 """Tests for GRPO reward functions."""
 
 import json
-import math
 
 import pytest
 

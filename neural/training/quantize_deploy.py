@@ -64,7 +64,7 @@ def fuse_adapter(
         "--save-path", output_path,
     ]
 
-    print(f"Fusing adapter into base model...")
+    print("Fusing adapter into base model...")
     print(f"  Base model: {base_model}")
     print(f"  Adapter: {adapter_path}")
     print(f"  Output: {output_path}")

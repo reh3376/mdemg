@@ -799,10 +799,10 @@ def run_train(args: argparse.Namespace) -> dict[str, Any]:
                 print(f"  {k}: {v}")
         if target_keys and args.tier == 2:
             print()
-            print(f"  first 3 target keys:")
+            print("  first 3 target keys:")
             for k in target_keys[:3]:
                 print(f"    {k}")
-            print(f"  last 3 target keys:")
+            print("  last 3 target keys:")
             for k in target_keys[-3:]:
                 print(f"    {k}")
         return summary

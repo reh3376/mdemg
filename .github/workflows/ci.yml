@@ -338,6 +338,37 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
+  neural-tests:
+    # UXTS-CI-001: ~610 neural/training Python tests had ZERO CI — first
+    # run surfaced two silently-failing tests (a stale MoE-era teacher
+    # label and a scalar-vs-array prompt-hash assumption). mlx-dependent
+    # modules (test_mlx_adapter, test_live_wiring) are excluded: mlx is
+    # Apple-Silicon-only and CI is ubuntu; those run locally on macOS.
+    # The sidecar app tests (neural/tests/) need sentence-transformers+
+    # torch (multi-GB) and stay local-only for now (disclosed).
+    name: Neural Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pytest numpy jsonschema cuid2 ruff
+
+      - name: Ruff lint (all of neural/)
+        run: ruff check neural/
+
+      - name: Pytest (training pipeline)
+        run: |
+          python3 -m pytest neural/training/ -q \
+            --ignore=neural/training/rl/tests/test_mlx_adapter.py \
+            --ignore=neural/training/rl/tests/test_live_wiring.py
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

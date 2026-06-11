@@ -23,7 +23,6 @@ Usage:
 
 import argparse
 import json
-import sys
 from typing import Any
 
 
