@@ -59,7 +59,12 @@ fi
 # If we can read the transcript tail, extract recent tool activity
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   # Get last few lines to identify recent activity (tool calls, files edited)
-  RECENT=$(tail -5 "$TRANSCRIPT_PATH" 2>/dev/null | jq -r '.content // empty' 2>/dev/null | head -3 || true)
+  # HOOKWIRE-001: transcript lines are {type, message:{content:[{type,text|name,...}]}}
+  # — the old top-level `.content` read always yielded empty.
+  RECENT=$(tail -5 "$TRANSCRIPT_PATH" 2>/dev/null | jq -r '
+    .message.content? // empty |
+    if type == "array" then (.[] | .text? // .name? // empty) else . end
+  ' 2>/dev/null | grep -v '^$' | head -3 || true)
   if [ -n "$RECENT" ]; then
     CONTEXT_PARTS="${CONTEXT_PARTS} Recent activity: $(echo "$RECENT" | tr '\n' ' ' | head -c 300)"
   fi
