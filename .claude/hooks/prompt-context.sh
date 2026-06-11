@@ -200,3 +200,10 @@ fi
 # Synergy: token count footer for recall + guidance
 RECALL_TOKENS=$(echo "${RECALL:-}" | wc -c | tr -d ' ')
 echo "[synergy-meta: recall_tokens=${RECALL_TOKENS}, guidance_tokens=${GUIDANCE_BYTES:-0}]"
+
+# HOOKSYNC-001: hook-channel heartbeat — one row per fire so the server's
+# hook_channel_silent rule can prove this channel is alive (the inverse signal
+# caught a months-long outage only by manual audit). Fire-and-forget.
+curl -sf -X POST "${MDEMG_URL}/v1/hooks/event" -H "Content-Type: application/json" \
+  -d "{\"hook\":\"prompt-context\",\"session_id\":\"${SESSION_ID}\",\"duration_ms\":$((SECONDS * 1000))}" \
+  --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &

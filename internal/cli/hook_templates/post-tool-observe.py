@@ -79,6 +79,41 @@ def _response_text(resp):
     return str(resp) if resp else ""
 
 
+# HOOKSYNC-001: throttled activity heartbeat. Proves sessions are ACTIVE so
+# the server's hook_channel_silent rule can detect the per-prompt channel
+# being dead while work is demonstrably happening (the HOOKWIRE-001 outage
+# shape: this hook kept firing while prompt-context silently exited).
+HEARTBEAT_COOLDOWN_SEC = int(os.environ.get("HOOK_HEARTBEAT_COOLDOWN_SEC", "300"))
+HEARTBEAT_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".hook-heartbeat-post-tool-observe")
+
+
+def send_hook_heartbeat():
+    """Fire-and-forget POST /v1/hooks/event, at most once per cooldown."""
+    try:
+        now = time.time()
+        try:
+            if now - os.path.getmtime(HEARTBEAT_FILE) < HEARTBEAT_COOLDOWN_SEC:
+                return
+        except OSError:
+            pass
+        os.makedirs(os.path.dirname(HEARTBEAT_FILE), exist_ok=True)
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(int(now)))
+        subprocess.Popen(
+            [
+                "curl", "-sf", "-X", "POST",
+                f"{MDEMG_URL}/v1/hooks/event",
+                "-H", "Content-Type: application/json",
+                "-d", json.dumps({"hook": "post-tool-observe", "session_id": SESSION_ID}),
+                "--connect-timeout", "1", "--max-time", "2", "-o", "/dev/null",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 INGEST_COOLDOWN_FILE = os.path.join(os.path.expanduser("~"), ".mdemg", ".last-ingest")
 INGEST_COOLDOWN_SECONDS = 300  # 5 minutes
 INGEST_LOG = os.path.join(os.path.expanduser("~"), ".mdemg", "logs", "ingest-claude-md.log")
@@ -589,6 +624,9 @@ def main():
     # Resolve the per-conversation SessionID for all observe() calls below.
     global SESSION_ID
     SESSION_ID = _resolve_session_id(input_data)
+
+    # HOOKSYNC-001: activity heartbeat (throttled, fail-open).
+    send_hook_heartbeat()
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})

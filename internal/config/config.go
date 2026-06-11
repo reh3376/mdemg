@@ -16,21 +16,21 @@ import (
 )
 
 type Config struct {
-	ListenAddr           string
-	Neo4jURI             string
-	Neo4jUser            string
-	Neo4jPass            string
-	Neo4jBoltPort        int // NEO4J_BOLT_PORT — preferred bolt port (default: 7687)
-	Neo4jHTTPPort        int // NEO4J_HTTP_PORT — preferred HTTP port (default: 7474)
+	ListenAddr            string
+	Neo4jURI              string
+	Neo4jUser             string
+	Neo4jPass             string
+	Neo4jBoltPort         int // NEO4J_BOLT_PORT — preferred bolt port (default: 7687)
+	Neo4jHTTPPort         int // NEO4J_HTTP_PORT — preferred HTTP port (default: 7474)
 	RequiredSchemaVersion int
 
-	VectorIndexName string
+	VectorIndexName   string
 	DefaultCandidateK int
-	DefaultTopK int
-	DefaultHopDepth int
+	DefaultTopK       int
+	DefaultHopDepth   int
 
-	MaxNeighborsPerNode int
-	MaxTotalEdgesFetched int
+	MaxNeighborsPerNode      int
+	MaxTotalEdgesFetched     int
 	AllowedRelationshipTypes []string
 
 	LearningEdgeCapPerRequest int
@@ -97,11 +97,11 @@ type Config struct {
 	HTTPWriteTimeout int // Write timeout in seconds (default: 600)
 
 	// Anomaly detection settings
-	AnomalyDetectionEnabled bool    // Feature toggle (default: true)
+	AnomalyDetectionEnabled   bool    // Feature toggle (default: true)
 	AnomalyDuplicateThreshold float64 // Vector similarity threshold for duplicates (default: 0.95)
-	AnomalyOutlierStdDevs   float64 // Standard deviations for outlier detection (default: 2.0)
-	AnomalyStaleDays        int     // Days after which an update is considered stale (default: 30)
-	AnomalyMaxCheckMs       int     // Maximum time for anomaly checks in ms (default: 100)
+	AnomalyOutlierStdDevs     float64 // Standard deviations for outlier detection (default: 2.0)
+	AnomalyStaleDays          int     // Days after which an update is considered stale (default: 30)
+	AnomalyMaxCheckMs         int     // Maximum time for anomaly checks in ms (default: 100)
 
 	// Temporal reasoning settings (Phase 1: Time-Aware Retrieval)
 	TemporalEnabled             bool    // Feature toggle for temporal reasoning (default: true)
@@ -116,8 +116,8 @@ type Config struct {
 	ScoringRhoChangelog            float64 // SCORING_RHO_CHANGELOG (default: 0.08)
 
 	// Phase 2 Temporal: Stale reference detection
-	TemporalStaleRefDays    int     // TEMPORAL_STALE_REF_DAYS (default: 0 = disabled)
-	TemporalStaleRefMaxPen  float64 // TEMPORAL_STALE_REF_MAX_PENALTY (default: 0.15)
+	TemporalStaleRefDays   int     // TEMPORAL_STALE_REF_DAYS (default: 0 = disabled)
+	TemporalStaleRefMaxPen float64 // TEMPORAL_STALE_REF_MAX_PENALTY (default: 0.15)
 
 	// Scoring hyperparameters for retrieval ranking
 	ScoringAlpha       float64 // Vector similarity weight (default: 0.60)
@@ -138,18 +138,18 @@ type Config struct {
 	LogSkipHealth bool   // Skip logging for /healthz and /readyz endpoints (default: false)
 
 	// Hidden layer settings (V0005)
-	HiddenLayerEnabled       bool    // Feature toggle for hidden layer processing (default: true)
-	HiddenLayerClusterEps    float64 // DBSCAN epsilon - max distance for neighborhood (default: 0.1)
-	HiddenLayerMinSamples    int     // DBSCAN min samples to form cluster (default: 3)
-	HiddenLayerMaxHidden     int     // Max hidden nodes to create per consolidation run (default: 100)
-	HiddenLayerMaxClusterSize int    // Max members per cluster before splitting (default: 200)
-	HiddenLayerPathGroupDepth int    // Path segments for pre-grouping (default: 2)
-	HiddenLayerBatchSize     int     // Batch size for clustering (0 = no limit, default: 0)
-	HiddenLayerForwardAlpha  float64 // Weight of current embedding in forward pass (default: 0.6)
-	HiddenLayerForwardBeta   float64 // Weight of aggregated embedding in forward pass (default: 0.4)
-	HiddenLayerBackwardSelf  float64 // Weight of self in backward pass (default: 0.2)
-	HiddenLayerBackwardBase  float64 // Weight of base signal in backward pass (default: 0.5)
-	HiddenLayerBackwardConc  float64 // Weight of concept signal in backward pass (default: 0.3)
+	HiddenLayerEnabled        bool    // Feature toggle for hidden layer processing (default: true)
+	HiddenLayerClusterEps     float64 // DBSCAN epsilon - max distance for neighborhood (default: 0.1)
+	HiddenLayerMinSamples     int     // DBSCAN min samples to form cluster (default: 3)
+	HiddenLayerMaxHidden      int     // Max hidden nodes to create per consolidation run (default: 100)
+	HiddenLayerMaxClusterSize int     // Max members per cluster before splitting (default: 200)
+	HiddenLayerPathGroupDepth int     // Path segments for pre-grouping (default: 2)
+	HiddenLayerBatchSize      int     // Batch size for clustering (0 = no limit, default: 0)
+	HiddenLayerForwardAlpha   float64 // Weight of current embedding in forward pass (default: 0.6)
+	HiddenLayerForwardBeta    float64 // Weight of aggregated embedding in forward pass (default: 0.4)
+	HiddenLayerBackwardSelf   float64 // Weight of self in backward pass (default: 0.2)
+	HiddenLayerBackwardBase   float64 // Weight of base signal in backward pass (default: 0.5)
+	HiddenLayerBackwardConc   float64 // Weight of concept signal in backward pass (default: 0.3)
 
 	// Concept merge settings (V0007) - deduplication during consolidation
 	ConceptMergeEnabled   bool    // Enable concept deduplication (default: true)
@@ -269,10 +269,10 @@ type Config struct {
 	MetaLearnTimeoutMs      int    // METALEARN_TIMEOUT_MS — timeout for generalization in ms (default: 15000, min 1000)
 
 	// Jiminy Guidance settings (Phase Jiminy)
-	JiminyEnabled          bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
-	JiminyTimeoutMs        int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 15000)
-	JiminyMaxItems         int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
-	JiminyMinConfidence    float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+	JiminyEnabled       bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
+	JiminyTimeoutMs     int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 15000)
+	JiminyMaxItems      int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
+	JiminyMinConfidence float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -289,17 +289,17 @@ type Config struct {
 	// 8-50s > 30s). Default 90s leaves headroom. Resolve via the single
 	// JiminyWarmComputeTimeout() method — do NOT re-default the literal at call
 	// sites. No-hardcoding rule (single source of truth).
-	JiminyWarmComputeTimeoutMs int // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: DefaultJiminyWarmComputeTimeoutMs)
-	JiminyWarmMaxAgeSec   int  // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
-	JiminyIncludeFrontiers bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
-	JiminyFrontierMinSim          float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
-	JiminyEffectivenessEnabled    bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
-	JiminyEffectivenessTTLSec     int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
+	JiminyWarmComputeTimeoutMs int     // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: DefaultJiminyWarmComputeTimeoutMs)
+	JiminyWarmMaxAgeSec        int     // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
+	JiminyIncludeFrontiers     bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
+	JiminyFrontierMinSim       float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
+	JiminyEffectivenessEnabled bool    // JIMINY_EFFECTIVENESS_ENABLED — enable guidance effectiveness tracking (default: true)
+	JiminyEffectivenessTTLSec  int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
 
 	// Jiminy J7: Full-Spectrum Retrieval
-	JiminyRetrievalEnabled bool // JIMINY_RETRIEVAL_ENABLED — use full retrieval pipeline (default: true)
-	JiminyRetrievalTopK    int  // JIMINY_RETRIEVAL_TOP_K — max results from retrieval pipeline (default: 10)
-	JiminyRetrievalHopDepth int // JIMINY_RETRIEVAL_HOP_DEPTH — graph hop depth for retrieval (default: 2)
+	JiminyRetrievalEnabled  bool // JIMINY_RETRIEVAL_ENABLED — use full retrieval pipeline (default: true)
+	JiminyRetrievalTopK     int  // JIMINY_RETRIEVAL_TOP_K — max results from retrieval pipeline (default: 10)
+	JiminyRetrievalHopDepth int  // JIMINY_RETRIEVAL_HOP_DEPTH — graph hop depth for retrieval (default: 2)
 
 	// Jiminy J8: LLM Synthesis
 	JiminySynthesisEnabled   bool   // JIMINY_SYNTHESIS_ENABLED — enable LLM guidance synthesis (default: false)
@@ -342,12 +342,12 @@ type Config struct {
 	JiminyEvaluateItemMaxChars    int // JIMINY_EVALUATE_ITEM_MAX_CHARS — max chars per constraint/correction in eval (default: 0 = unlimited)
 
 	// Jiminy J12: Session Escalation
-	JiminyEscalationEnabled      bool // JIMINY_ESCALATION_ENABLED — enable session escalation (default: true)
-	JiminyEscalationWarnAfter    int  // JIMINY_ESCALATION_WARN_AFTER — ignores before WARNED (default: 2)
-	JiminyEscalationEscalateAfter int // JIMINY_ESCALATION_ESCALATE_AFTER — ignores before ESCALATED (default: 4)
-	JiminyEscalationBlockAfter   int  // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
-	JiminyEscalationBlockEnabled bool // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
-	JiminyEscalationDecayMinutes   int  // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
+	JiminyEscalationEnabled        bool   // JIMINY_ESCALATION_ENABLED — enable session escalation (default: true)
+	JiminyEscalationWarnAfter      int    // JIMINY_ESCALATION_WARN_AFTER — ignores before WARNED (default: 2)
+	JiminyEscalationEscalateAfter  int    // JIMINY_ESCALATION_ESCALATE_AFTER — ignores before ESCALATED (default: 4)
+	JiminyEscalationBlockAfter     int    // JIMINY_ESCALATION_BLOCK_AFTER — ignores before BLOCKED (default: 6)
+	JiminyEscalationBlockEnabled   bool   // JIMINY_ESCALATION_BLOCK_ENABLED — enable BLOCKED state (default: false)
+	JiminyEscalationDecayMinutes   int    // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
 	JiminyEscalationPersistEnabled bool   // JIMINY_ESCALATION_PERSIST_ENABLED — persist escalation to Neo4j (default: true)
 	JiminyStrictStatePath          string // JIMINY_STRICT_STATE_PATH — path to strict-mode state file (default: ~/.mdemg/.jiminy-strict-mode)
 
@@ -357,9 +357,9 @@ type Config struct {
 	JiminyCodeRegenMinSamples int     // JIMINY_CODE_REGEN_MIN_SAMPLES — minimum samples before evaluating (default: 10)
 
 	// RSIC Jiminy Integration (J10)
-	RSICJiminyFollowRateThreshold           float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
+	RSICJiminyFollowRateThreshold              float64 // RSIC_JIMINY_FOLLOW_RATE_THRESHOLD — min follow rate (default: 0.5)
 	RSICJiminyConstraintEffectivenessThreshold float64 // RSIC_JIMINY_CONSTRAINT_EFFECTIVENESS_THRESHOLD — min effectiveness (default: 0.3)
-	RSICJiminySourceImbalanceThreshold      float64 // RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD — max single source ratio (default: 0.8)
+	RSICJiminySourceImbalanceThreshold         float64 // RSIC_JIMINY_SOURCE_IMBALANCE_THRESHOLD — max single source ratio (default: 0.8)
 
 	// J17: AI-to-AI Communication Protocol
 	J17Enabled            bool   // J17_ENABLED — enable J17 protocol for compact communication (default: true)
@@ -376,56 +376,56 @@ type Config struct {
 	J17DefaultTier     int    // J17_DEFAULT_TIER — default encoding tier 1-3 (default: 1)
 
 	// J17-3: Trust Score
-	J17TrustInitial           float64 // J17_TRUST_INITIAL — starting trust score (default: 0.65)
-	J17TrustBoostPerFollow    float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
-	J17TrustDecayPerIgnore    float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.02)
+	J17TrustInitial            float64 // J17_TRUST_INITIAL — starting trust score (default: 0.65)
+	J17TrustBoostPerFollow     float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
+	J17TrustDecayPerIgnore     float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.02)
 	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
-	J17TrustHighThreshold     float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
-	J17TrustLowThreshold      float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
-	J17TrustTTLHours          int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
-	J17BootstrapCodification  bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
-	J17BootstrapSpaceID       string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
+	J17TrustHighThreshold      float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
+	J17TrustLowThreshold       float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
+	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
+	J17BootstrapCodification   bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
+	J17BootstrapSpaceID        string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
 
 	// J17-4: Protocol Metrics + RSIC Evolution
-	J17MetricsEnabled             bool    // J17_METRICS_ENABLED — enable protocol metrics collection (default: inherits J17)
-	J17CodificationThreshold      int     // J17_CODIFICATION_THRESHOLD — T2 send count before RSIC proposes codification (default: 30)
-	J17ComprehensionMinThreshold  float64 // J17_COMPREHENSION_MIN_THRESHOLD — comprehension rate below which code is retired (default: 0.7)
-	J17CompressionMinRatio        float64 // J17_COMPRESSION_MIN_RATIO — compression ratio below which RSIC flags regression (default: 2.0)
-	J17ReplayFrequencyMax         float64 // J17_REPLAY_FREQUENCY_MAX — replays/hour above which RSIC adjusts buffer (default: 5.0)
-	J17NLIComprehensionEnabled    bool    // J17_NLI_COMPREHENSION_ENABLED — use NLI model for comprehension scoring (default: false)
-	J17ProtocolDataCollection     bool    // J17_PROTOCOL_DATA_COLLECTION — enable JSONL protocol training data collection (default: false)
+	J17MetricsEnabled            bool    // J17_METRICS_ENABLED — enable protocol metrics collection (default: inherits J17)
+	J17CodificationThreshold     int     // J17_CODIFICATION_THRESHOLD — T2 send count before RSIC proposes codification (default: 30)
+	J17ComprehensionMinThreshold float64 // J17_COMPREHENSION_MIN_THRESHOLD — comprehension rate below which code is retired (default: 0.7)
+	J17CompressionMinRatio       float64 // J17_COMPRESSION_MIN_RATIO — compression ratio below which RSIC flags regression (default: 2.0)
+	J17ReplayFrequencyMax        float64 // J17_REPLAY_FREQUENCY_MAX — replays/hour above which RSIC adjusts buffer (default: 5.0)
+	J17NLIComprehensionEnabled   bool    // J17_NLI_COMPREHENSION_ENABLED — use NLI model for comprehension scoring (default: false)
+	J17ProtocolDataCollection    bool    // J17_PROTOCOL_DATA_COLLECTION — enable JSONL protocol training data collection (default: false)
 
 	// J17-5: Extensions + System-Wide Encoding + ML Tier Selection
-	J17ExtensionsEnabled         bool     // J17_EXTENSIONS_ENABLED — enable agent-negotiated extensions (default: inherits J17)
-	J17AllowedExtensions         []string // J17_ALLOWED_EXTENSIONS — comma-separated list of allowed extensions
-	J17MLTierPredictionEnabled   bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
-	J17TierModelMinSamples       int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
-	J17SidecarURL                string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
-	J17SidecarTimeoutMs          int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 1000, floor: 100)
+	J17ExtensionsEnabled       bool     // J17_EXTENSIONS_ENABLED — enable agent-negotiated extensions (default: inherits J17)
+	J17AllowedExtensions       []string // J17_ALLOWED_EXTENSIONS — comma-separated list of allowed extensions
+	J17MLTierPredictionEnabled bool     // J17_ML_TIER_PREDICTION_ENABLED — enable ML-powered tier selection (default: false)
+	J17TierModelMinSamples     int      // J17_TIER_MODEL_MIN_SAMPLES — minimum training samples before ML prediction (default: 500)
+	J17SidecarURL              string   // J17_SIDECAR_URL — neural sidecar URL for shadow ML predictions (default: "")
+	J17SidecarTimeoutMs        int      // J17_SIDECAR_TIMEOUT_MS — timeout for sidecar calls in ms (default: 1000, floor: 100)
 
 	// J17-NS: Neural Sidecar Promotion (shadow → causal)
-	J17SidecarMode               string  // J17_SIDECAR_MODE — arbitration mode: shadow, compare, canary, active (default: "shadow")
-	J17SidecarCanaryPct          int     // J17_SIDECAR_CANARY_PERCENTAGE — % of eligible requests routed to ML in canary mode (default: 100)
-	J17SidecarConfidenceFloor    float64 // J17_SIDECAR_CONFIDENCE_FLOOR — min ML confidence to use prediction (default: 0.6)
-	J17NLIScoreOfRecord          bool    // J17_NLI_SCORE_OF_RECORD — when true + mode >= canary, NLI becomes comprehension score-of-record (default: false)
-	J17PrecedentProtectedCodes   string  // J17_PRECEDENT_PROTECTED_CODES — comma-separated constraint codes that NEVER use ML tier (default: "")
-	J17PrecedentLogEnabled       bool    // J17_PRECEDENT_LOG_ENABLED — audit log when ML would change a protected constraint's tier (default: true)
+	J17SidecarMode             string  // J17_SIDECAR_MODE — arbitration mode: shadow, compare, canary, active (default: "shadow")
+	J17SidecarCanaryPct        int     // J17_SIDECAR_CANARY_PERCENTAGE — % of eligible requests routed to ML in canary mode (default: 100)
+	J17SidecarConfidenceFloor  float64 // J17_SIDECAR_CONFIDENCE_FLOOR — min ML confidence to use prediction (default: 0.6)
+	J17NLIScoreOfRecord        bool    // J17_NLI_SCORE_OF_RECORD — when true + mode >= canary, NLI becomes comprehension score-of-record (default: false)
+	J17PrecedentProtectedCodes string  // J17_PRECEDENT_PROTECTED_CODES — comma-separated constraint codes that NEVER use ML tier (default: "")
+	J17PrecedentLogEnabled     bool    // J17_PRECEDENT_LOG_ENABLED — audit log when ML would change a protected constraint's tier (default: true)
 
 	// J17-NS: Sidecar Circuit Breaker
-	J17SidecarCBEnabled          bool    // J17_SIDECAR_CB_ENABLED — enable circuit breaker for sidecar calls (default: true)
-	J17SidecarCBFailureThreshold int     // J17_SIDECAR_CB_FAILURE_THRESHOLD — failures before opening circuit (default: 3)
-	J17SidecarCBTimeoutSec       int     // J17_SIDECAR_CB_TIMEOUT_SEC — seconds before half-open retry (default: 15)
+	J17SidecarCBEnabled          bool // J17_SIDECAR_CB_ENABLED — enable circuit breaker for sidecar calls (default: true)
+	J17SidecarCBFailureThreshold int  // J17_SIDECAR_CB_FAILURE_THRESHOLD — failures before opening circuit (default: 3)
+	J17SidecarCBTimeoutSec       int  // J17_SIDECAR_CB_TIMEOUT_SEC — seconds before half-open retry (default: 15)
 
 	// J17: T1 Comprehension Gate
 	J17T1ComprehensionGate float64 // J17_T1_COMPREHENSION_GATE — minimum T1 follow rate to continue using T1 (default: 0.5)
 
 	// NLI Feedback Loop: Per-Tier Effectiveness + Calibration
-	J17NLIObservationalEnabled        bool    // J17_NLI_OBSERVATIONAL_ENABLED — NLI scores flow to metrics in all modes (default: true)
-	J17TierEffectivenessMinSamples    int     // J17_TIER_EFFECTIVENESS_MIN_SAMPLES — min outcomes per tier/code before grading (default: 5)
-	J17TierIneffectiveThreshold       float64 // J17_TIER_INEFFECTIVE_THRESHOLD — comprehension below this = ineffective (default: 0.6)
-	J17TierDriftDetectionEnabled      bool    // J17_TIER_DRIFT_DETECTION_ENABLED — enable j17_tier_ineffective RSIC pattern (default: true)
-	J17NLICalibrationWindowSize       int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
-	J17NLICalibrationBiasThreshold    float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias (default: 0.15)
+	J17NLIObservationalEnabled     bool    // J17_NLI_OBSERVATIONAL_ENABLED — NLI scores flow to metrics in all modes (default: true)
+	J17TierEffectivenessMinSamples int     // J17_TIER_EFFECTIVENESS_MIN_SAMPLES — min outcomes per tier/code before grading (default: 5)
+	J17TierIneffectiveThreshold    float64 // J17_TIER_INEFFECTIVE_THRESHOLD — comprehension below this = ineffective (default: 0.6)
+	J17TierDriftDetectionEnabled   bool    // J17_TIER_DRIFT_DETECTION_ENABLED — enable j17_tier_ineffective RSIC pattern (default: true)
+	J17NLICalibrationWindowSize    int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
+	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias (default: 0.15)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -474,29 +474,29 @@ type Config struct {
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 
 	// RSIC (Recursive Self-Improvement Cycle) settings (Phase 60b)
-	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
-	RSICMesoPeriodHours    int     // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
-	RSICMesoPeriodSessions int     // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
-	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
-	RSICMaxNodePrunePct    float64 // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
-	RSICMaxEdgePrunePct    float64 // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
-	RSICRollbackWindow     int     // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
-	RSICWatchdogEnabled    bool    // RSIC_WATCHDOG_ENABLED — enable decay watchdog (default: true)
-	RSICWatchdogCheckSec   int     // RSIC_WATCHDOG_CHECK_SEC — seconds between watchdog checks (default: 300)
-	RSICWatchdogDecayRate  float64 // RSIC_WATCHDOG_DECAY_RATE — decay score increase per hour without cycle (default: 0.1)
-	RSICNudgeThreshold     float64 // RSIC_NUDGE_THRESHOLD — decay score for nudge-level escalation (default: 0.3)
-	RSICWarnThreshold      float64 // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
-	RSICForceThreshold     float64 // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
-	RSICCalibrationDays    int     // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
-	RSICMaxHistoryEntries  int     // RSIC_MAX_HISTORY_ENTRIES — max calibration history entries per type (default: 1000)
-	RSICMinConfidence      float64 // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
-	RSICTriggerCooldownSec  int     // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
-	RSICTriggerDedupeSec    int     // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
+	RSICMicroEnabled        bool     // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
+	RSICMesoPeriodHours     int      // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
+	RSICMesoPeriodSessions  int      // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
+	RSICMacroCron           string   // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
+	RSICMaxNodePrunePct     float64  // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
+	RSICMaxEdgePrunePct     float64  // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
+	RSICRollbackWindow      int      // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
+	RSICWatchdogEnabled     bool     // RSIC_WATCHDOG_ENABLED — enable decay watchdog (default: true)
+	RSICWatchdogCheckSec    int      // RSIC_WATCHDOG_CHECK_SEC — seconds between watchdog checks (default: 300)
+	RSICWatchdogDecayRate   float64  // RSIC_WATCHDOG_DECAY_RATE — decay score increase per hour without cycle (default: 0.1)
+	RSICNudgeThreshold      float64  // RSIC_NUDGE_THRESHOLD — decay score for nudge-level escalation (default: 0.3)
+	RSICWarnThreshold       float64  // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
+	RSICForceThreshold      float64  // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
+	RSICCalibrationDays     int      // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
+	RSICMaxHistoryEntries   int      // RSIC_MAX_HISTORY_ENTRIES — max calibration history entries per type (default: 1000)
+	RSICMinConfidence       float64  // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
+	RSICTriggerCooldownSec  int      // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
+	RSICTriggerDedupeSec    int      // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
 	RSICWatchdogSpaceID     string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
 	RSICPersistenceEnabled  bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
-	RSICProtectedSpaces      []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
-	RSICMacroCronSpace       string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
-	RSICMinActionConfidence  float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
+	RSICProtectedSpaces     []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
+	RSICMacroCronSpace      string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
+	RSICMinActionConfidence float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
 
 	// RSIC-SK1: Guidance self-calibration
 	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
@@ -505,9 +505,9 @@ type Config struct {
 	RSICGuidanceDecayThreshold     float64 // RSIC_GUIDANCE_DECAY_THRESHOLD — effectiveness rate below which confidence is decayed (default: 0.1)
 	RSICGuidanceDecayMinSurfaces   int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES — min surfaces before decay applies (default: 5)
 
-	SpacePruneIntervalHours       int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
-	ContextCoolerEnabled          bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
-	WeeklyGapInterviewsEnabled    bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
+	SpacePruneIntervalHours    int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
+	ContextCoolerEnabled       bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
+	WeeklyGapInterviewsEnabled bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
 
 	// Phase AR-3: LLM-powered RSIC reflection
 	RSICLLMReflectEnabled   bool   // RSIC_LLM_REFLECT_ENABLED — enable LLM-powered reflection (default: true)
@@ -540,10 +540,10 @@ type Config struct {
 	// as aliases with a deprecation log. Struct field names retained as MLX*
 	// to minimize blast radius (internal symbols only; rename in a future
 	// pure-rename sprint if desired).
-	MLXWatchdogEnabled    bool // LLM_WATCHDOG_ENABLED (alias: MLX_WATCHDOG_ENABLED) — start the watchdog goroutine + metrics (default: true; flipped from false in hotfix 11.6.3.1 per always-on policy)
-	MLXProbeIntervalSec   int  // LLM_PROBE_INTERVAL_SEC (alias: MLX_PROBE_INTERVAL_SEC) — seconds between probe ticks (default: 5, min 1)
-	MLXProbeTimeoutSec    int  // LLM_PROBE_TIMEOUT_SEC (alias: MLX_PROBE_TIMEOUT_SEC) — per-probe HTTP timeout in seconds; must be < LLM_PROBE_INTERVAL_SEC (default: 2, min 1)
-	MLXFailFastEnabled    bool // LLM_FAIL_FAST_ENABLED (alias: MLX_FAIL_FAST_ENABLED) — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
+	MLXWatchdogEnabled  bool // LLM_WATCHDOG_ENABLED (alias: MLX_WATCHDOG_ENABLED) — start the watchdog goroutine + metrics (default: true; flipped from false in hotfix 11.6.3.1 per always-on policy)
+	MLXProbeIntervalSec int  // LLM_PROBE_INTERVAL_SEC (alias: MLX_PROBE_INTERVAL_SEC) — seconds between probe ticks (default: 5, min 1)
+	MLXProbeTimeoutSec  int  // LLM_PROBE_TIMEOUT_SEC (alias: MLX_PROBE_TIMEOUT_SEC) — per-probe HTTP timeout in seconds; must be < LLM_PROBE_INTERVAL_SEC (default: 2, min 1)
+	MLXFailFastEnabled  bool // LLM_FAIL_FAST_ENABLED (alias: MLX_FAIL_FAST_ENABLED) — let llmclient short-circuit when probe says StateDown (default: true; only effective when MLXWatchdogEnabled is true)
 
 	// Phase 13 — Note 04 Column-Voting Retrieval. Replaces the linear-
 	// combination ranker at scoring.go:797 with a Reciprocal Rank Fusion
@@ -552,14 +552,14 @@ type Config struct {
 	// Default false until the UVTS A/B verdict passes — flag-flip in same
 	// commit if the merge gate clears (B mean ≥ A mean AND no per-question
 	// regression > 10%).
-	RetrievalColumnVotingEnabled bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
-	RetrievalRRFK                int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
-	RetrievalColumnTimeoutFrac   float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
-	RetrievalStructuralHops      int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
-	RetrievalColumnEmbeddingEnabled  bool // RETRIEVAL_COLUMN_EMBEDDING_ENABLED — per-column suppression knob (default: true)
-	RetrievalColumnBM25Enabled       bool // RETRIEVAL_COLUMN_BM25_ENABLED — per-column suppression knob (default: true)
-	RetrievalColumnGraphEnabled      bool // RETRIEVAL_COLUMN_GRAPH_ENABLED — per-column suppression knob (default: true)
-	RetrievalColumnStructuralEnabled bool // RETRIEVAL_COLUMN_STRUCTURAL_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnVotingEnabled     bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
+	RetrievalRRFK                    int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
+	RetrievalColumnTimeoutFrac       float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
+	RetrievalStructuralHops          int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
+	RetrievalColumnEmbeddingEnabled  bool    // RETRIEVAL_COLUMN_EMBEDDING_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnBM25Enabled       bool    // RETRIEVAL_COLUMN_BM25_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnGraphEnabled      bool    // RETRIEVAL_COLUMN_GRAPH_ENABLED — per-column suppression knob (default: true)
+	RetrievalColumnStructuralEnabled bool    // RETRIEVAL_COLUMN_STRUCTURAL_ENABLED — per-column suppression knob (default: true)
 
 	// Phase 13.1 — per-column RRF weights. Phase 13 shipped equal weights (1.0
 	// each via nil ColumnWeights map). Forensic diagnosis (phase_13_1_forensic_diagnosis.md)
@@ -599,10 +599,10 @@ type Config struct {
 	// gate default-on with the hybrid config (MIN=15 global +
 	// data_flow_integration MIN=20 override) after the canonical 120q
 	// A/B passed mean +0.003 / 0 regressions / 10 improvements.
-	SparseRetrievalEnabled    bool    // SPARSE_RETRIEVAL_ENABLED — apply percentile gate post-aggregation pre-rerank (default: true since Phase 14.1.1)
+	SparseRetrievalEnabled     bool    // SPARSE_RETRIEVAL_ENABLED — apply percentile gate post-aggregation pre-rerank (default: true since Phase 14.1.1)
 	SparseActivationPercentile float64 // SPARSE_ACTIVATION_PERCENTILE — within-call score percentile cutoff (default: 0.95; range 0.5-0.999)
-	SparseMinActive           int     // SPARSE_MIN_ACTIVE — floor on active set size; gate cannot drop below this (default: 3)
-	SparseMaxActive           int     // SPARSE_MAX_ACTIVE — cap on active set size; gate cannot exceed this (default: 20; matches observed top-K cap)
+	SparseMinActive            int     // SPARSE_MIN_ACTIVE — floor on active set size; gate cannot drop below this (default: 3)
+	SparseMaxActive            int     // SPARSE_MAX_ACTIVE — cap on active set size; gate cannot exceed this (default: 20; matches observed top-K cap)
 
 	// Phase 14.1 Epic 1 — Per-category sparse-gate overrides. Phase 14 120q
 	// full A/B revealed boundary regressions concentrated in specific
@@ -627,19 +627,19 @@ type Config struct {
 	// Defaults flag-off until Epic 6 A/B verdict — operator can enable
 	// observe-time fingerprint computation alone (no retrieval-side use)
 	// to start populating data for a future A/B.
-	ContextFingerprintEnabled              bool   // CONTEXT_FINGERPRINT_ENABLED — Service.Observe computes + writes context_fingerprint_active on new MemoryNodes (default: false until Epic 6 A/B passes)
-	ContextFingerprintBitBudget            int    // CONTEXT_FINGERPRINT_BIT_BUDGET — total bits per fingerprint (default: 256 per Note 05 spec)
-	ContextFingerprintRefreshEnabled       bool   // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
-	ContextFingerprintRefreshIntervalHours int    // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
-	ContextFingerprintRefreshTimeoutMs     int    // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
-	ContextCatalogTopNPaths                int    // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
-	ContextCatalogTopNTags                 int    // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
-	ContextCatalogFloorBitsPerKind         int    // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
-	ContextCatalogRoleTypeLayerBits        int    // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
-	RetrievalContextColumnEnabled          bool   // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: true since Phase 14.2.3, 2026-05-06; per-category zero-weight overrides for service_relationships / business_logic_constraints / relationship live in RetrievalContextColumnCategoryWeights)
+	ContextFingerprintEnabled              bool    // CONTEXT_FINGERPRINT_ENABLED — Service.Observe computes + writes context_fingerprint_active on new MemoryNodes (default: false until Epic 6 A/B passes)
+	ContextFingerprintBitBudget            int     // CONTEXT_FINGERPRINT_BIT_BUDGET — total bits per fingerprint (default: 256 per Note 05 spec)
+	ContextFingerprintRefreshEnabled       bool    // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
+	ContextFingerprintRefreshIntervalHours int     // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
+	ContextFingerprintRefreshTimeoutMs     int     // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
+	ContextCatalogTopNPaths                int     // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
+	ContextCatalogTopNTags                 int     // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
+	ContextCatalogFloorBitsPerKind         int     // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
+	ContextCatalogRoleTypeLayerBits        int     // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
+	RetrievalContextColumnEnabled          bool    // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: true since Phase 14.2.3, 2026-05-06; per-category zero-weight overrides for service_relationships / business_logic_constraints / relationship live in RetrievalContextColumnCategoryWeights)
 	RetrievalContextColumnWeight           float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
 	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
-	ContextFingerprintQueryTopK            int    // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
+	ContextFingerprintQueryTopK            int     // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
 
 	// Phase 14.2.3 — Per-category override of the context-column RRF weight.
 	// Default seed reflects the Phase 14.2.2 120q forensic: zero-weight on
@@ -659,7 +659,7 @@ type Config struct {
 	// classifier in findApplicableConstraints. Serial classification (~1.5s/node ×
 	// ~10 nodes) starved guidance synthesis of its time budget. Default 4 matches
 	// llama-server --parallel 4; floor 1 = serial (rollback). No-hardcoding rule.
-	ConsultingClassifyConcurrency    int    // CONSULTING_CLASSIFY_CONCURRENCY (default: 4, floor 1)
+	ConsultingClassifyConcurrency int // CONSULTING_CLASSIFY_CONCURRENCY (default: 4, floor 1)
 	// RRF-SCALE-001 — score gates for the consulting suggestion/constraint path.
 	// These were hardcoded (0.55/0.6/0.65/0.7) and calibrated for the legacy
 	// linear scorer; Phase 13.1 RRF default-on dropped the score scale (strong
@@ -703,36 +703,36 @@ type Config struct {
 	ScraperMaxContentLengthKB int    // SCRAPER_MAX_CONTENT_LENGTH_KB — max content length in KB (default: 500)
 
 	// Neo4j Backup & Restore (Phase 70)
-	BackupEnabled              bool   // BACKUP_ENABLED — enable backup module (default: true)
-	BackupStorageDir           string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: ".mdemg/backups")
-	BackupFullCmd              string // BACKUP_FULL_CMD — command for full backups (default: "docker")
-	BackupNeo4jContainer       string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
-	BackupFullIntervalHours    int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
-	BackupPartialIntervalHours int    // BACKUP_PARTIAL_INTERVAL_HOURS — hours between partial backups (default: 24)
-	BackupRetentionFullCount   int    // BACKUP_RETENTION_FULL_COUNT — keep last N full backups (default: 4)
-	BackupRetentionPartialCount int   // BACKUP_RETENTION_PARTIAL_COUNT — keep last N partial backups (default: 14)
-	BackupRetentionMaxAgeDays  int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
-	BackupRetentionMaxStorageGB int   // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
-	BackupRetentionRunAfter    bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
+	BackupEnabled               bool   // BACKUP_ENABLED — enable backup module (default: true)
+	BackupStorageDir            string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: ".mdemg/backups")
+	BackupFullCmd               string // BACKUP_FULL_CMD — command for full backups (default: "docker")
+	BackupNeo4jContainer        string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
+	BackupFullIntervalHours     int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
+	BackupPartialIntervalHours  int    // BACKUP_PARTIAL_INTERVAL_HOURS — hours between partial backups (default: 24)
+	BackupRetentionFullCount    int    // BACKUP_RETENTION_FULL_COUNT — keep last N full backups (default: 4)
+	BackupRetentionPartialCount int    // BACKUP_RETENTION_PARTIAL_COUNT — keep last N partial backups (default: 14)
+	BackupRetentionMaxAgeDays   int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
+	BackupRetentionMaxStorageGB int    // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
+	BackupRetentionRunAfter     bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
 
 	// TimescaleDB Backup & Restore
-	TSDBBackupEnabled          bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
-	TSDBBackupStorageDir       string // TSDB_BACKUP_STORAGE_DIR — directory for TSDB backup artifacts (default: ".mdemg/backups/tsdb")
-	TSDBBackupComposeFile      string // TSDB_BACKUP_COMPOSE_FILE — docker compose file path (default: auto-detect)
-	TSDBBackupServiceName      string // TSDB_BACKUP_SERVICE — compose service name (default: "timescaledb")
-	TSDBBackupIntervalHours    int    // TSDB_BACKUP_INTERVAL_HOURS — hours between backups (default: 24)
-	TSDBBackupRetentionCount   int    // TSDB_BACKUP_RETENTION_COUNT — keep last N backups (default: 14)
-	TSDBBackupRetentionMaxAgeDays int // TSDB_BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
+	TSDBBackupEnabled             bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
+	TSDBBackupStorageDir          string // TSDB_BACKUP_STORAGE_DIR — directory for TSDB backup artifacts (default: ".mdemg/backups/tsdb")
+	TSDBBackupComposeFile         string // TSDB_BACKUP_COMPOSE_FILE — docker compose file path (default: auto-detect)
+	TSDBBackupServiceName         string // TSDB_BACKUP_SERVICE — compose service name (default: "timescaledb")
+	TSDBBackupIntervalHours       int    // TSDB_BACKUP_INTERVAL_HOURS — hours between backups (default: 24)
+	TSDBBackupRetentionCount      int    // TSDB_BACKUP_RETENTION_COUNT — keep last N backups (default: 14)
+	TSDBBackupRetentionMaxAgeDays int    // TSDB_BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
 
 	// Phase 75: Relationship Extraction
-	RelExtractImports     bool    // REL_EXTRACT_IMPORTS — extract import relationships (default: true)
-	RelExtractInheritance bool    // REL_EXTRACT_INHERITANCE — extract inheritance relationships (default: true)
-	RelExtractCalls       bool    // REL_EXTRACT_CALLS — extract function call relationships (default: true)
-	RelCrossFileResolve   bool    // REL_CROSS_FILE_RESOLVE — enable cross-file symbol resolution (default: true)
-	GoTypesEnabled        bool    // GO_TYPES_ANALYSIS_ENABLED — use go/types for accurate analysis (default: false)
-	RelMaxCallsPerFunc    int     // REL_MAX_CALLS_PER_FUNCTION — max calls extracted per function (default: 50)
-	RelBatchSize          int     // REL_BATCH_SIZE — batch size for relationship insertion (default: 500)
-	RelResolutionTimeout  int     // REL_RESOLUTION_TIMEOUT_SEC — timeout for symbol resolution in seconds (default: 60)
+	RelExtractImports     bool // REL_EXTRACT_IMPORTS — extract import relationships (default: true)
+	RelExtractInheritance bool // REL_EXTRACT_INHERITANCE — extract inheritance relationships (default: true)
+	RelExtractCalls       bool // REL_EXTRACT_CALLS — extract function call relationships (default: true)
+	RelCrossFileResolve   bool // REL_CROSS_FILE_RESOLVE — enable cross-file symbol resolution (default: true)
+	GoTypesEnabled        bool // GO_TYPES_ANALYSIS_ENABLED — use go/types for accurate analysis (default: false)
+	RelMaxCallsPerFunc    int  // REL_MAX_CALLS_PER_FUNCTION — max calls extracted per function (default: 50)
+	RelBatchSize          int  // REL_BATCH_SIZE — batch size for relationship insertion (default: 500)
+	RelResolutionTimeout  int  // REL_RESOLUTION_TIMEOUT_SEC — timeout for symbol resolution in seconds (default: 60)
 
 	// Phase 75B: Topology Hardening
 	DynamicEdgesEnabled      bool    // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
@@ -749,16 +749,16 @@ type Config struct {
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
 
 	// Data transmission optimization settings (Phase 10.3)
-	CompressionEnabled  bool // Enable gzip compression for responses (default: true)
-	CompressionMinSize  int  // Minimum response size in bytes to compress (default: 1024)
-	PaginationMaxLimit  int  // Maximum items per page (default: 500)
-	PaginationDefLimit  int  // Default items per page (default: 50)
+	CompressionEnabled bool // Enable gzip compression for responses (default: true)
+	CompressionMinSize int  // Minimum response size in bytes to compress (default: 1024)
+	PaginationMaxLimit int  // Maximum items per page (default: 500)
+	PaginationDefLimit int  // Default items per page (default: 50)
 
 	// Neo4j connection pool settings (Phase 10.4)
-	Neo4jMaxPoolSize         int // Maximum connections in pool (default: 100)
-	Neo4jAcquireTimeoutSec   int // Connection acquire timeout in seconds (default: 60)
-	Neo4jMaxConnLifetimeSec  int // Maximum connection lifetime in seconds (default: 3600)
-	Neo4jConnIdleTimeoutSec  int // Connection idle timeout in seconds (default: 0 = disabled)
+	Neo4jMaxPoolSize        int // Maximum connections in pool (default: 100)
+	Neo4jAcquireTimeoutSec  int // Connection acquire timeout in seconds (default: 60)
+	Neo4jMaxConnLifetimeSec int // Maximum connection lifetime in seconds (default: 3600)
+	Neo4jConnIdleTimeoutSec int // Connection idle timeout in seconds (default: 0 = disabled)
 
 	// Dynamic port allocation
 	PortRangeStart int    // Start of fallback port range (default: derived from ListenAddr port)
@@ -781,16 +781,16 @@ type Config struct {
 	RateLimitByIP    bool    // Per-IP rate limiting vs global (default: true)
 
 	// Circuit breaker settings (Phase 3.1)
-	CircuitBreakerEnabled   bool // Feature toggle for circuit breaking (default: true)
-	CircuitBreakerThreshold int  // Failures before opening circuit (default: 5)
-	CircuitBreakerTimeoutSec int // Seconds before half-open (default: 30)
+	CircuitBreakerEnabled    bool // Feature toggle for circuit breaking (default: true)
+	CircuitBreakerThreshold  int  // Failures before opening circuit (default: 5)
+	CircuitBreakerTimeoutSec int  // Seconds before half-open (default: 30)
 
 	// Authentication settings (Phase 3.2)
-	AuthEnabled      bool     // Feature toggle for authentication (default: false for dev)
-	AuthMode         string   // Auth mode: "none", "apikey", "bearer" (default: "none")
-	AuthAPIKeys      []string // Comma-separated valid API keys
-	AuthJWTSecret    string   // JWT secret for bearer mode
-	AuthJWTIssuer    string   // Expected JWT issuer
+	AuthEnabled       bool     // Feature toggle for authentication (default: false for dev)
+	AuthMode          string   // Auth mode: "none", "apikey", "bearer" (default: "none")
+	AuthAPIKeys       []string // Comma-separated valid API keys
+	AuthJWTSecret     string   // JWT secret for bearer mode
+	AuthJWTIssuer     string   // Expected JWT issuer
 	AuthSkipEndpoints []string // Endpoints that bypass auth (default: /healthz,/readyz)
 
 	// CORS settings (Phase 3.2)
@@ -832,9 +832,9 @@ type Config struct {
 	MetaCogSignalBoostRate  float64 // METACOG_SIGNAL_BOOST_RATE — Hebbian boost per signal response (default: 0.1)
 
 	// ===== CMS Hardening: Configurable Defaults =====
-	CMSResumeMaxObs        int     // CMS_RESUME_MAX_OBS — default max observations on resume (default: 20)
-	CMSRecallTopK          int     // CMS_RECALL_TOP_K — default top-K for recall queries (default: 10)
-	CMSSummaryMaxChars     int     // CMS_SUMMARY_MAX_CHARS — max character length for generated summaries (default: 200)
+	CMSResumeMaxObs         int     // CMS_RESUME_MAX_OBS — default max observations on resume (default: 20)
+	CMSRecallTopK           int     // CMS_RECALL_TOP_K — default top-K for recall queries (default: 10)
+	CMSSummaryMaxChars      int     // CMS_SUMMARY_MAX_CHARS — max character length for generated summaries (default: 200)
 	CMSJiminyBaseConfidence float64 // CMS_JIMINY_BASE_CONFIDENCE — base confidence for Jiminy rationale (default: 0.5)
 
 	// ===== ANN Optimization: Learning Subsystem =====
@@ -892,18 +892,18 @@ type Config struct {
 	GuardrailHookTimeoutMs int  // GUARDRAIL_HOOK_TIMEOUT_MS — timeout for hook validation in ms (default: 3000)
 
 	// F2a: Contradiction Detection
-	ContradictionEnabled      bool    // CONTRADICTION_ENABLED — enable contradiction detection in surprise scoring (default: true)
-	ContradictionSimThreshold float64 // CONTRADICTION_SIM_THRESHOLD — min similarity for contradiction candidates (default: 0.75)
-	ContradictionMaxCandidates int    // CONTRADICTION_MAX_CANDIDATES — max candidates to check for contradiction (default: 20)
+	ContradictionEnabled       bool    // CONTRADICTION_ENABLED — enable contradiction detection in surprise scoring (default: true)
+	ContradictionSimThreshold  float64 // CONTRADICTION_SIM_THRESHOLD — min similarity for contradiction candidates (default: 0.75)
+	ContradictionMaxCandidates int     // CONTRADICTION_MAX_CANDIDATES — max candidates to check for contradiction (default: 20)
 
 	// F2b: NLI-Enhanced Contradiction Detection
 	ContradictionNLIEnabled bool // CONTRADICTION_NLI_ENABLED — use sidecar NLI for contradiction detection (default: false)
 
 	// F3: Effectiveness Feedback Persistence
-	JiminyPersistenceEnabled          bool    // JIMINY_PERSISTENCE_ENABLED — enable Neo4j write-through for guidance outcomes (default: false)
-	ConstraintConfidenceDecayPerNeg   float64 // CONSTRAINT_CONFIDENCE_DECAY_PER_NEGATIVE — confidence reduction per ignored guidance (default: 0.03)
-	ConstraintConfidenceBoostPerPos   float64 // CONSTRAINT_CONFIDENCE_BOOST_PER_POSITIVE — confidence increase per followed guidance (default: 0.02)
-	ConstraintArchiveThreshold        float64 // CONSTRAINT_ARCHIVE_THRESHOLD — confidence below which constraints auto-archive (default: 0.3)
+	JiminyPersistenceEnabled        bool    // JIMINY_PERSISTENCE_ENABLED — enable Neo4j write-through for guidance outcomes (default: false)
+	ConstraintConfidenceDecayPerNeg float64 // CONSTRAINT_CONFIDENCE_DECAY_PER_NEGATIVE — confidence reduction per ignored guidance (default: 0.03)
+	ConstraintConfidenceBoostPerPos float64 // CONSTRAINT_CONFIDENCE_BOOST_PER_POSITIVE — confidence increase per followed guidance (default: 0.02)
+	ConstraintArchiveThreshold      float64 // CONSTRAINT_ARCHIVE_THRESHOLD — confidence below which constraints auto-archive (default: 0.3)
 
 	// F4: Cross-Constraint Conflict Detection
 	ConstraintConflictDetectionEnabled bool    // CONSTRAINT_CONFLICT_DETECTION_ENABLED — enable pairwise conflict detection (default: false)
@@ -922,11 +922,11 @@ type Config struct {
 	DeterminismScoringEnabled bool // DETERMINISM_SCORING_ENABLED — enable determinism score computation (default: false)
 
 	// F10: Jiminy Latency Optimization
-	JiminyCacheEnabled    bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
-	JiminyCacheTTLSec     int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
-	JiminyCacheSize       int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
-	JiminyCacheJ17Bypass  bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
-	JiminyPartialTimeoutMs int // JIMINY_PARTIAL_TIMEOUT_MS — timeout for partial results (default: 2000)
+	JiminyCacheEnabled     bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
+	JiminyCacheTTLSec      int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
+	JiminyCacheSize        int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
+	JiminyCacheJ17Bypass   bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
+	JiminyPartialTimeoutMs int  // JIMINY_PARTIAL_TIMEOUT_MS — timeout for partial results (default: 2000)
 
 	// F11: Configurable Activation Dimension Weights
 	ActivationDimSemanticWeight     float64 // ACTIVATION_DIM_SEMANTIC_WEIGHT — semantic dimension weight (default: 0.6)
@@ -944,8 +944,8 @@ type Config struct {
 	LearningAutoPruneExcessEnabled bool // LEARNING_AUTO_PRUNE_EXCESS_ENABLED — auto-prune excess edges during consolidation (default: false)
 
 	// F20: Authority Levels
-	ConstraintAuthorityEnabled  bool   // CONSTRAINT_AUTHORITY_ENABLED — enable authority-level filtering (default: false)
-	ConstraintDefaultAuthority  string // CONSTRAINT_DEFAULT_AUTHORITY — default authority level for new constraints (default: "team_standard")
+	ConstraintAuthorityEnabled bool   // CONSTRAINT_AUTHORITY_ENABLED — enable authority-level filtering (default: false)
+	ConstraintDefaultAuthority string // CONSTRAINT_DEFAULT_AUTHORITY — default authority level for new constraints (default: "team_standard")
 
 	// ===== Neural Re-Ranker =====
 
@@ -964,19 +964,19 @@ type Config struct {
 
 	// ===== Synergy: Claude Code ↔ MDEMG Token Optimization =====
 
-	SynergyMemoryLineThreshold int     // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
-	SynergyMemoryAutoIngest    bool    // SYNERGY_MEMORY_AUTO_INGEST — master switch for auto-ingestion (default: true)
-	SynergyClaudeMDPath        string  // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
-	SynergyMemoryMDPath        string  // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
-	SynergyAssessmentEnabled   bool    // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
-	SynergyTargetClaudeLines   int     // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
-	SynergyTargetMemoryLines   int     // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
-	SynergyOverlapSampleSize   int     // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
-	SynergyOverlapThreshold    float64 // SYNERGY_OVERLAP_THRESHOLD — similarity threshold for "overlapping" (default: 0.85)
-	SynergyOverflowAlertThreshold int  // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
-	SynergyMaxHookTokens       int     // SYNERGY_MAX_HOOK_TOKENS — max per-prompt hook injection tokens (default: 500)
-	SynergyCronInterval        string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
-	SynergyCronEnabled         bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
+	SynergyMemoryLineThreshold    int     // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
+	SynergyMemoryAutoIngest       bool    // SYNERGY_MEMORY_AUTO_INGEST — master switch for auto-ingestion (default: true)
+	SynergyClaudeMDPath           string  // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
+	SynergyMemoryMDPath           string  // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
+	SynergyAssessmentEnabled      bool    // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
+	SynergyTargetClaudeLines      int     // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
+	SynergyTargetMemoryLines      int     // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
+	SynergyOverlapSampleSize      int     // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
+	SynergyOverlapThreshold       float64 // SYNERGY_OVERLAP_THRESHOLD — similarity threshold for "overlapping" (default: 0.85)
+	SynergyOverflowAlertThreshold int     // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
+	SynergyMaxHookTokens          int     // SYNERGY_MAX_HOOK_TOKENS — max per-prompt hook injection tokens (default: 500)
+	SynergyCronInterval           string  // SYNERGY_CRON_INTERVAL — health check cron interval (default: "4h")
+	SynergyCronEnabled            bool    // SYNERGY_CRON_ENABLED — master switch for cron health checks (default: true)
 
 	// ===== RSIC Overall-Health Weights (DH-005) =====
 	// Base priors for ComputeOverallHealth's 7 sub-dimensions. Values need not
@@ -1018,17 +1018,17 @@ type Config struct {
 	RetrievalEventLogging     bool   // RETRIEVAL_EVENT_LOGGING — log all Retrieve() pipelines for contrastive training data (default: true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
-	EventGraphEnabled                       bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
-	EventGraphWriterFlushIntervalSec        int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
-	EventGraphWriterBufferSize              int  // EVENTGRAPH_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
-	EventGraphMaxPairsPerEventBatch         int  // EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH — defensive cap on rows emitted per ApplyCoactivation invocation (default: 200, matches LearningEdgeCapPerRequest)
-	EventGraphMaxEventsPerQuery             int  // EVENTGRAPH_MAX_EVENTS_PER_QUERY — federation API ceiling on returned events (default: 500)
-	EventGraphFederationDefaultHops         int  // EVENTGRAPH_FEDERATION_DEFAULT_HOPS — federation API default hops when request omits the field (default: 2)
-	EventGraphFederationDefaultLookbackHours int // EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS — federation API default lookback window in hours (default: 24)
+	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
+	EventGraphWriterFlushIntervalSec         int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
+	EventGraphWriterBufferSize               int  // EVENTGRAPH_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
+	EventGraphMaxPairsPerEventBatch          int  // EVENTGRAPH_MAX_PAIRS_PER_EVENT_BATCH — defensive cap on rows emitted per ApplyCoactivation invocation (default: 200, matches LearningEdgeCapPerRequest)
+	EventGraphMaxEventsPerQuery              int  // EVENTGRAPH_MAX_EVENTS_PER_QUERY — federation API ceiling on returned events (default: 500)
+	EventGraphFederationDefaultHops          int  // EVENTGRAPH_FEDERATION_DEFAULT_HOPS — federation API default hops when request omits the field (default: 2)
+	EventGraphFederationDefaultLookbackHours int  // EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS — federation API default lookback window in hours (default: 24)
 
 	// Live Metrics (collect-on-request)
-	LiveMetricsEnabled          bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
-	LiveGuidanceRefreshSec      int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
+	LiveMetricsEnabled     bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
+	LiveGuidanceRefreshSec int  // LIVE_GUIDANCE_REFRESH_SEC — seconds between Jiminy guidance cache refreshes (default: 60)
 
 	// ===== Alert Dispatcher =====
 	AlertEnabled           bool   // ALERT_ENABLED — master switch for alert delivery (default: true)
@@ -1062,6 +1062,12 @@ type Config struct {
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
 	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
 	JobFailureLookbackMin   int  // JOB_FAILURE_LOOKBACK_MIN — alert if any scheduled job failed within this lookback window (default: 60)
+
+	// HOOKSYNC-001 — hook-channel absence detection (the "job never ran"
+	// guarantee applied to the per-prompt delivery channel).
+	HookHealthAlertEnabled  bool // HOOK_HEALTH_ALERT_ENABLED — enable the hook-channel-silent alert rule (default: true)
+	HookSilentLookbackHours int  // HOOK_SILENT_LOOKBACK_HOURS — window for "sessions active but prompt-context never fired" (default: 24)
+	HookActivityMinEvents   int  // HOOK_ACTIVITY_MIN_EVENTS — post-tool-observe heartbeats required in the window before the rule is eligible (default: 5)
 
 	// ===== TSDB Writer =====
 	TSDBWriterBufferMaxSize int // TSDB_WRITER_BUFFER_MAX_SIZE — max buffered records before FIFO eviction (default: 1000)
@@ -1113,9 +1119,10 @@ func (c Config) EffectiveLLMEndpoint() string {
 // JSON marshalling handles missing keys naturally.
 //
 // Example JSON value: {"min_active": 20}
-//   → MinActive=20, MaxActive=nil, Percentile=nil
-//   → at gate site: use category MinActive=20, fall back to global MaxActive
-//     and global Percentile.
+//
+//	→ MinActive=20, MaxActive=nil, Percentile=nil
+//	→ at gate site: use category MinActive=20, fall back to global MaxActive
+//	  and global Percentile.
 type SparseGateOverride struct {
 	MinActive  *int     `json:"min_active,omitempty"`
 	MaxActive  *int     `json:"max_active,omitempty"`
@@ -2242,10 +2249,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminySynthesisEnabled := getBool("JIMINY_SYNTHESIS_ENABLED", true)   // J15: default changed from false to true
+	jiminySynthesisEnabled := getBool("JIMINY_SYNTHESIS_ENABLED", true) // J15: default changed from false to true
 	jiminySynthesisProvider := get("JIMINY_SYNTHESIS_PROVIDER", llmProvider)
 	jiminySynthesisModel := get("JIMINY_SYNTHESIS_MODEL", llmModel)
-	jiminySynthesisMaxTokens, err := atoi("JIMINY_SYNTHESIS_MAX_TOKENS", 2000)  // J15: default changed from 1000 to 2000
+	jiminySynthesisMaxTokens, err := atoi("JIMINY_SYNTHESIS_MAX_TOKENS", 2000) // J15: default changed from 1000 to 2000
 	if err != nil {
 		return Config{}, err
 	}
@@ -4051,6 +4058,15 @@ func FromEnv() (Config, error) {
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
+	hookHealthAlertEnabled := getBool("HOOK_HEALTH_ALERT_ENABLED", true)
+	hookSilentLookbackHours, err := atoi("HOOK_SILENT_LOOKBACK_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	hookActivityMinEvents, err := atoi("HOOK_ACTIVITY_MIN_EVENTS", 5)
+	if err != nil {
+		return Config{}, err
+	}
 	jobBackupStalenessHours, err := atoi("JOB_BACKUP_STALENESS_HOURS", 0)
 	if err != nil {
 		return Config{}, err
@@ -4067,78 +4083,78 @@ func FromEnv() (Config, error) {
 	}
 
 	return Config{
-		ListenAddr: listen,
-		Neo4jURI: uri,
-		Neo4jUser: user,
-		Neo4jPass: pass,
-		Neo4jBoltPort: neo4jBoltPort,
-		Neo4jHTTPPort: neo4jHTTPPort,
-		RequiredSchemaVersion: reqVer,
-		VectorIndexName: idx,
-		DefaultCandidateK: candK,
-		DefaultTopK: topK,
-		DefaultHopDepth: hops,
-		MaxNeighborsPerNode: maxNbr,
-		MaxTotalEdgesFetched: maxEdges,
-		AllowedRelationshipTypes:  out,
-		LearningEdgeCapPerRequest: learnCap,
-		LearningMinActivation:     learnMinAct,
-		LearningEta:               learnEta,
-		LearningMu:                learnMu,
-		LearningWMin:              learnWMin,
-		LearningWMax:              learnWMax,
-		LearningDecayPerDay:       learnDecayPerDay,
-		LearningPruneThreshold:    learnPruneThreshold,
-		LearningMaxEdgesPerNode:   learnMaxEdgesPerNode,
-		LLMProvider:               llmProvider,
-		LLMModel:                  llmModel,
-		EmbeddingProvider:         embProvider,
-		OpenAIAPIKey: openaiKey,
-		OpenAIModel: openaiModel,
-		OpenAIEndpoint: openaiEndpoint,
-		LLMEndpoint:    llmEndpoint,
-		OllamaEndpoint: ollamaEndpoint,
-		OllamaModel:         ollamaModel,
-		ModelBackend:        modelBackend,
-		ModelNamespace:      modelNamespace,
-		ModelName:           modelName,
-		ModelQuants:         modelQuants,
-		ModelRamTiers:       modelRamTiers,
-		ModelQuant:          modelQuant,
-		AdapterBase:         adapterBase,
-		ModelDir:            modelDir,
-		OllamaModelsRoot:    ollamaModelsRoot,
-		OllamaRegistryHost:  ollamaRegistryHost,
-		ModelManifestPath:   modelManifestPath,
-		EmbeddingTargetDims: embTargetDims,
-		EmbeddingCacheEnabled:     embCacheEnabled,
-		EmbeddingCacheSize:        embCacheSize,
-		QueryCacheEnabled:         queryCacheEnabled,
-		QueryCacheCapacity:        queryCacheCapacity,
-		QueryCacheTTLSeconds:      queryCacheTTL,
-		SemanticEdgeOnIngest:      semEdgeEnabled,
-		SemanticEdgeTopN:          semEdgeTopN,
-		SemanticEdgeMinSimilarity: semEdgeMinSim,
-		SemanticEdgeInitialWeight: semEdgeInitWeight,
-		BatchIngestMaxItems:       batchMaxItems,
-		HTTPReadTimeout:           httpReadTimeout,
-		HTTPWriteTimeout:          httpWriteTimeout,
-		AnomalyDetectionEnabled:   anomalyEnabled,
-		AnomalyDuplicateThreshold: anomalyDupThreshold,
-		AnomalyOutlierStdDevs:     anomalyOutlierStdDevs,
-		AnomalyStaleDays:          anomalyStaleDays,
-		AnomalyMaxCheckMs:         anomalyMaxCheckMs,
-		ScoringAlpha:              scoringAlpha,
-		ScoringBeta:               scoringBeta,
-		ScoringGamma:              scoringGamma,
-		ScoringDelta:              scoringDelta,
-		ScoringPhi:                scoringPhi,
-		ScoringKappa:              scoringKappa,
-		ScoringRhoL0:              scoringRhoL0,
-		ScoringRhoL1:              scoringRhoL1,
-		ScoringRhoL2:              scoringRhoL2,
-		ScoringConfigBoost:        scoringConfigBoost,
-		ScoringPathBoost:          scoringPathBoost,
+		ListenAddr:                     listen,
+		Neo4jURI:                       uri,
+		Neo4jUser:                      user,
+		Neo4jPass:                      pass,
+		Neo4jBoltPort:                  neo4jBoltPort,
+		Neo4jHTTPPort:                  neo4jHTTPPort,
+		RequiredSchemaVersion:          reqVer,
+		VectorIndexName:                idx,
+		DefaultCandidateK:              candK,
+		DefaultTopK:                    topK,
+		DefaultHopDepth:                hops,
+		MaxNeighborsPerNode:            maxNbr,
+		MaxTotalEdgesFetched:           maxEdges,
+		AllowedRelationshipTypes:       out,
+		LearningEdgeCapPerRequest:      learnCap,
+		LearningMinActivation:          learnMinAct,
+		LearningEta:                    learnEta,
+		LearningMu:                     learnMu,
+		LearningWMin:                   learnWMin,
+		LearningWMax:                   learnWMax,
+		LearningDecayPerDay:            learnDecayPerDay,
+		LearningPruneThreshold:         learnPruneThreshold,
+		LearningMaxEdgesPerNode:        learnMaxEdgesPerNode,
+		LLMProvider:                    llmProvider,
+		LLMModel:                       llmModel,
+		EmbeddingProvider:              embProvider,
+		OpenAIAPIKey:                   openaiKey,
+		OpenAIModel:                    openaiModel,
+		OpenAIEndpoint:                 openaiEndpoint,
+		LLMEndpoint:                    llmEndpoint,
+		OllamaEndpoint:                 ollamaEndpoint,
+		OllamaModel:                    ollamaModel,
+		ModelBackend:                   modelBackend,
+		ModelNamespace:                 modelNamespace,
+		ModelName:                      modelName,
+		ModelQuants:                    modelQuants,
+		ModelRamTiers:                  modelRamTiers,
+		ModelQuant:                     modelQuant,
+		AdapterBase:                    adapterBase,
+		ModelDir:                       modelDir,
+		OllamaModelsRoot:               ollamaModelsRoot,
+		OllamaRegistryHost:             ollamaRegistryHost,
+		ModelManifestPath:              modelManifestPath,
+		EmbeddingTargetDims:            embTargetDims,
+		EmbeddingCacheEnabled:          embCacheEnabled,
+		EmbeddingCacheSize:             embCacheSize,
+		QueryCacheEnabled:              queryCacheEnabled,
+		QueryCacheCapacity:             queryCacheCapacity,
+		QueryCacheTTLSeconds:           queryCacheTTL,
+		SemanticEdgeOnIngest:           semEdgeEnabled,
+		SemanticEdgeTopN:               semEdgeTopN,
+		SemanticEdgeMinSimilarity:      semEdgeMinSim,
+		SemanticEdgeInitialWeight:      semEdgeInitWeight,
+		BatchIngestMaxItems:            batchMaxItems,
+		HTTPReadTimeout:                httpReadTimeout,
+		HTTPWriteTimeout:               httpWriteTimeout,
+		AnomalyDetectionEnabled:        anomalyEnabled,
+		AnomalyDuplicateThreshold:      anomalyDupThreshold,
+		AnomalyOutlierStdDevs:          anomalyOutlierStdDevs,
+		AnomalyStaleDays:               anomalyStaleDays,
+		AnomalyMaxCheckMs:              anomalyMaxCheckMs,
+		ScoringAlpha:                   scoringAlpha,
+		ScoringBeta:                    scoringBeta,
+		ScoringGamma:                   scoringGamma,
+		ScoringDelta:                   scoringDelta,
+		ScoringPhi:                     scoringPhi,
+		ScoringKappa:                   scoringKappa,
+		ScoringRhoL0:                   scoringRhoL0,
+		ScoringRhoL1:                   scoringRhoL1,
+		ScoringRhoL2:                   scoringRhoL2,
+		ScoringConfigBoost:             scoringConfigBoost,
+		ScoringPathBoost:               scoringPathBoost,
 		TemporalEnabled:                temporalEnabled,
 		TemporalSoftBoostMultiplier:    temporalSoftBoost,
 		TemporalHardFilterEnabled:      temporalHardFilterEnabled,
@@ -4149,86 +4165,86 @@ func FromEnv() (Config, error) {
 		ScoringRhoChangelog:            scoringRhoChangelog,
 		TemporalStaleRefDays:           temporalStaleRefDays,
 		TemporalStaleRefMaxPen:         temporalStaleRefMaxPen,
-		LogFormat:                 logFormat,
-		LogLevel:                  logLevel,
-		LogSkipHealth:             logSkipHealth,
-		HiddenLayerEnabled:        hiddenEnabled,
-		HiddenLayerClusterEps:     hiddenClusterEps,
-		HiddenLayerMinSamples:     hiddenMinSamples,
-		HiddenLayerMaxHidden:      hiddenMaxHidden,
-		HiddenLayerMaxClusterSize: hiddenMaxClusterSize,
-		HiddenLayerPathGroupDepth: hiddenPathGroupDepth,
-		HiddenLayerBatchSize:      hiddenBatchSize,
-		HiddenLayerForwardAlpha:   hiddenForwardAlpha,
-		HiddenLayerForwardBeta:    hiddenForwardBeta,
-		HiddenLayerBackwardSelf:   hiddenBackwardSelf,
-		HiddenLayerBackwardBase:   hiddenBackwardBase,
-		HiddenLayerBackwardConc:   hiddenBackwardConc,
-		ConceptMergeEnabled:       conceptMergeEnabled,
-		ConceptMergeThreshold:     conceptMergeThreshold,
-		EdgeAttentionEnabled:      edgeAttentionEnabled,
-		EdgeAttentionCoActivated:  edgeAttentionCoActivated,
-		EdgeAttentionAssociated:   edgeAttentionAssociated,
-		EdgeAttentionGeneralizes:  edgeAttentionGeneralizes,
-		EdgeAttentionAbstractsTo:  edgeAttentionAbstractsTo,
-		EdgeAttentionTemporal:     edgeAttentionTemporal,
-		EdgeAttentionCodeBoost:       edgeAttentionCodeBoost,
-		EdgeAttentionArchBoost:       edgeAttentionArchBoost,
-		QueryAwareExpansionEnabled:   queryAwareExpansionEnabled,
-		QueryAwareAttentionWeight:    queryAwareAttentionWeight,
-		NodeEmbeddingCacheSize:       nodeEmbeddingCacheSize,
-		NodeEmbeddingCacheTTLSec:     nodeEmbeddingCacheTTLSec,
-		EdgeTypeStrategy:             edgeTypeStrategy,
-		StructuralEdgeTypes:          structuralEdgeTypes,
-		LearnedEdgeTypes:             learnedEdgeTypes,
-		HybridSwitchHop:              hybridSwitchHop,
-		HybridRetrievalEnabled:       hybridEnabled,
-		BM25TopK:                  bm25TopK,
-		BM25Weight:                bm25Weight,
-		VectorWeight:              vectorWeight,
-		RRFConstant:               rrfConstant,
-		RerankEnabled:             rerankEnabled,
-		RerankProvider:            rerankProvider,
-		RerankModel:               rerankModel,
-		RerankTopN:                rerankTopN,
-		RerankWeight:              rerankWeight,
-		RerankTimeoutMs:           rerankTimeoutMs,
-		RerankJinaKey:             rerankJinaKey,
-		RerankJinaModel:           rerankJinaModel,
-		RerankJinaURL:             rerankJinaURL,
-		RerankCompress:            rerankCompress,
-		PluginsEnabled:            pluginsEnabled,
-		PluginsDir:                pluginsDir,
-		PluginSocketDir:           pluginSocketDir,
-		MdemgVersion:              mdemgVersion,
-		MdemgCommit:               mdemgCommit,
-		LinearTeamID:              linearTeamID,
-		LinearWorkspaceID:         linearWorkspaceID,
-		LinearWebhookSecret:         linearWebhookSecret,
-		LinearWebhookSpaceID:        linearWebhookSpaceID,
-		WebhookConfigs:              webhookConfigs,
-		FileWatcherEnabled:          fileWatcherEnabled,
-		FileWatcherConfigs:          fileWatcherConfigs,
-		ConflictLogEnabled:          conflictLogEnabled,
-		OrphanCleanupIntervalHours:  orphanCleanupIntervalHours,
+		LogFormat:                      logFormat,
+		LogLevel:                       logLevel,
+		LogSkipHealth:                  logSkipHealth,
+		HiddenLayerEnabled:             hiddenEnabled,
+		HiddenLayerClusterEps:          hiddenClusterEps,
+		HiddenLayerMinSamples:          hiddenMinSamples,
+		HiddenLayerMaxHidden:           hiddenMaxHidden,
+		HiddenLayerMaxClusterSize:      hiddenMaxClusterSize,
+		HiddenLayerPathGroupDepth:      hiddenPathGroupDepth,
+		HiddenLayerBatchSize:           hiddenBatchSize,
+		HiddenLayerForwardAlpha:        hiddenForwardAlpha,
+		HiddenLayerForwardBeta:         hiddenForwardBeta,
+		HiddenLayerBackwardSelf:        hiddenBackwardSelf,
+		HiddenLayerBackwardBase:        hiddenBackwardBase,
+		HiddenLayerBackwardConc:        hiddenBackwardConc,
+		ConceptMergeEnabled:            conceptMergeEnabled,
+		ConceptMergeThreshold:          conceptMergeThreshold,
+		EdgeAttentionEnabled:           edgeAttentionEnabled,
+		EdgeAttentionCoActivated:       edgeAttentionCoActivated,
+		EdgeAttentionAssociated:        edgeAttentionAssociated,
+		EdgeAttentionGeneralizes:       edgeAttentionGeneralizes,
+		EdgeAttentionAbstractsTo:       edgeAttentionAbstractsTo,
+		EdgeAttentionTemporal:          edgeAttentionTemporal,
+		EdgeAttentionCodeBoost:         edgeAttentionCodeBoost,
+		EdgeAttentionArchBoost:         edgeAttentionArchBoost,
+		QueryAwareExpansionEnabled:     queryAwareExpansionEnabled,
+		QueryAwareAttentionWeight:      queryAwareAttentionWeight,
+		NodeEmbeddingCacheSize:         nodeEmbeddingCacheSize,
+		NodeEmbeddingCacheTTLSec:       nodeEmbeddingCacheTTLSec,
+		EdgeTypeStrategy:               edgeTypeStrategy,
+		StructuralEdgeTypes:            structuralEdgeTypes,
+		LearnedEdgeTypes:               learnedEdgeTypes,
+		HybridSwitchHop:                hybridSwitchHop,
+		HybridRetrievalEnabled:         hybridEnabled,
+		BM25TopK:                       bm25TopK,
+		BM25Weight:                     bm25Weight,
+		VectorWeight:                   vectorWeight,
+		RRFConstant:                    rrfConstant,
+		RerankEnabled:                  rerankEnabled,
+		RerankProvider:                 rerankProvider,
+		RerankModel:                    rerankModel,
+		RerankTopN:                     rerankTopN,
+		RerankWeight:                   rerankWeight,
+		RerankTimeoutMs:                rerankTimeoutMs,
+		RerankJinaKey:                  rerankJinaKey,
+		RerankJinaModel:                rerankJinaModel,
+		RerankJinaURL:                  rerankJinaURL,
+		RerankCompress:                 rerankCompress,
+		PluginsEnabled:                 pluginsEnabled,
+		PluginsDir:                     pluginsDir,
+		PluginSocketDir:                pluginSocketDir,
+		MdemgVersion:                   mdemgVersion,
+		MdemgCommit:                    mdemgCommit,
+		LinearTeamID:                   linearTeamID,
+		LinearWorkspaceID:              linearWorkspaceID,
+		LinearWebhookSecret:            linearWebhookSecret,
+		LinearWebhookSpaceID:           linearWebhookSpaceID,
+		WebhookConfigs:                 webhookConfigs,
+		FileWatcherEnabled:             fileWatcherEnabled,
+		FileWatcherConfigs:             fileWatcherConfigs,
+		ConflictLogEnabled:             conflictLogEnabled,
+		OrphanCleanupIntervalHours:     orphanCleanupIntervalHours,
 
 		// Phase 47: Optimistic Retry + Edge Consistency
-		OptimisticRetryEnabled:       optimisticRetryEnabled,
-		OptimisticRetryMaxAttempts:   optimisticRetryMaxAttempts,
-		OptimisticRetryBaseDelayMs:   optimisticRetryBaseDelayMs,
-		OptimisticRetryMaxDelayMs:    optimisticRetryMaxDelayMs,
-		OptimisticRetryMultiplier:    optimisticRetryMultiplier,
-		EdgeStalenessCascadeEnabled:  edgeStalenessCascadeEnabled,
+		OptimisticRetryEnabled:        optimisticRetryEnabled,
+		OptimisticRetryMaxAttempts:    optimisticRetryMaxAttempts,
+		OptimisticRetryBaseDelayMs:    optimisticRetryBaseDelayMs,
+		OptimisticRetryMaxDelayMs:     optimisticRetryMaxDelayMs,
+		OptimisticRetryMultiplier:     optimisticRetryMultiplier,
+		EdgeStalenessCascadeEnabled:   edgeStalenessCascadeEnabled,
 		EdgeStalenessRefreshBatchSize: edgeStalenessRefreshBatchSize,
-		EdgeStalenessReclusterThresh: edgeStalenessReclusterThresh,
+		EdgeStalenessReclusterThresh:  edgeStalenessReclusterThresh,
 
-		LLMSummaryEnabled:           llmSummaryEnabled,
-		LLMSummaryProvider:        llmSummaryProvider,
-		LLMSummaryModel:           llmSummaryModel,
-		LLMSummaryMaxTokens:       llmSummaryMaxTokens,
-		LLMSummaryBatchSize:       llmSummaryBatchSize,
-		LLMSummaryTimeoutMs:       llmSummaryTimeoutMs,
-		LLMSummaryCacheSize:       llmSummaryCacheSize,
+		LLMSummaryEnabled:   llmSummaryEnabled,
+		LLMSummaryProvider:  llmSummaryProvider,
+		LLMSummaryModel:     llmSummaryModel,
+		LLMSummaryMaxTokens: llmSummaryMaxTokens,
+		LLMSummaryBatchSize: llmSummaryBatchSize,
+		LLMSummaryTimeoutMs: llmSummaryTimeoutMs,
+		LLMSummaryCacheSize: llmSummaryCacheSize,
 
 		// Phase 101: SME Synthesis
 		SynthesisEnabled:   synthesisEnabled,
@@ -4272,116 +4288,116 @@ func FromEnv() (Config, error) {
 		GuardrailCompress:       guardrailCompress,
 
 		// Phase Jiminy: Jiminy Guidance
-		JiminyEnabled:          jiminyEnabled,
-		JiminyTimeoutMs:        jiminyTimeoutMs,
-		JiminyMaxItems:         jiminyMaxItems,
-		JiminyMinConfidence:    jiminyMinConfidence,
+		JiminyEnabled:                    jiminyEnabled,
+		JiminyTimeoutMs:                  jiminyTimeoutMs,
+		JiminyMaxItems:                   jiminyMaxItems,
+		JiminyMinConfidence:              jiminyMinConfidence,
 		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,
-		JiminyIncludeFrontiers: jiminyIncludeFrontiers,
-		JiminyFrontierMinSim:          jiminyFrontierMinSim,
-		JiminyEffectivenessEnabled:    jiminyEffectivenessEnabled,
-		JiminyEffectivenessTTLSec:     jiminyEffectivenessTTLSec,
-		JiminyWarmEnabled:             jiminyWarmEnabled,
-		JiminyWarmDebounceSec:         jiminyWarmDebounceSec,
-		JiminyWarmComputeTimeoutMs:    jiminyWarmComputeTimeoutMs,
-		JiminyWarmMaxAgeSec:           jiminyWarmMaxAgeSec,
+		JiminyIncludeFrontiers:           jiminyIncludeFrontiers,
+		JiminyFrontierMinSim:             jiminyFrontierMinSim,
+		JiminyEffectivenessEnabled:       jiminyEffectivenessEnabled,
+		JiminyEffectivenessTTLSec:        jiminyEffectivenessTTLSec,
+		JiminyWarmEnabled:                jiminyWarmEnabled,
+		JiminyWarmDebounceSec:            jiminyWarmDebounceSec,
+		JiminyWarmComputeTimeoutMs:       jiminyWarmComputeTimeoutMs,
+		JiminyWarmMaxAgeSec:              jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
-		JiminyRetrievalEnabled:          jiminyRetrievalEnabled,
-		JiminyRetrievalTopK:             jiminyRetrievalTopK,
-		JiminyRetrievalHopDepth:         jiminyRetrievalHopDepth,
-		JiminySynthesisEnabled:          jiminySynthesisEnabled,
-		JiminySynthesisProvider:         jiminySynthesisProvider,
-		JiminySynthesisModel:            jiminySynthesisModel,
-		JiminySynthesisMaxTokens:        jiminySynthesisMaxTokens,
-		JiminySynthesisTimeoutMs:        jiminySynthesisTimeoutMs,
-		JiminyEvaluateEnabled:           jiminyEvaluateEnabled,
-		JiminyEvaluateTimeoutMs:         jiminyEvaluateTimeoutMs,
-		JiminyEvaluateMaxConstraints:    jiminyEvaluateMaxConstraints,
-		JiminyEvaluateLLMEnabled:        jiminyEvaluateLLMEnabled,
-		JiminyEvaluateLLMProvider:       jiminyEvaluateLLMProvider,
-		JiminyEvaluateLLMModel:          jiminyEvaluateLLMModel,
-		JiminyEvaluateLLMTimeoutMs:      jiminyEvaluateLLMTimeoutMs,
-		JiminyEvaluateLLMMaxTokens:      jiminyEvaluateLLMMaxTokens,
-		JiminyOutcomeClassifierEnabled:  jiminyOutcomeClassifierEnabled,
-		JiminyOutcomeLLMEnabled:         jiminyOutcomeLLMEnabled,
-		JiminyOutcomeSimilarityHigh:     jiminyOutcomeSimilarityHigh,
-		JiminyOutcomeSimilarityLow:      jiminyOutcomeSimilarityLow,
-		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
-		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
-		JiminyClassifyCompress:         jiminyClassifyCompress,
-		JiminyDedupSimilarityThreshold: jiminyDedupSimilarityThreshold,
-		JiminyCorrectionDecayRate:      jiminyCorrectionDecayRate,
-		J17TicketCacheSize:             j17TicketCacheSize,
-		JiminySynthesisTemperature:      jiminySynthesisTemperature,
-		JiminyGuidanceContextMaxChars:   jiminyGuidanceContextMaxChars,
-		JiminyGuidanceOutputMaxChars:    jiminyGuidanceOutputMaxChars,
-		JiminyEvaluateOutputMaxChars:    jiminyEvaluateOutputMaxChars,
-		JiminyEvaluateItemMaxChars:      jiminyEvaluateItemMaxChars,
-		JiminyEscalationEnabled:         jiminyEscalationEnabled,
-		JiminyEscalationWarnAfter:       jiminyEscalationWarnAfter,
-		JiminyEscalationEscalateAfter:   jiminyEscalationEscalateAfter,
-		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
-		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
-		JiminyEscalationDecayMinutes:      jiminyEscalationDecayMinutes,
-		JiminyEscalationPersistEnabled:   jiminyEscalationPersistEnabled,
-		JiminyStrictStatePath:            jiminyStrictStatePath,
-		JiminyCodeRegenEnabled:    jiminyCodeRegenEnabled,
-		JiminyCodeRegenThreshold:  jiminyCodeRegenThreshold,
-		JiminyCodeRegenMinSamples: jiminyCodeRegenMinSamples,
-		RSICJiminyFollowRateThreshold:           rsicJiminyFollowRateThreshold,
+		JiminyRetrievalEnabled:                     jiminyRetrievalEnabled,
+		JiminyRetrievalTopK:                        jiminyRetrievalTopK,
+		JiminyRetrievalHopDepth:                    jiminyRetrievalHopDepth,
+		JiminySynthesisEnabled:                     jiminySynthesisEnabled,
+		JiminySynthesisProvider:                    jiminySynthesisProvider,
+		JiminySynthesisModel:                       jiminySynthesisModel,
+		JiminySynthesisMaxTokens:                   jiminySynthesisMaxTokens,
+		JiminySynthesisTimeoutMs:                   jiminySynthesisTimeoutMs,
+		JiminyEvaluateEnabled:                      jiminyEvaluateEnabled,
+		JiminyEvaluateTimeoutMs:                    jiminyEvaluateTimeoutMs,
+		JiminyEvaluateMaxConstraints:               jiminyEvaluateMaxConstraints,
+		JiminyEvaluateLLMEnabled:                   jiminyEvaluateLLMEnabled,
+		JiminyEvaluateLLMProvider:                  jiminyEvaluateLLMProvider,
+		JiminyEvaluateLLMModel:                     jiminyEvaluateLLMModel,
+		JiminyEvaluateLLMTimeoutMs:                 jiminyEvaluateLLMTimeoutMs,
+		JiminyEvaluateLLMMaxTokens:                 jiminyEvaluateLLMMaxTokens,
+		JiminyOutcomeClassifierEnabled:             jiminyOutcomeClassifierEnabled,
+		JiminyOutcomeLLMEnabled:                    jiminyOutcomeLLMEnabled,
+		JiminyOutcomeSimilarityHigh:                jiminyOutcomeSimilarityHigh,
+		JiminyOutcomeSimilarityLow:                 jiminyOutcomeSimilarityLow,
+		JiminyOutcomeLLMMaxTokens:                  jiminyOutcomeLLMMaxTokens,
+		JiminyOutcomeCacheSize:                     jiminyOutcomeCacheSize,
+		JiminyClassifyCompress:                     jiminyClassifyCompress,
+		JiminyDedupSimilarityThreshold:             jiminyDedupSimilarityThreshold,
+		JiminyCorrectionDecayRate:                  jiminyCorrectionDecayRate,
+		J17TicketCacheSize:                         j17TicketCacheSize,
+		JiminySynthesisTemperature:                 jiminySynthesisTemperature,
+		JiminyGuidanceContextMaxChars:              jiminyGuidanceContextMaxChars,
+		JiminyGuidanceOutputMaxChars:               jiminyGuidanceOutputMaxChars,
+		JiminyEvaluateOutputMaxChars:               jiminyEvaluateOutputMaxChars,
+		JiminyEvaluateItemMaxChars:                 jiminyEvaluateItemMaxChars,
+		JiminyEscalationEnabled:                    jiminyEscalationEnabled,
+		JiminyEscalationWarnAfter:                  jiminyEscalationWarnAfter,
+		JiminyEscalationEscalateAfter:              jiminyEscalationEscalateAfter,
+		JiminyEscalationBlockAfter:                 jiminyEscalationBlockAfter,
+		JiminyEscalationBlockEnabled:               jiminyEscalationBlockEnabled,
+		JiminyEscalationDecayMinutes:               jiminyEscalationDecayMinutes,
+		JiminyEscalationPersistEnabled:             jiminyEscalationPersistEnabled,
+		JiminyStrictStatePath:                      jiminyStrictStatePath,
+		JiminyCodeRegenEnabled:                     jiminyCodeRegenEnabled,
+		JiminyCodeRegenThreshold:                   jiminyCodeRegenThreshold,
+		JiminyCodeRegenMinSamples:                  jiminyCodeRegenMinSamples,
+		RSICJiminyFollowRateThreshold:              rsicJiminyFollowRateThreshold,
 		RSICJiminyConstraintEffectivenessThreshold: rsicJiminyConstraintEffThreshold,
-		RSICJiminySourceImbalanceThreshold:      rsicJiminySourceImbalanceThreshold,
+		RSICJiminySourceImbalanceThreshold:         rsicJiminySourceImbalanceThreshold,
 
 		// J17: AI-to-AI Communication Protocol
-		J17Enabled:            j17Enabled,
-		J17TicketSecret:       j17TicketSecret,
-		J17TicketTTLHours:     j17TicketTTLHours,
-		J17SequenceBufferSize: j17SequenceBufferSize,
-		J17ReplayMaxEvents:    j17ReplayMaxEvents,
-		J17BootstrapEnabled:   j17BootstrapEnabled,
-		J17CodegenEnabled:          j17CodegenEnabled,
-		J17CodegenProvider:         j17CodegenProvider,
-		J17CodegenModel:            j17CodegenModel,
-		J17DefaultTier:             j17DefaultTier,
-		J17TrustInitial:            j17TrustInitial,
-		J17TrustBoostPerFollow:     j17TrustBoostPerFollow,
-		J17TrustDecayPerIgnore:     j17TrustDecayPerIgnore,
-		J17TrustDecayPerContradict: j17TrustDecayPerContradict,
-		J17TrustHighThreshold:      j17TrustHighThreshold,
-		J17TrustLowThreshold:       j17TrustLowThreshold,
-		J17TrustTTLHours:           j17TrustTTLHours,
-		J17BootstrapCodification:   j17BootstrapCodification,
-		J17BootstrapSpaceID:       j17BootstrapSpaceID,
-		J17MetricsEnabled:               j17MetricsEnabled,
-		J17CodificationThreshold:        j17CodificationThreshold,
-		J17ComprehensionMinThreshold:     j17ComprehensionMinThreshold,
-		J17CompressionMinRatio:           j17CompressionMinRatio,
-		J17ReplayFrequencyMax:            j17ReplayFrequencyMax,
-		J17NLIComprehensionEnabled:       j17NLIComprehensionEnabled,
-		J17ProtocolDataCollection:        j17ProtocolDataCollection,
-		J17T1ComprehensionGate:           j17T1ComprehensionGate,
-		J17ExtensionsEnabled:             j17ExtensionsEnabled,
-		J17AllowedExtensions:             j17AllowedExtensions,
-		J17MLTierPredictionEnabled:       j17MLTierPredictionEnabled,
-		J17TierModelMinSamples:           j17TierModelMinSamples,
-		J17SidecarURL:                    j17SidecarURL,
-		J17SidecarTimeoutMs:              j17SidecarTimeoutMs,
-		J17SidecarMode:                   j17SidecarMode,
-		J17SidecarCanaryPct:              j17SidecarCanaryPct,
-		J17SidecarConfidenceFloor:        j17SidecarConfidenceFloor,
-		J17NLIScoreOfRecord:              j17NLIScoreOfRecord,
-		J17PrecedentProtectedCodes:       j17PrecedentProtectedCodes,
-		J17PrecedentLogEnabled:           j17PrecedentLogEnabled,
-		J17SidecarCBEnabled:              j17SidecarCBEnabled,
-		J17SidecarCBFailureThreshold:     j17SidecarCBFailureThreshold,
-		J17SidecarCBTimeoutSec:           j17SidecarCBTimeoutSec,
-		J17NLIObservationalEnabled:       j17NLIObservationalEnabled,
-		J17TierEffectivenessMinSamples:   j17TierEffectivenessMinSamples,
-		J17TierIneffectiveThreshold:      j17TierIneffectiveThreshold,
-		J17TierDriftDetectionEnabled:     j17TierDriftDetectionEnabled,
-		J17NLICalibrationWindowSize:      j17NLICalibrationWindowSize,
-		J17NLICalibrationBiasThreshold:   j17NLICalibrationBiasThreshold,
+		J17Enabled:                     j17Enabled,
+		J17TicketSecret:                j17TicketSecret,
+		J17TicketTTLHours:              j17TicketTTLHours,
+		J17SequenceBufferSize:          j17SequenceBufferSize,
+		J17ReplayMaxEvents:             j17ReplayMaxEvents,
+		J17BootstrapEnabled:            j17BootstrapEnabled,
+		J17CodegenEnabled:              j17CodegenEnabled,
+		J17CodegenProvider:             j17CodegenProvider,
+		J17CodegenModel:                j17CodegenModel,
+		J17DefaultTier:                 j17DefaultTier,
+		J17TrustInitial:                j17TrustInitial,
+		J17TrustBoostPerFollow:         j17TrustBoostPerFollow,
+		J17TrustDecayPerIgnore:         j17TrustDecayPerIgnore,
+		J17TrustDecayPerContradict:     j17TrustDecayPerContradict,
+		J17TrustHighThreshold:          j17TrustHighThreshold,
+		J17TrustLowThreshold:           j17TrustLowThreshold,
+		J17TrustTTLHours:               j17TrustTTLHours,
+		J17BootstrapCodification:       j17BootstrapCodification,
+		J17BootstrapSpaceID:            j17BootstrapSpaceID,
+		J17MetricsEnabled:              j17MetricsEnabled,
+		J17CodificationThreshold:       j17CodificationThreshold,
+		J17ComprehensionMinThreshold:   j17ComprehensionMinThreshold,
+		J17CompressionMinRatio:         j17CompressionMinRatio,
+		J17ReplayFrequencyMax:          j17ReplayFrequencyMax,
+		J17NLIComprehensionEnabled:     j17NLIComprehensionEnabled,
+		J17ProtocolDataCollection:      j17ProtocolDataCollection,
+		J17T1ComprehensionGate:         j17T1ComprehensionGate,
+		J17ExtensionsEnabled:           j17ExtensionsEnabled,
+		J17AllowedExtensions:           j17AllowedExtensions,
+		J17MLTierPredictionEnabled:     j17MLTierPredictionEnabled,
+		J17TierModelMinSamples:         j17TierModelMinSamples,
+		J17SidecarURL:                  j17SidecarURL,
+		J17SidecarTimeoutMs:            j17SidecarTimeoutMs,
+		J17SidecarMode:                 j17SidecarMode,
+		J17SidecarCanaryPct:            j17SidecarCanaryPct,
+		J17SidecarConfidenceFloor:      j17SidecarConfidenceFloor,
+		J17NLIScoreOfRecord:            j17NLIScoreOfRecord,
+		J17PrecedentProtectedCodes:     j17PrecedentProtectedCodes,
+		J17PrecedentLogEnabled:         j17PrecedentLogEnabled,
+		J17SidecarCBEnabled:            j17SidecarCBEnabled,
+		J17SidecarCBFailureThreshold:   j17SidecarCBFailureThreshold,
+		J17SidecarCBTimeoutSec:         j17SidecarCBTimeoutSec,
+		J17NLIObservationalEnabled:     j17NLIObservationalEnabled,
+		J17TierEffectivenessMinSamples: j17TierEffectivenessMinSamples,
+		J17TierIneffectiveThreshold:    j17TierIneffectiveThreshold,
+		J17TierDriftDetectionEnabled:   j17TierDriftDetectionEnabled,
+		J17NLICalibrationWindowSize:    j17NLICalibrationWindowSize,
+		J17NLICalibrationBiasThreshold: j17NLICalibrationBiasThreshold,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,
@@ -4405,26 +4421,26 @@ func FromEnv() (Config, error) {
 		MetaLearnMaxTokens:      metaLearnMaxTokens,
 		MetaLearnTimeoutMs:      metaLearnTimeoutMs,
 
-		GapLowScoreThreshold:      gapLowScoreThreshold,
-		GapMinOccurrences:         gapMinOccurrences,
-		GapAnalysisWindowHours:    gapAnalysisWindowHours,
-		GapMetricsWindowSize:      gapMetricsWindowSize,
-		CompressionEnabled:        compressionEnabled,
-		CompressionMinSize:        compressionMinSize,
-		PaginationMaxLimit:        paginationMaxLimit,
-		PaginationDefLimit:        paginationDefLimit,
-		Neo4jMaxPoolSize:          neo4jMaxPoolSize,
-		Neo4jAcquireTimeoutSec:    neo4jAcquireTimeout,
-		Neo4jMaxConnLifetimeSec:   neo4jMaxConnLifetime,
-		Neo4jConnIdleTimeoutSec:   neo4jConnIdleTimeout,
-		PortRangeStart:            portRangeStart,
-		PortRangeEnd:              portRangeEnd,
-		PortFilePath:              portFilePath,
-		SyncIntervalMinutes:       syncIntervalMinutes,
-		SyncSpaceIDs:              syncSpaceIDs,
-		SyncStaleThresholdHours:   syncStaleThresholdHours,
-		SyncRepoPathMap:           syncRepoPathMap,
-		APEIngestSyncEnabled:      apeIngestSyncEnabled,
+		GapLowScoreThreshold:    gapLowScoreThreshold,
+		GapMinOccurrences:       gapMinOccurrences,
+		GapAnalysisWindowHours:  gapAnalysisWindowHours,
+		GapMetricsWindowSize:    gapMetricsWindowSize,
+		CompressionEnabled:      compressionEnabled,
+		CompressionMinSize:      compressionMinSize,
+		PaginationMaxLimit:      paginationMaxLimit,
+		PaginationDefLimit:      paginationDefLimit,
+		Neo4jMaxPoolSize:        neo4jMaxPoolSize,
+		Neo4jAcquireTimeoutSec:  neo4jAcquireTimeout,
+		Neo4jMaxConnLifetimeSec: neo4jMaxConnLifetime,
+		Neo4jConnIdleTimeoutSec: neo4jConnIdleTimeout,
+		PortRangeStart:          portRangeStart,
+		PortRangeEnd:            portRangeEnd,
+		PortFilePath:            portFilePath,
+		SyncIntervalMinutes:     syncIntervalMinutes,
+		SyncSpaceIDs:            syncSpaceIDs,
+		SyncStaleThresholdHours: syncStaleThresholdHours,
+		SyncRepoPathMap:         syncRepoPathMap,
+		APEIngestSyncEnabled:    apeIngestSyncEnabled,
 
 		// Phase 3: Production Readiness
 		RateLimitEnabled:           rateLimitEnabled,
@@ -4462,25 +4478,25 @@ func FromEnv() (Config, error) {
 		MemoryPressureThresholdMB: memoryPressureThresholdMB,
 
 		// Phase 60b: RSIC
-		RSICMicroEnabled:       rsicMicroEnabled,
-		RSICMesoPeriodHours:    rsicMesoPeriodHours,
-		RSICMesoPeriodSessions: rsicMesoPeriodSessions,
-		RSICMacroCron:          rsicMacroCron,
-		RSICMaxNodePrunePct:    rsicMaxNodePrunePct,
-		RSICMaxEdgePrunePct:    rsicMaxEdgePrunePct,
-		RSICRollbackWindow:     rsicRollbackWindow,
-		RSICWatchdogEnabled:    rsicWatchdogEnabled,
-		RSICWatchdogCheckSec:   rsicWatchdogCheckSec,
-		RSICWatchdogDecayRate:  rsicWatchdogDecayRate,
-		RSICNudgeThreshold:     rsicNudgeThreshold,
-		RSICWarnThreshold:      rsicWarnThreshold,
-		RSICForceThreshold:     rsicForceThreshold,
-		RSICCalibrationDays:    rsicCalibrationDays,
-		RSICMaxHistoryEntries:  rsicMaxHistoryEntries,
-		RSICMinConfidence:      rsicMinConfidence,
-		RSICTriggerCooldownSec:  rsicTriggerCooldownSec,
-		RSICTriggerDedupeSec:    rsicTriggerDedupeSec,
-		RSICWatchdogSpaceID:     rsicWatchdogSpaceID,
+		RSICMicroEnabled:               rsicMicroEnabled,
+		RSICMesoPeriodHours:            rsicMesoPeriodHours,
+		RSICMesoPeriodSessions:         rsicMesoPeriodSessions,
+		RSICMacroCron:                  rsicMacroCron,
+		RSICMaxNodePrunePct:            rsicMaxNodePrunePct,
+		RSICMaxEdgePrunePct:            rsicMaxEdgePrunePct,
+		RSICRollbackWindow:             rsicRollbackWindow,
+		RSICWatchdogEnabled:            rsicWatchdogEnabled,
+		RSICWatchdogCheckSec:           rsicWatchdogCheckSec,
+		RSICWatchdogDecayRate:          rsicWatchdogDecayRate,
+		RSICNudgeThreshold:             rsicNudgeThreshold,
+		RSICWarnThreshold:              rsicWarnThreshold,
+		RSICForceThreshold:             rsicForceThreshold,
+		RSICCalibrationDays:            rsicCalibrationDays,
+		RSICMaxHistoryEntries:          rsicMaxHistoryEntries,
+		RSICMinConfidence:              rsicMinConfidence,
+		RSICTriggerCooldownSec:         rsicTriggerCooldownSec,
+		RSICTriggerDedupeSec:           rsicTriggerDedupeSec,
+		RSICWatchdogSpaceID:            rsicWatchdogSpaceID,
 		RSICPersistenceEnabled:         rsicPersistenceEnabled,
 		RSICProtectedSpaces:            rsicProtectedSpaces,
 		RSICMacroCronSpace:             rsicMacroCronSpace,
@@ -4495,13 +4511,13 @@ func FromEnv() (Config, error) {
 		WeeklyGapInterviewsEnabled:     weeklyGapInterviewsEnabled,
 
 		// Phase AR-3: LLM-powered intelligence
-		RSICLLMReflectEnabled:            rsicLLMReflectEnabled,
-		RSICLLMReflectProvider:           rsicLLMReflectProvider,
-		RSICLLMReflectModel:              rsicLLMReflectModel,
-		RSICLLMReflectCompress:           rsicLLMReflectCompress,
-		RSICLLMReflectTimeoutMs:          rsicLLMReflectTimeoutMs,
-		RSICLLMConcurrencyLimit:          rsicLLMConcurrencyLimit,
-		ConflictTrackerEnabled:           conflictTrackerEnabled,
+		RSICLLMReflectEnabled:   rsicLLMReflectEnabled,
+		RSICLLMReflectProvider:  rsicLLMReflectProvider,
+		RSICLLMReflectModel:     rsicLLMReflectModel,
+		RSICLLMReflectCompress:  rsicLLMReflectCompress,
+		RSICLLMReflectTimeoutMs: rsicLLMReflectTimeoutMs,
+		RSICLLMConcurrencyLimit: rsicLLMConcurrencyLimit,
+		ConflictTrackerEnabled:  conflictTrackerEnabled,
 
 		// Phase 11.6.3 — MLX Watchdog
 		MLXWatchdogEnabled:  mlxWatchdogEnabled,
@@ -4524,9 +4540,9 @@ func FromEnv() (Config, error) {
 		RetrievalColumnWeightBM25:       retrievalColumnWeightBM25,
 		RetrievalColumnWeightGraph:      retrievalColumnWeightGraph,
 		RetrievalColumnWeightStructural: retrievalColumnWeightStructural,
-		RetrievalRerankConsumeConsensus:  retrievalRerankConsumeConsensus,
-		DH005ConsumeConsensus:            dh005ConsumeConsensus,
-		RetrievalAuditEnabled:            retrievalAuditEnabled,
+		RetrievalRerankConsumeConsensus: retrievalRerankConsumeConsensus,
+		DH005ConsumeConsensus:           dh005ConsumeConsensus,
+		RetrievalAuditEnabled:           retrievalAuditEnabled,
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
 		EventGraphEnabled:                        eventGraphEnabled,
@@ -4562,19 +4578,19 @@ func FromEnv() (Config, error) {
 		ContextFingerprintQueryTopK:            contextFingerprintQueryTopK,
 		RetrievalContextColumnCategoryWeights:  retrievalContextColumnCategoryWeights,
 
-		ConsultingLLMConstraintsEnabled:  consultingLLMConstraintsEnabled,
-		ConsultingLLMConstraintsProvider: consultingLLMConstraintsProvider,
-		ConsultingLLMConstraintsModel:    consultingLLMConstraintsModel,
-		ConsultingClassifyTimeoutMs:      consultingClassifyTimeoutMs,
-		ConsultingClassifyConcurrency:    consultingClassifyConcurrency,
+		ConsultingLLMConstraintsEnabled:     consultingLLMConstraintsEnabled,
+		ConsultingLLMConstraintsProvider:    consultingLLMConstraintsProvider,
+		ConsultingLLMConstraintsModel:       consultingLLMConstraintsModel,
+		ConsultingClassifyTimeoutMs:         consultingClassifyTimeoutMs,
+		ConsultingClassifyConcurrency:       consultingClassifyConcurrency,
 		ConsultingConstraintScoreFloor:      consultingConstraintScoreFloor,
 		ConsultingAuthorityScoreFloor:       consultingAuthorityScoreFloor,
 		ConsultingConflictScoreFloor:        consultingConflictScoreFloor,
 		RetrievalConfidenceSigmoidMidpoint:  retrievalConfidenceSigmoidMidpoint,
 		RetrievalConfidenceSigmoidSteepness: retrievalConfidenceSigmoidSteepness,
-		RetrievalLLMClassifyEnabled:      retrievalLLMClassifyEnabled,
-		RetrievalLLMClassifyProvider:     retrievalLLMClassifyProvider,
-		RetrievalLLMClassifyModel:        retrievalLLMClassifyModel,
+		RetrievalLLMClassifyEnabled:         retrievalLLMClassifyEnabled,
+		RetrievalLLMClassifyProvider:        retrievalLLMClassifyProvider,
+		RetrievalLLMClassifyModel:           retrievalLLMClassifyModel,
 
 		// Phase 38: UNTS Hash Verification
 		UNTSEnabled:  untsEnabled,
@@ -4603,25 +4619,25 @@ func FromEnv() (Config, error) {
 		ScraperMaxContentLengthKB: scraperMaxContentKB,
 
 		// Phase 70: Neo4j Backup & Restore
-		BackupEnabled:              backupEnabled,
-		BackupStorageDir:           backupStorageDir,
-		BackupFullCmd:              backupFullCmd,
-		BackupNeo4jContainer:       backupNeo4jContainer,
-		BackupFullIntervalHours:    backupFullIntervalHours,
-		BackupPartialIntervalHours: backupPartialIntervalHours,
-		BackupRetentionFullCount:   backupRetentionFullCount,
+		BackupEnabled:               backupEnabled,
+		BackupStorageDir:            backupStorageDir,
+		BackupFullCmd:               backupFullCmd,
+		BackupNeo4jContainer:        backupNeo4jContainer,
+		BackupFullIntervalHours:     backupFullIntervalHours,
+		BackupPartialIntervalHours:  backupPartialIntervalHours,
+		BackupRetentionFullCount:    backupRetentionFullCount,
 		BackupRetentionPartialCount: backupRetentionPartialCount,
-		BackupRetentionMaxAgeDays:  backupRetentionMaxAgeDays,
+		BackupRetentionMaxAgeDays:   backupRetentionMaxAgeDays,
 		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
-		BackupRetentionRunAfter:    backupRetentionRunAfter,
+		BackupRetentionRunAfter:     backupRetentionRunAfter,
 
 		// TimescaleDB Backup & Restore
-		TSDBBackupEnabled:          tsdbBackupEnabled,
-		TSDBBackupStorageDir:       tsdbBackupStorageDir,
-		TSDBBackupComposeFile:      tsdbBackupComposeFile,
-		TSDBBackupServiceName:      tsdbBackupServiceName,
-		TSDBBackupIntervalHours:    tsdbBackupIntervalHours,
-		TSDBBackupRetentionCount:   tsdbBackupRetentionCount,
+		TSDBBackupEnabled:             tsdbBackupEnabled,
+		TSDBBackupStorageDir:          tsdbBackupStorageDir,
+		TSDBBackupComposeFile:         tsdbBackupComposeFile,
+		TSDBBackupServiceName:         tsdbBackupServiceName,
+		TSDBBackupIntervalHours:       tsdbBackupIntervalHours,
+		TSDBBackupRetentionCount:      tsdbBackupRetentionCount,
 		TSDBBackupRetentionMaxAgeDays: tsdbBackupRetentionMaxAgeDays,
 
 		// Phase 75: Relationship Extraction & Topology Hardening
@@ -4745,19 +4761,19 @@ func FromEnv() (Config, error) {
 		NeuralRerankFallback:  neuralRerankFallback,
 
 		// Synergy
-		SynergyMemoryLineThreshold:    synergyMemoryLineThreshold,
-		SynergyMemoryAutoIngest:       synergyMemoryAutoIngest,
-		SynergyClaudeMDPath:           synergyClaudeMDPath,
-		SynergyMemoryMDPath:           synergyMemoryMDPath,
-		SynergyAssessmentEnabled:      synergyAssessmentEnabled,
-		SynergyTargetClaudeLines:      synergyTargetClaudeLines,
-		SynergyTargetMemoryLines:      synergyTargetMemoryLines,
-		SynergyOverlapSampleSize:      synergyOverlapSampleSize,
-		SynergyOverlapThreshold:       synergyOverlapThreshold,
-		SynergyOverflowAlertThreshold: synergyOverflowAlertThreshold,
-		SynergyMaxHookTokens:          synergyMaxHookTokens,
-		SynergyCronInterval:           synergyCronInterval,
-		SynergyCronEnabled:            synergyCronEnabled,
+		SynergyMemoryLineThreshold:      synergyMemoryLineThreshold,
+		SynergyMemoryAutoIngest:         synergyMemoryAutoIngest,
+		SynergyClaudeMDPath:             synergyClaudeMDPath,
+		SynergyMemoryMDPath:             synergyMemoryMDPath,
+		SynergyAssessmentEnabled:        synergyAssessmentEnabled,
+		SynergyTargetClaudeLines:        synergyTargetClaudeLines,
+		SynergyTargetMemoryLines:        synergyTargetMemoryLines,
+		SynergyOverlapSampleSize:        synergyOverlapSampleSize,
+		SynergyOverlapThreshold:         synergyOverlapThreshold,
+		SynergyOverflowAlertThreshold:   synergyOverflowAlertThreshold,
+		SynergyMaxHookTokens:            synergyMaxHookTokens,
+		SynergyCronInterval:             synergyCronInterval,
+		SynergyCronEnabled:              synergyCronEnabled,
 		SynergyRecoveryBufferSpace:      synergyRecoveryBufferSpace,
 		SynergyRecoveryBufferPath:       synergyRecoveryBufferPath,
 		SynergyRecoveryBufferMaxEntries: synergyRecoveryBufferMaxEntries,
@@ -4821,6 +4837,9 @@ func FromEnv() (Config, error) {
 
 		// Alert Evaluator
 		JobHealthAlertEnabled:     jobHealthAlertEnabled,
+		HookHealthAlertEnabled:    hookHealthAlertEnabled,
+		HookSilentLookbackHours:   hookSilentLookbackHours,
+		HookActivityMinEvents:     hookActivityMinEvents,
 		JobBackupStalenessHours:   jobBackupStalenessHours,
 		JobFailureLookbackMin:     jobFailureLookbackMin,
 		AlertEvaluatorEnabled:     alertEvaluatorEnabled,

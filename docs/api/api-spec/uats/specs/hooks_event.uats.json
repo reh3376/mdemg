@@ -1,0 +1,98 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Hook Event Heartbeat",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "hooks",
+      "jobhealth",
+      "write",
+      "tsdb"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/hooks/event records hook-channel heartbeats for absence detection (HOOKSYNC-001)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "002183146b0eac281a3dbdea3effeea77ffd5f4b59c2c0d6d363d97fbb1149d3"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/hooks/event",
+    "body": {
+      "hook": "uats-contract-probe",
+      "session_id": "uats-hooks-event",
+      "duration_ms": 5
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.status",
+        "op": "equals",
+        "expected": "recorded"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "invalid_hook_name",
+      "description": "Hook names outside ^[a-z0-9][a-z0-9-]{0,63}$ are rejected",
+      "request": {
+        "method": "POST",
+        "path": "/v1/hooks/event",
+        "body": {
+          "hook": "BAD NAME!"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_hook",
+      "description": "Empty hook name is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/v1/hooks/event",
+        "body": {
+          "hook": ""
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    }
+  ]
+}
