@@ -84,6 +84,9 @@ func newIngestCmd() *cobra.Command {
 	cmd.Flags().IntVar(&cfg.batchSize, "batch", 100, "Batch size for ingestion (default: 100, optimal for ~15/s per worker)")
 	cmd.Flags().IntVar(&cfg.workers, "workers", 4, "Number of parallel workers")
 	cmd.Flags().IntVar(&cfg.timeout, "timeout", 300, "HTTP timeout in seconds")
+	cmd.Flags().IntVar(&cfg.consolidateTimeout, "consolidate-timeout",
+		tsdbEnvInt("INGEST_CONSOLIDATE_TIMEOUT_SEC", 1800),
+		"Consolidation HTTP timeout in seconds (env INGEST_CONSOLIDATE_TIMEOUT_SEC; consolidating a ~10k-node space exceeds the batch timeout)")
 	cmd.Flags().IntVar(&cfg.delay, "delay", 50, "Delay between batches in ms")
 	cmd.Flags().IntVar(&cfg.maxRetries, "retries", 3, "Max retries per batch on failure")
 	cmd.Flags().IntVar(&cfg.retryDelay, "retry-delay", 2000, "Initial retry delay in ms, doubles each retry")
@@ -141,18 +144,19 @@ func newIngestCmd() *cobra.Command {
 
 type ingestConfig struct {
 	// Core settings
-	codebasePath  string
-	spaceID       string
-	mdemgEndpoint string
-	batchSize     int
-	workers       int
-	timeout       int
-	delay         int
-	maxRetries    int
-	retryDelay    int
-	consolidate   bool
-	dryRun        bool
-	verbose       bool
+	codebasePath       string
+	spaceID            string
+	mdemgEndpoint      string
+	batchSize          int
+	workers            int
+	timeout            int
+	consolidateTimeout int // HOOKWIRE-class fix: consolidation needs its own budget
+	delay              int
+	maxRetries         int
+	retryDelay         int
+	consolidate        bool
+	dryRun             bool
+	verbose            bool
 
 	// Filters
 	excludeDirs    string
@@ -784,8 +788,17 @@ func runIngest(cfg *ingestConfig) error {
 
 	if cfg.consolidate && stats.Ingested > 0 {
 		emitProgress(cfg, progressEvent{Event: "consolidation_start"})
-		slog.Info("running consolidation")
-		if err := runConsolidation(client, cfg.mdemgEndpoint, cfg.spaceID); err != nil {
+		slog.Info("running consolidation", "timeout_sec", cfg.consolidateTimeout)
+		// HIDDEN-WEIGHT-001 live-smoke fix: consolidation of a large space
+		// (~10k nodes) exceeds the shared batch-ingest timeout (--timeout,
+		// 300s) — the client gave up while the server completed the work.
+		// Same bug class as GUIDANCE-SYNTH-001's hardcoded 30s: long LLM/
+		// graph work needs its own config-driven budget.
+		conClient := &http.Client{
+			Timeout:   time.Duration(cfg.consolidateTimeout) * time.Second,
+			Transport: client.Transport,
+		}
+		if err := runConsolidation(conClient, cfg.mdemgEndpoint, cfg.spaceID); err != nil {
 			slog.Error("consolidation failed", "error", err)
 		}
 	}
@@ -947,28 +960,28 @@ func convertLanguageElement(elem languages.CodeElement) codeElement {
 
 func getEnabledLanguages(cfg *ingestConfig) map[string]bool {
 	return map[string]bool{
-		"go":         true,
-		"rust":       cfg.includeRust,
-		"python":     cfg.includePy,
-		"typescript": cfg.includeTS,
-		"java":       cfg.includeJava,
-		"markdown":   cfg.includeMd,
-		"json":       true,
-		"sql":        true,
-		"xml":        true,
-		"c":          true,
-		"cpp":        true,
-		"yaml":       true,
-		"toml":       true,
-		"ini":        true,
-		"dockerfile": true,
-		"shell":      true,
-		"cuda":       true,
-		"cypher":     true,
-		"csharp":     true,
-		"kotlin":     true,
-		"terraform":       true,
-		"makefile":        true,
+		"go":               true,
+		"rust":             cfg.includeRust,
+		"python":           cfg.includePy,
+		"typescript":       cfg.includeTS,
+		"java":             cfg.includeJava,
+		"markdown":         cfg.includeMd,
+		"json":             true,
+		"sql":              true,
+		"xml":              true,
+		"c":                true,
+		"cpp":              true,
+		"yaml":             true,
+		"toml":             true,
+		"ini":              true,
+		"dockerfile":       true,
+		"shell":            true,
+		"cuda":             true,
+		"cypher":           true,
+		"csharp":           true,
+		"kotlin":           true,
+		"terraform":        true,
+		"makefile":         true,
 		"php":              cfg.includePHP,
 		"graphql":          cfg.includeGraphQL,
 		"lua":              cfg.includeLua,

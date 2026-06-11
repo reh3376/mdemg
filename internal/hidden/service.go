@@ -699,12 +699,19 @@ CREATE (h:MemoryNode:HiddenPattern {
   version: 1
 })
 WITH h
-UNWIND $memberIds AS memberId
-MATCH (b:MemoryNode {space_id: $spaceId, node_id: memberId})
+UNWIND $memberEdges AS me
+MATCH (b:MemoryNode {space_id: $spaceId, node_id: me.memberId})
 CREATE (b)-[:GENERALIZES {
   space_id: $spaceId,
-  edge_id: randomUUID(),
-  weight: 1.0 - point.distance(b.embedding, h.embedding) / 2.0,
+  edge_id: me.edgeId,
+  // HIDDEN-WEIGHT-001: point.distance() is a spatial-Point function — on
+  // embedding lists it returns NULL, so this weight was never set (100% of
+  // GENERALIZES edges were weightless). vector.similarity.cosine returns
+  // [0,1] directly. Null-guard added (this site had none).
+  weight: CASE WHEN b.embedding IS NOT NULL AND h.embedding IS NOT NULL
+          THEN vector.similarity.cosine(b.embedding, h.embedding)
+          ELSE 0.5
+          END,
   category: $category,
   category_summary: $categorySummary,
   created_at: datetime(),
@@ -718,7 +725,7 @@ RETURN h.node_id AS hiddenId, count(b) AS edgeCount`
 			"name":            name,
 			"centroid":        toFloat32Slice(centroid),
 			"memberCount":     len(members),
-			"memberIds":       memberIDs,
+			"memberEdges":     memberEdgePairs(memberIDs),
 			"category":        category,
 			"categorySummary": categorySummary,
 		})
@@ -4470,16 +4477,19 @@ CREATE (t:MemoryNode:ConversationTheme {
   version: 1
 })
 WITH t
-UNWIND $memberIds AS memberId
-MATCH (o:MemoryNode {space_id: $spaceId, node_id: memberId})
-WITH t, o,
+UNWIND $memberEdges AS me
+MATCH (o:MemoryNode {space_id: $spaceId, node_id: me.memberId})
+WITH t, o, me,
+     // HIDDEN-WEIGHT-001: point.distance() returns NULL on embedding lists
+     // (the CASE guard passed, then the THEN expr evaluated NULL — so edges
+     // with GOOD embeddings got no weight while embedding-less ones got 0.5).
      CASE WHEN t.embedding IS NOT NULL AND o.embedding IS NOT NULL
-          THEN 1.0 - point.distance(o.embedding, t.embedding) / 2.0
+          THEN vector.similarity.cosine(o.embedding, t.embedding)
           ELSE 0.5
      END AS similarity
 CREATE (o)-[:GENERALIZES {
   space_id: $spaceId,
-  edge_id: randomUUID(),
+  edge_id: me.edgeId,
   weight: similarity,
   similarity_score: similarity,
   created_at: datetime(),
@@ -4494,7 +4504,7 @@ RETURN t.node_id AS themeId, count(o) AS edgeCount`
 			"summary":      summary,
 			"centroid":     toFloat32Slice(centroid),
 			"memberCount":  len(members),
-			"memberIds":    memberIDs,
+			"memberEdges":  memberEdgePairs(memberIDs),
 			"dominantType": dominantType,
 			"avgSurprise":  avgSurprise,
 		})
@@ -5502,16 +5512,18 @@ CREATE (c:MemoryNode:EmergentConcept {
   version: 1
 })
 WITH c
-UNWIND $memberIds AS memberId
-MATCH (m:MemoryNode {space_id: $spaceId, node_id: memberId})
-WITH c, m,
+UNWIND $memberEdges AS me
+MATCH (m:MemoryNode {space_id: $spaceId, node_id: me.memberId})
+WITH c, m, me,
+     // HIDDEN-WEIGHT-001: point.distance() returns NULL on embedding lists —
+     // 95% of ABSTRACTS_TO edges were weightless. cosine returns [0,1].
      CASE WHEN c.embedding IS NOT NULL AND m.embedding IS NOT NULL
-          THEN 1.0 - point.distance(m.embedding, c.embedding) / 2.0
+          THEN vector.similarity.cosine(m.embedding, c.embedding)
           ELSE 0.5
      END AS similarity
 CREATE (m)-[:ABSTRACTS_TO {
   space_id: $spaceId,
-  edge_id: randomUUID(),
+  edge_id: me.edgeId,
   weight: similarity,
   similarity_score: similarity,
   created_at: datetime(),
@@ -5528,7 +5540,7 @@ RETURN c.node_id AS conceptId, count(m) AS edgeCount`
 			"centroid":     toFloat32Slice(centroid),
 			"keywords":     keywords,
 			"memberCount":  len(members),
-			"memberIds":    memberIDs,
+			"memberEdges":  memberEdgePairs(memberIDs),
 			"avgSurprise":  avgSurprise,
 			"sessionCount": sessionCount,
 		})

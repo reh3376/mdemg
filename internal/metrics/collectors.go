@@ -15,9 +15,9 @@ type StandardMetrics struct {
 	HTTPRequestDuration func(method, path string) *Histogram
 
 	// Retrieval metrics
-	RetrievalLatency    *Histogram
-	RetrievalCacheHits  *Counter
-	RetrievalCacheMiss  *Counter
+	RetrievalLatency   *Histogram
+	RetrievalCacheHits *Counter
+	RetrievalCacheMiss *Counter
 
 	// Rate limiting metrics
 	RateLimitRejected *Counter
@@ -53,8 +53,8 @@ type StandardMetrics struct {
 	CMSDedupMergeFails   *Counter
 
 	// CMS retrieval metrics
-	CMSRecallTotal  *Counter
-	CMSResumeTotal  *Counter
+	CMSRecallTotal *Counter
+	CMSResumeTotal *Counter
 
 	// CMS error metrics
 	CMSWriteJSONFails       *Counter
@@ -62,12 +62,13 @@ type StandardMetrics struct {
 	CMSStabilityUpdateFails *Counter
 
 	// Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
-	Neo4jGraphNodes         func(spaceID string) *Gauge
-	Neo4jGraphEdges         func(spaceID string) *Gauge
-	Neo4jGraphObservations  func(spaceID string) *Gauge
-	Neo4jGraphOrphans       func(spaceID string) *Gauge
-	Neo4jGraphHealthScore   func(spaceID string) *Gauge
-	Neo4jGraphLearningEdges func(spaceID string) *Gauge
+	Neo4jGraphNodes           func(spaceID string) *Gauge
+	Neo4jGraphEdges           func(spaceID string) *Gauge
+	Neo4jGraphObservations    func(spaceID string) *Gauge
+	Neo4jGraphOrphans         func(spaceID string) *Gauge
+	Neo4jGraphNullWeightEdges func(spaceID string) *Gauge
+	Neo4jGraphHealthScore     func(spaceID string) *Gauge
+	Neo4jGraphLearningEdges   func(spaceID string) *Gauge
 
 	// Neo4j graph totals
 	Neo4jGraphTotalNodes  *Gauge
@@ -76,8 +77,8 @@ type StandardMetrics struct {
 
 	// Neo4j container resource metrics (via docker stats)
 	Neo4jContainerCPUPercent *Gauge
-	Neo4jContainerMemUsed   *Gauge
-	Neo4jContainerMemLimit  *Gauge
+	Neo4jContainerMemUsed    *Gauge
+	Neo4jContainerMemLimit   *Gauge
 	Neo4jContainerMemPercent *Gauge
 
 	// RSIC cycle metrics (Phase 91)
@@ -142,24 +143,24 @@ type StandardMetrics struct {
 	RSICSynergyBufferEntries func(spaceID string) *Gauge
 
 	// J17 Protocol metrics (published after each assessment)
-	J17TierT1Fraction      func(spaceID string) *Gauge
-	J17TierT2Fraction      func(spaceID string) *Gauge
-	J17TierT3Fraction      func(spaceID string) *Gauge
-	J17CompressionRatio    func(spaceID string) *Gauge
-	J17AvgComprehension    func(spaceID string) *Gauge
+	J17TierT1Fraction       func(spaceID string) *Gauge
+	J17TierT2Fraction       func(spaceID string) *Gauge
+	J17TierT3Fraction       func(spaceID string) *Gauge
+	J17CompressionRatio     func(spaceID string) *Gauge
+	J17AvgComprehension     func(spaceID string) *Gauge
 	J17AvgTokensPerGuidance func(spaceID string) *Gauge
-	J17ReplayFrequency     func(spaceID string) *Gauge
-	J17TicketRestoreRate   func(spaceID string) *Gauge
-	J17CodeCoverage        func(spaceID string) *Gauge
-	J17EventsTotal         func(spaceID string) *Gauge
-	J17TierT1Comprehension func(spaceID string) *Gauge
-	J17TierT2Comprehension func(spaceID string) *Gauge
-	J17TierT3Comprehension func(spaceID string) *Gauge
+	J17ReplayFrequency      func(spaceID string) *Gauge
+	J17TicketRestoreRate    func(spaceID string) *Gauge
+	J17CodeCoverage         func(spaceID string) *Gauge
+	J17EventsTotal          func(spaceID string) *Gauge
+	J17TierT1Comprehension  func(spaceID string) *Gauge
+	J17TierT2Comprehension  func(spaceID string) *Gauge
+	J17TierT3Comprehension  func(spaceID string) *Gauge
 
 	// J17 NLI calibration metrics
-	J17NLIMeanBias       func(spaceID string) *Gauge
-	J17NLIBiasAlert      func(spaceID string) *Gauge
-	J17NLIFallbackTotal  func(spaceID string) *Gauge
+	J17NLIMeanBias      func(spaceID string) *Gauge
+	J17NLIBiasAlert     func(spaceID string) *Gauge
+	J17NLIFallbackTotal func(spaceID string) *Gauge
 
 	// J17 tier outcome counts (sample size context)
 	J17TierT1OutcomeCount func(spaceID string) *Gauge
@@ -203,16 +204,16 @@ type StandardMetrics struct {
 
 	// Phase 11.6.3 — MLX Watchdog. State + fast-fail + transition metrics for
 	// the goroutine in internal/mlxprobe and the gate in internal/llmclient.
-	MLXHealthState        func(endpoint string) *Gauge   // 0=up, 1=degraded, 2=down
-	MLXFastFailTotal      func(callerTask string) *Counter // increment when llmclient short-circuits a call
-	MLXStateTransitions   func(from, to string) *Counter   // increment on each up/degraded/down transition
+	MLXHealthState      func(endpoint string) *Gauge     // 0=up, 1=degraded, 2=down
+	MLXFastFailTotal    func(callerTask string) *Counter // increment when llmclient short-circuits a call
+	MLXStateTransitions func(from, to string) *Counter   // increment on each up/degraded/down transition
 
 	// Phase 13 — Note 04 Column-Voting Retrieval. consensus_strength
 	// distribution + per-column wall-clock + per-column failure counter.
 	// Populated only when cfg.RetrievalColumnVotingEnabled is true.
-	RetrievalConsensusStrength    *Histogram                   // mdemg_retrieval_consensus_strength — aggregate consensus per retrieve call
-	RetrievalColumnLatency        func(column string) *Histogram // mdemg_retrieval_column_latency_seconds{column}
-	RetrievalColumnFailedTotal    func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
+	RetrievalConsensusStrength *Histogram                           // mdemg_retrieval_consensus_strength — aggregate consensus per retrieve call
+	RetrievalColumnLatency     func(column string) *Histogram       // mdemg_retrieval_column_latency_seconds{column}
+	RetrievalColumnFailedTotal func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
 
 	// Phase 14 Epic 1 — Note 06 sparse activation gate. Populated only when
 	// cfg.SparseRetrievalEnabled is true (or per-request override sets it).
@@ -322,6 +323,9 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.Neo4jGraphOrphans = func(spaceID string) *Gauge {
 		return r.NewGauge("neo4j_graph_orphans", "Zero-edge (orphan) nodes per space", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jGraphNullWeightEdges = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_graph_null_weight_edges", "NULL-weight abstraction edges per space (HIDDEN-WEIGHT-001; steady state 0)", map[string]string{"space_id": spaceID})
 	}
 	m.Neo4jGraphHealthScore = func(spaceID string) *Gauge {
 		return r.NewGauge("neo4j_graph_health_score", "Graph health score per space (0-1)", map[string]string{"space_id": spaceID})
@@ -824,6 +828,9 @@ type SpaceGraphData struct {
 	Orphans       int
 	LearningEdges int
 	HealthScore   float64
+	// NullWeightEdges counts GENERALIZES/ABSTRACTS_TO edges with NULL weight
+	// (HIDDEN-WEIGHT-001) — steady state 0; >0 = the bug class regressed.
+	NullWeightEdges int
 }
 
 // CollectNeo4jGraphMetrics updates Neo4j graph per-space metrics.
@@ -836,6 +843,7 @@ func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_edges|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_observations|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_orphans|")
+		m.registry.RemoveGaugesByPrefix("neo4j_graph_null_weight_edges|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_health_score|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_learning_edges|")
 	}
@@ -846,6 +854,7 @@ func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
 		m.Neo4jGraphEdges(s.SpaceID).Set(float64(s.Edges))
 		m.Neo4jGraphObservations(s.SpaceID).Set(float64(s.Observations))
 		m.Neo4jGraphOrphans(s.SpaceID).Set(float64(s.Orphans))
+		m.Neo4jGraphNullWeightEdges(s.SpaceID).Set(float64(s.NullWeightEdges))
 		m.Neo4jGraphHealthScore(s.SpaceID).Set(s.HealthScore)
 		m.Neo4jGraphLearningEdges(s.SpaceID).Set(float64(s.LearningEdges))
 		totalNodes += s.Nodes

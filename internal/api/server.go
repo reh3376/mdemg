@@ -19,30 +19,30 @@ import (
 	"mdemg/internal/anomaly"
 	"mdemg/internal/ape"
 	"mdemg/internal/auth"
-	"mdemg/internal/backup"
 	"mdemg/internal/backpressure"
+	"mdemg/internal/backup"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/consulting"
 	"mdemg/internal/conversation"
+	"mdemg/internal/dockerbin"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/eventgraph"
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
-	"mdemg/internal/jiminy"
-	"mdemg/internal/llmclient"
 	"mdemg/internal/hidden"
-	"mdemg/internal/metalearn"
+	"mdemg/internal/jiminy"
+	"mdemg/internal/jobhealth"
 	"mdemg/internal/jobs"
 	"mdemg/internal/learning"
-	"mdemg/internal/dockerbin"
-	"mdemg/internal/jobhealth"
+	"mdemg/internal/llmclient"
+	"mdemg/internal/metalearn"
 	"mdemg/internal/metrics"
+	"mdemg/internal/models"
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
-	"mdemg/internal/models"
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/transfer"
@@ -52,38 +52,38 @@ import (
 )
 
 type Server struct {
-	cfg             config.Config
-	driver          neo4j.DriverWithContext
-	retriever       *retrieval.Service
-	learner         *learning.Service
-	embedder        embeddings.Embedder
+	cfg       config.Config
+	driver    neo4j.DriverWithContext
+	retriever *retrieval.Service
+	learner   *learning.Service
+	embedder  embeddings.Embedder
 	// Phase 14.2.1 — vector-based query→fingerprint cache. nil-safe;
 	// initialized in NewServer when an embedder is available.
-	contextFPCache *contextFingerprintCache
-	anomalyDetector *anomaly.Service
-	hiddenLayer     *hidden.Service
-	pluginMgr       *plugins.Manager
-	apeScheduler    *ape.Scheduler
-	symbolStore     *symbols.Store
-	consultant      *consulting.Service
-	gapDetector     *gaps.GapDetector
-	gapInterviewer  *gaps.GapInterviewer
-	conversationSvc *conversation.Service
-	contextCooler   *conversation.ContextCooler
-	sessionTracker  *conversation.SessionTracker
-	hiddenSvc       *hidden.Service // alias for handleConversationConsolidate
+	contextFPCache          *contextFingerprintCache
+	anomalyDetector         *anomaly.Service
+	hiddenLayer             *hidden.Service
+	pluginMgr               *plugins.Manager
+	apeScheduler            *ape.Scheduler
+	symbolStore             *symbols.Store
+	consultant              *consulting.Service
+	gapDetector             *gaps.GapDetector
+	gapInterviewer          *gaps.GapInterviewer
+	conversationSvc         *conversation.Service
+	contextCooler           *conversation.ContextCooler
+	sessionTracker          *conversation.SessionTracker
+	hiddenSvc               *hidden.Service // alias for handleConversationConsolidate
 	webhookDebouncer        *linearWebhookDebouncer
 	genericWebhookDebouncer *webhookDebouncer
 	fileWatcherMgr          *filewatcher.Manager
 	stopConsolidate         chan struct{}
-	stopCooler         chan struct{}
-	stopInterviewer    chan struct{}
-	stopScheduledSync  chan struct{}
-	stopSpacePrune     chan struct{}
-	bgWg               sync.WaitGroup // tracks background goroutine completion
+	stopCooler              chan struct{}
+	stopInterviewer         chan struct{}
+	stopScheduledSync       chan struct{}
+	stopSpacePrune          chan struct{}
+	bgWg                    sync.WaitGroup // tracks background goroutine completion
 
 	// Phase 3: Production readiness components
-	cbRegistry     *circuitbreaker.Registry
+	cbRegistry      *circuitbreaker.Registry
 	metricsRegistry *metrics.Registry
 	metricsRecorder *metrics.MetricsRecorder
 
@@ -161,9 +161,9 @@ type Server struct {
 	liveCollectors *ape.LiveCollectors
 
 	// TSDB Sprint: Historical metric writer
-	tsdbClient      *tsdb.Client
-	tsdbWriter      *tsdb.MetricWriter
-	llmWriter       *tsdb.LLMInteractionWriter
+	tsdbClient               *tsdb.Client
+	tsdbWriter               *tsdb.MetricWriter
+	llmWriter                *tsdb.LLMInteractionWriter
 	embeddingWriter          *tsdb.EmbeddingEventWriter
 	retrievalWriter          *tsdb.RetrievalEventWriter
 	retrievalAuditWriter     *tsdb.RetrievalAuditWriter
@@ -547,16 +547,16 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		// J8/J15: Wire LLM synthesizer
 		if cfg.JiminySynthesisEnabled {
 			synCfg := jiminy.SynthesisConfig{
-				Enabled:        true,
-				Provider:       cfg.JiminySynthesisProvider,
-				Model:          cfg.JiminySynthesisModel,
-				MaxTokens:      cfg.JiminySynthesisMaxTokens,
-				TimeoutMs:      cfg.JiminySynthesisTimeoutMs,
-				OpenAIKey:      cfg.OpenAIAPIKey,
+				Enabled:   true,
+				Provider:  cfg.JiminySynthesisProvider,
+				Model:     cfg.JiminySynthesisModel,
+				MaxTokens: cfg.JiminySynthesisMaxTokens,
+				TimeoutMs: cfg.JiminySynthesisTimeoutMs,
+				OpenAIKey: cfg.OpenAIAPIKey,
 				// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches jiminy.synthesize
-				OpenAIURL:      cfg.EffectiveLLMEndpoint(),
-				OllamaURL:      cfg.OllamaEndpoint,
-				Temperature:    cfg.JiminySynthesisTemperature,
+				OpenAIURL:       cfg.EffectiveLLMEndpoint(),
+				OllamaURL:       cfg.OllamaEndpoint,
+				Temperature:     cfg.JiminySynthesisTemperature,
 				ContextMaxChars: cfg.JiminyGuidanceContextMaxChars,
 				OutputMaxChars:  cfg.JiminyGuidanceOutputMaxChars,
 			}
@@ -683,17 +683,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var backupSched *backup.Scheduler
 	if cfg.BackupEnabled {
 		backupCfg := backup.Config{
-			Enabled:              cfg.BackupEnabled,
-			StorageDir:           cfg.BackupStorageDir,
-			FullCmd:              cfg.BackupFullCmd,
-			Neo4jContainer:       cfg.BackupNeo4jContainer,
-			FullIntervalHours:    cfg.BackupFullIntervalHours,
-			PartialIntervalHours: cfg.BackupPartialIntervalHours,
-			RetentionFullCount:   cfg.BackupRetentionFullCount,
+			Enabled:               cfg.BackupEnabled,
+			StorageDir:            cfg.BackupStorageDir,
+			FullCmd:               cfg.BackupFullCmd,
+			Neo4jContainer:        cfg.BackupNeo4jContainer,
+			FullIntervalHours:     cfg.BackupFullIntervalHours,
+			PartialIntervalHours:  cfg.BackupPartialIntervalHours,
+			RetentionFullCount:    cfg.BackupRetentionFullCount,
 			RetentionPartialCount: cfg.BackupRetentionPartialCount,
-			RetentionMaxAgeDays:  cfg.BackupRetentionMaxAgeDays,
+			RetentionMaxAgeDays:   cfg.BackupRetentionMaxAgeDays,
 			RetentionMaxStorageGB: cfg.BackupRetentionMaxStorageGB,
-			RetentionRunAfter:    cfg.BackupRetentionRunAfter,
+			RetentionRunAfter:     cfg.BackupRetentionRunAfter,
 		}
 		exp := transfer.NewExporter(driver)
 		backupSvc = backup.NewService(backupCfg, driver, exp)
@@ -795,12 +795,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// Phase AR-3: Wire LLM-powered reflector if enabled
 	if cfg.RSICLLMReflectEnabled {
 		llmReflector := ape.NewLLMReflector(ape.LLMReflectorConfig{
-			Enabled:         true,
-			Provider:        cfg.RSICLLMReflectProvider,
-			Model:           cfg.RSICLLMReflectModel,
-			MaxTokens:       cfg.EmergenceMaxTokens,
-			TimeoutMs:       cfg.RSICLLMReflectTimeoutMs,
-			OpenAIKey:       cfg.OpenAIAPIKey,
+			Enabled:   true,
+			Provider:  cfg.RSICLLMReflectProvider,
+			Model:     cfg.RSICLLMReflectModel,
+			MaxTokens: cfg.EmergenceMaxTokens,
+			TimeoutMs: cfg.RSICLLMReflectTimeoutMs,
+			OpenAIKey: cfg.OpenAIAPIKey,
 			// Phase 11.6: route via EffectiveLLMEndpoint so LLM_ENDPOINT override reaches ape.reflect
 			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
 			OllamaURL:       cfg.OllamaEndpoint,
@@ -964,26 +964,26 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		fpCache = newContextFingerprintCache(embedderForFP)
 	}
 	s := &Server{
-		cfg:             cfg,
-		driver:          driver,
-		retriever:       ret,
-		learner:         lea,
-		embedder:        embedderForFP,
-		contextFPCache:  fpCache,
-		anomalyDetector: anom,
-		hiddenLayer:     hid,
-		hiddenSvc:       hid,
-		pluginMgr:       pluginMgr,
-		apeScheduler:    apeSched,
-		symbolStore:     symStore,
-		symbolParser:    symParser,
-		symbolResolver:  symResolver,
-		consultant:      cons,
-		gapDetector:     gapDet,
-		gapInterviewer:  gapInt,
-		conversationSvc: convSvc,
-		contextCooler:   ctxCooler,
-		sessionTracker:  sessTracker,
+		cfg:                     cfg,
+		driver:                  driver,
+		retriever:               ret,
+		learner:                 lea,
+		embedder:                embedderForFP,
+		contextFPCache:          fpCache,
+		anomalyDetector:         anom,
+		hiddenLayer:             hid,
+		hiddenSvc:               hid,
+		pluginMgr:               pluginMgr,
+		apeScheduler:            apeSched,
+		symbolStore:             symStore,
+		symbolParser:            symParser,
+		symbolResolver:          symResolver,
+		consultant:              cons,
+		gapDetector:             gapDet,
+		gapInterviewer:          gapInt,
+		conversationSvc:         convSvc,
+		contextCooler:           ctxCooler,
+		sessionTracker:          sessTracker,
 		webhookDebouncer:        newLinearWebhookDebouncer(),
 		genericWebhookDebouncer: newWebhookDebouncer(),
 		fileWatcherMgr:          filewatcher.NewManager(),
@@ -996,9 +996,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		orgReviewService:        conversation.NewOrgReviewService(driver),
 		rsicCycle:               rsicCycle,
 		rsicWatchdog:            rsicWatchdog,
-		orchestrationPolicy:    orchPolicy,
-		snapshotStore:          snapshotStore,
-		rsicStore:              rsicStore,
+		orchestrationPolicy:     orchPolicy,
+		snapshotStore:           snapshotStore,
+		rsicStore:               rsicStore,
 		scraperSvc:              scraperSvc,
 		backupSvc:               backupSvc,
 		backupScheduler:         backupSched,
@@ -2309,7 +2309,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/constraints", s.handleConstraintsList)
 	mux.HandleFunc("/v1/constraints/stats", s.handleConstraintStats)
 	mux.HandleFunc("/v1/constraints/effectiveness", s.handleConstraintEffectiveness) // F3: per-constraint effectiveness metrics
-	mux.HandleFunc("/v1/constraints/scope/", s.handleConstraintScopeUpdate)         // F7: PATCH scope override
+	mux.HandleFunc("/v1/constraints/scope/", s.handleConstraintScopeUpdate)          // F7: PATCH scope override
 
 	// F9: Determinism Score
 	mux.HandleFunc("/v1/metrics/determinism", s.handleDeterminismScore)
@@ -2656,6 +2656,7 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	// Query 1: Per-space node counts + observations
 	type spaceRow struct {
 		nodes, edges, observations, orphans, learningEdges int
+		nullWeightEdges                                    int
 	}
 	spaces := make(map[string]*spaceRow)
 
@@ -2741,6 +2742,33 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		}
 	}
 
+	// Query 4: Per-space NULL-weight abstraction edges (HIDDEN-WEIGHT-001).
+	// Steady state is 0 post-backfill; any reappearance means the
+	// point.distance bug class regressed at a creation site.
+	collected4, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH ()-[r:GENERALIZES|ABSTRACTS_TO]->()
+			 WHERE r.space_id IS NOT NULL AND r.weight IS NULL
+			 WITH r.space_id AS sid, count(r) AS nullEdges
+			 RETURN sid, nullEdges`,
+			nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
+	if err != nil {
+		slog.Error("metrics: neo4j graph query (null-weight edges) failed", "error", err)
+		return s.graphMetricsCache.data
+	}
+	for _, rec := range collected4.([]*neo4j.Record) {
+		sid, _ := rec.Get("sid")
+		nullEdges, _ := rec.Get("nullEdges")
+		if row, ok := spaces[sid.(string)]; ok {
+			row.nullWeightEdges = int(nullEdges.(int64))
+		}
+	}
+
 	// Build result with health scores
 	data := make([]metrics.SpaceGraphData, 0, len(spaces))
 	for sid, row := range spaces {
@@ -2757,13 +2785,14 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 			health = (1.0-orphanRatio)*0.6 + edgeDensity*0.4
 		}
 		data = append(data, metrics.SpaceGraphData{
-			SpaceID:       sid,
-			Nodes:         row.nodes,
-			Edges:         row.edges,
-			Observations:  row.observations,
-			Orphans:       row.orphans,
-			LearningEdges: row.learningEdges,
-			HealthScore:   health,
+			SpaceID:         sid,
+			Nodes:           row.nodes,
+			Edges:           row.edges,
+			Observations:    row.observations,
+			Orphans:         row.orphans,
+			LearningEdges:   row.learningEdges,
+			HealthScore:     health,
+			NullWeightEdges: row.nullWeightEdges,
 		})
 	}
 
@@ -2951,7 +2980,6 @@ func (s *Server) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request)
 
 	writeJSON(w, http.StatusGone, map[string]string{"error": "prometheus endpoint removed, use /v1/metrics/snapshot"})
 }
-
 
 // handleMetricsSnapshot serves a JSON snapshot of all registered metrics.
 func (s *Server) handleMetricsSnapshot(w http.ResponseWriter, r *http.Request) {
