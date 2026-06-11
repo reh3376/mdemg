@@ -134,6 +134,25 @@ if [ -s "$GUIDANCE_TMP" ]; then
   fi
 
   if [ -n "$AUGMENTATION" ] && [ "$WARM" = "true" ]; then
+    # Detect T1/T2 tiers in guidance items — if present, prepend bootstrap header
+    # so the agent can decode compact formats. Bootstrap is ~50 tokens.
+    # (HOOKSYNC-001: this block existed only in the live hook — reverse drift —
+    # and is now single-sourced here.)
+    MAX_TIER=$(jq -r '[.data.guidance[]?.tier // 3] | min' "$GUIDANCE_TMP" 2>/dev/null || echo "3")
+    if [ "$MAX_TIER" = "1" ] || [ "$MAX_TIER" = "2" ]; then
+      BOOTSTRAP=$(curl -sf "${MDEMG_URL}/v1/jiminy/bootstrap?space_id=${SPACE_ID}" \
+        --connect-timeout 1 --max-time 2 2>/dev/null | jq -r '.data.bootstrap // empty' 2>/dev/null) || true
+      if [ -n "$BOOTSTRAP" ]; then
+        echo ""
+        printf '%s\n' "$BOOTSTRAP"
+      fi
+      if [ "$MAX_TIER" = "1" ]; then
+        printf 'ACTIVE CONSTRAINTS (T1 coded format — apply these before responding):\n'
+      else
+        printf 'ACTIVE CONSTRAINTS (telegraphic — apply these before responding):\n'
+      fi
+    fi
+
     echo ""
     printf '%s\n' "$AUGMENTATION"
     if [ "$AGE_MS" != "?" ] && [ "$AGE_MS" -gt 60000 ] 2>/dev/null; then

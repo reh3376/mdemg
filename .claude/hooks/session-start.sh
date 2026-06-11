@@ -73,11 +73,32 @@ EOF
   fi
 fi
 
+# --- Alert delivery: show critical/high service alerts at session start ---
+_ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
+if [ -f "$_ALERT_FILE" ]; then
+  _CRIT_COUNT=$(jq '.alerts | map(select(.cleared == false and (.severity == "critical" or .severity == "high"))) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  if [ "$_CRIT_COUNT" -gt 0 ] 2>/dev/null; then
+    echo ""
+    echo "!! MDEMG HIGH/CRITICAL ALERTS [$_CRIT_COUNT] — INVESTIGATE BEFORE PROCEEDING !!"
+    jq -r '.alerts[] | select(.cleared == false and (.severity == "critical" or .severity == "high")) |
+      "  [\(.severity | ascii_upcase)] \(.service): \(.title)\n    \(.message)"
+    ' "$_ALERT_FILE" 2>/dev/null
+    echo ""
+  fi
+fi
+
+# Enhanced healthz: check for degraded subsystems
+HEALTHZ_RESP=$(curl -sf "${MDEMG_URL}/healthz" --connect-timeout 2 --max-time 3 2>/dev/null || echo "{}")
+HEALTHZ_STATUS=$(echo "$HEALTHZ_RESP" | jq -r '.status // "ok"' 2>/dev/null || echo "ok")
+if [ "$HEALTHZ_STATUS" = "degraded" ]; then
+  echo "⚠ MDEMG server degraded — some subsystems unhealthy"
+  echo "$HEALTHZ_RESP" | jq -r '.checks // {} | to_entries[] | select(.value != "ok") | "  [\(.key)] \(.value)"' 2>/dev/null
+fi
+
 # Version mismatch detection (CLI binary vs running server)
 if [ -x "./bin/mdemg" ]; then
   LOCAL_COMMIT=$(./bin/mdemg version 2>/dev/null | awk '/commit:/{print $2}')
-  SERVER_COMMIT=$(curl -sf "${MDEMG_URL}/healthz" --connect-timeout 2 --max-time 3 2>/dev/null \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit',''))" 2>/dev/null)
+  SERVER_COMMIT=$(echo "$HEALTHZ_RESP" | jq -r '.commit // empty' 2>/dev/null)
   if [ -n "$LOCAL_COMMIT" ] && [ -n "$SERVER_COMMIT" ] && [ "$LOCAL_COMMIT" != "unknown" ] && [ "$SERVER_COMMIT" != "unknown" ] && [ "$LOCAL_COMMIT" != "$SERVER_COMMIT" ]; then
     echo "⚠ Version mismatch: ./bin/mdemg=$LOCAL_COMMIT server=$SERVER_COMMIT — run: mdemg upgrade --edge"
   fi
