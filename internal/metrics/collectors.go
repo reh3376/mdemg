@@ -67,6 +67,7 @@ type StandardMetrics struct {
 	Neo4jGraphObservations    func(spaceID string) *Gauge
 	Neo4jGraphOrphans         func(spaceID string) *Gauge
 	Neo4jGraphNullWeightEdges func(spaceID string) *Gauge
+	Neo4jConversationCoverage func(spaceID string) *Gauge
 	Neo4jGraphHealthScore     func(spaceID string) *Gauge
 	Neo4jGraphLearningEdges   func(spaceID string) *Gauge
 
@@ -326,6 +327,9 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.Neo4jGraphNullWeightEdges = func(spaceID string) *Gauge {
 		return r.NewGauge("neo4j_graph_null_weight_edges", "NULL-weight abstraction edges per space (HIDDEN-WEIGHT-001; steady state 0)", map[string]string{"space_id": spaceID})
+	}
+	m.Neo4jConversationCoverage = func(spaceID string) *Gauge {
+		return r.NewGauge("neo4j_conversation_coverage_ratio", "Themed/total conversation observations per space (HIDDEN-CHURN-001)", map[string]string{"space_id": spaceID})
 	}
 	m.Neo4jGraphHealthScore = func(spaceID string) *Gauge {
 		return r.NewGauge("neo4j_graph_health_score", "Graph health score per space (0-1)", map[string]string{"space_id": spaceID})
@@ -831,6 +835,9 @@ type SpaceGraphData struct {
 	// NullWeightEdges counts GENERALIZES/ABSTRACTS_TO edges with NULL weight
 	// (HIDDEN-WEIGHT-001) — steady state 0; >0 = the bug class regressed.
 	NullWeightEdges int
+	// ConversationCoverage = themed/total conversation observations
+	// (HIDDEN-CHURN-001 PR-B — the 94%-uncovered gap's gauge).
+	ConversationCoverage float64
 }
 
 // CollectNeo4jGraphMetrics updates Neo4j graph per-space metrics.
@@ -844,6 +851,7 @@ func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_observations|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_orphans|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_null_weight_edges|")
+		m.registry.RemoveGaugesByPrefix("neo4j_conversation_coverage_ratio|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_health_score|")
 		m.registry.RemoveGaugesByPrefix("neo4j_graph_learning_edges|")
 	}
@@ -855,6 +863,7 @@ func (m *StandardMetrics) CollectNeo4jGraphMetrics(spaces []SpaceGraphData) {
 		m.Neo4jGraphObservations(s.SpaceID).Set(float64(s.Observations))
 		m.Neo4jGraphOrphans(s.SpaceID).Set(float64(s.Orphans))
 		m.Neo4jGraphNullWeightEdges(s.SpaceID).Set(float64(s.NullWeightEdges))
+		m.Neo4jConversationCoverage(s.SpaceID).Set(s.ConversationCoverage)
 		m.Neo4jGraphHealthScore(s.SpaceID).Set(s.HealthScore)
 		m.Neo4jGraphLearningEdges(s.SpaceID).Set(float64(s.LearningEdges))
 		totalNodes += s.Nodes

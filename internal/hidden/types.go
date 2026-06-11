@@ -307,6 +307,7 @@ type ConversationThemeResult struct {
 	ThemeSummaries    []string // Summaries of created themes
 	ObservationsUsed  int      // Total observations that were clustered
 	NoiseObservations int      // Observations that didn't fit any cluster
+	NoiseAssigned     int      // PR-B: noise observations density-assigned to nearest theme
 }
 
 // ConversationConsolidationResult holds results from conversation-specific consolidation

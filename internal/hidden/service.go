@@ -4223,8 +4223,13 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		embeddings[i] = obs.Embedding
 	}
 
-	// maxThemes = ceil(observations * 0.1) — this is the equation, NOT a configurable cap.
-	maxThemes := (len(validObs) + 9) / 10 // ceil(len/10)
+	// HIDDEN-CHURN-001 PR-B: themes-per-observation ratio is config-driven
+	// (HIDDEN_THEME_TARGET_RATIO, default 0.1 — preserves ceil(n/10)).
+	ratio := s.cfg.HiddenThemeTargetRatio
+	if ratio <= 0 {
+		ratio = 0.1
+	}
+	maxThemes := int(float64(len(validObs))*ratio + 0.999999)
 	if maxThemes < 1 {
 		maxThemes = 1
 	}
@@ -4297,6 +4302,21 @@ func (s *Service) ClusterConversations(ctx context.Context, spaceID string) (*Co
 		result.EdgesCreated += edgesCreated
 		result.ThemeSummaries = append(result.ThemeSummaries, summary)
 		themeID++
+	}
+
+	// HIDDEN-CHURN-001 PR-B: density assignment — NOISE observations attach
+	// to their nearest theme when within the assignment threshold (edges
+	// only, no new themes). Closes part of the 94% coverage gap: previously
+	// every sub-threshold observation was silently dropped from the
+	// hierarchy forever.
+	if s.cfg.HiddenThemeAssignSimThreshold > 0 && len(noise) > 0 {
+		assigned, aErr := s.assignNoiseToThemes(ctx, spaceID, noise, s.cfg.HiddenThemeAssignSimThreshold)
+		if aErr != nil {
+			slog.Warn("ClusterConversations: noise assignment failed", "error", aErr)
+		} else if assigned > 0 {
+			result.NoiseAssigned = assigned
+			slog.Info("ClusterConversations: density-assigned noise observations", "count", assigned)
+		}
 	}
 
 	// HIDDEN-CHURN-001: only themes matched by NO cluster this run die.

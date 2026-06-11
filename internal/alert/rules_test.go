@@ -70,3 +70,26 @@ func TestMaintenanceLivenessRules(t *testing.T) {
 		t.Errorf("custom lookback not applied")
 	}
 }
+
+func TestCoverageRules(t *testing.T) {
+	r := CoverageRules(0)[0]
+	if r.ID != "low_conversation_coverage" || r.Service != "conversation-coverage" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	for _, want := range []string{"mdemg_neo4j_conversation_coverage_ratio", "time >"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+}
+
+// RSIC-VALIDATE/HIDDEN-CHURN regression pin: metric_samples rules must use
+// the table's actual time column — `recorded_at` silently errored every
+// evaluation (Debug-only logging) for the null-weight rule's first hours.
+func TestMetricSamplesRules_UseTimeColumn(t *testing.T) {
+	for _, r := range append(WeightIntegrityRules(0), CoverageRules(0)...) {
+		if strings.Contains(r.QuerySQL, "recorded_at") {
+			t.Errorf("rule %s queries metric_samples with recorded_at (column is `time`)", r.ID)
+		}
+	}
+}

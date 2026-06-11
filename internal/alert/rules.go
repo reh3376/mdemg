@@ -401,8 +401,8 @@ func WeightIntegrityRules(threshold int) []AlertRule {
 				SELECT DISTINCT ON (labels->>'space_id') value
 				FROM metric_samples
 				WHERE metric_name = 'mdemg_neo4j_graph_null_weight_edges'
-				  AND recorded_at > now() - interval '10 minutes'
-				ORDER BY labels->>'space_id', recorded_at DESC) latest`,
+				  AND time > now() - interval '10 minutes'
+				ORDER BY labels->>'space_id', time DESC) latest`,
 			Threshold: float64(threshold),
 			Operator:  "gt",
 			Enabled:   true,
@@ -441,6 +441,38 @@ func MaintenanceLivenessRules(lookbackDays int) []AlertRule {
 				THEN 1 ELSE 0 END`, lookbackDays, lookbackDays),
 			Threshold: 0,
 			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
+// CoverageRules returns the HIDDEN-CHURN-001 conversation-coverage rule:
+// the primary space's themed/total observation ratio staying below the
+// floor. The audited state was ~6% coverage (94% of observations never
+// entered the hierarchy); the density-assignment retune should lift it —
+// this rule keeps the gap visible instead of silent. floor ≤ 0 → 0.2.
+func CoverageRules(floor float64) []AlertRule {
+	if floor <= 0 {
+		floor = 0.2
+	}
+	return []AlertRule{
+		{
+			ID:    "low_conversation_coverage",
+			Title: "Conversation Coverage Below Floor — Hierarchy Missing Most Observations",
+			// Distinct Service per the NOSILENT-001 cooldown-collision rule.
+			Service:     "conversation-coverage",
+			Severity:    SeverityMedium,
+			Interval:    1800 * time.Second,
+			ForDuration: 6 * time.Hour, // long: coverage converges over consolidation cycles
+			QuerySQL: fmt.Sprintf(`SELECT coalesce(min(value), 1) FROM (
+				SELECT DISTINCT ON (labels->>'space_id') value
+				FROM metric_samples
+				WHERE metric_name = 'mdemg_neo4j_conversation_coverage_ratio'
+				  AND time > now() - interval '1 hour'
+				ORDER BY labels->>'space_id', time DESC) latest
+				WHERE value < %f`, floor),
+			Threshold: floor,
+			Operator:  "lt",
 			Enabled:   true,
 		},
 	}

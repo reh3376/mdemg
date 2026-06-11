@@ -2670,6 +2670,7 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 	type spaceRow struct {
 		nodes, edges, observations, orphans, learningEdges int
 		nullWeightEdges                                    int
+		conversationCoverage                               float64
 	}
 	spaces := make(map[string]*spaceRow)
 
@@ -2782,6 +2783,36 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 		}
 	}
 
+	// Query 5: Per-space conversation coverage (HIDDEN-CHURN-001 PR-B) —
+	// fraction of conversation observations inside the theme hierarchy.
+	collected5, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx,
+			`MATCH (o:MemoryNode {role_type: 'conversation_observation'})
+			 WHERE o.space_id IS NOT NULL AND NOT coalesce(o.is_archived, false)
+			 WITH o.space_id AS sid, count(o) AS total,
+			      SUM(CASE WHEN (o)-[:GENERALIZES]->() THEN 1 ELSE 0 END) AS themed
+			 RETURN sid, total, themed`,
+			nil)
+		if err != nil {
+			return nil, err
+		}
+		return result.Collect(ctx)
+	})
+	if err != nil {
+		slog.Error("metrics: neo4j graph query (conversation coverage) failed", "error", err)
+		return s.graphMetricsCache.data
+	}
+	for _, rec := range collected5.([]*neo4j.Record) {
+		sid, _ := rec.Get("sid")
+		total, _ := rec.Get("total")
+		themed, _ := rec.Get("themed")
+		if row, ok := spaces[sid.(string)]; ok {
+			if t := total.(int64); t > 0 {
+				row.conversationCoverage = float64(themed.(int64)) / float64(t)
+			}
+		}
+	}
+
 	// Build result with health scores
 	data := make([]metrics.SpaceGraphData, 0, len(spaces))
 	for sid, row := range spaces {
@@ -2798,14 +2829,15 @@ func (s *Server) collectNeo4jGraphData() []metrics.SpaceGraphData {
 			health = (1.0-orphanRatio)*0.6 + edgeDensity*0.4
 		}
 		data = append(data, metrics.SpaceGraphData{
-			SpaceID:         sid,
-			Nodes:           row.nodes,
-			Edges:           row.edges,
-			Observations:    row.observations,
-			Orphans:         row.orphans,
-			LearningEdges:   row.learningEdges,
-			HealthScore:     health,
-			NullWeightEdges: row.nullWeightEdges,
+			SpaceID:              sid,
+			Nodes:                row.nodes,
+			Edges:                row.edges,
+			Observations:         row.observations,
+			Orphans:              row.orphans,
+			LearningEdges:        row.learningEdges,
+			HealthScore:          health,
+			NullWeightEdges:      row.nullWeightEdges,
+			ConversationCoverage: row.conversationCoverage,
 		})
 	}
 

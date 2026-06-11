@@ -183,3 +183,78 @@ RETURN count(*) AS removed`, map[string]any{"spaceId": spaceID, "ids": stale})
 	}
 	return out.(int), nil
 }
+
+// assignNoiseToThemes density-assigns sub-threshold (noise) observations to
+// their nearest CURRENT theme when cosine ≥ threshold — edges only, no new
+// themes (HIDDEN-CHURN-001 PR-B coverage retune). Observations below the
+// floor remain unthemed, honestly.
+func (s *Service) assignNoiseToThemes(ctx context.Context, spaceID string, noise []ConversationObservation, threshold float64) (int, error) {
+	themes, err := s.listConversationThemes(ctx, spaceID)
+	if err != nil {
+		return 0, err
+	}
+	if len(themes) == 0 {
+		return 0, nil
+	}
+
+	type pair struct{ obsID, themeID string }
+	var pairs []pair
+	for _, obs := range noise {
+		if len(obs.Embedding) == 0 {
+			continue
+		}
+		best, bestSim := "", threshold
+		for _, t := range themes {
+			if len(t.Centroid) == 0 {
+				continue
+			}
+			if sim := cosineSimilarity(obs.Embedding, t.Centroid); sim >= bestSim {
+				best, bestSim = t.NodeID, sim
+			}
+		}
+		if best != "" {
+			pairs = append(pairs, pair{obs.NodeID, best})
+		}
+	}
+	if len(pairs) == 0 {
+		return 0, nil
+	}
+
+	rows := make([]map[string]any, len(pairs))
+	for i, p := range pairs {
+		rows[i] = map[string]any{"obsId": p.obsID, "themeId": p.themeID, "edgeId": memberEdgePairs([]string{p.obsID})[0]["edgeId"]}
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+	out, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+UNWIND $rows AS row
+MATCH (o:MemoryNode {space_id: $spaceId, node_id: row.obsId})
+MATCH (t:ConversationTheme {space_id: $spaceId, node_id: row.themeId})
+WHERE NOT (o)-[:GENERALIZES]->(t)
+WITH o, t, row,
+     CASE WHEN o.embedding IS NOT NULL AND t.embedding IS NOT NULL
+          THEN vector.similarity.cosine(o.embedding, t.embedding)
+          ELSE 0.5 END AS similarity
+CREATE (o)-[:GENERALIZES {
+  space_id: $spaceId, edge_id: row.edgeId,
+  weight: similarity, similarity_score: similarity,
+  density_assigned: true,
+  created_at: datetime(), updated_at: datetime()
+}]->(t)
+RETURN count(o) AS assigned`, map[string]any{"spaceId": spaceID, "rows": rows})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			n, _ := res.Record().Get("assigned")
+			return asInt(n), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return out.(int), nil
+}

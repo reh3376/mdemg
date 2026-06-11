@@ -14,14 +14,14 @@ const (
 
 // Alert represents a service health event that should be surfaced to the user.
 type Alert struct {
-	ID      string    `json:"id"`
-	Time    time.Time `json:"time"`
-	Service string    `json:"service"`
-	Severity Severity `json:"severity"`
-	Title   string    `json:"title"`
-	Message string    `json:"message"`
-	SpaceID string    `json:"space_id,omitempty"`
-	Cleared bool      `json:"cleared"`
+	ID       string    `json:"id"`
+	Time     time.Time `json:"time"`
+	Service  string    `json:"service"`
+	Severity Severity  `json:"severity"`
+	Title    string    `json:"title"`
+	Message  string    `json:"message"`
+	SpaceID  string    `json:"space_id,omitempty"`
+	Cleared  bool      `json:"cleared"`
 }
 
 // AlertFile is the JSON structure persisted to disk.
