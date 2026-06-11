@@ -115,7 +115,7 @@ func TestDeduplicateInsights(t *testing.T) {
 		{PatternID: "b", RecommendedAction: "tombstone_stale"},
 	}
 	llm := []ReflectionInsight{
-		{PatternID: "llm:x", RecommendedAction: "prune_decayed_edges"}, // duplicate action
+		{PatternID: "llm:x", RecommendedAction: "prune_decayed_edges"},   // duplicate action
 		{PatternID: "llm:y", RecommendedAction: "trigger_consolidation"}, // new action
 	}
 

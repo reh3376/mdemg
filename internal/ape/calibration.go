@@ -101,15 +101,8 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 
 	// Phase AR-1: Populate MetricsAfter from post-cycle re-assessment
 	if postReport != nil {
-		outcome.MetricsAfter = map[string]float64{
-			"overall_health":      postReport.OverallHealth,
-			"retrieval_quality":   postReport.RetrievalQuality,
-			"memory_health":       postReport.MemoryHealth,
-			"edge_health":         postReport.EdgeHealth,
-			"orphan_ratio":        postReport.OrphanRatio,
-			"correction_rate":     postReport.CorrectionRate,
-			"edge_weight_entropy": postReport.EdgeWeightEntropy,
-		}
+		// RSIC-VALIDATE-001: same single-source extraction as the baseline.
+		outcome.MetricsAfter = reportMetricsMap(postReport)
 	}
 
 	// Phase AR-1: Evaluate success criteria per task
@@ -143,7 +136,16 @@ func (c *Calibrator) Validate(_ context.Context, cycleID string, tier CycleTier,
 			beforeVal, hasBefore := metricsBefore[metricKey]
 			afterVal, hasAfter := outcome.MetricsAfter[metricKey]
 			if !hasBefore || !hasAfter {
-				outcome.CriteriaDetail[criterion.Metric] = "missing_data"
+				// RSIC-VALIDATE-001 fail-closed: an unverifiable MUTATION must
+				// not be recorded as success. Observational tasks keep the
+				// advisory skip (their "success" changes nothing to roll back).
+				if isMutatingAction(task.ActionType) {
+					taskMet = false
+					outcome.CriteriaMet = false
+					outcome.CriteriaDetail[criterion.Metric] = "missing_data_failclosed"
+				} else {
+					outcome.CriteriaDetail[criterion.Metric] = "missing_data"
+				}
 				continue
 			}
 			delta := afterVal - beforeVal

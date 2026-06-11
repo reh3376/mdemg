@@ -12,12 +12,12 @@ import (
 
 // mockWatchdogSignalProvider implements WatchdogSignalProvider for testing.
 type mockWatchdogSignalProvider struct {
-	sessionHealthScore   float64
-	obsRatePerHour       float64
-	consolidationAgeSec  int64
-	consolidationAgeErr  error
-	jiminyHealthy        bool
-	sidecarHealthy       bool
+	sessionHealthScore  float64
+	obsRatePerHour      float64
+	consolidationAgeSec int64
+	consolidationAgeErr error
+	jiminyHealthy       bool
+	sidecarHealthy      bool
 }
 
 func (m *mockWatchdogSignalProvider) GetSessionHealthScore(sessionID string) float64 {
@@ -138,13 +138,13 @@ func TestSetSignalProvider(t *testing.T) {
 
 func TestCheckWithoutSignalProvider(t *testing.T) {
 	tests := []struct {
-		name              string
-		timeSinceCycle    time.Duration
-		decayRate         float64
-		wantEscalation    EscalationLevel
-		nudgeThreshold    float64
-		warnThreshold     float64
-		forceThreshold    float64
+		name           string
+		timeSinceCycle time.Duration
+		decayRate      float64
+		wantEscalation EscalationLevel
+		nudgeThreshold float64
+		warnThreshold  float64
+		forceThreshold float64
 	}{
 		{
 			name:           "nominal state",
@@ -337,7 +337,7 @@ func TestActiveAnomaliesDetection(t *testing.T) {
 		{
 			name:                "no anomalies",
 			sessionHealth:       0.8,
-			consolidationAgeSec: 3600,  // 1 hour
+			consolidationAgeSec: 3600, // 1 hour
 			decayScore:          0.2,
 			wantAnomalies:       nil,
 		},
@@ -430,13 +430,13 @@ func TestActiveAnomaliesDetection(t *testing.T) {
 
 func TestAdditionalEscalation(t *testing.T) {
 	tests := []struct {
-		name              string
-		sessionHealth     float64
-		timeSinceCycle    time.Duration
-		decayRate         float64
-		nudgeThreshold    float64
-		wantEscalation    EscalationLevel
-		wantCycleTrigger  bool
+		name             string
+		sessionHealth    float64
+		timeSinceCycle   time.Duration
+		decayRate        float64
+		nudgeThreshold   float64
+		wantEscalation   EscalationLevel
+		wantCycleTrigger bool
 	}{
 		{
 			name:             "critical session health with moderate decay - escalate to warn",

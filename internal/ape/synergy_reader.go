@@ -25,7 +25,7 @@ type FileSynergyReader struct {
 	overlapSampleSize   int // from cfg.SynergyOverlapSampleSize
 
 	// File content cache with 60s TTL to avoid redundant reads
-	cacheTTL   time.Duration
+	cacheTTL    time.Duration
 	claudeCache *cachedFileContent
 	memoryCache *cachedFileContent
 }

@@ -21,7 +21,7 @@ type Reflector struct {
 	llmReflector     *LLMReflector
 	protocolProvider ProtocolStatsProvider // J17: protocol metrics for reflection
 	tsdbClient       *tsdb.Client          // optional: TimescaleDB client for schema drift detection
-	datasetProvider  tsdb.DatasetProvider   // RSIC-DATA: curated datasets for trend-based reflection
+	datasetProvider  tsdb.DatasetProvider  // RSIC-DATA: curated datasets for trend-based reflection
 }
 
 // NewReflector creates a Reflector.

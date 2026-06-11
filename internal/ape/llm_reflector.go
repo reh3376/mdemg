@@ -19,14 +19,14 @@ import (
 
 // LLMReflectorConfig holds configuration for the LLM reflector.
 type LLMReflectorConfig struct {
-	Enabled        bool
-	Provider       string // "openai" or "ollama"
-	Model          string
-	MaxTokens      int
-	TimeoutMs      int
-	OpenAIKey      string
-	OpenAIURL      string
-	OllamaURL      string
+	Enabled         bool
+	Provider        string // "openai" or "ollama"
+	Model           string
+	MaxTokens       int
+	TimeoutMs       int
+	OpenAIKey       string
+	OpenAIURL       string
+	OllamaURL       string
 	CompressPrompts bool // J17-PC: compress reflection prompts to reduce tokens
 }
 
@@ -363,4 +363,3 @@ func (lr *LLMReflector) parseResponse(raw string) ([]ReflectionInsight, error) {
 	}
 	return insights, nil
 }
-

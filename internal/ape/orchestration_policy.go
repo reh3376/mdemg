@@ -30,10 +30,10 @@ type DedupeResult struct {
 // TriggerRecord stores metadata about a single trigger event.
 type TriggerRecord struct {
 	Source    TriggerSource `json:"source"`
-	SpaceID  string        `json:"space_id"`
-	Tier     CycleTier     `json:"tier"`
-	CycleID  string        `json:"cycle_id"`
-	Timestamp time.Time    `json:"timestamp"`
+	SpaceID   string        `json:"space_id"`
+	Tier      CycleTier     `json:"tier"`
+	CycleID   string        `json:"cycle_id"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
 // SessionCounter tracks session counts for meso periodic triggers.
@@ -207,9 +207,9 @@ func (p *OrchestrationPolicy) RecordTrigger(meta TriggerMetadata, spaceID string
 
 	rec := TriggerRecord{
 		Source:    meta.TriggerSource,
-		SpaceID:  spaceID,
-		Tier:     tier,
-		CycleID:  cycleID,
+		SpaceID:   spaceID,
+		Tier:      tier,
+		CycleID:   cycleID,
 		Timestamp: meta.TriggeredAt,
 	}
 

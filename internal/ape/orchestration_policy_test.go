@@ -343,9 +343,9 @@ func TestStaleActiveCycle_CleanedUpAutomatically(t *testing.T) {
 	p.mu.Lock()
 	p.activeCycles["space-1:meso"] = TriggerRecord{
 		Source:    TriggerManualAPI,
-		SpaceID:  "space-1",
-		Tier:     TierMeso,
-		CycleID:  "cycle-stale",
+		SpaceID:   "space-1",
+		Tier:      TierMeso,
+		CycleID:   "cycle-stale",
 		Timestamp: time.Now().Add(-31 * time.Minute), // older than 30 min
 	}
 	p.mu.Unlock()

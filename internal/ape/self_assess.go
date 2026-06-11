@@ -35,17 +35,17 @@ type SynergyMetrics struct {
 
 // Assessor gathers health metrics from subsystems to produce a SelfAssessmentReport.
 type Assessor struct {
-	cfg              config.Config
-	driver           neo4j.DriverWithContext
-	learner          LearningStatsProvider
-	convSvc          ConversationStatsProvider
-	jiminyProvider   JiminyStatsProvider   // J10: guidance stats provider
-	protocolProvider ProtocolStatsProvider // J17: protocol metrics provider
-	synergyReader     SynergyFileReader     // Synergy: file metrics provider
-	freshnessProvider FreshnessProvider     // Phase 47.2: ingest staleness provider
+	cfg               config.Config
+	driver            neo4j.DriverWithContext
+	learner           LearningStatsProvider
+	convSvc           ConversationStatsProvider
+	jiminyProvider    JiminyStatsProvider         // J10: guidance stats provider
+	protocolProvider  ProtocolStatsProvider       // J17: protocol metrics provider
+	synergyReader     SynergyFileReader           // Synergy: file metrics provider
+	freshnessProvider FreshnessProvider           // Phase 47.2: ingest staleness provider
 	sidecarChecker    func(context.Context) bool  // Sidecar health checker (nil = not configured)
 	reportCallback    func(*SelfAssessmentReport) // TSDB Sprint: called after Assess with the report
-	datasetProvider   tsdb.DatasetProvider         // RSIC-DATA: TSDB curated datasets for trend analysis
+	datasetProvider   tsdb.DatasetProvider        // RSIC-DATA: TSDB curated datasets for trend analysis
 }
 
 // NewAssessor creates an Assessor wired to the given subsystem providers.

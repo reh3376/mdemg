@@ -18,13 +18,13 @@ type Dispatcher struct {
 	activeTasks map[string]*activeTask
 	reports     map[string][]RSICProgressReport
 
-	learner       LearningStatsProvider
-	convSvc       ConversationStatsProvider
-	hiddenSvc     HiddenLayerProvider
-	driver        neo4j.DriverWithContext
-	protoEvolver       ProtocolEvolverProvider       // J17: protocol mutation executor
-	guidanceCalibrator GuidanceCalibrationProvider   // RSIC-SK1: guidance self-calibration
-	freshnessProvider  FreshnessProvider              // Phase 47.2: ingest staleness provider
+	learner            LearningStatsProvider
+	convSvc            ConversationStatsProvider
+	hiddenSvc          HiddenLayerProvider
+	driver             neo4j.DriverWithContext
+	protoEvolver       ProtocolEvolverProvider     // J17: protocol mutation executor
+	guidanceCalibrator GuidanceCalibrationProvider // RSIC-SK1: guidance self-calibration
+	freshnessProvider  FreshnessProvider           // Phase 47.2: ingest staleness provider
 
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
@@ -458,7 +458,7 @@ func (d *Dispatcher) executeRefreshStaleEdges(ctx context.Context, spaceID strin
 	defer sess.Close(ctx)
 
 	type refreshResult struct {
-		Refreshed      int64
+		Refreshed       int64
 		AvgWeightBefore float64
 		AvgWeightAfter  float64
 	}
@@ -886,9 +886,9 @@ func (d *Dispatcher) executeReviewNLICalibration(ctx context.Context, spaceID st
 	defer sess.Close(ctx)
 
 	type nliStats struct {
-		TotalConstraints int64
+		TotalConstraints  int64
 		ActiveConstraints int64
-		AvgConfidence    float64
+		AvgConfidence     float64
 	}
 
 	stats, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (nliStats, error) {

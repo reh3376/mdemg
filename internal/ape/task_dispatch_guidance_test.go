@@ -46,10 +46,10 @@ func TestExecuteReviewGuidanceEffectiveness(t *testing.T) {
 	// With calibrator
 	mock := &mockGuidanceCalibrator{
 		items: []GuidanceEffectivenessItem{
-			{NodeID: "n1", TotalSurfaced: 10, EffectivenessRate: 0.9},  // high
-			{NodeID: "n2", TotalSurfaced: 10, EffectivenessRate: 0.3},  // low
-			{NodeID: "n3", TotalSurfaced: 2, EffectivenessRate: 0.0},   // insufficient
-			{NodeID: "n4", TotalSurfaced: 8, EffectivenessRate: 0.05},  // low
+			{NodeID: "n1", TotalSurfaced: 10, EffectivenessRate: 0.9}, // high
+			{NodeID: "n2", TotalSurfaced: 10, EffectivenessRate: 0.3}, // low
+			{NodeID: "n3", TotalSurfaced: 2, EffectivenessRate: 0.0},  // insufficient
+			{NodeID: "n4", TotalSurfaced: 8, EffectivenessRate: 0.05}, // low
 		},
 	}
 	d.guidanceCalibrator = mock
@@ -80,10 +80,10 @@ func TestExecuteAdjustGuidanceConfidence(t *testing.T) {
 
 	mock := &mockGuidanceCalibrator{
 		items: []GuidanceEffectivenessItem{
-			{NodeID: "boost-me", TotalSurfaced: 10, EffectivenessRate: 0.8},   // boost (>= 0.7)
-			{NodeID: "decay-me", TotalSurfaced: 5, EffectivenessRate: 0.05},   // decay (< 0.1 && >= 5 surfaces)
-			{NodeID: "skip-low", TotalSurfaced: 2, EffectivenessRate: 0.0},    // skip (< 3 surfaces)
-			{NodeID: "mid-range", TotalSurfaced: 10, EffectivenessRate: 0.4},  // neither boost nor decay
+			{NodeID: "boost-me", TotalSurfaced: 10, EffectivenessRate: 0.8},  // boost (>= 0.7)
+			{NodeID: "decay-me", TotalSurfaced: 5, EffectivenessRate: 0.05},  // decay (< 0.1 && >= 5 surfaces)
+			{NodeID: "skip-low", TotalSurfaced: 2, EffectivenessRate: 0.0},   // skip (< 3 surfaces)
+			{NodeID: "mid-range", TotalSurfaced: 10, EffectivenessRate: 0.4}, // neither boost nor decay
 		},
 		archiveCount: 1,
 	}

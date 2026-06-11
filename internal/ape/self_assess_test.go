@@ -109,8 +109,8 @@ func TestScoreMemory_MediumOrphans(t *testing.T) {
 func TestScoreMemory_AllPenalties(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
-		OrphanRatio:         0.15, // > 0.1 → -0.1
-		CorrectionRate:      0.20, // > 0.15 → -0.2
+		OrphanRatio:         0.15,  // > 0.1 → -0.1
+		CorrectionRate:      0.20,  // > 0.15 → -0.2
 		ConsolidationAgeSec: 90000, // > 86400 → -0.2
 	}
 	got, _ := a.scoreMemory(r)
@@ -121,8 +121,8 @@ func TestScoreMemory_AllPenalties(t *testing.T) {
 func TestScoreMemory_AllPenaltiesMax(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
-		OrphanRatio:         0.25, // > 0.2 → -0.3
-		CorrectionRate:      0.20, // > 0.15 → -0.2
+		OrphanRatio:         0.25,  // > 0.2 → -0.3
+		CorrectionRate:      0.20,  // > 0.15 → -0.2
 		ConsolidationAgeSec: 90000, // > 86400 → -0.2
 	}
 	got, _ := a.scoreMemory(r)
@@ -136,8 +136,8 @@ func TestScoreMemory_ClampToZero(t *testing.T) {
 	// (max total penalty = 0.3 + 0.2 + 0.2 = 0.7, so minimum is 0.3).
 	// But verify the clamp logic still holds — a score of 0.3 is the floor.
 	r := &SelfAssessmentReport{
-		OrphanRatio:         0.99,  // > 0.2 → -0.3
-		CorrectionRate:      0.99,  // > 0.15 → -0.2
+		OrphanRatio:         0.99,   // > 0.2 → -0.3
+		CorrectionRate:      0.99,   // > 0.15 → -0.2
 		ConsolidationAgeSec: 999999, // > 86400 → -0.2
 	}
 	got, _ := a.scoreMemory(r)
@@ -166,7 +166,7 @@ func TestScoreEdge_HealthyEdges(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
-		EdgesBelowThreshold: 10, // 10% < 30%, no penalty
+		EdgesBelowThreshold: 10,  // 10% < 30%, no penalty
 		EdgeWeightEntropy:   0.8, // >= 0.5, no penalty
 	}
 	got, _ := a.scoreEdge(r)
@@ -177,7 +177,7 @@ func TestScoreEdge_HighBelowRatio(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
-		EdgesBelowThreshold: 40, // 40% > 30% → -0.3
+		EdgesBelowThreshold: 40,  // 40% > 30% → -0.3
 		EdgeWeightEntropy:   0.8, // >= 0.5, no penalty
 	}
 	got, _ := a.scoreEdge(r)
@@ -188,7 +188,7 @@ func TestScoreEdge_LowEntropy(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
-		EdgesBelowThreshold: 10, // 10% < 30%, no penalty
+		EdgesBelowThreshold: 10,  // 10% < 30%, no penalty
 		EdgeWeightEntropy:   0.3, // < 0.5 → -0.2
 	}
 	got, _ := a.scoreEdge(r)
@@ -199,7 +199,7 @@ func TestScoreEdge_BothPenalties(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
-		EdgesBelowThreshold: 50, // 50% > 30% → -0.3
+		EdgesBelowThreshold: 50,  // 50% > 30% → -0.3
 		EdgeWeightEntropy:   0.2, // < 0.5 → -0.2
 	}
 	got, _ := a.scoreEdge(r)
@@ -213,7 +213,7 @@ func TestScoreEdge_ClampToZero(t *testing.T) {
 	// Verify it never goes below 0.
 	r := &SelfAssessmentReport{
 		EdgeCount:           10,
-		EdgesBelowThreshold: 10, // 100% > 30% → -0.3
+		EdgesBelowThreshold: 10,  // 100% > 30% → -0.3
 		EdgeWeightEntropy:   0.0, // < 0.5 → -0.2
 	}
 	got, _ := a.scoreEdge(r)
@@ -281,9 +281,9 @@ func TestScoreTask_HalfAndHalf(t *testing.T) {
 func TestScoreGuidance_Perfect(t *testing.T) {
 	a := newTestAssessor()
 	stats := JiminyStatsResult{
-		FollowRate:      1.0,
+		FollowRate:        1.0,
 		ConstraintEffRate: 1.0,
-		SourceDiversity: 1.0,
+		SourceDiversity:   1.0,
 	}
 	got, _ := a.scoreGuidance(stats)
 	// 0.5*1.0 + 0.3*1.0 + 0.2*1.0 = 1.0
@@ -293,9 +293,9 @@ func TestScoreGuidance_Perfect(t *testing.T) {
 func TestScoreGuidance_Zero(t *testing.T) {
 	a := newTestAssessor()
 	stats := JiminyStatsResult{
-		FollowRate:      0.0,
+		FollowRate:        0.0,
 		ConstraintEffRate: 0.0,
-		SourceDiversity: 0.0,
+		SourceDiversity:   0.0,
 	}
 	got, _ := a.scoreGuidance(stats)
 	assertClose(t, got, 0.0, 0.001, "scoreGuidance zero")
@@ -304,9 +304,9 @@ func TestScoreGuidance_Zero(t *testing.T) {
 func TestScoreGuidance_Mixed(t *testing.T) {
 	a := newTestAssessor()
 	stats := JiminyStatsResult{
-		FollowRate:      0.8,
+		FollowRate:        0.8,
 		ConstraintEffRate: 0.6,
-		SourceDiversity: 0.4,
+		SourceDiversity:   0.4,
 	}
 	got, _ := a.scoreGuidance(stats)
 	// 0.5*0.8 + 0.3*0.6 + 0.2*0.4 = 0.40 + 0.18 + 0.08 = 0.66
@@ -316,9 +316,9 @@ func TestScoreGuidance_Mixed(t *testing.T) {
 func TestScoreGuidance_ClampInputs(t *testing.T) {
 	a := newTestAssessor()
 	stats := JiminyStatsResult{
-		FollowRate:      2.0, // clamped to 1.0
+		FollowRate:        2.0,  // clamped to 1.0
 		ConstraintEffRate: -0.5, // clamped to 0.0
-		SourceDiversity: 1.5, // clamped to 1.0
+		SourceDiversity:   1.5,  // clamped to 1.0
 	}
 	got, _ := a.scoreGuidance(stats)
 	// 0.5*1.0 + 0.3*0.0 + 0.2*1.0 = 0.50 + 0.00 + 0.20 = 0.70
@@ -432,10 +432,10 @@ func TestScoreSynergy_AllPenalties(t *testing.T) {
 	a := newTestAssessor()
 	r := &SelfAssessmentReport{
 		JiminyHealthy:       true,
-		SynergyLinesClaude:  200, // > 150 → -0.3
-		SynergyLinesMemory:  200, // > 140 → -0.3
+		SynergyLinesClaude:  200,  // > 150 → -0.3
+		SynergyLinesMemory:  200,  // > 140 → -0.3
 		SynergyOverflowRate: 15.0, // > 10 → -0.3
-		SynergyOverlapScore: 0.8, // > 0.5 → -0.2
+		SynergyOverlapScore: 0.8,  // > 0.5 → -0.2
 	}
 	got, _ := a.scoreSynergy(r)
 	// 1.0 - 0.3 - 0.3 - 0.3 - 0.2 = -0.1 → clamped to 0.0
@@ -452,7 +452,7 @@ func TestScoreProtocol_Perfect(t *testing.T) {
 		CompressionRatio:         5.0,   // (5.0-1.0)/4.0 = 1.0
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0,
-		ReplayFrequencyPerHour:  0.0, // penalty = 0, stability = 0.5*1.0 + 0.5*1.0 = 1.0
+		ReplayFrequencyPerHour:   0.0, // penalty = 0, stability = 0.5*1.0 + 0.5*1.0 = 1.0
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*1.0 + 0.25*1.0 + 0.20*1.0 + 0.15*1.0 = 1.0
@@ -467,7 +467,7 @@ func TestScoreProtocol_Zero(t *testing.T) {
 		CompressionRatio:         1.0,   // (1.0-1.0)/4.0 = 0.0
 		CodeCoverage:             0.0,
 		TicketRestoreSuccessRate: 0.0,
-		ReplayFrequencyPerHour:  0.0, // stability = 0.5*0.0 + 0.5*1.0 = 0.5
+		ReplayFrequencyPerHour:   0.0, // stability = 0.5*0.0 + 0.5*1.0 = 0.5
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.0 + 0.05*1.0 + 0.25*0.0 + 0.20*0.0 + 0.15*0.5 = 0.05 + 0.075 = 0.125
@@ -478,11 +478,11 @@ func TestScoreProtocol_NLIBiasAlert(t *testing.T) {
 	a := newTestAssessor()
 	stats := ProtocolStatsResult{
 		AvgComprehension:         1.0,
-		NLIBiasAlert:             true,  // calibration = 0.3
-		CompressionRatio:         5.0,   // compression = 1.0
+		NLIBiasAlert:             true, // calibration = 0.3
+		CompressionRatio:         5.0,  // compression = 1.0
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0,
-		ReplayFrequencyPerHour:  0.0, // stability = 1.0
+		ReplayFrequencyPerHour:   0.0, // stability = 1.0
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*0.3 + 0.25*1.0 + 0.20*1.0 + 0.15*1.0 = 0.35+0.015+0.25+0.20+0.15 = 0.965
@@ -494,10 +494,10 @@ func TestScoreProtocol_CompressionBelow1(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.8,
 		NLIBiasAlert:             false,
-		CompressionRatio:         0.5,  // (0.5-1.0)/4.0 = -0.125 → clamped to 0
+		CompressionRatio:         0.5, // (0.5-1.0)/4.0 = -0.125 → clamped to 0
 		CodeCoverage:             0.8,
 		TicketRestoreSuccessRate: 0.9,
-		ReplayFrequencyPerHour:  2.0, // penalty = 2.0/10.0 = 0.2, stability = 0.5*0.9 + 0.5*0.8 = 0.85
+		ReplayFrequencyPerHour:   2.0, // penalty = 2.0/10.0 = 0.2, stability = 0.5*0.9 + 0.5*0.8 = 0.85
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.8 + 0.05*1.0 + 0.25*0.0 + 0.20*0.8 + 0.15*0.85
@@ -510,10 +510,10 @@ func TestScoreProtocol_HighReplayFrequency(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         1.0,
 		NLIBiasAlert:             false,
-		CompressionRatio:         3.0,   // (3.0-1.0)/4.0 = 0.5
+		CompressionRatio:         3.0, // (3.0-1.0)/4.0 = 0.5
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0,
-		ReplayFrequencyPerHour:  20.0, // penalty = 20/10 = 2.0 → clamped to 1.0, stability = 0.5*1.0 + 0.5*0.0 = 0.5
+		ReplayFrequencyPerHour:   20.0, // penalty = 20/10 = 2.0 → clamped to 1.0, stability = 0.5*1.0 + 0.5*0.0 = 0.5
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*1.0 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*0.5
@@ -829,11 +829,11 @@ func TestScoreProtocol_StabilityWeighting(t *testing.T) {
 	// Test stability sub-component in isolation: restoreRate=0.6, replay=5/hr
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.0,
-		NLIBiasAlert:             true,  // calibration = 0.3
-		CompressionRatio:         1.0,   // compression = 0.0
+		NLIBiasAlert:             true, // calibration = 0.3
+		CompressionRatio:         1.0,  // compression = 0.0
 		CodeCoverage:             0.0,
 		TicketRestoreSuccessRate: 0.6,
-		ReplayFrequencyPerHour:  5.0, // penalty = 0.5, stability = 0.5*0.6 + 0.5*0.5 = 0.55
+		ReplayFrequencyPerHour:   5.0, // penalty = 0.5, stability = 0.5*0.6 + 0.5*0.5 = 0.55
 	}
 	got, _ := a.scoreProtocol(stats)
 	// 0.35*0.0 + 0.05*0.3 + 0.25*0.0 + 0.20*0.0 + 0.15*0.55

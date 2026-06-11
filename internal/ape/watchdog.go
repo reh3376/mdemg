@@ -18,9 +18,9 @@ type Watchdog struct {
 	signalProvider WatchdogSignalProvider
 	store          *RSICStore
 
-	mu            sync.RWMutex
-	state         WatchdogState
-	cycleTrigger  func(ctx context.Context, spaceID string, meta TriggerMetadata) // callback to auto-trigger meso cycle
+	mu           sync.RWMutex
+	state        WatchdogState
+	cycleTrigger func(ctx context.Context, spaceID string, meta TriggerMetadata) // callback to auto-trigger meso cycle
 
 	ctx    context.Context
 	cancel context.CancelFunc

@@ -251,9 +251,9 @@ func TestOrchestrationPolicy_HydrateRestoresCooldowns(t *testing.T) {
 	triggers := []TriggerRecord{
 		{
 			Source:    TriggerManualAPI,
-			SpaceID:  "test-space",
-			Tier:     TierMeso,
-			CycleID:  "cycle-old",
+			SpaceID:   "test-space",
+			Tier:      TierMeso,
+			CycleID:   "cycle-old",
 			Timestamp: time.Now().Add(-10 * time.Second), // 10 seconds ago — within cooldown
 		},
 	}
