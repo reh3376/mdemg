@@ -104,7 +104,9 @@ func TestRSIC_Holistic_TombstoneStaleEndToEnd(t *testing.T) {
 
 	// Seed:
 	// 1 hidden node (48h old) → ConsolidationAgeSec > 0
-	// 10 learning observations (2h old) → tombstone targets
+	// 10 learning observations (2h old) → tombstone targets — share the
+	//   per-space test session with the corrections (RSIC-VALIDATE-001:
+	//   tombstone_stale only archives correction-LINKED nodes now)
 	// 3 correction observations (now) → triggers correction_rate > 0.15
 	SeedHiddenNode(t, driver, spaceID, 48)
 	learningIDs := SeedObservationNodes(t, driver, spaceID, 10, "learning", 2)
