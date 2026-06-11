@@ -11,6 +11,7 @@ func newGraphCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newGraphRepairCmd())
+	cmd.AddCommand(newGraphBackfillWeightsCmd())
 
 	return cmd
 }
