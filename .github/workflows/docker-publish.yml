@@ -38,6 +38,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The job builds TWO multi-arch images (amd64 + QEMU arm64) with
+      # mode=max gha cache on one runner; the sidecar's torch wheels pushed
+      # the ~14 GB free disk over the edge intermittently ("No space left on
+      # device" killed the runner worker mid-sidecar-build — runs 27366931196,
+      # 27367756926, 27377325965). Reclaim ~25-30 GB of preinstalled
+      # toolchains we never use before building.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL \
+            /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /usr/local/share/boost || true
+          df -h /
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
