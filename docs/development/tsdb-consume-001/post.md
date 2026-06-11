@@ -56,8 +56,15 @@ intermittent runner disk exhaustion (identical failures on runs 27366931196
   file-based specs pass.
 - Scorer tripwire SQL hand-verified against the table's real 3-version
   history (see Epic 4).
-- Emergence-cycle gauge: verified at the next consolidation cycle
-  (see verification note below if landed post-push).
+- **Emergence-cycle gauge — live smoke caught a shipped no-op** (fix
+  commit, Phase 11.6.2 precedent): waiting for the first
+  `mdemg_emergence_cycle_duration_seconds` sample after a completed 18:06
+  consolidation cycle found NONE — Epic 5's combined edit script had died
+  on an assert before writing `internal/hidden/service.go`, so `86f39ee`
+  shipped the gauge, rule, and config with no writer (exactly the
+  readers-with-no-writers class this sprint kills, manufactured by the
+  sprint itself). All 4 duration sites instrumented in the fix commit;
+  gauge verified landing post-restart.
 - `scripts/verify_config_consumers.py`: 671/671 consumed (all 11 new
   Config fields wired). Full `go test ./internal/...` green; lint clean.
 
