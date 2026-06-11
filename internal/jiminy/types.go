@@ -155,6 +155,15 @@ type ClassificationResult struct {
 	Outcome    GuidanceOutcome `json:"outcome"`
 	Confidence float64         `json:"confidence"`
 	Reasoning  string          `json:"reasoning,omitempty"`
+	// Source records WHICH mechanism produced the verdict
+	// (JIMINY-OUTCOME-002): "tier1" (embedding similarity band),
+	// "llm" (Tier-2 classifier), "heuristic" (fallback when the LLM is
+	// unavailable/failed — the class that half-credited everything as
+	// partial_compliance while feedback calls were context-cancelled),
+	// or "explicit" (caller-provided outcome). Persisted to
+	// constraint_outcomes.classifier_source so fallback-derived rows are
+	// forever distinguishable from real verdicts.
+	Source string `json:"source,omitempty"`
 }
 
 // --- RSIC-SK1: SignalLearnerProvider interface ---
@@ -229,7 +238,7 @@ type JiminyStats struct {
 // OutcomeWriter records constraint guidance outcomes to TSDB for dynamic
 // Grafana queries (user-selected time range effectiveness calculation).
 type OutcomeWriter interface {
-	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID string, similarity float64)
+	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64)
 }
 
 // --- J12: Escalation types ---

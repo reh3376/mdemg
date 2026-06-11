@@ -22,6 +22,9 @@ type ConstraintOutcomeRow struct {
 	Similarity     float64
 	GuidanceType   string
 	InstanceID     string
+	// ClassifierSource: tier1|llm|heuristic|explicit (JIMINY-OUTCOME-002) —
+	// distinguishes real verdicts from the heuristic-fallback artifact class.
+	ClassifierSource string
 }
 
 // ConstraintOutcomesWriter buffers constraint outcome events and flushes them
@@ -69,17 +72,18 @@ func (w *ConstraintOutcomesWriter) flushLoop() {
 
 // RecordOutcome implements jiminy.OutcomeWriter by converting and buffering the record.
 // This avoids an import cycle between jiminy and tsdb packages.
-func (w *ConstraintOutcomesWriter) RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID string, similarity float64) {
+func (w *ConstraintOutcomesWriter) RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64) {
 	w.Record(ConstraintOutcomeRow{
-		SpaceID:        spaceID,
-		ConstraintID:   constraintID,
-		ConstraintCode: constraintCode,
-		GuidanceID:     guidanceID,
-		SessionID:      sessionID,
-		OutcomeType:    outcomeType,
-		Similarity:     similarity,
-		GuidanceType:   guidanceType,
-		InstanceID:     instanceID,
+		SpaceID:          spaceID,
+		ConstraintID:     constraintID,
+		ConstraintCode:   constraintCode,
+		GuidanceID:       guidanceID,
+		SessionID:        sessionID,
+		OutcomeType:      outcomeType,
+		Similarity:       similarity,
+		GuidanceType:     guidanceType,
+		InstanceID:       instanceID,
+		ClassifierSource: classifierSource,
 	})
 }
 
@@ -110,6 +114,7 @@ func (w *ConstraintOutcomesWriter) Flush(ctx context.Context) error {
 			r.Time, r.SpaceID, r.ConstraintID, r.ConstraintCode,
 			r.GuidanceID, r.SessionID, r.OutcomeType,
 			r.Similarity, r.GuidanceType, r.InstanceID,
+			r.ClassifierSource,
 		}
 	}
 
@@ -119,6 +124,7 @@ func (w *ConstraintOutcomesWriter) Flush(ctx context.Context) error {
 			"time", "space_id", "constraint_id", "constraint_code",
 			"guidance_id", "session_id", "outcome_type",
 			"similarity", "guidance_type", "instance_id",
+			"classifier_source",
 		},
 		pgx.CopyFromRows(rows),
 	)

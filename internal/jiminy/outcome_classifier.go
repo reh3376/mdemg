@@ -18,13 +18,19 @@ import (
 )
 
 const classifySystemPrompt = `You are a guidance outcome classifier. You determine whether an AI coding agent followed,
-ignored, partially complied with, or contradicted a piece of guidance.
+ignored, partially complied with, contradicted a piece of guidance — or whether the guidance
+simply did not apply to the action taken.
 
 Classification rules:
 - "followed": The agent's action clearly aligns with the guidance intent.
 - "partial_compliance": The agent addressed some aspects but missed others, or followed
   the spirit but not the letter of the guidance.
-- "ignored": The agent's action shows no evidence of considering the guidance.
+- "ignored": The guidance was relevant to this action — the agent could and should have
+  applied it — but the action shows no evidence of considering it.
+- "not_applicable": The guidance topic is unrelated to this specific action. The agent is
+  delivered many guidance items per action; most cannot apply to any single action. If the
+  action neither could have followed nor violated the guidance, it is "not_applicable",
+  NOT "ignored". Use "ignored" only when applying the guidance was genuinely possible here.
 - "contradicted": The agent's action directly opposes the guidance intent.
 
 Consider:
@@ -44,7 +50,8 @@ Respond with ONLY valid JSON: {"outcome": "...", "confidence": 0.0-1.0, "reasoni
 
 // classifySystemPromptCompact is a condensed system prompt for classification
 // used when CompressPrompts is enabled.
-const classifySystemPromptCompact = `Guidance outcome classifier. Classify: followed/partial_compliance/ignored/contradicted.
+const classifySystemPromptCompact = `Guidance outcome classifier. Classify: followed/partial_compliance/ignored/not_applicable/contradicted.
+not_applicable = guidance topic unrelated to this action (use it, not "ignored", when the action could neither follow nor violate the guidance).
 must/must_not=strict, should/should_not=flexible. Consider intent not literal text.
 Action format: "replaced 'OLD' with 'NEW'" = OLD was REMOVED, NEW was ADDED. Focus on NEW text and overall effect.
 Negation words in quoted code are NOT contradiction indicators.
@@ -54,7 +61,7 @@ JSON only: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 var ollamaClassifySchema = json.RawMessage(`{
 	"type": "object",
 	"properties": {
-		"outcome": {"type": "string", "enum": ["followed", "partial_compliance", "ignored", "contradicted"]},
+		"outcome": {"type": "string", "enum": ["followed", "partial_compliance", "ignored", "not_applicable", "contradicted"]},
 		"confidence": {"type": "number"},
 		"reasoning": {"type": "string"}
 	},
@@ -70,7 +77,7 @@ type OutcomeClassifier struct {
 	llmProvider     string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
 	compressPrompts bool    // J17-PC: compress classification prompts
 	highThreshold   float64 // above this similarity = followed (default: 0.7)
-	lowThreshold    float64 // below this similarity = ignored (default: 0.3)
+	lowThreshold    float64 // below this similarity = not_applicable (default: 0.2)
 	maxTokens       int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
@@ -161,7 +168,7 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	if oc.embedder == nil {
 		// Fall back to text overlap
 		outcome, sim := classifyOutcome(item, strings.ToLower(actionSummary))
-		return ClassificationResult{Outcome: outcome, Confidence: sim}
+		return ClassificationResult{Outcome: outcome, Confidence: sim, Source: "heuristic"}
 	}
 
 	// Tier 1: Embedding-based comparison
@@ -174,14 +181,14 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	if err != nil {
 		slog.Error("jiminy classifier: guidance embedding failed", "error", err)
 		outcome, sim := classifyOutcome(item, strings.ToLower(actionSummary))
-		return ClassificationResult{Outcome: outcome, Confidence: sim}
+		return ClassificationResult{Outcome: outcome, Confidence: sim, Source: "heuristic"}
 	}
 
 	actionEmbed, err := oc.embedder.Embed(ctx, actionSummary)
 	if err != nil {
 		slog.Error("jiminy classifier: action embedding failed", "error", err)
 		outcome, sim := classifyOutcome(item, strings.ToLower(actionSummary))
-		return ClassificationResult{Outcome: outcome, Confidence: sim}
+		return ClassificationResult{Outcome: outcome, Confidence: sim, Source: "heuristic"}
 	}
 
 	similarity := cosineSimilarity(guidanceEmbed, actionEmbed)
@@ -192,12 +199,12 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 
 	// Low similarity = not applicable (topics don't overlap — guidance wasn't relevant to this action)
 	if similarity < oc.lowThreshold {
-		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity}
+		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity, Source: "tier1"}
 	}
 
 	// High similarity + no negation = followed
 	if similarity >= oc.highThreshold && !hasNegation {
-		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
+		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity, Source: "tier1"}
 	}
 
 	// Uncertain range OR high-similarity-with-negation: try LLM Tier 2 if available.
@@ -212,12 +219,12 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 
 	// Heuristic fallback: no LLM available or LLM returned unknown.
 	if hasNegation {
-		return ClassificationResult{Outcome: OutcomeContradicted, Confidence: similarity}
+		return ClassificationResult{Outcome: OutcomeContradicted, Confidence: similarity, Source: "heuristic"}
 	}
 	if similarity >= oc.highThreshold {
-		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity}
+		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity, Source: "heuristic"}
 	}
-	return ClassificationResult{Outcome: OutcomePartialCompliance, Confidence: similarity}
+	return ClassificationResult{Outcome: OutcomePartialCompliance, Confidence: similarity, Source: "heuristic"}
 }
 
 // llmClassify uses an LLM to determine the outcome for uncertain cases (J14 upgraded).
@@ -279,6 +286,9 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 
 	// Parse structured response
 	cr := parseClassifyResponse(response, baseSimilarity)
+	if cr.Outcome != OutcomeUnknown {
+		cr.Source = "llm"
+	}
 
 	// Cache the result
 	oc.classifyCachePut(cacheKey, cr)
