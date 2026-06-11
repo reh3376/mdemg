@@ -61,6 +61,45 @@ func (b *FileBackend) ReadAlerts() AlertFile {
 	return b.readFile()
 }
 
+// Clear marks alerts as cleared (= delivered to the operator, not resolved —
+// persisting conditions re-fire new entries via the evaluator). Pass ids to
+// clear specific alerts, or a non-zero before to clear everything at/older
+// than that time. Idempotent; unknown ids are ignored. Returns the number of
+// alerts newly cleared. HOOKSYNC-001.
+func (b *FileBackend) Clear(ids []string, before time.Time) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	af := b.readFile()
+	if len(af.Alerts) == 0 {
+		return 0, nil
+	}
+
+	idSet := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idSet[id] = struct{}{}
+	}
+
+	cleared := 0
+	for i := range af.Alerts {
+		if af.Alerts[i].Cleared {
+			continue
+		}
+		_, byID := idSet[af.Alerts[i].ID]
+		byTime := !before.IsZero() && !af.Alerts[i].Time.After(before)
+		if byID || byTime {
+			af.Alerts[i].Cleared = true
+			cleared++
+		}
+	}
+	if cleared == 0 {
+		return 0, nil
+	}
+
+	af.UpdatedAt = time.Now().UTC()
+	return cleared, b.writeFile(af)
+}
+
 func (b *FileBackend) readFile() AlertFile {
 	data, err := os.ReadFile(b.filePath)
 	if err != nil {

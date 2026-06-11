@@ -76,14 +76,22 @@ fi
 # --- Alert delivery: show critical/high service alerts at session start ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then
-  _CRIT_COUNT=$(jq '.alerts | map(select(.cleared == false and (.severity == "critical" or .severity == "high"))) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
+  _CRIT=$(jq -c '[.alerts[] | select(.cleared == false and (.severity == "critical" or .severity == "high"))]' "$_ALERT_FILE" 2>/dev/null || echo "[]")
+  _CRIT_COUNT=$(echo "$_CRIT" | jq 'length' 2>/dev/null || echo 0)
   if [ "$_CRIT_COUNT" -gt 0 ] 2>/dev/null; then
     echo ""
     echo "!! MDEMG HIGH/CRITICAL ALERTS [$_CRIT_COUNT] — INVESTIGATE BEFORE PROCEEDING !!"
-    jq -r '.alerts[] | select(.cleared == false and (.severity == "critical" or .severity == "high")) |
+    echo "$_CRIT" | jq -r '.[] |
       "  [\(.severity | ascii_upcase)] \(.service): \(.title)\n    \(.message)"
-    ' "$_ALERT_FILE" 2>/dev/null
+    ' 2>/dev/null
     echo ""
+    # HOOKSYNC-001: mark the displayed alerts cleared (= delivered). Persisting
+    # conditions re-fire new entries via the evaluator. Fire-and-forget.
+    _IDS=$(echo "$_CRIT" | jq -c '[.[].id]' 2>/dev/null || echo "[]")
+    if [ "$_IDS" != "[]" ]; then
+      curl -sf -X POST "${MDEMG_URL}/v1/alerts/clear" -H "Content-Type: application/json" \
+        -d "{\"ids\":${_IDS}}" --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+    fi
   fi
 fi
 

@@ -112,3 +112,54 @@ func TestFileBackend_AtomicWrite(t *testing.T) {
 		t.Errorf("alert file should exist: %v", err)
 	}
 }
+
+func TestFileBackend_Clear_ByIDsAndBefore(t *testing.T) {
+	dir := t.TempDir()
+	b := NewFileBackend(dir+"/alerts.json", 10)
+	now := time.Now().UTC()
+	for i, id := range []string{"a1", "a2", "a3"} {
+		if err := b.Send(context.Background(), Alert{
+			ID: id, Time: now.Add(time.Duration(i-2) * time.Hour),
+			Service: "svc", Severity: SeverityHigh, Title: "t", Message: "m",
+		}); err != nil {
+			t.Fatalf("send: %v", err)
+		}
+	}
+
+	// Clear one by id.
+	n, err := b.Clear([]string{"a2"}, time.Time{})
+	if err != nil || n != 1 {
+		t.Fatalf("clear by id: n=%d err=%v, want 1,nil", n, err)
+	}
+	// Idempotent re-clear.
+	n, err = b.Clear([]string{"a2"}, time.Time{})
+	if err != nil || n != 0 {
+		t.Fatalf("re-clear: n=%d err=%v, want 0,nil", n, err)
+	}
+	// Unknown id ignored.
+	n, _ = b.Clear([]string{"nope"}, time.Time{})
+	if n != 0 {
+		t.Fatalf("unknown id cleared %d, want 0", n)
+	}
+	// Clear by time cutoff: a1 (now-2h) and a3 (now) — cutoff now-30m clears only a1.
+	n, err = b.Clear(nil, now.Add(-30*time.Minute))
+	if err != nil || n != 1 {
+		t.Fatalf("clear by before: n=%d err=%v, want 1,nil", n, err)
+	}
+	af := b.ReadAlerts()
+	cleared := map[string]bool{}
+	for _, a := range af.Alerts {
+		cleared[a.ID] = a.Cleared
+	}
+	if !cleared["a1"] || !cleared["a2"] || cleared["a3"] {
+		t.Fatalf("cleared state wrong: %v (want a1,a2 cleared; a3 pending)", cleared)
+	}
+}
+
+func TestDispatcher_ClearAlerts_NoFileBackend(t *testing.T) {
+	d := NewDispatcher(Config{Enabled: true}) // no file path → no file backend
+	n, err := d.ClearAlerts([]string{"x"}, time.Time{})
+	if err != nil || n != 0 {
+		t.Fatalf("no-backend clear: n=%d err=%v, want 0,nil", n, err)
+	}
+}

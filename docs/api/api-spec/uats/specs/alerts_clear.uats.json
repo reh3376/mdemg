@@ -1,0 +1,97 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Alerts Clear",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "alerts",
+      "hooks",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/alerts/clear marks file-backend alerts as delivered (HOOKSYNC-001)",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "sha256": "041e8e81d9f738390865602ea24f029f6eb98825343ce6f87d0b7980cd9491d2"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/alerts/clear",
+    "body": {
+      "ids": [
+        "uats-nonexistent-alert-id"
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.cleared",
+        "op": "equals",
+        "expected": 0
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_both_fields",
+      "description": "POST with empty ids and no all_before should return 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/alerts/clear",
+        "body": {
+          "ids": []
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "bad_rfc3339",
+      "description": "POST with malformed all_before should return 400",
+      "request": {
+        "method": "POST",
+        "path": "/v1/alerts/clear",
+        "body": {
+          "all_before": "yesterday"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "type_is",
+            "expected": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

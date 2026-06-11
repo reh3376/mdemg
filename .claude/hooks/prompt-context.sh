@@ -65,14 +65,24 @@ fi
 # --- Alert delivery: show pending MDEMG service alerts ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then
+  _PENDING=$(jq -c '[.alerts[] | select(.cleared == false)][:10]' "$_ALERT_FILE" 2>/dev/null || echo "[]")
   _ALERT_COUNT=$(jq '.alerts | map(select(.cleared == false)) | length' "$_ALERT_FILE" 2>/dev/null || echo 0)
-  if [ "$_ALERT_COUNT" -gt 0 ] 2>/dev/null; then
+  _SHOWN=$(echo "$_PENDING" | jq 'length' 2>/dev/null || echo 0)
+  if [ "$_SHOWN" -gt 0 ] 2>/dev/null; then
     echo ""
-    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending] !!"
-    jq -r '.alerts[] | select(.cleared == false) |
+    echo "!! MDEMG SERVICE ALERTS [$_ALERT_COUNT pending, showing $_SHOWN] !!"
+    echo "$_PENDING" | jq -r '.[] |
       "  [\(.severity | ascii_upcase)] [\(.time | .[0:19])] \(.service): \(.title) — \(.message)"
-    ' "$_ALERT_FILE" 2>/dev/null | head -10
+    ' 2>/dev/null
     echo ""
+    # HOOKSYNC-001: mark the DISPLAYED alerts cleared (= delivered to the
+    # operator) so they don't re-render every prompt. Persisting conditions
+    # re-fire new entries via the evaluator. Fire-and-forget, fail-open.
+    _IDS=$(echo "$_PENDING" | jq -c '[.[].id]' 2>/dev/null || echo "[]")
+    if [ "$_IDS" != "[]" ]; then
+      curl -sf -X POST "${MDEMG_URL}/v1/alerts/clear" -H "Content-Type: application/json" \
+        -d "{\"ids\":${_IDS}}" --connect-timeout 1 --max-time 2 -o /dev/null 2>/dev/null &
+    fi
   fi
 fi
 

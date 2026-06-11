@@ -2392,6 +2392,7 @@ func (s *Server) Routes() http.Handler {
 
 	// SR-001: Grafana alert webhook
 	mux.HandleFunc("POST /v1/alerts/grafana", s.handleGrafanaAlertWebhook)
+	mux.HandleFunc("POST /v1/alerts/clear", s.handleAlertsClear)
 
 	// File watcher management endpoints (Phase 9.4)
 	mux.HandleFunc("/v1/filewatcher/start", s.handleFileWatcherStart)

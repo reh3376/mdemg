@@ -2,10 +2,11 @@ package alert
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
+
+	cuid2 "github.com/nrednav/cuid2"
 )
 
 // Config controls the alert dispatcher behaviour.
@@ -55,6 +56,24 @@ func NewDispatcher(cfg Config) *Dispatcher {
 	return d
 }
 
+// ClearAlerts marks file-backend alerts as cleared (delivered to the
+// operator). Pass ids and/or a non-zero before cutoff. Returns the number
+// newly cleared. No-op (0, nil) when no file backend is configured.
+// HOOKSYNC-001.
+func (d *Dispatcher) ClearAlerts(ids []string, before time.Time) (int, error) {
+	d.mu.Lock()
+	backends := make([]Backend, len(d.backends))
+	copy(backends, d.backends)
+	d.mu.Unlock()
+
+	for _, b := range backends {
+		if fb, ok := b.(*FileBackend); ok {
+			return fb.Clear(ids, before)
+		}
+	}
+	return 0, nil
+}
+
 // Send dispatches an alert to all backends if not suppressed by cooldown.
 // This method is fire-and-forget — errors are logged, never returned.
 func (d *Dispatcher) Send(ctx context.Context, a Alert) {
@@ -70,9 +89,11 @@ func (d *Dispatcher) Send(ctx context.Context, a Alert) {
 		return
 	}
 
-	// Fill defaults.
+	// Fill defaults. CUIDv2 per the project identifier standard (HOOKSYNC-001;
+	// was UnixNano — existing file entries keep their old ids, both are opaque
+	// strings to the clear path).
 	if a.ID == "" {
-		a.ID = fmt.Sprintf("%d", time.Now().UnixNano())
+		a.ID = cuid2.Generate()
 	}
 	if a.Time.IsZero() {
 		a.Time = time.Now().UTC()
