@@ -183,7 +183,7 @@ WHERE n.layer >= 2 AND NOT coalesce(n.is_archived, false)
 WITH n LIMIT $n
 SET n.is_archived = true,
     n.archived_at = datetime(),
-    n.archived_reason = 'childless_concept_repair'
+    n.archive_reason = 'childless_concept_repair'
 RETURN count(n) AS c`, map[string]any{"spaceId": spaceID, "n": n})
 		if err != nil {
 			return 0, err

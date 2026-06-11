@@ -695,6 +695,7 @@ type Config struct {
 	CoolerStabilityIncreasePerReinf float64 // COOLER_STABILITY_INCREASE_PER_REINFORCEMENT (default: 0.15)
 	CoolerStabilityDecayRate        float64 // COOLER_STABILITY_DECAY_RATE — daily decay for unreinforced nodes (default: 0.1)
 	CoolerTombstoneThreshold        float64 // COOLER_TOMBSTONE_THRESHOLD — stability below which nodes are tombstoned (default: 0.05)
+	CoolerTombstoneMaxPerRun        int     // COOLER_TOMBSTONE_MAX_PER_RUN — max nodes tombstoned per graduation run; 0 = unlimited (default: 500)
 	CoolerGraduationThreshold       float64 // COOLER_GRADUATION_THRESHOLD — stability for graduation (default: 0.8)
 
 	// Constraint Module (Phase 45.5)
@@ -3197,6 +3198,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	coolerTombstoneMaxPerRun, err := atoi("COOLER_TOMBSTONE_MAX_PER_RUN", 500)
+	if err != nil {
+		return Config{}, err
+	}
 	coolerGradThresh, err := atof("COOLER_GRADUATION_THRESHOLD", 0.8)
 	if err != nil {
 		return Config{}, err
@@ -4733,6 +4738,7 @@ func FromEnv() (Config, error) {
 		CoolerStabilityIncreasePerReinf: coolerStabilityIncrease,
 		CoolerStabilityDecayRate:        coolerDecayRate,
 		CoolerTombstoneThreshold:        coolerTombstoneThresh,
+		CoolerTombstoneMaxPerRun:        coolerTombstoneMaxPerRun,
 		CoolerGraduationThreshold:       coolerGradThresh,
 
 		ConstraintDetectionEnabled: constraintDetectionEnabled,

@@ -1,6 +1,9 @@
 package ape
 
 import (
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -164,6 +167,9 @@ func TestSourceTierValidation_RejectsInvalidPairs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// RSIC-STORM-001: admission now reserves the slot, so sequential
+		// triggers legitimately interact — isolate each tier-pair case.
+		p.ResetState()
 		d := p.EvaluateTrigger(tt.source, "space-1", tt.tier, "")
 		if d.Allowed != tt.want {
 			t.Errorf("source=%s tier=%s: got allowed=%v, want %v (reason: %s)",
@@ -354,5 +360,83 @@ func TestStaleActiveCycle_CleanedUpAutomatically(t *testing.T) {
 	d := p.EvaluateTrigger(TriggerManualAPI, "space-1", TierMeso, "")
 	if !d.Allowed {
 		t.Errorf("stale active cycle should be cleaned up, got reason: %s", d.Reason)
+	}
+}
+
+// ── RSIC-STORM-001: atomic admission (reserve-on-allow) ──
+
+func TestEvaluateTrigger_ConcurrentAdmitsExactlyOne(t *testing.T) {
+	// The live storm shape: many observe-driven triggers land while no
+	// cycle has completed yet. Pre-fix all passed (records were written
+	// only after cycle completion); post-fix exactly one must win.
+	p := NewOrchestrationPolicy(testConfig())
+
+	const n = 50
+	var wg sync.WaitGroup
+	var admitted atomic.Int32
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if d := p.EvaluateTrigger(TriggerMicroAuto, "space-storm", TierMicro, ""); d.Allowed {
+				admitted.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if admitted.Load() != 1 {
+		t.Fatalf("expected exactly 1 admission, got %d", admitted.Load())
+	}
+}
+
+func TestEvaluateTrigger_CooldownEnforcedFromAdmission(t *testing.T) {
+	p := NewOrchestrationPolicy(testConfig())
+
+	d1 := p.EvaluateTrigger(TriggerMicroAuto, "space-cd", TierMicro, "")
+	if !d1.Allowed {
+		t.Fatal("first trigger should be admitted")
+	}
+	// Cycle completes — active slot clears, but the cooldown must hold.
+	p.CompleteCycle("space-cd", TierMicro)
+
+	d2 := p.EvaluateTrigger(TriggerMicroAuto, "space-cd", TierMicro, "")
+	if d2.Allowed {
+		t.Fatal("second trigger within cooldown should be rejected even after CompleteCycle")
+	}
+	if !strings.Contains(d2.Reason, "cooldown") {
+		t.Fatalf("expected cooldown rejection, got: %s", d2.Reason)
+	}
+}
+
+func TestEvaluateTrigger_FailedCycleStillCoolsDown(t *testing.T) {
+	// A failed cycle calls CompleteCycle without RecordTrigger; the
+	// admission-time cooldown record must survive.
+	p := NewOrchestrationPolicy(testConfig())
+
+	d1 := p.EvaluateTrigger(TriggerMicroAuto, "space-fail", TierMicro, "")
+	if !d1.Allowed {
+		t.Fatal("first trigger should be admitted")
+	}
+	p.CompleteCycle("space-fail", TierMicro) // failure path: no RecordTrigger
+
+	if d2 := p.EvaluateTrigger(TriggerMicroAuto, "space-fail", TierMicro, ""); d2.Allowed {
+		t.Fatal("cooldown must persist through a failed cycle")
+	}
+}
+
+func TestRecordTrigger_UpdatesReservationCycleID(t *testing.T) {
+	p := NewOrchestrationPolicy(testConfig())
+
+	d := p.EvaluateTrigger(TriggerMicroAuto, "space-id", TierMicro, "")
+	if !d.Allowed {
+		t.Fatal("trigger should be admitted")
+	}
+	p.RecordTrigger(d.Meta, "space-id", TierMicro, "cycle-real")
+
+	p.mu.Lock()
+	rec := p.activeCycles["space-id:micro"]
+	p.mu.Unlock()
+	if rec.CycleID != "cycle-real" {
+		t.Fatalf("RecordTrigger did not update the reservation: %q", rec.CycleID)
 	}
 }
