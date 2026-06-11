@@ -93,7 +93,7 @@ The most valuable signal for contrastive training:
 
 | Axis | Phases A–C (Generative LoRA) | Phase D (Embedding Fine-tuning) |
 |------|------------------------------|---------------------------------|
-| Model | Qwen3.6-35B-A3B | Domain-specific embedding model |
+| Model | dense Qwen3-14B (`mdemg-llm-v1`) | Domain-specific embedding model |
 | Technique | SFT + GRPO | Contrastive learning |
 | Training signal | LLM I/O from 16 tasks | Hard-negative text pairs |
 | Goal | Better reasoning/generation | Better semantic retrieval |

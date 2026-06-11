@@ -1,5 +1,15 @@
 # vllm-mlx Setup Guide
 
+> ⚠️ **SUPERSEDED (2026-06-11, DOC-TRUTH-002).** This guide describes the
+> abandoned MoE-era stack: vllm-mlx serving `Qwen3.6-35B-A3B`. The MoE
+> target was permanently dropped on 2026-04-22 (Metal 499K MTLResource
+> ceiling), and the production runtime since Phase 13.5 (2026-05-03) is
+> **llama.cpp `llama-server` on :8102** serving
+> `mdemg-llm-v1.Q5_K_M.gguf` (dense Qwen3-14B fine-tune). See the
+> "Local LLM Runtime" section of `CLAUDE.md` and
+> `docs/development/ft-lora/00_README_v2.md` for the current setup.
+> Retained unchanged below as a historical record (R-LT-4 keep-history).
+
 ## Overview
 
 vllm-mlx is the inference server for serving the LoRA fine-tuned model. It exposes an OpenAI-compatible API with prefix caching, continuous batching, and native Qwen3 reasoning parser. Since it's OpenAI-compatible, the existing MDEMG `llmclient` OpenAI provider works directly — no Go code changes needed.
