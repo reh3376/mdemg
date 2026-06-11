@@ -41,6 +41,29 @@ type BuilderOpts struct {
 	TopNTags          int // cap on tag bits
 	FloorBitsPerKind  int // minimum bits for any kind with ≥10 distinct values
 	RoleTypeLayerBits int // reserved bits for top-N (role_type, layer) tuples
+
+	// VersionRecorder, when non-nil, receives one CatalogVersionRecord per
+	// successful BuildForSpace — the V0020 context_catalog_versions feed
+	// (TSDB-CONSUME-001: the table had zero writes ever; the migration
+	// header promised this hook). Failures are logged, never fatal: catalog
+	// history is telemetry, the Neo4j persist is the source of truth.
+	VersionRecorder func(ctx context.Context, rec CatalogVersionRecord)
+}
+
+// CatalogVersionRecord is the package-local mirror of one V0020 row
+// (tsdb-shape coupling stays at the wiring site, like Config above).
+type CatalogVersionRecord struct {
+	SpaceID           string
+	Version           int
+	TotalBits         int
+	AllocationJSON    []byte
+	TopSymbols        []string
+	TopPaths          []string
+	TopTags           []string
+	BitsRoleTypeLayer int
+	BitsTag           int
+	BitsPath          int
+	BitsSymbol        int
 }
 
 // BuilderOptsFromConfig translates Config into the package-local BuilderOpts.
@@ -125,7 +148,41 @@ func (b *neo4jBuilder) BuildForSpace(ctx context.Context, spaceID string) (*Cata
 	if err != nil {
 		return nil, fmt.Errorf("construct in-memory catalog: %w", err)
 	}
+
+	// V0020 history snapshot (TSDB-CONSUME-001) — best-effort telemetry.
+	if b.opts.VersionRecorder != nil {
+		b.opts.VersionRecorder(ctx, catalogVersionRecord(spaceID, newVersion, b.opts.BitBudget, bits))
+	}
 	return cat, nil
+}
+
+// catalogVersionRecord flattens a bit allocation into the V0020 row shape:
+// per-kind counts + top-ref convenience arrays + the full JSON allocation.
+func catalogVersionRecord(spaceID string, version, totalBits int, bits []BitEntry) CatalogVersionRecord {
+	rec := CatalogVersionRecord{
+		SpaceID:   spaceID,
+		Version:   version,
+		TotalBits: totalBits,
+	}
+	for _, b := range bits {
+		switch b.Kind {
+		case BitKindRoleTypeLayer:
+			rec.BitsRoleTypeLayer++
+		case BitKindTag:
+			rec.BitsTag++
+			rec.TopTags = append(rec.TopTags, b.Ref)
+		case BitKindPath:
+			rec.BitsPath++
+			rec.TopPaths = append(rec.TopPaths, b.Ref)
+		case BitKindSymbol:
+			rec.BitsSymbol++
+			rec.TopSymbols = append(rec.TopSymbols, b.Ref)
+		}
+	}
+	if data, err := json.Marshal(bits); err == nil {
+		rec.AllocationJSON = data
+	}
+	return rec
 }
 
 // collectDensity runs four Cypher queries against Neo4j to gather feature
