@@ -358,7 +358,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install pytest numpy jsonschema cuid2 ruff
+        # tiktoken: openai_ft_adapter token counting; pyyaml: rl trainer/
+        # preflight config loading (lazy imports the dep sweep missed on a
+        # fully-provisioned local venv — CI's first run caught it).
+        run: pip install pytest numpy jsonschema cuid2 ruff tiktoken pyyaml
 
       - name: Ruff lint (all of neural/)
         run: ruff check neural/
