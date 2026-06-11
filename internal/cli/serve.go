@@ -481,6 +481,8 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 					cfg.MaintLiveLookbackDays)...)
 			}
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
+			// SUPERVISOR-002: meta-alert when a rule's query fails repeatedly
+			evaluator.SetRuleFailureThreshold(cfg.AlertRuleFailureThreshold)
 			sup.Register("alert-evaluator", func(_ context.Context) error {
 				evaluator.Start() // blocks until evaluator.Stop()
 				return nil

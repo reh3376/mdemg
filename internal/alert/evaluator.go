@@ -2,6 +2,7 @@ package alert
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math"
 	"sync"
@@ -12,20 +13,28 @@ import (
 
 // ruleState tracks per-rule evaluation state for ForDuration logic.
 type ruleState struct {
-	conditionFirstTrue time.Time // when the condition first became true
-	fired              bool      // whether we've already fired for this window
-	lastEval           time.Time // last evaluation time
+	conditionFirstTrue  time.Time // when the condition first became true
+	fired               bool      // whether we've already fired for this window
+	lastEval            time.Time // last evaluation time
+	consecutiveFailures int       // SUPERVISOR-002: query failures in a row
+	failureAlerted      bool      // SUPERVISOR-002: meta-alert sent for this failure streak
 }
+
+// defaultRuleFailureThreshold is the consecutive-query-failure count at which
+// the rule-health meta-alert fires (override via SetRuleFailureThreshold /
+// ALERT_RULE_FAILURE_THRESHOLD).
+const defaultRuleFailureThreshold = 3
 
 // Evaluator runs alert rules on a periodic schedule against TSDB.
 type Evaluator struct {
-	mu         sync.Mutex
-	rules      []AlertRule
-	pool       *pgxpool.Pool
-	dispatcher *Dispatcher
-	state      map[string]*ruleState
-	interval   time.Duration
-	stopCh     chan struct{}
+	mu               sync.Mutex
+	rules            []AlertRule
+	pool             *pgxpool.Pool
+	dispatcher       *Dispatcher
+	state            map[string]*ruleState
+	interval         time.Duration
+	stopCh           chan struct{}
+	failureThreshold int
 }
 
 // NewEvaluator creates an alert evaluator with the given rules, TSDB pool, and dispatcher.
@@ -38,12 +47,21 @@ func NewEvaluator(rules []AlertRule, pool *pgxpool.Pool, dispatcher *Dispatcher,
 		state[r.ID] = &ruleState{}
 	}
 	return &Evaluator{
-		rules:      rules,
-		pool:       pool,
-		dispatcher: dispatcher,
-		state:      state,
-		interval:   interval,
-		stopCh:     make(chan struct{}),
+		rules:            rules,
+		pool:             pool,
+		dispatcher:       dispatcher,
+		state:            state,
+		interval:         interval,
+		stopCh:           make(chan struct{}),
+		failureThreshold: defaultRuleFailureThreshold,
+	}
+}
+
+// SetRuleFailureThreshold overrides the consecutive-failure count at which a
+// rule-health meta-alert fires (SUPERVISOR-002). Non-positive keeps default.
+func (e *Evaluator) SetRuleFailureThreshold(n int) {
+	if n > 0 {
+		e.failureThreshold = n
 	}
 }
 
@@ -105,14 +123,24 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 	var value float64
 	err := e.pool.QueryRow(ctx, rule.QuerySQL).Scan(&value)
 	if err != nil {
-		// TSDB unavailable or no data — reset state and skip
-		slog.Debug("alert evaluator: query failed",
+		// SUPERVISOR-002: a rule whose SQL errors is a silently-disabled
+		// alert. Warn every time, and fire a rule-health meta-alert after
+		// N consecutive failures (directly via the dispatcher — the
+		// meta-channel must not depend on the failing rule mechanism).
+		slog.Warn("alert evaluator: query failed",
 			"rule", rule.ID, "error", err)
-		e.mu.Lock()
-		st := e.state[rule.ID]
-		st.conditionFirstTrue = time.Time{}
-		st.fired = false
-		e.mu.Unlock()
+		fireMeta, failures := e.recordRuleFailure(rule.ID)
+		if fireMeta && e.dispatcher != nil {
+			go e.dispatcher.Send(context.Background(), Alert{
+				// Distinct Service per rule: the dispatcher cooldown key is
+				// (Service, Severity) — shared labels suppress each other.
+				Service:  "rule-health-" + rule.ID,
+				Severity: SeverityHigh,
+				Title:    "Alert rule query failing: " + rule.ID,
+				Message: fmt.Sprintf("rule %q failed %d consecutive evaluations and is effectively disabled; last error: %v",
+					rule.ID, failures, err),
+			})
+		}
 		return
 	}
 
@@ -122,6 +150,8 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 	defer e.mu.Unlock()
 
 	st := e.state[rule.ID]
+	// SUPERVISOR-002: query succeeded — re-arm the rule-health meta-alert.
+	st.recordRuleSuccess()
 	if !breached {
 		// Condition cleared — reset state
 		st.conditionFirstTrue = time.Time{}
@@ -149,6 +179,35 @@ func (e *Evaluator) evaluateRule(rule AlertRule, now time.Time) {
 			Message:  rule.Title,
 		})
 	}
+}
+
+// recordRuleFailure tracks a rule query failure (SUPERVISOR-002): resets the
+// ForDuration state and increments the consecutive-failure streak. Returns
+// whether the rule-health meta-alert should fire now (once per streak) and
+// the current streak length.
+func (e *Evaluator) recordRuleFailure(ruleID string) (bool, int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	st := e.state[ruleID]
+	if st == nil {
+		st = &ruleState{}
+		e.state[ruleID] = st
+	}
+	st.conditionFirstTrue = time.Time{}
+	st.fired = false
+	st.consecutiveFailures++
+	if st.consecutiveFailures >= e.failureThreshold && !st.failureAlerted {
+		st.failureAlerted = true
+		return true, st.consecutiveFailures
+	}
+	return false, st.consecutiveFailures
+}
+
+// recordRuleSuccess re-arms the rule-health meta-alert after a successful
+// query (SUPERVISOR-002). Caller must hold e.mu.
+func (st *ruleState) recordRuleSuccess() {
+	st.consecutiveFailures = 0
+	st.failureAlerted = false
 }
 
 // checkThreshold compares a value against a threshold using the given operator.

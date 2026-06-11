@@ -178,3 +178,66 @@ func TestEvaluator_IntervalGating(t *testing.T) {
 		t.Fatal("should evaluate — interval has elapsed")
 	}
 }
+
+func TestRuleFailureStreak_MetaAlertAtThreshold(t *testing.T) {
+	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+
+	// Below threshold (default 3): no meta-alert
+	for i := 1; i <= 2; i++ {
+		fire, n := e.recordRuleFailure("r1")
+		if fire {
+			t.Fatalf("meta-alert fired at %d consecutive failures (threshold 3)", n)
+		}
+	}
+	// Third consecutive failure fires exactly once
+	fire, n := e.recordRuleFailure("r1")
+	if !fire || n != 3 {
+		t.Fatalf("expected meta-alert at 3rd failure, got fire=%v n=%d", fire, n)
+	}
+	// Streak continues — no re-fire
+	fire, _ = e.recordRuleFailure("r1")
+	if fire {
+		t.Fatal("meta-alert re-fired within the same failure streak")
+	}
+}
+
+func TestRuleFailureStreak_RearmsOnSuccess(t *testing.T) {
+	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	for range 3 {
+		e.recordRuleFailure("r1")
+	}
+	// Success resets streak + re-arms
+	e.mu.Lock()
+	e.state["r1"].recordRuleSuccess()
+	e.mu.Unlock()
+
+	for i := 1; i <= 2; i++ {
+		if fire, _ := e.recordRuleFailure("r1"); fire {
+			t.Fatalf("meta-alert fired at %d failures after re-arm", i)
+		}
+	}
+	if fire, _ := e.recordRuleFailure("r1"); !fire {
+		t.Fatal("meta-alert did not fire after re-armed streak reached threshold")
+	}
+}
+
+func TestRuleFailureStreak_ConfigurableThreshold(t *testing.T) {
+	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
+	e.SetRuleFailureThreshold(1)
+	if fire, _ := e.recordRuleFailure("r1"); !fire {
+		t.Fatal("threshold=1 should fire on first failure")
+	}
+	// Non-positive keeps current threshold
+	e.SetRuleFailureThreshold(0)
+	if e.failureThreshold != 1 {
+		t.Fatalf("threshold overwritten by non-positive value: %d", e.failureThreshold)
+	}
+}
+
+func TestRuleFailureStreak_UnknownRuleID(t *testing.T) {
+	e := NewEvaluator(nil, nil, nil, time.Second)
+	// Must not panic on a rule ID with no pre-seeded state
+	if fire, n := e.recordRuleFailure("ghost"); fire || n != 1 {
+		t.Fatalf("unexpected result for unseeded rule: fire=%v n=%d", fire, n)
+	}
+}
