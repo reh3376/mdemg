@@ -315,7 +315,7 @@ func (sl *SignalLearner) StartPersistence(ctx context.Context) {
 		sl.supervise("signal-learner-flush", run)
 		return
 	}
-	go func() {
+	go func() { //nolint:gosec // G118: legacy fallback runs for process lifetime; stop is via sl.cancel
 		_ = run(context.Background())
 	}()
 }

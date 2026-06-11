@@ -86,7 +86,7 @@ func (s *RSICStore) Start(ctx context.Context) {
 		s.supervise("rsic-store-flush", run)
 		return
 	}
-	go func() {
+	go func() { //nolint:gosec // G118: legacy fallback runs for process lifetime; stop is via s.cancel
 		_ = run(context.Background())
 	}()
 }

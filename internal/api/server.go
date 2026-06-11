@@ -1686,7 +1686,7 @@ func (s *Server) StartMacroCronScheduler() {
 					continue
 				}
 
-				go func() {
+				go func() { //nolint:gosec // G118: macro cycle must complete independently of the scheduler loop's ctx
 					opts := &ape.RunCycleOpts{TriggerMeta: &decision.Meta}
 					outcome, err := s.rsicCycle.RunCycle(context.Background(), spaceID, ape.TierMacro, opts)
 					if err != nil {
