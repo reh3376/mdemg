@@ -460,6 +460,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// HIDDEN-WEIGHT-001: NULL-weight abstraction edges reappearing.
 			rules = append(rules, alert.WeightIntegrityRules(
 				cfg.NullWeightEdgeAlertThreshold)...)
+			// MAINT-LIVE-001: maintenance recorded but never running live.
+			if cfg.MaintLiveAlertEnabled {
+				rules = append(rules, alert.MaintenanceLivenessRules(
+					cfg.MaintLiveLookbackDays)...)
+			}
 			evaluator := alert.NewEvaluator(rules, tsdbClient.Pool(), disp, evalInterval)
 			sup.Register("alert-evaluator", func(_ context.Context) error {
 				evaluator.Start() // blocks until evaluator.Stop()

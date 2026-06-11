@@ -55,3 +55,18 @@ func TestWeightIntegrityRules(t *testing.T) {
 		t.Errorf("custom threshold = %v, want 250", got)
 	}
 }
+
+func TestMaintenanceLivenessRules(t *testing.T) {
+	r := MaintenanceLivenessRules(0)[0] // 0 → default 8 days
+	if r.ID != "maintenance_no_live_run" || r.Service != "maintenance-liveness" {
+		t.Errorf("id/service = %q/%q", r.ID, r.Service)
+	}
+	for _, want := range []string{"'8 days'", "dry_run", "job_name = 'maintenance'", "success = true"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if got := MaintenanceLivenessRules(14)[0]; !strings.Contains(got.QuerySQL, "'14 days'") {
+		t.Errorf("custom lookback not applied")
+	}
+}
