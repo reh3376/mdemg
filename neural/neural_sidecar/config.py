@@ -6,7 +6,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Sidecar configuration loaded from environment variables."""
 
-    host: str = "0.0.0.0"
+    # HOOKSYNC-001: loopback by default — the sidecar serves an internal
+    # scoring API; only the local mdemg server calls it. Override via the
+    # SIDECAR_HOST env var (pydantic-settings) for multi-host setups.
+    host: str = "127.0.0.1"
     port: int = 8100
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     nli_model: str = "cross-encoder/nli-deberta-v3-xsmall"

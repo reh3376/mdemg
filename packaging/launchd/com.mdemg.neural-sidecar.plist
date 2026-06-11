@@ -12,7 +12,7 @@
         <string>uvicorn</string>
         <string>neural_sidecar.app:app</string>
         <string>--host</string>
-        <string>0.0.0.0</string>
+        <string>127.0.0.1</string>
         <string>--port</string>
         <string>8101</string>
     </array>
