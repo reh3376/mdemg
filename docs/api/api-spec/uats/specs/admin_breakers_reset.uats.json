@@ -23,7 +23,7 @@
     "tags": [
       "admin"
     ],
-    "sha256": "15120d034f25690a32c15d2bee4026f795cfada868818684ff79e1d1838ddc42"
+    "sha256": "d9b036ec63390b403ec6194f8b56b0a5bd1132152ef8fbeba587dc58a847ec97"
   },
   "request": {
     "method": "POST",
@@ -58,9 +58,9 @@
   "variants": [
     {
       "name": "reset_round_trip",
-      "description": "Resets a real registered breaker (openai-embeddings \u2014 present whenever the default openai embedding provider is configured). Reset is mutation-safe: it forces StateClosed, the healthy state.",
+      "description": "Resets a real registered breaker (openai-embeddings \u2014 present when the openai embedding provider is configured, as on the live dev stack). Tagged llm_required so provider-less CI environments exclude it (UATS-GAP-001 CI fix: CI has no such breaker and the round-trip 404'd there). Reset is mutation-safe: it forces StateClosed, the healthy state.",
       "tags": [
-        "live-breaker"
+        "llm_required"
       ],
       "request": {
         "method": "POST",
