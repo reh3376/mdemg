@@ -726,6 +726,7 @@ type Config struct {
 	BackupRetentionRunAfter     bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
 	BackupSnapshotWaitTimeoutSec int   // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for the pre-restore safety snapshot (default: 300)
 	BackupJobStalenessHours     int    // BACKUP_JOB_STALENESS_HOURS — neo4j-backup staleness alert window; 0 = partial interval × 2 (default: 0)
+	BackupInitialDelayMin       int    // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup; 0 disables (default: 5)
 
 	// TimescaleDB Backup & Restore
 	TSDBBackupEnabled             bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
@@ -3290,6 +3291,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	backupInitialDelayMin, err := atoi("BACKUP_INITIAL_DELAY_MIN", 5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// TimescaleDB Backup & Restore
 	tsdbBackupEnabled := getBool("TSDB_BACKUP_ENABLED", false)
@@ -4755,6 +4760,7 @@ func FromEnv() (Config, error) {
 		BackupRetentionRunAfter:     backupRetentionRunAfter,
 		BackupSnapshotWaitTimeoutSec: backupSnapshotWaitTimeoutSec,
 		BackupJobStalenessHours:     backupJobStalenessHours,
+		BackupInitialDelayMin:       backupInitialDelayMin,
 
 		// TimescaleDB Backup & Restore
 		TSDBBackupEnabled:             tsdbBackupEnabled,

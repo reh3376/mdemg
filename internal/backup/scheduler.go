@@ -82,6 +82,22 @@ func (s *Scheduler) Start() {
 	}
 
 	run := func(runCtx context.Context) error {
+		// BACKUP-RESTORE-VERIFY-001: an initial backup shortly after start.
+		// Without it, a fresh install has no backup (and an honest
+		// neo4j_backup_no_recent_success alert) until the first 24h tick.
+		if delay := time.Duration(s.svc.cfg.InitialBackupDelayMin) * time.Minute; delay > 0 {
+			select {
+			case <-runCtx.Done():
+				return nil
+			case <-s.stopCh:
+				slog.Info("backup: scheduler stopped")
+				return nil
+			case <-time.After(delay):
+				slog.Info("backup: scheduler: running initial backup on start")
+				s.runScheduled(string(BackupTypePartial), "initial-on-start")
+			}
+		}
+
 		fullTicker := time.NewTicker(fullInterval)
 		partialTicker := time.NewTicker(partialInterval)
 		defer fullTicker.Stop()

@@ -17,6 +17,7 @@ type Config struct {
 	RetentionMaxStorageGB int   // delete oldest until under quota
 	RetentionRunAfter    bool   // run retention after each backup
 	SnapshotWaitTimeoutSec int  // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for the pre-restore safety snapshot to complete (default: 300)
+	InitialBackupDelayMin  int  // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup runs; 0 disables (default: 5)
 }
 
 // BackupType identifies whether a backup is full or partial.
