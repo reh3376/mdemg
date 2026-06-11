@@ -1,0 +1,197 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Memory Retrieve \u2014 Sparse Gate + Context URL Params",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "retrieval",
+      "sparse",
+      "context-fingerprint",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Response-shape contract for the Phase 14.x retrieval URL params, default-on in production but previously referenced by ZERO specs: ?sparse=, ?sparse_percentile=, ?context=auto, ?strict_context=. CONTRACT: URL params override only fields the body left unset; the response always carries results[] + debug{}; ALL sparse_gate_*/below_threshold_* debug fields are conditional (present only when the gate fires) so clients MUST treat them as optional \u2014 these specs pin types-when-present, never presence. Invalid percentiles are ignored (still 200, default applies), never an error.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 20000,
+    "tags": [
+      "retrieval"
+    ],
+    "sha256": "09c2e6901e3313d6757cbf413af75eb53cebe9c1488247f131fcb44f68311afe"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/memory/retrieve?sparse=true&sparse_percentile=0.9",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "mdemg-dev",
+      "query_text": "backup checksum verification and restore validation",
+      "top_k": 5
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.results",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.debug",
+        "op": "type_is",
+        "expected": "object"
+      },
+      {
+        "path": "$.debug.sparse_gate_active_count",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.debug.sparse_gate_dropped_count",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.debug.sparse_gate_threshold",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.debug.sparse_gate_percentile",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.debug.sparse_gate_floor_applied",
+        "op": "type_is",
+        "expected": "boolean",
+        "optional": true
+      },
+      {
+        "path": "$.debug.sparse_gate_ceiling_applied",
+        "op": "type_is",
+        "expected": "boolean",
+        "optional": true
+      },
+      {
+        "path": "$.debug.below_threshold_node_ids",
+        "op": "type_is",
+        "expected": "array",
+        "optional": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "sparse_disabled_via_url",
+      "description": "?sparse=false suppresses the gate for this call (operator per-call opt-out, Phase 14.1.1); still a normal 200 retrieval.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?sparse=false",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "backup checksum verification and restore validation",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "context_auto_derivation",
+      "description": "?context=auto triggers server-side query\u2192fingerprint derivation (Phase 14.2.1) when the body carries no explicit fingerprint; the response contract is unchanged (derivation is internal).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?context=auto",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "supervisor restart budget semantics",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          },
+          {
+            "path": "$.debug",
+            "op": "type_is",
+            "expected": "object"
+          }
+        ]
+      }
+    },
+    {
+      "name": "strict_context_mode",
+      "description": "?strict_context=true drops candidates below the Jaccard threshold pre-scoring (Phase 14.2.3); fewer/zero results is valid \u2014 only the shape is contracted.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?context=auto&strict_context=true",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "supervisor restart budget semantics",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_percentile_ignored",
+      "description": "Out-of-range ?sparse_percentile (valid: 0.5\u20130.999) is ignored \u2014 the call still succeeds with the configured default; URL-param validation never turns a retrieve into an error.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?sparse=true&sparse_percentile=7.5",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "backup checksum verification and restore validation",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          }
+        ]
+      }
+    }
+  ]
+}

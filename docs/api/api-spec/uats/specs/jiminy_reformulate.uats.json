@@ -1,0 +1,144 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Reformulate (Strict-Mode Directives)",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "strict-mode",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/jiminy/reformulate \u2014 imperative directive generation used by prompt-context.sh when /strict mode is active. Response contract verified live (UATS-GAP-001): data.{guidance_id, directive, item_count, blocked_any, confidence}. An empty directive with item_count=0 is a valid 200 (no applicable constraints for the context). Authoring this spec live-caught a contract defect: missing context surfaced as 500 \u2014 fixed to 400 in the same sprint.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 25000,
+    "tags": [
+      "jiminy"
+    ],
+    "sha256": "5af106d93938fced132b7ad24ddf915265f99c82c6ff2d175fe43d5409ec5cce"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/reformulate",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "mdemg-dev",
+      "context": "uats contract: editing internal/backup/full.go restore path",
+      "query": "backup restore verification",
+      "session_id": "uats-contract-strict"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.guidance_id",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "path": "$.data.directive",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "path": "$.data.item_count",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.data.blocked_any",
+        "op": "type_is",
+        "expected": "boolean"
+      },
+      {
+        "path": "$.data.confidence",
+        "op": "type_is",
+        "expected": "number"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Empty space_id is a 400 request-validation failure.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/reformulate",
+        "body": {
+          "space_id": "",
+          "context": "x"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "space_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_context",
+      "description": "Empty context is a 400 request-validation failure (live-caught in UATS-GAP-001: previously leaked as 500 from the service layer).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/reformulate",
+        "body": {
+          "space_id": "mdemg-dev",
+          "context": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "context"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_get",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/reformulate"
+      },
+      "expected": {
+        "status": 405
+      }
+    },
+    {
+      "name": "disabled_contract_503",
+      "skip": true,
+      "skip_reason": "Requires JIMINY_ENABLED=false + restart; documented contract: 503 {error: 'jiminy guidance is not enabled'}.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/reformulate",
+        "body": {
+          "space_id": "mdemg-dev",
+          "context": "x"
+        }
+      },
+      "expected": {
+        "status": 503
+      }
+    }
+  ]
+}

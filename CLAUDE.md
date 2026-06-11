@@ -364,6 +364,8 @@ Endpoints:
 
 ## Testing
 
+- **UATS authoring pitfalls (UATS-GAP-001 — 2026-06-11):** ⚠️ the runner DEEP-MERGES variant bodies over the base body — required-field guards must use empty-string overrides, never key omission (an omitted key inherits the base value and the variant silently asserts nothing; caught live in `j17_protocol_learn`). ⚠️ Feature-gated disabled-path (503) cases must be `skip: true` variants or carry the `j17_disabled`/`jiminy_disabled` exclude tags — the live stack runs Jiminy/J17 ON. The /strict surface (`strict`/`reformulate`/`classify`), warm channel (`warm`/`latest`), admin breakers, and `?sparse=`/`?context=auto` retrieval params are contract-covered as of UATS-GAP-001 (`make test-api`: 0 fail / 0 error). Spec-authoring is a live forcing function: it caught the reformulate 500-on-validation defect AND a P0 (nil-edge-identity panic in `transfer/exporter.go` killed the whole server during a UATS-triggered backup export).
+
 - UVTS validation (Phase 12 — Universal Validation Test Specification, semantic retrieval-quality):
   - `make test-uvts-lint` — schema-validate all `*.uvts.json` (CI-safe, no live deps)
   - `make test-uvts-quick BASE_URL=http://localhost:9999` — 16-question quick profile (~10 min)

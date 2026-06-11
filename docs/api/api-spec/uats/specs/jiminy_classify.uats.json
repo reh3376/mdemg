@@ -1,0 +1,117 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Classify (Strict-Mode Gate)",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "strict-mode",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/jiminy/classify \u2014 the pre-write-check.py hook calls this before Write/Edit when /strict mode is active; verdict 'deny' blocks the tool call. CONTRACT: the endpoint FAILS OPEN \u2014 internal classification errors still return 200 {verdict: 'pass', confidence: 0} so a degraded server never blocks the agent. The only non-200s are request-validation (400) and feature-disabled (503).",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 15000,
+    "tags": [
+      "jiminy"
+    ],
+    "sha256": "01680538b23ede94d97bf5d8dc7798e29d6c550280fdf4b69eda570dd81c6dee"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/classify",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "space_id": "mdemg-dev",
+      "agent_output": "uats contract probe: writing documentation to docs/development/",
+      "session_id": "uats-contract-strict"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.verdict",
+        "op": "one_of",
+        "expected": [
+          "pass",
+          "deny"
+        ]
+      },
+      {
+        "path": "$.data.confidence",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.data.confidence",
+        "op": "range",
+        "expected": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_required_fields",
+      "description": "Empty space_id/agent_output is a 400 request-validation failure.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/classify",
+        "body": {
+          "space_id": "",
+          "agent_output": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "required"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_get",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/classify"
+      },
+      "expected": {
+        "status": 405
+      }
+    },
+    {
+      "name": "disabled_contract_503",
+      "skip": true,
+      "skip_reason": "Requires JIMINY_ENABLED=false + restart; documented contract: 503 {error: 'jiminy guidance is not enabled'}. Note pre-write-check.py fails open when this endpoint is unreachable.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/classify",
+        "body": {
+          "space_id": "mdemg-dev",
+          "agent_output": "x"
+        }
+      },
+      "expected": {
+        "status": 503
+      }
+    }
+  ]
+}

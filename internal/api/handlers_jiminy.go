@@ -568,6 +568,13 @@ func (s *Server) handleJiminyReformulate(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
 		return
 	}
+	// UATS-GAP-001 (live-caught while authoring the contract spec): the
+	// service rejects an empty context, but the handler surfaced that
+	// request-validation failure as a 500. Validate at the edge → 400.
+	if req.Context == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "context is required"})
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()

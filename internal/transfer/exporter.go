@@ -633,14 +633,27 @@ ORDER BY a.node_id, b.node_id SKIP $skip LIMIT $limit`, relMatch, endpointWhere)
 			if p, ok := propsVal.(map[string]any); ok {
 				props = p
 			}
-			if !cfg.OnlyLearnedEdges && !cfg.IncludeLearnedEdges && relType.(string) == "CO_ACTIVATED_WITH" {
+			// UATS-GAP-001 live-caught P0: these were unchecked type
+			// assertions — one edge whose endpoint node lacks node_id (nil
+			// fromId/toId) PANICKED the whole server mid-backup (a UATS
+			// backup_trigger run took the process down). Skip-with-warning;
+			// an unexportable edge must never be fatal.
+			fromIDStr, okFrom := fromID.(string)
+			toIDStr, okTo := toID.(string)
+			relTypeStr, okRel := relType.(string)
+			if !okFrom || !okTo || !okRel {
+				slog.Warn("transfer: skipping edge with nil identity fields",
+					"space_id", cfg.SpaceID, "from_ok", okFrom, "to_ok", okTo, "rel_ok", okRel)
+				continue
+			}
+			if !cfg.OnlyLearnedEdges && !cfg.IncludeLearnedEdges && relTypeStr == "CO_ACTIVATED_WITH" {
 				continue
 			}
 
 			ed := &pb.EdgeData{
-				FromNodeId:    fromID.(string),
-				ToNodeId:      toID.(string),
-				RelType:       relType.(string),
+				FromNodeId:    fromIDStr,
+				ToNodeId:      toIDStr,
+				RelType:       relTypeStr,
 				SpaceId:       cfg.SpaceID,
 				EdgeId:        getStr(props, "edge_id"),
 				Weight:        getFloat(props, "weight"),
@@ -730,8 +743,8 @@ ORDER BY o.obs_id SKIP $skip LIMIT $limit`
 				CreatedAt: getTime(props, "created_at"),
 			}
 
-			if parentVal != nil {
-				od.ParentNodeId = parentVal.(string)
+			if pv, ok := parentVal.(string); ok {
+				od.ParentNodeId = pv
 			}
 
 			if cfg.IncludeEmbeddings {
@@ -825,8 +838,8 @@ ORDER BY s.symbol_id SKIP $skip LIMIT $limit`
 				Language:   getStr(props, "language"),
 			}
 
-			if parentVal != nil {
-				sd.ParentNodeId = parentVal.(string)
+			if pv, ok := parentVal.(string); ok {
+				sd.ParentNodeId = pv
 			}
 
 			if cfg.IncludeEmbeddings {

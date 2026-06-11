@@ -1,0 +1,135 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Breakers Reset",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "breaker",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/admin/breakers/reset (DH-004 operator escape hatch for a breaker stuck open after a transient incident). The base case pins the unknown-name contract: 404 with the error AND the available[] list of registered names \u2014 the operator-discoverability guarantee. The happy-path round-trip resets 'openai-embeddings' (registered whenever EMBEDDING_PROVIDER=openai, the default stack); reset forces StateClosed, which is the healthy state, so the contract test is mutation-safe.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "d9b036ec63390b403ec6194f8b56b0a5bd1132152ef8fbeba587dc58a847ec97"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/admin/breakers/reset",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "uats-contract-unknown-breaker"
+    }
+  },
+  "expected": {
+    "status": 404,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "op": "contains",
+        "expected": "unknown breaker"
+      },
+      {
+        "path": "$.name",
+        "op": "equals",
+        "expected": "uats-contract-unknown-breaker"
+      },
+      {
+        "path": "$.available",
+        "op": "type_is",
+        "expected": "array"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "reset_round_trip",
+      "description": "Resets a real registered breaker (openai-embeddings \u2014 present when the openai embedding provider is configured, as on the live dev stack). Tagged llm_required so provider-less CI environments exclude it (UATS-GAP-001 CI fix: CI has no such breaker and the round-trip 404'd there). Reset is mutation-safe: it forces StateClosed, the healthy state.",
+      "tags": [
+        "llm_required"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/breakers/reset",
+        "body": {
+          "name": "openai-embeddings"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.ok",
+            "op": "equals",
+            "expected": true
+          },
+          {
+            "path": "$.name",
+            "op": "equals",
+            "expected": "openai-embeddings"
+          },
+          {
+            "path": "$.was_state",
+            "op": "one_of",
+            "expected": [
+              "closed",
+              "open",
+              "half-open"
+            ]
+          },
+          {
+            "path": "$.now_state",
+            "op": "equals",
+            "expected": "closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_name",
+      "description": "Empty name is a 400 request-validation failure.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/breakers/reset",
+        "body": {
+          "name": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "name"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_get",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/admin/breakers/reset"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

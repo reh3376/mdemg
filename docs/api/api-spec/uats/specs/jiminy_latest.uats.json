@@ -1,0 +1,104 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Latest (Warm Guidance Read)",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "warm-store",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates GET /v1/jiminy/latest \u2014 the per-prompt read prompt-context.sh pipes through jq (RRF-SCALE-001 Follow-up C investigated its JSON escaping; closed as a non-issue because writeJSON always escapes control chars \u2014 this spec is the standing strict-JSON contract for that surface). CONTRACT UNION: warm=true responses carry data/age_ms/compute_ms; warm=false carries status='no_guidance_available'. Only $.warm (boolean) is unconditional; state-dependent fields assert as optional so the spec passes in either warmth state.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "jiminy"
+    ],
+    "sha256": "1cba02a3bd191352127b3803f799d102c0ba44cb68f328fcc1a4a57f5d0ac29f"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/jiminy/latest?space_id=mdemg-dev"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.warm",
+        "op": "type_is",
+        "expected": "boolean"
+      },
+      {
+        "path": "$.status",
+        "op": "equals",
+        "expected": "no_guidance_available",
+        "optional": true
+      },
+      {
+        "path": "$.data.guidance_id",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "path": "$.age_ms",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.compute_ms",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.stale",
+        "op": "type_is",
+        "expected": "boolean",
+        "optional": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Missing space_id query param is a 400 request-validation failure.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/latest"
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "space_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disabled_contract_503",
+      "skip": true,
+      "skip_reason": "Requires JIMINY_ENABLED=false or JIMINY_WARM_ENABLED=false + restart; documented contract: 503 with the corresponding gate error message.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/latest?space_id=mdemg-dev"
+      },
+      "expected": {
+        "status": 503
+      }
+    }
+  ]
+}

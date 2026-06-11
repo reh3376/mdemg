@@ -1,0 +1,137 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Jiminy Strict Mode Toggle",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "jiminy",
+      "strict-mode",
+      "write"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates POST /v1/jiminy/strict (deterministic governance toggle, /strict mode). Uses a dedicated session_id so the contract test never flips strict mode for real agent sessions; the base case enables and the restore_disabled variant turns it back off, leaving no state behind. Disabled-path contract (503 {error: 'jiminy guidance is not enabled'} when JIMINY_ENABLED=false) is documented as a skip variant \u2014 the live stack runs with Jiminy enabled.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "jiminy"
+    ],
+    "sha256": "fd2f9922a33f00c955cf2b85ec16eba103714331563b7108c35c9c8261817b1b"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/v1/jiminy/strict",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "session_id": "uats-contract-strict",
+      "enabled": true
+    }
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.data.session_id",
+        "op": "equals",
+        "expected": "uats-contract-strict"
+      },
+      {
+        "path": "$.data.strict",
+        "op": "equals",
+        "expected": true
+      },
+      {
+        "path": "$.data.message",
+        "op": "type_is",
+        "expected": "string"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "restore_disabled",
+      "description": "Toggle strict mode back off for the contract session (state hygiene) and assert the disabled shape.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/strict",
+        "body": {
+          "session_id": "uats-contract-strict",
+          "enabled": false
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.strict",
+            "op": "equals",
+            "expected": false
+          },
+          {
+            "path": "$.data.message",
+            "op": "contains",
+            "expected": "disabled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing_session_id",
+      "description": "Empty session_id is a request-validation failure (400, not 500).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/strict",
+        "body": {
+          "session_id": "",
+          "enabled": true
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "session_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_get",
+      "description": "GET is rejected with 405.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/jiminy/strict"
+      },
+      "expected": {
+        "status": 405
+      }
+    },
+    {
+      "name": "disabled_contract_503",
+      "skip": true,
+      "skip_reason": "Requires JIMINY_ENABLED=false + restart; documented contract: 503 {error: 'jiminy guidance is not enabled'}.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/jiminy/strict",
+        "body": {
+          "session_id": "uats-contract-strict",
+          "enabled": true
+        }
+      },
+      "expected": {
+        "status": 503
+      }
+    }
+  ]
+}

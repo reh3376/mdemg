@@ -1,0 +1,94 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Admin Breakers List",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "admin",
+      "breaker",
+      "read"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-06-11",
+    "description": "Validates GET /v1/admin/breakers (DH-004 operator escape hatch): lists registered circuit breakers with state + counters. An empty list is a valid 200 (registry present, nothing registered yet). Auth note: not in the auth skip-list \u2014 when AUTH_API_KEYS is configured this endpoint requires a key (401 otherwise); the live dev stack runs without auth.",
+    "test_type": "contract",
+    "priority": "high"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "tags": [
+      "admin"
+    ],
+    "sha256": "7d228038c8281e784f83ebe861c4bdb40cc8c7c67688dd1d14c248b230c7565b"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/admin/breakers"
+  },
+  "expected": {
+    "status": 200,
+    "body_assertions": [
+      {
+        "path": "$.breakers",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.count",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.breakers[0].name",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "path": "$.breakers[0].state",
+        "op": "one_of",
+        "expected": [
+          "closed",
+          "open",
+          "half-open"
+        ],
+        "optional": true
+      },
+      {
+        "path": "$.breakers[0].failures",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.breakers[0].successes",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.breakers[0].total",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "method_guard_post",
+      "description": "POST on the list path is rejected with 405 (reset lives at /v1/admin/breakers/reset).",
+      "request": {
+        "method": "POST",
+        "path": "/v1/admin/breakers"
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}
